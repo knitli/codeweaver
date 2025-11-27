@@ -52,7 +52,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 
 - Q: When switching between vector store providers (e.g., in-memory → Qdrant) with existing indexed data, what should happen? → A: Warn and block on provider switch; user must manually re-index or revert settings. System detects provider changes and embedding dimension mismatches, providing actionable error message with resolution options. Automatic migration deferred to future enhancement.
 
-- Q: When a user doesn't explicitly configure a collection/index name in settings, what should the system do? → A: Use project name as default collection name (e.g., project "codeweaver-mcp" → collection "codeweaver-mcp").
+- Q: When a user doesn't explicitly configure a collection/index name in settings, what should the system do? → A: Use project name as default collection name (e.g., project "codeweaver" → collection "codeweaver").
 
 - Q: How should the system handle embeddings across different git branches? → A: Single shared collection per project with incremental updates. When switching branches, re-index only changed files. Delete embeddings immediately for deleted/renamed/moved files. Filter search results against current filesystem state before returning to user as validation layer to ensure embeddings reflect current working directory.
 

@@ -1,67 +1,20 @@
+#:tombi schema.strict = false
 # SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
 
 [project]
+# It seems 'codeweaver' is too similar to 'codeweave' on PyPI, so we use 'code-weaver' as the package name
+name = "code-weaver"
+description = "Extensible MCP server for semantic code search with plugin architecture supporting multiple embedding providers, vector databases, and data sources."
+readme = { file = "README.md", content-type = "text/markdown" }
+requires-python = ">=3.12"
+license = { text = "MIT OR Apache-2.0" }
 authors = [
   { name = "Knitli Inc." },
   { name = "Adam Poulemanos", email = "adam@knit.li" },
 ]
-name = "codeweaver-mcp"
-license = { text = "MIT OR Apache-2.0" }
-
-classifiers = [
-  "Development Status :: 4 - Beta",
-  "Environment :: Console",
-  "Intended Audience :: Developers",
-  "Intended Audience :: Information Technology",
-  "Natural Language :: English",
-  "Operating System :: OS Independent",
-  "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Python :: 3.12",
-  "Programming Language :: Python :: 3.13",
-  "Programming Language :: Python :: 3.14",
-  "Topic :: Database",
-  "Topic :: Software Development :: Libraries :: Application Frameworks",
-  "Topic :: Software Development :: Libraries :: Python Modules",
-  "Topic :: Scientific/Engineering :: Artificial Intelligence",
-  "Topic :: Scientific/Engineering :: Information Analysis",
-  "Topic :: Text Processing :: Indexing",
-  "Topic :: Utilities",
-  "Typing :: Typed",
-]
-
-dependencies = [
-  "aenum>=3.1.16",
-  "ast-grep-py>=0.39.6",
-  "blake3>=1.0.8",
-  "cyclopts>=4.0.0",
-  "fastmcp>=2.12.5",
-  "httpx>=0.28.1",
-  "mcp>=1.16.0",
-  "numpy>=2.3.4",
-  "posthog>=6.7.10",
-  "pydantic-ai>=1.4.0",
-  "pydantic-graph>=1.4.0",
-  "pydantic-settings>=2.11.0",
-  "pydantic>=2.12.3",
-  "qdrant-client>=1.15.1",
-  "rich>=14.2.0",
-  "rignore>=0.7.1",
-  "textcase>=0.4.5",
-  "tiktoken>=0.12.0",
-  "tomli-w>=1.2.0",
-  "typing_extensions>=4.15.0",
-  "uuid7>=0.1.0; python_version < '3.14'",
-  "uvicorn[standard]>=0.38.0",
-  "voyageai>=0.3.5",
-  "watchfiles>=1.1.1",
-]
-dynamic = ["version"]
-description = "Extensible MCP server for semantic code search with plugin architecture supporting multiple embedding providers, vector databases, and data sources."
-readme = { file = "README.md", content-type = "text/markdown" }
-requires-python = ">=3.12"
 keywords = [
   "agents",
   "ai",
@@ -77,9 +30,9 @@ keywords = [
   "code intelligence",
   "code search",
   "code understanding",
+  "codebase",
   "codebase analysis",
   "codebase management",
-  "codebase",
   "cohere",
   "docarray",
   "embedding",
@@ -98,9 +51,9 @@ keywords = [
   "large language models",
   "llama",
   "llms",
+  "mcp",
   "mcp protocol",
   "mcp server",
-  "mcp",
   "mistral",
   "model context protocol",
   "natural language processing",
@@ -118,62 +71,184 @@ keywords = [
   "semantic search",
   "sentence transformers",
   "tree-sitter",
+  "vector",
   "vector database",
   "vector embeddings",
   "vector search",
   "vector store",
-  "vector",
   "voyageai",
 ]
-
-
-[project.scripts]
-codeweaver = "codeweaver.cli.app:main"
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Information Technology",
+  "Natural Language :: English",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Database",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Topic :: Scientific/Engineering :: Information Analysis",
+  "Topic :: Software Development :: Libraries :: Application Frameworks",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Topic :: Text Processing :: Indexing",
+  "Topic :: Utilities",
+  "Typing :: Typed",
+]
+dependencies = [
+  # Core functionality
+  "aenum>=3.1.16",
+  "ast-grep-py>=0.40.0",
+  "blake3>=1.0.8",
+  # CLI framework and output
+  "cyclopts>=4.2.4",
+  "fastembed>=0.7.3",
+  # MCP server framework
+  "fastmcp>=2.13.1",
+  "httpx[http2]>=0.28.1",
+  "mcp>=1.19.0",
+  # Numerical and ML
+  "numpy>=2.3.5",
+  # Infrastructure and utilities
+  "posthog>=7.0.1",
+  "psutil>=7.1.3",
+  # Core data models and validation
+  "py-cpuinfo>=9.0.0",
+  "pydantic>=2.12.4",
+  "pydantic-ai>=1.20.0",
+  "pydantic-graph>=1.20.0",
+  "pydantic-settings[toml,yaml]>=2.12.0",  # Pulls: tomli>=2.0.1, pyyaml>=6.0.1
+  "qdrant-client>=1.16.1",
+  "rich>=14.2.0",
+  "rignore>=0.7.6",
+  "tenacity>=9.1.2",
+  "textcase>=0.4.5",
+  "tiktoken>=0.12.0",
+  "tokenizers>=0.22.1",
+  "tomli-w>=1.2.0",
+  "typing_extensions>=4.15.0",
+  "uuid7>=0.1.0; python_version < '3.14'",
+  "uvicorn[standard]>=0.38.0",
+  "uvloop>=0.22.1; python_implementation == 'CPython' and platform_system != 'Windows'",
+  "voyageai>=0.3.5",
+  "watchfiles>=1.1.1",
+]
+dynamic = ["version"]
 
 [project.urls]
-Changelog = "https://github.com/knitli/codeweaver-mcp/blob/main/CHANGELOG.md"
-Documentation = "https://dev.knitli.com/codeweaver"
-Homepage = "https://dev.knitli.com"
-Issues = "https://github.com/knitli/codeweaver-mcp/issues"
-Repository = "https://github.com/knitli/codeweaver-mcp"
+Changelog = "https://github.com/knitli/codeweaver/blob/main/CHANGELOG.md"
+# Documentation = "https://dev.knitli.com/codeweaver" not live yet
+Homepage = "https://knitli.com"
+Issues = "https://github.com/knitli/codeweaver/issues"
+Repository = "https://github.com/knitli/codeweaver"
 
-[build-system]
-requires = ["hatchling>=1.27.0", "uv-dynamic-versioning>=0.11.2"]
-build-backend = "hatchling.build"
+[project.scripts]
+codeweaver = "codeweaver.cli.__main__:main"
+cw = "codeweaver.cli.__main__:main"
 
-
-# TODO: Integrate hatch plugins for:
-#  - readme: https://github.com/hynek/hatch-fancy-pypi-readme
+[project.optional-dependencies]
+# eunomia middleware - see https://gofastmcp.com/integrations/eunomia-authorization
+auth-eunomia = ["eunomia-mcp"]
+# ==== Authentication and Authorization Middleware ====
+# Optional middleware to add authentication and authorization capabilities to the CodeWeaver server.
+# This allows you to secure your CodeWeaver instance with various authentication providers and authorization policies.
+# The middleware can be used to enforce access control policies, authenticate users, and manage permissions.
+# TODO: Implement authentication and authorization middleware -- should be simple to add
+# permit.io middleware - see https://gofastmcp.com/integrations/permit
+auth-permitio = ["permit-fastmcp"]
+# ==== Authentication and Authorization Middleware/Addons ====
+# Settings/Config Secrets
+aws-secrets-manager = ["pydantic-settings[yaml,toml,aws-secrets-manager]"]
+azure-key-vault = ["pydantic-settings[yaml,toml,azure-key-vault]"]
+# workos AuthKit middleware - see https://gofastmcp.com/integrations/authkit
+# No additional dependencies required, it's purely REST-based.
+# Enable with environment variables:
+#  ## Instruct FastMCP to use the AuthKit provider:
+#    FASTMCP_SERVER_AUTH=AUTHKIT
+#     configure the AuthKit provider
+#     FASTMCP_SERVER_AUTH_AUTHKITPROVIDER_AUTHKIT_DOMAIN="https://your-project-12345.authkit.app"
+#     FASTMCP_SERVER_AUTH_AUTHKITPROVIDER_BASE_URL="http://localhost:8000"
+# All groups for users - full featured with all middleware
+full = [
+  "permit-fastmcp",
+  "eunomia-mcp",
+  "pydantic-settings[yaml,toml,aws-secrets-manager,azure-key-vault,gcp-secret-manager]",
+  "permit-fastmcp",
+  "sentence-transformers>=5.1.2",
+]
+full-gpu = [
+  "permit-fastmcp",
+  "eunomia-mcp",
+  "fastembed-gpu",
+  "permit-fastmcp",
+  "pydantic-settings[yaml,toml,aws-secrets-manager,azure-key-vault,gcp-secret-manager]",
+  # see note below about why this is commented out
+  #  "sentence-transformers[onnx-gpu]; python_version>='3.12' and python_version<'3.14'",
+]
+gcp-secret-manager = ["pydantic-settings[yaml,toml,gcp-secret-manager]"]
+gpu-support = [
+  "fastembed-gpu",
+  # see note below about why this is commented out
+  #  "sentence-transformers[onnx-gpu]; python_version>='3.12' and python_version<'3.14'",
+]
+# ==== Providers ====
+#    --- Agent-only Providers --- (no embedding/rerank)
+provider-anthropic = ["pydantic-ai-slim[anthropic]"]
+# --- Embedding, Rerank and Agent Providers --- (the trifecta)
+provider-bedrock = [
+  "pydantic-ai-slim[bedrock]",
+]
+provider-cohere = ["pydantic-ai-slim[cohere]"]
+# --- Embedding and Rerank Only --- (no agent)
+provider-fastembed = ["fastembed", "py-cpuinfo"]
+# Requires additional setup, see https://qdrant.github.io/fastembed/examples/FastEmbed_GPU/
+provider-fastembed-gpu = ["fastembed-gpu", "py-cpuinfo"]
+provider-google = ["pydantic-ai-slim[google]"]
+provider-groq = ["pydantic-ai-slim[groq]"]
+# --- Embedding and Agent Providers --- (no rerank)
+provider-huggingface = ["pydantic-ai-slim[huggingface]"]
+# ==== Vector Stores ====
+provider-in-memory = ["qdrant-client", "tokenizers"]
+provider-mistral = ["pydantic-ai-slim[mistral]"]
+# OpenAI includes support for:
+#   Cerebras, DeekSeek, Ollama, OpenRouter, Vercel, Perplexity, Moonshot, FireworksAI,
+#   TogetherAI, Azure AI Foundry, Heroku, and Github Models, X-AI
+# which all use the OpenAI API
+provider-openai = ["pydantic-ai-slim[openai]"]
+provider-qdrant = ["qdrant-client"]
+provider-sentence-transformers = [
+  "sentence-transformers",
+  "py-cpuinfo",
+]
+# NOTE: Why not GPU or OpenVino support for sentence-transformers?
+# The underlying runtimes for these packages, when resolved against our other dependencies,
+# essentially require us to choose between support for Python 3.14 and these packages.
+# When python 3.14 is included, then the only compatible build results in transformers version 3.x
+# Which does not have the `SparseEncoder` class required for sparse-encodings.
+# We think the sparse-encoding use case is much broader than GPU or OpenVino acceleration for most users,
+# so we are leaving these out of the official optional dependencies for now.
+# If you need GPU or OpenVino support, you can install these packages manually in your environment.
+# provider-sentence-transformers-gpu = [
+# GPU requires additional setup
+#  "sentence-transformers[onnx-gpu]; python_version>='3.12' and python_version<'3.14'",
+# ]
+# provider-sentence-transformers-openvino = [
+#     "sentence-transformers[openvino]",
+#     "py-cpuinfo",
+# ]
+provider-voyageai = ["voyageai"]
+recommended-local-only = [
+  "fastembed",
+  "sentence-transformers",
+  "tokenizers",
+]
+# ==== Data Sources ====
+source-duckduckgo = ["pydantic-ai-slim[duckduckgo]"]
+source-tavily = ["pydantic-ai-slim[tavily]"]
 
 [dependency-groups]
-build = ["hatchling>=1.27.0", "uv-dynamic-versioning>=0.11.2"]
-test = [
-  "dirty-equals>=0.10.0",
-  "httpx>=0.28.1",
-  "pdbpp>=0.11.7",
-  "pytest-asyncio>=1.2.0",
-  "pytest-cov>=7.0.0",
-  "pytest-env>=1.2.0",
-  "pytest-flakefinder>=1.1.0",
-  "pytest-httpx>=0.35.0",
-  "pytest-mock>=3.15.1",
-  "pytest-report>=0.2.1",
-  "pytest-timeout>=2.4.0",
-  "pytest>=8.4.2",
-]
-docs = [
-  "mkdocs-awesome-nav>=3.2.0",
-  "mkdocs-gen-files>=0.5.0",
-  "mkdocs-git-revision-date-localized-plugin>=1.4.7",
-  "mkdocs-material>=9.6.22",
-  "mkdocs-minify-plugin>=0.8.0",
-  "mkdocs-redirects>=1.2.2",
-  "mkdocs-rss-plugin>=1.17.4",
-  "mkdocs>=1.6.1",
-  "mkdocstrings[python]>=0.30.1",
-  "pygments>=2.19.2",
-  "pymdown-extensions>=10.16.1",
-]
 dev = [
   "black>=25.9.0",
   "copychat>=0.7.2",
@@ -184,337 +259,66 @@ dev = [
   "pdbpp>=0.11.7",
   "pydantic-ai>=1.6.0",
   "pyperclip>=1.11.0",
-  "pyright>=1.1.407",
+  "pytest>=8.4.2",
+  "pytest-asyncio>=1.2.0",
+  "pytest-cov>=7.0.0",
+  "pytest-timeout>=2.4.0",
   "ruff>=0.14.2",
   "superclaude>=4.1.6",
+  "ty>=0.0.1a25",
   "types-boto3-custom",
   "uv>=0.9.5",
 ]
-all-dev = [
-  "copychat",
-  "py-cpuinfo",
-  "dirty-equals",
-  "hatchling",
-  "httpx",
-  "ipython",
-  "jsonlines",
-  "mkdocs-awesome-nav",
-  "mkdocs-gen-files",
-  "mkdocs-git-revision-date-localized-plugin",
-  "mkdocs-material",
-  "mkdocs-minify-plugin",
-  "mkdocs-redirects",
-  "mkdocs-rss-plugin",
-  "mkdocs",
-  "mkdocstrings[python]",
-  "mteb",
-  "pdbpp",
-  "pydantic",
-  "pydantic-ai",
-  "pygments",
-  "pymdown-extensions",
-  "pyperclip",
-  "pyright",
-  "pytest-asyncio",
-  "pytest-cov",
-  "pytest-env",
-  "pytest-flakefinder",
-  "pytest-httpx",
-  "pytest-mock",
-  "pytest-report",
-  "pytest-timeout",
-  "pytest",
-  "ruff",
-  "superclaude",
-  "types-boto3-custom",
-  "uv-dynamic-versioning",
-  "uv",
+build = ["hatchling>=1.27.0", "twine>=6.2.0", "uv-dynamic-versioning>=0.11.2"]
+docs = [
+  "mkdocs>=1.6.1",
+  "mkdocs-awesome-nav>=3.2.0",
+  "mkdocs-gen-files>=0.5.0",
+  "mkdocs-git-revision-date-localized-plugin>=1.5.0",
+  # TODO: Add llms-txt to mkdocs.yml
+  "mkdocs-llmstxt>=0.4.0",
+  "mkdocs-material>=9.6.23",
+  "mkdocs-minify-plugin>=0.8.0",
+  "mkdocs-redirects>=1.2.2",
+  "mkdocs-rss-plugin>=1.17.4",
+  "mkdocstrings[python]>=0.30.1",
+  "pygments>=2.19.2",
+  "pymdown-extensions>=10.16.1",
+]
+test = [
+  "dirty-equals>=0.10.0",
+  "pdbpp>=0.11.7",
+  "pytest>=9.0.1",
+  "pytest-asyncio>=1.2.0",
+  "pytest-cov>=7.0.0",
+  "pytest-env>=1.2.0",
+  "pytest-examples>=0.0.18",
+  "pytest-flakefinder>=1.1.0",
+  # "pytest-httpx>=0.35.0; python_version < '3.14'",
+  "pytest-mock>=3.15.1",
+  "pytest-report>=0.2.1",
+  "pytest-timeout>=2.4.0",
 ]
 
-[project.optional-dependencies]
-
-recommended = [
-  "aenum",
-  "ast-grep-py",
-  "cyclopts",
-  "py-cpuinfo",
-  "fastmcp",
-  "mcp",
-  "numpy",
-  "posthog",
-  "pydantic-ai",
-  "pydantic-graph",
-  "pydantic-settings",
-  "pydantic",
-  "qdrant-client",
-  "rich",
-  "rignore",
-  "textcase",
-  "tiktoken",
-  "tokenizers",
-  "tomli-w",
-  "typing_extensions",
-  "uuid7; python_version < '3.14'",
-  "uvicorn[standard]",
-  "voyageai",
-  "watchfiles",
+[build-system]
+requires = [
+  "hatchling>=1.27.0",
+  "twine>=6.2.0",
+  "uv-dynamic-versioning>=0.11.2"
 ]
+build-backend = "hatchling.build"
 
-recommended-no-telemetry = [
-  "aenum",
-  "ast-grep-py",
-  "cyclopts",
-  "py-cpuinfo",
-  "fastmcp",
-  "mcp",
-  "numpy",
-  "posthog",
-  "pydantic-ai",
-  "pydantic-graph",
-  "pydantic-settings",
-  "pydantic",
-  "qdrant-client",
-  "rich",
-  "rignore",
-  "textcase",
-  "tiktoken",
-  "tokenizers",
-  "tomli-w",
-  "typing-extensions",
-  "uuid7; python_version < '3.14'",
-  "uvicorn",
-  "voyageai",
-  "watchfiles",
-]
+# TODO: Integrate hatch plugins for:
+#  - readme: https://github.com/hynek/hatch-fancy-pypi-readme
 
-recommended-local-only = [
-  "aenum",
-  "ast-grep-py",
-  "cyclopts",
-  "py-cpuinfo",
-  "fastembed",
-  "fastmcp",
-  "mcp",
-  "numpy",
-  "posthog",
-  "pydantic-graph",
-  "pydantic-settings",
-  "pydantic",
-  "qdrant-client",
-  "rich",
-  "rignore",
-  "textcase",
-  "tiktoken",
-  "tokenizers",
-  "tomli-w",
-  "typing-extensions",
-  "uuid7; python_version < '3.14'",
-  "uvicorn[standard]",
-  "watchfiles",
-]
-
-# =================  A-La-Carte =================
-# Pick and choose what you want. You need:
-# 1. The `required-core` dependencies
-# 2. At least one provider for embedding generation (e.g. `provider-openai`)
-#      - If that provider is `provider-fastembed` or `provider-voyage` you also need to include
-#         any provider that uses pydantic-ai, like `provider-huggingface` or `provider-openai` or `provider-anthropic`
-# 3. At least one vector store provider (e.g. `provider-qdrant`)
-# **strongly recommended:**
-#    - `provider-filesystem` -- without it, you'll need to manually initiate indexing and handle file changes yourself
-#    - One agent-capable provider (e.g. `provider-openai`)
-#        We use agents to significantly improve results when you give us the necessary information (model, API key, installed client)
-#        We can do that without it, but we *can't do it outside of an MCP request*, such as for our `precontext` feature
-# Example install:
-#    `uv pip install 'codeweaver-mcp[required-core,provider-openai,provider-qdrant,source-filesystem]'`
-#    `uv pip install 'codeweaver-mcp[required-core,pre-context,provider-anthropic,provider-voyage,provider-qdrant]'`
-required-core = [
-  "aenum",
-  "ast-grep-py",
-  "fastmcp",
-  "mcp",
-  "numpy",
-  "pydantic-graph",
-  "pydantic-settings",
-  "pydantic",
-  "rignore",
-  "textcase",
-  "tiktoken",
-  "typing-extensions",
-  "uuid7; python_version < '3.14'",
-  "uvicorn[standard]",
-]
-
-cli = ["cyclopts", "rich", "tomli-w"]
-
-# also requires one agent-capable provider, one embedding-capable provider, and a vector store
-pre-context = [
-  "cyclopts",
-  "rich",
-  "tomli-w",
-  "watchfiles",
-]
-
-# ==== Providers ====
-#    --- Agent-only Providers --- (no embedding/rerank)
-provider-anthropic = ["pydantic-ai-slim[anthropic]"]
-provider-groq = ["pydantic-ai-slim[groq]"]
-
-#    --- Embedding and Agent Providers --- (no rerank)
-provider-huggingface = ["pydantic-ai-slim[huggingface]"]
-provider-google = ["pydantic-ai-slim[google]"]
-provider-openai = ["pydantic-ai-slim[openai]"]
-# OpenAI includes support for:
-#   DeekSeek, Ollama, OpenRouter, Vercel, Perplexity, Moonshot, FireworksAI, 
-#   TogetherAI, Azure AI Foundry, Heroku, and Github Models, X-AI
-# which all use the OpenAI API
-provider-mistral = ["pydantic-ai-slim[mistral]"]
-
-#    --- Embedding, Rerank and Agent Providers --- (the trifecta)
-
-provider-bedrock = ["pydantic-ai-slim[bedrock]"]
-provider-cohere = ["pydantic-ai-slim[cohere]"]
-
-#    --- Embedding and Rerank Only --- (no agent)
-provider-fastembed = ["fastembed", "py-cpuinfo"]
-provider-fastembed-gpu = ["fastembed-gpu", "py-cpuinfo"]
-provider-sentence-transformers = [
-  "sentence-transformers",
-  "py-cpuinfo",
-]
-provider-sentence-transformers-gpu = [
-  "sentence-transformers[onnx-gpu]",
-  "py-cpuinfo",
-]
-
-# disabled until we can fully integrate and resolve dependency conflicts
-# provider-sentence-transformers-openvino = [
-#     "sentence-transformers[openvino]",
-#     "py-cpuinfo",
-# ]
-
-provider-voyageai = ["voyageai"]
-# Requires additional setup, see https://qdrant.github.io/fastembed/examples/FastEmbed_GPU/
-
-# ==== Vector Stores ====
-provider-in-memory = ["qdrant-client", "tokenizers"]
-provider-qdrant = ["qdrant-client"]
-
-# ==== Data Sources ====
-
-source-filesystem = ["watchfiles"]
-source-tavily = ["pydantic-ai-slim[tavily]"]
-source-duckduckgo = ["pydantic-ai-slim[duckduckgo]"]
-
-
-# ==== Authentication and Authorization Middleware ====
-# Optional middleware to add authentication and authorization capabilities to the CodeWeaver server.
-# This allows you to secure your CodeWeaver instance with various authentication providers and authorization policies.
-# The middleware can be used to enforce access control policies, authenticate users, and manage permissions.
-
-# TODO: Implement authentication and authorization middleware -- should be simple to add
-# permit.io middleware - see https://gofastmcp.com/integrations/permit
-auth-permitio = ["permit-fastmcp"]
-
-# eunomia middleware - see https://gofastmcp.com/integrations/eunomia-authorization
-auth-eunomia = ["eunomia-mcp"]
-
-# workos AuthKit middleware - see https://gofastmcp.com/integrations/authkit
-# No additional dependencies required, it's purely REST-based.
-# Enable with environment variables:
-#  ## Instruct FastMCP to use the AuthKit provider:
-#    FASTMCP_SERVER_AUTH=AUTHKIT
-
-#     configure the AuthKit provider
-#     FASTMCP_SERVER_AUTH_AUTHKITPROVIDER_AUTHKIT_DOMAIN="https://your-project-12345.authkit.app"
-#     FASTMCP_SERVER_AUTH_AUTHKITPROVIDER_BASE_URL="http://localhost:8000"
-
-# All groups for users
-all = [
-  "aenum",
-  "ast-grep-py",
-  "py-cpuinfo",
-  "cyclopts",
-  "eunomia-mcp",
-  "fastembed",
-  "fastmcp",
-  "httpx",
-  "mcp",
-  "numpy",
-  "permit-fastmcp",
-  "posthog",
-  "numpy",
-  "permit-fastmcp",
-  "pydantic-ai",
-  "pydantic-graph",
-  "pydantic-settings",
-  "pydantic",
-  "qdrant-client",
-  "rich",
-  "rignore",
-  "sentence-transformers[onnx]",
-  "textcase",
-  "tiktoken",
-  "tokenizers",
-
-  "pydantic-ai",
-  "pydantic-graph",
-  "pydantic-settings",
-  "pydantic",
-  "qdrant-client",
-  "rich",
-  "rignore",
-  "textcase",
-  "tiktoken",
-  "tokenizers",
-  "tomli-w",
-  "typing-extensions",
-  "uuid7; python_version < '3.14'",
-  "uvicorn[standard]",
-  "voyageai",
-  "watchfiles",
-]
-
-all-gpu = [
-  "aenum",
-  "ast-grep-py",
-  "py-cpuinfo",
-  "cyclopts",
-  "eunomia-mcp",
-  "fastembed-gpu",
-  "fastmcp",
-  "httpx",
-  "mcp",
-  "numpy",
-  "permit-fastmcp",
-  "posthog",
-  "pydantic-ai",
-  "pydantic-graph",
-  "pydantic-settings",
-  "pydantic",
-  "qdrant-client",
-  "rich",
-  "rignore",
-  "sentence-transformers[onnx-gpu]",
-  "tiktoken",
-  "tokenizers",
-  "tomli-w",
-  "typing-extensions",
-  "uuid7",
-  "uvicorn[standard]",
-  "voyageai",
-  "watchfiles",
-]
-
-[tool.uv-dynamic-versioning]
-vcs = "git"
-style = "semver"
-bump = true
-tag-branch = "main"
-commit-prefix = "g"
+[tool.coverage.run]
+omit = ["scripts/*", "mise-tasks/*", "typings/*", ".venv/*"]
 
 [tool.hatch.build.hooks.version]
+additionalProperties = true
 path = "src/codeweaver/_version.py"
+# The reuse statements prevent REUSE from considering this snippet for license compliance, which would error
+# REUSE-IgnoreStart
 template = '''# SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-License-Identifier: MIT OR Apache-2.0
 """Version information for CodeWeaver."""
@@ -525,13 +329,12 @@ __version__: Final[str] = "{version}"
 
 __all__ = ("__version__",)
 '''
-
-[tool.hatch.version]
-source = "uv-dynamic-versioning"
+# REUSE-IgnoreEnd
 
 [tool.hatch.build.targets.wheel]
 artifacts = ["*.so", "src/**"]
 packages = ["src/codeweaver"]
+include = ["node_types/**", "typings/**"]
 
 [tool.hatch.build.targets.sdist]
 include = [
@@ -552,115 +355,185 @@ include = [
   "typings/**",
   "uv.lock",
   "uv.lock.license",
-  "vendored/**",
 ]
 
-[tool.pytest.ini_options]
-minversion = "6.0"
+[tool.hatch.version]
+source = "uv-dynamic-versioning"
+
+[tool.pytest]
 addopts = [
-  "-ra",
-  "--strict-markers",
-  "--strict-config",
-  "--cov=codeweaver",
-  "--cov-report=term-missing",
+  # While we don't chase coverage, we want to ensure a minimum bar to catch missing tests
+  # We can raise this over time as the project matures
+  "--cov-fail-under=50",
   "--cov-report=html",
+  "--cov-report=term-missing",
   "--cov-report=xml",
-  "--cov-fail-under=80",
+  "--cov=codeweaver",
   "--import-mode=importlib",
+  "--strict-config",
+  "--strict-markers",
+  "-ra",
 ]
-testpaths = ["tests"]
-python_files = ["test_*.py", "*_test.py"]
-python_classes = ["Test*"]
-python_functions = ["test_*"]
 filterwarnings = [
   "error",
-  "ignore::UserWarning",
   "ignore::DeprecationWarning",
   "ignore::PendingDeprecationWarning",
+  "ignore::UserWarning",
 ]
 markers = [
-  # Test categories
-  "unit: Unit tests that test individual components in isolation",
-  "integration: Integration tests that test component interactions",
-  "validation: Validation tests that ensure system consistency",
-  "e2e: End-to-end tests that test complete workflows",
-
+  "async_test: Asynchronous tests (in addition to pytest.mark.asyncio)",
   # Performance & benchmarks
   "benchmark: Performance benchmark tests",
-  "slow: Tests that take a significant amount of time to run",
-  "performance: Performance-related tests",
-
-  # External dependencies
-  "network: Tests that require network access",
-  "external_api: Tests that interact with external APIs",
-  "voyageai: Tests that require VoyageAI API access",
-  "qdrant: Tests that require Qdrant vector database",
-
   # Configuration & environment
   "config: Configuration-related tests",
-  "env_vars: Tests that depend on environment variables",
-  "mock_only: Tests that only use mocked dependencies",
-
-  # Feature-specific
-  "embeddings: Tests related to embedding functionality",
-  "search: Tests related to search functionality",
-  "indexing: Tests related to code indexing",
-  "telemetry: Tests related to telemetry and metrics",
-  "mcp: Tests related to MCP protocol functionality",
-  "services: Tests related to services layer",
-
-  # Test types
-  "parametrize: Parametrized tests with multiple test cases",
-  "fixtures: Tests that heavily rely on pytest fixtures",
-  "async_test: Asynchronous tests (in addition to pytest.mark.asyncio)",
-
-  # Stability & reliability
-  "flaky: Tests that may occasionally fail due to timing or external factors",
-  "timeout: Tests with specific timeout requirements",
-  "retry: Tests that may need retries",
-
   # Development & debugging
   "debug: Tests for debugging purposes",
   "dev_only: Tests that should only run in development",
+  "docker: Tests that require Docker and Docker Compose (may fail in some CI environments)",
+  "e2e: End-to-end tests that test complete workflows",
+  # Feature-specific
+  "embeddings: Tests related to embedding functionality",
+  "env_vars: Tests that depend on environment variables",
+  "external_api: Tests that interact with external APIs",
+  "fixtures: Tests that heavily rely on pytest fixtures",
+  # Stability & reliability
+  "flaky: Tests that may occasionally fail due to timing or external factors",
+  "indexing: Tests related to code indexing",
+  "integration: Integration tests that test component interactions",
+  "mcp: Tests related to MCP protocol functionality",
+  "mock_only: Tests that only use mocked dependencies",
+  "network: Tests that require network access",
+  # Test types
+  "parametrize: Parametrized tests with multiple test cases",
+  "performance: Performance-related tests",
+  "qdrant: Tests that require Qdrant vector database",
+  # External dependencies
+  "real_providers: Tests that require real provider configurations",
+  "retry: Tests that may need retries",
+  "search: Tests related to search functionality",
+  "server: Tests related to server functionality",
+  "services: Tests related to services layer",
   "skip_ci: Tests to skip in CI/CD environments",
+  "slow: Tests that take a significant amount of time to run",
+  "telemetry: Tests related to telemetry and metrics",
+  "timeout: Tests with specific timeout requirements",
+  # Test categories
+  "unit: Unit tests that test individual components in isolation",
+  "validation: Validation tests that ensure system consistency",
+  "voyageai: Tests that require VoyageAI API access",
 ]
+minversion = "9.0"
+python_classes = ["Test*"]
+python_files = ["*_test.py", "test_*.py"]
+python_functions = ["test_*"]
+testpaths = ["tests"]
 asyncio_mode = "auto"
-timeout = 300
+timeout = "300"
 timeout_method = "thread"
 
-[tool.pyright]
-strict = ["src/codeweaver/**/*.py"]
-include = ["src/codeweaver/**/*.py", "tests/**/*.py", "scripts/**/*.py"]
-exclude = [
-  "src/codeweaver/parsers/**/*.py",
-  ".venv/**",
-  "dist/**",
-  "build/**",
-  "docs/**",
-  "tests/data/**",
-  "typings/**",
-]
-autoImportCompletions = true
-deprecateTypingAliases = true
-pythonPlatform = "Linux"
-pythonVersion = "3.12"
-reportArgumentType = "information"
-reportImplicitStringConcatenation = "error"
-reportImportCycles = "none"  # this is overly noisy and doesn't account for lazy imports
-reportPrivateImportUsage = "none"
-reportPrivateUsage = "none" # It's our own internal use...
-reportPropertyTypeMismatch = "error"
-reportShadowedImports = "error"
-reportUninitializedInstanceVariable = "information"
-reportUnusedCallResult = "information"
-strictDictionaryInference = true
-strictListInference = true
-strictParameterNoneValue = true
-strictSetInference = true
-venvPath = ".venv"
-# we use standard for internal scripts and tooling,
-# the `strict` parameter above sets strict for the main codebase
-typeCheckingMode = "standard"
+[tool.ty.environment]
+python-version = "3.12"
+root = ["./src", "./tests", "./scripts", "./mise-tasks"]
+python = "./.venv"
+extra-paths = ["./typings"]
+
+[tool.ty.rules]
+# === Core Type Safety Rules (kept strict for src/) ===
+# These remain as errors by default and will catch real bugs in production code
+
+# === Test Framework Limitations ===
+# ty doesn't understand pytest mocks/fixtures - these are inherent limitations, not real bugs
+possibly-missing-attribute = "ignore"  # Pytest fixtures don't have static attributes
+unresolved-attribute = "warn"  # Test mocks may have dynamic attributes
+unknown-argument = "warn"  # Pytest fixtures injected dynamically
+unresolved-reference = "warn"  # Test references may be dynamic
+# === Type Inference Limitations ===
+# ty is overly strict with Literal inference in dict lookups and dynamic patterns
+invalid-argument-type = "warn"  # Many false positives in capabilities dicts and code gen
+missing-typed-dict-key = "warn"  # Often false positive with dynamic TypedDict construction (e.g., **dict comprehension)
+# === Style and Refactoring Suggestions ===
+redundant-cast = "ignore"  # Informational only, not bugs
+# === Optional Dependencies ===
+# Scripts may import optional dependencies (e.g., mkdocs_gen_files, black)
+unresolved-import = "warn"  # Downgrade to warn for optional dependencies
+
+[tool.ty.src]
+include = ["./src", "./tests", "./scripts", "./mise-tasks"]
+# Exclude vendored code, typings, and intentionally malformed test fixtures
+exclude = ["./typings", "./tests/fixtures/malformed.py"]
+
+# === Per-Directory Overrides ===
+# Apply different strictness levels: strict for src/, lenient for scripts/mise-tasks/tests
+
+# Scripts: Code generation, build automation, documentation generation
+# These often use dynamic patterns, optional dependencies, and intentional type flexibility
+[[tool.ty.overrides]]
+include = ["scripts/**/*.py"]
+
+[tool.ty.overrides.rules]
+invalid-assignment = "warn"
+unresolved-import = "ignore"
+invalid-argument-type = "ignore"
+unresolved-reference = "ignore"
+unresolved-attribute = "ignore"
+
+# Mise Tasks: Build and diagnostic automation
+# These are utility scripts with intentional dynamic behavior (e.g., monkey-patching warnings)
+[[tool.ty.overrides]]
+include = ["mise-tasks/**/*.py"]
+
+[tool.ty.overrides.rules]
+invalid-assignment = "ignore"
+unresolved-import = "ignore"
+invalid-argument-type = "ignore"
+unresolved-reference = "ignore"
+
+# Tests: May use pytest fixtures, mocks, and test-specific patterns
+# Also may not have test dependencies installed when running ty in dev environment
+# Tests can be less exact per the project requirements - focus on src/ strictness
+[[tool.ty.overrides]]
+include = ["tests/**/*.py"]
+
+[tool.ty.overrides.rules]
+unresolved-import = "ignore"  # pytest and other test dependencies may not be installed
+unknown-argument = "ignore"  # pytest fixtures inject arguments dynamically
+unresolved-reference = "ignore"  # test fixtures and dynamic test patterns
+unresolved-attribute = "ignore"  # mocks and fixtures have dynamic attributes
+non-subscriptable = "warn"  # Often false positive after pytest assertions
+unsupported-operator = "warn"  # Type narrowing after assertions not always understood
+missing-argument = "warn"  # Dynamic test patterns and fixtures
+too-many-positional-arguments = "warn"  # Dynamic function calls in tests
+invalid-assignment = "warn"  # Test setup patterns
+
+# Test Fixtures: Intentionally malformed or edge-case test data
+# These may have type errors by design to test error handling
+[[tool.ty.overrides]]
+include = ["tests/fixtures/**/*.py", "tests/unit/engine/test_failover.py"]
+
+[tool.ty.overrides.rules]
+invalid-assignment = "ignore"
+invalid-argument-type = "ignore"
+unresolved-reference = "ignore"
+
+[[tool.ty.overrides]]
+include = ["scripts/build/generate-mcp-server-json.py"]
+
+[tool.ty.overrides.rules]
+unknown-argument = "ignore"
+
+[[tool.ty.overrides]]
+include = ["src/codeweaver/providers/vector_stores/qdrant_base.py"]
+
+[tool.ty.overrides.rules]
+invalid-argument-type = "ignore"
 
 [tool.uv.sources]
-types-boto3-custom = { path = "vendored/types_boto3_custom-1.40.16-py3-none-any.whl" }
+types-boto3-custom = { path = "vendored/types_boto3_custom-1.41.0-py3-none-any.whl" }
+
+[tool.uv-dynamic-versioning]
+vcs = "git"
+style = "semver"
+bump = true
+dirty = true  # Add .dirty suffix when working directory has uncommitted changes
+# tag-branch = "main"  # Commented out to allow building on feature branches
+commit-prefix = "g"

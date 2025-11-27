@@ -11,14 +11,13 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from collections.abc import Callable, Mapping, Sequence
-from types import MappingProxyType
-from typing import Any, cast
+from collections.abc import Callable, Sequence
+from typing import Any, ClassVar, cast
 
 import numpy as np
 
 from codeweaver.common.utils.utils import rpartial
-from codeweaver.exceptions import ConfigurationError
+from codeweaver.exceptions import ValidationError as CodeWeaverValidationError
 from codeweaver.providers.provider import Provider
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 from codeweaver.providers.reranking.providers.base import RerankingProvider
@@ -30,9 +29,11 @@ try:
     from sentence_transformers import CrossEncoder
 
 except ImportError as e:
-    logger.exception("Failed to import CrossEncoder from sentence_transformers")
+    logger.warning("Failed to import CrossEncoder from sentence_transformers", exc_info=True)
+    from codeweaver.exceptions import ConfigurationError
+
     raise ConfigurationError(
-        "SentenceTransformers is not installed. Please install it with `pip install codeweaver[provider-sentence-transformers]` or `codeweaver[provider-sentence-transformers-gpu]`."
+        "SentenceTransformers is not installed. Please install it with `pip install code-weaver[sentence-transformers]` or `codeweaver[sentence-transformers-gpu]`."
     ) from e
 
 
@@ -57,73 +58,89 @@ class SentenceTransformersRerankingProvider(RerankingProvider[CrossEncoder]):
     model_name: The name of the SentenceTransformers model to use.
     """
 
-    _client: CrossEncoder
+    client: CrossEncoder
     _provider: Provider = Provider.SENTENCE_TRANSFORMERS
-    _caps: RerankingModelCapabilities
+    caps: RerankingModelCapabilities
 
-    _rerank_kwargs: MappingProxyType[str, Any] = MappingProxyType({"trust_remote_code": True})
+    # Use regular dict instead of MappingProxyType to avoid pickle errors
+    _rerank_kwargs: ClassVar[dict[str, Any]] = {"trust_remote_code": True}
 
     def __init__(
         self,
-        capabilities: RerankingModelCapabilities,
+        caps: RerankingModelCapabilities,
         client: CrossEncoder | None = None,
         prompt: str | None = None,
         top_n: int = 40,
         **kwargs: Any,
     ) -> None:
         """Initialize the SentenceTransformersRerankingProvider."""
-        self._caps = capabilities
-        self._rerank_kwargs = MappingProxyType({**type(self)._rerank_kwargs, **kwargs})
-        self._client = client or CrossEncoder(self._caps.name, **self._rerank_kwargs)
-        self._prompt = prompt
-        self._top_n = top_n
-        super().__init__(
-            capabilities,
-            client=self._client,  # pyright: ignore[reportCallIssue]
-            prompt=prompt,
-            top_n=top_n,
-            **self._rerank_kwargs,  # pyright: ignore[reportCallIssue]  # we're intentionally reassigning here
-        )
+        # Call super().__init__() FIRST which handles all Pydantic initialization
+        # This ensures _rerank_kwargs and other private attrs are properly initialized
+        if client is None:
+            client = CrossEncoder(caps.name, **kwargs)
+        super().__init__(client=client, caps=caps, prompt=prompt, top_n=top_n, **kwargs)
+
+        # Now we can safely access _rerank_kwargs after Pydantic initialization
+        # Initialize client if not provided
+        if self._rerank_kwargs:
+            object.__setattr__(
+                self, "client", CrossEncoder(caps.name, **(self._rerank_kwargs | kwargs))
+            )
 
     def _initialize(self) -> None:
         """
         Initialize the SentenceTransformersRerankingProvider.
         """
-        if "model_name" not in self.kwargs or "model_name_or_path" not in self.kwargs:
-            self.kwargs["model_name_or_path"] = self._caps.name
-        name = self.kwargs.pop("model_name")
+        # Set default model path if not provided
+        if "model_name" not in self.kwargs and "model_name_or_path" not in self.kwargs:
+            self.kwargs["model_name_or_path"] = self.caps.name
+
+        # Extract model name, with fallback to capabilities name
+        name = (
+            self.kwargs.pop("model_name", None)
+            or self.kwargs.pop("model_name_or_path", None)
+            or self.caps.name
+        )
+
         if not isinstance(name, str):
-            raise TypeError(f"Expected model_name to be str, got {type(name).__name__}")
-        self._client = self._client or CrossEncoder(name, **(self.kwargs or {}))  # pyright: ignore[reportArgumentType]
+            raise CodeWeaverValidationError(
+                "Reranking model name must be a string",
+                details={
+                    "provider": "sentence_transformers",
+                    "received_type": type(name).__name__,
+                    "received_value": str(name)[:100],
+                },
+                suggestions=[
+                    "Provide model_name as a string, not an object",
+                    "Check model configuration in capabilities",
+                    "Verify model name is properly initialized",
+                ],
+            )
+
+        # Note: _client is already initialized by __init__, no need to reinitialize
         if "Qwen3" in name:
             self._setup_qwen3()
 
     async def _execute_rerank(
-        self,
-        query: str,
-        documents: Sequence[str],
-        *,
-        top_n: int = 40,
-        **kwargs: Mapping[str, Any] | None,
+        self, query: str, documents: Sequence[str], *, top_n: int = 40, **kwargs: Any
     ) -> Any:
         """Execute the reranking process."""
         preprocessed = (
             preprocess_for_qwen(
                 query=query,
                 documents=documents,
-                instruction=self._caps.custom_prompt or "",
+                instruction=self.caps.custom_prompt or "",
                 prefix=self._query_prefix,
                 suffix=self._doc_suffix,
             )
-            if "Qwen3" in self._caps.name
+            if "Qwen3" in self.caps.name
             else [(query, doc) for doc in documents]
         )
         predict_partial = rpartial(
-            cast(Callable[..., np.ndarray], self._client.predict),  # pyright: ignore[reportUnknownMemberType]
-            convert_to_numpy=True,
+            cast(Callable[..., np.ndarray], self.client.predict), convert_to_numpy=True
         )
         loop = asyncio.get_running_loop()
-        scores = await loop.run_in_executor(None, predict_partial, preprocessed)  # pyright: ignore[reportArgumentType, reportUnknownMemberType, reportUnknownVariableType]
+        scores = await loop.run_in_executor(None, predict_partial, preprocessed)
         return scores.tolist()
 
     def _setup_qwen3(self) -> None:
@@ -137,8 +154,8 @@ class SentenceTransformersRerankingProvider(RerankingProvider[CrossEncoder]):
         except Exception:
             has_flash_attention = None
 
-        if other := self._caps.other:
-            self._query_prefix = f"{other.get('prefix', '')}{self._caps.custom_prompt}\n<Query>:\n"
+        if other := self.caps.other:
+            self._query_prefix = f"{other.get('prefix', '')}{self.caps.custom_prompt}\n<Query>:\n"
             self._doc_suffix = other.get("suffix", "")
         self.kwargs["model_kwargs"] = {"torch_dtype": "torch.float16"}
         if has_flash_attention:

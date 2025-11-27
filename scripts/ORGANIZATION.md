@@ -26,7 +26,14 @@ scripts/
 ├── README.md                          # Main documentation
 ├── ORGANIZATION.md                    # This file - organization design
 │
+├── build/                           # Packaging and background scripts (scripts run by other scripts)
+│   ├── generate-docker-server-yaml.py
+│   ├── generate-mcp-server-json.py
+│   ├── generate-supported-languages.py
+│   └── git-merge-latest-version.py
+│
 ├── dev-env/                           # Development environment setup
+│   ├── ci-free-disk-space.sh
 │   ├── dev-shell-init.zsh
 │   ├── install-mise.sh
 │   └── vscode-terminal-bootstrap.sh
@@ -51,8 +58,6 @@ scripts/
 ├── language-support/                  # Tree-sitter and language mappings
 │   ├── download-ts-grammars.py
 │   ├── build-language-mappings.py
-│   ├── generate-supported-languages.py
-│   ├── generate-delimiters.py
 │   ├── compare-delimiters.py
 │   └── analyze-grammar-structure.py
 │
@@ -68,12 +73,23 @@ scripts/
 ├── utils/                             # Shared utilities and debugging
 │   ├── ansi-color-tests.py
 │   ├── check-imports.py
-│   └── get-all-exceptions.py
+│   ├── get-all-exceptions.py
+│   ├── lazy-import-demo.py
+│   └── LAZY_IMPORT_GUIDE.md
+│
+├── project/                           # Project management and contributor tools
+│   ├── contributors.py
+│   └── generate-contributors-list.sh
 │
 └── [deprecated/]                      # Optional: for phased removal
 ```
 
 ## Category Definitions
+
+### build/
+Scripts used in the packaging process or otherwise aren't directly used by devs.
+- Build automation
+- Git drivers/resolution
 
 ### dev-env/
 Scripts for setting up and managing development environments.
@@ -118,6 +134,13 @@ Shared utilities and debugging tools.
 - Import checking
 - Exception analysis
 - Other diagnostic tools
+
+### project/
+Project management and contributor tracking tools.
+- Contributor list generation
+- CLA signature aggregation
+- Cross-repository contributor analysis
+- Project statistics and reports
 
 ## Future Considerations
 

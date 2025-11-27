@@ -1,0 +1,306 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-License-Identifier: MIT OR Apache-2.0
+#
+# GitHub Actions workflow to automatically submit CodeWeaver to the MCP Registry
+# Triggers on release publication after PyPI package is available
+
+name: Submit to MCP Registry
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to submit (leave empty to use latest release)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  validate-and-submit:
+    name: Validate and Submit to MCP Registry
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@b3498302c5c423fa896b97a26bb183df735d08f8
+        with:
+          ref: ${{ github.event.release.tag_name || github.ref }}
+
+      - name: Set up Python
+        uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        run: |
+          curl -LsSf "https://astral.sh/uv/install.sh" | sh
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
+      - name: Extract version information
+        id: version
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+          elif [ -n "${{ github.event.release.tag_name }}" ]; then
+            VERSION="${{ github.event.release.tag_name }}"
+            # Remove 'v' prefix if present
+            VERSION="${VERSION#v}"
+          else
+            # Fallback to reading from _version.py
+            VERSION=$(grep -oP "__version__: Final\[str\] = \"\K[^\"]+" "src/codeweaver/_version.py")
+          fi
+
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Detected version: ${VERSION}"
+
+      - name: Regenerate server.json from code
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          echo "Regenerating server.json from code with version ${VERSION}..."
+
+          # Run the generation script (uses PEP 723 dependencies)
+          uv run scripts/build/generate-mcp-server-json.py
+
+          # Update version in generated server.json
+          python -c "
+          import json
+
+          with open('server.json', 'r') as f:
+              data = json.load(f)
+
+          # Update top-level version
+          data['version'] = '${VERSION}'
+
+          # Update package versions
+          if 'packages' in data:
+              for pkg in data['packages']:
+                  pkg['version'] = '${VERSION}'
+
+          with open('server.json', 'w') as f:
+              json.dump(data, f, indent=2)
+
+          print(f'✓ Regenerated and versioned server.json to ${VERSION}')
+          "
+
+      - name: Update tools.json with release version
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          # Update the version fields in tools.json
+          python -c "
+          import json
+          import sys
+
+          with open('tools.json', 'r') as f:
+              tools_data = json.load(f)
+
+          # Update top-level version
+          tools_data['version'] = '${VERSION}'
+          # Update server version if present
+          if 'server' in tools_data:
+              tools_data['server']['version'] = '${VERSION}'
+
+          with open('tools.json', 'w') as f:
+              json.dump(tools_data, f, indent=2)
+
+          print(f'Updated tools.json to version ${VERSION}')
+          "
+
+      - name: Validate server.json format
+        run: |
+          python -c "
+          import json
+          import sys
+
+          try:
+              with open('server.json', 'r') as f:
+                  data = json.load(f)
+
+              # Basic validation checks
+              required_fields = ['name', 'description', 'version']
+              missing = [f for f in required_fields if f not in data]
+
+              if missing:
+                  print(f'ERROR: Missing required fields: {missing}')
+                  sys.exit(1)
+
+              # Validate name format (must be namespace/server-name)
+              if '/' not in data['name']:
+                  print('ERROR: name must be in format namespace/server-name')
+                  sys.exit(1)
+
+              # Validate packages or remotes exist
+              if 'packages' not in data and 'remotes' not in data:
+                  print('ERROR: Must have either packages or remotes array')
+                  sys.exit(1)
+
+              print('✓ server.json validation passed')
+              print(f'  Name: {data[\"name\"]}')
+              print(f'  Version: {data[\"version\"]}')
+              print(f'  Description: {data[\"description\"][:80]}...')
+
+          except json.JSONDecodeError as e:
+              print(f'ERROR: Invalid JSON in server.json: {e}')
+              sys.exit(1)
+          except Exception as e:
+              print(f'ERROR: Validation failed: {e}')
+              sys.exit(1)
+          "
+
+      - name: Wait for PyPI package availability
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          MAX_ATTEMPTS=30
+          SLEEP_TIME=60
+
+          echo "Waiting for codeweaver ${VERSION} to be available on PyPI..."
+          echo "This may take up to 30 minutes after release publication"
+
+          for i in $(seq 1 "$MAX_ATTEMPTS"); do
+            echo "Attempt $i/$MAX_ATTEMPTS..."
+
+            # Check if package version exists on PyPI
+            HTTP_CODE="$(curl -s -o /dev/null -w "%{http_code}" \
+              "https://pypi.org/pypi/codeweaver/${VERSION}/json")"
+
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "✓ Package codeweaver ${VERSION} is available on PyPI"
+              exit 0
+            fi
+
+            if [ "$i" -lt "$MAX_ATTEMPTS" ]; then
+              echo "Package not yet available (HTTP ${HTTP_CODE}), waiting ${SLEEP_TIME}s..."
+              sleep "$SLEEP_TIME"
+            fi
+          done
+
+          echo "ERROR: Package not available on PyPI after ${MAX_ATTEMPTS} attempts"
+          echo "Please verify that the package was successfully published"
+          exit 1
+
+      - name: Install mcp-publisher CLI
+        env:
+          MCP_PUBLISHER_VERSION: "v1.0.0"
+        run: |
+          ARCH OS VERSION NO_V_VERSION
+          ARCH="$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')"
+          OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
+          VERSION="${MCP_PUBLISHER_VERSION:- v1.0.0}"
+          NO_V_VERSION="${VERSION#v}"
+
+          echo "Downloading mcp-publisher ${VERSION} for ${OS}/${ARCH}..."
+          curl -L "https://github.com/modelcontextprotocol/registry/releases/download/${VERSION}/mcp-publisher_${NO_V_VERSION}_${OS}_${ARCH}.tar.gz" \
+            -o mcp-publisher.tar.gz
+          curl -L "https://github.com/modelcontextprotocol/registry/releases/download/${VERSION}/mcp-publisher_${NO_V_VERSION}_${OS}_${ARCH}.tar.gz.sha256" \
+            -o mcp-publisher.tar.gz.sha256
+
+          echo "Verifying checksum for mcp-publisher.tar.gz..."
+          if ! sha256sum -c mcp-publisher.tar.gz.sha256; then
+            echo "ERROR: Checksum verification failed for mcp-publisher.tar.gz"
+            exit 1
+          fi
+
+          tar xz < mcp-publisher.tar.gz mcp-publisher
+          sudo mv mcp-publisher /usr/local/bin/
+          chmod +x /usr/local/bin/mcp-publisher
+          rm mcp-publisher.tar.gz mcp-publisher.tar.gz.sha256
+
+          echo "✓ mcp-publisher installed"
+          mcp-publisher --version || echo "Version check not available"
+
+      - name: Validate server.json with mcp-publisher
+        run: |
+          echo "Validating server.json against MCP schema..."
+
+          # mcp-publisher validate should validate the server.json
+          # Note: exact command may vary based on mcp-publisher version
+          if command -v mcp-publisher &> /dev/null; then
+            mcp-publisher validate server.json || {
+              echo "ERROR: server.json validation failed"
+              exit 1
+            }
+          else
+            echo "WARNING: mcp-publisher validate command not available, skipping"
+          fi
+
+      - name: Submit to MCP Registry
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MCP_REGISTRY_KEY: ${{ secrets.MCP_REGISTRY_KEY }}
+        run: |
+          echo "Submitting to MCP Registry..."
+
+          # Note: The exact submission process depends on mcp-publisher CLI implementation
+          # and may require manual intervention if the API/CLI has changed.
+          # The following attempts multiple submission methods in order of preference.
+          MESSAGE
+          MESSAGE=""
+          # login to mcp-publisher
+          if command -v mcp-publisher &> /dev/null; then
+            echo "Logging in to mcp-publisher..."
+            mcp-publisher login dns --domain knitli.com --private-key "${MCP_REGISTRY_KEY}" || {
+              echo "WARNING: mcp-publisher login failed, proceeding without login"
+            }
+            MESSAGE="$(mcp-publisher publish)"
+          else
+            echo "WARNING: mcp-publisher CLI not available, skipping login"
+          fi
+          if [ -n "$MESSAGE" ] && [[ "$MESSAGE" == *Successfully* ]]; then
+            echo "✓ Successfully submitted to MCP Registry via mcp-publisher"
+            echo "$MESSAGE"
+            exit 0
+          else
+            RESPONSE="$(curl -X POST \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d @server.json \
+            -w "\n%{http_code}" \
+            https://registry.modelcontextprotocol.io/v0/servers 2>&1)"
+
+            HTTP_CODE="$(echo "$RESPONSE" | tail -n 1)"
+            BODY="$(echo "$RESPONSE" | head -n -1)"
+
+            if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "201" ]; then
+              echo "✓ Successfully submitted to MCP Registry (HTTP ${HTTP_CODE})"
+              exit 0
+            else
+              # Submission failed - provide helpful error message
+              echo "ERROR: Failed to submit to MCP Registry (HTTP ${HTTP_CODE})"
+              echo "Response: ${BODY}"
+              echo ""
+              echo "This may require manual submission via:"
+              echo "  1. The registry web interface at https://registry.modelcontextprotocol.io"
+              echo "  2. The mcp-publisher CLI tool"
+              echo "  3. Contact registry maintainers for assistance"
+              exit 1
+            fi
+          fi
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## MCP Registry Submission Summary"
+            echo ""
+            echo "- **Version**: ${{ steps.version.outputs.version }}"
+            echo "- **Status**: ${{ job.status }}"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "${{ job.status }}" = "success" ]; then
+            {
+              echo "✅ Successfully submitted to MCP Registry"
+              echo ""
+              echo "View your server at: https://registry.modelcontextprotocol.io/servers/com.knitli/codeweaver"
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            {
+              echo "❌ Submission failed"
+              echo ""
+              echo "Please check the workflow logs for details."
+              echo "You may need to submit manually at: https://registry.modelcontextprotocol.io"
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi

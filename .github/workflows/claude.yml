@@ -29,6 +29,13 @@ permissions:
 jobs:
   claude-response:
     runs-on: ubuntu-latest
+    env:
+      CODEWEAVER_VECTOR_STORE_URL: ${{ secrets.CODEWEAVER_VECTOR_STORE_URL }}
+      QDRANT__SERVICE__API_KEY: ${{ secrets.QDRANT__SERVICE__API_KEY }}
+      VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+      CODEWEAVER_PROJECT_PATH: ${{ github.workspace }}
+      MISE_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      MISE_ENV: "ci"
     steps:
       - name: Checkout Repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
@@ -46,10 +53,9 @@ jobs:
           label_trigger: claude
           base_branch: main
           use_commit_signing: true
-
           claude_args: |
             --max-turns 30
-            --allowedTools Bash,Batch,Glob,Grep,ToDoWrite,View,mcp__context7__get-library-docs,mcp__context7__resolve-library-id,mcp__sequential-thinking__sequentialthinking
+            --allowedTools Bash,Batch,Glob,Grep,ToDoWrite,View,mcp__context7__get-library-docs,mcp__context7__resolve-library-id,mcp__sequential-thinking__sequentialthinking,mcp__github_ci__get_workflow_run_details,mcp__codeweaver__find_code
             --mcp-config .mcp.json
           prompt: |
             REPO: ${{ github.repository }}
@@ -76,7 +82,7 @@ jobs:
           base_branch: main
           claude_args: |
             --max-turns 30
-            --allowedTools Bash,Batch,Glob,Grep,ToDoWrite,View,mcp__context7__get-library-docs,mcp__context7__resolve-library-id,mcp__sequential-thinking__sequentialthinking
+            --allowedTools Bash,Batch,Glob,Grep,ToDoWrite,View,mcp__context7__get-library-docs,mcp__context7__resolve-library-id,mcp__sequential-thinking__sequentialthinking,mcp__github_ci__get_workflow_run_details,mcp__codeweaver__find_code
             --mcp-config .mcp.json
           prompt: |
             REPO: ${{ github.repository }}
@@ -102,7 +108,7 @@ jobs:
           base_branch: main
           claude_args: |
             --max-turns 30
-            --allowedTools Bash,Batch,Glob,Grep,ToDoWrite,View,mcp__context7__get-library-docs,mcp__context7__resolve-library-id,mcp__sequential-thinking__sequentialthinking
+            --allowedTools Bash,Batch,Glob,Grep,ToDoWrite,View,mcp__context7__get-library-docs,mcp__context7__resolve-library-id,mcp__sequential-thinking__sequentialthinking,mcp__github_ci__get_workflow_run_details,mcp__codeweaver__find_code
             --mcp-config .mcp.json
           prompt: |
             REPO: ${{ github.repository }}
@@ -130,7 +136,7 @@ jobs:
           base_branch: main
           claude_args: |
             --max-turns 30
-            --allowedTools Bash,Batch,Glob,Grep,ToDoWrite,View,mcp__context7__get-library-docs,mcp__context7__resolve-library-id,mcp__sequential-thinking__sequentialthinking,mcp__github_ci__get_workflow_run_details
+            --allowedTools Bash,Batch,Glob,Grep,ToDoWrite,View,mcp__context7__get-library-docs,mcp__context7__resolve-library-id,mcp__sequential-thinking__sequentialthinking,mcp__github_ci__get_workflow_run_details,mcp__codeweaver__find_code
             --mcp-config .mcp.json
           prompt: |
             REPO: ${{ github.repository }}

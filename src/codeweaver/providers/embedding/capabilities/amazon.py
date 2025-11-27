@@ -7,12 +7,19 @@
 
 from __future__ import annotations
 
-from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+from typing import TYPE_CHECKING
+
 from codeweaver.providers.provider import Provider
+
+
+if TYPE_CHECKING:
+    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 
 
 def get_amazon_embedding_capabilities() -> tuple[EmbeddingModelCapabilities]:
     """Get the capabilities for Amazon embedding models."""
+    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+
     return (
         EmbeddingModelCapabilities.model_validate({
             "name": "amazon.titan-embed-text-v2:0",

@@ -18,6 +18,8 @@ from typing import TYPE_CHECKING
 
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.engine.chunker import ChunkerSelector, ChunkGovernor, chunk_files_parallel
+from codeweaver.engine.chunker.delimiter import DelimiterChunker
+from codeweaver.engine.chunker.exceptions import ChunkingError
 
 
 if TYPE_CHECKING:
@@ -106,19 +108,15 @@ class ChunkingService:
             logger.debug("No files to chunk")
             return
 
-        use_parallel = force_parallel or (
-            self.enable_parallel and len(files) >= self.parallel_threshold
-        )
-
-        if use_parallel:
-            logger.info(
+        if force_parallel or (self.enable_parallel and len(files) >= self.parallel_threshold):
+            logger.debug(
                 "Chunking %d files in parallel (threshold: %d)", len(files), self.parallel_threshold
             )
             yield from chunk_files_parallel(
                 files, self.governor, max_workers=max_workers, executor_type=executor_type
             )
         else:
-            logger.info("Chunking %d files sequentially", len(files))
+            logger.debug("Chunking %d files sequentially", len(files))
             yield from self._chunk_sequential(files)
 
     def _chunk_sequential(
@@ -142,21 +140,48 @@ class ChunkingService:
                 # Read file content
                 content = file.path.read_text(encoding="utf-8", errors="ignore")
 
-                # Chunk the file
-                chunks = chunker.chunk(content, file=file)
+                # Chunk the file with fallback for parse errors
+                try:
+                    chunks = chunker.chunk(content, file=file)
+                except ChunkingError as e:
+                    # Graceful fallback to delimiter chunking for parse errors
+                    # This is expected behavior for malformed files - not an error to report
+                    logger.debug(
+                        "Semantic chunking failed for %s, falling back to delimiter: %s",
+                        file.path,
+                        type(e).__name__,
+                        extra={"file_path": str(file.path), "error_type": type(e).__name__},
+                    )
+                    # Create delimiter chunker as fallback
+                    language = (
+                        file.ext_kind.language.variable
+                        if file.ext_kind and hasattr(file.ext_kind.language, "variable")
+                        else "unknown"
+                    )
+                    fallback_chunker = DelimiterChunker(self.governor, language=language)
+                    chunks = fallback_chunker.chunk(content, file=file)
 
                 logger.debug("Chunked %s: %d chunks generated", file.path, len(chunks))
 
                 yield (file.path, chunks)
 
             except Exception:
-                logger.exception(
-                    "Failed to chunk file %s",
+                # Only log at warning level - these are operational issues, not critical errors
+                # The file is simply skipped, processing continues normally
+                logger.warning(
+                    "Skipping file %s: chunking failed",
                     file.path,
                     extra={
                         "file_path": str(file.path),
-                        "ext_kind": file.ext_kind.value if file.ext_kind else None,
-                    },
+                        "ext_kind": file.ext_kind.value if file.ext_kind else None,  # type: ignore
+                    },  # type: ignore
+                )
+                # Log full traceback only at debug level
+                logger.debug(
+                    "Full error for %s",
+                    file.path,
+                    exc_info=True,
+                    extra={"file_path": str(file.path)},
                 )
                 # Continue processing other files
 
@@ -172,11 +197,29 @@ class ChunkingService:
             List of CodeChunk objects
 
         Raises:
-            Exception: If chunking fails
+            Exception: If chunking fails (after fallback attempts)
         """
         chunker = self._selector.select_for_file(file)
         content = file.path.read_text(encoding="utf-8", errors="ignore")
-        return chunker.chunk(content, file=file)
+
+        try:
+            return chunker.chunk(content, file=file)
+        except ChunkingError as e:
+            # Graceful fallback to delimiter chunking for parse errors
+            logger.debug(
+                "Semantic chunking failed for %s, falling back to delimiter: %s",
+                file.path,
+                type(e).__name__,
+                extra={"file_path": str(file.path), "error_type": type(e).__name__},
+            )
+            # Create delimiter chunker as fallback
+            language = (
+                file.ext_kind.language.variable
+                if file.ext_kind and hasattr(file.ext_kind.language, "variable")
+                else "unknown"
+            )
+            fallback_chunker = DelimiterChunker(self.governor, language=language)
+            return fallback_chunker.chunk(content, file=file)
 
     def chunk_content(self, content: str, file: DiscoveredFile | None = None) -> list[CodeChunk]:
         """Chunk string content directly.

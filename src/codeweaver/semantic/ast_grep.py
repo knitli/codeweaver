@@ -94,11 +94,11 @@ from pydantic import (
 )
 
 from codeweaver.common.utils import LazyImport, lazy_import, uuid7
+from codeweaver.common.utils.textify import humanize
 from codeweaver.core.language import SemanticSearchLanguage
 from codeweaver.core.types.aliases import FileExt, LiteralStringT, ThingName, ThingNameT
 from codeweaver.core.types.enum import AnonymityConversion, BaseEnum
 from codeweaver.core.types.models import BasedModel
-from codeweaver.engine import humanize
 
 # Runtime imports needed for cast operations and type checking
 from codeweaver.semantic.grammar import Category, CompositeThing, Token
@@ -407,7 +407,7 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
         if thing_name == ThingName("ERROR"):
             return None
         registry = registry_module  # Access the module, don't call it
-        if thing := registry.get_registry().get_thing_by_name(thing_name, language=self.language):
+        if thing := registry.get_registry().get_thing_by_name(thing_name, language=self.language):  # ty: ignore[unresolved-attribute]
             return cast(CompositeThing | Token | Category, thing)
         # Return None for unknown things rather than raising
         return None
@@ -441,8 +441,22 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
     @computed_field
     @property
     def symbol(self) -> str:
-        """Get a symbolic representation of the node."""
-        # Return the node's text as a simple symbol representation
+        """Get a symbolic representation of the node.
+
+        For structured nodes (functions, classes, variables), extracts the identifier
+        from the 'name' field. For simple tokens, returns the node's text.
+
+        This follows the standard tree-sitter pattern used by LSP implementations
+        and code intelligence tools, where semantic fields like 'name' contain
+        the identifier for structured constructs.
+        """
+        # Try to extract symbol from the 'name' field for structured nodes
+        # This is the standard approach used across tree-sitter grammars
+        with contextlib.suppress(Exception):
+            if name_node := self._node.field("name"):
+                return name_node.text()
+
+        # Fallback to the node's text for tokens and unnamed structures
         return self.text
 
     @computed_field
@@ -525,7 +539,7 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
         from codeweaver.semantic.scoring import SemanticScorer
 
         scorer = SemanticScorer()
-        return scorer.calculate_importance_score(self)  # pyright: ignore[reportArgumentType]
+        return scorer.calculate_importance_score(self)
 
     def importance_for_task(self, task: AgentTask) -> ImportanceScores:
         """Calculate the importance score for this node for a specific task."""
@@ -751,6 +765,8 @@ with contextlib.suppress(Exception):
     from codeweaver.core.metadata import SemanticMetadata
 
     for model in (FileThing, AstThing, SemanticMetadata, CodeChunk):
+        if model.__pydantic_complete__:
+            continue
         if not model.model_rebuild():
             logger.warning("Model %s failed to rebuild in ast_grep.py", model.__name__)
         else:

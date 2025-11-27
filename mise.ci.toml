@@ -1,0 +1,81 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+# ============================================================================
+# CI-Specific Mise Configuration
+# ============================================================================
+# This lightweight configuration is used in CI/CD environments when MISE_ENV=ci
+# It includes only essential tools needed for testing and building, significantly
+# reducing installation time and cache size.
+#
+# Usage in GitHub Actions:
+#   - name: Setup mise
+#     env:
+#       MISE_ENV: ci
+#     run: mise install
+#
+# NOTE: This configuration inherits from `mise.toml`, so these are additions/overrides
+# ============================================================================
+
+[settings]
+status.show_env = false  # Reduce CI output noise
+
+# ============================================================================
+# CI-Essential Tools Only
+# ============================================================================
+# These are the minimal tools required to run CI tasks:
+# - check, lint, format, test-cov, build
+# ============================================================================
+
+[tools]
+# Core language runtimes
+python = "3.13"
+uv = "latest"
+# Quality & validation tools
+"pipx:reuse" = "latest"  # License validation
+"pipx:ty" = "latest"  # Type checking
+hk = "latest"  # Task runner (used by check/format tasks)
+ruff = "latest"  # Python linting/formatting
+# CI/CD tools
+gh = "latest"  # GitHub CLI (for workflows)
+"pipx:tombi" = "latest"
+
+# ============================================================================
+# Environment Variables
+# ============================================================================
+[env]
+# Simplified PATH for CI (no dev scripts needed)
+_.path = [".venv/bin"]
+MISE_ENV = "ci"
+
+# ============================================================================
+# CI Tasks
+# ============================================================================
+
+[tasks.build]
+run = '''
+#!/bin/bash
+echo "Building package..."
+uv build &&
+echo "✅ Package built successfully!"
+'''
+
+[tasks.docs-build]
+tools.uv = "latest"
+run = '''
+#!/bin/bash
+echo "Building documentation..."
+uv run --group docs mkdocs build
+'''
+
+# Combined CI workflow
+[tasks.ci]
+run = [
+  "mise run check",
+  "mise run lint",
+  "mise run test-cov",
+  "mise run build",
+]
+description = "Run all CI checks (lightweight CI mode)"

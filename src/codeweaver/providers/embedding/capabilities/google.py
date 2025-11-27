@@ -5,8 +5,13 @@
 
 from __future__ import annotations
 
-from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+from typing import TYPE_CHECKING
+
 from codeweaver.providers.provider import Provider
+
+
+if TYPE_CHECKING:
+    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 
 
 def get_google_embedding_capabilities() -> tuple[EmbeddingModelCapabilities, ...]:
@@ -15,6 +20,8 @@ def get_google_embedding_capabilities() -> tuple[EmbeddingModelCapabilities, ...
     Note: Our default dimension for `gemini-embedding-001` is 768. Gemini-embedding-001 is capable of, and defaults to (for google, not us) 3072, but we prefer the smaller size for most use cases. The relevance hit is tiny (1% in our benchmarks), and the size reduction is significant (4x smaller).
 
     """
+    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+
     return (
         EmbeddingModelCapabilities(
             name="gemini-embedding-001",

@@ -1,3 +1,8 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 """Parallel chunking operations for efficient multi-file processing.
 
 This module provides parallel chunking capabilities using ProcessPoolExecutor
@@ -24,6 +29,7 @@ Performance Considerations:
 - Memory usage scales with max_workers setting
 - Iterator pattern prevents loading all results in memory
 """
+
 from __future__ import annotations
 
 import contextlib
@@ -35,6 +41,8 @@ from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_compl
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from codeweaver.engine.chunker.delimiter import DelimiterChunker
+from codeweaver.engine.chunker.exceptions import ChunkingError
 from codeweaver.engine.chunker.selector import ChunkerSelector
 
 
@@ -46,8 +54,11 @@ if TYPE_CHECKING:
     from codeweaver.engine.chunker.base import ChunkGovernor
 logger = logging.getLogger(__name__)
 
-def _chunk_single_file(file: DiscoveredFile, governor: ChunkGovernor) -> tuple[Path, list[CodeChunk]] | tuple[Path, None]:
-    """Chunk a single file using appropriate chunker.
+
+def _chunk_single_file(
+    file: DiscoveredFile, governor: ChunkGovernor
+) -> tuple[Path, list[CodeChunk]] | tuple[Path, None]:
+    """Chunk a single file using appropriate chunker with graceful fallback.
 
     This function is designed to be called in worker processes/threads.
     It creates a fresh chunker instance to ensure isolation and avoid
@@ -64,22 +75,60 @@ def _chunk_single_file(file: DiscoveredFile, governor: ChunkGovernor) -> tuple[P
     Notes:
         - Creates fresh ChunkerSelector and chunker instances
         - Reads file content directly from disk
+        - Gracefully falls back to delimiter chunking on parse errors
         - Handles all exceptions internally with logging
         - Never raises exceptions to caller
     """
     try:
         selector = ChunkerSelector(governor)
         chunker = selector.select_for_file(file)
-        content = file.path.read_text(encoding='utf-8', errors='ignore')
-        chunks = chunker.chunk(content, file=file)
-        logger.debug('Chunked %s: %d chunks generated', file.path, len(chunks))
+        content = file.path.read_text(encoding="utf-8", errors="ignore")
+
+        try:
+            chunks = chunker.chunk(content, file=file)
+        except ChunkingError as e:
+            # Graceful fallback to delimiter chunking for parse errors
+            # This is expected behavior for malformed files - not an error to report
+            logger.debug(
+                "Semantic chunking failed for %s, falling back to delimiter: %s",
+                file.path,
+                type(e).__name__,
+                extra={"file_path": str(file.path), "error_type": type(e).__name__},
+            )
+            # Create delimiter chunker as fallback
+            language = (
+                file.ext_kind.language.variable
+                if file.ext_kind and hasattr(file.ext_kind.language, "variable")
+                else "unknown"
+            )
+            fallback_chunker = DelimiterChunker(governor, language=language)
+            chunks = fallback_chunker.chunk(content, file=file)
+
+        logger.debug("Chunked %s: %d chunks generated", file.path, len(chunks))
     except Exception:
-        logger.exception('Failed to chunk file %s', file.path, extra={'file_path': str(file.path), 'ext_kind': file.ext_kind.value if file.ext_kind else None})
+        # Only log at warning level - these are operational issues, not critical errors
+        # The file is simply skipped, server continues normally
+        logger.warning(
+            "Skipping file %s: chunking failed",
+            file.path,
+            extra={"file_path": str(file.path), "ext_kind": file.ext_kind or "unknown"},
+        )
+        # Log full traceback only at debug level
+        logger.debug(
+            "Full error for %s", file.path, exc_info=True, extra={"file_path": str(file.path)}
+        )
         return (file.path, None)
     else:
         return (file.path, chunks)
 
-def chunk_files_parallel(files: list[DiscoveredFile], governor: ChunkGovernor, *, max_workers: int | None=None, executor_type: str | None=None) -> Iterator[tuple[Path, list[CodeChunk]]]:
+
+def chunk_files_parallel(
+    files: list[DiscoveredFile],
+    governor: ChunkGovernor,
+    *,
+    max_workers: int | None = None,
+    executor_type: str | None = None,
+) -> Iterator[tuple[Path, list[CodeChunk]]]:
     """Chunk multiple files in parallel using process or thread pool.
 
     Distributes file chunking across multiple workers for efficient processing
@@ -128,7 +177,7 @@ def chunk_files_parallel(files: list[DiscoveredFile], governor: ChunkGovernor, *
         - Empty file list returns immediately without creating executor
     """
     if not files:
-        logger.debug('No files to chunk')
+        logger.debug("No files to chunk")
         return
     if max_workers is None:
         if governor.settings and governor.settings.concurrency:
@@ -139,21 +188,36 @@ def chunk_files_parallel(files: list[DiscoveredFile], governor: ChunkGovernor, *
         if governor.settings and governor.settings.concurrency:
             executor_type = governor.settings.concurrency.executor
         else:
-            executor_type = 'process'
-    if executor_type == 'process':
+            executor_type = "process"
+    if executor_type == "process":
+        # Set multiprocessing start method to 'spawn' to avoid fork() deprecation in Python 3.13+
+        # 'spawn' is safer for multi-threaded processes and more portable across platforms
+        try:
+            current_method = multiprocessing.get_start_method(allow_none=True)
+            if current_method != "spawn":
+                multiprocessing.set_start_method("spawn", force=True)
+                logger.debug("Set multiprocessing start method to 'spawn'")
+        except RuntimeError:
+            # Start method already set, which is fine
+            logger.debug("Multiprocessing start method already configured")
+
         cpu_count = multiprocessing.cpu_count()
         max_workers = min(max_workers, cpu_count)
         executor_class = ProcessPoolExecutor
-        logger.info('Using ProcessPoolExecutor with %d workers (CPU count: %d)', max_workers, cpu_count)
+        logger.info(
+            "Using ProcessPoolExecutor with %d workers (CPU count: %d)", max_workers, cpu_count
+        )
     else:
         executor_class = ThreadPoolExecutor
-        logger.info('Using ThreadPoolExecutor with %d workers', max_workers)
+        logger.info("Using ThreadPoolExecutor with %d workers", max_workers)
     total_files = len(files)
     processed_count = 0
     error_count = 0
-    logger.info('Starting parallel chunking of %d files with %d workers', total_files, max_workers)
+    logger.info("Starting parallel chunking of %d files with %d workers", total_files, max_workers)
     with executor_class(max_workers=max_workers) as executor:
-        future_to_file: dict[Future[tuple[Path, list[CodeChunk] | None]], DiscoveredFile] = {executor.submit(_chunk_single_file, file, governor): file for file in files}
+        future_to_file: dict[Future[tuple[Path, list[CodeChunk] | None]], DiscoveredFile] = {
+            executor.submit(_chunk_single_file, file, governor): file for file in files
+        }
         for future in as_completed(future_to_file):
             future_to_file[future]
             with contextlib.suppress(Exception):
@@ -164,12 +228,30 @@ def chunk_files_parallel(files: list[DiscoveredFile], governor: ChunkGovernor, *
                     processed_count += 1
                     continue
                 processed_count += 1
-                logger.debug('Completed %d/%d files: %s (%d chunks)', processed_count, total_files, file_path, len(chunks))
+                logger.debug(
+                    "Completed %d/%d files: %s (%d chunks)",
+                    processed_count,
+                    total_files,
+                    file_path,
+                    len(chunks),
+                )
                 yield (file_path, chunks)
     success_count = processed_count - error_count
-    logger.info('Parallel chunking complete: %d/%d files successful, %d errors', success_count, total_files, error_count)
+    logger.info(
+        "Parallel chunking complete: %d/%d files successful, %d errors",
+        success_count,
+        total_files,
+        error_count,
+    )
 
-def chunk_files_parallel_dict(files: list[DiscoveredFile], governor: ChunkGovernor, *, max_workers: int | None=None, executor_type: str | None=None) -> dict[Path, list[CodeChunk]]:
+
+def chunk_files_parallel_dict(
+    files: list[DiscoveredFile],
+    governor: ChunkGovernor,
+    *,
+    max_workers: int | None = None,
+    executor_type: str | None = None,
+) -> dict[Path, list[CodeChunk]]:
     """Chunk multiple files in parallel and return as dictionary.
 
     Convenience wrapper around chunk_files_parallel that collects all results
@@ -196,5 +278,9 @@ def chunk_files_parallel_dict(files: list[DiscoveredFile], governor: ChunkGovern
         - Only includes successfully chunked files
         - Returns empty dict if no files chunked successfully
     """
-    return dict(chunk_files_parallel(files, governor, max_workers=max_workers, executor_type=executor_type))
-__all__ = ('chunk_files_parallel', 'chunk_files_parallel_dict')
+    return dict(
+        chunk_files_parallel(files, governor, max_workers=max_workers, executor_type=executor_type)
+    )
+
+
+__all__ = ("chunk_files_parallel", "chunk_files_parallel_dict")

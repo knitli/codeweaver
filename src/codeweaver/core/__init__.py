@@ -2,7 +2,6 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
-# pyright: reportUnsupportedDunderAll=none
 """Global type definitions for CodeWeaver.
 
 We usually try to keep types close to where they are used, but some types
@@ -11,6 +10,109 @@ are used so widely that it makes sense to define them globally here.
 
 from importlib import import_module
 from types import MappingProxyType
+from typing import TYPE_CHECKING
+
+
+if TYPE_CHECKING:
+    # Import everything for IDE and type checker support
+    # These imports are never executed at runtime, only during type checking
+    from codeweaver.core.chunks import (
+        ChunkSequence,
+        CodeChunk,
+        CodeChunkDict,
+        SerializedCodeChunk,
+        SerializedStrOnlyCodeChunk,
+        StructuredDataInput,
+    )
+    from codeweaver.core.discovery import DiscoveredFile
+    from codeweaver.core.language import (
+        ConfigLanguage,
+        ConfigNamePair,
+        LanguageConfigFile,
+        SemanticSearchLanguage,
+        find_config_paths,
+        has_semantic_extension,
+        is_semantic_config_ext,
+        language_from_config_file,
+        languages_present_from_configs,
+    )
+    from codeweaver.core.metadata import (
+        ChunkKind,
+        ChunkSource,
+        ExtKind,
+        ExtLangPair,
+        Metadata,
+        SemanticMetadata,
+    )
+    from codeweaver.core.spans import Span, SpanGroup, SpanTuple
+    from codeweaver.core.stores import (
+        BlakeHashKey,
+        BlakeKey,
+        BlakeStore,
+        StoreDict,
+        UUIDStore,
+        make_blake_store,
+        make_uuid_store,
+        to_uuid,
+    )
+    from codeweaver.core.types import (
+        BASEDMODEL_CONFIG,
+        DATACLASS_CONFIG,
+        FROZEN_BASEDMODEL_CONFIG,
+        UNSET,
+        AnonymityConversion,
+        BaseDataclassEnum,
+        BasedModel,
+        BaseEnum,
+        BaseEnumData,
+        CategoryName,
+        CategoryNameT,
+        DataclassSerializationMixin,
+        DeserializationKwargs,
+        DevToolName,
+        DevToolNameT,
+        DictView,
+        DirectoryName,
+        DirectoryNameT,
+        DirectoryPath,
+        DirectoryPathT,
+        EmbeddingModelName,
+        EmbeddingModelNameT,
+        EnvVarInfo,
+        FileExt,
+        FileExtensionT,
+        FileGlob,
+        FileGlobT,
+        FileName,
+        FileNameT,
+        FilePath,
+        FilePathT,
+        FilteredKey,
+        FilteredKeyT,
+        LanguageName,
+        LanguageNameT,
+        LiteralStringT,
+        LlmToolName,
+        LlmToolNameT,
+        ModelName,
+        ModelNameT,
+        RerankingModelName,
+        RerankingModelNameT,
+        Role,
+        RoleT,
+        RootedRoot,
+        Sentinel,
+        SentinelName,
+        SentinelNameT,
+        SerializationKwargs,
+        ThingName,
+        ThingNameT,
+        Unset,
+        UUID7Hex,
+        UUID7HexT,
+        generate_field_title,
+        generate_title,
+    )
 
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
@@ -35,6 +137,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "DirectoryPathT": (__spec__.parent, "types"),
     "EmbeddingModelName": (__spec__.parent, "types"),
     "EmbeddingModelNameT": (__spec__.parent, "types"),
+    "EnvVarInfo": (__spec__.parent, "types"),
     "ExtLangPair": (__spec__.parent, "metadata"),
     "FileExt": (__spec__.parent, "types"),
     "FileExtensionT": (__spec__.parent, "types"),
@@ -72,14 +175,12 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "ChunkSequence": (__spec__.parent, "chunks"),
     "CodeChunk": (__spec__.parent, "chunks"),
     "CodeChunkDict": (__spec__.parent, "chunks"),
-    "SearchResult": (__spec__.parent, "chunks"),
     "SerializedCodeChunk": (__spec__.parent, "chunks"),
     "StructuredDataInput": (__spec__.parent, "chunks"),
     "DictView": (__spec__.parent, "types"),
     "DiscoveredFile": (__spec__.parent, "discovery"),
     "ConfigLanguage": (__spec__.parent, "language"),
     "ConfigNamePair": (__spec__.parent, "language"),
-    "ExtPair": (__spec__.parent, "metadata"),
     "LanguageConfigFile": (__spec__.parent, "language"),
     "SemanticSearchLanguage": (__spec__.parent, "language"),
     "find_config_paths": (__spec__.parent, "language"),
@@ -92,6 +193,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "ChunkSource": (__spec__.parent, "metadata"),
     "ExtKind": (__spec__.parent, "metadata"),
     "SemanticMetadata": (__spec__.parent, "metadata"),
+    "SerializedStrOnlyCodeChunk": (__spec__.parent, "chunks"),
     "Span": (__spec__.parent, "spans"),
     "SpanGroup": (__spec__.parent, "spans"),
     "SpanTuple": (__spec__.parent, "spans"),
@@ -104,14 +206,14 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "make_uuid_store": (__spec__.parent, "stores"),
     "to_uuid": (__spec__.parent, "stores"),
 })
-"""Dynamically import submodules and classes for the core types package.
+"""Dynamically import submodules and classes for the core package.
 
 Maps class/function/type names to their respective module paths for lazy loading.
 """
 
 
 def __getattr__(name: str) -> object:
-    """Dynamically import submodules and classes for the semantic package."""
+    """Dynamically import submodules and classes for the core package."""
     if name in _dynamic_imports:
         module_name, submodule_name = _dynamic_imports[name]
         module = import_module(f"{module_name}.{submodule_name}")
@@ -146,6 +248,7 @@ __all__ = (
     "ConfigLanguage",
     "ConfigNamePair",
     "DataclassSerializationMixin",
+    "DeserializationKwargs",
     "DevToolName",
     "DevToolNameT",
     "DictView",
@@ -156,9 +259,9 @@ __all__ = (
     "DiscoveredFile",
     "EmbeddingModelName",
     "EmbeddingModelNameT",
+    "EnvVarInfo",
     "ExtKind",
     "ExtLangPair",
-    "ExtPair",
     "FileExt",
     "FileExtensionT",
     "FileGlob",
@@ -183,7 +286,6 @@ __all__ = (
     "Role",
     "RoleT",
     "RootedRoot",
-    "SearchResult",
     "SemanticMetadata",
     "SemanticSearchLanguage",
     "Sentinel",
@@ -191,6 +293,7 @@ __all__ = (
     "SentinelNameT",
     "SerializationKwargs",
     "SerializedCodeChunk",
+    "SerializedStrOnlyCodeChunk",
     "Span",
     "SpanGroup",
     "SpanTuple",
@@ -216,5 +319,5 @@ __all__ = (
 
 
 def __dir__() -> list[str]:
-    """List available attributes for the semantic package."""
+    """List available attributes for the core package."""
     return list(__all__)

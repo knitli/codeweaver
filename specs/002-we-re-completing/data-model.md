@@ -54,7 +54,7 @@ Connected -> Deleting (via delete_*)
 Any -> Error (on operation failure)
 ```
 
-### 2. QdrantVectorStore (Concrete Implementation)
+### 2. QdrantVectorStoreProvider (Concrete Implementation)
 
 **Purpose**: Qdrant vector database provider supporting local and remote deployments
 
@@ -65,7 +65,7 @@ Any -> Error (on operation failure)
 |-------|------|----------|-------------|------------------|
 | `_client` | `AsyncQdrantClient` | Yes | Qdrant async client | Must be initialized |
 | `_embedder` | `EmbeddingProvider` | Yes | Embedding provider | Must support required dimensions |
-| `_reranker` | `RerankingProvider \| None` | No | Optional reranking provider | - |
+| `_reranking` | `RerankingProvider \| None` | No | Optional reranking provider | - |
 | `config` | `QdrantConfig` | Yes | Qdrant-specific configuration | Validated via pydantic |
 | `_metadata` | `dict[str, Any] \| None` | No | Collection metadata cache | - |
 
@@ -86,7 +86,7 @@ Any -> Error (on operation failure)
 - `optionally-uses` RerankingProvider
 - `manages` Qdrant collections (via AsyncQdrantClient)
 
-### 3. MemoryVectorStore (Concrete Implementation)
+### 3. MemoryVectorStoreProvider (Concrete Implementation)
 
 **Purpose**: In-memory vector storage with JSON persistence for development/testing
 
@@ -237,7 +237,7 @@ def to_qdrant_filter(filter: Filter) -> QdrantFilter:
     return QdrantFilter(must=conditions)
 ```
 
-### 8. VectorStoreSettings (Configuration Integration)
+### 8. VectorStoreProviderSettings (Configuration Integration)
 
 **Purpose**: Provider selection and configuration in unified settings system
 
@@ -245,7 +245,7 @@ def to_qdrant_filter(filter: Filter) -> QdrantFilter:
 
 **Structure**:
 ```python
-class VectorStoreSettings(BaseSettings):
+class VectorStoreProviderSettings(BaseSettings):
     """Vector store configuration."""
 
     provider: Literal["qdrant", "memory"] = "qdrant"
@@ -264,7 +264,7 @@ class VectorStoreSettings(BaseSettings):
 ```python
 class CodeWeaverSettings(BaseSettings):
     # ... existing settings ...
-    vector_store: VectorStoreSettings = Field(default_factory=VectorStoreSettings)
+    vector_store: VectorStoreProviderSettings = Field(default_factory=VectorStoreProviderSettings)
 ```
 
 ### 9. CollectionMetadata (New Type)
@@ -304,19 +304,19 @@ async def _validate_compatibility(self) -> None:
 
 ```
 CodeWeaverSettings
-    ├── vector_store: VectorStoreSettings
+    ├── vector_store: VectorStoreProviderSettings
     │   ├── provider: "qdrant" | "memory"
     │   ├── qdrant: QdrantConfig
     │   └── memory: MemoryConfig
 
 VectorStoreProvider (abstract)
-    ├── QdrantVectorStore
+    ├── QdrantVectorStoreProvider
     │   ├── _client: AsyncQdrantClient
     │   ├── _embedder: EmbeddingProvider
     │   ├── config: QdrantConfig
     │   └── manages -> Collections -> Points
     │
-    └── MemoryVectorStore
+    └── MemoryVectorStoreProvider
         ├── _client: AsyncQdrantClient (in-memory)
         ├── _persist_path: Path
         └── persists-to -> JSON file

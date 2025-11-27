@@ -39,7 +39,7 @@ docker-compose up -d qdrant
 import asyncio
 from pathlib import Path
 from uuid import uuid4
-from codeweaver.providers.vector_stores import QdrantVectorStore
+from codeweaver.providers.vector_stores import QdrantVectorStoreProvider
 from codeweaver.config.providers import QdrantConfig
 from codeweaver.core.chunks import CodeChunk, ChunkEmbeddings
 from codeweaver.core.language import Language
@@ -50,7 +50,7 @@ async def test_store_hybrid_embeddings():
         url="http://localhost:6333",
         collection_name="test_hybrid"
     )
-    provider = QdrantVectorStore(config=config)
+    provider = QdrantVectorStoreProvider(config=config)
     await provider._initialize()
 
     # Create chunk with both dense and sparse embeddings
@@ -115,7 +115,7 @@ asyncio.run(test_store_hybrid_embeddings())
 async def test_persistence_across_restarts():
     # Phase 1: Initial indexing
     config = QdrantConfig(url="http://localhost:6333", collection_name="test_persist")
-    provider1 = QdrantVectorStore(config=config)
+    provider1 = QdrantVectorStoreProvider(config=config)
     await provider1._initialize()
 
     chunk = CodeChunk(
@@ -133,7 +133,7 @@ async def test_persistence_across_restarts():
     original_chunk_id = chunk.chunk_id
 
     # Simulate restart: Create new provider instance
-    provider2 = QdrantVectorStore(config=config)
+    provider2 = QdrantVectorStoreProvider(config=config)
     await provider2._initialize()
 
     # Verify: Previously stored chunk is retrievable
@@ -157,7 +157,7 @@ asyncio.run(test_persistence_across_restarts())
 ```python
 async def test_hybrid_search_ranking():
     config = QdrantConfig(url="http://localhost:6333", collection_name="test_ranking")
-    provider = QdrantVectorStore(config=config)
+    provider = QdrantVectorStoreProvider(config=config)
     await provider._initialize()
 
     # Insert multiple chunks with varying similarity
@@ -233,7 +233,7 @@ asyncio.run(test_hybrid_search_ranking())
 
 **Test Scenario**:
 ```python
-from codeweaver.providers.vector_stores import MemoryVectorStore
+from codeweaver.providers.vector_stores import MemoryVectorStoreProvider
 from codeweaver.config.providers import MemoryConfig
 import tempfile
 
@@ -247,7 +247,7 @@ async def test_inmemory_persistence():
     )
 
     # Phase 1: Create and populate
-    provider1 = MemoryVectorStore(config=config)
+    provider1 = MemoryVectorStoreProvider(config=config)
     await provider1._initialize()
 
     chunk = CodeChunk(
@@ -270,7 +270,7 @@ async def test_inmemory_persistence():
     assert temp_path.exists()
 
     # Phase 2: Restore from disk
-    provider2 = MemoryVectorStore(config=config)
+    provider2 = MemoryVectorStoreProvider(config=config)
     await provider2._initialize()
 
     # Verify: Chunk restored from disk
@@ -293,7 +293,7 @@ asyncio.run(test_inmemory_persistence())
 ```python
 async def test_incremental_updates():
     config = QdrantConfig(url="http://localhost:6333", collection_name="test_incremental")
-    provider = QdrantVectorStore(config=config)
+    provider = QdrantVectorStoreProvider(config=config)
     await provider._initialize()
 
     file_path = Path("src/updated_file.py")
@@ -356,7 +356,7 @@ async def test_custom_configuration():
         prefer_grpc=False
     )
 
-    provider = QdrantVectorStore(config=config)
+    provider = QdrantVectorStoreProvider(config=config)
     await provider._initialize()
 
     # Verify custom collection name
@@ -396,7 +396,7 @@ async def test_remote_connection():
         collection_name="test_remote"
     )
 
-    provider = QdrantVectorStore(config=config)
+    provider = QdrantVectorStoreProvider(config=config)
     await provider._initialize()
 
     # Verify connection
@@ -427,7 +427,7 @@ async def test_provider_switch_detection():
         url="http://localhost:6333",
         collection_name=collection_name
     )
-    qdrant_provider = QdrantVectorStore(config=qdrant_config)
+    qdrant_provider = QdrantVectorStoreProvider(config=qdrant_config)
     await qdrant_provider._initialize()
 
     chunk = CodeChunk(
@@ -444,7 +444,7 @@ async def test_provider_switch_detection():
 
     # Phase 2: Try to use same collection with Memory provider
     memory_config = MemoryConfig(collection_name=collection_name)
-    memory_provider = MemoryVectorStore(config=memory_config)
+    memory_provider = MemoryVectorStoreProvider(config=memory_config)
 
     # Should raise ProviderSwitchError
     try:
@@ -468,7 +468,7 @@ asyncio.run(test_provider_switch_detection())
 ```python
 async def test_partial_embeddings():
     config = QdrantConfig(url="http://localhost:6333", collection_name="test_partial")
-    provider = QdrantVectorStore(config=config)
+    provider = QdrantVectorStoreProvider(config=config)
     await provider._initialize()
 
     # Create chunk with sparse-only embedding (dense failed)

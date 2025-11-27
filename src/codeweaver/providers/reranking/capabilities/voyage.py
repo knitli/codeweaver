@@ -8,25 +8,15 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
 from pydantic import NonNegativeInt
 
-from codeweaver.core.chunks import CodeChunk
-from codeweaver.exceptions import ConfigurationError
-from codeweaver.providers.provider import Provider
-from codeweaver.providers.reranking.capabilities.base import (
-    PartialRerankingCapabilities,
-    RerankingModelCapabilities,
-)
 
-
-try:
-    from codeweaver.tokenizers import get_tokenizer
-
-except ImportError as e:
-    raise ConfigurationError(
-        "The `tokenizers` package is required for Voyage capabilities. Please install it with `pip install codeweaver[provider-voyage]` or `pip install tokenizers`."
-    ) from e
+if TYPE_CHECKING:
+    from codeweaver.core.chunks import CodeChunk
+    from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
+    from codeweaver.providers.reranking.capabilities.types import PartialRerankingCapabilitiesDict
 
 
 def _handle_too_big(token_list: Sequence[int]) -> Sequence[tuple[int, int]]:
@@ -46,9 +36,22 @@ def _handle_too_large(token_list: Sequence[int]) -> tuple[bool, NonNegativeInt]:
 
 def _voyage_max_limit(chunks: list[CodeChunk], query: str) -> tuple[bool, NonNegativeInt]:
     """Check if the number of chunks exceeds the maximum limit."""
+    try:
+        from codeweaver.tokenizers import get_tokenizer
+
+    except ImportError as e:
+        from codeweaver.exceptions import ConfigurationError
+
+        raise ConfigurationError(
+            "The `tokenizers` package is required for Voyage capabilities. Please install it with `pip install code-weaver[voyage]` or `pip install tokenizers`."
+        ) from e
     tokenizer = get_tokenizer("tokenizers", "voyageai/voyage-rerank-2.5")
     stringified_chunks = [chunk.serialize_for_embedding() for chunk in chunks]
-    sizes = [tokenizer.estimate(chunk) + tokenizer.estimate(query) for chunk in stringified_chunks]  # pyright: ignore[reportArgumentType]
+    sizes = [
+        tokenizer.estimate(chunk if isinstance(chunk, str | bytes) else chunk.content)
+        + tokenizer.estimate(query)
+        for chunk in stringified_chunks
+    ]
     too_large = sum(sizes) > 600_000
     too_many = len(stringified_chunks) > 1000
     too_big = any(size > 32_000 for size in sizes)
@@ -65,7 +68,8 @@ def _voyage_max_limit(chunks: list[CodeChunk], query: str) -> tuple[bool, NonNeg
         truncated_chunks = chunks[:1000]
         truncated_strings = [chunk.serialize_for_embedding() for chunk in truncated_chunks]
         truncated_sizes = [
-            tokenizer.estimate(c) + tokenizer.estimate(query)  # pyright: ignore[reportArgumentType]
+            tokenizer.estimate(c if isinstance(c, str | bytes) else c.content)
+            + tokenizer.estimate(query)
             for c in truncated_strings
         ]
         # If still too large, determine where to cut; otherwise accept the truncated set.
@@ -76,12 +80,15 @@ def _voyage_max_limit(chunks: list[CodeChunk], query: str) -> tuple[bool, NonNeg
     return False, 0
 
 
-def _get_voyage_capabilities() -> PartialRerankingCapabilities:
+def _get_voyage_capabilities() -> PartialRerankingCapabilitiesDict:
+    """Get the common capabilities for Voyage models."""
+    from codeweaver.providers.provider import Provider
+
     return {
         "name": "rerank-2.5",
         "provider": Provider.VOYAGE,
         "max_query": 8_000,
-        "max_input": _voyage_max_limit,  # pyright: ignore[reportReturnType]
+        "max_input": None,  # Voyage uses dynamic limit checking via _voyage_max_limit function
         "context_window": 32_000,
         "supports_custom_prompt": False,
         "tokenizer": "tokenizers",
@@ -93,6 +100,8 @@ def get_voyage_reranking_capabilities() -> tuple[
     RerankingModelCapabilities, RerankingModelCapabilities
 ]:
     """Get the capabilities of the Voyage reranking model."""
+    from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
+
     base_capabilities = _get_voyage_capabilities()
     lite_capabilities = base_capabilities.copy()
     lite_capabilities["name"] = "voyage-rerank-2.5-lite"

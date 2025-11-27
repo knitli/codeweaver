@@ -87,9 +87,9 @@ def _decide_fastembed_runtime(
             import onnxruntime as ort
 
             logger.info("ONNX Runtime GPU package detected. Attempting to preload DLLs...")
-            ort.preload_dlls(cuda=True, cudnn=True, msvc=platform.system() == "Windows")  # pyright: ignore[reportUnknownMemberType]
+            ort.preload_dlls(cuda=True, cudnn=True, msvc=platform.system() == "Windows")
         except Exception:
-            logger.exception("ONNX Runtime CUDA not usable despite being installed.")
+            logger.warning("ONNX Runtime CUDA not usable despite being installed.", exc_info=True)
             cuda_usable = False
 
     # Honor explicit user choice but guard against impossible states
@@ -127,7 +127,7 @@ def decide_fastembed_runtime(
             from warnings import warn
 
             warn(
-                f"It looks like you requested GPU usage for Fastembed, but cuda is not available. Make sure to provide your device_ids in your CodeWeaver settings if you have GPUs available, installed the `codeweaver-mcp[provider-fastembed-gpu]` extra, and followed Fastembed's [gpu setup instructions](https://qdrant.github.io/fastembed/examples/FastEmbed_GPU/). Our checks returned this message: {decision[2]}",
+                f"It looks like you requested GPU usage for Fastembed, but cuda is not available. Make sure to provide your device_ids in your CodeWeaver settings if you have GPUs available, installed the `codeweaver[fastembed-gpu]` extra, and followed Fastembed's [gpu setup instructions](https://qdrant.github.io/fastembed/examples/FastEmbed_GPU/). Our checks returned this message: {decision[2]}",
                 stacklevel=2,
             )
             return "cpu"
@@ -147,7 +147,7 @@ def decide_fastembed_runtime(
 type SimdExtensions = Literal["arm64", "avx2", "avx512", "avx512_vnni"]
 
 
-class AvailableOptimizations(TypedDict):
+class AvailableOptimizations(TypedDict, total=False):
     """Available optimizations in the current environment."""
 
     onnx: bool
@@ -253,15 +253,22 @@ def get_optimizations(model_kind: Literal["dense", "sparse", "both"]) -> Optimiz
     sparse_opts = dense_opts
     for key in ("use_small_chunks_for_dense", "chunk_func"):
         _ = sparse_opts.pop(key, None)
-    sparse_opts = OptimizationDecisions(
-        **(sparse_opts | {"use_small_batch_for_sparse": sparse_opts["backend"] == "onnx_gpu"})  # pyright: ignore[reportArgumentType]
+    sparse_opts = OptimizationDecisions(  # ty: ignore[missing-typed-dict-key]
+        **(
+            sparse_opts
+            | {
+                "use_small_batch_for_sparse": sparse_opts["backend"] == "onnx_gpu",
+                "backend": sparse_opts["backend"],
+                "dtype": sparse_opts["dtype"],
+            }
+        )
     )
     return (
         dense_opts
         if model_kind == "dense"
         else sparse_opts
         if model_kind == "sparse"
-        else OptimizationDecisions(**(dense_opts | sparse_opts))
+        else OptimizationDecisions(**(dense_opts | sparse_opts))  # ty: ignore[missing-typed-dict-key]
     )
 
 

@@ -4,41 +4,39 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 
 exclude = [
-    ".bzr",
-    ".direnv",
-    ".eggs",
-    ".git",
-    ".git-rewrite",
-    ".hg",
-    ".ipynb_checkpoints",
-    ".mypy_cache",
-    ".nox",
-    ".pants.d",
-    ".pyenv",
-    ".pytest_cache",
-    ".pytype",
-    ".ruff_cache",
-    ".svn",
-    ".tox",
-    ".venv",
-    ".vscode",
-    "__pypackages__",
-    "_build",
-    "buck-out",
-    "build",
-    "dist",
-    "node_modules",
-    "site-packages",
-    "venv",
-    "typings",
+  ".bzr",
+  ".direnv",
+  ".eggs",
+  ".git",
+  ".git-rewrite",
+  ".hg",
+  ".ipynb_checkpoints",
+  ".mypy_cache",
+  ".nox",
+  ".pants.d",
+  ".pyenv",
+  ".pytest_cache",
+  ".pytype",
+  ".ruff_cache",
+  ".svn",
+  ".tox",
+  ".venv",
+  ".vscode",
+  "__pypackages__",
+  "_build",
+  "buck-out",
+  "build",
+  "dist",
+  "node_modules",
+  "site-packages",
+  "venv",
+  "typings",
+  "tests/fixtures/malformed.py",
 ]
 extend-include = ["*.ipynb"]
-
-
 fix = true
 line-length = 100
 indent-width = 4
-
 target-version = "py312"
 
 [format]
@@ -46,25 +44,23 @@ docstring-code-format = true
 docstring-code-line-length = 80
 line-ending = "auto"
 indent-style = "space"
-
 skip-magic-trailing-comma = true
-
 exclude = [
-    "**/_vendor",
-    "setuptools/_distutils",
-    "setuptools/config/_validate_pyproject",
-    ".venv",
-    ".git",
-    ".github",
-    ".vscode",
-    ".idea",
-    "dist",
-    "build",
-    "site",
-    "bin",
-    "lib",
-    "include",
-    "docs",
+  "**/_vendor",
+  "setuptools/_distutils",
+  "setuptools/config/_validate_pyproject",
+  ".venv",
+  ".git",
+  ".github",
+  ".vscode",
+  ".idea",
+  "dist",
+  "build",
+  "site",
+  "bin",
+  "lib",
+  "include",
+  "docs",
 ]
 # Enable preview, required for quote-style = "preserve"
 preview = true
@@ -72,90 +68,90 @@ preview = true
 quote-style = "double"
 
 [lint]
-
 fixable = ["ALL"]
 # Almost all rules; but not all https://docs.astral.sh/ruff/rules/
 select = [
-    "A",
-    "ASYNC",
-    "B",
-    "C",
-    "D",
-    "E",
-    "F",
-    "FLY",
-    "FURB",
-    "G",
-    "I",
-    "ICN",
-    "INT",
-    "N",
-    "LOG",
-    "PD",
-    "PERF",
-    "PIE",
-    "PT",
-    "PTH",
-    "PYI",
-    "Q",
-    "RSE",
-    "RET",
-    "S",
-    "SLF",
-    "SLOT",
-    "SIM",
-    "TRY",
-    "RUF",
-    "UP",
-    "YTT",
-    "W",
+  "A",
+  "ASYNC",
+  "B",
+  "C",
+  "D",
+  "E",
+  "F",
+  "FLY",
+  "FURB",
+  "G",
+  "I",
+  "ICN",
+  "INT",
+  "N",
+  "LOG",
+  "PD",
+  "PERF",
+  "PIE",
+  "PT",
+  "PTH",
+  "PYI",
+  "Q",
+  "RSE",
+  "RET",
+  "S",
+  "SLF",
+  "SLOT",
+  "SIM",
+  "TRY",
+  "RUF",
+  "UP",
+  "YTT",
+  "W",
 ]
 extend-select = [
-    "A003",
-    "ANN201",
-    "ANN002",
-    "COM818",
-    "C901",
-    "DTZ005",
-    "DTZ007",
-    "FBT001",
-    "ISC003",
-    "TID252",
-    "TID253",
+  "A003",
+  "ANN201",
+  "ANN002",
+  "COM818",
+  "C901",
+  "DTZ005",
+  "DTZ007",
+  "FBT001",
+  "ISC003",
+  "TID252",
+  "TID253",
 ]
 ignore = [
-    # https://docs.astral.sh/ruff/formatter/#conflicting-lint-rules
-    "W191",
-    "E402",
-    "E111",
-    "E114",
-    "E117",
-    "D200",
-    "D205",
-    "D206",
-    "D300",
-    "D417",
-    "E501",
-    "Q000",
-    "Q001",
-    "Q002",
-    "Q003",
-    "PYI051", # redundant annotation with Literal and str -- we like to be explicit here
-    "COM812",
-    "COM819",
-    "ISC001",
-    "ISC002",
-    "D212",
-    "SLF001", # Private member accessed
-    "TRY003",
-    "UP015",  # redundant-open-modes, explicit is preferred
+  # https://docs.astral.sh/ruff/formatter/#conflicting-lint-rules
+  "W191",
+  "E402",
+  "E111",
+  "E114",
+  "E117",
+  "D200",
+  "D205",
+  "D206",
+  "D300",
+  "D417",
+  "E501",
+  "Q000",
+  "Q001",
+  "Q002",
+  "Q003",
+  "PYI051",  # redundant annotation with Literal and str -- we like to be explicit here
+  "COM812",
+  "COM819",
+  "ISC001",
+  "ISC002",
+  "D212",
+  "SLF001",  # Private member accessed... it's not private for us.
+  "TRY003",
+  "UP015",  # redundant-open-modes, explicit is preferred
 ]
 exclude = [
-    ".venv/",
-    "**/_vendor",
-    "setuptools/_distutils",
-    "setuptools/config/_validate_pyproject",
-    "typings",
+  ".venv/",
+  "**/_vendor",
+  "setuptools/_distutils",
+  "setuptools/config/_validate_pyproject",
+  "typings",
+  "tests/fixtures/malformed.py",
 ]
 
 [lint.pydocstyle]
@@ -164,46 +160,111 @@ convention = "google"
 [lint.per-file-ignores]
 # Ignore specific rules for certain files
 "**/validation/**/*.py" = [
-    "S110",   # try-except-pass
-    "TRY301", # abstract raise to an inner function
-    "S101",   # allow assert
-    "SLF001", # Private member accessed
-    "D100",   # missing docstring in public module
-    "D102",   # missing docstring in public class
-    "D103",   # missing docstring in public function
-    "D104",   # missing docstring in public method
-    "D105",   # missing docstring in magic method
-    "D107",   # missing docstring in __init__
-    "G004",   # f-string in logging statement
-    "N806",   # incorrect case for function name
+  "S110",  # try-except-pass
+  "TRY301",  # abstract raise to an inner function
+  "S101",  # allow assert
+  "SLF001",  # Private member accessed
+  "D100",  # missing docstring in public module
+  "D102",  # missing docstring in public class
+  "D103",  # missing docstring in public function
+  "D104",  # missing docstring in public method
+  "D105",  # missing docstring in magic method
+  "D107",  # missing docstring in __init__
+  "G004",  # f-string in logging statement
+  "N806",  # incorrect case for function name
 ]
 "tests/*.py" = [
-    "ANN",
-    "C901",   # too complex
-    "D",
-    "DTZ",
-    "FBT001", # boolean typed positional argument
-    "G004",   # f-string in logging statement
-    "N806",   # incorrect case for function name
-    "PTH",
-    "S",
-    "SIM",
-    "SLF001", # Private member accessed
+  "ANN",
+  "C901",  # too complex
+  "D",
+  "DTZ",
+  "FBT001",  # boolean typed positional argument
+  "G004",  # f-string in logging statement
+  "N806",  # incorrect case for function name
+  "PT012",  # pytest.raises() block should contain a single simple statement
+  "PT017",  # Found assertion on exception in except block
+  "PT018",  # Assertion should be broken down into multiple parts
+  "PT011",  # pytest.raises() too broad
+  "B017",  # Do not assert blind exception
+  "PTH",
+  "S",
+  "SIM",
+  "SLF001",  # Private member accessed
+  "PYI024",  # Use typing.NamedTuple instead of collections.namedtuple
+]
+"scripts/**/*.py" = [
+  "ANN",
+  "C901",  # too complex
+  "D",
+  "DTZ",
+  "N806",  # incorrect case for function name
+  "S108",  # Probable insecure usage of temporary file or directory
+  "TRY300",  # Consider moving this statement to an else block
+  "RUF001",  # String contains ambiguous characters
+]
+"mise-tasks/**/*.py" = [
+  "ANN",
+  "C901",  # too complex
+  "D",
+  "DTZ",
+  "N806",  # incorrect case for function name
+  "S108",  # Probable insecure usage of temporary file or directory
 ]
 "src/codeweaver/testing/**/*.py" = [
-    "ANN",
-    "C901",   # too complex
-    "D",
-    "DTZ",
-    "FBT001", # boolean typed positional argument
-    "G004",   # f-string in logging statement
-    "N806",   # incorrect case for function name
-    "PTH",
-    "S",
-    "SIM",
-    "SLF001", # Private member accessed
+  "ANN",
+  "C901",  # too complex
+  "D",
+  "DTZ",
+  "FBT001",  # boolean typed positional argument
+  "G004",  # f-string in logging statement
+  "N806",  # incorrect case for function name
+  "PTH",
+  "S",
+  "SIM",
+  "SLF001",  # Private member accessed
 ]
-
+#! The wall of shame for complex files that need to be gradually improved
+# CLI commands are complex by nature due to argument parsing and validation
+"src/codeweaver/cli/commands/*.py" = [
+  "C901",  # too complex - CLI commands have inherent complexity
+]
+# Registry and provider management have complex configuration logic
+"src/codeweaver/common/registry/provider.py" = [
+  "C901",  # too complex - provider instantiation has complex branching
+]
+"src/codeweaver/common/statistics.py" = [
+  "C901",  # too complex - statistics updates have complex conditional logic
+]
+# Core metadata determination has many edge cases
+"src/codeweaver/core/metadata.py" = [
+  "C901",  # too complex - file extension detection has many cases
+]
+# Engine components have complex orchestration logic
+"src/codeweaver/engine/chunker/parallel.py" = [
+  "C901",  # too complex - parallel processing has complex error handling
+]
+"src/codeweaver/engine/failover.py" = [
+  "C901",  # too complex - failover logic has many edge cases
+]
+"src/codeweaver/engine/indexer/indexer.py" = [
+  "C901",  # too complex - indexing orchestration is inherently complex
+]
+"src/codeweaver/engine/resource_estimation.py" = [
+  "C901",  # too complex - file counting has many edge cases and depth handling
+]
+# Server components have complex lifecycle and health check logic
+"src/codeweaver/server/health_service.py" = [
+  "C901",  # too complex - health checks have many conditions
+]
+"src/codeweaver/server/server.py" = [
+  "C901",  # too complex - server lifecycle has complex orchestration
+]
+"src/codeweaver/engine/chunker/base.py" = [
+  "C901",  # too complex - `from_backup_profile` has complex branching
+]
+"src/codeweaver/providers/vector_stores/inmemory.py" = [
+  "C901",  # too complex - vector store initialization has many conditions
+]
 
 [lint.isort]
 force-single-line = false

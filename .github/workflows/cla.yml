@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc. <knitli@knit.li>
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# ! GitHub Action to check CLA signatures for Knitli repositories
+# ! This action is triggered on issue comments and pull request events.
+name: CLA Assistant
+
+on:
+  issue_comment:
+    types:
+      - created
+  pull_request_target:
+    types:
+      - opened
+      - closed
+      - synchronize
+permissions:
+  actions: write
+  contents: read
+  pull-requests: write
+  statuses: write
+
+jobs:
+  cla-check:
+    uses: knitli/.github/.github/workflows/cla-check.yml@main
+    with:
+      repo_name: "codeweaver"
+      cla_document_url: "https://github.com/knitli/codeweaver/blob/main/CONTRIBUTORS_LICENSE_AGREEMENT.md"
+    secrets: inherit

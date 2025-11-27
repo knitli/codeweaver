@@ -24,6 +24,9 @@ space_redirects = true
 keep_padding = true
 function_next_line = true
 
+[[toml]]
+indent_size = 2
+
 # We don't have Makefiles, but if we did, they would need tabs and not spaces.
 [Makefile]
 indent_style = tab

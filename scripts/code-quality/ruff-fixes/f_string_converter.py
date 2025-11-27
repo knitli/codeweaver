@@ -150,11 +150,10 @@ def convert_file(file_path: Path) -> bool:
             new_content = ast.unparse(new_tree)
             file_path.write_text(new_content, encoding="utf-8")
             return True
-
+        return False
     except (SyntaxError, UnicodeDecodeError) as e:
         print(f"Warning: Could not process {file_path}: {e}", file=sys.stderr)
-
-    return False
+        return False
 
 
 def main() -> None:

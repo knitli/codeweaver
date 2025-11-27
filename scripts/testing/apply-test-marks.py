@@ -180,10 +180,16 @@ def main() -> None:
         return
 
     # Find all Python test files
-    test_files = test_files or test_files.extend(test_dir.rglob("*.py"))
+    if not (test_files := test_files or list(test_dir.rglob("*.py"))):
+        print("No test files found")
+        return
 
     # Filter out __pycache__ and other non-test files
-    test_files = [f for f in test_files if "__pycache__" not in str(f) and f.name != "__init__.py"]
+    test_files = [
+        f
+        for f in test_files
+        if test_files is not None and "__pycache__" not in str(f) and f.name != "__init__.py"
+    ]
 
     print(f"Found {len(test_files)} test files")
 

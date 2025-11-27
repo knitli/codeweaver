@@ -2,7 +2,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Debug MTEB Conversion Tool",
+      "name": "MTEB Conversion Script",
       "type": "debugpy",
       "request": "launch",
       "program": "${workspaceFolder}/scripts/model-data/mteb-to-codeweaver.py",
@@ -11,18 +11,16 @@
       "stopOnEntry": true
     },
     {
-      "name": "Debug CodeWeaver CLI",
+      "name": "CLI",
       "type": "debugpy",
       "request": "launch",
-      "program": "${workspaceFolder}/src/codeweaver/cli/app.py",
-      "args": [
-        "server"
-      ],
+      "program": "${workspaceFolder}/src/codeweaver/cli/__main__.py",
+      "args": "${command:pickArgs}",
       "console": "integratedTerminal",
       "justMyCode": false
     },
     {
-      "name": "CW Module As Script",
+      "name": "Module as-script",
       "type": "debugpy",
       "program": "${file}",
       "request": "launch",
@@ -32,7 +30,7 @@
       "args": "${command:pickArgs}"
     },
     {
-      "name": "Debug Selection",
+      "name": "Selected-Text",
       "type": "debugpy",
       "request": "launch",
       "program": "${selectedText}",
@@ -43,19 +41,11 @@
       "showReturnValue": true
     },
     {
-      "name": "Debug Fetch Grammars Script",
+      "name": "Get-Langs Script",
       "type": "debugpy",
       "request": "launch",
       "program": "${workspaceFolder}/scripts/language-support/get-langs.py",
       "console": "integratedTerminal"
-    },
-    {
-      "name": "Debug Lang Mapper Script",
-      "type": "debugpy",
-      "request": "launch",
-      "program": "${workspaceFolder}/scripts/language-support/build-language-mappings.py",
-      "console": "integratedTerminal",
-      "justMyCode": true
     }
   ]
 }

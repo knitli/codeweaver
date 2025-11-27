@@ -87,8 +87,22 @@ class MiddlewareOptions(TypedDict, total=False):
     rate_limiting: RateLimitingMiddlewareSettings | None
 
 
+DefaultMiddlewareSettings = MiddlewareOptions(
+    error_handling=ErrorHandlingMiddlewareSettings(
+        include_traceback=True, error_callback=None, transform_errors=False
+    ),
+    retry=RetryMiddlewareSettings(
+        max_retries=5, base_delay=1.0, max_delay=60.0, backoff_multiplier=2.0
+    ),
+    logging=LoggingMiddlewareSettings(log_level=30, include_payloads=False),
+    rate_limiting=RateLimitingMiddlewareSettings(
+        max_requests_per_second=75, get_client_id=None, burst_capacity=150, global_limit=True
+    ),
+)
+
 __all__ = (
     "AVAILABLE_MIDDLEWARE",
+    "DefaultMiddlewareSettings",
     "ErrorHandlingMiddlewareSettings",
     "LoggingMiddlewareSettings",
     "MiddlewareOptions",

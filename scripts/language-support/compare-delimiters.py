@@ -50,7 +50,7 @@ def delimiter_dict_to_delimiter(d: DelimiterDict) -> DelimiterPattern:
 
 
 def generate_language_delimiters(language: str) -> tuple[DelimiterPattern, ...]:
-    """Generate delimiters for a language (copied from generate_delimiters.py)."""
+    """Generate delimiters for a language."""
     # Auto-detect family
     family = LanguageFamily.from_known_language(language)
 
@@ -88,7 +88,7 @@ def compare_delimiter_counts(language: str) -> tuple[int, int, int]:
         Tuple of (manual_count, generated_count, delta)
     """
     # Get manual delimiters
-    manual = DELIMITERS.get(language, ())
+    manual = DELIMITERS.get(language, ())  # noqa: F821
     manual_count = len(manual)
 
     # Generate new delimiters
@@ -110,7 +110,7 @@ def compare_delimiter_sets(language: str) -> dict[str, list[tuple[str, str]]]:
         - "common": Delimiters in both sets
     """
     # Get manual delimiters
-    manual = DELIMITERS.get(language, ())
+    manual = DELIMITERS.get(language, ())  # noqa: F821
     manual_pairs = {(d.start, d.end) for d in manual}
 
     # Generate new delimiters
@@ -187,7 +187,7 @@ def main() -> None:
     Side Effects:
         Prints tables and summaries to the console.
     """
-    manual_languages = sorted(DELIMITERS.keys())
+    manual_languages = sorted(DELIMITERS.keys())  # noqa: F821
 
     console.print(
         f"\n[bold cyan]Comparing {len(manual_languages)} manually-defined languages[/bold cyan]\n"

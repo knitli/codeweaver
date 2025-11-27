@@ -1,4 +1,3 @@
-# pyright: reportUnsupportedDunderAll=none
 # SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
@@ -7,6 +6,76 @@
 
 from importlib import import_module
 from types import MappingProxyType
+from typing import TYPE_CHECKING
+
+
+if TYPE_CHECKING:
+    # Import everything for IDE and type checker support
+    # These imports are never executed at runtime, only during type checking
+    from codeweaver.common.logging import log_to_client_or_fallback, setup_logger
+    from codeweaver.common.statistics import (
+        FileStatistics,
+        Identifier,
+        SessionStatistics,
+        TimingStatistics,
+        TokenCategory,
+        TokenCounter,
+        add_failed_request,
+        add_successful_request,
+        get_session_statistics,
+        record_timed_http_request,
+        timed_http,
+    )
+    from codeweaver.common.types import (
+        CallHookTimingDict,
+        HttpRequestsDict,
+        McpComponentRequests,
+        McpComponentTimingDict,
+        McpOperationRequests,
+        McpTimingDict,
+        ResourceUri,
+        TimingStatisticsDict,
+        ToolOrPromptName,
+    )
+    from codeweaver.common.utils import (
+        LazyImport,
+        asyncio_or_uvloop,
+        backup_file_path,
+        ensure_iterable,
+        estimate_tokens,
+        file_is_binary,
+        format_docstring,
+        format_signature,
+        format_snippet_name,
+        generate_collection_name,
+        get_git_branch,
+        get_git_revision,
+        get_optimal_workers,
+        get_possible_env_vars,
+        get_project_path,
+        has_package,
+        humanize,
+        in_codeweaver_clone,
+        is_class,
+        is_debug,
+        is_git_dir,
+        is_pydantic_basemodel,
+        is_test_environment,
+        is_typeadapter,
+        is_wsl,
+        is_wsl_vscode,
+        lazy_import,
+        low_priority,
+        normalize_ext,
+        rpartial,
+        sanitize_unicode,
+        set_relative_path,
+        to_lowly_lowercase,
+        to_tokens,
+        try_git_rev_parse,
+        uuid7,
+        very_low_priority,
+    )
 
 
 _MARKUP_TAG = "bold dark_orange"
@@ -19,12 +88,10 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "HttpRequestsDict": (__spec__.parent, "types"),
     "Identifier": (__spec__.parent, "statistics"),
     "LazyImport": (__spec__.parent, "utils"),
-    "MISSING": (__spec__.parent, "utils"),
     "McpComponentRequests": (__spec__.parent, "types"),
     "McpComponentTimingDict": (__spec__.parent, "types"),
     "McpOperationRequests": (__spec__.parent, "types"),
     "McpTimingDict": (__spec__.parent, "types"),
-    "Missing": (__spec__.parent, "utils"),
     "ResourceUri": (__spec__.parent, "types"),
     "SessionStatistics": (__spec__.parent, "statistics"),
     "TimingStatistics": (__spec__.parent, "statistics"),
@@ -34,15 +101,24 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "ToolOrPromptName": (__spec__.parent, "types"),
     "add_failed_request": (__spec__.parent, "statistics"),
     "add_successful_request": (__spec__.parent, "statistics"),
+    "asyncio_or_uvloop": (__spec__.parent, "utils"),
+    "backup_file_path": (__spec__.parent, "utils"),
     "ensure_iterable": (__spec__.parent, "utils"),
     "estimate_tokens": (__spec__.parent, "utils"),
     "file_is_binary": (__spec__.parent, "utils"),
+    "format_docstring": (__spec__.parent, "utils"),
+    "format_signature": (__spec__.parent, "utils"),
+    "format_snippet_name": (__spec__.parent, "utils"),
+    "generate_collection_name": (__spec__.parent, "utils"),
     "get_git_branch": (__spec__.parent, "utils"),
     "get_git_revision": (__spec__.parent, "utils"),
+    "get_optimal_workers": (__spec__.parent, "utils"),
     "get_possible_env_vars": (__spec__.parent, "utils"),
-    "get_project_root": (__spec__.parent, "utils"),
+    "get_project_path": (__spec__.parent, "utils"),
     "get_session_statistics": (__spec__.parent, "statistics"),
+    "get_user_config_dir": (__spec__.parent, "utils"),
     "has_package": (__spec__.parent, "utils"),
+    "humanize": (__spec__.parent, "utils"),
     "in_codeweaver_clone": (__spec__.parent, "utils"),
     "is_class": (__spec__.parent, "utils"),
     "is_debug": (__spec__.parent, "utils"),
@@ -50,8 +126,11 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "is_pydantic_basemodel": (__spec__.parent, "utils"),
     "is_test_environment": (__spec__.parent, "utils"),
     "is_typeadapter": (__spec__.parent, "utils"),
+    "is_wsl": (__spec__.parent, "utils"),
+    "is_wsl_vscode": (__spec__.parent, "utils"),
     "lazy_import": (__spec__.parent, "utils"),
     "log_to_client_or_fallback": (__spec__.parent, "logging"),
+    "low_priority": (__spec__.parent, "utils"),
     "normalize_ext": (__spec__.parent, "utils"),
     "record_timed_http_request": (__spec__.parent, "statistics"),
     "rpartial": (__spec__.parent, "utils"),
@@ -59,8 +138,11 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "set_relative_path": (__spec__.parent, "utils"),
     "setup_logger": (__spec__.parent, "logging"),
     "timed_http": (__spec__.parent, "statistics"),
+    "to_lowly_lowercase": (__spec__.parent, "utils"),
+    "to_tokens": (__spec__.parent, "utils"),
     "try_git_rev_parse": (__spec__.parent, "utils"),
     "uuid7": (__spec__.parent, "utils"),
+    "very_low_priority": (__spec__.parent, "utils"),
 })
 """Dynamically import submodules and classes for the common package.
 
@@ -83,7 +165,6 @@ def __getattr__(name: str) -> object:
 
 __all__ = (
     "CODEWEAVER_PREFIX",
-    "MISSING",
     "CallHookTimingDict",
     "FileStatistics",
     "HttpRequestsDict",
@@ -93,7 +174,6 @@ __all__ = (
     "McpComponentTimingDict",
     "McpOperationRequests",
     "McpTimingDict",
-    "Missing",
     "ResourceUri",
     "SessionStatistics",
     "TimingStatistics",
@@ -103,15 +183,24 @@ __all__ = (
     "ToolOrPromptName",
     "add_failed_request",
     "add_successful_request",
+    "asyncio_or_uvloop",
+    "backup_file_path",
     "ensure_iterable",
     "estimate_tokens",
     "file_is_binary",
+    "format_docstring",
+    "format_signature",
+    "format_snippet_name",
+    "generate_collection_name",
     "get_git_branch",
     "get_git_revision",
+    "get_optimal_workers",
     "get_possible_env_vars",
-    "get_project_root",
+    "get_project_path",
     "get_session_statistics",
+    "get_user_config_dir",
     "has_package",
+    "humanize",
     "in_codeweaver_clone",
     "is_class",
     "is_debug",
@@ -119,8 +208,11 @@ __all__ = (
     "is_pydantic_basemodel",
     "is_test_environment",
     "is_typeadapter",
+    "is_wsl",
+    "is_wsl_vscode",
     "lazy_import",
     "log_to_client_or_fallback",
+    "low_priority",
     "normalize_ext",
     "record_timed_http_request",
     "rpartial",
@@ -128,8 +220,11 @@ __all__ = (
     "set_relative_path",
     "setup_logger",
     "timed_http",
+    "to_lowly_lowercase",
+    "to_tokens",
     "try_git_rev_parse",
     "uuid7",
+    "very_low_priority",
 )
 
 

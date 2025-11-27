@@ -17,6 +17,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0 -->
 - Elixir
 - Go
 - Haskell
+- Hcl
 - Html
 - Java
 - Javascript
@@ -36,13 +37,18 @@ SPDX-License-Identifier: MIT OR Apache-2.0 -->
 - Tsx
 - Yaml
 
-### Languages with Basic Parsing Support
+### Languages with Smart Delimiter Support
+
+These languages are parsed with our delimiter-based approach. This list also includes the above languages because we have backup support for them with the smart delimiter chunker. We identify patterns common to families of languages to extract meaningful semantic-like structures and data:
 
 - Asciidoc
 - Assembly
 - Assemblyscript
+- Astro
+- Bash
 - Batch
 - Beef
+- C
 - Carbon
 - Chapel
 - Clojure
@@ -51,9 +57,13 @@ SPDX-License-Identifier: MIT OR Apache-2.0 -->
 - Coffeescript
 - Confluence
 - Coq
+- Cpp
 - Creole
 - Crystal
+- Csharp
+- Css
 - Csv
+- Cuda
 - Cue
 - Cython
 - Dart
@@ -65,7 +75,11 @@ SPDX-License-Identifier: MIT OR Apache-2.0 -->
 - Dlang
 - Docbook
 - Docker
+- Duck
 - Dyck
+- Ecl
+- Eiffel
+- Elixir
 - Elm
 - Elvish
 - Emacs
@@ -77,30 +91,41 @@ SPDX-License-Identifier: MIT OR Apache-2.0 -->
 - Frege
 - Fsharp
 - Gleam
+- Go
 - Gosu
 - Graphql
 - Groovy
 - Hack
+- Haskell
 - Hcl
 - Help
 - Hjson
 - Hlsl
+- Html
 - Idris
 - Imba
 - Info
+- Ini
 - Io
 - Janet
+- Java
+- Javascript
 - Jelly
+- Jinja
+- Json
+- Jsx
 - Jule
 - Julia
 - Jupyter
 - Just
+- Kotlin
 - Lagda
 - Latex
 - Less
 - Lhs
 - Lisp
 - Livescript
+- Lua
 - Lucee
 - Make
 - Man
@@ -110,8 +135,8 @@ SPDX-License-Identifier: MIT OR Apache-2.0 -->
 - Mojo
 - Move
 - Newick
-- Nim
 - Nimble
+- Nix
 - Nushell
 - Nw
 - Objective C
@@ -121,12 +146,15 @@ SPDX-License-Identifier: MIT OR Apache-2.0 -->
 - Pascal
 - Perl
 - Pharo
-- Pmd
+- Php
+- Pkl
 - Pod
 - Pony
 - Powershell
+- Properties
 - Protobuf
 - Purescript
+- Python
 - Qb 64
 - Qml
 - R
@@ -134,7 +162,6 @@ SPDX-License-Identifier: MIT OR Apache-2.0 -->
 - Rake
 - Raku
 - Rakudo
-- Rdoc
 - Reason
 - Red
 - Rescript
@@ -144,16 +171,27 @@ SPDX-License-Identifier: MIT OR Apache-2.0 -->
 - Rmd
 - Rnw
 - Rtf
+- Ruby
+- Rust
 - Sas
 - Sass
+- Scala
 - Scheme
 - Scss
+- Self
 - Smali
+- Sml
+- Solidity
 - Sql
 - Svelte
+- Swift
 - Texinfo
 - Text
 - Textile
+- Toml
+- Tsv
+- Tsx
+- Typescript
 - Vala
 - Vale
 - Vbscript
@@ -164,7 +202,10 @@ SPDX-License-Identifier: MIT OR Apache-2.0 -->
 - Vue
 - Wiki
 - Xml
+- Xonsh
+- Yaml
 - Yard
 - Zig
+- Zsh
 
 

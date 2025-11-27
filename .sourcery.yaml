@@ -11,7 +11,8 @@ rule_settings:
     - dont-self-assign-variables
     - do-not-use-staticmethod
     - avoid-global-variables
-    - 'docstrings-for-functions'
+    - docstrings-for-functions
+    - don't-import-test-modules
   python_version: "3.12"
   rule_types:
     - refactoring

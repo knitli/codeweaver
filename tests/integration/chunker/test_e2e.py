@@ -14,8 +14,8 @@ import pytest
 
 from codeweaver.engine.chunker.selector import ChunkerSelector
 
-pytestmark = [pytest.mark.integration]
 
+pytestmark = [pytest.mark.integration]
 
 
 @pytest.fixture
@@ -37,9 +37,35 @@ def mock_discovered_file():
     from codeweaver.common.utils import uuid7
 
     def _make_file(path_str):
+        path = Path(path_str)
+
+        # Create mock stat result
+        mock_stat = Mock()
+        mock_stat.st_size = 1024  # 1KB file size
+
+        # Create mock path with stat() method
+        # Use real Path for integration test since semantic chunker needs to parse the file
+        mock_path = path
+
+        # Override stat() to use mock if needed
+        # For integration tests, we want to use the real file path for parsing
+        # but may need to mock stat for files that don't exist yet
+
+        # Create mock ExtKind
+        from codeweaver.core.language import SemanticSearchLanguage
+
+        mock_ext_kind = Mock()
+        if path.suffix == ".py":
+            mock_ext_kind.language = SemanticSearchLanguage.PYTHON
+        else:
+            mock_ext_kind.language = path.suffix.lstrip(".")
+
+        # Create mock DiscoveredFile
         file = Mock()
-        file.path = Path(path_str)
+        file.path = mock_path
+        file.ext_kind = mock_ext_kind
         file.source_id = uuid7()  # Add source_id for Span validation (UUID7)
+
         return file
 
     return _make_file
@@ -75,7 +101,7 @@ def test_e2e_degradation_chain(mock_governor, mock_discovered_file):
     # (implementation will add fallback logic)
     with pytest.raises(Exception):  # Will fail until fallback implemented
         chunker = selector.select_for_file(file)
-        chunker.chunk(content, file_path=fixture_path)
+        chunker.chunk(content, file=file)
 
 
 # =============================================================================
@@ -92,7 +118,14 @@ def sample_files():
     files = []
 
     # Collect existing Python fixtures, excluding edge cases and problem files
-    skip_files = {"__init__.py", "malformed.py", "empty.py", "whitespace_only.py"}
+    skip_files = {
+        "__init__.py",
+        "malformed.py",
+        "empty.py",
+        "whitespace_only.py",
+        "deep_nesting.py",  # Pathological file with 201 nesting levels
+        "single_line.py",  # Edge case: only one line of code
+    }
     for fixture_path in fixture_dir.glob("*.py"):
         if fixture_path.name not in skip_files:
             if discovered := DiscoveredFile.from_path(fixture_path):
@@ -101,7 +134,7 @@ def sample_files():
     return files
 
 
-@pytest.mark.skip(reason="Parallel file processing needs debugging - tracked separately")
+@pytest.mark.slow
 def test_e2e_multiple_files_parallel_process(sample_files):
     """Integration test: Process multiple files in parallel with ProcessPoolExecutor.
 
@@ -120,7 +153,7 @@ def test_e2e_multiple_files_parallel_process(sample_files):
         pytest.skip("No fixture files available for parallel processing test")
 
     # Create real governor with capabilities
-    capabilities = EmbeddingModelCapabilities(context_window=8192, embedding_dimensions=1536)
+    capabilities = EmbeddingModelCapabilities(context_window=8192, default_dimension=1536)
     settings = ChunkerSettings(
         performance=PerformanceSettings(
             max_ast_depth=200, chunk_timeout_seconds=30, max_chunks_per_file=5000
@@ -129,18 +162,15 @@ def test_e2e_multiple_files_parallel_process(sample_files):
     governor = ChunkGovernor(capabilities=(capabilities,), settings=settings)
 
     # Process files in parallel
-    results = {}
-    for file_path, chunks in chunk_files_parallel(
-        sample_files, governor, max_workers=2, executor_type="process"
-    ):
-        results[file_path] = chunks
+    results = dict(
+        chunk_files_parallel(sample_files, governor, max_workers=2, executor_type="process")
+    )
 
     # Verify results
-    assert len(results) > 0, "Should process at least one file"
+    assert results, "Should process at least one file"
     assert len(results) <= len(sample_files), "Should not have more results than input files"
 
-    # Quality checks on all results
-    for file_path, chunks in results.items():
+    def _assert_chunk_quality(file_path, chunks):
         assert len(chunks) > 0, f"File {file_path} should produce chunks"
         assert all(c.content.strip() for c in chunks), f"No empty chunks in {file_path}"
         assert all(c.metadata for c in chunks), f"All chunks have metadata in {file_path}"
@@ -148,8 +178,13 @@ def test_e2e_multiple_files_parallel_process(sample_files):
             f"Valid line ranges in {file_path}"
         )
 
+    # Quality checks on all results
+    # sourcery skip: no-loop-in-tests
+    for file_path, chunks in results.items():
+        _assert_chunk_quality(file_path, chunks)
 
-@pytest.mark.skip(reason="Parallel file processing needs debugging - tracked separately")
+
+@pytest.mark.slow
 def test_e2e_multiple_files_parallel_thread(sample_files):
     """Integration test: Process multiple files in parallel with ThreadPoolExecutor."""
     from codeweaver.config.chunker import ChunkerSettings, PerformanceSettings
@@ -162,7 +197,7 @@ def test_e2e_multiple_files_parallel_thread(sample_files):
         pytest.skip("No fixture files available for parallel processing test")
 
     # Create real governor
-    capabilities = EmbeddingModelCapabilities(context_window=8192, embedding_dimensions=1536)
+    capabilities = EmbeddingModelCapabilities(context_window=8192, default_dimension=1536)
     settings = ChunkerSettings(
         performance=PerformanceSettings(
             max_ast_depth=200, chunk_timeout_seconds=30, max_chunks_per_file=5000
@@ -171,17 +206,16 @@ def test_e2e_multiple_files_parallel_thread(sample_files):
     governor = ChunkGovernor(capabilities=(capabilities,), settings=settings)
 
     # Process files in parallel with threads
-    results = {}
-    for file_path, chunks in chunk_files_parallel(
-        sample_files, governor, max_workers=2, executor_type="thread"
-    ):
-        results[file_path] = chunks
+    results = dict(
+        chunk_files_parallel(sample_files, governor, max_workers=2, executor_type="thread")
+    )
 
     # Verify results
-    assert len(results) > 0, "Should process at least one file"
+    assert results, "Should process at least one file"
     assert len(results) <= len(sample_files), "Should not have more results than input files"
 
     # Quality checks
+    # sourcery skip: no-loop-in-tests
     for file_path, chunks in results.items():
         assert len(chunks) > 0, f"File {file_path} should produce chunks"
 
@@ -216,16 +250,12 @@ def test_e2e_parallel_error_handling(tmp_path):
     files = [good_discovered, bad_discovered, another_discovered]
 
     # Create governor
-    capabilities = EmbeddingModelCapabilities(context_window=8192, embedding_dimensions=1536)
+    capabilities = EmbeddingModelCapabilities(context_window=8192, default_dimension=1536)
     governor = ChunkGovernor(capabilities=(capabilities,), settings=ChunkerSettings())
 
     # Process in parallel - should continue despite bad file
     # Use thread executor to avoid process pickling issues
-    results = {}
-    for file_path, chunks in chunk_files_parallel(
-        files, governor, max_workers=2, executor_type="thread"
-    ):
-        results[file_path] = chunks
+    results = dict(chunk_files_parallel(files, governor, max_workers=2, executor_type="thread"))
 
     # Should have processed the good files even though one failed
     # Note: Depending on error handling, bad file might produce chunks via fallback
@@ -235,7 +265,7 @@ def test_e2e_parallel_error_handling(tmp_path):
     )
 
     # Check if good files are in results (handle both absolute and relative paths)
-    result_paths = {p.resolve() for p in results.keys()}
+    result_paths = {p.resolve() for p in results}
     assert good_file.resolve() in result_paths, f"Good file {good_file} should be processed"
     assert another_good.resolve() in result_paths, (
         f"Another good file {another_good} should be processed"
@@ -248,14 +278,14 @@ def test_e2e_parallel_empty_file_list():
     from codeweaver.engine.chunker.parallel import chunk_files_parallel
     from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 
-    capabilities = EmbeddingModelCapabilities(context_window=8192, embedding_dimensions=1536)
+    capabilities = EmbeddingModelCapabilities(context_window=8192, default_dimension=1536)
     governor = ChunkGovernor(capabilities=(capabilities,))
 
     # Process empty list
     results = list(chunk_files_parallel([], governor))
 
     # Should return empty without error
-    assert results == [], "Empty input should yield no results"
+    assert not results, "Empty input should yield no results"
 
 
 def test_e2e_parallel_dict_convenience():
@@ -266,32 +296,34 @@ def test_e2e_parallel_dict_convenience():
     from codeweaver.engine.chunker.parallel import chunk_files_parallel_dict
     from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 
-
-
-
     # Get sample files
     fixture_dir = Path("tests/fixtures")
-    files = []
-    for fixture_path in fixture_dir.glob("sample*.py"):
-        if discovered := DiscoveredFile.from_path(fixture_path):
-            files.append(discovered)
+    files = [
+        DiscoveredFile.from_path(fixture_path) for fixture_path in fixture_dir.glob("sample*.py")
+    ]
 
     if not files:
         pytest.skip("No sample files available")
 
     # Create governor
-    capabilities = EmbeddingModelCapabilities(context_window=8192, embedding_dimensions=1536)
+    capabilities = EmbeddingModelCapabilities(context_window=8192, default_dimension=1536)
     governor = ChunkGovernor(capabilities=(capabilities,), settings=ChunkerSettings())
 
+    if not files:
+        pytest.skip("No fixture files available for parallel dict test")
     # Get results as dict
-    results = chunk_files_parallel_dict(files, governor, max_workers=2)
+    results = chunk_files_parallel_dict(files, governor, max_workers=2)  # ty: ignore[invalid-argument-type]
 
     # Verify it's a dictionary
     assert isinstance(results, dict), "Should return dictionary"
     assert len(results) > 0, "Should have some results"
 
-    # Verify structure
-    for file_path, chunks in results.items():
+    def _assert_result_structure(file_path, chunks):
         assert isinstance(file_path, Path), "Keys should be Paths"
         assert isinstance(chunks, list), "Values should be lists"
         assert all(hasattr(c, "content") for c in chunks), "Should contain chunks"
+
+    # Verify structure
+    # sourcery skip: no-loop-in-tests
+    for file_path, chunks in results.items():
+        _assert_result_structure(file_path, chunks)

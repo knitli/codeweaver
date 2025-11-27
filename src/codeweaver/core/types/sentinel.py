@@ -9,20 +9,32 @@ from __future__ import annotations
 
 import sys as _sys
 
+from collections.abc import Callable
 from threading import Lock as _Lock
 from types import FrameType
-from typing import Annotated, Self, cast
+from typing import Any, Self, cast
 
-from pydantic import Field
+from pydantic import ConfigDict, GetCoreSchemaHandler
+from pydantic.annotated_handlers import GetJsonSchemaHandler
+from pydantic.json_schema import GenerateJsonSchema, JsonSchemaValue
 from pydantic_core import core_schema
+from pydantic_core._pydantic_core import PydanticOmit
 
 from codeweaver.core.types.aliases import LiteralStringT, SentinelName, SentinelNameT
-from codeweaver.core.types.models import BasedModel
+from codeweaver.core.types.models import BasedModel, clean_sentinel_from_schema
+
+
+class DontGenerateJsonSchema(GenerateJsonSchema):
+    """GenerateJsonSchema implementation that disables JSON Schema generation."""
+
+    def generate(self, _schema: core_schema.CoreSchema, _error_info: str) -> JsonSchemaValue:
+        """Disable JSON Schema generation by raising an error."""
+        raise PydanticOmit
 
 
 def _get_parent_frame() -> FrameType:
     """Get the parent frame of the caller."""
-    return _sys._getframe(2)  # pyright: ignore[reportPrivateUsage]
+    return _sys._getframe(2)
 
 
 _lock = _Lock()
@@ -34,22 +46,58 @@ class Sentinel(BasedModel):
     ...
     """
 
-    _name: Annotated[SentinelNameT, Field(default_factory=SentinelName)]
-    _repr: str
-    _module_name: str
+    model_config = BasedModel.model_config | ConfigDict(frozen=True)
 
-    def __new__(
-        cls, name: SentinelName, repr_: str | None = None, module_name: str | None = None
-    ) -> Self:
-        """Create a new ."""
+    name: SentinelName
+    module_name: str
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, source_type: Any, handler: GetCoreSchemaHandler
+    ) -> core_schema.CoreSchema:
+        """Tell Pydantic how to validate and serialize Sentinel instances.
+
+        Sentinels can only be validated if they're already Sentinel instances.
+        They cannot be constructed from arbitrary data like dicts or strings during validation.
+
+        For serialization, we convert to a simple string to avoid circular references.
+        """
+        from pydantic_core import core_schema as cs
+
+        # Define serialization function
+        def serialize_sentinel(value: Sentinel) -> str:
+            """Serialize Sentinel to string."""
+            return str(value.name)
+
+        assert source_type is cls, "Sentinel can only validate its own instances."  # noqa: S101
+        # Use is_instance schema with custom serialization
+        # Sentinels are only set internally,
+        # spellchecker:off
+        return cs.is_instance_schema(
+            cls,
+            cls_repr=repr(cls),
+            serialization=cs.plain_serializer_function_ser_schema(
+                serialize_sentinel, return_schema=cs.str_schema(), when_used="json"
+            ),
+        )
+        # spellchecker:on
+
+    @classmethod
+    def __get_pydantic_json_schema__(
+        cls, schema: core_schema.CoreSchema, handler: GetJsonSchemaHandler
+    ) -> JsonSchemaValue:
+        """Provide JSON Schema generation for Sentinel."""
+        return DontGenerateJsonSchema().generate(schema, repr(cls))
+
+    def __new__(cls, name: SentinelName | None = None, module_name: str | None = None) -> Self:
+        """Create a new Sentinel instance with singleton behavior."""
         # sourcery skip: avoid-builtin-shadow
-        name = SentinelName(name.strip())
-        repr_ = str(repr_) if repr_ else f"<<{name.split('.')[-1]}>>"
-        if not module_name:
-            parent_frame = _get_parent_frame()
-            module_name = (
-                parent_frame.f_globals.get("__name__", "__main__") if parent_frame else __name__
-            )
+        name = SentinelName(name or cast(LiteralStringT, cls.__name__.upper()).strip())
+        module_name = module_name or (
+            cls.module_name
+            if hasattr(cls, "module_name") and isinstance(cls.module_name, str)
+            else cls._get_module_name_generator()()
+        )
 
         # Include the class's module and fully qualified name in the
         # registry key to support sub-classing.
@@ -59,66 +107,89 @@ class Sentinel(BasedModel):
         existing: Sentinel | None = _registry.get(registry_key)
         if existing is not None:
             return cast(Self, existing)
-        existing = super().__new__(cls)
-        existing._name = name
-        existing._repr = repr_
-        existing._module_name = module_name or __name__
+
+        # Create instance using object.__new__ to avoid recursion
+        # Then manually set up Pydantic internals
+        newcls = object.__new__(cls)
+
+        # Set instance attributes (not type attributes!) using object.__setattr__
+        # because the model is frozen
+        object.__setattr__(newcls, "name", name)
+        object.__setattr__(newcls, "module_name", module_name or __name__)
+
+        # Initialize Pydantic's internal attributes for proper serialization
+        object.__setattr__(newcls, "__pydantic_fields_set__", {"name", "module_name"})
+        object.__setattr__(newcls, "__pydantic_extra__", None)
+        object.__setattr__(newcls, "__pydantic_private__", None)
+
         with _lock:
-            return cast(Self, _registry.setdefault(registry_key, existing))
+            return cast(Self, _registry.setdefault(registry_key, newcls))
 
-    def __init__(
-        self, name: SentinelName, repr_: str | None = None, module_name: str | None = None
-    ) -> None:
-        """Initialize a new ."""
-        self._name = name
-        self._repr = repr_ or f"<<{name.split('.')[-1]}>>"
-        self._module_name = module_name  # pyright: ignore[reportAttributeAccessIssue]
+    def __init__(self, name: SentinelName | None = None, module_name: str | None = None) -> None:
+        """Initialize a Sentinel instance.
 
-    @classmethod
-    def __call__(
-        cls, name: SentinelName, repr_: str | None = None, module_name: str | None = None
-    ) -> Self:
-        """Create a new ."""
-        return cls(name, repr_, module_name)
+        Note: Initialization is handled in __new__ to maintain singleton behavior
+        while properly setting up Pydantic's serialization infrastructure.
+        """
+        # Initialization already done in __new__
 
     def __str__(self) -> str:
-        """Return a string representation of the ."""
-        return self._name
+        """Return a string representation of the sentinel."""
+        return self.name
 
     def __repr__(self) -> str:
-        """Return a string representation of the ."""
-        return self._repr
+        """Return a string representation of the sentinel."""
+        return f"{type(self).__name__}(name={self.name}, module_name={self.module_name})"
 
-    def __reduce__(self) -> tuple[type[Self], tuple[str, str, str]]:
+    def __reduce__(self) -> tuple[type[Self], tuple[str, str]]:
         """Return state information for pickling."""
-        return (self.__class__, (self._name, self._repr, self._module_name))
+        return (self.__class__, (self.name, self.module_name))
 
     def __hash__(self) -> int:
-        """Return the hash of the ."""
-        return hash((self._name, self._module_name))
+        """Return the hash of the sentinel."""
+        return hash((self.name, self.module_name))
+
+    def __eq__(self, other: object) -> bool:
+        """Compare sentinels by identity."""
+        # Sentinels are singletons, so we can use identity comparison
+        # This avoids issues with Pydantic's __eq__ trying to access __pydantic_extra__
+        return self is other
 
     @staticmethod
-    def _validate(value: str, _info: core_schema.ValidationInfo) -> tuple[LiteralStringT, str, str]:
-        """Validate that a value is a ."""
+    def _get_module_name_generator() -> Callable[[], str]:
+        """Get a generator function that returns the module name of the caller."""
+
+        def generator() -> str:
+            parent_frame = _get_parent_frame()
+            if parent_frame and (module_name := parent_frame.f_globals.get("__name__", None)):
+                return module_name
+            return __name__
+
+        return generator
+
+    @staticmethod
+    def _validate(value: str, _info: core_schema.ValidationInfo) -> tuple[SentinelNameT, str, str]:
+        """Validate that a value is a sentinel."""
         name, repr_, module_name = value.split(" ")
-        return (cast(LiteralStringT, name.strip()), repr_, module_name.strip())
+        return SentinelName(cast(LiteralStringT, name.strip())), repr_, module_name.strip()
 
     @staticmethod
     def _serialize(existing: Sentinel) -> str:
         """Serialize a Sentinel to a string."""
-        return f"{existing._name} {existing._repr} {existing._module_name}"
+        return f"{existing.name} {existing.module_name}"
 
     def _telemetry_keys(self) -> None:
         return None
 
 
-class Unset:
+class Unset(Sentinel):
+    """A sentinel value to indicate that a value is unset.
+    Used as a default value in function arguments to distinguish between
+    an explicit `None` value and an uninitialized parameter.
     """
-    A sentinel value to indicate that a value is unset.
-    """
 
 
-UNSET: Unset = Unset()
+UNSET: Unset = Unset(name="Unset", module_name=Sentinel._get_module_name_generator()())  # type: ignore
 
 
-__all__ = ("UNSET", "Sentinel", "SentinelName", "Unset")
+__all__ = ("UNSET", "Sentinel", "SentinelName", "Unset", "clean_sentinel_from_schema")

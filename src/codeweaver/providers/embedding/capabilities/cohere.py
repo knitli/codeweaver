@@ -8,12 +8,14 @@
 from __future__ import annotations
 
 from types import MappingProxyType
+from typing import TYPE_CHECKING
 
-from codeweaver.providers.embedding.capabilities.base import (
-    EmbeddingModelCapabilities,
-    PartialCapabilities,
-)
+from codeweaver.providers.embedding.capabilities.types import PartialCapabilities
 from codeweaver.providers.provider import Provider
+
+
+if TYPE_CHECKING:
+    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 
 
 MODEL_MAP: MappingProxyType[Provider, tuple[str, ...]] = MappingProxyType({
@@ -36,6 +38,7 @@ def _get_shared_cohere_embedding_capabilities() -> PartialCapabilities:
         "name": MODEL_MAP[Provider.COHERE],
         "provider": Provider.COHERE,
         "supports_context_chunk_embedding": False,
+        "default_dtype": "float",
         "preferred_metrics": ("cosine", "dot", "euclidean"),
         "is_normalized": False,
         "tokenizer": "tokenizers",
@@ -45,6 +48,8 @@ def _get_shared_cohere_embedding_capabilities() -> PartialCapabilities:
 
 def get_cohere_embedding_capabilities() -> tuple[EmbeddingModelCapabilities, ...]:
     """Get the capabilities for cohere embedding models."""
+    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+
     shared_caps = _get_shared_cohere_embedding_capabilities()
     base_capabilities: dict[str, PartialCapabilities] = {
         "embed-english-v3.0": {

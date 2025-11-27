@@ -6,91 +6,221 @@
 
 from __future__ import annotations
 
+import logging
+
 from datetime import UTC, datetime
-from typing import Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any, Literal
 
-from pydantic import Field, PositiveInt
+from pydantic import Field
+from qdrant_client.http.models import SparseVectorParams, VectorParams
 
+from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.types.models import BasedModel
-from codeweaver.exceptions import DimensionMismatchError, ProviderSwitchError
+from codeweaver.exceptions import DimensionMismatchError, ModelSwitchError
+
+
+if TYPE_CHECKING:
+    from codeweaver.core.types.aliases import FilteredKeyT
+    from codeweaver.core.types.enum import AnonymityConversion
+
+logger = logging.getLogger(__name__)
+
+
+class HybridVectorPayload(BasedModel):
+    """Metadata payload for stored vectors."""
+
+    chunk: Annotated[CodeChunk, Field(description="Code chunk metadata")]
+    chunk_id: Annotated[str, Field(description="UUID7 hex string index identifier for the chunk")]
+    file_path: Annotated[str, Field(description="File path of the code chunk")]
+    line_start: Annotated[int, Field(description="Start line number of the code chunk")]
+    line_end: Annotated[int, Field(description="End line number of the code chunk")]
+    indexed_at: Annotated[
+        datetime,
+        Field(
+            description="Datetime object when the chunk was indexed. We use datetime here because qdrant can filter by datetime."
+        ),
+    ]
+    chunked_on: Annotated[
+        datetime,
+        Field(
+            description="Datetime object when the chunk was created. We use datetime here because qdrant can filter by datetime."
+        ),
+    ]
+    hash: Annotated[str, Field(description="blake 3 hash of the code chunk")]
+    provider: Annotated[str, Field(description="Provider name for the vector store")]
+    embedding_complete: Annotated[
+        bool,
+        Field(
+            description="Whether the chunk has been fully embedded with both sparse and dense embeddings"
+        ),
+    ]
+    is_backup: Annotated[
+        bool,
+        Field(
+            description="Whether the vector was created as part of a backup chunking/embedding/memory storage process"
+        ),
+    ] = False
+
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
+        from codeweaver.core.types.aliases import FilteredKey
+        from codeweaver.core.types.enum import AnonymityConversion
+
+        return {FilteredKey("file_path"): AnonymityConversion.HASH}
+
+    def to_payload(self) -> dict[str, Any]:
+        """Convert to a dictionary payload for storage."""
+        return self.model_dump(mode="json", exclude_none=True, by_alias=True, round_trip=True)
+
+    @classmethod
+    def from_payload(cls, payload: dict[str, Any]) -> HybridVectorPayload:
+        """Create a HybridVectorPayload from a dictionary payload."""
+        return cls.model_validate(payload)
 
 
 class CollectionMetadata(BasedModel):
     """Metadata stored with collections for validation and compatibility checks."""
 
     provider: Annotated[str, Field(description="Provider name that created collection")]
-    version: Annotated[str, Field(description="Metadata schema version")]
     created_at: Annotated[datetime, Field(default_factory=lambda: datetime.now(UTC))]
-    embedding_dim_dense: Annotated[
-        PositiveInt, Field(description="Expected dense embedding dimension")
-    ]
-    embedding_dim_sparse: Annotated[
-        int | None, Field(default=None, description="Max sparse embedding dimension")
-    ]
     project_name: Annotated[str, Field(description="Project/repository name")]
-    vector_config: Annotated[dict[str, Any], Field(description="Vector configuration snapshot")]
+    vector_config: Annotated[
+        dict[Literal["dense"], VectorParams],
+        Field(description="Vector configuration snapshot", serialization_alias="vectors_config"),
+    ]
+    sparse_config: Annotated[
+        dict[Literal["sparse"], SparseVectorParams],
+        Field(
+            description="Sparse embedding configuration snapshot",
+            serialization_alias="sparse_vectors_config",
+        ),
+    ]
 
-    def validate_compatibility(
-        self, current_provider: str, expected_dense_dim: int, expected_sparse_dim: int | None = None
-    ) -> None:
+    dense_model: Annotated[str | None, Field(description="Embedding model name used")] = None
+    sparse_model: Annotated[str | None, Field(description="Sparse embedding model name used")] = (
+        None
+    )
+    collection_name: Annotated[str, Field(description="Name of the collection")] = ""
+    is_backup: Annotated[
+        bool, Field(description="Whether this collection is for backup embeddings")
+    ] = False
+    version: Annotated[str, Field(description="Metadata schema version")] = "1.0.0"
+
+    def to_collection(self) -> dict[str, Any]:
+        """Convert to a dictionary that is the argument for collection creation."""
+        # Return collection creation params without metadata (metadata is stored separately)
+        return self.model_dump(
+            exclude_none=True,
+            by_alias=True,
+            round_trip=True,
+            exclude={
+                "created_at",
+                "is_backup",
+                "project_name",
+                "version",
+                "provider",
+                "dense_model",
+                "sparse_model",
+            },
+        )
+
+    @classmethod
+    def from_collection(cls, data: dict[str, Any]) -> CollectionMetadata:
+        """Create CollectionMetadata from a collection dictionary."""
+        metadata = data.get("metadata", {})
+        return cls.model_validate(metadata)
+
+    def validate_compatibility(self, other: CollectionMetadata) -> None:
         """Validate collection metadata against current provider configuration.
 
         Args:
-            current_provider: Current provider name
-            expected_dense_dim: Expected dense embedding dimension
-            expected_sparse_dim: Expected sparse embedding dimension (optional)
+            other: Other collection metadata to compare against
 
         Raises:
-            ProviderSwitchError: If provider doesn't match collection metadata
+            ModelSwitchError: If embedding models don't match
             DimensionMismatchError: If embedding dimensions don't match
+
+        Warnings:
+            Logs warning if provider has changed (suggests reindexing)
         """
-        if self.provider != current_provider:
-            raise ProviderSwitchError(
-                f"Collection was created with '{self.provider}' provider, but current configuration uses '{current_provider}'",
+        # Warn on provider switch - suggests reindexing but doesn't block
+        if self.provider != other.provider:
+            logger.warning(
+                "Provider switch detected: collection created with '%s', but current provider is '%s'.",
+                other.provider,
+                self.provider,
+                extra={
+                    "collection_provider": other.provider,
+                    "current_provider": self.provider,
+                    "collection": other.collection_name,
+                    "current_collection": self.collection_name,
+                    "project_name": self.project_name,
+                    "suggestions": [
+                        "Changing vector storage providers without changing models *may* be OK.",
+                        "To ensure compatibility, consider re-indexing your codebase with the new provider.",
+                        "If you encounter issues, you may need to delete the existing collection and re-index. Run `cw index` to re-index.",
+                    ],
+                },
+            )
+
+        # Error on model switch - this corrupts search results
+        # Only raise if both have models and they differ (allow None for backwards compatibility)
+        if self.dense_model and other.dense_model and self.dense_model != other.dense_model:
+            raise ModelSwitchError(
+                f"Your existing embedding collection was created with model '{other.dense_model}', but the current model is '{self.dense_model}'. You can't use different embedding models for the same collection.",
                 suggestions=[
-                    "Option 1: Re-index your codebase with the current provider",
+                    "Option 1: Re-index your codebase with the new provider",
                     "Option 2: Revert provider setting to match the collection",
                     "Option 3: Delete the existing collection and re-index",
+                    "Option 4: Create a new collection with a different name",
                 ],
                 details={
                     "collection_provider": self.provider,
-                    "current_provider": current_provider,
+                    "current_provider": other.provider,
+                    "collection_model": other.dense_model,
+                    "current_model": self.dense_model,
                     "collection": self.project_name,
                 },
             )
 
-        if self.embedding_dim_dense != expected_dense_dim:
+        if (
+            (dense_dim := self.vector_config["dense"].size) is not None
+            and (other_dense_dim := other.vector_config["dense"].size) is not None
+            and dense_dim != other_dense_dim
+        ):
             raise DimensionMismatchError(
-                f"Embedding dimension mismatch: collection expects {self.embedding_dim_dense}, but current embedder produces {expected_dense_dim}",
+                f"Embedding dimension mismatch: collection expects {other_dense_dim}, but current embedder produces {dense_dim}.",
                 suggestions=[
                     "Option 1: Use an embedding model with matching dimensions",
                     "Option 2: Re-index with the current embedding model",
                     "Option 3: Check your embedding provider configuration",
                 ],
                 details={
-                    "expected_dimension": self.embedding_dim_dense,
-                    "actual_dimension": expected_dense_dim,
+                    "expected_dimension": dense_dim,
+                    "actual_dimension": other_dense_dim,
                     "collection": self.project_name,
                 },
             )
-
         if (
-            expected_sparse_dim
-            and self.embedding_dim_sparse
-            and self.embedding_dim_sparse != expected_sparse_dim
+            (dtype := self.vector_config["dense"].datatype)
+            and (other_dtype := other.vector_config["dense"].datatype)
+            and dtype != other_dtype
         ):
-            raise DimensionMismatchError(
-                f"Sparse embedding dimension mismatch: collection expects {self.embedding_dim_sparse}, but current embedder produces {expected_sparse_dim}",
-                suggestions=[
-                    "Option 1: Use a sparse embedding model with matching dimensions",
-                    "Option 2: Re-index with the current sparse embedding model",
-                ],
-                details={
-                    "expected_sparse_dimension": self.embedding_dim_sparse,
-                    "actual_sparse_dimension": expected_sparse_dim,
+            logger.warning(
+                "Embedding data type mismatch: collection was created with '%s', but current embedder produces '%s'. This can produce unexpected results.",
+                other_dtype,
+                dtype,
+                extra={
+                    "expected_dtype": other_dtype,
+                    "actual_dtype": dtype,
                     "collection": self.project_name,
                 },
             )
 
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
+        from codeweaver.core.types.aliases import FilteredKey
+        from codeweaver.core.types.enum import AnonymityConversion
 
-__all__ = ("CollectionMetadata",)
+        return {FilteredKey("project_name"): AnonymityConversion.HASH}
+
+
+__all__ = ("CollectionMetadata", "HybridVectorPayload")

@@ -25,20 +25,14 @@ from codeweaver.engine.chunker.base import ChunkGovernor
 from codeweaver.engine.chunker.delimiter import DelimiterChunker
 from codeweaver.engine.chunker.delimiters.kind import DelimiterKind
 
+
 pytestmark = [pytest.mark.unit]
 
 
-
 @pytest.fixture
-def governor() -> ChunkGovernor:
-    """Create a basic ChunkGovernor for testing."""
-    return ChunkGovernor(capabilities=())
-
-
-@pytest.fixture
-def delimiter_chunker(governor: ChunkGovernor) -> DelimiterChunker:
+def delimiter_chunker(chunk_governor: ChunkGovernor) -> DelimiterChunker:
     """Create a DelimiterChunker instance."""
-    return DelimiterChunker(governor=governor)
+    return DelimiterChunker(governor=chunk_governor)
 
 
 class TestDelimiterChunksJavaScriptNested:

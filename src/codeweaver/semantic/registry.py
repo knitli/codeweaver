@@ -15,7 +15,6 @@ from itertools import chain
 from types import MappingProxyType
 from typing import TYPE_CHECKING, cast
 
-from codeweaver.common.utils import lazy_import
 from codeweaver.core.language import SemanticSearchLanguage
 from codeweaver.core.types.aliases import (
     CategoryNameT,
@@ -30,21 +29,11 @@ if TYPE_CHECKING:
     from codeweaver.semantic.grammar import (
         Category,
         CompositeThing,
-        Connection,
         DirectConnection,
         PositionalConnections,
         ThingOrCategoryType,
         Token,
     )
-else:
-    Category = lazy_import("codeweaver.semantic.grammar", "Category")
-    grammar_module = lazy_import("codeweaver.semantic.grammar")
-    CompositeThing = lazy_import("codeweaver.semantic.grammar", "CompositeThing")
-    Connection = lazy_import("codeweaver.semantic.grammar", "Connection")
-    DirectConnection = lazy_import("codeweaver.semantic.grammar", "DirectConnection")
-    PositionalConnections = lazy_import("codeweaver.semantic.grammar", "PositionalConnections")
-    Token = lazy_import("codeweaver.semantic.grammar", "Token")
-    ThingOrCategoryType = lazy_import("codeweaver.semantic.grammar", "ThingOrCategoryType")
 
 
 logger = logging.getLogger(__name__)
@@ -121,7 +110,7 @@ class ThingRegistry:
         )
 
         if isinstance(obj, Category | Token | CompositeThing):
-            return self.is_registered(obj)
+            return self.is_registered(obj.name)
         if isinstance(obj, DirectConnection | PositionalConnections):
             if isinstance(obj, DirectConnection):
                 return obj.source_thing in self._direct_connections.get(obj.language, {})
@@ -303,7 +292,8 @@ class ThingRegistry:
         from codeweaver.semantic.grammar import Connection
 
         if isinstance(connections, Connection):
-            self.register_connection(connections)
+            for connection in connections:
+                self.register_connection(connection)
             return
         for connection in connections:
             self.register_connection(connection)

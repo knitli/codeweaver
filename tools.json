@@ -1,0 +1,50 @@
+{
+  "server": {
+    "name": "io.github.knitli/codeweaver",
+    "version": "0.0.1rc778"
+  },
+  "tools": [
+    {
+      "name": "find_code",
+      "description": "Find relevant code in your codebase using semantic search with AI-powered intent detection. Returns precisely targeted code snippets based on natural language queries, reducing context bloat by 60-80%. Supports 170+ programming languages with intelligent chunking and multi-provider embeddings.",
+      "arguments": [
+        {
+          "name": "query",
+          "type": "string",
+          "required": true,
+          "description": "Natural language search query describing what code you're looking for (e.g., 'authentication logic', 'error handling for API calls')"
+        },
+        {
+          "name": "intent",
+          "type": "string",
+          "required": false,
+          "description": "Optional search intent: 'understand', 'debug', 'implement', 'refactor', 'document', 'test', or 'review'. Auto-detected if not provided."
+        },
+        {
+          "name": "token_limit",
+          "type": "integer",
+          "required": false,
+          "description": "Maximum tokens to return in results (default: 30000, range: 1000-100000)"
+        },
+        {
+          "name": "focus_languages",
+          "type": "array",
+          "required": false,
+          "description": "Optional array of programming languages to filter results (e.g., ['Python', 'JavaScript']). Supports 170+ languages."
+        },
+        {
+          "name": "max_results",
+          "type": "integer",
+          "required": false,
+          "description": "Maximum number of code matches to return (default: 30, range: 1-100)"
+        },
+        {
+          "name": "include_tests",
+          "type": "boolean",
+          "required": false,
+          "description": "Whether to include test files in search results (default: false)"
+        }
+      ]
+    }
+  ]
+}

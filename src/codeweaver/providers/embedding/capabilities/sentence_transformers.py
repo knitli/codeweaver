@@ -6,15 +6,17 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 from __future__ import annotations
 
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
-from codeweaver.providers.embedding.capabilities.base import (
-    EmbeddingCapabilities,
-    EmbeddingModelCapabilities,
+from codeweaver.providers.embedding.capabilities.types import (
+    EmbeddingCapabilitiesDict,
     PartialCapabilities,
 )
 from codeweaver.providers.provider import Provider
 
+
+if TYPE_CHECKING:
+    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 
 type SentenceTransformersProvider = Literal[
     Provider.FASTEMBED, Provider.HUGGINGFACE_INFERENCE, Provider.SENTENCE_TRANSFORMERS
@@ -67,6 +69,34 @@ CAP_MAP: dict[
     ),
 }
 
+
+SENTENCE_TRANSFORMERS_ALL_MINILM_L6_V2_CAPABILITIES: PartialCapabilities = {
+    "name": "sentence-transformers/all-MiniLM-L6-v2",
+    "default_dimension": 384,
+    "context_window": 256,
+    "preferred_metrics": ("cosine", "dot", "euclidean"),
+    "supports_context_chunk_embedding": False,
+    "tokenizer": "tokenizers",
+    "tokenizer_model": "sentence-transformers/all-MiniLM-L6-v2",
+    "default_dtype": "float",
+    "output_dtypes": ("float",),
+    "version": 2,
+    "supports_custom_prompts": False,
+    "custom_query_prompt": None,
+    "custom_document_prompt": None,
+    "other": {
+        "framework": ["Sentence Transformers", "PyTorch"],
+        "license": "apache-2.0",
+        "memory_usage_mb": 90,
+        "modalities": ["text"],
+        "n_parameters": 22700000,
+        "open_weights": True,
+        "reference": "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2",
+        "release_date": "2021-08-30",
+        "revision": "8b3219a92973c328a8e22fadcfa821b5dc75636a",
+        "memory_usage_gb": 0.09,
+    },
+}
 
 SENTENCE_TRANSFORMERS_ALL_MINILM_L12_V2_CAPABILITIES: PartialCapabilities = {
     "name": "sentence-transformers/all-MiniLM-L12-v2",
@@ -240,6 +270,7 @@ SENTENCE_TRANSFORMERS_PARAPHRASE_MULTILINGUAL_MPNET_BASE_V2_CAPABILITIES: Partia
 
 
 ALL_CAPABILITIES: tuple[PartialCapabilities, ...] = (
+    SENTENCE_TRANSFORMERS_ALL_MINILM_L6_V2_CAPABILITIES,
     SENTENCE_TRANSFORMERS_ALL_MINILM_L12_V2_CAPABILITIES,
     SENTENCE_TRANSFORMERS_ALL_MPNET_BASE_V2_CAPABILITIES,
     SENTENCE_TRANSFORMERS_GTR_T5_BASE_CAPABILITIES,
@@ -251,11 +282,13 @@ ALL_CAPABILITIES: tuple[PartialCapabilities, ...] = (
 
 def get_sentence_transformers_embedding_capabilities() -> tuple[EmbeddingModelCapabilities, ...]:
     """Get the capabilities for sentence-transformers embedding models."""
-    capabilities: list[EmbeddingCapabilities] = []
+    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+
+    capabilities: list[EmbeddingCapabilitiesDict] = []
     for cap in ALL_CAPABILITIES:
         capabilities.extend([
-            EmbeddingCapabilities({**cap, "provider": provider})  # pyright: ignore[reportArgumentType]
-            for provider in CAP_MAP[cap["name"]]  # pyright: ignore[reportArgumentType]
+            EmbeddingCapabilitiesDict({**cap, "provider": provider})  # type: ignore[missing-typeddict-key]
+            for provider in CAP_MAP[cap["name"]]  # ty: ignore[invalid-argument-type]
         ])
     return tuple(EmbeddingModelCapabilities.model_validate(cap) for cap in capabilities)
 

@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Any, Literal, NotRequired, Required, Self, TypedDict
+from typing import TYPE_CHECKING, Annotated, Any, Literal, Self
 
 from pydantic import ConfigDict, Field, PositiveFloat, PositiveInt
 
@@ -14,70 +14,18 @@ from codeweaver.core.types.models import BASEDMODEL_CONFIG, BasedModel
 from codeweaver.providers.provider import Provider
 
 
-class EmbeddingSettingsDict(TypedDict, total=False):
-    """A dictionary representing the settings for an embedding client, embedding model, and the embedding call itself. If any."""
-
-    client_options: dict[str, Any]
-    model_kwargs: dict[str, Any]
-    call_kwargs: dict[str, Any]
+if TYPE_CHECKING:
+    from codeweaver.providers.embedding.capabilities.types import EmbeddingCapabilitiesDict
 
 
-type PartialCapabilities = dict[
-    Literal[
-        "context_window",
-        "custom_document_prompt",
-        "custom_query_prompt",
-        "default_dimension",
-        "default_dtype",
-        "other",
-        "is_normalized",
-        "hf_name",
-        "name",
-        "output_dimensions",
-        "output_dtypes",
-        "preferred_metrics",
-        "provider",
-        "supports_context_chunk_embedding",
-        "supports_custom_prompts",
-        "tokenizer",
-        "tokenizer_model",
-        "version",
-    ],
-    Literal[
-        "tokenizers", "tiktoken", "dot", "cosine", "euclidean", "manhattan", "hamming", "chebyshev"
-    ]
-    | str
-    | PositiveInt
-    | PositiveFloat
-    | bool
-    | Provider
-    | None
-    | dict[str, Any]
-    | tuple[str, ...]
-    | tuple[PositiveInt, ...],
-]
-
-
-class EmbeddingCapabilities(TypedDict, total=False):
-    """Describes the capabilities of an embedding model, such as the default dimension."""
-
-    name: Required[str]
-    provider: Required[Provider]
-    version: NotRequired[str | int | None]
-    default_dimension: NotRequired[PositiveInt]
-    output_dimensions: NotRequired[tuple[PositiveInt, ...] | None]
-    default_dtype: NotRequired[str | None]
-    output_dtypes: NotRequired[tuple[str, ...] | None]
-    is_normalized: NotRequired[bool]
-    context_window: NotRequired[PositiveInt]
-    supports_context_chunk_embedding: NotRequired[bool]
-    tokenizer: NotRequired[Literal["tokenizers", "tiktoken"]]
-    tokenizer_model: NotRequired[str]
-    preferred_metrics: NotRequired[
-        tuple[Literal["dot", "cosine", "euclidean", "manhattan", "hamming", "chebyshev"], ...]
-    ]
-    hf_name: NotRequired[str]
-    other: NotRequired[dict[str, Any]]
+def _determine_max_batch_tokens(fields: dict[str, Any]) -> PositiveInt:
+    """Determine the maximum batch tokens from the provided fields."""
+    if provider := fields.get("provider"):
+        if provider.always_local:
+            return 1_000_000
+        if provider == Provider.VOYAGE:
+            return 120_000
+    return 100_000
 
 
 class EmbeddingModelCapabilities(BasedModel):
@@ -93,7 +41,7 @@ class EmbeddingModelCapabilities(BasedModel):
         Field(
             description="""The provider of the model. Since available settings vary across providers, each capabilities instance is tied to a provider."""
         ),
-    ] = Provider.UNSET  # type: ignore
+    ] = Provider.NOT_SET
     version: Annotated[
         str | PositiveInt | PositiveFloat | None,
         Field(
@@ -124,6 +72,12 @@ class EmbeddingModelCapabilities(BasedModel):
     ] = None
     is_normalized: bool = False
     context_window: Annotated[PositiveInt, Field(ge=256)] = 512
+    max_batch_tokens: PositiveInt = Field(
+        default_factory=_determine_max_batch_tokens,
+        description="""Maximum tokens allowed per batch.""",
+        ge=10_000,
+        le=1_000_000,
+    )
     supports_context_chunk_embedding: bool = False
     tokenizer: Literal["tokenizers", "tiktoken"] | None = None
     tokenizer_model: Annotated[
@@ -156,7 +110,7 @@ class EmbeddingModelCapabilities(BasedModel):
             description="""The Hugging Face model name, if it applies *and* is different from the model name. Currently only applies to some models from `fastembed` and `ollama`"""
         ),
     ] = None
-    other: Annotated[dict[str, Any], Field(description="""Extra model-specific settings.""")] = {}
+    other: Annotated[dict[str, Any], Field(description="""Extra model-specific settings.""")] = {}  # noqa: RUF012
     _available: Annotated[
         bool,
         Field(
@@ -176,7 +130,7 @@ class EmbeddingModelCapabilities(BasedModel):
         return self._version
 
     @classmethod
-    def from_capabilities(cls, capabilities: EmbeddingCapabilities) -> Self:
+    def from_capabilities(cls, capabilities: EmbeddingCapabilitiesDict) -> Self:
         """Create an instance from a dictionary of capabilities."""
         return cls.model_validate(capabilities)
 
@@ -212,7 +166,7 @@ class SparseEmbeddingModelCapabilities(BasedModel):
     name: Annotated[str, Field(description="""The name of the model.""")]
     multilingual: bool = False
     provider: Annotated[
-        Literal[Provider.FASTEMBED, Provider.SENTENCE_TRANSFORMERS, Provider.UNSET],  # pyright: ignore[reportPrivateUsage]
+        Literal[Provider.FASTEMBED, Provider.SENTENCE_TRANSFORMERS, Provider.NOT_SET],
         Field(
             description="""The provider of the model. We currently only support local providers for sparse embeddings. Since Sparse embedding tend to be very efficient and low resource, they are well-suited for deployment in resource-constrained environments."""
         ),
@@ -221,7 +175,7 @@ class SparseEmbeddingModelCapabilities(BasedModel):
         if HAS_FASTEMBED
         else Provider.SENTENCE_TRANSFORMERS
         if HAS_ST
-        else Provider.UNSET  # pyright: ignore[reportPrivateUsage]
+        else Provider.NOT_SET
     )
     hf_name: Annotated[
         str | None,
@@ -233,6 +187,24 @@ class SparseEmbeddingModelCapabilities(BasedModel):
         dict[str, Any],
         Field(description="""Extra model-specific settings.""", default_factory=dict),
     ]
+    default_dtype: Annotated[
+        Literal["float32", "float16", "int8"],
+        Field(description="""The default data type of the model."""),
+    ] = "float16"
+    max_batch_tokens: PositiveInt = Field(
+        default_factory=_determine_max_batch_tokens,
+        description="""Maximum tokens allowed per batch.""",
+        ge=10_000,
+        le=1_000_000,
+    )
+    tokenizer: Literal["tokenizers", "tiktoken"] | None = "tokenizers"
+    tokenizer_model: Annotated[
+        str | None,
+        Field(
+            min_length=3,
+            description="""The tokenizer model used by the embedding model. If the tokenizer is `tokenizers`, this should be the full name of the tokenizer or model (if it's listed by its model name), *including the organization*. Like: `voyageai/voyage-code-3`""",
+        ),
+    ] = None
 
     _available: Annotated[
         bool, Field(description="""Whether the model is available for use.""")
@@ -250,17 +222,23 @@ class SparseEmbeddingModelCapabilities(BasedModel):
 def get_sparse_caps() -> tuple[SparseEmbeddingModelCapabilities, ...]:
     """Get sparse embedding model capabilities."""
     caps = {  # type: ignore
-        "Qdrant/bm25": {"name": "Qdrant/bm25", "multilingual": True},
+        # Qdrant's bm25 model has no tokenizer, so we'll just use the same tokenizer as their other sparse model
+        "Qdrant/bm25": {
+            "name": "Qdrant/bm25",
+            "multilingual": True,
+            "tokenizer_model": "Qdrant/all_miniLM_L6_v2_with_attentions",
+        },
         "Qdrant/bm42-all-minilm-l6-v2-attentions": {
             "name": "Qdrant/bm42-all-minilm-l6-v2-attentions",
             "multilingual": False,
             "other": {},
             "_available": HAS_FASTEMBED,
+            "tokenizer_model": "Qdrant/all_miniLM_L6_v2_with_attentions",
         },
-        "prithivida/Splade-PP_en_v1": {
-            "name": "prithivida/Splade-PP_en_v1",
+        "prithivida/Splade_PP_en_v1": {
+            "name": "prithivida/Splade_PP_en_v1",
             "multilingual": False,
-            "hf_name": "Qdrant/Splade-PP_en_v1",
+            "hf_name": "Qdrant/Splade_PP_en_v1",
             "other": {},
             "_available": HAS_FASTEMBED,
         },
@@ -269,7 +247,7 @@ def get_sparse_caps() -> tuple[SparseEmbeddingModelCapabilities, ...]:
             "multilingual": False,
             "hf_name": None,
             "other": {},
-            "_available": HAS_FASTEMBED or HAS_ST,
+            "_available": HAS_ST,
         },
         "ibm-granite/granite-embedding-30m-sparse": {
             "name": "ibm-granite/granite-embedding-30m-sparse",
@@ -297,22 +275,26 @@ def get_sparse_caps() -> tuple[SparseEmbeddingModelCapabilities, ...]:
         },
     }
     fastembed_caps = tuple(
-        SparseEmbeddingModelCapabilities.model_validate(cap | {"provider": Provider.FASTEMBED})
-        for cap in list(caps.values())[:4]  # type: ignore
+        SparseEmbeddingModelCapabilities.model_validate(
+            cap
+            | {
+                "provider": Provider.FASTEMBED,
+                "tokenizer_model": cap.get("tokenizer_model") or cap["name"],
+            }
+        )
+        for cap in list(caps.values())[:3]  # type: ignore
     )
     st_caps = tuple(
         SparseEmbeddingModelCapabilities.model_validate(
-            cap | {"provider": Provider.SENTENCE_TRANSFORMERS}
+            cap
+            | {
+                "provider": Provider.SENTENCE_TRANSFORMERS,
+                "tokenizer_model": cap.get("tokenizer_model") or cap["name"],
+            }
         )
-        for cap in list(caps.values())[3:]  # type: ignore
+        for cap in list(caps.values())[2:]  # type: ignore
     )
     return fastembed_caps + st_caps
 
 
-__all__ = (
-    "EmbeddingCapabilities",
-    "EmbeddingModelCapabilities",
-    "PartialCapabilities",
-    "SparseEmbeddingModelCapabilities",
-    "get_sparse_caps",
-)
+__all__ = ("EmbeddingModelCapabilities", "SparseEmbeddingModelCapabilities", "get_sparse_caps")

@@ -58,14 +58,14 @@ Study pydantic ecosystem patterns: [pydantic](https://github.com/pydantic/pydant
 
 **Why**: Maintainability, self-documentation, easier debugging. Get it right upfront.
 
-- **Strict typing** with [opinionated pyright rules](pyproject.toml)
+- **Strict typing** with [opinionated `ty` rules](pyproject.toml)
 - **Structured data**: Use `TypedDict`, `Protocol`, `NamedTuple`, `enum.Enum`, `typing_extensions.TypeIs` (similar to typing.TypeGuard but more flexible, typing.TypeGuard also OK)
     - Use the project's derivative for these: 
       - `dataclass` -> `pydantic.dataclasses.dataclass` **and** `codeweaver.core.types.models.DataclassSerializationMixin`
       - `pydantic.BaseModel` -> `codeweaver.core.types.models.BasedModel`
       - `pydantic.ConfigDict` -> 
       - `enum.Enum` -> `codeweaver.core.types.enum.BaseEnum`
-- **Define structures**: Don't be lazy - use `TypedDict`, `NamedTuple`, `dataclass` or `BasedModel` to define structured data. Only use vague/generic types like `dict[str, Any]` when the types/structure are truly unknown or have many possibilities.
+- **Define structures**: Don't be lazy - use `TypedDict`, `NamedTuple`, `dataclass` or `BasedModel` to define structured data. Only use vague/generic types like `dict[str, Any]` when the types/structure are truly unknown or have many possibilities. As a rule: if you know what the keys to an object will be, then define it as a class.
     - Complex objects: `dataclass` or `BaseModel` descendants
     - New pattern for complex member-like objects: dataclass enums where each member has a dataclass value -- current plan is to replace most of the complex string enums with this pattern. See `codeweaver.semantic.classification.AgentTask` for an implementation example.
     - Simple objects: `NamedTuple` if the object would benefit from methods or will be nested; `TypedDict` otherwise. 
@@ -82,7 +82,7 @@ Study pydantic ecosystem patterns: [pydantic](https://github.com/pydantic/pydant
 from typing import Annotated
 from pydantic import ConfigDict, Field
 
-from codeweaver.core import BasedModel
+from codeweaver.core.types import BasedModel
 
 class MyModel(BasedModel):
     model_config = ConfigDict(extra="allow")
@@ -100,8 +100,7 @@ class MyModel(BasedModel):
 
 - **No f-strings in log statements**: Use `%s` formatting or `extra={"key": value}`
 - **No print statements**: Use logging in production
-- **Use logging.exception**: For exceptions with **no exception object in the statements** (logging.exception automatically includes the object)
-  - Don't use logging.error if you can use logging.exception
+- **Use logging.warning for most errors**: Using logging.warning allows CodeWeaver's UI to handle displaying the error based on severity and user configuration (like the `--verbose` flag). `logging.exception` bypasses the UI handler.
 
 ### Exception Handling
 

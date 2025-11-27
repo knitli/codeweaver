@@ -12,6 +12,7 @@ from typing import Annotated, Any, ClassVar, NamedTuple, Self, TypeGuard
 
 from pydantic import UUID7, Field, NonNegativeInt, PositiveInt, computed_field, model_validator
 from pydantic.dataclasses import dataclass
+from typing_extensions import TypeIs
 
 from codeweaver.common.utils import uuid7
 from codeweaver.core.types.models import DATACLASS_CONFIG, DataclassSerializationMixin
@@ -161,9 +162,9 @@ class Span(DataclassSerializationMixin):
         diff2 = other - self
         result: list[Span] = []
         if diff1:
-            result.extend(diff1 if isinstance(diff1, tuple) else [diff1])
+            result.extend(diff1 if isinstance(diff1, tuple) else [diff1])  # ty: ignore[invalid-argument-type]
         if diff2:
-            result.extend(diff2 if isinstance(diff2, tuple) else [diff2])
+            result.extend(diff2 if isinstance(diff2, tuple) else [diff2])  # ty: ignore[invalid-argument-type]
         return tuple(result) if result else None
 
     def __le__(self, other: Span) -> bool:  # Subset
@@ -196,7 +197,7 @@ class Span(DataclassSerializationMixin):
         return self.end - self.start + ONE_LINE
 
     @staticmethod
-    def _is_span_tuple(span: Span | SpanTuple | int) -> TypeGuard[SpanTuple]:
+    def _is_span_tuple(span: Span | SpanTuple | int) -> TypeIs[SpanTuple]:
         """Check if the given span is a SpanTuple."""
         return isinstance(span, tuple) and len(span) == 3 and hasattr(span[2], "hex")
 
@@ -223,8 +224,9 @@ class Span(DataclassSerializationMixin):
         """
         if isinstance(span, int):
             return self._is_contained(span)
-        if isinstance(span, tuple) and len(span) == 3 and self._is_span_tuple(span):
-            return bool(self & Span.from_tuple(span))
+        if self._is_span_tuple(span):
+            span_tuple: SpanTuple = span
+            return bool(self & Span.from_tuple(span_tuple))
         if self._is_file_end_tuple(span):
             start, end = span[:2]
             return self._is_contained(start) or self._is_contained(end)
@@ -411,7 +413,7 @@ class SpanGroup(DataclassSerializationMixin):
                     new_leftovers: list[Span] = []
                     for lf in leftovers:
                         if diff := lf - s2:
-                            new_leftovers.extend(diff if isinstance(diff, tuple) else [diff])
+                            new_leftovers.extend(diff if isinstance(diff, tuple) else [diff])  # ty: ignore[invalid-argument-type]
                     leftovers = new_leftovers
             result.update(leftovers)
         return SpanGroup({r for r in result if r})

@@ -1,0 +1,8 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+# git mailmap -- because keeping the same email on every commit is seemingly impossible
+
+Adam Poulemanos <adam@knit.li> <89049923+bashandbone@users.noreply.github.com>

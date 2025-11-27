@@ -1,0 +1,140 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+# CodeWeaver Docker Compose Configuration
+# Provides CodeWeaver MCP server with Qdrant vector database
+
+services:
+  # Qdrant Vector Database
+  # Provides persistent vector storage for code embeddings
+  qdrant:
+    image: qdrant/qdrant:v1.16.1
+    container_name: codeweaver-qdrant
+    ports:
+      - ${QDRANT_PORT:-6333}:6333 # REST API
+      - ${QDRANT_GRPC_PORT:-6334}:6334 # gRPC API
+    volumes:
+      - qdrant_storage:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__GRPC_PORT=6334
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "timeout 2 bash -c 'exec 3<>/dev/tcp/localhost/6333' || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - codeweaver-network
+
+  # CodeWeaver MCP Server
+  # Semantic code search and context delivery for AI agents
+  codeweaver:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: codeweaver-server
+    ports:
+      - ${CODEWEAVER_PORT:-9328}:9328
+    volumes:
+      # Mount your codebase to be indexed (read-only)
+      # Changes on host are immediately visible in container
+      - ${PROJECT_PATH:-.}:/workspace:ro
+
+      # Persistent storage for checkpoints, config, and secrets
+      # CRITICAL: This must persist between restarts for index checkpoints
+      - codeweaver_config:/app/config
+
+      # Application data and cache
+      - codeweaver_data:/app/data
+
+      # Note: Config auto-discovery
+      # CodeWeaver finds codeweaver.toml in your project root automatically.
+      # Just add it to PROJECT_PATH - no explicit mount needed.
+      # For config outside project, mount to: /app/config/codeweaver/codeweaver.toml
+    environment:
+      # =================================================================
+      # Profile-Based Configuration (Recommended)
+      # =================================================================
+      # Profile determines providers and models:
+      #   - recommended: Voyage AI (requires VOYAGE_API_KEY)
+      #   - quickstart: FastEmbed/Sentence Transformers (free, local)
+      #   - backup: Lightest local models + in-memory vectors
+      - CODEWEAVER_PROFILE=${CODEWEAVER_PROFILE:-quickstart}
+
+      # Vector store deployment type
+      - CODEWEAVER_VECTOR_DEPLOYMENT=${VECTOR_DEPLOYMENT:-local}
+      # For cloud deployment, set CODEWEAVER_VECTOR_URL
+      # - CODEWEAVER_VECTOR_URL=${VECTOR_URL:-}
+
+      # =================================================================
+      # Core Settings (These work with pydantic_settings)
+      # =================================================================
+      - CODEWEAVER_PROJECT_PATH=/workspace
+      - CODEWEAVER_TOKEN_LIMIT=${TOKEN_LIMIT:-30000}
+      - CODEWEAVER_PROJECT_NAME=${PROJECT_NAME}
+
+      # Redirect user config to mounted volume for checkpoint persistence
+      - XDG_CONFIG_HOME=/app/config
+
+      # =================================================================
+      # API Keys (Pass through to providers)
+      # =================================================================
+      # Required for 'recommended' profile
+      - VOYAGE_API_KEY=${VOYAGE_API_KEY:-}
+
+      # Required for agent functionality (future feature)
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+
+      # Optional: Alternative providers
+      # - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      # - COHERE_API_KEY=${COHERE_API_KEY:-}
+      # - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+
+      # =================================================================
+      # Operational Settings
+      # =================================================================
+    depends_on:
+      qdrant:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - -sf
+        - http://localhost:9328/health/
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    networks:
+      - codeweaver-network
+    # Resource limits (adjust based on your needs)
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 2G
+
+volumes:
+  # Persistent storage for Qdrant vector database
+  qdrant_storage:
+    driver: local
+  # CodeWeaver config, checkpoints, and secrets (MUST persist)
+  codeweaver_config:
+    driver: local
+  # CodeWeaver application data
+  codeweaver_data:
+    driver: local
+
+networks:
+  codeweaver-network:
+    driver: bridge

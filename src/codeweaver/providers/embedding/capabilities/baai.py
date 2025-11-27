@@ -6,14 +6,17 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 from __future__ import annotations
 
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
-from codeweaver.providers.embedding.capabilities.base import (
-    EmbeddingCapabilities,
-    EmbeddingModelCapabilities,
+from codeweaver.providers.embedding.capabilities.types import (
+    EmbeddingCapabilitiesDict,
     PartialCapabilities,
 )
 from codeweaver.providers.provider import Provider
+
+
+if TYPE_CHECKING:
+    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 
 
 type BaaiProvider = Literal[
@@ -163,11 +166,13 @@ ALL_CAPABILITIES: tuple[PartialCapabilities, ...] = (
 
 def get_baai_embedding_capabilities() -> tuple[EmbeddingModelCapabilities, ...]:
     """Get the capabilities for BAAI embedding models."""
-    capabilities: list[EmbeddingCapabilities] = []
+    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+
+    capabilities: list[EmbeddingCapabilitiesDict] = []
     for cap in ALL_CAPABILITIES:
         capabilities.extend([
-            EmbeddingCapabilities({**cap, "provider": provider})  # pyright: ignore[reportArgumentType]
-            for provider in CAP_MAP[cap["name"]]  # pyright: ignore[reportArgumentType]
+            EmbeddingCapabilitiesDict({**cap, "provider": provider})  # type: ignore[missing-typeddict-key]
+            for provider in CAP_MAP[cap["name"]]  # ty: ignore[invalid-argument-type]
         ])
     return tuple(EmbeddingModelCapabilities.model_validate(cap) for cap in capabilities)
 

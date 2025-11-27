@@ -188,15 +188,15 @@ To test manually:
 ```python
 # Check if resolved
 lazy = lazy_import("os")
-print(lazy.is_resolved)  # False
+print(lazy.is_resolved())  # False
 
 # Use it
 lazy.path.join("a", "b")
-print(lazy.is_resolved)  # Still False! (because .path created new LazyImport)
+print(lazy.is_resolved())  # Still False! (because .path created new LazyImport)
 
 # Check the chained one
 path = lazy.path
-print(path.is_resolved)  # False
+print(path.is_resolved())  # False
 path.join("a", "b")  # Now path chain resolves
 
 # Debug representation

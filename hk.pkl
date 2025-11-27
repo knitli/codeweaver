@@ -1,24 +1,34 @@
 amends "package://github.com/jdx/hk/releases/download/v1.2.0/hk@1.2.0#/Config.pkl"
 import "package://github.com/jdx/hk/releases/download/v1.2.0/hk@1.2.0#/Builtins.pkl"
 
+local function isCI() = (read?("env:CI")?.toBoolean() ?? false) || (read?("env:GITHUB_ACTIONS")?.toBoolean() ?? false)
+
 local linters = new Mapping<String, Step> {
-    // uses builtin prettier linter config
-    ["actionlint"] = Builtins.actionlint
+    // we don't perform these in CI to reduce download times and cache sizes
+    when (!isCI()) {
 
-    ["taplo"] = Builtins.taplo
+        ["actionlint"] = Builtins.actionlint
+
+        ["tombi"] = new Step {
+            glob = List("*.toml", "*.toml.*", ".*.toml")
+            check = "tombi format --check {{ files }}"
+            fix = "tombi format {{ files }}"
+        }
         // yaml
-    ["yq"] = new Step {
-      glob = List( "*.{.yaml,yml,yaml,.yml,json,jsonc,.json,.jsonc}")
-      batch = false
-      check  = "echo {{ files }} | rust-parallel -d stderr -i - --no-run-if-empty yq -P eval '.' >/dev/null"
-      fix = "echo {{ files }} | rust-parallel -d stderr -i - --no-run-if-empty yq -iP --indent=2 '.' "
-    }
 
-    ["typos"] = new Step {
-        workspace_indicator = "_typos.toml"
-        glob = List( "*README", "*.{login,astro,bash,bash_logout,bashrc,browserlistrc,conf,config,csh,css,cts,fish,gitattributes,gitmodules,html,htmx,ini,j2,jinja,jinja2,json,json5,jsonc,jsonl,ksh,md,mdown,mdtext,mdtxt,mdwn,mdx,mk,mkd,mts,nix,nu,pkl,profile,py,quokka,rs,sass,scss,sh,sh,shellcheckrc,sql,sqlite,stylelintrc,svelte,tcsh,toml,ts,tsx,txt,yaml,yml,zlogin,zlogout,zprofile,zsh,zshenv,zshrc}", "*Dockerfile*", "*Makefile*", "*makefile*", "CHANGELOG*", "CODE_OF_CONDUCT*", "CONTRIBUTING*", "HACKING*", "LICENSE", "README*", "SECURITY*", "UNLICENSE").filter((f) -> !f.endsWith("hf_models.json") && !f.contains("external"))
-        check = "typos -j 8 {{ files }}"
-        fix = "typos --write-changes {{ files }}"
+        ["yq"] = new Step {
+        glob = List("*.{yaml,yml,json,jsonc}")
+        batch = false
+        check  = "printf '%s\\n' {{ files }} | xargs -n1 yq -P eval '.' >/dev/null"
+        fix = "printf '%s\\n' {{ files }} | xargs -n1 yq -iP --indent=2 '.'"
+        }
+    
+        ["typos"] = new Step {
+            workspace_indicator = "_typos.toml"
+            glob = List( "*README", "*.{login,astro,bash,bash_logout,bashrc,browserlistrc,conf,config,csh,css,cts,fish,gitattributes,gitmodules,html,htmx,ini,j2,jinja,jinja2,json,json5,jsonc,jsonl,ksh,md,mdown,mdtext,mdtxt,mdwn,mdx,mk,mkd,mts,nix,nu,pkl,profile,py,quokka,rs,sass,scss,sh,sh,shellcheckrc,sql,sqlite,stylelintrc,svelte,tcsh,toml,ts,tsx,txt,yaml,yml,zlogin,zlogout,zprofile,zsh,zshenv,zshrc}", "*Dockerfile*", "*Makefile*", "*makefile*", "CHANGELOG*", "CODE_OF_CONDUCT*", "CONTRIBUTING*", "HACKING*", "LICENSE", "README*", "SECURITY*", "UNLICENSE").filter((f) -> !f.endsWith("hf_models.json") && !f.contains("external"))
+            check = "typos -j 8 {{ files }}"
+            fix = "typos --write-changes {{ files }}"
+        }
     }
 
     ["fix-ruff-patterns"] = new Step {
@@ -33,8 +43,9 @@ local linters = new Mapping<String, Step> {
 
     ["reuse"] = new Step {
         check = "reuse lint"
-        interactive = true
-        fix = "./scripts/code-quality/update-licenses.py add --interactive {{ files }}"
+        interactive = !isCI()
+        // this doesn't work ... until we can figure it out, linting only
+        // fix = if (isCI()) "./scripts/code-quality/update-licenses.py add {{ files }}" else "./scripts/code-quality/update-licenses.py add --interactive {{ files }}"
     }
 
     ["shellcheck"] = new Step {
@@ -45,17 +56,48 @@ local linters = new Mapping<String, Step> {
 
     ["shfmt"] = Builtins.shfmt
 
-    // define a custom linter
-    ["pkl"] = new Step{
-        glob = "*.pkl"
-        check = "pkl eval {{files}} >/dev/null"
-    }
-
     ["add-marks"] = new Step {
         glob = "tests/**/*.py"
         fix = "./scripts/testing/apply-test-marks.py {{ files }}"
     }
 
+    ["validate-lazy-imports"] = new Step {
+        glob = "{src,tests,scripts,mise-tasks}/**/*.py"
+        check = "./mise-tasks/validate-lazy-imports.py {{ files }}"
+    }
+
+    // ty typechecker for python
+    ["ty"] = new Step {
+        glob = "{src,tests,scripts,mise-tasks}/**/*.py"
+        check = "ty check {{ files }}"
+    }
+
+    ["fix-missing-eol"] = new Step {
+        glob = "*.{py,md,txt,toml,ini,cfg,conf,sh,bash,yml,yaml,json,jsonc,js,ts,tsx,rs,go,java,css,scss,html,xml}"
+        check = "hk util end-of-file-fixer {{ files }}"
+        fix = "hk util end-of-file-fixer --fix {{ files }}"
+    }
+    ["check-added-large-files"] = new Step {
+        glob = "**"
+        check = "hk util check-added-large-files --maxkb 10000 {{ files }}"
+    }
+    ["check-merge-conflict-markers"] = new Step {
+        glob = "**"
+        check = "hk util check-merge-conflict --assume-in-merge {{ files }}"
+    }
+    ["check-python-ast"] = new Step {
+        glob = "*.py"
+        check = "hk util python-check-ast {{ files }}"
+    }
+    ["check-trailing-whitespace"] = new Step {
+        glob = "*.{py,md,txt,toml,ini,cfg,conf,sh,bash,yml,yaml,json,jsonc,js,ts,tsx,rs,go,java,css,scss,html,xml}"
+        check = "hk util trailing-whitespace {{ files }}"
+        fix = "hk util trailing-whitespace --fix {{ files }}"
+    }
+    ["check-python-debug-statements"] = new Step {
+        glob = "*.py"
+        check = "hk util python-debug-statements {{ files }}"
+    }
 }
 
 hooks {

@@ -139,7 +139,7 @@ class ImportanceScores(DataclassSerializationMixin):
 
     def as_dict(self) -> ImportanceScoresDict:
         """Convert importance scores to a dictionary format."""
-        return ImportanceScoresDict(**self.dump_python())
+        return ImportanceScoresDict(**self.dump_python())  # ty: ignore[missing-typed-dict-key]
 
     @classmethod
     def from_dict(cls, **data: Unpack[ImportanceScoresDict]) -> Self:
@@ -233,9 +233,9 @@ class ThingClass(BasedModel):
         """Post-initialization validation."""
         with contextlib.suppress(KeyError, AttributeError, ValueError):
             if not self.name.category:
-                SemanticClass._update_categories(self)  # pyright: ignore[reportPrivateUsage]
+                SemanticClass._update_categories(self)
             if not self.name.rank:
-                SemanticClass._update_rank_map(self)  # pyright: ignore[reportPrivateUsage]
+                SemanticClass._update_rank_map(self)
 
     @field_validator("name", mode="before")
     @classmethod
@@ -882,8 +882,17 @@ class BaseAgentTask(BaseEnumData):
 
     def __init__(self, profile: ImportanceScoresDict | None, *args: Any, **kwargs: Any) -> None:
         """Initialize BaseAgentTask with profile."""
-        self._profile = profile or ImportanceScoresDict(
-            discovery=0.25, comprehension=0.25, modification=0.2, debugging=0.15, documentation=0.15
+        object.__setattr__(
+            self,
+            "_profile",
+            profile
+            or ImportanceScoresDict(
+                discovery=0.25,
+                comprehension=0.25,
+                modification=0.2,
+                debugging=0.15,
+                documentation=0.15,
+            ),
         )
         super().__init__(*args, **kwargs)
 

@@ -1,0 +1,1557 @@
+{
+  "name": "io.github.knitli/codeweaver",
+  "description": "Semantic code search built for AI agents. Hybrid AST-aware context for 166 languages.",
+  "status": "active",
+  "repository": {
+    "url": "https://github.com/knitli/codeweaver",
+    "source": "github",
+    "id": "1024985391",
+    "subfolder": "src/codeweaver"
+  },
+  "version": "0.0.1rc947+gf3d70949.dirty",
+  "websiteUrl": "https://github.com/knitli/codeweaver",
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-16/server.schema.json",
+  "packages": [
+    {
+      "registryType": "pypi",
+      "registryBaseUrl": "https://pypi.org/",
+      "identifier": "code-weaver",
+      "version": "0.0.1rc947+gf3d70949.dirty",
+      "runtimeHint": "uvx",
+      "transport": {
+        "type": "streamable-http",
+        "url": "http://{host}:{port}/mcp/"
+      },
+      "packageArguments": [
+        {
+          "description": "Start the MCP server",
+          "isRequired": true,
+          "value": "server",
+          "isSecret": false,
+          "type": "positional",
+          "isRepeated": false
+        },
+        {
+          "description": "Path to the code repository to index and search",
+          "isRequired": false,
+          "isSecret": false,
+          "type": "named",
+          "name": "--project",
+          "isRepeated": false
+        },
+        {
+          "description": "Path to configuration file (TOML, YAML or JSON format)",
+          "isRequired": false,
+          "isSecret": false,
+          "type": "named",
+          "name": "--config",
+          "isRepeated": false
+        },
+        {
+          "description": "Host address for MCP server",
+          "isRequired": false,
+          "isSecret": false,
+          "default": "127.0.0.1",
+          "type": "named",
+          "name": "--host",
+          "isRepeated": false
+        },
+        {
+          "description": "Port for MCP server",
+          "isRequired": false,
+          "format": "number",
+          "isSecret": false,
+          "default": "9328",
+          "type": "named",
+          "name": "--port",
+          "isRepeated": false
+        },
+        {
+          "description": "Transport type for MCP communication (only streamable-http supported for persistent state)",
+          "isRequired": false,
+          "isSecret": false,
+          "default": "streamable-http",
+          "choices": [
+            "streamable-http"
+          ],
+          "type": "named",
+          "name": "--transport",
+          "isRepeated": false
+        },
+        {
+          "description": "Enable verbose logging with timestamps",
+          "isRequired": false,
+          "format": "boolean",
+          "isSecret": false,
+          "type": "named",
+          "name": "--verbose",
+          "isRepeated": false
+        },
+        {
+          "description": "Enable debug logging",
+          "isRequired": false,
+          "format": "boolean",
+          "isSecret": false,
+          "type": "named",
+          "name": "--debug",
+          "isRepeated": false
+        }
+      ],
+      "environmentVariables": [
+        {
+          "description": "Specify a custom config file path for CodeWeaver. Only needed if not using the default locations.",
+          "isRequired": false,
+          "format": "filepath",
+          "isSecret": false,
+          "name": "CODEWEAVER_CONFIG_FILE"
+        },
+        {
+          "description": "Enable debug mode for CodeWeaver.",
+          "isRequired": false,
+          "format": "boolean",
+          "isSecret": false,
+          "default": "false",
+          "choices": [
+            "false",
+            "true"
+          ],
+          "name": "CODEWEAVER_DEBUG"
+        },
+        {
+          "description": "Specify the API key for the embedding provider, if required. Note: {', '.join([p for p in _providers_for_kind('embedding') if p.])}",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true,
+          "choices": [
+            "openai",
+            "fireworks",
+            "vercel",
+            "ollama (cloud only)",
+            "google",
+            "mistral",
+            "cohere",
+            "hf_inference",
+            "github",
+            "together",
+            "azure",
+            "heroku",
+            "voyage",
+            "groq",
+            "bedrock"
+          ],
+          "name": "CODEWEAVER_EMBEDDING_API_KEY"
+        },
+        {
+          "description": "Specify the embedding model to use.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "default": "voyage-code-3",
+          "name": "CODEWEAVER_EMBEDDING_MODEL"
+        },
+        {
+          "description": "Specify the embedding provider to use.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "default": "voyage",
+          "choices": [
+            "openai",
+            "fireworks",
+            "vercel",
+            "fastembed",
+            "google",
+            "mistral",
+            "cohere",
+            "hf_inference",
+            "github",
+            "ollama",
+            "azure",
+            "heroku",
+            "sentence_transformers",
+            "together",
+            "voyage",
+            "groq",
+            "bedrock"
+          ],
+          "name": "CODEWEAVER_EMBEDDING_PROVIDER"
+        },
+        {
+          "description": "Set the server host for CodeWeaver.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "default": "localhost",
+          "name": "CODEWEAVER_HOST"
+        },
+        {
+          "description": "Set the log level for CodeWeaver (e.g., DEBUG, INFO, WARNING, ERROR).",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "default": "WARNING",
+          "choices": [
+            "WARNING",
+            "INFO",
+            "CRITICAL",
+            "DEBUG",
+            "ERROR"
+          ],
+          "name": "CODEWEAVER_LOG_LEVEL"
+        },
+        {
+          "description": "Set the server port for CodeWeaver.",
+          "isRequired": false,
+          "format": "number",
+          "isSecret": false,
+          "default": "9328",
+          "name": "CODEWEAVER_PORT"
+        },
+        {
+          "description": "Use a premade settings profile for CodeWeaver.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "choices": [
+            "testing",
+            "quickstart",
+            "recommended"
+          ],
+          "name": "CODEWEAVER_PROFILE"
+        },
+        {
+          "description": "Set the project name for CodeWeaver.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "name": "CODEWEAVER_PROJECT_NAME"
+        },
+        {
+          "description": "Set the project path for CodeWeaver.",
+          "isRequired": false,
+          "format": "filepath",
+          "isSecret": false,
+          "name": "CODEWEAVER_PROJECT_PATH"
+        },
+        {
+          "description": "Specify the API key for the reranking provider, if required.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true,
+          "choices": [
+            "cohere",
+            "voyage",
+            "bedrock"
+          ],
+          "name": "CODEWEAVER_RERANKING_API_KEY"
+        },
+        {
+          "description": "Specify the reranking model to use.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "default": "rerank-2.5",
+          "name": "CODEWEAVER_RERANKING_MODEL"
+        },
+        {
+          "description": "Specify the reranking provider to use.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "default": "voyage",
+          "choices": [
+            "fastembed",
+            "cohere",
+            "sentence_transformers",
+            "voyage",
+            "bedrock"
+          ],
+          "name": "CODEWEAVER_RERANKING_PROVIDER"
+        },
+        {
+          "description": "Specify the sparse embedding model to use.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "default": "prithivida/Splade_pp_en_v1",
+          "name": "CODEWEAVER_SPARSE_EMBEDDING_MODEL"
+        },
+        {
+          "description": "Specify the sparse embedding provider to use.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "default": "fastembed",
+          "choices": [
+            "fastembed",
+            "sentence_transformers"
+          ],
+          "name": "CODEWEAVER_SPARSE_EMBEDDING_PROVIDER"
+        },
+        {
+          "description": "Specify the API key for the vector store, if required.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true,
+          "choices": [
+            "qdrant",
+            "qdrant (cloud only)"
+          ],
+          "name": "CODEWEAVER_VECTOR_STORE_API_KEY"
+        },
+        {
+          "description": "Specify the port for the vector store.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "default": "6333",
+          "name": "CODEWEAVER_VECTOR_STORE_PORT"
+        },
+        {
+          "description": "Specify the vector store provider to use.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "default": "qdrant",
+          "choices": [
+            "qdrant",
+            "memory"
+          ],
+          "name": "CODEWEAVER_VECTOR_STORE_PROVIDER"
+        },
+        {
+          "description": "Specify the URL for the vector store.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "default": "http://localhost",
+          "name": "CODEWEAVER_VECTOR_STORE_URL"
+        },
+        {
+          "description": "Disable telemetry data collection.",
+          "isRequired": false,
+          "format": "boolean",
+          "isSecret": false,
+          "default": "false",
+          "choices": [
+            "false",
+            "true"
+          ],
+          "name": "CODEWEAVER__TELEMETRY__DISABLE_TELEMETRY"
+        },
+        {
+          "description": "Opt-in to potentially identifying collection of query and search result data. This is invaluable for helping us improve CodeWeaver's search capabilities. If privacy is a higher priority, do not enable this setting.",
+          "isRequired": false,
+          "format": "boolean",
+          "isSecret": false,
+          "default": "false",
+          "choices": [
+            "false",
+            "true"
+          ],
+          "name": "CODEWEAVER__TELEMETRY__TOOLS_OVER_PRIVACY"
+        },
+        {
+          "description": "HTTP proxy for requests (Used by: Azure, Azure, Voyage)",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "name": "HTTPS_PROXY"
+        },
+        {
+          "description": "API key for OpenAI-compatible services (not necessarily an API key *for* OpenAI). The OpenAI client also requires an API key, even if you don't actually need one for your provider (like local Ollama). So provide a dummy key if needed. (Used by: Azure, Cerebras, Deepseek, Fireworks, Github, Groq, Heroku, Moonshot, Ollama, Openai, Openrouter, Perplexity, Together, Vercel, X Ai)",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true,
+          "name": "OPENAI_API_KEY"
+        },
+        {
+          "description": "One of: 'debug', 'info', 'warning', 'error' (Used by: Azure, Cerebras, Deepseek, Fireworks, Github, Groq, Heroku, Moonshot, Ollama, Openai, Openrouter, Perplexity, Together, Vercel, X Ai)",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "choices": [
+            "error",
+            "info",
+            "warning",
+            "debug"
+          ],
+          "name": "OPENAI_LOG"
+        },
+        {
+          "description": "Path to the SSL certificate file for requests (Used by: Azure, Azure, Voyage)",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "name": "SSL_CERT_FILE"
+        },
+        {
+          "description": "API key for Vercel service",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true,
+          "name": "AI_GATEWAY_API_KEY"
+        },
+        {
+          "description": "AWS Account ID for Bedrock service",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "name": "AWS_ACCOUNT_ID"
+        },
+        {
+          "description": "AWS region for Bedrock service",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "name": "AWS_REGION"
+        },
+        {
+          "description": "AWS Secret Access Key for Bedrock service",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true,
+          "name": "AWS_SECRET_ACCESS_KEY"
+        },
+        {
+          "description": "API key for Azure Cohere service (cohere models on Azure)",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true,
+          "name": "AZURE_COHERE_API_KEY"
+        },
+        {
+          "description": "Endpoint for Azure Cohere service (cohere models on Azure)",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "name": "AZURE_COHERE_ENDPOINT"
+        },
+        {
+          "description": "Region for Azure Cohere service",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "name": "AZURE_COHERE_REGION"
+        },
+        {
+          "description": "API key for Azure OpenAI service (OpenAI models on Azure)",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true,
+          "name": "AZURE_OPENAI_API_KEY"
+        },
+        {
+          "description": "Endpoint for Azure OpenAI service (OpenAI models on Azure)",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "name": "AZURE_OPENAI_ENDPOINT"
+        },
+        {
+          "description": "Region for Azure OpenAI service (OpenAI models on Azure)",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "name": "AZURE_OPENAI_REGION"
+        },
+        {
+          "description": "Your Cohere API Key",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "name": "COHERE_API_KEY"
+        },
+        {
+          "description": "Host URL for Cohere service",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "name": "CO_API_URL"
+        },
+        {
+          "description": "API key for DeepSeek service",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true,
+          "name": "DEEPSEEK_API_KEY"
+        },
+        {
+          "description": "Your Google Gemini API Key",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "name": "GEMINI_API_KEY"
+        },
+        {
+          "description": "Your Google API Key",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "name": "GOOGLE_API_KEY"
+        },
+        {
+          "description": "Log level for Hugging Face Hub client",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "choices": [
+            "error",
+            "critical",
+            "debug",
+            "info",
+            "warning"
+          ],
+          "name": "HF_HUB_VERBOSITY"
+        },
+        {
+          "description": "API key/token for Hugging Face service",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "name": "HF_TOKEN"
+        },
+        {
+          "description": "HTTP proxy for requests",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "name": "HTTPS_PROXY"
+        },
+        {
+          "description": "API key for Heroku service",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true,
+          "name": "INFERENCE_KEY"
+        },
+        {
+          "description": "Host URL for Heroku service",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "name": "INFERENCE_URL"
+        },
+        {
+          "description": "Your Mistral API Key",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "name": "MISTRAL_API_KEY"
+        },
+        {
+          "description": "API key for OpenAI-compatible services (not necessarily an API key *for* OpenAI). The OpenAI client also requires an API key, even if you don't actually need one for your provider (like local Ollama). So provide a dummy key if needed.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true,
+          "name": "OPENAI_API_KEY"
+        },
+        {
+          "description": "One of: 'debug', 'info', 'warning', 'error'",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "choices": [
+            "error",
+            "info",
+            "warning",
+            "debug"
+          ],
+          "name": "OPENAI_LOG"
+        },
+        {
+          "description": "Log level for Qdrant service",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "choices": [
+            "ERROR",
+            "WARNING",
+            "INFO",
+            "DEBUG"
+          ],
+          "name": "QDRANT__LOG_LEVEL"
+        },
+        {
+          "description": "API key for Qdrant service",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true,
+          "name": "QDRANT__SERVICE__API_KEY"
+        },
+        {
+          "description": "Enable TLS for Qdrant service, expects truthy or false value (e.g. 1 for on, 0 for off).",
+          "isRequired": false,
+          "format": "boolean",
+          "isSecret": false,
+          "choices": [
+            "false",
+            "true"
+          ],
+          "name": "QDRANT__SERVICE__ENABLE_TLS"
+        },
+        {
+          "description": "Hostname of the Qdrant service; do not use for URLs with schemes (e.g. 'http://')",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "name": "QDRANT__SERVICE__HOST"
+        },
+        {
+          "description": "Port number for the Qdrant service",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "name": "QDRANT__SERVICE__HTTP_PORT"
+        },
+        {
+          "description": "Path to the TLS certificate file for Qdrant service. Only needed if using a self-signed certificate. If you're using qdrant-cloud, you don't need this.",
+          "isRequired": false,
+          "format": "filepath",
+          "isSecret": false,
+          "name": "QDRANT__TLS__CERT"
+        },
+        {
+          "description": "Path to the SSL certificate file for requests",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "name": "SSL_CERT_FILE"
+        },
+        {
+          "description": "Your Tavily API Key",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "name": "TAVILY_API_KEY"
+        },
+        {
+          "description": "API key for Together service",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true,
+          "name": "TOGETHER_API_KEY"
+        },
+        {
+          "description": "OIDC token for Vercel service",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true,
+          "name": "VERCEL_OIDC_TOKEN"
+        },
+        {
+          "description": "API key for Voyage service",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true,
+          "name": "VOYAGE_API_KEY"
+        }
+      ]
+    },
+    {
+      "registryType": "oci",
+      "registryBaseUrl": "https://docker.io/",
+      "identifier": "knitli/codeweaver",
+      "version": "0.0.1rc947+gf3d70949.dirty",
+      "runtimeHint": "docker",
+      "transport": {
+        "type": "streamable-http",
+        "url": "http://localhost:{host_port}"
+      },
+      "runtimeArguments": [
+        {
+          "description": "Automatically remove container when it exits",
+          "isRequired": false,
+          "isSecret": false,
+          "type": "named",
+          "name": "--rm",
+          "isRepeated": false
+        },
+        {
+          "description": "Mount workspace directory as read-only",
+          "isRequired": false,
+          "value": "{workspace}:/workspace:ro",
+          "isSecret": false,
+          "variables": {
+            "workspace": {
+              "description": "Path to your codebase to index and search",
+              "isRequired": true,
+              "isSecret": false
+            }
+          },
+          "type": "named",
+          "name": "-v",
+          "isRepeated": false
+        },
+        {
+          "description": "Set repository path inside container",
+          "isRequired": false,
+          "value": "CODEWEAVER_PROJECT_PATH=/workspace",
+          "isSecret": false,
+          "type": "named",
+          "name": "-e",
+          "isRepeated": false
+        },
+        {
+          "description": "Port mapping for MCP server",
+          "isRequired": false,
+          "value": "{host_port}:9328",
+          "isSecret": false,
+          "variables": {
+            "host_port": {
+              "description": "Host port to expose MCP server",
+              "isRequired": false,
+              "isSecret": false,
+              "default": "9328"
+            }
+          },
+          "type": "named",
+          "name": "-p",
+          "isRepeated": false
+        },
+        {
+          "description": "Docker network for Qdrant connectivity",
+          "isRequired": false,
+          "value": "{network}",
+          "isSecret": false,
+          "variables": {
+            "network": {
+              "description": "Docker network name (use 'host' for local Qdrant or custom network)",
+              "isRequired": false,
+              "isSecret": false,
+              "default": "bridge"
+            }
+          },
+          "type": "named",
+          "name": "--network",
+          "isRepeated": false
+        }
+      ],
+      "packageArguments": [
+        {
+          "description": "Start CodeWeaver MCP server",
+          "isRequired": false,
+          "value": "server",
+          "isSecret": false,
+          "type": "positional",
+          "isRepeated": false
+        },
+        {
+          "description": "Bind to all interfaces in container",
+          "isRequired": false,
+          "value": "0.0.0.0",
+          "isSecret": false,
+          "type": "named",
+          "name": "--host",
+          "isRepeated": false
+        },
+        {
+          "description": "MCP server port inside container",
+          "isRequired": false,
+          "value": "9328",
+          "isSecret": false,
+          "type": "named",
+          "name": "--port",
+          "isRepeated": false
+        },
+        {
+          "description": "Use streamable-http for persistent state and continuous indexing",
+          "isRequired": false,
+          "value": "streamable-http",
+          "isSecret": false,
+          "type": "named",
+          "name": "--transport",
+          "isRepeated": false
+        }
+      ],
+      "environmentVariables": [
+        {
+          "description": "Specify a custom config file path for CodeWeaver. Only needed if not using the default locations.",
+          "isRequired": false,
+          "format": "filepath",
+          "isSecret": false,
+          "name": "CODEWEAVER_CONFIG_FILE"
+        },
+        {
+          "description": "Enable debug mode for CodeWeaver.",
+          "isRequired": false,
+          "format": "boolean",
+          "isSecret": false,
+          "default": "false",
+          "choices": [
+            "false",
+            "true"
+          ],
+          "name": "CODEWEAVER_DEBUG"
+        },
+        {
+          "description": "Specify the API key for the embedding provider, if required. Note: {', '.join([p for p in _providers_for_kind('embedding') if p.])}",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true,
+          "choices": [
+            "openai",
+            "fireworks",
+            "vercel",
+            "ollama (cloud only)",
+            "google",
+            "mistral",
+            "cohere",
+            "hf_inference",
+            "github",
+            "together",
+            "azure",
+            "heroku",
+            "voyage",
+            "groq",
+            "bedrock"
+          ],
+          "name": "CODEWEAVER_EMBEDDING_API_KEY"
+        },
+        {
+          "description": "Specify the embedding model to use.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "default": "voyage-code-3",
+          "name": "CODEWEAVER_EMBEDDING_MODEL"
+        },
+        {
+          "description": "Specify the embedding provider to use.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "default": "voyage",
+          "choices": [
+            "openai",
+            "fireworks",
+            "vercel",
+            "fastembed",
+            "google",
+            "mistral",
+            "cohere",
+            "hf_inference",
+            "github",
+            "ollama",
+            "azure",
+            "heroku",
+            "sentence_transformers",
+            "together",
+            "voyage",
+            "groq",
+            "bedrock"
+          ],
+          "name": "CODEWEAVER_EMBEDDING_PROVIDER"
+        },
+        {
+          "description": "Set the server host for CodeWeaver.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "default": "localhost",
+          "name": "CODEWEAVER_HOST"
+        },
+        {
+          "description": "Set the log level for CodeWeaver (e.g., DEBUG, INFO, WARNING, ERROR).",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "default": "WARNING",
+          "choices": [
+            "WARNING",
+            "INFO",
+            "CRITICAL",
+            "DEBUG",
+            "ERROR"
+          ],
+          "name": "CODEWEAVER_LOG_LEVEL"
+        },
+        {
+          "description": "Set the server port for CodeWeaver.",
+          "isRequired": false,
+          "format": "number",
+          "isSecret": false,
+          "default": "9328",
+          "name": "CODEWEAVER_PORT"
+        },
+        {
+          "description": "Use a premade settings profile for CodeWeaver.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "choices": [
+            "testing",
+            "quickstart",
+            "recommended"
+          ],
+          "name": "CODEWEAVER_PROFILE"
+        },
+        {
+          "description": "Set the project name for CodeWeaver.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "name": "CODEWEAVER_PROJECT_NAME"
+        },
+        {
+          "description": "Set the project path for CodeWeaver.",
+          "isRequired": false,
+          "format": "filepath",
+          "isSecret": false,
+          "name": "CODEWEAVER_PROJECT_PATH"
+        },
+        {
+          "description": "Specify the API key for the reranking provider, if required.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true,
+          "choices": [
+            "cohere",
+            "voyage",
+            "bedrock"
+          ],
+          "name": "CODEWEAVER_RERANKING_API_KEY"
+        },
+        {
+          "description": "Specify the reranking model to use.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "default": "rerank-2.5",
+          "name": "CODEWEAVER_RERANKING_MODEL"
+        },
+        {
+          "description": "Specify the reranking provider to use.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "default": "voyage",
+          "choices": [
+            "fastembed",
+            "cohere",
+            "sentence_transformers",
+            "voyage",
+            "bedrock"
+          ],
+          "name": "CODEWEAVER_RERANKING_PROVIDER"
+        },
+        {
+          "description": "Specify the sparse embedding model to use.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "default": "prithivida/Splade_pp_en_v1",
+          "name": "CODEWEAVER_SPARSE_EMBEDDING_MODEL"
+        },
+        {
+          "description": "Specify the sparse embedding provider to use.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "default": "fastembed",
+          "choices": [
+            "fastembed",
+            "sentence_transformers"
+          ],
+          "name": "CODEWEAVER_SPARSE_EMBEDDING_PROVIDER"
+        },
+        {
+          "description": "Specify the API key for the vector store, if required.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true,
+          "choices": [
+            "qdrant",
+            "qdrant (cloud only)"
+          ],
+          "name": "CODEWEAVER_VECTOR_STORE_API_KEY"
+        },
+        {
+          "description": "Specify the port for the vector store.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "default": "6333",
+          "name": "CODEWEAVER_VECTOR_STORE_PORT"
+        },
+        {
+          "description": "Specify the vector store provider to use.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "default": "qdrant",
+          "choices": [
+            "qdrant",
+            "memory"
+          ],
+          "name": "CODEWEAVER_VECTOR_STORE_PROVIDER"
+        },
+        {
+          "description": "Specify the URL for the vector store.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "default": "http://localhost",
+          "name": "CODEWEAVER_VECTOR_STORE_URL"
+        },
+        {
+          "description": "Disable telemetry data collection.",
+          "isRequired": false,
+          "format": "boolean",
+          "isSecret": false,
+          "default": "false",
+          "choices": [
+            "false",
+            "true"
+          ],
+          "name": "CODEWEAVER__TELEMETRY__DISABLE_TELEMETRY"
+        },
+        {
+          "description": "Opt-in to potentially identifying collection of query and search result data. This is invaluable for helping us improve CodeWeaver's search capabilities. If privacy is a higher priority, do not enable this setting.",
+          "isRequired": false,
+          "format": "boolean",
+          "isSecret": false,
+          "default": "false",
+          "choices": [
+            "false",
+            "true"
+          ],
+          "name": "CODEWEAVER__TELEMETRY__TOOLS_OVER_PRIVACY"
+        },
+        {
+          "description": "HTTP proxy for requests (Used by: Azure, Azure, Voyage)",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "name": "HTTPS_PROXY"
+        },
+        {
+          "description": "API key for OpenAI-compatible services (not necessarily an API key *for* OpenAI). The OpenAI client also requires an API key, even if you don't actually need one for your provider (like local Ollama). So provide a dummy key if needed. (Used by: Azure, Cerebras, Deepseek, Fireworks, Github, Groq, Heroku, Moonshot, Ollama, Openai, Openrouter, Perplexity, Together, Vercel, X Ai)",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true,
+          "name": "OPENAI_API_KEY"
+        },
+        {
+          "description": "One of: 'debug', 'info', 'warning', 'error' (Used by: Azure, Cerebras, Deepseek, Fireworks, Github, Groq, Heroku, Moonshot, Ollama, Openai, Openrouter, Perplexity, Together, Vercel, X Ai)",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "choices": [
+            "error",
+            "info",
+            "warning",
+            "debug"
+          ],
+          "name": "OPENAI_LOG"
+        },
+        {
+          "description": "Path to the SSL certificate file for requests (Used by: Azure, Azure, Voyage)",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "name": "SSL_CERT_FILE"
+        },
+        {
+          "description": "API key for Vercel service",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true,
+          "name": "AI_GATEWAY_API_KEY"
+        },
+        {
+          "description": "AWS Account ID for Bedrock service",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "name": "AWS_ACCOUNT_ID"
+        },
+        {
+          "description": "AWS region for Bedrock service",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "name": "AWS_REGION"
+        },
+        {
+          "description": "AWS Secret Access Key for Bedrock service",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true,
+          "name": "AWS_SECRET_ACCESS_KEY"
+        },
+        {
+          "description": "API key for Azure Cohere service (cohere models on Azure)",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true,
+          "name": "AZURE_COHERE_API_KEY"
+        },
+        {
+          "description": "Endpoint for Azure Cohere service (cohere models on Azure)",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "name": "AZURE_COHERE_ENDPOINT"
+        },
+        {
+          "description": "Region for Azure Cohere service",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "name": "AZURE_COHERE_REGION"
+        },
+        {
+          "description": "API key for Azure OpenAI service (OpenAI models on Azure)",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true,
+          "name": "AZURE_OPENAI_API_KEY"
+        },
+        {
+          "description": "Endpoint for Azure OpenAI service (OpenAI models on Azure)",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "name": "AZURE_OPENAI_ENDPOINT"
+        },
+        {
+          "description": "Region for Azure OpenAI service (OpenAI models on Azure)",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "name": "AZURE_OPENAI_REGION"
+        },
+        {
+          "description": "Your Cohere API Key",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "name": "COHERE_API_KEY"
+        },
+        {
+          "description": "Host URL for Cohere service",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "name": "CO_API_URL"
+        },
+        {
+          "description": "API key for DeepSeek service",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true,
+          "name": "DEEPSEEK_API_KEY"
+        },
+        {
+          "description": "Your Google Gemini API Key",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "name": "GEMINI_API_KEY"
+        },
+        {
+          "description": "Your Google API Key",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "name": "GOOGLE_API_KEY"
+        },
+        {
+          "description": "Log level for Hugging Face Hub client",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "choices": [
+            "error",
+            "critical",
+            "debug",
+            "info",
+            "warning"
+          ],
+          "name": "HF_HUB_VERBOSITY"
+        },
+        {
+          "description": "API key/token for Hugging Face service",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "name": "HF_TOKEN"
+        },
+        {
+          "description": "HTTP proxy for requests",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "name": "HTTPS_PROXY"
+        },
+        {
+          "description": "API key for Heroku service",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true,
+          "name": "INFERENCE_KEY"
+        },
+        {
+          "description": "Host URL for Heroku service",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "name": "INFERENCE_URL"
+        },
+        {
+          "description": "Your Mistral API Key",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "name": "MISTRAL_API_KEY"
+        },
+        {
+          "description": "API key for OpenAI-compatible services (not necessarily an API key *for* OpenAI). The OpenAI client also requires an API key, even if you don't actually need one for your provider (like local Ollama). So provide a dummy key if needed.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true,
+          "name": "OPENAI_API_KEY"
+        },
+        {
+          "description": "One of: 'debug', 'info', 'warning', 'error'",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "choices": [
+            "error",
+            "info",
+            "warning",
+            "debug"
+          ],
+          "name": "OPENAI_LOG"
+        },
+        {
+          "description": "Log level for Qdrant service",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "choices": [
+            "ERROR",
+            "WARNING",
+            "INFO",
+            "DEBUG"
+          ],
+          "name": "QDRANT__LOG_LEVEL"
+        },
+        {
+          "description": "API key for Qdrant service",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true,
+          "name": "QDRANT__SERVICE__API_KEY"
+        },
+        {
+          "description": "Enable TLS for Qdrant service, expects truthy or false value (e.g. 1 for on, 0 for off).",
+          "isRequired": false,
+          "format": "boolean",
+          "isSecret": false,
+          "choices": [
+            "false",
+            "true"
+          ],
+          "name": "QDRANT__SERVICE__ENABLE_TLS"
+        },
+        {
+          "description": "Hostname of the Qdrant service; do not use for URLs with schemes (e.g. 'http://')",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "name": "QDRANT__SERVICE__HOST"
+        },
+        {
+          "description": "Port number for the Qdrant service",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "name": "QDRANT__SERVICE__HTTP_PORT"
+        },
+        {
+          "description": "Path to the TLS certificate file for Qdrant service. Only needed if using a self-signed certificate. If you're using qdrant-cloud, you don't need this.",
+          "isRequired": false,
+          "format": "filepath",
+          "isSecret": false,
+          "name": "QDRANT__TLS__CERT"
+        },
+        {
+          "description": "Path to the SSL certificate file for requests",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "name": "SSL_CERT_FILE"
+        },
+        {
+          "description": "Your Tavily API Key",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "name": "TAVILY_API_KEY"
+        },
+        {
+          "description": "API key for Together service",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true,
+          "name": "TOGETHER_API_KEY"
+        },
+        {
+          "description": "OIDC token for Vercel service",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true,
+          "name": "VERCEL_OIDC_TOKEN"
+        },
+        {
+          "description": "API key for Voyage service",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true,
+          "name": "VOYAGE_API_KEY"
+        }
+      ]
+    }
+  ],
+  "_meta": {
+    "io.modelcontextprotocol.registry/publisher-provided": {
+      "build_info": {
+        "framework": "fastmcp",
+        "package_manager": "uv",
+        "python_version": ">=3.12"
+      },
+      "capabilities": {
+        "languages_supported": 166,
+        "embedding_providers": [
+          "Bedrock",
+          "Ollama",
+          "Google",
+          "Sentence Transformers",
+          "Together",
+          "Vercel",
+          "Heroku",
+          "Azure",
+          "Openai",
+          "Hf Inference",
+          "Fireworks",
+          "Mistral",
+          "Fastembed",
+          "Cohere",
+          "Groq",
+          "Github",
+          "Voyage"
+        ],
+        "vector_store_providers": [
+          "Memory",
+          "Qdrant"
+        ],
+        "sparse_embedding_providers": [
+          "Sentence Transformers",
+          "Fastembed"
+        ],
+        "reranking_providers": [
+          "Bedrock",
+          "Sentence Transformers",
+          "Fastembed",
+          "Cohere",
+          "Voyage"
+        ],
+        "search_types": [
+          "semantic",
+          "hybrid",
+          "traditional"
+        ],
+        "chunking_strategies": [
+          "semantic",
+          "semantically-aware-delimiters"
+        ]
+      },
+      "tags": [
+        "agent-tools",
+        "ast-parsing",
+        "code-search",
+        "code-understanding",
+        "developer-tools",
+        "embeddings",
+        "hybrid-search",
+        "multi-language",
+        "natural-language-processing",
+        "reranking",
+        "semantic-search",
+        "sparse-embeddings",
+        "vector-database"
+      ],
+      "all_supported_languages": [
+        "asciidoc",
+        "assembly",
+        "assemblyscript",
+        "astro",
+        "bash (AST support)",
+        "batch",
+        "beef",
+        "c lang (AST support)",
+        "c plus plus (AST support)",
+        "c sharp (AST support)",
+        "carbon",
+        "chapel",
+        "clojure",
+        "cmake",
+        "cobol",
+        "coffeescript",
+        "confluence",
+        "coq",
+        "creole",
+        "crystal",
+        "css (AST support)",
+        "csv",
+        "cuda",
+        "cue",
+        "cython",
+        "dart",
+        "data",
+        "dbf",
+        "devicetree",
+        "dhall",
+        "dita",
+        "dlang",
+        "docbook",
+        "docker",
+        "duck",
+        "dyck",
+        "ecl",
+        "eiffel",
+        "elixir (AST support)",
+        "elm",
+        "elvish",
+        "emacs",
+        "erlang",
+        "eta",
+        "excel",
+        "factor",
+        "fortran",
+        "frege",
+        "fsharp",
+        "gleam",
+        "go (AST support)",
+        "gosu",
+        "graphql",
+        "groovy",
+        "hack",
+        "haskell (AST support)",
+        "hcl (AST support)",
+        "help",
+        "hjson",
+        "hlsl",
+        "html (AST support)",
+        "idris",
+        "imba",
+        "info",
+        "ini",
+        "io",
+        "janet",
+        "java (AST support)",
+        "javascript (AST support)",
+        "jelly",
+        "jinja",
+        "json (AST support)",
+        "jsx (AST support)",
+        "jule",
+        "julia",
+        "jupyter",
+        "just",
+        "kotlin (AST support)",
+        "lagda",
+        "latex",
+        "less",
+        "lhs",
+        "lisp",
+        "livescript",
+        "lua (AST support)",
+        "lucee",
+        "make",
+        "man",
+        "markdown",
+        "matlab",
+        "mediawiki",
+        "mojo",
+        "move",
+        "newick",
+        "nimble",
+        "nix (AST support)",
+        "nushell",
+        "nw",
+        "objective-c",
+        "ocaml",
+        "odin",
+        "org",
+        "pascal",
+        "perl",
+        "pharo",
+        "php (AST support)",
+        "pkl",
+        "pod",
+        "pony",
+        "powershell",
+        "properties",
+        "protobuf",
+        "purescript",
+        "python (AST support)",
+        "qb64",
+        "qml",
+        "r",
+        "racket",
+        "rake",
+        "raku",
+        "rakudo",
+        "reason",
+        "red",
+        "rescript",
+        "restructuredtext",
+        "ring",
+        "rmarkdown",
+        "rmd",
+        "rnw",
+        "rtf",
+        "ruby (AST support)",
+        "rust (AST support)",
+        "sas",
+        "sass",
+        "scala (AST support)",
+        "scheme",
+        "scss",
+        "self",
+        "smali",
+        "sml",
+        "solidity (AST support)",
+        "sql",
+        "svelte",
+        "swift (AST support)",
+        "texinfo",
+        "text",
+        "textile",
+        "toml",
+        "tsv",
+        "tsx (AST support)",
+        "typescript (AST support)",
+        "vala",
+        "vale",
+        "vbscript",
+        "verilog",
+        "vhdl",
+        "visualbasic6",
+        "vlang",
+        "vue",
+        "wiki",
+        "xml",
+        "xonsh",
+        "yaml (AST support)",
+        "yard",
+        "zig",
+        "zsh"
+      ]
+    }
+  }
+}

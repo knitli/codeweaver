@@ -1,0 +1,264 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-License-Identifier: MIT OR Apache-2.0
+#
+# Validates server.json for MCP Registry submission requirements
+# Runs on PRs that modify server.json and can be run manually
+
+name: Validate MCP Server Config
+
+on:
+    pull_request:
+        paths:
+            - "server.json"
+            - ".github/workflows/mcp-registry-validate.yml"
+    push:
+        branches:
+            - main
+            - develop
+        paths:
+            - "server.json"
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+jobs:
+    validate:
+        name: Validate server.json
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@b3498302c5c423fa896b97a26bb183df735d08f8
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: "3.12"
+
+            - name: Validate JSON syntax
+              run: |
+                  echo "Validating JSON syntax..."
+                  python -c "
+                  import json
+                  import sys
+
+                  try:
+                      with open('server.json', 'r') as f:
+                          data = json.load(f)
+                      print('✓ Valid JSON syntax')
+                  except json.JSONDecodeError as e:
+                      print(f'ERROR: Invalid JSON syntax: {e}')
+                      sys.exit(1)
+                  "
+
+            - name: Validate required fields
+              run: |
+                  echo "Validating required fields..."
+                  python -c "
+                  import json
+                  import sys
+
+                  with open('server.json', 'r') as f:
+                      data = json.load(f)
+
+                  # Check required top-level fields
+                  required_fields = {
+                      '\$schema': 'Schema reference URL',
+                      'name': 'Server name in namespace/server format',
+                      'description': 'Server description',
+                      'version': 'Server version'
+                  }
+
+                  errors = []
+                  warnings = []
+
+                  for field, desc in required_fields.items():
+                      if field not in data:
+                          errors.append(f'Missing required field: {field} ({desc})')
+                      elif not data[field]:
+                          errors.append(f'Empty required field: {field}')
+
+                  # Validate name format
+                  if 'name' in data:
+                      if data['name'].count('/') != 1:
+                          errors.append('name must contain exactly one forward slash (namespace/server-name)')
+                      else:
+                          namespace, server_name = data['name'].split('/')
+                          if not namespace.startswith('io.github.') and not '.' in namespace:
+                              warnings.append(f'Namespace \"{namespace}\" should use reverse-DNS format (e.g., io.github.username or com.company)')
+
+                  # Validate version format
+                  if 'version' in data:
+                      version = data['version']
+                      # Check for invalid version patterns
+                      invalid_patterns = ['^', '~', '>=', '<=', '>', '<', '*', 'x', '||', 'latest']
+                      if any(p in version for p in invalid_patterns):
+                          errors.append(f'version \"{version}\" cannot contain ranges or wildcards (found: {[p for p in invalid_patterns if p in version]})')
+
+                  # Check for packages or remotes
+                  if 'packages' not in data and 'remotes' not in data:
+                      errors.append('Must have either \"packages\" or \"remotes\" array')
+
+                  # Validate packages array
+                  if 'packages' in data:
+                      if not isinstance(data['packages'], list) or len(data['packages']) == 0:
+                          errors.append('packages must be a non-empty array')
+                      else:
+                          for i, pkg in enumerate(data['packages']):
+                              pkg_errors = []
+
+                              # Required package fields
+                              pkg_required = ['registryType', 'identifier', 'version', 'transport']
+                              for field in pkg_required:
+                                  if field not in pkg:
+                                      pkg_errors.append(f'Missing required field: {field}')
+
+                              # Validate transport
+                              if 'transport' in pkg:
+                                  if 'type' not in pkg['transport']:
+                                      pkg_errors.append('transport must have \"type\" field')
+                                  elif pkg['transport']['type'] == 'stdio' and pkg['transport'].get('url'):
+                                      pkg_errors.append('stdio transport cannot have \"url\" field')
+
+                              # Validate argument names
+                              if 'packageArguments' in pkg:
+                                  for arg in pkg['packageArguments']:
+                                      if 'name' in arg:
+                                          name = arg['name']
+                                          if any(c in name for c in ['<', '>', '\$', ' ']):
+                                              pkg_errors.append(f'Invalid argument name \"{name}\": cannot contain <, >, \$, or spaces')
+                                          if '=' in name:
+                                              pkg_errors.append(f'Invalid argument name \"{name}\": value should be in separate \"value\" field')
+
+                              if pkg_errors:
+                                  errors.append(f'Package {i}: ' + '; '.join(pkg_errors))
+
+                  # Print results
+                  if errors:
+                      print('❌ Validation failed with errors:')
+                      for error in errors:
+                          print(f'  • {error}')
+                      sys.exit(1)
+
+                  if warnings:
+                      print('⚠️  Validation passed with warnings:')
+                      for warning in warnings:
+                          print(f'  • {warning}')
+                  else:
+                      print('✓ All validation checks passed')
+
+                  # Print summary
+                  print('')
+                  print('Server Configuration Summary:')
+                  print(f'  Name: {data.get(\"name\", \"N/A\")}')
+                  print(f'  Version: {data.get(\"version\", \"N/A\")}')
+                  print(f'  Description: {data.get(\"description\", \"N/A\")[:100]}...')
+                  if 'packages' in data:
+                      print(f'  Packages: {len(data[\"packages\"])}')
+                      for pkg in data['packages']:
+                          print(f'    - {pkg.get(\"registryType\")}: {pkg.get(\"identifier\")}')
+                  if 'remotes' in data:
+                      print(f'  Remotes: {len(data[\"remotes\"])}')
+                  "
+
+            - name: Validate schema compliance
+              run: |
+                  echo "Checking schema compliance..."
+                  python -c "
+                  import json
+                  import sys
+
+                  with open('server.json', 'r') as f:
+                      data = json.load(f)
+
+                  # Verify schema URL
+                  schema = data.get('\$schema', '')
+                  if not schema.startswith('https://static.modelcontextprotocol.io/schemas/'):
+                      print(f'WARNING: \$schema should point to official MCP schema URL')
+                      print(f'  Current: {schema}')
+                      print(f'  Expected: https://static.modelcontextprotocol.io/schemas/YYYY-MM-DD/server.schema.json')
+
+                  # Check recommended schema version
+                  if '2025-09-16' not in schema and '2025-09-29' not in schema:
+                      print(f'WARNING: Consider using schema version 2025-09-16 or 2025-09-29')
+
+                  print('✓ Schema reference validated')
+                  "
+
+            - name: Check PyPI package existence
+              if: always()
+              run: |
+                  echo "Checking if package exists on PyPI..."
+                  python -c "
+                  import json
+                  import sys
+                  from urllib import request
+                  from urllib.error import HTTPError
+
+                  with open('server.json', 'r') as f:
+                      data = json.load(f)
+
+                  # Check PyPI packages
+                  if 'packages' in data:
+                      for pkg in data['packages']:
+                          if pkg.get('registryType') == 'pypi':
+                              identifier = pkg['identifier']
+                              version = pkg.get('version', 'unknown')
+
+                              print(f'Checking PyPI package: {identifier} version {version}')
+
+                              try:
+                                  # Check if package exists
+                                  url = f'https://pypi.org/pypi/{identifier}/json'
+                                  with request.urlopen(url) as response:
+                                      if response.status == 200:
+                                          pkg_data = json.loads(response.read())
+                                          available_versions = list(pkg_data.get('releases', {}).keys())
+
+                                          print(f'  ✓ Package \"{identifier}\" exists on PyPI')
+
+                                          # Check if specific version exists
+                                          if version in available_versions:
+                                              print(f'  ✓ Version {version} is available')
+                                          else:
+                                              print(f'  ⚠️  Version {version} not yet published')
+                                              print(f'      Latest version: {pkg_data.get(\"info\", {}).get(\"version\", \"unknown\")}')
+                                              print(f'      Note: This is expected for pre-release validation')
+
+                              except HTTPError as e:
+                                  if e.code == 404:
+                                      print(f'  ⚠️  Package \"{identifier}\" not found on PyPI')
+                                      print(f'      This must be published before MCP registry submission')
+                                  else:
+                                      print(f'  ⚠️  HTTP {e.code} checking PyPI: {e.reason}')
+                              except Exception as e:
+                                  print(f'  ⚠️  Error checking PyPI: {e}')
+                  else:
+                      print('No PyPI packages to check')
+                  "
+
+            - name: Validation summary
+              if: always()
+              run: |
+                  {
+                    echo "## MCP server.json Validation"
+                    echo ""
+
+                    if [ "${{ job.status }}" = "success" ]; then
+                      echo "✅ Validation passed"
+                    else
+                      echo "❌ Validation failed - see logs for details"
+                    fi
+
+                    echo ""
+                    echo "### Next Steps"
+                    echo ""
+                    echo "Before submitting to MCP Registry:"
+                    echo "1. Ensure the package is published to PyPI"
+                    echo "2. Verify version numbers match between server.json and PyPI"
+                    echo "3. Test the server locally with MCP Inspector"
+                    echo "4. Create a release to trigger automatic submission"
+                    echo ""
+                    echo "Documentation: https://github.com/modelcontextprotocol/registry/blob/main/docs/guides/publishing/publish-server.md"
+                  } >> "$GITHUB_STEP_SUMMARY"

@@ -12,7 +12,6 @@ contract:
   name: VectorStoreProvider
   type: abstract_interface
   location: src/codeweaver/providers/vector_stores/base.py
-
 operations:
   - name: list_collections
     description: List all collections in the vector store
@@ -30,10 +29,11 @@ operations:
       - Returns None if provider doesn't support collection listing
     examples:
       - input: {}
-        output: ["codeweaver-mcp", "test-project"]
+        output:
+          - codeweaver
+          - test-project
       - input: {}
         output: []
-
   - name: search
     description: Search for similar vectors using query vector(s)
     method: async
@@ -74,25 +74,50 @@ operations:
     examples:
       - description: Dense vector search
         input:
-          vector: [0.1, 0.2, 0.3, ...]
+          vector:
+            - 0.1
+            - 0.2
+            - 0.3
+            - '...'
           query_filter: null
         output:
           - score: 0.95
-            chunk: {chunk_id: "...", file_path: "src/auth.py", ...}
+            chunk:
+              chunk_id: '...'
+              file_path: src/auth.py
+              '...':
           - score: 0.87
-            chunk: {chunk_id: "...", file_path: "src/login.py", ...}
+            chunk:
+              chunk_id: '...'
+              file_path: src/login.py
+              '...':
       - description: Hybrid search with filter
         input:
           vector:
-            dense: [0.1, 0.2, ...]
-            sparse: {indices: [1, 5, 10], values: [0.8, 0.6, 0.4]}
+            dense:
+              - 0.1
+              - 0.2
+              - '...'
+            sparse:
+              indices:
+                - 1
+                - 5
+                - 10
+              values:
+                - 0.8
+                - 0.6
+                - 0.4
           query_filter:
-            languages: ["python"]
-            file_paths: ["src/**/*.py"]
+            languages:
+              - python
+            file_paths:
+              - src/**/*.py
         output:
           - score: 0.92
-            chunk: {file_path: "src/auth.py", language: "python", ...}
-
+            chunk:
+              file_path: src/auth.py
+              language: python
+              '...':
   - name: upsert
     description: Insert or update code chunks with their embeddings
     method: async
@@ -123,21 +148,30 @@ operations:
       - description: Insert new chunks
         input:
           chunks:
-            - chunk_id: "uuid-1"
-              file_path: "src/auth.py"
-              embeddings: {dense: [...], sparse: {...}}
-            - chunk_id: "uuid-2"
-              file_path: "src/login.py"
-              embeddings: {dense: [...]}
+            - chunk_id: uuid-1
+              file_path: src/auth.py
+              embeddings:
+                dense:
+                  - '...'
+                sparse:
+                  '...':
+            - chunk_id: uuid-2
+              file_path: src/login.py
+              embeddings:
+                dense:
+                  - '...'
         output: null
       - description: Update existing chunk
         input:
           chunks:
-            - chunk_id: "uuid-1"  # Existing ID
-              file_path: "src/auth.py"
-              embeddings: {dense: [...], sparse: {...}}
+            - chunk_id: uuid-1 # Existing ID
+              file_path: src/auth.py
+              embeddings:
+                dense:
+                  - '...'
+                sparse:
+                  '...':
         output: null
-
   - name: delete_by_file
     description: Delete all chunks for a specific file
     method: async
@@ -162,13 +196,12 @@ operations:
     examples:
       - description: Delete all chunks for file
         input:
-          file_path: "src/auth.py"
+          file_path: src/auth.py
         output: null
       - description: Delete non-existent file (no-op)
         input:
-          file_path: "src/missing.py"
+          file_path: src/missing.py
         output: null
-
   - name: delete_by_id
     description: Delete specific code chunks by their unique identifiers
     method: async
@@ -193,9 +226,11 @@ operations:
     examples:
       - description: Delete specific chunks
         input:
-          ids: ["uuid-1", "uuid-2", "uuid-3"]
+          ids:
+            - uuid-1
+            - uuid-2
+            - uuid-3
         output: null
-
   - name: delete_by_name
     description: Delete specific code chunks by their unique names
     method: async
@@ -220,9 +255,10 @@ operations:
     examples:
       - description: Delete by chunk names
         input:
-          names: ["auth.py:authenticate", "login.py:validate_credentials"]
+          names:
+            - auth.py:authenticate
+            - login.py:validate_credentials
         output: null
-
 properties:
   - name: collection
     type: str | None
@@ -231,13 +267,11 @@ properties:
       - Alphanumeric characters, underscores, hyphens only
       - Maximum 255 characters
       - None if no collection configured
-
   - name: base_url
     type: str | None
     description: The base URL for the provider's API, if applicable
     constraints:
       - Valid HTTP/HTTPS URL or None
-
 invariants:
   - Collection must exist before any operations (except list_collections)
   - Embedding dimensions must remain consistent within a collection
@@ -245,13 +279,11 @@ invariants:
   - All async operations must be non-blocking
   - Provider must be initialized before any operations
   - Operations must be idempotent where specified
-
 performance_requirements:
   - search: <200ms p95 for local deployments with <100k chunks
   - upsert_batch: <1s for 100 chunks
   - delete_by_file: <100ms for typical files (<100 chunks)
   - list_collections: <100ms
-
 concurrency:
   - Multiple concurrent reads (search) must be supported
   - Concurrent reads and writes must be safe

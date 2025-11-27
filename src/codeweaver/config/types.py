@@ -19,15 +19,14 @@ import os
 import ssl
 
 from collections.abc import Awaitable, Callable
-from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any, Literal, NotRequired, Required, TypedDict
+from typing import TYPE_CHECKING, Annotated, Literal, NotRequired, TypedDict
 
 from fastmcp.server.middleware import Middleware
 from fastmcp.server.server import DuplicateBehavior
 from fastmcp.tools import Tool
 from mcp.server.auth.settings import AuthSettings
 from mcp.server.lowlevel.server import LifespanResultT
-from pydantic import Field, FilePath, NonNegativeFloat, PositiveFloat, PositiveInt, SecretStr
+from pydantic import DirectoryPath, Field, FilePath, PositiveFloat, PositiveInt, SecretStr
 from starlette.middleware import Middleware as ASGIMiddleware
 from uvicorn.config import (
     SSL_PROTOCOL_VERSION,
@@ -37,134 +36,20 @@ from uvicorn.config import (
     WSProtocolType,
 )
 
-from codeweaver.common.utils.utils import get_user_config_dir
+from codeweaver.config.chunker import ChunkerSettingsDict
+from codeweaver.config.indexer import IndexerSettingsDict
 from codeweaver.config.logging import LoggingConfigDict
+from codeweaver.config.telemetry import TelemetrySettingsDict
 from codeweaver.core.types.enum import AnonymityConversion
 from codeweaver.core.types.models import BASEDMODEL_CONFIG, BasedModel
+from codeweaver.core.types.sentinel import Unset
 
 
 if TYPE_CHECKING:
-    from codeweaver.config.chunker import CustomDelimiter, CustomLanguage
     from codeweaver.config.logging import LoggingSettings
     from codeweaver.config.middleware import MiddlewareOptions
     from codeweaver.config.providers import ProviderSettingsDict
-    from codeweaver.core.types import AnonymityConversion, DictView, FilteredKeyT, Unset
-    from codeweaver.providers.provider import Provider
-
-# ===========================================================================
-# *          Rignore and File Filter Settings
-# ===========================================================================
-
-
-class RignoreSettings(TypedDict, total=False):
-    """Settings for the rignore library."""
-
-    ignore_hidden: NotRequired[bool]
-    read_ignore_files: NotRequired[bool]
-    read_parents_ignores: NotRequired[bool]
-    read_git_ignore: NotRequired[bool]
-    read_global_git_ignore: NotRequired[bool]
-    read_git_exclude: NotRequired[bool]
-    require_git: NotRequired[bool]
-    additional_ignores: NotRequired[list[str | Path]]
-    additional_ignore_paths: NotRequired[list[str | Path]]
-    max_depth: NotRequired[int]
-    max_filesize: NotRequired[int]
-    follow_links: NotRequired[bool]
-    case_insensitive: NotRequired[bool]
-    same_file_system: NotRequired[bool]
-    should_exclude_entry: NotRequired[Callable[[Path], bool]]
-
-
-class FileFilterSettingsDict(TypedDict, total=False):
-    """A serialized `FileFilterSettings` object."""
-
-    forced_includes: NotRequired[frozenset[str | Path]]
-    excludes: NotRequired[frozenset[str | Path]]
-    excluded_extensions: NotRequired[frozenset[str]]
-    use_gitignore: NotRequired[bool]
-    use_other_ignore_files: NotRequired[bool]
-    ignore_hidden: NotRequired[bool]
-    include_github_dir: NotRequired[bool]
-    include_tooling_dir: NotRequired[bool]
-    other_ignore_kwargs: NotRequired[RignoreSettings | Unset]
-    default_rignore_settings: NotRequired[DictView[RignoreSettings]]
-
-
-# ===========================================================================
-# *            Provider Connection and Rate Limit Settings
-# ===========================================================================
-
-
-class ConnectionRateLimitConfig(TypedDict, total=False):
-    """Settings for connection rate limiting."""
-
-    max_requests_per_second: PositiveInt | None
-    burst_capacity: PositiveInt | None
-    backoff_multiplier: PositiveFloat | None
-    max_retries: PositiveInt | None
-
-
-class ConnectionConfiguration(TypedDict, total=False):
-    """Settings for connection configuration. Only required for non-default transports."""
-
-    host: str | None
-    port: PositiveInt | None
-    headers: NotRequired[dict[str, str] | None]
-    rate_limits: NotRequired[ConnectionRateLimitConfig | None]
-
-
-class BaseProviderSettings(TypedDict, total=False):
-    """Base settings for all providers."""
-
-    provider: Required[Provider]
-    enabled: Required[bool]
-    api_key: NotRequired[str | None]
-    connection: NotRequired[ConnectionConfiguration | None]
-    client_options: NotRequired[dict[str, Any] | None]
-    other: NotRequired[dict[str, Any] | None]
-
-
-# ===========================================================================
-# *       TypedDict Representations of Chunker and Related Settings
-# ===========================================================================
-
-
-class PerformanceSettingsDict(TypedDict, total=False):
-    """TypedDict for performance settings.
-
-    Not intended to be used directly; used for internal type checking and validation.
-    """
-
-    max_file_size_mb: NotRequired[PositiveInt | None]
-    chunk_timeout_seconds: NotRequired[PositiveInt | None]
-    parse_timeout_seconds: NotRequired[PositiveInt | None]
-    max_chunks_per_file: NotRequired[PositiveInt | None]
-    max_memory_mb_per_operation: NotRequired[PositiveInt | None]
-    max_ast_depth: NotRequired[PositiveInt | None]
-
-
-class ConcurrencySettingsDict(TypedDict, total=False):
-    """TypedDict for concurrency settings.
-
-    Not intended to be used directly; used for internal type checking and validation.
-    """
-
-    max_parallel_files: NotRequired[PositiveInt | None]
-    use_process_pool: NotRequired[bool | None]
-
-
-class ChunkerSettingsDict(TypedDict, total=False):
-    """TypedDict for Chunker settings.
-
-    Not intended to be used directly; used for internal type checking and validation.
-    """
-
-    custom_delimiters: NotRequired[list[CustomDelimiter]] | None
-    custom_languages: NotRequired[list[CustomLanguage]] | None
-    semantic_importance_threshold: NotRequired[NonNegativeFloat | None]
-    performance: NotRequired[PerformanceSettingsDict | None]
-    concurrency: NotRequired[ConcurrencySettingsDict | None]
+    from codeweaver.core.types import AnonymityConversion, FilteredKeyT
 
 
 # ===========================================================================
@@ -175,7 +60,7 @@ class ChunkerSettingsDict(TypedDict, total=False):
 class FastMcpHttpRunArgs(TypedDict, total=False):
     """Arguments for running FastMCP over HTTP."""
 
-    transport: NotRequired[Literal["http", "streamable-http"]]
+    transport: NotRequired[Literal["http", "streamable-http", "stdio"]]
     host: NotRequired[str | None]
     port: NotRequired[PositiveInt | None]
     log_level: NotRequired[Literal["debug", "info", "warning", "error"] | None]
@@ -212,35 +97,37 @@ class FastMcpServerSettingsDict(TypedDict, total=False):
     tools: NotRequired[list[str | Tool] | None]
 
 
+class EndpointSettingsDict(TypedDict, total=False):
+    """Defines enable/disable settings for various CodeWeaver HTTP endpoints."""
+
+    enable_state: NotRequired[bool | Unset]
+    enable_health: NotRequired[bool | Unset]
+    enable_metrics: NotRequired[bool | Unset]
+    enable_settings: NotRequired[bool | Unset]
+    enable_version: NotRequired[bool | Unset]
+
+
 class CodeWeaverSettingsDict(TypedDict, total=False):
     """TypedDict for CodeWeaver settings.
 
     Not intended to be used directly; used for internal type checking and validation.
     """
 
-    project_path: NotRequired[Path | None]
-    project_name: NotRequired[str | None]
-    provider: NotRequired[ProviderSettingsDict | None]
-    config_file: NotRequired[FilePath | None]
-    token_limit: NotRequired[PositiveInt]
-    max_file_size: NotRequired[PositiveInt]
-    max_results: NotRequired[PositiveInt]
-    server: NotRequired[FastMcpServerSettingsDict]
-    logging: NotRequired[LoggingSettings]
-    middleware_settings: NotRequired[MiddlewareOptions]
-    chunker: NotRequired[ChunkerSettingsDict]
-    project_root: NotRequired[Path | None]
-    uvicorn_settings: NotRequired[UvicornServerSettingsDict]
-    filter_settings: NotRequired[FileFilterSettingsDict]
-    enable_background_indexing: NotRequired[bool]
-    enable_telemetry: NotRequired[bool]
-    enable_health_endpoint: NotRequired[bool]
-    enable_statistics_endpoint: NotRequired[bool]
-    enable_settings_endpoint: NotRequired[bool]
-    enable_version_endpoint: NotRequired[bool]
-    allow_identifying_telemetry: NotRequired[bool]
-    enable_ai_intent_analysis: NotRequired[bool]
-    enable_precontext: NotRequired[bool]
+    project_path: NotRequired[DirectoryPath | Unset]
+    project_name: NotRequired[str | Unset]
+    provider: NotRequired[ProviderSettingsDict | Unset]
+    config_file: NotRequired[FilePath | Unset]
+    token_limit: NotRequired[PositiveInt | Unset]
+    max_file_size: NotRequired[PositiveInt | Unset]
+    max_results: NotRequired[PositiveInt | Unset]
+    server: NotRequired[FastMcpServerSettingsDict | Unset]
+    logging: NotRequired[LoggingSettings | Unset]
+    middleware: NotRequired[MiddlewareOptions | Unset]
+    chunker: NotRequired[ChunkerSettingsDict | Unset]
+    uvicorn: NotRequired[UvicornServerSettingsDict | Unset]
+    indexer: NotRequired[IndexerSettingsDict | Unset]
+    telemetry: NotRequired[TelemetrySettingsDict | Unset]
+    endpoints: NotRequired[EndpointSettingsDict | Unset]
 
 
 # ===========================================================================
@@ -259,8 +146,8 @@ class UvicornServerSettings(BasedModel):
     model_config = BASEDMODEL_CONFIG
 
     name: Annotated[str, Field(exclude=True)] = "CodeWeaver_http"
-    host: str = "127.0.0.1"
-    port: PositiveInt = 9328
+    host: str = os.environ.get("CODEWEAVER_HOST", "127.0.0.1")
+    port: PositiveInt = int(port) if (port := os.environ.get("CODEWEAVER_PORT")) else 9328
     uds: str | None = None
     fd: int | None = None
     http: type[asyncio.Protocol] | HTTPProtocolType | str = "auto"
@@ -273,11 +160,11 @@ class UvicornServerSettings(BasedModel):
     lifespan: LifespanType = "auto"
     env_file: str | os.PathLike[str] | None = None
     log_config: LoggingConfigDict | None = None
-    log_level: str | int | None = "info"
+    log_level: str | int | None = "warning"
     access_log: bool = True
     use_colors: bool | None = None
     interface: InterfaceType = "auto"
-    reload: bool = False  # TODO: We should add it, but we need to manage handling it mid-request.
+    reload: bool = False
     reload_dirs: list[str] | str | None = None
     reload_delay: PositiveFloat = 0.25
     reload_includes: list[str] | str | None = None
@@ -385,46 +272,10 @@ class UvicornServerSettingsDict(TypedDict, total=False):
     h11_max_incomplete_event_size: NotRequired[int | None]
 
 
-def default_config_file_locations(
-    *, as_yaml: bool = False, as_json: bool = False
-) -> tuple[str, ...]:
-    """Get default file locations for configuration files."""
-    # Determine base extensions
-    extensions = (
-        ["toml"] if not as_yaml and not as_json else ["yaml", "yml"] if as_yaml else ["json"]
-    )
-    # Get user config directory
-    user_config_dir = get_user_config_dir()
-
-    # Build file paths maintaining precedence order
-    base_paths = [
-        (Path.cwd(), ".codeweaver.local"),
-        (Path.cwd(), ".codeweaver"),
-        (Path(user_config_dir) / "codeweaver", "settings"),
-    ]
-
-    # Generate all file paths using list comprehension
-    file_paths = [
-        str(base_dir / f"{filename}.{ext}")
-        for base_dir, filename in base_paths
-        for ext in extensions
-    ]
-
-    return tuple(file_paths)
-
-
 __all__ = (
-    "ChunkerSettingsDict",
     "CodeWeaverSettingsDict",
-    "ConcurrencySettingsDict",
-    "ConnectionConfiguration",
-    "ConnectionRateLimitConfig",
     "FastMcpHttpRunArgs",
     "FastMcpServerSettingsDict",
-    "FileFilterSettingsDict",
-    "PerformanceSettingsDict",
-    "RignoreSettings",
     "UvicornServerSettings",
     "UvicornServerSettingsDict",
-    "default_config_file_locations",
 )

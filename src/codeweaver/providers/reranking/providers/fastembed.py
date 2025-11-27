@@ -10,10 +10,10 @@ from __future__ import annotations
 import logging
 import multiprocessing
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from typing import Any, ClassVar
 
-from codeweaver.exceptions import ConfigurationError
+from codeweaver.exceptions import ProviderError
 from codeweaver.providers.provider import Provider
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 from codeweaver.providers.reranking.providers.base import RerankingProvider
@@ -25,18 +25,22 @@ try:
     from fastembed.rerank.cross_encoder import TextCrossEncoder
 
 except ImportError as e:
-    logger.exception("Failed to import TextCrossEncoder from fastembed.rerank.cross_encoder")
+    logger.warning(
+        "Failed to import TextCrossEncoder from fastembed.rerank.cross_encoder", exc_info=True
+    )
+    from codeweaver.exceptions import ConfigurationError
+
     raise ConfigurationError(
-        "FastEmbed is not installed. Please install it with `pip install codeweaver[provider-fastembed]` or `codeweaver[provider-fastembed-gpu]`."
+        "FastEmbed is not installed. Please install it with `pip install code-weaver[fastembed]` or `codeweaver[fastembed-gpu]`."
     ) from e
 
 
-def fastembed_kwargs(**kwargs: Mapping[str, Any] | None) -> dict[str, Any]:
+def fastembed_kwargs(**kwargs: Any) -> dict[str, Any]:
     """Get all possible kwargs for FastEmbed embedding methods."""
-    default_kwargs: Mapping[str, Any] = {"threads": multiprocessing.cpu_count(), "lazy_load": True}
+    default_kwargs: dict[str, Any] = {"threads": multiprocessing.cpu_count(), "lazy_load": True}
     if kwargs:
-        device_ids: list[int] | None = kwargs.get("device_ids")  # pyright: ignore[reportAssignmentType]
-        cuda: bool | None = kwargs.get("cuda")  # pyright: ignore[reportAssignmentType]
+        device_ids: list[int] | None = kwargs.get("device_ids")
+        cuda: bool | None = kwargs.get("cuda")
         if cuda == False:  # user **explicitly** disabled cuda  # noqa: E712
             return default_kwargs | kwargs
         cuda = bool(cuda)
@@ -53,9 +57,9 @@ def fastembed_kwargs(**kwargs: Mapping[str, Any] | None) -> dict[str, Any]:
             cuda = False
             device_ids = None
         if cuda:
-            kwargs["cuda"] = True  # pyright: ignore[reportArgumentType]
-            kwargs["device_ids"] = device_ids  # pyright: ignore[reportArgumentType]
-            kwargs["providers"] = ["CUDAExecutionProvider"]  # pyright: ignore[reportArgumentType]
+            kwargs["cuda"] = True
+            kwargs["device_ids"] = device_ids
+            kwargs["providers"] = ["CUDAExecutionProvider"]
     return default_kwargs | kwargs
 
 
@@ -66,9 +70,9 @@ class FastEmbedRerankingProvider(RerankingProvider[TextCrossEncoder]):
     model_name: The name of the FastEmbed model to use.
     """
 
-    _client: TextCrossEncoder
+    client: TextCrossEncoder
     _provider: Provider = Provider.FASTEMBED
-    _caps: RerankingModelCapabilities
+    caps: RerankingModelCapabilities
 
     _kwargs: ClassVar[dict[str, Any]] = fastembed_kwargs()
 
@@ -76,16 +80,11 @@ class FastEmbedRerankingProvider(RerankingProvider[TextCrossEncoder]):
 
     def _initialize(self) -> None:
         if "model_name" not in self.kwargs:
-            self.kwargs["model_name"] = self._caps.name
-        self._client = TextCrossEncoder(**self.kwargs)  # pyright: ignore[reportArgumentType]
+            self.kwargs["model_name"] = self.caps.name
+        self.client = TextCrossEncoder(**self.kwargs)
 
     async def _execute_rerank(
-        self,
-        query: str,
-        documents: Sequence[str],
-        *,
-        top_n: int = 40,
-        **kwargs: Mapping[str, Any] | None,
+        self, query: str, documents: Sequence[str], *, top_n: int = 40, **kwargs: Any
     ) -> Any:
         """Execute the reranking process."""
         try:
@@ -95,7 +94,23 @@ class FastEmbedRerankingProvider(RerankingProvider[TextCrossEncoder]):
                 query=query, documents=documents, batch_size=len(documents), **(kwargs or {})
             )
         except Exception as e:
-            raise RuntimeError(f"Error during reranking with FastEmbed: {e}") from e
+            raise ProviderError(
+                f"FastEmbed reranking execution failed: {e}",
+                details={
+                    "provider": "fastembed",
+                    "model": self.caps.name,
+                    "query_length": len(query),
+                    "document_count": len(documents),
+                    "batch_size": len(documents),
+                    "error_type": type(e).__name__,
+                },
+                suggestions=[
+                    "Verify FastEmbed model is properly initialized",
+                    "Check if GPU/CUDA is available if using GPU acceleration",
+                    "Reduce batch size if encountering memory issues",
+                    "Ensure documents are valid text strings",
+                ],
+            ) from e
         else:
             return response
 

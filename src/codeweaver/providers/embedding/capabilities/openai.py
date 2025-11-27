@@ -7,13 +7,14 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
-from codeweaver.providers.embedding.capabilities.base import (
-    EmbeddingModelCapabilities,
-    PartialCapabilities,
-)
+from codeweaver.providers.embedding.capabilities.types import PartialCapabilities
 from codeweaver.providers.provider import Provider
+
+
+if TYPE_CHECKING:
+    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 
 
 def _get_openai_models(
@@ -40,6 +41,7 @@ def _get_shared_openai_embedding_capabilities() -> PartialCapabilities:
         "supports_custom_prompts": False,
         "is_normalized": True,
         "tokenizer": "tiktoken",
+        "max_batch_tokens": 64_000,
         "tokenizer_model": "cl100k_base",
         "supports_context_chunk_embedding": False,
         "context_window": 8192,
@@ -50,6 +52,8 @@ def _get_shared_openai_embedding_capabilities() -> PartialCapabilities:
 
 def get_openai_embedding_capabilities() -> tuple[EmbeddingModelCapabilities, ...]:
     """Get the capabilities for OpenAI embedding models."""
+    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+
     dimensions = (3072, 2560, 2048, 1536, 1024, 512, 256)
     return tuple(
         EmbeddingModelCapabilities.model_validate({

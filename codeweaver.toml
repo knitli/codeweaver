@@ -1,0 +1,75 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+"$schema" = "https://raw.githubusercontent.com/knitli/codeweaver/refs/heads/main/schema/codeweaver.schema.json"
+project_path = "."
+project_name = "codeweaver"
+token_limit = 30000
+max_file_size = 1048576
+max_results = 30
+
+[provider]
+agent = [
+  # model_settings is a required field with no required settings currently
+  # When we integrate agents, we can re-evaluate the settings needed here
+  { provider = "anthropic", enabled = true, model = "anthropic:claude-haiku-4.5", model_settings = {  } },
+]
+data = [
+  { provider = "tavily", enabled = true },
+  { provider = "duckduckgo", enabled = true },
+]
+embedding = [
+  { provider = "voyage", enabled = true, model_settings = { model = "voyage-code-3" } },
+]
+reranking = [
+  { provider = "voyage", enabled = true, model_settings = { model = "rerank-2.5" } },
+]
+vector_store = [
+  { provider = "qdrant", enabled = true },
+]
+sparse_embedding = [
+  # this is codeweaver's default sparse embedding model because of its relative quality
+  # and availability -- it's the strongest sparse model available on fastembed
+  # We need to do more testing against real codebases to refine sparse model choices more generally
+  { provider = "fastembed", enabled = true, model_settings = { model = "prithivida/Splade_PP_en_v1" } },
+]
+
+[server]
+on_duplicate_tools = "replace"
+on_duplicate_resources = "replace"
+on_duplicate_prompts = "replace"
+resource_prefix_format = "path"
+
+[logging]
+name = "codeweaver"
+level = 30
+use_rich = true
+
+[middleware.error_handling]
+transform_errors = false
+
+[middleware.retry]
+max_retries = 5
+base_delay = 1.0
+max_delay = 60.0
+backoff_multiplier = 2.0
+
+[middleware.logging]
+log_level = 30
+include_payloads = false
+
+[middleware.rate_limiting]
+max_requests_per_second = 75
+burst_capacity = 150
+global_limit = true
+
+[indexer]
+excludes = [
+  "tests/fixtures/deep_nesting.py",
+  "tests/fixtures/malformed.py",
+  "tests/fixtures/sample.go",
+  "data/**",
+  "specs/**",
+  "plans/**",
+]

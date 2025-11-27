@@ -1,3 +1,4 @@
+# sourcery skip: no-complex-if-expressions
 # SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
@@ -11,10 +12,77 @@ are organized into five primary categories.
 
 from __future__ import annotations
 
-from typing import Any, ClassVar
+import sys
+
+from typing import Any, ClassVar, NamedTuple
 
 
-# TODO: We got into a bad habit of not using native exception types. We need to systematically go through and improve exception handling and information.
+class LocationInfo(NamedTuple):
+    """Location information for where an exception was raised.
+
+    Attributes:
+        filename: The name of the file
+        line_number: The line number in the file
+    """
+
+    filename: str
+    line_number: int
+    module_name: str
+
+    @classmethod
+    def from_frame(cls, frame: int = 2) -> LocationInfo | None:
+        """Create LocationInfo from a stack frame.
+
+        Args:
+            frame: The stack frame to inspect (default: 2)
+
+        Returns:
+            LocationInfo instance or None if unavailable.
+        """
+        try:
+            tb = sys._getframe(frame)
+            filename = tb.f_code.co_filename
+            line_number = tb.f_lineno
+            module_name = tb.f_globals.get("__name__", "<unknown>")
+            return cls(filename, line_number, module_name)
+        except (AttributeError, ValueError):
+            return None
+
+
+def _is_tty() -> bool:
+    """Check if the output is a TTY in an interactive terminal."""
+    return sys.stdout.isatty() if hasattr(sys, "stdout") and sys.stdout else False
+
+
+def _get_issue_information() -> tuple[str, ...]:
+    """Generate issue reporting information."""
+    if _is_tty():
+        return (
+            "[dark orange]CodeWeaver[/dark orange] [bold magenta]is in alpha[/bold magenta]. Please report possible bugs at https://github.com/knitli/codeweaver/issues",
+            "",
+            "If you're not sure something is a bug, you can open a discussion at: https://github.com/knitli/codeweaver/discussions",
+            "",
+            "[bold]Thank you for helping us improve CodeWeaver! ❤️[/bold]",
+        )
+    return (
+        "CodeWeaver is in alpha. Please report possible bugs at https://github.com/knitli/codeweaver/issues",
+        "",
+        "If you're not sure something is a bug, you can open a discussion at: https://github.com/knitli/codeweaver/discussions",
+        "",
+        "Thank you for helping us improve CodeWeaver!",
+    )
+
+
+def _get_reporting_info(detail_parts: list[str]) -> str:
+    """Generate issue reporting information."""
+    detail_parts = detail_parts or []
+    return "\n".join((
+        "Include the following information when reporting issues:",
+        "- Details: " + ", ".join(detail_parts)
+        if detail_parts
+        else "- No additional details provided.",
+        "",
+    ))
 
 
 class CodeWeaverError(Exception):
@@ -24,13 +92,7 @@ class CodeWeaverError(Exception):
     for resolution.
     """
 
-    _issue_information: ClassVar[tuple[str, ...]] = (
-        "CodeWeaver is still in beta. If you encounter issues, and think they are bugs, please report them at https://github.com/knitli/codeweaver-mcp/issues",
-        "",
-        "If you're not sure, you can open a discussion at: https://github.com/knitli/codeweaver-mcp/discussions",
-        "",
-        "Thank you for helping us improve CodeWeaver!",
-    )
+    _issue_information: ClassVar[tuple[str, ...]] = _get_issue_information()
 
     def __init__(
         self,
@@ -38,6 +100,7 @@ class CodeWeaverError(Exception):
         *,
         details: dict[str, Any] | None = None,
         suggestions: list[str] | None = None,
+        location: LocationInfo | None = None,
     ) -> None:
         """Initialize CodeWeaver error.
 
@@ -45,67 +108,60 @@ class CodeWeaverError(Exception):
             message: Human-readable error message
             details: Additional context about the error
             suggestions: Actionable suggestions for resolving the error
-            _issue_information: Preformatted issue reporting information
         """
         super().__init__(message)
         self.message = message
         self.details = details or {}
         self.suggestions = suggestions or []
+        self.location = location or LocationInfo.from_frame(2)
 
     def __str__(self) -> str:
         """Return descriptive error message with context details."""
         # Start with base message
-        parts = [self.message]
+        from codeweaver.cli.utils import format_file_link
+
+        if _is_tty():
+            location_info = (
+                f"\n[bold red]Encountered error[/bold red] in '{self.location.module_name}' "
+                f"at {format_file_link(self.location.filename, self.location.line_number)}\n"
+                if self.location and self.location.filename
+                else ""
+            )
+        else:
+            location_info = (
+                f"\nEncountered error in '{self.location.module_name}' "
+                f"at {format_file_link(self.location.filename, self.location.line_number)}\n"
+                if self.location and self.location.filename
+                else ""
+            )
+        parts: list[str] = [self.message, location_info]
 
         # Add important details if present
         if self.details:
-            detail_parts = []
+            detail_parts: list[str] = []
             # Include file_path if present
             if "file_path" in self.details:
                 detail_parts.append(f"file: {self.details['file_path']}")
             # Include numeric metrics if present
-            for key in [
-                "actual_depth",
-                "max_depth",
-                "actual_tokens",
-                "max_tokens",
-                "chunk_count",
-                "max_chunks",
-                "timeout_seconds",
-                "elapsed_seconds",
-                "line_number",
-            ]:
-                if key in self.details:
-                    detail_parts.append(f"{key.replace('_', ' ')}: {self.details[key]}")
-
+            detail_parts.extend(
+                f"{key.replace('_', ' ')}: {self.details[key]}"
+                for key in [
+                    "actual_depth",
+                    "max_depth",
+                    "actual_tokens",
+                    "max_tokens",
+                    "chunk_count",
+                    "max_chunks",
+                    "timeout_seconds",
+                    "elapsed_seconds",
+                    "line_number",
+                ]
+                if key in self.details
+            )
             if detail_parts:
-                parts.append(f"({', '.join(detail_parts)})")
-
-        return " ".join(parts)
-
-    @property
-    def _reporting_info(self) -> str:
-        """Generate issue reporting information."""
-        return "\n".join((
-            "Include the following information when reporting issues:",
-            f"- Error Message: {self.message}",
-            "- Details: " + ", ".join(f"{k}: {v}" for k, v in self.details.items())
-            if self.details
-            else "- No additional details provided.",
-            "- Suggestions: " + ", ".join(self.suggestions)
-            if self.suggestions
-            else "- No suggestions provided.",
-            "",
-            "If you're not sure, you can open a discussion at: https://github.com/knitli/codeweaver-mcp/discussions",
-            "",
-            "Thank you for helping us improve CodeWeaver!",
-        ))
-
-    @property
-    def report(self) -> str:
-        """Generate a full error report including reporting information."""
-        about = type(self)._issue_information
-        return f"{'\n'.join(about)}\n\n{self._reporting_info}"
+                parts.append(_get_reporting_info(detail_parts))
+        parts.extend(type(self)._issue_information)
+        return "\n".join(parts)
 
 
 class InitializationError(CodeWeaverError):
@@ -129,6 +185,14 @@ class ProviderError(CodeWeaverError):
 
     Raised when there are issues with embedding providers, vector stores,
     or other external service integrations.
+    """
+
+
+class ModelSwitchError(ProviderError):
+    """Model switching detection error.
+
+    Raised when the system detects that the embedding model has changed
+    from what was used to create the existing vector store collection.
     """
 
 
