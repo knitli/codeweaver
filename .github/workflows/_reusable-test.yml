@@ -43,8 +43,6 @@ on:
 jobs:
   test:
     name: Test Python ${{ matrix.python-version }}
-    permissions:
-      contents: write
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -69,7 +67,7 @@ jobs:
         uses: ./.github/actions/setup-python-env
         with:
           python-version: ${{ matrix.python-version }}
-          skip-checkout: 'true'
+          skip-checkout: "true"
 
       - name: Run quality checks
         if: inputs.run-quality-checks
