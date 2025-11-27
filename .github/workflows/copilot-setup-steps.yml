@@ -69,14 +69,20 @@ jobs:
           sudo apt-get update && sudo apt-get install -y zsh curl git
       - name: Setup Mise
         run: |
+          current_dir
+          subdirs
           current_dir="$(pwd)"
-          subdirs="$(ls -d */ 2>/dev/null || echo '')"
-          if [[ "$current_dir" != *codeweaver && "$current_dir" =~ $subdirs ]]; then
+          subdirs="$(ls -d -- */ 2>/dev/null || echo '')"
+          if [[ "$current_dir" != "*codeweaver*" && "$current_dir" =~ $subdirs ]]; then
             cd codeweaver
           fi
           echo "Mise setup in directory: $(pwd)"
-          export MISE="$(which mise)"
-          export MISE_DIR="$(dirname "$MISE")"
+          MISE
+          MISE_DIR
+          MISE="$(which mise)"
+          export MISE
+          MISE_DIR="$(dirname "$MISE")"
+          export MISE_DIR
           # Skip activation in CI to avoid hanging - just trust and install
           "$MISE" --quiet -y trust
           "$MISE" --quiet -y install 2>&1 || echo "Warning: Some tools failed to install due to network limitations in CI environment"

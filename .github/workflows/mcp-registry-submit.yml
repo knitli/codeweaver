@@ -37,8 +37,8 @@ jobs:
 
       - name: Install uv
         run: |
-          curl -LsSf https://astral.sh/uv/install.sh | sh
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          curl -LsSf "https://astral.sh/uv/install.sh" | sh
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
 
       - name: Extract version information
         id: version
@@ -51,10 +51,10 @@ jobs:
             VERSION="${VERSION#v}"
           else
             # Fallback to reading from _version.py
-            VERSION=$(grep -oP "__version__: Final\[str\] = \"\K[^\"]+" src/codeweaver/_version.py)
+            VERSION=$(grep -oP "__version__: Final\[str\] = \"\K[^\"]+" "src/codeweaver/_version.py")
           fi
 
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "Detected version: ${VERSION}"
 
       - name: Regenerate server.json from code
@@ -159,21 +159,21 @@ jobs:
           echo "Waiting for codeweaver ${VERSION} to be available on PyPI..."
           echo "This may take up to 30 minutes after release publication"
 
-          for i in $(seq 1 $MAX_ATTEMPTS); do
+          for i in $(seq 1 "$MAX_ATTEMPTS"); do
             echo "Attempt $i/$MAX_ATTEMPTS..."
             
             # Check if package version exists on PyPI
-            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
-              "https://pypi.org/pypi/codeweaver/${VERSION}/json")
+            HTTP_CODE="$(curl -s -o /dev/null -w "%{http_code}" \
+              "https://pypi.org/pypi/codeweaver/${VERSION}/json")"
             
             if [ "$HTTP_CODE" = "200" ]; then
               echo "✓ Package codeweaver ${VERSION} is available on PyPI"
               exit 0
             fi
-            
-            if [ $i -lt $MAX_ATTEMPTS ]; then
+
+            if [ "$i" -lt "$MAX_ATTEMPTS" ]; then
               echo "Package not yet available (HTTP ${HTTP_CODE}), waiting ${SLEEP_TIME}s..."
-              sleep $SLEEP_TIME
+              sleep "$SLEEP_TIME"
             fi
           done
 
@@ -185,8 +185,9 @@ jobs:
         env:
           MCP_PUBLISHER_VERSION: "v1.0.0"
         run: |
-          ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
-          OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+          ARCH OS VERSION NO_V_VERSION
+          ARCH="$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')"
+          OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
           VERSION="${MCP_PUBLISHER_VERSION:- v1.0.0}"
           NO_V_VERSION="${VERSION#v}"
 
@@ -197,8 +198,7 @@ jobs:
             -o mcp-publisher.tar.gz.sha256
 
           echo "Verifying checksum for mcp-publisher.tar.gz..."
-          sha256sum -c mcp-publisher.tar.gz.sha256
-          if [ $? -ne 0 ]; then
+          if ! sha256sum -c mcp-publisher.tar.gz.sha256; then
             echo "ERROR: Checksum verification failed for mcp-publisher.tar.gz"
             exit 1
           fi
@@ -236,6 +236,7 @@ jobs:
           # Note: The exact submission process depends on mcp-publisher CLI implementation
           # and may require manual intervention if the API/CLI has changed.
           # The following attempts multiple submission methods in order of preference.
+          MESSAGE
           MESSAGE=""
           # login to mcp-publisher
           if command -v mcp-publisher &> /dev/null; then
@@ -252,15 +253,15 @@ jobs:
             echo "$MESSAGE"
             exit 0
           else
-            RESPONSE=$(curl -X POST \
+            RESPONSE="$(curl -X POST \
             -H "Authorization: Bearer ${GITHUB_TOKEN}" \
             -H "Content-Type: application/json" \
             -d @server.json \
             -w "\n%{http_code}" \
-            https://registry.modelcontextprotocol.io/v0/servers 2>&1)
+            https://registry.modelcontextprotocol.io/v0/servers 2>&1)"
 
-            HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
-            BODY=$(echo "$RESPONSE" | head -n -1)
+            HTTP_CODE="$(echo "$RESPONSE" | tail -n 1)"
+            BODY="$(echo "$RESPONSE" | head -n -1)"
 
             if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "201" ]; then
               echo "✓ Successfully submitted to MCP Registry (HTTP ${HTTP_CODE})"
@@ -281,19 +282,25 @@ jobs:
       - name: Summary
         if: always()
         run: |
-          echo "## MCP Registry Submission Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Version**: ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "## MCP Registry Submission Summary"
+            echo ""
+            echo "- **Version**: ${{ steps.version.outputs.version }}"
+            echo "- **Status**: ${{ job.status }}"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
 
           if [ "${{ job.status }}" = "success" ]; then
-            echo "✅ Successfully submitted to MCP Registry" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "View your server at: https://registry.modelcontextprotocol.io/servers/com.knitli/codeweaver" >> $GITHUB_STEP_SUMMARY
+            {
+              echo "✅ Successfully submitted to MCP Registry"
+              echo ""
+              echo "View your server at: https://registry.modelcontextprotocol.io/servers/com.knitli/codeweaver"
+            } >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "❌ Submission failed" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "Please check the workflow logs for details." >> $GITHUB_STEP_SUMMARY
-            echo "You may need to submit manually at: https://registry.modelcontextprotocol.io" >> $GITHUB_STEP_SUMMARY
+            {
+              echo "❌ Submission failed"
+              echo ""
+              echo "Please check the workflow logs for details."
+              echo "You may need to submit manually at: https://registry.modelcontextprotocol.io"
+            } >> "$GITHUB_STEP_SUMMARY"
           fi

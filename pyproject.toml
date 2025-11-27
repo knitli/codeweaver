@@ -360,7 +360,7 @@ include = [
 [tool.hatch.version]
 source = "uv-dynamic-versioning"
 
-[tool.pytest.ini_options]
+[tool.pytest]
 addopts = [
   "-ra",
   "--strict-markers",

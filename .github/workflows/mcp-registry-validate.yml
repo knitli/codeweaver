@@ -241,22 +241,24 @@ jobs:
             - name: Validation summary
               if: always()
               run: |
-                  echo "## MCP server.json Validation" >> $GITHUB_STEP_SUMMARY
-                  echo "" >> $GITHUB_STEP_SUMMARY
+                  {
+                    echo "## MCP server.json Validation"
+                    echo ""
 
-                  if [ "${{ job.status }}" = "success" ]; then
-                    echo "✅ Validation passed" >> $GITHUB_STEP_SUMMARY
-                  else
-                    echo "❌ Validation failed - see logs for details" >> $GITHUB_STEP_SUMMARY
-                  fi
+                    if [ "${{ job.status }}" = "success" ]; then
+                      echo "✅ Validation passed"
+                    else
+                      echo "❌ Validation failed - see logs for details"
+                    fi
 
-                  echo "" >> $GITHUB_STEP_SUMMARY
-                  echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
-                  echo "" >> $GITHUB_STEP_SUMMARY
-                  echo "Before submitting to MCP Registry:" >> $GITHUB_STEP_SUMMARY
-                  echo "1. Ensure the package is published to PyPI" >> $GITHUB_STEP_SUMMARY
-                  echo "2. Verify version numbers match between server.json and PyPI" >> $GITHUB_STEP_SUMMARY
-                  echo "3. Test the server locally with MCP Inspector" >> $GITHUB_STEP_SUMMARY
-                  echo "4. Create a release to trigger automatic submission" >> $GITHUB_STEP_SUMMARY
-                  echo "" >> $GITHUB_STEP_SUMMARY
-                  echo "Documentation: https://github.com/modelcontextprotocol/registry/blob/main/docs/guides/publishing/publish-server.md" >> $GITHUB_STEP_SUMMARY
+                    echo ""
+                    echo "### Next Steps"
+                    echo ""
+                    echo "Before submitting to MCP Registry:"
+                    echo "1. Ensure the package is published to PyPI"
+                    echo "2. Verify version numbers match between server.json and PyPI"
+                    echo "3. Test the server locally with MCP Inspector"
+                    echo "4. Create a release to trigger automatic submission"
+                    echo ""
+                    echo "Documentation: https://github.com/modelcontextprotocol/registry/blob/main/docs/guides/publishing/publish-server.md"
+                  } >> "$GITHUB_STEP_SUMMARY"
