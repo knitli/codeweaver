@@ -24,12 +24,13 @@ jobs:
       CODEWEAVER_PROJECT_PATH: ${{ github.workspace }}
       MISE_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       MISE_ENV: "ci"
+      MISE_YES: 1
     runs-on: ubuntu-latest
-    # Set the permissions to the lowest permissions possible needed for your steps.
+    # Set the permissions to the lowest permissions possible needed for your steps. 
     # Copilot will be given its own token for its operations.
     permissions:
-      # If you want to clone the repository as part of your setup steps, for example to install dependencies, you'll need the `contents: read` permission. If you don't clone the repository in your setup steps, Copilot will do this for you automatically after the steps complete.
-      contents: read
+      # If you want to clone the repository as part of your setup steps, for example to install dependencies, you'll need the `contents: read` permission. If you don't clone the repository in your[...]
+      contents: write
     # You can define any steps you want, and they will run before the agent starts.
     # If you do not check out your code, Copilot will do this for you.
     steps:
@@ -44,7 +45,7 @@ jobs:
             ~/.local/share/mise
             ~/.local/bin/mise
             ~/.local/share/mise/shims
-            ~/.cache/mise
+            ~/. cache/mise
             ~/.local/bin
           key: mise-copilot-${{ runner.os }}-${{ hashFiles('mise.ci.toml') }}
           restore-keys: |
@@ -59,7 +60,7 @@ jobs:
           key: uv-copilot-${{ runner.os }}-${{ hashFiles('uv.lock') }}
           restore-keys: |
             uv-copilot-${{ runner.os }}-
-            uv-${{ runner.os }}-
+            uv-${{ runner. os }}-
       - uses: jdx/mise-action@fcec31d82eb5c88cd7eb3fe3c270cb093aeeef18
         with:
           # Disable automatic env export to avoid hanging on enter hook in CI
@@ -79,8 +80,10 @@ jobs:
           export MISE
           MISE_DIR="$(dirname "$MISE")"
           export MISE_DIR
-          # Skip activation in CI to avoid hanging - just trust and install
+          # Trust the config globally
           "$MISE" --quiet -y trust
+          # Also set the trusted config paths environment variable for subprocesses
+          echo "MISE_TRUSTED_CONFIG_PATHS=$PWD/mise.toml:$PWD/mise.ci.toml" >> $GITHUB_ENV
           "$MISE" --quiet -y install 2>&1 || echo "Warning: Some tools failed to install due to network limitations in CI environment"
         env:
           MISE_DIR: ${{ runner.temp }}/mise
