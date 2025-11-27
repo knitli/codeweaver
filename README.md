@@ -10,9 +10,11 @@ mcp-name: com.knitli/codeweaver
 <div align="center">
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/codeweaver-secondary.svg">
-  <img src="docs/assets/codeweaver-primary.svg" width="200" height="200" alt="CodeWeaver Logo">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/codeweaver-reverse.webp">
+  <source media="(prefers-color-scheme: light)" srcset="docs/assets/codeweaver-primary.webp">
+  <img alt="CodeWeaver logo" src="docs/assets/codeweaver-primary.webp">
 </picture>
+
 
 # CodeWeaver
 
@@ -75,7 +77,7 @@ mcp-name: com.knitli/codeweaver
 Using the [CLI](#cli) with [uv](https://astral.sh/uv):
 
 ```bash
-# Install CodeWeaver
+# Add CodeWeaver to your project
 uv add --prerelease allow --dev codeweaver
 
 # Initialize config and MCP setup
@@ -189,7 +191,7 @@ CodeWeaver combines [AST][wiki_ask]-level understanding, semantic relationships,
 
 ### Architecture Highlights
 
-```
+```text
 ┌─────────────────────────────────────────────────────────┐
 │                    Your Codebase                        │
 └────────────────┬────────────────────────────────────────┘
@@ -206,12 +208,12 @@ CodeWeaver combines [AST][wiki_ask]-level understanding, semantic relationships,
              │
              ▼
     ┌─────────────────┐
-    │  Reranking Layer │ ← Relevance optimization
+    │  Reranking Layer │ ← Relevance optimization (heuristic and reranking model)
     └────────┬────────┘
              │
              ▼
     ┌──────────────────┐
-    │   MCP Interface   │ ← Simple "find_code" tool
+    │   MCP Interface   │ ← Simple "find_code" tool (`find_code("authentication api")`)
     └────────┬─────────┘
              │
              ▼
