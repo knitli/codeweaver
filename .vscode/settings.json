@@ -24,6 +24,6 @@
   "ruff.interpreter": [
     "${userHome}/.local/share/mise/shims/python"
   ],
-  "python.defaultInterpreterPath": "${workspaceFolder}/.venv",
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
   "shellcheck.executablePath": "${userHome}/.local/share/mise/shims/shellcheck"
 }
