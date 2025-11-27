@@ -78,7 +78,7 @@ Using the [CLI](#cli) with [uv](https://astral.sh/uv):
 
 ```bash
 # Add CodeWeaver to your project
-uv add --prerelease allow --dev codeweaver
+uv add --prerelease allow --dev code-weaver
 
 # Initialize config and MCP setup
 cw init
