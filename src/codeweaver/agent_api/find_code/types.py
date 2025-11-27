@@ -406,9 +406,9 @@ class StrategizedQuery(NamedTuple):
             if k in ("limit", "score_threshold", "filter", "params")
         }
 
-        # Extract top-level query_points parameters (with_payload, with_vectors, query_filter)
-        # These should be passed to query_points, not to Prefetch
-        # Exclude None values and parameters already in prefetch to avoid duplication
+        # Extract top-level query_points parameters
+        # Note: limit is needed at BOTH levels - prefetch limit controls initial retrieval,
+        # top-level limit controls final results after fusion
         top_level_params = {
             k: v
             for k, v in query_kwargs.items()
@@ -417,6 +417,7 @@ class StrategizedQuery(NamedTuple):
                 "with_payload",
                 "with_vectors",
                 "query_filter",
+                "limit",  # Required for hybrid search - controls final result count after fusion
                 "offset",
                 "consistency",
                 "shard_key_selector",
