@@ -20,15 +20,17 @@ cryptographic signatures, provenance tracking, and SBOMs.
 from __future__ import annotations
 
 import subprocess
+
 from pathlib import Path
 
 import yaml
 
 from codeweaver import __version__
-from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
-from codeweaver.core.file_extensions import ALL_LANGUAGES
 from codeweaver.config.envs import environment_variables
+from codeweaver.core.file_extensions import ALL_LANGUAGES
+from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
 from codeweaver.providers.provider import Provider
+
 
 def _languages() -> list[str]:
     """Get all supported programming languages."""
@@ -62,7 +64,7 @@ def get_git_commit() -> str:
     """Get the current git commit hash."""
     try:
         result = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
+            ["git", "rev-parse", "HEAD"], # noqa: S607
             capture_output=True,
             text=True,
             check=True,
@@ -161,7 +163,7 @@ def generate_server_yaml() -> dict:
         "about": {
             "title": "CodeWeaver - Code Search for AI Agents",
             "description": f"Semantic code search built for AI agents. Hybrid AST-aware context for {len(_languages())} languages with intelligent chunking, intent detection, and multi-provider support.",
-            "icon": "https://github.com/knitli/codeweaver/raw/refs/main/docs/assets/codeweaver-primary.svg",
+            "icon": "https://github.com/knitli/codeweaver/raw/refs/heads/main/docs/assets/codeweaver-primary.svg",
         },
         "source": {
             "project": "https://github.com/knitli/codeweaver",
@@ -224,7 +226,7 @@ if __name__ == "__main__":
         print(f"📝 Commit: {config['source']['commit'][:8]}")
         print(f"🏷️  Category: {config['meta']['category']}")
         print(f"🔖 Tags: {', '.join(config['meta']['tags'])}")
-        print(f"\n📋 Next steps:")
+        print("\n📋 Next steps:")
         print("   1. Review server.yaml and adjust descriptions if needed")
         print("   2. Ensure Dockerfile is at repository root")
         print("   3. Fork github.com/docker/mcp-registry")
