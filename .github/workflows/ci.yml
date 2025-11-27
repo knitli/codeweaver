@@ -22,6 +22,7 @@ jobs:
     name: Test Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
     env:
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
       CODEWEAVER_TESTING: "true"
       CODEWEAVER_VECTOR_STORE_URL: ${{ secrets.CODEWEAVER_VECTOR_STORE_URL }}
       QDRANT__SERVICE__API_KEY: ${{ secrets.QDRANT__SERVICE__API_KEY }}
@@ -206,14 +207,14 @@ jobs:
             uv-${{ runner.os }}-
       - name: Install UV and build tools
         run: |
-          python -m pip install uv twine
+          python -m pip install uv
       - name: Build package
         run: |
           uv build
       - name: Check build artifacts
         run: |
           ls -la dist/
-          uv run python -m twine check dist/*
+          uvx twine check dist/*
       - name: Upload build artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
