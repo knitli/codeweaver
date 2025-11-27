@@ -305,6 +305,8 @@ class TestGetProjectPath:
     ) -> None:
         """Test walks up directory tree when git rev-parse fails."""
         mocker.patch("codeweaver.common.utils.git.try_git_rev_parse", return_value=None)
+        # Clear CODEWEAVER_PROJECT_PATH to test the walk-up behavior
+        mocker.patch.dict("os.environ", {"CODEWEAVER_PROJECT_PATH": ""}, clear=False)
         subdir = temp_git_repo / "nested"
         subdir.mkdir()
         mocker.patch("pathlib.Path.cwd", return_value=subdir)
@@ -316,6 +318,8 @@ class TestGetProjectPath:
         self, mocker: MockerFixture, temp_git_repo: Path, temp_non_git_dir: Path
     ) -> None:
         """Test walks up when provided root_path is invalid."""
+        # Clear CODEWEAVER_PROJECT_PATH to test the walk-up behavior
+        mocker.patch.dict("os.environ", {"CODEWEAVER_PROJECT_PATH": ""}, clear=False)
         # Create nested structure: git_repo/non_git/current
         non_git_nested = temp_git_repo / "non_git"
         non_git_nested.mkdir()
