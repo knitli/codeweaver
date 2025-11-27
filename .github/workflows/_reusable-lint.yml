@@ -4,6 +4,8 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 
 name: Reusable Lint Workflow
+permissions:
+  contents: read
 
 on:
   workflow_call:
