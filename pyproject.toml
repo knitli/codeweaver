@@ -422,7 +422,7 @@ markers = [
   "validation: Validation tests that ensure system consistency",
   "voyageai: Tests that require VoyageAI API access",
 ]
-minversion = "6.0"
+minversion = "9.0"
 python_classes = ["Test*"]
 python_files = ["*_test.py", "test_*.py"]
 python_functions = ["test_*"]
