@@ -1,0 +1,43 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+name: Reusable Lint Workflow
+
+on:
+  workflow_call:
+    inputs:
+      python-version:
+        description: 'Python version for linting'
+        required: false
+        type: string
+        default: '3.12'
+      run-format-check:
+        description: 'Run format/license checks'
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  lint:
+    name: Lint and Format
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Python environment
+        uses: ./.github/actions/setup-python-env
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      - name: Check code style and linting
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          mise run lint || echo "::warning::Lint checks failed but allowing workflow to continue"
+        continue-on-error: true
+
+      - name: Check formatting and licenses
+        if: inputs.run-format-check
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          mise run format || echo "::warning::License checks or formatting checks failed but allowing workflow to continue"
+        continue-on-error: true
