@@ -16,17 +16,17 @@ on:
         type: string
         default: '["3.12", "3.13"]'
       test-markers:
-        description: 'Pytest markers for test filtering'
+        description: "Pytest markers for test filtering"
         required: false
         type: string
-        default: 'not docker and not qdrant and not dev_only and not skip_ci and not network and not external_api'
+        default: "not docker and not qdrant and not dev_only and not skip_ci and not network and not external_api"
       upload-coverage:
-        description: 'Upload coverage to Codecov'
+        description: "Upload coverage to Codecov"
         required: false
         type: boolean
         default: true
       run-quality-checks:
-        description: 'Run quality checks before tests'
+        description: "Run quality checks before tests"
         required: false
         type: boolean
         default: true
@@ -43,11 +43,14 @@ on:
 jobs:
   test:
     name: Test Python ${{ matrix.python-version }}
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     strategy:
       matrix:
         python-version: ${{ fromJSON(inputs.python-versions) }}
     env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
       CODEWEAVER_TESTING: "true"
       CODEWEAVER_VECTOR_STORE_URL: ${{ secrets.CODEWEAVER_VECTOR_STORE_URL }}

@@ -11,18 +11,20 @@ on:
   workflow_call:
     inputs:
       python-version:
-        description: 'Python version for linting'
+        description: "Python version for linting"
         required: false
         type: string
-        default: '3.12'
+        default: "3.12"
       run-format-check:
-        description: 'Run format/license checks'
+        description: "Run format/license checks"
         required: false
         type: boolean
         default: true
 
 jobs:
   lint:
+    permissions:
+      contents: read
     name: Lint and Format
     runs-on: ubuntu-latest
     steps:

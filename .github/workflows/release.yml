@@ -47,6 +47,7 @@ jobs:
       python-version: "3.12"
       upload-artifacts: true
       clean-build: true
+    secrets: inherit
 
   github-release:
     name: Create GitHub Release

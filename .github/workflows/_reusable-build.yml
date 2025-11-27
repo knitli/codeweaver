@@ -35,6 +35,8 @@ jobs:
     permissions:
       contents: read
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Setup Python environment
         uses: ./.github/actions/setup-python-env
