@@ -648,11 +648,7 @@ class CodeWeaverSettings(BaseSettings):
         from codeweaver.common.utils import get_project_path
 
         # Check environment variable first to support Docker deployments without .git
-        env_path = os.environ.get("CODEWEAVER_PROJECT_PATH")
-        if env_path and (env_path_obj := Path(env_path)).is_dir():
-            path = env_path_obj
-        else:
-            path = get_project_path() or Path.cwd()
+        path = cls._resolve_env_settings_path(directory=True)
         return CodeWeaverSettingsDict(
             project_path=path,
             project_name=path.name,
