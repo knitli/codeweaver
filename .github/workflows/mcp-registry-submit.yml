@@ -159,15 +159,33 @@ jobs:
           echo "Waiting for codeweaver ${VERSION} to be available on PyPI..."
           echo "This may take up to 30 minutes after release publication"
 
+          # Install packaging library for version normalization
+          pip install packaging
+
+          # Normalize version to PEP 440 format (e.g., 0.1.0alpha.1 -> 0.1.0a1)
+          NORMALIZED_VERSION="$(python -c "
+          from packaging.version import Version
+          import sys
+          try:
+              v = Version('${VERSION}')
+              print(str(v))
+          except Exception as e:
+              print('${VERSION}', file=sys.stderr)
+              sys.exit(1)
+          ")"
+
+          echo "Original version: ${VERSION}"
+          echo "Normalized version for PyPI: ${NORMALIZED_VERSION}"
+
           for i in $(seq 1 "$MAX_ATTEMPTS"); do
             echo "Attempt $i/$MAX_ATTEMPTS..."
 
-            # Check if package version exists on PyPI
+            # Check if package version exists on PyPI using normalized version
             HTTP_CODE="$(curl -s -o /dev/null -w "%{http_code}" \
-              "https://pypi.org/pypi/code-weaver/${VERSION}/json")"
+              "https://pypi.org/pypi/code-weaver/${NORMALIZED_VERSION}/json")"
 
             if [ "$HTTP_CODE" = "200" ]; then
-              echo "✓ Package codeweaver ${VERSION} is available on PyPI"
+              echo "✓ Package code-weaver ${NORMALIZED_VERSION} is available on PyPI"
               exit 0
             fi
 
