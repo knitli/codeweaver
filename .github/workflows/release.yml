@@ -133,7 +133,7 @@ jobs:
           python -m pip install uv twine hatch
       - name: Build package
         run: |
-          uv build --clean
+          uv build --clear
       - name: Verify build artifacts
         run: "ls -la dist/\necho \"Built packages:\"\nfor file in dist/*; do\n  echo \"\U0001F4E6 $(basename \"$file\")\"\ndone\n"
       - name: Check package integrity with twine
