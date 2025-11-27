@@ -163,7 +163,7 @@ def generate_server_yaml() -> dict:
         "about": {
             "title": "CodeWeaver - Code Search for AI Agents",
             "description": f"Semantic code search built for AI agents. Hybrid AST-aware context for {len(_languages())} languages with intelligent chunking, intent detection, and multi-provider support.",
-            "icon": "https://github.com/knitli/codeweaver/raw/refs/heads/main/docs/assets/codeweaver-primary.svg",
+            "icon": "https://github.com/knitli/codeweaver/raw/refs/heads/main/docs/assets/codeweaver-favico.png",
         },
         "source": {
             "project": "https://github.com/knitli/codeweaver",
