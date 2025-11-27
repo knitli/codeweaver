@@ -134,7 +134,7 @@ cw server
 
 ### 🌐 Language Support
 - **26 languages** with full AST/semantic
-- **136+ languages** with intelligent chunking
+- **166+ languages** with intelligent chunking
 - **Family heuristics** for smart parsing
 
 </td>
@@ -248,7 +248,7 @@ cw config    # View resolved configuration
 |-----------|--------|-------|
 | 🔄 **Live indexing & file watching** | ⭐⭐⭐⭐ | Runs continuously; reliable |
 | 🌳 **AST-based chunking** | ⭐⭐⭐⭐ | Full semantic/AST for 26 languages |
-| 📝 **Context-aware chunking** | ⭐⭐⭐⭐ | 136+ languages, heuristic AST-lite |
+| 📝 **Context-aware chunking** | ⭐⭐⭐⭐ | 166+ languages, heuristic AST-lite |
 | 🔌 **Provider integration** | ⭐⭐⭐ | Voyage/FastEmbed reliable, others vary |
 | 🛡️ **Automatic fallback** | ⭐⭐⭐ | Seamless offline/degraded mode |
 | 💻 **CLI** | ⭐⭐⭐⭐ | Core commands fully wired and tested |

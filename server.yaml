@@ -19,7 +19,7 @@ meta:
 about:
   title: CodeWeaver - Code Search for AI Agents
   description: Semantic code search built for AI agents. Hybrid AST-aware context for 166 languages with intelligent chunking, intent detection, and multi-provider support.
-  icon: https://github.com/knitli/codeweaver/raw/refs/main/docs/assets/codeweaver-primary.svg
+  icon: https://github.com/knitli/codeweaver/raw/refs/heads/main/docs/assets/codeweaver-primary.svg
 source:
   project: https://github.com/knitli/codeweaver
   commit: 4d1173a524f0e29e261de691131cd031333a50c4
