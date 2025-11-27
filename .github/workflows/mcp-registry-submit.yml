@@ -203,7 +203,6 @@ jobs:
         env:
           MCP_PUBLISHER_VERSION: "v1.0.0"
         run: |
-          ARCH OS VERSION NO_V_VERSION
           ARCH="$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')"
           OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
           VERSION="${MCP_PUBLISHER_VERSION:- v1.0.0}"
@@ -254,7 +253,6 @@ jobs:
           # Note: The exact submission process depends on mcp-publisher CLI implementation
           # and may require manual intervention if the API/CLI has changed.
           # The following attempts multiple submission methods in order of preference.
-          MESSAGE
           MESSAGE=""
           # login to mcp-publisher
           if command -v mcp-publisher &> /dev/null; then
