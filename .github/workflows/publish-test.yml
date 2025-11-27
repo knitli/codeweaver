@@ -18,7 +18,7 @@ concurrency:
 jobs:
   tests:
     name: Run Tests
-    if: ${{ github.event.inputs.run_tests == 'true' }}
+    if: ${{ github.event.inputs.run_tests }}
     uses: ./.github/workflows/_reusable-test.yml
     with:
       python-versions: '["3.12", "3.13"]'
