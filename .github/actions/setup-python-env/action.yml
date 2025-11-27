@@ -27,8 +27,12 @@ inputs:
     description: Skip checkout step (if already checked out by calling workflow)
     required: false
     default: 'false'
+  github-token:
+    description: GitHub token for mise installation (to avoid rate limits)
+    required: false
+    default: ''
 
-runs:    
+runs:
   using: composite
   steps:
     - name: Checkout code
@@ -80,7 +84,7 @@ runs:
     - name: Install mise
       shell: bash
       env:
-        MISE_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        MISE_GITHUB_TOKEN: ${{ inputs.github-token }}
         MISE_ENV: "ci"
         MISE_YES: 1
       run: |

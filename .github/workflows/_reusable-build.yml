@@ -47,6 +47,7 @@ jobs:
           python-version: ${{ inputs.python-version }}
           skip-mise-setup: "true" # Don't need full mise setup for building
           skip-checkout: 'true'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install UV and build tools
         run: |

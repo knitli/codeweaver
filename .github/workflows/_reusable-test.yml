@@ -68,6 +68,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           skip-checkout: "true"
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run quality checks
         if: inputs.run-quality-checks
