@@ -9,6 +9,7 @@ from __future__ import annotations
 
 # ruff: noqa: S603
 import contextlib
+import os
 import shutil
 import subprocess
 
@@ -89,18 +90,34 @@ def _root_path_checks_out(root_path: Path) -> bool:
 
 
 def get_project_path(root_path: Path | None = None) -> Path:
-    """Get the root directory of the project."""
+    """Get the root directory of the project.
+
+    Resolution order:
+    1. Try git rev-parse to find the git root (if root_path is None)
+    2. If root_path is provided and is a valid git directory, use it
+    3. Check CODEWEAVER_PROJECT_PATH environment variable (useful for Docker containers
+       where .git may not be present)
+    4. Walk up the directory tree to find a .git directory
+    """
     if (
         root_path is None
         and (git_root := try_git_rev_parse())
         and (_root_path_checks_out(git_root))
     ):
         return git_root
-    return (
-        root_path
-        if isinstance(root_path, Path) and _root_path_checks_out(root_path)
-        else _walk_up_to_git_root(root_path)
-    )
+    if isinstance(root_path, Path) and _root_path_checks_out(root_path):
+        return root_path
+
+    # Check for CODEWEAVER_PROJECT_PATH environment variable as fallback
+    # This is useful for Docker containers where .git may not be present
+    # Note: We intentionally don't require a .git directory here since the
+    # primary use case is Docker containers without git repositories
+    if (env_path := os.environ.get("CODEWEAVER_PROJECT_PATH")) and (
+        path := Path(env_path)
+    ).is_dir():
+        return path
+
+    return _walk_up_to_git_root(root_path)
 
 
 def set_relative_path(path: Path | str | None) -> Path | None:
