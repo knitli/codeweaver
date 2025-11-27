@@ -1,0 +1,95 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+name: Reusable Test Workflow
+permissions:
+  contents: read
+
+on:
+  workflow_call:
+    inputs:
+      python-versions:
+        description: 'JSON array of Python versions to test (e.g., ["3.12", "3.13"])'
+        required: false
+        type: string
+        default: '["3.12", "3.13"]'
+      test-markers:
+        description: "Pytest markers for test filtering"
+        required: false
+        type: string
+        default: "not docker and not qdrant and not dev_only and not skip_ci and not network and not external_api"
+      upload-coverage:
+        description: "Upload coverage to Codecov"
+        required: false
+        type: boolean
+        default: true
+      run-quality-checks:
+        description: "Run quality checks before tests"
+        required: false
+        type: boolean
+        default: true
+    secrets:
+      CODECOV_TOKEN:
+        required: false
+      CODEWEAVER_VECTOR_STORE_URL:
+        required: false
+      QDRANT__SERVICE__API_KEY:
+        required: false
+      VOYAGE_API_KEY:
+        required: false
+
+jobs:
+  test:
+    name: Test Python ${{ matrix.python-version }}
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ${{ fromJSON(inputs.python-versions) }}
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      CODEWEAVER_TESTING: "true"
+      CODEWEAVER_VECTOR_STORE_URL: ${{ secrets.CODEWEAVER_VECTOR_STORE_URL }}
+      QDRANT__SERVICE__API_KEY: ${{ secrets.QDRANT__SERVICE__API_KEY }}
+      VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+      CODEWEAVER_PROJECT_PATH: ${{ github.workspace }}
+      MISE_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      MISE_ENV: "ci"
+    steps:
+      - name: Setup Python environment
+        uses: ./.github/actions/setup-python-env
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Run quality checks
+        if: inputs.run-quality-checks
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          mise run check
+        continue-on-error: true
+
+      - name: Run tests with coverage
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          mise run test-cov -m "${{ inputs.test-markers }}"
+
+      - name: Upload coverage to Codecov
+        if: inputs.upload-coverage && matrix.python-version == '3.12'
+        uses: codecov/codecov-action@5a1091511ad55cbe89839c7260b706298ca349f7
+        with:
+          files: ./coverage.xml
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Upload test results
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: test-results-${{ matrix.python-version }}
+          path: |
+            test-results.xml
+            coverage.xml

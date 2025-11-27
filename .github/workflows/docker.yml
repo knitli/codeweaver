@@ -11,10 +11,26 @@ on:
       - staging
     tags:
       - v*.*.*
+    paths:
+      - src/**
+      - Dockerfile
+      - docker-compose.yml
+      - .dockerignore
+      - pyproject.toml
+      - .github/workflows/docker.yml
+      - uv.lock
   pull_request:
     branches:
       - main
       - staging
+    paths:
+      - src/**
+      - Dockerfile
+      - docker-compose.yml
+      - .dockerignore
+      - pyproject.toml
+      - .github/workflows/docker.yml
+      - uv.lock
   workflow_dispatch:
 env:
   REGISTRY: docker.io

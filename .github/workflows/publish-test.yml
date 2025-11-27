@@ -18,128 +18,26 @@ concurrency:
 jobs:
   tests:
     name: Run Tests
-    if: ${{ github.event.inputs.run_tests == 'true' }}
-    runs-on: ubuntu-latest
-    env:
-      CODEWEAVER_PROJECT_PATH: ${{ github.workspace }}
-      MISE_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      MISE_ENV: "ci"
-    permissions:
-      contents: read
-    strategy:
-      matrix:
-        python-version:
-          - "3.12"
-          - "3.13"
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@b3498302c5c423fa896b97a26bb183df735d08f8
-        with:
-          fetch-depth: 0
-      - name: Free up disk space
-        run: ./scripts/dev-env/ci-free-disk-space.sh
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@9b03c627221f32cb88b299427119da30671cf9cc
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Install dependencies
-        run: |
-          sudo apt-get update && sudo apt-get install -y zsh
-      - name: Cache mise tools
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
-        with:
-          path: |
-            ~/.local/share/mise
-            ~/.local/bin/mise
-            ~/.local/share/mise/shims
-            ~/.cache/mise
-            ~/.local/bin
-          key: mise-${{ runner.os }}-${{ hashFiles('mise.ci.toml') }}
-          restore-keys: |
-            mise-${{ runner.os }}-
-      - name: Cache UV dependencies
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
-        with:
-          path: |
-            ~/.cache/uv
-            .venv
-          key: uv-${{ runner.os }}-python${{ matrix.python-version }}-${{ hashFiles('uv.lock') }}
-          restore-keys: |
-            uv-${{ runner.os }}-python${{ matrix.python-version }}-
-            uv-${{ runner.os }}-
-      - name: Install mise
-        run: |
-          if [ ! -f "$HOME/.local/bin/mise" ]; then
-            # Install mise directly from GitHub releases for reliability
-            MISE_VERSION="v2025.11.7"
-            MISE_URL="https://github.com/jdx/mise/releases/download/${MISE_VERSION}/mise-${MISE_VERSION}-linux-x64.tar.gz"
-            mkdir -p "$HOME/.local/bin"
-            TMPDIR="$(mktemp -d)"
-            curl -fsSL "$MISE_URL" | tar -xz -C "$TMPDIR"
-            cp "$TMPDIR/mise/bin/mise" "$HOME/.local/bin/"
-            rm -rf "$TMPDIR"
-            echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-          fi
-      - name: Install tools with mise
-        run: |
-          export PATH="$HOME/.local/bin:$PATH"
-          mise run setup > /dev/null 2>&1 || true
-      - name: Run quality checks
-        run: |
-          export PATH="$HOME/.local/bin:$PATH"
-          mise run check
-        continue-on-error: true # Allow reuse lint failures to be warnings
-      - name: Run tests with coverage
-        run: |
-          export PATH="$HOME/.local/bin:$PATH"
-          # Skip docker and qdrant tests in CI - qdrant container health checks fail in GitHub Actions
-          # Also skip dev_only and skip_ci marked tests
-          mise run test-cov -m "not docker and not qdrant and not dev_only and not skip_ci"
+    if: ${{ github.event.inputs.run_tests }}
+    uses: ./.github/workflows/_reusable-test.yml
+    with:
+      python-versions: '["3.12", "3.13"]'
+      test-markers: "not docker and not qdrant and not dev_only and not skip_ci"
+      upload-coverage: false
+      run-quality-checks: true
+    secrets: inherit
+
   build:
     name: Build Distribution
     needs: tests
     if: always() && (needs.tests.result == 'success' || needs.tests.result == 'skipped')
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
-        with:
-          fetch-depth: 0
-      - name: Free up disk space
-        run: ./scripts/dev-env/ci-free-disk-space.sh
-      - name: Set up Python
-        uses: actions/setup-python@9b03c627221f32cb88b299427119da30671cf9cc
-        with:
-          python-version: "3.12"
-      - name: Cache UV dependencies
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
-        with:
-          path: |
-            ~/.cache/uv
-            .venv
-          key: uv-build-${{ runner.os }}-${{ hashFiles('uv.lock') }}
-          restore-keys: |
-            uv-build-${{ runner.os }}-
-            uv-${{ runner.os }}-
-      - name: Install UV and build tools
-        run: |
-          python -m pip install uv twine
-      - name: Build package
-        run: |
-          uv build --clean
-      - name: Verify build artifacts
-        run: "ls -la dist/\necho \"Built packages:\"\nfor file in dist/*; do\n  echo \"\U0001F4E6 $(basename \"$file\")\"\ndone\n"
-      - name: Check package integrity with twine
-        run: |
-          uv pip install twine
-          twine check dist/*
-      - name: Upload artifacts
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: python-package-distributions
-          path: dist/
+    uses: ./.github/workflows/_reusable-build.yml
+    with:
+      artifact-name: python-package-distributions
+      python-version: "3.12"
+      upload-artifacts: true
+      clean-build: true
+
   publish-to-testpypi:
     name: Publish to TestPyPI
     needs:

@@ -1,0 +1,75 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+name: Reusable Build Workflow
+
+on:
+  workflow_call:
+    inputs:
+      artifact-name:
+        description: "Name for the build artifacts"
+        required: false
+        type: string
+        default: "python-package-distributions"
+      python-version:
+        description: "Python version for building"
+        required: false
+        type: string
+        default: "3.12"
+      upload-artifacts:
+        description: "Upload build artifacts"
+        required: false
+        type: boolean
+        default: true
+      clean-build:
+        description: "Run clean build (uv build --clear)"
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  build:
+    name: Build Package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Setup Python environment
+        uses: ./.github/actions/setup-python-env
+        with:
+          python-version: ${{ inputs.python-version }}
+          skip-mise-setup: "true" # Don't need full mise setup for building
+
+      - name: Install UV and build tools
+        run: |
+          python -m pip install uv
+
+      - name: Build package
+        run: |
+          if [ "${{ inputs.clean-build }}" = "true" ]; then
+            uv build --clear
+          else
+            uv build
+          fi
+
+      - name: Check build artifacts
+        run: |
+          ls -la dist/
+          echo "Built packages:"
+          for file in dist/*; do
+            echo "📦 $(basename "$file")"
+          done
+
+      - name: Verify package integrity with twine
+        run: |
+          uvx twine check dist/*
+
+      - name: Upload build artifacts
+        if: inputs.upload-artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ${{ inputs.artifact-name }}
+          path: dist/
+          retention-days: 7

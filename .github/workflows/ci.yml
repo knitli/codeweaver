@@ -4,219 +4,63 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 
 name: CI
+permissions:
+  contents: read
+
 on:
   push:
     branches:
       - main
       - staging
+    paths:
+      - "src/**"
+      - "tests/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "mise.toml"
+      - "mise.ci.toml"
+      - ".github/workflows/ci.yml"
+      - ".github/workflows/_reusable-*.yml"
+      - ".github/actions/**"
   pull_request:
     branches:
       - main
       - staging
+    paths:
+      - "src/**"
+      - "tests/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "mise.toml"
+      - "mise.ci.toml"
+      - ".github/workflows/ci.yml"
+      - ".github/workflows/_reusable-*.yml"
+      - ".github/actions/**"
   workflow_dispatch:
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
 jobs:
   test:
-    name: Test Python ${{ matrix.python-version }}
-    runs-on: ubuntu-latest
-    env:
+    name: Test
+    uses: ./.github/workflows/_reusable-test.yml
+    secrets:
       CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-      CODEWEAVER_TESTING: "true"
       CODEWEAVER_VECTOR_STORE_URL: ${{ secrets.CODEWEAVER_VECTOR_STORE_URL }}
       QDRANT__SERVICE__API_KEY: ${{ secrets.QDRANT__SERVICE__API_KEY }}
       VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
-      CODEWEAVER_PROJECT_PATH: ${{ github.workspace }}
-      MISE_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      MISE_ENV: "ci"
-    strategy:
-      matrix:
-        python-version:
-          - "3.12"
-          - "3.13"
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@b3498302c5c423fa896b97a26bb183df735d08f8
-      - name: Free up disk space
-        run: ./scripts/dev-env/ci-free-disk-space.sh
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@9b03c627221f32cb88b299427119da30671cf9cc
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Install dependencies
-        run: |
-          sudo apt-get update && sudo apt-get install -y zsh curl git
-      - name: Cache mise tools
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
-        with:
-          path: |
-            ~/.local/share/mise
-            ~/.local/bin/mise
-            ~/.local/share/mise/shims
-            ~/.cache/mise
-            ~/.local/bin
-          key: mise-${{ runner.os }}-${{ hashFiles('mise.ci.toml') }}
-          restore-keys: |
-            mise-${{ runner.os }}-
-      - name: Cache UV dependencies
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
-        with:
-          path: |
-            ~/.cache/uv
-            .venv
-          key: uv-${{ runner.os }}-python${{ matrix.python-version }}-${{ hashFiles('uv.lock') }}
-          restore-keys: |
-            uv-${{ runner.os }}-python${{ matrix.python-version }}-
-            uv-${{ runner.os }}-
-      - name: Install mise
-        run: |
-          if [ ! -f "$HOME/.local/bin/mise" ]; then
-            # Install mise directly from GitHub releases for reliability
-            MISE_VERSION="v2025.11.7"
-            MISE_URL="https://github.com/jdx/mise/releases/download/${MISE_VERSION}/mise-${MISE_VERSION}-linux-x64.tar.gz"
-            mkdir -p "$HOME/.local/bin"
-            TMP_MISE_DIR="$(mktemp -d /tmp/mise-extract-XXXXXX)"
-            curl -fsSL "$MISE_URL" | tar -xz -C "$TMP_MISE_DIR"
-            cp "$TMP_MISE_DIR/mise/bin/mise" "$HOME/.local/bin/"
-            rm -rf "$TMP_MISE_DIR"
-            echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-          fi
-      - name: Install tools with mise
-        run: |
-          export PATH="$HOME/.local/bin:$PATH"
-          mise run setup > /dev/null 2>&1 || true
-      - name: Run quality checks
-        run: |
-          export PATH="$HOME/.local/bin:$PATH"
-          mise run check
-        continue-on-error: true # Allow reuse lint failures to be warnings
-        # Note: Testing with coverage is more about seeing where we might have *important* gaps. We're not striving for high coverage rates just to meet a number. [See](https://github.com/knitli/codeweaver/tree/main/CODE_STYLE.md#testing-philosophy)
-      - name: Run tests with coverage
-        run: |
-          export PATH="$HOME/.local/bin:$PATH"
-          # Skip tests that require external resources in CI:
-          # - docker/qdrant: container health checks fail in GitHub Actions
-          # - dev_only/skip_ci: tests that should only run locally
-          # - network: tests requiring network access to download models
-          # - external_api: tests requiring external API keys (even if available, flaky in CI)
-          mise run test-cov -m "not docker and not qdrant and not dev_only and not skip_ci and not network and not external_api"
-      - name: Upload coverage to Codecov
-        if: matrix.python-version == '3.12'
-        uses: codecov/codecov-action@5a1091511ad55cbe89839c7260b706298ca349f7
-        with:
-          files: ./coverage.xml
-          fail_ci_if_error: false
-          token: ${{ secrets.CODECOV_TOKEN }}
-      - name: Upload test results
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        if: always()
-        with:
-          name: test-results-${{ matrix.python-version }}
-          path: |
-            test-results.xml
-            coverage.xml
+
   lint:
-    name: Lint and Format
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
-      - name: Free up disk space
-        run: ./scripts/dev-env/ci-free-disk-space.sh
-      - name: Set up Python
-        uses: actions/setup-python@9b03c627221f32cb88b299427119da30671cf9cc
-        with:
-          python-version: "3.12"
-      - name: Install dependencies
-        run: |
-          sudo apt-get update && sudo apt-get install -y zsh curl
-      - name: Cache mise tools
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
-        with:
-          path: |
-            ~/.local/share/mise
-            ~/.local/bin/mise
-            ~/.local/share/mise/shims
-            ~/.cache/mise
-            ~/.local/bin
-          key: mise-lint-${{ runner.os }}-${{ hashFiles('mise.ci.toml') }}
-          restore-keys: |
-            mise-lint-${{ runner.os }}-
-            mise-${{ runner.os }}-
-      - name: Cache UV dependencies
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
-        with:
-          path: |
-            ~/.cache/uv
-            .venv
-          key: uv-lint-${{ runner.os }}-${{ hashFiles('uv.lock') }}
-          restore-keys: |
-            uv-lint-${{ runner.os }}-
-            uv-${{ runner.os }}-python3.12-
-            uv-${{ runner.os }}-
-      - name: Install mise
-        run: |
-          if [ ! -f "$HOME/.local/bin/mise" ]; then
-            # Install mise directly from GitHub releases for reliability
-            MISE_VERSION="v2025.11.7"
-            MISE_URL="https://github.com/jdx/mise/releases/download/${MISE_VERSION}/mise-${MISE_VERSION}-linux-x64.tar.gz"
-            mkdir -p "$HOME/.local/bin"
-            curl -fsSL "$MISE_URL" | tar -xz -C /tmp
-            cp /tmp/mise/bin/mise "$HOME/.local/bin/"
-            rm -rf /tmp/mise
-            echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-          fi
-      - name: Install tools with mise
-        run: |
-          export PATH="$HOME/.local/bin:$PATH"
-          mise run setup
-      - name: Check code style and linting
-        run: |
-          export PATH="$HOME/.local/bin:$PATH"
-          mise run lint || echo "::warning::Lint checks failed but allowing workflow to continue"
-          mise run format || echo "::warning::License checks or formatting checks failed but allowing workflow to continue"
-        continue-on-error: true
+    name: Lint
+    uses: ./.github/workflows/_reusable-lint.yml
+    secrets: inherit
+
   build:
-    name: Build Package
-    runs-on: ubuntu-latest
+    name: Build
     needs:
       - test
       - lint
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
-      - name: Free up disk space
-        run: ./scripts/dev-env/ci-free-disk-space.sh
-      - name: Set up Python
-        uses: actions/setup-python@9b03c627221f32cb88b299427119da30671cf9cc
-        with:
-          python-version: "3.12"
-      - name: Install dependencies
-        run: |
-          sudo apt-get update && sudo apt-get install -y zsh curl
-      - name: Cache UV dependencies
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
-        with:
-          path: |
-            ~/.cache/uv
-            .venv
-          key: uv-build-${{ runner.os }}-${{ hashFiles('uv.lock') }}
-          restore-keys: |
-            uv-build-${{ runner.os }}-
-            uv-${{ runner.os }}-
-      - name: Install UV and build tools
-        run: |
-          python -m pip install uv
-      - name: Build package
-        run: |
-          uv build
-      - name: Check build artifacts
-        run: |
-          ls -la dist/
-          uvx twine check dist/*
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: python-package-distributions
-          path: dist/
+    uses: ./.github/workflows/_reusable-build.yml
+    # No secrets needed for build job
