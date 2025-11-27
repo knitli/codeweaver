@@ -49,7 +49,7 @@ jobs:
       - name: Build package
         run: |
           if [ "${{ inputs.clean-build }}" = "true" ]; then
-            uv build --clear
+            rm -rf dist/ && uv build
           else
             uv build
           fi
