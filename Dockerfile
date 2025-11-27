@@ -64,10 +64,12 @@ LABEL org.opencontainers.image.version="${VERSION}" \
     io.modelcontextprotocol.server-name="com.knitli/codeweaver"
 
 # Install runtime dependencies
+# Note: git is required for CodeWeaver to detect project root directory
 # hadolint ignore=DL3008
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     ca-certificates \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user for security
