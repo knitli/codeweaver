@@ -12,7 +12,7 @@ mcp-name: com.knitli/codeweaver
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/codeweaver-reverse.webp">
   <source media="(prefers-color-scheme: light)" srcset="docs/assets/codeweaver-primary.webp">
-  <img alt="CodeWeaver logo" src="docs/assets/codeweaver-primary.webp">
+  <img alt="CodeWeaver logo" src="docs/assets/codeweaver-primary.webp" height="150px" width="150px">
 </picture>
 
 
