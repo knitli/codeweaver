@@ -36,11 +36,17 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Checkout code
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          fetch-depth: 0
+
       - name: Setup Python environment
         uses: ./.github/actions/setup-python-env
         with:
           python-version: ${{ inputs.python-version }}
           skip-mise-setup: "true" # Don't need full mise setup for building
+          skip-checkout: 'true'
 
       - name: Install UV and build tools
         run: |
