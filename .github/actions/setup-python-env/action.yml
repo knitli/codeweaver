@@ -5,6 +5,7 @@
 
 name: Setup Python Environment
 description: Complete Python development environment setup with mise and UV caching
+
 inputs:
   python-version:
     description: Python version to install
@@ -27,7 +28,7 @@ inputs:
     required: false
     default: 'false'
 
-runs:
+runs:    
   using: composite
   steps:
     - name: Checkout code
@@ -78,6 +79,10 @@ runs:
 
     - name: Install mise
       shell: bash
+      env:
+        MISE_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        MISE_ENV: "ci"
+        MISE_YES: 1
       run: |
         if [ ! -f "$HOME/.local/bin/mise" ]; then
           # Install mise directly from GitHub releases for reliability
@@ -95,5 +100,6 @@ runs:
       if: inputs.skip-mise-setup != 'true'
       shell: bash
       run: |
-        export PATH="$HOME/.local/bin:$PATH"
+        export PATH="$HOME/.local/bin:$PATH" -E ci
+        mise trust --all
         mise run setup > /dev/null 2>&1 || true
