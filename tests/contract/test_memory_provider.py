@@ -276,4 +276,6 @@ class TestMemoryProviderContract:
         parts = collection_name.replace("-", "_").split("_")
         last_part = parts[-1]
         assert len(last_part) == 8, f"Expected 8-char hex suffix, got '{last_part}'"
-        assert all(c in "0123456789abcdef" for c in last_part), f"Expected hex characters, got '{last_part}'"
+        assert all(c in "0123456789abcdef" for c in last_part), (
+            f"Expected hex characters, got '{last_part}'"
+        )

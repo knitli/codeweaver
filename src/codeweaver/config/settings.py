@@ -645,10 +645,8 @@ class CodeWeaverSettings(BaseSettings):
     @classmethod
     def _defaults(cls) -> CodeWeaverSettingsDict:
         """Get a default settings dictionary."""
-        from codeweaver.common.utils import get_project_path
-
         # Check environment variable first to support Docker deployments without .git
-        path = cls._resolve_env_settings_path(directory=True)
+        path = _resolve_env_settings_path(directory=True)
         return CodeWeaverSettingsDict(
             project_path=path,
             project_name=path.name,

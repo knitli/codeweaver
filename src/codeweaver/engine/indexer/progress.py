@@ -170,7 +170,7 @@ class IndexingProgressTracker:
             self.live.stop()
             self.live = None
             # Explicitly flush to ensure clean terminal state
-            if hasattr(self.console.file, 'flush'):
+            if hasattr(self.console.file, "flush"):
                 self.console.file.flush()
 
     def update(self, stats: IndexingStats, phase: str | None = None) -> None:
@@ -263,7 +263,7 @@ class IndexingProgressTracker:
         """Context manager exit - ensures clean terminal state."""
         self.stop()
         # Additional flush to ensure terminal is fully reset
-        if hasattr(self.console.file, 'flush'):
+        if hasattr(self.console.file, "flush"):
             self.console.file.flush()
 
 

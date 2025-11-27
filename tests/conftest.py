@@ -98,7 +98,9 @@ def _mock_get_tokenizer(tokenizer: str, model: str) -> MockTokenizer:
 
 
 @pytest.fixture(autouse=True)
-def mock_tokenizer_for_unit_tests(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> None:
+def mock_tokenizer_for_unit_tests(
+    request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Auto-patch the tokenizer for unit tests that are marked as mock_only.
 
     This prevents network calls to download tiktoken encodings during unit tests.

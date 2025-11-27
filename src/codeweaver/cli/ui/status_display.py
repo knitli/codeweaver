@@ -207,7 +207,7 @@ class IndexingProgress:
             self.progress.stop()
             self._started = False
             # Explicitly flush to ensure clean terminal state
-            if hasattr(self.console.file, 'flush'):
+            if hasattr(self.console.file, "flush"):
                 self.console.file.flush()
 
     def start_batch(self, batch_num: int, files_in_batch: int) -> None:
@@ -503,7 +503,7 @@ class IndexingProgress:
         """Context manager exit - ensures clean terminal state."""
         self.stop()
         # Additional flush to ensure terminal is fully reset
-        if hasattr(self.console.file, 'flush'):
+        if hasattr(self.console.file, "flush"):
             self.console.file.flush()
 
 
@@ -653,7 +653,7 @@ class StatusDisplay:
         with Live(spinner_obj, console=self.console, refresh_per_second=10):
             yield
         # Ensure terminal state is clean after spinner exits
-        if hasattr(self.console.file, 'flush'):
+        if hasattr(self.console.file, "flush"):
             self.console.file.flush()
 
     def print_error(self, message: str, *, details: str | None = None) -> None:
@@ -758,7 +758,7 @@ class StatusDisplay:
         with progress:
             yield progress
         # Ensure terminal state is clean after progress exits
-        if hasattr(self.console.file, 'flush'):
+        if hasattr(self.console.file, "flush"):
             self.console.file.flush()
 
     @contextmanager
@@ -794,7 +794,7 @@ class StatusDisplay:
 
             yield update
         # Ensure terminal state is clean after progress bar exits
-        if hasattr(self.console.file, 'flush'):
+        if hasattr(self.console.file, "flush"):
             self.console.file.flush()
 
     def print_index_summary(
