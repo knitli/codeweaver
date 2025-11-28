@@ -144,10 +144,10 @@ logger = get_logger(__name__)
 class ManagementServer:
     """
     HTTP server for management endpoints.
-    
+
     Always runs on HTTP (port 9329), independent of MCP transport.
     Provides observability endpoints for monitoring and debugging.
-    
+
     Endpoints mirror existing app_bindings.py custom_route patterns:
     - /health - Health check with indexing status
     - /status - Indexing and failover status
@@ -160,7 +160,7 @@ class ManagementServer:
     def __init__(self, background_state: BackgroundState):
         """
         Initialize management server.
-        
+
         Args:
             background_state: BackgroundState instance for accessing services
         """
@@ -171,11 +171,11 @@ class ManagementServer:
     async def health(self, request):
         """
         Health check endpoint.
-        
+
         Matches existing /health endpoint from app_bindings.py.
         """
         from codeweaver.server.app_bindings import health
-        
+
         # health() expects app.state with our BackgroundState
         request.app.state.background = self.background_state
         return await health(request)
@@ -183,74 +183,74 @@ class ManagementServer:
     async def status_info(self, request):
         """
         Indexing and failover status endpoint.
-        
+
         Matches existing /status endpoint from app_bindings.py.
         """
         from codeweaver.server.app_bindings import status_info
-        
+
         request.app.state.background = self.background_state
         return await status_info(request)
 
     async def stats_info(self, request):
         """
         Statistics and metrics endpoint.
-        
+
         Matches existing /metrics endpoint from app_bindings.py.
         """
         from codeweaver.server.app_bindings import stats_info
-        
+
         return await stats_info(request)
 
     async def version_info(self, request):
         """
         Version information endpoint.
-        
+
         Matches existing /version endpoint from app_bindings.py.
         """
         from codeweaver.server.app_bindings import version_info
-        
+
         return await version_info(request)
 
     async def settings_info(self, request):
         """
         Settings endpoint (redacts sensitive fields).
-        
+
         Matches existing /settings endpoint from app_bindings.py.
         """
         from codeweaver.server.app_bindings import settings_info
-        
+
         return await settings_info(request)
 
     async def state_info(self, request):
         """
         Internal state endpoint.
-        
+
         Matches existing /state endpoint from app_bindings.py.
         """
         from codeweaver.server.app_bindings import state_info
-        
+
         request.app.state.background = self.background_state
         return await state_info(request)
 
     async def favicon(self, request):
         """
         Favicon endpoint.
-        
+
         Matches existing /favicon.ico endpoint from app_bindings.py.
         """
         from codeweaver.server.app_bindings import favicon
-        
+
         return await favicon(request)
 
     def create_app(self) -> Starlette:
         """
         Create Starlette app with management routes.
-        
+
         Routes are conditionally registered based on endpoint_settings
         (matching pattern from app_bindings.py).
         """
         from codeweaver.config.settings import get_settings_map
-        
+
         settings_map = get_settings_map()
         endpoint_settings = settings_map.get("endpoints", {})
 
@@ -283,7 +283,7 @@ class ManagementServer:
     async def start(self, host: str = "127.0.0.1", port: int = 9329):
         """
         Start management server.
-        
+
         Args:
             host: Server host (default: 127.0.0.1)
             port: Server port (default: 9329)
@@ -291,7 +291,7 @@ class ManagementServer:
         logger.info(f"Starting management server on {host}:{port}")
 
         app = self.create_app()
-        
+
         config = uvicorn.Config(
             app,
             host=host,
@@ -299,12 +299,12 @@ class ManagementServer:
             log_level="warning",  # Quiet logs for management server
             access_log=False  # Use our own logging via @timed_http
         )
-        
+
         self.server = uvicorn.Server(config)
-        
+
         # Run in background task
         self.server_task = asyncio.create_task(self.server.serve())
-        
+
         logger.info(f"Management server ready at http://{host}:{port}")
 
     async def stop(self):
@@ -312,13 +312,13 @@ class ManagementServer:
         if self.server:
             logger.info("Stopping management server")
             self.server.should_exit = True
-            
+
             if self.server_task:
                 try:
                     await asyncio.wait_for(self.server_task, timeout=5.0)
                 except asyncio.TimeoutError:
                     logger.warning("Management server did not stop within 5 seconds")
-            
+
             logger.info("Management server stopped")
 ```
 
@@ -415,10 +415,10 @@ class BackgroundState(DataclassSerializationMixin):
             # Initialize and start management server
             # (Always HTTP, independent of MCP transport)
             self.management_server = ManagementServer(background_state=self)
-            
+
             mgmt_host = settings_map.get("server", {}).get("management_host", "127.0.0.1")
             mgmt_port = settings_map.get("server", {}).get("management_port", 9329)
-            
+
             await self.management_server.start(host=mgmt_host, port=mgmt_port)
 
             self.initialized = True
