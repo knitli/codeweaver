@@ -20,16 +20,16 @@ mcp-name: com.knitli/codeweaver
 
 ### The missing abstraction layer between AI and your code
 
-[![Python Version](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/downloads/)
-[![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-green.svg)](LICENSE)
-[![Alpha Release](https://img.shields.io/badge/release-alpha%201-orange.svg)](https://github.com/knitli/codeweaver/releases)
-[![MCP Compatible](https://img.shields.io/badge/MCP-compatible-purple.svg)](https://modelcontextprotocol.io)
+[![Python Version][badge_python]][link_python]
+[![License][badge_license]][link_license]
+[![Alpha Release][badge_release]][link_release]
+[![MCP Compatible][badge_mcp]][link_mcp]
 
-[Installation](#-getting-started) •
-[Features](#-features) •
-[How It Works](#-how-it-works) •
-[Documentation](#-documentation) •
-[Contributing](#-contributing)
+[Installation][nav_install] •
+[Features][nav_features] •
+[How It Works][nav_how_it_works] •
+[Documentation][nav_docs] •
+[Contributing][nav_contributing]
 
 </div>
 
@@ -41,7 +41,7 @@ mcp-name: com.knitli/codeweaver
 
 **If you want AI that actually knows your code instead of guessing, this is the foundation.**
 
-> ⚠️ **Alpha Release**: CodeWeaver is in active development. [Use it, break it, shape it, help make it better][report].
+> ⚠️ **Alpha Release**: CodeWeaver is in active development. [Use it, break it, shape it, help make it better][issues].
 
 ---
 
@@ -66,7 +66,7 @@ mcp-name: com.knitli/codeweaver
 ✅ **Deploy it however you want**
 ✅ **One great tool instead of 30 mediocre ones**
 
-📖 [Read the detailed rationale →][WHY]
+📖 [Read the detailed rationale →][why_codeweaver]
 
 ---
 
@@ -74,7 +74,7 @@ mcp-name: com.knitli/codeweaver
 
 ### Quick Install
 
-Using the [CLI](#cli) with [uv](https://astral.sh/uv):
+Using the [CLI](#cli) with [uv][uv_tool]:
 
 ```bash
 # Add CodeWeaver to your project
@@ -91,10 +91,10 @@ cw server
 ```
 
 > **📝 Note**: `cw init` defaults to CodeWeaver's `recommended` profile, which requires:
-> - 🔑 [Voyage AI API key](http://voyage.ai) (generous free tier)
-> - 🗄️ [Qdrant instance](https://qdrant.tech) (cloud or local, generous free tier for cloud, free local)
+> - 🔑 [Voyage AI API key][voyage_ai] (generous free tier)
+> - 🗄️ [Qdrant instance][qdrant] (cloud or local, generous free tier for cloud, free local)
 
-🐳 **Prefer Docker?** [See Docker setup guide →](DOCKER.md)
+🐳 **Prefer Docker?** [See Docker setup guide →][docker_guide]
 
 ### MCP Configuration
 
@@ -113,7 +113,7 @@ cw server
 
 > **💡 Why HTTP?** Unlike most MCP servers, CodeWeaver defaults to `streamable-http` transport for a more predictable, smoother experience.
 
-> ⚠️ **Warning**: While `stdio` transport is technically possible, it's **untested** and may cause issues due to complex background orchestration. Use at your own risk!
+> ⚠️ **Warning**: While `stdio` transport is technically possible, it's **untested** and may cause issues due to complex background orchestration. Use at your own risk! We hope to make it fully available in the next Alpha Release (2).
 
 ---
 
@@ -166,7 +166,7 @@ cw server
 - **Multiple embedding providers**
 - **Sparse & dense models**
 - **Reranking support**
-- [See full provider list →](overrides/partials/providers.md)
+- [See full provider list →][providers_list]
 
 </td>
 <td>
@@ -185,7 +185,7 @@ cw server
 
 ## 🏗️ How It Works
 
-CodeWeaver combines [AST][wiki_ask]-level understanding, semantic relationships, and hybrid embeddings (sparse + dense) to deliver both contextual and literal understanding of your codebase.
+CodeWeaver combines [AST][wiki_ast]-level understanding, semantic relationships, and hybrid embeddings (sparse + dense) to deliver both contextual and literal understanding of your codebase.
 
 **The goal: give AI the fragments it *should* see, not whatever it can grab.**
 
@@ -262,7 +262,7 @@ _Legend: ⭐⭐⭐⭐ = solid | ⭐⭐⭐ = works with quirks | ⭐⭐ = experim
 
 ## 🗺️ Roadmap
 
-The [`enhancement`](https://github.com/knitli/codeweaver/labels/enhancement) issues describe detailed plans. Short version:
+The [`enhancement`][enhancement_label] issues describe detailed plans. Short version:
 
 - 📚 **Way better docs** – comprehensive guides and tutorials
 - 🤖 **AI-powered context curation** – agents identify purpose and intent
@@ -281,17 +281,17 @@ Agents just need to explain what they need. No complex schemas. No novella-lengt
 ## 📚 Documentation
 
 ### For Users
-- 🐳 [Docker Setup Notes](docs/docker/DOCKER_BUILD_NOTES.md)
-- 🚀 [Getting Started Guide](#-getting-started)
+- 🐳 [Docker Setup Notes][docker_notes]
+- 🚀 [Getting Started Guide][nav_install]
 
 ### For Developers
-- 🏗️ [Overall Architecture](ARCHITECTURE.md)
-- 🔍 [find_code API](src/codeweaver/agent_api/find_code/README.md)
-- 📐 [find_code Architecture](src/codeweaver/agent_api/find_code/ARCHITECTURE.md)
+- 🏗️ [Overall Architecture][architecture]
+- 🔍 [find_code API][api_find_code]
+- 📐 [find_code Architecture][arch_find_code]
 
 ### Product Philosophy
-- 💭 [Product Decisions](PRODUCT.md) – transparency matters
-- 🤔 [Why CodeWeaver?](docs/WHY.md) – detailed rationale
+- 💭 [Product Decisions][product_decisions] – transparency matters
+- 🤔 [Why CodeWeaver?][why_codeweaver] – detailed rationale
 
 <!-- Comprehensive documentation coming soon at https://dev.knitli.com/codeweaver -->
 
@@ -312,38 +312,38 @@ This is still early, and the best time to help shape the direction.
 5. 📝 Update documentation
 6. 🚀 Submit a PR
 
-You'll need to agree to our [Contributor License Agreement](CONTRIBUTORS_LICENSE_AGREEMENT.md).
+You'll need to agree to our [Contributor License Agreement][cla].
 
 ### Found a Bug?
 
-🐛 [Report it here][report] – include as much detail as possible!
+🐛 [Report it here][issues] – include as much detail as possible!
 
 ---
 
 ## 🔗 Links
 
 ### Project
-- 📦 **Repository**: [github.com/knitli/codeweaver](https://github.com/knitli/codeweaver)
-- 🐛 **Issues**: [Report bugs & request features](https://github.com/knitli/codeweaver/issues)
-- 📋 **Changelog**: [View release history](https://github.com/knitli/codeweaver/blob/main/CHANGELOG.md)
+- 📦 **Repository**: [github.com/knitli/codeweaver][repo]
+- 🐛 **Issues**: [Report bugs & request features][issues]
+- 📋 **Changelog**: [View release history][changelog]
 <!-- - 📖 **Documentation**: https://dev.knitli.com/codeweaver (in progress) -->
 
 ### Company
-- 🏢 **Knitli**: [knitli.com](https://knitli.com)
-- ✍️ **Blog**: [blog.knitli.com](https://blog.knitli.com)
-- 🐦 **X/Twitter**: [@knitli_inc](https://x.com/knitli_inc)
-- 💼 **LinkedIn**: [company/knitli](https://linkedin.com/company/knitli)
-- 💻 **GitHub**: [@knitli](https://github.com/knitli)
+- 🏢 **Knitli**: [knitli.com][knitli_site]
+- ✍️ **Blog**: [blog.knitli.com][knitli_blog]
+- 🐦 **X/Twitter**: [@knitli_inc][knitli_x]
+- 💼 **LinkedIn**: [company/knitli][knitli_linkedin]
+- 💻 **GitHub**: [@knitli][knitli_github]
 
 ### Support the Project
 
-We're a [one-person company](https://github.com/bashandbone) at the moment... and make no money... if you like CodeWeaver and want to keep it going, please consider **[sponsoring me](https://github.com/sponsors/knitli)** 😄
+We're a [one-person company][bashandbone] at the moment... and make no money... if you like CodeWeaver and want to keep it going, please consider **[sponsoring me][sponsor]** 😄
 
 ---
 
 ## 📦 Package Info
 
-- **Python package**: `codeweaver`
+- **Python package**: `code-weaver` 👈❗ **note the hyphen**
 - **CLI commands**: `cw` / `codeweaver`
 - **Python requirement**: ≥3.12 (tested on 3.12, 3.13, 3.14)
 - **Entry point**: `codeweaver.cli.app:main`
@@ -354,19 +354,19 @@ We're a [one-person company](https://github.com/bashandbone) at the moment... an
 
 Licensed under **MIT OR Apache 2.0** — you choose! Some vendored code is Apache 2.0 only and some is MIT only. Everything is permissively licensed.
 
-The project follows the [REUSE specification](https://reuse.software). Every file has detailed licensing information, and we regularly generate a [software bill of materials](sbom.spdx).
+The project follows the [REUSE specification][reuse_spec]. Every file has detailed licensing information, and we regularly generate a [software bill of materials][sbom].
 
 ---
 
 ## 📊 Telemetry
 
-The default includes **very anonymized telemetry** to improve CodeWeaver. [See the implementation](src/codeweaver/common/telemetry/) or read [the README](src/codeweaver/common/telemetry/README.md).
+The default includes **very anonymized telemetry** to improve CodeWeaver. [See the implementation][telemetry_impl] or read [the README][telemetry_readme].
 
 **Opt out**: `export CODEWEAVER__TELEMETRY__DISABLE_TELEMETRY=true`
 
 **Opt in to detailed feedback** (helps us improve): `export CODEWEAVER__TELEMETRY__TOOLS_OVER_PRIVACY=true`
 
-📋 [See our privacy policy](PRIVACY_POLICY.md)
+📋 [See our privacy policy][privacy_policy]
 
 ---
 
@@ -380,15 +380,60 @@ The default includes **very anonymized telemetry** to improve CodeWeaver. [See t
 
 <div align="center">
 
-**Built with ❤️ by [Knitli](https://knitli.com)**
+**Built with ❤️ by [Knitli][knitli_site]**
 
-[⬆ Back to top](#codeweaver)
+[⬆ Back to top][nav_top]
 
 </div>
 
+<!-- Badges -->
+
+[badge_license]: <https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-green.svg> "License Badge"
+[badge_mcp]: <https://img.shields.io/badge/MCP-compatible-purple.svg> "MCP Compatible Badge"
+[badge_python]: <https://img.shields.io/badge/python-3.12%2B-blue.svg> "Python Version Badge"
+[badge_release]: <https://img.shields.io/badge/release-alpha%201-orange.svg> "Release Badge"
+
+<!-- Other links -->
+
+[api_find_code]: <src/codeweaver/agent_api/find_code/README.md> "find_code API Documentation"
+[arch_find_code]: <src/codeweaver/agent_api/find_code/ARCHITECTURE.md> "find_code Architecture"
+[architecture]: <ARCHITECTURE.md> "Overall Architecture"
+[bashandbone]: <https://github.com/bashandbone> "Adam Poulemanos' GitHub Profile"
+[changelog]: <https://github.com/knitli/codeweaver/blob/main/CHANGELOG.md> "Changelog"
+[cla]: <CONTRIBUTORS_LICENSE_AGREEMENT.md> "Contributor License Agreement"
 [cli_guide]: <docs/CLI.md> "Command Line Reference"
 [config_schema]: <schema/codeweaver.schema.json> "The CodeWeaver Config Schema"
+[docker_guide]: <DOCKER.md> "Docker Setup Guide"
+[docker_notes]: <docs/docker/DOCKER_BUILD_NOTES.md> "Docker Build Notes"
+[enhancement_label]: <https://github.com/knitli/codeweaver/labels/enhancement> "Enhancement Issues"
+[issues]: <https://github.com/knitli/codeweaver/issues> "Report an Issue"
+[knitli_blog]: <https://blog.knitli.com> "Knitli Blog"
+[knitli_github]: <https://github.com/knitli> "Knitli GitHub Organization"
+[knitli_linkedin]: <https://linkedin.com/company/knitli> "Knitli LinkedIn"
+[knitli_site]: <https://knitli.com> "Knitli Website"
+[knitli_x]: <https://x.com/knitli_inc> "Knitli X/Twitter"
+[link_license]: <LICENSE> "License File"
+[link_mcp]: <https://modelcontextprotocol.io> "Model Context Protocol Website"
+[link_python]: <https://www.python.org/downloads/> "Python Downloads"
+[link_release]: <https://github.com/knitli/codeweaver/releases> "CodeWeaver Releases"
 [mcp]: <https://modelcontextprotocol.io> "Learn About the Model Context Protocol"
-[report]: <https://github.com/knitli/codeweaver/issues> "Report an Issue"
-[wiki_ask]: <https://en.wikipedia.org/wiki/Abstract_syntax_tree> "About Abstract Syntax Trees"
-[WHY]: <docs/WHY.md> "Why I built CodeWeaver"
+[nav_contributing]: <#-contributing> "Contributing Section"
+[nav_docs]: <#-documentation> "Documentation Section"
+[nav_features]: <#-features> "Features Section"
+[nav_how_it_works]: <#-how-it-works> "How It Works Section"
+[nav_install]: <#-getting-started> "Installation Section"
+[nav_top]: <#codeweaver> "Back to Top"
+[privacy_policy]: <PRIVACY_POLICY.md> "Privacy Policy"
+[product_decisions]: <PRODUCT.md> "Product Decisions"
+[providers_list]: <overrides/partials/providers.md> "Full Provider List"
+[qdrant]: <https://qdrant.tech> "Qdrant Website"
+[repo]: <https://github.com/knitli/codeweaver> "CodeWeaver Repository"
+[reuse_spec]: <https://reuse.software> "REUSE Specification"
+[sbom]: <sbom.spdx> "Software Bill of Materials"
+[sponsor]: <https://github.com/sponsors/knitli> "Sponsor Knitli"
+[telemetry_impl]: <src/codeweaver/common/telemetry/> "Telemetry Implementation"
+[telemetry_readme]: <src/codeweaver/common/telemetry/README.md> "Telemetry README"
+[uv_tool]: <https://astral.sh/uv> "uv Package Manager"
+[voyage_ai]: <http://voyage.ai> "Voyage AI Website"
+[why_codeweaver]: <docs/WHY.md> "Why CodeWeaver"
+[wiki_ast]: <https://en.wikipedia.org/wiki/Abstract_syntax_tree> "About Abstract Syntax Trees"
