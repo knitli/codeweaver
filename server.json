@@ -1,26 +1,24 @@
 {
-  "name": "io.github.knitli/codeweaver",
+  "name": "com.knitli/codeweaver",
   "description": "Semantic code search built for AI agents. Hybrid AST-aware context for 166 languages.",
-  "status": "active",
   "repository": {
     "url": "https://github.com/knitli/codeweaver",
     "source": "github",
     "id": "1024985391",
     "subfolder": "src/codeweaver"
   },
-  "version": "0.0.1rc947+gf3d70949.dirty",
+  "version": "0.1.0a1",
   "websiteUrl": "https://github.com/knitli/codeweaver",
-  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-16/server.schema.json",
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json",
   "packages": [
     {
       "registryType": "pypi",
       "registryBaseUrl": "https://pypi.org/",
       "identifier": "code-weaver",
-      "version": "0.0.1rc947+gf3d70949.dirty",
+      "version": "0.1.0a1",
       "runtimeHint": "uvx",
       "transport": {
-        "type": "streamable-http",
-        "url": "http://{host}:{port}/mcp/"
+        "type": "stdio"
       },
       "packageArguments": [
         {
@@ -37,6 +35,7 @@
           "isSecret": false,
           "type": "named",
           "name": "--project",
+          "valueHint": "path",
           "isRepeated": false
         },
         {
@@ -45,6 +44,7 @@
           "isSecret": false,
           "type": "named",
           "name": "--config",
+          "valueHint": "file_path",
           "isRepeated": false
         },
         {
@@ -54,6 +54,7 @@
           "default": "127.0.0.1",
           "type": "named",
           "name": "--host",
+          "valueHint": "host",
           "isRepeated": false
         },
         {
@@ -64,6 +65,7 @@
           "default": "9328",
           "type": "named",
           "name": "--port",
+          "valueHint": "port",
           "isRepeated": false
         },
         {
@@ -123,20 +125,20 @@
           "format": "string",
           "isSecret": true,
           "choices": [
-            "openai",
-            "fireworks",
+            "cohere",
+            "google",
             "vercel",
             "ollama (cloud only)",
-            "google",
-            "mistral",
-            "cohere",
             "hf_inference",
-            "github",
             "together",
-            "azure",
-            "heroku",
-            "voyage",
+            "mistral",
+            "github",
             "groq",
+            "azure",
+            "openai",
+            "fireworks",
+            "voyage",
+            "heroku",
             "bedrock"
           ],
           "name": "CODEWEAVER_EMBEDDING_API_KEY"
@@ -156,22 +158,22 @@
           "isSecret": false,
           "default": "voyage",
           "choices": [
+            "cohere",
+            "google",
+            "vercel",
+            "hf_inference",
+            "together",
+            "mistral",
+            "fastembed",
+            "sentence_transformers",
+            "ollama",
+            "github",
+            "groq",
+            "azure",
             "openai",
             "fireworks",
-            "vercel",
-            "fastembed",
-            "google",
-            "mistral",
-            "cohere",
-            "hf_inference",
-            "github",
-            "ollama",
-            "azure",
-            "heroku",
-            "sentence_transformers",
-            "together",
             "voyage",
-            "groq",
+            "heroku",
             "bedrock"
           ],
           "name": "CODEWEAVER_EMBEDDING_PROVIDER"
@@ -191,10 +193,10 @@
           "isSecret": false,
           "default": "WARNING",
           "choices": [
-            "WARNING",
             "INFO",
-            "CRITICAL",
             "DEBUG",
+            "WARNING",
+            "CRITICAL",
             "ERROR"
           ],
           "name": "CODEWEAVER_LOG_LEVEL"
@@ -260,8 +262,8 @@
           "isSecret": false,
           "default": "voyage",
           "choices": [
-            "fastembed",
             "cohere",
+            "fastembed",
             "sentence_transformers",
             "voyage",
             "bedrock"
@@ -371,10 +373,10 @@
           "format": "string",
           "isSecret": false,
           "choices": [
-            "error",
-            "info",
+            "debug",
             "warning",
-            "debug"
+            "info",
+            "error"
           ],
           "name": "OPENAI_LOG"
         },
@@ -496,11 +498,11 @@
           "format": "string",
           "isSecret": false,
           "choices": [
-            "error",
             "critical",
             "debug",
-            "info",
-            "warning"
+            "error",
+            "warning",
+            "info"
           ],
           "name": "HF_HUB_VERBOSITY"
         },
@@ -552,10 +554,10 @@
           "format": "string",
           "isSecret": false,
           "choices": [
-            "error",
-            "info",
+            "debug",
             "warning",
-            "debug"
+            "info",
+            "error"
           ],
           "name": "OPENAI_LOG"
         },
@@ -565,10 +567,10 @@
           "format": "string",
           "isSecret": false,
           "choices": [
-            "ERROR",
-            "WARNING",
             "INFO",
-            "DEBUG"
+            "WARNING",
+            "DEBUG",
+            "ERROR"
           ],
           "name": "QDRANT__LOG_LEVEL"
         },
@@ -651,8 +653,7 @@
     {
       "registryType": "oci",
       "registryBaseUrl": "https://docker.io/",
-      "identifier": "knitli/codeweaver",
-      "version": "0.0.1rc947+gf3d70949.dirty",
+      "identifier": "knitli/codeweaver:0.1.0a1",
       "runtimeHint": "docker",
       "transport": {
         "type": "streamable-http",
@@ -790,20 +791,20 @@
           "format": "string",
           "isSecret": true,
           "choices": [
-            "openai",
-            "fireworks",
+            "cohere",
+            "google",
             "vercel",
             "ollama (cloud only)",
-            "google",
-            "mistral",
-            "cohere",
             "hf_inference",
-            "github",
             "together",
-            "azure",
-            "heroku",
-            "voyage",
+            "mistral",
+            "github",
             "groq",
+            "azure",
+            "openai",
+            "fireworks",
+            "voyage",
+            "heroku",
             "bedrock"
           ],
           "name": "CODEWEAVER_EMBEDDING_API_KEY"
@@ -823,22 +824,22 @@
           "isSecret": false,
           "default": "voyage",
           "choices": [
+            "cohere",
+            "google",
+            "vercel",
+            "hf_inference",
+            "together",
+            "mistral",
+            "fastembed",
+            "sentence_transformers",
+            "ollama",
+            "github",
+            "groq",
+            "azure",
             "openai",
             "fireworks",
-            "vercel",
-            "fastembed",
-            "google",
-            "mistral",
-            "cohere",
-            "hf_inference",
-            "github",
-            "ollama",
-            "azure",
-            "heroku",
-            "sentence_transformers",
-            "together",
             "voyage",
-            "groq",
+            "heroku",
             "bedrock"
           ],
           "name": "CODEWEAVER_EMBEDDING_PROVIDER"
@@ -858,10 +859,10 @@
           "isSecret": false,
           "default": "WARNING",
           "choices": [
-            "WARNING",
             "INFO",
-            "CRITICAL",
             "DEBUG",
+            "WARNING",
+            "CRITICAL",
             "ERROR"
           ],
           "name": "CODEWEAVER_LOG_LEVEL"
@@ -927,8 +928,8 @@
           "isSecret": false,
           "default": "voyage",
           "choices": [
-            "fastembed",
             "cohere",
+            "fastembed",
             "sentence_transformers",
             "voyage",
             "bedrock"
@@ -1038,10 +1039,10 @@
           "format": "string",
           "isSecret": false,
           "choices": [
-            "error",
-            "info",
+            "debug",
             "warning",
-            "debug"
+            "info",
+            "error"
           ],
           "name": "OPENAI_LOG"
         },
@@ -1163,11 +1164,11 @@
           "format": "string",
           "isSecret": false,
           "choices": [
-            "error",
             "critical",
             "debug",
-            "info",
-            "warning"
+            "error",
+            "warning",
+            "info"
           ],
           "name": "HF_HUB_VERBOSITY"
         },
@@ -1219,10 +1220,10 @@
           "format": "string",
           "isSecret": false,
           "choices": [
-            "error",
-            "info",
+            "debug",
             "warning",
-            "debug"
+            "info",
+            "error"
           ],
           "name": "OPENAI_LOG"
         },
@@ -1232,10 +1233,10 @@
           "format": "string",
           "isSecret": false,
           "choices": [
-            "ERROR",
-            "WARNING",
             "INFO",
-            "DEBUG"
+            "WARNING",
+            "DEBUG",
+            "ERROR"
           ],
           "name": "QDRANT__LOG_LEVEL"
         },
@@ -1326,38 +1327,38 @@
       "capabilities": {
         "languages_supported": 166,
         "embedding_providers": [
-          "Bedrock",
-          "Ollama",
-          "Google",
-          "Sentence Transformers",
-          "Together",
-          "Vercel",
-          "Heroku",
-          "Azure",
-          "Openai",
-          "Hf Inference",
-          "Fireworks",
           "Mistral",
-          "Fastembed",
-          "Cohere",
-          "Groq",
+          "Openai",
+          "Fireworks",
+          "Together",
           "Github",
-          "Voyage"
+          "Azure",
+          "Cohere",
+          "Ollama",
+          "Groq",
+          "Vercel",
+          "Voyage",
+          "Sentence Transformers",
+          "Google",
+          "Fastembed",
+          "Bedrock",
+          "Heroku",
+          "Hf Inference"
         ],
         "vector_store_providers": [
           "Memory",
           "Qdrant"
         ],
         "sparse_embedding_providers": [
-          "Sentence Transformers",
-          "Fastembed"
+          "Fastembed",
+          "Sentence Transformers"
         ],
         "reranking_providers": [
-          "Bedrock",
-          "Sentence Transformers",
-          "Fastembed",
           "Cohere",
-          "Voyage"
+          "Voyage",
+          "Sentence Transformers",
+          "Bedrock",
+          "Fastembed"
         ],
         "search_types": [
           "semantic",

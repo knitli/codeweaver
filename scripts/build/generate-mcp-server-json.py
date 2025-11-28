@@ -204,14 +204,6 @@ REPOSITORY = Repository(
 )
 
 
-class Status(Enum):
-    """Lifecycle status of the MCP server."""
-
-    active = "active"
-    deprecated = "deprecated"
-    deleted = "deleted"
-
-
 class Server(BaseModel):
     """MCP server metadata."""
 
@@ -231,10 +223,6 @@ class Server(BaseModel):
         min_length=1,
         description="Clear human-readable explanation of server functionality. Should focus on capabilities, not implementation details.",
         examples=["MCP server providing weather data and forecasts via OpenWeatherMap API"],
-    )
-    status: Status | None = Field(
-        Status.active,
-        description="Server lifecycle status. 'deprecated' indicates the server is no longer recommended for new usage. 'deleted' indicates the server should never be installed and existing installations should be uninstalled - this is rare, and usually indicates malware or a legal takedown.",
     )
     repository: Repository | None = Field(
         REPOSITORY,
@@ -333,6 +321,12 @@ class NamedArgument(InputWithVariables):
     type_: NamedArgumentType = Field(..., examples=["named"], alias="type")
     name: str = Field(
         ..., description="The flag name, including any leading dashes.", examples=["--port"]
+    )
+    value_hint: str | None = Field(
+        None,
+        description="An identifier-like hint for the value. This is not part of the command line, but can be used by client configuration and to provide hints to users.",
+        alias="valueHint",
+        examples=["host", "port"],
     )
     is_repeated: bool | None = Field(
         False,
@@ -433,11 +427,6 @@ class FieldMeta(BaseModel):
         alias="io.modelcontextprotocol.registry/publisher-provided",
         description="Publisher-provided metadata for downstream registries",
     )
-    io_modelcontextprotocol_registry_official: dict[str, Any] | None = Field(
-        None,
-        alias="io.modelcontextprotocol.registry/official",
-        description="Official MCP registry metadata (read-only, added by registry)",
-    )
 
 
 class Package(BaseModel):
@@ -466,15 +455,16 @@ class Package(BaseModel):
     )
     identifier: str = Field(
         "codeweaver",
-        description="Package identifier - either a package name (for registries) or URL (for direct downloads)",
+        description="Package identifier - package name for npm/pypi/nuget, full image reference with tag for OCI (e.g., ghcr.io/owner/repo:v1.0.0), or download URL for MCPB",
         examples=[
             "@modelcontextprotocol/server-brave-search",
+            "ghcr.io/modelcontextprotocol/server-example:v1.2.3",
             "https://github.com/example/releases/download/v1.0.0/package.mcpb",
         ],
     )
-    version: str = Field(
-        __version__,
-        description="Package version. Must be a specific version. Version ranges are rejected (e.g., '^1.2.3', '~1.2.3', '>=1.2.3', '1.x', '1.*').",
+    version: str | None = Field(
+        None,
+        description="Package version. Required for npm/pypi/nuget packages. Optional for MCPB packages (can be embedded in download URL). Not used for OCI packages (version included in identifier tag). Must be a specific version. Version ranges are rejected (e.g., '^1.2.3', '~1.2.3', '>=1.2.3', '1.x', '1.*').",
         examples=["1.0.2"],
         min_length=1,
     )
@@ -515,10 +505,10 @@ class ServerDetail(Server):
     """Complete MCP server definition including packages and remotes."""
 
     field_schema: AnyUrl | None = Field(
-        AnyUrl("https://static.modelcontextprotocol.io/schemas/2025-09-16/server.schema.json"),
+        AnyUrl("https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json"),
         alias="$schema",
         description="JSON Schema URI for this server.json format",
-        examples=["https://static.modelcontextprotocol.io/schemas/2025-09-16/server.schema.json"],
+        examples=["https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json"],
     )
     packages: list[Package] | None = Field(None)
     remotes: list[StreamableHttpTransport | SseTransport] | None = Field(None)
@@ -573,9 +563,9 @@ def _create_uvx_package() -> Package:
         identifier="code-weaver",
         version=__version__,
         runtime_hint="uvx",
-        transport=StreamableHttpTransport(
-            type_=StreamableHttpTransportType.streamable_http,
-            url="http://{host}:{port}/mcp/",
+        transport=StdioTransport(
+            type_=StdioTransportType.stdio,
+
         ),
 
         package_arguments=[
@@ -607,6 +597,7 @@ def _create_uvx_package() -> Package:
                 description="Host address for MCP server",
                 is_required=False,
                 default="127.0.0.1",
+                value_hint="host",
             ),
             NamedArgument(
                 type_=NamedArgumentType.named,
@@ -615,6 +606,7 @@ def _create_uvx_package() -> Package:
                 is_required=False,
                 default="9328",
                 fmt=EnvFormat.NUMBER,
+                value_hint="port",
             ),
             NamedArgument(
                 type_=NamedArgumentType.named,
@@ -710,8 +702,7 @@ def _create_docker_package() -> Package:
     return Package(
         registry_type="oci",
         registry_base_url=AnyUrl("https://docker.io"),
-        identifier="knitli/codeweaver",
-        version=__version__,
+        identifier=f"knitli/codeweaver:{__version__}",
         runtime_hint="docker",
         transport=StreamableHttpTransport(
             type_=StreamableHttpTransportType.streamable_http,
@@ -846,12 +837,11 @@ def _create_field_meta() -> FieldMeta:
 def generate_server_detail() -> ServerDetail:
     """Generate the complete ServerDetail object from code."""
     return ServerDetail(
-        field_schema=AnyUrl("https://static.modelcontextprotocol.io/schemas/2025-09-16/server.schema.json"),
-        name="io.github.knitli/codeweaver",
+        field_schema=AnyUrl("https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json"),
+        name="com.knitli/codeweaver",
         description=f"Semantic code search built for AI agents. Hybrid AST-aware context for {len(_languages())} languages.",
         title="CodeWeaver - Code Search for AI Agents",
         version=__version__,
-        status=Status.active,
         repository=REPOSITORY,
         website_url=AnyUrl("https://github.com/knitli/codeweaver"),
         packages=[_create_uvx_package(), _create_docker_package()],
