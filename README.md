@@ -270,7 +270,7 @@ The [`enhancement`][enhancement_label] issues describe detailed plans. Short ver
 - 💉 **True DI system** – replace existing registry
 - 🕸️ **Advanced orchestration** – integrate `pydantic-graph`
 
-### What Will Stay: One Tool
+### What Will Stay: **One Tool**
 
 **One tool**. We give AI agents one simple tool: `find_code`.
 
