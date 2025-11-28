@@ -22,7 +22,7 @@ from fastmcp.server.middleware.error_handling import ErrorHandlingMiddleware, Re
 from fastmcp.server.middleware.logging import LoggingMiddleware, StructuredLoggingMiddleware
 from fastmcp.server.middleware.middleware import Middleware
 from fastmcp.server.middleware.rate_limiting import RateLimitingMiddleware
-from pydantic import ConfigDict, DirectoryPath, Field, NonNegativeInt, computed_field
+from pydantic import ConfigDict, DirectoryPath, Field, NonNegativeInt, PrivateAttr, computed_field
 from pydantic.dataclasses import dataclass
 
 from codeweaver import __version__ as version
@@ -153,7 +153,7 @@ class AppState(DataclassSerializationMixin):
         float, Field(default_factory=time.time, description="Server startup timestamp")
     ]
 
-    telemetry: PostHogClient | None = None
+    telemetry: Annotated[PostHogClient | None, PrivateAttr()] = None
 
     def __post_init__(self) -> None:
         """Post-initialization to set the global state reference."""
