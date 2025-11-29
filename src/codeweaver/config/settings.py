@@ -213,6 +213,14 @@ class FastMcpServerSettings(BasedModel):
         ),
     ] = None
 
+    def __init__(self, **kwargs: Any) -> None:
+        """Initialize FastMcpServerSettings, ensuring all fields are set."""
+        if (transport := kwargs.get("transport")) and transport == "stdio":
+            self.transport = "stdio"
+            self.host = None
+            self.port = None
+            self.auth = None
+
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         from codeweaver.core.types import AnonymityConversion, FilteredKey
 
@@ -457,10 +465,24 @@ class CodeWeaverSettings(BaseSettings):
         Field(description="""Telemetry configuration""", validate_default=False),
     ] = UNSET
 
+    # Management Server (Always HTTP, independent of MCP transport)
+    management_host: Annotated[
+        str | Unset,
+        Field(
+            description="""Management server host (independent of MCP transport). Default is 127.0.0.1 (localhost)."""
+        ),
+    ] = UNSET
+    management_port: Annotated[
+        PositiveInt | Unset,
+        Field(
+            description="""Management server port (always HTTP, for health/stats/metrics). Default is 9329."""
+        ),
+    ] = UNSET
+
     default_mcp_config: Annotated[
         MCPServerConfig | Unset,
         Field(
-            description="""Default MCP server configuration for mcp clients. Setting this makes it quick and easy to add codeweaver to any mcp.json file using `cw init`. Defaults to a streamable-http CodeWeaver server at `http://127.0.0.1:9328`. We strongly recommend using streamable-http instead of stdio for a better experience.""",
+            description="""Default MCP server configuration for mcp clients. Setting this makes it quick and easy to add codeweaver to any mcp.json file using `cw init`. Defaults to a streamable-http CodeWeaver server at `http://127.0.0.1:9328`.""",
             validate_default=False,
         ),
     ] = UNSET
@@ -484,7 +506,7 @@ class CodeWeaverSettings(BaseSettings):
             description="""Schema version for CodeWeaver settings""",
             pattern=r"\d{1,2}\.\d{1,3}\.\d{1,3}",
         ),
-    ] = "1.0.0"
+    ] = "1.1.0"
 
     _map: Annotated[DictView[CodeWeaverSettingsDict] | None, PrivateAttr()] = None
 
@@ -546,6 +568,12 @@ class CodeWeaverSettings(BaseSettings):
             TelemetrySettings._default()  # type: ignore
             if isinstance(self.telemetry, Unset)
             else self.telemetry
+        )
+        self.management_host = (
+            "127.0.0.1" if isinstance(self.management_host, Unset) else self.management_host
+        )
+        self.management_port = (
+            9329 if isinstance(self.management_port, Unset) else self.management_port
         )
         self.uvicorn = (
             UvicornServerSettings.model_validate(DefaultUvicornSettings)

@@ -26,13 +26,23 @@ app = App("status", help="Show CodeWeaver runtime status.")
 
 
 def get_url() -> str:
-    """Get the server URL from settings."""
+    """Get the MCP server URL from settings (http transport)."""
     from codeweaver.config.settings import get_settings_map
 
     settings_map = get_settings_map()
     host = settings_map["server"]["host"] or "127.0.0.1"
     port = settings_map["server"]["port"] or "9328"  # WEAV
     return f"http://{host}:{port}"
+
+
+def get_management_url() -> str:
+    """Get the management server URL from settings."""
+    from codeweaver.config.settings import get_settings_map
+
+    settings_map = get_settings_map()
+    mgmt_host = settings_map["server"].get("management_host", "127.0.0.1")
+    mgmt_port = settings_map["server"].get("management_port", 9329)
+    return f"http://{mgmt_host}:{mgmt_port}"
 
 
 @app.default
@@ -56,9 +66,15 @@ async def _show_status_once(display: StatusDisplay, *, verbose: bool) -> None:
     """Show status one time."""
     display.print_command_header("status", "CodeWeaver Runtime Status")
     server_url = get_url()
+    management_url = get_management_url()
 
     status_data = await _query_server_status(server_url)
+    management_healthy = await _query_management_health(management_url)
 
+    # Display management server status first
+    _display_management_status(display, management_url, healthy=management_healthy)
+
+    # Then display MCP server status
     if status_data is None:
         _display_server_offline(display, server_url)
     else:
@@ -70,6 +86,7 @@ async def _watch_status(display: StatusDisplay, *, verbose: bool, interval: int)
     display.print_command_header("status", "CodeWeaver Runtime Status (Watch Mode)")
     display.print_info(f"Refreshing every {interval} seconds. Press Ctrl+C to exit.")
     server_url = get_url()
+    management_url = get_management_url()
 
     try:
         while True:
@@ -81,7 +98,12 @@ async def _watch_status(display: StatusDisplay, *, verbose: bool, interval: int)
             )
 
             status_data = await _query_server_status(server_url)
+            management_healthy = await _query_management_health(management_url)
 
+            # Display management server status first
+            _display_management_status(display, management_url, healthy=management_healthy)
+
+            # Then display MCP server status
             if status_data is None:
                 _display_server_offline(display, server_url)
             else:
@@ -116,10 +138,48 @@ async def _query_server_status(server_url: str) -> dict[str, Any] | None:
         return None
 
 
+async def _query_management_health(management_url: str) -> bool:
+    """Query the management server /health endpoint.
+
+    Args:
+        management_url: Base URL of the management server
+
+    Returns:
+        True if management server is running and healthy, False otherwise
+    """
+    import httpx
+
+    try:
+        async with httpx.AsyncClient(timeout=2.0) as client:
+            response = await client.get(f"{management_url}/health")
+            return response.status_code == 200
+    except Exception:
+        return False
+
+
+def _display_management_status(
+    display: StatusDisplay, management_url: str, *, healthy: bool
+) -> None:
+    """Display management server status.
+
+    Args:
+        display: StatusDisplay instance
+        management_url: Management server URL
+        healthy: Whether management server is healthy
+    """
+    display.print_section("Background Services")
+    if healthy:
+        display.print_success("Background services running")
+        display.print_info(f"Management server: {management_url}", prefix="🌐")
+    else:
+        display.print_warning("Background services not running")
+        display.print_info("To start background services: 'cw start'")
+
+
 def _display_server_offline(display: StatusDisplay, server_url: str) -> None:
     """Display server offline message."""
-    display.print_section("Server Status")
-    display.print_error(f"Server offline at {server_url}")
+    display.print_section("MCP Server Status")
+    display.print_error(f"MCP server offline at {server_url}")
     display.print_info(
         "The CodeWeaver server is not running. Commands like 'index' and 'search' can still work without the server."
     )
@@ -136,10 +196,10 @@ def _display_full_status(
         status_data: Status data from server
         verbose: Show detailed information
     """
-    # Server uptime
-    display.print_section("Server Status")
+    # MCP server uptime
+    display.print_section("MCP Server Status")
     uptime = status_data.get("uptime_seconds", 0)
-    display.print_success(f"Server online - Uptime: {_format_duration(uptime)}")
+    display.print_success(f"MCP server online - Uptime: {_format_duration(uptime)}")
     if verbose:
         display.print_info(f"Timestamp: {status_data.get('timestamp', 'unknown')}")
 

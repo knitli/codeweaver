@@ -17,7 +17,7 @@ import sys
 
 from collections.abc import Callable, Iterable
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Literal, cast, overload
 
 from pydantic import UUID7
 
@@ -42,6 +42,14 @@ def uuid7() -> UUID7:
     )  # it's always UUID7 and not str | int | bytes because we don't take kwargs
 
 
+@overload
+def uuid7_as_timestamp(
+    uuid: str | int | UUID7, *, as_datetime: Literal[True]
+) -> datetime.datetime | None: ...
+@overload
+def uuid7_as_timestamp(
+    uuid: str | int | UUID7, *, as_datetime: Literal[False] = False
+) -> int | None: ...
 def uuid7_as_timestamp(
     uuid: str | UUID7 | int, *, as_datetime: bool = False
 ) -> int | datetime.datetime | None:

@@ -22,14 +22,12 @@ logger = logging.getLogger(__name__)
 
 
 DefaultFastMcpServerSettings = FastMcpServerSettingsDict(
-    transport="http",
     auth=None,
     on_duplicate_tools="replace",
     on_duplicate_resources="replace",
     on_duplicate_prompts="replace",
     resource_prefix_format="path",
     middleware=[],
-    tools=[],
 )
 DefaultEndpointSettings = EndpointSettingsDict(
     enable_health=True,

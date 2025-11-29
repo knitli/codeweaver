@@ -874,16 +874,15 @@ mcp._lifespan = combined_lifespan
 ```
 
 **Key Changes**:
-1. ❌ **Removed**: Starlette middleware for state passing
-2. ✅ **Kept**: FastMCP `StatisticsMiddleware` for telemetry
-3. ✅ **Added**: Context injection for accessing `BackgroundState`
-4. ✅ **Simplified**: Direct delegation to `app_bindings.find_code_tool`
+1. ✅ **Kept**: FastMCP `StatisticsMiddleware` for call timing
+2. ✅ **Added**: Context injection for accessing `BackgroundState`
+3. ✅ **Simplified**: Direct delegation to `app_bindings.find_code_tool`
 
 ---
 
 ## Phase 2: Configuration Updates (Week 2)
 
-### 2.1 Update ServerSettings (Not IndexerSettings)
+### 2.1 Update ServerSettings
 
 **Rationale**: Background services are server lifecycle concerns, not indexer-specific.
 
@@ -932,22 +931,8 @@ class ServerSettings(BasedModel):
     management_port: int = 9329
     """Management server port (always HTTP, for health/stats/metrics)."""
 
-    # Background Services
-    auto_index_on_startup: bool = True
-    """Automatically start indexing on server startup."""
-
-    file_watching_enabled: bool = True
-    """Enable file watching for real-time updates."""
-
-    health_check_interval_seconds: int = 30
-    """Interval for health checks (seconds)."""
-
-    statistics_enabled: bool = True
-    """Enable statistics collection."""
-
-    def _telemetry_keys(self) -> dict | None:
-        """No sensitive fields."""
-        return None
+ 
+    # Existing telemetry keys definition
 ```
 
 **File**: `config.toml` (UPDATE)
@@ -964,11 +949,6 @@ transport = "streamable-http"
 management_host = "127.0.0.1"
 management_port = 9329
 
-# Background services
-auto_index_on_startup = true
-file_watching_enabled = true
-health_check_interval_seconds = 30
-statistics_enabled = true
 ```
 
 **Immutability Pattern**:

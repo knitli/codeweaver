@@ -32,7 +32,7 @@ CODEWEAVER_PROJECT_PATH = '''{{ config_root }}'''
 # Get version from git tags (uv-dynamic-versioning uses git as source)
 # Falls back to "dev" if git command fails
 CODEWEAVER_VERSION = '''{{ exec(command='git describe --tags --always --dirty 2>/dev/null || echo "dev"') | trim }}'''
-CI = '''{% if get_env(name="GITHUB_ACTIONS", default="") != "" %}true{% else %}false{% endif %}'''
+CI = '''{% if get_env(name="GITHUB_ACTIONS", default="") != "true" %}true{% else %}false{% endif %}'''
 _.path = [
   "scripts/dev-env",
   "scripts/code-quality",

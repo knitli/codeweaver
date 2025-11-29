@@ -20,7 +20,7 @@ from typing import Any, cast, overload
 from fastmcp.prompts import Prompt
 from fastmcp.resources import Resource, ResourceTemplate
 from fastmcp.server.middleware import CallNext, MiddlewareContext
-from fastmcp.server.middleware.middleware import Middleware
+from fastmcp.server.middleware.middleware import Middleware as McpMiddleware
 from fastmcp.tools import Tool
 from mcp.types import (
     CallToolRequestParams,
@@ -47,7 +47,7 @@ from codeweaver.common.types import TimingStatisticsDict
 from codeweaver.exceptions import ProviderError
 
 
-class StatisticsMiddleware(Middleware):
+class StatisticsMiddleware(McpMiddleware):
     """Middleware to track request statistics and performance metrics."""
 
     def __init__(

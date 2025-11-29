@@ -125,6 +125,9 @@ class CodeWeaverSettingsDict(TypedDict, total=False):
     middleware: NotRequired[MiddlewareOptions | Unset]
     chunker: NotRequired[ChunkerSettingsDict | Unset]
     uvicorn: NotRequired[UvicornServerSettingsDict | Unset]
+    # Management Server (Always HTTP, independent of MCP transport)
+    management_host: NotRequired[str | Unset]
+    management_port: NotRequired[PositiveInt | Unset]
     indexer: NotRequired[IndexerSettingsDict | Unset]
     telemetry: NotRequired[TelemetrySettingsDict | Unset]
     endpoints: NotRequired[EndpointSettingsDict | Unset]
@@ -145,9 +148,9 @@ class UvicornServerSettings(BasedModel):
     # For the following, we just want to track if it's the default value or not (True/False), not the actual value.
     model_config = BASEDMODEL_CONFIG
 
-    name: Annotated[str, Field(exclude=True)] = "CodeWeaver_http"
+    name: Annotated[str, Field(exclude=True)] = "CodeWeaver_Management_Server"
     host: str = os.environ.get("CODEWEAVER_HOST", "127.0.0.1")
-    port: PositiveInt = int(port) if (port := os.environ.get("CODEWEAVER_PORT")) else 9328
+    port: PositiveInt = int(port) if (port := os.environ.get("CODEWEAVER_PORT")) else 9329
     uds: str | None = None
     fd: int | None = None
     http: type[asyncio.Protocol] | HTTPProtocolType | str = "auto"

@@ -23,7 +23,7 @@ from pydantic import NonNegativeFloat, NonNegativeInt
 
 
 if TYPE_CHECKING:
-    from codeweaver.engine.indexer.indexer import IndexingStats
+    from codeweaver.engine.indexer.progress import IndexingStats
 
 logger = logging.getLogger(__name__)
 

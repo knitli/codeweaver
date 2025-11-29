@@ -10,10 +10,11 @@ import contextlib
 import time
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, ClassVar, Self
+from typing import TYPE_CHECKING, Any, Self, TypedDict
 
 from pydantic import Field
 from pydantic.dataclasses import dataclass
+from pydantic.fields import computed_field
 from rich.console import Console
 from rich.live import Live
 from rich.panel import Panel
@@ -38,39 +39,47 @@ if TYPE_CHECKING:
     from codeweaver.core.types.enum import AnonymityConversion
 
 
+class IndexingErrorDict(TypedDict):
+    """Structured error information for failed file indexing."""
+
+    file_path: str  # Path to the file that failed
+    error_type: str  # Type of error (e.g., "ValueError", "RuntimeError")
+    error_message: str  # Error message
+    phase: str  # Phase where error occurred (discovery, chunking, embedding, storage)
+    timestamp: str  # ISO8601 timestamp when error occurred
+
+
 @dataclass
 class IndexingStats(DataclassSerializationMixin):
     """Statistics tracking for indexing progress."""
 
-    files_discovered: int = 0
-    files_processed: int = 0
-    chunks_created: int = 0
-    chunks_embedded: int = 0
-    chunks_indexed: int = 0
+    files_discovered: int = Field(0)
+    files_processed: int = Field(0)
+    chunks_created: int = Field(0)
+    chunks_embedded: int = Field(0)
+    chunks_indexed: int = Field(0)
     start_time: float = Field(default_factory=time.time)
-    files_with_errors: ClassVar[
-        Annotated[
-            list[Path],
-            Field(description="""List of file paths that encountered errors during indexing."""),
-        ]
-    ] = []
+    files_with_errors: list[Path] = Field(default_factory=list)
+    structured_errors: list[IndexingErrorDict] = Field(default_factory=list)
 
+    @computed_field
     def elapsed_time(self) -> float:
         """Calculate elapsed time since indexing started."""
         return time.time() - self.start_time
 
+    @computed_field
     def processing_rate(self) -> float:
         """Files processed per second."""
         if self.elapsed_time() == 0:
             return 0.0
         return self.files_processed / self.elapsed_time()
 
-    @property
+    @computed_field
     def total_errors(self) -> int:
         """Total number of files with errors."""
         return len(self.files_with_errors)
 
-    @property
+    @computed_field
     def total_files_discovered(self) -> int:
         """Total files discovered (alias for files_discovered)."""
         return self.files_discovered
@@ -80,6 +89,51 @@ class IndexingStats(DataclassSerializationMixin):
         from codeweaver.core.types.enum import AnonymityConversion
 
         return {FilteredKey("files_with_errors"): AnonymityConversion.COUNT}
+
+    def add_error(self, file_path: Path, error: Exception, phase: str) -> None:
+        """Add a structured error to the tracking system.
+
+        Args:
+            file_path: Path to the file that failed
+            error: The exception that occurred
+            phase: Phase where error occurred (discovery, chunking, embedding, storage)
+        """
+        from datetime import UTC, datetime
+
+        self.files_with_errors.add(file_path)  # Set automatically deduplicates
+        self.structured_errors.append(
+            IndexingErrorDict(
+                file_path=str(file_path),
+                error_type=type(error).__name__,
+                error_message=str(error),
+                phase=phase,
+                timestamp=datetime.now(UTC).isoformat(),
+            )
+        )
+
+    def get_error_summary(self) -> dict[str, Any]:
+        """Get summary of errors by phase and type.
+
+        Returns:
+            Dictionary with error statistics
+        """
+        if not self.structured_errors:
+            return {"total_errors": 0, "by_phase": {}, "by_type": {}}
+
+        by_phase: dict[str, int] = {}
+        by_type: dict[str, int] = {}
+
+        for error in self.structured_errors:
+            phase = error["phase"]
+            error_type = error["error_type"]
+            by_phase[phase] = by_phase.get(phase, 0) + 1
+            by_type[error_type] = by_type.get(error_type, 0) + 1
+
+        return {
+            "total_errors": len(self.structured_errors),
+            "by_phase": by_phase,
+            "by_type": by_type,
+        }
 
 
 class IndexingPhase(str, BaseEnum):
@@ -244,7 +298,7 @@ class IndexingProgressTracker:
         table.add_row("Processing Rate", f"{stats.processing_rate():.2f} files/sec")
         table.add_row("Time Elapsed", f"{stats.elapsed_time():.2f} seconds")
 
-        if stats.total_errors > 0:
+        if stats.total_errors() > 0:
             table.add_row("Files with Errors", f"[yellow]{stats.total_errors}[/yellow]")
 
         # Display in panel

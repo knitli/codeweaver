@@ -69,6 +69,8 @@ IS_EXCEPTION = (
     "codeweaver.common.utils.LazyImport",
     "codeweaver.common.utils.create_lazy_getattr",
     "codeweaver.common.utils.lazy_import",
+    "codeweaver.mcp.middleware.default_middleware_for_transport",
+    "codeweaver.mcp.middleware.McpMiddleware",
     "codeweaver.providers.agent.AgentProfile",
     "codeweaver.providers.agent.AgentProfileSpec",
     "codeweaver.providers.reranking.KnownRerankModelName",
@@ -81,12 +83,7 @@ IS_EXCEPTION = (
     "codeweaver.providers.embedding.capabilities.load_sparse_capabilities",
 )
 
-PROBLEM_CHILDREN = (
-    "codeweaver.providers.embedding.providers.bedrock",
-    "codeweaver.providers.embedding.providers.sentence_transformers",
-    "SentenceTransformersSparseProvider",
-    "BedrockEmbeddingProvider",
-)
+PROBLEM_CHILDREN = ("codeweaver.providers.embedding.providers.bedrock", "BedrockEmbeddingProvider")
 
 """Tuple of modules and types with known problematic lazy imports to skip during validation."""
 

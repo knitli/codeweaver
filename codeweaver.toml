@@ -36,6 +36,17 @@ sparse_embedding = [
 ]
 
 [server]
+# MCP Server (HTTP mode - port 9328)
+host = "127.0.0.1"
+port = 9328
+transport = "streamable-http"
+
+# Management Server (Always HTTP - port 9329)
+# Available regardless of MCP transport (stdio or HTTP)
+management_host = "127.0.0.1"
+management_port = 9329
+
+# FastMCP Settings
 on_duplicate_tools = "replace"
 on_duplicate_resources = "replace"
 on_duplicate_prompts = "replace"

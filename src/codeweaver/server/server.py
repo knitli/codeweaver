@@ -2,7 +2,7 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
-"""Initialize the FastMCP application with default middleware and settings."""
+"""Initialize the CodeWeaver Server (all background services)."""
 
 from __future__ import annotations
 
@@ -55,6 +55,7 @@ from codeweaver.engine.indexer import Indexer
 from codeweaver.exceptions import InitializationError
 from codeweaver.providers.provider import Provider as Provider
 from codeweaver.server.health_service import HealthService
+from codeweaver.server.management import ManagementServer
 
 
 if TYPE_CHECKING:
@@ -85,12 +86,12 @@ BRACKET_PATTERN: re.Pattern[str] = re.compile("\\[.+\\]")
 
 
 # ================================================
-# *     Application State and Health
+# *     CodeWeaver Application State and Health
 # ================================================
 
 
 @dataclass(order=True, kw_only=True, config=DATACLASS_CONFIG | ConfigDict(extra="forbid"))
-class AppState(DataclassSerializationMixin):
+class CodeWeaverState(DataclassSerializationMixin):
     """Application state for CodeWeaver server."""
 
     initialized: Annotated[
@@ -135,10 +136,6 @@ class AppState(DataclassSerializationMixin):
             description="Session statistics and performance tracking",
         ),
     ]
-    middleware_stack: Annotated[
-        tuple[Middleware, ...],
-        Field(description="Tuple of FastMCP middleware instances applied to the server"),
-    ] = ()
     indexer: Annotated[
         Indexer | None, Field(default=None, description="Indexer instance for background indexing")
     ] = None
@@ -152,8 +149,17 @@ class AppState(DataclassSerializationMixin):
     startup_time: Annotated[
         float, Field(default_factory=time.time, description="Server startup timestamp")
     ]
+    management_server: Annotated[
+        ManagementServer | None,
+        Field(
+            description="Management HTTP server instance. The Management Server is a lightweight uvicorn server that provides HTTP endpoints for status checking and similar functionality.",
+            exclude=True,
+        ),
+    ] = None  # type: ignore[valid-type]
 
     telemetry: Annotated[PostHogClient | None, PrivateAttr()] = None
+
+    _tasks: list[asyncio.Task] = PrivateAttr(default_factory=list)
 
     def __post_init__(self) -> None:
         """Post-initialization to set the global state reference."""
@@ -168,7 +174,6 @@ class AppState(DataclassSerializationMixin):
             # We'd need to make broader use of the Unset sentinel for that to work well
             FilteredKey("config_path"): AnonymityConversion.BOOLEAN,
             FilteredKey("project_path"): AnonymityConversion.HASH,
-            FilteredKey("middleware_stack"): AnonymityConversion.COUNT,
         }
 
     @computed_field
@@ -180,17 +185,22 @@ class AppState(DataclassSerializationMixin):
         return 0
 
 
-_state: AppState | None = None
+_state: CodeWeaverState | None = None
 
 
-def get_state() -> AppState:
+def get_state() -> CodeWeaverState:
     """Get the current application state."""
     global _state
     if _state is None:
         raise InitializationError(
-            "AppState has not been initialized yet. Ensure the server is properly set up before accessing the state."
+            "CodeWeaverState has not been initialized yet. Ensure the server is properly set up before accessing the state."
         )
     return _state
+
+
+# Alias for backward compatibility during migration
+# get_background_state is the new name, but get_state still works
+get_background_state = get_state
 
 
 def _get_health_service() -> HealthService:
@@ -208,7 +218,7 @@ def _get_health_service() -> HealthService:
 
 
 async def _run_background_indexing(
-    state: AppState,
+    state: CodeWeaverState,
     settings: CodeWeaverSettings,
     status_display: StatusDisplay,
     *,
@@ -976,4 +986,12 @@ def build_app(
     )
 
 
-__all__ = ("AppState", "ServerSetup", "build_app", "get_state", "lifespan")
+__all__ = (
+    "AppState",
+    "BackgroundState",
+    "ServerSetup",
+    "build_app",
+    "get_background_state",
+    "get_state",
+    "lifespan",
+)

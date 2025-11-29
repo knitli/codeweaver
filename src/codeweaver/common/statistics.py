@@ -15,7 +15,7 @@ import time
 
 from collections import Counter, defaultdict
 from collections.abc import Awaitable, Callable, Sequence
-from datetime import UTC, datetime
+from datetime import datetime
 from functools import cache
 from pathlib import Path
 from types import MappingProxyType
@@ -930,19 +930,25 @@ class Identifier(NamedTuple):
     """A named tuple for request identifiers."""
 
     request_id: str | int | None = None
-    uuid: UUID7_STR | None = str(uuid7())
+    uuid: UUID7_STR = uuid7().hex
 
     @property
     def timestamp(self) -> int:
         """Get the timestamp from the UUID7."""
-        int_uuid = int(str(self.uuid).replace("-", ""), base=16)
-        x = int.to_bytes(int_uuid, length=16, byteorder="big")
-        return int.from_bytes(x[:6])
+        from codeweaver.common.utils.utils import uuid7_as_timestamp
+
+        return cast(int, uuid7_as_timestamp(self.uuid)) if self.uuid else 0
 
     @property
     def as_datetime(self) -> datetime:
         """Get the datetime from the timestamp."""
-        return datetime.fromtimestamp(self.timestamp / 1_000, tz=UTC)
+        from codeweaver.common.utils.utils import uuid7_as_timestamp
+
+        return (
+            id_time
+            if (id_time := uuid7_as_timestamp(self.uuid, as_datetime=True))
+            else datetime.min
+        )
 
 
 @dataclass(config=DATACLASS_CONFIG | ConfigDict(extra="forbid", defer_build=True))
@@ -950,17 +956,17 @@ class FailoverStats(DataclassSerializationMixin):
     """Statistics tracking for vector store failover operations."""
 
     failover_active: bool = False
-    failover_count: int = 0
-    total_failover_time_seconds: float = 0.0
+    failover_count: NonNegativeInt = 0
+    total_failover_time_seconds: NonNegativeFloat = 0.0
     last_failover_time: str | None = None
-    backup_syncs_completed: int = 0
-    sync_back_operations: int = 0
-    chunks_synced_back: int = 0
+    backup_syncs_completed: NonNegativeInt = 0
+    sync_back_operations: NonNegativeInt = 0
+    chunks_synced_back: NonNegativeInt = 0
     active_store_type: str | None = None
     primary_circuit_breaker_state: str | None = None
     backup_file_exists: bool = False
-    backup_file_size_bytes: int = 0
-    chunks_in_failover: int = 0
+    backup_file_size_bytes: NonNegativeInt = 0
+    chunks_in_failover: NonNegativeInt = 0
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         """Define telemetry anonymization for failover statistics."""
@@ -1306,12 +1312,12 @@ class SessionStatistics(DataclassSerializationMixin):
         last_failover_time: str | None = None,
         increment_backup_syncs: bool = False,
         increment_sync_back_ops: bool = False,
-        chunks_synced_back: int | None = None,
+        chunks_synced_back: NonNegativeInt | None = None,
         active_store_type: str | None = None,
         primary_circuit_breaker_state: str | None = None,
         backup_file_exists: bool | None = None,
-        backup_file_size_bytes: int | None = None,
-        chunks_in_failover: int | None = None,
+        backup_file_size_bytes: NonNegativeInt | None = None,
+        chunks_in_failover: NonNegativeInt | None = None,
     ) -> None:
         """Update failover statistics.
 
