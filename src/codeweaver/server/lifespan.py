@@ -38,7 +38,7 @@ async def combined_lifespan(
     *,
     verbose: bool = False,
     debug: bool = False,
-) -> AsyncIterator[None]:
+) -> AsyncIterator[CodeWeaverState]:
     """
     Unified lifespan context manager for background services + MCP server.
 
@@ -51,6 +51,9 @@ async def combined_lifespan(
         statistics: Session statistics instance
         verbose: Enable verbose logging
         debug: Enable debug logging
+
+    Yields:
+        CodeWeaverState instance for the server lifecycle
     """
     from codeweaver.cli.ui import StatusDisplay
     from codeweaver.common.utils import get_project_path
@@ -74,15 +77,10 @@ async def combined_lifespan(
     if isinstance(settings.project_path, Unset):
         settings.project_path = get_project_path()
 
-    # Initialize CodeWeaverState (formerly CodeWeaverState)
-    # This is the same initialization as before, just renamed
+    # Initialize CodeWeaverState
     from codeweaver.server.server import _initialize_cw_state
 
-    # _initialize_cw_state returns CodeWeaverState now (will be updated during migration)
-    background_state: CodeWeaverState = _initialize_cw_state(app, settings, statistics)  # type: ignore[assignment]
-
-    # Store in app.state for access via Context
-    app.state.background = background_state
+    background_state: CodeWeaverState = _initialize_cw_state(settings, statistics)
 
     indexing_task = None
 
@@ -90,19 +88,12 @@ async def combined_lifespan(
         if verbose or debug:
             logger.info("Initializing background services...")
 
-        # Initialize background services
-        await background_state.initialize()
-
         # Start background indexing task
         from codeweaver.server.server import _run_background_indexing
 
         indexing_task = asyncio.create_task(
             _run_background_indexing(
-                background_state,  # type: ignore[arg-type]
-                settings,
-                status_display,
-                verbose=verbose,
-                debug=debug,
+                background_state, settings, status_display, verbose=verbose, debug=debug
             )
         )
 
@@ -146,7 +137,7 @@ async def combined_lifespan(
         background_state.initialized = True
 
         # Server runs here
-        yield
+        yield background_state
 
     except Exception:
         background_state.initialized = False
@@ -157,4 +148,4 @@ async def combined_lifespan(
 
         await _cleanup_state(
             background_state, indexing_task, status_display, verbose=verbose or debug
-        )  # type: ignore[arg-type]
+        )
