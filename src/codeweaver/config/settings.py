@@ -1164,7 +1164,8 @@ def reset_settings() -> None:
 
 __all__ = (
     "CodeWeaverSettings",
-    "FastMcpServerSettings",
+    "FastMcpHttpServerSettings",
+    "FastMcpStdioServerSettings",
     "get_settings",
     "get_settings_map",
     "reset_settings",
