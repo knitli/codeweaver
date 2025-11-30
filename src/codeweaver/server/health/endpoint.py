@@ -10,7 +10,7 @@ import logging
 
 from typing import TYPE_CHECKING, Any, NoReturn
 
-from codeweaver.server.health_models import (
+from codeweaver.server.health.models import (
     EmbeddingProviderServiceInfo,
     HealthResponse,
     RerankingServiceInfo,
@@ -20,7 +20,7 @@ from codeweaver.server.health_models import (
 
 
 if TYPE_CHECKING:
-    from codeweaver.server.health_service import HealthService
+    from codeweaver.server.health.health_service import HealthService
     from codeweaver.server.server import get_state
 
 
@@ -68,7 +68,7 @@ async def get_health() -> HealthResponse | Any:
         logger.warning("Health check failed with error", exc_info=True)
         # Return unhealthy status on error
 
-        from codeweaver.server.health_models import (
+        from codeweaver.server.health.models import (
             IndexingInfo,
             IndexingProgressInfo,
             ServicesInfo,

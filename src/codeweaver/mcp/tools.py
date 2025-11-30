@@ -102,6 +102,8 @@ TOOL_DEFINITIONS: DictView[ToolCollectionDict] = DictView(
     )
 )
 
+find_code_tool_definition: Tool = TOOL_DEFINITIONS["find_code"]
+
 
 def register_tool(app: FastMCP[Any], tool: Tool) -> FastMCP[Any]:
     """Register all CodeWeaver tools with the application."""
@@ -109,4 +111,4 @@ def register_tool(app: FastMCP[Any], tool: Tool) -> FastMCP[Any]:
     return app
 
 
-__all__ = ("TOOL_DEFINITIONS", "register_tool")
+__all__ = ("TOOL_DEFINITIONS", "find_code_tool_definition", "register_tool")

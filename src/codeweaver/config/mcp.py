@@ -58,6 +58,7 @@ from codeweaver.exceptions import MissingValueError
 
 
 if TYPE_CHECKING:
+    from codeweaver.config.types import CodeWeaverMCPConfigDict, StdioCodeWeaverConfigDict
     from codeweaver.core.types.aliases import FilteredKeyT
     from codeweaver.core.types.enum import AnonymityConversion
 
@@ -148,7 +149,6 @@ class StdioCodeWeaverConfig(BasedModel, FastMCPStdioMCPServer):
         from codeweaver.core.types.enum import AnonymityConversion
 
         return {
-            FilteredKey("command"): AnonymityConversion.HASH,
             FilteredKey("args"): AnonymityConversion.COUNT,
             FilteredKey("env"): AnonymityConversion.COUNT,
             FilteredKey("cwd"): AnonymityConversion.HASH,
@@ -212,4 +212,4 @@ class MCPConfig(BasedModel, FastMCPConfig):
         return cls.model_validate(data)
 
 
-__all__ = ("CodeWeaverMCPConfig", "MCPConfig", "update_mcp_config_file")
+__all__ = ("CodeWeaverMCPConfig", "MCPConfig", "StdioCodeWeaverConfig", "update_mcp_config_file")

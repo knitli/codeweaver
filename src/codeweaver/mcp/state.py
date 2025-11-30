@@ -1,5 +1,7 @@
 """Defines the MCP server state object for HTTP deployments."""
 
+from __future__ import annotations
+
 import logging
 import time
 
@@ -7,9 +9,8 @@ from typing import TYPE_CHECKING, Any
 
 from anthropic._models import computed_field
 from fastmcp import FastMCP
-from pydantic import ConfigDict, Field, PrivateAttr
+from pydantic import ConfigDict, Field, NonNegativeFloat, NonNegativeInt, PrivateAttr
 from pydantic.dataclasses import dataclass
-from pydantic.types import NonNegativeFloat, NonNegativeInt
 
 from codeweaver.common.utils.lazy_importer import lazy_import
 from codeweaver.common.utils.utils import elapsed_time_to_human_readable
@@ -25,7 +26,12 @@ from codeweaver.core.types.sentinel import Unset
 from codeweaver.mcp.middleware import McpMiddleware
 
 
+if TYPE_CHECKING:
+    from fastmcp import FastMCP
+
 get_settings_map = lazy_import("codeweaver.config.settings", "get_settings_map")
+
+logger = logging.getLogger(__name__)
 
 
 def _get_fastmcp_settings_map(*, http: bool = False) -> DictView[FastMcpServerSettingsDict]:
@@ -57,7 +63,7 @@ class CwMcpHttpState(DataclassSerializationMixin):
     app: FastMCP[Any] = PrivateAttr()
 
     logger: logging.Logger = Field(
-        default_factory=lambda: logging.getLogger(__name__),
+        default_factory=lambda: logging.getLogger("codeweaver.mcp.http"),
         description="Logger instance for the MCP HTTP server.",
     )
 
@@ -85,9 +91,6 @@ class CwMcpHttpState(DataclassSerializationMixin):
     start_time: NonNegativeInt = Field(default_factory=lambda: int(time.time()))
 
     stopwatch_start: NonNegativeFloat = Field(default_factory=time.monotonic)
-
-    if TYPE_CHECKING:
-        from fastmcp import FastMCP
 
     @computed_field
     def uptime_seconds(self) -> NonNegativeInt:
@@ -119,6 +122,21 @@ class CwMcpHttpState(DataclassSerializationMixin):
         return self.run_args.get("host") or self.mcp_settings.get("uvicorn_config", {}).get(
             "host", "127.0.0.1"
         )
+
+    @classmethod
+    def from_app(cls, app: FastMCP[Any], **kwargs: Any) -> CwMcpHttpState:
+        """Create state from app setup with the app and optional kwargs."""
+        assembled_kwargs: dict[str, Any] = {"app": app}
+        if run_args := kwargs.get("run_args"):
+            assembled_kwargs["run_args"] = run_args
+        if middleware_instances := kwargs.get("middleware"):
+            assembled_kwargs["middleware_instances"] = middleware_instances
+        # we are dealing with FastMcpServerSettingsDict here
+        if "instructions" in kwargs:
+            assembled_kwargs |= {
+                "mcp_settings": {k: v for k, v in kwargs.items() if k != "run_args"}
+            }
+        return cls(**assembled_kwargs)
 
 
 __all__ = ("CwMcpHttpState",)

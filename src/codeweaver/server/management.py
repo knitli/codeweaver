@@ -134,7 +134,7 @@ async def health(_request: Request) -> PlainTextResponse:
         if state.health_service is None:
             logger.warning("Health service not initialized, returning error response")
             # Health service not initialized - create error response
-            from codeweaver.server.health_models import (
+            from codeweaver.server.health.models import (
                 EmbeddingProviderServiceInfo,
                 HealthResponse,
                 IndexingInfo,
@@ -198,7 +198,7 @@ async def health(_request: Request) -> PlainTextResponse:
         logger.exception("Failed to get health status")
         # Return unhealthy status on error
 
-        from codeweaver.server.health_models import (
+        from codeweaver.server.health.models import (
             EmbeddingProviderServiceInfo,
             HealthResponse,
             IndexingInfo,

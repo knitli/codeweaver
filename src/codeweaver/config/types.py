@@ -218,7 +218,9 @@ class UvicornServerSettings(BasedModel):
     host: str = os.environ.get("CODEWEAVER_HOST", "127.0.0.1")
     port: PositiveInt = (
         int(port)
-        if (port := os.environ.get("CODEWEAVER_PORT") or os.environ.get("CODEWEAVER__UVICORN__PORT"))
+        if (
+            port := os.environ.get("CODEWEAVER_PORT") or os.environ.get("CODEWEAVER__UVICORN__PORT")
+        )
         else 9329
     )
     uds: str | None = None
@@ -349,33 +351,12 @@ class MCPConfigDict(TypedDict):
     mcpServers: list[CodeWeaverMCPConfigDict | StdioCodeWeaverConfigDict]
 
 
-class ServerSetup(TypedDict, total=False):
-    """TypedDict for server setup configuration.
-
-    Used by build_app() to pass configuration between server initialization
-    and startup phases.
-    """
-
-    app: Required[Any]  # FastMCP instance - using Any to avoid circular imports
-    settings: Required[Any]  # CodeWeaverSettings
-    middleware_settings: NotRequired[MiddlewareOptions]
-    host: NotRequired[str]
-    port: NotRequired[PositiveInt]
-    streamable_http_path: NotRequired[str]
-    transport: NotRequired[Literal["streamable-http", "stdio"]]
-    log_level: NotRequired[Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]]
-    middleware: NotRequired[set[Any]]  # set of Middleware types
-    verbose: NotRequired[bool]
-    debug: NotRequired[bool]
-
-
 __all__ = (
     "CodeWeaverMCPConfigDict",
     "CodeWeaverSettingsDict",
     "FastMcpHttpRunArgs",
     "FastMcpServerSettingsDict",
     "MCPConfigDict",
-    "ServerSetup",
     "StdioCodeWeaverConfigDict",
     "UvicornServerSettings",
     "UvicornServerSettingsDict",

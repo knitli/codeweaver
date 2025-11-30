@@ -80,7 +80,7 @@ async def start_cw_services(
     from codeweaver import __version__ as version
     from codeweaver.common.statistics import get_session_statistics
     from codeweaver.config.settings import get_settings
-    from codeweaver.server.health_service import HealthService
+    from codeweaver.server.health.health_service import HealthService
     from codeweaver.server.server import CodeWeaverState, _run_background_indexing
 
     # Load settings

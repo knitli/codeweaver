@@ -1,11 +1,14 @@
-"""FastMCP Server Creation and Lifespan Management for CodeWeaver."""
+"""FastMCP Server Creation and Lifespan Management for CodeWeaver.
+
+This module handles the setup, configuration, and instantiation of FastMCP servers. **It does not *start* the servers;** instead, it provides factory functions to create server instances configured for either HTTP or stdio transport.
+"""
 
 from __future__ import annotations
 
 import logging
 
 from collections.abc import AsyncIterator, Container
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Literal, cast, overload
 
 from fastmcp import FastMCP
 from fastmcp.client.transports import StreamableHttpTransport
@@ -13,15 +16,17 @@ from fastmcp.server.proxy import FastMCPProxy, ProxyClient
 from fastmcp.tools import Tool
 
 from codeweaver.common.utils import lazy_import
-from codeweaver.config.middleware import DefaultMiddlewareSettings, MiddlewareOptions
+from codeweaver.config.middleware import MiddlewareOptions, default_for_transport
 from codeweaver.config.settings import FastMcpHttpServerSettings, FastMcpStdioServerSettings
+from codeweaver.config.types import FastMcpHttpRunArgs, FastMcpServerSettingsDict
 from codeweaver.core.types import DictView, Unset
-from codeweaver.mcp.state import CwMcpHttpState
 
 
 if TYPE_CHECKING:
-    from codeweaver.config.types import FastMcpServerSettingsDict
+    from codeweaver.config.types import CodeWeaverSettingsDict, FastMcpServerSettingsDict
     from codeweaver.mcp.middleware import McpMiddleware, StatisticsMiddleware
+    from codeweaver.mcp.state import CwMcpHttpState
+
 
 TOOLS_TO_REGISTER = ("find_code",)
 
@@ -46,7 +51,7 @@ def _get_fastmcp_settings_map(*, http: bool = False) -> DictView[FastMcpServerSe
     )
 
 
-def _get_middleware_settings() -> DictView[MiddlewareOptions]:
+def _get_middleware_settings() -> DictView[MiddlewareOptions] | None:
     """Get the current middleware settings."""
     from codeweaver.config.settings import get_settings_map
 
@@ -54,7 +59,7 @@ def _get_middleware_settings() -> DictView[MiddlewareOptions]:
     return (
         settings_map.get_subview("middleware")
         if settings_map.get("middleware") is not Unset
-        else DictView(DefaultMiddlewareSettings)
+        else None
     )  # type: ignore[arg-type]
 
 
@@ -67,20 +72,105 @@ def _get_default_middleware() -> Container[type[McpMiddleware]]:
     return default_middleware_for_transport(transport)
 
 
-def get_statistics_middleware(settings: MiddlewareOptions) -> StatisticsMiddleware:
+def get_statistics_middleware(
+    settings: MiddlewareOptions | DictView[MiddlewareOptions],
+) -> StatisticsMiddleware:
     """Get the statistics middleware instance."""
     from codeweaver.common.statistics import get_session_statistics
     from codeweaver.mcp.middleware.statistics import StatisticsMiddleware
 
     return StatisticsMiddleware(
         statistics=get_session_statistics(),
-        logger=settings.get("logging", {}).get("logger", logging.getLogger(__name__)),
+        logger=logging.getLogger("codeweaver.middleware.statistics"),
         log_level=settings.get("logging", {}).get("log_level", 30),
     )
 
 
+def configure_uvicorn_logging(
+    run_args: FastMcpHttpRunArgs,
+    host: str | None = None,
+    port: int | None = None,
+    *,
+    verbose: bool = False,
+    debug: bool = False,
+) -> FastMcpHttpRunArgs:
+    """Configure uvicorn logging based on verbosity settings."""
+    uvicorn_config = run_args.get("uvicorn_config", {})
+    if port:
+        run_args["port"] = port
+        uvicorn_config["port"] = port  # ty: ignore[possibly-missing-implicit-call]
+    if host:
+        run_args["host"] = host
+        uvicorn_config["host"] = host  # ty: ignore[possibly-missing-implicit-call]
+    if verbose or debug:
+        # Verbose/debug mode: Enable uvicorn access logs
+        return FastMcpHttpRunArgs(
+            **(
+                run_args
+                | {
+                    "uvicorn_config": {
+                        **uvicorn_config,
+                        "access_log": True,  # Enable access logging in verbose mode
+                        "log_level": "debug" if debug else "info",  # Match verbosity level
+                    }
+                }
+            )
+        )
+    # Non-verbose mode: Suppress all uvicorn logging completely
+    uvicorn_log_config = {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "formatters": {
+            "default": {
+                "()": "uvicorn.logging.DefaultFormatter",
+                "fmt": "%(levelprefix)s %(message)s",
+                "use_colors": None,
+            }
+        },
+        "handlers": {"null": {"class": "logging.NullHandler"}},
+        "loggers": {
+            "uvicorn": {"handlers": ["null"], "level": "CRITICAL", "propagate": False},
+            "uvicorn.error": {"handlers": ["null"], "level": "CRITICAL", "propagate": False},
+            "uvicorn.access": {"handlers": ["null"], "level": "CRITICAL", "propagate": False},
+            # Additional loggers that may leak through
+            "fastmcp": {"handlers": ["null"], "level": "CRITICAL", "propagate": False},
+        },
+    }
+    return FastMcpHttpRunArgs(
+        **(
+            run_args
+            | {
+                "uvicorn_config": {
+                    **uvicorn_config,
+                    "access_log": False,  # Disable access logging
+                    "log_level": "critical",  # Only critical errors
+                    "log_config": uvicorn_log_config,  # Custom logging config, suppressing all logs
+                }
+            }
+        )
+    )
+
+
+def setup_runargs(
+    run_args: FastMcpHttpRunArgs | DictView[FastMcpHttpRunArgs],
+    host: str | None,
+    port: int | None,
+    *,
+    verbose: bool = False,
+    debug: bool = False,
+) -> FastMcpHttpRunArgs:
+    """Setup run arguments for the server."""
+    mutable_run_args = dict(run_args) if isinstance(run_args, DictView) else run_args
+    if host:
+        mutable_run_args["host"] = host
+    if port:
+        mutable_run_args["port"] = port
+    return FastMcpHttpRunArgs(**mutable_run_args)
+
+
 def setup_middleware(
-    middleware: Container[type[McpMiddleware]], middleware_settings: MiddlewareOptions
+    middleware: Container[type[McpMiddleware]],
+    middleware_settings: MiddlewareOptions | DictView[MiddlewareOptions],
 ) -> set[McpMiddleware]:
     """Setup middleware for the application."""
     # Convert container to set for modification
@@ -92,13 +182,24 @@ def setup_middleware(
         mw: type[McpMiddleware]  # type: ignore
         match mw.__name__:  # type: ignore[reportUnknownMemberType, reportUnknownArgumentType, reportAttributeAccessIssue]
             case "ErrorHandlingMiddleware":
-                instance = mw(**middleware_settings.get("error_handling", {}))  # type: ignore[reportCallIssue]
+                instance = mw(
+                    **(
+                        middleware_settings.get("error_handling", {})
+                        | {"logger": logging.getLogger("codeweaver.middleware.error_handling")}  # type: ignore[reportCallIssue]
+                    )
+                )
             case "RetryMiddleware":
-                instance = mw(**middleware_settings.get("retry", {}))  # type: ignore[reportCallIssue]
+                instance = mw(
+                    **(middleware_settings.get("retry", {}))
+                    | {"logger": logging.getLogger("codeweaver.middleware.retry")}  # type: ignore[reportCallIssue]
+                )
             case "RateLimitingMiddleware":
                 instance = mw(**middleware_settings.get("rate_limiting", {}))  # type: ignore[reportCallIssue]
             case "LoggingMiddleware" | "StructuredLoggingMiddleware":
-                instance = mw(**middleware_settings.get("logging", {}))  # type: ignore[reportCallIssue]
+                instance = mw(
+                    **(middleware_settings.get("logging", {}))
+                    | {"logger": logging.getLogger("codeweaver.middleware.logging")}  # type: ignore[reportCallIssue]
+                )
             case "ResponseCachingMiddleware":
                 instance = mw(**middleware_settings.get("caching", {}))  # type: ignore
             case _:
@@ -114,7 +215,7 @@ def setup_middleware(
 def register_middleware(
     app: FastMCP[StdioClientLifespan] | FastMCP[CwMcpHttpState],
     middleware: Container[type[McpMiddleware]],
-    middleware_settings: MiddlewareOptions,
+    middleware_settings: MiddlewareOptions | DictView[MiddlewareOptions],
 ) -> FastMCP[StdioClientLifespan] | FastMCP[CwMcpHttpState]:
     """Register middleware with the application."""
     for mw in setup_middleware(middleware, middleware_settings):
@@ -138,33 +239,115 @@ def register_tools(
     return app
 
 
+@overload
 def _setup_server(
     args: DictView[FastMcpServerSettingsDict],
-) -> FastMCP[StdioClientLifespan] | FastMCP[CwMcpHttpState]:
+    transport: Literal["stdio"],
+    host: None = None,
+    port: None = None,
+    *,
+    verbose: Literal[False] = False,
+    debug: Literal[False] = False,
+) -> FastMCP[StdioClientLifespan]: ...
+@overload
+def _setup_server(
+    args: DictView[FastMcpServerSettingsDict],
+    transport: Literal["streamable-http"],
+    host: str | None = None,
+    port: int | None = None,
+    *,
+    verbose: bool,
+    debug: bool,
+) -> CwMcpHttpState: ...
+def _setup_server[TransportT: Literal["stdio", "streamable-http"]](
+    args: DictView[FastMcpServerSettingsDict],
+    transport: TransportT,
+    host: str | None = None,
+    port: int | None = None,
+    *,
+    verbose: bool = False,
+    debug: bool = False,
+) -> FastMCP[StdioClientLifespan] | CwMcpHttpState:
     """Set class args for FastMCP server settings."""
-    from codeweaver.config.middleware import default_for_transport
-
-    is_http = bool(args.get("run_args"))
+    is_http = bool(args.get("run_args")) or transport == "streamable-http"
     # `run_args` is only set for HTTP transport
-    middleware_opts = default_for_transport("streamable-http" if is_http else "stdio")
+    middleware_opts = _get_middleware_settings() or default_for_transport(
+        "streamable-http" if is_http else "stdio"
+    )
     mutable_args = dict(args)
     middleware = mutable_args.pop("middleware", [])
+    run_args = mutable_args.pop("run_args", {})
+    if is_http:
+        run_args = setup_runargs(run_args, host, port, verbose=verbose, debug=debug)
     app = FastMCP(
         "CodeWeaver",
         **(
             mutable_args
-            | {"icons": [lazy_import("codeweaver.server._assets", "CODEWEAVER_SVG_ICON")]}
+            | {
+                "icons": [lazy_import("codeweaver.server._assets", "CODEWEAVER_SVG_ICON")],
+                "show_banner": False,
+            }
         ),  # ty: ignore[invalid-argument-type]
     )
     app = register_tools(app)
-    return register_middleware(app, cast(list[type[McpMiddleware]], middleware), middleware_opts)
+    app = register_middleware(app, cast(list[type[McpMiddleware]], middleware), middleware_opts)
+    if is_http:
+        from codeweaver.mcp.state import CwMcpHttpState
+
+        return CwMcpHttpState.from_app(
+            app, **(mutable_args | {"run_args": run_args, "middleware": middleware})
+        )
+    return cast(FastMCP[StdioClientLifespan], app)
 
 
 # Note: FastMCP's parameterized type is the server's lifespan. For stdio servers, the client manages lifespan, so we use AsyncIterator[Any] aliased as StdioClientLifespan.
-async def create_stdio_server() -> FastMCPProxy:
-    """Get a FastMCP server configured for stdio transport."""
-    stdio_settings = _get_fastmcp_settings_map(http=False)
-    app = _setup_server(stdio_settings)
-    http_settings = _get_fastmcp_settings_map(http=True)
-    url = f"http://{http_settings['run_args']['host']}:{http_settings['run_args']['port']}{http_settings.get('path', '/mcp/')}"
+async def create_stdio_server(
+    *,
+    settings: CodeWeaverSettingsDict | None = None,
+    host: str | None = None,
+    port: int | None = None,
+    verbose: bool = False,
+    debug: bool = False,
+) -> FastMCPProxy:
+    """Get a FastMCP server configured for stdio transport.
+
+    Args:
+        settings: Optional FastMCP server settings dictionary, constructed when a custom config file is passed to the main CLI.
+        host: Optional host for the server (this is the host/port for the *codeweaver http mcp server* that the stdio client will be proxied to -- only needed if not default or not what's in your config).
+        port: Optional port for the server (this is the host/port for the *codeweaver http mcp server* that the stdio client will be proxied to -- only needed if not default or not what's in your config).
+        verbose: Enable verbose logging.
+        debug: Enable debug logging.
+
+    Returns:
+        Configured FastMCP stdio server instance.
+    """
+    if settings and (stdio_settings := settings.get("stdio_server")) is not Unset:
+        stdio_settings = DictView(FastMcpServerSettingsDict(**cast(dict, stdio_settings)))
+    else:
+        stdio_settings = _get_fastmcp_settings_map(http=False)
+    app = _setup_server(stdio_settings, transport="stdio")
+    if settings and (http_settings := settings.get("mcp_server")) is not Unset:
+        http_settings = DictView(FastMcpServerSettingsDict(**cast(dict, http_settings)))
+    else:
+        http_settings = _get_fastmcp_settings_map(http=True)
+        run_args = http_settings.get("run_args", {})
+    url = f"http://{host or run_args.get('host', '127.0.0.1')}:{port or run_args.get('port', 9328)}{http_settings.get('path', '/mcp')}"
     return app.as_proxy(backend=ProxyClient(transport=StreamableHttpTransport(url=url)))
+
+
+async def create_http_server(
+    *, host: str | None = None, port: int | None = None, verbose: bool = False, debug: bool = False
+) -> CwMcpHttpState:
+    """Get a FastMCP server configured for HTTP transport."""
+    http_settings = _get_fastmcp_settings_map(http=True)
+    return _setup_server(
+        http_settings,
+        transport="streamable-http",
+        host=host,
+        port=port,
+        verbose=verbose,
+        debug=debug,
+    )
+
+
+__all__ = ("create_http_server", "create_stdio_server")

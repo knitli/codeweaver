@@ -26,7 +26,7 @@ _logger = logging.getLogger(__name__)
 # -------------------------
 # * `find_code` tool definition
 #
-# * This is the function that gets called when an MCP agent invokes the `find_code` tool. It wraps the actual `find_code`, which is defined in `codeweaver.agent_api.find_code`.
+# * This is the function that gets called when an MCP agent invokes the `find_code` tool. The mcp Tool definition is in `codeweaver.mcp.tools`. This find_code_tool wraps the actual `find_code`, which is defined in `codeweaver.agent_api.find_code`.
 # -------------------------
 async def find_code_tool(
     query: str,

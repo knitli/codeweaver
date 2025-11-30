@@ -13,11 +13,10 @@ from codeweaver.common.utils import create_lazy_getattr
 
 
 if TYPE_CHECKING:
-    from codeweaver.config.types import ServerSetup
-    from codeweaver.server.health_endpoint import get_health
-    from codeweaver.server.health_models import (
+    from codeweaver.server.health import (
         EmbeddingProviderServiceInfo,
         HealthResponse,
+        HealthService,
         IndexingInfo,
         IndexingProgressInfo,
         RerankingServiceInfo,
@@ -25,8 +24,8 @@ if TYPE_CHECKING:
         SparseEmbeddingServiceInfo,
         StatisticsInfo,
         VectorStoreServiceInfo,
+        get_health,
     )
-    from codeweaver.server.health_service import HealthService
     from codeweaver.server.server import CodeWeaverState, build_app, get_state, lifespan
 
 

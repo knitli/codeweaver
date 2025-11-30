@@ -13,16 +13,13 @@ import signal
 import sys
 
 from pathlib import Path
-from types import EllipsisType
-from typing import TYPE_CHECKING, Any, Literal, cast, is_typeddict
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 from fastmcp import FastMCP
-from fastmcp.server.middleware import Middleware
 from pydantic import FilePath
-from typing_extensions import TypeIs
 
 from codeweaver.common.utils import lazy_import
-from codeweaver.core.types.sentinel import Unset
+from codeweaver.config.types import CodeWeaverSettingsDict
 from codeweaver.exceptions import InitializationError
 from codeweaver.providers.provider import Provider as Provider  # needed for pydantic models
 
@@ -44,22 +41,15 @@ class UvicornAccessLogFilter(logging.Filter):
 
 
 if TYPE_CHECKING:
-    from codeweaver.config.settings import CodeWeaverSettings
-    from codeweaver.server import CodeWeaverState, ServerSetup
+    from codeweaver.mcp.server import StdioClientLifespan
+    from codeweaver.server.lifespan import CodeWeaverState
 
 logger = logging.getLogger(__name__)
 
 
-def is_server_setup(obj: Any) -> TypeIs[ServerSetup]:
-    """Type guard to check if an object is a ServerSetup TypedDict."""
-    return (
-        is_typeddict(obj)
-        and all(key in obj for key in ("app", "settings"))
-        and isinstance(obj["settings"], CodeWeaverSettings)
-    )
-
-
-async def start_server(server: FastMCP[CodeWeaverState] | ServerSetup, **kwargs: Any) -> None:
+async def start_server(
+    server: FastMCP[CodeWeaverState], *, verbose: bool, debug: bool, **kwargs: Any
+) -> None:
     """Start CodeWeaver's FastMCP server with force shutdown support.
 
     We start a minimal server here, and once it's up, we register components and merge in settings.
@@ -84,126 +74,75 @@ async def start_server(server: FastMCP[CodeWeaverState] | ServerSetup, **kwargs:
     # Install force shutdown handler
     with contextlib.suppress(ValueError, OSError):
         original_sigint_handler = signal.signal(signal.SIGINT, force_shutdown_handler)
-    try:
-        app = server if isinstance(server, FastMCP) else server["app"]
-        resolved_kwargs: dict[str, Any] = kwargs or {}
-        server_setup: ServerSetup | EllipsisType = server if is_server_setup(server) else ...
 
-        # Get verbose/debug flags early for use throughout
-        verbose = False
-        debug = False
+    registry = lazy_import("codeweaver.common.registry.provider", "get_provider_registry")  # type: ignore
+    _ = registry()  # type: ignore
 
-        if server_setup and is_server_setup(server_setup):
-            settings: CodeWeaverSettings = server_setup["settings"]
+    # Aggressively suppress uvicorn loggers BEFORE starting server
+    if not (verbose or debug):
+        # Add filter to root logger to block uvicorn access logs
+        access_filter = UvicornAccessLogFilter()
+        logging.getLogger().addFilter(access_filter)
 
-            # Get verbose/debug flags
-            verbose = server_setup.get("verbose", False)
-            debug = server_setup.get("debug", False)
+        for logger_name in ["uvicorn", "uvicorn.access", "uvicorn.error"]:
+            logger_obj = logging.getLogger(logger_name)
+            logger_obj.setLevel(logging.CRITICAL)
+            logger_obj.handlers.clear()
+            logger_obj.propagate = False
+            logger_obj.addFilter(access_filter)
 
-            # Transport priority: 1) CLI param (in server_setup), 2) settings, 3) default
-            # TODO UPDATE FOR NEW STRUCTURE
-            transport = (
-                server_setup.get("transport")
-                or (
-                    "streamable-http"
-                    if isinstance(settings.mcp_server, Unset)
-                    else settings.mcp_server.transport
-                )
-                or "streamable-http"
+    # Wrap in try-except to catch KeyboardInterrupt cleanly without traceback
+    with contextlib.suppress(KeyboardInterrupt):
+        await app.run_http_async(**resolved_kwargs)  # type: ignore
+    # Restore original signal handler
+    if original_sigint_handler:
+        with contextlib.suppress(ValueError, OSError):
+            signal.signal(signal.SIGINT, original_sigint_handler)
+
+
+async def get_stdio_server(
+    *,
+    config_file: FilePath | None = None,
+    project_path: Path | None = None,
+    host: str | None = None,
+    port: int | None = None,
+) -> FastMCP[StdioClientLifespan]:
+    """Get a FastMCP stdio server setup for CodeWeaver.
+
+    Args:
+        config_file: Optional path to configuration file.
+        project_path: Optional path to project directory.
+        host: Optional host for the server (this is the host/port for the *codeweaver http mcp server* that the stdio client will be proxied to -- only needed if not default or not what's in your config).
+        port: Optional port for the server (this is the host/port for the *codeweaver http mcp server* that the stdio client will be proxied to -- only needed if not default or not what's in your config).
+
+    Returns:
+        Configured FastMCP stdio server instance.
+
+    """
+    from codeweaver.mcp.server import create_stdio_server
+
+    if config_file or project_path:
+        # We normally want to use the global settings instance, but here because a proxied stdio client could be used in isolation and outside a typical configuration, we create a unique settings instance.
+        from codeweaver.config.settings import CodeWeaverSettings, get_settings
+
+        global_settings = get_settings()
+        if config_file and isinstance(config_file, Path) and config_file.exists():
+            settings = (
+                CodeWeaverSettings(config_file=config_file, project_path=project_path)
+                if project_path
+                else CodeWeaverSettings(config_file=config_file)
             )
-
-            # Configure uvicorn based on verbosity
-            uvicorn_config = settings.uvicorn or {}
-            if not (verbose or debug):
-                # Non-verbose mode: Suppress all uvicorn logging completely
-                uvicorn_log_config = {
-                    "version": 1,
-                    "disable_existing_loggers": False,
-                    "formatters": {
-                        "default": {
-                            "()": "uvicorn.logging.DefaultFormatter",
-                            "fmt": "%(levelprefix)s %(message)s",
-                            "use_colors": None,
-                        }
-                    },
-                    "handlers": {"null": {"class": "logging.NullHandler"}},
-                    "loggers": {
-                        "uvicorn": {"handlers": ["null"], "level": "CRITICAL", "propagate": False},
-                        "uvicorn.error": {
-                            "handlers": ["null"],
-                            "level": "CRITICAL",
-                            "propagate": False,
-                        },
-                        "uvicorn.access": {
-                            "handlers": ["null"],
-                            "level": "CRITICAL",
-                            "propagate": False,
-                        },
-                        # Additional loggers that may leak through
-                        "fastapi": {"handlers": ["null"], "level": "CRITICAL", "propagate": False},
-                        "fastmcp": {"handlers": ["null"], "level": "CRITICAL", "propagate": False},
-                    },
-                }
-
-                uvicorn_config = {
-                    **uvicorn_config,
-                    "access_log": False,  # Disable access logging
-                    "log_level": "critical",  # Only critical errors
-                    "log_config": uvicorn_log_config,  # Custom logging config
-                }
-            else:
-                # Verbose/debug mode: Enable uvicorn access logs
-                uvicorn_config = {
-                    **uvicorn_config,
-                    "access_log": True,  # Enable access logging in verbose mode
-                    "log_level": "debug" if debug else "info",  # Match verbosity level
-                }
-
-            new_kwargs = {  # type: ignore
-                "transport": transport,
-                "host": server_setup.pop("host", "127.0.0.1"),
-                "port": server_setup.pop("port", 9328),
-                "log_level": server_setup.pop("log_level", "INFO"),
-                "middleware": server_setup.pop("middleware", set()),
-                "uvicorn_config": uvicorn_config,  # Use configured uvicorn settings
-                "show_banner": False,  # We use our own custom banner via StatusDisplay
-            }
-            resolved_kwargs = new_kwargs | kwargs
+        elif project_path and project_path.exists():
+            settings = global_settings.model_copy(update={"project_path": project_path})
         else:
-            resolved_kwargs = {  # type: ignore
-                "transport": "streamable-http",
-                "host": "127.0.0.1",
-                "port": 9328,
-                "log_level": "INFO",
-                "middleware": set(),
-                "uvicorn_config": {},
-                "show_banner": False,  # We use our own custom banner via StatusDisplay
-                **kwargs.copy(),
-            }  # type: ignore
-        registry = lazy_import("codeweaver.common.registry.provider", "get_provider_registry")  # type: ignore
-        _ = registry()  # type: ignore
-
-        # Aggressively suppress uvicorn loggers BEFORE starting server
-        if not (verbose or debug):
-            # Add filter to root logger to block uvicorn access logs
-            access_filter = UvicornAccessLogFilter()
-            logging.getLogger().addFilter(access_filter)
-
-            for logger_name in ["uvicorn", "uvicorn.access", "uvicorn.error"]:
-                logger_obj = logging.getLogger(logger_name)
-                logger_obj.setLevel(logging.CRITICAL)
-                logger_obj.handlers.clear()
-                logger_obj.propagate = False
-                logger_obj.addFilter(access_filter)
-
-        # Wrap in try-except to catch KeyboardInterrupt cleanly without traceback
-        with contextlib.suppress(KeyboardInterrupt):
-            await app.run_http_async(**resolved_kwargs)  # type: ignore
-    finally:
-        # Restore original signal handler
-        if original_sigint_handler:
-            with contextlib.suppress(ValueError, OSError):
-                signal.signal(signal.SIGINT, original_sigint_handler)
+            settings = None
+        if settings:
+            settings = CodeWeaverSettingsDict(**settings.model_dump())
+    else:
+        settings = None
+    return await create_stdio_server(
+        settings=cast(CodeWeaverSettingsDict | None, settings), host=host, port=port
+    )
 
 
 async def run(
@@ -217,40 +156,6 @@ async def run(
     debug: bool = False,
 ) -> None:
     """Run the CodeWeaver server."""
-    # TODO: MUST UPDATE FOR NEW STRUCTURE
-    from codeweaver.server import build_app
-    from codeweaver.server.app_bindings import register_app_bindings, register_tool
-
-    server_setup = build_app(verbose=verbose, debug=debug, transport=transport)
-    server_setup["verbose"] = verbose
-    server_setup["debug"] = debug
-    if host:
-        server_setup["host"] = host
-    if port:
-        server_setup["port"] = port
-    if config_file or project_path:
-        from codeweaver.config.settings import get_settings
-
-        server_setup["settings"] = get_settings(config_file=config_file)
-    if project_path:
-        from codeweaver.config.settings import update_settings
-
-        logger.debug("Type of server_setup['settings']: %s", type(server_setup["settings"]))
-        _ = update_settings(**{  # ty: ignore[invalid-argument-type]
-            **server_setup["settings"].model_dump(),
-            "project_path": project_path,
-        })
-
-    # Explicitly type the middleware to satisfy type checker
-    middleware: set[Middleware] = server_setup.get("middleware", set())  # type: ignore[assignment]
-
-    server_setup["app"], server_setup["middleware"] = await register_app_bindings(  # type: ignore
-        server_setup["app"],
-        cast(set[Middleware], middleware),
-        server_setup.get("middleware_settings", {}),  # ty: ignore[invalid-argument-type]
-    )
-    server_setup["app"] = register_tool(server_setup["app"])
-    await start_server(server_setup)
 
 
 if __name__ == "__main__":

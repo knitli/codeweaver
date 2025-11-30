@@ -16,9 +16,9 @@ Tests comprehensive health endpoint functionality with FR-010-Enhanced schema va
 
 Reference:
 - Contract: specs/003-our-aim-to/contracts/health_endpoint.json
-- Health models: src/codeweaver/server/health_models.py
-- Health service: src/codeweaver/server/health_service.py
-- Health endpoint: src/codeweaver/server/management.py (/health route)
+- Health models: src/codeweaver/server/health/models.py
+- Health service: src/codeweaver/server/health/health_service.py
+- Health endpoint: src/codeweaver/server/health/endpoint.py
 """
 
 from __future__ import annotations
@@ -35,13 +35,13 @@ import pytest
 
 from codeweaver.common.statistics import FailoverStats, Identifier, SessionStatistics
 from codeweaver.engine.indexer import Indexer, IndexingStats
-from codeweaver.server.health_models import (
+from codeweaver.server.health.health_service import HealthService
+from codeweaver.server.health.models import (
     HealthResponse,
     IndexingInfo,
     ServicesInfo,
     StatisticsInfo,
 )
-from codeweaver.server.health_service import HealthService
 
 
 if TYPE_CHECKING:
@@ -331,7 +331,7 @@ async def test_health_status_healthy(health_service: HealthService, mocker):
     Then: Status is 'healthy'
     """
     # Mock resource collection to return healthy values
-    from codeweaver.server.health_models import ResourceInfo
+    from codeweaver.server.health.models import ResourceInfo
 
     async def mock_resource_info():
         return ResourceInfo(

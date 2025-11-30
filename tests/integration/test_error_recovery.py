@@ -334,7 +334,7 @@ async def test_indexing_continues_on_file_errors(initialize_test_settings, test_
     stats = indexer.stats
 
     # Should have discovered at least 2 Python files
-    assert stats.total_files_discovered >= 2
+    assert stats.total_files_discovered() >= 2
 
     # Binary files are filtered out before processing, so no errors expected
 
@@ -382,7 +382,7 @@ async def test_warning_at_25_errors(initialize_test_settings, tmp_path: Path):
         # Implementation should log warning when errors >= 25
         stats = indexer.stats
 
-        if stats.total_errors >= 25:
+        if stats.total_errors() >= 25:
             # Verify warning exists (in logs or stderr)
             # This is a behavioral test - actual output may vary
             assert True  # Warning mechanism validated
@@ -398,7 +398,7 @@ async def test_health_shows_degraded_status(initialize_test_settings):
     Then: Status = degraded, circuit_breaker_state = open
     """
     from codeweaver.common.statistics import get_session_statistics
-    from codeweaver.server.health_service import HealthService
+    from codeweaver.server.health.health_service import HealthService
 
     # Mock provider registry with degraded state
     with patch("codeweaver.common.registry.get_provider_registry") as mock_registry:
@@ -530,6 +530,7 @@ async def test_graceful_shutdown_with_checkpoint(initialize_test_settings):
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_error_logging_structured():
+    # sourcery skip: use-contextlib-suppress
     """T013: Errors logged with structured format (FR-040).
 
     Given: Various error scenarios

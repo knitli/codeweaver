@@ -14,7 +14,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Literal, NoReturn, cast
 
 from codeweaver.exceptions import ConfigurationError
-from codeweaver.server.health_models import (
+from codeweaver.server.health.models import (
     EmbeddingProviderServiceInfo,
     FailoverInfo,
     HealthResponse,

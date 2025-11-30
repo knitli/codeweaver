@@ -656,9 +656,23 @@ class CodeWeaverSettings(BaseSettings):
                 )
             )
         ):
+            import re
+
             from urllib.parse import urlparse
 
-            is_cloud = urlparse(vector_url).hostname not in ("localhost", "127.0.0.1")
+            is_cloud = urlparse(vector_url).hostname not in (
+                "localhost",
+                "127.0.0.1",
+                "0.0.0.0",  # noqa: S104
+                "::1",
+                "0:0:0:0:0:0:0:1",
+                "::",  # I guess ruff is ok if we bind to all interfaces in ipv6
+                # save the more expensive check for second
+                # this checks if the ip range is in private ranges
+            ) and not re.match(
+                r"^(((192\.168|10\.\d{1,3}|172\.(1[6-9]|2\d|3[0-1]))\.\d{1,3}\.\d{1,3})|(fe80|fc00|fd00):(?:[0-9a-fA-F]{1,4}:){0,7}[0-9a-fA-F]{1,4}(%[0-9a-zA-Z]+))$",
+                urlparse(vector_url).hostname or "",
+            )  # type: ignore
             self.provider = ProviderSettings.model_validate(
                 get_profile(
                     self.profile if self.profile != "testing" else "backup",
@@ -707,7 +721,7 @@ class CodeWeaverSettings(BaseSettings):
             chunker=DefaultChunkerSettings,
             management_host="127.0.0.1",
             management_port=9329,
-            default_mcp_config=StdioCodeWeaverConfigDict(StdioCodeWeaverConfig().model_dump()),
+            default_mcp_config=StdioCodeWeaverConfigDict(StdioCodeWeaverConfig().model_dump()),  # ty: ignore[missing-typed-dict-key]
             telemetry=DefaultTelemetrySettings,
             uvicorn=DefaultUvicornSettings,
             endpoints=DefaultEndpointSettings,

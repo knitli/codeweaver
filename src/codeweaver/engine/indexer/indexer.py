@@ -1220,7 +1220,7 @@ class Indexer(BasedModel):
         )
 
         # Log error summary if there were errors
-        if self._stats.total_errors > 0:
+        if self._stats.total_errors() > 0:
             self._log_error_summary()
         # Save file manifest
         self._save_file_manifest()
@@ -1230,7 +1230,7 @@ class Indexer(BasedModel):
         logger.info("Final checkpoint saved")
 
         # Clean up checkpoint file on successful completion
-        if self._checkpoint_manager and self._stats.total_errors == 0:
+        if self._checkpoint_manager and self._stats.total_errors() == 0:
             self._checkpoint_manager.delete()
             logger.info("Checkpoint file deleted after successful completion")
 
