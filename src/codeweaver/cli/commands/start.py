@@ -83,7 +83,6 @@ async def start_cw_services(
     from codeweaver.server.health_service import HealthService
     from codeweaver.server.server import CodeWeaverState, _run_background_indexing
 
-    # TODO: This seems very silly. We should only initialize in one place.
     # Load settings
     settings = get_settings()
     if project_path:
@@ -98,7 +97,7 @@ async def start_cw_services(
     provider_registry = ProviderRegistry()
     statistics = get_session_statistics()
 
-    # Create BackgroundState
+    # Create CodeWeaverState
     cw_state = CodeWeaverState(
         initialized=False,
         settings=settings,
@@ -125,9 +124,6 @@ async def start_cw_services(
         startup_time=time.time(),
     )
 
-    # Initialize background services
-    await cw_state.initialize()
-
     # Start telemetry session
     if telemetry_client and telemetry_client.enabled:
         telemetry_client.start_session({
@@ -140,7 +136,6 @@ async def start_cw_services(
     indexing_task = asyncio.create_task(
         _run_background_indexing(cw_state, settings, display, verbose=False, debug=False)
     )
-    cw_state.background_tasks.add(indexing_task)
 
     display.print_success("Background services started successfully")
     display.print_info(
@@ -149,11 +144,19 @@ async def start_cw_services(
 
     # Keep services running until interrupted
     try:
-        await cw_state.shutdown_event.wait()
+        # Wait for indexing task to complete or be cancelled
+        await indexing_task
+    except asyncio.CancelledError:
+        display.print_warning("Background services cancelled...")
     except KeyboardInterrupt:
         display.print_warning("Shutting down background services...")
+        indexing_task.cancel()
+        try:
+            await asyncio.wait_for(indexing_task, timeout=5.0)
+        except (asyncio.CancelledError, TimeoutError):
+            pass
     finally:
-        await cw_state.shutdown()
+        cw_state.initialized = False
 
 
 @app.default

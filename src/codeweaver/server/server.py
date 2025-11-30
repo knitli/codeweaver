@@ -61,6 +61,7 @@ from codeweaver.server.management import ManagementServer
 if TYPE_CHECKING:
     from codeweaver.cli.ui import IndexingProgress, StatusDisplay
     from codeweaver.common.utils import LazyImport
+    from codeweaver.config.types import ServerSetup
     from codeweaver.core.types import AnonymityConversion, FilteredKeyT
     from codeweaver.mcp.state import CwMcpHttpState
 
@@ -561,7 +562,7 @@ async def lifespan(
     if isinstance(settings.project_path, Unset):
         settings.project_path = get_project_path()
 
-    state = _initialize_cw_state(app, settings, statistics)
+    state = _initialize_cw_state(settings, statistics)
 
     if not isinstance(state, CodeWeaverState):
         raise InitializationError(
@@ -835,14 +836,23 @@ def build_app(
     verbose: bool = False,
     debug: bool = False,
     transport: Literal["streamable-http", "stdio"] = "streamable-http",
-) -> FastMcpHttpRunArgs | None:
+    host: str = "127.0.0.1",
+    port: int = 9328,
+) -> ServerSetup:
     """Build and configure the FastMCP application without starting it.
 
     Args:
         verbose: Enable verbose logging (INFO level)
         debug: Enable debug logging (DEBUG level)
         transport: Transport type for MCP communication (streamable-http or stdio)
+        host: Host to bind the server to
+        port: Port to bind the server to
+
+    Returns:
+        ServerSetup dict with configured application and settings
     """
+    from codeweaver.config.types import ServerSetup
+
     session_statistics = get_session_statistics._resolve()()
 
     # Set up logger with appropriate level based on flags
@@ -868,15 +878,13 @@ def build_app(
     middleware_settings, logging_middleware = _configure_middleware(
         settings_view, app_logger, level
     )
-    _filter_server_settings(
-        lazy_import("codeweaver.config.settings", "FastMcpServerSettings")().model_dump(  # type: ignore
-            round_trip=True
-        )
-        if isinstance((server_settings := settings_view.get("server")), Unset)
-        else server_settings
-    )
+
+    # Build base FastMCP settings dict
+    base_fast_mcp_settings: dict[str, Any] = {
+        "instructions": "CodeWeaver is an advanced code search and analysis tool."
+    }
+
     middleware = {logging_middleware, *get_default_middleware()}
-    base_fast_mcp_settings = _create_base_fastmcp_settings()
     from codeweaver.config.settings import get_settings
 
     if verbose or debug:
@@ -886,7 +894,6 @@ def build_app(
         get_settings(), session_statistics, verbose=verbose, debug=debug
     )
     base_fast_mcp_settings["lifespan"] = lifespan_fn
-    _ = base_fast_mcp_settings.pop("transport", "http")
     final_app_logger, _final_level = _setup_logger(settings_view)
     int_level = next((k for k, v in LEVEL_MAP.items() if v == _final_level), "INFO")
     for key, middleware_setting in middleware_settings.items():
@@ -908,9 +915,9 @@ def build_app(
         app=server,
         settings=get_settings(),
         middleware_settings=middleware_settings,
-        host=host or "127.0.0.1",
-        port=port or 9328,
-        streamable_http_path=cast(str, http_path or "/codeweaver"),
+        host=host,
+        port=port,
+        streamable_http_path=cast(str, http_path),
         transport=transport,
         log_level=_final_level or "INFO",
         middleware={*middleware},
