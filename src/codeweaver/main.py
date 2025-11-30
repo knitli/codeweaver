@@ -45,7 +45,7 @@ class UvicornAccessLogFilter(logging.Filter):
 
 if TYPE_CHECKING:
     from codeweaver.config.settings import CodeWeaverSettings
-    from codeweaver.server import AppState, ServerSetup
+    from codeweaver.server import CodeWeaverState, ServerSetup
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +59,7 @@ def is_server_setup(obj: Any) -> TypeIs[ServerSetup]:
     )
 
 
-async def start_server(server: FastMCP[AppState] | ServerSetup, **kwargs: Any) -> None:
+async def start_server(server: FastMCP[CodeWeaverState] | ServerSetup, **kwargs: Any) -> None:
     """Start CodeWeaver's FastMCP server with force shutdown support.
 
     We start a minimal server here, and once it's up, we register components and merge in settings.
@@ -101,12 +101,13 @@ async def start_server(server: FastMCP[AppState] | ServerSetup, **kwargs: Any) -
             debug = server_setup.get("debug", False)
 
             # Transport priority: 1) CLI param (in server_setup), 2) settings, 3) default
+            # TODO UPDATE FOR NEW STRUCTURE
             transport = (
                 server_setup.get("transport")
                 or (
                     "streamable-http"
-                    if isinstance(settings.server, Unset)
-                    else settings.server.transport
+                    if isinstance(settings.mcp_server, Unset)
+                    else settings.mcp_server.transport
                 )
                 or "streamable-http"
             )
@@ -216,6 +217,7 @@ async def run(
     debug: bool = False,
 ) -> None:
     """Run the CodeWeaver server."""
+    # TODO: MUST UPDATE FOR NEW STRUCTURE
     from codeweaver.server import build_app
     from codeweaver.server.app_bindings import register_app_bindings, register_tool
 

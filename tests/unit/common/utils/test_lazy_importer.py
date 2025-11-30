@@ -553,7 +553,7 @@ class TestLazyImportIntrospection:
         from pydantic import Field
         from pydantic.dataclasses import dataclass
 
-        # This is the pattern used in AppState
+        # This is the pattern used in CodeWeaverState
         get_settings_lazy = lazy_import("codeweaver.config.settings", "get_settings")
 
         @dataclass

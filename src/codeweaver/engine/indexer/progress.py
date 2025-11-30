@@ -30,6 +30,7 @@ from rich.progress import (
 )
 from rich.table import Table
 
+from codeweaver.common.utils.utils import elapsed_time_to_human_readable
 from codeweaver.core.types.enum import BaseEnum
 from codeweaver.core.types.models import DataclassSerializationMixin
 
@@ -59,13 +60,19 @@ class IndexingStats(DataclassSerializationMixin):
     chunks_embedded: int = Field(0)
     chunks_indexed: int = Field(0)
     start_time: float = Field(default_factory=time.time)
+    stopwatch_time: int = Field(default_factory=lambda: int(time.monotonic()))
     files_with_errors: list[Path] = Field(default_factory=list)
     structured_errors: list[IndexingErrorDict] = Field(default_factory=list)
 
     @computed_field
     def elapsed_time(self) -> float:
         """Calculate elapsed time since indexing started."""
-        return time.time() - self.start_time
+        return time.monotonic() - self.stopwatch_time
+
+    @computed_field
+    def human_elapsed_time(self) -> str:
+        """Get human-readable elapsed time."""
+        return elapsed_time_to_human_readable(self.elapsed_time())
 
     @computed_field
     def processing_rate(self) -> float:
@@ -88,7 +95,10 @@ class IndexingStats(DataclassSerializationMixin):
         from codeweaver.core.types.aliases import FilteredKey
         from codeweaver.core.types.enum import AnonymityConversion
 
-        return {FilteredKey("files_with_errors"): AnonymityConversion.COUNT}
+        return {
+            FilteredKey("files_with_errors"): AnonymityConversion.COUNT,
+            FilteredKey("structured_errors"): AnonymityConversion.COUNT,
+        }
 
     def add_error(self, file_path: Path, error: Exception, phase: str) -> None:
         """Add a structured error to the tracking system.
@@ -100,7 +110,7 @@ class IndexingStats(DataclassSerializationMixin):
         """
         from datetime import UTC, datetime
 
-        self.files_with_errors.add(file_path)  # Set automatically deduplicates
+        self.files_with_errors.append(file_path)  # Set automatically deduplicates
         self.structured_errors.append(
             IndexingErrorDict(
                 file_path=str(file_path),

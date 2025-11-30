@@ -30,8 +30,8 @@ async def is_services_running() -> bool:
         return False
 
     settings_map = get_settings_map()
-    mgmt_host = settings_map.get("server", {}).get("management_host", "127.0.0.1")
-    mgmt_port = settings_map.get("server", {}).get("management_port", 9329)
+    mgmt_host = settings_map.get("management_host", "127.0.0.1")
+    mgmt_port = settings_map.get("management_port", 9329)
 
     try:
         async with httpx.AsyncClient() as client:

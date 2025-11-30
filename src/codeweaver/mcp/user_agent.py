@@ -24,14 +24,16 @@ _logger = logging.getLogger(__name__)
 
 
 # -------------------------
-# * `find_code` tool entrypoint
+# * `find_code` tool definition
+#
+# * This is the function that gets called when an MCP agent invokes the `find_code` tool. It wraps the actual `find_code`, which is defined in `codeweaver.agent_api.find_code`.
 # -------------------------
 async def find_code_tool(
     query: str,
     intent: IntentType | None = None,
     *,
     token_limit: int = 30000,
-    focus_languages: tuple[SemanticSearchLanguage, ...] | None = None,
+    focus_languages: tuple[SemanticSearchLanguage | str, ...] | None = None,
     context: Context | None = None,
 ) -> FindCodeResponseSummary:
     """CodeWeaver's `find_code` tool is an advanced code search function that leverages context and task-aware semantic search to identify and retrieve relevant code snippets from a codebase using natural language queries. `find_code` uses advanced sparse and dense embedding models, and reranking models to provide the best possible results. It is purpose-built for AI coding agents to assist with code understanding, implementation, debugging, optimization, testing, configuration, and documentation tasks.

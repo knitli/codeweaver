@@ -38,7 +38,7 @@ async def get_health() -> HealthResponse | Any:
 
 
     Args:
-        ctx: FastMCP context with AppState
+        ctx: FastMCP context with CodeWeaverState
 
     Returns:
         HealthResponse with complete system health information

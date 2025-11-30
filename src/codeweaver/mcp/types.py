@@ -8,24 +8,24 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any, NotRequired, TypedDict
+from typing import Any, NotRequired, Required, TypedDict
 
 from mcp.types import ToolAnnotations
 
 
-class ToolRegistrationDict(TypedDict):
+class ToolRegistrationDict(TypedDict, total=False):
     """Information about a registered tool."""
 
-    fn: Callable[..., Any]
-    name: str
-    description: str
-    tags: set[str]
-    annotations: ToolAnnotations
-    exclude_args: list[str]
-    serializer: Callable[[Any], str]
-    output_schema: dict[str, Any] | None
-    meta: dict[str, Any]
-    enabled: bool
+    fn: Required[Callable[..., Any]]
+    name: NotRequired[str | None]
+    description: NotRequired[str | None]
+    tags: NotRequired[set[str] | None]
+    annotations: NotRequired[ToolAnnotations | None]
+    exclude_args: NotRequired[list[str] | None]
+    serializer: NotRequired[Callable[[Any], str] | None]
+    output_schema: NotRequired[dict[str, Any] | None]
+    meta: NotRequired[dict[str, Any] | None]
+    enabled: NotRequired[bool | None]
 
 
 class ToolAnnotationsDict(TypedDict, total=False):

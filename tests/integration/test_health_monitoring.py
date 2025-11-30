@@ -18,7 +18,7 @@ Reference:
 - Contract: specs/003-our-aim-to/contracts/health_endpoint.json
 - Health models: src/codeweaver/server/health_models.py
 - Health service: src/codeweaver/server/health_service.py
-- Health endpoint: src/codeweaver/server/app_bindings.py (/health route)
+- Health endpoint: src/codeweaver/server/management.py (/health route)
 """
 
 from __future__ import annotations

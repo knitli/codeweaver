@@ -686,8 +686,8 @@ def _get_health_endpoint():
     from codeweaver.config.settings import get_settings_map
 
     settings_map = get_settings_map()
-    host = settings_map.get("server.host", "localhost")
-    port = settings_map.get("server.port", 9328)
+    host = settings_map.get("management_host", "localhost")
+    port = settings_map.get("management_port", 9329)
     return f"http://{host}:{port}/health/"
 
 

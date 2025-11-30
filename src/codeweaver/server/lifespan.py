@@ -74,12 +74,12 @@ async def combined_lifespan(
     if isinstance(settings.project_path, Unset):
         settings.project_path = get_project_path()
 
-    # Initialize CodeWeaverState (formerly AppState)
+    # Initialize CodeWeaverState (formerly CodeWeaverState)
     # This is the same initialization as before, just renamed
-    from codeweaver.server.server import _initialize_app_state
+    from codeweaver.server.server import _initialize_cw_state
 
-    # _initialize_app_state returns CodeWeaverState now (will be updated during migration)
-    background_state: CodeWeaverState = _initialize_app_state(app, settings, statistics)  # type: ignore[assignment]
+    # _initialize_cw_state returns CodeWeaverState now (will be updated during migration)
+    background_state: CodeWeaverState = _initialize_cw_state(app, settings, statistics)  # type: ignore[assignment]
 
     # Store in app.state for access via Context
     app.state.background = background_state

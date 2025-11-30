@@ -71,6 +71,17 @@ class DictView[TypedDictT: (Mapping[str, Any])](Mapping[str, Any]):
         """Return the value for the given key, or the default value if the key is not found."""
         return self._mapping.get(key, default)
 
+    def get_subview[KeyToMappingT: str, MappingT: Mapping[str, Any]](
+        self, key: KeyToMappingT
+    ) -> DictView[MappingT]:  # ty: ignore[invalid-argument-type]
+        """Return a DictView of the sub-mapping at the given key."""
+        sub_mapping = self._mapping[key]
+        if not isinstance(sub_mapping, Mapping | dict | MappingProxyType):
+            raise TypeError(
+                f"Value at key '{key}' is not a mapping. `get_subview` only works for keys with mapping values. Got: {type(sub_mapping)}"
+            )
+        return DictView(sub_mapping)
+
     def __setattr__(self, name: str, value: Any) -> None:
         """Prevent setting attributes on the DictView, except during __init__."""
         # allow setting during __init__, which sets _mapping and data

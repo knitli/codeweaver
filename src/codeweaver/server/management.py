@@ -265,7 +265,7 @@ async def favicon(_request: Request) -> Response:
         content=svg_data,
         media_type="image/svg+xml",
         headers={
-            "Cache-Control": "public, max-age=86400"  # Cache for 24 hours
+            "Cache-Control": "public, max-age=259200"  # Cache for 72 hours
         },
     )
 
@@ -368,19 +368,12 @@ class ManagementServer:
 
         routes = [
             # Always register favicon (browsers always request it)
-            Route("/favicon.ico", favicon, methods=["GET"], include_in_schema=False)
+            Route("/favicon.ico", favicon, methods=["GET"], include_in_schema=False),
+            # these are always enabled because we use them internally
+            Route("/health", health, methods=["GET"]),
+            Route("/status", health, methods=["GET"]),
+            Route("/metrics", stats_info, methods=["GET"]),
         ]
-
-        # Conditional endpoints (matching app_bindings.py pattern)
-        if endpoint_settings.get("enable_health", True):
-            routes.append(Route("/health", health, methods=["GET"]))
-
-        if endpoint_settings.get("enable_status", True):
-            # Note: status endpoint uses health for now
-            routes.append(Route("/status", health, methods=["GET"]))
-
-        if endpoint_settings.get("enable_metrics", True):
-            routes.append(Route("/metrics", stats_info, methods=["GET"]))
 
         if endpoint_settings.get("enable_version", True):
             routes.append(Route("/version", version_info, methods=["GET"]))

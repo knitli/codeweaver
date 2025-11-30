@@ -7,6 +7,8 @@
 As a convenience, we lazily export (almost) every type in CodeWeaver so you can easily make use of them.
 
 **Important**: You should not take these exports to mean it's CodeWeaver's public API. We are in alpha and the API **will change** substantially, and sometimes without notice. Once we're stable, then we'll adopt a more routined approach to public APIs.
+
+(are we exporting too much? Yes. We'll refine this over time as we better understand what users need. For now, enjoy the convenience of having everything available.)
 """
 
 from __future__ import annotations
@@ -30,7 +32,10 @@ from codeweaver.common.utils.lazy_importer import create_lazy_getattr
 
 
 def get_version() -> str:
-    """Get the current version of CodeWeaver."""
+    """Get the current version of CodeWeaver.
+
+    Because our version is dynamically generated during build/release, we try several methods to get it. If you downloaded CodeWeaver from PyPi, then the first will work, or the second if the file didn't get generated for some reason. If you're running from source, we try to get the version from git tags. If all else fails, we return "0.0.0".
+    """
     try:
         from codeweaver._version import __version__
     except ImportError:
@@ -43,6 +48,8 @@ def get_version() -> str:
                 import shutil
                 import subprocess
 
+                from pathlib import Path
+
                 if git := (shutil.which("git") is not None):
                     git_describe = subprocess.run(
                         ["describe", "--tags", "--always", "--dirty"],  # noqa: S607
@@ -50,6 +57,7 @@ def get_version() -> str:
                         capture_output=True,
                         text=True,
                         check=True,
+                        cwd=str(Path(__file__).parent.parent.parent),
                     )
                     __version__ = git_describe.stdout.strip()
             except Exception:
@@ -104,8 +112,9 @@ if TYPE_CHECKING:
         ErrorHandlingMiddlewareSettings,
         FastembedGPUProviderSettings,
         FastMcpHttpRunArgs,
-        FastMcpServerSettings,
+        FastMcpHttpServerSettings,
         FastMcpServerSettingsDict,
+        FastMcpStdioServerSettings,
         FilterID,
         FiltersDict,
         FormatterID,
@@ -306,7 +315,7 @@ if TYPE_CHECKING:
         RerankingProviderError,
         ValidationError,
     )
-    from codeweaver.middleware import StatisticsMiddleware
+    from codeweaver.mcp import StatisticsMiddleware
     from codeweaver.providers import (
         CLIENT_MAP,
         PROVIDER_CAPABILITIES,
@@ -404,14 +413,13 @@ if TYPE_CHECKING:
         get_all_grammars,
     )
     from codeweaver.server import (
-        AppState,
+        CodeWeaverState,
         EmbeddingProviderServiceInfo,
         HealthResponse,
         HealthService,
         IndexingInfo,
         IndexingProgressInfo,
         RerankingServiceInfo,
-        ServerSetup,
         ServicesInfo,
         SparseEmbeddingServiceInfo,
         StatisticsInfo,
@@ -434,7 +442,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "AgentTask": (__spec__.parent, "semantic"),
     "AnonymityConversion": (__spec__.parent, "core"),
     "AnyVariants": (__spec__.parent, "engine"),
-    "AppState": (__spec__.parent, "server"),
+    "CodeWeaverState": (__spec__.parent, "server"),
     "ArbitraryFilter": (__spec__.parent, "engine"),
     "AstThing": (__spec__.parent, "semantic"),
     "AvailableOptimizations": (__spec__.parent, "providers"),
@@ -544,7 +552,8 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "FastEmbedRerankingProvider": (__spec__.parent, "providers"),
     "FastEmbedSparseProvider": (__spec__.parent, "providers"),
     "FastMcpHttpRunArgs": (__spec__.parent, "config"),
-    "FastMcpServerSettings": (__spec__.parent, "config"),
+    "FastMcpHttpServerSettings": (__spec__.parent, "config"),
+    "FastMcpStdioServerSettings": (__spec__.parent, "config"),
     "FastMcpServerSettingsDict": (__spec__.parent, "config"),
     "FastembedGPUProviderSettings": (__spec__.parent, "config"),
     "FieldCondition": (__spec__.parent, "engine"),
@@ -707,7 +716,6 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "SerializationKwargs": (__spec__.parent, "core"),
     "SerializedCodeChunk": (__spec__.parent, "core"),
     "SerializedStrOnlyCodeChunk": (__spec__.parent, "core"),
-    "ServerSetup": (__spec__.parent, "server"),
     "ServicesInfo": (__spec__.parent, "server"),
     "SessionStatistics": (__spec__.parent, "common"),
     "SourceIdRegistry": (__spec__.parent, "engine"),
@@ -794,7 +802,6 @@ __all__ = (
     "AgentTask",
     "AnonymityConversion",
     "AnyVariants",
-    "AppState",
     "ArbitraryFilter",
     "AstThing",
     "AvailableOptimizations",
@@ -837,6 +844,7 @@ __all__ = (
     "CodeWeaverMCPConfigDict",
     "CodeWeaverSettings",
     "CodeWeaverSettingsDict",
+    "CodeWeaverState",
     "CohereEmbeddingProvider",
     "CohereRerankingProvider",
     "CollectionMetadata",
@@ -900,8 +908,9 @@ __all__ = (
     "FastEmbedRerankingProvider",
     "FastEmbedSparseProvider",
     "FastMcpHttpRunArgs",
-    "FastMcpServerSettings",
+    "FastMcpHttpServerSettings",
     "FastMcpServerSettingsDict",
+    "FastMcpStdioServerSettings",
     "FastembedGPUProviderSettings",
     "FieldCondition",
     "FileExt",
@@ -1063,7 +1072,6 @@ __all__ = (
     "SerializationKwargs",
     "SerializedCodeChunk",
     "SerializedStrOnlyCodeChunk",
-    "ServerSetup",
     "ServicesInfo",
     "SessionStatistics",
     "SourceIdRegistry",

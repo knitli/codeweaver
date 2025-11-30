@@ -246,8 +246,10 @@ queries:
     intent: DOCUMENT
     precision_target: 5
     expected_files:
-      - src/codeweaver/server/app_bindings.py
+      - src/codeweaver/server/management.py
       - src/codeweaver/server/health_endpoint.py
       - src/codeweaver/server/server.py
+      - src/codeweaver/config/types.py
+      - src/codeweaver/mcp/user_agent.py
       - src/codeweaver/agent_api/find_code/__init__.py
     description: Documenting MCP server interface

@@ -9,7 +9,6 @@
 from __future__ import annotations
 
 import contextlib
-import time
 
 from collections.abc import AsyncGenerator, Generator
 from pathlib import Path
@@ -934,18 +933,18 @@ def real_providers(real_provider_registry: MagicMock) -> Generator[ProviderRegis
 
 
 # ===========================================================================
-# AppState Initialization Fixture
+# CodeWeaverState Initialization Fixture
 # ===========================================================================
 
 
 @pytest.fixture
-def initialized_app_state(tmp_path: Path) -> Generator[Any, None, None]:
-    """Initialize AppState for integration tests that call find_code_tool.
+def initialized_cw_state(tmp_path: Path) -> Generator[Any, None, None]:
+    """Initialize CodeWeaverState for integration tests that call find_code_tool.
 
-    This fixture ensures AppState is properly initialized before tests that
-    call find_code_tool, which requires AppState.get_state() to succeed.
+    This fixture ensures CodeWeaverState is properly initialized before tests that
+    call find_code_tool, which requires CodeWeaverState.get_state() to succeed.
 
-    The fixture creates a minimal AppState with:
+    The fixture creates a minimal CodeWeaverState with:
     - Settings initialized
     - Registries initialized (provider, services, model)
     - Statistics tracking
@@ -953,7 +952,7 @@ def initialized_app_state(tmp_path: Path) -> Generator[Any, None, None]:
 
     Usage:
         @pytest.mark.asyncio
-        async def test_something(initialized_app_state):
+        async def test_something(initialized_cw_state):
             # find_code_tool will work now
             response = await find_code_tool("test query", ...)
     """
@@ -964,16 +963,14 @@ def initialized_app_state(tmp_path: Path) -> Generator[Any, None, None]:
     )
     from codeweaver.common.statistics import get_session_statistics
     from codeweaver.config.settings import get_settings
-    from codeweaver.server.server import AppState
+    from codeweaver.server.server import CodeWeaverState
 
     # Initialize settings
     settings = get_settings()
-    # Create AppState (this sets the global _state)
-    state = AppState(
+    yield CodeWeaverState(
         initialized=True,
         settings=settings,
         project_path=tmp_path,
-        startup_time=time.time(),
         config_path=None,
         provider_registry=get_provider_registry(),
         services_registry=get_services_registry(),
@@ -984,9 +981,6 @@ def initialized_app_state(tmp_path: Path) -> Generator[Any, None, None]:
         health_service=None,
         failover_manager=None,
     )
-
-    yield state
-
     # Cleanup: Reset global state
     from codeweaver.server import server
 

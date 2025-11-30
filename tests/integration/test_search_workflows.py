@@ -109,7 +109,7 @@ def test_project_path(tmp_path: Path) -> Path:
 @pytest.mark.integration
 @pytest.mark.network
 @pytest.mark.asyncio
-async def test_cli_search_returns_results(test_project_path: Path, initialized_app_state):
+async def test_cli_search_returns_results(test_project_path: Path, initialized_cw_state):
     """T010: CLI search command returns results (stub validation).
 
     Given: Test project path
@@ -119,13 +119,13 @@ async def test_cli_search_returns_results(test_project_path: Path, initialized_a
     Note: Currently validates stub response. When find_code is re-enabled,
     this test will validate actual search results.
     """
-    from codeweaver.server.app_bindings import find_code_tool
+    from codeweaver.mcp.user_agent import find_code_tool
 
     # Execute search via find_code_tool (CLI uses this internally)
     response = await find_code_tool(
         query="authentication logic",
         intent=None,
-        token_limit=30000,
+        token_limit=30_000,
         focus_languages=None,
         context=None,
     )
@@ -159,14 +159,14 @@ async def test_cli_search_returns_results(test_project_path: Path, initialized_a
 @pytest.mark.integration
 @pytest.mark.network
 @pytest.mark.asyncio
-async def test_cli_search_output_formats(test_project_path: Path, initialized_app_state):
+async def test_cli_search_output_formats(test_project_path: Path, initialized_cw_state):
     """T010: CLI search supports multiple output formats.
 
     Given: Search results available
     When: Output format specified (json, table, markdown)
     Then: Results render correctly in each format
     """
-    from codeweaver.server.app_bindings import find_code_tool
+    from codeweaver.mcp.user_agent import find_code_tool
 
     # Get search results
     response = await find_code_tool(
@@ -206,7 +206,7 @@ async def test_cli_search_output_formats(test_project_path: Path, initialized_ap
 @pytest.mark.integration
 @pytest.mark.network
 @pytest.mark.asyncio
-async def test_mcp_find_code_tool(test_project_path: Path, initialized_app_state):
+async def test_mcp_find_code_tool(test_project_path: Path, initialized_cw_state):
     """T010: MCP find_code tool returns valid response conforming to contract.
 
     Given: CodeWeaver MCP tool interface
@@ -217,7 +217,7 @@ async def test_mcp_find_code_tool(test_project_path: Path, initialized_app_state
     """
     from codeweaver.agent_api.find_code.intent import IntentType
     from codeweaver.agent_api.find_code.types import CodeMatchType
-    from codeweaver.server.app_bindings import find_code_tool
+    from codeweaver.mcp.user_agent import find_code_tool
 
     # Invoke MCP tool
     response = await find_code_tool(
@@ -268,14 +268,14 @@ async def test_mcp_find_code_tool(test_project_path: Path, initialized_app_state
 @pytest.mark.integration
 @pytest.mark.network
 @pytest.mark.asyncio
-async def test_mcp_find_code_required_parameters(test_project_path: Path, initialized_app_state):
+async def test_mcp_find_code_required_parameters(test_project_path: Path, initialized_cw_state):
     """T010: MCP find_code handles parameter validation.
 
     Given: MCP tool interface
     When: Parameters provided (including edge cases)
     Then: Appropriate handling occurs
     """
-    from codeweaver.server.app_bindings import find_code_tool
+    from codeweaver.mcp.user_agent import find_code_tool
 
     # Test with empty query
     response = await find_code_tool(
@@ -307,7 +307,7 @@ async def test_mcp_find_code_required_parameters(test_project_path: Path, initia
 @pytest.mark.integration
 @pytest.mark.network
 @pytest.mark.asyncio
-async def test_search_with_intent_parameter(initialized_app_state):
+async def test_search_with_intent_parameter(initialized_cw_state):
     """T010: Search with explicit intent parameter.
 
     Given: Search query with intent specified
@@ -315,7 +315,7 @@ async def test_search_with_intent_parameter(initialized_app_state):
     Then: Intent reflected in response
     """
     from codeweaver.agent_api.find_code.intent import IntentType
-    from codeweaver.server.app_bindings import find_code_tool
+    from codeweaver.mcp.user_agent import find_code_tool
 
     intents_to_test = [
         IntentType.UNDERSTAND,
@@ -356,14 +356,14 @@ async def test_search_with_intent_parameter(initialized_app_state):
 @pytest.mark.integration
 @pytest.mark.network
 @pytest.mark.asyncio
-async def test_search_filters_work(initialized_app_state):
+async def test_search_filters_work(initialized_cw_state):
     """T010: Search filters (include_tests) parameter handling.
 
     Given: Search with filter parameters
     When: Filters applied (include_tests=True/False)
     Then: Both return valid responses
     """
-    from codeweaver.server.app_bindings import find_code_tool
+    from codeweaver.mcp.user_agent import find_code_tool
 
     # Test include_tests filter (parameter removed from API)
     response_with_tests = await find_code_tool(
@@ -392,14 +392,14 @@ async def test_search_filters_work(initialized_app_state):
 @pytest.mark.integration
 @pytest.mark.network
 @pytest.mark.asyncio
-async def test_search_token_limit(initialized_app_state):
+async def test_search_token_limit(initialized_cw_state):
     """T010: Search respects token_limit parameter.
 
     Given: Search with token_limit specified
     When: token_limit parameter provided
     Then: Response respects limit
     """
-    from codeweaver.server.app_bindings import find_code_tool
+    from codeweaver.mcp.user_agent import find_code_tool
 
     response = await find_code_tool(
         query="authentication",
@@ -421,14 +421,14 @@ async def test_search_token_limit(initialized_app_state):
 @pytest.mark.integration
 @pytest.mark.network
 @pytest.mark.asyncio
-async def test_empty_query_handling(initialized_app_state):
+async def test_empty_query_handling(initialized_cw_state):
     """T010: Empty query handled gracefully.
 
     Given: Empty or whitespace-only query
     When: Search executed
     Then: Returns graceful response
     """
-    from codeweaver.server.app_bindings import find_code_tool
+    from codeweaver.mcp.user_agent import find_code_tool
 
     # Test empty query
     response = await find_code_tool(
@@ -444,14 +444,14 @@ async def test_empty_query_handling(initialized_app_state):
 @pytest.mark.integration
 @pytest.mark.network
 @pytest.mark.asyncio
-async def test_no_results_scenario(initialized_app_state):
+async def test_no_results_scenario(initialized_cw_state):
     """T010: No matching results handled gracefully.
 
     Given: Query that matches nothing in codebase
     When: Search executed
     Then: Returns empty results with clear summary
     """
-    from codeweaver.server.app_bindings import find_code_tool
+    from codeweaver.mcp.user_agent import find_code_tool
 
     response = await find_code_tool(
         query="xyzabc123nonexistentquerythatmatchesnothing",
@@ -477,7 +477,7 @@ async def test_no_results_scenario(initialized_app_state):
 @pytest.mark.network
 @pytest.mark.asyncio
 @pytest.mark.benchmark
-async def test_search_performance(test_project_path: Path, initialized_app_state):
+async def test_search_performance(test_project_path: Path, initialized_cw_state):
     """T010: Search performance meets <3s requirement for ≤10k files (FR-037).
 
     Given: Indexed project with embeddings (≤10k files)
@@ -510,14 +510,14 @@ async def test_search_performance(test_project_path: Path, initialized_app_state
 @pytest.mark.network
 @pytest.mark.asyncio
 @pytest.mark.benchmark
-async def test_search_response_time_tracking(initialized_app_state):
+async def test_search_response_time_tracking(initialized_cw_state):
     """T010: Search response time accurately tracked.
 
     Given: Search query executed
     When: Response returned
     Then: execution_time_ms tracked (even for stub)
     """
-    from codeweaver.server.app_bindings import find_code_tool
+    from codeweaver.mcp.user_agent import find_code_tool
 
     start_time = time.time()
 
@@ -570,14 +570,14 @@ async def test_search_strategy_reporting(test_project_path: Path, configured_pro
 @pytest.mark.integration
 @pytest.mark.network
 @pytest.mark.asyncio
-async def test_search_languages_found(initialized_app_state):
+async def test_search_languages_found(initialized_cw_state):
     """T010: Languages found correctly reported.
 
     Given: Search across codebase
     When: Results returned
     Then: languages_found has correct structure
     """
-    from codeweaver.server.app_bindings import find_code_tool
+    from codeweaver.mcp.user_agent import find_code_tool
 
     response = await find_code_tool(
         query="authentication database",

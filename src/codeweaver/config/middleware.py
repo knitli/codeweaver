@@ -20,11 +20,11 @@ from fastmcp.server.middleware.caching import (
     CallToolSettings,
     GetPromptSettings,
     ListPromptsSettings,
-    ListResourceSettings,
+    ListResourcesSettings,
     ListToolsSettings,
     ReadResourceSettings,
 )
-from fastmcp.server.middleware.context import MiddlewareContext as McpMiddlewareContext
+from fastmcp.server.middleware.middleware import MiddlewareContext as McpMiddlewareContext
 from pydantic import Field, PositiveInt
 
 from codeweaver.mcp.middleware import (
@@ -65,7 +65,7 @@ class ResponseCachingMiddlewareSettings(TypedDict, total=False):
     cache_storage: NotRequired[AsyncKeyValue | None]
     list_tools_settings: NotRequired[ListToolsSettings | None]
     list_prompts_settings: NotRequired[ListPromptsSettings | None]
-    list_resource_settings: NotRequired[ListResourceSettings | None]
+    list_resources_settings: NotRequired[ListResourcesSettings | None]
     read_resource_settings: NotRequired[ReadResourceSettings | None]
     get_prompt_settings: NotRequired[GetPromptSettings | None]
     call_tool_settings: NotRequired[CallToolSettings | None]
@@ -147,7 +147,9 @@ def default_for_transport(protocol: Literal["streamable-http", "stdio"]) -> Midd
     """Get default middleware settings for a given transport protocol."""
     settings = DefaultMiddlewareSettings.copy()
     if protocol == "stdio":
-        return {k: v for k, v in settings.items() if k not in ("rate_limiting", "retry")}
+        return MiddlewareOptions(**{
+            k: v for k, v in settings.items() if k not in ("rate_limiting", "retry")
+        })
     return settings
 
 

@@ -20,12 +20,14 @@ if TYPE_CHECKING:
     from fastmcp.server.middleware.error_handling import ErrorHandlingMiddleware, RetryMiddleware
     from fastmcp.server.middleware.logging import LoggingMiddleware, StructuredLoggingMiddleware
     from fastmcp.server.middleware.rate_limiting import RateLimitingMiddleware
+    from fastmcp.server.middleware.timing import DetailedTimingMiddleware
 
-    from codeweaver.middleware.statistics import StatisticsMiddleware
+    from codeweaver.mcp.middleware.statistics import StatisticsMiddleware
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "ResponseCachingMiddleware": ("fastmcp.server.middleware.caching", "caching"),
     "ErrorHandlingMiddleware": ("fastmcp.server.middleware.error_handling", "error_handling"),
+    "DetailedTimingMiddleware": ("fastmcp.server.middleware.timing", "timing"),
     "LoggingMiddleware": ("fastmcp.server.middleware.logging", "logging"),
     "RateLimitingMiddleware": ("fastmcp.server.middleware.rate_limiting", "rate_limiting"),
     "RetryMiddleware": ("fastmcp.server.middleware.error_handling", "error_handling"),
@@ -59,6 +61,7 @@ __getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
 
 
 __all__ = (
+    "DetailedTimingMiddleware",
     "ErrorHandlingMiddleware",
     "LoggingMiddleware",
     "McpMiddleware",

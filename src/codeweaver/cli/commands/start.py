@@ -14,34 +14,50 @@ import asyncio
 import time
 
 from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 from cyclopts import App, Parameter
-from pydantic import FilePath
+from pydantic import FilePath, PositiveInt
 
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
 from codeweaver.common.registry import ModelRegistry, ProviderRegistry, ServicesRegistry
 from codeweaver.common.telemetry.client import PostHogClient
 from codeweaver.common.utils import get_project_path
-from codeweaver.config.settings import get_settings, get_settings_map
 from codeweaver.core.types.sentinel import Unset
 from codeweaver.engine.indexer import Indexer
 
+
+if TYPE_CHECKING:
+    from codeweaver.config.types import CodeWeaverSettingsDict
+    from codeweaver.core.types.dictview import DictView
 
 _display: StatusDisplay = get_display()
 app = App("start", help="Start CodeWeaver background services.")
 
 
-async def is_services_running() -> bool:
+def _get_settings_map() -> DictView[CodeWeaverSettingsDict]:
+    """Get the current settings map."""
+    from codeweaver.config.settings import get_settings_map
+
+    return get_settings_map()
+
+
+async def are_services_running() -> bool:
     """Check if background services are running via management server."""
     try:
         import httpx
     except ImportError:
         return False
 
-    settings_map = get_settings_map()
-    mgmt_host = settings_map.get("server", {}).get("management_host", "127.0.0.1")
-    mgmt_port = settings_map.get("server", {}).get("management_port", 9329)
+    settings_map = _get_settings_map()
+    mgmt_host = (
+        settings_map["management_host"]
+        if settings_map["management_host"] is not Unset
+        else "127.0.0.1"
+    )
+    mgmt_port = (
+        settings_map["management_port"] if settings_map["management_port"] is not Unset else 9329
+    )
 
     try:
         async with httpx.AsyncClient() as client:
@@ -51,18 +67,23 @@ async def is_services_running() -> bool:
         return False
 
 
-async def start_background_services(
+async def start_cw_services(
     display: StatusDisplay,
     config_path: Path | None = None,
     project_path: Path | None = None,
+    *,
+    start_mcp_http_server: bool = False,
+    mcp_host: str | None = None,
+    mcp_port: PositiveInt | None = None,
 ) -> None:
     """Start background services (indexer, watcher, health, management server)."""
     from codeweaver import __version__ as version
     from codeweaver.common.statistics import get_session_statistics
-    from codeweaver.server.background.state import BackgroundState
+    from codeweaver.config.settings import get_settings
     from codeweaver.server.health_service import HealthService
-    from codeweaver.server.server import _run_background_indexing
+    from codeweaver.server.server import CodeWeaverState, _run_background_indexing
 
+    # TODO: This seems very silly. We should only initialize in one place.
     # Load settings
     settings = get_settings()
     if project_path:
@@ -76,10 +97,9 @@ async def start_background_services(
     # Get singletons
     provider_registry = ProviderRegistry()
     statistics = get_session_statistics()
-    startup_time = time.time()
 
     # Create BackgroundState
-    background_state = BackgroundState(
+    cw_state = CodeWeaverState(
         initialized=False,
         settings=settings,
         statistics=statistics,
@@ -94,20 +114,19 @@ async def start_background_services(
         failover_manager=None,
         telemetry=telemetry_client,
         indexer=Indexer.from_settings(),
-        startup_time=startup_time,
     )
 
     # Initialize health service
-    background_state.health_service = HealthService(
+    cw_state.health_service = HealthService(
         provider_registry=provider_registry,
         statistics=statistics,
-        indexer=background_state.indexer,
-        failover_manager=background_state.failover_manager,
-        startup_time=startup_time,
+        indexer=cw_state.indexer,
+        failover_manager=cw_state.failover_manager,
+        startup_time=time.time(),
     )
 
     # Initialize background services
-    await background_state.initialize()
+    await cw_state.initialize()
 
     # Start telemetry session
     if telemetry_client and telemetry_client.enabled:
@@ -119,36 +138,46 @@ async def start_background_services(
 
     # Start background indexing
     indexing_task = asyncio.create_task(
-        _run_background_indexing(
-            background_state, settings, display, verbose=False, debug=False
-        )
+        _run_background_indexing(cw_state, settings, display, verbose=False, debug=False)
     )
-    background_state.background_tasks.add(indexing_task)
+    cw_state.background_tasks.add(indexing_task)
 
     display.print_success("Background services started successfully")
     display.print_info(
-        f"Management server: http://127.0.0.1:{settings.server.management_port}",
-        prefix="🌐"
+        f"Management server: http://127.0.0.1:{settings.management_port}", prefix="🌐"
     )
 
     # Keep services running until interrupted
     try:
-        await background_state.shutdown_event.wait()
+        await cw_state.shutdown_event.wait()
     except KeyboardInterrupt:
         display.print_warning("Shutting down background services...")
     finally:
-        await background_state.shutdown()
+        await cw_state.shutdown()
 
 
 @app.default
 async def start(
-    config: Annotated[
+    config_file: Annotated[
         FilePath | None,
-        Parameter(name=["--config", "-c"], help="Path to CodeWeaver configuration file"),
+        Parameter(
+            name=["--config-file", "-c"],
+            help="Path to CodeWeaver configuration file, only needed if not using defaults.",
+        ),
     ] = None,
     project: Annotated[
-        Path | None, Parameter(name=["--project", "-p"], help="Path to project directory")
+        Path | None,
+        Parameter(
+            name=["--project", "-p"],
+            help="Path to project directory. CodeWeaver will attempt to auto-detect if not provided.",
+        ),
     ] = None,
+    *,
+    management_host: str = "127.0.0.1",
+    management_port: PositiveInt = 9329,
+    start_mcp_http_server: bool = False,
+    mcp_host: str | None = None,
+    mcp_port: PositiveInt | None = None,
 ) -> None:
     """Start CodeWeaver background services.
 
@@ -156,15 +185,16 @@ async def start(
     - Indexer (semantic search engine)
     - FileWatcher (real-time index updates)
     - HealthService (system monitoring)
-    - Statistics (telemetry collection)
-    - Management server (HTTP on port 9329)
+    - Statistics and Telemetry (if enabled)
+    - Management server (HTTP on port 9329 by default)
 
     Background services run independently of the MCP server.
     The MCP server will auto-start these if needed.
 
-    Management endpoints available at http://127.0.0.1:9329:
+    Management endpoints available at http://127.0.0.1:9329 (by default):
     - /health - Health check
     - /status - Indexing status
+    - /state - CodeWeaver state
     - /metrics - Statistics and metrics
     - /version - Version information
     """
@@ -175,7 +205,7 @@ async def start(
         display.print_command_header("start", "Start Background Services")
 
         # Check if already running
-        if await is_services_running():
+        if await are_services_running():
             display.print_warning("Background services already running")
             display.print_info("Management server: http://127.0.0.1:9329", prefix="🌐")
             return
@@ -183,10 +213,10 @@ async def start(
         display.print_info("Starting CodeWeaver background services...")
         display.print_info("Press Ctrl+C to stop", prefix="⚠️")
 
-        await start_background_services(display, config_path=config, project_path=project)
+        await start_cw_services(display, config_path=config_file, project_path=project)
 
     except KeyboardInterrupt:
-        # Already handled in start_background_services
+        # Already handled in start_cw_services
         pass
     except Exception as e:
         error_handler.handle_error(e, "Start command", exit_code=1)

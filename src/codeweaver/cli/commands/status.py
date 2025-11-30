@@ -19,6 +19,8 @@ from pydantic_core import from_json
 from rich.table import Table
 
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
+from codeweaver.config.server_defaults import DefaultFastMcpHttpRunArgs
+from codeweaver.core.types.sentinel import Unset
 
 
 _display: StatusDisplay = get_display()
@@ -30,8 +32,14 @@ def get_url() -> str:
     from codeweaver.config.settings import get_settings_map
 
     settings_map = get_settings_map()
-    host = settings_map["server"]["host"] or "127.0.0.1"
-    port = settings_map["server"]["port"] or "9328"  # WEAV
+    mcp_server_settings = settings_map["mcp_server"]
+    run_args = (
+        DefaultFastMcpHttpRunArgs
+        if mcp_server_settings["run_args"] is Unset
+        else mcp_server_settings["run_args"]
+    )
+    host = run_args["host"] or "127.0.0.1"
+    port = run_args["port"] or "9328"  # WEAV
     return f"http://{host}:{port}"
 
 
@@ -40,8 +48,14 @@ def get_management_url() -> str:
     from codeweaver.config.settings import get_settings_map
 
     settings_map = get_settings_map()
-    mgmt_host = settings_map["server"].get("management_host", "127.0.0.1")
-    mgmt_port = settings_map["server"].get("management_port", 9329)
+    mgmt_host = (
+        settings_map["management_host"]
+        if settings_map["management_host"] is not Unset
+        else "127.0.0.1"
+    )
+    mgmt_port = (
+        settings_map["management_port"] if settings_map["management_port"] is not Unset else 9329
+    )
     return f"http://{mgmt_host}:{mgmt_port}"
 
 

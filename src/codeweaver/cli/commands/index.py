@@ -269,8 +269,8 @@ def _get_url():
     from codeweaver.config.settings import get_settings_map
 
     settings_map = get_settings_map()
-    host = settings_map.get("server.host", "localhost")
-    port = settings_map.get("server.port", 9328)
+    host = settings_map.get("management_host", "localhost")
+    port = settings_map.get("management_port", 9329)
     return f"http://{host}:{port}"
 
 
@@ -397,17 +397,17 @@ async def _run_standalone_indexing(
         hours = int(elapsed // 3600)
         minutes = int((elapsed % 3600) // 60)
         seconds = int(elapsed % 60)
-        time_str = f"{hours}h {minutes}m {seconds}s"
+        human_time = f"{hours}h {minutes}m {seconds}s"
     elif elapsed >= 60:
         minutes = int(elapsed // 60)
         seconds = int(elapsed % 60)
-        time_str = f"{minutes}m {seconds}s"
+        human_time = f"{minutes}m {seconds}s"
     else:
-        time_str = f"{elapsed:.1f}s"
-    display.console.print(f"  Time elapsed: [cyan]{time_str}[/cyan]")
+        human_time = f"{elapsed:.1f}s"
+    display.console.print(f"  Time elapsed: [cyan]{human_time}[/cyan]")
 
-    if stats.total_errors > 0:
-        display.console.print(f"  [yellow]Files with errors: {stats.total_errors}[/yellow]")
+    if stats.total_errors() > 0:
+        display.console.print(f"  [yellow]Files with errors: {stats.total_errors()}[/yellow]")
 
     sys.exit(0)
 

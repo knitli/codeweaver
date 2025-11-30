@@ -15,7 +15,7 @@ import time
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any, Literal, NotRequired, Required, TypedDict, cast
+from typing import TYPE_CHECKING, Annotated, Any, Literal, cast
 
 from fastmcp import FastMCP
 from fastmcp.server.middleware.error_handling import ErrorHandlingMiddleware, RetryMiddleware
@@ -24,13 +24,19 @@ from fastmcp.server.middleware.middleware import Middleware
 from fastmcp.server.middleware.rate_limiting import RateLimitingMiddleware
 from pydantic import ConfigDict, DirectoryPath, Field, NonNegativeInt, PrivateAttr, computed_field
 from pydantic.dataclasses import dataclass
+from starlette.middleware import Middleware as ASGIMiddleware
 
 from codeweaver import __version__ as version
 from codeweaver.common.logging import setup_logger
 from codeweaver.common.registry import ModelRegistry, ProviderRegistry, ServicesRegistry
 from codeweaver.common.statistics import SessionStatistics
 from codeweaver.common.telemetry.client import PostHogClient
-from codeweaver.common.utils import get_project_path, lazy_import, rpartial
+from codeweaver.common.utils import (
+    elapsed_time_to_human_readable,
+    get_project_path,
+    lazy_import,
+    rpartial,
+)
 from codeweaver.config.logging import LoggingSettings
 from codeweaver.config.middleware import (
     ErrorHandlingMiddlewareSettings,
@@ -39,13 +45,7 @@ from codeweaver.config.middleware import (
     RateLimitingMiddlewareSettings,
     RetryMiddlewareSettings,
 )
-from codeweaver.config.settings import (
-    CodeWeaverSettings,
-    CodeWeaverSettingsDict,
-    FastMcpServerSettings,
-    get_settings_map,
-)
-from codeweaver.config.types import FastMcpServerSettingsDict
+from codeweaver.config.settings import CodeWeaverSettings, CodeWeaverSettingsDict, get_settings_map
 from codeweaver.core.types.dictview import DictView
 from codeweaver.core.types.enum import AnonymityConversion
 from codeweaver.core.types.models import DATACLASS_CONFIG, DataclassSerializationMixin
@@ -62,6 +62,7 @@ if TYPE_CHECKING:
     from codeweaver.cli.ui import IndexingProgress, StatusDisplay
     from codeweaver.common.utils import LazyImport
     from codeweaver.core.types import AnonymityConversion, FilteredKeyT
+    from codeweaver.mcp.state import CwMcpHttpState
 
 # lazy imports for default factory functions
 get_provider_registry: LazyImport[Callable[[], ProviderRegistry]] = lazy_import(
@@ -92,7 +93,17 @@ BRACKET_PATTERN: re.Pattern[str] = re.compile("\\[.+\\]")
 
 @dataclass(order=True, kw_only=True, config=DATACLASS_CONFIG | ConfigDict(extra="forbid"))
 class CodeWeaverState(DataclassSerializationMixin):
-    """Application state for CodeWeaver server."""
+    """Application state for CodeWeaver server.
+
+    A few important notes about CodeWeaverState and the codeweaver server more broadly:
+    - An instance of CodeWeaverState and its server **must be associated with a unique project path**, which includes the project path's subdirectories. We currently don't *check* for this uniqueness, but failing to honor it may result in instability and potentially data destruction. (We didn't have a good answer for how to enforce this, so if you do, please open an issue or PR!)
+    - CodeWeaverState is a singleton per CodeWeaver server instance. You should not create multiple instances of CodeWeaverState within the same server process.
+    - If you need to run multiple CodeWeaver server instances (for different projects), you need to ensure that each instance has its own process, and that each instance's ports do not conflict (both the mcp port if using http/streamable-http transport for mcp, and the management server port).
+
+    CodeWeaver was intended to run as a dedicated server for a single project/repo at a time, so these constraints are in place to ensure stability and data integrity. If you have a use case that requires multiple projects in the same process, please open an issue to discuss it.
+
+    We do think there may be a need for us to support multiple projects in the same process in the future, but it will require significant changes and is not currently on our roadmap.
+    """
 
     initialized: Annotated[
         bool, Field(description="Indicates if the server has been initialized")
@@ -146,9 +157,8 @@ class CodeWeaverState(DataclassSerializationMixin):
         VectorStoreFailoverManager | None,
         Field(description="Failover manager instance", exclude=True),
     ] = None
-    startup_time: Annotated[
-        float, Field(default_factory=time.time, description="Server startup timestamp")
-    ]
+    startup_time: NonNegativeInt = Field(default_factory=lambda: int(time.time()))
+    startup_stopwatch: NonNegativeInt = Field(default_factory=lambda: int(time.monotonic()))
     management_server: Annotated[
         ManagementServer | None,
         Field(
@@ -157,7 +167,14 @@ class CodeWeaverState(DataclassSerializationMixin):
         ),
     ] = None  # type: ignore[valid-type]
 
+    middleware_stack: tuple[ASGIMiddleware, ...] = Field(
+        default_factory=tuple,
+        description="Optional HTTP middleware stack to CodeWeaver's management and http mcp servers.",
+    )
+
     telemetry: Annotated[PostHogClient | None, PrivateAttr()] = None
+
+    _mcp_http_server: FastMCP[CwMcpHttpState] | None = PrivateAttr(default=None)
 
     _tasks: list[asyncio.Task] = PrivateAttr(default_factory=list)
 
@@ -180,9 +197,22 @@ class CodeWeaverState(DataclassSerializationMixin):
     @property
     def request_count(self) -> NonNegativeInt:
         """Computed field for the number of requests handled by the server."""
-        if self.statistics:
-            return self.statistics.total_requests + (self.statistics.total_http_requests or 0)
-        return 0
+        return self.statistics.total_requests if self.statistics else 0
+
+    @computed_field
+    def uptime_seconds(self) -> NonNegativeInt:
+        """Computed field for the server uptime in seconds."""
+        return int(time.monotonic() - self.startup_stopwatch)
+
+    @computed_field
+    def human_uptime(self) -> str:
+        """Computed field for the server uptime in human-readable format."""
+        return elapsed_time_to_human_readable(self.uptime_seconds())
+
+    @property
+    def mcp_http_server(self) -> FastMCP[CwMcpHttpState] | None:
+        """Get the MCP HTTP server instance."""
+        return self._mcp_http_server
 
 
 _state: CodeWeaverState | None = None
@@ -196,11 +226,6 @@ def get_state() -> CodeWeaverState:
             "CodeWeaverState has not been initialized yet. Ensure the server is properly set up before accessing the state."
         )
     return _state
-
-
-# Alias for backward compatibility during migration
-# get_background_state is the new name, but get_state still works
-get_background_state = get_state
 
 
 def _get_health_service() -> HealthService:
@@ -292,7 +317,7 @@ async def _run_background_indexing(
                 progress_tracker.update_sparse_embedding(current, total)
             elif phase == "embedding":
                 # Legacy embedding callback - maps to dense
-                progress_tracker.update_embedding(current, total)
+                progress_tracker.update_dense_embedding(current, total)
             elif phase == "indexing":
                 progress_tracker.update_indexing(current, total)
 
@@ -333,9 +358,9 @@ async def _run_background_indexing(
             time_str = f"{elapsed:.1f}s"
         status_display.console.print(f"  Time elapsed: [cyan]{time_str}[/cyan]")
 
-        if stats.total_errors > 0:
+        if stats.total_errors() > 0:
             status_display.console.print(
-                f"  [yellow]Files with errors: {stats.total_errors}[/yellow]"
+                f"  [yellow]Files with errors: {stats.total_errors()}[/yellow]"
             )
 
         status_display.console.print()
@@ -389,16 +414,11 @@ async def _run_background_indexing(
         status_display.print_shutdown_complete()
 
 
-def _initialize_app_state(
-    app: FastMCP[AppState], settings: CodeWeaverSettings, statistics: SessionStatistics | None
-) -> AppState:
+def _initialize_cw_state(
+    settings: CodeWeaverSettings, statistics: SessionStatistics | None
+) -> CodeWeaverState:
     """Initialize application state if not already present."""
-    if hasattr(app, "state"):
-        return cast(AppState, app.state)
-
-    telemetry_client = PostHogClient.from_settings()
-
-    state = AppState(  # type: ignore
+    state = CodeWeaverState(  # type: ignore
         initialized=False,
         settings=settings,
         statistics=statistics or get_session_statistics._resolve()(),
@@ -409,29 +429,38 @@ def _initialize_app_state(
         provider_registry=get_provider_registry._resolve()(),
         services_registry=get_services_registry._resolve()(),
         model_registry=get_model_registry._resolve()(),
-        middleware_stack=tuple(getattr(app, "middleware", ())),
-        health_service=None,  # Initialize as None, will be set after AppState construction
-        failover_manager=None,  # Initialize as None, will be set after AppState construction
-        telemetry=telemetry_client,
+        middleware_stack=(),
+        health_service=None,  # Initialize as None, will be set after CodeWeaverState construction
+        failover_manager=None,  # Initialize as None, will be set after CodeWeaverState construction
+        telemetry=PostHogClient.from_settings(),
         indexer=Indexer.from_settings(),
-        startup_time=time.time(),
     )
-    object.__setattr__(app, "state", state)
-    # Now that AppState is constructed and _state is set, create the HealthService
     state.health_service = _get_health_service()
-
     # Start telemetry session with metadata
-    if telemetry_client and telemetry_client.enabled:
-        telemetry_client.start_session({
+    if state.telemetry and state.telemetry.enabled:
+        state.telemetry.start_session({
             "codeweaver_version": version,
-            "index_backend": "qdrant",  # TODO: get from settings
+            "vector_store": vector_store
+            if (vector_store := state.provider_registry.get_provider_enum_for("vector_store"))
+            else "Qdrant",
+            "embedding_provider": embedding_provider
+            if (embedding_provider := state.provider_registry.get_provider_enum_for("embedding"))
+            else "Voyage",
+            "sparse_embedding_provider": sparse_provider
+            if (
+                sparse_provider := state.provider_registry.get_provider_enum_for("sparse_embedding")
+            )
+            else "None",
+            "reranking_provider": reranking_provider
+            if (reranking_provider := state.provider_registry.get_provider_enum_for("reranking"))
+            else "None",
         })
 
     return state
 
 
 async def _cleanup_state(
-    state: AppState,
+    state: CodeWeaverState,
     indexing_task: asyncio.Task | None,
     status_display: Any,
     *,
@@ -498,13 +527,13 @@ async def _cleanup_state(
 
 @asynccontextmanager
 async def lifespan(
-    app: FastMCP[AppState],
+    app: FastMCP[CodeWeaverState],
     settings: CodeWeaverSettings | None,
     statistics: SessionStatistics | None = None,
     *,
     verbose: bool = False,
     debug: bool = False,
-) -> AsyncIterator[AppState]:
+) -> AsyncIterator[CodeWeaverState]:
     """Context manager for application lifespan with proper initialization.
 
     Args:
@@ -532,11 +561,11 @@ async def lifespan(
     if isinstance(settings.project_path, Unset):
         settings.project_path = get_project_path()
 
-    state = _initialize_app_state(app, settings, statistics)
+    state = _initialize_cw_state(app, settings, statistics)
 
-    if not isinstance(state, AppState):
+    if not isinstance(state, CodeWeaverState):
         raise InitializationError(
-            "AppState should be an instance of AppState, but isn't. Something is wrong. Please report this issue.",
+            "CodeWeaverState should be an instance of CodeWeaverState, but isn't. Something is wrong. Please report this issue.",
             details={"state": state},
         )
 
@@ -776,61 +805,8 @@ def get_default_middleware() -> list[type[Middleware]]:
     return [ErrorHandlingMiddleware, RetryMiddleware, RateLimitingMiddleware]
 
 
-def _create_base_fastmcp_settings() -> FastMcpServerSettingsDict:
-    """Create the base FastMCP settings dictionary.
-
-    Returns:
-        Dictionary with base FastMCP configuration
-    """
-    return FastMcpServerSettingsDict(
-        instructions="Ask a question, describe what you're trying to do, and get the exact context you need. CodeWeaver is an advanced code search and code context tool. It keeps an updated vector, AST, and text index of your codebase, and uses intelligent intent analysis to provide the most relevant context for AI Agents to complete tasks. It's just one easy-to-use tool - the `find_code` tool. To use it, you only need to provide a plain language description of what you want to find, and what you are trying to do. CodeWeaver will return the most relevant code matches, along with their context and precise locations.",
-        version=version,
-        include_tags={"external", "user", "code-context"},
-        exclude_tags={"internal", "system", "admin"},
-    )
-
-
 type SettingsKey = Literal["middleware", "tools"]
 """Type alias for `CodeWeaverSettings` keys that can have additional items."""
-
-
-def _integrate_user_settings(
-    settings: FastMcpServerSettings, base_fast_mcp_settings: FastMcpServerSettingsDict
-) -> FastMcpServerSettingsDict:
-    """Integrate user-provided settings with base FastMCP settings.
-
-    Args:
-        settings: CodeWeaver settings containing user preferences
-        base_fast_mcp_settings: Base FastMCP configuration to extend
-
-    Returns:
-        Updated FastMCP settings dictionary
-    """
-    additional_keys = ("additional_middleware", "additional_tools")
-    for key in additional_keys:
-        replacement_key = key.replace("additional_", "")
-        if not base_fast_mcp_settings.get(replacement_key):
-            base_fast_mcp_settings[replacement_key] = []  # type: ignore
-        if not base_fast_mcp_settings[replacement_key] and base_fast_mcp_settings.get(key):  # type: ignore
-            base_fast_mcp_settings[replacement_key] = [  # type: ignore
-                string_to_class(s) if isinstance(s, str) else s
-                for s in base_fast_mcp_settings[key]  # type: ignore
-                if s
-            ]
-        if key in base_fast_mcp_settings:
-            _ = base_fast_mcp_settings.pop(key, None)  # ty: ignore[no-matching-overload]
-        if (value := getattr(settings, key, None)) and isinstance(value, list):
-            base_fast_mcp_settings[replacement_key].extend(  # type: ignore
-                string_to_class(item) if isinstance(item, str) else item
-                for item in value  # type: ignore
-                if item and item not in base_fast_mcp_settings[replacement_key]  # type: ignore
-            )
-        base_fast_mcp_settings[replacement_key] = (  # type: ignore
-            list(set(base_fast_mcp_settings[replacement_key]))  # type: ignore
-            if base_fast_mcp_settings[replacement_key]  # type: ignore
-            else []
-        )
-    return base_fast_mcp_settings
 
 
 def _setup_file_filters_and_lifespan(
@@ -854,50 +830,12 @@ def _setup_file_filters_and_lifespan(
     return rpartial(lifespan, settings, session_statistics, verbose=verbose, debug=debug)
 
 
-def _filter_server_settings(server_settings: FastMcpServerSettings) -> FastMcpServerSettingsDict:
-    """Filter server settings to remove keys not recognized by FastMCP."""
-    to_remove = ("additional_middleware", "additional_tools", "additional_dependencies")
-    return cast(
-        FastMcpServerSettingsDict,
-        {k: v for k, v in cast(dict[str, Any], server_settings).items() if k not in to_remove},
-    )
-
-
-def string_to_class(s: str) -> type[Any] | None:
-    """Convert a string representation of a class to the actual class."""
-    components = s.split(".")
-    module_name = ".".join(components[:-1])
-    class_name = components[-1]
-    try:
-        module = __import__(module_name, fromlist=[class_name])
-    except (ImportError, AttributeError):
-        return None
-    else:
-        return getattr(module, class_name, None)
-
-
-class ServerSetup(TypedDict):
-    """TypedDict for the CodeWeaver FastMCP server setup."""
-
-    app: Required[FastMCP[AppState]]
-    settings: Required[CodeWeaverSettings]
-    middleware_settings: NotRequired[MiddlewareOptions]
-    host: NotRequired[str | None]
-    port: NotRequired[int | None]
-    streamable_http_path: NotRequired[str | None]
-    transport: NotRequired[Literal["streamable-http", "stdio"]]
-    log_level: NotRequired[Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]]
-    middleware: NotRequired[set[Middleware] | set[type[Middleware]]]
-    verbose: NotRequired[bool]
-    debug: NotRequired[bool]
-
-
 def build_app(
     *,
     verbose: bool = False,
     debug: bool = False,
     transport: Literal["streamable-http", "stdio"] = "streamable-http",
-) -> ServerSetup:
+) -> FastMcpHttpRunArgs | None:
     """Build and configure the FastMCP application without starting it.
 
     Args:
@@ -930,7 +868,7 @@ def build_app(
     middleware_settings, logging_middleware = _configure_middleware(
         settings_view, app_logger, level
     )
-    filtered_server_settings = _filter_server_settings(
+    _filter_server_settings(
         lazy_import("codeweaver.config.settings", "FastMcpServerSettings")().model_dump(  # type: ignore
             round_trip=True
         )
@@ -939,9 +877,6 @@ def build_app(
     )
     middleware = {logging_middleware, *get_default_middleware()}
     base_fast_mcp_settings = _create_base_fastmcp_settings()
-    base_fast_mcp_settings = _integrate_user_settings(
-        settings_view.get("server", {}), filtered_server_settings
-    )
     from codeweaver.config.settings import get_settings
 
     if verbose or debug:
@@ -961,10 +896,8 @@ def build_app(
             middleware_settings[key]["log_level"] = int_level  # ty: ignore[invalid-key]
     global _logger
     _logger = final_app_logger
-    host = base_fast_mcp_settings.pop("host", "127.0.0.1")
-    port = base_fast_mcp_settings.pop("port", 9328)
     http_path = "/codeweaver"
-    server = FastMCP[AppState](
+    server = FastMCP[CodeWeaverState](
         name="CodeWeaver",
         **base_fast_mcp_settings,  # type: ignore
         icons=[lazy_import("codeweaver.server._assets", "CODEWEAVER_SVG_ICON")],  # type: ignore
@@ -986,12 +919,4 @@ def build_app(
     )
 
 
-__all__ = (
-    "AppState",
-    "BackgroundState",
-    "ServerSetup",
-    "build_app",
-    "get_background_state",
-    "get_state",
-    "lifespan",
-)
+__all__ = ("CodeWeaverState", "build_app", "get_state", "lifespan")

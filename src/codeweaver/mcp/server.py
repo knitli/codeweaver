@@ -4,37 +4,58 @@ from __future__ import annotations
 
 import logging
 
-from collections.abc import Container
-from typing import TYPE_CHECKING, Any
+from collections.abc import AsyncIterator, Container
+from typing import TYPE_CHECKING, Any, cast
 
 from fastmcp import FastMCP
+from fastmcp.client.transports import StreamableHttpTransport
+from fastmcp.server.proxy import FastMCPProxy, ProxyClient
+from fastmcp.tools import Tool
 
-from codeweaver.config.middleware import MiddlewareOptions
+from codeweaver.common.utils import lazy_import
+from codeweaver.config.middleware import DefaultMiddlewareSettings, MiddlewareOptions
+from codeweaver.config.settings import FastMcpHttpServerSettings, FastMcpStdioServerSettings
 from codeweaver.core.types import DictView, Unset
-from codeweaver.mcp.middleware import McpMiddleware
+from codeweaver.mcp.state import CwMcpHttpState
 
 
 if TYPE_CHECKING:
-    from codeweaver.config.types import FastMcpSettingsDict
-    from codeweaver.middleware.statistics import StatisticsMiddleware
+    from codeweaver.config.types import FastMcpServerSettingsDict
+    from codeweaver.mcp.middleware import McpMiddleware, StatisticsMiddleware
+
+TOOLS_TO_REGISTER = ("find_code",)
+
+type StdioClientLifespan = AsyncIterator[Any]
 
 
-def _get_fastmcp_settings_map() -> DictView[FastMcpSettingsDict]:
+def _get_fastmcp_settings_map(*, http: bool = False) -> DictView[FastMcpServerSettingsDict]:
     """Get the current settings."""
-    from codeweaver.config.server_defaults import DefaultFastMcpServerSettings
     from codeweaver.config.settings import get_settings_map
 
     settings_map = get_settings_map()
-    fastmcp_settings = settings_map.get("server") if settings_map.get("server") is not Unset else {}
-    return DictView({**DefaultFastMcpServerSettings, **fastmcp_settings})
+    if http:
+        return (
+            settings_map.get_subview("mcp_server")
+            if settings_map.get("mcp_server") is not Unset
+            else DictView(FastMcpServerSettingsDict(**FastMcpHttpServerSettings().as_settings()))
+        )
+    return (
+        settings_map.get_subview("stdio_server")
+        if settings_map.get("stdio_server") is not Unset
+        else DictView(FastMcpServerSettingsDict(**FastMcpStdioServerSettings().as_settings()))
+    )
 
 
-def _get_middleware_settings() -> MiddlewareOptions:
+def _get_middleware_settings() -> DictView[MiddlewareOptions]:
     """Get the current middleware settings."""
     from codeweaver.config.settings import get_settings_map
 
     settings_map = get_settings_map()
-    return settings_map.get("middleware") if settings_map.get("middleware") is not Unset else {}
+    return (
+        settings_map.get_subview("middleware")
+        if settings_map.get("middleware") is not Unset
+        else DictView(DefaultMiddlewareSettings)
+    )  # type: ignore[arg-type]
 
 
 def _get_default_middleware() -> Container[type[McpMiddleware]]:
@@ -49,7 +70,7 @@ def _get_default_middleware() -> Container[type[McpMiddleware]]:
 def get_statistics_middleware(settings: MiddlewareOptions) -> StatisticsMiddleware:
     """Get the statistics middleware instance."""
     from codeweaver.common.statistics import get_session_statistics
-    from codeweaver.middleware.statistics import StatisticsMiddleware
+    from codeweaver.mcp.middleware.statistics import StatisticsMiddleware
 
     return StatisticsMiddleware(
         statistics=get_session_statistics(),
@@ -91,29 +112,59 @@ def setup_middleware(
 
 
 def register_middleware(
-    app: FastMCP[Any],
+    app: FastMCP[StdioClientLifespan] | FastMCP[CwMcpHttpState],
     middleware: Container[type[McpMiddleware]],
     middleware_settings: MiddlewareOptions,
-) -> FastMCP[Any]:
+) -> FastMCP[StdioClientLifespan] | FastMCP[CwMcpHttpState]:
     """Register middleware with the application."""
     for mw in setup_middleware(middleware, middleware_settings):
         app = app.add_middleware(mw)
     return app
 
 
-async def create_stdio_server() -> FastMCP[Any]:
-    """Get a FastMCP server configured for stdio transport."""
+def register_tools(
+    app: FastMCP[StdioClientLifespan] | FastMCP[CwMcpHttpState],
+) -> FastMCP[StdioClientLifespan] | FastMCP[CwMcpHttpState]:
+    """Register tools with the application."""
+    from codeweaver.mcp.tools import TOOL_DEFINITIONS, register_tool
+
+    for tool_name in TOOLS_TO_REGISTER:
+        if tool_name not in TOOL_DEFINITIONS:
+            continue
+        app = register_tool(
+            app,
+            tool if (tool := TOOL_DEFINITIONS[tool_name]) and isinstance(tool, Tool) else tool(app),
+        )
+    return app
+
+
+def _setup_server(
+    args: DictView[FastMcpServerSettingsDict],
+) -> FastMCP[StdioClientLifespan] | FastMCP[CwMcpHttpState]:
+    """Set class args for FastMCP server settings."""
     from codeweaver.config.middleware import default_for_transport
 
-    middleware_opts = default_for_transport("stdio")
-    fastmcp_settings = dict(_get_fastmcp_settings_map())
-    middleware = fastmcp_settings.pop("middleware", [])
-    middleware = sorted(
-        (set(middleware) | set(default_for_transport("stdio"))), key=lambda x: x.__name__
+    is_http = bool(args.get("run_args"))
+    # `run_args` is only set for HTTP transport
+    middleware_opts = default_for_transport("streamable-http" if is_http else "stdio")
+    mutable_args = dict(args)
+    middleware = mutable_args.pop("middleware", [])
+    app = FastMCP(
+        "CodeWeaver",
+        **(
+            mutable_args
+            | {"icons": [lazy_import("codeweaver.server._assets", "CODEWEAVER_SVG_ICON")]}
+        ),  # ty: ignore[invalid-argument-type]
     )
-    for setting_key in {"host", "port", "auth"}:
-        _ = fastmcp_settings.pop(setting_key, None)
-    app = await FastMCP("CodeWeaver", **fastmcp_settings).run_stdio_async(
-        show_banner=False, log_level="warning"
-    )
-    return register_middleware(app, middleware, middleware_opts)
+    app = register_tools(app)
+    return register_middleware(app, cast(list[type[McpMiddleware]], middleware), middleware_opts)
+
+
+# Note: FastMCP's parameterized type is the server's lifespan. For stdio servers, the client manages lifespan, so we use AsyncIterator[Any] aliased as StdioClientLifespan.
+async def create_stdio_server() -> FastMCPProxy:
+    """Get a FastMCP server configured for stdio transport."""
+    stdio_settings = _get_fastmcp_settings_map(http=False)
+    app = _setup_server(stdio_settings)
+    http_settings = _get_fastmcp_settings_map(http=True)
+    url = f"http://{http_settings['run_args']['host']}:{http_settings['run_args']['port']}{http_settings.get('path', '/mcp/')}"
+    return app.as_proxy(backend=ProxyClient(transport=StreamableHttpTransport(url=url)))

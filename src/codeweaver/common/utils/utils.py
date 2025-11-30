@@ -19,7 +19,8 @@ from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, cast, overload
 
-from pydantic import UUID7
+from pydantic import UUID7, NonNegativeFloat
+from pydantic.types import NonNegativeInt
 
 
 if TYPE_CHECKING:
@@ -248,8 +249,25 @@ def generate_collection_name(
     return f"{project_name}-{blake_hash}{collection_suffix}"
 
 
+def elapsed_time_to_human_readable(elapsed_seconds: NonNegativeFloat | NonNegativeInt) -> str:
+    """Convert elapsed time between start_time and end_time to a human-readable format."""
+    minutes, sec = divmod(int(elapsed_seconds), 60)
+    hours, min_ = divmod(minutes, 60)
+    days, hr = divmod(hours, 24)
+    parts: list[str] = []
+    if days > 0:
+        parts.append(f"{days}d")
+    if hr > 0:
+        parts.append(f"{hr}h")
+    if min_ > 0:
+        parts.append(f"{min_}m")
+    parts.append(f"{sec}s")
+    return " ".join(parts)
+
+
 __all__ = (
     "backup_file_path",
+    "elapsed_time_to_human_readable",
     "ensure_iterable",
     "estimate_tokens",
     "generate_collection_name",
