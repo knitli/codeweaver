@@ -118,7 +118,7 @@ def register_middleware(
 ) -> FastMCP[StdioClientLifespan] | FastMCP[CwMcpHttpState]:
     """Register middleware with the application."""
     for mw in setup_middleware(middleware, middleware_settings):
-        app = app.add_middleware(mw)
+        _ = app.add_middleware(mw)
     return app
 
 

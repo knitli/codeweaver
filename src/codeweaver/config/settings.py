@@ -21,8 +21,8 @@ from importlib import util
 from pathlib import Path
 from typing import Annotated, Any, Literal, Self, Unpack, cast, get_origin, overload
 
-from fastmcp.server.auth import AuthSettings
 from fastmcp.server.server import DuplicateBehavior
+from mcp.server.auth.settings import AuthSettings
 from mcp.server.lowlevel.server import LifespanResultT
 from pydantic import (
     DirectoryPath,

@@ -97,7 +97,7 @@ class CwMcpHttpState(DataclassSerializationMixin):
     @computed_field
     def human_uptime(self) -> str:
         """Get the uptime of the server in a human-readable format."""
-        return elapsed_time_to_human_readable(self.uptime_seconds)
+        return elapsed_time_to_human_readable(self.uptime_seconds())
 
     @computed_field
     def human_start_time(self) -> str:

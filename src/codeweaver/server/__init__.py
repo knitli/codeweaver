@@ -13,6 +13,7 @@ from codeweaver.common.utils import create_lazy_getattr
 
 
 if TYPE_CHECKING:
+    from codeweaver.config.types import ServerSetup
     from codeweaver.server.health_endpoint import get_health
     from codeweaver.server.health_models import (
         EmbeddingProviderServiceInfo,
@@ -37,6 +38,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "IndexingInfo": (__spec__.parent, "health_models"),
     "IndexingProgressInfo": (__spec__.parent, "health_models"),
     "RerankingServiceInfo": (__spec__.parent, "health_models"),
+    "ServerSetup": ("codeweaver.config", "types"),
     "ServicesInfo": (__spec__.parent, "health_models"),
     "SparseEmbeddingServiceInfo": (__spec__.parent, "health_models"),
     "StatisticsInfo": (__spec__.parent, "health_models"),
