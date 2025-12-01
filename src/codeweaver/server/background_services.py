@@ -8,7 +8,6 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import logging
 
 from functools import partial
@@ -222,8 +221,6 @@ async def run_background_indexing(
         # Ensure watcher task is cancelled on any exit
         if watcher_task and not watcher_task.done():
             watcher_task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await watcher_task
         status_display.print_shutdown_complete()
 
 

@@ -16,7 +16,6 @@ import logging
 import time
 
 from datetime import UTC, datetime
-from functools import cache
 from typing import TYPE_CHECKING, Any
 
 import uvicorn
@@ -40,13 +39,11 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-@cache
 def statistics() -> SessionStatistics:
     """Get the current session statistics."""
     return get_session_statistics()
 
 
-@cache
 def settings() -> DictView[CodeWeaverSettingsDict]:
     """Get the current settings."""
     return get_settings_map()
@@ -390,7 +387,7 @@ class ManagementServer:
         app = Starlette(routes=routes)
 
         # Attach background state to app for handlers to access
-        # Handlersget_state() global
+        # Handlers use get_state() global
         app.state.background = self.background_state
 
         return app

@@ -14,7 +14,6 @@ import time
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterator, Mapping, Sequence
-from functools import cache
 from types import MappingProxyType
 from typing import (
     TYPE_CHECKING,
@@ -82,7 +81,6 @@ class RerankingResult(NamedTuple):
     sparse_score: float | None = None
 
 
-@cache
 def _get_statistics() -> SessionStatistics:
     """Get the statistics source for the reranking provider."""
     statistics_module = importlib.import_module("codeweaver.common.statistics")
