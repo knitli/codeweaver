@@ -149,7 +149,7 @@ async def test_server_starts_without_errors(indexer: Indexer):
     # Note: May be None if API keys not configured, that's acceptable
     stats = indexer.stats
     assert stats.files_processed == 0  # Not yet indexed
-    assert stats.total_errors == 0
+    assert stats.total_errors() == 0
 
 
 @pytest.mark.integration

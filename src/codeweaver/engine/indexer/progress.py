@@ -14,7 +14,6 @@ from typing import TYPE_CHECKING, Any, Self, TypedDict
 
 from pydantic import Field
 from pydantic.dataclasses import dataclass
-from pydantic.fields import computed_field
 from rich.console import Console
 from rich.live import Live
 from rich.panel import Panel
@@ -64,29 +63,24 @@ class IndexingStats(DataclassSerializationMixin):
     files_with_errors: list[Path] = Field(default_factory=list)
     structured_errors: list[IndexingErrorDict] = Field(default_factory=list)
 
-    @computed_field
     def elapsed_time(self) -> float:
         """Calculate elapsed time since indexing started."""
         return time.monotonic() - self.stopwatch_time
 
-    @computed_field
     def human_elapsed_time(self) -> str:
         """Get human-readable elapsed time."""
         return elapsed_time_to_human_readable(self.elapsed_time())
 
-    @computed_field
     def processing_rate(self) -> float:
         """Files processed per second."""
         if self.elapsed_time() == 0:
             return 0.0
         return self.files_processed / self.elapsed_time()
 
-    @computed_field
     def total_errors(self) -> int:
         """Total number of files with errors."""
         return len(self.files_with_errors)
 
-    @computed_field
     def total_files_discovered(self) -> int:
         """Total files discovered (alias for files_discovered)."""
         return self.files_discovered
@@ -309,7 +303,7 @@ class IndexingProgressTracker:
         table.add_row("Time Elapsed", f"{stats.elapsed_time():.2f} seconds")
 
         if stats.total_errors() > 0:
-            table.add_row("Files with Errors", f"[yellow]{stats.total_errors}[/yellow]")
+            table.add_row("Files with Errors", f"[yellow]{stats.total_errors()}[/yellow]")
 
         # Display in panel
         panel = Panel(
