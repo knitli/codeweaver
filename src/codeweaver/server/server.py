@@ -39,6 +39,7 @@ from codeweaver.core.types.sentinel import Unset
 from codeweaver.engine.failover import VectorStoreFailoverManager
 from codeweaver.engine.indexer import Indexer
 from codeweaver.exceptions import InitializationError
+from codeweaver.mcp.state import CwMcpHttpState
 from codeweaver.providers.provider import Provider as Provider
 from codeweaver.server.health.health_service import HealthService
 from codeweaver.server.management import ManagementServer
@@ -47,7 +48,6 @@ from codeweaver.server.management import ManagementServer
 if TYPE_CHECKING:
     from codeweaver.common.utils import LazyImport
     from codeweaver.core.types import AnonymityConversion, FilteredKeyT
-    from codeweaver.mcp.state import CwMcpHttpState
 
 # lazy imports for default factory functions
 get_provider_registry: LazyImport[Callable[[], ProviderRegistry]] = lazy_import(
@@ -132,7 +132,7 @@ class CodeWeaverState(DataclassSerializationMixin):
         ),
     ]
     indexer: Annotated[
-        Indexer | None, Field(default=None, description="Indexer instance for background indexing")
+        Indexer | None, Field(description="Indexer instance for background indexing")
     ] = None
     health_service: Annotated[
         HealthService | None, Field(description="Health service instance", exclude=True)
@@ -158,12 +158,13 @@ class CodeWeaverState(DataclassSerializationMixin):
 
     telemetry: Annotated[PostHogClient | None, PrivateAttr(default=None)]
 
-    _mcp_http_server: Annotated[FastMCP[CwMcpHttpState] | None, PrivateAttr(default=None)]
+    _mcp_http_server: Annotated[FastMCP[CwMcpHttpState] | None, PrivateAttr()] = None
 
-    _tasks: Annotated[list[asyncio.Task], PrivateAttr(default_factory=list)]
+    _tasks: Annotated[list[asyncio.Task] | None, PrivateAttr(default_factory=list)] = None
 
     def __post_init__(self) -> None:
         """Post-initialization to set the global state reference."""
+        self._tasks = []
         global _state
         _state = self
 

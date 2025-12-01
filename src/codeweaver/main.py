@@ -14,7 +14,7 @@ import signal
 import sys
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal, cast
+from typing import Any, Literal, cast
 
 from fastmcp import FastMCP
 from pydantic import FilePath
@@ -40,9 +40,6 @@ class UvicornAccessLogFilter(logging.Filter):
             )
         )
 
-
-if TYPE_CHECKING:
-    from codeweaver.mcp.state import CwMcpHttpState
 
 logger = logging.getLogger(__name__)
 
@@ -113,6 +110,7 @@ async def _run_http_server(
     from codeweaver.config.settings import get_settings
     from codeweaver.core.types.sentinel import Unset
     from codeweaver.mcp.server import create_http_server
+    from codeweaver.mcp.state import CwMcpHttpState
     from codeweaver.server.lifespan import http_lifespan
     from codeweaver.server.management import ManagementServer
 
@@ -175,9 +173,10 @@ async def _run_http_server(
             try:
                 # Run MCP server
                 with contextlib.suppress(KeyboardInterrupt):
-                    await mcp_state.app.run_http_async(
-                        **(mcp_state.run_args | {"show_banner": False, "log_level": "error"})  # ty: ignore[invalid-argument-type]
-                    )
+                    # run_args contains both top-level params and uvicorn_config
+                    # FastMCP.run_http_async() handles host/port specially - they go in uvicorn_config
+                    # So we just pass run_args directly, which already has everything configured
+                    await mcp_state.app.run_http_async(**mcp_state.run_args)
             finally:
                 # Stop management server
                 await management_server.stop()

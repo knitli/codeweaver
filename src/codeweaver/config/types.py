@@ -182,7 +182,7 @@ class UvicornServerSettingsDict(TypedDict, total=False):
     workers: NotRequired[int | None]
     proxy_headers: NotRequired[bool]
     server_header: NotRequired[bool]
-    data_header: NotRequired[bool]
+    date_header: NotRequired[bool]
     forwarded_allow_ips: NotRequired[str | list[str] | None]
     root_path: NotRequired[str]
     limit_concurrency: NotRequired[PositiveInt | None]
@@ -247,7 +247,7 @@ class UvicornServerSettings(BasedModel):
     workers: int | None = None
     proxy_headers: bool = True
     server_header: bool = True
-    data_header: bool = True
+    date_header: bool = True
     forwarded_allow_ips: str | list[str] | None = None
     root_path: str = ""
     limit_concurrency: PositiveInt | None = None

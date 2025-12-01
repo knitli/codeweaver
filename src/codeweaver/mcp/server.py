@@ -25,11 +25,12 @@ from codeweaver.config.middleware import MiddlewareOptions, default_for_transpor
 from codeweaver.config.settings import FastMcpHttpServerSettings, FastMcpStdioServerSettings
 from codeweaver.config.types import FastMcpHttpRunArgs, FastMcpServerSettingsDict
 from codeweaver.core.types import DictView, Unset
+from codeweaver.mcp.middleware import McpMiddleware
 
 
 if TYPE_CHECKING:
     from codeweaver.config.types import CodeWeaverSettingsDict, FastMcpServerSettingsDict
-    from codeweaver.mcp.middleware import McpMiddleware, StatisticsMiddleware
+    from codeweaver.mcp.middleware import StatisticsMiddleware
     from codeweaver.mcp.state import CwMcpHttpState
 
 
@@ -100,60 +101,40 @@ def configure_uvicorn_logging(
     debug: bool = False,
 ) -> FastMcpHttpRunArgs:
     """Configure uvicorn logging based on verbosity settings."""
-    uvicorn_config = run_args.get("uvicorn_config", {})
+    # Make a mutable copy to avoid modifying the input
+    mutable_run_args = dict(run_args)
+    uvicorn_config = dict(mutable_run_args.get("uvicorn_config", {}))
+
+    # host, port, and name go in run_args top-level only (FastMCP extracts them)
+    # Also filter out invalid uvicorn.Config parameters
+    invalid_params = {"host", "port", "name", "data_header"}  # data_header should be date_header
+    uvicorn_config = {k: v for k, v in uvicorn_config.items() if k not in invalid_params}
+
+    # Update mutable_run_args with the cleaned uvicorn_config
+    mutable_run_args["uvicorn_config"] = uvicorn_config
+
     if port:
-        run_args["port"] = port
-        uvicorn_config["port"] = port  # ty: ignore[possibly-missing-implicit-call]
+        mutable_run_args["port"] = port
     if host:
-        run_args["host"] = host
-        uvicorn_config["host"] = host  # ty: ignore[possibly-missing-implicit-call]
+        mutable_run_args["host"] = host
+
     if verbose or debug:
         # Verbose/debug mode: Enable uvicorn access logs
-        return FastMcpHttpRunArgs(
-            **(
-                run_args
-                | {
-                    "uvicorn_config": {
-                        **uvicorn_config,
-                        "access_log": True,  # Enable access logging in verbose mode
-                        "log_level": "debug" if debug else "info",  # Match verbosity level
-                    }
-                }
-            )
-        )
-    # Non-verbose mode: Suppress all uvicorn logging completely
-    uvicorn_log_config = {
-        "version": 1,
-        "disable_existing_loggers": False,
-        "formatters": {
-            "default": {
-                "()": "uvicorn.logging.DefaultFormatter",
-                "fmt": "%(levelprefix)s %(message)s",
-                "use_colors": None,
-            }
-        },
-        "handlers": {"null": {"class": "logging.NullHandler"}},
-        "loggers": {
-            "uvicorn": {"handlers": ["null"], "level": "CRITICAL", "propagate": False},
-            "uvicorn.error": {"handlers": ["null"], "level": "CRITICAL", "propagate": False},
-            "uvicorn.access": {"handlers": ["null"], "level": "CRITICAL", "propagate": False},
-            # Additional loggers that may leak through
-            "fastmcp": {"handlers": ["null"], "level": "CRITICAL", "propagate": False},
-        },
+        mutable_run_args["uvicorn_config"] = {
+            **uvicorn_config,
+            "access_log": True,  # Enable access logging in verbose mode
+            "log_level": "debug" if debug else "info",  # Match verbosity level
+        }
+        return FastMcpHttpRunArgs(**mutable_run_args)
+    # Non-verbose mode: Suppress all uvicorn logging
+    # Just set log_level to critical and disable access_log
+    # Don't pass custom log_config as it's complex to get right with Pydantic validation
+    mutable_run_args["uvicorn_config"] = {
+        **uvicorn_config,
+        "access_log": False,  # Disable access logging
+        "log_level": "critical",  # Only critical errors (minimal logging)
     }
-    return FastMcpHttpRunArgs(
-        **(
-            run_args
-            | {
-                "uvicorn_config": {
-                    **uvicorn_config,
-                    "access_log": False,  # Disable access logging
-                    "log_level": "critical",  # Only critical errors
-                    "log_config": uvicorn_log_config,  # Custom logging config, suppressing all logs
-                }
-            }
-        )
-    )
+    return FastMcpHttpRunArgs(**mutable_run_args)
 
 
 def setup_runargs(
@@ -166,11 +147,26 @@ def setup_runargs(
 ) -> FastMcpHttpRunArgs:
     """Setup run arguments for the server."""
     mutable_run_args = dict(run_args) if isinstance(run_args, DictView) else run_args
-    if host:
-        mutable_run_args["host"] = host
-    if port:
-        mutable_run_args["port"] = port
-    return FastMcpHttpRunArgs(**mutable_run_args)
+    # Configure uvicorn logging and clean up host/port from uvicorn_config
+    return configure_uvicorn_logging(
+        mutable_run_args, host=host, port=port, verbose=verbose, debug=debug
+    )
+
+
+def _attempt_import(mw: str) -> type[McpMiddleware] | None:
+    """Attempt to import a middleware class from a string."""
+    from importlib import import_module
+
+    try:
+        imported = import_module(mw.rsplit(".", 1)[0])
+        imported = getattr(imported, mw.rsplit(".", 1)[1])
+        if isinstance(imported, type) and issubclass(imported, McpMiddleware):
+            return imported
+    except (ImportError, AttributeError):
+        logging.getLogger("codeweaver.mcp.server").warning(
+            "Failed to import middleware class '%s'", mw
+        )
+    return None
 
 
 def setup_middleware(
@@ -183,8 +179,9 @@ def setup_middleware(
 
     # Apply middleware settings
     # ty gets very confused here, so we ignore most issues
+
     for mw in middleware:  # type: ignore
-        mw: type[McpMiddleware]  # type: ignore
+        mw = mw
         match mw.__name__:  # type: ignore[reportUnknownMemberType, reportUnknownArgumentType, reportAttributeAccessIssue]
             case "ErrorHandlingMiddleware":
                 instance = mw(
@@ -280,18 +277,25 @@ def _setup_server[TransportT: Literal["stdio", "streamable-http"]](
         "streamable-http" if is_http else "stdio"
     )
     mutable_args = dict(args)
-    middleware = mutable_args.pop("middleware", [])
+    # Middleware in settings is just configuration names/options, not classes
+    # Remove it from args and always use default middleware classes for the transport
+    mutable_args.pop("middleware", None)
     run_args = mutable_args.pop("run_args", {})
+    # Remove transport from args - it's not a FastMCP constructor parameter
+    mutable_args.pop("transport", None)
+
+    # Always use default middleware classes for this transport
+    from codeweaver.mcp.middleware import default_middleware_for_transport
+
+    middleware = default_middleware_for_transport(transport)
+
     if is_http:
         run_args = setup_runargs(run_args, host, port, verbose=verbose, debug=debug)
     app = FastMCP(
         "CodeWeaver",
         **(
             mutable_args
-            | {
-                "icons": [lazy_import("codeweaver.server._assets", "CODEWEAVER_SVG_ICON")],
-                "show_banner": False,
-            }
+            | {"icons": [lazy_import("codeweaver.server._assets", "CODEWEAVER_SVG_ICON")]}
         ),  # ty: ignore[invalid-argument-type]
     )
     app = register_tools(app)
@@ -299,8 +303,9 @@ def _setup_server[TransportT: Literal["stdio", "streamable-http"]](
     if is_http:
         from codeweaver.mcp.state import CwMcpHttpState
 
+        # Pass the instantiated middleware from app.middleware, not the classes
         return CwMcpHttpState.from_app(
-            app, **(mutable_args | {"run_args": run_args, "middleware": middleware})
+            app, **(mutable_args | {"run_args": run_args, "middleware": app.middleware})
         )
     return cast(FastMCP[StdioClientLifespan], app)
 
