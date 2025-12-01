@@ -83,20 +83,10 @@ jobs:
           # Trust the config globally
           "$MISE" --quiet -y trust
           # Also set the trusted config paths environment variable for subprocesses
-<<<<<<< Updated upstream
-          echo "MISE_TRUSTED_CONFIG_PATHS=$PWD/mise.toml:$PWD/mise.ci.toml" >> "$GITHUB_ENV"
-          "$MISE" --quiet -y install 2>&1 || echo "Warning: Some tools failed to install due to network limitations in CI environment"
-||||||| Stash base
-          echo "MISE_TRUSTED_CONFIG_PATHS=$PWD/mise.toml:$PWD/mise.ci.toml" >> "$GITHUB_ENV"
-          # Guard the install with a timeout to prevent OOM / runaway installs in CI
-          # If the install fails or timeouts, we continue with a warning so Copilot can still run.
-          timeout 10m "$MISE" --quiet -y install 2>&1 || echo "Warning: Some tools failed to install due to network limitations or timeout in CI environment"
-=======
           echo "MISE_TRUSTED_CONFIG_PATHS=$PWD/mise.toml:$PWD/mise.cloudagent.toml" >> "$GITHUB_ENV"
           # Guard the install with a timeout to prevent OOM / runaway installs in CI
           # If the install fails or timeouts, we continue with a warning so Copilot can still run.
           timeout 10m "$MISE" --quiet -y install 2>&1 || echo "Warning: Some tools failed to install due to network limitations or timeout in CI environment"
->>>>>>> Stashed changes
         env:
           MISE_DIR: ${{ runner.temp }}/mise
       - name: Configure Mise and Activate Environment
