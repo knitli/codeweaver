@@ -35,6 +35,7 @@ on:
     inputs:
       update_description_only:
         description: "Only update Docker Hub description (no build)"
+        description: "Only update Docker Hub description (no build)"
         required: false
         type: boolean
         default: false
@@ -169,48 +170,31 @@ jobs:
             exit 1
           fi
           # .github/workflows/docker.yml
-      - name: Create test environment file
-        run: |
-          cat > .env << EOF
-          PROJECT_PATH=.
-          CODEWEAVER_PORT=9328
-          QDRANT_PORT=6333
-          QDRANT_GRPC_PORT=6334
-          CODEWEAVER_PROFILE=quickstart  # ← Add this
-          COLLECTION_NAME=codeweaver-test
-          ENABLE_TELEMETRY=false
-          LOG_LEVEL=INFO
-          EOF
+          - name: Create test environment file
+            run: |
+              cat > .env << EOF
+              PROJECT_PATH=.
+              CODEWEAVER_PORT=9328
+              QDRANT_PORT=6333
+              QDRANT_GRPC_PORT=6334
+              CODEWEAVER_PROFILE=quickstart  # ← Add this
+              COLLECTION_NAME=codeweaver-test
+              ENABLE_TELEMETRY=false
+              LOG_LEVEL=INFO
+              EOF
       - name: Build and start services
         run: |
           docker compose build
           docker compose up -d
           # .github/workflows/docker.yml
-      - name: Wait for services to be healthy
-        env:
-          # Health check endpoints - /healthz for Qdrant (v1.5.0+), /health/ for CodeWeaver
-          QDRANT_HEALTH_URL: http://localhost:6333/healthz
-          CODEWEAVER_HEALTH_URL: http://localhost:9328/health/
-        run: |
-          echo "Waiting for Qdrant to be ready..."
-          # Use /healthz endpoint (Qdrant v1.5.0+), /health returns 404
-          max_attempts=30
-          attempt=0
-          until curl -sf "$QDRANT_HEALTH_URL" >/dev/null 2>&1; do
-            attempt=$((attempt + 1))
-            if [ $attempt -ge $max_attempts ]; then
-              echo "Qdrant failed to become healthy after $max_attempts attempts"
-              docker compose logs qdrant
-              exit 1
-            fi
-            echo "Waiting for Qdrant... (attempt $attempt/$max_attempts)"
-            sleep 2
-          done
-          echo "Qdrant is healthy!"
-
-          echo "Waiting for CodeWeaver to be ready..."
-          # Increase timeout to 5 minutes for initial model downloads
-          timeout 300 bash -c 'until curl -sf http://localhost:9328/health/ 2>/dev/null; do echo "Waiting for CodeWeaver (may download models on first run)..."; sleep 10; done'
+          - name: Wait for services to be healthy
+            run: |
+              echo "Waiting for Qdrant to be ready..."
+              timeout 60 bash -c 'until curl -sf http://localhost:6333/health; do sleep 2; done'
+              
+              echo "Waiting for CodeWeaver to be ready..."
+              # Increase timeout to 5 minutes for initial model downloads
+              timeout 300 bash -c 'until curl -sf http://localhost:9328/health/ 2>/dev/null; do echo "Waiting for CodeWeaver (may download models on first run)..."; sleep 10; done'
       - name: Test Qdrant accessibility
         env:
           QDRANT_HEALTH_URL: http://localhost:6333/healthz
@@ -223,6 +207,7 @@ jobs:
           CODEWEAVER_HEALTH_URL: http://localhost:9328/health/
         run: |
           echo "Testing CodeWeaver health endpoint..."
+          curl -f http://localhost:9328/health/ || (docker compose logs codeweaver && exit 1)
           curl -f http://localhost:9328/health/ || (docker compose logs codeweaver && exit 1)
       - name: Check logs for errors
         if: always()
