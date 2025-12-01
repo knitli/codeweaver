@@ -302,7 +302,7 @@ async def lifespan(
     """Context manager for application lifespan with proper initialization.
 
     Args:
-        app: FastMCP application instance
+        app: application instance
         settings: Configuration settings
         statistics: Session statistics instance
         verbose: Enable verbose logging
@@ -315,7 +315,7 @@ async def lifespan(
 
     # Print clean header (not in verbose mode, as this is always shown)
     server_host = getattr(app, "host", "127.0.0.1") if hasattr(app, "host") else "127.0.0.1"
-    server_port = getattr(app, "port", 9328) if hasattr(app, "port") else 9328
+    server_port = getattr(app, "port", 9329) if hasattr(app, "port") else 9329
     status_display.print_header(host=server_host, port=server_port)
 
     if verbose or debug:
@@ -443,15 +443,6 @@ def _initialize_cw_state(
     return state
 
 
-def resolve_globs(path_string: str, repo_root: Path) -> set[Path]:
-    """Resolve glob patterns in a path string."""
-    if "*" in path_string or "?" in path_string or BRACKET_PATTERN.search(path_string):
-        return set(repo_root.glob(path_string))
-    if (path := (repo_root / path_string)) and path.exists():
-        return {path} if path.is_file() else set(path.glob("**/*"))
-    return set()
-
-
 def build_app(
     *,
     verbose: bool = False,
@@ -459,7 +450,7 @@ def build_app(
     transport: Literal["streamable-http", "stdio"] = "streamable-http",
     host: str = "127.0.0.1",
     port: int = 9328,
-):
+) -> None:
     """Build and configure the CodeWeaver application without starting it.
 
     Args:
@@ -492,7 +483,7 @@ def build_app(
         except Exception as e:
             raise InitializationError("Failed to load CodeWeaver settings.") from e
 
-    lifespan_fn = rpartial(
+    rpartial(
         lifespan,
         get_settings() if get_settings is not LazyImport else get_settings._resolve()(),
         session_statistics,

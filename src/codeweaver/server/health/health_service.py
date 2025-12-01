@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import time
 
@@ -31,7 +32,7 @@ from codeweaver.server.health.models import (
 
 if TYPE_CHECKING:
     from codeweaver.common.registry import ProviderRegistry
-    from codeweaver.common.statistics import SessionStatistics
+    from codeweaver.common.statistics import FileStatistics, SessionStatistics
     from codeweaver.engine.failover import VectorStoreFailoverManager
     from codeweaver.engine.indexer import Indexer
 
@@ -344,74 +345,101 @@ class HealthService:
             return RerankingServiceInfo(status="down", model="unknown", latency_ms=0)
         return RerankingServiceInfo(status="down", model="unknown", latency_ms=0)
 
+    def _aggregate_chunk_statistics(
+        self, index_statistics: FileStatistics
+    ) -> tuple[int, int, int, int, float]:
+        """Aggregate chunk statistics from index statistics.
+
+        Returns:
+            Tuple of (total_chunks, semantic_chunks, delimiter_chunks, file_chunks, avg_chunk_size)
+        """
+        semantic_chunks = 0
+        delimiter_chunks = 0
+        file_chunks = 0
+        all_chunk_sizes = []
+
+        for category_stats in index_statistics.categories.values():
+            for lang_stats in category_stats.languages.values():
+                semantic_chunks += lang_stats.semantic_chunks
+                delimiter_chunks += lang_stats.delimiter_chunks
+                file_chunks += lang_stats.file_chunks
+                all_chunk_sizes.extend(lang_stats.chunk_sizes)
+
+        total_chunks = semantic_chunks + delimiter_chunks + file_chunks
+        avg_chunk_size = 0.0
+        if all_chunk_sizes:
+            import statistics as stats_module
+
+            avg_chunk_size = stats_module.mean(all_chunk_sizes)
+
+        return total_chunks, semantic_chunks, delimiter_chunks, file_chunks, avg_chunk_size
+
+    def _extract_indexed_languages(self, index_statistics: Any) -> list[str]:
+        """Extract and normalize language names from index statistics.
+
+        Returns:
+            Sorted list of unique language names
+        """
+        languages = []
+        for category_stats in index_statistics.categories.values():
+            for lang in category_stats.languages:
+                if isinstance(lang, str):
+                    languages.append(lang)
+                else:
+                    languages.append(
+                        lang.as_variable if hasattr(lang, "as_variable") else str(lang)
+                    )
+        return sorted(set(languages))
+
+    def _calculate_avg_query_latency(self, stats: Any) -> float:
+        """Calculate average query latency from timing statistics.
+
+        Returns:
+            Average latency in milliseconds
+        """
+        timing_stats = stats.get_timing_statistics()
+        if not timing_stats or "queries" not in timing_stats:
+            return 0.0
+
+        if query_timings := timing_stats["queries"]:
+            return sum(query_timings) / len(query_timings) * 1000  # Convert to ms
+        return 0.0
+
     async def _get_statistics_info(self) -> StatisticsInfo:
         """Get statistics and metrics information."""
         stats = self._statistics
 
-        # Calculate total chunks and files indexed
+        # Initialize default values
         total_chunks = 0
         total_files = 0
         semantic_chunks = 0
         delimiter_chunks = 0
         file_chunks = 0
         avg_chunk_size = 0.0
+        languages: list[str] = []
 
+        # Collect indexer statistics if available
         if self._indexer:
-            # Use session statistics from indexer for comprehensive tracking
             session_stats = self._indexer.session_statistics
 
-            # Get file statistics from session stats if available
             if session_stats.index_statistics:
-                total_files = session_stats.index_statistics.total_unique_files
+                # Get detailed statistics from session stats
+                index_stats = session_stats.index_statistics
+                total_files = index_stats.total_unique_files
 
-                # Aggregate chunk statistics across all categories and languages
-                all_chunk_sizes = []
-                for category_stats in session_stats.index_statistics.categories.values():
-                    for lang_stats in category_stats.languages.values():
-                        semantic_chunks += lang_stats.semantic_chunks
-                        delimiter_chunks += lang_stats.delimiter_chunks
-                        file_chunks += lang_stats.file_chunks
-                        all_chunk_sizes.extend(lang_stats.chunk_sizes)
-
-                # Calculate totals and averages
-                total_chunks = semantic_chunks + delimiter_chunks + file_chunks
-                if all_chunk_sizes:
-                    import statistics as stats_module
-
-                    avg_chunk_size = stats_module.mean(all_chunk_sizes)
+                total_chunks, semantic_chunks, delimiter_chunks, file_chunks, avg_chunk_size = (
+                    self._aggregate_chunk_statistics(index_stats)
+                )
+                languages = self._extract_indexed_languages(index_stats)
             else:
-                # Fallback to indexer stats (no detailed chunk breakdown)
+                # Fallback to basic indexer stats
                 indexer_stats = self._indexer.stats
                 total_chunks = indexer_stats.chunks_indexed
                 total_files = indexer_stats.files_processed
 
-        # Calculate average query latency from timing statistics
-        timing_stats = stats.get_timing_statistics()
-        avg_latency = 0.0
-        if (
-            timing_stats
-            and "queries" in timing_stats
-            and (query_timings := timing_stats["queries"])
-        ):
-            avg_latency = sum(query_timings) / len(query_timings) * 1000  # Convert to ms
-
-        # Get total queries processed
+        # Calculate query metrics
+        avg_latency = self._calculate_avg_query_latency(stats)
         total_queries = stats.total_requests
-
-        # Get indexed languages from session statistics
-        languages = []
-        if self._indexer and self._indexer.session_statistics.index_statistics:
-            file_stats = self._indexer.session_statistics.index_statistics
-            # Extract language names from all categories
-            for category_stats in file_stats.categories.values():
-                for lang in category_stats.languages:
-                    if isinstance(lang, str):
-                        languages.append(lang)
-                    else:
-                        languages.append(
-                            lang.as_variable if hasattr(lang, "as_variable") else str(lang)
-                        )
-        languages = sorted(set(languages))  # Deduplicate and sort
 
         # Estimate index size (rough estimate: ~1KB per chunk)
         index_size_mb = int((total_chunks * 1024) / (1024 * 1024))
@@ -508,7 +536,7 @@ class HealthService:
                 try:
                     total = sum(f.stat().st_size for f in path.rglob("*") if f.is_file())
                     return total // (1024 * 1024)
-                except (PermissionError, OSError):
+                except OSError:
                     # Gracefully handle permission errors
                     return 0
 
@@ -519,17 +547,13 @@ class HealthService:
             # File descriptors (Unix only)
             file_descriptors = None
             file_descriptors_limit = None
-            try:
+            with contextlib.suppress(AttributeError, ImportError):
                 file_descriptors = process.num_fds()  # Unix only
                 # Get system limit
                 import resource
 
                 soft_limit, _ = resource.getrlimit(resource.RLIMIT_NOFILE)
                 file_descriptors_limit = soft_limit
-            except (AttributeError, ImportError):
-                # Windows or unavailable
-                pass
-
             return ResourceInfo(
                 memory_mb=memory_mb,
                 cpu_percent=cpu_percent,

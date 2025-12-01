@@ -89,12 +89,10 @@ async def combined_lifespan(
             logger.info("Initializing background services...")
 
         # Start background indexing task
-        from codeweaver.server.server import _run_background_indexing
+        from codeweaver.server.background_services import run_background_indexing
 
         indexing_task = asyncio.create_task(
-            _run_background_indexing(
-                background_state, settings, status_display, verbose=verbose, debug=debug
-            )
+            run_background_indexing(background_state, status_display, verbose=verbose, debug=debug)
         )
 
         # Perform health checks and display results

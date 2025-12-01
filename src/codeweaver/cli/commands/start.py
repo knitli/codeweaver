@@ -11,6 +11,7 @@ independently of the MCP server.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import time
 
 from pathlib import Path
@@ -80,8 +81,8 @@ async def start_cw_services(
     from codeweaver import __version__ as version
     from codeweaver.common.statistics import get_session_statistics
     from codeweaver.config.settings import get_settings
+    from codeweaver.server.background_services import CodeWeaverState, run_background_indexing
     from codeweaver.server.health.health_service import HealthService
-    from codeweaver.server.server import CodeWeaverState, _run_background_indexing
 
     # Load settings
     settings = get_settings()
@@ -134,7 +135,7 @@ async def start_cw_services(
 
     # Start background indexing
     indexing_task = asyncio.create_task(
-        _run_background_indexing(cw_state, settings, display, verbose=False, debug=False)
+        run_background_indexing(cw_state, display, verbose=False, debug=False)
     )
 
     display.print_success("Background services started successfully")
@@ -151,10 +152,8 @@ async def start_cw_services(
     except KeyboardInterrupt:
         display.print_warning("Shutting down background services...")
         indexing_task.cancel()
-        try:
+        with contextlib.suppress(asyncio.CancelledError, TimeoutError):
             await asyncio.wait_for(indexing_task, timeout=5.0)
-        except (asyncio.CancelledError, TimeoutError):
-            pass
     finally:
         cw_state.initialized = False
 

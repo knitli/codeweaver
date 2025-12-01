@@ -12,7 +12,7 @@ from codeweaver.core.types.sentinel import Unset
 
 if TYPE_CHECKING:
     from codeweaver.config.types import CodeWeaverSettingsDict
-    from codeweaver.config.views.dict_view import DictView
+    from codeweaver.core.types import DictView
 
 
 def _set_log_levels():
@@ -33,6 +33,7 @@ def _set_log_levels():
         "fastmcp.server",
         "google",
         "google.api_core",
+        "google.genai",
         "hf",
         "httpcore",
         "httpx",

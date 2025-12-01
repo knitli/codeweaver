@@ -60,6 +60,59 @@ def _progress_callback(
             progress_tracker.update_sparse_embedding(current, total)
 
 
+async def _perform_indexing(
+    state: CodeWeaverState, status_display: StatusDisplay, *, verbose: bool, debug: bool
+) -> None:
+    """Perform the indexing operation with progress tracking."""
+    status_display.print_info("Initializing indexer...")
+
+    # Check if sparse embeddings are configured
+    has_sparse = state.indexer._sparse_provider is not None
+
+    # Create progress tracker with batch support (same as index command)
+    progress_tracker: IndexingProgress = IndexingProgress(
+        console=status_display.console, has_sparse=has_sparse
+    )
+
+    # Track files in current batch for complete_batch
+    current_batch_files = [0]  # Use list to allow mutation in closure
+
+    status_display.print_success("Starting indexing process...")
+
+    with progress_tracker:
+        await state.indexer.prime_index(
+            force_reindex=False,
+            progress_callback=partial(_progress_callback, progress_tracker, current_batch_files),
+            status_display=None if verbose or debug else status_display,
+        )
+        progress_tracker.complete()
+
+
+def _display_indexing_summary(status_display: StatusDisplay, stats: Any) -> None:
+    """Display the indexing summary statistics."""
+    status_display.console.print()
+    status_display.print_success("Indexing Complete!")
+    status_display.console.print()
+    status_display.console.print(f"  Files processed: [cyan]{stats.files_processed}[/cyan]")
+    status_display.console.print(f"  Chunks created: [cyan]{stats.chunks_created}[/cyan]")
+    status_display.console.print(f"  Chunks indexed: [cyan]{stats.chunks_indexed}[/cyan]")
+    status_display.console.print(
+        f"  Processing rate: [cyan]{stats.processing_rate():.2f}[/cyan] files/sec"
+    )
+
+    # Format elapsed time in human-readable format
+    elapsed = stats.elapsed_time()
+    human_time = elapsed_time_to_human_readable(elapsed)
+    status_display.console.print(f"  Time elapsed: [cyan]{human_time}[/cyan]")
+
+    if stats.total_errors() > 0:
+        status_display.console.print(
+            f"  [yellow]Files with errors: {stats.total_errors()}[/yellow]"
+        )
+
+    status_display.console.print()
+
+
 async def start_watcher(
     state: CodeWeaverState, status_display: StatusDisplay
 ) -> asyncio.Task[None]:
@@ -83,6 +136,41 @@ async def start_watcher(
     return await asyncio.create_task(watcher.run())
 
 
+async def _handle_watcher_cancellation(
+    watcher_task: asyncio.Task[None] | None, status_display: StatusDisplay, *, verbose: bool
+) -> None:
+    """Handle graceful cancellation of the watcher task."""
+    if not watcher_task or watcher_task.done():
+        return
+
+    watcher_task.cancel()
+    try:
+        await asyncio.wait_for(watcher_task, timeout=2.5)
+    except (TimeoutError, asyncio.CancelledError):
+        if verbose:
+            _logger.warning("Watcher did not stop within timeout")
+        status_display.console.print("  [dim]Tidying up a few loose threads...[/dim]")
+
+
+async def _run_indexing_workflow(
+    state: CodeWeaverState, status_display: StatusDisplay, *, verbose: bool, debug: bool
+) -> asyncio.Task[None]:
+    """Run the complete indexing workflow and start the watcher."""
+    # Perform indexing with progress tracking
+    await _perform_indexing(state, status_display, verbose=verbose, debug=debug)
+
+    # Display final summary
+    _display_indexing_summary(status_display, state.indexer.stats)
+
+    status_display.print_step("Watching for file changes...")
+
+    # Start file watcher for real-time updates
+    if verbose:
+        _logger.info("Starting file watcher...")
+
+    return await start_watcher(state, status_display)
+
+
 async def run_background_indexing(
     state: CodeWeaverState,
     status_display: StatusDisplay,
@@ -99,87 +187,28 @@ async def run_background_indexing(
         verbose: Whether to show verbose output
         debug: Whether debug mode is enabled
     """
+    if verbose:
+        _logger.info("Starting background indexing...")
+
+    if not state.indexer:
+        # Always show this warning to the user - it's important
+        status_display.print_warning("No indexer configured, skipping background indexing")
+        if verbose:
+            _logger.warning(
+                "No indexer configured, skipping background indexing. This is probably a bug if you have everything else set up correctly."
+            )
+        return
+
     watcher_task = None
     try:
-        if verbose:
-            _logger.info("Starting background indexing...")
-
-        if not state.indexer:
-            # Always show this warning to the user - it's important
-            status_display.print_warning("No indexer configured, skipping background indexing")
-            if verbose:
-                _logger.warning("No indexer configured, skipping background indexing")
-            return
-
-        status_display.print_info("Initializing indexer...")
-
-        # Check if sparse embeddings are configured
-        has_sparse = state.indexer._sparse_provider is not None
-
-        # Create progress tracker with batch support (same as index command)
-        progress_tracker: IndexingProgress = IndexingProgress(
-            console=status_display.console, has_sparse=has_sparse
+        watcher_task = await _run_indexing_workflow(
+            state, status_display, verbose=verbose, debug=debug
         )
-
-        # Track files in current batch for complete_batch
-        current_batch_files = [0]  # Use list to allow mutation in closure
-
-        status_display.print_success("Starting indexing process...")
-
-        with progress_tracker:
-            await state.indexer.prime_index(
-                force_reindex=False,
-                progress_callback=partial(
-                    _progress_callback, progress_tracker, current_batch_files
-                ),
-                status_display=None if verbose or debug else status_display,
-            )
-            progress_tracker.complete()
-
-        # Display final summary
-        stats = state.indexer.stats
-        status_display.console.print()
-        status_display.print_success("Indexing Complete!")
-        status_display.console.print()
-        status_display.console.print(f"  Files processed: [cyan]{stats.files_processed}[/cyan]")
-        status_display.console.print(f"  Chunks created: [cyan]{stats.chunks_created}[/cyan]")
-        status_display.console.print(f"  Chunks indexed: [cyan]{stats.chunks_indexed}[/cyan]")
-        status_display.console.print(
-            f"  Processing rate: [cyan]{stats.processing_rate():.2f}[/cyan] files/sec"
-        )
-
-        # Format elapsed time in human-readable format
-        elapsed = stats.elapsed_time()
-        human_time = elapsed_time_to_human_readable(elapsed)
-        status_display.console.print(f"  Time elapsed: [cyan]{human_time}[/cyan]")
-
-        if stats.total_errors() > 0:
-            status_display.console.print(
-                f"  [yellow]Files with errors: {stats.total_errors()}[/yellow]"
-            )
-
-        status_display.console.print()
-        status_display.print_step("Watching for file changes...")
-
-        # Start file watcher for real-time updates
-        if verbose:
-            _logger.info("Starting file watcher...")
-
-        watcher_task = await start_watcher(state, status_display)
-
     except asyncio.CancelledError:
         status_display.print_shutdown_start()
         if verbose:
             _logger.info("Background indexing cancelled, shutting down watcher...")
-        # Cancel watcher task if it's still running
-        if watcher_task and not watcher_task.done():
-            watcher_task.cancel()
-            try:
-                await asyncio.wait_for(watcher_task, timeout=2.5)
-            except (TimeoutError, asyncio.CancelledError):
-                if verbose:
-                    _logger.warning("Watcher did not stop within timeout")
-                status_display.console.print("  [dim]Tidying up a few loose threads...[/dim]")
+        await _handle_watcher_cancellation(watcher_task, status_display, verbose=verbose)
         raise
     except Exception as e:
         status_display.print_error("Background indexing error", details=str(e))
