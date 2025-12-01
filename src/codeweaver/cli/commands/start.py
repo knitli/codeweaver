@@ -111,8 +111,8 @@ async def start_cw_services(
             if management_server.server_task:
                 await management_server.server_task
             else:
-                # Wait indefinitely if task not set (shouldn't happen)
-                await asyncio.Event().wait()
+                # Shouldn't happen: server_task not set
+                raise RuntimeError("ManagementServer.server_task was not set. This should not happen; please check server startup logic.")
         except (KeyboardInterrupt, asyncio.CancelledError):
             display.print_warning("Shutting down background services...")
         finally:
