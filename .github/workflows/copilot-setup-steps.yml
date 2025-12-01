@@ -27,7 +27,7 @@ jobs:
       MISE_YES: 1
     runs-on: ubuntu-latest
     # Add an overall job timeout so we don't let runaway installs exhaust the runner indefinitely
-    timeout-minutes: 30
+    timeout-minutes: 50
     # Set the permissions to the lowest permissions possible needed for your steps.
     # Copilot will be given its own token for its operations.
     permissions:
@@ -57,7 +57,7 @@ jobs:
           path: |
             ~/.cache/uv
             .venv
-          key: uv-copilot-${{ runner.os }}-py3.12-${{ hashFiles('uv.lock') }}
+          key: uv-copilot-${{ runner.os }}-${{ hashFiles('uv.lock') }}
           restore-keys: |
             uv-copilot-${{ runner.os }}-
             uv-${{ runner.os }}-
