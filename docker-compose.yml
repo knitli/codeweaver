@@ -20,8 +20,13 @@ services:
     environment:
       - QDRANT__SERVICE__GRPC_PORT=6334
     healthcheck:
-      # Use /healthz endpoint (Qdrant v1.5.0+) - /health returns 404
-      test: ["CMD", "curl", "-sf", "http://localhost:6333/healthz"]
+      # Use raw bash TCP/HTTP check since curl/wget not in Qdrant image
+      # Check /healthz endpoint (Qdrant v1.5.0+) for proper health status
+      test:
+        [
+          "CMD-SHELL",
+          "exec 3<>/dev/tcp/127.0.0.1/6333 && echo -e 'GET /healthz HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && timeout 2 cat <&3 | grep -q 'HTTP/1.1 200'",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5

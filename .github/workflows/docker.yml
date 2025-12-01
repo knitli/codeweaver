@@ -187,12 +187,16 @@ jobs:
           docker compose up -d
           # .github/workflows/docker.yml
       - name: Wait for services to be healthy
+        env:
+          # Health check endpoints - /healthz for Qdrant (v1.5.0+), /health/ for CodeWeaver
+          QDRANT_HEALTH_URL: http://localhost:6333/healthz
+          CODEWEAVER_HEALTH_URL: http://localhost:9328/health/
         run: |
           echo "Waiting for Qdrant to be ready..."
           # Use /healthz endpoint (Qdrant v1.5.0+), /health returns 404
           max_attempts=30
           attempt=0
-          until curl -sf http://localhost:6333/healthz >/dev/null 2>&1; do
+          until curl -sf "$QDRANT_HEALTH_URL" >/dev/null 2>&1; do
             attempt=$((attempt + 1))
             if [ $attempt -ge $max_attempts ]; then
               echo "Qdrant failed to become healthy after $max_attempts attempts"
@@ -208,12 +212,15 @@ jobs:
           # Increase timeout to 5 minutes for initial model downloads
           timeout 300 bash -c 'until curl -sf http://localhost:9328/health/ 2>/dev/null; do echo "Waiting for CodeWeaver (may download models on first run)..."; sleep 10; done'
       - name: Test Qdrant accessibility
+        env:
+          QDRANT_HEALTH_URL: http://localhost:6333/healthz
         run: |
           echo "Testing Qdrant health endpoint..."
-          # Use /healthz endpoint (correct endpoint for Qdrant v1.5.0+)
-          curl -sf http://localhost:6333/healthz || (echo "Qdrant health check failed" && docker compose logs qdrant && exit 1)
+          curl -sf "$QDRANT_HEALTH_URL" || (echo "Qdrant health check failed" && docker compose logs qdrant && exit 1)
           echo "Qdrant health check passed!"
       - name: Test CodeWeaver accessibility
+        env:
+          CODEWEAVER_HEALTH_URL: http://localhost:9328/health/
         run: |
           echo "Testing CodeWeaver health endpoint..."
           curl -f http://localhost:9328/health/ || (docker compose logs codeweaver && exit 1)
