@@ -188,9 +188,26 @@ jobs:
           docker compose up -d
           # .github/workflows/docker.yml
       - name: Wait for services to be healthy
+        env:
+          # Health check endpoints - /healthz for Qdrant (v1.5.0+), /health/ for CodeWeaver
+          QDRANT_HEALTH_URL: http://localhost:6333/healthz
+          CODEWEAVER_HEALTH_URL: http://localhost:9328/health/
         run: |
           echo "Waiting for Qdrant to be ready..."
-          timeout 60 bash -c 'until curl -sf http://localhost:6333/health; do sleep 2; done'
+          # Use /healthz endpoint (Qdrant v1.5.0+), /health returns 404
+          max_attempts=30
+          attempt=0
+          until curl -sf "$QDRANT_HEALTH_URL" >/dev/null 2>&1; do
+            attempt=$((attempt + 1))
+            if [ $attempt -ge $max_attempts ]; then
+              echo "Qdrant failed to become healthy after $max_attempts attempts"
+              docker compose logs qdrant
+              exit 1
+            fi
+            echo "Waiting for Qdrant... (attempt $attempt/$max_attempts)"
+            sleep 2
+          done
+          echo "Qdrant is healthy!"
 
           echo "Waiting for CodeWeaver to be ready..."
           # Increase timeout to 5 minutes for initial model downloads
