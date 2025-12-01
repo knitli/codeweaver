@@ -930,7 +930,7 @@ class Identifier(NamedTuple):
     """A named tuple for request identifiers."""
 
     request_id: str | int | None = None
-    uuid: UUID7_STR = uuid7().hex
+    uuid: UUID7_STR = Field(default_factory=lambda: uuid7().hex)
 
     @property
     def timestamp(self) -> int:
