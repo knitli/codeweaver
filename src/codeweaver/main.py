@@ -221,7 +221,7 @@ async def _run_stdio_server(
 
     # Run stdio proxy (blocks until client disconnects)
     try:
-        stdio_server.run()
+        await stdio_server.run_stdio_async(show_banner=False, log_level="warning")
     except KeyboardInterrupt:
         if verbose or debug:
             logger.info("stdio server shutting down...")
@@ -243,7 +243,7 @@ async def get_stdio_server(
         port: Optional port for the server. This is the host/port for the *codeweaver http mcp server* that the stdio client will be proxied to. **You only need this if you're not connecting to a default setting or not connecting to what is in your config file**.
 
     Returns:
-        Configured FastMCP stdio server instance.
+        Configured FastMCP stdio server instance (not yet running).
 
     """
     from codeweaver.mcp.server import create_stdio_server
@@ -267,11 +267,9 @@ async def get_stdio_server(
             settings = CodeWeaverSettingsDict(**settings.model_dump())
     else:
         settings = None
-    server = await create_stdio_server(
+    return await create_stdio_server(
         settings=cast(CodeWeaverSettingsDict | None, settings), host=host, port=port
     )
-    await server.run_stdio_async(show_banner=False, log_level="warning")
-    return server
 
 
 async def run(

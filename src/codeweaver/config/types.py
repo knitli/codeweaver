@@ -305,7 +305,7 @@ class UvicornServerSettings(BasedModel):
             | {
                 "name": "CodeWeaver MCP Server",
                 "port": int(env)
-                if (env := os.environ.get("CODEWEAVER_MCP_PORT")) and env.isnumeric()
+                if (env := os.environ.get("CODEWEAVER_MCP_PORT")) and env.isdigit()
                 else 9328,
             }
         )

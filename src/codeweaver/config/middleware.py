@@ -144,7 +144,7 @@ DefaultMiddlewareSettings = MiddlewareOptions(
 
 
 def default_for_transport(protocol: Literal["streamable-http", "stdio"]) -> MiddlewareOptions:
-    """Get default middleware settings for a given transport protocol."""
+    """Get default mcp middleware settings for a given transport protocol."""
     settings = DefaultMiddlewareSettings.copy()
     if protocol == "stdio":
         return MiddlewareOptions(**{

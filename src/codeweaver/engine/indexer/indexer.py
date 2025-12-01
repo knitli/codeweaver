@@ -1205,6 +1205,9 @@ class Indexer(BasedModel):
                 self.save_checkpoint()
                 logger.debug("Checkpoint saved after batch %d/%d", batch_num, total_batches)
 
+            # Yield to event loop between file batches to keep server responsive
+            await asyncio.sleep(0)
+
         logger.info("Batch-through-pipeline indexing complete: %d batches processed", total_batches)
 
     def _finalize_indexing(self) -> None:
@@ -1588,6 +1591,10 @@ class Indexer(BasedModel):
                     # Report sparse embedding progress (always, even after exceptions)
                     if progress_callback:
                         progress_callback("sparse_embedding", sparse_embedded, total_chunks)
+
+                # Explicitly yield to event loop between batches to prevent blocking
+                # other async tasks (HTTP server, management server, etc.)
+                await asyncio.sleep(0)
 
                 # Update overall stats
                 self._stats.chunks_embedded += len(batch)

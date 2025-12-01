@@ -104,16 +104,17 @@ class IndexingStats(DataclassSerializationMixin):
         """
         from datetime import UTC, datetime
 
-        self.files_with_errors.append(file_path)  # Set automatically deduplicates
-        self.structured_errors.append(
-            IndexingErrorDict(
-                file_path=str(file_path),
-                error_type=type(error).__name__,
-                error_message=str(error),
-                phase=phase,
-                timestamp=datetime.now(UTC).isoformat(),
+        if file_path not in self.files_with_errors:
+            self.files_with_errors.append(file_path)
+            self.structured_errors.append(
+                IndexingErrorDict(
+                    file_path=str(file_path),
+                    error_type=type(error).__name__,
+                    error_message=str(error),
+                    phase=phase,
+                    timestamp=datetime.now(UTC).isoformat(),
+                )
             )
-        )
 
     def get_error_summary(self) -> dict[str, Any]:
         """Get summary of errors by phase and type.
