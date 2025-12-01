@@ -360,7 +360,9 @@ class TestSearchEvent:
         assert "query" in properties
         assert properties["query"]["token_count"] == 3  # "find authentication functions"
         assert properties["query"]["char_count"] == len("find authentication functions")
-        assert "hash" in properties["query"]
+        # The query dict includes redacted query and results, not a hash
+        assert "query" in properties["query"]  # The redacted query string
+        assert "results" in properties["query"]  # The redacted results JSON
 
     def test_search_event_without_tools_over_privacy(self) -> None:
         """Test SearchEvent excludes query details when tools_over_privacy=False."""

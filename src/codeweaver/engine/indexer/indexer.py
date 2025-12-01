@@ -721,7 +721,7 @@ class Indexer(BasedModel):
                         "error": str(e),
                         "error_type": type(e).__name__,
                         "phase": phase,
-                        "total_errors": self._stats.total_errors,
+                        "total_errors": self._stats.total_errors(),
                     },
                 },
             )
@@ -1214,7 +1214,7 @@ class Indexer(BasedModel):
             self._stats.files_processed,
             self._stats.chunks_created,
             self._stats.chunks_indexed,
-            self._stats.total_errors,
+            self._stats.total_errors(),
             self._stats.elapsed_time(),
             self._stats.processing_rate(),
         )

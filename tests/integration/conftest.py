@@ -962,6 +962,7 @@ def initialized_cw_state(tmp_path: Path) -> Generator[Any, None, None]:
         get_services_registry,
     )
     from codeweaver.common.statistics import get_session_statistics
+    from codeweaver.common.telemetry.client import PostHogClient
     from codeweaver.config.settings import get_settings
     from codeweaver.server.server import CodeWeaverState
 
@@ -980,6 +981,7 @@ def initialized_cw_state(tmp_path: Path) -> Generator[Any, None, None]:
         indexer=None,
         health_service=None,
         failover_manager=None,
+        telemetry=PostHogClient.from_settings(),
     )
     # Cleanup: Reset global state
     from codeweaver.server import server
