@@ -340,7 +340,9 @@ async def create_stdio_server(
     else:
         http_settings = _get_fastmcp_settings_map(http=True)
         run_args = http_settings.get("run_args", {})
-    url = f"http://{host or run_args.get('host', '127.0.0.1')}:{port or run_args.get('port', 9328)}{http_settings.get('path', '/mcp')}"
+    resolved_host = host or run_args.get('host', '127.0.0.1')
+    resolved_port = port or run_args.get('port', 9328)
+    url = f"http://{resolved_host}:{resolved_port}{http_settings.get('path', '/mcp')}"
     return app.as_proxy(backend=ProxyClient(transport=StreamableHttpTransport(url=url)))
 
 
