@@ -349,9 +349,7 @@ class ManagementServer:
         """
         self.background_state = background_state
         self.server: uvicorn.Server | None = None
-        self.server_task: asyncio.Task | None  # type: ignore[type-arg]
-        self.server_task = None
-
+        self.server_task: asyncio.Task | None = None
     def create_app(self) -> Starlette:
         """
         Create Starlette app with management routes.
