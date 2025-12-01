@@ -396,15 +396,16 @@ def _initialize_cw_state(
     settings: CodeWeaverSettings | None = None, statistics: SessionStatistics | None = None
 ) -> CodeWeaverState:
     """Initialize application state if not already present."""
+    resolved_settings = settings or get_settings._resolve()()
     state = CodeWeaverState(  # type: ignore
         initialized=False,
         # for lazy imports, we need to call resolve() to get the function/object and then call it
-        settings=settings or get_settings._resolve()(),
+        settings=resolved_settings,
         statistics=statistics or get_session_statistics._resolve()(),
         project_path=get_project_path()
-        if isinstance(settings.project_path, Unset)
-        else settings.project_path,
-        config_path=None if isinstance(settings.config_file, Unset) else settings.config_file,
+        if isinstance(resolved_settings.project_path, Unset)
+        else resolved_settings.project_path,
+        config_path=None if isinstance(resolved_settings.config_file, Unset) else resolved_settings.config_file,
         provider_registry=get_provider_registry._resolve()(),
         services_registry=get_services_registry._resolve()(),
         model_registry=get_model_registry._resolve()(),
