@@ -20,10 +20,12 @@ services:
     environment:
       - QDRANT__SERVICE__GRPC_PORT=6334
     healthcheck:
+      # Use raw bash TCP/HTTP check since curl/wget not in Qdrant image
+      # Check /healthz endpoint (Qdrant v1.5.0+) for proper health status
       test:
         [
           "CMD-SHELL",
-          "timeout 2 bash -c 'exec 3<>/dev/tcp/localhost/6333' || exit 1",
+          "(exec 3<>/dev/tcp/127.0.0.1/6333 && echo -e 'GET /healthz HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && timeout 2 cat <&3 | grep -q 'HTTP/1.1 200'; exec 3>&-)",
         ]
       interval: 10s
       timeout: 5s
