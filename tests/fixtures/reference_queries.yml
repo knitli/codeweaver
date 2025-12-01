@@ -41,15 +41,15 @@ queries:
     expected_files:
       - src/codeweaver/providers/embedding/providers/base.py
       - src/codeweaver/providers/reranking/providers/base.py
-      - src/codeweaver/server/health_service.py
+      - src/codeweaver/server/health/health_service.py
     description: Understanding circuit breaker resilience pattern
   - query: show me the health endpoint implementation
     intent: UNDERSTAND
     precision_target: 3
     expected_files:
-      - src/codeweaver/server/health_service.py
-      - src/codeweaver/server/health_models.py
-      - src/codeweaver/server/health_endpoint.py
+      - src/codeweaver/server/health/health_service.py
+      - src/codeweaver/server/health/models.py
+      - src/codeweaver/server/health/endpoint.py
     description: Understanding health monitoring system
   - query: explain chunker selector strategy
     intent: UNDERSTAND
@@ -100,9 +100,9 @@ queries:
     intent: IMPLEMENT
     precision_target: 3
     expected_files:
-      - src/codeweaver/telemetry/events.py
-      - src/codeweaver/telemetry/client.py
-      - src/codeweaver/telemetry/config.py
+      - src/codeweaver/common/telemetry/events.py
+      - src/codeweaver/common/telemetry/client.py
+      - src/codeweaver/config/telemetry.py
     description: Implementing telemetry tracking
   # ============================================================================
   # DEBUG Intent Queries (4 queries)
@@ -190,9 +190,9 @@ queries:
     intent: TEST
     precision_target: 3
     expected_files:
-      - src/codeweaver/server/health_endpoint.py
-      - src/codeweaver/server/health_service.py
-      - src/codeweaver/server/health_models.py
+      - src/codeweaver/server/health/endpoint.py
+      - src/codeweaver/server/health/health_service.py
+      - src/codeweaver/server/health/models.py
     description: Testing health check functionality
   # ============================================================================
   # CONFIGURE Intent Queries (2 queries)
@@ -228,9 +228,10 @@ queries:
     intent: DOCUMENT
     precision_target: 5
     expected_files:
-      - src/codeweaver/common/registry.py
+      - src/codeweaver/common/registry/provider.py
       - src/codeweaver/providers/provider.py
       - src/codeweaver/providers/embedding/registry.py
+      - src/codeweaver/common/registry/models.py
     description: Documenting provider architecture
   - query: document indexing pipeline architecture
     intent: DOCUMENT
@@ -240,14 +241,29 @@ queries:
       - src/codeweaver/engine/chunking_service.py
       - src/codeweaver/engine/chunker/base.py
       - src/codeweaver/engine/indexer/checkpoint.py
+      - src/codeweaver/engine/indexer/manifest.py
+      - src/codeweaver/engine/failover.py
       - src/codeweaver/engine/watcher/watcher.py
     description: Documenting indexing system flow
-  - query: document MCP server endpoints
+  - query: document http and mcp server endpoints
     intent: DOCUMENT
     precision_target: 5
     expected_files:
-      - src/codeweaver/server/app_bindings.py
-      - src/codeweaver/server/health_endpoint.py
+      - src/codeweaver/server/management.py
+      - src/codeweaver/server/health/endpoint.py
       - src/codeweaver/server/server.py
+      - src/codeweaver/config/types.py
+      - src/codeweaver/mcp/server.py
+      - src/codeweaver/mcp/user_agent.py
       - src/codeweaver/agent_api/find_code/__init__.py
-    description: Documenting MCP server interface
+    description: Documenting server interface
+  - query: document MCP configuration options
+    intent: DOCUMENT
+    precision_target: 3
+    expected_files:
+      - src/codeweaver/config/mcp.py
+      - src/codeweaver/config/types.py
+      - src/codeweaver/cli/commands/init.py
+      - src/codeweaver/mcp/middleware/__init__.py
+      - src/codeweaver/config/middleware.py
+    description: Documenting MCP config settings

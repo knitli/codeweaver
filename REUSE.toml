@@ -55,7 +55,10 @@ SPDX-License-Identifier = "MIT"
 
 # TypeScript: tree-sitter/tree-sitter-typescript (MIT - Max Brunsfeld)
 [[annotations]]
-path = ["data/node_types/typescript-node-types.json", "data/node_types/tsx-node-types.json"]
+path = [
+  "data/node_types/typescript-node-types.json",
+  "data/node_types/tsx-node-types.json"
+]
 precedence = "override"
 SPDX-FileCopyrightText = "2017 Max Brunsfeld"
 SPDX-License-Identifier = "MIT"

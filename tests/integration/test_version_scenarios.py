@@ -104,16 +104,13 @@ def test_version_scenarios():
         ), f"Tagged release should have semantic version, got: {version}"
     else:
         # Scenario 2 or 3: Pre-release or dirty
-        if is_dirty:
-            # Scenario 3: Dirty working directory
-            assert "dirty" in version.lower(), (
-                f"Dirty working directory should include 'dirty', got: {version}"
-            )
-        else:
-            # Scenario 2: Pre-release (untagged commit)
-            assert re.search(r"(rc|dev|\+g)", version), (
-                f"Pre-release should include commit indicator, got: {version}"
-            )
+        # Note: .dirty suffix disabled to maintain PEP 440 compliance
+        # (see pyproject.toml tool.uv-dynamic-versioning.dirty = false)
+
+        # Pre-release (untagged commit): should include commit indicator
+        assert re.search(r"(rc|dev|\+g|a\d+\.dev)", version), (
+            f"Pre-release should include commit indicator, got: {version}"
+        )
 
     # All versions must be PEP 440 compliant
     pep440_pattern = r"^\d+\.\d+\.\d+([a-zA-Z0-9\.\+\-]*)?$"

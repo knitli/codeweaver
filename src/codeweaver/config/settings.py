@@ -1,4 +1,4 @@
-# sourcery skip: name-type-suffix, no-complex-if-expressions
+# sourcery skip: lambdas-should-be-short, name-type-suffix, no-complex-if-expressions
 # SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
@@ -12,7 +12,6 @@ clear precedence hierarchy and validation.
 
 from __future__ import annotations
 
-import contextlib
 import inspect
 import logging
 import os
@@ -22,22 +21,20 @@ from importlib import util
 from pathlib import Path
 from typing import Annotated, Any, Literal, Self, Unpack, cast, get_origin, overload
 
-from fastmcp.server.middleware import Middleware
 from fastmcp.server.server import DuplicateBehavior
-from fastmcp.tools.tool import Tool
 from mcp.server.auth.settings import AuthSettings
+from mcp.server.lowlevel.server import LifespanResultT
 from pydantic import (
     DirectoryPath,
     Field,
     FilePath,
-    ImportString,
     PositiveInt,
     PrivateAttr,
     ValidationError,
     computed_field,
-    field_validator,
 )
 from pydantic.fields import ComputedFieldInfo, FieldInfo
+from pydantic.networks import HttpUrl
 from pydantic_core import from_json, to_json
 from pydantic_settings import (
     AWSSecretsManagerSettingsSource,
@@ -60,22 +57,21 @@ from codeweaver.common.utils.utils import get_user_config_dir
 from codeweaver.config.chunker import ChunkerSettings, DefaultChunkerSettings
 from codeweaver.config.indexer import DefaultIndexerSettings, IndexerSettings
 from codeweaver.config.logging import DefaultLoggingSettings, LoggingSettings
-from codeweaver.config.mcp import CodeWeaverMCPConfig, MCPServerConfig
-from codeweaver.config.middleware import (
-    AVAILABLE_MIDDLEWARE,
-    DefaultMiddlewareSettings,
-    MiddlewareOptions,
-)
+from codeweaver.config.mcp import MCPServerConfig, StdioCodeWeaverConfig
+from codeweaver.config.middleware import DefaultMiddlewareSettings, MiddlewareOptions
 from codeweaver.config.providers import AllDefaultProviderSettings, ProviderSettings
 from codeweaver.config.server_defaults import (
     DefaultEndpointSettings,
-    DefaultFastMcpServerSettings,
+    DefaultFastMcpHttpRunArgs,
     DefaultUvicornSettings,
 )
 from codeweaver.config.telemetry import DefaultTelemetrySettings, TelemetrySettings
 from codeweaver.config.types import (
     CodeWeaverSettingsDict,
     EndpointSettingsDict,
+    FastMcpHttpRunArgs,
+    FastMcpServerSettingsDict,
+    StdioCodeWeaverConfigDict,
     UvicornServerSettings,
 )
 from codeweaver.core.types.aliases import FilteredKeyT
@@ -83,6 +79,7 @@ from codeweaver.core.types.dictview import DictView
 from codeweaver.core.types.enum import AnonymityConversion
 from codeweaver.core.types.models import BasedModel, clean_sentinel_from_schema
 from codeweaver.core.types.sentinel import UNSET, Unset
+from codeweaver.mcp.middleware import McpMiddleware
 
 
 logger = logging.getLogger(__name__)
@@ -168,140 +165,144 @@ def ensure_set_fields(obj: BaseSettings | BasedModel) -> BaseSettings | BasedMod
     return obj
 
 
-class FastMcpServerSettings(BasedModel):
-    """Settings for the FastMCP server.
+DEFAULT_BASE_MIDDLEWARE = [
+    f"codeweaver.mcp.middleware.{mw}"
+    for mw in (
+        "ResponseCachingMiddleware",
+        "ErrorHandlingMiddleware",
+        "StatisticsMiddleware",
+        "LoggingMiddleware",
+    )
+]
 
-    These settings don't represent the complete set of FastMCP server settings, but the ones users can configure. The remaining settings, if changed, could break functionality or cause unexpected behavior.
-    """
+DEFAULT_HTTP_MIDDLEWARE = [
+    *DEFAULT_BASE_MIDDLEWARE[:-1],
+    "codeweaver.mcp.middleware.RateLimitingMiddleware",
+    "codeweaver.mcp.middleware.RetryMiddleware",
+    "codeweaver.mcp.middleware.StructuredLoggingMiddleware",
+]
+_sort_order = (
+    "ResponseCachingMiddleware",
+    "RateLimitingMiddleware",
+    "RetryMiddleware",
+    "LoggingMiddleware",
+    "StructuredLoggingMiddleware",
+    "ErrorHandlingMiddleware",
+    "StatisticsMiddleware",
+)
+
+
+class BaseFastMcpServerSettings(BasedModel):
+    """Base settings for FastMCP server configurations."""
 
     transport: Annotated[
-        Literal["stdio", "http", "streamable-http"] | None,
+        Literal["stdio", "streamable-http", "http"] | None,
         Field(
-            description="""Transport protocol to use for the FastMCP server. Stdio is for local use and cannot support concurrent requests. HTTP (streamable HTTP) can be used for local or remote use and supports concurrent requests. Unlike many MCP servers, CodeWeaver **defaults to streamable-http**."""
+            description="""Transport protocol to use for the FastMCP server. Can be 'stdio', 'streamable-http', or 'http' (which is an alias for streamable-http). These values are always set by CodeWeaver depending on context, so users typically don't need to set this value themselves."""
         ),
-    ] = "streamable-http"
-    host: Annotated[str | None, Field(description="""Host address for the FastMCP server.""")] = (
-        os.environ.get("CODEWEAVER_HOST", "127.0.0.1")
-    )
-    port: Annotated[
-        PositiveInt | None,
-        Field(description="""Port number for the FastMCP server. Default is 9328 ('WEAV')"""),
-    ] = int(_port) if (_port := os.environ.get("CODEWEAVER_PORT")) else 9328
+    ] = None
 
-    auth: Annotated[AuthSettings | None, Field(description="""OAuth provider configuration""")] = (
-        None
-    )
+    # like Highlander, there can only be one.
     on_duplicate_tools: DuplicateBehavior | None = "replace"
     on_duplicate_resources: DuplicateBehavior | None = "replace"
     on_duplicate_prompts: DuplicateBehavior | None = "replace"
     resource_prefix_format: Literal["protocol", "path"] | None = None
-    # these are each "middleware", "tools", and "dependencies" for FastMCP. But we prefix them with "additional_" to make it clear these are *in addition to* the ones we provide by default.
-    additional_middleware: Annotated[
-        list[ImportString[Middleware]] | None,
-        Field(
-            description="""Additional middleware to add to the FastMCP server. Values should be full path import strings, like `codeweaver.middleware.statistics.StatisticsMiddleware`.""",
-            validation_alias="middleware",
-            serialization_alias="middleware",
-        ),
-    ] = None
-    additional_tools: Annotated[
-        list[ImportString[Any]] | None,
-        Field(
-            description="""Additional tools to add to the FastMCP server. Values can be either full path import strings, like `codeweaver.agent_api.git.GitTool`, or just the tool name, like `GitTool`.""",
-            validation_alias="tools",
-            serialization_alias="tools",
-        ),
-    ] = None
+    auth: AuthSettings | None = None
 
-    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
-        from codeweaver.core.types import AnonymityConversion, FilteredKey
+    middleware: list[type[McpMiddleware]] = Field(
+        default_factory=lambda: sorted(
+            DEFAULT_BASE_MIDDLEWARE, key=lambda mw: _sort_order.index(mw.split(".")[-1])
+        ),
+        description="""Mcp Middleware classes (classes that subclass and implement `fastmcp.server.middleware.middleware.Middleware`). CodeWeaver includes several middleware by default, and always includes its own required middleware. Setting this field will override default (not required) middleware. Options are set in the `middleware` field of `CodeWeaverSettings`.""",
+    )
 
+    @computed_field
+    @property
+    def name(self) -> str:
+        """Get the name of the server based on transport."""
+        return (
+            "CodeWeaver MCP HTTP Server"
+            if self.transport in ("http", "streamable-http")
+            else "CodeWeaver MCP Bridge"
+        )
+
+    @computed_field
+    @property
+    def include_tags(self) -> set[str]:
+        """Tags for included resources, tools, and prompts."""
+        return {"external", "user", "code-context", "agent-api", "public", "human-api"}
+
+    @computed_field
+    @property
+    def exclude_tags(self) -> set[str]:
+        """Tags for excluded resources, tools, and prompts."""
         return {
-            FilteredKey("auth"): AnonymityConversion.BOOLEAN,
-            FilteredKey("host"): AnonymityConversion.BOOLEAN,
-            FilteredKey("port"): AnonymityConversion.BOOLEAN,
-            FilteredKey("additional_middleware"): AnonymityConversion.COUNT,
-            FilteredKey("additional_tools"): AnonymityConversion.COUNT,
+            "internal",
+            "debug",
+            "experimental",
+            "context-agent-api",
+            "system",
+            "admin",
+            "testing",
         }
 
-    @staticmethod
-    def _attempt_import(suspected_path: str) -> Any | None:
-        """Attempt to import a class or callable."""
-        module_path, class_name = suspected_path.rsplit(".", 1)
-        with contextlib.suppress(ImportError, AttributeError):
-            module = __import__(module_path, fromlist=[class_name])
-            cls = getattr(module, class_name, None)
-            if cls and (inspect.isclass(cls) or callable(cls)):
-                return cls
+    @computed_field
+    @property
+    def instructions(self) -> str:
+        """Get instruction prompt for the server. This is a literal string that can't be set by the user. The `instructions` field provides guidance to MCP clients on how to interact with CodeWeaver."""
+        return """CodeWeaver is an advanced code search and analysis tool. It uses cutting edge vector search techniques (sparse and dense embeddings) to find relevant code and documentation snippets based on natural language queries. Code snippets contain rich semantic and relational information about their context in the codebase, with support for over 160 languages. CodeWeaver has only one powerful tool: `find_code`."""
+
+    def _telemetry_handler(self, _serialized_self: dict[str, Any], /) -> dict[str, Any]:
+        """Handle telemetry anonymization on dict fields. Set booleans based on non-default values."""
+        if self.transport == "stdio":
+            if self.middleware == DEFAULT_BASE_MIDDLEWARE:
+                return _serialized_self | {"middleware": False}
+            return _serialized_self | {"middleware": True}
+        # we're dealing with http now
+        if not (run_args := getattr(self, "run_args", None)):
+            return _serialized_self | {"middleware": self.middleware != DEFAULT_HTTP_MIDDLEWARE}
+        if uvicorn_config := run_args.get("uvicorn_config"):
+            run_args["uvicorn_config"] = UvicornServerSettings.model_validate(
+                uvicorn_config
+            ).serialize_for_telemetry()
+        return _serialized_self
+
+    def _telemetry_keys(self) -> None:
         return None
 
-    @staticmethod
-    def _dotted_name(obj: Any) -> str | None:
-        """Return a stable 'module.qualname' for a class/callable/instance when possible."""
-        with contextlib.suppress(ImportError, AttributeError):
-            if inspect.isclass(obj) or inspect.isfunction(obj) or inspect.ismethod(obj):
-                module = getattr(obj, "__module__", None)
-                qual = getattr(obj, "__qualname__", None)
-                if module and qual:
-                    return f"{module}.{qual}"
-            # Instance -> use its class
-            cls_obj = getattr(obj, "__class__", None)
-            module = getattr(cls_obj, "__module__", None)
-            qual = getattr(cls_obj, "__qualname__", None)
-            if module and qual:
-                return f"{module}.{qual}"
-        return None
-
-    @classmethod
-    def _callable_to_path(cls, value: Any, field: Literal["middleware", "tools"]) -> str | None:
-        """Normalize middleware inputs (class/instance/callable/str) into 'module.qualname' strings."""
-        if not value:
-            return None
-        if isinstance(value, str) and field == "tools":
-            return value
-        # Strings
-        if isinstance(value, str) and field == "middleware":
-            # If it matches a known middleware class name, expand to dotted path
-            for mw in AVAILABLE_MIDDLEWARE:
-                if value in (mw.__name__, mw.__qualname__, str(mw)):
-                    return f"{mw.__module__}.{mw.__qualname__}"
-            # If dotted import path, keep as-is
-            return value
-        # Known class/instance/callable
-        if (isinstance(value, Middleware | Tool) or inspect.isclass(value) or callable(value)) and (
-            dotted := cls._dotted_name(value)
-        ):
-            return dotted
-        return None
-
-    @classmethod
-    @field_validator("additional_middleware", mode="before")
-    def _validate_additional_middleware(cls, value: Any) -> list[str] | None:
-        """Validate and normalize additional middleware inputs."""
-        if value is None or isinstance(value, Unset):
-            return None
-        if isinstance(value, str | bytes | bytearray):
-            try:
-                value = from_json(value)
-            except Exception:
-                value = [value]
-        return [s for s in (cls._callable_to_path(v, "middleware") for v in value) if s]
-
-    @classmethod
-    @field_validator("additional_tools", mode="before")
-    def _validate_additional_tools(cls, value: Any) -> list[str] | None:
-        """Validate and normalize additional tool inputs."""
-        if value is None or isinstance(value, Unset):
-            return None
-        if isinstance(value, str | bytes | bytearray):
-            try:
-                value = from_json(value)
-            except Exception:
-                value = [value]
-        return [s for s in (cls._callable_to_path(v, "tools") for v in value) if s]
+    def as_settings(self) -> FastMcpServerSettingsDict:
+        """Convert to FastMcpServerSettingsDict for use with FastMCP server."""
+        return FastMcpServerSettingsDict(**self.model_dump(exclude_none=True))
 
 
-_ = ProviderSettings.model_rebuild()
+class FastMcpStdioServerSettings(BaseFastMcpServerSettings):
+    """Settings for FastMCP stdio server configurations."""
+
+    transport: Literal["stdio"] = "stdio"
+
+
+class FastMcpHttpServerSettings(BaseFastMcpServerSettings):
+    """Settings for FastMCP HTTP server configurations."""
+
+    transport: Literal["streamable-http", "http"] = "streamable-http"
+
+    run_args: FastMcpHttpRunArgs = Field(
+        default_factory=lambda: DefaultFastMcpHttpRunArgs,
+        description="""Run arguments for the FastMCP HTTP server.""",
+    )
+
+    lifespan: LifespanResultT | None = None
+
+    middleware: list[type[McpMiddleware]] = Field(
+        default_factory=lambda: sorted(
+            DEFAULT_HTTP_MIDDLEWARE, key=lambda mw: _sort_order.index(mw.split(".")[-1])
+        ),
+        description="""Mcp Middleware classes (classes that subclass and implement `fastmcp.server.middleware.middleware.Middleware`). CodeWeaver includes several middlewares by default, and always includes its own required middlewares. Setting this field will override default (not required) middlewares.""",
+    )
+
+
+if not ProviderSettings.__pydantic_complete__:
+    _ = ProviderSettings.model_rebuild()
 
 
 @overload
@@ -416,11 +417,16 @@ class CodeWeaverSettings(BaseSettings):
             validate_default=False,
         ),
     ] = UNSET
-    server: Annotated[
-        FastMcpServerSettings | Unset,
+    mcp_server: Annotated[
+        FastMcpHttpServerSettings | Unset,
         Field(
-            description="""Optionally customize FastMCP server settings.""", validate_default=False
+            description="""Optionally customize server settings for the HTTP MCP server.""",
+            validate_default=False,
         ),
+    ] = UNSET
+    stdio_server: Annotated[
+        FastMcpStdioServerSettings | Unset,
+        Field(description="""Settings for stdio MCP servers.""", validate_default=False),
     ] = UNSET
 
     logging: Annotated[
@@ -444,12 +450,28 @@ class CodeWeaverSettings(BaseSettings):
 
     endpoints: Annotated[
         EndpointSettingsDict | Unset,
-        Field(description="""Endpoint settings""", validate_default=False),
+        Field(description="""Endpoint settings for optional endpoints.""", validate_default=False),
     ] = UNSET
 
     uvicorn: Annotated[
         UvicornServerSettings | Unset,
-        Field(description="""Settings for the Uvicorn server""", validate_default=False),
+        Field(
+            description="""
+        Settings for the Uvicorn management server. If you want to configure uvicorn settings for the mcp http server, pass them to `mcp_server.run_args.uvicorn_config`.
+
+        Example:
+        ```toml
+        # this will set uvicorn settings for the management server:
+        [uvicorn]
+        log_level = "debug"
+
+        # this will set uvicorn settings for the mcp http server:
+        [mcp_server.run_args.uvicorn_config]
+        log_level = "debug"
+        ```
+        """,
+            validate_default=False,
+        ),
     ] = UNSET
 
     telemetry: Annotated[
@@ -457,10 +479,24 @@ class CodeWeaverSettings(BaseSettings):
         Field(description="""Telemetry configuration""", validate_default=False),
     ] = UNSET
 
+    # Management Server (Always HTTP, independent of MCP transport)
+    management_host: Annotated[
+        str | Unset,
+        Field(
+            description="""Management server host (independent of MCP transport). Default is 127.0.0.1 (localhost)."""
+        ),
+    ] = UNSET
+    management_port: Annotated[
+        PositiveInt | Unset,
+        Field(
+            description="""Management server port (always HTTP, for health/stats/metrics). Default is 9329."""
+        ),
+    ] = UNSET
+
     default_mcp_config: Annotated[
         MCPServerConfig | Unset,
         Field(
-            description="""Default MCP server configuration for mcp clients. Setting this makes it quick and easy to add codeweaver to any mcp.json file using `cw init`. Defaults to a streamable-http CodeWeaver server at `http://127.0.0.1:9328`. We strongly recommend using streamable-http instead of stdio for a better experience.""",
+            description="""Default MCP server configuration for mcp clients. Setting this makes it quick and easy to add codeweaver to any mcp.json file using `cw init`. Defaults to a streamable-http CodeWeaver server at `http://127.0.0.1:9328`.""",
             validate_default=False,
         ),
     ] = UNSET
@@ -483,8 +519,16 @@ class CodeWeaverSettings(BaseSettings):
         Field(
             description="""Schema version for CodeWeaver settings""",
             pattern=r"\d{1,2}\.\d{1,3}\.\d{1,3}",
+            alias="schema_version",
         ),
-    ] = "1.0.0"
+    ] = "1.1.0"
+
+    schema_: HttpUrl = Field(
+        description="URL to the CodeWeaver settings schema",
+        default_factory=lambda data: HttpUrl(
+            f"https://raw.githubusercontent.com/knitli/codeweaver/main/schema/v{data.get('__version__', data.get('schema_version')) or '1.1.0'}/codeweaver.schema.json"
+        ),
+    )
 
     _map: Annotated[DictView[CodeWeaverSettingsDict] | None, PrivateAttr()] = None
 
@@ -530,10 +574,13 @@ class CodeWeaverSettings(BaseSettings):
             1 * 1024 * 1024 if isinstance(self.max_file_size, Unset) else self.max_file_size
         )
         self.max_results = 30 if isinstance(self.max_results, Unset) else self.max_results
-        self.server = (
-            FastMcpServerSettings.model_validate(DefaultFastMcpServerSettings)
-            if isinstance(self.server, Unset)
-            else self.server
+        self.mcp_server = (
+            FastMcpHttpServerSettings() if isinstance(self.mcp_server, Unset) else self.mcp_server
+        )
+        self.stdio_server = (
+            FastMcpStdioServerSettings()
+            if isinstance(self.stdio_server, Unset)
+            else self.stdio_server
         )
         self.middleware = (
             DefaultMiddlewareSettings if isinstance(self.middleware, Unset) else self.middleware
@@ -547,6 +594,12 @@ class CodeWeaverSettings(BaseSettings):
             if isinstance(self.telemetry, Unset)
             else self.telemetry
         )
+        self.management_host = (
+            "127.0.0.1" if isinstance(self.management_host, Unset) else self.management_host
+        )
+        self.management_port = (
+            9329 if isinstance(self.management_port, Unset) else self.management_port
+        )
         self.uvicorn = (
             UvicornServerSettings.model_validate(DefaultUvicornSettings)
             if isinstance(self.uvicorn, Unset)
@@ -558,7 +611,7 @@ class CodeWeaverSettings(BaseSettings):
             else DefaultEndpointSettings | self.endpoints
         )
         self.default_mcp_config = (
-            CodeWeaverMCPConfig()
+            StdioCodeWeaverConfig()
             if isinstance(self.default_mcp_config, Unset)
             else self.default_mcp_config
         )
@@ -605,9 +658,23 @@ class CodeWeaverSettings(BaseSettings):
                 )
             )
         ):
+            import re
+
             from urllib.parse import urlparse
 
-            is_cloud = urlparse(vector_url).hostname not in ("localhost", "127.0.0.1")
+            is_cloud = urlparse(vector_url).hostname not in (
+                "localhost",
+                "127.0.0.1",
+                "0.0.0.0",  # noqa: S104
+                "::1",
+                "0:0:0:0:0:0:0:1",
+                "::",  # I guess ruff is ok if we bind to all interfaces in ipv6
+                # save the more expensive check for second
+                # this checks if the ip range is in private ranges
+            ) and not re.match(
+                r"^(((192\.168|10\.\d{1,3}|172\.(1[6-9]|2\d|3[0-1]))\.\d{1,3}\.\d{1,3})|(fe80|fc00|fd00):(?:[0-9a-fA-F]{1,4}:){0,7}[0-9a-fA-F]{1,4}(%[0-9a-zA-Z]+))$",
+                urlparse(vector_url).hostname or "",
+            )  # type: ignore
             self.provider = ProviderSettings.model_validate(
                 get_profile(
                     self.profile if self.profile != "testing" else "backup",
@@ -624,21 +691,22 @@ class CodeWeaverSettings(BaseSettings):
             )
 
     @classmethod
+    def python_json_schema(cls) -> dict[str, Any]:
+        """Get the JSON validation schema for the settings model as a string."""
+        return cls.model_json_schema(by_alias=True)
+
+    @classmethod
     def json_schema(cls) -> bytes:
         """Get the JSON validation schema for the settings model."""
-        schema = cls.model_json_schema()
-        # until we get around to putting in a proper schema store
-        schema = {
-            "$schema": "https://raw.githubusercontent.com/knitli/codeweaver/refs/heads/main/schema/codeweaver.schema.json",
-            **schema,
-        }
-        return to_json(schema, indent=2)
+        return to_json(cls.python_json_schema(), indent=2).replace(b"schema_", b"$schema")
 
     @classmethod
     def save_schema(cls, path: Path | None = None) -> int:
         """Save the JSON validation schema to a file."""
         if path is None:
-            path = Path(__file__).parent.parent.parent.parent / "schema" / "codeweaver.schema.json"
+            schema_url = get_settings().schema_
+            end_path = schema_url.path.replace("/knitli/codeweaver/main/", "").lstrip("/")
+            path = Path(__file__).parent.parent.parent.parent / end_path
         path.parent.mkdir(parents=True, exist_ok=True)
         return path.write_bytes(cls.json_schema())
 
@@ -654,9 +722,15 @@ class CodeWeaverSettings(BaseSettings):
             token_limit=30_000,
             max_file_size=1 * 1024 * 1024,
             max_results=30,
-            server=DefaultFastMcpServerSettings,
+            mcp_server=FastMcpHttpServerSettings().as_settings(),
+            stdio_server=FastMcpStdioServerSettings().as_settings(),
+            logging=DefaultLoggingSettings,
+            middleware=DefaultMiddlewareSettings,
             indexer=DefaultIndexerSettings,
             chunker=DefaultChunkerSettings,
+            management_host="127.0.0.1",
+            management_port=9329,
+            default_mcp_config=StdioCodeWeaverConfigDict(StdioCodeWeaverConfig().model_dump()),  # ty: ignore[missing-typed-dict-key]
             telemetry=DefaultTelemetrySettings,
             uvicorn=DefaultUvicornSettings,
             endpoints=DefaultEndpointSettings,
@@ -1113,7 +1187,8 @@ def reset_settings() -> None:
 
 __all__ = (
     "CodeWeaverSettings",
-    "FastMcpServerSettings",
+    "FastMcpHttpServerSettings",
+    "FastMcpStdioServerSettings",
     "get_settings",
     "get_settings_map",
     "reset_settings",

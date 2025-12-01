@@ -43,15 +43,14 @@ This enables:
 
 from __future__ import annotations
 
-import datetime
-
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal, NotRequired, Required, TypedDict
+from typing import TYPE_CHECKING, Any, Literal
 
 from fastmcp.mcp_config import MCPConfig as FastMCPConfig
 from fastmcp.mcp_config import RemoteMCPServer as FastMCPRemoteMCPServer
 from fastmcp.mcp_config import StdioMCPServer as FastMCPStdioMCPServer
 from fastmcp.mcp_config import update_config_file as update_mcp_config_file
+from pydantic import Field
 from pydantic_core import from_json
 
 from codeweaver.core.types.models import BasedModel
@@ -59,6 +58,7 @@ from codeweaver.exceptions import MissingValueError
 
 
 if TYPE_CHECKING:
+    from codeweaver.config.types import CodeWeaverMCPConfigDict, StdioCodeWeaverConfigDict
     from codeweaver.core.types.aliases import FilteredKeyT
     from codeweaver.core.types.enum import AnonymityConversion
 
@@ -87,6 +87,14 @@ class CodeWeaverMCPConfig(BasedModel, FastMCPRemoteMCPServer):
         """
         return "codeweaver"
 
+    def as_mcp_config(self) -> dict[Literal["codeweaver"], CodeWeaverMCPConfigDict]:
+        """Serialize the configuration to a dictionary suitable for MCP config files.
+
+        Returns:
+            A dictionary representation of the CodeWeaver MCP configuration.
+        """
+        return {self.name_key: self.model_dump(round_trip=True, exclude_none=True)}
+
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         """Get telemetry keys for the MCP server.
 
@@ -108,7 +116,8 @@ class CodeWeaverMCPConfig(BasedModel, FastMCPRemoteMCPServer):
 class StdioCodeWeaverConfig(BasedModel, FastMCPStdioMCPServer):
     """Configuration model for CodeWeaver mcp.json files using stdio communication."""
 
-    command: str = "cw server --transport stdio"
+    command: str = "cw"
+    args: list[str] = Field(default_factory=lambda: ["server", "--transport", "stdio"])
     type: Literal["stdio"] | None = "stdio"
     description: str | None = CODEWEAVER_DESCRIPTION
     icon: str | None = CODEWEAVER_ICON
@@ -122,6 +131,14 @@ class StdioCodeWeaverConfig(BasedModel, FastMCPStdioMCPServer):
         """
         return "codeweaver"
 
+    def as_mcp_config(self) -> dict[Literal["codeweaver"], StdioCodeWeaverConfigDict]:
+        """Serialize the configuration to a dictionary suitable for MCP config files.
+
+        Returns:
+            A dictionary representation of the CodeWeaver MCP configuration.
+        """
+        return {self.name_key: self.model_dump(round_trip=True, exclude_none=True)}
+
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         """Get telemetry keys for the MCP server.
 
@@ -132,7 +149,6 @@ class StdioCodeWeaverConfig(BasedModel, FastMCPStdioMCPServer):
         from codeweaver.core.types.enum import AnonymityConversion
 
         return {
-            FilteredKey("command"): AnonymityConversion.HASH,
             FilteredKey("args"): AnonymityConversion.COUNT,
             FilteredKey("env"): AnonymityConversion.COUNT,
             FilteredKey("cwd"): AnonymityConversion.HASH,
@@ -196,46 +212,4 @@ class MCPConfig(BasedModel, FastMCPConfig):
         return cls.model_validate(data)
 
 
-class CodeWeaverMCPConfigDict(TypedDict, total=False):
-    """TypedDict for CodeWeaverMCPConfig serialization."""
-
-    url: Required[str]
-    transport: NotRequired[Literal["http", "streamable-http"] | None]
-    timeout: NotRequired[int | None]
-    auth: NotRequired[str | Literal["oauth"] | Any | None]  # httpx.Auth at runtime
-    authentication: NotRequired[dict[str, Any] | None]
-    headers: NotRequired[dict[str, str] | None]
-    description: NotRequired[str | None]
-    icon: NotRequired[str | None]
-    sse_read_timeout: NotRequired[int | datetime.timedelta | float | None]  # deprecated
-
-
-class StdioCodeWeaverConfigDict(TypedDict, total=False):
-    """TypedDict for StdioCodeWeaverConfig serialization."""
-
-    command: Required[str]
-    args: NotRequired[list[str] | None]
-    env: NotRequired[dict[str, Any] | None]
-    transport: NotRequired[Literal["stdio"]]
-    cwd: NotRequired[str | None]
-    timeout: NotRequired[int | None]
-    authentication: NotRequired[dict[str, Any] | None]
-    type: NotRequired[Literal["stdio"] | None]
-    description: NotRequired[str | None]
-    icon: NotRequired[str | None]
-
-
-class MCPConfigDict(TypedDict):
-    """TypedDict for MCPConfig serialization."""
-
-    mcpServers: list[CodeWeaverMCPConfigDict | StdioCodeWeaverConfigDict]
-
-
-__all__ = (
-    "CodeWeaverMCPConfig",
-    "CodeWeaverMCPConfigDict",
-    "MCPConfig",
-    "MCPConfigDict",
-    "StdioCodeWeaverConfigDict",
-    "update_mcp_config_file",
-)
+__all__ = ("CodeWeaverMCPConfig", "MCPConfig", "StdioCodeWeaverConfig", "update_mcp_config_file")

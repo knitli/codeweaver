@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import logging
 import sys
+import time
 
 from functools import cache
 from importlib.util import find_spec
@@ -225,6 +226,8 @@ class PostHogClient:
         # Add system info tags
         tag("python_version", f"{sys.version_info.major}.{sys.version_info.minor}")
         tag("os_platform", sys.platform)
+        tag("system_locale", sys.getdefaultencoding())
+        tag("system_timezone", time.tzname[0])
 
         self._session_started = True
         self.logger.debug("PostHog session started with ID: %s", self.session_id)

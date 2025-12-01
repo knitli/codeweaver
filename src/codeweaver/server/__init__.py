@@ -13,11 +13,10 @@ from codeweaver.common.utils import create_lazy_getattr
 
 
 if TYPE_CHECKING:
-    from codeweaver.server.app_bindings import find_code_tool, register_app_bindings, register_tool
-    from codeweaver.server.health_endpoint import get_health
-    from codeweaver.server.health_models import (
+    from codeweaver.server.health import (
         EmbeddingProviderServiceInfo,
         HealthResponse,
+        HealthService,
         IndexingInfo,
         IndexingProgressInfo,
         RerankingServiceInfo,
@@ -25,56 +24,54 @@ if TYPE_CHECKING:
         SparseEmbeddingServiceInfo,
         StatisticsInfo,
         VectorStoreServiceInfo,
+        get_health,
     )
-    from codeweaver.server.health_service import HealthService
-    from codeweaver.server.server import AppState, ServerSetup, build_app, get_state, lifespan
+    from codeweaver.server.lifespan import background_services_lifespan, http_lifespan
+    from codeweaver.server.management import ManagementServer
+    from codeweaver.server.server import CodeWeaverState, get_state, lifespan
 
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
-    "AppState": (__spec__.parent, "server"),
-    "EmbeddingProviderServiceInfo": (__spec__.parent, "health_models"),
-    "HealthResponse": (__spec__.parent, "health_models"),
-    "HealthService": (__spec__.parent, "health_service"),
-    "IndexingInfo": (__spec__.parent, "health_models"),
-    "IndexingProgressInfo": (__spec__.parent, "health_models"),
-    "RerankingServiceInfo": (__spec__.parent, "health_models"),
-    "ServerSetup": (__spec__.parent, "server"),
-    "ServicesInfo": (__spec__.parent, "health_models"),
-    "SparseEmbeddingServiceInfo": (__spec__.parent, "health_models"),
-    "StatisticsInfo": (__spec__.parent, "health_models"),
-    "VectorStoreServiceInfo": (__spec__.parent, "health_models"),
-    "build_app": (__spec__.parent, "server"),
-    "find_code_tool": (__spec__.parent, "app_bindings"),
-    "get_health": (__spec__.parent, "health_endpoint"),
+    "CodeWeaverState": (__spec__.parent, "server"),
+    "EmbeddingProviderServiceInfo": (__spec__.parent, "health"),
+    "HealthResponse": (__spec__.parent, "health"),
+    "HealthService": (__spec__.parent, "health"),
+    "IndexingInfo": (__spec__.parent, "health"),
+    "IndexingProgressInfo": (__spec__.parent, "health"),
+    "ManagementServer": (__spec__.parent, "management"),
+    "RerankingServiceInfo": (__spec__.parent, "health"),
+    "ServicesInfo": (__spec__.parent, "health"),
+    "SparseEmbeddingServiceInfo": (__spec__.parent, "health"),
+    "StatisticsInfo": (__spec__.parent, "health"),
+    "VectorStoreServiceInfo": (__spec__.parent, "health"),
+    "background_services_lifespan": (__spec__.parent, "lifespan"),
+    "get_health": (__spec__.parent, "health"),
     "get_state": (__spec__.parent, "server"),
+    "http_lifespan": (__spec__.parent, "lifespan"),
     "lifespan": (__spec__.parent, "server"),
-    "register_app_bindings": (__spec__.parent, "app_bindings"),
-    "register_tool": (__spec__.parent, "app_bindings"),
 })
 
 __getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
 
 
 __all__ = (
-    "AppState",
+    "CodeWeaverState",
     "EmbeddingProviderServiceInfo",
     "HealthResponse",
     "HealthService",
     "IndexingInfo",
     "IndexingProgressInfo",
+    "ManagementServer",
     "RerankingServiceInfo",
-    "ServerSetup",
     "ServicesInfo",
     "SparseEmbeddingServiceInfo",
     "StatisticsInfo",
     "VectorStoreServiceInfo",
-    "build_app",
-    "find_code_tool",
+    "background_services_lifespan",
     "get_health",
     "get_state",
+    "http_lifespan",
     "lifespan",
-    "register_app_bindings",
-    "register_tool",
 )
 
 

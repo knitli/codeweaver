@@ -49,6 +49,8 @@ app = App(
 app.command("codeweaver.cli.commands.config:app", name="config")
 app.command("codeweaver.cli.commands.search:app", name="search")
 app.command("codeweaver.cli.commands.server:app", name="server")
+app.command("codeweaver.cli.commands.start:app", name="start")
+app.command("codeweaver.cli.commands.stop:app", name="stop")
 app.command("codeweaver.cli.commands.index:app", name="index")
 app.command("codeweaver.cli.commands.doctor:app", name="doctor")
 app.command("codeweaver.cli.commands.list:app", name="list", alias="ls")

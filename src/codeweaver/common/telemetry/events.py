@@ -14,7 +14,6 @@ All events use privacy-safe, anonymized data with support for opt-in detailed tr
 
 from __future__ import annotations
 
-import hashlib
 import statistics
 
 from datetime import UTC, datetime
@@ -332,11 +331,13 @@ class SearchEvent:
 
         # Opt-in detailed tracking (only when tools_over_privacy=True)
         if self._tools_over_privacy:
+            from codeweaver.common.telemetry.utils import redact_identifiable_info
+
             properties["query"] = {
                 "token_count": len(self._query.split()),
                 "char_count": len(self._query),
-                # Hash for pattern analysis without content
-                "hash": hashlib.sha256(self._query.encode()).hexdigest()[:16],
+                "query": redact_identifiable_info(self._query),
+                "results": redact_identifiable_info(response.model_dump_json()),
             }
 
         return (self.EVENT_NAME, properties)

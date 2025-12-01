@@ -7,6 +7,8 @@
 As a convenience, we lazily export (almost) every type in CodeWeaver so you can easily make use of them.
 
 **Important**: You should not take these exports to mean it's CodeWeaver's public API. We are in alpha and the API **will change** substantially, and sometimes without notice. Once we're stable, then we'll adopt a more routined approach to public APIs.
+
+(are we exporting too much? Yes. We'll refine this over time as we better understand what users need. For now, enjoy the convenience of having everything available.)
 """
 
 from __future__ import annotations
@@ -30,7 +32,10 @@ from codeweaver.common.utils.lazy_importer import create_lazy_getattr
 
 
 def get_version() -> str:
-    """Get the current version of CodeWeaver."""
+    """Get the current version of CodeWeaver.
+
+    Because our version is dynamically generated during build/release, we try several methods to get it. If you downloaded CodeWeaver from PyPi, then the first will work, or the second if the file didn't get generated for some reason. If you're running from source, we try to get the version from git tags. If all else fails, we return "0.0.0".
+    """
     try:
         from codeweaver._version import __version__
     except ImportError:
@@ -43,6 +48,8 @@ def get_version() -> str:
                 import shutil
                 import subprocess
 
+                from pathlib import Path
+
                 if git := (shutil.which("git") is not None):
                     git_describe = subprocess.run(
                         ["describe", "--tags", "--always", "--dirty"],  # noqa: S607
@@ -50,6 +57,7 @@ def get_version() -> str:
                         capture_output=True,
                         text=True,
                         check=True,
+                        cwd=str(Path(__file__).parent.parent.parent),
                     )
                     __version__ = git_describe.stdout.strip()
             except Exception:
@@ -104,8 +112,9 @@ if TYPE_CHECKING:
         ErrorHandlingMiddlewareSettings,
         FastembedGPUProviderSettings,
         FastMcpHttpRunArgs,
-        FastMcpServerSettings,
+        FastMcpHttpServerSettings,
         FastMcpServerSettingsDict,
+        FastMcpStdioServerSettings,
         FilterID,
         FiltersDict,
         FormatterID,
@@ -306,7 +315,26 @@ if TYPE_CHECKING:
         RerankingProviderError,
         ValidationError,
     )
-    from codeweaver.middleware import StatisticsMiddleware
+    from codeweaver.mcp import (
+        TOOL_DEFINITIONS,
+        CwMcpHttpState,
+        ErrorHandlingMiddleware,
+        LoggingMiddleware,
+        McpMiddleware,
+        RateLimitingMiddleware,
+        ResponseCachingMiddleware,
+        RetryMiddleware,
+        StatisticsMiddleware,
+        StructuredLoggingMiddleware,
+        ToolAnnotationsDict,
+        ToolRegistrationDict,
+        create_http_server,
+        create_stdio_server,
+        find_code_tool,
+        find_code_tool_definition,
+        get_bulk_tool,
+        register_tool,
+    )
     from codeweaver.providers import (
         CLIENT_MAP,
         PROVIDER_CAPABILITIES,
@@ -404,14 +432,14 @@ if TYPE_CHECKING:
         get_all_grammars,
     )
     from codeweaver.server import (
-        AppState,
+        CodeWeaverState,
         EmbeddingProviderServiceInfo,
         HealthResponse,
         HealthService,
         IndexingInfo,
         IndexingProgressInfo,
+        ManagementServer,
         RerankingServiceInfo,
-        ServerSetup,
         ServicesInfo,
         SparseEmbeddingServiceInfo,
         StatisticsInfo,
@@ -434,7 +462,6 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "AgentTask": (__spec__.parent, "semantic"),
     "AnonymityConversion": (__spec__.parent, "core"),
     "AnyVariants": (__spec__.parent, "engine"),
-    "AppState": (__spec__.parent, "server"),
     "ArbitraryFilter": (__spec__.parent, "engine"),
     "AstThing": (__spec__.parent, "semantic"),
     "AvailableOptimizations": (__spec__.parent, "providers"),
@@ -480,6 +507,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "CodeWeaverMCPConfigDict": (__spec__.parent, "config"),
     "CodeWeaverSettings": (__spec__.parent, "config"),
     "CodeWeaverSettingsDict": (__spec__.parent, "config"),
+    "CodeWeaverState": (__spec__.parent, "server"),
     "CohereEmbeddingProvider": (__spec__.parent, "providers"),
     "CohereRerankingProvider": (__spec__.parent, "providers"),
     "CollectionMetadata": (__spec__.parent, "providers"),
@@ -498,6 +526,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "CustomDelimiter": (__spec__.parent, "config"),
     "CustomLang": (__spec__.parent, "semantic"),
     "CustomLanguage": (__spec__.parent, "config"),
+    "CwMcpHttpState": (__spec__.parent, "mcp"),
     "DATACLASS_CONFIG": (__spec__.parent, "core"),
     "DataProviderSettings": (__spec__.parent, "config"),
     "DataclassSerializationMixin": (__spec__.parent, "core"),
@@ -532,6 +561,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "EmbeddingProviderSettings": (__spec__.parent, "config"),
     "Entry": (__spec__.parent, "engine"),
     "EnvVarInfo": (__spec__.parent, "core"),
+    "ErrorHandlingMiddleware": (__spec__.parent, "mcp"),
     "ErrorHandlingMiddlewareSettings": (__spec__.parent, "config"),
     "EvidenceKind": (__spec__.parent, "semantic"),
     "ExtKind": (__spec__.parent, "core"),
@@ -544,8 +574,9 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "FastEmbedRerankingProvider": (__spec__.parent, "providers"),
     "FastEmbedSparseProvider": (__spec__.parent, "providers"),
     "FastMcpHttpRunArgs": (__spec__.parent, "config"),
-    "FastMcpServerSettings": (__spec__.parent, "config"),
+    "FastMcpHttpServerSettings": (__spec__.parent, "config"),
     "FastMcpServerSettingsDict": (__spec__.parent, "config"),
+    "FastMcpStdioServerSettings": (__spec__.parent, "config"),
     "FastembedGPUProviderSettings": (__spec__.parent, "config"),
     "FieldCondition": (__spec__.parent, "engine"),
     "FileExt": (__spec__.parent, "core"),
@@ -614,10 +645,12 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "LoggerName": (__spec__.parent, "config"),
     "LoggersDict": (__spec__.parent, "config"),
     "LoggingConfigDict": (__spec__.parent, "config"),
+    "LoggingMiddleware": (__spec__.parent, "mcp"),
     "LoggingMiddlewareSettings": (__spec__.parent, "config"),
     "LoggingSettings": (__spec__.parent, "config"),
     "MCPConfig": (__spec__.parent, "config"),
     "MCPConfigDict": (__spec__.parent, "config"),
+    "ManagementServer": (__spec__.parent, "server"),
     "Match": (__spec__.parent, "engine"),
     "MatchAny": (__spec__.parent, "engine"),
     "MatchExcept": (__spec__.parent, "engine"),
@@ -626,6 +659,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "MatchValue": (__spec__.parent, "engine"),
     "McpComponentRequests": (__spec__.parent, "common"),
     "McpComponentTimingDict": (__spec__.parent, "common"),
+    "McpMiddleware": (__spec__.parent, "mcp"),
     "McpOperationRequests": (__spec__.parent, "common"),
     "McpTimingDict": (__spec__.parent, "common"),
     "MemoryVectorStoreProvider": (__spec__.parent, "providers"),
@@ -671,6 +705,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "QueryType": (__spec__.parent, "providers"),
     "Range": (__spec__.parent, "engine"),
     "RangeRule": (__spec__.parent, "semantic"),
+    "RateLimitingMiddleware": (__spec__.parent, "mcp"),
     "RateLimitingMiddlewareSettings": (__spec__.parent, "config"),
     "RawEmbeddingVectors": (__spec__.parent, "providers"),
     "Relation": (__spec__.parent, "semantic"),
@@ -685,6 +720,8 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "RerankingServiceInfo": (__spec__.parent, "server"),
     "ResourceGovernor": (__spec__.parent, "engine"),
     "ResourceUri": (__spec__.parent, "common"),
+    "ResponseCachingMiddleware": (__spec__.parent, "mcp"),
+    "RetryMiddleware": (__spec__.parent, "mcp"),
     "RetryMiddlewareSettings": (__spec__.parent, "config"),
     "RignoreSettings": (__spec__.parent, "config"),
     "Role": (__spec__.parent, "core"),
@@ -707,7 +744,6 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "SerializationKwargs": (__spec__.parent, "core"),
     "SerializedCodeChunk": (__spec__.parent, "core"),
     "SerializedStrOnlyCodeChunk": (__spec__.parent, "core"),
-    "ServerSetup": (__spec__.parent, "server"),
     "ServicesInfo": (__spec__.parent, "server"),
     "SessionStatistics": (__spec__.parent, "common"),
     "SourceIdRegistry": (__spec__.parent, "engine"),
@@ -719,13 +755,15 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "SparseEmbeddingModelSettings": (__spec__.parent, "config"),
     "SparseEmbeddingServiceInfo": (__spec__.parent, "server"),
     "StatisticsInfo": (__spec__.parent, "server"),
-    "StatisticsMiddleware": (__spec__.parent, "middleware"),
+    "StatisticsMiddleware": (__spec__.parent, "mcp"),
     "StatusDisplay": (__spec__.parent, "cli"),
     "StdioCodeWeaverConfig": (__spec__.parent, "config"),
     "StdioCodeWeaverConfigDict": (__spec__.parent, "config"),
     "StoreDict": (__spec__.parent, "core"),
     "StoredEmbeddingVectors": (__spec__.parent, "providers"),
     "StructuredDataInput": (__spec__.parent, "core"),
+    "StructuredLoggingMiddleware": (__spec__.parent, "mcp"),
+    "TOOL_DEFINITIONS": (__spec__.parent, "mcp"),
     "TelemetrySettings": (__spec__.parent, "config"),
     "ThingClass": (__spec__.parent, "semantic"),
     "ThingKind": (__spec__.parent, "semantic"),
@@ -742,7 +780,9 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "TokenPurpose": (__spec__.parent, "semantic"),
     "Tokenizer": (__spec__.parent, "tokenizers"),
     "Tokenizers": (__spec__.parent, "tokenizers"),
+    "ToolAnnotationsDict": (__spec__.parent, "mcp"),
     "ToolOrPromptName": (__spec__.parent, "common"),
+    "ToolRegistrationDict": (__spec__.parent, "mcp"),
     "ToolsetTool": (__spec__.parent, "providers"),
     "UNSET": (__spec__.parent, "core"),
     "UUID7Hex": (__spec__.parent, "core"),
@@ -761,11 +801,17 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "VoyageEmbeddingProvider": (__spec__.parent, "providers"),
     "VoyageRerankingProvider": (__spec__.parent, "providers"),
     "WrapperToolset": (__spec__.parent, "providers"),
+    "create_http_server": (__spec__.parent, "mcp"),
+    "create_stdio_server": (__spec__.parent, "mcp"),
     "find_code": (__spec__.parent, "agent_api"),
+    "find_code_tool": (__spec__.parent, "mcp"),
+    "find_code_tool_definition": (__spec__.parent, "mcp"),
     "get_all_grammars": (__spec__.parent, "semantic"),
+    "get_bulk_tool": (__spec__.parent, "mcp"),
     "get_settings_map": (__spec__.parent, "config"),
     "make_blake_store": (__spec__.parent, "core"),
     "make_uuid_store": (__spec__.parent, "core"),
+    "register_tool": (__spec__.parent, "mcp"),
 })
 
 __getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
@@ -779,6 +825,7 @@ __all__ = (
     "DATACLASS_CONFIG",
     "FROZEN_BASEDMODEL_CONFIG",
     "PROVIDER_CAPABILITIES",
+    "TOOL_DEFINITIONS",
     "UNSET",
     "VECTOR_PROVIDER_CAPABILITIES",
     "ASTDepthExceededError",
@@ -794,7 +841,6 @@ __all__ = (
     "AgentTask",
     "AnonymityConversion",
     "AnyVariants",
-    "AppState",
     "ArbitraryFilter",
     "AstThing",
     "AvailableOptimizations",
@@ -837,6 +883,7 @@ __all__ = (
     "CodeWeaverMCPConfigDict",
     "CodeWeaverSettings",
     "CodeWeaverSettingsDict",
+    "CodeWeaverState",
     "CohereEmbeddingProvider",
     "CohereRerankingProvider",
     "CollectionMetadata",
@@ -855,6 +902,7 @@ __all__ = (
     "CustomDelimiter",
     "CustomLang",
     "CustomLanguage",
+    "CwMcpHttpState",
     "DataProviderSettings",
     "DataclassSerializationMixin",
     "DatetimeRange",
@@ -889,6 +937,7 @@ __all__ = (
     "EmbeddingProviderSettings",
     "Entry",
     "EnvVarInfo",
+    "ErrorHandlingMiddleware",
     "ErrorHandlingMiddlewareSettings",
     "EvidenceKind",
     "ExtKind",
@@ -900,8 +949,9 @@ __all__ = (
     "FastEmbedRerankingProvider",
     "FastEmbedSparseProvider",
     "FastMcpHttpRunArgs",
-    "FastMcpServerSettings",
+    "FastMcpHttpServerSettings",
     "FastMcpServerSettingsDict",
+    "FastMcpStdioServerSettings",
     "FastembedGPUProviderSettings",
     "FieldCondition",
     "FileExt",
@@ -970,10 +1020,12 @@ __all__ = (
     "LoggerName",
     "LoggersDict",
     "LoggingConfigDict",
+    "LoggingMiddleware",
     "LoggingMiddlewareSettings",
     "LoggingSettings",
     "MCPConfig",
     "MCPConfigDict",
+    "ManagementServer",
     "Match",
     "MatchAny",
     "MatchExcept",
@@ -982,6 +1034,7 @@ __all__ = (
     "MatchValue",
     "McpComponentRequests",
     "McpComponentTimingDict",
+    "McpMiddleware",
     "McpOperationRequests",
     "McpTimingDict",
     "MemoryVectorStoreProvider",
@@ -1027,6 +1080,7 @@ __all__ = (
     "Range",
     "Range",
     "RangeRule",
+    "RateLimitingMiddleware",
     "RateLimitingMiddlewareSettings",
     "RawEmbeddingVectors",
     "Relation",
@@ -1041,6 +1095,8 @@ __all__ = (
     "RerankingServiceInfo",
     "ResourceGovernor",
     "ResourceUri",
+    "ResponseCachingMiddleware",
+    "RetryMiddleware",
     "RetryMiddlewareSettings",
     "RignoreSettings",
     "Role",
@@ -1063,7 +1119,6 @@ __all__ = (
     "SerializationKwargs",
     "SerializedCodeChunk",
     "SerializedStrOnlyCodeChunk",
-    "ServerSetup",
     "ServicesInfo",
     "SessionStatistics",
     "SourceIdRegistry",
@@ -1082,6 +1137,7 @@ __all__ = (
     "StoreDict",
     "StoredEmbeddingVectors",
     "StructuredDataInput",
+    "StructuredLoggingMiddleware",
     "TelemetrySettings",
     "ThingClass",
     "ThingKind",
@@ -1098,7 +1154,9 @@ __all__ = (
     "TokenPurpose",
     "Tokenizer",
     "Tokenizers",
+    "ToolAnnotationsDict",
     "ToolOrPromptName",
+    "ToolRegistrationDict",
     "ToolsetTool",
     "UUID7Hex",
     "UUID7HexT",
@@ -1116,11 +1174,17 @@ __all__ = (
     "VoyageRerankingProvider",
     "WrapperToolset",
     "__version__",
+    "create_http_server",
+    "create_stdio_server",
     "find_code",
+    "find_code_tool",
+    "find_code_tool_definition",
     "get_all_grammars",
+    "get_bulk_tool",
     "get_settings_map",
     "make_blake_store",
     "make_uuid_store",
+    "register_tool",
 )
 
 

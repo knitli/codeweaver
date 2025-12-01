@@ -42,6 +42,9 @@ class SettingsEnvVars(TypedDict):
     CODEWEAVER_PORT: EnvVarInfo
     """Environment variable for setting the server port."""
 
+    CODEWEAVER_MCP_PORT: EnvVarInfo
+    """Environment variable for setting the MCP server port."""
+
     CODEWEAVER_DEBUG: EnvVarInfo
     """Environment variable for enabling debug mode."""
 
@@ -183,12 +186,20 @@ def environment_variables() -> DictView[SettingsEnvVars]:
             ),
             CODEWEAVER_PORT=EnvVarInfo(
                 env="CODEWEAVER_PORT",
-                description="Set the server port for CodeWeaver.",
+                description="Set the port for the codeweaver management server (information and management endpoints).",
+                is_required=False,
+                is_secret=False,
+                fmt=EnvFormat.NUMBER,
+                default="9329",
+                variable_name="port",
+            ),
+            CODEWEAVER_MCP_PORT=EnvVarInfo(
+                env="CODEWEAVER_MCP_PORT",
+                description="Set the MCP server port for CodeWeaver if using http transport for mcp. Not required if using the default port (9328), or stdio transport.",
                 is_required=False,
                 is_secret=False,
                 fmt=EnvFormat.NUMBER,
                 default="9328",
-                variable_name="port",
             ),
             CODEWEAVER_DEBUG=EnvVarInfo(
                 env="CODEWEAVER_DEBUG",
@@ -202,7 +213,7 @@ def environment_variables() -> DictView[SettingsEnvVars]:
             ),
             CODEWEAVER_PROFILE=EnvVarInfo(
                 env="CODEWEAVER_PROFILE",
-                description="Use a premade settings profile for CodeWeaver.",
+                description="Use a premade provider settings profile for CodeWeaver.",
                 is_required=False,
                 is_secret=False,
                 variable_name="profile",

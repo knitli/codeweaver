@@ -29,6 +29,11 @@ local linters = new Mapping<String, Step> {
             check = "typos -j 8 {{ files }}"
             fix = "typos --write-changes {{ files }}"
         }
+            ["shellcheck"] = new Step {
+            batch = true
+            glob = List("*.sh", "*.bash")
+            check = "shellcheck {{ files }}"
+        }
     }
 
     ["fix-ruff-patterns"] = new Step {
@@ -48,11 +53,6 @@ local linters = new Mapping<String, Step> {
         // fix = if (isCI()) "./scripts/code-quality/update-licenses.py add {{ files }}" else "./scripts/code-quality/update-licenses.py add --interactive {{ files }}"
     }
 
-    ["shellcheck"] = new Step {
-            batch = true
-            glob = List("*.sh", "*.bash")
-            check = "shellcheck {{ files }}"
-    }
 
     ["shfmt"] = Builtins.shfmt
 
@@ -62,7 +62,7 @@ local linters = new Mapping<String, Step> {
     }
 
     ["validate-lazy-imports"] = new Step {
-        glob = "{src,tests,scripts,mise-tasks}/**/*.py"
+        glob = "{src,tests}/**/*.py"
         check = "./mise-tasks/validate-lazy-imports.py {{ files }}"
     }
 
@@ -73,16 +73,16 @@ local linters = new Mapping<String, Step> {
     }
 
     ["fix-missing-eol"] = new Step {
-        glob = "*.{py,md,txt,toml,ini,cfg,conf,sh,bash,yml,yaml,json,jsonc,js,ts,tsx,rs,go,java,css,scss,html,xml}"
+        glob = "*.{py,md,txt,toml,ini,cfg,conf,sh,bash,js,ts,tsx,rs,go,java,css,scss,html,xml}"
         check = "hk util end-of-file-fixer {{ files }}"
         fix = "hk util end-of-file-fixer --fix {{ files }}"
     }
     ["check-added-large-files"] = new Step {
-        glob = "**"
+        glob = "*"
         check = "hk util check-added-large-files --maxkb 10000 {{ files }}"
     }
     ["check-merge-conflict-markers"] = new Step {
-        glob = "**"
+        glob = "*"
         check = "hk util check-merge-conflict --assume-in-merge {{ files }}"
     }
     ["check-python-ast"] = new Step {

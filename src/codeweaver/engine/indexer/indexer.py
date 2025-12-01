@@ -17,7 +17,6 @@ It is the backend service that powers CodeWeaver's code search and retrieval cap
 from __future__ import annotations
 
 import asyncio
-import dataclasses
 import logging
 import signal
 import time
@@ -28,7 +27,6 @@ from typing import TYPE_CHECKING, Annotated, Any, Protocol, TypedDict
 import rignore
 
 from pydantic import DirectoryPath, NonNegativeFloat, NonNegativeInt, PrivateAttr
-from pydantic.dataclasses import dataclass
 from watchfiles import Change
 
 from codeweaver.common.logging import log_to_client_or_fallback
@@ -44,6 +42,7 @@ from codeweaver.core.types.models import BasedModel
 from codeweaver.engine.chunking_service import ChunkingService
 from codeweaver.engine.indexer.checkpoint import CheckpointManager, IndexingCheckpoint
 from codeweaver.engine.indexer.manifest import FileManifestManager, IndexFileManifest
+from codeweaver.engine.indexer.progress import IndexingStats
 from codeweaver.engine.watcher.types import FileChange
 
 
@@ -60,16 +59,6 @@ if TYPE_CHECKING:
     from codeweaver.config.types import CodeWeaverSettingsDict
     from codeweaver.core.chunks import CodeChunk
     from codeweaver.providers.embedding.providers.base import EmbeddingProvider
-
-
-class IndexingError(TypedDict):
-    """Structured error information for failed file indexing."""
-
-    file_path: str  # Path to the file that failed
-    error_type: str  # Type of error (e.g., "ValueError", "RuntimeError")
-    error_message: str  # Error message
-    phase: str  # Phase where error occurred (discovery, chunking, embedding, storage)
-    timestamp: str  # ISO8601 timestamp when error occurred
 
 
 class ProgressCallback(Protocol):
@@ -150,86 +139,6 @@ def _get_chunking_service() -> ChunkingService:
         ChunkerSettings() if isinstance(chunk_settings, Unset) else chunk_settings
     )
     return ChunkingService(governor=governor)
-
-
-@dataclass
-class IndexingStats:
-    """Statistics tracking for indexing progress."""
-
-    files_discovered: int = 0
-    files_processed: int = 0
-    chunks_created: int = 0
-    chunks_embedded: int = 0
-    chunks_indexed: int = 0
-    start_time: float = dataclasses.field(default_factory=time.time)
-    files_with_errors: set[Path] = dataclasses.field(default_factory=set)
-    # Structured error tracking (new in v1.1.0)
-    structured_errors: list[IndexingError] = dataclasses.field(default_factory=list)
-
-    def elapsed_time(self) -> float:
-        """Calculate elapsed time since indexing started."""
-        return time.time() - self.start_time
-
-    def processing_rate(self) -> float:
-        """Files processed per second."""
-        if self.elapsed_time() == 0:
-            return 0.0
-        return self.files_processed / self.elapsed_time()
-
-    @property
-    def total_errors(self) -> int:
-        """Total number of files with errors (based on structured error tracking)."""
-        return len(self.structured_errors)
-
-    @property
-    def total_files_discovered(self) -> int:
-        """Total files discovered (alias for files_discovered)."""
-        return self.files_discovered
-
-    def add_error(self, file_path: Path, error: Exception, phase: str) -> None:
-        """Add a structured error to the tracking system.
-
-        Args:
-            file_path: Path to the file that failed
-            error: The exception that occurred
-            phase: Phase where error occurred (discovery, chunking, embedding, storage)
-        """
-        from datetime import UTC, datetime
-
-        self.files_with_errors.add(file_path)  # Set automatically deduplicates
-        self.structured_errors.append(
-            IndexingError(
-                file_path=str(file_path),
-                error_type=type(error).__name__,
-                error_message=str(error),
-                phase=phase,
-                timestamp=datetime.now(UTC).isoformat(),
-            )
-        )
-
-    def get_error_summary(self) -> dict[str, Any]:
-        """Get summary of errors by phase and type.
-
-        Returns:
-            Dictionary with error statistics
-        """
-        if not self.structured_errors:
-            return {"total_errors": 0, "by_phase": {}, "by_type": {}}
-
-        by_phase: dict[str, int] = {}
-        by_type: dict[str, int] = {}
-
-        for error in self.structured_errors:
-            phase = error["phase"]
-            error_type = error["error_type"]
-            by_phase[phase] = by_phase.get(phase, 0) + 1
-            by_type[error_type] = by_type.get(error_type, 0) + 1
-
-        return {
-            "total_errors": len(self.structured_errors),
-            "by_phase": by_phase,
-            "by_type": by_type,
-        }
 
 
 class Indexer(BasedModel):
@@ -812,7 +721,7 @@ class Indexer(BasedModel):
                         "error": str(e),
                         "error_type": type(e).__name__,
                         "phase": phase,
-                        "total_errors": self._stats.total_errors,
+                        "total_errors": self._stats.total_errors(),
                     },
                 },
             )
@@ -1296,6 +1205,9 @@ class Indexer(BasedModel):
                 self.save_checkpoint()
                 logger.debug("Checkpoint saved after batch %d/%d", batch_num, total_batches)
 
+            # Yield to event loop between file batches to keep server responsive
+            await asyncio.sleep(0)
+
         logger.info("Batch-through-pipeline indexing complete: %d batches processed", total_batches)
 
     def _finalize_indexing(self) -> None:
@@ -1305,13 +1217,13 @@ class Indexer(BasedModel):
             self._stats.files_processed,
             self._stats.chunks_created,
             self._stats.chunks_indexed,
-            self._stats.total_errors,
+            self._stats.total_errors(),
             self._stats.elapsed_time(),
             self._stats.processing_rate(),
         )
 
         # Log error summary if there were errors
-        if self._stats.total_errors > 0:
+        if self._stats.total_errors() > 0:
             self._log_error_summary()
         # Save file manifest
         self._save_file_manifest()
@@ -1321,7 +1233,7 @@ class Indexer(BasedModel):
         logger.info("Final checkpoint saved")
 
         # Clean up checkpoint file on successful completion
-        if self._checkpoint_manager and self._stats.total_errors == 0:
+        if self._checkpoint_manager and self._stats.total_errors() == 0:
             self._checkpoint_manager.delete()
             logger.info("Checkpoint file deleted after successful completion")
 
@@ -1679,6 +1591,10 @@ class Indexer(BasedModel):
                     # Report sparse embedding progress (always, even after exceptions)
                     if progress_callback:
                         progress_callback("sparse_embedding", sparse_embedded, total_chunks)
+
+                # Explicitly yield to event loop between batches to prevent blocking
+                # other async tasks (HTTP server, management server, etc.)
+                await asyncio.sleep(0)
 
                 # Update overall stats
                 self._stats.chunks_embedded += len(batch)

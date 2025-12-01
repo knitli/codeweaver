@@ -76,7 +76,21 @@ async def server(
         bool, cyclopts.Parameter(name=["--debug", "-d"], help="Enable debug logging")
     ] = False,
 ) -> None:
-    """Start CodeWeaver MCP server."""
+    """Start CodeWeaver MCP server.
+
+    This starts the MCP protocol server with integrated background services:
+    - Indexer (semantic search engine)
+    - FileWatcher (real-time index updates)
+    - HealthService (system monitoring)
+    - Statistics (telemetry collection)
+
+    Transport modes:
+    - streamable-http (default): HTTP-based transport on port 9328
+    - stdio: Standard I/O transport (launched per-session by MCP clients)
+
+    Background services are automatically started with the server.
+    Management endpoints available at http://127.0.0.1:9329 (Phase 1.2+).
+    """
     display = StatusDisplay()
     error_handler = CLIErrorHandler(display, verbose=verbose, debug=debug)
     from codeweaver.common.utils import is_wsl_vscode

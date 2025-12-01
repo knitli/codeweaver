@@ -3,38 +3,78 @@
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
 
-"""Middleware configuration settings for CodeWeaver."""
+"""McpMiddleware configuration settings for CodeWeaver.
+
+NOTE: This module defines configurations for **mcp** middleware. It only applies to the mcp protocol server, and not CodeWeaver's http endpoints or services.
+"""
 
 from __future__ import annotations
 
 import logging
 
 from collections.abc import Callable
-from typing import Annotated, Any, NotRequired, TypedDict
+from typing import Annotated, Any, Literal, NotRequired, TypedDict
 
-from fastmcp.contrib.bulk_tool_caller import BulkToolCaller
-from fastmcp.server.middleware.error_handling import ErrorHandlingMiddleware, RetryMiddleware
-from fastmcp.server.middleware.logging import LoggingMiddleware, StructuredLoggingMiddleware
-from fastmcp.server.middleware.middleware import MiddlewareContext
-from fastmcp.server.middleware.rate_limiting import RateLimitingMiddleware
-from fastmcp.server.middleware.timing import DetailedTimingMiddleware
+from fastmcp.server.middleware.caching import (
+    AsyncKeyValue,
+    CallToolSettings,
+    GetPromptSettings,
+    ListPromptsSettings,
+    ListResourcesSettings,
+    ListToolsSettings,
+    ReadResourceSettings,
+)
+from fastmcp.server.middleware.middleware import MiddlewareContext as McpMiddlewareContext
 from pydantic import Field, PositiveInt
+
+from codeweaver.mcp.middleware import (
+    DetailedTimingMiddleware,
+    ErrorHandlingMiddleware,
+    LoggingMiddleware,
+    RateLimitingMiddleware,
+    ResponseCachingMiddleware,
+    RetryMiddleware,
+    StructuredLoggingMiddleware,
+)
 
 
 # ===========================================================================
-# *          TypedDict classes for Middleware Settings
+# *          TypedDict classes for McpMiddleware Settings
 # ===========================================================================
 
 
 AVAILABLE_MIDDLEWARE = (
-    BulkToolCaller,
     ErrorHandlingMiddleware,
     LoggingMiddleware,
     StructuredLoggingMiddleware,
     DetailedTimingMiddleware,
     RateLimitingMiddleware,
+    ResponseCachingMiddleware,
     RetryMiddleware,
 )
+
+
+# ===========================
+# *  Caching McpMiddleware
+# ===========================
+
+
+class ResponseCachingMiddlewareSettings(TypedDict, total=False):
+    """Settings for response caching middleware."""
+
+    cache_storage: NotRequired[AsyncKeyValue | None]
+    list_tools_settings: NotRequired[ListToolsSettings | None]
+    list_prompts_settings: NotRequired[ListPromptsSettings | None]
+    list_resources_settings: NotRequired[ListResourcesSettings | None]
+    read_resource_settings: NotRequired[ReadResourceSettings | None]
+    get_prompt_settings: NotRequired[GetPromptSettings | None]
+    call_tool_settings: NotRequired[CallToolSettings | None]
+    max_item_size: NotRequired[int]
+
+
+# ===========================
+# * Other McpMiddleware
+# ===========================
 
 
 class ErrorHandlingMiddlewareSettings(TypedDict, total=False):
@@ -42,7 +82,7 @@ class ErrorHandlingMiddlewareSettings(TypedDict, total=False):
 
     logger: NotRequired[logging.Logger | None]
     include_traceback: NotRequired[bool]
-    error_callback: NotRequired[Callable[[Exception, MiddlewareContext[Any]], None] | None]
+    error_callback: NotRequired[Callable[[Exception, McpMiddlewareContext[Any]], None] | None]
     transform_errors: NotRequired[bool]
 
 
@@ -74,13 +114,14 @@ class RateLimitingMiddlewareSettings(TypedDict, total=False):
 
     max_requests_per_second: NotRequired[PositiveInt]
     burst_capacity: NotRequired[PositiveInt | None]
-    get_client_id: NotRequired[Callable[[MiddlewareContext[Any]], str] | None]
+    get_client_id: NotRequired[Callable[[McpMiddlewareContext[Any]], str] | None]
     global_limit: NotRequired[bool]
 
 
 class MiddlewareOptions(TypedDict, total=False):
     """Settings for middleware."""
 
+    caching: ResponseCachingMiddlewareSettings | None
     error_handling: ErrorHandlingMiddlewareSettings | None
     retry: RetryMiddlewareSettings | None
     logging: LoggingMiddlewareSettings | None
@@ -88,6 +129,7 @@ class MiddlewareOptions(TypedDict, total=False):
 
 
 DefaultMiddlewareSettings = MiddlewareOptions(
+    caching=ResponseCachingMiddlewareSettings(),  # we'll use defaults for now.
     error_handling=ErrorHandlingMiddlewareSettings(
         include_traceback=True, error_callback=None, transform_errors=False
     ),
@@ -99,6 +141,17 @@ DefaultMiddlewareSettings = MiddlewareOptions(
         max_requests_per_second=75, get_client_id=None, burst_capacity=150, global_limit=True
     ),
 )
+
+
+def default_for_transport(protocol: Literal["streamable-http", "stdio"]) -> MiddlewareOptions:
+    """Get default mcp middleware settings for a given transport protocol."""
+    settings = DefaultMiddlewareSettings.copy()
+    if protocol == "stdio":
+        return MiddlewareOptions(**{
+            k: v for k, v in settings.items() if k not in ("rate_limiting", "retry")
+        })
+    return settings
+
 
 __all__ = (
     "AVAILABLE_MIDDLEWARE",

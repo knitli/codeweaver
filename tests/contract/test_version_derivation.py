@@ -121,12 +121,9 @@ def test_validate_version_derivation(git_state: dict):
         )
     else:
         # Pre-release or dirty: should include commit info
-        # Format: X.Y.ZrcN+gHASH or X.Y.ZrcN+gHASH.dirty
-        # or X.Y.Z.devN+gHASH or X.Y.Z.devN+gHASH.dirty
-        if git_state["is_dirty"]:
-            assert "dirty" in derived_version.lower(), (
-                f"Dirty working directory should include 'dirty', got: {derived_version}"
-            )
+        # Format: X.Y.ZaN.devN+gHASH (PEP 440 compliant)
+        # Note: .dirty suffix disabled to maintain PEP 440 compliance
+        # (see pyproject.toml tool.uv-dynamic-versioning.dirty = false)
 
         if git_state["commit_distance"] > 0:
             # Should include commit indicator (rc, dev, or similar)

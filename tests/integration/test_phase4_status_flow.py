@@ -28,8 +28,8 @@ from codeweaver.agent_api.find_code.types import FindCodeResponseSummary
 from codeweaver.common.registry import ProviderRegistry
 from codeweaver.common.statistics import FailoverStats, get_session_statistics
 from codeweaver.engine.failover import VectorStoreFailoverManager
-from codeweaver.server.health_models import FailoverInfo
-from codeweaver.server.health_service import HealthService
+from codeweaver.server.health.health_service import HealthService
+from codeweaver.server.health.models import FailoverInfo
 
 
 @pytest.fixture

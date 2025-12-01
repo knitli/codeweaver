@@ -10,9 +10,8 @@ import contextlib
 
 """Tests for ResourceGovernor resource limits enforcement."""
 
-import time
-
 from typing import Protocol
+from unittest.mock import patch
 
 import pytest
 
@@ -42,10 +41,13 @@ def test_timeout_enforcement():
     """Test that ChunkingTimeoutError is raised when timeout is exceeded."""
     settings = MockPerformanceSettings(chunk_timeout_seconds=1)
 
-    with pytest.raises(ChunkingTimeoutError, match="exceeded timeout"):
-        with ResourceGovernor(settings) as governor:
-            time.sleep(1.1)
-            governor.check_timeout()
+    with patch("codeweaver.engine.chunker.governance.time") as mock_time:
+        # Set up time progression: 0.0 at __enter__, 1.5 at check_timeout()
+        mock_time.time.side_effect = [0.0, 1.5]
+
+        with pytest.raises(ChunkingTimeoutError, match="exceeded timeout"):
+            with ResourceGovernor(settings) as governor:
+                governor.check_timeout()
 
 
 def test_chunk_limit_enforcement():
@@ -54,8 +56,18 @@ def test_chunk_limit_enforcement():
 
     with pytest.raises(ChunkLimitExceededError, match="Exceeded maximum"):
         with ResourceGovernor(settings) as governor:
-            for _ in range(11):
-                governor.register_chunk()
+            # Register 11 chunks to exceed the limit of 10
+            governor.register_chunk()  # 1
+            governor.register_chunk()  # 2
+            governor.register_chunk()  # 3
+            governor.register_chunk()  # 4
+            governor.register_chunk()  # 5
+            governor.register_chunk()  # 6
+            governor.register_chunk()  # 7
+            governor.register_chunk()  # 8
+            governor.register_chunk()  # 9
+            governor.register_chunk()  # 10
+            governor.register_chunk()  # 11 - should raise
 
 
 def test_governor_context_manager_success():

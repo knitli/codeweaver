@@ -193,6 +193,7 @@ class TestLazyImportThreadSafety:
         # Create multiple threads that try to resolve concurrently
         threads = [threading.Thread(target=resolve_and_call) for _ in range(10)]
 
+        # sourcery skip: no-loop-in-tests
         for t in threads:
             t.start()
 
@@ -275,25 +276,28 @@ class TestLazyImportRealWorldUseCases:
         sys.modules["mock_tiktoken"] = tiktoken_module
 
         try:
-            # Global-level lazy imports (like at module scope)
-            _get_settings = lazy_import("mock_config").get_settings
-            _tiktoken = lazy_import("mock_tiktoken")
-
-            # Neither should be resolved yet
-            assert not _get_settings.is_resolved()
-            assert not _tiktoken.is_resolved()
-
-            # Use them later (like in functions)
-            settings = _get_settings()
-            assert settings == {"loaded": True}
-            assert _get_settings.is_resolved()
-
-            encoder = _tiktoken.get_encoding("gpt2")
-            assert encoder == "Encoding(gpt2)"
-            assert _tiktoken.is_resolved()
+            self._test_lazy_imports_resolve()
         finally:
             del sys.modules["mock_config"]
             del sys.modules["mock_tiktoken"]
+
+    def _test_lazy_imports_resolve(self):
+        # Global-level lazy imports (like at module scope)
+        _get_settings = lazy_import("mock_config").get_settings
+        _tiktoken = lazy_import("mock_tiktoken")
+
+        # Neither should be resolved yet
+        assert not _get_settings.is_resolved()
+        assert not _tiktoken.is_resolved()
+
+        # Use them later (like in functions)
+        settings = _get_settings()
+        assert settings == {"loaded": True}
+        assert _get_settings.is_resolved()
+
+        encoder = _tiktoken.get_encoding("gpt2")
+        assert encoder == "Encoding(gpt2)"
+        assert _tiktoken.is_resolved()
 
 
 @pytest.mark.benchmark
@@ -305,15 +309,15 @@ class TestLazyImportMagicMethods:
         """Test __repr__ shows path and status."""
         lazy = lazy_import("os", "path", "join")
 
-        repr_str = repr(lazy)
-        assert "os.path.join" in repr_str
-        assert "not resolved" in repr_str
+        repr_ = repr(lazy)
+        assert "os.path.join" in repr_
+        assert "not resolved" in repr_
 
         # Resolve it
         lazy._resolve()
-        repr_str = repr(lazy)
-        assert "resolved" in repr_str
-        assert "not resolved" not in repr_str
+        repr_ = repr(lazy)
+        assert "resolved" in repr_
+        assert "not resolved" not in repr_
 
     def test_dir(self):
         """Test __dir__ forwards to resolved object."""
@@ -471,6 +475,7 @@ class TestLazyImportPerformance:
         # Measure lazy import + resolution
         iterations = 1000
         start = time.perf_counter()
+        # sourcery skip: no-loop-in-tests
         for _ in range(iterations):
             lazy = lazy_import("os.path", "join")
             result = lazy("a", "b")
@@ -504,6 +509,7 @@ class TestLazyImportPerformance:
         # Measure cached access
         iterations = 10000
         start = time.perf_counter()
+        # sourcery skip: no-loop-in-tests
         for _ in range(iterations):
             result = lazy("a", "b")
             assert result == "a/b"
@@ -553,7 +559,7 @@ class TestLazyImportIntrospection:
         from pydantic import Field
         from pydantic.dataclasses import dataclass
 
-        # This is the pattern used in AppState
+        # This is the pattern used in CodeWeaverState
         get_settings_lazy = lazy_import("codeweaver.config.settings", "get_settings")
 
         @dataclass

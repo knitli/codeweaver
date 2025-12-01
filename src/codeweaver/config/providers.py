@@ -132,17 +132,17 @@ class RerankingModelSettings(TypedDict, total=False):
 class AWSProviderSettings(TypedDict, total=False):
     """Settings for AWS provider.
 
-    You need to provide these settings if you are using Bedrock, and you need to provide them for each Bedrock model you use. It might be repetitive, but a lot of people have different credentials for different models/services.
+    You need to provide these settings if you are using Bedrock, and you need to provide them for each Bedrock model you use. It might be repetitive, but a lot of people have different credentials for different models/services, and certainly different regions. Reranking models, in particular, are only available in a few regions right now.
     """
 
     region_name: Required[str]
     model_arn: Required[str]
     aws_access_key_id: NotRequired[SecretStr | None]
-    """Optional AWS access key ID. If not provided, we'll assume you have you have your AWS credentials configured in another way, such as environment variables, AWS config files, or IAM roles."""
+    """Optional AWS access key ID. If not provided, we'll assume you have your AWS credentials configured in another way, such as environment variables, AWS config files, or IAM roles."""
     aws_secret_access_key: NotRequired[SecretStr | None]
-    """Optional AWS secret access key. If not provided, we'll assume you have you have your AWS credentials configured in another way, such as environment variables, AWS config files, or IAM roles."""
+    """Optional AWS secret access key. If not provided, we'll assume you have your AWS credentials configured in another way, such as environment variables, AWS config files, or IAM roles."""
     aws_session_token: NotRequired[SecretStr | None]
-    """Optional AWS session token. If not provided, we'll assume you have you have your AWS credentials configured in another way, such as environment variables, AWS config files, or IAM roles."""
+    """Optional AWS session token. If not provided, we'll assume you have your AWS credentials configured in another way, such as environment variables, AWS config files, or IAM roles."""
 
 
 class AzureCohereProviderSettings(TypedDict, total=False):

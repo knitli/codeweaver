@@ -7,22 +7,20 @@
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import logging
 import signal
 import sys
 
 from pathlib import Path
-from types import EllipsisType
-from typing import TYPE_CHECKING, Any, Literal, cast, is_typeddict
+from typing import Any, Literal, cast
 
 from fastmcp import FastMCP
-from fastmcp.server.middleware import Middleware
 from pydantic import FilePath
-from typing_extensions import TypeIs
 
 from codeweaver.common.utils import lazy_import
-from codeweaver.core.types.sentinel import Unset
+from codeweaver.config.types import CodeWeaverSettingsDict
 from codeweaver.exceptions import InitializationError
 from codeweaver.providers.provider import Provider as Provider  # needed for pydantic models
 
@@ -43,40 +41,34 @@ class UvicornAccessLogFilter(logging.Filter):
         )
 
 
-if TYPE_CHECKING:
-    from codeweaver.config.settings import CodeWeaverSettings
-    from codeweaver.server import AppState, ServerSetup
-
 logger = logging.getLogger(__name__)
 
 
-def is_server_setup(obj: Any) -> TypeIs[ServerSetup]:
-    """Type guard to check if an object is a ServerSetup TypedDict."""
-    return (
-        is_typeddict(obj)
-        and all(key in obj for key in ("app", "settings"))
-        and isinstance(obj["settings"], CodeWeaverSettings)
-    )
+def _setup_logging_filters(*, verbose: bool, debug: bool) -> None:
+    """Suppress uvicorn loggers if not in verbose/debug mode."""
+    if not (verbose or debug):
+        access_filter = UvicornAccessLogFilter()
+        logging.getLogger().addFilter(access_filter)
+
+        for logger_name in ["uvicorn", "uvicorn.access", "uvicorn.error"]:
+            logger_obj = logging.getLogger(logger_name)
+            logger_obj.setLevel(logging.CRITICAL)
+            logger_obj.handlers.clear()
+            logger_obj.propagate = False
+            logger_obj.addFilter(access_filter)
 
 
-async def start_server(server: FastMCP[AppState] | ServerSetup, **kwargs: Any) -> None:
-    """Start CodeWeaver's FastMCP server with force shutdown support.
-
-    We start a minimal server here, and once it's up, we register components and merge in settings.
-    Supports force shutdown on second Ctrl+C.
-    """
-    # Track Ctrl+C count for force shutdown
-    shutdown_count = 0
+def _setup_signal_handler() -> Any:
+    """Setup force shutdown handler and return original handler."""
+    shutdown_count = [0]  # Use list to allow mutation in closure
     original_sigint_handler = None
 
     def force_shutdown_handler(signum: int, frame: Any) -> None:
         """Handle multiple SIGINT signals for force shutdown."""
-        nonlocal shutdown_count
-        shutdown_count += 1
+        shutdown_count[0] += 1
 
-        if shutdown_count == 1:
+        if shutdown_count[0] == 1:
             # Silent first interrupt - let lifespan cleanup handle the message
-            # Raise KeyboardInterrupt to trigger graceful shutdown
             raise KeyboardInterrupt
         logger.warning("Force shutdown requested, exiting immediately...")
         sys.exit(1)
@@ -84,125 +76,200 @@ async def start_server(server: FastMCP[AppState] | ServerSetup, **kwargs: Any) -
     # Install force shutdown handler
     with contextlib.suppress(ValueError, OSError):
         original_sigint_handler = signal.signal(signal.SIGINT, force_shutdown_handler)
+
+    return original_sigint_handler
+
+
+async def _run_http_server(
+    *,
+    config_file: FilePath | None = None,
+    project_path: Path | None = None,
+    host: str = "127.0.0.1",
+    port: int = 9328,
+    verbose: bool = False,
+    debug: bool = False,
+) -> None:
+    """Run HTTP MCP server with integrated background services and management server.
+
+    This mode runs three components concurrently:
+    1. Background services (indexing, file watching, health monitoring)
+    2. MCP HTTP server (port 9328 by default)
+    3. Management server (port 9329 by default)
+
+    Args:
+        config_file: Optional configuration file path
+        project_path: Optional project directory path
+        host: Host for MCP server
+        port: Port for MCP server
+        verbose: Enable verbose logging
+        debug: Enable debug logging
+    """
+    from codeweaver.cli.ui import StatusDisplay
+    from codeweaver.common.statistics import get_session_statistics
+    from codeweaver.common.utils import get_project_path
+    from codeweaver.config.settings import get_settings
+    from codeweaver.core.types.sentinel import Unset
+    from codeweaver.mcp.server import create_http_server
+    from codeweaver.mcp.state import CwMcpHttpState
+    from codeweaver.server.lifespan import http_lifespan
+    from codeweaver.server.management import ManagementServer
+
+    # Load settings
+    settings = get_settings()
+    if config_file:
+        settings.config_file = config_file  # type: ignore
+    if project_path:
+        settings.project_path = project_path
+    elif isinstance(settings.project_path, Unset):
+        settings.project_path = get_project_path()
+
+    # Setup logging
+    if verbose or debug:
+        from codeweaver.config.settings import get_settings_map
+        from codeweaver.server.logging import setup_logger
+
+        setup_logger(get_settings_map())
+
+    # Create MCP HTTP server state
+    mcp_state: CwMcpHttpState = await create_http_server(
+        host=host, port=port, verbose=verbose, debug=debug
+    )
+
+    # Create status display
+    status_display = StatusDisplay()
+
+    # Get statistics
+    statistics = get_session_statistics()
+
+    # Setup management server
+    mgmt_host = getattr(settings, "management_host", "127.0.0.1")
+    mgmt_port = getattr(settings, "management_port", 9329)
+
+    # Setup signal handler for force shutdowns
+    original_sigint_handler = _setup_signal_handler()
+
+    # Initialize provider registry
+    registry = lazy_import("codeweaver.common.registry.provider", "get_provider_registry")  # type: ignore
+    _ = registry._resolve()()  # type: ignore
+
+    # Suppress uvicorn loggers if not in verbose/debug mode
+    if not (verbose or debug):
+        _setup_logging_filters(verbose=verbose, debug=debug)
+
+    # Run with http_lifespan
     try:
-        app = server if isinstance(server, FastMCP) else server["app"]
-        resolved_kwargs: dict[str, Any] = kwargs or {}
-        server_setup: ServerSetup | EllipsisType = server if is_server_setup(server) else ...
+        async with http_lifespan(
+            mcp_state=mcp_state,
+            settings=settings,
+            statistics=statistics,
+            status_display=status_display,
+            verbose=verbose,
+            debug=debug,
+        ) as background_state:
+            # Start management server
+            management_server = ManagementServer(background_state)
+            await management_server.start(host=mgmt_host, port=mgmt_port)
 
-        # Get verbose/debug flags early for use throughout
-        verbose = False
-        debug = False
-
-        if server_setup and is_server_setup(server_setup):
-            settings: CodeWeaverSettings = server_setup["settings"]
-
-            # Get verbose/debug flags
-            verbose = server_setup.get("verbose", False)
-            debug = server_setup.get("debug", False)
-
-            # Transport priority: 1) CLI param (in server_setup), 2) settings, 3) default
-            transport = (
-                server_setup.get("transport")
-                or (
-                    "streamable-http"
-                    if isinstance(settings.server, Unset)
-                    else settings.server.transport
-                )
-                or "streamable-http"
-            )
-
-            # Configure uvicorn based on verbosity
-            uvicorn_config = settings.uvicorn or {}
-            if not (verbose or debug):
-                # Non-verbose mode: Suppress all uvicorn logging completely
-                uvicorn_log_config = {
-                    "version": 1,
-                    "disable_existing_loggers": False,
-                    "formatters": {
-                        "default": {
-                            "()": "uvicorn.logging.DefaultFormatter",
-                            "fmt": "%(levelprefix)s %(message)s",
-                            "use_colors": None,
-                        }
-                    },
-                    "handlers": {"null": {"class": "logging.NullHandler"}},
-                    "loggers": {
-                        "uvicorn": {"handlers": ["null"], "level": "CRITICAL", "propagate": False},
-                        "uvicorn.error": {
-                            "handlers": ["null"],
-                            "level": "CRITICAL",
-                            "propagate": False,
-                        },
-                        "uvicorn.access": {
-                            "handlers": ["null"],
-                            "level": "CRITICAL",
-                            "propagate": False,
-                        },
-                        # Additional loggers that may leak through
-                        "fastapi": {"handlers": ["null"], "level": "CRITICAL", "propagate": False},
-                        "fastmcp": {"handlers": ["null"], "level": "CRITICAL", "propagate": False},
-                    },
-                }
-
-                uvicorn_config = {
-                    **uvicorn_config,
-                    "access_log": False,  # Disable access logging
-                    "log_level": "critical",  # Only critical errors
-                    "log_config": uvicorn_log_config,  # Custom logging config
-                }
-            else:
-                # Verbose/debug mode: Enable uvicorn access logs
-                uvicorn_config = {
-                    **uvicorn_config,
-                    "access_log": True,  # Enable access logging in verbose mode
-                    "log_level": "debug" if debug else "info",  # Match verbosity level
-                }
-
-            new_kwargs = {  # type: ignore
-                "transport": transport,
-                "host": server_setup.pop("host", "127.0.0.1"),
-                "port": server_setup.pop("port", 9328),
-                "log_level": server_setup.pop("log_level", "INFO"),
-                "middleware": server_setup.pop("middleware", set()),
-                "uvicorn_config": uvicorn_config,  # Use configured uvicorn settings
-                "show_banner": False,  # We use our own custom banner via StatusDisplay
-            }
-            resolved_kwargs = new_kwargs | kwargs
-        else:
-            resolved_kwargs = {  # type: ignore
-                "transport": "streamable-http",
-                "host": "127.0.0.1",
-                "port": 9328,
-                "log_level": "INFO",
-                "middleware": set(),
-                "uvicorn_config": {},
-                "show_banner": False,  # We use our own custom banner via StatusDisplay
-                **kwargs.copy(),
-            }  # type: ignore
-        registry = lazy_import("codeweaver.common.registry.provider", "get_provider_registry")  # type: ignore
-        _ = registry()  # type: ignore
-
-        # Aggressively suppress uvicorn loggers BEFORE starting server
-        if not (verbose or debug):
-            # Add filter to root logger to block uvicorn access logs
-            access_filter = UvicornAccessLogFilter()
-            logging.getLogger().addFilter(access_filter)
-
-            for logger_name in ["uvicorn", "uvicorn.access", "uvicorn.error"]:
-                logger_obj = logging.getLogger(logger_name)
-                logger_obj.setLevel(logging.CRITICAL)
-                logger_obj.handlers.clear()
-                logger_obj.propagate = False
-                logger_obj.addFilter(access_filter)
-
-        # Wrap in try-except to catch KeyboardInterrupt cleanly without traceback
-        with contextlib.suppress(KeyboardInterrupt):
-            await app.run_http_async(**resolved_kwargs)  # type: ignore
+            try:
+                # Run MCP server
+                with contextlib.suppress(KeyboardInterrupt):
+                    # run_args contains both top-level params and uvicorn_config
+                    # FastMCP.run_http_async() handles host/port specially - they go in uvicorn_config
+                    # So we just pass run_args directly, which already has everything configured
+                    await mcp_state.app.run_http_async(**mcp_state.run_args)
+            finally:
+                # Stop management server
+                await management_server.stop()
+    except KeyboardInterrupt:
+        logger.info("Shutdown requested, cleaning up...")
     finally:
         # Restore original signal handler
         if original_sigint_handler:
             with contextlib.suppress(ValueError, OSError):
                 signal.signal(signal.SIGINT, original_sigint_handler)
+
+
+async def _run_stdio_server(
+    *,
+    config_file: FilePath | None = None,
+    project_path: Path | None = None,
+    host: str = "127.0.0.1",
+    port: int = 9328,
+    verbose: bool = False,
+    debug: bool = False,
+) -> None:
+    """Run stdio MCP server (proxies to HTTP backend).
+
+    This creates a stdio proxy that forwards MCP requests to an HTTP backend.
+    The HTTP backend should already be running via `codeweaver server`.
+
+    Args:
+        config_file: Optional configuration file path
+        project_path: Optional project directory path
+        host: Host of HTTP backend to proxy to
+        port: Port of HTTP backend to proxy to
+        verbose: Enable verbose logging
+        debug: Enable debug logging
+    """
+    # Create stdio proxy server
+    stdio_server = await get_stdio_server(
+        config_file=config_file, project_path=project_path, host=host, port=port
+    )
+
+    if verbose or debug:
+        logger.info("Starting stdio proxy to HTTP server at %s:%d", host, port)
+
+    # Run stdio proxy (blocks until client disconnects)
+    try:
+        await stdio_server.run_stdio_async(show_banner=False, log_level="warning")
+    except KeyboardInterrupt:
+        if verbose or debug:
+            logger.info("stdio server shutting down...")
+
+
+async def get_stdio_server(
+    *,
+    config_file: FilePath | None = None,
+    project_path: Path | None = None,
+    host: str | None = None,
+    port: int | None = None,
+) -> FastMCP:  # type: ignore
+    """Get a FastMCP stdio server setup for CodeWeaver.
+
+    Args:
+        config_file: Optional path to configuration file.
+        project_path: Optional path to project directory.
+        host: Optional host for the server. This is the host/port for the *codeweaver http mcp server* that the stdio client will be proxied to. **You only need this if you're not connecting to a default setting or not connecting to what is in your config file**.
+        port: Optional port for the server. This is the host/port for the *codeweaver http mcp server* that the stdio client will be proxied to. **You only need this if you're not connecting to a default setting or not connecting to what is in your config file**.
+
+    Returns:
+        Configured FastMCP stdio server instance (not yet running).
+
+    """
+    from codeweaver.mcp.server import create_stdio_server
+
+    if config_file or project_path:
+        # We normally want to use the global settings instance, but here because a proxied stdio client could be used in isolation and outside a typical configuration, we create a unique settings instance.
+        from codeweaver.config.settings import CodeWeaverSettings, get_settings
+
+        global_settings = get_settings()
+        if config_file and isinstance(config_file, Path) and config_file.exists():
+            settings = (
+                CodeWeaverSettings(config_file=config_file, project_path=project_path)
+                if project_path
+                else CodeWeaverSettings(config_file=config_file)
+            )
+        elif project_path and project_path.exists():
+            settings = global_settings.model_copy(update={"project_path": project_path})
+        else:
+            settings = None
+        if settings:
+            settings = CodeWeaverSettingsDict(**settings.model_dump())
+    else:
+        settings = None
+    return await create_stdio_server(
+        settings=cast(CodeWeaverSettingsDict | None, settings), host=host, port=port
+    )
 
 
 async def run(
@@ -215,40 +282,41 @@ async def run(
     verbose: bool = False,
     debug: bool = False,
 ) -> None:
-    """Run the CodeWeaver server."""
-    from codeweaver.server import build_app
-    from codeweaver.server.app_bindings import register_app_bindings, register_tool
+    """Run the CodeWeaver server with appropriate transport.
 
-    server_setup = build_app(verbose=verbose, debug=debug, transport=transport)
-    server_setup["verbose"] = verbose
-    server_setup["debug"] = debug
-    if host:
-        server_setup["host"] = host
-    if port:
-        server_setup["port"] = port
-    if config_file or project_path:
-        from codeweaver.config.settings import get_settings
+    This is the main entry point for starting CodeWeaver's MCP server.
 
-        server_setup["settings"] = get_settings(config_file=config_file)
-    if project_path:
-        from codeweaver.config.settings import update_settings
+    Transport modes:
+    - streamable-http: Full server with background services, MCP HTTP server, and management server
+    - stdio: stdio proxy that forwards to an existing HTTP backend
 
-        logger.debug("Type of server_setup['settings']: %s", type(server_setup["settings"]))
-        _ = update_settings(**{  # ty: ignore[invalid-argument-type]
-            **server_setup["settings"].model_dump(),
-            "project_path": project_path,
-        })
-
-    # Explicitly type the middleware to satisfy type checker
-    middleware: set[Middleware] = server_setup.get("middleware", set())  # type: ignore[assignment]
-
-    server_setup["app"], server_setup["middleware"] = await register_app_bindings(  # type: ignore
-        server_setup["app"],
-        cast(set[Middleware], middleware),
-        server_setup.get("middleware_settings", {}),  # ty: ignore[invalid-argument-type]
-    )
-    server_setup["app"] = register_tool(server_setup["app"])
-    await start_server(server_setup)
+    Args:
+        config_file: Optional configuration file path
+        project_path: Optional project directory path
+        host: Host to bind server to
+        port: Port to bind server to
+        transport: Transport protocol (streamable-http or stdio)
+        verbose: Enable verbose logging
+        debug: Enable debug logging
+    """
+    if transport == "stdio":
+        await _run_stdio_server(
+            config_file=config_file,
+            project_path=project_path,
+            host=host,
+            port=port,
+            verbose=verbose,
+            debug=debug,
+        )
+    else:  # streamable-http
+        await _run_http_server(
+            config_file=config_file,
+            project_path=project_path,
+            host=host,
+            port=port,
+            verbose=verbose,
+            debug=debug,
+        )
 
 
 if __name__ == "__main__":
@@ -261,4 +329,4 @@ if __name__ == "__main__":
         logging.getLogger(__name__).exception("Failed to start CodeWeaver server: ")
         raise InitializationError("Failed to start CodeWeaver server.") from e
 
-__all__ = ("run", "start_server")
+__all__ = ("get_stdio_server", "run")

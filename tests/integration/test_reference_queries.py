@@ -152,7 +152,7 @@ def reference_queries() -> list[ReferenceQuery]:
 @pytest.mark.asyncio
 async def test_reference_queries_comprehensive(
     reference_queries: list[ReferenceQuery], configured_providers
-) -> None:
+) -> None:  # sourcery skip: low-code-quality
     """Execute all reference queries and validate precision targets.
 
     This is the main comprehensive test that:
@@ -231,7 +231,7 @@ async def test_reference_queries_comprehensive(
         sum(precision_at_5_scores) / len(precision_at_5_scores) if precision_at_5_scores else 0.0
     )
 
-    overall_precision = sum([r.precision for r in results]) / len(results) if results else 0.0
+    overall_precision = sum(r.precision for r in results) / len(results) if results else 0.0
 
     # ========================================================================
     # Report detailed results
@@ -293,8 +293,7 @@ async def test_reference_queries_comprehensive(
                 # Show what was missed
                 expected_names = result.query.expected_file_names
                 actual_names = {Path(f).name for f in result.actual_files}
-                missed = expected_names - actual_names
-                if missed:
+                if missed := expected_names - actual_names:
                     logger.info("      Missed: %s", ", ".join(sorted(missed)))
 
     logger.info("\n%s\n", "=" * 80)
@@ -309,7 +308,7 @@ async def test_reference_queries_comprehensive(
             "Test validates basic functionality only."
         )
         # Just verify the test infrastructure works
-        assert len(results) > 0, "Should have executed at least one query"
+        assert results, "Should have executed at least one query"
         return
 
     # Real provider assertions
@@ -438,8 +437,8 @@ def test_query_diversity_metrics(reference_queries: list[ReferenceQuery]) -> Non
         assert count >= 2, f"Intent {intent.value} has insufficient coverage ({count} queries)"
 
     # Check precision target distribution
-    p3_count = sum(1 for q in reference_queries if q.precision_target == 3)
-    p5_count = sum(1 for q in reference_queries if q.precision_target == 5)
+    p3_count = sum(q.precision_target == 3 for q in reference_queries)
+    p5_count = sum(q.precision_target == 5 for q in reference_queries)
 
     logger.info("\nPrecision Target Distribution:")
     logger.info("  P@3 queries: %d", p3_count)

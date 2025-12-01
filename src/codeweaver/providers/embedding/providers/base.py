@@ -517,6 +517,9 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                 Sequence[float] | Sequence[int] | dict[str, list[int] | list[float]]
             ] = []
 
+            # Yield after CPU-bound token batching to prevent event loop blocking
+            await asyncio.sleep(0)
+
             for batch_idx, token_batch in enumerate(token_batches):
                 if len(token_batches) > 1:
                     logger.debug(
@@ -535,6 +538,9 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                     token_batch, for_backup=for_backup, **kwargs
                 )
                 all_results.extend(batch_results)
+
+                # Yield between token batches to keep server responsive
+                await asyncio.sleep(0)
 
             results = all_results
         except CircuitBreakerOpenError as e:

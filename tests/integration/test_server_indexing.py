@@ -149,7 +149,7 @@ async def test_server_starts_without_errors(indexer: Indexer):
     # Note: May be None if API keys not configured, that's acceptable
     stats = indexer.stats
     assert stats.files_processed == 0  # Not yet indexed
-    assert stats.total_errors == 0
+    assert stats.total_errors() == 0
 
 
 @pytest.mark.integration
@@ -199,7 +199,7 @@ async def test_indexing_progress_via_health(indexer: Indexer):
     assert stats.files_discovered >= 0
     assert stats.files_processed <= stats.files_discovered
     assert stats.chunks_created >= 0
-    assert stats.total_errors >= 0
+    assert stats.total_errors() >= 0
 
 
 @pytest.mark.integration
@@ -269,8 +269,8 @@ async def test_indexing_error_recovery(test_project_path: Path):
 
     # Errors should be tracked
     # Note: May be 0 if binary file filtered out before chunking
-    if stats.total_errors > 0:
-        assert stats.total_errors <= 2, "Expected ≤2 errors (corrupted file + retry)"
+    if stats.total_errors() > 0:
+        assert stats.total_errors() <= 2, "Expected ≤2 errors (corrupted file + retry)"
 
 
 @pytest.mark.integration
@@ -287,8 +287,6 @@ async def test_file_change_indexing(indexer: Indexer, test_project_path: Path):
     await asyncio.sleep(1)
 
     initial_stats = indexer.stats
-    initial_chunks = initial_stats.chunks_created
-
     # Modify a file
     auth_file = test_project_path / "src" / "auth.py"
     original_content = auth_file.read_text()
@@ -310,6 +308,8 @@ async def test_file_change_indexing(indexer: Indexer, test_project_path: Path):
     # Should have created new chunks for modified file
     # Note: May be same if providers not available
     if updated_stats.chunks_created > 0:
+        initial_chunks = initial_stats.chunks_created
+
         assert updated_stats.chunks_created >= initial_chunks
 
 

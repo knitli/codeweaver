@@ -30,7 +30,7 @@ from typing import (
     overload,
 )
 
-from fastmcp.server.middleware import MiddlewareContext
+from fastmcp import Context as FastMCPContext
 from pydantic import DirectoryPath, Field, FilePath, PrivateAttr, computed_field
 
 from codeweaver.core.file_extensions import DEFAULT_EXCLUDED_DIRS, DEFAULT_EXCLUDED_EXTENSIONS
@@ -343,7 +343,7 @@ class IndexerSettings(BasedModel):
 
     _inc_exc_set: Annotated[bool, PrivateAttr()] = False
 
-    def model_post_init(self, _context: MiddlewareContext[Any] | None = None, /) -> None:
+    def model_post_init(self, _context: FastMCPContext[Any] | None = None, /) -> None:
         """Post-initialization processing."""
         self._inc_exc_set = False
         if self.include_github_dir:
