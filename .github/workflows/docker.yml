@@ -185,12 +185,16 @@ jobs:
           docker compose build
           docker compose up -d
       - name: Wait for services to be healthy
+        env:
+          # Health check endpoints - /healthz for Qdrant (v1.5.0+), /health/ for CodeWeaver
+          QDRANT_HEALTH_URL: http://localhost:6333/healthz
+          CODEWEAVER_HEALTH_URL: http://localhost:9328/health/
         run: |
           echo "Waiting for Qdrant to be ready..."
           # Use /healthz endpoint (Qdrant v1.5.0+), /health returns 404
           max_attempts=30
           attempt=0
-          until curl -sf http://localhost:6333/healthz >/dev/null 2>&1; do
+          until curl -sf "$QDRANT_HEALTH_URL" >/dev/null 2>&1; do
             attempt=$((attempt + 1))
             if [ $attempt -ge $max_attempts ]; then
               echo "Qdrant failed to become healthy after $max_attempts attempts"
@@ -206,7 +210,7 @@ jobs:
           # CodeWeaver may take longer due to initial model downloads and setup
           max_attempts=40
           attempt=0
-          until curl -sf http://localhost:9328/health/ >/dev/null 2>&1; do
+          until curl -sf "$CODEWEAVER_HEALTH_URL" >/dev/null 2>&1; do
             attempt=$((attempt + 1))
             if [ $attempt -ge $max_attempts ]; then
               echo "CodeWeaver failed to become healthy after $max_attempts attempts"
@@ -221,16 +225,19 @@ jobs:
             echo "CodeWeaver is healthy!"
           fi
       - name: Test Qdrant accessibility
+        env:
+          QDRANT_HEALTH_URL: http://localhost:6333/healthz
         run: |
           echo "Testing Qdrant health endpoint..."
-          # Use /healthz endpoint (correct endpoint for Qdrant v1.5.0+)
-          curl -sf http://localhost:6333/healthz || (echo "Qdrant health check failed" && docker compose logs qdrant && exit 1)
+          curl -sf "$QDRANT_HEALTH_URL" || (echo "Qdrant health check failed" && docker compose logs qdrant && exit 1)
           echo "Qdrant health check passed!"
       - name: Test CodeWeaver accessibility
+        env:
+          CODEWEAVER_HEALTH_URL: http://localhost:9328/health/
         run: |
           echo "Testing CodeWeaver health endpoint..."
           # Try health endpoint, may fail without valid API key but tests connectivity
-          if curl -sf http://localhost:9328/health/ >/dev/null 2>&1; then
+          if curl -sf "$CODEWEAVER_HEALTH_URL" >/dev/null 2>&1; then
             echo "CodeWeaver health check passed!"
           else
             echo "CodeWeaver health check returned non-200 (may be expected without valid API key)"
