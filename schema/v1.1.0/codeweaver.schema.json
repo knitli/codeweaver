@@ -1,0 +1,2476 @@
+{
+  "$defs": {
+    "AgentProviderSettings": {
+      "description": "Settings for agent models.",
+      "properties": {
+        "api_key": {
+          "anyOf": [
+            {
+              "format": "password",
+              "type": "string",
+              "writeOnly": true
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Api key"
+        },
+        "client_options": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Client options"
+        },
+        "connection": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ConnectionConfiguration"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Connection"
+        },
+        "enabled": {
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ModelString"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Model"
+        },
+        "model_settings": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ModelSettings"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Settings for the agent model(s).",
+          "title": "Model settings"
+        },
+        "other": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Other"
+        },
+        "provider": {
+          "$ref": "#/$defs/Provider"
+        }
+      },
+      "required": [
+        "provider",
+        "model",
+        "model_settings"
+      ],
+      "title": "AgentProviderSettings",
+      "type": "object"
+    },
+    "AuthSettings": {
+      "properties": {
+        "client_registration_options": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ClientRegistrationOptions"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "issuer_url": {
+          "description": "OAuth authorization server URL that issues tokens for this resource server.",
+          "format": "uri",
+          "minLength": 1,
+          "title": "Issuer Url",
+          "type": "string"
+        },
+        "required_scopes": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Required Scopes"
+        },
+        "resource_server_url": {
+          "anyOf": [
+            {
+              "format": "uri",
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The URL of the MCP server to be used as the resource identifier and base route to look up OAuth Protected Resource Metadata.",
+          "title": "Resource Server Url"
+        },
+        "revocation_options": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RevocationOptions"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "service_documentation_url": {
+          "anyOf": [
+            {
+              "format": "uri",
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Service Documentation Url"
+        }
+      },
+      "required": [
+        "issuer_url",
+        "resource_server_url"
+      ],
+      "title": "AuthSettings",
+      "type": "object"
+    },
+    "AWSProviderSettings": {
+      "description": "Settings for AWS provider.\n\nYou need to provide these settings if you are using Bedrock, and you need to provide them for each Bedrock model you use. It might be repetitive, but a lot of people have different credentials for different models/services.",
+      "properties": {
+        "aws_access_key_id": {
+          "anyOf": [
+            {
+              "format": "password",
+              "type": "string",
+              "writeOnly": true
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional AWS access key ID. If not provided, we'll assume you have your AWS credentials configured in another way, such as environment variables, AWS config files, or IAM roles.",
+          "title": "Aws access key id"
+        },
+        "aws_secret_access_key": {
+          "anyOf": [
+            {
+              "format": "password",
+              "type": "string",
+              "writeOnly": true
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional AWS secret access key. If not provided, we'll assume you have your AWS credentials configured in another way, such as environment variables, AWS config files, or IAM roles.",
+          "title": "Aws secret access key"
+        },
+        "aws_session_token": {
+          "anyOf": [
+            {
+              "format": "password",
+              "type": "string",
+              "writeOnly": true
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional AWS session token. If not provided, we'll assume you have your AWS credentials configured in another way, such as environment variables, AWS config files, or IAM roles.",
+          "title": "Aws session token"
+        },
+        "model_arn": {
+          "title": "Model arn",
+          "type": "string"
+        },
+        "region_name": {
+          "title": "Region name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "region_name",
+        "model_arn"
+      ],
+      "title": "AWSProviderSettings",
+      "type": "object"
+    },
+    "AzureCohereProviderSettings": {
+      "description": "Provider settings for Azure Cohere.\n\nYou need to provide these settings if you are using Azure Cohere, and you need to provide them for each Azure Cohere model you use.\nThey're **all required**. They're marked `NotRequired` in the TypedDict because you can also provide them by environment variables, but you must provide them one way or another.",
+      "properties": {
+        "api_key": {
+          "anyOf": [
+            {
+              "format": "password",
+              "type": "string",
+              "writeOnly": true
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Your Azure API key. If not provided, we'll assume you have your Azure credentials configured in another way, such as environment variables.",
+          "title": "Api key"
+        },
+        "azure_endpoint": {
+          "description": "The endpoint for your Azure resource. This is used to send requests to your resource. Only provide the endpoint, not the full URL. For example, if your endpoint is `https://your-cool-resource.<region_name>.inference.ai.azure.com/v1`, you would only provide \"your-cool-resource\" here.",
+          "title": "Azure endpoint",
+          "type": "string"
+        },
+        "azure_resource_name": {
+          "description": "The name of your Azure resource. This is used to identify your resource in Azure.",
+          "title": "Azure resource name",
+          "type": "string"
+        },
+        "model_deployment": {
+          "description": "The deployment name of the model you want to use. Important: While the OpenAI API uses the model name to identify the model, you must separately provide a codeweaver-compatible name for the model, as well as your Azure resource name here. We're open to PRs if you want to add a parser for model names that can extract the deployment name from them.",
+          "title": "Model deployment",
+          "type": "string"
+        },
+        "region_name": {
+          "description": "The Azure region where your resource is located. This is used to route requests to the correct regional endpoint.",
+          "title": "Region name",
+          "type": "string"
+        }
+      },
+      "title": "AzureCohereProviderSettings",
+      "type": "object"
+    },
+    "AzureOpenAIProviderSettings": {
+      "description": "Provider settings for Azure OpenAI.\n\nYou need to provide these settings if you are using Azure OpenAI, and you need to provide them for each Azure OpenAI model you use.\n\n**For embedding models:**\n**We only support the \"**next-generation** Azure OpenAI API.\" Currently, you need to opt into this API in your Azure settings. We didn't want to start supporting the old API knowing it's going away.\n\nFor agent models:\nWe support both APIs for agentic models because our support comes from `pydantic_ai`, which supports both.",
+      "properties": {
+        "api_key": {
+          "anyOf": [
+            {
+              "format": "password",
+              "type": "string",
+              "writeOnly": true
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Your Azure API key. If not provided, we'll assume you have your Azure credentials configured in another way, such as environment variables.",
+          "title": "Api key"
+        },
+        "azure_resource_name": {
+          "description": "The name of your Azure resource. This is used to identify your resource in Azure.",
+          "title": "Azure resource name",
+          "type": "string"
+        },
+        "endpoint": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The endpoint for your Azure resource. This is used to send requests to your resource. Only provide the endpoint, not the full URL. For example, if your endpoint is `https://your-cool-resource.<region_name>.inference.ai.azure.com/v1`, you would only provide \"your-cool-resource\" here.",
+          "title": "Endpoint"
+        },
+        "model_deployment": {
+          "description": "The deployment name of the model you want to use. Important: While the OpenAI API uses the model name to identify the model, you must separately provide a codeweaver-compatible name for the model, as well as your Azure resource name here. We're open to PRs if you want to add a parser for model names that can extract the deployment name from them.",
+          "title": "Model deployment",
+          "type": "string"
+        },
+        "region_name": {
+          "description": "The Azure region where your resource is located. This is used to route requests to the correct regional endpoint.",
+          "title": "Region name",
+          "type": "string"
+        }
+      },
+      "title": "AzureOpenAIProviderSettings",
+      "type": "object"
+    },
+    "ClientRegistrationOptions": {
+      "properties": {
+        "client_secret_expiry_seconds": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Client Secret Expiry Seconds"
+        },
+        "default_scopes": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Default Scopes"
+        },
+        "enabled": {
+          "default": false,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "valid_scopes": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid Scopes"
+        }
+      },
+      "title": "ClientRegistrationOptions",
+      "type": "object"
+    },
+    "CodeWeaverMCPConfig": {
+      "additionalProperties": true,
+      "description": "Configuration model for CodeWeaver configuration in mcp.json files.",
+      "properties": {
+        "auth": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "const": "oauth",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Either a string representing a Bearer token, the literal \"oauth\" to use OAuth authentication, or an httpx.Auth instance for custom authentication.",
+          "title": "Auth"
+        },
+        "authentication": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Authentication"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "CodeWeaver advanced code search and understanding server.",
+          "title": "Description"
+        },
+        "headers": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Headers",
+          "type": "object"
+        },
+        "icon": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "https://raw.githubusercontent.com/knitli/codeweaver/main/docs/assets/codeweaver-primary.svg",
+          "title": "Icon"
+        },
+        "sse_read_timeout": {
+          "anyOf": [
+            {
+              "format": "duration",
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sse read timeout"
+        },
+        "timeout": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 120,
+          "title": "Timeout"
+        },
+        "transport": {
+          "anyOf": [
+            {
+              "enum": [
+                "http",
+                "streamable-http",
+                "sse"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Transport"
+        },
+        "url": {
+          "default": "http://127.0.0.1:9328/mcp",
+          "title": "Url",
+          "type": "string"
+        }
+      },
+      "title": "Code Weaver Mcp Config",
+      "type": "object"
+    },
+    "ConnectionConfiguration": {
+      "description": "Settings for connection configuration. Only required for non-default transports.",
+      "properties": {
+        "headers": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Headers"
+        },
+        "host": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Host"
+        },
+        "port": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Port"
+        },
+        "rate_limits": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ConnectionRateLimitConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Rate limits"
+        }
+      },
+      "title": "ConnectionConfiguration",
+      "type": "object"
+    },
+    "ConnectionRateLimitConfig": {
+      "description": "Settings for connection rate limiting.",
+      "properties": {
+        "backoff_multiplier": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Backoff multiplier"
+        },
+        "burst_capacity": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Burst capacity"
+        },
+        "max_requests_per_second": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Max requests per second"
+        },
+        "max_retries": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Max retries"
+        }
+      },
+      "title": "ConnectionRateLimitConfig",
+      "type": "object"
+    },
+    "DataProviderSettings": {
+      "description": "Settings for data providers.",
+      "properties": {
+        "api_key": {
+          "anyOf": [
+            {
+              "format": "password",
+              "type": "string",
+              "writeOnly": true
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Api key"
+        },
+        "client_options": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Client options"
+        },
+        "connection": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ConnectionConfiguration"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Connection"
+        },
+        "enabled": {
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "other": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Other"
+        },
+        "provider": {
+          "$ref": "#/$defs/Provider",
+          "title": "Provider"
+        }
+      },
+      "required": [
+        "provider"
+      ],
+      "title": "DataProviderSettings",
+      "type": "object"
+    },
+    "EmbeddingModelSettings": {
+      "description": "Embedding model settings. Use this class for dense (vector) models.",
+      "properties": {
+        "custom_prompt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "A custom prompt to use for the embedding model, if supported. Most models do not support custom prompts for embedding.",
+          "title": "Custom prompt"
+        },
+        "data_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Data type"
+        },
+        "dimension": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Dimension"
+        },
+        "embed_options": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Keyword arguments to pass to the *provider* **client's** (like `voyageai.async_client.AsyncClient`) `embed` method. These are different from `model_options`, which are passed to the model constructor itself.",
+          "title": "Embed options"
+        },
+        "model": {
+          "title": "Model",
+          "type": "string"
+        },
+        "model_options": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Keyword arguments to pass to the model's constructor.",
+          "title": "Model options"
+        }
+      },
+      "required": [
+        "model"
+      ],
+      "title": "EmbeddingModelSettings",
+      "type": "object"
+    },
+    "EmbeddingProviderSettings": {
+      "description": "Settings for (dense) embedding models. It validates that the model and provider settings are compatible and complete, reconciling environment variables and config file settings as needed.",
+      "properties": {
+        "api_key": {
+          "anyOf": [
+            {
+              "format": "password",
+              "type": "string",
+              "writeOnly": true
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Api key"
+        },
+        "client_options": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Client options"
+        },
+        "connection": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ConnectionConfiguration"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Connection"
+        },
+        "enabled": {
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "model_settings": {
+          "$ref": "#/$defs/EmbeddingModelSettings",
+          "description": "Settings for the embedding model(s).",
+          "title": "Model settings"
+        },
+        "other": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Other"
+        },
+        "provider": {
+          "$ref": "#/$defs/Provider"
+        },
+        "provider_settings": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ProviderSpecificSettings"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Settings for specific providers, if any. Some providers have special settings that are required for them to work properly, but you may provide them by environment variables as well as in your config, or both.",
+          "title": "Provider settings"
+        }
+      },
+      "required": [
+        "provider",
+        "model_settings"
+      ],
+      "title": "EmbeddingProviderSettings",
+      "type": "object"
+    },
+    "EndpointSettingsDict": {
+      "additionalProperties": true,
+      "description": "Defines enable/disable settings for various CodeWeaver HTTP endpoints.\n\nHealth and metrics are always enabled because they are used internally for monitoring and diagnostics (CodeWeaver is actually multiple servers which sometimes need to check in with each other).",
+      "properties": {
+        "enable_settings": {
+          "title": "Enable settings",
+          "type": "boolean"
+        },
+        "enable_state": {
+          "title": "Enable state",
+          "type": "boolean"
+        },
+        "enable_version": {
+          "title": "Enable version",
+          "type": "boolean"
+        }
+      },
+      "title": "EndpointSettingsDict",
+      "type": "object"
+    },
+    "FastembedGPUProviderSettings": {
+      "description": "Special settings for Fastembed-GPU provider.\n\nThese settings only apply if you are using a Fastembed provider, installed the `codeweaver[fastembed-gpu]` or `codeweaver[full-gpu]` extra, have a CUDA-capable GPU, and have properly installed and configured the ONNX GPU runtime.\nYou can provide these settings with your CodeWeaver embedding provider settings, or rerank provider settings. If you're using fastembed-gpu for both, we'll assume you are using the same settings for both if we find one of them.\n\nImportant: You cannot have both `fastembed` and `fastembed-gpu` installed at the same time. They conflict with each other. Make sure to uninstall `fastembed` if you want to use `fastembed-gpu`.",
+      "properties": {
+        "cuda": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Whether to use CUDA (if available). If `None`, will auto-detect. We'll generally assume you want to use CUDA if it's available unless you provide a `False` value here.",
+          "title": "Cuda"
+        },
+        "provider_settings": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "List of GPU device IDs to use. If `None`, we will try to detect available GPUs using `nvidia-smi` if we can find it. We recommend specifying them because our checks aren't perfect.",
+          "title": "Provider settings"
+        }
+      },
+      "title": "FastembedGPUProviderSettings",
+      "type": "object"
+    },
+    "FastMcpStdioServerSettings": {
+      "description": "Settings for FastMCP stdio server configurations.",
+      "properties": {
+        "auth": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AuthSettings"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Auth"
+        },
+        "middleware": {
+          "description": "Mcp Middleware classes (classes that subclass and implement `fastmcp.server.middleware.middleware.Middleware`). CodeWeaver includes several middleware by default, and always includes its own required middleware. Setting this field will override default (not required) middleware. Options are set in the `middleware` field of `CodeWeaverSettings`.",
+          "items": {},
+          "title": "Middleware",
+          "type": "array"
+        },
+        "on_duplicate_prompts": {
+          "anyOf": [
+            {
+              "enum": [
+                "warn",
+                "error",
+                "replace",
+                "ignore"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "replace",
+          "title": "On duplicate prompts"
+        },
+        "on_duplicate_resources": {
+          "anyOf": [
+            {
+              "enum": [
+                "warn",
+                "error",
+                "replace",
+                "ignore"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "replace",
+          "title": "On duplicate resources"
+        },
+        "on_duplicate_tools": {
+          "anyOf": [
+            {
+              "enum": [
+                "warn",
+                "error",
+                "replace",
+                "ignore"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "replace",
+          "title": "On duplicate tools"
+        },
+        "resource_prefix_format": {
+          "anyOf": [
+            {
+              "enum": [
+                "protocol",
+                "path"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Resource prefix format"
+        },
+        "transport": {
+          "const": "stdio",
+          "default": "stdio",
+          "title": "Transport",
+          "type": "string"
+        }
+      },
+      "title": "Fast Mcp Stdio Server Settings",
+      "type": "object"
+    },
+    "FiltersDict": {
+      "additionalProperties": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "type": "object"
+    },
+    "FormattersDict": {
+      "description": "A dictionary of formatters for logging configuration.\n\nThis is used to define custom formatters for logging in a dictionary format.\nEach formatter can have a `format`, `date_format`, `style`, and other optional fields.\n\n[See the Python documentation for more details](https://docs.python.org/3/library/logging.html#logging.Formatter).",
+      "properties": {
+        "class_name": {
+          "description": "The class name of the formatter in the form of an import path, like `logging.Formatter` or `rich.logging.RichFormatter`.",
+          "title": "Class",
+          "type": "string"
+        },
+        "date_format": {
+          "title": "Date format",
+          "type": "string"
+        },
+        "defaults": {
+          "additionalProperties": true,
+          "description": "Default values for the formatter. [See the Python documentation for more details](https://docs.python.org/3/library/logging.html#logging.Formatter).",
+          "title": "Defaults",
+          "type": "object"
+        },
+        "format": {
+          "title": "Format",
+          "type": "string"
+        },
+        "style": {
+          "title": "Style",
+          "type": "string"
+        },
+        "validate": {
+          "title": "Validate",
+          "type": "boolean"
+        }
+      },
+      "title": "FormattersDict",
+      "type": "object"
+    },
+    "HandlersDict": {
+      "description": "A dictionary of handlers for logging configuration.\n\nThis is used to define custom handlers for logging in a dictionary format.\nEach handler can have a `class_name`, `level`, and other optional fields.\n\n[See the Python documentation for more details](https://docs.python.org/3/library/logging.html#logging.Handler).",
+      "properties": {
+        "class_name": {
+          "description": "The class name of the handler in the form of an import path, like `logging.StreamHandler` or `rich.logging.RichHandler`.",
+          "title": "Class",
+          "type": "string"
+        },
+        "filters": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Filters",
+          "type": "array"
+        },
+        "formatter": {
+          "title": "Formatter",
+          "type": "string"
+        },
+        "level": {
+          "enum": [
+            0,
+            10,
+            20,
+            30,
+            40,
+            50
+          ],
+          "title": "Level",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "class_name"
+      ],
+      "title": "HandlersDict",
+      "type": "object"
+    },
+    "IndexerSettings": {
+      "description": "Settings for indexing and file filtering.\n\n## How File Filtering Works\n\nCodeWeaver uses the `rignore` library (a Python wrapper for Rust's `ignore` crate) to\nefficiently walk directories while respecting various ignore rules. The filtering\nhappens in this order:\n\n1. **Override patterns** (highest priority): Whitelist patterns for tooling dirs,\n   ignore patterns for excluded dirs (note: any positive whitelist here -- meaning not beginning with a `!` -- is treated as an *only* -- files not matching them will be ignored entirely.)\n2. **Ignore files**: .gitignore, .ignore, .git/info/exclude, global gitignore\n3. **Hidden files**: Files/dirs starting with . are ignored by default\n4. **Extension filter**: Only files with known extensions are included\n\n## Default Behavior\n\nWith default settings, CodeWeaver will:\n- Respect .gitignore files (including parent directories and global gitignore)\n- Ignore hidden files and directories\n- Include .github, .circleci, and common tooling dirs (.vscode, .claude, etc.)\n- Exclude common build/cache dirs (node_modules, __pycache__, .git, etc.)\n- Only index files with known extensions (~360 supported file types)\n\n## Key Settings\n\n- `use_gitignore`: Respect .gitignore rules (default: True)\n- `ignore_hidden`: Ignore hidden files/dirs (default: True)\n- `include_tooling_dirs`: Whitelist common tooling dirs despite ignore_hidden (default: True)\n- `excludes`: Additional directories to exclude (default: common build/cache dirs)\n- `excluded_extensions`: File extensions to exclude (default: binaries, media, etc.)\n\n## Path Resolution\n\nAll paths should be relative to the project root. CodeWeaver deconflicts paths:\n- Files in `forced_includes` are always included, even if they match excludes\n- Tooling directories are whitelisted via overrides, still respecting .gitignore\n- The `excludes` list is converted to ignore patterns",
+      "properties": {
+        "excluded_extensions": {
+          "default": [
+            ".rar",
+            ".exe",
+            ".ms",
+            ".jar",
+            ".sig",
+            ".mp3",
+            ".mp4",
+            ".mpg",
+            ".pch",
+            ".vspec",
+            ".bmp",
+            ".jpg",
+            ".env",
+            ".webp",
+            ".builds",
+            ".mov",
+            ".pyc",
+            ".7z",
+            ".lock",
+            ".avif",
+            ".snk",
+            ".dll",
+            ".gif",
+            ".iobj",
+            ".msi",
+            ".tmp_proj",
+            ".class",
+            ".mpeg",
+            ".png",
+            ".cache",
+            ".pdb",
+            ".meta",
+            ".so",
+            ".jpeg",
+            ".vssscc",
+            ".coverage",
+            ".local",
+            ".svg",
+            "codeweaver.local.json",
+            ".o",
+            ".code-workspace",
+            ".gz",
+            ".tlb",
+            ".log",
+            ".obj",
+            ".temp",
+            "codeweaver.local.yaml",
+            ".tlog",
+            "codeweaver.local.toml",
+            ".dmg",
+            ".swp",
+            ".rsp",
+            ".webm",
+            ".lcov",
+            ".scc",
+            ".tar",
+            ".avi",
+            ".svclog",
+            ".pyo",
+            ".pgc",
+            ".swo",
+            ".coverage.xml",
+            ".wav",
+            ".tmp",
+            ".zip",
+            ".pgd"
+          ],
+          "description": "File extensions to exclude from search and indexing",
+          "items": {
+            "type": "string"
+          },
+          "title": "Excluded extensions",
+          "type": "array",
+          "uniqueItems": true
+        },
+        "excludes": {
+          "default": [
+            "releases",
+            ".eslintcache",
+            ".nuxt",
+            "debug",
+            "Releases",
+            "tmp",
+            "vendor",
+            "win32",
+            "target",
+            "logs",
+            ".vs",
+            ".svn",
+            ".htmlcov",
+            "node_modules",
+            "x64",
+            ".temp",
+            "Debug",
+            "Thumbs.db",
+            ".git",
+            ".DS_Store",
+            ".tsbuildinfo",
+            "dist",
+            ".venv",
+            "out",
+            ".next",
+            ".ruff_cache",
+            "temp",
+            "site",
+            "venv",
+            "lib64",
+            "__pytest_cache__",
+            "aarch64",
+            "remote-debug-profile",
+            "htmlcov",
+            "Release",
+            ".cache",
+            "__pycache__",
+            "release",
+            "obj",
+            "win64",
+            "arm64",
+            "x86",
+            "arm",
+            "bower_components",
+            ".jj",
+            ".history",
+            ".idea",
+            "log",
+            ".hg",
+            ".tmp"
+          ],
+          "description": "Directories, files, or [glob patterns](https://docs.python.org/3/library/pathlib.html#pathlib-pattern-language) to exclude from search and indexing. This is a set of strings, so you can use glob patterns like `**/node_modules/**` or `**/*.log` to exclude directories or files. You don't need to provide gitignored paths here if `use_gitignore` is enabled (default).",
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "format": "path",
+                "type": "string"
+              }
+            ]
+          },
+          "title": "Excludes",
+          "type": "array",
+          "uniqueItems": true
+        },
+        "forced_includes": {
+          "default": [],
+          "description": "Directories, files, or [glob patterns](https://docs.python.org/3/library/pathlib.html#pathlib-pattern-language) to include in search and indexing. This is a set of strings, so you can use glob patterns like `**/src/**` or `**/*.py` to include directories or files.",
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "format": "path",
+                "type": "string"
+              }
+            ]
+          },
+          "title": "Forced includes",
+          "type": "array",
+          "uniqueItems": true
+        },
+        "ignore_hidden": {
+          "default": true,
+          "description": "Whether to ignore hidden files (starting with .) for filtering",
+          "title": "Ignore hidden",
+          "type": "boolean"
+        },
+        "include_github_dir": {
+          "default": true,
+          "description": "Whether to include the .github directory in search and indexing. Because the .github directory is hidden, it wouldn't be included in default settings. Most people want to include it for work on GitHub Actions, workflows, and other GitHub-related files. Note: this setting will also include `.circleci` if present. Any subdirectories or files within `.github` or `.circleci` that are gitignored will still be excluded.",
+          "title": "Include github dir",
+          "type": "boolean"
+        },
+        "include_tooling_dirs": {
+          "default": true,
+          "description": "Whether to include common hidden tooling directories in search and indexing. This is enabled by default and recommended for most users. Still respects .gitignore rules, so any gitignored files will be excluded.",
+          "title": "Include tooling dirs",
+          "type": "boolean"
+        },
+        "only_index_on_command": {
+          "default": false,
+          "description": "Disabled by default and usually **not recommended**. This setting disables background indexing, requiring you to manually trigger indexing by command or program call. CodeWeaver uses background indexing to ensure it always has an accurate view of the codebase, so disabling this can severely impact the quality of results. We expose this setting for troubleshooting, debugging, and some isolated use cases where codeweaver may be orchestrated externally or supplied with data from other sources.",
+          "title": "Only index on command",
+          "type": "boolean"
+        },
+        "rignore_options": {
+          "description": "Other kwargs to pass to `rignore`. See <https://pypi.org/project/rignore/>. By default we set same_file_system to True.",
+          "title": "Rignore options"
+        },
+        "use_gitignore": {
+          "default": true,
+          "description": "Whether to use .gitignore for filtering. Enabled by default and strongly recommended. Disabling would cause CodeWeaver to index your entire git history, including all ignored files, which is usually not desired. We can't think of a use case where you'd want this disabled, but it's here if you need it.",
+          "title": "Use gitignore",
+          "type": "boolean"
+        },
+        "use_other_ignore_files": {
+          "default": true,
+          "description": "Whether to read any `.ignore` files (besides .gitignore) for filtering",
+          "title": "Use other ignore files",
+          "type": "boolean"
+        }
+      },
+      "title": "Indexer Settings",
+      "type": "object"
+    },
+    "LoggersDict": {
+      "description": "A dictionary of loggers for logging configuration.\n\nThis is used to define custom loggers for logging in a dictionary format.\nEach logger can have a `level`, `handlers`, and other optional fields.\n\n[See the Python documentation for more details](https://docs.python.org/3/library/logging.html#logging.Logger).",
+      "properties": {
+        "filters": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Filters",
+          "type": "array"
+        },
+        "handlers": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Handlers",
+          "type": "array"
+        },
+        "level": {
+          "enum": [
+            0,
+            10,
+            20,
+            30,
+            40,
+            50
+          ],
+          "title": "Level",
+          "type": "integer"
+        },
+        "propagate": {
+          "title": "Propagate",
+          "type": "boolean"
+        }
+      },
+      "title": "LoggersDict",
+      "type": "object"
+    },
+    "LoggingConfigDict": {
+      "description": "Logging configuration settings. You may optionally use this to customize logging in a very granular way.\n\n`LoggingConfigDict` is structured to match the format expected by Python's `logging.config.dictConfig` function. You can use this to define loggers, handlers, and formatters in a dictionary format -- either programmatically or in your CodeWeaver settings file.\n[See the Python documentation for more details](https://docs.python.org/3/library/logging.config.html).",
+      "properties": {
+        "disable_existing_loggers": {
+          "description": "Whether to disable all existing loggers when configuring logging. If not present, defaults to `True`.",
+          "title": "Disable existing loggers",
+          "type": "boolean"
+        },
+        "filters": {
+          "$ref": "#/$defs/FiltersDict",
+          "title": "Filters"
+        },
+        "formatters": {
+          "additionalProperties": {
+            "$ref": "#/$defs/FormattersDict"
+          },
+          "title": "Formatters",
+          "type": "object"
+        },
+        "handlers": {
+          "additionalProperties": {
+            "$ref": "#/$defs/HandlersDict"
+          },
+          "title": "Handlers",
+          "type": "object"
+        },
+        "incremental": {
+          "description": "Whether to apply this configuration incrementally or replace the existing configuration. [See the Python documentation for more details](https://docs.python.org/3/library/logging.config.html#logging-config-dict-incremental).",
+          "title": "Incremental",
+          "type": "boolean"
+        },
+        "loggers": {
+          "additionalProperties": {
+            "$ref": "#/$defs/LoggersDict"
+          },
+          "title": "Loggers",
+          "type": "object"
+        },
+        "root": {
+          "$ref": "#/$defs/LoggersDict",
+          "description": "The root logger configuration.",
+          "title": "Root"
+        },
+        "version": {
+          "const": 1,
+          "title": "Version",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "version"
+      ],
+      "title": "LoggingConfigDict",
+      "type": "object"
+    },
+    "LoggingSettings": {
+      "additionalProperties": true,
+      "description": "Global logging settings.",
+      "properties": {
+        "dict_config": {
+          "$ref": "#/$defs/LoggingConfigDict",
+          "description": "Logging configuration in dictionary format that matches the format expected by [`logging.config.dictConfig`](https://docs.python.org/3/library/logging.config.html).",
+          "title": "Dict config"
+        },
+        "level": {
+          "enum": [
+            0,
+            10,
+            20,
+            30,
+            40,
+            50
+          ],
+          "title": "Level",
+          "type": "integer"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "rich_options": {
+          "additionalProperties": true,
+          "description": "Additional keyword arguments for the `rich` logging handler, [`rich.logging.RichHandler`], if enabled.",
+          "title": "Rich options",
+          "type": "object"
+        },
+        "use_rich": {
+          "title": "Use rich",
+          "type": "boolean"
+        }
+      },
+      "title": "LoggingSettings",
+      "type": "object"
+    },
+    "MCPServerConfig": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/CodeWeaverMCPConfig"
+        },
+        {
+          "$ref": "#/$defs/StdioCodeWeaverConfig"
+        }
+      ]
+    },
+    "MemoryConfig": {
+      "description": "Configuration for in-memory vector store provider.",
+      "properties": {
+        "auto_persist": {
+          "description": "Automatically save after operations. Defaults to True.",
+          "title": "Auto persist",
+          "type": "boolean"
+        },
+        "collection_name": {
+          "description": "Collection name override. Defaults to project name if not specified.",
+          "title": "Collection name",
+          "type": "string"
+        },
+        "persist_interval": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Periodic persist interval in seconds. Defaults to 300 (5 minutes). Set to None to disable periodic persistence.",
+          "title": "Persist interval"
+        },
+        "persist_path": {
+          "format": "path",
+          "title": "Persist path",
+          "type": "string"
+        }
+      },
+      "title": "MemoryConfig",
+      "type": "object"
+    },
+    "ModelSettings": {
+      "description": "Settings to configure an LLM.\n\nHere we include only settings which apply to multiple models / model providers,\nthough not all of these settings are supported by all models.",
+      "properties": {
+        "extra_body": {
+          "description": "Extra body to send to the model.\n\nSupported by:\n\n* OpenAI\n* Anthropic\n* Groq\n* Outlines (all providers)",
+          "title": "Extra body"
+        },
+        "extra_headers": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Extra headers to send to the model.\n\nSupported by:\n\n* OpenAI\n* Anthropic\n* Groq",
+          "title": "Extra headers",
+          "type": "object"
+        },
+        "frequency_penalty": {
+          "description": "Penalize new tokens based on their existing frequency in the text so far.\n\nSupported by:\n\n* OpenAI\n* Groq\n* Cohere\n* Gemini\n* Mistral\n* Outlines (LlamaCpp, SgLang, VLLMOffline)",
+          "title": "Frequency penalty",
+          "type": "number"
+        },
+        "logit_bias": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "description": "Modify the likelihood of specified tokens appearing in the completion.\n\nSupported by:\n\n* OpenAI\n* Groq\n* Outlines (Transformers, LlamaCpp, VLLMOffline)",
+          "title": "Logit bias",
+          "type": "object"
+        },
+        "max_tokens": {
+          "description": "The maximum number of tokens to generate before stopping.\n\nSupported by:\n\n* Gemini\n* Anthropic\n* OpenAI\n* Groq\n* Cohere\n* Mistral\n* Bedrock\n* MCP Sampling\n* Outlines (all providers)",
+          "title": "Max tokens",
+          "type": "integer"
+        },
+        "parallel_tool_calls": {
+          "description": "Whether to allow parallel tool calls.\n\nSupported by:\n\n* OpenAI (some models, not o1)\n* Groq\n* Anthropic",
+          "title": "Parallel tool calls",
+          "type": "boolean"
+        },
+        "presence_penalty": {
+          "description": "Penalize new tokens based on whether they have appeared in the text so far.\n\nSupported by:\n\n* OpenAI\n* Groq\n* Cohere\n* Gemini\n* Mistral\n* Outlines (LlamaCpp, SgLang, VLLMOffline)",
+          "title": "Presence penalty",
+          "type": "number"
+        },
+        "seed": {
+          "description": "The random seed to use for the model, theoretically allowing for deterministic results.\n\nSupported by:\n\n* OpenAI\n* Groq\n* Cohere\n* Mistral\n* Gemini\n* Outlines (LlamaCpp, VLLMOffline)",
+          "title": "Seed",
+          "type": "integer"
+        },
+        "stop_sequences": {
+          "description": "Sequences that will cause the model to stop generating.\n\nSupported by:\n\n* OpenAI\n* Anthropic\n* Bedrock\n* Mistral\n* Groq\n* Cohere\n* Google",
+          "items": {
+            "type": "string"
+          },
+          "title": "Stop sequences",
+          "type": "array"
+        },
+        "temperature": {
+          "description": "Amount of randomness injected into the response.\n\nUse `temperature` closer to `0.0` for analytical / multiple choice, and closer to a model's\nmaximum `temperature` for creative and generative tasks.\n\nNote that even with `temperature` of `0.0`, the results will not be fully deterministic.\n\nSupported by:\n\n* Gemini\n* Anthropic\n* OpenAI\n* Groq\n* Cohere\n* Mistral\n* Bedrock\n* Outlines (Transformers, LlamaCpp, SgLang, VLLMOffline)",
+          "title": "Temperature",
+          "type": "number"
+        },
+        "timeout": {
+          "description": "Override the client-level default timeout for a request, in seconds.\n\nSupported by:\n\n* Gemini\n* Anthropic\n* OpenAI\n* Groq\n* Mistral",
+          "title": "Timeout",
+          "type": "number"
+        },
+        "top_p": {
+          "description": "An alternative to sampling with temperature, called nucleus sampling, where the model considers the results of the tokens with top_p probability mass.\n\nSo 0.1 means only the tokens comprising the top 10% probability mass are considered.\n\nYou should either alter `temperature` or `top_p`, but not both.\n\nSupported by:\n\n* Gemini\n* Anthropic\n* OpenAI\n* Groq\n* Cohere\n* Mistral\n* Bedrock\n* Outlines (Transformers, LlamaCpp, SgLang, VLLMOffline)",
+          "title": "Top p",
+          "type": "number"
+        }
+      },
+      "title": "ModelSettings",
+      "type": "object"
+    },
+    "ModelString": {
+      "description": "The model string, as it appears in `pydantic_ai.models.KnownModelName`.",
+      "type": "string"
+    },
+    "Provider": {
+      "description": "Enumeration of available providers.",
+      "enum": [
+        "voyage",
+        "fastembed",
+        "qdrant",
+        "memory",
+        "anthropic",
+        "bedrock",
+        "cohere",
+        "google",
+        "x-ai",
+        "hf-inference",
+        "sentence-transformers",
+        "mistral",
+        "openai",
+        "azure",
+        "cerebras",
+        "deepseek",
+        "fireworks",
+        "github",
+        "groq",
+        "heroku",
+        "litellm",
+        "moonshot",
+        "ollama",
+        "openrouter",
+        "perplexity",
+        "together",
+        "vercel",
+        "duckduckgo",
+        "tavily",
+        "not_set"
+      ],
+      "title": "Provider",
+      "type": "string"
+    },
+    "ProviderSettings": {
+      "description": "Settings for provider configuration.",
+      "properties": {
+        "agent": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/AgentProviderSettings"
+              },
+              "type": "array"
+            },
+            {
+              "$ref": "#/$defs/AgentProviderSettings"
+            }
+          ],
+          "default": {
+            "enabled": true,
+            "model": "claude-sonnet-4-latest",
+            "model_settings": {},
+            "provider": "anthropic"
+          },
+          "description": "Agent provider configuration",
+          "title": "Agent"
+        },
+        "data": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/DataProviderSettings"
+              },
+              "type": "array"
+            },
+            {
+              "$ref": "#/$defs/DataProviderSettings"
+            }
+          ],
+          "default": [
+            {
+              "api_key": null,
+              "enabled": false,
+              "other": null,
+              "provider": "tavily"
+            },
+            {
+              "api_key": null,
+              "enabled": true,
+              "other": null,
+              "provider": "duckduckgo"
+            }
+          ],
+          "description": "Data provider configuration",
+          "title": "Data"
+        },
+        "embedding": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/EmbeddingProviderSettings"
+              },
+              "type": "array"
+            },
+            {
+              "$ref": "#/$defs/EmbeddingProviderSettings"
+            }
+          ],
+          "default": {
+            "enabled": true,
+            "model_settings": {
+              "model": "voyage-code-3"
+            },
+            "provider": "voyage"
+          },
+          "description": "Embedding provider configuration.\n\n            We will only use the first provider you configure here. We may add support for multiple embedding providers in the future.\n            ",
+          "title": "Embedding"
+        },
+        "reranking": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/RerankingProviderSettings"
+              },
+              "type": "array"
+            },
+            {
+              "$ref": "#/$defs/RerankingProviderSettings"
+            }
+          ],
+          "default": {
+            "enabled": true,
+            "model_settings": {
+              "model": "voyage:rerank-2.5"
+            },
+            "provider": "voyage"
+          },
+          "description": "Reranking provider configuration.\n\n            We will only use the first provider you configure here. We may add support for multiple reranking providers in the future.",
+          "title": "Reranking"
+        },
+        "sparse_embedding": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/SparseEmbeddingProviderSettings"
+              },
+              "type": "array"
+            },
+            {
+              "$ref": "#/$defs/SparseEmbeddingProviderSettings"
+            }
+          ],
+          "default": {
+            "enabled": true,
+            "model_settings": {
+              "model": "opensearch/opensearch-neural-sparse-encoding-doc-v3-gte"
+            },
+            "provider": "sentence-transformers"
+          },
+          "description": "Sparse embedding provider configuration.\n\n            We will only use the first provider you configure here. We may add support for multiple sparse embedding providers in the future.",
+          "title": "Sparse embedding"
+        },
+        "vector_store": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/VectorStoreProviderSettings"
+              },
+              "type": "array"
+            },
+            {
+              "$ref": "#/$defs/VectorStoreProviderSettings"
+            }
+          ],
+          "default": {
+            "enabled": true,
+            "provider": "qdrant",
+            "provider_settings": {}
+          },
+          "description": "Vector store provider configuration (Qdrant or in-memory), defaults to a local Qdrant instance.",
+          "title": "Vector store"
+        }
+      },
+      "title": "Provider Settings",
+      "type": "object"
+    },
+    "ProviderSpecificSettings": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/FastembedGPUProviderSettings"
+        },
+        {
+          "$ref": "#/$defs/AWSProviderSettings"
+        },
+        {
+          "$ref": "#/$defs/AzureOpenAIProviderSettings"
+        },
+        {
+          "$ref": "#/$defs/AzureCohereProviderSettings"
+        }
+      ]
+    },
+    "QdrantConfig": {
+      "description": "Configuration for Qdrant vector store provider.",
+      "properties": {
+        "api_key": {
+          "anyOf": [
+            {
+              "format": "password",
+              "type": "string",
+              "writeOnly": true
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "API key for authentication (required for remote instances unless you have custom authentication for a private instance).",
+          "title": "Api key"
+        },
+        "batch_size": {
+          "description": "Batch size for bulk upsert operations. Defaults to 64.",
+          "exclusiveMinimum": 0,
+          "title": "Batch size",
+          "type": "integer"
+        },
+        "collection_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Collection name override. Defaults to project name if not specified.",
+          "title": "Collection name"
+        },
+        "dense_vector_name": {
+          "description": "Named vector for dense embeddings. Defaults to 'dense'.",
+          "title": "Dense vector name",
+          "type": "string"
+        },
+        "prefer_grpc": {
+          "description": "Use gRPC instead of HTTP. Defaults to False.",
+          "title": "Prefer grpc",
+          "type": "boolean"
+        },
+        "sparse_vector_name": {
+          "description": "Named vector for sparse embeddings. Defaults to 'sparse'.",
+          "title": "Sparse vector name",
+          "type": "string"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Qdrant server URL. Defaults to http://localhost:6333 if not specified.",
+          "title": "Url"
+        }
+      },
+      "title": "QdrantConfig",
+      "type": "object"
+    },
+    "RerankingModelSettings": {
+      "description": "Rerank model settings.",
+      "properties": {
+        "client_options": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Keyword arguments to pass to the *provider* **client's** (like `voyageai.async_client.AsyncClient`) constructor.",
+          "title": "Client options"
+        },
+        "custom_prompt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Custom prompt"
+        },
+        "model": {
+          "title": "Model",
+          "type": "string"
+        },
+        "model_options": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Keyword arguments to pass to the model's constructor.",
+          "title": "Model options"
+        },
+        "rerank_options": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Keyword arguments to pass to the *provider* **client's** (like `voyageai.async_client.AsyncClient`) `rerank` method.",
+          "title": "Rerank options"
+        }
+      },
+      "required": [
+        "model"
+      ],
+      "title": "RerankingModelSettings",
+      "type": "object"
+    },
+    "RerankingProviderSettings": {
+      "description": "Settings for re-ranking models.",
+      "properties": {
+        "api_key": {
+          "anyOf": [
+            {
+              "format": "password",
+              "type": "string",
+              "writeOnly": true
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Api key"
+        },
+        "client_options": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Client options"
+        },
+        "connection": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ConnectionConfiguration"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Connection"
+        },
+        "enabled": {
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "model_settings": {
+          "$ref": "#/$defs/RerankingModelSettings",
+          "description": "Settings for the re-ranking model(s).",
+          "title": "Model settings"
+        },
+        "other": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Other"
+        },
+        "provider": {
+          "$ref": "#/$defs/Provider"
+        },
+        "provider_settings": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ProviderSpecificSettings"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Provider settings"
+        },
+        "top_n": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Top n"
+        }
+      },
+      "required": [
+        "provider",
+        "model_settings"
+      ],
+      "title": "RerankingProviderSettings",
+      "type": "object"
+    },
+    "RevocationOptions": {
+      "properties": {
+        "enabled": {
+          "default": false,
+          "title": "Enabled",
+          "type": "boolean"
+        }
+      },
+      "title": "RevocationOptions",
+      "type": "object"
+    },
+    "SparseEmbeddingModelSettings": {
+      "description": "Sparse embedding model settings. Use this class for sparse (e.g. bag-of-words) models.",
+      "properties": {
+        "data_type": {
+          "anyOf": [
+            {
+              "enum": [
+                "float32",
+                "float16",
+                "int8",
+                "binary"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Data type"
+        },
+        "embed_options": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Keyword arguments to pass to the *provider* **client's** (like `sentence_transformers.SparseEncoder`) `embed` method. These are different from `model_options`, which are passed to the model constructor itself.",
+          "title": "Embed options"
+        },
+        "model": {
+          "title": "Model",
+          "type": "string"
+        },
+        "model_options": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Keyword arguments to pass to the model's constructor.",
+          "title": "Model options"
+        }
+      },
+      "required": [
+        "model"
+      ],
+      "title": "SparseEmbeddingModelSettings",
+      "type": "object"
+    },
+    "SparseEmbeddingProviderSettings": {
+      "description": "Settings for sparse embedding models.",
+      "properties": {
+        "api_key": {
+          "anyOf": [
+            {
+              "format": "password",
+              "type": "string",
+              "writeOnly": true
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Api key"
+        },
+        "client_options": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Client options"
+        },
+        "connection": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ConnectionConfiguration"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Connection"
+        },
+        "enabled": {
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "model_settings": {
+          "$ref": "#/$defs/SparseEmbeddingModelSettings",
+          "description": "Settings for the sparse embedding model(s).",
+          "title": "Model settings"
+        },
+        "other": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Other"
+        },
+        "provider": {
+          "$ref": "#/$defs/Provider"
+        },
+        "provider_settings": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ProviderSpecificSettings"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Provider settings"
+        }
+      },
+      "required": [
+        "provider",
+        "model_settings"
+      ],
+      "title": "SparseEmbeddingProviderSettings",
+      "type": "object"
+    },
+    "StdioCodeWeaverConfig": {
+      "additionalProperties": true,
+      "description": "Configuration model for CodeWeaver mcp.json files using stdio communication.",
+      "properties": {
+        "args": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Args",
+          "type": "array"
+        },
+        "authentication": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Authentication"
+        },
+        "command": {
+          "default": "cw",
+          "title": "Command",
+          "type": "string"
+        },
+        "cwd": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cwd"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "CodeWeaver advanced code search and understanding server.",
+          "title": "Description"
+        },
+        "env": {
+          "additionalProperties": true,
+          "title": "Env",
+          "type": "object"
+        },
+        "icon": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "https://raw.githubusercontent.com/knitli/codeweaver/main/docs/assets/codeweaver-primary.svg",
+          "title": "Icon"
+        },
+        "timeout": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Timeout"
+        },
+        "transport": {
+          "const": "stdio",
+          "default": "stdio",
+          "title": "Transport",
+          "type": "string"
+        },
+        "type": {
+          "anyOf": [
+            {
+              "const": "stdio",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "stdio",
+          "title": "Type"
+        }
+      },
+      "title": "Stdio Code Weaver Config",
+      "type": "object"
+    },
+    "TelemetrySettings": {
+      "description": "Telemetry configuration settings.\n\nWe collect basic telemetry data **by default** to help us improve CodeWeaver. **We do not collect _any_ potentially identifying information.**\n        We **DO _NOT_ collect**:\n            - hash file paths and repository names,\n            - screen out potential secrets,\n            - don't collect any queries or results content (unless you explicitly tell us we can, see `value_tools_more_than_privacy`).\n        If enabled, we **DO collect**:\n            - usage patterns,\n            - errors,\n            - performance metrics,\n            - settings usage (e.g., which providers you use, whether you explicitly set certain settings, etc).\n        Well, technically we don't collect anything yet -- telemetry isn't wired up -- but when we do, this is what we will collect. This helps us make CodeWeaver better for everyone.  **We will never sell your data or show you ads. We only use it to improve CodeWeaver.**\nWe pass all data we collect through filters in CodeWeaver before we send it to PostHog, and at PostHog, we have additional filters set up at the entry point (before we can see it) to further ensure we don't collect any potentially identifying information.",
+      "properties": {
+        "batch_interval_seconds": {
+          "description": "Maximum time in seconds to wait before sending batched events.",
+          "exclusiveMinimum": 0,
+          "title": "Batch interval seconds",
+          "type": "integer"
+        },
+        "batch_size": {
+          "description": "Number of events to batch before sending to PostHog.",
+          "exclusiveMinimum": 0,
+          "title": "Batch size",
+          "type": "integer"
+        },
+        "disable_telemetry": {
+          "description": "\n            hash file paths, repository names, and screen out potential secrets, and we don't collect any queries or results content (unless you explicitly tell us we can, see `value_tools_more_than_privacy`). We only collect data on usage patterns, errors, and performance. This helps us make CodeWeaver better for everyone.  **We will never sell your data or show you ads. We only use it to improve CodeWeaver.**\n\n            If you want to disable telemetry, you have several options:\n            1. set this setting to False in your codeweaver.toml/yaml/json file,\n            2. set the environment variable `CODEWEAVER_ENABLE_TELEMETRY` to `false`\n            3. install CodeWeaver with the `codeweaver[recommended-no-telemetry]` extra, or use the a-la-carte install with `codeweaver[required-core]` and your choice of providers (like, `codeweaver[required-core,cli,provider-anthropic,provider-fastembed,provider-azure]`) to install without telemetry\n            4. Point the `CODEWEAVER__TELEMETRY__POSTHOG_PROJECT_KEY` environment variable to your own Posthog project (if you're a data nerd, or want to collect internal telemetry for your organization). If you disable telemetry, we won't collect any data at all.",
+          "title": "Disable telemetry",
+          "type": "boolean"
+        },
+        "posthog_host": {
+          "anyOf": [
+            {
+              "format": "uri",
+              "maxLength": 2083,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "https://us.i.posthog.com/",
+          "description": "PostHog host URL for telemetry events.",
+          "title": "Posthog host"
+        },
+        "posthog_project_key": {
+          "anyOf": [
+            {
+              "format": "password",
+              "type": "string",
+              "writeOnly": true
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "**********",
+          "description": "PostHog Project key for telemetry events. You'll see that the default is, of course, ours. This **is not an api_key**, but rather a write-only key. If you want to divert telemetry to your own posthog instance or cloud account, you can change this key. To override it with an environment variable, set `CODEWEAVER__TELEMETRY__POSTHOG_PROJECT_KEY`.",
+          "title": "Posthog project key"
+        },
+        "tools_over_privacy": {
+          "description": "Opt-in to allow us to collect anonymized query and result data. We want to make CodeWeaver great, and the best way to do that is for us to fully understand exactly how you use it -- particularly what you search for and how you interact with the results. Unlike with Google, we don't want to show you ads or sell your data, track you, or anything like that... and we don't think it's right to assume you're OK with us collecting search and result data.\n\n            So, you have the choice. Let us collect anonymized search and result interaction data to help make CodeWeaver better, or prioritize your privacy and not send us that data.\n\n            If you enable this setting, we will collect anonymized data about your searches and the results you interact with. Because of the nature of searches and results and codebases, we can't guarantee complete anonymity -- but we will do our best to filter out any potential secrets or PII, using multiple filters both in CodeWeaver and on ingest at Posthog. We will hash file paths and repository names, and we won't collect any raw queries or result content. This data will help us improve CodeWeaver's search algorithms, agent prompting, ranking, and overall user experience. If you care about making CodeWeaver better and are OK with us collecting this data, please enable this setting. If you value your privacy more than helping us improve CodeWeaver; that's cool too -- you can just leave this setting disabled.",
+          "title": "Tools over privacy",
+          "type": "boolean"
+        }
+      },
+      "title": "Telemetry Settings",
+      "type": "object"
+    },
+    "VectorStoreProviderSettings": {
+      "description": "Settings for vector store provider selection and configuration.",
+      "properties": {
+        "api_key": {
+          "anyOf": [
+            {
+              "format": "password",
+              "type": "string",
+              "writeOnly": true
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Api key"
+        },
+        "client_options": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Client options"
+        },
+        "connection": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ConnectionConfiguration"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Connection"
+        },
+        "enabled": {
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "other": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Other"
+        },
+        "provider": {
+          "$ref": "#/$defs/Provider"
+        },
+        "provider_settings": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/QdrantConfig"
+            },
+            {
+              "$ref": "#/$defs/MemoryConfig"
+            }
+          ],
+          "title": "Provider settings"
+        }
+      },
+      "required": [
+        "provider",
+        "provider_settings"
+      ],
+      "title": "VectorStoreProviderSettings",
+      "type": "object"
+    }
+  },
+  "additionalProperties": true,
+  "description": "Main configuration model following pydantic-settings patterns.\n\nConfiguration precedence (highest to lowest):\n1. Environment variables (CODEWEAVER_*)\n2. Local config (codeweaver.local.toml (or .yaml, .yml, .json) in current directory)\n3. Project config (codeweaver.toml (or .yaml, .yml, .json) in project root)\n4. User config (~/codeweaver.toml (or .yaml, .yml, .json))\n5. Global config (/etc/codeweaver.toml (or .yaml, .yml, .json))\n6. Defaults",
+  "properties": {
+    "$schema": {
+      "description": "URL to the CodeWeaver settings schema",
+      "format": "uri",
+      "maxLength": 2083,
+      "minLength": 1,
+      "title": "Schema",
+      "type": "string"
+    },
+    "chunker": {
+      "description": "Chunker system configuration",
+      "title": "Chunker"
+    },
+    "config_file": {
+      "description": "Path to the configuration file, if any",
+      "format": "file-path",
+      "title": "Config file",
+      "type": "string"
+    },
+    "default_mcp_config": {
+      "$ref": "#/$defs/MCPServerConfig",
+      "description": "Default MCP server configuration for mcp clients. Setting this makes it quick and easy to add codeweaver to any mcp.json file using `cw init`. Defaults to a streamable-http CodeWeaver server at `http://127.0.0.1:9328`.",
+      "title": "Default mcp config"
+    },
+    "endpoints": {
+      "$ref": "#/$defs/EndpointSettingsDict",
+      "description": "Endpoint settings for optional endpoints.",
+      "title": "Endpoints"
+    },
+    "indexer": {
+      "$ref": "#/$defs/IndexerSettings",
+      "description": "Indexer settings",
+      "title": "Indexer"
+    },
+    "logging": {
+      "$ref": "#/$defs/LoggingSettings",
+      "description": "Logging configuration",
+      "title": "Logging"
+    },
+    "management_host": {
+      "description": "Management server host (independent of MCP transport). Default is 127.0.0.1 (localhost).",
+      "title": "Management host",
+      "type": "string"
+    },
+    "management_port": {
+      "description": "Management server port (always HTTP, for health/stats/metrics). Default is 9329.",
+      "exclusiveMinimum": 0,
+      "title": "Management port",
+      "type": "integer"
+    },
+    "max_file_size": {
+      "description": "Maximum file size to process in bytes",
+      "exclusiveMinimum": 0,
+      "title": "Max file size",
+      "type": "integer"
+    },
+    "max_results": {
+      "description": "Maximum code matches to return. Because CodeWeaver primarily indexes ast-nodes, a page can return multiple matches per file, so this is not the same as the number of files returned. This is the maximum number of code matches returned in a single response. The default is 30.",
+      "exclusiveMinimum": 0,
+      "title": "Max results",
+      "type": "integer"
+    },
+    "mcp_server": {
+      "description": "Optionally customize server settings for the HTTP MCP server.",
+      "title": "Mcp server"
+    },
+    "middleware": {
+      "description": "Middleware settings",
+      "title": "Middleware"
+    },
+    "profile": {
+      "anyOf": [
+        {
+          "enum": [
+            "recommended",
+            "quickstart",
+            "testing"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Use a premade provider profile.  The recommended profile uses Voyage AI for top-quality embedding and reranking, but requires an API key. The quickstart profile is entirely free and local, and does not require any API key. It sacrifices some search quality and performance compared to the recommended profile. The testing profile is only recommended for testing -- it uses an in-memory vector store and very light weight local models. The testing profile is also CodeWeaver's backup system when a cloud embedding or vector store provider isn't available. Both the quickstart and recommended profiles default to a local qdrant instance for the vector store. If you want to use a cloud or remote instance (which we recommend) you must also provide a URL for it, either with the environment variable CODEWEAVER_VECTOR_STORE_URL or in your codeweaver config in the vector_store settings.",
+      "title": "Profile"
+    },
+    "project_name": {
+      "description": "Project name (auto-detected from directory if None)",
+      "title": "Project name",
+      "type": "string"
+    },
+    "project_path": {
+      "default": "/home/knitli/codeweaver",
+      "description": "Root path of the codebase to analyze. CodeWeaver will try to detect the project path automatically if you don't provide one.",
+      "format": "directory-path",
+      "title": "Project path",
+      "type": "string"
+    },
+    "provider": {
+      "$ref": "#/$defs/ProviderSettings",
+      "description": "Provider and model configurations for agents, data, embedding, reranking, sparse embedding, and vector store providers. Will default to default profile if not provided.",
+      "title": "Provider"
+    },
+    "stdio_server": {
+      "$ref": "#/$defs/FastMcpStdioServerSettings",
+      "description": "Settings for stdio MCP servers.",
+      "title": "Stdio server"
+    },
+    "telemetry": {
+      "$ref": "#/$defs/TelemetrySettings",
+      "description": "Telemetry configuration",
+      "title": "Telemetry"
+    },
+    "token_limit": {
+      "description": "Maximum tokens per response",
+      "exclusiveMinimum": 0,
+      "title": "Token limit",
+      "type": "integer"
+    },
+    "uvicorn": {
+      "description": "\n        Settings for the Uvicorn management server. If you want to configure uvicorn settings for the mcp http server, pass them to `mcp_server.run_args.uvicorn_config`.\n\n        Example:\n        ```toml\n        # this will set uvicorn settings for the management server:\n        [uvicorn]\n        log_level = \"debug\"\n\n        # this will set uvicorn settings for the mcp http server:\n        [mcp_server.run_args.uvicorn_config]\n        log_level = \"debug\"\n        ```\n        ",
+      "title": "Uvicorn"
+    }
+  },
+  "title": "CodeWeaver Settings",
+  "type": "object"
+}
