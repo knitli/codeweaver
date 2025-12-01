@@ -849,6 +849,59 @@ class StatusDisplay:
         self.console.print(f"↻ Reindexed {files} files, {chunks} chunks ({duration:.1f}s)")
 
 
+class NullDisplay(StatusDisplay):
+    """Display that suppresses all output.
+
+    Useful for daemon mode where we don't want any console output.
+    """
+
+    def print_header(self, *, host: str = "127.0.0.1", port: int = 9328) -> None:
+        """No-op print header."""
+        pass
+
+    def print_step(self, message: str) -> None:
+        """No-op print step."""
+        pass
+
+    def print_completion(
+        self, message: str, *, success: bool = True, details: str | None = None
+    ) -> None:
+        """No-op print completion."""
+        pass
+
+    def print_list(
+        self, items: list[str], *, title: str | None = None, numbered: bool = False
+    ) -> None:
+        """No-op print list."""
+        pass
+
+    def print_indexing_stats(
+        self,
+        files_indexed: int,
+        chunks_created: int,
+        duration_seconds: float,
+        files_per_second: float,
+    ) -> None:
+        """No-op print indexing stats."""
+        pass
+
+    def print_success(self, message: str, *, prefix: str | None = None) -> None:
+        """No-op print success."""
+        pass
+
+    def print_info(self, message: str, *, prefix: str | None = None) -> None:
+        """No-op print info."""
+        pass
+
+    def print_warning(self, message: str, *, prefix: str | None = None) -> None:
+        """No-op print warning."""
+        pass
+
+    def print_error(self, message: str, *, prefix: str | None = None) -> None:
+        """No-op print error."""
+        pass
+
+
 _display: StatusDisplay | None = None
 
 
@@ -864,4 +917,4 @@ def get_display() -> StatusDisplay:
     return _display
 
 
-__all__ = ("IndexingProgress", "StatusDisplay", "get_display")
+__all__ = ("IndexingProgress", "StatusDisplay", "NullDisplay", "get_display")
