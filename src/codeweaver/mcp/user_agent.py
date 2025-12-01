@@ -1,3 +1,8 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 # sourcery skip: no-complex-if-expressions
 """Tools, Resources, and Prompts exposed to users and Users' Agents. Currently there's only one: `find_code` and we don't plan to change that soon."""
 

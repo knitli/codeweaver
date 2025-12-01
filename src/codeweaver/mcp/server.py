@@ -1,3 +1,8 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 """FastMCP Server Creation and Lifespan Management for CodeWeaver.
 
 This module handles the setup, configuration, and instantiation of FastMCP servers. **It does not *start* the servers;** instead, it provides factory functions to create server instances configured for either HTTP or stdio transport.

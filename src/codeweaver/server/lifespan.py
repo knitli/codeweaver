@@ -3,10 +3,11 @@
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
 """
-Starlette lifespan integration for background services.
+Lifespan management for CodeWeaver background services and servers.
 
-Manages startup/shutdown of background services using Starlette's
-AsyncExitStack pattern.
+This module provides lifespan context managers for different deployment modes:
+- background_services_lifespan: Background services only (daemon mode)
+- http_lifespan: Background services + HTTP MCP server integration
 """
 
 from __future__ import annotations
@@ -22,54 +23,56 @@ from codeweaver.server.server import CodeWeaverState
 
 
 if TYPE_CHECKING:
-    from fastmcp import FastMCP
-
+    from codeweaver.cli.ui import StatusDisplay
     from codeweaver.common.statistics import SessionStatistics
     from codeweaver.config.settings import CodeWeaverSettings
+    from codeweaver.mcp.state import CwMcpHttpState
 
 logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
-async def combined_lifespan(
-    app: FastMCP,  # type: ignore[type-arg]
+async def background_services_lifespan(
     settings: CodeWeaverSettings | None = None,
     statistics: SessionStatistics | None = None,
+    status_display: StatusDisplay | None = None,
     *,
     verbose: bool = False,
     debug: bool = False,
 ) -> AsyncIterator[CodeWeaverState]:
     """
-    Unified lifespan context manager for background services + MCP server.
+    Lifespan context manager for background services only.
 
-    This replaces the old lifespan() function in server.py.
-    Manages both background services and MCP server lifecycle.
+    This manages the lifecycle of CodeWeaver's background services without
+    requiring an MCP server. Used for daemon mode (`codeweaver start`).
+
+    Manages:
+    - Background indexing task
+    - File watcher
+    - Health monitoring
+    - Statistics and telemetry
 
     Args:
-        app: FastMCP application instance
         settings: Configuration settings
         statistics: Session statistics instance
+        status_display: StatusDisplay for user-facing output (created if None)
         verbose: Enable verbose logging
         debug: Enable debug logging
 
     Yields:
-        CodeWeaverState instance for the server lifecycle
+        CodeWeaverState instance for background services
     """
     from codeweaver.cli.ui import StatusDisplay
     from codeweaver.common.utils import get_project_path
     from codeweaver.config.settings import get_settings
     from codeweaver.core.types.sentinel import Unset
 
-    # Create StatusDisplay for clean user-facing output
-    status_display = StatusDisplay()
-
-    # Print clean header
-    server_host = getattr(app, "host", "127.0.0.1") if hasattr(app, "host") else "127.0.0.1"
-    server_port = getattr(app, "port", 9328) if hasattr(app, "port") else 9328
-    status_display.print_header(host=server_host, port=server_port)
+    # Create StatusDisplay if not provided
+    if status_display is None:
+        status_display = StatusDisplay()
 
     if verbose or debug:
-        logger.info("Entering combined lifespan context manager...")
+        logger.info("Entering background services lifespan context manager...")
 
     # Load settings if not provided
     if settings is None:
@@ -130,11 +133,11 @@ async def combined_lifespan(
         status_display.print_ready()
 
         if verbose or debug:
-            logger.info("Lifespan start actions complete, server initialized.")
+            logger.info("Background services initialized successfully.")
 
         background_state.initialized = True
 
-        # Server runs here
+        # Background services run here
         yield background_state
 
     except Exception:
@@ -147,3 +150,63 @@ async def combined_lifespan(
         await _cleanup_state(
             background_state, indexing_task, status_display, verbose=verbose or debug
         )
+
+
+@asynccontextmanager
+async def http_lifespan(
+    mcp_state: CwMcpHttpState,
+    settings: CodeWeaverSettings | None = None,
+    statistics: SessionStatistics | None = None,
+    status_display: StatusDisplay | None = None,
+    *,
+    verbose: bool = False,
+    debug: bool = False,
+) -> AsyncIterator[CodeWeaverState]:
+    """
+    Lifespan context manager for HTTP MCP server with background services.
+
+    This manages both the MCP HTTP server lifecycle and background services
+    together. Used when running `codeweaver server --transport streamable-http`.
+
+    Args:
+        mcp_state: MCP HTTP server state containing FastMCP app and config
+        settings: Configuration settings
+        statistics: Session statistics instance
+        status_display: StatusDisplay for user-facing output (created if None)
+        verbose: Enable verbose logging
+        debug: Enable debug logging
+
+    Yields:
+        CodeWeaverState instance for background services
+    """
+    from codeweaver.cli.ui import StatusDisplay
+
+    # Create StatusDisplay if not provided
+    if status_display is None:
+        status_display = StatusDisplay()
+
+    # Print header with MCP server info
+    status_display.print_header(host=mcp_state.host, port=mcp_state.port)
+
+    if verbose or debug:
+        logger.info("Entering HTTP server lifespan context manager...")
+
+    # Use background services lifespan for all the heavy lifting
+    async with background_services_lifespan(
+        settings=settings,
+        statistics=statistics,
+        status_display=status_display,
+        verbose=verbose,
+        debug=debug,
+    ) as background_state:
+        if verbose or debug:
+            logger.info("HTTP server lifespan initialized with background services.")
+
+        yield background_state
+
+
+# Backward compatibility alias (deprecated)
+combined_lifespan = http_lifespan
+
+
+__all__ = ("background_services_lifespan", "combined_lifespan", "http_lifespan")

@@ -156,11 +156,11 @@ class CodeWeaverState(DataclassSerializationMixin):
         description="Optional HTTP middleware stack to CodeWeaver's management and http mcp servers.",
     )
 
-    telemetry: Annotated[PostHogClient | None, PrivateAttr()] = None
+    telemetry: Annotated[PostHogClient | None, PrivateAttr(default=None)]
 
-    _mcp_http_server: FastMCP[CwMcpHttpState] | None = PrivateAttr(default=None)
+    _mcp_http_server: Annotated[FastMCP[CwMcpHttpState] | None, PrivateAttr(default=None)]
 
-    _tasks: list[asyncio.Task] = PrivateAttr(default_factory=list)
+    _tasks: Annotated[list[asyncio.Task], PrivateAttr(default_factory=list)]
 
     def __post_init__(self) -> None:
         """Post-initialization to set the global state reference."""

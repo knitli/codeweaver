@@ -17,7 +17,7 @@ import time
 
 from datetime import UTC, datetime
 from functools import cache
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import uvicorn
 
@@ -31,7 +31,10 @@ from codeweaver.common.statistics import SessionStatistics, get_session_statisti
 from codeweaver.config.settings import get_settings_map
 from codeweaver.config.types import CodeWeaverSettingsDict
 from codeweaver.core.types import DictView
-from codeweaver.server.server import CodeWeaverState
+
+
+if TYPE_CHECKING:
+    from codeweaver.server.server import CodeWeaverState
 
 
 logger = logging.getLogger(__name__)
