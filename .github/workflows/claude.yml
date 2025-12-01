@@ -35,7 +35,7 @@ jobs:
       VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
       CODEWEAVER_PROJECT_PATH: ${{ github.workspace }}
       MISE_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      MISE_ENV: "ci"
+      MISE_ENV: "cloudagent"
     steps:
       - name: Checkout Repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
@@ -55,7 +55,7 @@ jobs:
           base_branch: main
           use_commit_signing: true
           claude_args: |
-            --max-turns 30
+            --max-turns 100
             --allowedTools Bash,Batch,Glob,Grep,ToDoWrite,View,mcp__context7__get-library-docs,mcp__context7__resolve-library-id,mcp__sequential-thinking__sequentialthinking,mcp__github_ci__get_workflow_run_details,mcp__codeweaver__find_code
             --mcp-config .mcp.json
           prompt: |
@@ -82,8 +82,8 @@ jobs:
           use_commit_signing: true
           base_branch: main
           claude_args: |
-            --max-turns 30
-            --allowedTools Bash,Batch,Glob,Grep,ToDoWrite,View,mcp__context7__get-library-docs,mcp__context7__resolve-library-id,mcp__sequential-thinking__sequentialthinking,mcp__github_ci__get_workflow_run_details,mcp__codeweaver__find_code
+            --max-turns 100
+            --allowedTools Bash,Batch,Glob,Grep,ToDoWrite,View,mcp__context7__get-library-docs,mcp__context7__resolve-library-id,mcp__sequential-thinking__sequentialthinking,mcp__github_ci__get_workflow_run_details,mcp__codeweaver__find_code,WebFetch,WebSearch
             --mcp-config .mcp.json
           prompt: |
             REPO: ${{ github.repository }}
@@ -108,7 +108,7 @@ jobs:
           use_commit_signing: true
           base_branch: main
           claude_args: |
-            --max-turns 30
+            --max-turns 50
             --allowedTools Bash,Batch,Glob,Grep,ToDoWrite,View,mcp__context7__get-library-docs,mcp__context7__resolve-library-id,mcp__sequential-thinking__sequentialthinking,mcp__github_ci__get_workflow_run_details,mcp__codeweaver__find_code
             --mcp-config .mcp.json
           prompt: |
@@ -136,8 +136,8 @@ jobs:
           use_commit_signing: true
           base_branch: main
           claude_args: |
-            --max-turns 30
-            --allowedTools Bash,Batch,Glob,Grep,ToDoWrite,View,mcp__context7__get-library-docs,mcp__context7__resolve-library-id,mcp__sequential-thinking__sequentialthinking,mcp__github_ci__get_workflow_run_details,mcp__codeweaver__find_code
+            --max-turns 200
+            --allowedTools Bash,Batch,Glob,Grep,ToDoWrite,View,mcp__context7__get-library-docs,mcp__context7__resolve-library-id,mcp__sequential-thinking__sequentialthinking,mcp__github_ci__get_workflow_run_details,mcp__codeweaver__find_code,WebFetch,WebSearch
             --mcp-config .mcp.json
           prompt: |
             REPO: ${{ github.repository }}

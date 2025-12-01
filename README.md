@@ -98,9 +98,11 @@ cw server
 
 ### MCP Configuration
 
+Behind the scenes, CodeWeaver always runs an http server for mcp services, but you can use it with *either* stdio or http transports. Your stdio session bridges to the http server.
+
 `cw init` will add CodeWeaver to your project's `.mcp.json`:
 
-```json
+```json "with http:"
 {
   "mcpServers": {
     "codeweaver": {
@@ -111,9 +113,19 @@ cw server
 }
 ```
 
-> **💡 Why HTTP?** Unlike most MCP servers, CodeWeaver defaults to `streamable-http` transport for a more predictable, smoother experience.
+```json "with stdio:"
+{
+  "mcpServers": {
+    "codeweaver": {
+      "type": "stdio",
+      "cmd": "uv",
+      "args": ["run", "codeweaver", "server", "--transport", "stdio"],
+      "env": {"SOME_API_KEY_FOR_PROVIDERS": "value"}
+    }
+  }
+}
 
-> ⚠️ **Warning**: While `stdio` transport is technically possible, it's **untested** and may cause issues due to complex background orchestration. Use at your own risk! We hope to make it fully available in the next Alpha Release (2).
+```
 
 ---
 
