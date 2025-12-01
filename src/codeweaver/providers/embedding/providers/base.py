@@ -518,7 +518,6 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             ] = []
 
             # Yield after CPU-bound token batching to prevent event loop blocking
-            import asyncio
             await asyncio.sleep(0)
 
             for batch_idx, token_batch in enumerate(token_batches):
