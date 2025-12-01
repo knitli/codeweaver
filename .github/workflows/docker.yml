@@ -169,31 +169,31 @@ jobs:
             exit 1
           fi
           # .github/workflows/docker.yml
-          - name: Create test environment file
-            run: |
-              cat > .env << EOF
-              PROJECT_PATH=.
-              CODEWEAVER_PORT=9328
-              QDRANT_PORT=6333
-              QDRANT_GRPC_PORT=6334
-              CODEWEAVER_PROFILE=quickstart  # ← Add this
-              COLLECTION_NAME=codeweaver-test
-              ENABLE_TELEMETRY=false
-              LOG_LEVEL=INFO
-              EOF
+      - name: Create test environment file
+        run: |
+          cat > .env << EOF
+          PROJECT_PATH=.
+          CODEWEAVER_PORT=9328
+          QDRANT_PORT=6333
+          QDRANT_GRPC_PORT=6334
+          CODEWEAVER_PROFILE=quickstart  # ← Add this
+          COLLECTION_NAME=codeweaver-test
+          ENABLE_TELEMETRY=false
+          LOG_LEVEL=INFO
+          EOF
       - name: Build and start services
         run: |
           docker compose build
           docker compose up -d
           # .github/workflows/docker.yml
-          - name: Wait for services to be healthy
-            run: |
-              echo "Waiting for Qdrant to be ready..."
-              timeout 60 bash -c 'until curl -sf http://localhost:6333/health; do sleep 2; done'
-              
-              echo "Waiting for CodeWeaver to be ready..."
-              # Increase timeout to 5 minutes for initial model downloads
-              timeout 300 bash -c 'until curl -sf http://localhost:9328/health/ 2>/dev/null; do echo "Waiting for CodeWeaver (may download models on first run)..."; sleep 10; done'
+      - name: Wait for services to be healthy
+        run: |
+          echo "Waiting for Qdrant to be ready..."
+          timeout 60 bash -c 'until curl -sf http://localhost:6333/health; do sleep 2; done'
+
+          echo "Waiting for CodeWeaver to be ready..."
+          # Increase timeout to 5 minutes for initial model downloads
+          timeout 300 bash -c 'until curl -sf http://localhost:9328/health/ 2>/dev/null; do echo "Waiting for CodeWeaver (may download models on first run)..."; sleep 10; done'
       - name: Test Qdrant accessibility
         run: |
           echo "Testing Qdrant health endpoint..."
