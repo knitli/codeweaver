@@ -398,7 +398,7 @@ def _initialize_cw_state(
     """Initialize application state if not already present."""
     state = CodeWeaverState(  # type: ignore
         initialized=False,
-        # for lazy imports, we need to cal resolve() to get the function/object and then call it
+        # for lazy imports, we need to call resolve() to get the function/object and then call it
         settings=settings or get_settings._resolve()(),
         statistics=statistics or get_session_statistics._resolve()(),
         project_path=get_project_path()
