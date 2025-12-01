@@ -369,7 +369,7 @@ class ManagementServer:
             Route("/favicon.ico", favicon, methods=["GET"], include_in_schema=False),
             # these are always enabled because we use them internally
             Route("/health", health, methods=["GET"]),
-            Route("/status", health, methods=["GET"]),
+            Route("/status", status_info, methods=["GET"]),
             Route("/metrics", stats_info, methods=["GET"]),
         ]
 
