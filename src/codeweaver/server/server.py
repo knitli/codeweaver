@@ -420,15 +420,15 @@ def _initialize_cw_state(
     if state.telemetry and state.telemetry.enabled:
         state.telemetry.start_session({
             "codeweaver_version": version,
-            "vector_store": vector_store
-            if (vector_store := state.provider_registry.get_provider_enum_for("vector_store"))
+            "vector_store": vector_store_provider
+            if (vector_store_provider := state.provider_registry.get_provider_enum_for("vector_store"))
             else "Qdrant",
-            "embedding_provider": embedding_provider
-            if (embedding_provider := state.provider_registry.get_provider_enum_for("embedding"))
+            "embedding_provider": embedding_provider_provider
+            if (embedding_provider_provider := state.provider_registry.get_provider_enum_for("embedding"))
             else "Voyage",
-            "sparse_embedding_provider": sparse_provider
+            "sparse_embedding_provider": sparse_embedding_provider
             if (
-                sparse_provider := state.provider_registry.get_provider_enum_for("sparse_embedding")
+                sparse_embedding_provider := state.provider_registry.get_provider_enum_for("sparse_embedding")
             )
             else "None",
             "reranking_provider": reranking_provider
