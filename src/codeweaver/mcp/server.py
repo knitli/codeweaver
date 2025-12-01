@@ -270,8 +270,8 @@ def _setup_server[TransportT: Literal["stdio", "streamable-http"]](
     debug: bool = False,
 ) -> FastMCP[StdioClientLifespan] | CwMcpHttpState:
     """Set class args for FastMCP server settings."""
-    is_http = bool(args.get("run_args")) or transport == "streamable-http"
-    # `run_args` is only set for HTTP transport
+    is_http = transport == "streamable-http"
+    # Use transport parameter as the primary indicator for HTTP transport
     middleware_opts = _get_middleware_settings() or default_for_transport(
         "streamable-http" if is_http else "stdio"
     )
