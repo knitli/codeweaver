@@ -73,7 +73,7 @@ local linters = new Mapping<String, Step> {
     }
 
     ["fix-missing-eol"] = new Step {
-        glob = "*.{py,md,txt,toml,ini,cfg,conf,sh,bash,yml,yaml,json,jsonc,js,ts,tsx,rs,go,java,css,scss,html,xml}"
+        glob = "*.{py,md,txt,toml,ini,cfg,conf,sh,bash,js,ts,tsx,rs,go,java,css,scss,html,xml}"
         check = "hk util end-of-file-fixer {{ files }}"
         fix = "hk util end-of-file-fixer --fix {{ files }}"
     }
