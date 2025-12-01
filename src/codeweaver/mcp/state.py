@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 import time
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Annotated, Any
 
 from anthropic._models import computed_field
 from fastmcp import FastMCP
@@ -65,7 +65,7 @@ def _get_fastmcp_settings_map(*, http: bool = False) -> DictView[FastMcpServerSe
 class CwMcpHttpState(DataclassSerializationMixin):
     """State object for MCP HTTP server deployments."""
 
-    app: FastMCP[Any] = PrivateAttr()
+    app: Annotated[FastMCP[Any], PrivateAttr()]
 
     logger: logging.Logger = Field(
         default_factory=lambda: logging.getLogger("codeweaver.mcp.http"),

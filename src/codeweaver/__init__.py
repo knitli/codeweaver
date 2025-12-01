@@ -727,7 +727,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "SparseEmbeddingModelSettings": (__spec__.parent, "config"),
     "SparseEmbeddingServiceInfo": (__spec__.parent, "server"),
     "StatisticsInfo": (__spec__.parent, "server"),
-    "StatisticsMiddleware": (__spec__.parent, "middleware"),
+    "StatisticsMiddleware": (__spec__.parent, "mcp"),
     "StatusDisplay": (__spec__.parent, "cli"),
     "StdioCodeWeaverConfig": (__spec__.parent, "config"),
     "StdioCodeWeaverConfigDict": (__spec__.parent, "config"),
