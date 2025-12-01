@@ -21,6 +21,7 @@ from pydantic import PositiveInt
 
 if TYPE_CHECKING:
     from collections.abc import Generator
+    from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -238,4 +239,196 @@ def get_optimal_workers(task_type: str = "cpu") -> int:
     return min(cpu_count * 2, 16) if task_type == "io" else max(cpu_count - 1, 1)
 
 
-__all__ = ("asyncio_or_uvloop", "get_optimal_workers", "low_priority", "very_low_priority")
+# ==============================================================================
+# Daemon process management
+# ==============================================================================
+
+PID_FILE_NAME = "codeweaver.pid"
+
+
+def get_pid_file_path() -> "Path":
+    """Get the path to the CodeWeaver PID file.
+
+    Returns:
+        Path to the PID file in the user config directory.
+    """
+    from pathlib import Path
+
+    from codeweaver.common.utils.utils import get_user_config_dir
+
+    config_dir = get_user_config_dir()
+    config_dir.mkdir(parents=True, exist_ok=True)
+    return config_dir / PID_FILE_NAME
+
+
+def write_pid_file(pid: int | None = None) -> "Path":
+    """Write the current process PID to the PID file.
+
+    Args:
+        pid: Process ID to write. Defaults to current process PID.
+
+    Returns:
+        Path to the written PID file.
+    """
+    pid_file = get_pid_file_path()
+    pid_to_write = pid if pid is not None else os.getpid()
+    pid_file.write_text(str(pid_to_write))
+    logger.debug("Wrote PID %d to %s", pid_to_write, pid_file)
+    return pid_file
+
+
+def read_pid_file() -> int | None:
+    """Read the daemon process PID from the PID file.
+
+    Returns:
+        The daemon PID if the file exists and contains a valid integer, None otherwise.
+    """
+    pid_file = get_pid_file_path()
+    if not pid_file.exists():
+        return None
+    try:
+        pid_str = pid_file.read_text().strip()
+        return int(pid_str)
+    except (ValueError, OSError) as e:
+        logger.warning("Failed to read PID file %s: %s", pid_file, e)
+        return None
+
+
+def remove_pid_file() -> bool:
+    """Remove the PID file.
+
+    Returns:
+        True if the file was removed, False if it didn't exist.
+    """
+    pid_file = get_pid_file_path()
+    if pid_file.exists():
+        pid_file.unlink()
+        logger.debug("Removed PID file %s", pid_file)
+        return True
+    return False
+
+
+def is_process_running(pid: int) -> bool:
+    """Check if a process with the given PID is running.
+
+    Args:
+        pid: Process ID to check.
+
+    Returns:
+        True if the process is running, False otherwise.
+    """
+    try:
+        import psutil
+
+        if not psutil.pid_exists(pid):
+            return False
+        # Check process status to exclude zombies
+        try:
+            proc = psutil.Process(pid)
+            return proc.status() != psutil.STATUS_ZOMBIE
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            return False
+    except ImportError:
+        # Fallback without psutil
+        if sys.platform == "win32":
+            import ctypes
+
+            kernel32 = ctypes.windll.kernel32
+            handle = kernel32.OpenProcess(0x0400, False, pid)  # PROCESS_QUERY_INFORMATION
+            if handle:
+                kernel32.CloseHandle(handle)
+                return True
+            return False
+        else:
+            try:
+                os.kill(pid, 0)  # Signal 0 checks if process exists
+                return True
+            except OSError:
+                return False
+
+
+def terminate_process(pid: int, *, timeout: float = 5.0, force: bool = False) -> bool:
+    """Terminate a process gracefully with optional force kill.
+
+    Sends SIGTERM first, waits for timeout, then sends SIGKILL if force=True
+    and the process is still running.
+
+    Args:
+        pid: Process ID to terminate.
+        timeout: Seconds to wait for graceful shutdown.
+        force: If True, forcefully kill the process after timeout.
+
+    Returns:
+        True if the process was terminated, False if it wasn't running.
+    """
+    import signal
+    import time
+
+    if not is_process_running(pid):
+        logger.debug("Process %d is not running", pid)
+        return False
+
+    try:
+        # Send SIGTERM for graceful shutdown
+        if sys.platform == "win32":
+            import ctypes
+
+            kernel32 = ctypes.windll.kernel32
+            handle = kernel32.OpenProcess(1, False, pid)  # PROCESS_TERMINATE
+            if handle:
+                kernel32.TerminateProcess(handle, 0)
+                kernel32.CloseHandle(handle)
+        else:
+            os.kill(pid, signal.SIGTERM)
+
+        logger.debug("Sent SIGTERM to process %d", pid)
+
+        # Wait for process to terminate
+        start_time = time.monotonic()
+        while time.monotonic() - start_time < timeout:
+            if not is_process_running(pid):
+                logger.debug("Process %d terminated gracefully", pid)
+                return True
+            time.sleep(0.1)
+
+        # Process still running after timeout
+        if force and is_process_running(pid):
+            logger.warning("Process %d did not terminate, sending SIGKILL", pid)
+            if sys.platform != "win32":
+                os.kill(pid, signal.SIGKILL)
+            # On Windows, TerminateProcess is already forceful
+            time.sleep(0.5)
+            return not is_process_running(pid)
+
+        return not is_process_running(pid)
+
+    except (OSError, PermissionError) as e:
+        logger.error("Failed to terminate process %d: %s", pid, e)
+        return False
+
+
+def get_daemon_status() -> tuple[bool, int | None]:
+    """Get the status of the CodeWeaver daemon process.
+
+    Returns:
+        Tuple of (is_running, pid). pid is None if not running or PID file doesn't exist.
+    """
+    pid = read_pid_file()
+    if pid is None:
+        return False, None
+    return is_process_running(pid), pid
+
+
+__all__ = (
+    "asyncio_or_uvloop",
+    "get_daemon_status",
+    "get_optimal_workers",
+    "get_pid_file_path",
+    "is_process_running",
+    "low_priority",
+    "read_pid_file",
+    "remove_pid_file",
+    "terminate_process",
+    "very_low_priority",
+    "write_pid_file",
+)

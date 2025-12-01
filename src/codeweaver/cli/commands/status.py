@@ -181,10 +181,21 @@ def _display_management_status(
         management_url: Management server URL
         healthy: Whether management server is healthy
     """
+    from codeweaver.common.utils.procs import get_daemon_status
+
     display.print_section("Background Services")
+
+    is_daemon_running, daemon_pid = get_daemon_status()
+
     if healthy:
         display.print_success("Background services running")
+        if daemon_pid:
+            display.print_info(f"Daemon PID: {daemon_pid}", prefix="🔧")
         display.print_info(f"Management server: {management_url}", prefix="🌐")
+    elif is_daemon_running and daemon_pid:
+        # PID file exists but health check failed - might be starting up
+        display.print_warning(f"Daemon process running (PID {daemon_pid}) but not responding")
+        display.print_info("The service may still be starting up...")
     else:
         display.print_warning("Background services not running")
         display.print_info("To start background services: 'cw start'")
