@@ -607,7 +607,7 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
                 if isinstance(sparse_emb, CodeWeaverSparseEmbedding):
                     self._prepare_sparse_vector_data(sparse_emb, SparseVector, vectors)
             elif isinstance(sparse_info, CodeWeaverSparseEmbedding):
-                self._extracted_from__prepare_vectors_34(sparse_info, SparseVector, vectors)
+                self._prepare_sparse_vector_data(sparse_info, SparseVector, vectors)
         return vectors
 
     def _prepare_sparse_vector_data(
