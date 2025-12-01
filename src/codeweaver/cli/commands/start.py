@@ -11,8 +11,6 @@ independently of the MCP server.
 from __future__ import annotations
 
 import asyncio
-import contextlib
-import time
 
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
@@ -21,11 +19,7 @@ from cyclopts import App, Parameter
 from pydantic import FilePath, PositiveInt
 
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
-from codeweaver.common.registry import ModelRegistry, ProviderRegistry, ServicesRegistry
-from codeweaver.common.telemetry.client import PostHogClient
-from codeweaver.common.utils import get_project_path
 from codeweaver.core.types.sentinel import Unset
-from codeweaver.engine.indexer import Indexer
 
 
 if TYPE_CHECKING:
@@ -73,89 +67,56 @@ async def start_cw_services(
     config_path: Path | None = None,
     project_path: Path | None = None,
     *,
-    start_mcp_http_server: bool = False,
+    start_mcp_http_server: bool = False,  # Currently unused, reserved for future
     mcp_host: str | None = None,
     mcp_port: PositiveInt | None = None,
 ) -> None:
-    """Start background services (indexer, watcher, health, management server)."""
-    from codeweaver import __version__ as version
+    """Start background services using the new lifespan architecture."""
     from codeweaver.common.statistics import get_session_statistics
     from codeweaver.config.settings import get_settings
-    from codeweaver.server.background_services import CodeWeaverState, run_background_indexing
-    from codeweaver.server.health.health_service import HealthService
+    from codeweaver.server.lifespan import background_services_lifespan
+    from codeweaver.server.management import ManagementServer
 
     # Load settings
     settings = get_settings()
+    if config_path:
+        settings.config_file = config_path  # type: ignore
     if project_path:
         settings.project_path = project_path
-    elif isinstance(settings.project_path, Unset):
-        settings.project_path = get_project_path()
 
-    # Initialize telemetry
-    telemetry_client = PostHogClient.from_settings()
-
-    # Get singletons
-    provider_registry = ProviderRegistry()
     statistics = get_session_statistics()
 
-    # Create CodeWeaverState
-    cw_state = CodeWeaverState(
-        initialized=False,
+    # Use background_services_lifespan (the new Phase 1 implementation)
+    async with background_services_lifespan(
         settings=settings,
         statistics=statistics,
-        project_path=get_project_path()
-        if isinstance(settings.project_path, Unset)
-        else settings.project_path,
-        config_path=config_path,
-        provider_registry=provider_registry,
-        services_registry=ServicesRegistry(),
-        model_registry=ModelRegistry(),
-        health_service=None,
-        failover_manager=None,
-        telemetry=telemetry_client,
-        indexer=Indexer.from_settings(),
-    )
+        status_display=display,
+        verbose=False,
+        debug=False,
+    ) as background_state:
+        # Start management server
+        mgmt_host = getattr(settings, "management_host", "127.0.0.1")
+        mgmt_port = getattr(settings, "management_port", 9329)
 
-    # Initialize health service
-    cw_state.health_service = HealthService(
-        provider_registry=provider_registry,
-        statistics=statistics,
-        indexer=cw_state.indexer,
-        failover_manager=cw_state.failover_manager,
-        startup_time=time.time(),
-    )
+        management_server = ManagementServer(background_state)
+        await management_server.start(host=mgmt_host, port=mgmt_port)
 
-    # Start telemetry session
-    if telemetry_client and telemetry_client.enabled:
-        telemetry_client.start_session({
-            "codeweaver_version": version,
-            "index_backend": "qdrant",
-            "mode": "background_services",
-        })
+        display.print_success("Background services started successfully")
+        display.print_info(
+            f"Management server: http://{mgmt_host}:{mgmt_port}", prefix="🌐"
+        )
 
-    # Start background indexing
-    indexing_task = asyncio.create_task(
-        run_background_indexing(cw_state, display, verbose=False, debug=False)
-    )
-
-    display.print_success("Background services started successfully")
-    display.print_info(
-        f"Management server: http://127.0.0.1:{settings.management_port}", prefix="🌐"
-    )
-
-    # Keep services running until interrupted
-    try:
-        # Wait for indexing task to complete or be cancelled
-        await indexing_task
-    except asyncio.CancelledError:
-        display.print_warning("Background services cancelled...")
-    except KeyboardInterrupt:
-        display.print_warning("Shutting down background services...")
-        indexing_task.cancel()
-        with contextlib.suppress(asyncio.CancelledError, TimeoutError):
-            await asyncio.wait_for(indexing_task, timeout=5.0)
-    finally:
-        cw_state.initialized = False
+        try:
+            # Keep services running until interrupted
+            if management_server.server_task:
+                await management_server.server_task
+            else:
+                # Wait indefinitely if task not set (shouldn't happen)
+                await asyncio.Event().wait()
+        except (KeyboardInterrupt, asyncio.CancelledError):
+            display.print_warning("Shutting down background services...")
+        finally:
+            await management_server.stop()
 
 
 @app.default

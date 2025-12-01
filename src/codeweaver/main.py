@@ -61,17 +61,16 @@ def _setup_logging_filters(*, verbose: bool, debug: bool) -> None:
             logger_obj.addFilter(access_filter)
 
 
-def _setup_signal_handler() -> tuple[int, Any]:
-    """Setup force shutdown handler and return shutdown counter and original handler."""
-    shutdown_count = 0
+def _setup_signal_handler() -> Any:
+    """Setup force shutdown handler and return original handler."""
+    shutdown_count = [0]  # Use list to allow mutation in closure
     original_sigint_handler = None
 
     def force_shutdown_handler(signum: int, frame: Any) -> None:
         """Handle multiple SIGINT signals for force shutdown."""
-        nonlocal shutdown_count
-        shutdown_count += 1
+        shutdown_count[0] += 1
 
-        if shutdown_count == 1:
+        if shutdown_count[0] == 1:
             # Silent first interrupt - let lifespan cleanup handle the message
             raise KeyboardInterrupt
         logger.warning("Force shutdown requested, exiting immediately...")
@@ -81,7 +80,7 @@ def _setup_signal_handler() -> tuple[int, Any]:
     with contextlib.suppress(ValueError, OSError):
         original_sigint_handler = signal.signal(signal.SIGINT, force_shutdown_handler)
 
-    return shutdown_count, original_sigint_handler
+    return original_sigint_handler
 
 
 async def _run_http_server(
@@ -149,7 +148,7 @@ async def _run_http_server(
     mgmt_port = getattr(settings, "management_port", 9329)
 
     # Setup signal handler for force shutdowns
-    shutdown_count, original_sigint_handler = _setup_signal_handler()
+    original_sigint_handler = _setup_signal_handler()
 
     # Initialize provider registry
     registry = lazy_import("codeweaver.common.registry.provider", "get_provider_registry")  # type: ignore
@@ -183,14 +182,7 @@ async def _run_http_server(
                 # Stop management server
                 await management_server.stop()
     except KeyboardInterrupt:
-        if shutdown_count == 1:
-            logger.info("Shutdown requested, cleaning up...")
-        else:
-            logger.info("Shutdown requested...")
-            with contextlib.suppress(asyncio.CancelledError):
-                await asyncio.sleep(0.5)
-            with contextlib.suppress(ValueError, OSError):
-                signal.signal(signal.SIGINT, original_sigint_handler)
+        logger.info("Shutdown requested, cleaning up...")
     finally:
         # Restore original signal handler
         if original_sigint_handler:
