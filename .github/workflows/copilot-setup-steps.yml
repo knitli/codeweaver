@@ -57,7 +57,7 @@ jobs:
           path: |
             ~/.cache/uv
             .venv
-          key: uv-copilot-${{ runner.os }}-py${{ matrix.python-version || '3.12' }}-${{ hashFiles('uv.lock') }}
+          key: uv-copilot-${{ runner.os }}-py3.12-${{ hashFiles('uv.lock') }}
           restore-keys: |
             uv-copilot-${{ runner.os }}-
             uv-${{ runner.os }}-
