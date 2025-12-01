@@ -536,7 +536,7 @@ class HealthService:
                 try:
                     total = sum(f.stat().st_size for f in path.rglob("*") if f.is_file())
                     return total // (1024 * 1024)
-                except OSError:
+                except (PermissionError, OSError):
                     # Gracefully handle permission errors
                     return 0
 
