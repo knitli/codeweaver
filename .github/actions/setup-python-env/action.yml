@@ -104,7 +104,9 @@ runs:
       if: inputs.skip-mise-setup != 'true'
       shell: bash
       run: |
-        export PATH="$HOME/.local/bin:$PATH" -E ci
+        export PATH="$HOME/.local/bin:$PATH"
+        export MISE_ENV="ci"
+        export MISE_YES=1
         mise trust --all
         # Guard heavy setup with a timeout to limit runner memory and time usage in CI
         timeout 10m mise run setup > /dev/null 2>&1 || true
