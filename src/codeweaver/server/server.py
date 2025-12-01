@@ -15,7 +15,7 @@ import time
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any, Literal
+from typing import TYPE_CHECKING, Annotated, Any
 
 from fastmcp import FastMCP
 from pydantic import ConfigDict, DirectoryPath, Field, NonNegativeInt, PrivateAttr, computed_field
@@ -26,13 +26,8 @@ from codeweaver import __version__ as version
 from codeweaver.common.registry import ModelRegistry, ProviderRegistry, ServicesRegistry
 from codeweaver.common.statistics import SessionStatistics
 from codeweaver.common.telemetry.client import PostHogClient
-from codeweaver.common.utils import (
-    elapsed_time_to_human_readable,
-    get_project_path,
-    lazy_import,
-    rpartial,
-)
-from codeweaver.config.settings import CodeWeaverSettings, CodeWeaverSettingsDict, get_settings_map
+from codeweaver.common.utils import elapsed_time_to_human_readable, get_project_path, lazy_import
+from codeweaver.config.settings import CodeWeaverSettings
 from codeweaver.core.types.enum import AnonymityConversion
 from codeweaver.core.types.models import DATACLASS_CONFIG, DataclassSerializationMixin
 from codeweaver.core.types.sentinel import Unset
@@ -444,59 +439,4 @@ def _initialize_cw_state(
     return state
 
 
-def build_app(
-    *,
-    verbose: bool = False,
-    debug: bool = False,
-    transport: Literal["streamable-http", "stdio"] = "streamable-http",
-    host: str = "127.0.0.1",
-    port: int = 9328,
-) -> None:
-    """Build and configure the CodeWeaver application without starting it.
-
-    Args:
-        verbose: Enable verbose logging (INFO level)
-        debug: Enable debug logging (DEBUG level)
-        transport: Transport type for MCP communication (streamable-http or stdio)
-        host: Host to bind the server to
-        port: Port to bind the server to
-
-    Returns:
-        ServerSetup dict with configured application and settings
-    """
-    session_statistics = get_session_statistics._resolve()()
-
-    if verbose or debug:
-        global _logger
-        _logger.info("Initializing CodeWeaver server. Logging set up.")
-    settings_view = get_settings_map()
-    if not settings_view:
-        try:
-            from codeweaver.config.settings import get_settings
-            from codeweaver.core.types.dictview import DictView
-
-            if settings := get_settings():
-                settings_view = DictView(
-                    CodeWeaverSettingsDict(**settings.model_dump(round_trip=True))
-                )
-                settings_module = settings.__class__.__module__
-                settings_module._mapped_settings = settings_view  # type: ignore[attr-defined]
-        except Exception as e:
-            raise InitializationError("Failed to load CodeWeaver settings.") from e
-
-    rpartial(
-        lifespan,
-        get_settings() if get_settings is not LazyImport else get_settings._resolve()(),
-        session_statistics,
-        verbose=verbose,
-        debug=debug,
-    )
-    from codeweaver.server.logging import setup_logger
-
-    if verbose or debug:
-        final_app_logger = setup_logger(settings_view)
-        _logger = final_app_logger
-        _logger.info("FastMCP application initialized successfully.")
-
-
-__all__ = ("CodeWeaverState", "build_app", "get_state", "lifespan")
+__all__ = ("CodeWeaverState", "get_state", "lifespan")

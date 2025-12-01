@@ -26,7 +26,9 @@ if TYPE_CHECKING:
         VectorStoreServiceInfo,
         get_health,
     )
-    from codeweaver.server.server import CodeWeaverState, build_app, get_state, lifespan
+    from codeweaver.server.lifespan import background_services_lifespan, http_lifespan
+    from codeweaver.server.management import ManagementServer
+    from codeweaver.server.server import CodeWeaverState, get_state, lifespan
 
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
@@ -36,14 +38,16 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "HealthService": (__spec__.parent, "health"),
     "IndexingInfo": (__spec__.parent, "health"),
     "IndexingProgressInfo": (__spec__.parent, "health"),
+    "ManagementServer": (__spec__.parent, "management"),
     "RerankingServiceInfo": (__spec__.parent, "health"),
     "ServicesInfo": (__spec__.parent, "health"),
     "SparseEmbeddingServiceInfo": (__spec__.parent, "health"),
     "StatisticsInfo": (__spec__.parent, "health"),
     "VectorStoreServiceInfo": (__spec__.parent, "health"),
-    "build_app": (__spec__.parent, "server"),
+    "background_services_lifespan": (__spec__.parent, "lifespan"),
     "get_health": (__spec__.parent, "health"),
     "get_state": (__spec__.parent, "server"),
+    "http_lifespan": (__spec__.parent, "lifespan"),
     "lifespan": (__spec__.parent, "server"),
 })
 
@@ -57,14 +61,16 @@ __all__ = (
     "HealthService",
     "IndexingInfo",
     "IndexingProgressInfo",
+    "ManagementServer",
     "RerankingServiceInfo",
     "ServicesInfo",
     "SparseEmbeddingServiceInfo",
     "StatisticsInfo",
     "VectorStoreServiceInfo",
-    "build_app",
+    "background_services_lifespan",
     "get_health",
     "get_state",
+    "http_lifespan",
     "lifespan",
 )
 

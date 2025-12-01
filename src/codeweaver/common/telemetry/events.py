@@ -337,7 +337,7 @@ class SearchEvent:
                 "token_count": len(self._query.split()),
                 "char_count": len(self._query),
                 "query": redact_identifiable_info(self._query),
-                "results": redact_identifiable_info(response.serialize()),
+                "results": redact_identifiable_info(response.model_dump_json()),
             }
 
         return (self.EVENT_NAME, properties)

@@ -519,13 +519,15 @@ class CodeWeaverSettings(BaseSettings):
         Field(
             description="""Schema version for CodeWeaver settings""",
             pattern=r"\d{1,2}\.\d{1,3}\.\d{1,3}",
+            alias="schema_version",
         ),
     ] = "1.1.0"
 
-    schema: Annotated[
-        HttpUrl, Field(description="JSON Schema URL for CodeWeaver settings", alias="$schema")
-    ] = HttpUrl(
-        "https://raw.githubusercontent.com/knitli/codeweaver/main/schema/codeweaver.schema.json"
+    schema_: HttpUrl = Field(
+        description="URL to the CodeWeaver settings schema",
+        default_factory=lambda data: HttpUrl(
+            f"https://raw.githubusercontent.com/knitli/codeweaver/main/schema/v{data.get('__version__', data.get('schema_version')) or '1.1.0'}/codeweaver.schema.json"
+        ),
     )
 
     _map: Annotated[DictView[CodeWeaverSettingsDict] | None, PrivateAttr()] = None
