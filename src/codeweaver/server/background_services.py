@@ -137,7 +137,7 @@ async def start_watcher(
     )
 
     # Run watcher in a separate task so we can cancel it cleanly
-    return await asyncio.create_task(watcher.run())
+    return asyncio.create_task(watcher.run())
 
 
 async def _handle_watcher_cancellation(
