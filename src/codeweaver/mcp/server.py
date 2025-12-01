@@ -149,7 +149,7 @@ def setup_runargs(
     mutable_run_args = dict(run_args) if isinstance(run_args, DictView) else run_args
     # Configure uvicorn logging and clean up host/port from uvicorn_config
     return configure_uvicorn_logging(
-        mutable_run_args, host=host, port=port, verbose=verbose, debug=debug
+        FastMcpHttpRunArgs(**mutable_run_args), host=host, port=port, verbose=verbose, debug=debug
     )
 
 

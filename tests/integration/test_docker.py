@@ -274,6 +274,7 @@ LOG_LEVEL=DEBUG
             )
 
     @pytest.mark.slow
+    @pytest.mark.flaky
     @pytest.mark.network
     def test_qdrant_health_endpoint(self, repo_root, tmp_path):
         """Test that Qdrant health endpoint is accessible."""

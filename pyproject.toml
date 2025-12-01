@@ -532,8 +532,8 @@ types-boto3-custom = { path = "vendored/types_boto3_custom-1.41.0-py3-none-any.w
 
 [tool.uv-dynamic-versioning]
 vcs = "git"
-style = "semver"
+style = "pep440"
 bump = true
-dirty = true  # Add .dirty suffix when working directory has uncommitted changes
+dirty = false  # Disabled .dirty suffix to maintain PEP 440 compliance
 # tag-branch = "main"  # Commented out to allow building on feature branches
 commit-prefix = "g"
