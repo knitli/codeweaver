@@ -106,4 +106,5 @@ runs:
       run: |
         export PATH="$HOME/.local/bin:$PATH" -E ci
         mise trust --all
-        mise run setup > /dev/null 2>&1 || true
+        # Guard heavy setup with a timeout to limit runner memory and time usage in CI
+        timeout 10m mise run setup > /dev/null 2>&1 || true
