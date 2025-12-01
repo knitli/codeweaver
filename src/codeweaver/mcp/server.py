@@ -181,7 +181,6 @@ def setup_middleware(
     # ty gets very confused here, so we ignore most issues
 
     for mw in middleware:  # type: ignore
-        mw = mw
         match mw.__name__:  # type: ignore[reportUnknownMemberType, reportUnknownArgumentType, reportAttributeAccessIssue]
             case "ErrorHandlingMiddleware":
                 instance = mw(
