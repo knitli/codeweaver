@@ -91,7 +91,7 @@ jobs:
         id: release_notes
         run: |
           # Get the latest release tag (before current)
-          PREVIOUS_TAG="$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+' | head -2 | tail -1 || echo "")"
+          PREVIOUS_TAG="$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+([ab]|rc|-alpha|-beta)?[0-9]*(\.[0-9]+)?$' | head -2 | tail -1 || echo "")"
           CURRENT_TAG="${{ steps.version.outputs.tag }}"
           VERSION="${{ steps.version.outputs.version }}"
 
