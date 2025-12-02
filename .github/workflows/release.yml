@@ -98,7 +98,9 @@ jobs:
           echo "Previous tag: $PREVIOUS_TAG"
           echo "Current tag: $CURRENT_TAG"
 
-          # Generate changelog using git-cliff
+          # Generate changelog using git-cliff.
+          # Note: We use '--strip header' to intentionally remove the changelog header (as defined in cliff.toml),
+          # so that only the changes section is extracted for embedding in the release notes.
           if [ -n "$PREVIOUS_TAG" ] && [ "$PREVIOUS_TAG" != "$CURRENT_TAG" ]; then
             # Generate changelog for the range between previous and current tag
             git-cliff --strip header --tag "$CURRENT_TAG" "$PREVIOUS_TAG..$CURRENT_TAG" > changelog_section.md
