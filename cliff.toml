@@ -88,7 +88,7 @@ commit_preprocessors = [
   # 1. Extract PR description from merge commits and append to subject
   # Input: "Merge pull request #123 from org/branch\n\nPR Description"
   # Output: "Merge pull request #123 from org/branch | PR Description"
-  { pattern = 'Merge pull request (#[0-9]+) from ([^\n]+)\n+(.+)', replace = "Merge pull request ${1} from ${2} | ${3}" },
+  { pattern = 'Merge pull request (#[0-9]+) from ([^\n]+)\n+([\s\S]+)', replace = "Merge pull request ${1} from ${2} | ${3}" },
 
   # 2. Mark squash merge commits for easier template detection
   # Input: "feat: some feature (#123)"
