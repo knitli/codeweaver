@@ -1,10 +1,5 @@
 #!/usr/bin/env bash
 
-# SPDX-FileCopyrightText: 2025 Knitli Inc.
-# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
-#
-# SPDX-License-Identifier: MIT OR Apache-2.0
-
 # Common functions and variables for all scripts
 
 # Get repository root, with fallback for non-git repositories

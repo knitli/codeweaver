@@ -369,9 +369,9 @@ def _create_stdio_config(
     from codeweaver.config.mcp import StdioCodeWeaverConfig
 
     # Build the command - CodeWeaver doesn't need uv environment
-    # stdio is the default transport, so we just run: cw server
+    # Explicitly specify stdio transport to make configuration unambiguous
     command = cmd or "codeweaver"
-    command_args = args or ["server"]
+    command_args = args or ["server", "--transport", "stdio"]
 
     # Combine command and args into single command string
     full_command = f"{command} {' '.join(command_args)}"

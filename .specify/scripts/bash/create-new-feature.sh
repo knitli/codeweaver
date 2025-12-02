@@ -1,10 +1,5 @@
 #!/usr/bin/env bash
 
-# SPDX-FileCopyrightText: 2025 Knitli Inc.
-# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
-#
-# SPDX-License-Identifier: MIT OR Apache-2.0
-
 set -e
 
 JSON_MODE=false
@@ -38,7 +33,7 @@ find_repo_root() {
 
 # Resolve repository root. Prefer git information when available, but fall back
 # to searching for repository markers so the workflow still functions in repositories that
-# were initialised with --no-git.
+# were initialized with --no-git.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 if git rev-parse --show-toplevel >/dev/null 2>&1; then

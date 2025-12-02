@@ -89,16 +89,16 @@ class TestInitFullWorkflow:
     def test_http_streaming_architecture(
         self, test_environment: dict[str, Path], monkeypatch: pytest.MonkeyPatch, mock_confirm
     ) -> None:
-        """Test MCP config uses HTTP streaming, not STDIO."""
+        """Test MCP config uses HTTP streaming when explicitly requested."""
         test_environment["home"]
         project = test_environment["project"]
 
         monkeypatch.setenv("VOYAGE_API_KEY", "test-key")
         mock_confirm.ask.return_value = True
 
-        # Execute init
+        # Execute init with explicit HTTP transport
         func, bound_args, _ = init_app.parse_args(
-            ["--quickstart", "--client", "claude_code", "--project", str(project)],
+            ["--quickstart", "--client", "claude_code", "--transport", "streamable-http", "--project", str(project)],
             exit_on_error=False,
         )
         func(**bound_args.arguments)
@@ -112,7 +112,7 @@ class TestInitFullWorkflow:
         config_str = json.dumps(cw_server).lower()
         assert "url" in config_str or "http" in config_str
 
-        # Should NOT use STDIO patterns
+        # Should NOT use STDIO patterns when HTTP is requested
         assert "stdio" not in config_str
 
 

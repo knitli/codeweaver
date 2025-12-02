@@ -46,9 +46,11 @@ runs:
       run: ./scripts/dev-env/ci-free-disk-space.sh
 
     - name: Set up Python ${{ inputs.python-version }}
-      uses: actions/setup-python@9b03c627221f32cb88b299427119da30671cf9cc
+      uses: actions/setup-python@9b03c627221f32cb88b299427119da30671cf9cc # v5
       with:
         python-version: ${{ inputs.python-version }}
+        # Support free-threaded Python (e.g., 3.13t, 3.14t)
+        allow-prereleases: true
 
     - name: Install system dependencies
       shell: bash

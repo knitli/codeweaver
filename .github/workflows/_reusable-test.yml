@@ -11,7 +11,7 @@ on:
   workflow_call:
     inputs:
       python-versions:
-        description: 'JSON array of Python versions to test (e.g., ["3.12", "3.13"])'
+        description: 'JSON array of Python versions to test (e.g., ["3.12", "3.13"]). Experimental versions (3.13t, 3.14, 3.14t) are always included via matrix.include.'
         required: false
         type: string
         default: '["3.12", "3.13"]'
@@ -42,11 +42,22 @@ on:
 
 jobs:
   test:
-    name: Test Python ${{ matrix.python-version }}
+    name: Test Python ${{ matrix.python-version }}${{ matrix.experimental && ' (experimental)' || '' }}
     runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.experimental || false }}
     strategy:
+      fail-fast: false
       matrix:
         python-version: ${{ fromJSON(inputs.python-versions) }}
+        experimental: [false]
+        include:
+          # Experimental free-threaded Python versions (no-GIL)
+          - python-version: "3.13t"
+            experimental: true
+          - python-version: "3.14"
+            experimental: true
+          - python-version: "3.14t"
+            experimental: true
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

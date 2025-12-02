@@ -192,25 +192,23 @@ async def start_cw_services(
                     """Wait for shutdown signal from management API."""
                     from codeweaver.server.management import ManagementServer as MgmtServer
 
-                    while not MgmtServer.is_shutdown_requested():
-                        await asyncio.sleep(0.5)
-                    display.print_info("Shutdown requested via management API")
+                    # Wait on the event instead of busy-waiting with sleep
+                    if MgmtServer._shutdown_event is not None:
+                        await MgmtServer._shutdown_event.wait()
+                        display.print_info("Shutdown requested via management API")
 
                 shutdown_task = asyncio.create_task(wait_for_shutdown())
 
                 # Wait for either server tasks to complete or shutdown request
-                done, pending = await asyncio.wait(
-                    [*tasks_to_wait, shutdown_task],
-                    return_when=asyncio.FIRST_COMPLETED,
+                _, pending = await asyncio.wait(
+                    [*tasks_to_wait, shutdown_task], return_when=asyncio.FIRST_COMPLETED
                 )
 
                 # Cancel pending tasks
                 for task in pending:
                     task.cancel()
-                    try:
+                    with contextlib.suppress(asyncio.CancelledError):
                         await task
-                    except asyncio.CancelledError:
-                        pass
             else:
                 # Shouldn't happen: no server tasks set
                 raise RuntimeError(
@@ -221,10 +219,8 @@ async def start_cw_services(
         finally:
             if mcp_server_task and not mcp_server_task.done():
                 mcp_server_task.cancel()
-                try:
+                with contextlib.suppress(asyncio.CancelledError):
                     await mcp_server_task
-                except asyncio.CancelledError:
-                    pass
             await management_server.stop()
 
 
@@ -353,7 +349,7 @@ async def start(
         if (project_path := settings_map.get("project_path")) is not Unset
         else get_project_path._resolve()()
     )
-    if not (project or not isinstance(project, Path) or not project.exists()):
+    if not project and isinstance(project, Path) and project.exists():
         display.print_warning(
             "No valid project directory found. Please provide a path using --project."
         )

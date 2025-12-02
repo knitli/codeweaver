@@ -345,20 +345,18 @@ async def shutdown_handler(request: Request) -> PlainTextResponse:
             media_type="application/json",
         )
 
-    # Request shutdown
-    if ManagementServer.request_shutdown():
-        logger.info("Shutdown requested via management API")
-        return PlainTextResponse(
-            content=to_json({"status": "shutdown_initiated", "message": "Daemon shutdown initiated"}),
-            status_code=202,
-            media_type="application/json",
-        )
-    else:
+    if not ManagementServer.request_shutdown():
         return PlainTextResponse(
             content=to_json({"error": "Shutdown could not be initiated"}),
             status_code=500,
             media_type="application/json",
         )
+    logger.info("Shutdown requested via management API")
+    return PlainTextResponse(
+        content=to_json({"status": "shutdown_initiated", "message": "Daemon shutdown initiated"}),
+        status_code=202,
+        media_type="application/json",
+    )
 
 
 class ManagementServer:
@@ -373,7 +371,7 @@ class ManagementServer:
 
     # Class-level shutdown event for coordinating graceful shutdown
     _shutdown_event: asyncio.Event | None = None
-    _instance: "ManagementServer | None" = None
+    _instance: ManagementServer | None = None
 
     def __init__(self, background_state: CodeWeaverState) -> None:
         """
@@ -389,7 +387,7 @@ class ManagementServer:
         ManagementServer._shutdown_event = asyncio.Event()
 
     @classmethod
-    def get_instance(cls) -> "ManagementServer | None":
+    def get_instance(cls) -> ManagementServer | None:
         """Get the current management server instance."""
         return cls._instance
 
