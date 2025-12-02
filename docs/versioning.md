@@ -279,7 +279,7 @@ The changelog can also be generated via GitHub Actions:
 
 ### Release Workflow Integration
 
-When you create a release by pushing a tag, the release workflow automatically:
+When the release workflow is triggered—either by pushing a tag or by manually dispatching the workflow—it automatically:
 1. Generates categorized changelog entries using git-cliff
 2. Creates a GitHub release with the changelog and installation instructions
 3. Includes verification info and links to artifacts
