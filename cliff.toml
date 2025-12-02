@@ -46,15 +46,12 @@ body = """
             {# Handle regular merge format: "Merge pull request #123 from org/branch | Description" #}
             {%- set_global pr_num = commit.message | replace(from="Merge pull request #", to="") | split(pat=" ") | first | trim -%}
             {%- if commit.message is containing(" | ") -%}
-                {# Split by " | " and take the second part (index 1) as the description #}
                 {%- set_global parts = commit.message | split(pat=" | ") -%}
-                {%- if parts | length > 1 -%}
+                {%- if parts | length >= 2 -%}
                     {%- set_global pr_desc = parts | nth(n=1) | trim -%}
                 {%- else -%}
                     {%- set_global pr_desc = "No description" -%}
                 {%- endif -%}
-            {%- else -%}
-                {%- set_global pr_desc = "No description" -%}
             {%- endif %}
             {%- if pr_num is matching("^[0-9]+$") -%}
     - {{ pr_desc }} ([#{{ pr_num }}](https://github.com/knitli/codeweaver/pull/{{ pr_num }}))
