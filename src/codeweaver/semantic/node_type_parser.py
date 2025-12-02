@@ -565,6 +565,18 @@ class NodeTypeParser:
 
     # we don't start the process until explicitly called
 
+    @property
+    def registration_cache(self) -> dict[SemanticSearchLanguage, _ThingCacheDict]:
+        """Get the registration cache for serialization.
+
+        This provides public access to the internal registration cache,
+        primarily for build scripts that need to serialize the cache.
+
+        Returns:
+            Dictionary mapping languages to their cached Things and Categories.
+        """
+        return type(self)._registration_cache
+
     def _load_from_cache(self) -> bool:
         """Try to load pre-processed node types from cache.
 

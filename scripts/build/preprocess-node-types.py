@@ -35,10 +35,11 @@ def main() -> int:
 
     print(f"  Parsed {len(all_things)} Things/Categories across all languages")
 
-    # Get the cache from the parser's internal registry
+    # Get the cache from the parser's registration cache
+    # Note: We only cache the registration_cache, not all_things,
+    # since all_things can be reconstructed from the cache at runtime
     cache_data = {
-        "things": all_things,
-        "registration_cache": parser._registration_cache,
+        "registration_cache": parser.registration_cache,
     }
 
     # Write cache file
