@@ -24,16 +24,14 @@ logger = logging.getLogger(__name__)
 
 
 async def check_daemon_health(
-    management_host: str = "127.0.0.1",
-    management_port: int = 9329,
-    timeout: float = 2.0,
+    management_host: str = "127.0.0.1", management_port: int = 9329, timeout_at: float = 2.0
 ) -> bool:
     """Check if the CodeWeaver daemon is healthy.
 
     Args:
         management_host: Host of management server
         management_port: Port of management server
-        timeout: Request timeout in seconds
+        timeout_at: Request timeout in seconds
 
     Returns:
         True if daemon is healthy, False otherwise
@@ -46,20 +44,53 @@ async def check_daemon_health(
     try:
         async with httpx.AsyncClient() as client:
             response = await client.get(
-                f"http://{management_host}:{management_port}/health",
-                timeout=timeout,
+                f"http://{management_host}:{management_port}/health", timeout=timeout_at
             )
             return response.status_code == 200
     except Exception:
         return False
 
 
+def _get_daemon_cmd_and_args(
+    config_file: Path | None,
+    project: Path | None,
+    management_host: str | None,
+    management_port: int | None,
+    mcp_host: str | None,
+    mcp_port: int | None,
+) -> tuple[str, list[str]]:
+    """Resolve the daemon executable and arguments."""
+    cw_cmd = shutil.which("cw") or shutil.which("codeweaver")
+    if not cw_cmd:
+        # Try using python -m codeweaver
+        cw_cmd = sys.executable
+        cw_args = ["-m", "codeweaver", "start", "--foreground"]
+    else:
+        cw_args = ["start", "--foreground"]
+
+    # Add optional arguments
+    if config_file:
+        cw_args.extend(["--config-file", str(config_file)])
+    if project:
+        cw_args.extend(["--project", str(project)])
+    if management_host and management_host != "127.0.0.1":
+        cw_args.extend(["--management-host", management_host])
+    if management_port and management_port != 9329:
+        cw_args.extend(["--management-port", str(management_port)])
+    if mcp_host:
+        cw_args.extend(["--mcp-host", mcp_host])
+    if mcp_port:
+        cw_args.extend(["--mcp-port", str(mcp_port)])
+
+    return cw_cmd, cw_args
+
+
 def spawn_daemon_process(
     *,
     config_file: Path | None = None,
     project: Path | None = None,
-    management_host: str = "127.0.0.1",
-    management_port: int = 9329,
+    management_host: str | None = None,
+    management_port: int | None = None,
     mcp_host: str | None = None,
     mcp_port: int | None = None,
 ) -> bool:
@@ -76,28 +107,9 @@ def spawn_daemon_process(
     Returns:
         True if daemon was spawned successfully, False otherwise.
     """
-    # Find the codeweaver executable
-    cw_cmd = shutil.which("cw") or shutil.which("codeweaver")
-    if not cw_cmd:
-        # Try using python -m codeweaver
-        cw_cmd = sys.executable
-        cw_args = ["-m", "codeweaver", "start", "--foreground"]
-    else:
-        cw_args = ["start", "--foreground"]
-
-    # Add optional arguments
-    if config_file:
-        cw_args.extend(["--config-file", str(config_file)])
-    if project:
-        cw_args.extend(["--project", str(project)])
-    if management_host != "127.0.0.1":
-        cw_args.extend(["--management-host", management_host])
-    if management_port != 9329:
-        cw_args.extend(["--management-port", str(management_port)])
-    if mcp_host:
-        cw_args.extend(["--mcp-host", mcp_host])
-    if mcp_port:
-        cw_args.extend(["--mcp-port", str(mcp_port)])
+    cw_cmd, cw_args = _get_daemon_cmd_and_args(
+        config_file, project, management_host, management_port, mcp_host, mcp_port
+    )
 
     # Determine working directory for the daemon
     working_dir = project.resolve() if isinstance(project, Path) and project.exists() else None
@@ -117,12 +129,14 @@ def spawn_daemon_process(
         else:
             kwargs["start_new_session"] = True
 
-        subprocess.Popen([cw_cmd, *cw_args], **kwargs)
-        return True
+        subprocess.Popen([cw_cmd, *cw_args], **kwargs)  # noqa: S603
 
     except Exception as e:
-        logger.error("Failed to spawn daemon: %s", e)
+        logger.warning("Failed to spawn daemon", exc_info=e)
         return False
+    else:
+        logger.debug("Spawned daemon process with command: %s %s", cw_cmd, " ".join(cw_args))
+        return True
 
 
 async def start_daemon_if_needed(

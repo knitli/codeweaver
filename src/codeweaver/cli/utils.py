@@ -13,11 +13,16 @@ from typing import TYPE_CHECKING
 
 from pydantic import NonNegativeInt
 
+from codeweaver.common.utils.git import get_project_path
 from codeweaver.common.utils.lazy_importer import LazyImport, lazy_import
 
 
 if TYPE_CHECKING:
     from rich.console import Console
+
+    from codeweaver.config.settings import CodeWeaverSettings
+    from codeweaver.config.types import CodeWeaverSettingsDict
+    from codeweaver.core.types import DictView
 
 
 console: LazyImport[Console] = lazy_import("rich.console", "Console")
@@ -55,7 +60,6 @@ def resolve_project_root() -> Path:
     settings_map = get_settings_map()
     if isinstance(settings_map.get("project_path"), Path):
         return settings_map["project_path"]
-    from codeweaver.common.utils.git import get_project_path
 
     return get_project_path()
 
@@ -148,6 +152,33 @@ def is_codeweaver_config_path(path: Path) -> bool:
 def is_wsl() -> bool:
     """Check if running inside Windows Subsystem for Linux (WSL)."""
     return "microsoft" in (release := os.uname().release.lower()) or "wsl" in release
+
+
+def _set_settings_for_config(config_file: Path) -> CodeWeaverSettings:
+    """Set the global settings based on the given config file."""
+    from codeweaver.config.settings import get_settings
+
+    return get_settings(config_file=config_file)
+
+
+def _set_project_path(project_path: Path) -> DictView[CodeWeaverSettingsDict]:
+    """Set the global project path."""
+    from codeweaver.config.settings import get_settings_map, update_settings
+
+    return update_settings(**(dict(get_settings_map()) | {"project_path": project_path}))
+
+
+def get_settings_map_for(
+    config_file: Path | None = None, project_path: Path | None = None
+) -> DictView[CodeWeaverSettingsDict]:
+    """Get the settings map for the given config file."""
+    if config_file is not None:
+        return _set_settings_for_config(config_file).view
+    if project_path is not None:
+        return _set_project_path(project_path)
+    from codeweaver.config.settings import get_settings_map
+
+    return get_settings_map()
 
 
 __all__ = (

@@ -92,12 +92,10 @@ commit_preprocessors = [
   # Input: "Merge pull request #123 from org/branch\n\nPR Description"
   # Output: "Merge pull request #123 from org/branch | PR Description"
   { pattern = 'Merge pull request (#[0-9]+) from ([^\n]+)\n+([\s\S]+)', replace = "Merge pull request ${1} from ${2} | ${3}" },
-
   # 2. Mark squash merge commits for easier template detection
   # Input: "feat: some feature (#123)"
   # Output: "SQUASH | feat: some feature | #123"
   { pattern = '^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+?\))?: (.+) \(#([0-9]+)\)$', replace = "SQUASH | ${1}${2}: ${3} | #${4}" },
-
   # 3. Catch squash merges without conventional commit prefix
   # Input: "Some change (#123)"
   # Output: "SQUASH | Some change | #123"
@@ -108,7 +106,6 @@ commit_preprocessors = [
 commit_parsers = [
   # Skip non-PR merge commits (like "Merge branch 'main'")
   { message = "^Merge branch", skip = true },
-
   # === Squash Merge Parsers (conventional commits) ===
   # After preprocessing, squash merges are in format: "SQUASH | type: description | #123"
   { message = "^SQUASH \\| feat", group = "Features" },
@@ -122,7 +119,6 @@ commit_parsers = [
   { message = "^SQUASH \\| chore", group = "Maintenance" },
   { message = "^SQUASH \\| revert", group = "Reverts" },
   { message = "^SQUASH \\|", group = "Other Changes" },
-
   # === Regular Merge Commit Parsers (branch-based) ===
   # Features - check branch name patterns
   { message = "^Merge pull request #[0-9]+ from .*/feat", group = "Features" },

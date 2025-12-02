@@ -14,19 +14,20 @@ current terminal session.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated
-import contextlib
+from typing import TYPE_CHECKING, Annotated, Any, NamedTuple
+
 from cyclopts import App, Parameter
 from pydantic import FilePath, PositiveInt
+from typing_extensions import TypeIs
 
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
+from codeweaver.cli.utils import get_settings_map_for
+from codeweaver.common.utils.lazy_importer import lazy_import
 from codeweaver.core.types.sentinel import Unset
-from codeweaver.daemon import (
-    check_daemon_health,
-    spawn_daemon_process,
-)
+from codeweaver.daemon import check_daemon_health, spawn_daemon_process
 
 
 if TYPE_CHECKING:
@@ -37,6 +38,15 @@ _display: StatusDisplay = get_display()
 app = App("start", help="Start CodeWeaver background services.")
 
 
+class NetworkConfig(NamedTuple):
+    """Network configuration for CodeWeaver services."""
+
+    management_host: str
+    management_port: int
+    mcp_host: str | None
+    mcp_port: int | None
+
+
 def _get_settings_map() -> DictView[CodeWeaverSettingsDict]:
     """Get the current settings map."""
     from codeweaver.config.settings import get_settings_map
@@ -44,68 +54,49 @@ def _get_settings_map() -> DictView[CodeWeaverSettingsDict]:
     return get_settings_map()
 
 
-async def are_services_running(
-    management_host: str | None = None,
-    management_port: int | None = None,
-) -> bool:
+async def are_services_running(management_host: str, management_port: int) -> bool:
     """Check if background services are running via management server.
 
     Args:
-        management_host: Host to check. If None, uses settings or defaults to 127.0.0.1
-        management_port: Port to check. If None, uses settings or defaults to 9329
+        management_host: Host to check.
+        management_port: Port to check.
 
     Returns:
         True if services are running, False otherwise.
     """
-    # Use provided values or fall back to settings/defaults
-    if management_host is None or management_port is None:
-        settings_map = _get_settings_map()
-        if management_host is None:
-            management_host = (
-                settings_map["management_host"]
-                if settings_map["management_host"] is not Unset
-                else "127.0.0.1"
-            )
-        if management_port is None:
-            management_port = (
-                settings_map["management_port"]
-                if settings_map["management_port"] is not Unset
-                else 9329
-            )
-
     return await check_daemon_health(management_host, management_port)
 
 
 def _start_daemon_background(
     display: StatusDisplay,
+    project: Path,
+    management_host: str,
+    management_port: int,
+    mcp_host: str,
+    mcp_port: int,
     config_file: Path | None = None,
-    project: Path | None = None,
-    management_host: str = "127.0.0.1",
-    management_port: int = 9329,
-    mcp_host: str | None = None,
-    mcp_port: int | None = None,
 ) -> bool:
     """Start the CodeWeaver daemon as a background process.
 
     Args:
         display: Status display for output
-        config_file: Optional configuration file path
         project: Optional project directory path
         management_host: Host for management server
         management_port: Port for management server
         mcp_host: Host for MCP HTTP server
         mcp_port: Port for MCP HTTP server
+        config_file: Optional configuration file path
 
     Returns:
         True if daemon was started successfully, False otherwise.
     """
     success = spawn_daemon_process(
-        config_file=config_file,
         project=project,
         management_host=management_host,
         management_port=management_port,
         mcp_host=mcp_host,
         mcp_port=mcp_port,
+        config_file=config_file,
     )
     if not success:
         display.print_error("Failed to start daemon process")
@@ -144,12 +135,13 @@ async def _wait_for_daemon_healthy(
 
 async def start_cw_services(
     display: StatusDisplay,
-    config_path: Path | None = None,
-    project_path: Path | None = None,
+    project_path: Path,
+    mcp_host: str,
+    mcp_port: PositiveInt,
+    management_host: str,
+    management_port: PositiveInt,
     *,
     start_mcp_http_server: bool = True,  # Start MCP HTTP server for stdio proxy support
-    mcp_host: str | None = None,
-    mcp_port: PositiveInt | None = None,
 ) -> None:
     """Start background services and optionally MCP HTTP server.
 
@@ -157,41 +149,25 @@ async def start_cw_services(
     (port 9328) to support stdio proxy connections.
     """
     from codeweaver.common.statistics import get_session_statistics
-    from codeweaver.config.settings import get_settings
     from codeweaver.server.lifespan import background_services_lifespan
     from codeweaver.server.management import ManagementServer
 
-    # Load settings
-    settings = get_settings()
-    if config_path:
-        settings.config_file = config_path  # type: ignore
-    if project_path:
-        settings.project_path = project_path
-
     statistics = get_session_statistics()
-
-    # Resolve MCP server host/port
-    _mcp_host = mcp_host or getattr(settings, "mcp_host", "127.0.0.1")
-    _mcp_port = mcp_port or getattr(settings, "mcp_port", 9328)
 
     # Use background_services_lifespan (the new Phase 1 implementation)
     async with background_services_lifespan(
-        settings=settings,
+        settings=lazy_import("codeweaver.config.settings", "get_settings")._resolve()(),
         statistics=statistics,
         status_display=display,
         verbose=False,
         debug=False,
     ) as background_state:
-        # Start management server
-        mgmt_host = getattr(settings, "management_host", "127.0.0.1")
-        mgmt_port = getattr(settings, "management_port", 9329)
-
         management_server = ManagementServer(background_state)
-        await management_server.start(host=mgmt_host, port=mgmt_port)
+        await management_server.start(host=management_host, port=management_port)
 
         display.print_success("Background services started successfully")
         display.print_info(
-            f"Management server: http://{mgmt_host}:{mgmt_port}", prefix="🌐"
+            f"Management server: http://{management_host}:{management_port}", prefix="🌐"
         )
 
         # Start MCP HTTP server if requested (needed for stdio proxy)
@@ -200,11 +176,9 @@ async def start_cw_services(
             from codeweaver.mcp.server import create_http_server
 
             mcp_state = await create_http_server(
-                host=_mcp_host, port=_mcp_port, verbose=False, debug=False
+                host=mcp_host, port=mcp_port, verbose=False, debug=False
             )
-            display.print_info(
-                f"MCP HTTP server: http://{_mcp_host}:{_mcp_port}/mcp/", prefix="🔌"
-            )
+            display.print_info(f"MCP HTTP server: http://{mcp_host}:{mcp_port}/mcp/", prefix="🔌")
 
             # Start MCP HTTP server as background task
             mcp_server_task = asyncio.create_task(
@@ -212,13 +186,13 @@ async def start_cw_services(
             )
 
         try:
-            # Keep services running until interrupted
-            tasks_to_wait = [t for t in [management_server.server_task, mcp_server_task] if t]
-            if tasks_to_wait:
+            if tasks_to_wait := [t for t in [management_server.server_task, mcp_server_task] if t]:
                 await asyncio.gather(*tasks_to_wait)
             else:
                 # Shouldn't happen: no server tasks set
-                raise RuntimeError("No server tasks were created. This should not happen; please check server startup logic.")
+                raise RuntimeError(
+                    "No server tasks were created. This should not happen; please check server startup logic."
+                )
         except (KeyboardInterrupt, asyncio.CancelledError):
             display.print_warning("Shutting down background services...")
         finally:
@@ -227,6 +201,47 @@ async def start_cw_services(
                 with contextlib.suppress(asyncio.CancelledError):
                     await mcp_server_task
             await management_server.stop()
+
+
+def get_network_settings() -> NetworkConfig:
+    """Get network configuration from settings."""
+    settings_map = _get_settings_map()
+
+    management_host = (
+        settings_map["management_host"]
+        if settings_map["management_host"] is not Unset
+        else "127.0.0.1"
+    )
+    management_port = (
+        settings_map["management_port"] if settings_map["management_port"] is not Unset else 9329
+    )
+    mcp_host = settings_map["mcp_host"] if settings_map["mcp_host"] is not Unset else "127.0.0.1"
+    mcp_port = settings_map["mcp_port"] if settings_map["mcp_port"] is not Unset else 9328
+    return NetworkConfig(
+        management_host=management_host,
+        management_port=management_port,
+        mcp_host=mcp_host,
+        mcp_port=mcp_port,
+    )
+
+
+def _is_valid_host(host: Any) -> TypeIs[str]:
+    """Check if the provided host is a valid hostname or IP address."""
+    if not isinstance(host, str):
+        return False
+    import socket
+
+    try:
+        socket.gethostbyname(host)
+    except OSError:
+        return False
+    else:
+        return True
+
+
+def _is_valid_port(port: Any) -> TypeIs[PositiveInt]:
+    """Check if the provided port is within the valid range (1-65535)."""
+    return isinstance(port, int) and 1 <= port <= 65535
 
 
 @app.default
@@ -253,10 +268,18 @@ async def start(
             help="Run daemon in foreground (blocks terminal). Default is to run in background.",
         ),
     ] = False,
-    management_host: str = "127.0.0.1",
-    management_port: PositiveInt = 9329,
-    mcp_host: str | None = None,
-    mcp_port: PositiveInt | None = None,
+    management_host: Annotated[
+        str | None, Parameter(help="Management server host. Default is 127.0.0.1. (localhost)")
+    ] = None,
+    management_port: Annotated[
+        PositiveInt | None, Parameter(help="Management server port. Default is 9329.")
+    ] = None,
+    mcp_host: Annotated[
+        str | None, Parameter(help="MCP server host. Default is 127.0.0.1. (localhost)")
+    ] = None,
+    mcp_port: Annotated[
+        PositiveInt | None, Parameter(help="MCP server port. Default is 9328.")
+    ] = None,
 ) -> None:
     """Start CodeWeaver daemon with background services and MCP HTTP server.
 
@@ -283,16 +306,42 @@ async def start(
 
     MCP HTTP server available at http://127.0.0.1:9328/mcp/ (by default).
     """
+    settings_map = get_settings_map_for(config_file=config_file, project_path=project)
     display = _display
     error_handler = CLIErrorHandler(display, verbose=False, debug=False)
-
+    network_config = get_network_settings()
+    management_host = management_host or network_config.management_host
+    management_port = management_port or network_config.management_port
+    mcp_host = mcp_host or network_config.mcp_host
+    mcp_port = mcp_port or network_config.mcp_port
+    if (
+        not _is_valid_host(management_host)
+        or not _is_valid_host(mcp_host)
+        or not _is_valid_port(management_port)
+        or not _is_valid_port(mcp_port)
+    ):
+        display.print_error("Invalid host or port provided. Please check your inputs.")
+        return
+    get_project_path = lazy_import("codeweaver.common.utils.git", "get_project_path")
+    project = (
+        project or project_path
+        if (project_path := settings_map.get("project_path")) is not Unset
+        else get_project_path._resolve()()
+    )
+    if not (project or not isinstance(project, Path) or not project.exists()):
+        display.print_warning(
+            "No valid project directory found. Please provide a path using --project."
+        )
+        return
     try:
         display.print_command_header("start", "Start Background Services")
 
         # Check if already running (use the specified host/port for accurate check)
         if await are_services_running(management_host, management_port):
             display.print_warning("Background services already running")
-            display.print_info(f"Management server: http://{management_host}:{management_port}", prefix="🌐")
+            display.print_info(
+                f"Management server: http://{management_host}:{management_port}", prefix="🌐"
+            )
             return
 
         if foreground:
@@ -302,23 +351,25 @@ async def start(
 
             await start_cw_services(
                 display,
-                config_path=config_file,
                 project_path=project,
+                management_host=management_host,
+                management_port=management_port,
                 mcp_host=mcp_host,
                 mcp_port=mcp_port,
             )
         else:
             # Background mode (default): spawn detached process
             display.print_info("Starting CodeWeaver daemon in background...")
+            display.print_info("Use 'cw stop' to stop the daemon", prefix="💡")
 
             success = _start_daemon_background(
                 display,
-                config_file=config_file,
                 project=project,
                 management_host=management_host,
                 management_port=management_port,
                 mcp_host=mcp_host,
                 mcp_port=mcp_port,
+                config_file=config_file,
             )
 
             if not success:
@@ -337,10 +388,14 @@ async def start(
 
             if healthy:
                 display.print_success("CodeWeaver daemon started successfully")
-                display.print_info(f"Management server: http://{management_host}:{management_port}", prefix="🌐")
-                mcp_port_val = mcp_port or 9328
-                mcp_host_val = mcp_host or "127.0.0.1"
-                display.print_info(f"MCP HTTP server: http://{mcp_host_val}:{mcp_port_val}/mcp/", prefix="🔌")
+                display.print_info(
+                    f"Management server: http://{management_host}:{management_port}", prefix="🌐"
+                )
+                mcp_port_val = mcp_port
+                mcp_host_val = mcp_host
+                display.print_info(
+                    f"MCP HTTP server: http://{mcp_host_val}:{mcp_port_val}/mcp/", prefix="🔌"
+                )
                 display.print_info("Stop with: cw stop", prefix="💡")
             else:
                 display.print_error("Daemon started but did not become healthy within 30 seconds")
@@ -371,11 +426,7 @@ def persist(
         ),
     ] = True,
     uninstall: Annotated[
-        bool,
-        Parameter(
-            name=["--uninstall", "-u"],
-            help="Remove the installed service",
-        ),
+        bool, Parameter(name=["--uninstall", "-u"], help="Remove the installed service")
     ] = False,
 ) -> None:
     """Install CodeWeaver as a persistent system service.

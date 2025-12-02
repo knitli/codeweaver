@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import os
 import sys
+
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -44,10 +45,11 @@ class TestStartCommandBehavior:
 
     def test_start_command_has_foreground_flag(self) -> None:
         """Test that start command has --foreground/-f flag."""
-        from codeweaver.cli.commands.start import start
-
         # Check the function signature has foreground parameter
         import inspect
+
+        from codeweaver.cli.commands.start import start
+
         sig = inspect.signature(start)
         assert "foreground" in sig.parameters
         # Default should be False (background mode is default)
@@ -55,9 +57,10 @@ class TestStartCommandBehavior:
 
     def test_start_command_default_is_background(self) -> None:
         """Test that start defaults to background mode (foreground=False)."""
+        import inspect
+
         from codeweaver.cli.commands.start import start
 
-        import inspect
         sig = inspect.signature(start)
         # foreground should default to False
         assert sig.parameters["foreground"].default is False
@@ -77,14 +80,14 @@ class TestStartCommandBehavior:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=None)
 
-        with patch.dict("sys.modules", {"httpx": MagicMock(AsyncClient=MagicMock(return_value=mock_client))}):
-            result = await are_services_running()
+        with patch.dict(
+            "sys.modules", {"httpx": MagicMock(AsyncClient=MagicMock(return_value=mock_client))}
+        ):
+            result = await are_services_running("127.0.0.1", 9329)
             assert result is True
 
     @pytest.mark.asyncio
-    async def test_start_detects_not_running(
-        self, temp_project: Path
-    ) -> None:
+    async def test_start_detects_not_running(self, temp_project: Path) -> None:
         """Test that start detects when services are not running."""
         from codeweaver.cli.commands.start import are_services_running
 
@@ -94,8 +97,10 @@ class TestStartCommandBehavior:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=None)
 
-        with patch.dict("sys.modules", {"httpx": MagicMock(AsyncClient=MagicMock(return_value=mock_client))}):
-            result = await are_services_running()
+        with patch.dict(
+            "sys.modules", {"httpx": MagicMock(AsyncClient=MagicMock(return_value=mock_client))}
+        ):
+            result = await are_services_running("127.0.0.1", 9329)
             assert result is False
 
 
@@ -112,13 +117,22 @@ class TestStartDaemonBackground:
         display = StatusDisplay()
 
         # Mock subprocess.Popen and shutil.which in the daemon module
-        with patch("codeweaver.daemon.shutil.which") as mock_which, \
-             patch("codeweaver.daemon.subprocess.Popen") as mock_popen:
+        with (
+            patch("codeweaver.daemon.shutil.which") as mock_which,
+            patch("codeweaver.daemon.subprocess.Popen") as mock_popen,
+        ):
             # Simulate finding cw executable
             mock_which.return_value = "/usr/local/bin/cw"
             mock_popen.return_value = MagicMock()
 
-            result = _start_daemon_background(display)
+            result = _start_daemon_background(
+                display,
+                project=temp_project,
+                management_host="127.0.0.1",
+                management_port=9329,
+                mcp_host="127.0.0.1",
+                mcp_port=9328,
+            )
 
             assert result is True
             mock_popen.assert_called_once()
@@ -133,13 +147,22 @@ class TestStartDaemonBackground:
 
         display = StatusDisplay()
 
-        with patch("codeweaver.daemon.shutil.which") as mock_which, \
-             patch("codeweaver.daemon.subprocess.Popen") as mock_popen:
+        with (
+            patch("codeweaver.daemon.shutil.which") as mock_which,
+            patch("codeweaver.daemon.subprocess.Popen") as mock_popen,
+        ):
             # Simulate not finding cw executable
             mock_which.return_value = None
             mock_popen.return_value = MagicMock()
 
-            result = _start_daemon_background(display)
+            result = _start_daemon_background(
+                display,
+                project=temp_project,
+                management_host="127.0.0.1",
+                management_port=9329,
+                mcp_host="127.0.0.1",
+                mcp_port=9328,
+            )
 
             assert result is True
             call_args = mock_popen.call_args[0][0]
@@ -155,8 +178,10 @@ class TestStartDaemonBackground:
 
         display = StatusDisplay()
 
-        with patch("codeweaver.daemon.shutil.which") as mock_which, \
-             patch("codeweaver.daemon.subprocess.Popen") as mock_popen:
+        with (
+            patch("codeweaver.daemon.shutil.which") as mock_which,
+            patch("codeweaver.daemon.subprocess.Popen") as mock_popen,
+        ):
             mock_which.return_value = "/usr/local/bin/cw"
             mock_popen.return_value = MagicMock()
 
@@ -194,9 +219,10 @@ class TestInitServiceCommand:
 
     def test_service_command_has_enable_flag(self) -> None:
         """Test that service command has --enable flag."""
+        import inspect
+
         from codeweaver.cli.commands.init import service
 
-        import inspect
         sig = inspect.signature(service)
         assert "enable" in sig.parameters
         # Default should be True (enable by default)
@@ -204,9 +230,10 @@ class TestInitServiceCommand:
 
     def test_service_command_has_uninstall_flag(self) -> None:
         """Test that service command has --uninstall flag."""
+        import inspect
+
         from codeweaver.cli.commands.init import service
 
-        import inspect
         sig = inspect.signature(service)
         assert "uninstall" in sig.parameters
         # Default should be False
@@ -223,8 +250,7 @@ class TestSystemdServiceGeneration:
         from codeweaver.cli.commands.init import _get_systemd_unit
 
         unit_content = _get_systemd_unit(
-            cw_cmd="/usr/local/bin/cw",
-            working_dir=Path("/home/user/project"),
+            cw_cmd="/usr/local/bin/cw", working_dir=Path("/home/user/project")
         )
 
         # Check required systemd sections
@@ -243,8 +269,7 @@ class TestSystemdServiceGeneration:
         from codeweaver.cli.commands.init import _get_systemd_unit
 
         unit_content = _get_systemd_unit(
-            cw_cmd="/usr/local/bin/cw",
-            working_dir=Path("/home/user/project"),
+            cw_cmd="/usr/local/bin/cw", working_dir=Path("/home/user/project")
         )
 
         assert "Documentation=" in unit_content
@@ -261,8 +286,7 @@ class TestLaunchdServiceGeneration:
         from codeweaver.cli.commands.init import _get_launchd_plist
 
         plist_content = _get_launchd_plist(
-            cw_cmd="/usr/local/bin/cw",
-            working_dir=Path("/Users/user/project"),
+            cw_cmd="/usr/local/bin/cw", working_dir=Path("/Users/user/project")
         )
 
         # Check XML structure
@@ -281,8 +305,7 @@ class TestLaunchdServiceGeneration:
         from codeweaver.cli.commands.init import _get_launchd_plist
 
         plist_content = _get_launchd_plist(
-            cw_cmd="/usr/local/bin/cw",
-            working_dir=Path("/Users/user/project"),
+            cw_cmd="/usr/local/bin/cw", working_dir=Path("/Users/user/project")
         )
 
         # Should include start --foreground in arguments
@@ -295,8 +318,7 @@ class TestLaunchdServiceGeneration:
         from codeweaver.cli.commands.init import _get_launchd_plist
 
         plist_content = _get_launchd_plist(
-            cw_cmd="/usr/local/bin/cw",
-            working_dir=Path("/Users/user/project"),
+            cw_cmd="/usr/local/bin/cw", working_dir=Path("/Users/user/project")
         )
 
         assert "<key>StandardOutPath</key>" in plist_content
@@ -319,9 +341,10 @@ class TestStartPersistAlias:
 
     def test_persist_command_has_same_options_as_service(self) -> None:
         """Test that persist command has same options as init service."""
+        import inspect
+
         from codeweaver.cli.commands.start import persist
 
-        import inspect
         persist_sig = inspect.signature(persist)
 
         # persist should have enable and uninstall flags like service
@@ -332,12 +355,18 @@ class TestStartPersistAlias:
     def test_persist_delegates_to_init_service(self) -> None:
         """Test that persist command delegates to init service."""
         from codeweaver.cli.commands.start import persist
+
         # Patch the init_service function that persist should delegate to
         with patch("codeweaver.cli.commands.init.service") as mock_init_service:
             # Call persist with some test arguments
-            persist(enable=True, uninstall=False, project="test_project")
-            # Assert that init_service was called
-            assert mock_init_service.called
+            from tempfile import TemporaryDirectory
+
+            with TemporaryDirectory() as temp_dir:
+                persist(enable=True, uninstall=False, project=Path(temp_dir))
+                # Assert that init_service was called
+                assert mock_init_service.called
+
+
 @pytest.mark.unit
 @pytest.mark.cli
 class TestServiceInstallationBehavior:
@@ -347,6 +376,7 @@ class TestServiceInstallationBehavior:
     def test_systemd_install_creates_service_file(self, temp_home: Path) -> None:
         """Test that systemd installation creates service file in correct location."""
         import subprocess as subprocess_module
+
         from codeweaver.cli.commands.init import _install_systemd_service
         from codeweaver.cli.ui import StatusDisplay
 
@@ -432,6 +462,7 @@ class TestHealthCheckBehavior:
     async def test_wait_for_daemon_healthy_success(self) -> None:
         """Test waiting for daemon to become healthy."""
         import httpx as httpx_module
+
         from codeweaver.cli.commands.start import _wait_for_daemon_healthy
         from codeweaver.cli.ui import StatusDisplay
 
@@ -446,9 +477,7 @@ class TestHealthCheckBehavior:
 
         with patch.object(httpx_module, "AsyncClient", return_value=mock_client):
             result = await _wait_for_daemon_healthy(
-                display,
-                max_wait_seconds=5.0,
-                check_interval=0.1,
+                display, max_wait_seconds=5.0, check_interval=0.1
             )
 
             assert result is True
@@ -457,6 +486,7 @@ class TestHealthCheckBehavior:
     async def test_wait_for_daemon_healthy_timeout(self) -> None:
         """Test timeout when daemon doesn't become healthy."""
         import httpx as httpx_module
+
         from codeweaver.cli.commands.start import _wait_for_daemon_healthy
         from codeweaver.cli.ui import StatusDisplay
 

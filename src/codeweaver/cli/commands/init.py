@@ -12,7 +12,6 @@ in a single command with proper HTTP streaming transport support.
 
 from __future__ import annotations
 
-import shlex
 import shutil
 import sys
 
@@ -967,8 +966,6 @@ def _get_systemd_unit(cw_cmd: str, working_dir: Path) -> str:
         Systemd unit file content as a string
     """
     # Quote paths to handle spaces and special characters
-    quoted_cmd = shlex.quote(cw_cmd)
-    quoted_dir = shlex.quote(str(working_dir))
     return f"""[Unit]
 Description=CodeWeaver MCP Server - Semantic Code Search
 Documentation=https://github.com/knitli/codeweaver
@@ -976,8 +973,8 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart={quoted_cmd} start --foreground
-WorkingDirectory={quoted_dir}
+ExecStart="{cw_cmd}" start --foreground
+WorkingDirectory="{working_dir!s}"
 Restart=on-failure
 RestartSec=5
 
@@ -1065,7 +1062,9 @@ def _get_launchd_plist(cw_cmd: str, working_dir: Path) -> str:
 """
 
 
-def _install_systemd_service(display: StatusDisplay, cw_cmd: str, working_dir: Path, enable: bool) -> bool:
+def _install_systemd_service(
+    display: StatusDisplay, cw_cmd: str, working_dir: Path, *, enable: bool
+) -> bool:
     """Install CodeWeaver as a systemd user service.
 
     Args:
@@ -1092,20 +1091,28 @@ def _install_systemd_service(display: StatusDisplay, cw_cmd: str, working_dir: P
         display.print_success(f"Created systemd service: {service_file}")
 
         # Reload systemd
-        subprocess.run(["systemctl", "--user", "daemon-reload"], check=True, capture_output=True)
+        subprocess.run(
+            ["/usr/bin/systemctl", "--user", "daemon-reload"], check=True, capture_output=True
+        )
         display.print_info("Reloaded systemd daemon")
 
         if enable:
             # Enable and start the service
-            subprocess.run(["systemctl", "--user", "enable", "codeweaver.service"], check=True, capture_output=True)
+            subprocess.run(
+                ["/usr/bin/systemctl", "--user", "enable", "codeweaver.service"],
+                check=True,
+                capture_output=True,
+            )
             display.print_success("Enabled codeweaver service")
-            subprocess.run(["systemctl", "--user", "start", "codeweaver.service"], check=True, capture_output=True)
+            subprocess.run(
+                ["/usr/bin/systemctl", "--user", "start", "codeweaver.service"],
+                check=True,
+                capture_output=True,
+            )
             display.print_success("Started codeweaver service")
         else:
             display.print_info("To enable: systemctl --user enable codeweaver.service")
             display.print_info("To start: systemctl --user start codeweaver.service")
-
-        return True
 
     except subprocess.CalledProcessError as e:
         display.print_error(f"systemctl command failed: {e}")
@@ -1113,9 +1120,13 @@ def _install_systemd_service(display: StatusDisplay, cw_cmd: str, working_dir: P
     except Exception as e:
         display.print_error(f"Failed to install systemd service: {e}")
         return False
+    else:
+        return True
 
 
-def _install_launchd_service(display: StatusDisplay, cw_cmd: str, working_dir: Path, enable: bool) -> bool:
+def _install_launchd_service(
+    display: StatusDisplay, cw_cmd: str, working_dir: Path, *, enable: bool
+) -> bool:
     """Install CodeWeaver as a launchd user agent.
 
     Args:
@@ -1147,18 +1158,15 @@ def _install_launchd_service(display: StatusDisplay, cw_cmd: str, working_dir: P
 
         if enable:
             # Unload if already loaded (ignore errors)
-            subprocess.run(
-                ["launchctl", "unload", str(plist_file)],
-                capture_output=True,
-            )
+            subprocess.run(["/bin/launchctl", "unload", str(plist_file)], capture_output=True)  # noqa: S603
             # Load the service
-            subprocess.run(["launchctl", "load", str(plist_file)], check=True, capture_output=True)
+            subprocess.run(  # noqa: S603
+                ["/bin/launchctl", "load", str(plist_file)], check=True, capture_output=True
+            )
             display.print_success("Loaded codeweaver agent")
         else:
             display.print_info(f"To load: launchctl load {plist_file}")
             display.print_info(f"To unload: launchctl unload {plist_file}")
-
-        return True
 
     except subprocess.CalledProcessError as e:
         display.print_error(f"launchctl command failed: {e}")
@@ -1166,6 +1174,8 @@ def _install_launchd_service(display: StatusDisplay, cw_cmd: str, working_dir: P
     except Exception as e:
         display.print_error(f"Failed to install launchd agent: {e}")
         return False
+    else:
+        return True
 
 
 def _show_windows_instructions(display: StatusDisplay, cw_cmd: str, working_dir: Path) -> None:
@@ -1188,7 +1198,7 @@ def _show_windows_instructions(display: StatusDisplay, cw_cmd: str, working_dir:
         [
             "Download NSSM from: https://nssm.cc/download",
             "Open an Administrator Command Prompt",
-            f"Run: nssm install CodeWeaver \"{cw_cmd}\" start --foreground",
+            f'Run: nssm install CodeWeaver "{cw_cmd}" start --foreground',
             f"Set startup directory to: {working_dir}",
             "Configure environment variables if needed (VOYAGE_API_KEY, etc.)",
             "Start the service: nssm start CodeWeaver",
@@ -1206,13 +1216,22 @@ def _uninstall_systemd_service(display: StatusDisplay, error_handler: CLIErrorHa
     service_file = Path.home() / ".config" / "systemd" / "user" / "codeweaver.service"
     if service_file.exists():
         try:
-            subprocess.run(["systemctl", "--user", "stop", "codeweaver.service"], capture_output=True)
-            subprocess.run(["systemctl", "--user", "disable", "codeweaver.service"], capture_output=True)
+            subprocess.run(
+                ["/usr/bin/systemctl", "--user", "stop", "codeweaver.service"], capture_output=True
+            )
+            subprocess.run(
+                ["/usr/bin/systemctl", "--user", "disable", "codeweaver.service"],
+                capture_output=True,
+            )
             service_file.unlink()
-            subprocess.run(["systemctl", "--user", "daemon-reload"], check=True, capture_output=True)
+            subprocess.run(
+                ["/usr/bin/systemctl", "--user", "daemon-reload"], check=True, capture_output=True
+            )
             display.print_success("Removed systemd service")
         except Exception as e:
-            error_handler.handle_error(CodeWeaverError(f"Failed to remove service: {e}"), "Service removal")
+            error_handler.handle_error(
+                CodeWeaverError(f"Failed to remove service: {e}"), "Service removal"
+            )
     else:
         display.print_warning("Service not installed")
 
@@ -1224,11 +1243,13 @@ def _uninstall_launchd_service(display: StatusDisplay, error_handler: CLIErrorHa
     plist_file = Path.home() / "Library" / "LaunchAgents" / "li.knit.codeweaver.plist"
     if plist_file.exists():
         try:
-            subprocess.run(["launchctl", "unload", str(plist_file)], capture_output=True)
+            subprocess.run(["/bin/launchctl", "unload", str(plist_file)], capture_output=True)  # noqa: S603
             plist_file.unlink()
             display.print_success("Removed launchd agent")
         except Exception as e:
-            error_handler.handle_error(CodeWeaverError(f"Failed to remove agent: {e}"), "Service removal")
+            error_handler.handle_error(
+                CodeWeaverError(f"Failed to remove agent: {e}"), "Service removal"
+            )
     else:
         display.print_warning("Agent not installed")
 
@@ -1274,11 +1295,7 @@ def service(
         ),
     ] = True,
     uninstall: Annotated[
-        bool,
-        cyclopts.Parameter(
-            name=["--uninstall", "-u"],
-            help="Remove the installed service",
-        ),
+        bool, cyclopts.Parameter(name=["--uninstall", "-u"], help="Remove the installed service")
     ] = False,
 ) -> None:
     """Install CodeWeaver as a system service for automatic startup.
@@ -1335,10 +1352,10 @@ def service(
     display.print_section("Installing Service")
 
     if platform == "linux":
-        if _install_systemd_service(display, cw_cmd, project_path, enable):
+        if _install_systemd_service(display, cw_cmd, project_path, enable=enable):
             _show_systemd_management_commands(display)
     elif platform == "darwin":
-        if _install_launchd_service(display, cw_cmd, project_path, enable):
+        if _install_launchd_service(display, cw_cmd, project_path, enable=enable):
             _show_launchd_management_commands(display)
     elif platform == "win32":
         _show_windows_instructions(display, cw_cmd, project_path)
