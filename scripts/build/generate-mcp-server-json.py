@@ -10,6 +10,7 @@
 """MCP server.json models."""
 
 from __future__ import annotations
+from datasets.arrow_writer import type_
 
 from enum import Enum
 from pathlib import Path
@@ -559,7 +560,6 @@ def _create_uvx_package() -> Package:
 
     return Package(
         registry_type="pypi",
-        registry_base_url=AnyUrl("https://pypi.org"),
         identifier="code-weaver",
         version=__version__,
         runtime_hint="uvx",
@@ -587,7 +587,7 @@ def _create_uvx_package() -> Package:
             NamedArgument(
                 type_=NamedArgumentType.named,
                 name="--config",
-                description="Path to configuration file (TOML, YAML or JSON format)",
+                description="Path to configuration file (TOML, YAML or JSON format). Only needed if not using default config locations.",
                 is_required=False,
                 value_hint="file_path",
             ),
@@ -611,10 +611,10 @@ def _create_uvx_package() -> Package:
             NamedArgument(
                 type_=NamedArgumentType.named,
                 name="--transport",
-                description="Transport type for MCP communication (only streamable-http supported for persistent state)",
+                description="Transport type for MCP communication. ",
                 is_required=False,
                 default="streamable-http",
-                choices=["streamable-http"],
+                choices=["streamable-http", "stdio"],
             ),
             NamedArgument(
                 type_=NamedArgumentType.named,
@@ -701,13 +701,9 @@ def _create_docker_package() -> Package:
 
     return Package(
         registry_type="oci",
-        registry_base_url=AnyUrl("https://docker.io"),
-        identifier=f"knitli/codeweaver:{__version__}",
+        identifier=f"docker.io/knitli/codeweaver:{__version__}",
         runtime_hint="docker",
-        transport=StreamableHttpTransport(
-            type_=StreamableHttpTransportType.streamable_http,
-            url="http://localhost:{host_port}",
-        ),
+        transport=StdioTransport(type_=StdioTransportType.stdio),
         runtime_arguments=[
             NamedArgument(
                 type_=NamedArgumentType.named,
@@ -786,7 +782,9 @@ def _create_docker_package() -> Package:
                 type_=NamedArgumentType.named,
                 name="--transport",
                 description="Use streamable-http for persistent state and continuous indexing",
-                value="streamable-http",
+                default="streamable-http",
+                choices=["streamable-http", "stdio"],
+                
             ),
         ],
         environment_variables=as_keyvalues,

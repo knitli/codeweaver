@@ -7,15 +7,14 @@
     "id": "1024985391",
     "subfolder": "src/codeweaver"
   },
-  "version": "0.1.0a1",
+  "version": "0.1.0a2",
   "websiteUrl": "https://github.com/knitli/codeweaver",
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json",
   "packages": [
     {
       "registryType": "pypi",
-      "registryBaseUrl": "https://pypi.org/",
       "identifier": "code-weaver",
-      "version": "0.1.0a1",
+      "version": "0.1.0a2",
       "runtimeHint": "uvx",
       "transport": {
         "type": "stdio"
@@ -39,7 +38,7 @@
           "isRepeated": false
         },
         {
-          "description": "Path to configuration file (TOML, YAML or JSON format)",
+          "description": "Path to configuration file (TOML, YAML or JSON format). Only needed if not using default config locations.",
           "isRequired": false,
           "isSecret": false,
           "type": "named",
@@ -69,12 +68,13 @@
           "isRepeated": false
         },
         {
-          "description": "Transport type for MCP communication (only streamable-http supported for persistent state)",
+          "description": "Transport type for MCP communication. ",
           "isRequired": false,
           "isSecret": false,
           "default": "streamable-http",
           "choices": [
-            "streamable-http"
+            "streamable-http",
+            "stdio"
           ],
           "type": "named",
           "name": "--transport",
@@ -125,21 +125,21 @@
           "format": "string",
           "isSecret": true,
           "choices": [
-            "cohere",
-            "google",
-            "vercel",
-            "ollama (cloud only)",
-            "hf_inference",
-            "together",
+            "bedrock",
             "mistral",
+            "together",
+            "google",
+            "cohere",
             "github",
-            "groq",
-            "azure",
-            "openai",
-            "fireworks",
             "voyage",
+            "ollama (cloud only)",
+            "vercel",
+            "openai",
             "heroku",
-            "bedrock"
+            "azure",
+            "groq",
+            "fireworks",
+            "hf_inference"
           ],
           "name": "CODEWEAVER_EMBEDDING_API_KEY"
         },
@@ -158,23 +158,23 @@
           "isSecret": false,
           "default": "voyage",
           "choices": [
-            "cohere",
-            "google",
-            "vercel",
-            "hf_inference",
-            "together",
-            "mistral",
-            "fastembed",
-            "sentence_transformers",
             "ollama",
+            "bedrock",
+            "mistral",
+            "together",
+            "google",
+            "cohere",
             "github",
-            "groq",
-            "azure",
-            "openai",
-            "fireworks",
             "voyage",
+            "fastembed",
+            "vercel",
+            "openai",
             "heroku",
-            "bedrock"
+            "azure",
+            "groq",
+            "fireworks",
+            "sentence_transformers",
+            "hf_inference"
           ],
           "name": "CODEWEAVER_EMBEDDING_PROVIDER"
         },
@@ -195,28 +195,36 @@
           "choices": [
             "INFO",
             "DEBUG",
-            "WARNING",
             "CRITICAL",
-            "ERROR"
+            "ERROR",
+            "WARNING"
           ],
           "name": "CODEWEAVER_LOG_LEVEL"
         },
         {
-          "description": "Set the server port for CodeWeaver.",
+          "description": "Set the MCP server port for CodeWeaver if using http transport for mcp. Not required if using the default port (9328), or stdio transport.",
           "isRequired": false,
           "format": "number",
           "isSecret": false,
           "default": "9328",
+          "name": "CODEWEAVER_MCP_PORT"
+        },
+        {
+          "description": "Set the port for the codeweaver management server (information and management endpoints).",
+          "isRequired": false,
+          "format": "number",
+          "isSecret": false,
+          "default": "9329",
           "name": "CODEWEAVER_PORT"
         },
         {
-          "description": "Use a premade settings profile for CodeWeaver.",
+          "description": "Use a premade provider settings profile for CodeWeaver.",
           "isRequired": false,
           "format": "string",
           "isSecret": false,
           "choices": [
-            "testing",
             "quickstart",
+            "testing",
             "recommended"
           ],
           "name": "CODEWEAVER_PROFILE"
@@ -242,8 +250,8 @@
           "isSecret": true,
           "choices": [
             "cohere",
-            "voyage",
-            "bedrock"
+            "bedrock",
+            "voyage"
           ],
           "name": "CODEWEAVER_RERANKING_API_KEY"
         },
@@ -262,11 +270,11 @@
           "isSecret": false,
           "default": "voyage",
           "choices": [
+            "bedrock",
             "cohere",
             "fastembed",
-            "sentence_transformers",
             "voyage",
-            "bedrock"
+            "sentence_transformers"
           ],
           "name": "CODEWEAVER_RERANKING_PROVIDER"
         },
@@ -316,8 +324,8 @@
           "isSecret": false,
           "default": "qdrant",
           "choices": [
-            "qdrant",
-            "memory"
+            "memory",
+            "qdrant"
           ],
           "name": "CODEWEAVER_VECTOR_STORE_PROVIDER"
         },
@@ -373,10 +381,10 @@
           "format": "string",
           "isSecret": false,
           "choices": [
-            "debug",
             "warning",
             "info",
-            "error"
+            "error",
+            "debug"
           ],
           "name": "OPENAI_LOG"
         },
@@ -498,11 +506,11 @@
           "format": "string",
           "isSecret": false,
           "choices": [
-            "critical",
-            "debug",
-            "error",
             "warning",
-            "info"
+            "debug",
+            "critical",
+            "info",
+            "error"
           ],
           "name": "HF_HUB_VERBOSITY"
         },
@@ -554,10 +562,10 @@
           "format": "string",
           "isSecret": false,
           "choices": [
-            "debug",
             "warning",
             "info",
-            "error"
+            "error",
+            "debug"
           ],
           "name": "OPENAI_LOG"
         },
@@ -568,9 +576,9 @@
           "isSecret": false,
           "choices": [
             "INFO",
-            "WARNING",
             "DEBUG",
-            "ERROR"
+            "ERROR",
+            "WARNING"
           ],
           "name": "QDRANT__LOG_LEVEL"
         },
@@ -653,11 +661,10 @@
     {
       "registryType": "oci",
       "registryBaseUrl": "https://docker.io/",
-      "identifier": "knitli/codeweaver:0.1.0a1",
+      "identifier": "knitli/codeweaver:0.1.0a2",
       "runtimeHint": "docker",
       "transport": {
-        "type": "streamable-http",
-        "url": "http://localhost:{host_port}"
+        "type": "stdio"
       },
       "runtimeArguments": [
         {
@@ -758,8 +765,12 @@
         {
           "description": "Use streamable-http for persistent state and continuous indexing",
           "isRequired": false,
-          "value": "streamable-http",
           "isSecret": false,
+          "default": "streamable-http",
+          "choices": [
+            "streamable-http",
+            "stdio"
+          ],
           "type": "named",
           "name": "--transport",
           "isRepeated": false
@@ -791,21 +802,21 @@
           "format": "string",
           "isSecret": true,
           "choices": [
-            "cohere",
-            "google",
-            "vercel",
-            "ollama (cloud only)",
-            "hf_inference",
-            "together",
+            "bedrock",
             "mistral",
+            "together",
+            "google",
+            "cohere",
             "github",
-            "groq",
-            "azure",
-            "openai",
-            "fireworks",
             "voyage",
+            "ollama (cloud only)",
+            "vercel",
+            "openai",
             "heroku",
-            "bedrock"
+            "azure",
+            "groq",
+            "fireworks",
+            "hf_inference"
           ],
           "name": "CODEWEAVER_EMBEDDING_API_KEY"
         },
@@ -824,23 +835,23 @@
           "isSecret": false,
           "default": "voyage",
           "choices": [
-            "cohere",
-            "google",
-            "vercel",
-            "hf_inference",
-            "together",
-            "mistral",
-            "fastembed",
-            "sentence_transformers",
             "ollama",
+            "bedrock",
+            "mistral",
+            "together",
+            "google",
+            "cohere",
             "github",
-            "groq",
-            "azure",
-            "openai",
-            "fireworks",
             "voyage",
+            "fastembed",
+            "vercel",
+            "openai",
             "heroku",
-            "bedrock"
+            "azure",
+            "groq",
+            "fireworks",
+            "sentence_transformers",
+            "hf_inference"
           ],
           "name": "CODEWEAVER_EMBEDDING_PROVIDER"
         },
@@ -861,28 +872,36 @@
           "choices": [
             "INFO",
             "DEBUG",
-            "WARNING",
             "CRITICAL",
-            "ERROR"
+            "ERROR",
+            "WARNING"
           ],
           "name": "CODEWEAVER_LOG_LEVEL"
         },
         {
-          "description": "Set the server port for CodeWeaver.",
+          "description": "Set the MCP server port for CodeWeaver if using http transport for mcp. Not required if using the default port (9328), or stdio transport.",
           "isRequired": false,
           "format": "number",
           "isSecret": false,
           "default": "9328",
+          "name": "CODEWEAVER_MCP_PORT"
+        },
+        {
+          "description": "Set the port for the codeweaver management server (information and management endpoints).",
+          "isRequired": false,
+          "format": "number",
+          "isSecret": false,
+          "default": "9329",
           "name": "CODEWEAVER_PORT"
         },
         {
-          "description": "Use a premade settings profile for CodeWeaver.",
+          "description": "Use a premade provider settings profile for CodeWeaver.",
           "isRequired": false,
           "format": "string",
           "isSecret": false,
           "choices": [
-            "testing",
             "quickstart",
+            "testing",
             "recommended"
           ],
           "name": "CODEWEAVER_PROFILE"
@@ -908,8 +927,8 @@
           "isSecret": true,
           "choices": [
             "cohere",
-            "voyage",
-            "bedrock"
+            "bedrock",
+            "voyage"
           ],
           "name": "CODEWEAVER_RERANKING_API_KEY"
         },
@@ -928,11 +947,11 @@
           "isSecret": false,
           "default": "voyage",
           "choices": [
+            "bedrock",
             "cohere",
             "fastembed",
-            "sentence_transformers",
             "voyage",
-            "bedrock"
+            "sentence_transformers"
           ],
           "name": "CODEWEAVER_RERANKING_PROVIDER"
         },
@@ -982,8 +1001,8 @@
           "isSecret": false,
           "default": "qdrant",
           "choices": [
-            "qdrant",
-            "memory"
+            "memory",
+            "qdrant"
           ],
           "name": "CODEWEAVER_VECTOR_STORE_PROVIDER"
         },
@@ -1039,10 +1058,10 @@
           "format": "string",
           "isSecret": false,
           "choices": [
-            "debug",
             "warning",
             "info",
-            "error"
+            "error",
+            "debug"
           ],
           "name": "OPENAI_LOG"
         },
@@ -1164,11 +1183,11 @@
           "format": "string",
           "isSecret": false,
           "choices": [
-            "critical",
-            "debug",
-            "error",
             "warning",
-            "info"
+            "debug",
+            "critical",
+            "info",
+            "error"
           ],
           "name": "HF_HUB_VERBOSITY"
         },
@@ -1220,10 +1239,10 @@
           "format": "string",
           "isSecret": false,
           "choices": [
-            "debug",
             "warning",
             "info",
-            "error"
+            "error",
+            "debug"
           ],
           "name": "OPENAI_LOG"
         },
@@ -1234,9 +1253,9 @@
           "isSecret": false,
           "choices": [
             "INFO",
-            "WARNING",
             "DEBUG",
-            "ERROR"
+            "ERROR",
+            "WARNING"
           ],
           "name": "QDRANT__LOG_LEVEL"
         },
@@ -1327,38 +1346,38 @@
       "capabilities": {
         "languages_supported": 166,
         "embedding_providers": [
-          "Mistral",
-          "Openai",
-          "Fireworks",
-          "Together",
-          "Github",
-          "Azure",
-          "Cohere",
           "Ollama",
-          "Groq",
           "Vercel",
+          "Fireworks",
           "Voyage",
+          "Openai",
+          "Cohere",
+          "Groq",
           "Sentence Transformers",
-          "Google",
-          "Fastembed",
-          "Bedrock",
+          "Mistral",
           "Heroku",
-          "Hf Inference"
+          "Fastembed",
+          "Hf Inference",
+          "Together",
+          "Google",
+          "Azure",
+          "Bedrock",
+          "Github"
         ],
         "vector_store_providers": [
           "Memory",
           "Qdrant"
         ],
         "sparse_embedding_providers": [
-          "Fastembed",
-          "Sentence Transformers"
+          "Sentence Transformers",
+          "Fastembed"
         ],
         "reranking_providers": [
-          "Cohere",
           "Voyage",
+          "Cohere",
           "Sentence Transformers",
-          "Bedrock",
-          "Fastembed"
+          "Fastembed",
+          "Bedrock"
         ],
         "search_types": [
           "semantic",
