@@ -357,7 +357,7 @@ def _create_stdio_config(
 
     Args:
         cmd: Command to execute (default: "codeweaver")
-        args: Arguments for the command (default: ["server", "--transport", "stdio"])
+        args: Arguments for the command (default: ["server"])
         env: Environment variables for the process
         timeout: Connection timeout in seconds
         authentication: Authentication configuration
@@ -369,9 +369,9 @@ def _create_stdio_config(
     from codeweaver.config.mcp import StdioCodeWeaverConfig
 
     # Build the command - CodeWeaver doesn't need uv environment
-    # We directly execute: cw server --transport stdio
+    # stdio is the default transport, so we just run: cw server
     command = cmd or "codeweaver"
-    command_args = args or ["server", "--transport", "stdio"]
+    command_args = args or ["server"]
 
     # Combine command and args into single command string
     full_command = f"{command} {' '.join(command_args)}"
