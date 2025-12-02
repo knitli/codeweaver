@@ -13,7 +13,7 @@ Following CodeWeaver's constitutional principles (Simplicity Through Architectur
 1. **Flat grouping**: One level of subdirectories by functional area
 2. **Obvious purpose**: Directory names clearly indicate contents
 3. **Minimal disruption**: Preserve build tool references with clear mappings
-4. **Consistent naming**: 
+4. **Consistent naming**:
    - Python executable scripts: `kebab-case.py`
    - Python modules: `snake_case.py`
    - Shell scripts: `kebab-case.sh`

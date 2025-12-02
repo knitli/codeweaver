@@ -326,7 +326,7 @@ Installs or updates the mise task runner (version 2025.7.0).
 ./scripts/dev-env/install-mise.sh version   # Check version
 ```
 
-**Referenced in:** 
+**Referenced in:**
 - `.github/workflows/copilot-setup-steps.yml`
 - `.vscode/terminal.extra.zsh`
 
