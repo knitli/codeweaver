@@ -9,9 +9,9 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 
 **Purpose**: This document serves as the authoritative reference for CodeWeaver's architectural decisions, design principles, and technical philosophy. It consolidates design decisions scattered across multiple project files into a unified resource.
 
-**Status**: Living document - Updated as architectural decisions evolve  
-**Version**: 1.1.0  
-**Last Updated**: 2025-11-23
+**Status**: Living document - Updated as architectural decisions evolve
+**Version**: 1.2.0
+**Last Updated**: 2025-12-02
 
 ---
 
@@ -180,6 +180,77 @@ We transform complexity into clarity using simple modularity with extensible des
 ---
 
 ## Technical Architecture
+
+### Daemon Architecture
+
+**Design Decision**: Separate background services from MCP transport servers.
+
+CodeWeaver runs as a daemon with distinct server components:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     CodeWeaver Daemon                            │
+│                                                                  │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │              Background Services                          │   │
+│  │  • Indexer (semantic search engine)                       │   │
+│  │  • FileWatcher (real-time index updates)                  │   │
+│  │  • HealthService (system monitoring)                      │   │
+│  │  • Statistics & Telemetry                                 │   │
+│  └──────────────────────────────────────────────────────────┘   │
+│                                                                  │
+│  ┌─────────────────────┐    ┌─────────────────────────────┐    │
+│  │  Management Server   │    │    MCP HTTP Server          │    │
+│  │  (Starlette)         │    │    (FastMCP)                │    │
+│  │  Port 9329           │    │    Port 9328                │    │
+│  │                      │    │                             │    │
+│  │  • /health           │    │    • /mcp/ (MCP endpoint)   │    │
+│  │  • /status           │    │    • find_code tool         │    │
+│  │  • /metrics          │    │                             │    │
+│  │  • /state            │    │                             │    │
+│  └─────────────────────┘    └─────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────┘
+                                        ▲
+                                        │
+                    ┌───────────────────┴───────────────────┐
+                    │                                       │
+           ┌────────┴────────┐                    ┌─────────┴─────────┐
+           │  stdio Proxy     │                    │   HTTP Clients    │
+           │  (MCP Clients)   │                    │   (Direct)        │
+           │                  │                    │                   │
+           │  Claude Code     │                    │  curl, httpie     │
+           │  Cursor, VSCode  │                    │  Custom clients   │
+           └──────────────────┘                    └───────────────────┘
+```
+
+**Components**:
+
+- **Daemon**: Long-running background process managing all services
+- **Management Server** (port 9329): Starlette HTTP server for health checks, status, and metrics
+- **MCP HTTP Server** (port 9328): FastMCP server handling MCP protocol over HTTP
+- **stdio Proxy**: Lightweight process that proxies MCP stdio to the HTTP backend
+
+**Transport Modes**:
+
+- **stdio (default)**: MCP clients spawn a stdio process that proxies to the daemon's HTTP server. Auto-starts daemon if needed.
+- **streamable-http**: Direct HTTP connection to the MCP server (for persistent server deployments)
+
+**CLI Commands**:
+
+```bash
+cw start              # Start daemon in background
+cw start --foreground # Run daemon in current terminal
+cw stop               # Stop the daemon
+cw init service       # Install as system service (systemd/launchd)
+cw server             # Run MCP server (stdio by default)
+```
+
+**Rationale**:
+- Separates concerns: background indexing vs. request handling
+- Enables safe stdio transport: proxy is stateless, daemon handles state
+- Management endpoints accessible regardless of MCP transport
+- System service installation for production deployments
+- Graceful degradation: stdio auto-starts daemon if not running
 
 ### Span-Based Core
 
@@ -1007,3 +1078,4 @@ This document serves as the historical record of significant architectural decis
 **Version History**:
 - v1.0.0 (2025-10-21): Initial unified architecture document
 - v1.1.0 (2025-11-23): Updated to include recent design decisions and project structure changes.
+- v1.2.0 (2025-12-02): Added Daemon Architecture section documenting the new multi-server design with management server, MCP HTTP server, and stdio proxy. Default transport changed to stdio.
