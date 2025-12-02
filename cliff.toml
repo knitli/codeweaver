@@ -46,7 +46,7 @@ body = """
             {# Handle regular merge format: "Merge pull request #123 from org/branch | Description" #}
             {%- set_global pr_num = commit.message | replace(from="Merge pull request #", to="") | split(pat=" ") | first | trim -%}
             {%- if commit.message is containing(" | ") -%}
-                {%- set_global pr_desc = commit.message | split(pat=" | ") | last -%}
+                {%- set_global pr_desc = commit.message | slice(start=(commit.message | find(pat=" | ") + 3)) | trim -%}
             {%- else -%}
                 {%- set_global pr_desc = "No description" -%}
             {%- endif %}
