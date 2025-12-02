@@ -10,9 +10,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
-import shutil
 import signal
-import subprocess
 import sys
 
 from pathlib import Path
@@ -191,102 +189,9 @@ async def _run_http_server(
                 signal.signal(signal.SIGINT, original_sigint_handler)
 
 
-async def _check_daemon_health(
-    management_host: str = "127.0.0.1",
-    management_port: int = 9329,
-    timeout: float = 2.0,
-) -> bool:
-    """Check if the CodeWeaver daemon is running via management server health endpoint.
-
-    Args:
-        management_host: Host of management server
-        management_port: Port of management server
-        timeout: Request timeout in seconds
-
-    Returns:
-        True if daemon is healthy, False otherwise
-    """
-    try:
-        import httpx
-    except ImportError:
-        return False
-
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"http://{management_host}:{management_port}/health",
-                timeout=timeout,
-            )
-            return response.status_code == 200
-    except Exception:
-        return False
-
-
-async def _start_daemon_if_needed(
-    management_host: str = "127.0.0.1",
-    management_port: int = 9329,
-    max_wait_seconds: float = 30.0,
-    check_interval: float = 0.5,
-) -> bool:
-    """Start the CodeWeaver daemon if not already running, and wait for it to be healthy.
-
-    Args:
-        management_host: Host of management server
-        management_port: Port of management server
-        max_wait_seconds: Maximum time to wait for daemon to become healthy
-        check_interval: Interval between health checks
-
-    Returns:
-        True if daemon is running (either was already running or successfully started),
-        False if daemon could not be started or failed to become healthy.
-    """
-    # First check if already running
-    if await _check_daemon_health(management_host, management_port):
-        logger.debug("Daemon already running at %s:%d", management_host, management_port)
-        return True
-
-    # Find the codeweaver executable
-    cw_cmd = shutil.which("cw") or shutil.which("codeweaver")
-    if not cw_cmd:
-        # Try using python -m codeweaver
-        cw_cmd = sys.executable
-        cw_args = ["-m", "codeweaver", "start"]
-    else:
-        cw_args = ["start"]
-
-    logger.info("Starting CodeWeaver daemon...")
-
-    try:
-        # Start daemon as detached subprocess
-        # Use CREATE_NEW_PROCESS_GROUP on Windows, start_new_session on Unix
-        kwargs: dict[str, Any] = {
-            "stdout": subprocess.DEVNULL,
-            "stderr": subprocess.DEVNULL,
-            "stdin": subprocess.DEVNULL,
-        }
-        if sys.platform == "win32":
-            kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP  # type: ignore[attr-defined]
-        else:
-            kwargs["start_new_session"] = True
-
-        subprocess.Popen([cw_cmd, *cw_args], **kwargs)
-
-        # Wait for daemon to become healthy
-        elapsed = 0.0
-        while elapsed < max_wait_seconds:
-            await asyncio.sleep(check_interval)
-            elapsed += check_interval
-
-            if await _check_daemon_health(management_host, management_port):
-                logger.info("Daemon started successfully")
-                return True
-
-        logger.warning("Daemon did not become healthy within %s seconds", max_wait_seconds)
-        return False
-
-    except Exception as e:
-        logger.error("Failed to start daemon: %s", e)
-        return False
+# Re-export from shared daemon module for backward compatibility
+from codeweaver.daemon import check_daemon_health as _check_daemon_health
+from codeweaver.daemon import start_daemon_if_needed as _start_daemon_if_needed
 
 
 async def _run_stdio_server(
@@ -405,10 +310,12 @@ async def run(
     This is the main entry point for starting CodeWeaver's MCP server.
 
     Transport modes:
-    - stdio (default): stdio proxy that forwards to the daemon's HTTP backend
-    - streamable-http: Full server with background services, MCP HTTP server, and management server
+    - stdio (default): stdio proxy that forwards to the daemon's HTTP backend.
+      The daemon is started automatically if not already running.
+    - streamable-http: Full server with background services, MCP HTTP server,
+      and management server
 
-    For stdio transport, first start the daemon with `codeweaver start`.
+    For manual daemon control, use `codeweaver start` and `codeweaver stop`.
 
     Args:
         config_file: Optional configuration file path

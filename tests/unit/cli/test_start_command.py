@@ -111,9 +111,9 @@ class TestStartDaemonBackground:
 
         display = StatusDisplay()
 
-        # Mock subprocess.Popen and shutil.which
-        with patch("codeweaver.cli.commands.start.shutil.which") as mock_which, \
-             patch("codeweaver.cli.commands.start.subprocess.Popen") as mock_popen:
+        # Mock subprocess.Popen and shutil.which in the daemon module
+        with patch("codeweaver.daemon.shutil.which") as mock_which, \
+             patch("codeweaver.daemon.subprocess.Popen") as mock_popen:
             # Simulate finding cw executable
             mock_which.return_value = "/usr/local/bin/cw"
             mock_popen.return_value = MagicMock()
@@ -133,8 +133,8 @@ class TestStartDaemonBackground:
 
         display = StatusDisplay()
 
-        with patch("codeweaver.cli.commands.start.shutil.which") as mock_which, \
-             patch("codeweaver.cli.commands.start.subprocess.Popen") as mock_popen:
+        with patch("codeweaver.daemon.shutil.which") as mock_which, \
+             patch("codeweaver.daemon.subprocess.Popen") as mock_popen:
             # Simulate not finding cw executable
             mock_which.return_value = None
             mock_popen.return_value = MagicMock()
@@ -155,8 +155,8 @@ class TestStartDaemonBackground:
 
         display = StatusDisplay()
 
-        with patch("codeweaver.cli.commands.start.shutil.which") as mock_which, \
-             patch("codeweaver.cli.commands.start.subprocess.Popen") as mock_popen:
+        with patch("codeweaver.daemon.shutil.which") as mock_which, \
+             patch("codeweaver.daemon.subprocess.Popen") as mock_popen:
             mock_which.return_value = "/usr/local/bin/cw"
             mock_popen.return_value = MagicMock()
 
@@ -319,12 +319,10 @@ class TestStartPersistAlias:
 
     def test_persist_command_has_same_options_as_service(self) -> None:
         """Test that persist command has same options as init service."""
-        from codeweaver.cli.commands.init import service as init_service
         from codeweaver.cli.commands.start import persist
 
         import inspect
         persist_sig = inspect.signature(persist)
-        service_sig = inspect.signature(init_service)
 
         # persist should have enable and uninstall flags like service
         assert "enable" in persist_sig.parameters

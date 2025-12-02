@@ -14,18 +14,19 @@ current terminal session.
 from __future__ import annotations
 
 import asyncio
-import shutil
-import subprocess
-import sys
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import TYPE_CHECKING, Annotated
 
 from cyclopts import App, Parameter
 from pydantic import FilePath, PositiveInt
 
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
 from codeweaver.core.types.sentinel import Unset
+from codeweaver.daemon import (
+    check_daemon_health,
+    spawn_daemon_process,
+)
 
 
 if TYPE_CHECKING:
@@ -43,29 +44,36 @@ def _get_settings_map() -> DictView[CodeWeaverSettingsDict]:
     return get_settings_map()
 
 
-async def are_services_running() -> bool:
-    """Check if background services are running via management server."""
-    try:
-        import httpx
-    except ImportError:
-        return False
+async def are_services_running(
+    management_host: str | None = None,
+    management_port: int | None = None,
+) -> bool:
+    """Check if background services are running via management server.
 
-    settings_map = _get_settings_map()
-    mgmt_host = (
-        settings_map["management_host"]
-        if settings_map["management_host"] is not Unset
-        else "127.0.0.1"
-    )
-    mgmt_port = (
-        settings_map["management_port"] if settings_map["management_port"] is not Unset else 9329
-    )
+    Args:
+        management_host: Host to check. If None, uses settings or defaults to 127.0.0.1
+        management_port: Port to check. If None, uses settings or defaults to 9329
 
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(f"http://{mgmt_host}:{mgmt_port}/health", timeout=2.0)
-            return response.status_code == 200
-    except Exception:
-        return False
+    Returns:
+        True if services are running, False otherwise.
+    """
+    # Use provided values or fall back to settings/defaults
+    if management_host is None or management_port is None:
+        settings_map = _get_settings_map()
+        if management_host is None:
+            management_host = (
+                settings_map["management_host"]
+                if settings_map["management_host"] is not Unset
+                else "127.0.0.1"
+            )
+        if management_port is None:
+            management_port = (
+                settings_map["management_port"]
+                if settings_map["management_port"] is not Unset
+                else 9329
+            )
+
+    return await check_daemon_health(management_host, management_port)
 
 
 def _start_daemon_background(
@@ -91,48 +99,17 @@ def _start_daemon_background(
     Returns:
         True if daemon was started successfully, False otherwise.
     """
-    # Find the codeweaver executable
-    cw_cmd = shutil.which("cw") or shutil.which("codeweaver")
-    if not cw_cmd:
-        # Try using python -m codeweaver
-        cw_cmd = sys.executable
-        cw_args = ["-m", "codeweaver", "start", "--foreground"]
-    else:
-        cw_args = ["start", "--foreground"]
-
-    # Add optional arguments
-    if config_file:
-        cw_args.extend(["--config-file", str(config_file)])
-    if project:
-        cw_args.extend(["--project", str(project)])
-    if management_host != "127.0.0.1":
-        cw_args.extend(["--management-host", management_host])
-    if management_port != 9329:
-        cw_args.extend(["--management-port", str(management_port)])
-    if mcp_host:
-        cw_args.extend(["--mcp-host", mcp_host])
-    if mcp_port:
-        cw_args.extend(["--mcp-port", str(mcp_port)])
-
-    try:
-        # Start daemon as detached subprocess
-        # Use CREATE_NEW_PROCESS_GROUP on Windows, start_new_session on Unix
-        kwargs: dict[str, Any] = {
-            "stdout": subprocess.DEVNULL,
-            "stderr": subprocess.DEVNULL,
-            "stdin": subprocess.DEVNULL,
-        }
-        if sys.platform == "win32":
-            kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP  # type: ignore[attr-defined]
-        else:
-            kwargs["start_new_session"] = True
-
-        subprocess.Popen([cw_cmd, *cw_args], **kwargs)
-        return True
-
-    except Exception as e:
-        display.print_error(f"Failed to start daemon: {e}")
-        return False
+    success = spawn_daemon_process(
+        config_file=config_file,
+        project=project,
+        management_host=management_host,
+        management_port=management_port,
+        mcp_host=mcp_host,
+        mcp_port=mcp_port,
+    )
+    if not success:
+        display.print_error("Failed to start daemon process")
+    return success
 
 
 async def _wait_for_daemon_healthy(
@@ -154,23 +131,13 @@ async def _wait_for_daemon_healthy(
     Returns:
         True if daemon became healthy, False if timeout.
     """
-    import httpx
-
     elapsed = 0.0
     while elapsed < max_wait_seconds:
         await asyncio.sleep(check_interval)
         elapsed += check_interval
 
-        try:
-            async with httpx.AsyncClient() as client:
-                response = await client.get(
-                    f"http://{management_host}:{management_port}/health",
-                    timeout=2.0,
-                )
-                if response.status_code == 200:
-                    return True
-        except Exception:
-            pass
+        if await check_daemon_health(management_host, management_port):
+            return True
 
     return False
 
@@ -322,8 +289,8 @@ async def start(
     try:
         display.print_command_header("start", "Start Background Services")
 
-        # Check if already running
-        if await are_services_running():
+        # Check if already running (use the specified host/port for accurate check)
+        if await are_services_running(management_host, management_port):
             display.print_warning("Background services already running")
             display.print_info(f"Management server: http://{management_host}:{management_port}", prefix="🌐")
             return
