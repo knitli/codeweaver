@@ -33,13 +33,17 @@ body = """
     ### {{ group | striptags | trim | upper_first }}
     {%- for commit in commits -%}
         {%- if commit.message is starting_with("Merge pull request") -%}
-            {%- set_global pr_num = commit.message | replace(from="Merge pull request #", to="") | split(pat=" ") | first -%}
+            {%- set_global pr_num = commit.message | replace(from="Merge pull request #", to="") | split(pat=" ") | first | trim -%}
             {%- if commit.message is containing(" | ") -%}
                 {%- set_global pr_desc = commit.message | split(pat=" | ") | last -%}
             {%- else -%}
                 {%- set_global pr_desc = "No description" -%}
             {%- endif %}
+            {%- if pr_num is matching("^[0-9]+$") -%}
     - {{ pr_desc }} ([#{{ pr_num }}](https://github.com/knitli/codeweaver/pull/{{ pr_num }}))
+            {%- else -%}
+    - {{ pr_desc }} (PR: invalid or unknown)
+            {%- endif -%}
         {%- else %}
     - {{ commit.message | upper_first }}
         {%- endif -%}
