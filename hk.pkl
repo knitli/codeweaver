@@ -34,6 +34,10 @@ local linters = new Mapping<String, Step> {
             glob = List("*.sh", "*.bash")
             check = "shellcheck {{ files }}"
         }
+        ["update-cli-docs"] = new Step {
+            glob = "src/codeweaver/cli/**/*.py"
+            fix = "uv run scripts/docs/generate-cli-docs.py"
+        }
     }
 
     ["fix-ruff-patterns"] = new Step {

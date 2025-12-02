@@ -62,6 +62,7 @@ scripts/
 │   └── analyze-grammar-structure.py
 │
 ├── docs/                              # Documentation generation
+│   ├── generate-cli-docs.py
 │   ├── gen-ref-pages.py
 │   └── add-plaintext-to-codeblock.py
 │

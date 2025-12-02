@@ -9,12 +9,12 @@
 [changelog]
 # Template for the changelog header
 header = """
-# Changelog
+# Changelog 🚀
 
-All notable changes to CodeWeaver will be documented in this file.
+Welcome to the changelog for CodeWeaver! Here you'll find a list of all notable changes made to the project between each release.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 """
 # Template for the changelog body
@@ -92,12 +92,10 @@ commit_preprocessors = [
   # Input: "Merge pull request #123 from org/branch\n\nPR Description"
   # Output: "Merge pull request #123 from org/branch | PR Description"
   { pattern = 'Merge pull request (#[0-9]+) from ([^\n]+)\n+([\s\S]+)', replace = "Merge pull request ${1} from ${2} | ${3}" },
-
   # 2. Mark squash merge commits for easier template detection
   # Input: "feat: some feature (#123)"
   # Output: "SQUASH | feat: some feature | #123"
   { pattern = '^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+?\))?: (.+) \(#([0-9]+)\)$', replace = "SQUASH | ${1}${2}: ${3} | #${4}" },
-
   # 3. Catch squash merges without conventional commit prefix
   # Input: "Some change (#123)"
   # Output: "SQUASH | Some change | #123"
@@ -108,48 +106,34 @@ commit_preprocessors = [
 commit_parsers = [
   # Skip non-PR merge commits (like "Merge branch 'main'")
   { message = "^Merge branch", skip = true },
-
   # === Squash Merge Parsers (conventional commits) ===
   # After preprocessing, squash merges are in format: "SQUASH | type: description | #123"
-  { message = "^SQUASH \\| feat", group = "Features" },
-  { message = "^SQUASH \\| fix", group = "Bug Fixes" },
-  { message = "^SQUASH \\| docs", group = "Documentation" },
-  { message = "^SQUASH \\| perf", group = "Performance" },
-  { message = "^SQUASH \\| refactor", group = "Refactoring" },
-  { message = "^SQUASH \\| test", group = "Testing" },
-  { message = "^SQUASH \\| build", group = "Build System" },
-  { message = "^SQUASH \\| ci", group = "CI/CD" },
-  { message = "^SQUASH \\| chore", group = "Maintenance" },
-  { message = "^SQUASH \\| revert", group = "Reverts" },
-  { message = "^SQUASH \\|", group = "Other Changes" },
-
+  { message = "^SQUASH \\| feat", group = "<!-- 00 -->Added" },
+  { message = "^SQUASH \\| fix", group = "<!-- 01 -->Fixed" },
+  { message = "^SQUASH \\| docs", group = "<!-- 02 -->Documentation" },
+  { message = "^SQUASH \\| perf", group = "<!-- 03 -->Changed" },
+  { message = "^SQUASH \\| refactor", group = "<!-- 03 -->Changed" },
+  { message = "^SQUASH \\| style", group = "<!-- 03 -->Changed" },
+  { message = "^SQUASH \\| revert", group = "<!-- 03 -->Changed" },
+  { message = "^SQUASH \\| test", group = "<!-- 03 -->Changed" },
+  { message = "^SQUASH \\| build", group = "<!-- 03 -->Changed" },
+  { message = "^SQUASH \\| ci", group = "<!-- 03 -->Changed" },
+  { message = "^SQUASH \\| chore", group = "<!-- 03 -->Changed" },
+  { message = "^SQUASH \\|", group = "<!-- 03 -->Changed" },
   # === Regular Merge Commit Parsers (branch-based) ===
   # Features - check branch name patterns
-  { message = "^Merge pull request #[0-9]+ from .*/feat", group = "Features" },
-  { message = "^Merge pull request #[0-9]+ from .*/feature", group = "Features" },
+  { message = "^Merge pull request #[0-9]+ from .*/feat", group = "<!-- 00 -->Added" },
+  { message = "^Merge pull request #[0-9]+ from .*/feature", group = "<!-- 00 -->Added" },
   # Fixes - multiple patterns for fix-related branches
-  { message = "^Merge pull request #[0-9]+ from .*/fix", group = "Bug Fixes" },
-  { message = "^Merge pull request #[0-9]+ from .*/bugfix", group = "Bug Fixes" },
-  { message = "^Merge pull request #[0-9]+ from .*/hotfix", group = "Bug Fixes" },
-  { message = "^Merge pull request #[0-9]+ from .*/issue-", group = "Bug Fixes" },
+  { message = "^Merge pull request #[0-9]+ from .*/fix", group = "<!-- 01 -->Fixed" },
+  { message = "^Merge pull request #[0-9]+ from .*/bugfix", group = "<!-- 01 -->Fixed" },
+  { message = "^Merge pull request #[0-9]+ from .*/hotfix", group = "<!-- 01 -->Fixed" },
+  { message = "^Merge pull request #[0-9]+ from .*/issue-", group = "<!-- 01 -->Fixed" },
   # Documentation
-  { message = "^Merge pull request #[0-9]+ from .*/docs", group = "Documentation" },
-  { message = "^Merge pull request #[0-9]+ from .*/doc", group = "Documentation" },
-  # Performance
-  { message = "^Merge pull request #[0-9]+ from .*/perf", group = "Performance" },
-  { message = "^Merge pull request #[0-9]+ from .*/optimize", group = "Performance" },
-  # Refactoring
-  { message = "^Merge pull request #[0-9]+ from .*/refactor", group = "Refactoring" },
-  # Testing
-  { message = "^Merge pull request #[0-9]+ from .*/test", group = "Testing" },
-  # CI/CD and tooling
-  { message = "^Merge pull request #[0-9]+ from .*/ci", group = "CI/CD" },
-  { message = "^Merge pull request #[0-9]+ from .*/workflow", group = "CI/CD" },
-  { message = "^Merge pull request #[0-9]+ from .*/build", group = "Build System" },
-  # Chores and maintenance
-  { message = "^Merge pull request #[0-9]+ from .*/chore", group = "Maintenance" },
-  # Catch-all for other PRs (will be categorized as miscellaneous)
-  { message = "^Merge pull request #[0-9]+", group = "Other Changes" },
+  { message = "^Merge pull request #[0-9]+ from .*/docs", group = "<!-- 02 -->Documentation" },
+  { message = "^Merge pull request #[0-9]+ from .*/doc", group = "<!-- 02 -->Documentation" },
+  # Catch-all for other PRs (will be categorized as Changed)
+  { message = "^Merge pull request #[0-9]+", group = "<!-- 03 -->Changed" },
 ]
 # Protect breaking changes from being skipped due to matching a skipping commit_parser
 protect_breaking_commits = false

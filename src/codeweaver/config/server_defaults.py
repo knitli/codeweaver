@@ -18,7 +18,7 @@ from codeweaver.config.types import (
 
 logger = logging.getLogger(__name__)
 
-# NOTE: Default provider settings are in `codeweaver.config.providers`
+# NOTE: Default provider settings are in `codeweaver.config.providers`, and other modules have their defaults (e.g. logging defaults in `codeweaver.config.logging`).
 
 DefaultFastMcpServerSettings = FastMcpServerSettingsDict(
     auth=None,

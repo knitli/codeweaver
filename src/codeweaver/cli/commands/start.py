@@ -88,11 +88,7 @@ async def start_cw_services(
 
     # Use background_services_lifespan (the new Phase 1 implementation)
     async with background_services_lifespan(
-        settings=settings,
-        statistics=statistics,
-        status_display=display,
-        verbose=False,
-        debug=False,
+        settings=settings, statistics=statistics, status_display=display, verbose=False, debug=False
     ) as background_state:
         # Start management server
         mgmt_host = getattr(settings, "management_host", "127.0.0.1")
@@ -102,9 +98,7 @@ async def start_cw_services(
         await management_server.start(host=mgmt_host, port=mgmt_port)
 
         display.print_success("Background services started successfully")
-        display.print_info(
-            f"Management server: http://{mgmt_host}:{mgmt_port}", prefix="🌐"
-        )
+        display.print_info(f"Management server: http://{mgmt_host}:{mgmt_port}", prefix="🌐")
 
         try:
             # Keep services running until interrupted
@@ -112,7 +106,9 @@ async def start_cw_services(
                 await management_server.server_task
             else:
                 # Shouldn't happen: server_task not set
-                raise RuntimeError("ManagementServer.server_task was not set. This should not happen; please check server startup logic.")
+                raise RuntimeError(
+                    "ManagementServer.server_task was not set. This should not happen; please check server startup logic."
+                )
         except (KeyboardInterrupt, asyncio.CancelledError):
             display.print_warning("Shutting down background services...")
         finally:

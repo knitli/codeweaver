@@ -34,7 +34,9 @@ These scripts are called by project tooling (pyproject.toml, mise.toml, hk.pkl, 
 | Script | Purpose | Referenced By |
 |--------|---------|---------------|
 | **[code-quality/fix-ruff-patterns.sh](#fix-ruff-patternssh)** | Auto-fix ruff violations (TRY401, G004, TRY300) | mise.toml, hk.pkl |
+| **[build/generate-mcp-server-json.py](#generate-mcp-server-json-py)** | Generates the server.json used to register CodeWeaver with the official mcp registry; this is a build action that executes after a release | .github/workflows
 | **[code-quality/update-licenses.py](#update-licensespy)** | Update REUSE license headers | mise.toml, hk.pkl |
+| **[docs/generate-cli-docs.py](#generate-cli-docspy)** | Generate CLI command documentation | hk.pkl
 | **[testing/apply-test-marks.py](#apply-test-markspy)** | Apply pytest marks to test files | hk.pkl |
 | **[dev-env/install-mise.sh](#install-misesh)** | Install mise task runner | .github/workflows |
 | **[dev-env/ci-free-disk-space.sh](#ci-free-disk-spacesh)** | Free disk space on CI runners | .github/workflows |
@@ -451,6 +453,20 @@ uv run -s scripts/language-support/compare-delimiters.py
 ---
 
 ## Documentation
+
+### generate-cli-docs.py
+
+**Location:** `scripts/docs/generate-cli-docs.py`
+
+Generates documentation for CLI commands based on help text and metadata.
+
+**Usage:**
+- Manual or automated call as a commit hook if CLI files have changed
+- Optionally pass a file path as a positional argument
+
+**Features:**
+- Generates docs from CLI commands
+- Creates a table of contents
 
 ### gen-ref-pages.py
 

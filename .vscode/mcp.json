@@ -1,8 +1,21 @@
 {
   "servers": {
     "codeweaver": {
-      "url": "http://127.0.0.1:9328/mcp/",
-      "type": "http"
+      "command": "uv",
+      "args": [
+        "run",
+        "codeweaver",
+        "server",
+        "--transport",
+        "stdio"
+      ],
+      "type": "stdio",
+      "env": {
+        "CODEWEAVER_PROJECT_PATH": "${env:CODEWEAVER_PROJECT_PATH}",
+        "CODEWEAVER_VECTOR_STORE_URL": "${env:CODEWEAVER_VECTOR_STORE_URL}",
+        "VOYAGE_API_KEY": "${env:VOYAGE_API_KEY}",
+        "QDRANT__SERVICE__API_KEY": "${env:QDRANT__SERVICE__API_KEY}"
+      }
     },
     "context7": {
       "args": [
