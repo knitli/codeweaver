@@ -190,7 +190,6 @@ async def _run_http_server(
 
 
 # Re-export from shared daemon module for backward compatibility
-from codeweaver.daemon import check_daemon_health as _check_daemon_health
 from codeweaver.daemon import start_daemon_if_needed as _start_daemon_if_needed
 
 
