@@ -80,6 +80,18 @@ def get_provider_env_vars() -> dict[Provider, list[McpInputDict]]:
         for provider, var_infos in _all_var_infos().items()
     }
 
+def set_version(version: str, *, for_docker: bool = False) -> str:
+    """Set the version string, adjusting for Docker if needed."""
+    # if the repo is dirty, there will be a ".dev+githash" suffix we want to remove
+    # We're assuming that we're actually submitting the last release, which is a safe assumption
+    if ".dev" in version:
+        version = version.split(".dev")[0]
+    if for_docker:
+        # Replace 'a' with '-alpha.' and 'b' with '-beta.' for Docker tags
+        # pypi is in pep440 format, but docker is semver (e.g. 1.0.0-alpha.1 vs 1.0.0a1)
+        version = version.replace("a", "-alpha.").replace("b", "-beta.")
+    return version.lstrip('v')
+
 
 def _providers_for_kind(kind: ProviderKind) -> set[Provider]:
     return {prov for prov in Provider if prov in PROVIDER_CAPABILITIES and kind in PROVIDER_CAPABILITIES[prov]}
@@ -700,7 +712,7 @@ def _create_docker_package() -> Package:
 
     return Package(
         registry_type="oci",
-        identifier=f"docker.io/knitli/codeweaver:{__version__}",
+        identifier=f"docker.io/knitli/codeweaver:{__version__.replace("a", "alpha").replace("b", "beta")}",
         runtime_hint="docker",
         transport=StdioTransport(type_=StdioTransportType.stdio),
         runtime_arguments=[
@@ -836,7 +848,7 @@ def generate_server_detail() -> ServerDetail:
     return ServerDetail(
         field_schema=AnyUrl("https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json"),
         name="com.knitli/codeweaver",
-        description=f"Semantic code search built for AI agents. Hybrid AST-aware context for {len(_languages())} languages.",
+        description=f"Semantic code search built for AI agents. Hybrid, AST-aware, context for {len(_languages())} languages.",
         title="CodeWeaver - Code Search for AI Agents",
         version=__version__,
         repository=REPOSITORY,

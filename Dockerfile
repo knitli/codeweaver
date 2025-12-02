@@ -61,7 +61,7 @@ ARG VCS_REF
 LABEL org.opencontainers.image.version="${VERSION}" \
     org.opencontainers.image.created="${BUILD_DATE}" \
     org.opencontainers.image.revision="${VCS_REF}" \
-    io.modelcontextprotocol.server-name="com.knitli/codeweaver"
+    io.modelcontextprotocol.server.name="com.knitli/codeweaver"
 
 # Install runtime dependencies
 # Note: git is required for CodeWeaver to detect project root directory

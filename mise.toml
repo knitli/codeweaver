@@ -474,6 +474,7 @@ run = [
   "print -P \"%F{209}[codeweaver]%f Running %F{209}CodeWeaver%f pre-commit checks 🪝... %F{38} Thanks for your contributions! You're pretty cool.%f 🚀\" || true",
   "hk fix || print -P \"%F{209}[codeweaver]%f ⚠️  %F{red}You need to fix some issues%f before committing. %F{209}Do not pass go, do not collect 200 dollars.%f 💸 😦\" && exit 1",
   "git add .",
+  "git commit --amend --no-edit || true",
   "hk check || print -P \"%F{209}[codeweaver]%f ⚠️  %F{red}You need to fix some issues before committing. Almost there!%f\" && exit 1",
   "print -P \"%F{209}[codeweaver]%f ✅ %F{green}All pre-commit checks passed! You're awesome!%f 🎉 ... and they said the Kobiyashi Maru was unwinnable! 🖖\"",
 ]
