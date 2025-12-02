@@ -332,14 +332,12 @@ class TestStartPersistAlias:
     def test_persist_delegates_to_init_service(self) -> None:
         """Test that persist command delegates to init service."""
         from codeweaver.cli.commands.start import persist
-
-        # Check that persist imports and calls init_service
-        import inspect
-        source = inspect.getsource(persist)
-        assert "from codeweaver.cli.commands.init import service" in source or \
-               "init_service" in source
-
-
+        # Patch the init_service function that persist should delegate to
+        with patch("codeweaver.cli.commands.init.service") as mock_init_service:
+            # Call persist with some test arguments
+            persist(enable=True, uninstall=False, project="test_project")
+            # Assert that init_service was called
+            assert mock_init_service.called
 @pytest.mark.unit
 @pytest.mark.cli
 class TestServiceInstallationBehavior:
