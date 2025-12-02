@@ -93,7 +93,7 @@ commit_preprocessors = [
   # 2. Mark squash merge commits for easier template detection
   # Input: "feat: some feature (#123)"
   # Output: "SQUASH | feat: some feature | #123"
-  { pattern = '^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?: (.+) \(#([0-9]+)\)$', replace = "SQUASH | ${1}${2}: ${3} | #${4}" },
+  { pattern = '^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+?\))?: (.+) \(#([0-9]+)\)$', replace = "SQUASH | ${1}${2}: ${3} | #${4}" },
 
   # 3. Catch squash merges without conventional commit prefix
   # Input: "Some change (#123)"
