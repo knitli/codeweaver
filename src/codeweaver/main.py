@@ -227,7 +227,7 @@ async def _run_stdio_server(
     if not daemon_ready:
         raise InitializationError(
             "CodeWeaver daemon is not running and could not be started automatically. "
-            "Please start it manually with: codeweaver start"
+            "Please start it manually with: cw start"
         )
 
     if verbose or debug:
