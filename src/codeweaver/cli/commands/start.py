@@ -198,8 +198,10 @@ async def start_cw_services(
         finally:
             if mcp_server_task and not mcp_server_task.done():
                 mcp_server_task.cancel()
-                with contextlib.suppress(asyncio.CancelledError):
+                try:
                     await mcp_server_task
+                except asyncio.CancelledError:
+                    pass
             await management_server.stop()
 
 
