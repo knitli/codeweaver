@@ -289,4 +289,7 @@ When you create a release by pushing a tag, the release workflow automatically:
 1. **Maintain good PR descriptions**: Since the changelog is based on PR descriptions, clear and descriptive PR titles/descriptions result in better changelogs
 2. **Use branch name conventions**: Follow the naming patterns (`feat/`, `fix/`, etc.) for automatic categorization
 3. **Update before releases**: Run `mise run changelog-update` before creating release tags to keep CHANGELOG.md current
-4. **Squash vs Merge**: The setup works with both squash commits and merge commits, but focuses on the final PR merge
+4. **Squash vs Merge**: The setup works with both squash commits and merge commits, but handles them differently:
+   - **Squash merges** REQUIRE conventional commit prefixes (e.g., `feat:`, `fix:`) in the commit message for proper changelog categorization.
+   - **Regular merges** use branch naming patterns (e.g., `feat/branch-name`, `fix/branch-name`) to categorize changes.
+   - Different categorization rules apply to each, so ensure your workflow and commit/branch naming conventions match your desired changelog output.
