@@ -61,7 +61,11 @@ jobs:
           if git diff --staged --quiet; then
             echo "No changes to commit"
           else
-            git commit -m "docs: update CHANGELOG.md"
+            if [ -n "${{ github.event.inputs.tag }}" ]; then
+              git commit -m "docs: update CHANGELOG.md for ${{ github.event.inputs.tag }}"
+            else
+              git commit -m "docs: update CHANGELOG.md with unreleased changes"
+            fi
             git push
           fi
 
