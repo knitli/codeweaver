@@ -225,6 +225,7 @@ This project uses **git-cliff** for automated changelog generation. Changelogs a
   - `refactor/` → Refactoring
   - `ci/`, `workflow/` → CI/CD
   - `test/` → Testing
+  - `build/` → Build System
   - Everything else → Other Changes
 - **Clean output**: Extracts PR descriptions instead of showing "Merge pull request..." messages
 - **Manual triggers**: Generate changelogs on-demand via mise tasks or GitHub workflows
