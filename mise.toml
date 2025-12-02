@@ -351,12 +351,12 @@ tools."cargo:git-cliff" = "latest"
 run = '''
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Generating changelog for tag ${usage_tag}..."
-git-cliff --tag "${usage_tag}" --output CHANGELOG.md &&
+git-cliff --tag "${usage_tag}" --prepend --output CHANGELOG.md &&
 print -P "%F{209}[codeweaver]%f ✅ CHANGELOG.md generated for ${usage_tag}!"
 '''
 run_windows = '''
 echo [codeweaver] Generating changelog for tag %usage_tag%...
-git-cliff --tag %usage_tag% --output CHANGELOG.md
+git-cliff --tag %usage_tag% --prepend --output CHANGELOG.md
 if %ERRORLEVEL% equ 0 (
     echo [codeweaver] CHANGELOG.md generated for %usage_tag%!
 )
