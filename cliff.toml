@@ -60,10 +60,10 @@ footer = """
 # Remove the leading and trailing whitespace from the templates
 trim = true
 # Postprocessors to apply after rendering the changelog
-postprocessors = [
-  # Replace issue/PR numbers with links
-  { pattern = '\(#([0-9]+)\)', replace = "([#${1}](https://github.com/knitli/codeweaver/pull/${1}))" },
-]
+# postprocessors = [
+#   # Replace issue/PR numbers with links
+#   { pattern = '\(#([0-9]+)\)', replace = "([#${1}](https://github.com/knitli/codeweaver/pull/${1}))" },
+# ]
 
 [git]
 # Parse commits based on https://www.conventionalcommits.org
