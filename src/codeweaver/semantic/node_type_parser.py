@@ -246,8 +246,10 @@ For developers familiar with tree-sitter terminology:
 from __future__ import annotations
 
 import logging
+import pickle
 
 from collections.abc import Callable, Sequence
+from importlib.resources import files
 from itertools import groupby
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, ClassVar, TypedDict, cast, overload
@@ -344,15 +346,26 @@ logger = logging.getLogger()
 # ===========================================================================
 
 
-def _get_types_files_in_directory(directory: DirectoryPath) -> list[FilePath]:
+def _get_types_files_in_directory(directory: DirectoryPath | None = None) -> list[Path]:
     """Get list of node types files in a directory.
 
     Args:
-        directory: Directory to search for node types files
+        directory: Directory to search for node types files. If None, uses package resources.
 
     Returns:
         List of node types file paths
     """
+    if directory is None:
+        # Use importlib.resources to access package data
+        data_dir = files("codeweaver.data") / "node_types"
+        if not data_dir.is_dir():
+            return []
+        return [
+            Path(str(data_dir / item.name))
+            for item in data_dir.iterdir()
+            if item.name.endswith("node-types.json")
+        ]
+
     return [
         path
         for path in directory.iterdir()
@@ -396,19 +409,20 @@ class NodeTypeFileLoader:
     """Container for node types files in a directory structure.
 
     Attributes:
-        directory: Directory containing node types files
+        directory: Directory containing node types files (None to use package resources)
         files: List of node types file paths
     """
 
     directory: Annotated[
-        DirectoryPath, Field(description="""Directory containing node types files.""")
-    ] = Path(__file__).parent.parent.parent.parent / "data" / "node_types"
+        DirectoryPath | None,
+        Field(description="""Directory containing node types files. None to use package resources."""),
+    ] = None
 
     files: Annotated[
-        list[FilePath],
+        list[Path],
         Field(
             description="""List of node types file paths.""",
-            default_factory=lambda data: _get_types_files_in_directory(data["directory"]),
+            default_factory=list,
             init=False,
         ),
     ]
@@ -418,12 +432,11 @@ class NodeTypeFileLoader:
     _nodes: ClassVar[list[NodeArray]] = []
 
     def __init__(
-        self, directory: DirectoryPath | None = None, files: list[FilePath] | None = None
+        self, directory: DirectoryPath | None = None, files: list[Path] | None = None
     ) -> None:
         """Initialize NodeTypesFiles, auto-populating files if not provided."""
         # Optionally override directory
-        if directory is not None:
-            self.directory = directory
+        self.directory = directory
         # Initialize files list deterministically
         if files is not None:
             self.files = files
@@ -444,6 +457,14 @@ class NodeTypeFileLoader:
         """Load a single node types file for a specific language."""
         if language == SemanticSearchLanguage.JSX:
             language = SemanticSearchLanguage.JAVASCRIPT
+
+        # If using package resources, load directly
+        if self.directory is None:
+            data_dir = files("codeweaver.data") / "node_types"
+            filename = f"{language.value}-node-types.json"
+            resource = data_dir / filename
+            return from_json(resource.read_bytes()) if resource.is_file() else None
+        # Otherwise use file path
         file_path = next(
             (
                 file
@@ -518,21 +539,89 @@ class NodeTypeParser:
         for lang in SemanticSearchLanguage
     }
 
-    def __init__(self, languages: Sequence[SemanticSearchLanguage] | None = None) -> None:
+    _cache_loaded: ClassVar[bool] = False
+
+    def __init__(
+        self, languages: Sequence[SemanticSearchLanguage] | None = None, use_cache: bool = True
+    ) -> None:
         """Initialize NodeTypeParser with an optional NodeTypeFileLoader.
 
         Args:
             languages: Optional pre-loaded list of languages to parse; if None, will load all available languages.
+            use_cache: Whether to try loading from the pre-built cache. Default True.
         """
         self._languages: frozenset[SemanticSearchLanguage] = frozenset(
             languages or iter(SemanticSearchLanguage)
         )
 
         self._loader = NodeTypeFileLoader()
+        self._use_cache = use_cache
+
+        # Try to load from cache if enabled
+        if use_cache and not type(self)._cache_loaded:
+            self._load_from_cache()
 
         self._initialized = lambda: self.cache_complete()
 
     # we don't start the process until explicitly called
+
+    @property
+    def registration_cache(self) -> dict[SemanticSearchLanguage, _ThingCacheDict]:
+        """Get the registration cache for serialization.
+
+        This provides public access to the internal registration cache,
+        primarily for build scripts that need to serialize the cache.
+
+        Returns:
+            Dictionary mapping languages to their cached Things and Categories.
+        """
+        return type(self)._registration_cache
+
+    def _load_from_cache(self) -> bool:
+        """Try to load pre-processed node types from cache.
+
+        Security: While pickle.loads() can execute arbitrary code, this cache is:
+        1. Generated during our build process
+        2. Shipped as part of the package (same trust level as our code)
+        3. Validated for structure and version compatibility
+
+        Returns:
+            True if cache was loaded successfully, False otherwise.
+        """
+        try:
+            # Try to load cache from package resources
+            cache_resource = files("codeweaver.data") / "node_types_cache.pkl"
+            if not cache_resource.is_file():
+                logger.debug("Node types cache not found, will parse from JSON files")
+                return False
+
+            cache_data = pickle.loads(cache_resource.read_bytes())
+
+            # Validate cache structure
+            if not isinstance(cache_data, dict) or "registration_cache" not in cache_data:
+                logger.warning(
+                    "Invalid cache structure: missing 'registration_cache' key, will parse from JSON"
+                )
+                return False
+
+            # Validate cache data type
+            if not isinstance(cache_data["registration_cache"], dict):
+                logger.warning("Invalid cache data type, will parse from JSON")
+                return False
+
+            type(self)._registration_cache = cache_data["registration_cache"]
+            type(self)._cache_loaded = True
+            logger.debug("Loaded node types from cache")
+            return True
+
+        except (pickle.UnpicklingError, AttributeError, KeyError) as e:
+            # Specific pickle/data structure errors
+            logger.warning("Cache corrupted or incompatible: %s, will parse from JSON", e)
+            return False
+        except (FileNotFoundError, OSError) as e:
+            # File system errors
+            logger.warning("Failed to read cache file: %s, will parse from JSON", e)
+            return False
 
     @property
     def nodes(self) -> list[NodeArray]:

@@ -334,7 +334,7 @@ __all__ = ("__version__",)
 [tool.hatch.build.targets.wheel]
 artifacts = ["*.so", "src/**"]
 packages = ["src/codeweaver"]
-include = ["node_types/**", "typings/**"]
+include = ["typings/**"]
 
 [tool.hatch.build.targets.sdist]
 include = [
@@ -348,9 +348,10 @@ include = [
   "README.md",
   "context7.json",
   "context7.json.license",
-  "node_types/**",
   "pyproject.toml",
   "sbom.spdx",
+  "schema/**",
+  "scripts/**",
   "src/**",
   "typings/**",
   "uv.lock",

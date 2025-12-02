@@ -342,6 +342,132 @@ git-cliff --tag "${usage_tag:?}" --prepend --output CHANGELOG.md &&
 echo "✅ CHANGELOG.md generated for ${usage_tag:?}!"
 '''
 
+[tasks.prepare-version]
+description = "Prepare build artifacts for a new version release"
+usage = '''
+arg "[version]" {
+  help = "Version to prepare (e.g., 1.2.0). If not provided, will prompt."
+}
+flag "--no-commit" {
+  help = "Don't commit the changes, just generate artifacts"
+}
+flag "--no-tag" {
+  help = "Don't create a git tag"
+}
+flag "--push" {
+  help = "Push changes and tags to remote after committing"
+}
+'''
+run = '''
+#!/usr/bin/env bash
+set -e
+
+# Colors for output
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
+echo -e "${BLUE}[codeweaver]${NC} Preparing version release..."
+
+# Get version
+VERSION="${usage_version:-}"
+if [ -z "$VERSION" ]; then
+    read -p "Enter version number (e.g., 1.2.0): " VERSION
+fi
+
+# Validate version format
+if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    echo -e "${RED}Error: Invalid version format. Use semantic versioning (e.g., 1.2.0)${NC}"
+    exit 1
+fi
+
+echo -e "${BLUE}[codeweaver]${NC} Preparing version ${GREEN}v${VERSION}${NC}..."
+
+# Step 1: Run build preparation
+echo -e "${BLUE}[codeweaver]${NC} Step 1/5: Running build preparation..."
+uv run python scripts/build/prepare-build.py || {
+    echo -e "${RED}Build preparation failed!${NC}"
+    exit 1
+}
+
+# Step 2: Check for generated artifacts
+echo -e "${BLUE}[codeweaver]${NC} Step 2/5: Verifying generated artifacts..."
+if [ ! -f "src/codeweaver/data/node_types_cache.pkl" ]; then
+    echo -e "${YELLOW}Warning: node_types_cache.pkl not found${NC}"
+fi
+
+# Step 3: Update CHANGELOG
+echo -e "${BLUE}[codeweaver]${NC} Step 3/5: Updating CHANGELOG.md..."
+git-cliff --tag "v${VERSION}" --prepend --output CHANGELOG.md || {
+    echo -e "${YELLOW}Warning: Failed to update CHANGELOG${NC}"
+}
+
+# Step 4: Commit if not disabled
+if [ -z "${usage_no_commit:-}" ]; then
+    echo -e "${BLUE}[codeweaver]${NC} Step 4/5: Committing build artifacts..."
+    git add src/codeweaver/data/node_types_cache.pkl 2>/dev/null || true
+    git add CHANGELOG.md 2>/dev/null || true
+    git add schema/ 2>/dev/null || true
+
+    if ! git diff --cached --quiet; then
+        git commit -m "chore: prepare build artifacts for v${VERSION}
+
+- Update node_types cache
+- Generate schema for v${VERSION}
+- Update CHANGELOG.md" || {
+            echo -e "${RED}Commit failed!${NC}"
+            exit 1
+        }
+        echo -e "${GREEN}✓ Build artifacts committed${NC}"
+    else
+        echo -e "${YELLOW}No changes to commit${NC}"
+    fi
+else
+    echo -e "${YELLOW}Skipping commit (--no-commit flag)${NC}"
+fi
+
+# Step 5: Tag if not disabled
+if [ -z "${usage_no_tag:-}" ] && [ -z "${usage_no_commit:-}" ]; then
+    echo -e "${BLUE}[codeweaver]${NC} Step 5/5: Creating git tag v${VERSION}..."
+    git tag -a "v${VERSION}" -m "Release v${VERSION}" || {
+        echo -e "${RED}Tagging failed!${NC}"
+        exit 1
+    }
+    echo -e "${GREEN}✓ Created tag v${VERSION}${NC}"
+else
+    echo -e "${YELLOW}Skipping tag creation${NC}"
+fi
+
+# Push if requested
+if [ -n "${usage_push:-}" ]; then
+    echo -e "${BLUE}[codeweaver]${NC} Pushing to remote..."
+    git push && git push --tags || {
+        echo -e "${RED}Push failed!${NC}"
+        exit 1
+    }
+    echo -e "${GREEN}✓ Pushed to remote${NC}"
+fi
+
+echo ""
+echo -e "${GREEN}════════════════════════════════════════════════${NC}"
+echo -e "${GREEN}✓ Version ${VERSION} prepared successfully!${NC}"
+echo -e "${GREEN}════════════════════════════════════════════════${NC}"
+echo ""
+echo -e "${BLUE}Next steps:${NC}"
+if [ -z "${usage_push:-}" ]; then
+    echo -e "  1. Review the changes: ${YELLOW}git show${NC}"
+    echo -e "  2. Push to remote: ${YELLOW}git push && git push --tags${NC}"
+fi
+echo -e "  3. Create GitHub release from tag v${VERSION}"
+echo ""
+'''
+run_windows = '''
+echo [codeweaver] Version preparation on Windows not yet supported. Use WSL or Linux.
+exit 1
+'''
+
 [tasks.pre-commit]
 shell = "zsh -c"
 run = [
