@@ -125,14 +125,16 @@ jobs:
 
           # Add pre-release specific installation instructions
           if [[ "$VERSION" == *"a"* ]] || [[ "$VERSION" == *"b"* ]] || [[ "$VERSION" == *"rc"* ]]; then
-            cat >> release_notes.md << EOF
+            cat >> release_notes.md << 'EOF'
           **This is a pre-release version.** Install with:
-          \`\`\`bash
+          ```bash
           pip install --pre code-weaver
           # Or specific version:
-          pip install code-weaver==$VERSION
-          \`\`\`
+          pip install code-weaver==
+          ```
           EOF
+            # Append the version line with variable expansion
+            sed -i "/pip install code-weaver==/a pip install code-weaver=$VERSION" release_notes.md
           else
             cat >> release_notes.md << 'EOF'
           Install from PyPI:
