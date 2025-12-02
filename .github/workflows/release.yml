@@ -101,10 +101,10 @@ jobs:
           # Generate changelog using git-cliff
           if [ -n "$PREVIOUS_TAG" ] && [ "$PREVIOUS_TAG" != "$CURRENT_TAG" ]; then
             # Generate changelog for the range between previous and current tag
-            git-cliff --strip all --tag "$CURRENT_TAG" "$PREVIOUS_TAG..$CURRENT_TAG" > changelog_section.md
+            git-cliff --strip header --tag "$CURRENT_TAG" "$PREVIOUS_TAG..$CURRENT_TAG" > changelog_section.md
           else
             # First release - get all commits
-            git-cliff --strip all --tag "$CURRENT_TAG" > changelog_section.md
+            git-cliff --strip header --tag "$CURRENT_TAG" > changelog_section.md
           fi
 
           # Build complete release notes with installation instructions
