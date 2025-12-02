@@ -17,11 +17,7 @@ from pydantic import PositiveInt
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
 from codeweaver.config.settings import get_settings_map
 from codeweaver.core.types.sentinel import Unset
-from codeweaver.daemon import (
-    check_daemon_health,
-    request_daemon_shutdown,
-    wait_for_daemon_shutdown,
-)
+from codeweaver.daemon import check_daemon_health, request_daemon_shutdown, wait_for_daemon_shutdown
 
 
 _display: StatusDisplay = get_display()
@@ -37,9 +33,7 @@ def _get_default_host_port() -> tuple[str, int]:
         else "127.0.0.1"
     )
     mgmt_port = (
-        settings_map["management_port"]
-        if settings_map["management_port"] is not Unset
-        else 9329
+        settings_map["management_port"] if settings_map["management_port"] is not Unset else 9329
     )
     return mgmt_host, mgmt_port
 
@@ -61,12 +55,9 @@ async def stop(
         ),
     ] = None,
     *,
-    timeout: Annotated[
+    timeout: Annotated[  # noqa: ASYNC109  # acceptable for a command line argument
         float,
-        Parameter(
-            name=["--timeout", "-t"],
-            help="Maximum time to wait for shutdown (seconds)",
-        ),
+        Parameter(name=["--timeout", "-t"], help="Maximum time to wait for shutdown (seconds)"),
     ] = 30.0,
 ) -> None:
     """Stop CodeWeaver background services.
@@ -104,10 +95,7 @@ async def stop(
         # Request shutdown via management API
         if not await request_daemon_shutdown(host, port, timeout=10.0):
             display.print_error("Failed to request shutdown")
-            display.print_info(
-                "The daemon may not be responding. You can try:",
-                prefix="💡",
-            )
+            display.print_info("The daemon may not be responding. You can try:", prefix="💡")
             display.print_info("  - Check logs: journalctl --user -u codeweaver.service")
             display.print_info("  - Force stop: pkill -f 'codeweaver start'")
             return
@@ -119,10 +107,7 @@ async def stop(
             display.print_success("CodeWeaver daemon stopped successfully")
         else:
             display.print_warning(f"Daemon did not shut down within {timeout} seconds")
-            display.print_info(
-                "The daemon may still be shutting down. You can:",
-                prefix="💡",
-            )
+            display.print_info("The daemon may still be shutting down. You can:", prefix="💡")
             display.print_info("  - Wait and check: cw status")
             display.print_info("  - Force stop: pkill -f 'codeweaver start'")
 

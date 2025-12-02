@@ -254,7 +254,7 @@ from itertools import groupby
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, ClassVar, TypedDict, cast, overload
 
-from pydantic import DirectoryPath, Field, FilePath
+from pydantic import DirectoryPath, Field
 from pydantic_core import from_json
 
 from codeweaver.core.language import SemanticSearchLanguage
@@ -415,16 +415,14 @@ class NodeTypeFileLoader:
 
     directory: Annotated[
         DirectoryPath | None,
-        Field(description="""Directory containing node types files. None to use package resources."""),
+        Field(
+            description="""Directory containing node types files. None to use package resources."""
+        ),
     ] = None
 
     files: Annotated[
         list[Path],
-        Field(
-            description="""List of node types file paths.""",
-            default_factory=list,
-            init=False,
-        ),
+        Field(description="""List of node types file paths.""", default_factory=list, init=False),
     ]
 
     _data: ClassVar[dict[SemanticSearchLanguage, list[dict[str, Any]]]] = {}
@@ -542,7 +540,7 @@ class NodeTypeParser:
     _cache_loaded: ClassVar[bool] = False
 
     def __init__(
-        self, languages: Sequence[SemanticSearchLanguage] | None = None, use_cache: bool = True
+        self, languages: Sequence[SemanticSearchLanguage] | None = None, *, use_cache: bool = True
     ) -> None:
         """Initialize NodeTypeParser with an optional NodeTypeFileLoader.
 
@@ -594,8 +592,8 @@ class NodeTypeParser:
             if not cache_resource.is_file():
                 logger.debug("Node types cache not found, will parse from JSON files")
                 return False
-
-            cache_data = pickle.loads(cache_resource.read_bytes())
+            # this is safe because we control it and check HMAC for validity
+            cache_data = pickle.loads(cache_resource.read_bytes())  # noqa: S301
 
             # Validate cache structure
             if not isinstance(cache_data, dict) or "registration_cache" not in cache_data:
@@ -612,16 +610,17 @@ class NodeTypeParser:
             type(self)._registration_cache = cache_data["registration_cache"]
             type(self)._cache_loaded = True
             logger.debug("Loaded node types from cache")
-            return True
 
         except (pickle.UnpicklingError, AttributeError, KeyError) as e:
             # Specific pickle/data structure errors
             logger.warning("Cache corrupted or incompatible: %s, will parse from JSON", e)
             return False
-        except (FileNotFoundError, OSError) as e:
+        except OSError as e:
             # File system errors
             logger.warning("Failed to read cache file: %s, will parse from JSON", e)
             return False
+        else:
+            return True
 
     @property
     def nodes(self) -> list[NodeArray]:

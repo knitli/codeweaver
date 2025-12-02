@@ -50,8 +50,9 @@ def get_version() -> str:
 
                 # Try to get version from git if available
                 # Git commands work from any directory within a repo, so no need to specify cwd
+                # The subprocess call is safe because we use the system to find the executable, not user input
                 if git := shutil.which("git"):
-                    git_describe = subprocess.run(
+                    git_describe = subprocess.run(  # noqa: S603
                         [git, "describe", "--tags", "--always", "--dirty"],
                         capture_output=True,
                         text=True,

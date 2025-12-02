@@ -24,9 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 async def check_daemon_health(
-    management_host: str = "127.0.0.1",
-    management_port: int = 9329,
-    timeout_at: float = 5.0,
+    management_host: str = "127.0.0.1", management_port: int = 9329, timeout_at: float = 5.0
 ) -> bool:
     """Check if the CodeWeaver daemon is healthy.
 
@@ -200,16 +198,14 @@ async def start_daemon_if_needed(
 
 
 async def request_daemon_shutdown(
-    management_host: str = "127.0.0.1",
-    management_port: int = 9329,
-    timeout: float = 10.0,
+    management_host: str = "127.0.0.1", management_port: int = 9329, timeout_at: float = 10.0
 ) -> bool:
     """Request daemon shutdown via management server endpoint.
 
     Args:
         management_host: Host of management server
         management_port: Port of management server
-        timeout: Request timeout in seconds
+        timeout_at: Request timeout in seconds
 
     Returns:
         True if shutdown was requested successfully, False otherwise.
@@ -217,18 +213,17 @@ async def request_daemon_shutdown(
     try:
         import httpx
     except ImportError:
-        logger.error("httpx not available for shutdown request")
+        logger.exception("httpx not available for shutdown request")
         return False
 
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(
-                f"http://{management_host}:{management_port}/shutdown",
-                timeout=timeout,
+                f"http://{management_host}:{management_port}/shutdown", timeout=timeout_at
             )
             return response.status_code in (200, 202)
     except Exception as e:
-        logger.error("Failed to request daemon shutdown: %s", e)
+        logger.warning("Failed to request daemon shutdown: %s", e, exc_info=e)
         return False
 
 
