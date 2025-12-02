@@ -48,7 +48,7 @@ body = """
             {%- if commit.message is containing(" | ") -%}
                 {%- set_global parts = commit.message | split(pat=" | ") -%}
                 {%- if parts | length >= 2 -%}
-                    {%- set_global pr_desc = parts | nth(n=1) | trim -%}
+                    {%- set_global pr_desc = parts | slice(start=1) | join(sep=" | ") | trim -%}
                 {%- else -%}
                     {%- set_global pr_desc = "No description" -%}
                 {%- endif -%}
