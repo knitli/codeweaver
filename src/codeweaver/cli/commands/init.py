@@ -955,6 +955,359 @@ def init(
     )
 
 
+def _get_systemd_unit(cw_cmd: str, working_dir: Path) -> str:
+    """Generate systemd user service unit file content.
+
+    Args:
+        cw_cmd: Path to the codeweaver executable
+        working_dir: Working directory for the service
+
+    Returns:
+        Systemd unit file content as a string
+    """
+    return f"""[Unit]
+Description=CodeWeaver MCP Server - Semantic Code Search
+Documentation=https://github.com/knitli/codeweaver
+After=network.target
+
+[Service]
+Type=simple
+ExecStart={cw_cmd} start --foreground
+WorkingDirectory={working_dir}
+Restart=on-failure
+RestartSec=5
+
+# Environment (uncomment and set if needed)
+# Environment=VOYAGE_API_KEY=your-api-key
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target
+"""
+
+
+def _get_launchd_plist(cw_cmd: str, working_dir: Path) -> str:
+    """Generate launchd user agent plist file content.
+
+    Args:
+        cw_cmd: Path to the codeweaver executable
+        working_dir: Working directory for the service
+
+    Returns:
+        Launchd plist file content as a string
+    """
+    return f"""<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>li.knit.codeweaver</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>{cw_cmd}</string>
+        <string>start</string>
+        <string>--foreground</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>{working_dir}</string>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>{Path.home() / 'Library' / 'Logs' / 'codeweaver.log'}</string>
+
+    <key>StandardErrorPath</key>
+    <string>{Path.home() / 'Library' / 'Logs' / 'codeweaver.error.log'}</string>
+
+    <!-- Environment variables (uncomment and set if needed) -->
+    <!--
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>VOYAGE_API_KEY</key>
+        <string>your-api-key</string>
+    </dict>
+    -->
+</dict>
+</plist>
+"""
+
+
+def _install_systemd_service(display: StatusDisplay, cw_cmd: str, working_dir: Path, enable: bool) -> bool:
+    """Install CodeWeaver as a systemd user service.
+
+    Args:
+        display: Status display for output
+        cw_cmd: Path to the codeweaver executable
+        working_dir: Working directory for the service
+        enable: Whether to enable the service to start on login
+
+    Returns:
+        True if successful, False otherwise
+    """
+    import subprocess
+
+    service_dir = Path.home() / ".config" / "systemd" / "user"
+    service_file = service_dir / "codeweaver.service"
+
+    try:
+        # Create service directory
+        service_dir.mkdir(parents=True, exist_ok=True)
+
+        # Write service file
+        unit_content = _get_systemd_unit(cw_cmd, working_dir)
+        service_file.write_text(unit_content, encoding="utf-8")
+        display.print_success(f"Created systemd service: {service_file}")
+
+        # Reload systemd
+        subprocess.run(["systemctl", "--user", "daemon-reload"], check=True, capture_output=True)
+        display.print_info("Reloaded systemd daemon")
+
+        if enable:
+            # Enable and start the service
+            subprocess.run(["systemctl", "--user", "enable", "codeweaver.service"], check=True, capture_output=True)
+            display.print_success("Enabled codeweaver service")
+            subprocess.run(["systemctl", "--user", "start", "codeweaver.service"], check=True, capture_output=True)
+            display.print_success("Started codeweaver service")
+        else:
+            display.print_info("To enable: systemctl --user enable codeweaver.service")
+            display.print_info("To start: systemctl --user start codeweaver.service")
+
+        return True
+
+    except subprocess.CalledProcessError as e:
+        display.print_error(f"systemctl command failed: {e}")
+        return False
+    except Exception as e:
+        display.print_error(f"Failed to install systemd service: {e}")
+        return False
+
+
+def _install_launchd_service(display: StatusDisplay, cw_cmd: str, working_dir: Path, enable: bool) -> bool:
+    """Install CodeWeaver as a launchd user agent.
+
+    Args:
+        display: Status display for output
+        cw_cmd: Path to the codeweaver executable
+        working_dir: Working directory for the service
+        enable: Whether to load the service immediately
+
+    Returns:
+        True if successful, False otherwise
+    """
+    import subprocess
+
+    agents_dir = Path.home() / "Library" / "LaunchAgents"
+    plist_file = agents_dir / "li.knit.codeweaver.plist"
+
+    try:
+        # Create agents directory
+        agents_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create logs directory
+        logs_dir = Path.home() / "Library" / "Logs"
+        logs_dir.mkdir(parents=True, exist_ok=True)
+
+        # Write plist file
+        plist_content = _get_launchd_plist(cw_cmd, working_dir)
+        plist_file.write_text(plist_content, encoding="utf-8")
+        display.print_success(f"Created launchd agent: {plist_file}")
+
+        if enable:
+            # Unload if already loaded (ignore errors)
+            subprocess.run(
+                ["launchctl", "unload", str(plist_file)],
+                capture_output=True,
+            )
+            # Load the service
+            subprocess.run(["launchctl", "load", str(plist_file)], check=True, capture_output=True)
+            display.print_success("Loaded codeweaver agent")
+        else:
+            display.print_info(f"To load: launchctl load {plist_file}")
+            display.print_info(f"To unload: launchctl unload {plist_file}")
+
+        return True
+
+    except subprocess.CalledProcessError as e:
+        display.print_error(f"launchctl command failed: {e}")
+        return False
+    except Exception as e:
+        display.print_error(f"Failed to install launchd agent: {e}")
+        return False
+
+
+def _show_windows_instructions(display: StatusDisplay, cw_cmd: str, working_dir: Path) -> None:
+    """Show instructions for Windows service installation.
+
+    Windows services are more complex and typically require third-party tools
+    like NSSM (Non-Sucking Service Manager) or sc.exe.
+
+    Args:
+        display: Status display for output
+        cw_cmd: Path to the codeweaver executable
+        working_dir: Working directory for the service
+    """
+    display.print_section("Windows Service Installation")
+    display.print_info(
+        "Windows services require administrator privileges and additional setup.\n"
+        "We recommend using NSSM (Non-Sucking Service Manager) for a simple setup."
+    )
+    display.print_list(
+        [
+            "Download NSSM from: https://nssm.cc/download",
+            "Open an Administrator Command Prompt",
+            f"Run: nssm install CodeWeaver \"{cw_cmd}\" start --foreground",
+            f"Set startup directory to: {working_dir}",
+            "Configure environment variables if needed (VOYAGE_API_KEY, etc.)",
+            "Start the service: nssm start CodeWeaver",
+        ],
+        title="Steps:",
+        numbered=True,
+    )
+    display.print_info("\nAlternatively, use Task Scheduler to run CodeWeaver at login.")
+
+
+@app.command
+def service(
+    *,
+    project: Annotated[Path | None, cyclopts.Parameter(name=["--project", "-p"])] = None,
+    enable: Annotated[
+        bool,
+        cyclopts.Parameter(
+            name=["--enable", "-e"],
+            help="Enable and start the service immediately (Linux/macOS only)",
+        ),
+    ] = True,
+    uninstall: Annotated[
+        bool,
+        cyclopts.Parameter(
+            name=["--uninstall", "-u"],
+            help="Remove the installed service",
+        ),
+    ] = False,
+) -> None:
+    """Install CodeWeaver as a system service for automatic startup.
+
+    This command configures CodeWeaver to start automatically when you log in.
+
+    **Linux (systemd):**
+    Creates a user systemd service at ~/.config/systemd/user/codeweaver.service
+
+    **macOS (launchd):**
+    Creates a user launch agent at ~/Library/LaunchAgents/li.knit.codeweaver.plist
+
+    **Windows:**
+    Provides instructions for setting up with NSSM or Task Scheduler.
+
+    Examples:
+        cw init service                  # Install and enable service
+        cw init service --no-enable      # Install without enabling
+        cw init service --uninstall      # Remove the service
+        cw start persist                 # Alias for 'cw init service'
+    """
+    display = _display
+    error_handler = CLIErrorHandler(display)
+
+    display.print_command_header("init service", "Install CodeWeaver as a system service")
+
+    # Determine project path
+    project_path = (project or resolve_project_root()).resolve()
+    display.print_info(f"Working directory: {project_path}\n")
+
+    # Find the codeweaver executable
+    cw_cmd = shutil.which("cw") or shutil.which("codeweaver")
+    if not cw_cmd:
+        cw_cmd = f"{sys.executable} -m codeweaver"
+        display.print_warning(f"Could not find cw/codeweaver in PATH, using: {cw_cmd}")
+    else:
+        display.print_info(f"Executable: {cw_cmd}")
+
+    platform = sys.platform
+
+    if uninstall:
+        # Handle uninstallation
+        display.print_section("Uninstalling Service")
+        if platform == "linux":
+            import subprocess
+
+            service_file = Path.home() / ".config" / "systemd" / "user" / "codeweaver.service"
+            if service_file.exists():
+                try:
+                    subprocess.run(["systemctl", "--user", "stop", "codeweaver.service"], capture_output=True)
+                    subprocess.run(["systemctl", "--user", "disable", "codeweaver.service"], capture_output=True)
+                    service_file.unlink()
+                    subprocess.run(["systemctl", "--user", "daemon-reload"], check=True, capture_output=True)
+                    display.print_success("Removed systemd service")
+                except Exception as e:
+                    error_handler.handle_error(CodeWeaverError(f"Failed to remove service: {e}"), "Service removal")
+            else:
+                display.print_warning("Service not installed")
+        elif platform == "darwin":
+            import subprocess
+
+            plist_file = Path.home() / "Library" / "LaunchAgents" / "li.knit.codeweaver.plist"
+            if plist_file.exists():
+                try:
+                    subprocess.run(["launchctl", "unload", str(plist_file)], capture_output=True)
+                    plist_file.unlink()
+                    display.print_success("Removed launchd agent")
+                except Exception as e:
+                    error_handler.handle_error(CodeWeaverError(f"Failed to remove agent: {e}"), "Service removal")
+            else:
+                display.print_warning("Agent not installed")
+        elif platform == "win32":
+            display.print_info("To remove Windows service:")
+            display.print_info("  nssm remove CodeWeaver confirm")
+        return
+
+    # Handle installation
+    display.print_section("Installing Service")
+
+    if platform == "linux":
+        success = _install_systemd_service(display, cw_cmd, project_path, enable)
+        if success:
+            display.print_section("Management Commands")
+            display.print_list(
+                [
+                    "Status: systemctl --user status codeweaver.service",
+                    "Stop: systemctl --user stop codeweaver.service",
+                    "Start: systemctl --user start codeweaver.service",
+                    "Logs: journalctl --user -u codeweaver.service -f",
+                    "Disable: systemctl --user disable codeweaver.service",
+                ],
+                title="",
+            )
+    elif platform == "darwin":
+        success = _install_launchd_service(display, cw_cmd, project_path, enable)
+        if success:
+            display.print_section("Management Commands")
+            display.print_list(
+                [
+                    "Status: launchctl list | grep codeweaver",
+                    "Stop: launchctl unload ~/Library/LaunchAgents/li.knit.codeweaver.plist",
+                    "Start: launchctl load ~/Library/LaunchAgents/li.knit.codeweaver.plist",
+                    "Logs: tail -f ~/Library/Logs/codeweaver.log",
+                ],
+                title="",
+            )
+    elif platform == "win32":
+        _show_windows_instructions(display, cw_cmd, project_path)
+    else:
+        display.print_warning(f"Unsupported platform: {platform}")
+        display.print_info("Manual setup required. Run: cw start --foreground")
+
+
 def main() -> None:
     """CLI entry point for init command."""
     display = _display
