@@ -580,6 +580,11 @@ class NodeTypeParser:
     def _load_from_cache(self) -> bool:
         """Try to load pre-processed node types from cache.
 
+        Security: While pickle.loads() can execute arbitrary code, this cache is:
+        1. Generated during our build process
+        2. Shipped as part of the package (same trust level as our code)
+        3. Validated for structure and version compatibility
+
         Returns:
             True if cache was loaded successfully, False otherwise.
         """
@@ -591,13 +596,31 @@ class NodeTypeParser:
                 return False
 
             cache_data = pickle.loads(cache_resource.read_bytes())
+
+            # Validate cache structure
+            if not isinstance(cache_data, dict) or "registration_cache" not in cache_data:
+                logger.warning(
+                    "Invalid cache structure: missing 'registration_cache' key, will parse from JSON"
+                )
+                return False
+
+            # Validate cache data type
+            if not isinstance(cache_data["registration_cache"], dict):
+                logger.warning("Invalid cache data type, will parse from JSON")
+                return False
+
             type(self)._registration_cache = cache_data["registration_cache"]
             type(self)._cache_loaded = True
             logger.debug("Loaded node types from cache")
             return True
 
-        except Exception as e:
-            logger.warning("Failed to load node types cache, will parse from JSON: %s", e)
+        except (pickle.UnpicklingError, AttributeError, KeyError) as e:
+            # Specific pickle/data structure errors
+            logger.warning("Cache corrupted or incompatible: %s, will parse from JSON", e)
+            return False
+        except (FileNotFoundError, OSError) as e:
+            # File system errors
+            logger.warning("Failed to read cache file: %s, will parse from JSON", e)
             return False
 
     @property
