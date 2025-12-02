@@ -210,19 +210,63 @@ pip install --pre --upgrade codeweaver
 
 By default, `pip install code-weaver` will **not** install pre-releases.
 
-## Integration with Changesets
+## Changelog Management
 
-This project uses changesets for changelog management. The version workflow integrates with changesets:
+This project uses **git-cliff** for automated changelog generation. Changelogs are generated from pull request merge commits, filtering out individual commit noise.
 
-1. Create changeset for your changes:
-   ```bash
-   changeset add
-   ```
+### How It Works
 
-2. Changesets create entries in `.changeset/` directory
+- **PR-focused**: Only merge commits from pull requests are included in changelogs
+- **Automatic categorization**: PRs are grouped by branch name patterns:
+  - `feat/` or `feature/` → Features
+  - `fix/`, `bugfix/`, `hotfix/`, `issue-` → Bug Fixes
+  - `optimize/`, `perf/` → Performance
+  - `docs/`, `doc/` → Documentation
+  - `refactor/` → Refactoring
+  - `ci/`, `workflow/` → CI/CD
+  - `test/` → Testing
+  - Everything else → Other Changes
+- **Clean output**: Extracts PR descriptions instead of showing "Merge pull request..." messages
+- **Manual triggers**: Generate changelogs on-demand via mise tasks or GitHub workflows
 
-3. When ready to release, changeset updates version and CHANGELOG
+### Local Usage
 
-4. Tag the release and push
+Generate and view changelog:
+```bash
+# View full changelog (stdout)
+mise run changelog
 
-See project changeset configuration for details.
+# View unreleased changes only (stdout)
+mise run changelog-unreleased
+
+# Update CHANGELOG.md with unreleased changes
+mise run changelog-update
+
+# Generate changelog for specific tag
+mise run changelog-tag v0.1.0
+```
+
+### GitHub Workflow
+
+The changelog can also be generated via GitHub Actions:
+
+1. Go to **Actions** → **Generate Changelog**
+2. Click **Run workflow**
+3. Options:
+   - **Tag**: Leave empty for unreleased changes, or specify a tag (e.g., `v0.1.0`)
+   - **Commit**: Check to automatically commit and push CHANGELOG.md
+4. Download the generated changelog as an artifact, or check the committed file
+
+### Release Workflow Integration
+
+When you create a release by pushing a tag, the release workflow automatically:
+1. Generates release notes using git-cliff
+2. Creates a GitHub release with categorized PR descriptions
+3. Includes installation instructions and verification info
+
+### Best Practices
+
+1. **Maintain good PR descriptions**: Since the changelog is based on PR descriptions, clear and descriptive PR titles/descriptions result in better changelogs
+2. **Use branch name conventions**: Follow the naming patterns (`feat/`, `fix/`, etc.) for automatic categorization
+3. **Update before releases**: Run `mise run changelog-update` before creating release tags to keep CHANGELOG.md current
+4. **Squash vs Merge**: The setup works with both squash commits and merge commits, but focuses on the final PR merge
