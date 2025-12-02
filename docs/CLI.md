@@ -113,7 +113,7 @@ $ codeweaver search [OPTIONS] QUERY
 
 * `--intent`:   *[choices: understand, implement, debug, optimize, test, configure, document]*
 * `--limit`:   *[default: 10]*
-* `-p, --project`: 
+* `-p, --project`:
 * `-c, --config-file`: Path to a specific config file to use
 * `--output-format`:   *[choices: json, table, markdown]*  *[default: table]*
 
@@ -131,8 +131,8 @@ $ codeweaver server [OPTIONS]
 
 ### Options
 
-* `-c, --config`: 
-* `-p, --project`: 
+* `-c, --config`:
+* `-p, --project`:
 * `--host`:   *[default: 127.0.0.1]*
 * `--port`:   *[default: 9328]*
 * `-t, --transport`: Transport type for MCP communication (streamable-http or stdio)  *[choices: streamable-http, stdio]*  *[default: streamable-http]*
@@ -158,7 +158,7 @@ $ codeweaver start [OPTIONS] [ARGS]
 * `--management-host`:   *[default: 127.0.0.1]*
 * `--management-port`:   *[default: 9329]*
 * `--start-mcp-http-server, --no-start-mcp-http-server`:   *[default: --no-start-mcp-http-server]*
-* `--mcp-host`: 
+* `--mcp-host`:
 * `--mcp-port`:
 
 ## `codeweaver stop`
@@ -248,7 +248,7 @@ $ codeweaver doctor [OPTIONS]
 * `--display.console.style.meta`: Style to apply to all output, or None for no style. Defaults to None.
 * `--display.console.no-color, --display.console.no-no-color`: Enabled no color mode, or None to auto detect. Defaults to None.
 * `--display.console.tab-size`: Number of spaces used to replace a tab character. Defaults to 8.  *[default: 8]*
-* `--display.console.record, --display.console.no-record`: Boolean to enable recording of terminal output, required to call export_html, export_svg, and export_text. Defaults to 
+* `--display.console.record, --display.console.no-record`: Boolean to enable recording of terminal output, required to call export_html, export_svg, and export_text. Defaults to
 False.
 * `--display.console.markup, --display.console.no-markup`: Boolean to enable :ref:`console_markup`. Defaults to True.  *[default: --display.console.markup]*
 * `--display.console.emoji, --display.console.no-emoji`: Enable emoji code. Defaults to True.  *[default: --display.console.emoji]*
@@ -613,7 +613,7 @@ $ codeweaver init COMMAND [OPTIONS]
 * `--profile`: Configuration profile to use (recommended, quickstart, or test). Defaults to 'recommended' with --recommended.  *[choices: recommended, quickstart, test]*  *[default: recommended]*
 * `--vector-deployment`: Vector store deployment type  *[choices: local, cloud]*  *[default: local]*
 * `--vector-url`: URL for cloud vector deployment (required if --vector-deployment=cloud)
-* `-c, --client, --empty-client`: MCP clients to configure. Defaults to 'mcpjson' if none specified. You can provide multiple clients by repeating this 
+* `-c, --client, --empty-client`: MCP clients to configure. Defaults to 'mcpjson' if none specified. You can provide multiple clients by repeating this
 flag.  *[choices: claude_code, claude_desktop, cursor, gemini_cli, vscode, mcpjson]*
 * `--host`: CodeWeaver server host  *[default: http://127.0.0.1]*
 * `--port`: CodeWeaver server port  *[default: 9328]*
@@ -648,8 +648,8 @@ $ codeweaver init config [OPTIONS]
 * `--vector-url`: URL for cloud vector deployment (required if --vector-deployment=cloud)
 * `--config-path`: Custom path for configuration file (defaults to codeweaver.toml in project root)
 * `--config-extension`:   *[choices: toml, yaml, yml, json]*  *[default: toml]*
-* `--config-level`: Configuration level. Local configs (which end in 'local') should be gitignored and are for personal use. Project-level 
-are for shared configuration in a repository and should not be gitignored. User-level are for personal configurations 
+* `--config-level`: Configuration level. Local configs (which end in 'local') should be gitignored and are for personal use. Project-level
+are for shared configuration in a repository and should not be gitignored. User-level are for personal configurations
 across multiple projects.  *[choices: local, project, user]*  *[default: project]*
 * `-f, --force, --no-force`: Overwrite existing configuration file  *[default: --no-force]*
 
@@ -661,10 +661,10 @@ Set up MCP client configuration for CodeWeaver.
 This command generates MCP client configuration that allows AI assistants like Claude Code, Cursor, or VSCode to connect
 to CodeWeaver's MCP server.
 
-Transport Types: - streamable-http (default): HTTP-based transport for persistent server connections - stdio: Standard 
+Transport Types: - streamable-http (default): HTTP-based transport for persistent server connections - stdio: Standard
 input/output transport that launches CodeWeaver per-session
 
-Tip: Set a default MCP config in your CodeWeaver config, then just run cw init mcp --client your_client --client 
+Tip: Set a default MCP config in your CodeWeaver config, then just run cw init mcp --client your_client --client
 another_client to generate the config for those clients.
 
 **Usage**:
@@ -679,7 +679,7 @@ $ codeweaver init mcp [OPTIONS]
 * `-p, --project`: Path to project directory (auto-detected if not provided)
 * `-l, --config-level`: Configuration level to write to.  *[choices: project, user]*  *[default: project]*
 * `-f, --file-path`: Custom path to MCP client configuration file.
-* `-c, --client, --empty-client`: MCP client to configure, you can provide multiple clients by repeating this flag. Defaults to 'mcpjson' if none 
+* `-c, --client, --empty-client`: MCP client to configure, you can provide multiple clients by repeating this flag. Defaults to 'mcpjson' if none
 specified.  *[choices: claude_code, claude_desktop, cursor, gemini_cli, vscode, mcpjson]*
 * `--host`: [http-only] Server host address (default: http://127.0.0.1)  *[default: http://127.0.0.1]*
 * `--port`: [http-only] Server port (default: 9328)  *[default: 9328]*
