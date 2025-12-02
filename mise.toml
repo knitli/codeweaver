@@ -300,7 +300,7 @@ for /f "delims=" %%v in ('uv --version') do echo [codeweaver] UV version: %%v
 '''
 
 [tasks.changelog]
-description = "Generate changelog for all commits (output to stdout)"
+description = "Generate a filtered, PR-focused changelog (output to stdout)"
 tools."cargo:git-cliff" = "latest"
 run = '''
 #!/usr/bin/env zsh
