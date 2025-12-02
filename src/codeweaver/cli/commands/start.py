@@ -17,7 +17,7 @@ import asyncio
 
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
-
+import contextlib
 from cyclopts import App, Parameter
 from pydantic import FilePath, PositiveInt
 
@@ -224,7 +224,7 @@ async def start_cw_services(
         finally:
             if mcp_server_task and not mcp_server_task.done():
                 mcp_server_task.cancel()
-                with asyncio.suppress(asyncio.CancelledError):
+                with contextlib.suppress(asyncio.CancelledError):
                     await mcp_server_task
             await management_server.stop()
 
