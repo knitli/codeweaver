@@ -262,9 +262,9 @@ The changelog can also be generated via GitHub Actions:
 ### Release Workflow Integration
 
 When you create a release by pushing a tag, the release workflow automatically:
-1. Generates release notes using git-cliff
-2. Creates a GitHub release with categorized PR descriptions
-3. Includes installation instructions and verification info
+1. Generates categorized changelog entries using git-cliff
+2. Creates a GitHub release with the changelog and installation instructions
+3. Includes verification info and links to artifacts
 
 ### Best Practices
 
