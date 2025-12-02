@@ -101,14 +101,15 @@ RUN mkdir -p /app/data /app/config /app/.codeweaver && \
 # Switch to non-root user
 USER codeweaver
 
-# Health check to ensure service is running
+# Health check via management server
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:9328/health/ || exit 1
+    CMD curl -f http://localhost:9329/health || exit 1
 
-# Expose the MCP server port
-EXPOSE 9328
+# Expose the MCP HTTP server port (9328) and management server port (9329)
+EXPOSE 9328 9329
 
-# Default command: start the CodeWeaver MCP server
-# Users can override this with custom config via docker-compose or docker run
+# Default command: start the CodeWeaver daemon in foreground mode
+# This runs both management server (9329) and MCP HTTP server (9328)
+# For stdio-only mode (MCP clients), use: codeweaver server
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["codeweaver", "server", "--host", "0.0.0.0", "--port", "9328"]
+CMD ["codeweaver", "start", "--foreground"]

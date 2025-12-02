@@ -42,6 +42,8 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: codeweaver-server
+    # Use HTTP transport for persistent service mode (daemon not needed in Docker)
+    command: ["codeweaver", "server", "--host", "0.0.0.0", "--port", "9328", "--transport", "streamable-http"]
     ports:
       - ${CODEWEAVER_PORT:-9328}:9328
     volumes:

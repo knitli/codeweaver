@@ -368,10 +368,14 @@ exclude_patterns = ["node_modules", ".git", "dist", "__pycache__"]
 
 ## Architecture
 
+CodeWeaver uses a daemon architecture with stdio as the default transport:
+
+**Standalone/docker-compose mode** (HTTP transport):
 ```
 ┌─────────────────────────────────────────────────┐
 │  CodeWeaver Container                           │
-│  ├─ MCP Server (port 9328)                     │
+│  ├─ MCP Server (port 9328, HTTP)               │
+│  ├─ Management Server (port 9329)              │
 │  ├─ Live File Watcher                          │
 │  ├─ Indexing Engine                            │
 │  └─ Search API                                 │
@@ -385,6 +389,22 @@ exclude_patterns = ["node_modules", ".git", "dist", "__pycache__"]
 │  ├─ gRPC API (port 6334)                       │
 │  └─ Persistent Storage                         │
 └─────────────────────────────────────────────────┘
+```
+
+**MCP client spawned mode** (STDIO transport - default):
+```
+┌──────────────────┐     ┌──────────────────────────┐
+│  MCP Client      │────▶│  Docker Container        │
+│  (Claude, etc.)  │stdio│  └─ STDIO proxy to HTTP  │
+└──────────────────┘     └───────────┬──────────────┘
+                                     │ HTTP
+                                     ▼
+                         ┌──────────────────────────┐
+                         │  CodeWeaver Daemon       │
+                         │  (running on host)       │
+                         │  ├─ MCP Server :9328     │
+                         │  └─ Management :9329    │
+                         └──────────────────────────┘
 ```
 
 ## Performance Optimization

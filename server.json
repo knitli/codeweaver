@@ -71,10 +71,10 @@
           "description": "Transport type for MCP communication. ",
           "isRequired": false,
           "isSecret": false,
-          "default": "streamable-http",
+          "default": "stdio",
           "choices": [
-            "streamable-http",
-            "stdio"
+            "stdio",
+            "streamable-http"
           ],
           "type": "named",
           "name": "--transport",
@@ -763,13 +763,13 @@
           "isRepeated": false
         },
         {
-          "description": "Use streamable-http for persistent state and continuous indexing",
+          "description": "Transport type for MCP communication (stdio proxies to HTTP backend)",
           "isRequired": false,
           "isSecret": false,
-          "default": "streamable-http",
+          "default": "stdio",
           "choices": [
-            "streamable-http",
-            "stdio"
+            "stdio",
+            "streamable-http"
           ],
           "type": "named",
           "name": "--transport",

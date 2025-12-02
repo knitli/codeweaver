@@ -330,6 +330,37 @@ async def status_info(_request: Request) -> PlainTextResponse:
         )
 
 
+@timed_http("shutdown")
+async def shutdown_handler(request: Request) -> PlainTextResponse:
+    """Request graceful shutdown of the daemon.
+
+    This endpoint triggers an orderly shutdown of all daemon services.
+    Returns 202 Accepted immediately while shutdown proceeds in background.
+    """
+    # Only allow POST requests for safety
+    if request.method != "POST":
+        return PlainTextResponse(
+            content=to_json({"error": "Method not allowed. Use POST."}),
+            status_code=405,
+            media_type="application/json",
+        )
+
+    # Request shutdown
+    if ManagementServer.request_shutdown():
+        logger.info("Shutdown requested via management API")
+        return PlainTextResponse(
+            content=to_json({"status": "shutdown_initiated", "message": "Daemon shutdown initiated"}),
+            status_code=202,
+            media_type="application/json",
+        )
+    else:
+        return PlainTextResponse(
+            content=to_json({"error": "Shutdown could not be initiated"}),
+            status_code=500,
+            media_type="application/json",
+        )
+
+
 class ManagementServer:
     """
     HTTP server for management endpoints.
@@ -339,6 +370,10 @@ class ManagementServer:
 
     Reuses existing endpoint handlers from app_bindings.py.
     """
+
+    # Class-level shutdown event for coordinating graceful shutdown
+    _shutdown_event: asyncio.Event | None = None
+    _instance: "ManagementServer | None" = None
 
     def __init__(self, background_state: CodeWeaverState) -> None:
         """
@@ -350,6 +385,27 @@ class ManagementServer:
         self.background_state = background_state
         self.server: uvicorn.Server | None = None
         self.server_task: asyncio.Task | None = None
+        ManagementServer._instance = self
+        ManagementServer._shutdown_event = asyncio.Event()
+
+    @classmethod
+    def get_instance(cls) -> "ManagementServer | None":
+        """Get the current management server instance."""
+        return cls._instance
+
+    @classmethod
+    def request_shutdown(cls) -> bool:
+        """Request graceful shutdown of the daemon."""
+        if cls._shutdown_event:
+            cls._shutdown_event.set()
+            return True
+        return False
+
+    @classmethod
+    def is_shutdown_requested(cls) -> bool:
+        """Check if shutdown has been requested."""
+        return cls._shutdown_event is not None and cls._shutdown_event.is_set()
+
     def create_app(self) -> Starlette:
         """
         Create Starlette app with management routes.
@@ -371,6 +427,8 @@ class ManagementServer:
             Route("/health", health, methods=["GET"]),
             Route("/status", status_info, methods=["GET"]),
             Route("/metrics", stats_info, methods=["GET"]),
+            # Shutdown endpoint for graceful daemon termination
+            Route("/shutdown", shutdown_handler, methods=["POST"]),
         ]
 
         if endpoint_settings.get("enable_version", True):

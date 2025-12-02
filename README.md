@@ -98,29 +98,29 @@ cw server
 
 ### MCP Configuration
 
-Behind the scenes, CodeWeaver always runs an http server for mcp services, but you can use it with *either* stdio or http transports. Your stdio session bridges to the http server.
+CodeWeaver uses **stdio transport by default**, which proxies to the HTTP backend daemon. First start the daemon with `codeweaver start`, then MCP clients can connect via stdio.
 
 `cw init` will add CodeWeaver to your project's `.mcp.json`:
 
-```json "with http:"
-{
-  "mcpServers": {
-    "codeweaver": {
-      "type": "http",
-      "url": "http://127.0.0.1:9328/mcp"
-    }
-  }
-}
-```
-
-```json "with stdio:"
+```json "with stdio (default):"
 {
   "mcpServers": {
     "codeweaver": {
       "type": "stdio",
       "cmd": "uv",
-      "args": ["run", "codeweaver", "server", "--transport", "stdio"],
+      "args": ["run", "codeweaver", "server"],
       "env": {"SOME_API_KEY_FOR_PROVIDERS": "value"}
+    }
+  }
+}
+```
+
+```json "with http (direct connection):"
+{
+  "mcpServers": {
+    "codeweaver": {
+      "type": "http",
+      "url": "http://127.0.0.1:9328/mcp"
     }
   }
 }
@@ -237,7 +237,9 @@ CodeWeaver combines [AST][wiki_ast]-level understanding, semantic relationships,
 ### CLI Commands
 
 ```bash
-cw server    # Run the MCP server
+cw start     # Start daemon in background (or --foreground)
+cw stop      # Stop the daemon
+cw server    # Run the MCP server (stdio by default)
 cw doctor    # Full setup diagnostic
 cw index     # Run indexing without server
 cw init      # Set up MCP + config
@@ -245,6 +247,15 @@ cw list      # List providers, models, capabilities
 cw status    # Live server status, health, index state
 cw search    # Test the search engine
 cw config    # View resolved configuration
+```
+
+#### Running as a System Service
+
+Install CodeWeaver to start automatically on login:
+
+```bash
+cw init service          # Install and enable (systemd/launchd)
+cw init service --uninstall  # Remove the service
 ```
 
 📖 [Full CLI Guide →][cli_guide]

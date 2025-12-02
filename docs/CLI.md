@@ -123,7 +123,7 @@ $ codeweaver server [OPTIONS]
 * `-p, --project`: 
 * `--host`:   *[default: 127.0.0.1]*
 * `--port`:   *[default: 9328]*
-* `-t, --transport`: Transport type for MCP communication (streamable-http or stdio)  *[choices: streamable-http, stdio]*  *[default: streamable-http]*
+* `-t, --transport`: Transport type for MCP communication (stdio or streamable-http)  *[choices: stdio, streamable-http]*  *[default: stdio]*
 * `-v, --verbose, --no-verbose`: Enable verbose logging with timestamps  *[default: --no-verbose]*
 * `-d, --debug, --no-debug`: Enable debug logging  *[default: --no-debug]*
 
@@ -574,7 +574,7 @@ flag.  *[choices: claude_code, claude_desktop, cursor, gemini_cli, vscode, mcpjs
 * `--host`: CodeWeaver server host  *[default: http://127.0.0.1]*
 * `--port`: CodeWeaver server port  *[default: 9328]*
 * `-f, --force, --no-force`: Force overwrite existing config  *[default: --no-force]*
-* `-t, --transport`: Transport type (streamable-http or stdio). Streamable default and recommended.  *[choices: streamable-http, stdio]*  *[default: streamable-http]*
+* `-t, --transport`: Transport type (stdio or streamable-http). Stdio is default and recommended.  *[choices: stdio, streamable-http]*  *[default: stdio]*
 * `--config-extension`:   *[choices: toml, yaml, yml, json]*  *[default: toml]*
 * `--config-path`: Custom path for CodeWeaver configuration file
 * `--mcp-config-level`: The level of mcp configuration to write to (project or user)  *[choices: project, user]*  *[default: project]*
@@ -617,8 +617,8 @@ Set up MCP client configuration for CodeWeaver.
 This command generates MCP client configuration that allows AI assistants like Claude Code, Cursor, or VSCode to connect
 to CodeWeaver's MCP server.
 
-Transport Types: - streamable-http (default): HTTP-based transport for persistent server connections - stdio: Standard 
-input/output transport that launches CodeWeaver per-session
+Transport Types: - stdio (default): Standard input/output transport that proxies to HTTP backend - streamable-http: Direct
+HTTP-based transport for persistent server connections
 
 Tip: Set a default MCP config in your CodeWeaver config, then just run cw init mcp --client your_client --client 
 another_client to generate the config for those clients.
@@ -639,7 +639,7 @@ $ codeweaver init mcp [OPTIONS]
 specified.  *[choices: claude_code, claude_desktop, cursor, gemini_cli, vscode, mcpjson]*
 * `--host`: [http-only] Server host address (default: http://127.0.0.1)  *[default: http://127.0.0.1]*
 * `--port`: [http-only] Server port (default: 9328)  *[default: 9328]*
-* `-t, --transport`: Transport type for MCP communication  *[choices: streamable-http, stdio]*  *[default: streamable-http]*
+* `-t, --transport`: Transport type for MCP communication  *[choices: stdio, streamable-http]*  *[default: stdio]*
 * `--timeout`: Timeout in seconds for MCP client connections  *[default: 120]*
 * `--auth`: Authentication method for MCP client (bearer token, 'oauth', an httpx.Auth object, or None)  *[choices: oauth]*
 * `--cmd`: [stdio-only] Command to start MCP client process

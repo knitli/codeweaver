@@ -357,7 +357,7 @@ def _create_stdio_config(
 
     Args:
         cmd: Command to execute (default: "codeweaver")
-        args: Arguments for the command (default: ["server", "--transport", "stdio"])
+        args: Arguments for the command (default: ["server"])
         env: Environment variables for the process
         timeout: Connection timeout in seconds
         authentication: Authentication configuration
@@ -369,9 +369,9 @@ def _create_stdio_config(
     from codeweaver.config.mcp import StdioCodeWeaverConfig
 
     # Build the command - CodeWeaver doesn't need uv environment
-    # We directly execute: cw server --transport stdio
+    # stdio is the default transport, so we just run: cw server
     command = cmd or "codeweaver"
-    command_args = args or ["server", "--transport", "stdio"]
+    command_args = args or ["server"]
 
     # Combine command and args into single command string
     full_command = f"{command} {' '.join(command_args)}"
@@ -605,14 +605,14 @@ def mcp(
     host: Annotated[str, cyclopts.Parameter(name=["--host"])] = "http://127.0.0.1",
     port: Annotated[int, cyclopts.Parameter(name=["--port"])] = 9328,
     transport: Annotated[
-        Literal["streamable-http", "stdio"],
+        Literal["stdio", "streamable-http"],
         cyclopts.Parameter(
             name=["--transport", "-t"],
             help="Transport type for MCP communication",
             show_default=True,
             show_choices=True,
         ),
-    ] = "streamable-http",
+    ] = "stdio",
     timeout: Annotated[
         int,
         cyclopts.Parameter(
@@ -657,8 +657,8 @@ def mcp(
     Cursor, or VSCode to connect to CodeWeaver's MCP server.
 
     **Transport Types:**
-    - `streamable-http` (default): HTTP-based transport for persistent server connections
-    - `stdio`: Standard input/output transport that launches CodeWeaver per-session
+    - `stdio` (default): Standard input/output transport that proxies to the HTTP backend
+    - `streamable-http`: Direct HTTP-based transport for persistent server connections
 
     **Tip**: Set a default MCP config in your CodeWeaver config, then just run
     `cw init mcp --client your_client --client another_client` to generate the config for those clients.
@@ -675,7 +675,7 @@ def mcp(
         auth: [http-only] Authentication method
 
         cmd: [stdio-only] Command to start MCP server process (default: "codeweaver")
-        args: [stdio-only] Arguments for the command (default: ["server", "--transport", "stdio"])
+        args: [stdio-only] Arguments for the command (default: ["server"])
         env: [stdio-only] Environment variables for the process
 
         timeout: Timeout in seconds for connections
@@ -765,8 +765,8 @@ def init(
         bool, cyclopts.Parameter(name=["--force", "-f"], help="Force overwrite existing config")
     ] = False,
     transport: Annotated[
-        Literal["streamable-http", "stdio"], cyclopts.Parameter(name=["--transport", "-t"])
-    ] = "streamable-http",
+        Literal["stdio", "streamable-http"], cyclopts.Parameter(name=["--transport", "-t"])
+    ] = "stdio",
     config_extension: Annotated[
         Literal["toml", "yaml", "yml", "json"], cyclopts.Parameter(name=["--config-extension"])
     ] = "toml",
@@ -801,13 +801,14 @@ def init(
     Use --config-only or --mcp-only to create just one.
 
     ARCHITECTURE NOTE:
-    CodeWeaver uses HTTP streaming (not STDIO) for the MCP protocol *by default*.
+    CodeWeaver uses STDIO transport by default, which proxies to the HTTP backend daemon.
     This means:
+    - Start the daemon first: `cw start` (runs background services + HTTP backend)
+    - MCP clients connect via stdio, which proxies to the daemon
     - Single server instance shared across all clients
     - Background indexing persists between client sessions
-    - Server must be started separately: `cw server`
 
-    You can use --transport stdio if you prefer per-session server instances.
+    You can use --transport streamable-http for direct HTTP connections.
 
     Args:
         project: Path to project directory (defaults to current directory)
@@ -820,17 +821,17 @@ def init(
         clients: MCP clients to configure (claude_code, claude_desktop, cursor, gemini_cli, vscode, mcpjson).
         host: Server host address for MCP config (default: 127.0.0.1)
         port: Server port for MCP config (default: 9328)
-        transport: Transport type (streamable-http or stdio). Streamable default and recommended.
+        transport: Transport type (stdio or streamable-http). Stdio is default and recommended.
         config_level: Configuration level (project or user)
         force: Overwrite existing configurations
 
     Examples:
-        cw init --quickstart         # Full setup with quickstart profile (free/offline)
-        cw init                      # Full setup with recommended profile
-        cw init --config-only        # Just config file
-        cw init --mcp-only           # Just MCP client config
-        cw init --client cursor      # Setup for Cursor
-        cw init --transport stdio    # Use stdio transport (not recommended)
+        cw init --quickstart              # Full setup with quickstart profile (free/offline)
+        cw init                           # Full setup with recommended profile
+        cw init --config-only             # Just config file
+        cw init --mcp-only                # Just MCP client config
+        cw init --client cursor           # Setup for Cursor
+        cw init --transport streamable-http  # Use direct HTTP transport
     """
     if clients is None:
         clients = ["mcpjson"]
@@ -917,43 +918,450 @@ def init(
             title="Next Steps:",
             numbered=True,
         )
-    if transport == "streamable-http":
+    if transport == "stdio":
         display.print_list(
             [
-                "CodeWeaver uses HTTP streaming transport for MCP communication.",
-                "Ensure the CodeWeaver server is running before starting your MCP client.",
-                "Background indexing will persist between client sessions.",
+                "CodeWeaver uses stdio transport that proxies to the HTTP backend daemon.",
+                "Start the daemon first: [dim]cw start[/dim]",
+                "MCP clients will connect via stdio, sharing the same indexed codebase.",
+                "Background indexing persists between client sessions.",
             ],
             title="Important Notes:",
         )
 
     else:
-        display.print_warning(
-            "You chose stdio transport, which is not the recommended setup for CodeWeaver."
-        )
-        display.console.print("Important Notes:")
         display.print_list(
             [
-                "Each MCP client session will launch a separate CodeWeaver server instance.",
-                "Background indexing will NOT persist between client sessions.",
-                "Consider using the default streamable-http transport for better performance, less resource use, and a more consistent experience between clients and sessions.",
+                "CodeWeaver is configured for direct HTTP streaming transport.",
+                "Ensure the CodeWeaver server is running before starting your MCP client.",
+                "Start the server: [dim]cw server --transport streamable-http[/dim]",
+                "Background indexing will persist between client sessions.",
             ],
-            title="Using the stdio transport:",
+            title="Important Notes:",
         )
 
     display.print_section("Using CodeWeaver")
     display.print_list(
         [
-            "We recommend you start and run CodeWeaver while you code, whether you are using MCP clients or not.",
-            "You can use a tool like `mise` to automatically start CodeWeaver when you enter your project directory.",
-            "Or, just get in the habit of running `cw server` in a terminal tab when you start coding.",
-            "You can use CodeWeaver to search your codebase outside of an MCP client with `codeweaver search`",
-            "Check status with `cw status`",
-            "To check your config setup, run `codeweaver doctor`",
+            "We recommend you start the daemon while you code: [dim]cw start[/dim]",
+            "You can use a tool like `mise` to automatically start the daemon when you enter your project directory.",
+            "Or, just get in the habit of running [dim]cw start[/dim] when you start coding.",
+            "You can use CodeWeaver to search your codebase outside of an MCP client with [dim]codeweaver search[/dim]",
+            "Check status with [dim]cw status[/dim]",
+            "To check your config setup, run [dim]codeweaver doctor[/dim]",
             "[red]CodeWeaver is in Alpha. There are bugs.[/red] Help us by reporting them: https://github.com/knitli/codeweaver/issues",
         ],
         title="Tips for Best Experience:",
     )
+
+
+def _get_systemd_unit(cw_cmd: str, working_dir: Path) -> str:
+    """Generate systemd user service unit file content.
+
+    Args:
+        cw_cmd: Path to the codeweaver executable
+        working_dir: Working directory for the service
+
+    Returns:
+        Systemd unit file content as a string
+    """
+    # Quote paths to handle spaces and special characters
+    return f"""[Unit]
+Description=CodeWeaver MCP Server - Semantic Code Search
+Documentation=https://github.com/knitli/codeweaver
+After=network.target
+
+[Service]
+Type=simple
+ExecStart="{cw_cmd}" start --foreground
+WorkingDirectory="{working_dir!s}"
+Restart=on-failure
+RestartSec=5
+
+# Environment (uncomment and set if needed)
+# Environment=VOYAGE_API_KEY=your-api-key
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target
+"""
+
+
+def _escape_xml(text: str) -> str:
+    """Escape special characters for XML content."""
+    return (
+        text.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+        .replace("'", "&apos;")
+    )
+
+
+def _get_launchd_plist(cw_cmd: str, working_dir: Path) -> str:
+    """Generate launchd user agent plist file content.
+
+    Args:
+        cw_cmd: Path to the codeweaver executable
+        working_dir: Working directory for the service
+
+    Returns:
+        Launchd plist file content as a string
+    """
+    # Escape paths for XML to handle special characters
+    escaped_cmd = _escape_xml(cw_cmd)
+    escaped_dir = _escape_xml(str(working_dir))
+    escaped_log = _escape_xml(str(Path.home() / "Library" / "Logs" / "codeweaver.log"))
+    escaped_err_log = _escape_xml(str(Path.home() / "Library" / "Logs" / "codeweaver.error.log"))
+
+    return f"""<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>li.knit.codeweaver</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>{escaped_cmd}</string>
+        <string>start</string>
+        <string>--foreground</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>{escaped_dir}</string>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>{escaped_log}</string>
+
+    <key>StandardErrorPath</key>
+    <string>{escaped_err_log}</string>
+
+    <!-- Environment variables (uncomment and set if needed) -->
+    <!--
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>VOYAGE_API_KEY</key>
+        <string>your-api-key</string>
+    </dict>
+    -->
+</dict>
+</plist>
+"""
+
+
+def _install_systemd_service(
+    display: StatusDisplay, cw_cmd: str, working_dir: Path, *, enable: bool
+) -> bool:
+    """Install CodeWeaver as a systemd user service.
+
+    Args:
+        display: Status display for output
+        cw_cmd: Path to the codeweaver executable
+        working_dir: Working directory for the service
+        enable: Whether to enable the service to start on login
+
+    Returns:
+        True if successful, False otherwise
+    """
+    import subprocess
+
+    service_dir = Path.home() / ".config" / "systemd" / "user"
+    service_file = service_dir / "codeweaver.service"
+
+    try:
+        # Create service directory
+        service_dir.mkdir(parents=True, exist_ok=True)
+
+        # Write service file
+        unit_content = _get_systemd_unit(cw_cmd, working_dir)
+        service_file.write_text(unit_content, encoding="utf-8")
+        display.print_success(f"Created systemd service: {service_file}")
+
+        # Reload systemd
+        subprocess.run(
+            ["/usr/bin/systemctl", "--user", "daemon-reload"], check=True, capture_output=True
+        )
+        display.print_info("Reloaded systemd daemon")
+
+        if enable:
+            # Enable and start the service
+            subprocess.run(
+                ["/usr/bin/systemctl", "--user", "enable", "codeweaver.service"],
+                check=True,
+                capture_output=True,
+            )
+            display.print_success("Enabled codeweaver service")
+            subprocess.run(
+                ["/usr/bin/systemctl", "--user", "start", "codeweaver.service"],
+                check=True,
+                capture_output=True,
+            )
+            display.print_success("Started codeweaver service")
+        else:
+            display.print_info("To enable: systemctl --user enable codeweaver.service")
+            display.print_info("To start: systemctl --user start codeweaver.service")
+
+    except subprocess.CalledProcessError as e:
+        display.print_error(f"systemctl command failed: {e}")
+        return False
+    except Exception as e:
+        display.print_error(f"Failed to install systemd service: {e}")
+        return False
+    else:
+        return True
+
+
+def _install_launchd_service(
+    display: StatusDisplay, cw_cmd: str, working_dir: Path, *, enable: bool
+) -> bool:
+    """Install CodeWeaver as a launchd user agent.
+
+    Args:
+        display: Status display for output
+        cw_cmd: Path to the codeweaver executable
+        working_dir: Working directory for the service
+        enable: Whether to load the service immediately
+
+    Returns:
+        True if successful, False otherwise
+    """
+    import subprocess
+
+    agents_dir = Path.home() / "Library" / "LaunchAgents"
+    plist_file = agents_dir / "li.knit.codeweaver.plist"
+
+    try:
+        # Create agents directory
+        agents_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create logs directory
+        logs_dir = Path.home() / "Library" / "Logs"
+        logs_dir.mkdir(parents=True, exist_ok=True)
+
+        # Write plist file
+        plist_content = _get_launchd_plist(cw_cmd, working_dir)
+        plist_file.write_text(plist_content, encoding="utf-8")
+        display.print_success(f"Created launchd agent: {plist_file}")
+
+        if enable:
+            # Unload if already loaded (ignore errors)
+            subprocess.run(["/bin/launchctl", "unload", str(plist_file)], capture_output=True)  # noqa: S603
+            # Load the service
+            subprocess.run(  # noqa: S603
+                ["/bin/launchctl", "load", str(plist_file)], check=True, capture_output=True
+            )
+            display.print_success("Loaded codeweaver agent")
+        else:
+            display.print_info(f"To load: launchctl load {plist_file}")
+            display.print_info(f"To unload: launchctl unload {plist_file}")
+
+    except subprocess.CalledProcessError as e:
+        display.print_error(f"launchctl command failed: {e}")
+        return False
+    except Exception as e:
+        display.print_error(f"Failed to install launchd agent: {e}")
+        return False
+    else:
+        return True
+
+
+def _show_windows_instructions(display: StatusDisplay, cw_cmd: str, working_dir: Path) -> None:
+    """Show instructions for Windows service installation.
+
+    Windows services are more complex and typically require third-party tools
+    like NSSM (Non-Sucking Service Manager) or sc.exe.
+
+    Args:
+        display: Status display for output
+        cw_cmd: Path to the codeweaver executable
+        working_dir: Working directory for the service
+    """
+    display.print_section("Windows Service Installation")
+    display.print_info(
+        "Windows services require administrator privileges and additional setup.\n"
+        "We recommend using NSSM (Non-Sucking Service Manager) for a simple setup."
+    )
+    display.print_list(
+        [
+            "Download NSSM from: https://nssm.cc/download",
+            "Open an Administrator Command Prompt",
+            f'Run: nssm install CodeWeaver "{cw_cmd}" start --foreground',
+            f"Set startup directory to: {working_dir}",
+            "Configure environment variables if needed (VOYAGE_API_KEY, etc.)",
+            "Start the service: nssm start CodeWeaver",
+        ],
+        title="Steps:",
+        numbered=True,
+    )
+    display.print_info("\nAlternatively, use Task Scheduler to run CodeWeaver at login.")
+
+
+def _uninstall_systemd_service(display: StatusDisplay, error_handler: CLIErrorHandler) -> None:
+    """Uninstall the systemd user service on Linux."""
+    import subprocess
+
+    service_file = Path.home() / ".config" / "systemd" / "user" / "codeweaver.service"
+    if service_file.exists():
+        try:
+            subprocess.run(
+                ["/usr/bin/systemctl", "--user", "stop", "codeweaver.service"], capture_output=True
+            )
+            subprocess.run(
+                ["/usr/bin/systemctl", "--user", "disable", "codeweaver.service"],
+                capture_output=True,
+            )
+            service_file.unlink()
+            subprocess.run(
+                ["/usr/bin/systemctl", "--user", "daemon-reload"], check=True, capture_output=True
+            )
+            display.print_success("Removed systemd service")
+        except Exception as e:
+            error_handler.handle_error(
+                CodeWeaverError(f"Failed to remove service: {e}"), "Service removal"
+            )
+    else:
+        display.print_warning("Service not installed")
+
+
+def _uninstall_launchd_service(display: StatusDisplay, error_handler: CLIErrorHandler) -> None:
+    """Uninstall the launchd user agent on macOS."""
+    import subprocess
+
+    plist_file = Path.home() / "Library" / "LaunchAgents" / "li.knit.codeweaver.plist"
+    if plist_file.exists():
+        try:
+            subprocess.run(["/bin/launchctl", "unload", str(plist_file)], capture_output=True)  # noqa: S603
+            plist_file.unlink()
+            display.print_success("Removed launchd agent")
+        except Exception as e:
+            error_handler.handle_error(
+                CodeWeaverError(f"Failed to remove agent: {e}"), "Service removal"
+            )
+    else:
+        display.print_warning("Agent not installed")
+
+
+def _show_systemd_management_commands(display: StatusDisplay) -> None:
+    """Show systemd management commands after successful installation."""
+    display.print_section("Management Commands")
+    display.print_list(
+        [
+            "Status: systemctl --user status codeweaver.service",
+            "Stop: systemctl --user stop codeweaver.service",
+            "Start: systemctl --user start codeweaver.service",
+            "Logs: journalctl --user -u codeweaver.service -f",
+            "Disable: systemctl --user disable codeweaver.service",
+        ],
+        title="",
+    )
+
+
+def _show_launchd_management_commands(display: StatusDisplay) -> None:
+    """Show launchd management commands after successful installation."""
+    display.print_section("Management Commands")
+    display.print_list(
+        [
+            "Status: launchctl list | grep codeweaver",
+            "Stop: launchctl unload ~/Library/LaunchAgents/li.knit.codeweaver.plist",
+            "Start: launchctl load ~/Library/LaunchAgents/li.knit.codeweaver.plist",
+            "Logs: tail -f ~/Library/Logs/codeweaver.log",
+        ],
+        title="",
+    )
+
+
+@app.command
+def service(
+    *,
+    project: Annotated[Path | None, cyclopts.Parameter(name=["--project", "-p"])] = None,
+    enable: Annotated[
+        bool,
+        cyclopts.Parameter(
+            name=["--enable", "-e"],
+            help="Enable and start the service immediately (Linux/macOS only)",
+        ),
+    ] = True,
+    uninstall: Annotated[
+        bool, cyclopts.Parameter(name=["--uninstall", "-u"], help="Remove the installed service")
+    ] = False,
+) -> None:
+    """Install CodeWeaver as a system service for automatic startup.
+
+    This command configures CodeWeaver to start automatically when you log in.
+
+    **Linux (systemd):**
+    Creates a user systemd service at ~/.config/systemd/user/codeweaver.service
+
+    **macOS (launchd):**
+    Creates a user launch agent at ~/Library/LaunchAgents/li.knit.codeweaver.plist
+
+    **Windows:**
+    Provides instructions for setting up with NSSM or Task Scheduler.
+
+    Examples:
+        cw init service                  # Install and enable service
+        cw init service --no-enable      # Install without enabling
+        cw init service --uninstall      # Remove the service
+        cw start persist                 # Alias for 'cw init service'
+    """
+    display = _display
+    error_handler = CLIErrorHandler(display)
+
+    display.print_command_header("init service", "Install CodeWeaver as a system service")
+
+    # Determine project path
+    project_path = (project or resolve_project_root()).resolve()
+    display.print_info(f"Working directory: {project_path}\n")
+
+    # Find the codeweaver executable
+    cw_cmd = shutil.which("cw") or shutil.which("codeweaver")
+    if not cw_cmd:
+        cw_cmd = f"{sys.executable} -m codeweaver"
+        display.print_warning(f"Could not find cw/codeweaver in PATH, using: {cw_cmd}")
+    else:
+        display.print_info(f"Executable: {cw_cmd}")
+
+    platform = sys.platform
+
+    if uninstall:
+        # Handle uninstallation
+        display.print_section("Uninstalling Service")
+        if platform == "linux":
+            _uninstall_systemd_service(display, error_handler)
+        elif platform == "darwin":
+            _uninstall_launchd_service(display, error_handler)
+        elif platform == "win32":
+            display.print_info("To remove Windows service:")
+            display.print_info("  nssm remove CodeWeaver confirm")
+        return
+
+    # Handle installation
+    display.print_section("Installing Service")
+
+    if platform == "linux":
+        if _install_systemd_service(display, cw_cmd, project_path, enable=enable):
+            _show_systemd_management_commands(display)
+    elif platform == "darwin":
+        if _install_launchd_service(display, cw_cmd, project_path, enable=enable):
+            _show_launchd_management_commands(display)
+    elif platform == "win32":
+        _show_windows_instructions(display, cw_cmd, project_path)
+    else:
+        display.print_warning(f"Unsupported platform: {platform}")
+        display.print_info("Manual setup required. Run: cw start --foreground")
 
 
 def main() -> None:

@@ -13,7 +13,13 @@ This file provides guidance to Claude Code (claude.ai/code), Github Copilot, Roo
 
 CodeWeaver is an extensible MCP (Model Context Protocol) server for semantic code search. It provides intelligent codebase context discovery through a single `find_code` tool interface, supporting multiple embedding providers, vector databases, and data sources through a plugin architecture.
 
-**Current Status**: Alpha Release 1. Most core features complete and relatively stable. Advanced functionality planned in several epics.
+**Architecture**: CodeWeaver runs as a daemon with separate transport servers:
+- **Daemon**: Background services (indexing, file watching, health monitoring)
+- **Management Server**: HTTP endpoints at port 9329 (health, status, metrics)
+- **MCP HTTP Server**: FastMCP at port 9328 for HTTP clients
+- **MCP stdio**: Lightweight proxy that forwards to the HTTP backend (default transport)
+
+**Current Status**: Alpha Release 2. Most core features complete and relatively stable. Advanced functionality planned in several epics.
 
 > [!IMPORTANT]
 > Because it is an MCP server, you can use CodeWeaver while assisting with CodeWeaver development!
@@ -134,10 +140,12 @@ src/codeweaver/
 │       ├── context.py   # Context exploration commands *scaffolding*
 │       ├── doctor.py    # Health check and diagnostics
 │       ├── index.py     # Indexing commands
-│       ├── init.py      # Project initialization
+│       ├── init.py      # Project initialization + service persistence
 │       ├── list.py      # List resources (models, providers, etc.)
 │       ├── search.py    # Search command (wraps find_code)
-│       └── server.py    # MCP server management
+│       ├── server.py    # MCP server management (stdio/HTTP transports)
+│       ├── start.py     # Start daemon in background (or --foreground)
+│       └── stop.py      # Stop the running daemon
 │
 ├── common/              # Shared utilities and infrastructure
 │   ├── __init__.py
@@ -346,14 +354,16 @@ src/codeweaver/
 │   ├── token_patterns.py # Token pattern matching for cross-language token identification
 │   └── types.py         # Semantic analysis types
 │
-├── server/              # MCP server implementation
+├── server/              # Server implementations
 │   ├── __init__.py
-
-│   ├── app_bindings.py  # Application dependency bindings and http admin endpoints (i.e. /metrics)
+│   ├── app_bindings.py  # Application dependency bindings and http admin endpoints
 │   ├── health_endpoint.py # Health check endpoint
 │   ├── health_models.py # Health check data models
 │   ├── health_service.py # Health check service
-│   └── server.py        # Main MCP server entry point
+│   ├── management.py    # Management server (Starlette, port 9329)
+│   ├── mcp_http.py      # MCP HTTP server (FastMCP, port 9328)
+│   ├── server.py        # Main MCP server entry point
+│   └── stdio_proxy.py   # stdio-to-HTTP proxy for MCP clients
 │
 ├── tokenizers/          # Token counting for various models
 │   ├── __init__.py

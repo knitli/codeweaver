@@ -27,12 +27,12 @@ async def _run_server(
     host: str = "127.0.0.1",
     port: int = 9328,
     transport: Annotated[
-        Literal["streamable-http", "stdio"],
+        Literal["stdio", "streamable-http"],
         cyclopts.Parameter(
             name=["--transport", "-t"],
-            help="Transport type for MCP communication (streamable-http or stdio)",
+            help="Transport type for MCP communication (stdio or streamable-http)",
         ),
-    ] = "streamable-http",
+    ] = "stdio",
     *,
     debug: bool = False,
     verbose: bool = False,
@@ -62,12 +62,12 @@ async def server(
     host: str = "127.0.0.1",
     port: int = 9328,
     transport: Annotated[
-        Literal["streamable-http", "stdio"],
+        Literal["stdio", "streamable-http"],
         cyclopts.Parameter(
             name=["--transport", "-t"],
-            help="Transport type for MCP communication (streamable-http or stdio)",
+            help="Transport type for MCP communication (stdio or streamable-http)",
         ),
-    ] = "streamable-http",
+    ] = "stdio",
     verbose: Annotated[
         bool,
         cyclopts.Parameter(name=["--verbose", "-v"], help="Enable verbose logging with timestamps"),
@@ -78,18 +78,15 @@ async def server(
 ) -> None:
     """Start CodeWeaver MCP server.
 
-    This starts the MCP protocol server with integrated background services:
-    - Indexer (semantic search engine)
-    - FileWatcher (real-time index updates)
-    - HealthService (system monitoring)
-    - Statistics (telemetry collection)
+    This starts the MCP protocol server. When using stdio transport (default),
+    CodeWeaver connects to the daemon's HTTP backend for background services.
 
     Transport modes:
-    - streamable-http (default): HTTP-based transport on port 9328
-    - stdio: Standard I/O transport (launched per-session by MCP clients)
+    - stdio (default): Standard I/O transport, proxies to HTTP backend
+    - streamable-http: Direct HTTP-based transport on port 9328
 
-    Background services are automatically started with the server.
-    Management endpoints available at http://127.0.0.1:9329 (Phase 1.2+).
+    For stdio transport, first start the daemon with `codeweaver start`.
+    Management endpoints available at http://127.0.0.1:9329.
     """
     display = StatusDisplay()
     error_handler = CLIErrorHandler(display, verbose=verbose, debug=debug)
