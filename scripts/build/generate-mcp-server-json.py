@@ -10,7 +10,6 @@
 """MCP server.json models."""
 
 from __future__ import annotations
-from datasets.arrow_writer import type_
 
 from enum import Enum
 from pathlib import Path
@@ -784,7 +783,7 @@ def _create_docker_package() -> Package:
                 description="Use streamable-http for persistent state and continuous indexing",
                 default="streamable-http",
                 choices=["streamable-http", "stdio"],
-                
+
             ),
         ],
         environment_variables=as_keyvalues,
