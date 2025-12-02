@@ -10,35 +10,46 @@ and types where appropriate.
 
 ## MCP Transports
 
-Current MCP specification allows two primary transports: HTTP streaming and STDIO (SSE is also supported but will be deprecated). Most MCP servers use STDIO transport (local 1-to-1 synchronous connection). CodeWeaver *can* use STDIO, but STDIO significantly degrades CodeWeaver's capabilities.
+CodeWeaver supports two MCP transports: STDIO (default) and HTTP streaming.
 
-## Why Not STDIO?
+## Architecture: STDIO with HTTP Backend
 
-STDIO transport spawns a separate server process per client instance and isolates each session. This means:
-- Each client has its own server instance (no sharing)
-- CodeWeaver cannot index or watch for changes in the background between client sessions
-- A single server instance cannot handle concurrent requests from multiple clients
-- Session management is limited to the lifespan of the client process (no or limited persistence)
-- CodeWeaver can't expose features directly to users outside of MCP clients
-- We also can't have long-lived sessions, background indexing and file watching, shared state
+CodeWeaver uses a daemon architecture that provides the best of both worlds:
 
-As far as we know, there are no existing comparable tools to CodeWeaver, but tools with less robust search and discovery use one of two approaches:
+1. **Daemon** (`codeweaver start`): Runs background services as a persistent process
+   - Background indexing and file watching
+   - HTTP MCP server on port 9328
+   - Management server on port 9329
 
-1. They aren't an MCP server at all (e.g., standalone search UIs, like in IDEs or integrated into an MCP client itself (like Roo)). This limits interoperability and the ability to leverage multiple clients and agents. CodeWeaver doesn't lock you into a single client or IDE.
-2. They use STDIO MCP servers but sacrifice advanced features, with limited indexing capabilities, caching, no background indexing, and limited session management. Serena is an example of this approach, where any caching is to files in your project directory. Serena relies solely on language servers for code understanding, which limits it capabilities compared to CodeWeaver's approach.
+2. **STDIO Transport** (default): MCP clients spawn stdio processes that proxy to the daemon
+   - Compatible with all MCP clients (Claude Desktop, VS Code, etc.)
+   - Each stdio process is lightweight - just a proxy to the HTTP backend
+   - All clients share the same indexed codebase via the daemon
 
-## Streaming HTTP Transport
+This architecture enables:
+- **Universal compatibility**: STDIO works with any MCP client
+- **Shared state**: All clients access the same index via the HTTP backend
+- **Background indexing**: The daemon keeps your index up to date between sessions
+- **Concurrent access**: Multiple clients can connect simultaneously
+- **Resource efficiency**: One daemon serves all clients
 
-CodeWeaver uses HTTP streaming transport for MCP by default and strongly recommends users do the same.
+## When to Use HTTP Transport Directly
 
-This enables:
-- Single shared server instance across all clients -- your code is indexed once and available to all clients
-- Collective context across multiple clients -- sessions can persist and share state, and eventually we can get better understanding of what you're working on across clients to provide better results
-- Background indexing that stays relevant regardless of client sessions -- CodeWeaver can watch your files and keep the index up to date even when no clients are connected.
-- CLI-based search for humans outside of MCP clients (because we keep the index up to date in the background)
-- Concurrent request handling
-- Proper session management
-- Less resource usage -- a single server process instead of one per client
+Use `--transport streamable-http` when:
+- Running CodeWeaver as a standalone service (e.g., in Docker)
+- Connecting from clients that support HTTP transport natively
+- You don't need STDIO compatibility
+
+## Quick Start
+
+```bash
+# Start the daemon (runs HTTP backend + background services)
+codeweaver start
+
+# MCP clients will automatically use STDIO transport to connect to the daemon
+# Or run STDIO server manually:
+codeweaver server  # defaults to --transport stdio
+```
 """
 
 from __future__ import annotations
@@ -114,10 +125,10 @@ class CodeWeaverMCPConfig(BasedModel, FastMCPRemoteMCPServer):
 
 
 class StdioCodeWeaverConfig(BasedModel, FastMCPStdioMCPServer):
-    """Configuration model for CodeWeaver mcp.json files using stdio communication."""
+    """Configuration model for CodeWeaver mcp.json files using stdio communication (default)."""
 
     command: str = "cw"
-    args: list[str] = Field(default_factory=lambda: ["server", "--transport", "stdio"])
+    args: list[str] = Field(default_factory=lambda: ["server"])
     type: Literal["stdio"] | None = "stdio"
     description: str | None = CODEWEAVER_DESCRIPTION
     icon: str | None = CODEWEAVER_ICON

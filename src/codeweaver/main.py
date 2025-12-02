@@ -278,7 +278,7 @@ async def run(
     project_path: Path | None = None,
     host: str = "127.0.0.1",
     port: int = 9328,
-    transport: Literal["streamable-http", "stdio"] = "streamable-http",
+    transport: Literal["stdio", "streamable-http"] = "stdio",
     verbose: bool = False,
     debug: bool = False,
 ) -> None:
@@ -287,15 +287,17 @@ async def run(
     This is the main entry point for starting CodeWeaver's MCP server.
 
     Transport modes:
+    - stdio (default): stdio proxy that forwards to the daemon's HTTP backend
     - streamable-http: Full server with background services, MCP HTTP server, and management server
-    - stdio: stdio proxy that forwards to an existing HTTP backend
+
+    For stdio transport, first start the daemon with `codeweaver start`.
 
     Args:
         config_file: Optional configuration file path
         project_path: Optional project directory path
-        host: Host to bind server to
-        port: Port to bind server to
-        transport: Transport protocol (streamable-http or stdio)
+        host: Host of HTTP backend to proxy to (stdio) or bind to (http)
+        port: Port of HTTP backend to proxy to (stdio) or bind to (http)
+        transport: Transport protocol (stdio or streamable-http)
         verbose: Enable verbose logging
         debug: Enable debug logging
     """

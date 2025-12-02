@@ -108,7 +108,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 # Expose the MCP server port
 EXPOSE 9328
 
-# Default command: start the CodeWeaver MCP server
-# Users can override this with custom config via docker-compose or docker run
+# Default command: start the CodeWeaver MCP server in stdio mode
+# For persistent HTTP service (docker-compose), use: --transport streamable-http
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["codeweaver", "server", "--host", "0.0.0.0", "--port", "9328"]
+CMD ["codeweaver", "server"]

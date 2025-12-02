@@ -605,14 +605,14 @@ def mcp(
     host: Annotated[str, cyclopts.Parameter(name=["--host"])] = "http://127.0.0.1",
     port: Annotated[int, cyclopts.Parameter(name=["--port"])] = 9328,
     transport: Annotated[
-        Literal["streamable-http", "stdio"],
+        Literal["stdio", "streamable-http"],
         cyclopts.Parameter(
             name=["--transport", "-t"],
             help="Transport type for MCP communication",
             show_default=True,
             show_choices=True,
         ),
-    ] = "streamable-http",
+    ] = "stdio",
     timeout: Annotated[
         int,
         cyclopts.Parameter(
@@ -657,8 +657,8 @@ def mcp(
     Cursor, or VSCode to connect to CodeWeaver's MCP server.
 
     **Transport Types:**
-    - `streamable-http` (default): HTTP-based transport for persistent server connections
-    - `stdio`: Standard input/output transport that launches CodeWeaver per-session
+    - `stdio` (default): Standard input/output transport that proxies to the HTTP backend
+    - `streamable-http`: Direct HTTP-based transport for persistent server connections
 
     **Tip**: Set a default MCP config in your CodeWeaver config, then just run
     `cw init mcp --client your_client --client another_client` to generate the config for those clients.
@@ -675,7 +675,7 @@ def mcp(
         auth: [http-only] Authentication method
 
         cmd: [stdio-only] Command to start MCP server process (default: "codeweaver")
-        args: [stdio-only] Arguments for the command (default: ["server", "--transport", "stdio"])
+        args: [stdio-only] Arguments for the command (default: ["server"])
         env: [stdio-only] Environment variables for the process
 
         timeout: Timeout in seconds for connections
@@ -765,8 +765,8 @@ def init(
         bool, cyclopts.Parameter(name=["--force", "-f"], help="Force overwrite existing config")
     ] = False,
     transport: Annotated[
-        Literal["streamable-http", "stdio"], cyclopts.Parameter(name=["--transport", "-t"])
-    ] = "streamable-http",
+        Literal["stdio", "streamable-http"], cyclopts.Parameter(name=["--transport", "-t"])
+    ] = "stdio",
     config_extension: Annotated[
         Literal["toml", "yaml", "yml", "json"], cyclopts.Parameter(name=["--config-extension"])
     ] = "toml",
@@ -801,13 +801,14 @@ def init(
     Use --config-only or --mcp-only to create just one.
 
     ARCHITECTURE NOTE:
-    CodeWeaver uses HTTP streaming (not STDIO) for the MCP protocol *by default*.
+    CodeWeaver uses STDIO transport by default, which proxies to the HTTP backend daemon.
     This means:
+    - Start the daemon first: `cw start` (runs background services + HTTP backend)
+    - MCP clients connect via stdio, which proxies to the daemon
     - Single server instance shared across all clients
     - Background indexing persists between client sessions
-    - Server must be started separately: `cw server`
 
-    You can use --transport stdio if you prefer per-session server instances.
+    You can use --transport streamable-http for direct HTTP connections.
 
     Args:
         project: Path to project directory (defaults to current directory)
@@ -820,17 +821,17 @@ def init(
         clients: MCP clients to configure (claude_code, claude_desktop, cursor, gemini_cli, vscode, mcpjson).
         host: Server host address for MCP config (default: 127.0.0.1)
         port: Server port for MCP config (default: 9328)
-        transport: Transport type (streamable-http or stdio). Streamable default and recommended.
+        transport: Transport type (stdio or streamable-http). Stdio is default and recommended.
         config_level: Configuration level (project or user)
         force: Overwrite existing configurations
 
     Examples:
-        cw init --quickstart         # Full setup with quickstart profile (free/offline)
-        cw init                      # Full setup with recommended profile
-        cw init --config-only        # Just config file
-        cw init --mcp-only           # Just MCP client config
-        cw init --client cursor      # Setup for Cursor
-        cw init --transport stdio    # Use stdio transport (not recommended)
+        cw init --quickstart              # Full setup with quickstart profile (free/offline)
+        cw init                           # Full setup with recommended profile
+        cw init --config-only             # Just config file
+        cw init --mcp-only                # Just MCP client config
+        cw init --client cursor           # Setup for Cursor
+        cw init --transport streamable-http  # Use direct HTTP transport
     """
     if clients is None:
         clients = ["mcpjson"]
@@ -917,39 +918,37 @@ def init(
             title="Next Steps:",
             numbered=True,
         )
-    if transport == "streamable-http":
+    if transport == "stdio":
         display.print_list(
             [
-                "CodeWeaver uses HTTP streaming transport for MCP communication.",
-                "Ensure the CodeWeaver server is running before starting your MCP client.",
-                "Background indexing will persist between client sessions.",
+                "CodeWeaver uses stdio transport that proxies to the HTTP backend daemon.",
+                "Start the daemon first: [dim]cw start[/dim]",
+                "MCP clients will connect via stdio, sharing the same indexed codebase.",
+                "Background indexing persists between client sessions.",
             ],
             title="Important Notes:",
         )
 
     else:
-        display.print_warning(
-            "You chose stdio transport, which is not the recommended setup for CodeWeaver."
-        )
-        display.console.print("Important Notes:")
         display.print_list(
             [
-                "Each MCP client session will launch a separate CodeWeaver server instance.",
-                "Background indexing will NOT persist between client sessions.",
-                "Consider using the default streamable-http transport for better performance, less resource use, and a more consistent experience between clients and sessions.",
+                "CodeWeaver is configured for direct HTTP streaming transport.",
+                "Ensure the CodeWeaver server is running before starting your MCP client.",
+                "Start the server: [dim]cw server --transport streamable-http[/dim]",
+                "Background indexing will persist between client sessions.",
             ],
-            title="Using the stdio transport:",
+            title="Important Notes:",
         )
 
     display.print_section("Using CodeWeaver")
     display.print_list(
         [
-            "We recommend you start and run CodeWeaver while you code, whether you are using MCP clients or not.",
-            "You can use a tool like `mise` to automatically start CodeWeaver when you enter your project directory.",
-            "Or, just get in the habit of running `cw server` in a terminal tab when you start coding.",
-            "You can use CodeWeaver to search your codebase outside of an MCP client with `codeweaver search`",
-            "Check status with `cw status`",
-            "To check your config setup, run `codeweaver doctor`",
+            "We recommend you start the daemon while you code: [dim]cw start[/dim]",
+            "You can use a tool like `mise` to automatically start the daemon when you enter your project directory.",
+            "Or, just get in the habit of running [dim]cw start[/dim] when you start coding.",
+            "You can use CodeWeaver to search your codebase outside of an MCP client with [dim]codeweaver search[/dim]",
+            "Check status with [dim]cw status[/dim]",
+            "To check your config setup, run [dim]codeweaver doctor[/dim]",
             "[red]CodeWeaver is in Alpha. There are bugs.[/red] Help us by reporting them: https://github.com/knitli/codeweaver/issues",
         ],
         title="Tips for Best Experience:",
