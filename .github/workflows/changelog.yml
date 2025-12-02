@@ -44,7 +44,7 @@ jobs:
             git-cliff --tag "${{ github.event.inputs.tag }}" --output CHANGELOG.md --prepend
           else
             echo "Generating changelog for unreleased changes"
-            git-cliff --unreleased --output CHANGELOG.md --prepend
+            git-cliff --unreleased --prepend --output CHANGELOG.md
           fi
 
       - name: Display changelog
