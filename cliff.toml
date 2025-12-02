@@ -156,7 +156,7 @@ protect_breaking_commits = false
 # Filter commits - when true, only commits matching a non-skip parser are included
 filter_commits = true
 # Regex for tags to include in the changelog
-tag_pattern = "v[0-9].*"
+tag_pattern = "v[0-9]+\\.[0-9]+\\.[0-9]+.*"
 # Skip tags matching this regex
 skip_tags = ""
 # Ignore tags matching this regex
