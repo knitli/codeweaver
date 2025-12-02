@@ -223,6 +223,7 @@ This project uses **git-cliff** for automated changelog generation. Changelogs a
   - `optimize/`, `perf/` → Performance
   - `docs/`, `doc/` → Documentation
   - `refactor/` → Refactoring
+  - `chore/` → Maintenance
   - `ci/`, `workflow/` → CI/CD
   - `test/` → Testing
   - `build/` → Build System
