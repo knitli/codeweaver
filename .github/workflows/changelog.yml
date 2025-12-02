@@ -41,7 +41,7 @@ jobs:
         run: |
           if [ -n "${{ github.event.inputs.tag }}" ]; then
             echo "Generating changelog for tag ${{ github.event.inputs.tag }}"
-            git-cliff --tag "${{ github.event.inputs.tag }}" --output CHANGELOG.md
+            git-cliff --tag "${{ github.event.inputs.tag }}" --output CHANGELOG.md --prepend
           else
             echo "Generating changelog for unreleased changes"
             git-cliff --unreleased --output CHANGELOG.md --prepend
