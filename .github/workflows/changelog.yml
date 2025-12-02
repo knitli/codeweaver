@@ -1,0 +1,80 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+name: Generate Changelog
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Generate changelog for specific tag (e.g., v0.1.0). Leave empty for unreleased changes.'
+        required: false
+        type: string
+      commit:
+        description: 'Commit and push the generated CHANGELOG.md'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  generate-changelog:
+    name: Generate Changelog
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          fetch-depth: 0  # Fetch all history for changelog generation
+
+      - name: Install git-cliff
+        uses: taiki-e/install-action@331a600f1b10a3fed8dc56f925012bede91ae51f
+        with:
+          tool: git-cliff@2.8.1
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Note: Using --prepend adds new entries at the top of CHANGELOG.md
+          # This preserves existing content but may create duplicates if run multiple times for the same version
+          # See docs/versioning.md for details on changelog management
+          if [ -n "${{ github.event.inputs.tag }}" ]; then
+            echo "Generating changelog for tag ${{ github.event.inputs.tag }}"
+            git-cliff --tag "${{ github.event.inputs.tag }}" --output CHANGELOG.md --prepend
+          else
+            echo "Generating changelog for unreleased changes"
+            git-cliff --unreleased --prepend --output CHANGELOG.md
+          fi
+
+      - name: Display changelog
+        run: |
+          echo "Generated CHANGELOG.md:"
+          cat CHANGELOG.md
+
+      - name: Commit and push
+        if: github.event.inputs.commit == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add CHANGELOG.md
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            if [ -n "${{ github.event.inputs.tag }}" ]; then
+              git commit -m "docs: update CHANGELOG.md for ${{ github.event.inputs.tag }}"
+            else
+              git commit -m "docs: update CHANGELOG.md with unreleased changes"
+            fi
+            git push
+          fi
+
+      - name: Upload changelog artifact
+        uses: actions/upload-artifact@4b540d30404c5374296eb0061f5d53f85b8f4cc2
+        with:
+          name: changelog
+          path: CHANGELOG.md
+          retention-days: 7

@@ -181,12 +181,12 @@ git push origin v0.1.1
 **Alpha** (`-alpha.N`): Robust infrastructure, not heavily tested
 - Signals "feature-complete but not battle-tested"
 - Sets appropriate expectations for early testers
-- Users must explicitly install: `pip install --pre codeweaver`
+- Users must explicitly install: `pip install --pre code-weaver`
 
 **Beta** (`-beta.N`): Feature complete, undergoing testing
 - Signals "mostly stable, finding edge cases"
 - Ready for broader testing audience
-- Users must explicitly install: `pip install --pre codeweaver`
+- Users must explicitly install: `pip install --pre code-weaver`
 
 **Release Candidate** (`-rc.N`): Final testing before release
 - Signals "production-ready pending final validation"
@@ -199,30 +199,97 @@ Users who want to test alpha/beta versions must explicitly opt-in:
 
 ```bash
 # Install latest pre-release (alpha, beta, or rc)
-pip install --pre codeweaver
+pip install --pre code-weaver
 
 # Install specific alpha version
 pip install code-weaver==0.1.0a1
 
 # Upgrade to latest pre-release
-pip install --pre --upgrade codeweaver
+pip install --pre --upgrade code-weaver
 ```
 
 By default, `pip install code-weaver` will **not** install pre-releases.
 
-## Integration with Changesets
+## Changelog Management
 
-This project uses changesets for changelog management. The version workflow integrates with changesets:
+This project uses **git-cliff** for automated changelog generation. Changelogs are generated from pull request merge commits, filtering out individual commit noise.
 
-1. Create changeset for your changes:
-   ```bash
-   changeset add
-   ```
+### How It Works
 
-2. Changesets create entries in `.changeset/` directory
+- **PR-focused**: Only merge commits from pull requests are included in changelogs
+- **Automatic categorization**: PRs are grouped by branch name patterns:
+  - `feat/` or `feature/` → Features
+  - `fix/`, `bugfix/`, `hotfix/`, `issue-` → Bug Fixes
+  - `optimize/`, `perf/` → Performance
+  - `docs/`, `doc/` → Documentation
+  - `refactor/` → Refactoring
+  - `ci/`, `workflow/` → CI/CD
+  - `build/` → Build System
+  - `chore/` → Maintenance
+  - `test/` → Testing
+  - Everything else → Other Changes
+- **Clean output**: Extracts PR descriptions instead of showing "Merge pull request..." messages
+- **Manual triggers**: Generate changelogs on-demand via mise tasks or GitHub workflows
 
-3. When ready to release, changeset updates version and CHANGELOG
+### Local Usage
 
-4. Tag the release and push
+Generate and view changelog:
+```bash
+# View full changelog (stdout)
+mise run changelog
 
-See project changeset configuration for details.
+# View unreleased changes only (stdout)
+mise run changelog-unreleased
+
+# Update CHANGELOG.md with unreleased changes
+# ⚠️ This uses --prepend which adds new entries at the top
+mise run changelog-update
+
+# Generate changelog for specific tag
+# ⚠️ This uses --prepend which adds the tag's changes at the top
+mise run changelog-tag v0.1.0
+```
+
+**Important Notes About `--prepend`:**
+
+The `changelog-update` and `changelog-tag` tasks use git-cliff's `--prepend` flag, which adds new changelog entries at the top of CHANGELOG.md while preserving existing content. This means:
+
+- ✅ **Safe for normal workflow**: Existing changelog entries are preserved
+- ✅ **Idempotent**: Running multiple times won't duplicate entries for the same commits
+- ⚠️ **Manual edits**: If you manually edit CHANGELOG.md between runs, those edits will be preserved (entries are added at the top, not replaced)
+- ⚠️ **Version conflicts**: If you run `changelog-tag` for a version that already exists in CHANGELOG.md, git-cliff will add a duplicate entry at the top
+- ⚠️ **Git conflicts**: In collaborative environments, multiple people running changelog generation simultaneously may cause git merge conflicts
+
+**Best Practices:**
+1. Run changelog generation on a single branch/machine before creating releases
+2. Commit the CHANGELOG.md immediately after generation to avoid conflicts
+3. If you need to regenerate for an existing version, manually remove the old entry first or regenerate the entire changelog from scratch
+4. Consider the CHANGELOG.md as generated content - avoid manual edits when possible
+
+### GitHub Workflow
+
+The changelog can also be generated via GitHub Actions:
+
+1. Go to **Actions** → **Generate Changelog**
+2. Click **Run workflow**
+3. Options:
+   - **Tag**: Leave empty for unreleased changes, or specify a tag (e.g., `v0.1.0`)
+   - **Commit**: Check to automatically commit and push CHANGELOG.md
+4. Download the generated changelog as an artifact, or check the committed file
+
+### Release Workflow Integration
+
+When the release workflow is triggered—either by pushing a tag or by manually dispatching the workflow—it automatically:
+1. Generates categorized changelog entries using git-cliff
+2. Creates a GitHub release with the changelog and installation instructions
+3. Includes verification info and links to artifacts
+
+### Best Practices
+
+1. **Maintain good PR descriptions**: Since the changelog is based on PR descriptions, clear and descriptive PR titles/descriptions result in better changelogs
+2. **Use branch name conventions**: Follow the naming patterns (`feat/`, `fix/`, etc.) for automatic categorization
+3. **Update before releases**: Run `mise run changelog-update` before creating release tags to keep CHANGELOG.md current
+4. **Squash vs Merge**: The setup works with both squash commits and merge commits, but handles them differently:
+   - **Squash merges** REQUIRE conventional commit prefixes (e.g., `feat:`, `fix:`) in the commit message for proper changelog categorization.
+   - **Regular merges** use branch naming patterns (e.g., `feat/branch-name`, `fix/branch-name`) to categorize changes.
+   - Different categorization rules apply to each, so ensure your workflow and commit/branch naming conventions match your desired changelog output.

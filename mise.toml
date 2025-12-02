@@ -300,14 +300,46 @@ for /f "delims=" %%v in ('uv --version') do echo [codeweaver] UV version: %%v
 '''
 
 [tasks.changelog]
+description = "Generate a filtered, PR-focused changelog (output to stdout)"
+tools."cargo:git-cliff" = "latest"
 run = '''
-#!/usr/bin/env zsh
-print -P "%F{209}[codeweaver]%f Generating changelog..."
-mise x -- npm exec changeset version
+#!/usr/bin/env bash
+echo "Generating changelog..."
+git-cliff
 '''
-run_windows = '''
-echo [codeweaver] Generating changelog...
-npm exec changeset version
+
+[tasks.changelog-unreleased]
+description = "Generate changelog for unreleased changes (output to stdout)"
+tools."cargo:git-cliff" = "latest"
+run = '''
+#!/usr/bin/env bash
+echo "Generating unreleased changelog..."
+git-cliff --unreleased
+'''
+
+[tasks.changelog-update]
+description = "Update CHANGELOG.md with unreleased changes"
+tools."cargo:git-cliff" = "latest"
+run = '''
+#!/usr/bin/env bash
+echo "Updating CHANGELOG.md with unreleased changes..."
+git-cliff --unreleased --prepend --output CHANGELOG.md &&
+echo "✅ CHANGELOG.md updated!"
+'''
+
+[tasks.changelog-tag]
+description = "Generate changelog for a specific tag"
+usage = '''
+arg "<tag>" {
+  help = "Git tag to generate changelog for (e.g., v0.1.0)"
+}
+'''
+tools."cargo:git-cliff" = "latest"
+run = '''
+#!/usr/bin/env bash
+echo "Generating changelog for tag ${usage_tag:?}..."
+git-cliff --tag "${usage_tag:?}" --prepend --output CHANGELOG.md &&
+echo "✅ CHANGELOG.md generated for ${usage_tag:?}!"
 '''
 
 [tasks.pre-commit]
