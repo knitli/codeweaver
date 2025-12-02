@@ -181,12 +181,12 @@ git push origin v0.1.1
 **Alpha** (`-alpha.N`): Robust infrastructure, not heavily tested
 - Signals "feature-complete but not battle-tested"
 - Sets appropriate expectations for early testers
-- Users must explicitly install: `pip install --pre codeweaver`
+- Users must explicitly install: `pip install --pre code-weaver`
 
 **Beta** (`-beta.N`): Feature complete, undergoing testing
 - Signals "mostly stable, finding edge cases"
 - Ready for broader testing audience
-- Users must explicitly install: `pip install --pre codeweaver`
+- Users must explicitly install: `pip install --pre code-weaver`
 
 **Release Candidate** (`-rc.N`): Final testing before release
 - Signals "production-ready pending final validation"
@@ -199,13 +199,13 @@ Users who want to test alpha/beta versions must explicitly opt-in:
 
 ```bash
 # Install latest pre-release (alpha, beta, or rc)
-pip install --pre codeweaver
+pip install --pre code-weaver
 
 # Install specific alpha version
 pip install code-weaver==0.1.0a1
 
 # Upgrade to latest pre-release
-pip install --pre --upgrade codeweaver
+pip install --pre --upgrade code-weaver
 ```
 
 By default, `pip install code-weaver` will **not** install pre-releases.
@@ -242,11 +242,29 @@ mise run changelog
 mise run changelog-unreleased
 
 # Update CHANGELOG.md with unreleased changes
+# ⚠️ This uses --prepend which adds new entries at the top
 mise run changelog-update
 
 # Generate changelog for specific tag
+# ⚠️ This uses --prepend which adds the tag's changes at the top
 mise run changelog-tag v0.1.0
 ```
+
+**Important Notes About `--prepend`:**
+
+The `changelog-update` and `changelog-tag` tasks use git-cliff's `--prepend` flag, which adds new changelog entries at the top of CHANGELOG.md while preserving existing content. This means:
+
+- ✅ **Safe for normal workflow**: Existing changelog entries are preserved
+- ✅ **Idempotent**: Running multiple times won't duplicate entries for the same commits
+- ⚠️ **Manual edits**: If you manually edit CHANGELOG.md between runs, those edits will be preserved (entries are added at the top, not replaced)
+- ⚠️ **Version conflicts**: If you run `changelog-tag` for a version that already exists in CHANGELOG.md, git-cliff will add a duplicate entry at the top
+- ⚠️ **Git conflicts**: In collaborative environments, multiple people running changelog generation simultaneously may cause git merge conflicts
+
+**Best Practices:**
+1. Run changelog generation on a single branch/machine before creating releases
+2. Commit the CHANGELOG.md immediately after generation to avoid conflicts
+3. If you need to regenerate for an existing version, manually remove the old entry first or regenerate the entire changelog from scratch
+4. Consider the CHANGELOG.md as generated content - avoid manual edits when possible
 
 ### GitHub Workflow
 

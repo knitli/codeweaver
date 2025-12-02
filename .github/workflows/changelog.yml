@@ -39,6 +39,9 @@ jobs:
       - name: Generate changelog
         id: changelog
         run: |
+          # Note: Using --prepend adds new entries at the top of CHANGELOG.md
+          # This preserves existing content but may create duplicates if run multiple times for the same version
+          # See docs/versioning.md for details on changelog management
           if [ -n "${{ github.event.inputs.tag }}" ]; then
             echo "Generating changelog for tag ${{ github.event.inputs.tag }}"
             git-cliff --tag "${{ github.event.inputs.tag }}" --output CHANGELOG.md --prepend

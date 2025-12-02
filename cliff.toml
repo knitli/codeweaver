@@ -32,7 +32,18 @@ body = """
 {% for group, commits in commits | group_by(attribute="group") %}
     ### {{ group | striptags | trim | upper_first }}
     {%- for commit in commits -%}
-        {%- if commit.message is starting_with("Merge pull request") -%}
+        {%- if commit.message is starting_with("SQUASH | ") -%}
+            {# Handle squash merge format: "SQUASH | description | #123" #}
+            {%- set_global parts = commit.message | split(pat=" | ") -%}
+            {%- set_global pr_desc = parts | nth(n=1) | trim -%}
+            {%- set_global pr_num = parts | nth(n=2) | replace(from="#", to="") | trim -%}
+            {%- if pr_num is matching("^[0-9]+$") -%}
+    - {{ pr_desc }} ([#{{ pr_num }}](https://github.com/knitli/codeweaver/pull/{{ pr_num }}))
+            {%- else -%}
+    - {{ pr_desc }}
+            {%- endif -%}
+        {%- elif commit.message is starting_with("Merge pull request") -%}
+            {# Handle regular merge format: "Merge pull request #123 from org/branch | Description" #}
             {%- set_global pr_num = commit.message | replace(from="Merge pull request #", to="") | split(pat=" ") | first | trim -%}
             {%- if commit.message is containing(" | ") -%}
                 {%- set_global pr_desc = commit.message | split(pat=" | ") | last -%}
@@ -42,7 +53,7 @@ body = """
             {%- if pr_num is matching("^[0-9]+$") -%}
     - {{ pr_desc }} ([#{{ pr_num }}](https://github.com/knitli/codeweaver/pull/{{ pr_num }}))
             {%- else -%}
-    - {{ pr_desc }} (PR: invalid or unknown)
+    - {{ pr_desc }}
             {%- endif -%}
         {%- else %}
     - {{ commit.message | upper_first }}
@@ -72,19 +83,44 @@ conventional_commits = false
 filter_unconventional = false
 # Process merge commits - THIS IS KEY for PR-based changelog
 split_commits = false
-# Only include merge commits (PR merges)
-# Preprocessor to append PR description to the merge commit message for easier extraction
+# Preprocessors for both merge commits and squash merges
 commit_preprocessors = [
-  # Extract PR description and append to subject for template use
+  # 1. Extract PR description from merge commits and append to subject
   # Input: "Merge pull request #123 from org/branch\n\nPR Description"
   # Output: "Merge pull request #123 from org/branch | PR Description"
   { pattern = 'Merge pull request (#[0-9]+) from ([^\n]+)\n+(.+)', replace = "Merge pull request ${1} from ${2} | ${3}" },
+
+  # 2. Mark squash merge commits for easier template detection
+  # Input: "feat: some feature (#123)"
+  # Output: "SQUASH | feat: some feature | #123"
+  { pattern = '^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?: (.+) \(#([0-9]+)\)$', replace = "SQUASH | ${1}${2}: ${3} | #${4}" },
+
+  # 3. Catch squash merges without conventional commit prefix
+  # Input: "Some change (#123)"
+  # Output: "SQUASH | Some change | #123"
+  { pattern = '^(.+) \(#([0-9]+)\)$', replace = "SQUASH | ${1} | #${2}" },
 ]
-# Parse merge commits to extract PR info
+# Parse both merge commits and squash merges to extract PR info
 # NOTE: Order matters! Commits are matched top-to-bottom, first match wins
 commit_parsers = [
   # Skip non-PR merge commits (like "Merge branch 'main'")
   { message = "^Merge branch", skip = true },
+
+  # === Squash Merge Parsers (conventional commits) ===
+  # After preprocessing, squash merges are in format: "SQUASH | type: description | #123"
+  { message = "^SQUASH \\| feat", group = "Features" },
+  { message = "^SQUASH \\| fix", group = "Bug Fixes" },
+  { message = "^SQUASH \\| docs", group = "Documentation" },
+  { message = "^SQUASH \\| perf", group = "Performance" },
+  { message = "^SQUASH \\| refactor", group = "Refactoring" },
+  { message = "^SQUASH \\| test", group = "Testing" },
+  { message = "^SQUASH \\| build", group = "Build System" },
+  { message = "^SQUASH \\| ci", group = "CI/CD" },
+  { message = "^SQUASH \\| chore", group = "Maintenance" },
+  { message = "^SQUASH \\| revert", group = "Reverts" },
+  { message = "^SQUASH \\|", group = "Other Changes" },
+
+  # === Regular Merge Commit Parsers (branch-based) ===
   # Features - check branch name patterns
   { message = "^Merge pull request #[0-9]+ from .*/feat", group = "Features" },
   { message = "^Merge pull request #[0-9]+ from .*/feature", group = "Features" },

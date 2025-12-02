@@ -303,12 +303,8 @@ for /f "delims=" %%v in ('uv --version') do echo [codeweaver] UV version: %%v
 description = "Generate a filtered, PR-focused changelog (output to stdout)"
 tools."cargo:git-cliff" = "latest"
 run = '''
-#!/usr/bin/env zsh
-print -P "%F{209}[codeweaver]%f Generating changelog..."
-git-cliff
-'''
-run_windows = '''
-echo [codeweaver] Generating changelog...
+#!/usr/bin/env bash
+echo "Generating changelog..."
 git-cliff
 '''
 
@@ -316,12 +312,8 @@ git-cliff
 description = "Generate changelog for unreleased changes (output to stdout)"
 tools."cargo:git-cliff" = "latest"
 run = '''
-#!/usr/bin/env zsh
-print -P "%F{209}[codeweaver]%f Generating unreleased changelog..."
-git-cliff --unreleased
-'''
-run_windows = '''
-echo [codeweaver] Generating unreleased changelog...
+#!/usr/bin/env bash
+echo "Generating unreleased changelog..."
 git-cliff --unreleased
 '''
 
@@ -329,37 +321,25 @@ git-cliff --unreleased
 description = "Update CHANGELOG.md with unreleased changes"
 tools."cargo:git-cliff" = "latest"
 run = '''
-#!/usr/bin/env zsh
-print -P "%F{209}[codeweaver]%f Updating CHANGELOG.md with unreleased changes..."
+#!/usr/bin/env bash
+echo "Updating CHANGELOG.md with unreleased changes..."
 git-cliff --unreleased --prepend --output CHANGELOG.md &&
-print -P "%F{209}[codeweaver]%f ✅ CHANGELOG.md updated!"
-'''
-run_windows = '''
-echo [codeweaver] Updating CHANGELOG.md with unreleased changes...
-git-cliff --unreleased --prepend --output CHANGELOG.md
-if %ERRORLEVEL% equ 0 (
-    echo [codeweaver] CHANGELOG.md updated!
-)
+echo "✅ CHANGELOG.md updated!"
 '''
 
 [tasks.changelog-tag]
 description = "Generate changelog for a specific tag"
 usage = '''
-arg "<tag>" help="Git tag to generate changelog for (e.g., v0.1.0)" required=true
+arg "<tag>" {
+  help = "Git tag to generate changelog for (e.g., v0.1.0)"
+}
 '''
 tools."cargo:git-cliff" = "latest"
 run = '''
-#!/usr/bin/env zsh
-print -P "%F{209}[codeweaver]%f Generating changelog for tag ${usage_tag}..."
-git-cliff --tag "${usage_tag}" --prepend --output CHANGELOG.md &&
-print -P "%F{209}[codeweaver]%f ✅ CHANGELOG.md generated for ${usage_tag}!"
-'''
-run_windows = '''
-echo [codeweaver] Generating changelog for tag %usage_tag%...
-git-cliff --tag %usage_tag% --prepend --output CHANGELOG.md
-if %ERRORLEVEL% equ 0 (
-    echo [codeweaver] CHANGELOG.md generated for %usage_tag%!
-)
+#!/usr/bin/env bash
+echo "Generating changelog for tag ${usage_tag:?}..."
+git-cliff --tag "${usage_tag:?}" --prepend --output CHANGELOG.md &&
+echo "✅ CHANGELOG.md generated for ${usage_tag:?}!"
 '''
 
 [tasks.pre-commit]
