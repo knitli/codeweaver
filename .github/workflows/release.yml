@@ -85,7 +85,7 @@ jobs:
       - name: Install git-cliff
         uses: taiki-e/install-action@331a600f1b10a3fed8dc56f925012bede91ae51f
         with:
-          tool: git-cliff@2.8.1
+          tool: git-cliff@2.10.0
 
       - name: Generate release notes
         id: release_notes

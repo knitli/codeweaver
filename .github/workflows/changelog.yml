@@ -9,11 +9,11 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Generate changelog for specific tag (e.g., v0.1.0). Leave empty for unreleased changes.'
+        description: "Generate changelog for specific tag (e.g., v0.1.0). Leave empty for unreleased changes."
         required: false
         type: string
       commit:
-        description: 'Commit and push the generated CHANGELOG.md'
+        description: "Commit and push the generated CHANGELOG.md"
         required: false
         type: boolean
         default: false
@@ -29,12 +29,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
         with:
-          fetch-depth: 0  # Fetch all history for changelog generation
+          fetch-depth: 0 # Fetch all history for changelog generation
 
       - name: Install git-cliff
         uses: taiki-e/install-action@331a600f1b10a3fed8dc56f925012bede91ae51f
         with:
-          tool: git-cliff@2.8.1
+          tool: git-cliff@2.10.0
 
       - name: Generate changelog
         id: changelog
