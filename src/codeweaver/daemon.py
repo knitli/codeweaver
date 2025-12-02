@@ -100,7 +100,7 @@ def spawn_daemon_process(
         cw_args.extend(["--mcp-port", str(mcp_port)])
 
     # Determine working directory for the daemon
-    working_dir = project.resolve() if project and project.exists() else None
+    working_dir = project.resolve() if isinstance(project, Path) and project.exists() else None
 
     try:
         # Start daemon as detached subprocess
