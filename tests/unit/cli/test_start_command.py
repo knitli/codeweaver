@@ -258,9 +258,12 @@ class TestSystemdServiceGeneration:
         assert "[Service]" in unit_content
         assert "[Install]" in unit_content
 
-        # Check service configuration
-        assert "ExecStart=/usr/local/bin/cw start --foreground" in unit_content
-        assert "WorkingDirectory=/home/user/project" in unit_content
+        # Check service configuration (paths may be quoted with shlex.quote)
+        assert "ExecStart=" in unit_content
+        assert "/usr/local/bin/cw" in unit_content
+        assert "start --foreground" in unit_content
+        assert "WorkingDirectory=" in unit_content
+        assert "/home/user/project" in unit_content
         assert "Type=simple" in unit_content
         assert "Restart=on-failure" in unit_content
 
@@ -399,9 +402,11 @@ class TestServiceInstallationBehavior:
             service_file = temp_home / ".config" / "systemd" / "user" / "codeweaver.service"
             assert service_file.exists()
 
-            # Verify content
+            # Verify content (paths may be quoted)
             content = service_file.read_text()
-            assert "ExecStart=/usr/local/bin/cw start --foreground" in content
+            assert "ExecStart=" in content
+            assert "/usr/local/bin/cw" in content
+            assert "start --foreground" in content
 
     @pytest.mark.skipif(sys.platform != "darwin", reason="macOS-specific test")
     def test_launchd_install_creates_plist_file(self, temp_home: Path) -> None:

@@ -24,14 +24,16 @@ logger = logging.getLogger(__name__)
 
 
 async def check_daemon_health(
-    management_host: str = "127.0.0.1", management_port: int = 9329, timeout_at: float = 2.0
+    management_host: str = "127.0.0.1",
+    management_port: int = 9329,
+    timeout_at: float = 5.0,
 ) -> bool:
     """Check if the CodeWeaver daemon is healthy.
 
     Args:
         management_host: Host of management server
         management_port: Port of management server
-        timeout_at: Request timeout in seconds
+        timeout_at: Request timeout in seconds (default 5s to handle cold starts)
 
     Returns:
         True if daemon is healthy, False otherwise
@@ -194,4 +196,68 @@ async def start_daemon_if_needed(
             return True
 
     logger.warning("Daemon did not become healthy within %s seconds", max_wait_seconds)
+    return False
+
+
+async def request_daemon_shutdown(
+    management_host: str = "127.0.0.1",
+    management_port: int = 9329,
+    timeout: float = 10.0,
+) -> bool:
+    """Request daemon shutdown via management server endpoint.
+
+    Args:
+        management_host: Host of management server
+        management_port: Port of management server
+        timeout: Request timeout in seconds
+
+    Returns:
+        True if shutdown was requested successfully, False otherwise.
+    """
+    try:
+        import httpx
+    except ImportError:
+        logger.error("httpx not available for shutdown request")
+        return False
+
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"http://{management_host}:{management_port}/shutdown",
+                timeout=timeout,
+            )
+            return response.status_code in (200, 202)
+    except Exception as e:
+        logger.error("Failed to request daemon shutdown: %s", e)
+        return False
+
+
+async def wait_for_daemon_shutdown(
+    management_host: str = "127.0.0.1",
+    management_port: int = 9329,
+    max_wait_seconds: float = 30.0,
+    check_interval: float = 0.5,
+) -> bool:
+    """Wait for daemon to complete shutdown.
+
+    Args:
+        management_host: Host of management server
+        management_port: Port of management server
+        max_wait_seconds: Maximum time to wait for shutdown
+        check_interval: Interval between health checks
+
+    Returns:
+        True if daemon shut down within timeout, False otherwise.
+    """
+    elapsed = 0.0
+    while elapsed < max_wait_seconds:
+        await asyncio.sleep(check_interval)
+        elapsed += check_interval
+
+        # Daemon is shut down when health check fails
+        if not await check_daemon_health(management_host, management_port, timeout_at=2.0):
+            logger.info("Daemon shut down successfully")
+            return True
+
+    logger.warning("Daemon did not shut down within %s seconds", max_wait_seconds)
     return False

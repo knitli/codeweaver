@@ -187,7 +187,30 @@ async def start_cw_services(
 
         try:
             if tasks_to_wait := [t for t in [management_server.server_task, mcp_server_task] if t]:
-                await asyncio.gather(*tasks_to_wait)
+                # Create a task that monitors the shutdown event
+                async def wait_for_shutdown() -> None:
+                    """Wait for shutdown signal from management API."""
+                    from codeweaver.server.management import ManagementServer as MgmtServer
+
+                    while not MgmtServer.is_shutdown_requested():
+                        await asyncio.sleep(0.5)
+                    display.print_info("Shutdown requested via management API")
+
+                shutdown_task = asyncio.create_task(wait_for_shutdown())
+
+                # Wait for either server tasks to complete or shutdown request
+                done, pending = await asyncio.wait(
+                    [*tasks_to_wait, shutdown_task],
+                    return_when=asyncio.FIRST_COMPLETED,
+                )
+
+                # Cancel pending tasks
+                for task in pending:
+                    task.cancel()
+                    try:
+                        await task
+                    except asyncio.CancelledError:
+                        pass
             else:
                 # Shouldn't happen: no server tasks set
                 raise RuntimeError(
