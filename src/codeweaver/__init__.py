@@ -48,18 +48,21 @@ def get_version() -> str:
                 import shutil
                 import subprocess
 
-                from pathlib import Path
-
-                if git := (shutil.which("git") is not None):
+                # Try to get version from git if available
+                # Git commands work from any directory within a repo, so no need to specify cwd
+                if git := shutil.which("git"):
                     git_describe = subprocess.run(
-                        ["describe", "--tags", "--always", "--dirty"],  # noqa: S607
-                        executable=git,
+                        [git, "describe", "--tags", "--always", "--dirty"],
                         capture_output=True,
                         text=True,
-                        check=True,
-                        cwd=str(Path(__file__).parent.parent.parent),
+                        check=False,
                     )
-                    __version__ = git_describe.stdout.strip()
+                    if git_describe.returncode == 0:
+                        __version__ = git_describe.stdout.strip()
+                    else:
+                        __version__ = "0.0.0"
+                else:
+                    __version__ = "0.0.0"
             except Exception:
                 __version__ = "0.0.0"
     return __version__

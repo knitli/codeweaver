@@ -697,18 +697,12 @@ class CodeWeaverSettings(BaseSettings):
 
     @classmethod
     def json_schema(cls) -> bytes:
-        """Get the JSON validation schema for the settings model."""
-        return to_json(cls.python_json_schema(), indent=2).replace(b"schema_", b"$schema")
+        """Get the JSON validation schema for the settings model.
 
-    @classmethod
-    def save_schema(cls, path: Path | None = None) -> int:
-        """Save the JSON validation schema to a file."""
-        if path is None:
-            schema_url = get_settings().schema_
-            end_path = schema_url.path.replace("/knitli/codeweaver/main/", "").lstrip("/")
-            path = Path(__file__).parent.parent.parent.parent / end_path
-        path.parent.mkdir(parents=True, exist_ok=True)
-        return path.write_bytes(cls.json_schema())
+        Note: For build-time schema generation, use scripts/build/generate-schema.py instead.
+        This method is kept for runtime introspection and testing purposes.
+        """
+        return to_json(cls.python_json_schema(), indent=2).replace(b"schema_", b"$schema")
 
     @classmethod
     def _defaults(cls) -> CodeWeaverSettingsDict:
