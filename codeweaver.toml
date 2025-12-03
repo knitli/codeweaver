@@ -8,6 +8,8 @@ project_name = "codeweaver"
 token_limit = 30000
 max_file_size = 1048576
 max_results = 30
+management_host = "127.0.0.1"
+management_port = 9329
 
 [provider]
 agent = [
@@ -35,15 +37,13 @@ sparse_embedding = [
   { provider = "fastembed", enabled = true, model_settings = { model = "prithivida/Splade_PP_en_v1" } },
 ]
 
-[server]
+[mcp_server]
 # MCP Server (HTTP mode - port 9328)
 host = "127.0.0.1"
 port = 9328
 transport = "streamable-http"
 # Management Server (Always HTTP - port 9329)
 # Available regardless of MCP transport (stdio or HTTP)
-management_host = "127.0.0.1"
-management_port = 9329
 # FastMCP Settings
 on_duplicate_tools = "replace"
 on_duplicate_resources = "replace"

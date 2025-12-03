@@ -44,6 +44,7 @@ from codeweaver.engine.indexer.checkpoint import CheckpointManager, IndexingChec
 from codeweaver.engine.indexer.manifest import FileManifestManager, IndexFileManifest
 from codeweaver.engine.indexer.progress import IndexingStats
 from codeweaver.engine.watcher.types import FileChange
+from codeweaver.exceptions import IndexingError, ProviderError
 
 
 logger = logging.getLogger(__name__)
@@ -1324,6 +1325,82 @@ class Indexer(BasedModel):
         # Index files in batch
         await self._perform_batch_indexing_async(files_to_index, progress_callback)
 
+        # Perform automatic reconciliation: detect and fix missing embeddings
+        # Initialize tracking variables for exception handling context
+        dense_file_count = 0
+        sparse_file_count = 0
+        current_models: dict[str, str | None] = {}
+
+        if (
+            not force_reindex
+            and self._vector_store
+            and (self._embedding_provider or self._sparse_provider)
+        ):
+            try:
+                logger.info("Checking for missing embeddings in vector store...")
+
+                # Get current embedding configuration
+                current_models = self._get_current_embedding_models()
+
+                # Check if any files need embeddings
+                files_needing = self._file_manifest.get_files_needing_embeddings(
+                    current_dense_provider=current_models["dense_provider"],
+                    current_dense_model=current_models["dense_model"],
+                    current_sparse_provider=current_models["sparse_provider"],
+                    current_sparse_model=current_models["sparse_model"],
+                )
+
+                needs_dense = bool(files_needing.get("dense_only") and self._embedding_provider)
+                needs_sparse = bool(files_needing.get("sparse_only") and self._sparse_provider)
+
+                if needs_dense or needs_sparse:
+                    dense_file_count = len(files_needing.get("dense_only", []))
+                    sparse_file_count = len(files_needing.get("sparse_only", []))
+                    if needs_dense:
+                        logger.info(
+                            "Found %d files needing dense embeddings",
+                            dense_file_count,
+                        )
+                    if needs_sparse:
+                        logger.info(
+                            "Found %d files needing sparse embeddings",
+                            sparse_file_count,
+                        )
+
+                    logger.info("Starting automatic reconciliation...")
+                    reconciliation_result = await self.add_missing_embeddings_to_existing_chunks(
+                        add_dense=needs_dense, add_sparse=needs_sparse
+                    )
+
+                    if reconciliation_result["chunks_updated"] > 0:
+                        logger.info(
+                            "Reconciliation complete: updated %d chunks across %d files",
+                            reconciliation_result["chunks_updated"],
+                            reconciliation_result["files_processed"],
+                        )
+                    else:
+                        logger.debug("Reconciliation complete: no chunks needed updating")
+            except (ProviderError, IndexingError) as e:
+                # Provider or indexing errors are expected failure modes
+                logger.warning(
+                    "Automatic reconciliation failed: %s (collection=%s, dense_files=%d, sparse_files=%d, dense_provider=%s, sparse_provider=%s)",
+                    str(e),
+                    self._vector_store.collection if self._vector_store else "unknown",
+                    dense_file_count,
+                    sparse_file_count,
+                    current_models.get("dense_provider", "none"),
+                    current_models.get("sparse_provider", "none"),
+                    exc_info=True,
+                )
+            except (ConnectionError, TimeoutError, OSError) as e:
+                # Network/IO errors that may be transient
+                logger.warning(
+                    "Automatic reconciliation failed due to connection/IO error: %s (collection=%s)",
+                    str(e),
+                    self._vector_store.collection if self._vector_store else "unknown",
+                    exc_info=True,
+                )
+
         # Finalize and report
         self._finalize_indexing()
 
@@ -2392,7 +2469,7 @@ class Indexer(BasedModel):
                     collection_name=collection_name,
                     ids=point_ids,
                     with_payload=True,
-                    with_vectors=False,
+                    with_vectors=True,  # Need to check what vectors already exist
                 )
 
                 # For each retrieved point, generate the missing embedding
@@ -2403,12 +2480,32 @@ class Indexer(BasedModel):
                     if not payload:
                         continue
 
+                    # Check which vector types already exist in this point
+                    # Handle various vector representations from Qdrant:
+                    # - dict[str, list[float]]: Named vectors
+                    # - Mapping (e.g., NamedVectors): Mapping-like objects with vector names
+                    # - list[float]: Single unnamed vector
+                    # - None: No vectors
+                    from collections.abc import Mapping
+
+                    existing_vectors = point.vector if hasattr(point, "vector") else {}
+                    if isinstance(existing_vectors, Mapping):
+                        # Already a mapping (dict or NamedVectors), use keys as-is
+                        existing_vector_names = set(existing_vectors.keys())
+                    elif existing_vectors:
+                        # Single unnamed vector (list), treat as dense with empty string key
+                        existing_vector_names = {""}
+                    else:
+                        existing_vector_names = set()
+
                     # Generate missing embeddings
                     vectors_to_add: dict[str, list[float]] = {}
 
+                    # Only add dense if requested AND not already present
                     if (
                         add_dense
                         and self._embedding_provider
+                        and "" not in existing_vector_names  # Check if dense vector missing
                         and (chunk_text := payload.get("text", ""))
                     ):
                         # Use embedding provider to generate dense embedding
@@ -2417,9 +2514,11 @@ class Indexer(BasedModel):
                             # Use empty string for default dense vector
                             vectors_to_add[""] = dense_emb[0]
 
+                    # Only add sparse if requested AND not already present
                     if (
                         add_sparse
                         and self._sparse_provider
+                        and "sparse" not in existing_vector_names  # Check if sparse vector missing
                         and (chunk_text := payload.get("text", ""))
                     ):
                         sparse_emb = await self._sparse_provider.embed_document([chunk_text])

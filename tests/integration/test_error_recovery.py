@@ -425,7 +425,7 @@ async def test_health_shows_degraded_status(initialize_test_settings):
 
         # Create health service
         health_service = HealthService(
-            provider_registry=mock_reg, startup_time=time.time(), statistics=stats
+            provider_registry=mock_reg, startup_stopwatch=time.monotonic(), statistics=stats
         )
 
         # Get health response
