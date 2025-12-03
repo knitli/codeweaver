@@ -20,9 +20,9 @@ export default defineConfig({
       favicon: '/codeweaver-favico.png',
       social: [
         {
-          name: 'GitHub',
+          label: 'GitHub',
           icon: 'github',
-          url: 'https://github.com/knitli/codeweaver',
+          href: 'https://github.com/knitli/codeweaver',
         },
       ],
       customCss: [
