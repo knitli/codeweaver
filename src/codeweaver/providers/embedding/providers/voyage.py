@@ -102,12 +102,33 @@ class VoyageEmbeddingProvider(EmbeddingProvider[AsyncClient]):
         self, documents: Sequence[CodeChunk], **kwargs: Any
     ) -> list[list[float]] | list[list[int]]:
         """Embed a list of documents into vectors."""
+        import logging
+
+        logger = logging.getLogger(__name__)
         ready_documents = cast(list[str], self.chunks_to_strings(documents))
-        results: EmbeddingsObject = await self.client.embed(
-            texts=ready_documents, **(kwargs | self.doc_kwargs)
-        )
-        self._fire_and_forget(lambda: self._update_token_stats(token_count=results.total_tokens))
-        return self._process_output(results)
+
+        try:
+            results: EmbeddingsObject = await self.client.embed(
+                texts=ready_documents, **(kwargs | self.doc_kwargs)
+            )
+            self._fire_and_forget(lambda: self._update_token_stats(token_count=results.total_tokens))
+            return self._process_output(results)
+        except Exception as e:
+            # Check if this is a token limit error from Voyage API
+            error_msg = str(e)
+            if "max allowed tokens per submitted batch" in error_msg.lower() and len(documents) > 1:
+                logger.warning(
+                    "Voyage batch token limit exceeded (%s), splitting batch of %d chunks in half and retrying",
+                    error_msg.split("Your batch has")[1].split("tokens")[0].strip() if "Your batch has" in error_msg else "unknown",
+                    len(documents),
+                )
+                # Split the batch in half and process recursively
+                mid = len(documents) // 2
+                first_half = await self._embed_documents(documents[:mid], **kwargs)
+                second_half = await self._embed_documents(documents[mid:], **kwargs)
+                return first_half + second_half  # type: ignore
+            # Re-raise if not a token limit error or can't split further
+            raise
 
     async def _embed_query(
         self, query: Sequence[str], **kwargs: Any

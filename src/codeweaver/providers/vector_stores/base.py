@@ -23,7 +23,25 @@ from typing_extensions import TypeIs
 
 
 # Common retryable exceptions for vector store operations
-RETRYABLE_EXCEPTIONS = (ConnectionError, TimeoutError, OSError, httpx.TimeoutException)
+# Include httpcore and qdrant-specific exceptions that indicate transient network issues
+try:
+    import httpcore
+    import qdrant_client.http.exceptions
+
+    RETRYABLE_EXCEPTIONS = (
+        ConnectionError,
+        TimeoutError,
+        OSError,
+        httpx.TimeoutException,
+        httpcore.ReadError,
+        httpcore.WriteError,
+        httpcore.ConnectError,
+        httpcore.PoolTimeout,
+        qdrant_client.http.exceptions.ResponseHandlingException,
+    )
+except ImportError:
+    # Fallback if httpcore or qdrant_client not available
+    RETRYABLE_EXCEPTIONS = (ConnectionError, TimeoutError, OSError, httpx.TimeoutException)
 
 from codeweaver.agent_api.find_code.types import StrategizedQuery
 from codeweaver.config.providers import EmbeddingModelSettings, SparseEmbeddingModelSettings

@@ -282,7 +282,18 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             return []
 
         max_tokens = max_tokens or self.caps.max_batch_tokens
+        # Apply 85% safety margin to account for tokenizer estimation variance
+        # This prevents edge cases where our token estimate slightly underestimates
+        # the provider's actual token count, which would cause API errors
+        effective_limit = int(max_tokens * 0.85)
         tokenizer = self.tokenizer
+
+        if effective_limit != max_tokens:
+            logger.debug(
+                "Using conservative token limit %d (85%% of %d) to prevent estimation errors",
+                effective_limit,
+                max_tokens,
+            )
 
         batches: list[list[CodeChunk]] = []
         current_batch: list[CodeChunk] = []
@@ -295,11 +306,11 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
 
             # If single chunk exceeds limit, log warning and include it anyway
             # (the API will handle the error, but we shouldn't silently drop it)
-            if chunk_tokens > max_tokens:
+            if chunk_tokens > effective_limit:
                 logger.warning(
-                    "Single chunk exceeds max batch tokens (%d > %d), including anyway",
+                    "Single chunk exceeds effective batch token limit (%d > %d), including anyway",
                     chunk_tokens,
-                    max_tokens,
+                    effective_limit,
                 )
                 if current_batch:
                     batches.append(current_batch)
@@ -309,7 +320,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                 continue
 
             # If adding this chunk would exceed limit, start new batch
-            if current_tokens + chunk_tokens > max_tokens and current_batch:
+            if current_tokens + chunk_tokens > effective_limit and current_batch:
                 batches.append(current_batch)
                 current_batch = []
                 current_tokens = 0
@@ -323,10 +334,10 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
 
         if len(batches) > 1:
             logger.debug(
-                "Split %d chunks into %d token-aware batches (max %d tokens/batch)",
+                "Split %d chunks into %d token-aware batches (effective limit %d tokens/batch)",
                 len(chunks),
                 len(batches),
-                max_tokens,
+                effective_limit,
             )
 
         return batches
