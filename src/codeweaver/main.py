@@ -176,7 +176,9 @@ async def _run_http_server(
                     # run_args contains both top-level params and uvicorn_config
                     # FastMCP.run_http_async() handles host/port specially - they go in uvicorn_config
                     # So we just pass run_args directly, which already has everything configured
-                    await mcp_state.app.run_http_async(**mcp_state.run_args)
+                    await mcp_state.app.run_http_async(
+                        **(mcp_state.run_args | {"show_banner": False})  # ty: ignore[invalid-argument-type]
+                    )
             finally:
                 # Stop management server
                 await management_server.stop()
