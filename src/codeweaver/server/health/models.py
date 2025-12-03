@@ -11,8 +11,8 @@ import time
 from datetime import UTC, datetime
 from typing import Annotated, Literal
 
-from anthropic._models import computed_field
-from pydantic import Field, NonNegativeInt
+
+from pydantic import Field, NonNegativeInt, computed_field
 from pydantic.types import NonNegativeFloat
 
 from codeweaver.core.types import BasedModel
