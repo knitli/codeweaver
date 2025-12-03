@@ -6,13 +6,11 @@
 
 from __future__ import annotations
 
-import time
-
 from datetime import UTC, datetime
 from typing import Annotated, Literal
 
 
-from pydantic import Field, NonNegativeInt, computed_field
+from pydantic import Field, NonNegativeInt
 from pydantic.types import NonNegativeFloat
 
 from codeweaver.core.types import BasedModel
@@ -214,6 +212,9 @@ class HealthResponse(BasedModel):
     indexing: Annotated[IndexingInfo, Field(description="Indexing state and progress")]
     services: Annotated[ServicesInfo, Field(description="Service health information")]
     statistics: Annotated[StatisticsInfo, Field(description="Statistics and metrics")]
+    uptime_seconds: Annotated[
+        NonNegativeInt, Field(description="Server uptime in seconds")
+    ] = 0
     failover: Annotated[
         FailoverInfo | None, Field(description="Failover status and statistics")
     ] = None
@@ -224,14 +225,6 @@ class HealthResponse(BasedModel):
         description="Health check timestamp (ISO8601)",
         default_factory=lambda: datetime.now(UTC).isoformat(),
     )
-    stopwatch_start: NonNegativeInt = Field(default_factory=time.monotonic_ns, exclude=True)
-
-    @computed_field
-    @property
-    def uptime_seconds(self) -> NonNegativeInt:
-        """Calculate uptime in seconds based on stopwatch_start."""
-        elapsed_ns = time.monotonic_ns() - self.stopwatch_start
-        return elapsed_ns // 1_000_000_000
 
     @classmethod
     def create_with_current_timestamp(
@@ -247,6 +240,7 @@ class HealthResponse(BasedModel):
         """Create health response with current timestamp."""
         return cls(
             status=status,
+            uptime_seconds=uptime_seconds,
             indexing=indexing,
             services=services,
             statistics=statistics,

@@ -1049,11 +1049,9 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                 ]
             )
 
-        # Detect if this is a sparse embedding provider
-        is_sparse_provider = (
-            type(self).__name__.lower().startswith("sparse")
-            or "sparse" in type(self).__name__.lower()
-        )
+        # Detect if this is a sparse embedding provider using type checking
+        # SparseEmbeddingProvider is defined in this same module after EmbeddingProvider
+        is_sparse_provider = isinstance(self, SparseEmbeddingProvider)
 
         # Add NEW chunks with batch keys and add their hashes to store
         for i, chunk in enumerate(starter_chunks):
