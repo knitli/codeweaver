@@ -142,6 +142,8 @@ async def start_cw_services(
     management_port: PositiveInt,
     *,
     start_mcp_http_server: bool = True,  # Start MCP HTTP server for stdio proxy support
+    verbose: bool = False,
+    debug: bool = False,
 ) -> None:
     """Start background services and optionally MCP HTTP server.
 
@@ -159,8 +161,8 @@ async def start_cw_services(
         settings=lazy_import("codeweaver.config.settings", "get_settings")._resolve()(),
         statistics=statistics,
         status_display=display,
-        verbose=False,
-        debug=False,
+        verbose=verbose,
+        debug=debug,
     ) as background_state:
         management_server = ManagementServer(background_state)
         await management_server.start(host=management_host, port=management_port)
@@ -176,7 +178,7 @@ async def start_cw_services(
             from codeweaver.mcp.server import create_http_server
 
             mcp_state = await create_http_server(
-                host=mcp_host, port=mcp_port, verbose=False, debug=False
+                host=mcp_host, port=mcp_port, verbose=verbose, debug=debug
             )
             display.print_info(f"MCP HTTP server: http://{mcp_host}:{mcp_port}/mcp/", prefix="🔌")
 
@@ -305,6 +307,13 @@ async def start(
     mcp_port: Annotated[
         PositiveInt | None, Parameter(help="MCP server port. Default is 9328.")
     ] = None,
+    verbose: Annotated[
+        bool,
+        Parameter(name=["--verbose", "-v"], help="Enable verbose logging with timestamps"),
+    ] = False,
+    debug: Annotated[
+        bool, Parameter(name=["--debug", "-d"], help="Enable debug logging")
+    ] = False,
 ) -> None:
     """Start CodeWeaver daemon with background services and MCP HTTP server.
 
@@ -333,7 +342,7 @@ async def start(
     """
     settings_map = get_settings_map_for(config_file=config_file, project_path=project)
     display = _display
-    error_handler = CLIErrorHandler(display, verbose=False, debug=False)
+    error_handler = CLIErrorHandler(display, verbose=verbose, debug=debug)
     network_config = get_network_settings()
     management_host = management_host or network_config.management_host
     management_port = management_port or network_config.management_port
@@ -381,6 +390,8 @@ async def start(
                 management_port=management_port,
                 mcp_host=mcp_host,
                 mcp_port=mcp_port,
+                verbose=verbose,
+                debug=debug,
             )
         else:
             # Background mode (default): spawn detached process
