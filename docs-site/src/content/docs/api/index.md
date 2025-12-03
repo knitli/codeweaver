@@ -9,6 +9,10 @@ Complete documentation for CodeWeaver's Python API.
 
 ## Modules
 
+### _Version
+
+- [`_version`](/api/_version/)
+
 ### Agent_Api
 
 - [`agent_api`](/api/agent_api/)
