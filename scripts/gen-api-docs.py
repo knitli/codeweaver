@@ -1,4 +1,13 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run -s
+# ruff: noqa: N999
+# ///script
+# requires-python = ">=3.11"
+# dependencies = ["griffe", "pydantic"]
+# ///
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
 """
 Generate API documentation markdown files from Python source code.
 
@@ -7,28 +16,12 @@ Starlight-compatible markdown files with proper frontmatter.
 """
 
 import sys
+
 from pathlib import Path
 from typing import Any
 
-try:
-    from griffe import (
-        GriffeLoader,
-        Module,
-        Class,
-        Function,
-        Attribute,
-        DocstringSectionKind,
-    )
-except ImportError as e:
-    print(f"Error: griffe is not installed or imports failed: {e}")
-    print("Run: pip install griffe")
-    sys.exit(1)
-
-try:
-    from pydantic import BaseModel
-except ImportError:
-    print("Warning: pydantic not found. Pydantic model field descriptions will not be extracted.")
-    BaseModel = None
+from griffe import Attribute, Class, DocstringSectionKind, Function, GriffeLoader, Module
+from pydantic import BaseModel
 
 
 def get_pydantic_fields(cls: Class) -> dict[str, str]:
@@ -37,32 +30,28 @@ def get_pydantic_fields(cls: Class) -> dict[str, str]:
         return {}
 
     # Check if this is a Pydantic model by looking at bases
-    is_pydantic = any("BaseModel" in str(base) or "pydantic" in str(base)
-                      for base in cls.bases)
+    is_pydantic = any("BaseModel" in str(base) or "pydantic" in str(base) for base in cls.bases)
 
     if not is_pydantic:
         return {}
 
-    field_descriptions = {}
-
-    # Extract field descriptions from docstring or annotations
-    for member_name, member in cls.members.items():
-        if isinstance(member, Attribute) and member.docstring:
-            field_descriptions[member_name] = member.docstring.value
-
-    return field_descriptions
+    return {
+        member_name: member.docstring.value
+        for member_name, member in cls.members.items()
+        if isinstance(member, Attribute) and member.docstring
+    }
 
 
 def format_signature(func: Function) -> str:
     """Format function signature for markdown."""
     params = []
     for param in func.parameters:
-        param_str = param.name
+        param_name = param.name
         if param.annotation:
-            param_str += f": {param.annotation}"
+            param_name += f": {param.annotation}"
         if param.default:
-            param_str += f" = {param.default}"
-        params.append(param_str)
+            param_name += f" = {param.default}"
+        params.append(param_name)
 
     sig = f"{func.name}({', '.join(params)})"
     if func.returns:
@@ -89,8 +78,7 @@ def extract_docstring_sections(obj: Any) -> dict[str, list[str]]:
             sections["returns"] = [f"{section.value.annotation or ''}: {section.value.description}"]
         elif section.kind == DocstringSectionKind.raises:
             sections["raises"] = [
-                f"- **{exc.annotation}**: {exc.description}"
-                for exc in section.value
+                f"- **{exc.annotation}**: {exc.description}" for exc in section.value
             ]
         elif section.kind == DocstringSectionKind.examples:
             sections["examples"] = [section.value]
@@ -100,12 +88,9 @@ def extract_docstring_sections(obj: Any) -> dict[str, list[str]]:
 
 def generate_function_docs(func: Function, depth: int = 2) -> str:
     """Generate markdown documentation for a function."""
-    md = []
     header = "#" * depth
 
-    # Function signature
-    md.append(f"{header} `{format_signature(func)}`\n")
-
+    md = [f"{header} `{format_signature(func)}`\n"]
     # Docstring sections
     sections = extract_docstring_sections(func)
 
@@ -114,105 +99,76 @@ def generate_function_docs(func: Function, depth: int = 2) -> str:
         md.append("")
 
     if "parameters" in sections:
-        md.append("**Parameters:**\n")
-        md.extend(sections["parameters"])
-        md.append("")
-
+        _append_section_to_md(md, "**Parameters:**\n", sections, "parameters")
     if "returns" in sections:
-        md.append("**Returns:**\n")
-        md.extend(sections["returns"])
-        md.append("")
-
+        _append_section_to_md(md, "**Returns:**\n", sections, "returns")
     if "raises" in sections:
-        md.append("**Raises:**\n")
-        md.extend(sections["raises"])
-        md.append("")
-
+        _append_section_to_md(md, "**Raises:**\n", sections, "raises")
     if "examples" in sections:
-        md.append("**Examples:**\n")
-        md.extend(sections["examples"])
-        md.append("")
-
+        _append_section_to_md(md, "**Examples:**\n", sections, "examples")
     return "\n".join(md)
+
+
+def _append_section_to_md(md, header: str, sections, kind: str) -> None:
+    """Helper to append a section to markdown."""
+    md.append(header)
+    md.extend(sections[kind])
+    md.append("")
 
 
 def generate_class_docs(cls: Class, depth: int = 2) -> str:
     """Generate markdown documentation for a class."""
-    md = []
     header = "#" * depth
 
     # Class header
-    bases_str = f"({', '.join(str(b) for b in cls.bases)})" if cls.bases else ""
-    md.append(f"{header} class `{cls.name}{bases_str}`\n")
-
+    bases = f"({', '.join(str(b) for b in cls.bases)})" if cls.bases else ""
+    md = [f"{header} class `{cls.name}{bases}`\n"]
     # Class docstring
     if cls.docstring:
-        md.append(cls.docstring.value)
+        md.extend((cls.docstring.value, ""))
+    if pydantic_fields := get_pydantic_fields(cls):
+        md.extend((f"{header}# Fields\n", "| Field | Description |", "|-------|-------------|"))
+        md.extend(
+            f"| `{field_name}` | {description} |"
+            for field_name, description in pydantic_fields.items()
+        )
         md.append("")
 
-    # Pydantic fields
-    pydantic_fields = get_pydantic_fields(cls)
-    if pydantic_fields:
-        md.append(f"{header}# Fields\n")
-        md.append("| Field | Description |")
-        md.append("|-------|-------------|")
-        for field_name, description in pydantic_fields.items():
-            md.append(f"| `{field_name}` | {description} |")
-        md.append("")
-
-    # Methods
-    methods = [m for m in cls.members.values() if isinstance(m, Function)]
-    if methods:
+    if methods := [m for m in cls.members.values() if isinstance(m, Function)]:
         md.append(f"{header}# Methods\n")
-        for method in methods:
-            if not method.name.startswith("_"):  # Skip private methods
-                md.append(generate_function_docs(method, depth + 2))
-
+        md.extend(
+            generate_function_docs(method, depth + 2)
+            for method in methods
+            if not method.name.startswith("_")
+        )
     return "\n".join(md)
 
 
-def generate_module_docs(module: Module, output_path: Path):
+def generate_module_docs(module: Module, output_path: Path) -> None:
     """Generate markdown file for a Python module."""
-    md = []
-
     # Frontmatter
     module_title = module.name.replace("codeweaver.", "")
-    md.append("---")
-    md.append(f"title: {module_title}")
-    md.append(f"description: API reference for {module.name}")
-    md.append("---\n")
-
+    md = ["---", f"title: {module_title}", f"description: API reference for {module.name}", "---\n"]
     # Module docstring
     if module.docstring:
-        md.append(f"# {module_title}\n")
-        md.append(module.docstring.value)
-        md.append("")
-
-    # Classes
-    classes = [m for m in module.members.values() if isinstance(m, Class)]
-    if classes:
+        md.extend((f"# {module_title}\n", module.docstring.value, ""))
+    if classes := [m for m in module.members.values() if isinstance(m, Class)]:
         md.append("## Classes\n")
         for cls in classes:
             if not cls.name.startswith("_"):  # Skip private classes
-                md.append(generate_class_docs(cls))
-                md.append("")
-
-    # Functions
-    functions = [m for m in module.members.values() if isinstance(m, Function)]
-    if functions:
+                md.extend((generate_class_docs(cls), ""))
+    if functions := [m for m in module.members.values() if isinstance(m, Function)]:
         md.append("## Functions\n")
         for func in functions:
             if not func.name.startswith("_"):  # Skip private functions
-                md.append(generate_function_docs(func))
-                md.append("")
-
+                md.extend((generate_function_docs(func), ""))
     # Write to file
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text("\n".join(md))
     print(f"Generated: {output_path}")
 
 
-def main():
+def main() -> None:
     """Main entry point."""
     # Paths
     project_root = Path(__file__).parent.parent
@@ -249,7 +205,7 @@ def main():
     # Process all submodules
     for module_name, module in codeweaver.modules.items():
         # Skip __init__ and __main__
-        if module_name.endswith("__init__") or module_name.endswith("__main__"):
+        if module_name.endswith(("__init__", "__main__")):
             continue
 
         # Generate relative path for output
