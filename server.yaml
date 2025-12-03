@@ -1,115 +1,32 @@
-# SPDX-FileCopyrightText: 2025 Knitli Inc.
-# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
-#
-# SPDX-License-Identifier: MIT OR Apache-2.0
 name: codeweaver
 image: mcp/codeweaver
 type: server
 meta:
-  category: developer-tools
-  tags:
-    - code-search
-    - semantic-search
-    - embeddings
-    - ai
-    - developer-tools
-    - ast
-    - hybrid-search
-    - rag
+    category: devops
+    tags:
+        - devops
 about:
-  title: CodeWeaver - Code Search for AI Agents
-  description: Semantic code search built for AI agents. Hybrid AST-aware context for 166 languages with intelligent chunking, intent detection, and multi-provider support.
-  icon: https://github.com/knitli/codeweaver/raw/refs/heads/main/docs/assets/codeweaver-primary.svg
+    title: Codeweaver - Code Search for AI Agents
+    description: Semantic code search built for AI agents. Advanced hybrid, AST-aware context curation for 166 languages with intelligent chunking, intent detection, and multi-provider support. Deploy CodeWeaver locally or as a service, in the cloud or completely local. Use with any IDE or AI client. CodeWeaver gives your AI agents one great tool to get the information they need.
+    icon: https://github.com/knitli/codeweaver/raw/refs/heads/main/docs/assets/codeweaver-favico.png
 source:
-  project: https://github.com/knitli/codeweaver
-  commit: 4d1173a524f0e29e261de691131cd031333a50c4
+    project: https://github.com/knitli/codeweaver
+    commit: b2809e688507c84d20867de1199d00d037ca859a
+run:
+    volumes:
+        - /data:{{codeweaver.data}}
 config:
-  description: Configure CodeWeaver with your project path, optional choice of providers and models, and optional vector store settings. Supports 17 embedding providers, 2 sparse embedding providers, 5 reranking providers, and 166 programming languages.
-  secrets:
-    - name: codeweaver.embedding_api_key
-      env: CODEWEAVER_EMBEDDING_API_KEY
-      example: <CODEWEAVER_EMBEDDING_API_KEY>
-    - name: codeweaver.vector_store_api_key
-      env: CODEWEAVER_VECTOR_STORE_API_KEY
-      example: <CODEWEAVER_VECTOR_STORE_API_KEY>
-    - name: codeweaver.reranking_api_key
-      env: CODEWEAVER_RERANKING_API_KEY
-      example: <CODEWEAVER_RERANKING_API_KEY>
-  env:
-    - name: CODEWEAVER_PROJECT_PATH
-      example: <CODEWEAVER_PROJECT_PATH>
-      value: '{{codeweaver.project_path}}'
-    - name: CODEWEAVER_EMBEDDING_PROVIDER
-      example: voyage
-      value: '{{codeweaver.embedding_provider}}'
-    - name: CODEWEAVER_EMBEDDING_MODEL
-      example: voyage-code-3
-      value: '{{codeweaver.embedding_model}}'
-    - name: CODEWEAVER_VECTOR_STORE_PROVIDER
-      example: qdrant
-      value: '{{codeweaver.vector_store_provider}}'
-    - name: CODEWEAVER_VECTOR_STORE_URL
-      example: http://localhost
-      value: '{{codeweaver.vector_store_url}}'
-    - name: CODEWEAVER_RERANKING_PROVIDER
-      example: voyage
-      value: '{{codeweaver.reranking_provider}}'
-    - name: CODEWEAVER_RERANKING_MODEL
-      example: rerank-2.5
-      value: '{{codeweaver.reranking_model}}'
-  parameters:
-    type: object
-    properties:
-      project_path:
-        type: string
-      embedding_provider:
-        type: string
-        enum:
-          - azure
-          - bedrock
-          - cohere
-          - fastembed
-          - fireworks
-          - github
-          - google
-          - groq
-          - heroku
-          - hf_inference
-          - mistral
-          - ollama
-          - openai
-          - sentence_transformers
-          - together
-          - vercel
-          - voyage
-        default: voyage
-      embedding_model:
-        type: string
-        default: voyage-code-3
-      embedding_api_key:
-        type: string
-      vector_store_provider:
-        type: string
-        enum:
-          - memory
-          - qdrant
-        default: qdrant
-      vector_store_url:
-        type: string
-        default: http://localhost
-      vector_store_api_key:
-        type: string
-      reranking_provider:
-        type: string
-        enum:
-          - bedrock
-          - cohere
-          - fastembed
-          - sentence_transformers
-          - voyage
-        default: voyage
-      reranking_model:
-        type: string
-        default: rerank-2.5
-      reranking_api_key:
-        type: string
+    description: Configure the connection to Codeweaver - Code Search for AI Agents
+    secrets:
+        - name: codeweaver.foo
+          env: bar
+          example: <bar>
+    env:
+        - name: foo
+          example: value
+          value: '{{value}}'
+    parameters:
+        type: object
+        properties:
+            foo:
+                type: string

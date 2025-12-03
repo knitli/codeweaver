@@ -90,6 +90,18 @@ class SettingsEnvVars(TypedDict):
     CODEWEAVER_RERANKING_API_KEY: EnvVarInfo
     """Environment variable for specifying the API key for the reranking provider."""
 
+    CODEWEAVER_AGENT_PROVIDER: EnvVarInfo
+    """Environment variable for specifying the agent provider to use."""
+
+    CODEWEAVER_AGENT_MODEL: EnvVarInfo
+    """Environment variable for specifying the agent model to use."""
+
+    CODEWEAVER_AGENT_API_KEY: EnvVarInfo
+    """Environment variable for specifying the API key for the agent provider."""
+
+    CODEWEAVER_DATA_PROVIDERS: EnvVarInfo
+    """Environment variable for specifying data providers. API keys, if required, must be set using the provider's specific environment variable, such as `TAVILY_API_KEY` for the TAVILY provider."""
+
     CODEWEAVER__TELEMETRY__DISABLE_TELEMETRY: EnvVarInfo
     """Environment variable to disable telemetry data collection."""
 
@@ -182,7 +194,7 @@ def environment_variables() -> DictView[SettingsEnvVars]:
                 is_required=False,
                 is_secret=False,
                 default="localhost",
-                variable_name="host",
+                variable_name="management_host",
             ),
             CODEWEAVER_PORT=EnvVarInfo(
                 env="CODEWEAVER_PORT",
@@ -191,7 +203,7 @@ def environment_variables() -> DictView[SettingsEnvVars]:
                 is_secret=False,
                 fmt=EnvFormat.NUMBER,
                 default="9329",
-                variable_name="port",
+                variable_name="management_port",
             ),
             CODEWEAVER_MCP_PORT=EnvVarInfo(
                 env="CODEWEAVER_MCP_PORT",
@@ -200,6 +212,7 @@ def environment_variables() -> DictView[SettingsEnvVars]:
                 is_secret=False,
                 fmt=EnvFormat.NUMBER,
                 default="9328",
+                variable_name="mcp_port",
             ),
             CODEWEAVER_DEBUG=EnvVarInfo(
                 env="CODEWEAVER_DEBUG",
@@ -296,7 +309,7 @@ def environment_variables() -> DictView[SettingsEnvVars]:
             ),
             CODEWEAVER_EMBEDDING_API_KEY=EnvVarInfo(
                 env="CODEWEAVER_EMBEDDING_API_KEY",
-                description="Specify the API key for the embedding provider, if required. Note: {', '.join([p for p in _providers_for_kind('embedding') if p.])}",
+                description="Specify the API key for the embedding provider, if required. Note: Ollama may require an API key if using their cloud services.",
                 is_required=False,
                 is_secret=True,
                 variable_name="api_key",
@@ -326,6 +339,39 @@ def environment_variables() -> DictView[SettingsEnvVars]:
                 is_secret=True,
                 variable_name="api_key",
                 choices=_auth_list_for_kind("reranking"),
+            ),
+            CODEWEAVER_AGENT_PROVIDER=EnvVarInfo(
+                env="CODEWEAVER_AGENT_PROVIDER",
+                description="Specify the agent provider to use.",
+                is_required=False,
+                is_secret=False,
+                default="anthropic",
+                variable_name="provider",
+                choices=_providers_for_kind("agent"),
+            ),
+            CODEWEAVER_AGENT_MODEL=EnvVarInfo(
+                env="CODEWEAVER_AGENT_MODEL",
+                description="Specify the agent model to use. Provide the model name as you would to the provider directly -- check the provider's documentation.",
+                is_required=False,
+                is_secret=False,
+                default="claude-haiku-4.5-latest",
+                variable_name="model",
+            ),
+            CODEWEAVER_AGENT_API_KEY=EnvVarInfo(
+                env="CODEWEAVER_AGENT_API_KEY",
+                description="Specify the API key for the agent provider, if required. Note: Ollama uses the `openai` client, which requires an API key. If you're using Ollama locally, you need to set this, but it can be to anything -- like `madeup-key`.",
+                is_required=False,
+                is_secret=True,
+                variable_name="api_key",
+                choices=_auth_list_for_kind("agent"),
+            ),
+            CODEWEAVER_DATA_PROVIDERS=EnvVarInfo(
+                env="CODEWEAVER_DATA_PROVIDERS",
+                description="Specify data providers to use, separated by commas. API keys, if required, must be set using the provider's specific environment variable, such as `TAVILY_API_KEY` for the TAVILY provider.",
+                is_required=False,
+                is_secret=False,
+                default="tavily",
+                choices=_providers_for_kind("data"),
             ),
             CODEWEAVER__TELEMETRY__DISABLE_TELEMETRY=EnvVarInfo(
                 env="CODEWEAVER__TELEMETRY__DISABLE_TELEMETRY",

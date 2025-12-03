@@ -525,6 +525,20 @@ class Provider(BaseEnum):
 
         return ProviderKind.RERANKING in get_provider_kinds(cast(LiteralProvider, self))
 
+    def is_agent_provider(self) -> bool:
+        """Check if the provider is an agent model provider."""
+        from codeweaver.providers.capabilities import get_provider_kinds
+        from codeweaver.providers.types import LiteralProvider
+
+        return ProviderKind.AGENT in get_provider_kinds(cast(LiteralProvider, self))
+
+    def is_data_provider(self) -> bool:
+        """Check if the provider is a data provider."""
+        from codeweaver.providers.capabilities import get_provider_kinds
+        from codeweaver.providers.types import LiteralProvider
+
+        return ProviderKind.DATA in get_provider_kinds(cast(LiteralProvider, self))
+
     def get_env_api_key(self) -> str | None:
         """Get the API key from environment variables, if set."""
         if env_vars := self.api_key_env_vars:

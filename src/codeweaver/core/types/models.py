@@ -457,6 +457,9 @@ class EnvVarInfo(NamedTuple):
 
         return {f"{self.variable_name or self.env}": os.getenv(self.env)}
 
+    def as_docker_yaml(self) -> None:
+        """TODO: Convert to Docker MCP Registry YAML format."""
+
 
 __all__ = (
     "BASEDMODEL_CONFIG",

@@ -236,8 +236,12 @@ def get_network_settings() -> NetworkConfig:
     management_port = (
         settings_map["management_port"] if settings_map["management_port"] is not Unset else 9329
     )
-    mcp_host = settings_map["mcp_host"] if settings_map["mcp_host"] is not Unset else "127.0.0.1"
-    mcp_port = settings_map["mcp_port"] if settings_map["mcp_port"] is not Unset else 9328
+    if (mcp_http_server := settings_map["mcp_server"]) is not Unset:
+        mcp_host = mcp_http_server.get("host", "127.0.0.1")
+        mcp_port = mcp_http_server.get("port", 9328)
+    else:
+        mcp_host = "127.0.0.1"
+        mcp_port = 9328
     return NetworkConfig(
         management_host=management_host,
         management_port=management_port,

@@ -343,6 +343,7 @@ echo "✅ CHANGELOG.md generated for ${usage_tag:?}!"
 '''
 
 [tasks.prepare-version]
+tools."cargo:git-cliff" = "latest"
 description = "Prepare build artifacts for a new version release"
 usage = '''
 arg "[version]" {
