@@ -436,6 +436,13 @@ async def index(
             name=["--yes", "-y"], help="Skip confirmation prompts (use with --clear)"
         ),
     ] = False,
+    verbose: Annotated[
+        bool,
+        cyclopts.Parameter(name=["--verbose", "-v"], help="Enable verbose logging with timestamps"),
+    ] = False,
+    debug: Annotated[
+        bool, cyclopts.Parameter(name=["--debug", "-d"], help="Enable debug logging")
+    ] = False,
 ) -> None:
     """Index or re-index a codebase.
 
@@ -458,7 +465,7 @@ async def index(
         yes: If True, skip confirmation prompts
     """
     display = _display or get_display()
-    error_handler = CLIErrorHandler(display, verbose=False, debug=False)
+    error_handler = CLIErrorHandler(display, verbose=verbose, debug=debug)
     from codeweaver.common.utils import is_wsl_vscode
 
     if is_wsl_vscode():
