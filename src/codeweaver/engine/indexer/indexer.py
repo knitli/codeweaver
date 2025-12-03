@@ -1326,6 +1326,11 @@ class Indexer(BasedModel):
         await self._perform_batch_indexing_async(files_to_index, progress_callback)
 
         # Perform automatic reconciliation: detect and fix missing embeddings
+        # Initialize tracking variables for exception handling context
+        dense_file_count = 0
+        sparse_file_count = 0
+        current_models: dict[str, str | None] = {}
+
         if (
             not force_reindex
             and self._vector_store
@@ -1381,10 +1386,10 @@ class Indexer(BasedModel):
                     "Automatic reconciliation failed: %s (collection=%s, dense_files=%d, sparse_files=%d, dense_provider=%s, sparse_provider=%s)",
                     str(e),
                     self._vector_store.collection if self._vector_store else "unknown",
-                    dense_file_count if "dense_file_count" in dir() else 0,
-                    sparse_file_count if "sparse_file_count" in dir() else 0,
-                    current_models.get("dense_provider", "none") if "current_models" in dir() else "unknown",
-                    current_models.get("sparse_provider", "none") if "current_models" in dir() else "unknown",
+                    dense_file_count,
+                    sparse_file_count,
+                    current_models.get("dense_provider", "none"),
+                    current_models.get("sparse_provider", "none"),
                     exc_info=True,
                 )
             except (ConnectionError, TimeoutError, OSError) as e:

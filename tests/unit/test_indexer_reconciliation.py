@@ -741,9 +741,10 @@ class TestEdgeCases:
         mock_indexer._embedding_provider.embed_document.assert_called_once()
 
         # Verify update contains only dense vector
+        # Note: Empty string key ("") is Qdrant's convention for the default/unnamed dense vector
         call_args = mock_indexer._vector_store.client.update_vectors.call_args
         vectors = call_args[1]["vectors"][0]
-        assert "" in vectors  # Dense present
+        assert "" in vectors  # Dense vector present (empty string = default dense vector)
         assert "sparse" not in vectors  # Sparse not present
 
         assert result["chunks_updated"] == 1
@@ -787,10 +788,11 @@ class TestEdgeCases:
         mock_indexer._sparse_provider.embed_document.assert_called_once()
 
         # Verify update contains only sparse vector
+        # Note: Empty string key ("") is Qdrant's convention for the default/unnamed dense vector
         call_args = mock_indexer._vector_store.client.update_vectors.call_args
         vectors = call_args[1]["vectors"][0]
         assert "sparse" in vectors  # Sparse present
-        assert "" not in vectors  # Dense not present
+        assert "" not in vectors  # Dense not present (empty string = default dense vector)
 
         assert result["chunks_updated"] == 1
 
