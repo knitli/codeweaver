@@ -18,9 +18,13 @@ export default defineConfig({
         dark: './src/assets/codeweaver-reverse.svg',
       },
       favicon: '/codeweaver-favico.png',
-      social: {
-        github: 'https://github.com/knitli/codeweaver',
-      },
+      social: [
+        {
+          name: 'GitHub',
+          icon: 'github',
+          url: 'https://github.com/knitli/codeweaver',
+        },
+      ],
       customCss: [
         './src/styles/custom.css',
       ],
