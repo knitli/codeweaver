@@ -19,14 +19,9 @@ services:
       - qdrant_storage:/qdrant/storage
     environment:
       - QDRANT__SERVICE__GRPC_PORT=6334
-    healthcheck:
-      # Simple healthcheck using wget (available in Qdrant v1.16+)
-      # Check /healthz endpoint (Qdrant v1.5.0+) for proper health status
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:6333/healthz || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
+    # Note: No internal healthcheck - Qdrant image intentionally excludes curl/wget/nc for security
+    # Health checking is performed externally by the workflow (see docker.yml lines 189-209)
+    # See: https://github.com/qdrant/qdrant/issues/3491 and https://github.com/qdrant/qdrant/issues/4250
     restart: unless-stopped
     networks:
       - codeweaver-network
@@ -101,8 +96,9 @@ services:
       # Operational Settings
       # =================================================================
     depends_on:
+      # Start after Qdrant starts (workflow performs external health checks)
       qdrant:
-        condition: service_healthy
+        condition: service_started
     healthcheck:
       test:
         - CMD
