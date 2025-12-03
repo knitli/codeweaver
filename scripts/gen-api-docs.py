@@ -208,6 +208,11 @@ def main() -> None:
         if module_name.endswith(("__init__", "__main__")):
             continue
 
+        # Skip private modules (those with components starting with underscore)
+        module_parts = module_name.replace("codeweaver.", "").split(".")
+        if any(part.startswith("_") for part in module_parts):
+            continue
+
         # Generate relative path for output
         rel_path = module_name.replace("codeweaver.", "").replace(".", "/")
         output_path = docs_output / f"{rel_path}.md"
