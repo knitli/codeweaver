@@ -387,27 +387,41 @@ fi
 echo -e "${BLUE}[codeweaver]${NC} Preparing version ${GREEN}v${VERSION}${NC}..."
 
 # Step 1: Run build preparation
-echo -e "${BLUE}[codeweaver]${NC} Step 1/5: Running build preparation..."
+echo -e "${BLUE}[codeweaver]${NC} Step 1/7: Running build preparation..."
 uv run python scripts/build/prepare-build.py || {
     echo -e "${RED}Build preparation failed!${NC}"
     exit 1
 }
 
 # Step 2: Check for generated artifacts
-echo -e "${BLUE}[codeweaver]${NC} Step 2/5: Verifying generated artifacts..."
+echo -e "${BLUE}[codeweaver]${NC} Step 2/7: Verifying generated artifacts..."
 if [ ! -f "src/codeweaver/data/node_types_cache.pkl" ]; then
     echo -e "${YELLOW}Warning: node_types_cache.pkl not found${NC}"
 fi
 
 # Step 3: Update CHANGELOG
-echo -e "${BLUE}[codeweaver]${NC} Step 3/5: Updating CHANGELOG.md..."
+echo -e "${BLUE}[codeweaver]${NC} Step 3/7: Updating CHANGELOG.md..."
 git-cliff --tag "v${VERSION}" --prepend --output CHANGELOG.md || {
     echo -e "${YELLOW}Warning: Failed to update CHANGELOG${NC}"
 }
 
-# Step 4: Commit if not disabled
+# Step 4: Ensure Reuse coverage
+echo -e "${BLUE}[codeweaver]${NC} Step 4/7: Ensuring Reuse coverage..."
+reuse lint || {
+    echo -e "${RED}Reuse lint failed!${NC}"
+    exit 1
+}
+
+# Step 5: Generate SBOM
+echo -e "${BLUE}[codeweaver]${NC} Step 5/7: Generating SBOM for version ${VERSION}..."
+reuse spdx --add-license-concluded --creator-person "automated[bot]" --creator-organization "Knitli Inc." -o sbom.spdx || {
+    echo -e "${RED}SBOM generation failed!${NC}"
+    exit 1
+}
+
+# Step 6: Commit if not disabled
 if [ -z "${usage_no_commit:-}" ]; then
-    echo -e "${BLUE}[codeweaver]${NC} Step 4/5: Committing build artifacts..."
+    echo -e "${BLUE}[codeweaver]${NC} Step 6/7: Committing build artifacts..."
     git add src/codeweaver/data/node_types_cache.pkl 2>/dev/null || true
     git add CHANGELOG.md 2>/dev/null || true
     git add schema/ 2>/dev/null || true
@@ -429,9 +443,9 @@ else
     echo -e "${YELLOW}Skipping commit (--no-commit flag)${NC}"
 fi
 
-# Step 5: Tag if not disabled
+# Step 7: Tag if not disabled
 if [ -z "${usage_no_tag:-}" ] && [ -z "${usage_no_commit:-}" ]; then
-    echo -e "${BLUE}[codeweaver]${NC} Step 5/5: Creating git tag v${VERSION}..."
+    echo -e "${BLUE}[codeweaver]${NC} Step 7/7: Creating git tag v${VERSION}..."
     git tag -a "v${VERSION}" -m "Release v${VERSION}" || {
         echo -e "${RED}Tagging failed!${NC}"
         exit 1
