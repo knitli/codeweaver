@@ -138,7 +138,8 @@ class TestStartDaemonBackground:
             mock_popen.assert_called_once()
             # Verify the command uses the cw executable with 'start' command
             call_args = mock_popen.call_args[0][0]
-            assert "/usr/local/bin/cw" in call_args[0]
+            # Check that the executable path is used (mock returns /usr/local/bin/cw)
+            assert call_args[0] == "/usr/local/bin/cw"
             assert "start" in call_args
 
     def test_start_daemon_background_uses_python_fallback(self, temp_project: Path) -> None:

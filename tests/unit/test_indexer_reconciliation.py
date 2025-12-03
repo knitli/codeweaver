@@ -439,7 +439,7 @@ class TestAutomaticReconciliation:
             return_value={"chunks_updated": 0, "files_processed": 0, "errors": []}
         )
 
-        # Use class-level patching with autospec=False to avoid Pydantic issues
+        # Use class-level patching to avoid Pydantic v2 model attribute setting issues
         with (
             patch(
                 "codeweaver.engine.indexer.indexer.Indexer._initialize_providers_async",
@@ -850,7 +850,7 @@ class TestReconciliationExceptionHandling:
 
         mock_reconciliation = AsyncMock(side_effect=ProviderError("Test provider error"))
 
-        # Use class-level patching with autospec=False to avoid Pydantic issues
+        # Use class-level patching to avoid Pydantic v2 model attribute setting issues
         with (
             patch(
                 "codeweaver.engine.indexer.indexer.Indexer._initialize_providers_async",
@@ -910,7 +910,7 @@ class TestReconciliationExceptionHandling:
 
         mock_reconciliation = AsyncMock(side_effect=IndexingError("Test indexing error"))
 
-        # Use class-level patching with autospec=False to avoid Pydantic issues
+        # Use class-level patching to avoid Pydantic v2 model attribute setting issues
         with (
             patch(
                 "codeweaver.engine.indexer.indexer.Indexer._initialize_providers_async",
@@ -965,7 +965,7 @@ class TestReconciliationExceptionHandling:
 
         mock_reconciliation = AsyncMock(side_effect=ConnectionError("Network error"))
 
-        # Use class-level patching with autospec=False to avoid Pydantic issues
+        # Use class-level patching to avoid Pydantic v2 model attribute setting issues
         with (
             patch(
                 "codeweaver.engine.indexer.indexer.Indexer._initialize_providers_async",
