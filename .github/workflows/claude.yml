@@ -28,6 +28,8 @@ permissions:
   pull-requests: write
 jobs:
   claude-response:
+    # Alternative: Use ubuntu-latest-4-cores (16GB RAM) if OOM issues persist
+    # Requires GitHub Team/Enterprise plan
     runs-on: ubuntu-latest
     env:
       CODEWEAVER_VECTOR_STORE_URL: ${{ secrets.CODEWEAVER_VECTOR_STORE_URL }}
@@ -36,6 +38,13 @@ jobs:
       CODEWEAVER_PROJECT_PATH: ${{ github.workspace }}
       MISE_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       MISE_ENV: "cloudagent"
+      # Limit CodeQL memory usage to prevent OOM kills on standard runners (7GB total RAM)
+      # Note: Standard runners have ~7GB, so limit to 3GB to leave headroom for system
+      CODEQL_RAM: 3072
+      CODEQL_THREADS: 2
+      # Additional limits for CodeQL extractor and evaluator
+      CODEQL_EXTRACTOR_PYTHON_RAM: 2048
+      CODEQL_EVALUATOR_RAM: 2048
     steps:
       - name: Checkout Repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8

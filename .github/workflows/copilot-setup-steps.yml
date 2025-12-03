@@ -25,7 +25,17 @@ jobs:
       MISE_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       MISE_ENV: "cloudagent"
       MISE_YES: 1
+      # Limit CodeQL memory usage to prevent OOM kills on standard runners (7GB total RAM)
+      # Note: Standard runners have ~7GB, so limit to 3GB to leave headroom for system
+      CODEQL_RAM: 3072
+      CODEQL_THREADS: 2
+      # Additional limits for CodeQL extractor and evaluator
+      CODEQL_EXTRACTOR_PYTHON_RAM: 2048
+      CODEQL_EVALUATOR_RAM: 2048
     runs-on: ubuntu-latest
+    # Alternative: Use ubuntu-latest-4-cores (16GB RAM) if OOM issues persist
+    # Requires GitHub Team/Enterprise plan
+    # runs-on: ubuntu-latest-4-cores
     # Add an overall job timeout so we don't let runaway installs exhaust the runner indefinitely
     timeout-minutes: 50
     # Set the permissions to the lowest permissions possible needed for your steps.
