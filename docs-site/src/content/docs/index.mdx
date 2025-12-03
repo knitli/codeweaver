@@ -4,7 +4,7 @@ description: Semantic code search and understanding for modern development teams
 template: splash
 hero:
   title: CodeWeaver
-  tagline: Semantic code search and understanding powered by AI
+  tagline: Semantic code search and understanding for AI, and you.
   image:
     file: ../../assets/codeweaver-primary.svg
   actions:
@@ -40,13 +40,13 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
 
 ```bash
 # Install CodeWeaver
-pip install codeweaver
+uv pip install codeweaver
 
-# Index your repository
-codeweaver index /path/to/repo
+# Start the daemon
+cw start --project /path/to/your/codebase
 
-# Search your code
-codeweaver search "authentication logic"
+# Search your code -- use the same tool your agent does
+cw search "authentication logic"
 ```
 
 ## What's Next?
