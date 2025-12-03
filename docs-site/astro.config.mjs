@@ -37,40 +37,8 @@ export default defineConfig({
           ],
         },
         {
-          label: 'Guides',
-          items: [
-            { label: 'Publishing', slug: 'guides/publishing' },
-            { label: 'Versioning', slug: 'guides/versioning' },
-          ],
-        },
-        {
-          label: 'Advanced',
-          items: [
-            { label: 'Vector Store Validation', slug: 'advanced/vector-store-validation' },
-            { label: 'Indexer Deduplication', slug: 'advanced/indexer-deduplication-analysis' },
-          ],
-        },
-        {
-          label: 'Registry',
-          items: [
-            { label: 'Submission Guide', slug: 'registry/submission' },
-          ],
-        },
-        {
-          label: 'Docker',
-          items: [
-            { label: 'Build Notes', slug: 'docker/build-notes' },
-          ],
-        },
-        {
           label: 'API Reference',
           autogenerate: { directory: 'api' },
-        },
-        {
-          label: 'Development',
-          items: [
-            { label: 'Release Checklist', slug: 'dev/release-checklist' },
-          ],
         },
       ],
     }),
