@@ -44,6 +44,7 @@ from codeweaver.engine.indexer.checkpoint import CheckpointManager, IndexingChec
 from codeweaver.engine.indexer.manifest import FileManifestManager, IndexFileManifest
 from codeweaver.engine.indexer.progress import IndexingStats
 from codeweaver.engine.watcher.types import FileChange
+from codeweaver.exceptions import IndexingError, ProviderError
 
 
 logger = logging.getLogger(__name__)
@@ -1325,6 +1326,11 @@ class Indexer(BasedModel):
         await self._perform_batch_indexing_async(files_to_index, progress_callback)
 
         # Perform automatic reconciliation: detect and fix missing embeddings
+        # Initialize tracking variables for exception handling context
+        dense_file_count = 0
+        sparse_file_count = 0
+        current_models: dict[str, str | None] = {}
+
         if (
             not force_reindex
             and self._vector_store
@@ -1348,15 +1354,17 @@ class Indexer(BasedModel):
                 needs_sparse = bool(files_needing.get("sparse_only") and self._sparse_provider)
 
                 if needs_dense or needs_sparse:
+                    dense_file_count = len(files_needing.get("dense_only", []))
+                    sparse_file_count = len(files_needing.get("sparse_only", []))
                     if needs_dense:
                         logger.info(
                             "Found %d files needing dense embeddings",
-                            len(files_needing["dense_only"]),
+                            dense_file_count,
                         )
                     if needs_sparse:
                         logger.info(
                             "Found %d files needing sparse embeddings",
-                            len(files_needing["sparse_only"]),
+                            sparse_file_count,
                         )
 
                     logger.info("Starting automatic reconciliation...")
@@ -1372,8 +1380,26 @@ class Indexer(BasedModel):
                         )
                     else:
                         logger.debug("Reconciliation complete: no chunks needed updating")
-            except Exception:
-                logger.warning("Automatic reconciliation failed", exc_info=True)
+            except (ProviderError, IndexingError) as e:
+                # Provider or indexing errors are expected failure modes
+                logger.warning(
+                    "Automatic reconciliation failed: %s (collection=%s, dense_files=%d, sparse_files=%d, dense_provider=%s, sparse_provider=%s)",
+                    str(e),
+                    self._vector_store.collection if self._vector_store else "unknown",
+                    dense_file_count,
+                    sparse_file_count,
+                    current_models.get("dense_provider", "none"),
+                    current_models.get("sparse_provider", "none"),
+                    exc_info=True,
+                )
+            except (ConnectionError, TimeoutError, OSError) as e:
+                # Network/IO errors that may be transient
+                logger.warning(
+                    "Automatic reconciliation failed due to connection/IO error: %s (collection=%s)",
+                    str(e),
+                    self._vector_store.collection if self._vector_store else "unknown",
+                    exc_info=True,
+                )
 
         # Finalize and report
         self._finalize_indexing()
@@ -2455,16 +2481,22 @@ class Indexer(BasedModel):
                         continue
 
                     # Check which vector types already exist in this point
-                    # We just need to check for presence, not extract the actual vectors
-                    existing_vectors = point.vector if hasattr(point, "vector") else {}
-                    if not isinstance(existing_vectors, dict):
-                        # If it's a single vector (unnamed), treat it as dense
-                        existing_vectors = {"": existing_vectors} if existing_vectors else {}
+                    # Handle various vector representations from Qdrant:
+                    # - dict[str, list[float]]: Named vectors
+                    # - Mapping (e.g., NamedVectors): Mapping-like objects with vector names
+                    # - list[float]: Single unnamed vector
+                    # - None: No vectors
+                    from collections.abc import Mapping
 
-                    # Get set of existing vector names for quick lookup
-                    existing_vector_names = (
-                        set(existing_vectors.keys()) if existing_vectors else set()
-                    )
+                    existing_vectors = point.vector if hasattr(point, "vector") else {}
+                    if isinstance(existing_vectors, Mapping):
+                        # Already a mapping (dict or NamedVectors), use keys as-is
+                        existing_vector_names = set(existing_vectors.keys())
+                    elif existing_vectors:
+                        # Single unnamed vector (list), treat as dense with empty string key
+                        existing_vector_names = {""}
+                    else:
+                        existing_vector_names = set()
 
                     # Generate missing embeddings
                     vectors_to_add: dict[str, list[float]] = {}

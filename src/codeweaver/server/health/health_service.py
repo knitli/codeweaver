@@ -50,7 +50,7 @@ class HealthService:
         statistics: SessionStatistics,
         indexer: Indexer | None = None,
         failover_manager: VectorStoreFailoverManager | None = None,
-        startup_time: float,
+        startup_stopwatch: float,
     ) -> None:
         """Initialize health service.
 
@@ -59,13 +59,13 @@ class HealthService:
             statistics: Session statistics for query metrics
             indexer: Indexer instance for indexing progress (optional)
             failover_manager: Failover manager for vector store failover (optional)
-            startup_time: Server startup timestamp
+            startup_stopwatch: Server startup monotonic time (from time.monotonic())
         """
         self._provider_registry = provider_registry
         self._statistics = statistics
         self._indexer = indexer
         self._failover_manager = failover_manager
-        self._startup_time = startup_time
+        self._startup_stopwatch = startup_stopwatch
         self._last_indexed: str | None = None
         self._indexed_languages: set[str] = set()
 
@@ -111,8 +111,8 @@ class HealthService:
         # Determine overall status (including resource checks)
         status = self._determine_status(indexing_info, services_info, resources_info)
 
-        # Calculate uptime
-        uptime_seconds = int(time.time() - self._startup_time)
+        # Calculate uptime using monotonic time to prevent clock drift/skew issues
+        uptime_seconds = int(time.monotonic() - self._startup_stopwatch)
 
         return HealthResponse.create_with_current_timestamp(
             status=cast(Literal["healthy", "degraded", "unhealthy"], status),

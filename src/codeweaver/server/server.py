@@ -216,7 +216,7 @@ def _get_health_service() -> HealthService:
         provider_registry=state.provider_registry,
         statistics=state.statistics,
         indexer=state.indexer,
-        startup_time=state.startup_time,
+        startup_stopwatch=state.startup_stopwatch,
     )
 
 
