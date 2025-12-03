@@ -98,7 +98,15 @@ class TestInitFullWorkflow:
 
         # Execute init with explicit HTTP transport
         func, bound_args, _ = init_app.parse_args(
-            ["--quickstart", "--client", "claude_code", "--transport", "streamable-http", "--project", str(project)],
+            [
+                "--quickstart",
+                "--client",
+                "claude_code",
+                "--transport",
+                "streamable-http",
+                "--project",
+                str(project),
+            ],
             exit_on_error=False,
         )
         func(**bound_args.arguments)

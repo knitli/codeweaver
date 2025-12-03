@@ -111,7 +111,9 @@ class VoyageEmbeddingProvider(EmbeddingProvider[AsyncClient]):
             results: EmbeddingsObject = await self.client.embed(
                 texts=ready_documents, **(kwargs | self.doc_kwargs)
             )
-            self._fire_and_forget(lambda: self._update_token_stats(token_count=results.total_tokens))
+            self._fire_and_forget(
+                lambda: self._update_token_stats(token_count=results.total_tokens)
+            )
             return self._process_output(results)
         except Exception as e:
             # Check if this is a token limit error from Voyage API
@@ -119,7 +121,9 @@ class VoyageEmbeddingProvider(EmbeddingProvider[AsyncClient]):
             if "max allowed tokens per submitted batch" in error_msg.lower() and len(documents) > 1:
                 logger.warning(
                     "Voyage batch token limit exceeded (%s), splitting batch of %d chunks in half and retrying",
-                    error_msg.split("Your batch has")[1].split("tokens")[0].strip() if "Your batch has" in error_msg else "unknown",
+                    error_msg.split("Your batch has")[1].split("tokens")[0].strip()
+                    if "Your batch has" in error_msg
+                    else "unknown",
                     len(documents),
                 )
                 # Split the batch in half and process recursively

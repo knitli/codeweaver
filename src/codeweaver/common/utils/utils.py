@@ -16,6 +16,7 @@ import os
 import sys
 
 from collections.abc import Callable, Iterable
+from functools import cache
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, cast, overload
 
@@ -182,6 +183,7 @@ def ensure_iterable[T](value: Iterable[T] | T) -> Iterable[T]:
         yield cast(T, value)
 
 
+@cache
 def get_user_config_dir(*, base_only: bool = False) -> Path:
     """Get the user configuration directory based on the operating system."""
     import platform
@@ -233,6 +235,7 @@ def backup_file_path(*, project_name: str | None = None, project_path: Path | No
     )
 
 
+@cache
 def generate_collection_name(
     *, is_backup: bool = False, project_name: str | None = None, project_path: Path | None = None
 ) -> str:

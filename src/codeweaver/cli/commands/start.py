@@ -308,12 +308,9 @@ async def start(
         PositiveInt | None, Parameter(help="MCP server port. Default is 9328.")
     ] = None,
     verbose: Annotated[
-        bool,
-        Parameter(name=["--verbose", "-v"], help="Enable verbose logging with timestamps"),
+        bool, Parameter(name=["--verbose", "-v"], help="Enable verbose logging with timestamps")
     ] = False,
-    debug: Annotated[
-        bool, Parameter(name=["--debug", "-d"], help="Enable debug logging")
-    ] = False,
+    debug: Annotated[bool, Parameter(name=["--debug", "-d"], help="Enable debug logging")] = False,
 ) -> None:
     """Start CodeWeaver daemon with background services and MCP HTTP server.
 

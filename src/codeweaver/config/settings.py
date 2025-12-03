@@ -538,6 +538,7 @@ class CodeWeaverSettings(BaseSettings):
 
     def __init__(self, **kwargs: Any) -> None:
         """Initialize CodeWeaverSettings, loading from config file if provided."""
+        type(self)._ensure_settings_dirs()
         if (config := kwargs.get("config_file")) and config is not UNSET:
             content = from_json(config.read_bytes())
             if content and content != kwargs:
@@ -750,6 +751,22 @@ class CodeWeaverSettings(BaseSettings):
 
         return cls(project_path=get_project_path(), **{**kwargs, "config_file": path})  # type: ignore
 
+    @staticmethod
+    def user_config_dir() -> Path:
+        """Get the user configuration directory, ensuring it exists with correct permissions."""
+        return get_user_config_dir()
+
+    @staticmethod
+    def _ensure_settings_dirs() -> None:
+        """Ensure that necessary configuration directories exist with correct permissions."""
+        # since these are nondestructive, we can just always call them
+        user_config_dir = CodeWeaverSettings.user_config_dir()
+        secrets_dir = user_config_dir / ".secrets"
+        user_config_dir.mkdir(parents=True, exist_ok=True)
+        user_config_dir.chmod(0o700)
+        secrets_dir.mkdir(parents=True, exist_ok=True)
+        secrets_dir.chmod(0o700)
+
     @computed_field
     def project_root(self) -> Path:
         """Get the project root directory. Alias for `project_path`."""
@@ -809,14 +826,7 @@ class CodeWeaverSettings(BaseSettings):
             - Google Secret Manager
         """
         config_files: list[PydanticBaseSettingsSource] = []
-        user_config_dir = get_user_config_dir()
-        secrets_dir = user_config_dir / ".secrets"
-        if not user_config_dir.exists():
-            user_config_dir.mkdir(parents=True, exist_ok=True)
-            user_config_dir.chmod(0o700)
-        if not secrets_dir.exists():
-            secrets_dir.mkdir(parents=True, exist_ok=True)
-            secrets_dir.chmod(0o700)
+        cls._ensure_settings_dirs()
         # Check if we're in test mode - prioritize test configs
         is_test_mode = is_test_environment()
 
@@ -840,7 +850,7 @@ class CodeWeaverSettings(BaseSettings):
                 ".codeweaver",
                 ".codeweaver/codeweaver.local",
                 ".codeweaver/codeweaver",
-                f"{user_config_dir!s}/codeweaver",
+                f"{cls.user_config_dir()!s}/codeweaver",
             ])
         for _class in (
             TomlConfigSettingsSource,
@@ -921,7 +931,7 @@ class CodeWeaverSettings(BaseSettings):
             *config_files,
             SecretsSettingsSource(
                 settings_cls=settings_cls,
-                secrets_dir=f"{user_config_dir}/secrets",
+                secrets_dir=f"{cls.user_config_dir()}/secrets",
                 env_ignore_empty=True,
             ),
             *other_sources,
