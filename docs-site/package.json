@@ -1,0 +1,26 @@
+{
+  "name": "codeweaver-docs",
+  "type": "module",
+  "version": "0.0.1",
+  "scripts": {
+    "gen-api-docs": "python3 ../scripts/gen-api-docs.py",
+    "prebuild": "npm run gen-api-docs",
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "astro check && astro build",
+    "preview": "astro preview",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "@astrojs/check": "^0.9.0",
+    "@astrojs/starlight": "^0.28.0",
+    "@astrojs/starlight-tailwind": "^2.0.3",
+    "astro": "^4.15.0",
+    "sharp": "^0.33.0",
+    "tailwindcss": "^4.0.0",
+    "@tailwindcss/vite": "^4.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}
