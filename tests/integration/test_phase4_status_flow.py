@@ -191,7 +191,7 @@ class TestPhase4StatusFlow:
         health_service = HealthService(
             provider_registry=registry,
             statistics=stats,
-            startup_time=time.time(),
+            startup_stopwatch=time.monotonic(),
             indexer=None,
             failover_manager=failover_manager,
         )
@@ -223,7 +223,7 @@ class TestPhase4StatusFlow:
         health_service = HealthService(
             provider_registry=registry,
             statistics=stats,
-            startup_time=time.time(),
+            startup_stopwatch=time.monotonic(),
             indexer=None,
             failover_manager=failover_manager,
         )
@@ -372,7 +372,7 @@ class TestPhase4StatusFlow:
         health_service = HealthService(
             provider_registry=registry,
             statistics=stats,
-            startup_time=time.time(),
+            startup_stopwatch=time.monotonic(),
             indexer=None,
             failover_manager=failover_manager,
         )
