@@ -202,7 +202,7 @@ def health_service(
         provider_registry=mock_provider_registry,
         statistics=session_statistics,
         indexer=None,
-        startup_time=time.time(),
+        startup_stopwatch=time.monotonic(),
     )
 
 

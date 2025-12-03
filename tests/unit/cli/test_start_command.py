@@ -136,12 +136,13 @@ class TestStartDaemonBackground:
 
             assert result is True
             mock_popen.assert_called_once()
-            # Verify --foreground is passed (background spawns foreground process)
+            # Verify the command uses the cw executable with 'start' command
             call_args = mock_popen.call_args[0][0]
-            assert "--foreground" in call_args
+            assert "/usr/local/bin/cw" in call_args[0]
+            assert "start" in call_args
 
     def test_start_daemon_background_uses_python_fallback(self, temp_project: Path) -> None:
-        """Test fallback to python -m codeweaver when executable not found."""
+        """Test fallback to python when cw/codeweaver executable not found."""
         from codeweaver.cli.commands.start import _start_daemon_background
         from codeweaver.cli.ui import StatusDisplay
 
@@ -166,10 +167,11 @@ class TestStartDaemonBackground:
 
             assert result is True
             call_args = mock_popen.call_args[0][0]
-            # Should use sys.executable with -m codeweaver
+            # Should use sys.executable with the CLI __main__.py path
             assert sys.executable in call_args[0]
-            assert "-m" in call_args
-            assert "codeweaver" in call_args
+            # Should run the CLI __main__.py file directly
+            assert any("__main__.py" in str(arg) for arg in call_args)
+            assert "start" in call_args
 
     def test_start_daemon_background_passes_options(self, temp_project: Path) -> None:
         """Test that custom options are passed to the spawned daemon."""

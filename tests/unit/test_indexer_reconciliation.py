@@ -435,18 +435,7 @@ class TestAutomaticReconciliation:
             return_value={"chunks_updated": 0, "files_processed": 0, "errors": []}
         )
 
-        # Mock _get_current_embedding_models to return matching providers
-        mock_current_models = MagicMock(
-            return_value={
-                "dense_provider": "voyage",
-                "dense_model": "voyage-3",
-                "sparse_provider": "splade",
-                "sparse_model": "splade-v3",
-            }
-        )
-
-        # Use module-level patching to avoid Pydantic model patching issues
-        # Mock all the methods called during prime_index
+        # Use class-level patching with autospec=False to avoid Pydantic issues
         with (
             patch(
                 "codeweaver.engine.indexer.indexer.Indexer._initialize_providers_async",
@@ -458,7 +447,14 @@ class TestAutomaticReconciliation:
             ),
             patch(
                 "codeweaver.engine.indexer.indexer.Indexer._get_current_embedding_models",
-                mock_current_models,
+                MagicMock(
+                    return_value={
+                        "dense_provider": "voyage",
+                        "dense_model": "voyage-3",
+                        "sparse_provider": "splade",
+                        "sparse_model": "splade-v3",
+                    }
+                ),
             ),
             patch(
                 "codeweaver.engine.indexer.indexer.Indexer.add_missing_embeddings_to_existing_chunks",
@@ -845,15 +841,7 @@ class TestReconciliationExceptionHandling:
 
         mock_reconciliation = AsyncMock(side_effect=ProviderError("Test provider error"))
 
-        mock_current_models = MagicMock(
-            return_value={
-                "dense_provider": "voyage",
-                "dense_model": "voyage-3",
-                "sparse_provider": "splade",
-                "sparse_model": "splade-v3",
-            }
-        )
-
+        # Use class-level patching with autospec=False to avoid Pydantic issues
         with (
             patch(
                 "codeweaver.engine.indexer.indexer.Indexer._initialize_providers_async",
@@ -865,7 +853,14 @@ class TestReconciliationExceptionHandling:
             ),
             patch(
                 "codeweaver.engine.indexer.indexer.Indexer._get_current_embedding_models",
-                mock_current_models,
+                MagicMock(
+                    return_value={
+                        "dense_provider": "voyage",
+                        "dense_model": "voyage-3",
+                        "sparse_provider": "splade",
+                        "sparse_model": "splade-v3",
+                    }
+                ),
             ),
             patch(
                 "codeweaver.engine.indexer.indexer.Indexer.add_missing_embeddings_to_existing_chunks",
@@ -901,15 +896,7 @@ class TestReconciliationExceptionHandling:
 
         mock_reconciliation = AsyncMock(side_effect=IndexingError("Test indexing error"))
 
-        mock_current_models = MagicMock(
-            return_value={
-                "dense_provider": "voyage",
-                "dense_model": "voyage-3",
-                "sparse_provider": "splade",
-                "sparse_model": "splade-v3",
-            }
-        )
-
+        # Use class-level patching with autospec=False to avoid Pydantic issues
         with (
             patch(
                 "codeweaver.engine.indexer.indexer.Indexer._initialize_providers_async",
@@ -921,7 +908,14 @@ class TestReconciliationExceptionHandling:
             ),
             patch(
                 "codeweaver.engine.indexer.indexer.Indexer._get_current_embedding_models",
-                mock_current_models,
+                MagicMock(
+                    return_value={
+                        "dense_provider": "voyage",
+                        "dense_model": "voyage-3",
+                        "sparse_provider": "splade",
+                        "sparse_model": "splade-v3",
+                    }
+                ),
             ),
             patch(
                 "codeweaver.engine.indexer.indexer.Indexer.add_missing_embeddings_to_existing_chunks",
@@ -952,15 +946,7 @@ class TestReconciliationExceptionHandling:
 
         mock_reconciliation = AsyncMock(side_effect=ConnectionError("Network error"))
 
-        mock_current_models = MagicMock(
-            return_value={
-                "dense_provider": "voyage",
-                "dense_model": "voyage-3",
-                "sparse_provider": "splade",
-                "sparse_model": "splade-v3",
-            }
-        )
-
+        # Use class-level patching with autospec=False to avoid Pydantic issues
         with (
             patch(
                 "codeweaver.engine.indexer.indexer.Indexer._initialize_providers_async",
@@ -972,7 +958,14 @@ class TestReconciliationExceptionHandling:
             ),
             patch(
                 "codeweaver.engine.indexer.indexer.Indexer._get_current_embedding_models",
-                mock_current_models,
+                MagicMock(
+                    return_value={
+                        "dense_provider": "voyage",
+                        "dense_model": "voyage-3",
+                        "sparse_provider": "splade",
+                        "sparse_model": "splade-v3",
+                    }
+                ),
             ),
             patch(
                 "codeweaver.engine.indexer.indexer.Indexer.add_missing_embeddings_to_existing_chunks",
