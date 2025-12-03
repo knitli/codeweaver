@@ -6,9 +6,12 @@
 
 from __future__ import annotations
 
+import time
+
 from datetime import UTC, datetime
 from typing import Annotated, Literal
 
+from anthropic._models import computed_field
 from pydantic import Field, NonNegativeInt
 from pydantic.types import NonNegativeFloat
 
@@ -207,14 +210,7 @@ class HealthResponse(BasedModel):
     status: Annotated[
         Literal["healthy", "degraded", "unhealthy"], Field(description="Overall system health")
     ]
-    timestamp: Annotated[
-        str,
-        Field(
-            description="Health check timestamp (ISO8601)",
-            default_factory=lambda: datetime.now(UTC).isoformat(),
-        ),
-    ]
-    uptime_seconds: Annotated[NonNegativeInt, Field(description="Server uptime in seconds")]
+
     indexing: Annotated[IndexingInfo, Field(description="Indexing state and progress")]
     services: Annotated[ServicesInfo, Field(description="Service health information")]
     statistics: Annotated[StatisticsInfo, Field(description="Statistics and metrics")]
@@ -224,6 +220,18 @@ class HealthResponse(BasedModel):
     resources: Annotated[
         ResourceInfo | None, Field(description="System resource usage information")
     ] = None
+    timestamp: str = Field(
+        description="Health check timestamp (ISO8601)",
+        default_factory=lambda: datetime.now(UTC).isoformat(),
+    )
+    stopwatch_start: NonNegativeInt = Field(default_factory=time.monotonic_ns, exclude=True)
+
+    @computed_field
+    @property
+    def uptime_seconds(self) -> NonNegativeInt:
+        """Calculate uptime in seconds based on stopwatch_start."""
+        elapsed_ns = time.monotonic_ns() - self.stopwatch_start
+        return elapsed_ns // 1_000_000_000
 
     @classmethod
     def create_with_current_timestamp(
@@ -239,8 +247,6 @@ class HealthResponse(BasedModel):
         """Create health response with current timestamp."""
         return cls(
             status=status,
-            timestamp=datetime.now(UTC).isoformat(),
-            uptime_seconds=uptime_seconds,
             indexing=indexing,
             services=services,
             statistics=statistics,

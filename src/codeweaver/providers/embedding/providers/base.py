@@ -1049,11 +1049,17 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                 ]
             )
 
+        # Detect if this is a sparse embedding provider
+        is_sparse_provider = (
+            type(self).__name__.lower().startswith("sparse")
+            or "sparse" in type(self).__name__.lower()
+        )
+
         # Add NEW chunks with batch keys and add their hashes to store
         for i, chunk in enumerate(starter_chunks):
             # Find the original index in chunk_list to get correct hash
             original_idx = chunk_list.index(chunk)
-            batch_keys = BatchKeys(id=key, idx=i)
+            batch_keys = BatchKeys(id=key, idx=i, sparse=is_sparse_provider)
             final_chunks.append(chunk.set_batch_keys(batch_keys, secondary=for_backup))
             # Now add the hash to store, mapping it to this batch key
             if for_backup:

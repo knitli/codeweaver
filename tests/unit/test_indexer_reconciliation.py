@@ -1,0 +1,472 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+"""Tests for automatic embedding reconciliation in the indexer."""
+
+from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, patch
+from uuid import uuid4
+
+import pytest
+
+from codeweaver.core.stores import get_blake_hash
+from codeweaver.engine.indexer.indexer import Indexer
+from codeweaver.engine.indexer.manifest import IndexFileManifest
+
+
+pytestmark = [pytest.mark.unit]
+
+
+class TestAddMissingEmbeddings:
+    """Test the add_missing_embeddings_to_existing_chunks method."""
+
+    @pytest.fixture
+    def mock_indexer(self, tmp_path: Path):
+        """Create an indexer with mocked dependencies for reconciliation testing."""
+        indexer = Indexer(project_path=tmp_path, auto_initialize_providers=False)
+
+        # Set up manifest
+        indexer._file_manifest = IndexFileManifest(project_path=tmp_path)
+
+        # Mock vector store with client
+        indexer._vector_store = MagicMock()
+        indexer._vector_store.collection = "test_collection"
+        indexer._vector_store.client = AsyncMock()
+        indexer._vector_store.client.retrieve = AsyncMock()
+        indexer._vector_store.client.update_vectors = AsyncMock()
+
+        # Mock embedding providers
+        indexer._embedding_provider = AsyncMock()
+        indexer._embedding_provider.embed_document = AsyncMock(
+            return_value=[[0.1] * 384]  # Mock dense embedding
+        )
+        indexer._embedding_provider.provider_name = "voyage"
+        indexer._embedding_provider.model_name = "voyage-3"
+
+        indexer._sparse_provider = AsyncMock()
+        indexer._sparse_provider.embed_document = AsyncMock(
+            return_value=[[0.2] * 128]  # Mock sparse embedding
+        )
+        indexer._sparse_provider.provider_name = "splade"
+        indexer._sparse_provider.model_name = "splade-v3"
+
+        # Mock manifest lock
+        indexer._manifest_lock = AsyncMock()
+        indexer._manifest_lock.__aenter__ = AsyncMock()
+        indexer._manifest_lock.__aexit__ = AsyncMock()
+
+        return indexer
+
+    @pytest.mark.asyncio
+    async def test_only_adds_sparse_when_dense_exists(
+        self, mock_indexer: Indexer, tmp_path: Path
+    ) -> None:
+        """Test that only sparse embeddings are generated when dense already exists."""
+        # Setup: File with dense embeddings but missing sparse
+        chunk_id = str(uuid4())
+        test_file = tmp_path / "test.py"
+        test_file.write_text("def test(): pass")
+
+        # Add to manifest with dense embeddings only
+        mock_indexer._file_manifest.add_file(
+            path=Path("test.py"),
+            content_hash=get_blake_hash(b"def test(): pass"),
+            chunk_ids=[chunk_id],
+            dense_embedding_provider="voyage",
+            dense_embedding_model="voyage-3",
+            has_dense_embeddings=True,
+            has_sparse_embeddings=False,
+        )
+
+        # Mock retrieve to return point with dense vector only
+        mock_point = MagicMock()
+        mock_point.id = chunk_id
+        mock_point.payload = {"text": "def test(): pass"}
+        mock_point.vector = {"": [0.1] * 384}  # Has dense (empty string key)
+        mock_indexer._vector_store.client.retrieve.return_value = [mock_point]
+
+        # Mock set_relative_path
+        with patch(
+            "codeweaver.engine.indexer.indexer.set_relative_path", return_value=Path("test.py")
+        ):
+            # Run reconciliation
+            result = await mock_indexer.add_missing_embeddings_to_existing_chunks(
+                add_dense=False, add_sparse=True
+            )
+
+        # Verify only sparse embedding was generated
+        mock_indexer._embedding_provider.embed_document.assert_not_called()
+        mock_indexer._sparse_provider.embed_document.assert_called_once()
+
+        # Verify update_vectors was called with sparse only
+        assert mock_indexer._vector_store.client.update_vectors.call_count == 1
+        call_args = mock_indexer._vector_store.client.update_vectors.call_args
+        vectors = call_args[1]["vectors"][0]
+        assert "sparse" in vectors
+        assert "" not in vectors  # Dense should not be included
+
+        # Verify result
+        assert result["chunks_updated"] == 1
+        assert result["files_processed"] == 1
+
+    @pytest.mark.asyncio
+    async def test_only_adds_dense_when_sparse_exists(
+        self, mock_indexer: Indexer, tmp_path: Path
+    ) -> None:
+        """Test that only dense embeddings are generated when sparse already exists."""
+        # Setup: File with sparse embeddings but missing dense
+        chunk_id = str(uuid4())
+        test_file = tmp_path / "test.py"
+        test_file.write_text("def test(): pass")
+
+        # Add to manifest with sparse embeddings only
+        mock_indexer._file_manifest.add_file(
+            path=Path("test.py"),
+            content_hash=get_blake_hash(b"def test(): pass"),
+            chunk_ids=[chunk_id],
+            sparse_embedding_provider="splade",
+            sparse_embedding_model="splade-v3",
+            has_dense_embeddings=False,
+            has_sparse_embeddings=True,
+        )
+
+        # Mock retrieve to return point with sparse vector only
+        mock_point = MagicMock()
+        mock_point.id = chunk_id
+        mock_point.payload = {"text": "def test(): pass"}
+        mock_point.vector = {"sparse": [0.2] * 128}  # Has sparse
+        mock_indexer._vector_store.client.retrieve.return_value = [mock_point]
+
+        # Mock set_relative_path
+        with patch(
+            "codeweaver.engine.indexer.indexer.set_relative_path", return_value=Path("test.py")
+        ):
+            # Run reconciliation
+            result = await mock_indexer.add_missing_embeddings_to_existing_chunks(
+                add_dense=True, add_sparse=False
+            )
+
+        # Verify only dense embedding was generated
+        mock_indexer._embedding_provider.embed_document.assert_called_once()
+        mock_indexer._sparse_provider.embed_document.assert_not_called()
+
+        # Verify update_vectors was called with dense only
+        assert mock_indexer._vector_store.client.update_vectors.call_count == 1
+        call_args = mock_indexer._vector_store.client.update_vectors.call_args
+        vectors = call_args[1]["vectors"][0]
+        assert "" in vectors  # Dense should be included
+        assert "sparse" not in vectors
+
+        # Verify result
+        assert result["chunks_updated"] == 1
+        assert result["files_processed"] == 1
+
+    @pytest.mark.asyncio
+    async def test_adds_both_when_both_missing(self, mock_indexer: Indexer, tmp_path: Path) -> None:
+        """Test that both embeddings are generated when both are missing."""
+        # Setup: File with no embeddings
+        chunk_id = str(uuid4())
+        test_file = tmp_path / "test.py"
+        test_file.write_text("def test(): pass")
+
+        # Add to manifest with no embeddings
+        mock_indexer._file_manifest.add_file(
+            path=Path("test.py"),
+            content_hash=get_blake_hash(b"def test(): pass"),
+            chunk_ids=[chunk_id],
+            has_dense_embeddings=False,
+            has_sparse_embeddings=False,
+        )
+
+        # Mock retrieve to return point with no vectors
+        mock_point = MagicMock()
+        mock_point.id = chunk_id
+        mock_point.payload = {"text": "def test(): pass"}
+        mock_point.vector = {}  # No vectors
+        mock_indexer._vector_store.client.retrieve.return_value = [mock_point]
+
+        # Mock set_relative_path
+        with patch(
+            "codeweaver.engine.indexer.indexer.set_relative_path", return_value=Path("test.py")
+        ):
+            # Run reconciliation
+            result = await mock_indexer.add_missing_embeddings_to_existing_chunks(
+                add_dense=True, add_sparse=True
+            )
+
+        # Verify both embeddings were generated
+        mock_indexer._embedding_provider.embed_document.assert_called_once()
+        mock_indexer._sparse_provider.embed_document.assert_called_once()
+
+        # Verify update_vectors was called with both
+        assert mock_indexer._vector_store.client.update_vectors.call_count == 1
+        call_args = mock_indexer._vector_store.client.update_vectors.call_args
+        vectors = call_args[1]["vectors"][0]
+        assert "" in vectors  # Dense included
+        assert "sparse" in vectors  # Sparse included
+
+        # Verify result
+        assert result["chunks_updated"] == 1
+        assert result["files_processed"] == 1
+
+    @pytest.mark.asyncio
+    async def test_skips_when_both_exist(self, mock_indexer: Indexer, tmp_path: Path) -> None:
+        """Test that no embeddings are generated when both already exist."""
+        # Setup: File with both embeddings
+        chunk_id = str(uuid4())
+        test_file = tmp_path / "test.py"
+        test_file.write_text("def test(): pass")
+
+        # Add to manifest with both embeddings
+        mock_indexer._file_manifest.add_file(
+            path=Path("test.py"),
+            content_hash=get_blake_hash(b"def test(): pass"),
+            chunk_ids=[chunk_id],
+            dense_embedding_provider="voyage",
+            dense_embedding_model="voyage-3",
+            sparse_embedding_provider="splade",
+            sparse_embedding_model="splade-v3",
+            has_dense_embeddings=True,
+            has_sparse_embeddings=True,
+        )
+
+        # Mock retrieve to return point with both vectors
+        mock_point = MagicMock()
+        mock_point.id = chunk_id
+        mock_point.payload = {"text": "def test(): pass"}
+        mock_point.vector = {
+            "": [0.1] * 384,  # Has dense
+            "sparse": [0.2] * 128,  # Has sparse
+        }
+        mock_indexer._vector_store.client.retrieve.return_value = [mock_point]
+
+        # Mock set_relative_path
+        with patch(
+            "codeweaver.engine.indexer.indexer.set_relative_path", return_value=Path("test.py")
+        ):
+            # Run reconciliation
+            result = await mock_indexer.add_missing_embeddings_to_existing_chunks(
+                add_dense=True, add_sparse=True
+            )
+
+        # Verify no embeddings were generated
+        mock_indexer._embedding_provider.embed_document.assert_not_called()
+        mock_indexer._sparse_provider.embed_document.assert_not_called()
+
+        # Verify update_vectors was not called (no updates needed)
+        mock_indexer._vector_store.client.update_vectors.assert_not_called()
+
+        # Verify result - no updates since both exist
+        # Note: files_processed may still be 1 since we checked the file,
+        # but chunks_updated should be 0
+        assert result["chunks_updated"] == 0
+
+    @pytest.mark.asyncio
+    async def test_handles_multiple_chunks_in_file(
+        self, mock_indexer: Indexer, tmp_path: Path
+    ) -> None:
+        """Test reconciliation with multiple chunks from the same file."""
+        # Setup: File with multiple chunks, all missing sparse
+        chunk_id_1 = str(uuid4())
+        chunk_id_2 = str(uuid4())
+        chunk_id_3 = str(uuid4())
+        test_file = tmp_path / "test.py"
+        test_file.write_text("def test(): pass\ndef another(): pass\ndef third(): pass")
+
+        # Add to manifest with dense only
+        mock_indexer._file_manifest.add_file(
+            path=Path("test.py"),
+            content_hash=get_blake_hash(b"content"),
+            chunk_ids=[chunk_id_1, chunk_id_2, chunk_id_3],
+            dense_embedding_provider="voyage",
+            dense_embedding_model="voyage-3",
+            has_dense_embeddings=True,
+            has_sparse_embeddings=False,
+        )
+
+        # Mock retrieve to return all chunks with dense only
+        mock_points = []
+        for chunk_id in [chunk_id_1, chunk_id_2, chunk_id_3]:
+            mock_point = MagicMock()
+            mock_point.id = chunk_id
+            mock_point.payload = {"text": f"chunk {chunk_id}"}
+            mock_point.vector = {"": [0.1] * 384}  # All have dense only
+            mock_points.append(mock_point)
+
+        mock_indexer._vector_store.client.retrieve.return_value = mock_points
+
+        # Mock set_relative_path
+        with patch(
+            "codeweaver.engine.indexer.indexer.set_relative_path", return_value=Path("test.py")
+        ):
+            # Run reconciliation
+            result = await mock_indexer.add_missing_embeddings_to_existing_chunks(
+                add_dense=False, add_sparse=True
+            )
+
+        # Verify sparse embedding was generated for each chunk
+        assert mock_indexer._sparse_provider.embed_document.call_count == 3
+
+        # Verify update_vectors was called with all 3 chunks
+        assert mock_indexer._vector_store.client.update_vectors.call_count == 1
+        call_args = mock_indexer._vector_store.client.update_vectors.call_args
+        assert len(call_args[1]["vectors"]) == 3
+
+        # Verify result
+        assert result["chunks_updated"] == 3
+        assert result["files_processed"] == 1
+
+    @pytest.mark.asyncio
+    async def test_handles_mixed_vector_states(self, mock_indexer: Indexer, tmp_path: Path) -> None:
+        """Test reconciliation with chunks in different states."""
+        # Setup: File with 3 chunks in different states
+        chunk_id_1 = str(uuid4())  # Has both
+        chunk_id_2 = str(uuid4())  # Has dense only
+        chunk_id_3 = str(uuid4())  # Has neither
+
+        mock_indexer._file_manifest.add_file(
+            path=Path("test.py"),
+            content_hash=get_blake_hash(b"content"),
+            chunk_ids=[chunk_id_1, chunk_id_2, chunk_id_3],
+            has_dense_embeddings=False,  # File-level tracking
+            has_sparse_embeddings=False,
+        )
+
+        # Mock retrieve with mixed states
+        mock_point_1 = MagicMock()
+        mock_point_1.id = chunk_id_1
+        mock_point_1.payload = {"text": "chunk 1"}
+        mock_point_1.vector = {"": [0.1] * 384, "sparse": [0.2] * 128}  # Has both
+
+        mock_point_2 = MagicMock()
+        mock_point_2.id = chunk_id_2
+        mock_point_2.payload = {"text": "chunk 2"}
+        mock_point_2.vector = {"": [0.1] * 384}  # Has dense only
+
+        mock_point_3 = MagicMock()
+        mock_point_3.id = chunk_id_3
+        mock_point_3.payload = {"text": "chunk 3"}
+        mock_point_3.vector = {}  # Has neither
+
+        mock_indexer._vector_store.client.retrieve.return_value = [
+            mock_point_1,
+            mock_point_2,
+            mock_point_3,
+        ]
+
+        # Mock set_relative_path
+        with patch(
+            "codeweaver.engine.indexer.indexer.set_relative_path", return_value=Path("test.py")
+        ):
+            # Run reconciliation requesting both
+            result = await mock_indexer.add_missing_embeddings_to_existing_chunks(
+                add_dense=True, add_sparse=True
+            )
+
+        # Verify correct generation:
+        # - chunk 1: no calls (has both)
+        # - chunk 2: 1 sparse call (missing sparse)
+        # - chunk 3: 1 dense + 1 sparse call (missing both)
+        # Total: 1 dense, 2 sparse
+        assert mock_indexer._embedding_provider.embed_document.call_count == 1
+        assert mock_indexer._sparse_provider.embed_document.call_count == 2
+
+        # Verify only 2 chunks were updated (chunk 1 skipped)
+        call_args = mock_indexer._vector_store.client.update_vectors.call_args
+        assert len(call_args[1]["vectors"]) == 2
+
+        assert result["chunks_updated"] == 2
+
+
+class TestAutomaticReconciliation:
+    """Test automatic reconciliation during prime_index."""
+
+    @pytest.fixture
+    def mock_indexer_with_reconciliation(self, tmp_path: Path):
+        """Create indexer for testing automatic reconciliation."""
+        indexer = Indexer(project_path=tmp_path, auto_initialize_providers=False)
+
+        indexer._file_manifest = IndexFileManifest(project_path=tmp_path)
+        indexer._vector_store = MagicMock()
+        indexer._vector_store.collection = "test_collection"
+
+        # Mock embedding providers
+        indexer._embedding_provider = AsyncMock()
+        indexer._embedding_provider.provider_name = "voyage"
+        indexer._embedding_provider.model_name = "voyage-3"
+
+        indexer._sparse_provider = AsyncMock()
+        indexer._sparse_provider.provider_name = "splade"
+        indexer._sparse_provider.model_name = "splade-v3"
+
+        return indexer
+
+    @pytest.mark.asyncio
+    async def test_reconciliation_called_during_prime_index(
+        self, mock_indexer_with_reconciliation: Indexer, tmp_path: Path
+    ) -> None:
+        """Test that reconciliation is automatically called during prime_index."""
+        # Add file to manifest indicating sparse embeddings are missing
+        mock_indexer_with_reconciliation._file_manifest.add_file(
+            path=Path("test.py"),
+            content_hash=get_blake_hash(b"content"),
+            chunk_ids=[str(uuid4())],
+            dense_embedding_provider="voyage",
+            dense_embedding_model="voyage-3",
+            has_dense_embeddings=True,
+            has_sparse_embeddings=False,  # Missing sparse
+        )
+
+        # Mock _index_files_batch and add_missing_embeddings_to_existing_chunks at class level
+        with (
+            patch.object(mock_indexer_with_reconciliation, "_index_files_batch", new=AsyncMock()),
+            patch(
+                "codeweaver.engine.indexer.indexer.Indexer.add_missing_embeddings_to_existing_chunks",
+                new=AsyncMock(
+                    return_value={"chunks_updated": 0, "files_processed": 0, "errors": []}
+                ),
+            ) as mock_reconciliation,
+        ):
+            # Run prime_index (not force_reindex)
+            await mock_indexer_with_reconciliation.prime_index(force_reindex=False)
+
+            # Verify reconciliation was called
+            mock_reconciliation.assert_called_once()
+            call_args = mock_reconciliation.call_args
+            assert call_args[1]["add_sparse"] is True  # Should request sparse
+
+    @pytest.mark.asyncio
+    async def test_reconciliation_skipped_on_force_reindex(
+        self, mock_indexer_with_reconciliation: Indexer, tmp_path: Path
+    ) -> None:
+        """Test that reconciliation is skipped when force_reindex is True."""
+        # Add file to manifest indicating sparse embeddings are missing
+        mock_indexer_with_reconciliation._file_manifest.add_file(
+            path=Path("test.py"),
+            content_hash=get_blake_hash(b"content"),
+            chunk_ids=[str(uuid4())],
+            has_dense_embeddings=True,
+            has_sparse_embeddings=False,
+        )
+
+        # Mock _index_files_batch and add_missing_embeddings_to_existing_chunks at class level
+        with (
+            patch.object(mock_indexer_with_reconciliation, "_index_files_batch", new=AsyncMock()),
+            patch(
+                "codeweaver.engine.indexer.indexer.Indexer.add_missing_embeddings_to_existing_chunks",
+                new=AsyncMock(
+                    return_value={"chunks_updated": 0, "files_processed": 0, "errors": []}
+                ),
+            ) as mock_reconciliation,
+        ):
+            # Run prime_index with force_reindex
+            await mock_indexer_with_reconciliation.prime_index(force_reindex=True)
+
+            # Verify reconciliation was NOT called
+            mock_reconciliation.assert_not_called()
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

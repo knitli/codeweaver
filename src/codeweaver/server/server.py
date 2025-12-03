@@ -405,7 +405,9 @@ def _initialize_cw_state(
         project_path=get_project_path()
         if isinstance(resolved_settings.project_path, Unset)
         else resolved_settings.project_path,
-        config_path=None if isinstance(resolved_settings.config_file, Unset) else resolved_settings.config_file,
+        config_path=None
+        if isinstance(resolved_settings.config_file, Unset)
+        else resolved_settings.config_file,
         provider_registry=get_provider_registry._resolve()(),
         services_registry=get_services_registry._resolve()(),
         model_registry=get_model_registry._resolve()(),
@@ -422,14 +424,24 @@ def _initialize_cw_state(
         state.telemetry.start_session({
             "codeweaver_version": version,
             "vector_store": vector_store_provider
-            if (vector_store_provider := state.provider_registry.get_provider_enum_for("vector_store"))
+            if (
+                vector_store_provider := state.provider_registry.get_provider_enum_for(
+                    "vector_store"
+                )
+            )
             else "Qdrant",
             "embedding_provider": embedding_provider_provider
-            if (embedding_provider_provider := state.provider_registry.get_provider_enum_for("embedding"))
+            if (
+                embedding_provider_provider := state.provider_registry.get_provider_enum_for(
+                    "embedding"
+                )
+            )
             else "Voyage",
             "sparse_embedding_provider": sparse_embedding_provider
             if (
-                sparse_embedding_provider := state.provider_registry.get_provider_enum_for("sparse_embedding")
+                sparse_embedding_provider := state.provider_registry.get_provider_enum_for(
+                    "sparse_embedding"
+                )
             )
             else "None",
             "reranking_provider": reranking_provider
