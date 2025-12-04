@@ -4,6 +4,8 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 """MCP tools for CodeWeaver."""
 
+from __future__ import annotations
+
 import contextlib
 
 from codeweaver.providers.provider import Provider

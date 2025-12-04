@@ -11,6 +11,8 @@
 This package is heavily derived from Qdrant's example MCP server, [mcp-server-qdrant](https://github.com/qdrant/mcp-server-qdrant). We've made small modifications to fit our use case, and those changes are copyrighted by Knitli Inc. and licensed under MIT OR Apache-2.0, whichever you want. Original code from Qdrant remains under their copyright and Apache 2.0 license.
 """
 
+from __future__ import annotations
+
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 

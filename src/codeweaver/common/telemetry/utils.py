@@ -4,6 +4,8 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 """Privacy utilities for telemetry."""
 
+from __future__ import annotations
+
 import re
 
 from typing import NamedTuple

@@ -4,6 +4,8 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 """User interface components for clean status display."""
 
+from __future__ import annotations
+
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 

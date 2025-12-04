@@ -2,8 +2,9 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
-
 """CodeWeaver MCP server command-line interface."""
+
+from __future__ import annotations
 
 from pathlib import Path
 from typing import Annotated, Literal

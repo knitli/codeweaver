@@ -6,6 +6,8 @@
 # sourcery skip: no-complex-if-expressions
 """Defines a base class for the Qdrant and In Memory Qdrant vector stores to reduce code duplication."""
 
+from __future__ import annotations
+
 import logging
 
 from abc import ABC, abstractmethod

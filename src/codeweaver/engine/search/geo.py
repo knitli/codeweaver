@@ -13,6 +13,8 @@ We may never use these, but they are here for completeness.
 Nearly all of this file and its contents were adapted from Qdrant's example MCP server, [mcp-server-qdrant](https://github.com/qdrant/mcp-server-qdrant/), and fall under Qdrant's copyright and Apache 2.0 license. Any modifications or changes made to the original code are copyrighted by Knitli Inc. and are licensed under MIT OR Apache-2.0, whichever you want.
 """
 
+from __future__ import annotations
+
 from collections.abc import Sequence
 from typing import Annotated
 

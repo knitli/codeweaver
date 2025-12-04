@@ -48,7 +48,7 @@ gh = "latest"  # GitHub CLI (for workflows)
 [env]
 # Simplified PATH for CI (no dev scripts needed)
 _.path = [".venv/bin"]
-MISE_ENV = "ci"
+# MISE_ENV is determined by the template in mise.toml based on GITHUB_ACTIONS
 
 # ============================================================================
 # CI Tasks

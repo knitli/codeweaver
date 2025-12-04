@@ -5,6 +5,8 @@
 
 """Types used in engine base modules."""
 
+from __future__ import annotations
+
 from collections.abc import Awaitable, Callable, Sequence
 from pathlib import Path
 from typing import Any, Literal, NotRequired, Required, TypedDict

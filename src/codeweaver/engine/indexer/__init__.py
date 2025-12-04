@@ -7,6 +7,8 @@
 `Indexer` is CodeWeaver's backend-end pipeline for handling document ingestion, processing, and storage. It provides tools to efficiently index documents, making them easily searchable and retrievable, principally the `Indexer` class itself.
 """
 
+from __future__ import annotations
+
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 

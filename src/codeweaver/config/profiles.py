@@ -16,6 +16,8 @@ The recommended flag gives you access to:
 
 """
 
+from __future__ import annotations
+
 import contextlib
 
 from importlib import util

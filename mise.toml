@@ -42,7 +42,7 @@ _.path = [
   "scripts/utils",
   ".venv/bin",
 ]
-MISE_ENV = '''{% if `get_env(name="GITHUB_ACTIONS", default="") != ""` %}ci{% else %}dev{% endif %}'''
+MISE_ENV = "dev"
 
 [tasks.info]
 description = "Print project information"

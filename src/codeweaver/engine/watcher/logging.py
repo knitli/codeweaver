@@ -6,6 +6,8 @@
 Logging utilities for the CodeWeaver engine.
 """
 
+from __future__ import annotations
+
 import asyncio
 import logging
 import re
