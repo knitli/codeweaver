@@ -34,7 +34,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 - **uv** - Fast Python package manager (replaces pip)
 - **yamlfmt** - YAML formatter
 
-### Python Tools (via pipx)
+### Python Tools (via mise pipx)
 - **changesets** - Changelog generation
 - **claude-monitor** - Claude API monitoring
 - **copychat** - Chat utilities
@@ -45,7 +45,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 - **tombi** - TOML formatter
 - **ty** - Type checker (pyright-based)
 
-### Rust Tools (via cargo)
+### Rust Tools (via mise cargo)
 - **rust-parallel** - Parallel command execution
 - **tree-sitter-cli** - Tree-sitter grammar tools
 

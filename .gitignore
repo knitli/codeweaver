@@ -182,6 +182,11 @@ bld/
 *.coverage
 *.coveragexml
 
+# Generated for builds
+server.json
+server.yaml
+tools.json
+
 # Visual Studio cache files
 # files ending in .cache can be ignored
 *.[Cc]ache

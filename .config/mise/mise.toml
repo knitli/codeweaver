@@ -2,6 +2,8 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
+experimental_monorepo_root = true
+
 [settings]
 idiomatic_version_file_enable_tools = []
 
@@ -24,6 +26,7 @@ pkl = "latest"
 uv = "latest"
 
 [env]
+MISE_EXPERIMENTAL = "1"
 GH_REPO = "knitli/codeweaver"
 REMOTE_ORIGIN_URL = '''http://github.com/knitli/codeweaver.git'''
 # Use the project name derived from the current directory

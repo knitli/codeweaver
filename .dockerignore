@@ -66,25 +66,41 @@ coverage.xml
 .editorconfig
 .mailmap
 .sourcery.yaml
+cliff.toml
+.mcp.json*
+.rootmodes*
+.editorconfig
+context7*
+server.yaml*
+server.json*
+AGENTS.md
 
 # Build and CI
 .github/
-mise.toml
+.config/mise/*
 mise-tasks/
 scripts/
 hk.pkl
 _typos.toml
 ruff.toml
 sgconfig.yml
+codeweaver.*
+.sourcery.yaml
 
 # Data and config (will be mounted)
 data/
-context7.json
+.config/
 claudedocs/
 examples/
 plans/
 specs/
 todo-tree.txt
+.specify/
+.roo/
+.roomodes*
+.serena/
+docs-site/
+.vscode/
 
 # Temporary files
 *.log

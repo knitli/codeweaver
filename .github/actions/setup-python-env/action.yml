@@ -67,7 +67,7 @@ runs:
           ~/.cache/mise
           ~/.local/bin
         # Unified cache key (no workflow-specific prefixes)
-        key: ${{ inputs.cache-prefix }}mise-${{ runner.os }}-${{ hashFiles('mise.ci.toml', 'mise.toml') }}
+        key: ${{ inputs.cache-prefix }}mise-${{ runner.os }}-${{ hashFiles('.config/mise/mise.ci.toml', '.config/mise/mise.toml') }}
         restore-keys: |
           ${{ inputs.cache-prefix }}mise-${{ runner.os }}-
 

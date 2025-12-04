@@ -840,6 +840,12 @@ class CodeWeaverSettings(BaseSettings):
                 ".codeweaver.test",
                 ".codeweaver/codeweaver.test.local",
                 ".codeweaver/codeweaver.test",
+                ".config/codeweaver/test.local",
+                ".config/codeweaver/test",
+                ".config/codeweaver/config.test.local",
+                ".config/codeweaver/config.test",
+                ".config/codeweaver/codeweaver.test.local",
+                ".config/codeweaver/codeweaver.test",
             ])
         else:
             # Standard config locations
@@ -850,7 +856,14 @@ class CodeWeaverSettings(BaseSettings):
                 ".codeweaver",
                 ".codeweaver/codeweaver.local",
                 ".codeweaver/codeweaver",
+                ".codeweaver/config.local",
+                ".codeweaver/config",
+                ".config/codeweaver/codeweaver.local",
+                ".config/codeweaver/codeweaver",
+                ".config/codeweaver/config.local",
+                ".config/codeweaver/config",
                 f"{cls.user_config_dir()!s}/codeweaver",
+                f"{cls.user_config_dir()!s}/config",
             ])
         for _class in (
             TomlConfigSettingsSource,
@@ -925,6 +938,8 @@ class CodeWeaverSettings(BaseSettings):
                     ".codeweaver.env",
                     ".codeweaver/.local.env",
                     ".codeweaver/.env",
+                    ".config/codeweaver/.local.env",
+                    ".config/codeweaver/.env",
                 ),
                 env_ignore_empty=True,
             ),

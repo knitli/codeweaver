@@ -174,7 +174,6 @@ Run local documentation server: `mise run docs-serve`
 - `pyproject.toml` - Python project metadata, dependencies, tool config
 - `mise.toml` - Task runner configuration
 - `ruff.toml` - Ruff linter/formatter configuration
-- `mkdocs.yml` - Documentation site configuration
 - `codeweaver.toml` - CodeWeaver application configuration
 
 ### Development Configuration
@@ -195,9 +194,8 @@ Run local documentation server: `mise run docs-serve`
 - `__pycache__/` - Python bytecode cache
 
 ### Documentation Output
-- `site/` - MkDocs built site (generated)
+- `docs-site/` - Starlight build site (generated)
 - `coverage.xml` - Coverage report
-- `test-results.xml` - JUnit test results
 
 ## Module Import Patterns
 
