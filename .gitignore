@@ -83,6 +83,8 @@ docs-site/dist/
 docs-site/dist/**
 docs-site/.cache/
 docs-site/.cache/**
+!docs-site/.astro/content.d.ts
+!docs-site/.astro/types.d.ts
 
 # Cache files
 **/__pycache__/
