@@ -31,6 +31,7 @@ usage = "latest"
 uv = "latest"
 yq = "latest"
 git-cliff = "latest"
+"pipx:smolcrawl" = "latest"
 
 [env]
 _.path = [

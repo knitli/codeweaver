@@ -181,6 +181,7 @@ full = [
   "pydantic-settings[yaml,toml,aws-secrets-manager,azure-key-vault,gcp-secret-manager]",
   "permit-fastmcp",
   "sentence-transformers>=5.1.2",
+  "types-boto3-custom",
 ]
 full-gpu = [
   "permit-fastmcp",
@@ -188,6 +189,7 @@ full-gpu = [
   "fastembed-gpu",
   "permit-fastmcp",
   "pydantic-settings[yaml,toml,aws-secrets-manager,azure-key-vault,gcp-secret-manager]",
+  "sentence-transformers",
   # see note below about why this is commented out
   #  "sentence-transformers[onnx-gpu]; python_version>='3.12' and python_version<'3.14'",
 ]
@@ -198,14 +200,12 @@ gpu-support = [
   #  "sentence-transformers[onnx-gpu]; python_version>='3.12' and python_version<'3.14'",
 ]
 # ==== Providers ====
-#    --- Agent-only Providers --- (no embedding/rerank)
 provider-anthropic = ["pydantic-ai-slim[anthropic]"]
-# --- Embedding, Rerank and Agent Providers --- (the trifecta)
 provider-bedrock = [
   "pydantic-ai-slim[bedrock]",
+  "types-boto3-custom",
 ]
 provider-cohere = ["pydantic-ai-slim[cohere]"]
-# --- Embedding and Rerank Only --- (no agent)
 provider-fastembed = ["fastembed", "py-cpuinfo"]
 # Requires additional setup, see https://qdrant.github.io/fastembed/examples/FastEmbed_GPU/
 provider-fastembed-gpu = ["fastembed-gpu", "py-cpuinfo"]
@@ -267,10 +267,9 @@ dev = [
   "pytest-asyncio>=1.2.0",
   "pytest-cov>=7.0.0",
   "pytest-timeout>=2.4.0",
-  "ruff>=0.14.2",
-  "smolcrawl>=0.1.7",
-  "superclaude>=4.1.6",
-  "ty>=0.0.1a25",
+  "ruff>=0.14.7",
+  "superclaude>=4.1.9",
+  "ty>=0.0.1a31",
   "types-boto3-custom",
   "uv>=0.9.5",
 ]
@@ -325,9 +324,17 @@ __all__ = ("__version__",)
 # REUSE-IgnoreEnd
 
 [tool.hatch.build.targets.wheel]
-artifacts = ["*.so", "src/**"]
-packages = ["src/codeweaver"]
-include = ["typings/**"]
+artifacts = ["*.so", "src/**", "vendored/**"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"LICENSES" = "LICENSES"
+"typings" = "typings"
+"README.md" = "README.md"
+"SECURITY.md" = "SECURITY.md"
+"sbom.spdx" = "sbom.spdx"
+"LICENSE-Apache-2.0" = "LICENSE-APACHE-2.0"
+"LICENSE-MIT" = "LICENSE-MIT"
+"src/codeweaver" = "codeweaver"
 
 [tool.hatch.build.targets.sdist]
 include = [
@@ -338,17 +345,37 @@ include = [
   "LICENSE",
   "LICENSE-APACHE-2.0",
   "LICENSE-MIT",
+  "LICENSES",
+  "PRIVACY_POLICY.md",
   "README.md",
+  "REUSE.toml",
+  "SECURITY.md",
   "context7.json",
   "context7.json.license",
   "pyproject.toml",
   "sbom.spdx",
   "schema/**",
-  "scripts/**",
   "src/**",
   "typings/**",
   "uv.lock",
   "uv.lock.license",
+  "vendored/**",
+]
+exclude = [
+  ".claude/**",
+  ".roo/**",
+  ".serena/**",
+  ".specify/**",
+  ".vscode/**",
+  "claudedocs/**",
+  "data/**",
+  "docker/**",
+  "docs-site/**",
+  "mise-tasks/**",
+  "overrides/**",
+  "plans/**",
+  "scripts/**",
+  "specs/**",
 ]
 
 [tool.hatch.version]
@@ -522,7 +549,7 @@ include = ["src/codeweaver/providers/vector_stores/qdrant_base.py"]
 invalid-argument-type = "ignore"
 
 [tool.uv.sources]
-types-boto3-custom = { path = "vendored/types_boto3_custom-1.41.0-py3-none-any.whl" }
+types-boto3-custom = { path = "vendored/types_boto3_custom-1.41.2-py3-none-any.whl" }
 
 [tool.uv-dynamic-versioning]
 vcs = "git"

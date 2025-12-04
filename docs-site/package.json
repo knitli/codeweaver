@@ -17,7 +17,7 @@
     "build": "astro check && astro build",
     "dev": "astro dev",
     "gen-api-docs": "uv run ../scripts/gen-api-docs.py",
-    "prebuild": "npm run gen-api-docs",
+    "prebuild": "bun run gen-api-docs",
     "preview": "astro preview",
     "start": "astro dev"
   },
