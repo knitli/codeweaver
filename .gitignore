@@ -72,11 +72,17 @@ coverage
 **/.venv
 .venv/
 
-# node
+# node and docs-site
 node_modules
 node_modules/
 node_modules/**
 **/node_modules/**
+docs-site/.astro/
+docs-site/.astro/**
+docs-site/dist/
+docs-site/dist/**
+docs-site/.cache/
+docs-site/.cache/**
 
 # Cache files
 **/__pycache__/
