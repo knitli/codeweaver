@@ -42,7 +42,7 @@ With most tools, you can't. CodeWeaver gives you that freedom.
 
 ## 3. Cost
 
-Coding agents are *very* inefficient. If you have watched them stumble around your codebase reading the same huge files over and over again, you know this. They carry all that context with them for every tool call.
+Coding agents are *very* inefficient. If you have watched them stumble around your codebase reading the same huge files over and over again, you already know. They carry all that context with them for every tool call.
 
 CodeWeaver's overall goal is to stop that cycle -- give agents exactly what they need from the start. Cut context -- and cost -- by **50%+**.
 

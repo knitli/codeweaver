@@ -21,14 +21,10 @@ from pathlib import Path
 from typing import Any
 
 from griffe import Attribute, Class, DocstringSectionKind, Function, GriffeLoader, Module
-from pydantic import BaseModel
 
 
 def get_pydantic_fields(cls: Class) -> dict[str, str]:
     """Extract Pydantic field descriptions from model schema."""
-    if not BaseModel:
-        return {}
-
     # Check if this is a Pydantic model by looking at bases
     is_pydantic = any("BaseModel" in str(base) or "pydantic" in str(base) for base in cls.bases)
 
@@ -109,7 +105,7 @@ def generate_function_docs(func: Function, depth: int = 2) -> str:
     return "\n".join(md)
 
 
-def _append_section_to_md(md, header: str, sections, kind: str) -> None:
+def _append_section_to_md(md: list[str], header: str, sections, kind: str) -> None:
     """Helper to append a section to markdown."""
     md.append(header)
     md.extend(sections[kind])
@@ -136,11 +132,11 @@ def generate_class_docs(cls: Class, depth: int = 2) -> str:
 
     if methods := [m for m in cls.members.values() if isinstance(m, Function)]:
         md.append(f"{header}# Methods\n")
-        md.extend(
+        md.extend([
             generate_function_docs(method, depth + 2)
             for method in methods
             if not method.name.startswith("_")
-        )
+        ])
     return "\n".join(md)
 
 
