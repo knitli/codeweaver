@@ -284,6 +284,16 @@ precedence = "override"
 SPDX-FileCopyrightText = "2020 Joran Honig"
 SPDX-License-Identifier = "MIT"
 
+# HCL: tree-sitter-grammars/tree-sitter-hcl (Apache-2.0 - Michael Hoffman 2021)
+[[annotations]]
+path = [
+  "data/node_types/hcl-node-types.json",
+  "src/codeweaver/data/node_types/hcl-node-types.json"
+]
+precedence = "override"
+SPDX-FileCopyrightText = "2021 Michael Hoffman"
+SPDX-License-Identifier = "Apache-2.0"
+
 # =============================================================================
 # data/node_types/analysis - Aggregated/derived tree-sitter node type data
 # =============================================================================

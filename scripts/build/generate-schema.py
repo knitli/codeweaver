@@ -13,6 +13,7 @@ when the schema file doesn't exist.
 from __future__ import annotations
 
 import sys
+
 from pathlib import Path
 
 
@@ -24,10 +25,10 @@ def main() -> int:
     if src_path not in sys.path:
         sys.path.insert(0, str(src_path))
 
-    from codeweaver.config.settings import CodeWeaverSettings
-
+    from codeweaver.config.settings import get_settings
     # Get the schema version from CodeWeaverSettings
-    version = CodeWeaverSettings.model_fields["__version__"].default
+    settings = get_settings()
+    version = settings.__version__
     schema_dir = repo_root / "schema" / f"v{version}"
     schema_file = schema_dir / "codeweaver.schema.json"
 
@@ -41,7 +42,7 @@ def main() -> int:
     print(f"Generating schema for version {version}...")
     schema_dir.mkdir(parents=True, exist_ok=True)
 
-    schema_bytes = CodeWeaverSettings.json_schema()
+    schema_bytes = type(settings).json_schema()
     bytes_written = schema_file.write_bytes(schema_bytes)
 
     print(f"✓ Generated schema file: {schema_file}")

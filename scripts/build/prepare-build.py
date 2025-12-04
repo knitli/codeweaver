@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
+
 from pathlib import Path
 
 
@@ -27,7 +28,7 @@ def run_script(script_path: Path, *args: str) -> int:
     print(f"Running: {script_name}")
     print(f"{'=' * 70}")
 
-    result = subprocess.run(
+    result = subprocess.run( # noqa: S603
         [sys.executable, str(script_path), *args],
         cwd=script_path.parent.parent.parent,
         check=False,
@@ -63,10 +64,10 @@ def main() -> int:
 
     # Step 3: Update node-types from tree-sitter grammars
     exit_code = run_script(
-        scripts_lang / "download-ts-grammars.py", "fetch", "--only-update", "--only-node-types"
+        scripts_lang / "download-ts-grammars.py", "fetch", "--only-node-types"
     )
-    if exit_code != 0:
-        return exit_code
+    # we don't exit if this fails
+    # it's a flaky step prone to rate limiting issues and isn't critical
 
     # Step 4: Preprocess node-types into cache
     exit_code = run_script(scripts_build / "preprocess-node-types.py")

@@ -142,28 +142,18 @@ if %ERRORLEVEL% equ 0 (
 '''
 
 # Documentation
-[tasks.docs-serve]
+[tasks.docs-dev]
 tools.uv = "latest"
 run = '''
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Starting %F{209}CodeWeaver%f documentation server..."
-uv run --group docs mkdocs serve
+cd docs-site || true
+bun run dev || npm run dev
 '''
 run_windows = '''
 echo [codeweaver] Starting CodeWeaver documentation server...
-uv run --group docs mkdocs serve
-'''
-
-[tasks.docs-build]
-tools.uv = "latest"
-run = '''
-#!/bin/bash
-echo "Building documentation..."
-uv run --group docs mkdocs build
-'''
-run_windows = '''
-echo Building documentation...
-uv run --group docs mkdocs build
+cd docs-site || exit /b 1
+bun run dev || npm run dev
 '''
 
 [tasks.changelog]
@@ -197,9 +187,7 @@ echo "✅ CHANGELOG.md updated!"
 [tasks.changelog-tag]
 description = "Generate changelog for a specific tag"
 usage = '''
-arg "<tag>" {
-  help = "Git tag to generate changelog for (e.g., v0.1.0)"
-}
+arg "<tag>" help="Git tag to generate changelog for (e.g., v0.1.0)"
 '''
 tools.git-cliff = "latest"
 run = '''
@@ -213,18 +201,10 @@ echo "✅ CHANGELOG.md generated for ${usage_tag:?}!"
 tools.git-cliff = "latest"
 description = "Prepare build artifacts for a new version release"
 usage = '''
-arg "[version]" {
-  help = "Version to prepare (e.g., 1.2.0). If not provided, will prompt."
-}
-flag "--no-commit" {
-  help = "Don't commit the changes, just generate artifacts"
-}
-flag "--no-tag" {
-  help = "Don't create a git tag"
-}
-flag "--push" {
-  help = "Push changes and tags to remote after committing"
-}
+arg "[version]" help="Version to prepare (e.g., 1.2.0). If not provided, will prompt."
+flag "--no-commit" help="Don't commit the changes, just generate artifacts"
+flag "--no-tag" help="Don't create a git tag"
+flag "--push" help="Push changes and tags to remote after committing"
 '''
 run = '''
 #!/usr/bin/env bash
@@ -245,9 +225,9 @@ if [ -z "$VERSION" ]; then
     read -p "Enter version number (e.g., 1.2.0): " VERSION
 fi
 
-# Validate version format
-if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-    echo -e "${RED}Error: Invalid version format. Use semantic versioning (e.g., 1.2.0)${NC}"
+# Validate version format (supports pre-release: 1.2.0-alpha.1, 1.2.0-beta.2, etc.)
+if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9._-]+)?$ ]]; then
+    echo -e "${RED}Error: Invalid version format. Use semantic versioning (e.g., 1.2.0 or 1.2.0-alpha.1)${NC}"
     exit 1
 fi
 
@@ -268,7 +248,7 @@ fi
 
 # Step 3: Update CHANGELOG
 echo -e "${BLUE}[codeweaver]${NC} Step 3/7: Updating CHANGELOG.md..."
-git-cliff --tag "v${VERSION}" --prepend --output CHANGELOG.md || {
+git cliff --unreleased --bump --prepend CHANGELOG.md || {
     echo -e "${YELLOW}Warning: Failed to update CHANGELOG${NC}"
 }
 

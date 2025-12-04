@@ -62,8 +62,10 @@ app = AppCtor(
     help_format="rich",
 )
 
-GH_USERNAME = os.environ.get("GH_USERNAME", None)
-GH_TOKEN = os.environ.get("GH_TOKEN", os.environ.get("GITHUB_TOKEN", None))
+GH_USERNAME = os.environ.get("GH_USERNAME", "bashandbone")
+GH_TOKEN = os.environ.get(
+    "GH_TOKEN", os.environ.get("GITHUB_TOKEN", os.environ.get("MISE_GITHUB_TOKEN"))
+)
 
 MULTIPLIER = (
     1 if GH_TOKEN else 3
@@ -381,6 +383,7 @@ class AstGrepSupportedLanguage(Enum):
     ELIXIR = "elixir"
     GO = "go"
     HASKELL = "haskell"
+    HCL = "hcl"
     HTML = "html"
     JAVA = "java"
     JAVASCRIPT = "javascript"
@@ -466,13 +469,18 @@ class AstGrepSupportedLanguage(Enum):
                 )
             case (
                 AstGrepSupportedLanguage.KOTLIN
+                | AstGrepSupportedLanguage.HCL
                 | AstGrepSupportedLanguage.LUA
                 | AstGrepSupportedLanguage.YAML
             ):
                 return TreeSitterRepo(
                     language=self,
                     repo=f"tree-sitter-grammars/{tree_sitter_name}",
-                    branch="main" if self == AstGrepSupportedLanguage.LUA else "master",
+                    branch=(
+                        "main"
+                        if self in [AstGrepSupportedLanguage.LUA, AstGrepSupportedLanguage.HCL]
+                        else "master"
+                    ),
                 )
             case AstGrepSupportedLanguage.NIX:
                 return TreeSitterRepo(
@@ -548,7 +556,7 @@ class AstGrepSupportedLanguage(Enum):
     def languages(cls) -> Generator[str, None, None]:
         """Returns names of all supported languages (excluding _ALL)."""
         # Use members() so _ALL is excluded
-        yield from (m.name for m in cls.members())
+        yield from (m.name for m in cls.members() if m is not cls._ALL)
 
     @classmethod
     def members(cls) -> Generator[AstGrepSupportedLanguage, None, None]:
@@ -617,7 +625,7 @@ async def _gather(repos: tuple[TreeSitterRepo, ...]) -> tuple[TreeSitterGrammarR
             console.print("[bold green]Successfully retrieved all grammars[/bold green] 🎉")
             break
         if tries < 3:
-            await asyncio.sleep((tries + 1) * 2 * MULTIPLIER)
+            await asyncio.sleep((tries + 3) * 2 * MULTIPLIER)
     return tuple(successful_results)
 
 

@@ -7,9 +7,9 @@ SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 
 ## Embedding Providers
 - Azure
-- AWS Bedrock
+- Bedrock
 - Cohere
-- Fastembed (`quickstart` profile's default)
+- Fastembed
 - Fireworks
 - Github
 - Google
@@ -19,24 +19,22 @@ SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 - Mistral
 - Ollama
 - Openai
-- Sentence Transformers [^1]
+- Sentence Transformers
 - Together
 - Vercel
-- Voyage (`recommended` profile's default)
+- Voyage
 
-## Sparse Embedding Providers
-- Fastembed (`recommended` profile's default)
-- Sentence Transformers [^1]
+## Sparse embedding Providers
+- Fastembed
+- Sentence Transformers
 
 ## Reranking Providers
-- AWS Bedrock
+- Bedrock
 - Cohere
-- Fastembed (`quickstart` profile's default)
-- Sentence Transformers [^1]
-- Voyage (`recommended` profile's default)
+- Fastembed
+- Sentence Transformers
+- Voyage
 
-## Vector Store Providers
-- Memory (for testing)
-- Qdrant (default for `recommended` and `quickstart`)
-
-[^1]: Sentence Transformers requires one of the following extra install flags: `sentence-transformers`, `full`. For example: `uv pip install "codeweaver[sentence-transformers]"`
+## Vector store Providers
+- Memory
+- Qdrant
