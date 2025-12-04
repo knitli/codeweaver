@@ -549,6 +549,53 @@ class ProviderRegistry(BasedModel):
 
     # 🔧 NEW: Client Factory Methods
 
+    def _get_pooled_httpx_client(
+        self, provider: Provider, provider_kind: ProviderKind
+    ) -> Any | None:
+        """Get a pooled HTTP client for providers that support httpx_client injection.
+
+        This method provides connection pooling for HTTP-based providers (Voyage, Cohere),
+        reducing connection overhead and improving reliability during high-load operations.
+
+        Args:
+            provider: Provider enum (VOYAGE, COHERE, etc.)
+            provider_kind: Provider kind (embedding, reranking, etc.)
+
+        Returns:
+            Pooled httpx.AsyncClient if available, None otherwise (provider will create own client)
+        """
+        try:
+            from codeweaver.common.http_pool import get_http_pool
+
+            pool = get_http_pool()
+
+            # Provider-specific pool settings
+            # Longer read timeouts for embedding operations which can be slow
+            pool_overrides: dict[str, Any] = {}
+            if provider == Provider.VOYAGE:
+                pool_overrides = {
+                    "max_connections": 50,
+                    "read_timeout": 90.0,  # Embeddings can take time
+                }
+            elif provider == Provider.COHERE:
+                pool_overrides = {
+                    "max_connections": 50,
+                    "read_timeout": 90.0,
+                }
+
+            # Create unique client name based on provider and kind
+            client_name = f"{provider.value.lower()}_{provider_kind.value.lower()}"
+            return pool.get_client(client_name, **pool_overrides)
+        except Exception as e:
+            # Fallback to provider-created client if pool fails
+            logger.debug(
+                "Failed to get pooled HTTP client for %s (%s): %s. Provider will create own client.",
+                provider,
+                provider_kind,
+                e,
+            )
+            return None
+
     def collect_env_vars(self, provider: Provider) -> dict[str, str]:
         """Collect relevant environment variables for a provider.
 
@@ -818,6 +865,19 @@ class ProviderRegistry(BasedModel):
 
         provider_settings = provider_settings or {}
         merged_settings = provider_settings | client_options
+
+        # Inject pooled HTTP client for providers that support it (Voyage, Cohere)
+        # This improves connection reuse and reduces overhead during high-load operations
+        if provider in (Provider.VOYAGE, Provider.COHERE) and "httpx_client" not in merged_settings:
+            pooled_client = self._get_pooled_httpx_client(provider, provider_kind)
+            if pooled_client is not None:
+                merged_settings["httpx_client"] = pooled_client
+                logger.debug(
+                    "Injected pooled HTTP client for %s provider (kind: %s)",
+                    provider,
+                    provider_kind,
+                )
+
         args, kwargs = clean_args(merged_settings, client_class)
         args = tuple(arg.get_secret_value() if isinstance(arg, SecretStr) else arg for arg in args)
         kwargs = {

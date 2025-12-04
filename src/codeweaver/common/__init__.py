@@ -12,6 +12,13 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     # Import everything for IDE and type checker support
     # These imports are never executed at runtime, only during type checking
+    from codeweaver.common.http_pool import (
+        HttpClientPool,
+        PoolLimits,
+        PoolTimeouts,
+        get_http_pool,
+        reset_http_pool,
+    )
     from codeweaver.common.logging import log_to_client_or_fallback, setup_logger
     from codeweaver.common.statistics import (
         FileStatistics,
@@ -103,6 +110,7 @@ CODEWEAVER_PREFIX = f"[{_MARKUP_TAG}]CodeWeaver[/{_MARKUP_TAG}]"
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "CallHookTimingDict": (__spec__.parent, "types"),
     "FileStatistics": (__spec__.parent, "statistics"),
+    "HttpClientPool": (__spec__.parent, "http_pool"),
     "HttpRequestsDict": (__spec__.parent, "types"),
     "Identifier": (__spec__.parent, "statistics"),
     "LazyImport": (__spec__.parent, "utils"),
@@ -110,6 +118,8 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "McpComponentTimingDict": (__spec__.parent, "types"),
     "McpOperationRequests": (__spec__.parent, "types"),
     "McpTimingDict": (__spec__.parent, "types"),
+    "PoolLimits": (__spec__.parent, "http_pool"),
+    "PoolTimeouts": (__spec__.parent, "http_pool"),
     "ResourceUri": (__spec__.parent, "types"),
     "SessionStatistics": (__spec__.parent, "statistics"),
     "TimingStatistics": (__spec__.parent, "statistics"),
@@ -140,6 +150,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "get_function_signature": (__spec__.parent, "utils"),
     "get_git_branch": (__spec__.parent, "utils"),
     "get_git_revision": (__spec__.parent, "utils"),
+    "get_http_pool": (__spec__.parent, "http_pool"),
     "get_optimal_workers": (__spec__.parent, "utils"),
     "get_possible_env_vars": (__spec__.parent, "utils"),
     "get_project_path": (__spec__.parent, "utils"),
@@ -169,6 +180,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "low_priority": (__spec__.parent, "utils"),
     "normalize_ext": (__spec__.parent, "utils"),
     "record_timed_http_request": (__spec__.parent, "statistics"),
+    "reset_http_pool": (__spec__.parent, "http_pool"),
     "rpartial": (__spec__.parent, "utils"),
     "sanitize_unicode": (__spec__.parent, "utils"),
     "set_relative_path": (__spec__.parent, "utils"),
@@ -203,6 +215,7 @@ __all__ = (
     "CODEWEAVER_PREFIX",
     "CallHookTimingDict",
     "FileStatistics",
+    "HttpClientPool",
     "HttpRequestsDict",
     "Identifier",
     "LazyImport",
@@ -210,6 +223,8 @@ __all__ = (
     "McpComponentTimingDict",
     "McpOperationRequests",
     "McpTimingDict",
+    "PoolLimits",
+    "PoolTimeouts",
     "ResourceUri",
     "SessionStatistics",
     "TimingStatistics",
@@ -240,6 +255,7 @@ __all__ = (
     "get_function_signature",
     "get_git_branch",
     "get_git_revision",
+    "get_http_pool",
     "get_optimal_workers",
     "get_possible_env_vars",
     "get_project_path",
@@ -269,6 +285,7 @@ __all__ = (
     "low_priority",
     "normalize_ext",
     "record_timed_http_request",
+    "reset_http_pool",
     "rpartial",
     "sanitize_unicode",
     "set_relative_path",
