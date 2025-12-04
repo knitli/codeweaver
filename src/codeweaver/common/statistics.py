@@ -1492,7 +1492,9 @@ def get_session_statistics() -> SessionStatistics:
 
 
 def timed_http(
-    request_type: Literal["health", "version", "settings", "state", "metrics", "status"],
+    request_type: Literal[
+        "health", "version", "settings", "state", "metrics", "status", "shutdown"
+    ],
 ) -> Callable[
     [Callable[..., Awaitable[PlainTextResponse]]], Callable[..., Awaitable[PlainTextResponse]]
 ]:

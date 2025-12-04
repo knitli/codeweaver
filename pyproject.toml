@@ -275,19 +275,7 @@ dev = [
 ]
 build = ["hatchling>=1.27.0", "twine>=6.2.0", "uv-dynamic-versioning>=0.11.2"]
 docs = [
-  "mkdocs>=1.6.1",
-  "mkdocs-awesome-nav>=3.2.0",
-  "mkdocs-gen-files>=0.5.0",
-  "mkdocs-git-revision-date-localized-plugin>=1.5.0",
-  # TODO: Add llms-txt to mkdocs.yml
-  "mkdocs-llmstxt>=0.4.0",
-  "mkdocs-material>=9.6.23",
-  "mkdocs-minify-plugin>=0.8.0",
-  "mkdocs-redirects>=1.2.2",
-  "mkdocs-rss-plugin>=1.17.4",
-  "mkdocstrings[python]>=0.30.1",
-  "pygments>=2.19.2",
-  "pymdown-extensions>=10.16.1",
+  "griffe>=1.15.0",
 ]
 test = [
   "dirty-equals>=0.10.0",

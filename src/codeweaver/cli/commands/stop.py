@@ -93,7 +93,7 @@ async def stop(
         display.print_info("Requesting daemon shutdown...")
 
         # Request shutdown via management API
-        if not await request_daemon_shutdown(host, port, timeout=10.0):
+        if not await request_daemon_shutdown(host, port, timeout_at=10.0):
             display.print_error("Failed to request shutdown")
             display.print_info("The daemon may not be responding. You can try:", prefix="💡")
             display.print_info("  - Check logs: journalctl --user -u codeweaver.service")

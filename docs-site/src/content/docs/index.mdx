@@ -1,0 +1,56 @@
+---
+title: CodeWeaver Documentation
+description: Semantic code search and understanding for modern development teams
+template: splash
+hero:
+  title: CodeWeaver
+  tagline: Semantic code search and understanding for AI, and you.
+  image:
+    file: ../../assets/codeweaver-primary.svg
+  actions:
+    - text: Get Started
+      link: /why/
+      icon: right-arrow
+      variant: primary
+    - text: View on GitHub
+      link: https://github.com/knitli/codeweaver
+      icon: external
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## Features
+
+<CardGrid>
+  <Card title="Semantic Search" icon="magnifier">
+    Search your codebase using natural language queries powered by advanced embeddings
+  </Card>
+  <Card title="Multi-Provider Support" icon="puzzle">
+    Works with multiple embedding providers, vector stores, and reranking services
+  </Card>
+  <Card title="Fast & Efficient" icon="rocket">
+    Optimized chunking and indexing for large codebases
+  </Card>
+  <Card title="Developer Friendly" icon="laptop">
+    Simple CLI, MCP server support, and comprehensive API
+  </Card>
+</CardGrid>
+
+## Quick Start
+
+```bash
+# Install CodeWeaver
+uv pip install codeweaver
+
+# Start the daemon
+cw start --project /path/to/your/codebase
+
+# Search your code -- use the same tool your agent does
+cw search "authentication logic"
+```
+
+## What's Next?
+
+- Learn [Why CodeWeaver](/why/) is the right choice for your team
+- Explore the [CLI Reference](/cli/) for detailed command documentation
+- Check out the [API Reference](/api/) for integration guides
