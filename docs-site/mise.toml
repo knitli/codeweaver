@@ -8,3 +8,14 @@ bun = "1.3.3"
 node = "24"
 
 [env]
+
+[tasks]
+astro = "bun run astro"
+build = "bun run build"
+dev = "bun run dev"
+preview = "bun run preview"
+sync = "bun install"
+
+[tasks.gen-api-docs]
+tools.uv = "latest"
+run = "uvx ../scripts/gen-api-docs.py"
