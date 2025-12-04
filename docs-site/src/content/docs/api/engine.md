@@ -10,6 +10,6 @@ description: API reference for engine
 
 # engine
 
-The engine package contains core functionality for indexing, searching, and searching code and documentation data, but also for other data providers 🚋.
+The engine package contains core functionality for indexing and searching code and documentation data, as well as other data providers 🚋.
 
 ## Functions

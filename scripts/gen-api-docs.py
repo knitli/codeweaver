@@ -49,7 +49,7 @@ def format_signature(func: Function) -> str:
         param_name = param.name
         if param.annotation:
             param_name += f": {param.annotation}"
-        if param.default:
+        if getattr(param, "has_default", False):
             param_name += f" = {param.default}"
         params.append(param_name)
 
@@ -68,7 +68,7 @@ def extract_docstring_sections(obj: Any) -> dict[str, list[str]]:
     sections = {}
     for section in obj.docstring.parsed:
         if section.kind == DocstringSectionKind.text:
-            sections["description"] = [section.value]
+            sections.setdefault("description", []).append(section.value)
         elif section.kind == DocstringSectionKind.parameters:
             sections["parameters"] = [
                 f"- **{param.name}** ({param.annotation or 'Any'}): {param.description}"
