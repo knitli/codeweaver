@@ -880,7 +880,8 @@ class ProviderRegistry(BasedModel):
 
         # Inject pooled HTTP client for providers that support it
         # This improves connection reuse and reduces overhead during high-load operations
-        if param_name := self._POOLED_HTTP_PROVIDERS.get(provider):
+        param_name = self._POOLED_HTTP_PROVIDERS.get(provider)
+        if param_name is not None:
             # Check if a client isn't already provided (via httpx_client or http_client)
             if param_name not in merged_settings:
                 pooled_client = self._get_pooled_httpx_client(provider, provider_kind)

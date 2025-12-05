@@ -104,7 +104,10 @@ class HttpClientPool:
     limits: PoolLimits = field(default_factory=PoolLimits)
     timeouts: PoolTimeouts = field(default_factory=PoolTimeouts)
     _clients: dict[str, httpx.AsyncClient] = field(default_factory=dict, repr=False)
-    _lock: asyncio.Lock = field(default_factory=asyncio.Lock, repr=False)
+    # Note: _async_lock is created lazily to avoid event loop binding issues.
+    # asyncio.Lock is bound to the event loop it's created in, so we create it
+    # on first use in get_client() to ensure it's bound to the correct loop.
+    _async_lock: asyncio.Lock | None = field(default=None, repr=False)
     _sync_lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
 
     @classmethod
@@ -181,11 +184,20 @@ class HttpClientPool:
             Configured httpx.AsyncClient with connection pooling.
         """
         # Fast path: return existing client without lock
-        if name in self._clients:
+        # Use try-except to handle race condition where client could be removed
+        # between check and return
+        try:
             return self._clients[name]
+        except KeyError:
+            pass  # Continue to locked creation
+
+        # Lazily create asyncio.Lock on first use to avoid event loop binding issues.
+        # asyncio.Lock must be created in the same event loop where it will be used.
+        if self._async_lock is None:
+            self._async_lock = asyncio.Lock()
 
         # Slow path: acquire lock for client creation
-        async with self._lock:
+        async with self._async_lock:
             # Double-check after acquiring lock
             if name in self._clients:
                 return self._clients[name]
@@ -236,6 +248,12 @@ class HttpClientPool:
             This is intentional for connection pooling - each provider should use
             consistent settings.
 
+        Warning:
+            Synchronous and asynchronous methods should NOT be mixed. The locking
+            strategy does not protect against concurrent access from both threads
+            and coroutines. Only use sync methods in a purely threaded context,
+            and async methods in a purely async context.
+
         Args:
             name: Provider name (e.g., 'voyage', 'cohere', 'qdrant').
             **overrides: Override default limits/timeouts for this client.
@@ -244,8 +262,12 @@ class HttpClientPool:
             Configured httpx.AsyncClient with connection pooling.
         """
         # Fast path: client already exists
-        if name in self._clients:
+        # Use try-except to handle race condition where client could be removed
+        # between check and return
+        try:
             return self._clients[name]
+        except KeyError:
+            pass  # Continue to locked creation
 
         # Slow path: acquire lock and double-check
         with self._sync_lock:
@@ -309,7 +331,11 @@ class HttpClientPool:
         Returns:
             True if client was closed, False if no client existed.
         """
-        async with self._lock:
+        # Ensure async lock exists
+        if self._async_lock is None:
+            self._async_lock = asyncio.Lock()
+
+        async with self._async_lock:
             if name in self._clients:
                 client = self._clients.pop(name)
                 try:
@@ -327,7 +353,11 @@ class HttpClientPool:
         This method should be called during application shutdown to properly
         close all HTTP connections and release resources.
         """
-        async with self._lock:
+        # Ensure async lock exists
+        if self._async_lock is None:
+            self._async_lock = asyncio.Lock()
+
+        async with self._async_lock:
             client_names = list(self._clients.keys())
             for name in client_names:
                 client = self._clients.pop(name, None)
