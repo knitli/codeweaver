@@ -551,7 +551,7 @@ class ProviderRegistry(BasedModel):
 
     # Providers that support HTTP client injection for connection pooling
     # Maps provider -> parameter name used by that provider's SDK
-    _POOLED_HTTP_PROVIDERS: dict[Provider, str] = {
+    _POOLED_HTTP_PROVIDERS: ClassVar[dict[Provider, str]] = {
         # Voyage/Cohere use 'httpx_client' parameter
         Provider.VOYAGE: "httpx_client",
         Provider.COHERE: "httpx_client",
