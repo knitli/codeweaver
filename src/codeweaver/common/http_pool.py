@@ -292,16 +292,17 @@ class HttpClientPool:
         Returns:
             True if client was closed, False if no client existed.
         """
-        if name in self._clients:
-            client = self._clients.pop(name)
-            try:
-                await client.aclose()
-                logger.debug("Closed HTTP client pool for %s", name)
-                return True
-            except (httpx.HTTPError, OSError) as e:
-                logger.warning("Error closing HTTP client pool for %s: %s", name, e)
-                # Client already removed from dict above
-        return False
+        async with self._lock:
+            if name in self._clients:
+                client = self._clients.pop(name)
+                try:
+                    await client.aclose()
+                    logger.debug("Closed HTTP client pool for %s", name)
+                    return True
+                except (httpx.HTTPError, OSError) as e:
+                    logger.warning("Error closing HTTP client pool for %s: %s", name, e)
+                    # Client already removed from dict above
+            return False
 
     async def close_all(self) -> None:
         """Close all pooled clients (cleanup on shutdown).
@@ -309,19 +310,20 @@ class HttpClientPool:
         This method should be called during application shutdown to properly
         close all HTTP connections and release resources.
         """
-        client_names = list(self._clients.keys())
-        for name in client_names:
-            client = self._clients.pop(name, None)
-            if client is None:
-                continue
-            try:
-                await client.aclose()
-                logger.debug("Closed HTTP client pool for %s", name)
-            except (httpx.HTTPError, OSError) as e:
-                logger.warning("Error closing HTTP client pool for %s: %s", name, e)
+        async with self._lock:
+            client_names = list(self._clients.keys())
+            for name in client_names:
+                client = self._clients.pop(name, None)
+                if client is None:
+                    continue
+                try:
+                    await client.aclose()
+                    logger.debug("Closed HTTP client pool for %s", name)
+                except (httpx.HTTPError, OSError) as e:
+                    logger.warning("Error closing HTTP client pool for %s: %s", name, e)
 
-        if client_names:
-            logger.debug("Closed %d HTTP client pool(s)", len(client_names))
+            if client_names:
+                logger.debug("Closed %d HTTP client pool(s)", len(client_names))
 
     async def __aenter__(self) -> HttpClientPool:
         """Async context manager entry."""
