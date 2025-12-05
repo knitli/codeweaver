@@ -1,2 +1,0 @@
-#!/usr/bin/env bash
-exec mise x "aqua:ast-grep/ast-grep@latest" -- "$@"
