@@ -271,7 +271,7 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
         # Try to recover from trash first, then return default
         return self.store.get(key, default) if self.recover(key) else default
 
-    def __iter__(self) -> Iterator[KeyT]:
+    def __iter__(self) -> Iterator[KeyT]:  # ty:ignore[invalid-method-override]
         """Return an iterator over the keys in the store."""
         return iter(self.store)
 

@@ -11,7 +11,7 @@ from __future__ import annotations
 import contextlib
 import logging
 
-from typing import Any
+from typing import Any, cast
 
 from fastmcp.server.context import Context
 from mcp.server.session import ServerSession
@@ -62,7 +62,10 @@ async def find_code_tool(
         # Call the real find_code implementation
         # Convert focus_languages from SemanticSearchLanguage to str tuple
         focus_langs = (
-            tuple(lang.value if hasattr(lang, "value") else str(lang) for lang in focus_languages)
+            tuple(
+                lang.variable if hasattr(lang, "variable") else str(lang)
+                for lang in focus_languages
+            )
             if focus_languages
             else None
         )
@@ -79,7 +82,7 @@ async def find_code_tool(
             query=query,
             intent=intent,
             token_limit=token_limit,
-            focus_languages=focus_langs,
+            focus_languages=cast(tuple[str, ...], focus_langs),
             max_results=30,  # Default from find_code signature
         )
 

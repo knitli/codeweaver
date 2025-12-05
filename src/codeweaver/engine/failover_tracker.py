@@ -137,7 +137,7 @@ class FileChangeTracker(BasedModel):
 
         serialized_rel_path = str(rel_path)
         old_hash = self.file_hashes.get(serialized_rel_path)
-        new_hash = discovered_file.file_hash
+        new_hash = discovered_file.file_hash()
 
         if old_hash != new_hash:
             self.pending_changes.add(serialized_rel_path)
@@ -290,7 +290,7 @@ class FileChangeTracker(BasedModel):
 
         temp_path = self._persist_path.with_suffix(".tmp")
         temp_path.write_text(state)
-        temp_path.replace(self._persist_path)
+        temp_path.replace(str(self._persist_path))
 
         self._dirty = False
         logger.debug("Saved tracker state to %s", self._persist_path)

@@ -17,6 +17,8 @@ from codeweaver.engine.failover_tracker import FileChangeTracker
 pytestmark = [pytest.mark.unit]
 
 
+@pytest.mark.mock_only
+@pytest.mark.unit
 class TestFileChangeTrackerBasics:
     """Tests for basic FileChangeTracker operations."""
 
@@ -30,9 +32,12 @@ class TestFileChangeTrackerBasics:
         assert tracker.failover_indexed == set()
         assert tracker.last_sync_time is None
 
+    def _get_tracker(self, tmp_path: Path) -> FileChangeTracker:
+        return FileChangeTracker(project_path=tmp_path)
+
     def test_pending_count_sums_changes_and_deletions(self, tmp_path: Path):
         """Test pending_count property."""
-        tracker = FileChangeTracker(project_path=tmp_path)
+        tracker = self._get_tracker(tmp_path)
         tracker.pending_changes = {"a.py", "b.py"}
         tracker.pending_deletions = {"c.py"}
 
@@ -40,86 +45,80 @@ class TestFileChangeTrackerBasics:
 
     def test_has_pending_changes_true_when_changes(self, tmp_path: Path):
         """Test has_pending_changes with pending changes."""
-        tracker = FileChangeTracker(project_path=tmp_path)
-        tracker.pending_changes = {"a.py"}
-
-        assert tracker.has_pending_changes is True
+        tracker = self._get_tracker(tmp_path)
+        tracker.pending_changes = self._setup_file_change_tracker_with_deletion(tmp_path)
 
     def test_has_pending_changes_true_when_deletions(self, tmp_path: Path):
         """Test has_pending_changes with pending deletions."""
-        tracker = FileChangeTracker(project_path=tmp_path)
-        tracker.pending_deletions = {"a.py"}
+        tracker = self._get_tracker(tmp_path)
+        tracker.pending_deletions = self._setup_file_change_tracker_with_deletion(tmp_path)
 
+    def _setup_file_change_tracker_with_deletion(self, tmp_path):
+        tracker = self._get_tracker(tmp_path)
         assert tracker.has_pending_changes is True
+        return {"a.py"}
 
     def test_has_pending_changes_false_when_empty(self, tmp_path: Path):
         """Test has_pending_changes when empty."""
-        tracker = FileChangeTracker(project_path=tmp_path)
+        tracker = self._get_tracker(tmp_path)
 
         assert tracker.has_pending_changes is False
 
     def test_has_failover_files(self, tmp_path: Path):
         """Test has_failover_files property."""
-        tracker = FileChangeTracker(project_path=tmp_path)
+        tracker = self._get_tracker(tmp_path)
         assert tracker.has_failover_files is False
 
         tracker.failover_indexed = {"a.py"}
         assert tracker.has_failover_files is True
 
 
+@pytest.mark.mock_only
+@pytest.mark.unit
 class TestRecordFileIndexed:
     """Tests for record_file_indexed method."""
 
     def test_records_new_file(self, tmp_path: Path):
         """Test recording a new file."""
-        tracker = FileChangeTracker(project_path=tmp_path)
+        tracker = self._get_tracker(tmp_path)
 
-        # Create a mock DiscoveredFile
-        mock_file = MagicMock()
-        mock_file.path = tmp_path / "src" / "test.py"
-        mock_file.file_hash = "abc123"
-
-        with patch("codeweaver.engine.failover_tracker.set_relative_path") as mock_rel:
-            mock_rel.return_value = Path("src/test.py")
-            tracker.record_file_indexed(mock_file)
-
-        assert "src/test.py" in tracker.pending_changes
-        assert tracker.file_hashes["src/test.py"] == "abc123"
+        self._validate_test_recorded_file(tmp_path, "abc123", tracker)
         assert tracker._dirty is True
 
     def test_records_modified_file(self, tmp_path: Path):
         """Test recording a modified file (different hash)."""
-        tracker = FileChangeTracker(project_path=tmp_path)
+        tracker = self._get_tracker(tmp_path)
         tracker.file_hashes["src/test.py"] = "old_hash"
 
-        mock_file = MagicMock()
-        mock_file.path = tmp_path / "src" / "test.py"
-        mock_file.file_hash = "new_hash"
+        self._validate_test_recorded_file(tmp_path, "new_hash", tracker)
 
-        with patch("codeweaver.engine.failover_tracker.set_relative_path") as mock_rel:
-            mock_rel.return_value = Path("src/test.py")
-            tracker.record_file_indexed(mock_file)
-
+    def _validate_test_recorded_file(
+        self, tmp_path: Path, file_hash: str, tracker: FileChangeTracker
+    ):
+        self._validate_test_recorded_file(tmp_path, file_hash, tracker)
         assert "src/test.py" in tracker.pending_changes
-        assert tracker.file_hashes["src/test.py"] == "new_hash"
+        assert tracker.file_hashes["src/test.py"] == file_hash
 
     def test_skips_unchanged_file(self, tmp_path: Path):
         """Test that unchanged files are skipped."""
-        tracker = FileChangeTracker(project_path=tmp_path)
+        tracker = self._get_tracker(tmp_path)
         tracker.file_hashes["src/test.py"] = "same_hash"
 
+        self._mock_file_recording(tmp_path, "same_hash", tracker)
+        assert "src/test.py" not in tracker.pending_changes
+        assert tracker._dirty is False
+
+    def _mock_file_recording(self, tmp_path: Path, file_hash: str, tracker: FileChangeTracker):
         mock_file = MagicMock()
         mock_file.path = tmp_path / "src" / "test.py"
-        mock_file.file_hash = "same_hash"
-
+        mock_file.file_hash = file_hash
         with patch("codeweaver.engine.failover_tracker.set_relative_path") as mock_rel:
             mock_rel.return_value = Path("src/test.py")
             tracker.record_file_indexed(mock_file)
 
-        assert "src/test.py" not in tracker.pending_changes
-        assert tracker._dirty is False
 
-
+@pytest.mark.mock_only
+@pytest.mark.unit
 class TestRecordFileDeleted:
     """Tests for record_file_deleted method."""
 
@@ -139,6 +138,8 @@ class TestRecordFileDeleted:
         assert tracker._dirty is True
 
 
+@pytest.mark.mock_only
+@pytest.mark.unit
 class TestRecordFailoverIndexed:
     """Tests for record_file_indexed_during_failover method."""
 
@@ -154,6 +155,8 @@ class TestRecordFailoverIndexed:
         assert tracker._dirty is True
 
 
+@pytest.mark.mock_only
+@pytest.mark.unit
 class TestGetFilesNeedingBackup:
     """Tests for get_files_needing_backup method."""
 
@@ -180,6 +183,8 @@ class TestGetFilesNeedingBackup:
         assert files_to_delete == set()
 
 
+@pytest.mark.mock_only
+@pytest.mark.unit
 class TestMarkComplete:
     """Tests for mark_backup_complete and mark_primary_recovery_complete."""
 
@@ -191,8 +196,8 @@ class TestMarkComplete:
 
         tracker.mark_backup_complete()
 
-        assert tracker.pending_changes == set()
-        assert tracker.pending_deletions == set()
+        assert not tracker.pending_changes
+        assert not tracker.pending_deletions
         assert tracker.last_sync_time is not None
         assert tracker._dirty is True
 
@@ -203,10 +208,12 @@ class TestMarkComplete:
 
         tracker.mark_primary_recovery_complete()
 
-        assert tracker.failover_indexed == set()
+        assert not tracker.failover_indexed
         assert tracker._dirty is True
 
 
+@pytest.mark.mock_only
+@pytest.mark.unit
 class TestTimeSinceLastSync:
     """Tests for time_since_last_sync method."""
 
@@ -227,6 +234,8 @@ class TestTimeSinceLastSync:
         assert time_since < 1  # Should be less than 1 second
 
 
+@pytest.mark.mock_only
+@pytest.mark.unit
 class TestPersistence:
     """Tests for save and load functionality."""
 
@@ -265,7 +274,7 @@ class TestPersistence:
         # Use a valid 64-character blake3 hash
         valid_hash = "a" * 64
         tracker1 = FileChangeTracker(project_path=tmp_path)
-        tracker1.file_hashes["test.py"] = valid_hash
+        tracker1.file_hashes["test.py"] = valid_hash  # ty:ignore[invalid-assignment]
         tracker1.pending_changes = {"test.py"}
         tracker1._dirty = True
         tracker1.save()
@@ -293,6 +302,8 @@ class TestPersistence:
         assert tracker.file_hashes == {}
 
 
+@pytest.mark.mock_only
+@pytest.mark.unit
 class TestGetStatus:
     """Tests for get_status method."""
 

@@ -27,7 +27,6 @@ from codeweaver.exceptions import CodeWeaverError
 
 if TYPE_CHECKING:
     from codeweaver.config.settings import CodeWeaverSettings
-    from codeweaver.config.types import CodeWeaverSettingsDict
     from codeweaver.engine.indexer.checkpoint import CheckpointManager
 
 _display: StatusDisplay = get_display()
@@ -209,7 +208,7 @@ async def _perform_clear_operation(
         and (vector_provider_config := vector_settings.get("provider_settings"))
     ):
         # Copy provider_settings (url, collection_name, etc.)
-        provider_config = dict(vector_provider_config)
+        provider_config = dict(vector_provider_config)  # ty:ignore[no-matching-overload]
         # Add api_key from parent level if present
         if api_key := vector_settings.get("api_key"):
             provider_config["api_key"] = (

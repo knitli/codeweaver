@@ -290,7 +290,7 @@ class PostHogClient:
             return None
 
         try:
-            return self._client.get_feature_flag(flag_key, self.session_id)
+            return self._client.get_feature_flag(flag_key, self.session_id)  # ty:ignore[invalid-return-type]
         except Exception:
             self.logger.warning("Failed to get feature flag '%s'", flag_key)
             return None
@@ -343,7 +343,7 @@ class PostHogClient:
         try:
             if hasattr(data_obj, "serialize_for_telemetry"):
                 properties = data_obj.serialize_for_telemetry()
-                self.capture(event, properties, distinct_id=distinct_id or self.session_id)
+                self.capture(event, properties, distinct_id=distinct_id or self.session_id)  # ty:ignore[invalid-argument-type]
             else:
                 self.logger.warning(
                     "Object %s does not have serialize_for_telemetry method, skipping event '%s'",

@@ -57,6 +57,8 @@ NO_LAZY_PACKAGES = [
     "codeweaver.cli.commands",
     "codeweaver.agent_api.find_code",
     "codeweaver.providers.data",
+    "codeweaver.data",
+    "codeweaver.mcp.middleware",
 ]
 
 # Modules to check for package-level lazy imports

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from collections.abc import MutableMapping
 from types import MappingProxyType
-from typing import ClassVar
+from typing import ClassVar, cast
 
 from pydantic import ConfigDict, PrivateAttr
 
@@ -51,7 +51,7 @@ class ServicesRegistry(BasedModel):
         """
         if isinstance(card, dict):
             card = ServiceCard.from_dict(card)  # ty: ignore[invalid-argument-type]
-        self._services[card.feature].append(card)
+        self._services[card.feature].append(cast(ServiceCard, card))
 
     def is_service_enabled(self, feature: Feature) -> bool:
         """Check if a service feature is enabled.

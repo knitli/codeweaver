@@ -283,7 +283,7 @@ def is_constructor_arg[ClassT: type](
         bool: True if the argument is a constructor argument, False otherwise.
     """
     constructor = get_class_constructor(cls)
-    return arg_name in get_function_parameters(alt_constructor or constructor.object)
+    return arg_name in get_function_parameters(alt_constructor or constructor.object)  # ty:ignore[invalid-argument-type]
 
 
 def _construct_args(
@@ -366,7 +366,7 @@ def clean_args(
     """
     # Handle class constructors first
     if isclass(func):
-        func = get_class_constructor(func).object
+        func = get_class_constructor(func).object  # ty:ignore[invalid-assignment]
 
     # Allow objects with __signature__ (e.g., Mock objects in tests)
     if not (isfunction(func) or ismethod(func) or hasattr(func, "__signature__")):

@@ -32,7 +32,7 @@ class ConfigProfile(StrEnum):
 
 
 if TYPE_CHECKING:
-    from codeweaver.config.types import CodeWeaverSettingsDict, ProviderSettingsDict
+    from codeweaver.config import CodeWeaverSettingsDict, ProviderSettingsDict
     from codeweaver.core.types.dictview import DictView
 
 display: StatusDisplay = get_display()

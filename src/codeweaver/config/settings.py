@@ -336,12 +336,12 @@ class CodeWeaverSettings(BaseSettings):
 
     Configuration precedence (highest to lowest):
     1. Environment variables (CODEWEAVER_*)
-    2. Local config (codeweaver.local.toml (or .yaml, .yml, .json) in current directory)
-    3. Project config (codeweaver.toml (or .yaml, .yml, .json) in project root)
-    4. User config (~/codeweaver.toml (or .yaml, .yml, .json))
-    5. Global config (/etc/codeweaver.toml (or .yaml, .yml, .json))
-    6. Defaults
+    2. Local config (codeweaver.local.toml (or .yaml, .yml, .json) in project root, or in .codeweaver/, codeweaver/, .config/codeweaver/. In subdirectories, can also be named 'config.local.toml')
+    3. Project config (codeweaver.toml (or .yaml, .yml, .json) in project root, or in .codeweaver/, codeweaver/, .config/codeweaver/. In subdirectories, can also be named 'config.toml')
+    4. User config ($XDG_CONFIG_HOME/codeweaver/ or equivalent platform-specific config dir. Can also be named 'config.toml')
+    5. Defaults
 
+    NOTE: You should add local configs to the .gitignore, either at the project .gitignore, or if it's not your repo, in .git/info/exclude (like with: `echo "codeweaver.local.toml" >> .git/info/exclude`). You should tell projects you work on to add a *.local.* pattern to their .gitiginore if they haven't already because this is a common pattern for local config files.
     """
 
     model_config = SettingsConfigDict(
@@ -712,7 +712,7 @@ class CodeWeaverSettings(BaseSettings):
         path = _resolve_env_settings_path(directory=True)
         return CodeWeaverSettingsDict(
             project_path=path,
-            project_name=path.name,
+            project_name=path.name if isinstance(path, Path) else "",
             provider=AllDefaultProviderSettings,
             token_limit=30_000,
             max_file_size=1 * 1024 * 1024,
@@ -725,7 +725,7 @@ class CodeWeaverSettings(BaseSettings):
             chunker=DefaultChunkerSettings,
             management_host="127.0.0.1",
             management_port=9329,
-            default_mcp_config=StdioCodeWeaverConfigDict(StdioCodeWeaverConfig().model_dump()),  # ty: ignore[missing-typed-dict-key]
+            default_mcp_config=StdioCodeWeaverConfigDict(StdioCodeWeaverConfig().model_dump()),  # ty: ignore[missing-typed-dict-key, invalid-argument-type]
             telemetry=DefaultTelemetrySettings,
             uvicorn=DefaultUvicornSettings,
             endpoints=DefaultEndpointSettings,
@@ -808,16 +808,24 @@ class CodeWeaverSettings(BaseSettings):
             - .env
             - .codeweaver.local.env
             - .codeweaver.env
+            - codeweaver/.local.env
+            - codeweaver/.env
             - .codeweaver/.local.env
             - .codeweaver/.env
+            - .config/codeweaver/.local.env
+            - .config/codeweaver/.env
         4. In order of .toml, .yaml/.yml, .json files:
             - codeweaver.local.{toml,yaml,yml,json}
             - codeweaver.{toml,yaml,yml,json}
             - .codeweaver.local.{toml,yaml,yml,json}
             - .codeweaver.{toml,yaml,yml,json}
-            - .codeweaver/codeweaver.local.{toml,yaml,yml,json}
+            - codeweaver/{codeweaver,config}.local.{toml,yaml,yml,json}
+            - .codeweaver/{codeweaver,config}.local.{toml,yaml,yml,json}
+            - codeweaver/{codeweaver,config}.{toml,yaml,yml,json}
             - .codeweaver/codeweaver.{toml,yaml,yml,json}
-            - SYSTEM_USER_CONFIG_DIR/codeweaver/codeweaver.{toml,yaml,yml,json}
+            - .config/codeweaver/{codeweaver,config}.local.{toml,yaml,yml,json}
+            - .config/codeweaver/{codeweaver,config}.{toml,yaml,yml,json}
+            - SYSTEM_USER_CONFIG_DIR/codeweaver/{codeweaver,config}.{toml,yaml,yml,json}
         5. file_secret_settings - Secret files SYSTEM_USER_CONFIG_DIR/codeweaver/.secrets/
            (see https://docs.pydantic.dev/latest/concepts/pydantic_settings/#secrets for more info)
         6. If available and configured:
@@ -838,8 +846,18 @@ class CodeWeaverSettings(BaseSettings):
                 "codeweaver.test",
                 ".codeweaver.test.local",
                 ".codeweaver.test",
+                "codeweaver/codeweaver.test.local",
+                "codeweaver/codeweaver.test",
+                "codeweaver/config.test.local",
+                "codeweaver/config.test",
                 ".codeweaver/codeweaver.test.local",
                 ".codeweaver/codeweaver.test",
+                ".config/codeweaver/test.local",
+                ".config/codeweaver/test",
+                ".config/codeweaver/config.test.local",
+                ".config/codeweaver/config.test",
+                ".config/codeweaver/codeweaver.test.local",
+                ".config/codeweaver/codeweaver.test",
             ])
         else:
             # Standard config locations
@@ -848,9 +866,20 @@ class CodeWeaverSettings(BaseSettings):
                 "codeweaver",
                 ".codeweaver.local",
                 ".codeweaver",
+                "codeweaver/codeweaver.local",
+                "codeweaver/config.local",
+                "codeweaver/codeweaver",
+                "codeweaver/config",
                 ".codeweaver/codeweaver.local",
+                ".codeweaver/config.local",
                 ".codeweaver/codeweaver",
+                ".codeweaver/config",
+                ".config/codeweaver/codeweaver.local",
+                ".config/codeweaver/codeweaver",
+                ".config/codeweaver/config.local",
+                ".config/codeweaver/config",
                 f"{cls.user_config_dir()!s}/codeweaver",
+                f"{cls.user_config_dir()!s}/config",
             ])
         for _class in (
             TomlConfigSettingsSource,
@@ -925,6 +954,8 @@ class CodeWeaverSettings(BaseSettings):
                     ".codeweaver.env",
                     ".codeweaver/.local.env",
                     ".codeweaver/.env",
+                    ".config/codeweaver/.local.env",
+                    ".config/codeweaver/.env",
                 ),
                 env_ignore_empty=True,
             ),

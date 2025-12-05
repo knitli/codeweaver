@@ -21,6 +21,7 @@ import pytest
 
 from codeweaver.cli.commands.doctor import app as doctor_app
 from codeweaver.config.settings import CodeWeaverSettings
+from codeweaver.core.types.aliases import SentinelName
 from codeweaver.core.types.sentinel import Unset
 from codeweaver.providers.provider import Provider
 
@@ -51,7 +52,7 @@ class TestDoctorUnsetHandling:
 
     def test_unset_vs_none_distinction(self) -> None:
         """Test Unset is correctly distinguished from None."""
-        unset_value = Unset(name="UNSET", module_name=__name__)
+        unset_value = Unset(name=SentinelName("UNSET"), module_name=__name__)
 
         assert unset_value is not None
         assert isinstance(unset_value, Unset)

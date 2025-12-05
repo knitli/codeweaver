@@ -691,7 +691,7 @@ def get_custom_patterns(language: str) -> list[DelimiterPattern]:
         and (custom_delimiters := chunker.custom_delimiters)
     ):
         for delim in custom_delimiters:
-            if (lang := delim.language) and language == textcase.snake(lang):
+            if (lang := delim.language) and language == textcase.snake(str(lang)):
                 delimiters.extend(delim.delimiters)
             if (extensions := delim.extensions) and any(
                 ext

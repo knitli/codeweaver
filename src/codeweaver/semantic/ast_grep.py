@@ -516,7 +516,7 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
         """Get the primary category of the node, if any."""
         if not self.thing or isinstance(self.thing, Category):
             return None
-        return self.thing.primary_category.name if self.thing.primary_category else None
+        return str(self.thing.primary_category.name) if self.thing.primary_category else None
 
     @computed_field
     @cached_property

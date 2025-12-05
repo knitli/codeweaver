@@ -13,30 +13,29 @@ from types import MappingProxyType
 from typing import TYPE_CHECKING, Literal, TypedDict, cast
 
 from codeweaver.common.utils import lazy_import
-from codeweaver.core.types.aliases import LanguageName, LanguageNameT, LiteralStringT
+from codeweaver.core.types.aliases import (
+    DevToolName,
+    DevToolNameT,
+    DirectoryName,
+    DirectoryNameT,
+    FileExt,
+    FileExtensionT,
+    FileGlob,
+    FileGlobT,
+    LanguageName,
+    LanguageNameT,
+    LiteralStringT,
+    LlmToolName,
+    LlmToolNameT,
+)
 
 
 if TYPE_CHECKING:
     from codeweaver.common.utils import LazyImport
     from codeweaver.core.metadata import ExtLangPair
-    from codeweaver.core.types.aliases import (
-        DevToolNameT,
-        DirectoryNameT,
-        FileExtensionT,
-        FileGlobT,
-        LanguageNameT,
-        LiteralStringT,
-        LlmToolNameT,
-    )
+
 
 LangPair: LazyImport[ExtLangPair] = lazy_import("codeweaver.core.metadata", "ExtLangPair")
-DevToolName: LazyImport[DevToolNameT] = lazy_import("codeweaver.core.types.aliases", "DevToolName")
-DirectoryName: LazyImport[DirectoryNameT] = lazy_import(
-    "codeweaver.core.types.aliases", "DirectoryName"
-)
-FileGlob: LazyImport[FileGlobT] = lazy_import("codeweaver.core.types.aliases", "FileGlob")
-LlmToolName: LazyImport[LlmToolNameT] = lazy_import("codeweaver.core.types.aliases", "LlmToolName")
-FileExt: LazyImport[FileExtensionT] = lazy_import("codeweaver.core.types.aliases", "FileExt")
 
 
 METADATA_PATH = "metadata"

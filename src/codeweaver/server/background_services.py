@@ -119,7 +119,7 @@ def _display_indexing_summary(status_display: StatusDisplay, stats: Any) -> None
 
 async def start_watcher(
     state: CodeWeaverState, status_display: StatusDisplay
-) -> asyncio.Task[None]:
+) -> asyncio.Task[None | int]:
     """Start the file watcher as an asynchronous task."""
     import rignore
 
@@ -141,7 +141,7 @@ async def start_watcher(
 
 
 async def _handle_watcher_cancellation(
-    watcher_task: asyncio.Task[None] | None, status_display: StatusDisplay, *, verbose: bool
+    watcher_task: asyncio.Task[None | int] | None, status_display: StatusDisplay, *, verbose: bool
 ) -> None:
     """Handle graceful cancellation of the watcher task."""
     if not watcher_task or watcher_task.done():
@@ -158,7 +158,7 @@ async def _handle_watcher_cancellation(
 
 async def _run_indexing_workflow(
     state: CodeWeaverState, status_display: StatusDisplay, *, verbose: bool, debug: bool
-) -> asyncio.Task[None]:
+) -> asyncio.Task[None | int]:
     """Run the complete indexing workflow and start the watcher."""
     # Perform indexing with progress tracking
     await _perform_indexing(state, status_display, verbose=verbose, debug=debug)

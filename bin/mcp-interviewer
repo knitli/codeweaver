@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+exec mise x "pipx:git+https://github.com/microsoft/mcp-interviewer.git@latest" -- "$@"

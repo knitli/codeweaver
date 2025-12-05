@@ -34,6 +34,9 @@ local linters = new Mapping<String, Step> {
             glob = List("scripts/{*.sh,*.bash}", "mise-tasks/{*.sh,*.bash}")
             check = "shellcheck {{ files }}"
         }
+
+            ["shfmt"] = Builtins.shfmt
+
     }
 
     ["fix-ruff-patterns"] = new Step {
@@ -54,8 +57,6 @@ local linters = new Mapping<String, Step> {
     }
 
 
-    ["shfmt"] = Builtins.shfmt
-
     ["add-marks"] = new Step {
         glob = "tests/**/*.py"
         fix = "./scripts/testing/apply-test-marks.py {{ files }}"
@@ -63,7 +64,7 @@ local linters = new Mapping<String, Step> {
 
     ["validate-lazy-imports"] = new Step {
         glob = "{src,tests}/**/*.py"
-        check = "./mise-tasks/validate-lazy-imports.py {{ files }}"
+        check = "uv run --no-cache mise-tasks/validate-lazy-imports.py {{ files }}"
     }
 
     // ty typechecker for python

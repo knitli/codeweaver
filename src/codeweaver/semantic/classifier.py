@@ -937,7 +937,7 @@ class GrammarBasedClassifier:
         """
         if is_composite_thing(token):
             return None  # Only Tokens have purpose classifications
-        classification = SemanticClass.from_token_purpose(token.purpose, token.name)
+        classification = SemanticClass.from_token_purpose(token.purpose, str(token.name))
         adjustment = 0
         if classification == SemanticClass.DOCUMENTATION_STRUCTURED:
             adjustment = -15  # We need more context to be sure it's a docstring

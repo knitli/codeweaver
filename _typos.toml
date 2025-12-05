@@ -97,7 +97,7 @@ ignore-hex = true
 identifier-leading-digits = false
 locale = "en-us"
 extend-ignore-identifiers-re = []
-extend-ignore-words-re = ['GUD']
+extend-ignore-words-re = ["GUD"]
 extend-ignore-re = [
   '(?s)(#|//)\s*spellchecker:off.*?\n\s*(#|//)\s*spellchecker:on',
 ]
@@ -117,21 +117,6 @@ extend-ignore-re = [
   '(?s)(#|//)\s*spellchecker:off.*?\n\s*(#|//)\s*spellchecker:on',
 ]
 
-[type.json]
-extend-glob = []
-binary = false
-check-filename = true
-check-file = true
-unicode = true
-ignore-hex = true
-identifier-leading-digits = false
-locale = "en-us"
-extend-ignore-identifiers-re = []
-extend-ignore-words-re = ['tha|bre']
-extend-ignore-re = [
-  '(?s)(#|//)\s*spellchecker:off.*?\n\s*(#|//)\s*spellchecker:on',
-]
-
 [type.cert.extend-identifiers]
 
 [type.cert.extend-words]
@@ -145,6 +130,21 @@ iif = "iif"
 i18n-t = "i18n-t"
 mak = "mak"
 i18next = "i18next"
+
+[type.json]
+extend-glob = []
+binary = false
+check-filename = true
+check-file = true
+unicode = true
+ignore-hex = true
+identifier-leading-digits = false
+locale = "en-us"
+extend-ignore-identifiers-re = []
+extend-ignore-words-re = ["tha|bre"]
+extend-ignore-re = [
+  '(?s)(#|//)\s*spellchecker:off.*?\n\s*(#|//)\s*spellchecker:on',
+]
 
 [type.bitbake]
 extend-glob = []

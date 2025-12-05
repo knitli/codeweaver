@@ -755,7 +755,7 @@ class Category(BasedModel):
 
     def __str__(self) -> str:
         """String representation of the Category."""
-        return f"Category: {self.name}, Language: {self.language.variable}, Members: [{', '.join(sorted((thing.name for thing in self.member_things if thing), key=str.lower))}]"
+        return f"Category: {self.name}, Language: {self.language.variable}, Members: [{', '.join(sorted((str(thing.name) for thing in self.member_things if thing), key=str.lower))}]"
 
     @property
     def short_str(self) -> str:
@@ -767,7 +767,7 @@ class Category(BasedModel):
         return thing in self.member_things
 
     @override
-    def __iter__(self) -> Iterator[CompositeThing | Token]:
+    def __iter__(self) -> Iterator[CompositeThing | Token]:  # ty:ignore[invalid-method-override]
         """Iterate over the member Things in this Category."""
         return iter(self.member_things)
 

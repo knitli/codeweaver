@@ -88,7 +88,11 @@ class DefaultExtensionFilter(ExtensionFilter):
 
 
 CodeFilter = DefaultExtensionFilter(
-    tuple(pair.ext for pair in CODE_FILES_EXTENSIONS if pair.language not in CONFIG_FILE_LANGUAGES)
+    tuple(
+        str(pair.ext)
+        for pair in CODE_FILES_EXTENSIONS
+        if pair.language not in CONFIG_FILE_LANGUAGES
+    )
     + tuple(SemanticSearchLanguage.code_extensions())
 )
 
@@ -100,7 +104,7 @@ ConfigFilter = DefaultExtensionFilter(
     )
 )
 
-DocsFilter = DefaultExtensionFilter(tuple(pair.ext for pair in DOC_FILES_EXTENSIONS))
+DocsFilter = DefaultExtensionFilter(tuple(str(pair.ext) for pair in DOC_FILES_EXTENSIONS))
 
 
 class DefaultFilter(watchfiles.DefaultFilter):

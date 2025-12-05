@@ -395,7 +395,7 @@ class ExtLangPair(NamedTuple):
             return True
         if self.ext.istitle():
             return True
-        return True if self.ext.find(".", 1) != -1 else "." not in self.ext
+        return True if self.ext.find(".", 1) != -1 else "." not in str(self.ext)
 
     def is_same(self, filename: str) -> bool:
         """Check if the given filename is the same filetype as the extension."""
@@ -403,7 +403,7 @@ class ExtLangPair(NamedTuple):
         if self.ext.lower() not in filename.lower():
             return False
         # a couple of these may seem redundant but we're descending in confidence levels here
-        if not self.is_weird_extension and filename.endswith(self.ext):
+        if not self.is_weird_extension and filename.endswith(str(self.ext)):
             return True
         if self.is_file_name and filename == self.ext:
             return True
@@ -614,7 +614,7 @@ class ExtKind(NamedTuple):
 
         # Try to convert string to SemanticSearchLanguage
         with contextlib.suppress(KeyError, ValueError, AttributeError):
-            if semantic := SemanticSearchLanguage.from_string(language):
+            if semantic := SemanticSearchLanguage.from_string(language):  # ty:ignore[invalid-argument-type]
                 return cls.from_language(semantic, kind)
 
         # Resolve as LanguageName and categorize

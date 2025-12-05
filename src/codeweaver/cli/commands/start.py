@@ -184,7 +184,7 @@ async def start_cw_services(
 
             # Start MCP HTTP server as background task
             mcp_server_task = asyncio.create_task(
-                mcp_state.app.run_http_async(**mcp_state.run_args)
+                mcp_state.app.run_http_async(**mcp_state.run_args)  # ty:ignore[invalid-argument-type]
             )
 
         try:

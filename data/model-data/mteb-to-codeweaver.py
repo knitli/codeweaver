@@ -39,8 +39,8 @@ from typing_extensions import TypeIs
 # make sure codeweaver is importable
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from codeweaver.config.types import Provider
 from codeweaver.providers.embedding.capabilities.base import PartialCapabilities
+from codeweaver.providers.provider import Provider
 
 
 VERSION_PATTERNS = (  # some special cases first

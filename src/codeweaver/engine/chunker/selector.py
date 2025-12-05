@@ -226,7 +226,13 @@ class ChunkerSelector:
         ext = file.path.suffix
 
         # SemanticSearchLanguage.from_extension returns None for unknown
-        return file.ext_kind.language if file.ext_kind else ext.lstrip(".").lower()
+        return (
+            file.ext_kind.language.variable
+            if isinstance(file.ext_kind.language, SemanticSearchLanguage | ConfigLanguage)
+            else str(file.ext_kind.language)
+            if file.ext_kind
+            else ext.lstrip(".").lower()
+        )
 
 
 class GracefulChunker(BaseChunker):

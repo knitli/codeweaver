@@ -27,7 +27,7 @@ from codeweaver.core.types.models import BasedModel, clean_sentinel_from_schema
 class DontGenerateJsonSchema(GenerateJsonSchema):
     """GenerateJsonSchema implementation that disables JSON Schema generation."""
 
-    def generate(self, _schema: core_schema.CoreSchema, _error_info: str) -> JsonSchemaValue:
+    def generate(self, _schema: core_schema.CoreSchema, _error_info: str) -> JsonSchemaValue:  # ty:ignore[invalid-method-override]
         """Disable JSON Schema generation by raising an error."""
         raise PydanticOmit
 
@@ -135,7 +135,7 @@ class Sentinel(BasedModel):
 
     def __str__(self) -> str:
         """Return a string representation of the sentinel."""
-        return self.name
+        return str(self.name)
 
     def __repr__(self) -> str:
         """Return a string representation of the sentinel."""
@@ -143,7 +143,7 @@ class Sentinel(BasedModel):
 
     def __reduce__(self) -> tuple[type[Self], tuple[str, str]]:
         """Return state information for pickling."""
-        return (self.__class__, (self.name, self.module_name))
+        return (self.__class__, (str(self.name), self.module_name))
 
     def __hash__(self) -> int:
         """Return the hash of the sentinel."""

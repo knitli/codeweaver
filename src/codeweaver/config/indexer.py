@@ -34,6 +34,13 @@ from fastmcp import Context as FastMCPContext
 from pydantic import DirectoryPath, Field, FilePath, PrivateAttr, computed_field
 
 from codeweaver.core.file_extensions import DEFAULT_EXCLUDED_DIRS, DEFAULT_EXCLUDED_EXTENSIONS
+from codeweaver.core.types.aliases import (
+    DirectoryNameT,
+    FileExtensionT,
+    FileGlob,
+    FileGlobT,
+    FilteredKeyT,
+)
 from codeweaver.core.types.models import BasedModel
 from codeweaver.core.types.sentinel import UNSET, Unset
 
@@ -42,7 +49,6 @@ if TYPE_CHECKING:
     from codeweaver.config.settings import CodeWeaverSettings
     from codeweaver.config.types import CodeWeaverSettingsDict
     from codeweaver.core.types import DictView
-    from codeweaver.core.types.aliases import FilteredKeyT
     from codeweaver.core.types.enum import AnonymityConversion
 
 logger = logging.getLogger(__name__)
@@ -94,9 +100,9 @@ class RignoreSettings(TypedDict, total=False):
 class IndexerSettingsDict(TypedDict, total=False):
     """A serialized `IndexerSettings` object."""
 
-    forced_includes: NotRequired[frozenset[str | Path]]
-    excludes: NotRequired[frozenset[str | Path]]
-    excluded_extensions: NotRequired[frozenset[str]]
+    forced_includes: NotRequired[frozenset[FileGlobT | Path]]
+    excludes: NotRequired[frozenset[DirectoryNameT | FileGlobT | Path]]
+    excluded_extensions: NotRequired[frozenset[FileExtensionT]]
     use_gitignore: NotRequired[bool]
     use_other_ignore_files: NotRequired[bool]
     ignore_hidden: NotRequired[bool]
@@ -270,20 +276,19 @@ class IndexerSettings(BasedModel):
     - The `excludes` list is converted to ignore patterns
     """
 
-    forced_includes: Annotated[
-        frozenset[str | Path],
-        Field(
-            description="""Directories, files, or [glob patterns](https://docs.python.org/3/library/pathlib.html#pathlib-pattern-language) to include in search and indexing. This is a set of strings, so you can use glob patterns like `**/src/**` or `**/*.py` to include directories or files."""
+    forced_includes: frozenset[FileGlobT | Path] = Field(
+        default_factory=lambda paths: frozenset(
+            FileGlob(p) if isinstance(p, str) else p for p in paths
         ),
-    ] = frozenset()
-    excludes: Annotated[
-        frozenset[str | Path],
-        Field(
-            description="""Directories, files, or [glob patterns](https://docs.python.org/3/library/pathlib.html#pathlib-pattern-language) to exclude from search and indexing. This is a set of strings, so you can use glob patterns like `**/node_modules/**` or `**/*.log` to exclude directories or files. You don't need to provide gitignored paths here if `use_gitignore` is enabled (default)."""
-        ),
-    ] = DEFAULT_EXCLUDED_DIRS
+        description="""Directories, files, or [glob patterns](https://docs.python.org/3/library/pathlib.html#pathlib-pattern-language) to include in search and indexing. This is a set of strings, so you can use glob patterns like `**/src/**` or `**/*.py` to include directories or files.""",
+    )
+    excludes: frozenset[DirectoryNameT | FileGlobT | Path] = Field(
+        DEFAULT_EXCLUDED_DIRS,
+        description="""Directories, files, or [glob patterns](https://docs.python.org/3/library/pathlib.html#pathlib-pattern-language) to exclude from search and indexing. This is a set of strings, so you can use glob patterns like `**/node_modules/**` or `**/*.log` to exclude directories or files.""",
+    )
     excluded_extensions: Annotated[
-        frozenset[str], Field(description="""File extensions to exclude from search and indexing""")
+        frozenset[FileExtensionT],
+        Field(description="""File extensions to exclude from search and indexing"""),
     ] = DEFAULT_EXCLUDED_EXTENSIONS
     use_gitignore: Annotated[
         bool,
@@ -618,6 +623,9 @@ class IndexerSettings(BasedModel):
         """Serialize to `RignoreSettings`."""
         return self._as_settings()
 
+
+if not IndexerSettings.__pydantic_complete__:
+    IndexerSettings.model_rebuild()
 
 DefaultIndexerSettings = IndexerSettingsDict(
     IndexerSettings().model_dump(exclude_none=True, exclude_computed_fields=True)  # type: ignore

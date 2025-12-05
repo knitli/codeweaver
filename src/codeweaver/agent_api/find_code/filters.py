@@ -19,12 +19,11 @@ if TYPE_CHECKING:
     from codeweaver.core.chunks import CodeChunk
 
 
-def filter_test_files(candidates: list[SearchResult], *, include_tests: bool) -> list[SearchResult]:
+def filter_test_files(candidates: list[SearchResult]) -> list[SearchResult]:
     """Filter out test files if include_tests is False.
 
     Args:
         candidates: List of search results to filter
-        include_tests: Whether to include test files
 
     Returns:
         Filtered list of search results
@@ -33,33 +32,28 @@ def filter_test_files(candidates: list[SearchResult], *, include_tests: bool) ->
         This is a basic implementation using path name heuristics.
         Future versions will use repo metadata to properly tag test files.
     """
-    if include_tests:
-        return candidates
-
     return [c for c in candidates if not (c.file_path and "test" in str(c.file_path).lower())]
 
 
 def filter_by_languages(
-    candidates: list[SearchResult], focus_languages: tuple[str, ...] | None
+    candidates: list[SearchResult], focus_languages: tuple[str, ...]
 ) -> list[SearchResult]:
     """Filter search results to only include specified languages.
 
     Args:
         candidates: List of search results to filter
-        focus_languages: Optional tuple of language names to include
+        focus_languages: tuple of language names to include
 
     Returns:
         Filtered list of search results
     """
-    if not focus_languages:
-        return candidates
-
     langs = set(focus_languages)
     return [
         c
         for c in candidates
         if (
-            isinstance(c.content, CodeChunk)
+            c
+            and isinstance(c.content, CodeChunk)
             and c.content.language
             and str(c.content.language) in langs
         )
@@ -82,8 +76,15 @@ def apply_filters(
     Returns:
         Filtered list of search results
     """
-    return filter_by_languages(
-        filter_test_files(candidates, include_tests=include_tests), focus_languages=focus_languages
+    # we don't need to filter anything
+    if not focus_languages and include_tests:
+        return candidates
+    # if include_tests is True, only filter by languages
+    if include_tests:
+        # the empty tuple is for the type checker which hasn't figured out we already know we have focus_languages
+        return filter_by_languages(candidates, focus_languages=(focus_languages or ()))
+    return filter_test_files(
+        filter_by_languages(candidates, focus_languages=(focus_languages or ()))
     )
 
 

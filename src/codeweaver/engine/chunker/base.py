@@ -28,6 +28,7 @@ from pydantic import ConfigDict, Field, PositiveInt, PrivateAttr, computed_field
 
 # Import ChunkerSettings at runtime for model rebuild to work
 from codeweaver.config.chunker import ChunkerSettings
+from codeweaver.config.providers import ProviderSettingsDict
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.types.models import BasedModel
 from codeweaver.exceptions import InitializationError
@@ -189,7 +190,7 @@ class ChunkGovernor(BasedModel):
 
     @classmethod
     def from_backup_profile(
-        cls, backup_profile: dict[str, Any], settings: ChunkerSettings | None = None
+        cls, backup_profile: ProviderSettingsDict, settings: ChunkerSettings | None = None
     ) -> ChunkGovernor:
         """Create a ChunkGovernor from backup profile settings.
 

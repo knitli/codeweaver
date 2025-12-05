@@ -68,7 +68,7 @@ def find_builtin_usage_in_source(module: ModuleType, builtins: set[str]) -> set[
         return found_exceptions
 
 
-def safe_walk_packages(package, prefix) -> "iter[pkgutil.ModuleInfo]":
+def safe_walk_packages(package, prefix) -> "iter[pkgutil.ModuleInfo]":  # ty:ignore[invalid-type-form]
     """Walk packages safely, handling import errors during discovery."""
 
     def onerror(name):
@@ -114,7 +114,7 @@ def scan_source_files_for_exceptions(
 
                 def visit_ExceptHandler(
                     self, node: ast.Raise, module_name: str = module_name
-                ) -> None:
+                ) -> None:  # ty:ignore[invalid-method-override]
                     """Handle except clauses to find exception types."""
                     if node.type:
                         if isinstance(node.type, ast.Name) and node.type.id in builtin_exceptions:
@@ -125,7 +125,7 @@ def scan_source_files_for_exceptions(
                                     builtin_usage.add((module_name, elt.id))
                     self.generic_visit(node)
 
-                def visit_ClassDef(self, node: ast.Raise, module_name: str = module_name) -> None:
+                def visit_ClassDef(self, node: ast.Raise, module_name: str = module_name) -> None:  # ty:ignore[invalid-method-override]
                     """Handle class definitions to find custom exceptions."""
                     # Find custom exception classes
                     for base in node.bases:

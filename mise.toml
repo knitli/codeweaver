@@ -2,6 +2,8 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
+experimental_monorepo_root = true
+
 [settings]
 idiomatic_version_file_enable_tools = []
 
@@ -18,22 +20,30 @@ uv_venv_create_args = [
 
 [tools]
 python = "3.13"
-gh = "latest"
 hk = "latest"
 pkl = "latest"
+usage = "latest"
 uv = "latest"
+# Quality & validation tools
+"pipx:reuse" = "latest"  # License validation
+"pipx:tombi" = "latest"
+"pipx:ty" = "latest"  # Type checking
+ruff = "latest"  # Python linting/formatting
 
 [env]
+MISE_EXPERIMENTAL = "1"
 GH_REPO = "knitli/codeweaver"
 REMOTE_ORIGIN_URL = '''http://github.com/knitli/codeweaver.git'''
-# Use the project name derived from the current directory
-PROJECT_NAME = "{{ config_root | basename }}"
-CODEWEAVER_PROJECT_PATH = '''{{ config_root }}'''
+PROJECT_NAME = "codeweaver"
+# According to the mise docs, config_root should always be the project root. Even if the mise.toml is in a subdirectory.
+# But that didn't seem to be the case, so we manually trim known suffixes.
+CODEWEAVER_PROJECT_PATH = '''{{ config_root | trim | trim_end_matches(pat="/") | trim_end_matches(pat="/mise") | trim_end_matches(pat="/.config") }}'''
 # Get version from git tags (uv-dynamic-versioning uses git as source)
 # Falls back to "dev" if git command fails
 CODEWEAVER_VERSION = '''{{ exec(command='git describe --tags --always --dirty 2>/dev/null || echo "dev"') | trim }}'''
 CI = '''{% if get_env(name="GITHUB_ACTIONS", default="") != "" %}true{% else %}false{% endif %}'''
 _.path = [
+  "bin",
   "scripts/dev-env",
   "scripts/code-quality",
   "scripts/build",
@@ -42,7 +52,7 @@ _.path = [
   "scripts/utils",
   ".venv/bin",
 ]
-MISE_ENV = "dev"
+MISE_ENV = '''{% if get_env(name="CI", default="") == "true" %}ci{% else %}dev{% endif %}'''
 
 [tasks.info]
 description = "Print project information"

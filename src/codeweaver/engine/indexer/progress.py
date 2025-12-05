@@ -22,6 +22,7 @@ from rich.progress import (
     MofNCompleteColumn,
     Progress,
     SpinnerColumn,
+    TaskID,
     TaskProgressColumn,
     TextColumn,
     TimeElapsedColumn,
@@ -251,7 +252,7 @@ class IndexingProgressTracker:
         # Update discovery task
         if self.discovery_task_id is not None and stats.files_discovered > 0:
             self.progress.update(
-                self.discovery_task_id,
+                TaskID(self.discovery_task_id),
                 total=stats.files_discovered,
                 completed=stats.files_discovered,
                 visible=True,
@@ -260,7 +261,7 @@ class IndexingProgressTracker:
         # Update chunking task
         if self.chunking_task_id is not None and stats.files_processed > 0:
             self.progress.update(
-                self.chunking_task_id,
+                TaskID(self.chunking_task_id),
                 total=stats.files_discovered,
                 completed=stats.files_processed,
                 visible=True,
@@ -269,7 +270,7 @@ class IndexingProgressTracker:
         # Update embedding task
         if self.embedding_task_id is not None and stats.chunks_embedded > 0:
             self.progress.update(
-                self.embedding_task_id,
+                TaskID(self.embedding_task_id),
                 total=stats.chunks_created if stats.chunks_created > 0 else None,
                 completed=stats.chunks_embedded,
                 visible=True,
@@ -278,7 +279,7 @@ class IndexingProgressTracker:
         # Update indexing task
         if self.indexing_task_id is not None and stats.chunks_indexed > 0:
             self.progress.update(
-                self.indexing_task_id,
+                TaskID(self.indexing_task_id),
                 total=stats.chunks_created if stats.chunks_created > 0 else None,
                 completed=stats.chunks_indexed,
                 visible=True,
