@@ -274,12 +274,14 @@ class HttpClientPool:
         Returns:
             True if a client exists for this provider.
         """
-        return name in self._clients
+        with self._sync_lock:
+            return name in self._clients
 
     @property
     def client_names(self) -> list[str]:
         """Get list of all provider names with active clients."""
-        return list(self._clients.keys())
+        with self._sync_lock:
+            return list(self._clients.keys())
 
     async def close_client(self, name: str) -> bool:
         """Close a specific provider's HTTP client.
