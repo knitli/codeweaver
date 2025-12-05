@@ -549,9 +549,12 @@ class ProviderRegistry(BasedModel):
 
     # 🔧 NEW: Client Factory Methods
 
+    # Providers that support httpx_client injection for connection pooling
+    _POOLED_HTTP_PROVIDERS: frozenset[Provider] = frozenset({Provider.VOYAGE, Provider.COHERE})
+
     def _get_pooled_httpx_client(
         self, provider: Provider, provider_kind: ProviderKind
-    ) -> Any | None:
+    ) -> Any:
         """Get a pooled HTTP client for providers that support httpx_client injection.
 
         This method provides connection pooling for HTTP-based providers (Voyage, Cohere),
@@ -572,21 +575,16 @@ class ProviderRegistry(BasedModel):
             # Provider-specific pool settings
             # Longer read timeouts for embedding operations which can be slow
             pool_overrides: dict[str, Any] = {}
-            if provider == Provider.VOYAGE:
+            if provider in self._POOLED_HTTP_PROVIDERS:
                 pool_overrides = {
                     "max_connections": 50,
                     "read_timeout": 90.0,  # Embeddings can take time
                 }
-            elif provider == Provider.COHERE:
-                pool_overrides = {
-                    "max_connections": 50,
-                    "read_timeout": 90.0,
-                }
 
             # Create unique client name based on provider and kind
             client_name = f"{provider.value.lower()}_{provider_kind.value.lower()}"
-            return pool.get_client(client_name, **pool_overrides)
-        except Exception as e:
+            return pool.get_client_sync(client_name, **pool_overrides)
+        except (ImportError, AttributeError, RuntimeError) as e:
             # Fallback to provider-created client if pool fails
             logger.debug(
                 "Failed to get pooled HTTP client for %s (%s): %s. Provider will create own client.",
@@ -868,7 +866,7 @@ class ProviderRegistry(BasedModel):
 
         # Inject pooled HTTP client for providers that support it (Voyage, Cohere)
         # This improves connection reuse and reduces overhead during high-load operations
-        if provider in (Provider.VOYAGE, Provider.COHERE) and "httpx_client" not in merged_settings:
+        if provider in self._POOLED_HTTP_PROVIDERS and "httpx_client" not in merged_settings:
             pooled_client = self._get_pooled_httpx_client(provider, provider_kind)
             if pooled_client is not None:
                 merged_settings["httpx_client"] = pooled_client

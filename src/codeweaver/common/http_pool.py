@@ -20,10 +20,16 @@ Usage:
 
     # Cleanup on shutdown
     await pool.close_all()
+
+Note:
+    Thread safety is ensured via asyncio.Lock for coroutine-safe client creation.
+    The singleton pattern assumes single-threaded initialization during application
+    startup, which is standard for async Python applications.
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass, field
 from typing import Any, ClassVar
@@ -76,9 +82,13 @@ class HttpClientPool:
 
     The pool supports HTTP/2 by default for better multiplexing on modern APIs.
 
+    Thread Safety:
+        Client creation is protected by an asyncio.Lock to prevent race conditions
+        when multiple coroutines request the same client simultaneously.
+
     Example:
         pool = HttpClientPool.get_instance()
-        client = pool.get_client('voyage', max_connections=50, read_timeout=90.0)
+        client = await pool.get_client('voyage', max_connections=50, read_timeout=90.0)
         # Use client for API calls...
         await pool.close_all()  # Cleanup on shutdown
     """
@@ -88,6 +98,7 @@ class HttpClientPool:
     limits: PoolLimits = field(default_factory=PoolLimits)
     timeouts: PoolTimeouts = field(default_factory=PoolTimeouts)
     _clients: dict[str, httpx.AsyncClient] = field(default_factory=dict, repr=False)
+    _lock: asyncio.Lock = field(default_factory=asyncio.Lock, repr=False)
 
     @classmethod
     def get_instance(
@@ -121,11 +132,14 @@ class HttpClientPool:
         """Reset the singleton instance (primarily for testing)."""
         cls._instance = None
 
-    def get_client(self, name: str, **overrides: Any) -> httpx.AsyncClient:
+    async def get_client(self, name: str, **overrides: Any) -> httpx.AsyncClient:
         """Get or create a pooled HTTP client for a specific provider.
 
         Clients are cached by name and reused for subsequent requests.
         Override parameters allow per-provider customization of limits and timeouts.
+
+        This method is coroutine-safe: concurrent calls for the same provider
+        will not create duplicate clients.
 
         Args:
             name: Provider name (e.g., 'voyage', 'cohere', 'qdrant').
@@ -138,6 +152,62 @@ class HttpClientPool:
                 - write_timeout: float
                 - pool_timeout: float
                 - http2: bool (default True)
+
+        Returns:
+            Configured httpx.AsyncClient with connection pooling.
+        """
+        # Fast path: return existing client without lock
+        if name in self._clients:
+            return self._clients[name]
+
+        # Slow path: acquire lock for client creation
+        async with self._lock:
+            # Double-check after acquiring lock
+            if name in self._clients:
+                return self._clients[name]
+
+            limits = httpx.Limits(
+                max_connections=overrides.get("max_connections", self.limits.max_connections),
+                max_keepalive_connections=overrides.get(
+                    "max_keepalive_connections",
+                    self.limits.max_keepalive_connections,
+                ),
+                keepalive_expiry=overrides.get("keepalive_expiry", self.limits.keepalive_expiry),
+            )
+
+            timeout = httpx.Timeout(
+                connect=overrides.get("connect_timeout", self.timeouts.connect),
+                read=overrides.get("read_timeout", self.timeouts.read),
+                write=overrides.get("write_timeout", self.timeouts.write),
+                pool=overrides.get("pool_timeout", self.timeouts.pool),
+            )
+
+            self._clients[name] = httpx.AsyncClient(
+                limits=limits,
+                timeout=timeout,
+                http2=overrides.get("http2", True),  # Enable HTTP/2 for better multiplexing
+            )
+
+            logger.debug(
+                "Created HTTP client pool for %s: max_conn=%d, keepalive=%d, read_timeout=%.1fs",
+                name,
+                limits.max_connections,
+                limits.max_keepalive_connections,
+                timeout.read,
+            )
+
+        return self._clients[name]
+
+    def get_client_sync(self, name: str, **overrides: Any) -> httpx.AsyncClient:
+        """Synchronous version of get_client for non-async contexts.
+
+        This method is NOT coroutine-safe and should only be used during
+        application initialization or in contexts where concurrent access
+        is not possible. Prefer get_client() for async contexts.
+
+        Args:
+            name: Provider name (e.g., 'voyage', 'cohere', 'qdrant').
+            **overrides: Override default limits/timeouts for this client.
 
         Returns:
             Configured httpx.AsyncClient with connection pooling.
@@ -162,10 +232,10 @@ class HttpClientPool:
             self._clients[name] = httpx.AsyncClient(
                 limits=limits,
                 timeout=timeout,
-                http2=overrides.get("http2", True),  # Enable HTTP/2 for better multiplexing
+                http2=overrides.get("http2", True),
             )
 
-            logger.info(
+            logger.debug(
                 "Created HTTP client pool for %s: max_conn=%d, keepalive=%d, read_timeout=%.1fs",
                 name,
                 limits.max_connections,
@@ -201,15 +271,14 @@ class HttpClientPool:
             True if client was closed, False if no client existed.
         """
         if name in self._clients:
+            client = self._clients.pop(name)
             try:
-                await self._clients[name].aclose()
-                del self._clients[name]
-                logger.info("Closed HTTP client pool for %s", name)
+                await client.aclose()
+                logger.debug("Closed HTTP client pool for %s", name)
                 return True
-            except Exception:
-                logger.exception("Error closing HTTP client pool for %s", name)
-                # Still remove from dict to prevent reuse of broken client
-                self._clients.pop(name, None)
+            except (httpx.HTTPError, OSError) as e:
+                logger.warning("Error closing HTTP client pool for %s: %s", name, e)
+                # Client already removed from dict above
         return False
 
     async def close_all(self) -> None:
@@ -220,15 +289,17 @@ class HttpClientPool:
         """
         client_names = list(self._clients.keys())
         for name in client_names:
+            client = self._clients.pop(name, None)
+            if client is None:
+                continue
             try:
-                await self._clients[name].aclose()
+                await client.aclose()
                 logger.debug("Closed HTTP client pool for %s", name)
-            except Exception:
-                logger.exception("Error closing HTTP client pool for %s", name)
-        self._clients.clear()
+            except (httpx.HTTPError, OSError) as e:
+                logger.warning("Error closing HTTP client pool for %s: %s", name, e)
 
         if client_names:
-            logger.info("Closed %d HTTP client pool(s)", len(client_names))
+            logger.debug("Closed %d HTTP client pool(s)", len(client_names))
 
     async def __aenter__(self) -> HttpClientPool:
         """Async context manager entry."""
@@ -237,10 +308,6 @@ class HttpClientPool:
     async def __aexit__(self, *args: Any) -> None:
         """Async context manager exit - closes all clients."""
         await self.close_all()
-
-
-# Module-level singleton accessor
-_pool_instance: HttpClientPool | None = None
 
 
 def get_http_pool() -> HttpClientPool:
@@ -252,20 +319,27 @@ def get_http_pool() -> HttpClientPool:
     Returns:
         The singleton HttpClientPool instance.
     """
-    global _pool_instance
-    if _pool_instance is None:
-        _pool_instance = HttpClientPool.get_instance()
-    return _pool_instance
+    return HttpClientPool.get_instance()
 
 
-def reset_http_pool() -> None:
+async def reset_http_pool() -> None:
     """Reset the global HTTP client pool (primarily for testing).
 
-    Warning: This does NOT close existing clients. Call close_all() first
-    if you need to clean up resources.
+    This async function properly closes all existing clients before resetting
+    the singleton instance to prevent resource leaks.
     """
-    global _pool_instance
-    _pool_instance = None
+    instance = HttpClientPool._instance
+    if instance is not None:
+        await instance.close_all()
+    HttpClientPool.reset_instance()
+
+
+def reset_http_pool_sync() -> None:
+    """Synchronous reset for testing fixtures (no cleanup).
+
+    Warning: This does NOT close existing clients. Use reset_http_pool()
+    if you need to clean up resources properly.
+    """
     HttpClientPool.reset_instance()
 
 
@@ -275,4 +349,5 @@ __all__ = (
     "PoolTimeouts",
     "get_http_pool",
     "reset_http_pool",
+    "reset_http_pool_sync",
 )

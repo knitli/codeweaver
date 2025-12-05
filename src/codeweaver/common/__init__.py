@@ -18,6 +18,7 @@ if TYPE_CHECKING:
         PoolTimeouts,
         get_http_pool,
         reset_http_pool,
+        reset_http_pool_sync,
     )
     from codeweaver.common.logging import log_to_client_or_fallback, setup_logger
     from codeweaver.common.statistics import (
@@ -181,6 +182,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "normalize_ext": (__spec__.parent, "utils"),
     "record_timed_http_request": (__spec__.parent, "statistics"),
     "reset_http_pool": (__spec__.parent, "http_pool"),
+    "reset_http_pool_sync": (__spec__.parent, "http_pool"),
     "rpartial": (__spec__.parent, "utils"),
     "sanitize_unicode": (__spec__.parent, "utils"),
     "set_relative_path": (__spec__.parent, "utils"),
@@ -286,6 +288,7 @@ __all__ = (
     "normalize_ext",
     "record_timed_http_request",
     "reset_http_pool",
+    "reset_http_pool_sync",
     "rpartial",
     "sanitize_unicode",
     "set_relative_path",
