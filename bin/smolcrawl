@@ -1,2 +1,2 @@
-#!/usr/bin/env bash
-exec mise x "smolcrawl@latest" -- "$@"
+#!/usr/bin/env zsh
+exec mise x "pipx:smolcrawl@latest" -- "$@"

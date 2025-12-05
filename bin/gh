@@ -1,2 +1,2 @@
-#!/usr/bin/env -S bash
+#!/usr/bin/env bash
 exec mise x gh -- "$@"

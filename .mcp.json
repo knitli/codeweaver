@@ -12,6 +12,17 @@
       "command": "npx",
       "type": "stdio"
     },
+    "mise": {
+      "args": [
+        "mcp"
+      ],
+      "command": "mise",
+      "env": {
+        "MISE_EXPERIMENTAL": "1",
+        "MISE_GITHUB_TOKEN": "${env:MISE_GITHUB_TOKEN}"
+      },
+      "type": "stdio"
+    },
     "morph-llm-fast-apply": {
       "args": [
         "-y",

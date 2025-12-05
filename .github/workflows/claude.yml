@@ -37,7 +37,8 @@ jobs:
       VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
       CODEWEAVER_PROJECT_PATH: ${{ github.workspace }}
       MISE_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      MISE_ENV: "cloudagent"
+      MISE_ENV: "dev"
+      MISE_YES: 1
       # Limit CodeQL memory usage to prevent OOM kills on standard runners (7GB total RAM)
       # Note: Standard runners have ~7GB, so limit to 3GB to leave headroom for system
       CODEQL_RAM: 3072
