@@ -21,16 +21,18 @@ Usage:
     # Cleanup on shutdown
     await pool.close_all()
 
-Note:
-    Thread safety is ensured via asyncio.Lock for coroutine-safe client creation.
-    The singleton pattern assumes single-threaded initialization during application
-    startup, which is standard for async Python applications.
+Thread Safety:
+    - Singleton initialization: Thread-safe via double-checked locking (threading.Lock)
+    - Async client creation (get_client): Coroutine-safe via asyncio.Lock
+    - Sync client creation (get_client_sync): Thread-safe via threading.Lock
+    - All methods can be called concurrently without creating duplicate clients.
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
+import threading
 from dataclasses import dataclass, field
 from typing import Any, ClassVar
 
@@ -38,6 +40,9 @@ import httpx
 
 
 logger = logging.getLogger(__name__)
+
+# Module-level lock for thread-safe singleton initialization
+_instance_lock = threading.Lock()
 
 
 @dataclass(frozen=True)
@@ -99,6 +104,7 @@ class HttpClientPool:
     timeouts: PoolTimeouts = field(default_factory=PoolTimeouts)
     _clients: dict[str, httpx.AsyncClient] = field(default_factory=dict, repr=False)
     _lock: asyncio.Lock = field(default_factory=asyncio.Lock, repr=False)
+    _sync_lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
 
     @classmethod
     def get_instance(
@@ -108,6 +114,8 @@ class HttpClientPool:
     ) -> HttpClientPool:
         """Get or create the singleton HttpClientPool instance.
 
+        This method is thread-safe via double-checked locking pattern.
+
         Args:
             limits: Optional connection pool limits (only used on first call).
             timeouts: Optional timeout configuration (only used on first call).
@@ -115,16 +123,22 @@ class HttpClientPool:
         Returns:
             The singleton HttpClientPool instance.
         """
-        if cls._instance is None:
-            cls._instance = cls(
-                limits=limits or PoolLimits(),
-                timeouts=timeouts or PoolTimeouts(),
-            )
-            logger.debug(
-                "Created HttpClientPool singleton with limits=%s, timeouts=%s",
-                cls._instance.limits,
-                cls._instance.timeouts,
-            )
+        # Fast path: instance already exists
+        if cls._instance is not None:
+            return cls._instance
+
+        # Slow path: acquire lock and double-check
+        with _instance_lock:
+            if cls._instance is None:
+                cls._instance = cls(
+                    limits=limits or PoolLimits(),
+                    timeouts=timeouts or PoolTimeouts(),
+                )
+                logger.debug(
+                    "Created HttpClientPool singleton with limits=%s, timeouts=%s",
+                    cls._instance.limits,
+                    cls._instance.timeouts,
+                )
         return cls._instance
 
     @classmethod
@@ -201,9 +215,9 @@ class HttpClientPool:
     def get_client_sync(self, name: str, **overrides: Any) -> httpx.AsyncClient:
         """Synchronous version of get_client for non-async contexts.
 
-        This method is NOT coroutine-safe and should only be used during
-        application initialization or in contexts where concurrent access
-        is not possible. Prefer get_client() for async contexts.
+        This method is thread-safe via double-checked locking pattern.
+        It can be called concurrently from multiple threads during provider
+        initialization without creating duplicate clients.
 
         Args:
             name: Provider name (e.g., 'voyage', 'cohere', 'qdrant').
@@ -212,36 +226,42 @@ class HttpClientPool:
         Returns:
             Configured httpx.AsyncClient with connection pooling.
         """
-        if name not in self._clients:
-            limits = httpx.Limits(
-                max_connections=overrides.get("max_connections", self.limits.max_connections),
-                max_keepalive_connections=overrides.get(
-                    "max_keepalive_connections",
-                    self.limits.max_keepalive_connections,
-                ),
-                keepalive_expiry=overrides.get("keepalive_expiry", self.limits.keepalive_expiry),
-            )
+        # Fast path: client already exists
+        if name in self._clients:
+            return self._clients[name]
 
-            timeout = httpx.Timeout(
-                connect=overrides.get("connect_timeout", self.timeouts.connect),
-                read=overrides.get("read_timeout", self.timeouts.read),
-                write=overrides.get("write_timeout", self.timeouts.write),
-                pool=overrides.get("pool_timeout", self.timeouts.pool),
-            )
+        # Slow path: acquire lock and double-check
+        with self._sync_lock:
+            if name not in self._clients:
+                limits = httpx.Limits(
+                    max_connections=overrides.get("max_connections", self.limits.max_connections),
+                    max_keepalive_connections=overrides.get(
+                        "max_keepalive_connections",
+                        self.limits.max_keepalive_connections,
+                    ),
+                    keepalive_expiry=overrides.get("keepalive_expiry", self.limits.keepalive_expiry),
+                )
 
-            self._clients[name] = httpx.AsyncClient(
-                limits=limits,
-                timeout=timeout,
-                http2=overrides.get("http2", True),
-            )
+                timeout = httpx.Timeout(
+                    connect=overrides.get("connect_timeout", self.timeouts.connect),
+                    read=overrides.get("read_timeout", self.timeouts.read),
+                    write=overrides.get("write_timeout", self.timeouts.write),
+                    pool=overrides.get("pool_timeout", self.timeouts.pool),
+                )
 
-            logger.debug(
-                "Created HTTP client pool for %s: max_conn=%d, keepalive=%d, read_timeout=%.1fs",
-                name,
-                limits.max_connections,
-                limits.max_keepalive_connections,
-                timeout.read,
-            )
+                self._clients[name] = httpx.AsyncClient(
+                    limits=limits,
+                    timeout=timeout,
+                    http2=overrides.get("http2", True),
+                )
+
+                logger.debug(
+                    "Created HTTP client pool for %s: max_conn=%d, keepalive=%d, read_timeout=%.1fs",
+                    name,
+                    limits.max_connections,
+                    limits.max_keepalive_connections,
+                    timeout.read,
+                )
 
         return self._clients[name]
 
