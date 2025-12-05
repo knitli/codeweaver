@@ -157,6 +157,14 @@ class HttpClientPool:
         This method is coroutine-safe: concurrent calls for the same provider
         will not create duplicate clients.
 
+        Note:
+            Clients are cached by name only, not by override parameters. If the same
+            provider name is requested multiple times with different overrides, the
+            client created on the first call will be returned for all subsequent calls.
+            This is intentional for connection pooling - each provider should use
+            consistent settings. The ProviderRegistry ensures consistent overrides
+            per provider type.
+
         Args:
             name: Provider name (e.g., 'voyage', 'cohere', 'qdrant').
             **overrides: Override default limits/timeouts for this client:
@@ -220,6 +228,13 @@ class HttpClientPool:
         This method is thread-safe via double-checked locking pattern.
         It can be called concurrently from multiple threads during provider
         initialization without creating duplicate clients.
+
+        Note:
+            Clients are cached by name only, not by override parameters. If the same
+            provider name is requested multiple times with different overrides, the
+            client created on the first call will be returned for all subsequent calls.
+            This is intentional for connection pooling - each provider should use
+            consistent settings.
 
         Args:
             name: Provider name (e.g., 'voyage', 'cohere', 'qdrant').
