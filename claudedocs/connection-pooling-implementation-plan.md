@@ -207,11 +207,22 @@ The `qdrant_client` library uses httpx internally but doesn't expose an `httpx_c
 
 ## Provider-Specific Settings
 
-| Provider | max_connections | read_timeout | keepalive_expiry | HTTP/2 |
-|----------|----------------|--------------|------------------|--------|
-| Voyage   | 50             | 90s          | 5s               | Yes    |
-| Cohere   | 50             | 90s          | 5s               | Yes    |
-| Qdrant   | 30             | 120s         | 30s              | Yes    |
+| Provider | max_connections | read_timeout | keepalive_expiry | HTTP/2 | Parameter Name |
+|----------|----------------|--------------|------------------|--------|----------------|
+| Voyage   | 50             | 90s          | 5s               | Yes    | `httpx_client` |
+| Cohere   | 50             | 90s          | 5s               | Yes    | `httpx_client` |
+| OpenAI   | 50             | 90s          | 5s               | Yes    | `http_client`  |
+| Azure    | 50             | 90s          | 5s               | Yes    | `http_client`  |
+| Fireworks| 50             | 90s          | 5s               | Yes    | `http_client`  |
+| Groq     | 50             | 90s          | 5s               | Yes    | `http_client`  |
+| Together | 50             | 90s          | 5s               | Yes    | `http_client`  |
+| Ollama   | 50             | 90s          | 5s               | Yes    | `http_client`  |
+| Cerebras | 50             | 90s          | 5s               | Yes    | `http_client`  |
+| Heroku   | 50             | 90s          | 5s               | Yes    | `http_client`  |
+| Mistral  | 50             | 90s          | 5s               | Yes    | `httpx_client` |
+| Qdrant   | N/A            | N/A          | N/A              | N/A    | Not supported  |
+
+**Note**: Qdrant uses httpx internally but doesn't expose a client injection parameter.
 
 ---
 

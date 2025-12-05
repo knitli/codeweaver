@@ -400,7 +400,7 @@ class TestProviderRegistryPooling:
 
         assert client is not None
         assert isinstance(client, httpx.AsyncClient)
-        # Verify Voyage-specific settings are applied
+        # Verify pool settings are applied
         assert client.timeout.read == 90.0
         assert client._limits.max_connections == 50
 
@@ -415,7 +415,36 @@ class TestProviderRegistryPooling:
 
         assert client is not None
         assert isinstance(client, httpx.AsyncClient)
-        # Verify Cohere-specific settings are applied
+        # Verify pool settings are applied
+        assert client.timeout.read == 90.0
+        assert client._limits.max_connections == 50
+
+    def test_get_pooled_client_openai(self):
+        """Test getting pooled client for OpenAI provider."""
+        from codeweaver.common.registry.provider import ProviderRegistry
+        from codeweaver.providers.kinds import ProviderKind
+        from codeweaver.providers.provider import Provider
+
+        registry = ProviderRegistry()
+        client = registry._get_pooled_httpx_client(Provider.OPENAI, ProviderKind.EMBEDDING)
+
+        assert client is not None
+        assert isinstance(client, httpx.AsyncClient)
+        # All pooled providers now use consistent settings
+        assert client.timeout.read == 90.0
+        assert client._limits.max_connections == 50
+
+    def test_get_pooled_client_mistral(self):
+        """Test getting pooled client for Mistral provider."""
+        from codeweaver.common.registry.provider import ProviderRegistry
+        from codeweaver.providers.kinds import ProviderKind
+        from codeweaver.providers.provider import Provider
+
+        registry = ProviderRegistry()
+        client = registry._get_pooled_httpx_client(Provider.MISTRAL, ProviderKind.EMBEDDING)
+
+        assert client is not None
+        assert isinstance(client, httpx.AsyncClient)
         assert client.timeout.read == 90.0
         assert client._limits.max_connections == 50
 
@@ -448,25 +477,41 @@ class TestProviderRegistryPooling:
 
         assert client1 is client2
 
-    def test_get_pooled_client_non_pooled_provider(self):
-        """Test getting pooled client for a non-pooled provider returns client with defaults."""
-        from codeweaver.common.registry.provider import ProviderRegistry
-        from codeweaver.providers.kinds import ProviderKind
-        from codeweaver.providers.provider import Provider
-
-        registry = ProviderRegistry()
-        # OPENAI is not in _POOLED_HTTP_PROVIDERS, so it should get default settings
-        client = registry._get_pooled_httpx_client(Provider.OPENAI, ProviderKind.EMBEDDING)
-
-        assert client is not None
-        # Should use default timeouts, not the 90.0 for pooled providers
-        assert client.timeout.read == 60.0  # Default from PoolTimeouts
-
-    def test_pooled_http_providers_constant(self):
-        """Test that _POOLED_HTTP_PROVIDERS includes expected providers."""
+    def test_pooled_http_providers_mapping(self):
+        """Test that _POOLED_HTTP_PROVIDERS includes expected providers with correct param names."""
         from codeweaver.common.registry.provider import ProviderRegistry
         from codeweaver.providers.provider import Provider
 
-        assert Provider.VOYAGE in ProviderRegistry._POOLED_HTTP_PROVIDERS
-        assert Provider.COHERE in ProviderRegistry._POOLED_HTTP_PROVIDERS
-        assert len(ProviderRegistry._POOLED_HTTP_PROVIDERS) == 2
+        pooled = ProviderRegistry._POOLED_HTTP_PROVIDERS
+
+        # Voyage/Cohere use httpx_client
+        assert pooled.get(Provider.VOYAGE) == "httpx_client"
+        assert pooled.get(Provider.COHERE) == "httpx_client"
+
+        # OpenAI-compatible use http_client
+        assert pooled.get(Provider.OPENAI) == "http_client"
+        assert pooled.get(Provider.AZURE) == "http_client"
+        assert pooled.get(Provider.FIREWORKS) == "http_client"
+        assert pooled.get(Provider.GROQ) == "http_client"
+        assert pooled.get(Provider.TOGETHER) == "http_client"
+        assert pooled.get(Provider.OLLAMA) == "http_client"
+        assert pooled.get(Provider.CEREBRAS) == "http_client"
+        assert pooled.get(Provider.HEROKU) == "http_client"
+
+        # Mistral uses httpx_client (mapped internally to async_client)
+        assert pooled.get(Provider.MISTRAL) == "httpx_client"
+
+        # Total count
+        assert len(pooled) == 11
+
+    def test_non_pooled_provider_not_in_mapping(self):
+        """Test that providers without pooling support are not in the mapping."""
+        from codeweaver.common.registry.provider import ProviderRegistry
+        from codeweaver.providers.provider import Provider
+
+        pooled = ProviderRegistry._POOLED_HTTP_PROVIDERS
+
+        # Bedrock uses boto3, not httpx
+        assert Provider.BEDROCK not in pooled
+        # HuggingFace uses global factory pattern
+        assert Provider.HUGGINGFACE_INFERENCE not in pooled
