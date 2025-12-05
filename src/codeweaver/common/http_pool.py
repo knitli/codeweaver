@@ -16,7 +16,7 @@ Usage:
     pool = get_http_pool()
 
     # Get a pooled client for a specific provider
-    client = pool.get_client('voyage', read_timeout=90.0)
+    client = await pool.get_client('voyage', read_timeout=90.0)
 
     # Cleanup on shutdown
     await pool.close_all()
@@ -25,7 +25,8 @@ Thread Safety:
     - Singleton initialization: Thread-safe via double-checked locking (threading.Lock)
     - Async client creation (get_client): Coroutine-safe via asyncio.Lock
     - Sync client creation (get_client_sync): Thread-safe via threading.Lock
-    - All methods can be called concurrently without creating duplicate clients.
+    - WARNING: Synchronous and asynchronous methods should NOT be mixed. The locking strategy does not protect against concurrent access from both threads and coroutines. Only use sync methods in a purely threaded context, and async methods in a purely async context.
+    - All methods can be called concurrently within their respective contexts (sync or async) without creating duplicate clients.
 """
 
 from __future__ import annotations
@@ -144,7 +145,8 @@ class HttpClientPool:
     @classmethod
     def reset_instance(cls) -> None:
         """Reset the singleton instance (primarily for testing)."""
-        cls._instance = None
+        with _instance_lock:
+            cls._instance = None
 
     async def get_client(self, name: str, **overrides: Any) -> httpx.AsyncClient:
         """Get or create a pooled HTTP client for a specific provider.
