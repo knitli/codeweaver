@@ -18,6 +18,7 @@
 #
 # NOTE: This configuration inherits from `mise.toml`, so these are additions/overrides
 # ============================================================================
+extends = "mise.toml"
 
 [settings]
 status.show_env = false  # Reduce CI output noise
@@ -52,9 +53,9 @@ uv run --group docs mkdocs build
 # Combined CI workflow
 [tasks.ci]
 run = [
-  "mise run check",
-  "mise run lint",
-  "mise run test-cov",
-  "mise run build",
+  "mise //:check",
+  "mise //:lint",
+  "mise //:test-cov",
+  "mise //:build",
 ]
 description = "Run all CI checks (lightweight CI mode)"

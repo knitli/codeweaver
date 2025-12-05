@@ -99,8 +99,8 @@ run = [
   "mise set &>/dev/null",
   "mise -y trust &>/dev/null",
   "mise -y install &>/dev/null || true",
-  "mise -y venv &>/dev/null",
-  "mise -y run sync &>/dev/null",
+  "mise -y //:venv &>/dev/null",
+  "mise -y //:sync &>/dev/null",
   "mise env &>/dev/null || true",
   "git config include.path .gitconfig &>/dev/null || true",
   "echo 'src/codeweaver/_version.py' >> .git/info/exclude",
@@ -113,8 +113,8 @@ run_windows = [
   "mise set > NUL 2>&1",
   "mise -y trust > NUL 2>&1",
   "mise -y install > NUL 2>&1 || echo.",
-  "mise -y venv > NUL 2>&1",
-  "mise run sync > NUL 2>&1",
+  "mise -y //:venv > NUL 2>&1",
+  "mise -y //:sync > NUL 2>&1",
   "mise env > NUL 2>&1",
   "git config include.path .gitconfig > NUL 2>&1",
   "echo src/codeweaver/_version.py >> .git\\info\\exclude",
@@ -187,7 +187,7 @@ tools."cargo:rust-parallel" = "latest"
 run = '''
 #!/usr/bin/env zsh
 print -P "%F{209}[codeweaver]%f Applying formatting...hold onto your butts 🚬...🦖 "
-# mise run fix-ruff-patterns || {  # there are some bugs to work out
+# mise -y //:fix-ruff-patterns || {  # there are some bugs to work out
 #    print -P "%F{209}[codeweaver]%f ⚠️  %F{red}Ruff pattern fixer encountered issues.%f"}
 uv run ruff format .
 files="$(git ls-files "*.yaml" "*.yml" "*.json" 2>/dev/null)"
@@ -228,7 +228,7 @@ uv venv --allow-existing --seed --keyring-provider subprocess --python 3.13 --re
 print -P "%F{209}[codeweaver]%f ✅ Virtual environment is ready!"
 source .venv/bin/activate || print -P "%F{209}[codeweaver]%f ⚠️  %F{red}Failed to source virtual environment.%f"
 print -P "%F{209}[codeweaver]%f Running dependency sync..."
-mise run sync &
+mise //:sync &
 '''
 run_windows = '''
 echo [codeweaver] Setting up Python virtual environment...
@@ -241,7 +241,7 @@ if %ERRORLEVEL% equ 0 (
     )
 )
 echo [codeweaver] Running dependency sync...
-start /b mise run sync
+start /b mise //:sync
 '''
 
 [tasks.test]

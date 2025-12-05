@@ -1,5 +1,5 @@
-# sourcery skip: no-complex-if-expressions, no-relative-imports
 #!/usr/bin/env -S uv run -s
+# sourcery skip: no-complex-if-expressions, no-relative-imports
 # SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
@@ -8,6 +8,7 @@
 # python-version = ">=3.12"
 # dependencies = ["pyyaml"]
 # ///
+
 """Generate server.yaml for Docker MCP Registry submission.
 
 This script creates the server.yaml configuration file needed for submitting
