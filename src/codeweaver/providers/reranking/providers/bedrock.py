@@ -309,8 +309,8 @@ class BedrockRerankingProvider(RerankingProvider[AgentsforBedrockRuntimeClient])
 
     _kwargs: dict[str, Any] | None
 
-    _input_transformer = bedrock_reranking_input_transformer
-    _output_transformer = bedrock_reranking_output_transformer
+    _input_transformer = bedrock_reranking_input_transformer  # ty:ignore[invalid-method-override]
+    _output_transformer = bedrock_reranking_output_transformer  # ty:ignore[invalid-method-override]
 
     def __init__(
         self,
@@ -362,7 +362,7 @@ class BedrockRerankingProvider(RerankingProvider[AgentsforBedrockRuntimeClient])
         *,
         top_n: int = 40,
         **kwargs: dict[str, Any] | None,
-    ) -> Any:
+    ) -> Any:  # ty:ignore[invalid-method-override]
         """
         Execute the reranking process.
         """

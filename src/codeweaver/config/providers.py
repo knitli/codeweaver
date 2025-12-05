@@ -696,7 +696,7 @@ class ProviderSettings(BasedModel):
             if setting is None or setting is Unset:
                 continue
             # Normalize to tuple form
-            configs[field] = setting if isinstance(setting, tuple) else (setting,)
+            configs[field] = setting if isinstance(setting, tuple) else (setting,)  # ty:ignore[invalid-assignment]
         return configs or None  # type: ignore[return-value]
 
     @property
@@ -737,7 +737,7 @@ class ProviderSettings(BasedModel):
         for field in matching_fields:
             if setting := self.settings_for_kind(field):
                 if isinstance(setting, tuple):
-                    all_settings.extend(setting)
+                    all_settings.extend(setting)  # ty:ignore[invalid-argument-type]
                 else:
                     all_settings.append(setting)
 

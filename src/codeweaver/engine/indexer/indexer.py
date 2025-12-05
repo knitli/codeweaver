@@ -496,7 +496,7 @@ class Indexer(BasedModel):
                 logger.debug("Skipping non-text file: %s", path)
                 return
 
-            self._store.set(discovered_file.file_hash, discovered_file)
+            self._store.set(discovered_file.file_hash(), discovered_file)
             self._stats.files_discovered += 1
 
             # Track file discovery in session statistics
@@ -667,7 +667,7 @@ class Indexer(BasedModel):
                         async with self._manifest_lock:
                             self._file_manifest.add_file(
                                 path=relative_path,
-                                content_hash=discovered_file.file_hash,
+                                content_hash=discovered_file.file_hash(),
                                 chunk_ids=chunk_ids,
                                 dense_embedding_provider=model_info["dense_provider"],
                                 dense_embedding_model=model_info["dense_model"],
@@ -975,7 +975,7 @@ class Indexer(BasedModel):
                     async with self._manifest_lock:
                         self._file_manifest.add_file(
                             path=relative_path,
-                            content_hash=discovered_file.file_hash,
+                            content_hash=discovered_file.file_hash(),
                             chunk_ids=chunk_ids,
                             dense_embedding_provider=model_info["dense_provider"],
                             dense_embedding_model=model_info["dense_model"],
@@ -1357,15 +1357,9 @@ class Indexer(BasedModel):
                     dense_file_count = len(files_needing.get("dense_only", []))
                     sparse_file_count = len(files_needing.get("sparse_only", []))
                     if needs_dense:
-                        logger.info(
-                            "Found %d files needing dense embeddings",
-                            dense_file_count,
-                        )
+                        logger.info("Found %d files needing dense embeddings", dense_file_count)
                     if needs_sparse:
-                        logger.info(
-                            "Found %d files needing sparse embeddings",
-                            sparse_file_count,
-                        )
+                        logger.info("Found %d files needing sparse embeddings", sparse_file_count)
 
                     logger.info("Starting automatic reconciliation...")
                     reconciliation_result = await self.add_missing_embeddings_to_existing_chunks(
@@ -1524,7 +1518,7 @@ class Indexer(BasedModel):
                 discovered_file = DiscoveredFile.from_path(path)
                 if discovered_file and discovered_file.is_text:
                     discovered_files.append(discovered_file)
-                    self._store.set(discovered_file.file_hash, discovered_file)
+                    self._store.set(discovered_file.file_hash(), discovered_file)
             except Exception:
                 logger.warning("Failed to discover file %s", path, exc_info=True)
                 self._stats.files_with_errors.append(path)
@@ -2058,12 +2052,17 @@ class Indexer(BasedModel):
                 try:
                     # Resolve paths for comparison
                     # discovered_file.path is *always* relative to project path
-                    discovered_abs = (project_path / discovered_file.path).resolve()
+                    if (
+                        project_path
+                        and isinstance(project_path, Path)
+                        and isinstance(discovered_file.path, Path)
+                    ):
+                        discovered_abs = (project_path / discovered_file.path).resolve()
 
-                    path_abs = (project_path / path).resolve()
+                        path_abs = (project_path / path).resolve()
 
-                    if discovered_abs == path_abs:
-                        to_delete.append(key)
+                        if discovered_abs == path_abs:
+                            to_delete.append(key)
                 except Exception:
                     # defensive: malformed entry shouldn't break cleanup
                     logger.warning("Error checking stored item for deletion", exc_info=True)

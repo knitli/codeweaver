@@ -203,9 +203,7 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
                 "use_auth_token",
                 "token",
             }
-        }
-        encode_kwargs.update({**kwargs, "convert_to_numpy": True})
-
+        } | {**kwargs, "convert_to_numpy": True}
         embed_partial = rpartial(self.client.encode, **encode_kwargs)  # type: ignore
         loop = asyncio.get_running_loop()
         results: np.ndarray = await loop.run_in_executor(None, embed_partial, preprocessed)  # type: ignore
@@ -237,9 +235,7 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
                 "use_auth_token",
                 "token",
             }
-        }
-        encode_kwargs.update({**kwargs, "convert_to_numpy": True})
-
+        } | {**kwargs, "convert_to_numpy": True}
         embed_partial = rpartial(self.client.encode, **encode_kwargs)  # type: ignore
         loop = asyncio.get_running_loop()
         results: np.ndarray = await loop.run_in_executor(None, embed_partial, preprocessed)  # type: ignore
@@ -367,7 +363,7 @@ class SentenceTransformersSparseProvider(SparseEmbeddingProvider[_SparseEncoderT
 
     async def _embed_documents(
         self, documents: Sequence[CodeChunk], **kwargs: Any
-    ) -> list[SparseEmbedding]:
+    ) -> list[SparseEmbedding]:  # ty:ignore[invalid-method-override]
         """Embed a sequence of documents into sparse vectors."""
         preprocessed = cast(list[str], self.chunks_to_strings(documents))
         embed_partial = rpartial(  # type: ignore
@@ -386,7 +382,7 @@ class SentenceTransformersSparseProvider(SparseEmbeddingProvider[_SparseEncoderT
         self._update_token_stats(token_count=sum(len(emb.indices) for emb in formatted_results))
         return formatted_results
 
-    async def _embed_query(self, query: Sequence[str], **kwargs: Any) -> list[SparseEmbedding]:
+    async def _embed_query(self, query: Sequence[str], **kwargs: Any) -> list[SparseEmbedding]:  # ty:ignore[invalid-method-override]
         """Embed a sequence of queries into sparse vectors."""
         preprocessed = cast(list[str], query)
         embed_partial = rpartial(  # type: ignore

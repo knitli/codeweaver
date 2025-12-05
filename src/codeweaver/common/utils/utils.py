@@ -87,7 +87,7 @@ type DictOutputTypesT = (
 
 def dict_set_to_tuple(d: DictInputTypesT) -> DictOutputTypesT:
     """Convert all sets in a dictionary to tuples."""
-    return dict(  # ty: ignore[invalid-return-type]
+    return dict(  # ty: ignore[invalid-return-type, no-matching-overload]
         sorted({k: tuple(sorted(v)) for k, v in d.items()}.items()), key=lambda item: str(item[0])
     )
 

@@ -15,17 +15,18 @@ from __future__ import annotations
 import logging
 import time
 
-from typing import Any, cast, overload
+from collections.abc import Sequence
+from typing import Any, cast, overload, override
 
 from fastmcp.prompts import Prompt
 from fastmcp.resources import Resource, ResourceTemplate
 from fastmcp.server.middleware import CallNext
 from fastmcp.server.middleware import MiddlewareContext as McpMiddlewareContext
 from fastmcp.server.middleware.middleware import Middleware as McpMiddleware
-from fastmcp.tools import Tool
+from fastmcp.tools.tool import Tool, ToolResult
+from mcp.server.lowlevel.helper_types import ReadResourceContents
 from mcp.types import (
     CallToolRequestParams,
-    CallToolResult,
     GetPromptRequestParams,
     GetPromptResult,
     ListPromptsRequest,
@@ -33,7 +34,6 @@ from mcp.types import (
     ListResourceTemplatesRequest,
     ListToolsRequest,
     ReadResourceRequestParams,
-    ReadResourceResult,
 )
 from pydantic import AnyUrl
 from typing_extensions import TypeIs
@@ -88,18 +88,18 @@ class StatisticsMiddleware(McpMiddleware):
     async def _time_operation(
         self,
         context: McpMiddlewareContext[CallToolRequestParams],
-        call_next: CallNext[CallToolRequestParams, CallToolResult],
+        call_next: CallNext[CallToolRequestParams, ToolResult],
         operation_name: str,
         tool_or_resource_name: str,
-    ) -> CallToolResult: ...
+    ) -> ToolResult: ...
     @overload
     async def _time_operation(
         self,
         context: McpMiddlewareContext[ReadResourceRequestParams],
-        call_next: CallNext[ReadResourceRequestParams, ReadResourceResult],
+        call_next: CallNext[ReadResourceRequestParams, Sequence[ReadResourceContents]],
         operation_name: str,
         tool_or_resource_name: AnyUrl,
-    ) -> ReadResourceResult: ...
+    ) -> Sequence[ReadResourceContents]: ...
     @overload
     async def _time_operation(
         self,
@@ -184,18 +184,19 @@ class StatisticsMiddleware(McpMiddleware):
     async def on_call_tool(
         self,
         context: McpMiddlewareContext[CallToolRequestParams],
-        call_next: CallNext[CallToolRequestParams, CallToolResult],
-    ) -> CallToolResult:
+        call_next: CallNext[CallToolRequestParams, ToolResult],
+    ) -> ToolResult:
         """Handle incoming requests and track statistics."""
         return await self._time_operation(
             context, call_next, "on_call_tool_requests", context.message.name
         )
 
+    @override
     async def on_read_resource(
         self,
         context: McpMiddlewareContext[ReadResourceRequestParams],
-        call_next: CallNext[ReadResourceRequestParams, ReadResourceResult],
-    ) -> ReadResourceResult:
+        call_next: CallNext[ReadResourceRequestParams, Sequence[ReadResourceContents]],
+    ) -> Sequence[ReadResourceContents]:
         """Handle resource read requests and track statistics."""
         return await self._time_operation(
             context, call_next, "on_read_resource_requests", context.message.uri

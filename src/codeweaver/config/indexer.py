@@ -42,7 +42,7 @@ if TYPE_CHECKING:
     from codeweaver.config.settings import CodeWeaverSettings
     from codeweaver.config.types import CodeWeaverSettingsDict
     from codeweaver.core.types import DictView
-    from codeweaver.core.types.aliases import FilteredKeyT
+    from codeweaver.core.types.aliases import DirectoryNameT, FileExtensionT, FilteredKeyT
     from codeweaver.core.types.enum import AnonymityConversion
 
 logger = logging.getLogger(__name__)
@@ -277,13 +277,14 @@ class IndexerSettings(BasedModel):
         ),
     ] = frozenset()
     excludes: Annotated[
-        frozenset[str | Path],
+        frozenset[DirectoryNameT | Path],
         Field(
             description="""Directories, files, or [glob patterns](https://docs.python.org/3/library/pathlib.html#pathlib-pattern-language) to exclude from search and indexing. This is a set of strings, so you can use glob patterns like `**/node_modules/**` or `**/*.log` to exclude directories or files. You don't need to provide gitignored paths here if `use_gitignore` is enabled (default)."""
         ),
     ] = DEFAULT_EXCLUDED_DIRS
     excluded_extensions: Annotated[
-        frozenset[str], Field(description="""File extensions to exclude from search and indexing""")
+        frozenset[FileExtensionT],
+        Field(description="""File extensions to exclude from search and indexing"""),
     ] = DEFAULT_EXCLUDED_EXTENSIONS
     use_gitignore: Annotated[
         bool,

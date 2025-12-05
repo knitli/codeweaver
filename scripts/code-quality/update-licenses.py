@@ -196,7 +196,7 @@ def get_staged_files() -> list[Path]:
             capture_output=True,
             text=True,
             check=True,
-        )
+        )  # ty:ignore[no-matching-overload]
         print(result.stdout.strip())
         staged_files = result.stdout.strip().splitlines()
     except subprocess.CalledProcessError as e:
@@ -221,7 +221,7 @@ def get_files_with_missing() -> list[Path] | None:
     try:
         result = subprocess.run(
             CHECK_CMD, capture_output=True, text=True
-        )  # reuse returns a non-zero exit code if there are non-compliant files, so we don't use check=True
+        )  # reuse returns a non-zero exit code if there are non-compliant files, so we don't use check=True  # ty:ignore[no-matching-overload]
         output = from_json.loads(result.stdout.strip("%\n "))
         missing_files: list[str] = []
         if (non_compliant_report := output.get("non_compliant", {})) and (

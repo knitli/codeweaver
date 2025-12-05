@@ -351,7 +351,7 @@ class SemanticSearchLanguage(str, BaseEnum):
         )
 
     @property
-    def extensions(self) -> tuple[str, ...] | None:
+    def extensions(self) -> tuple[FileExtensionT, ...] | None:
         """
         Returns the file extensions associated with this language.
         """
@@ -1165,9 +1165,9 @@ class SemanticSearchLanguage(str, BaseEnum):
                 ),
                 workspace_defined_in_file=True,
                 workspace_definition_files=(
-                    (FileName("package.json"), (FileName("workspaces"),)),
-                    (FileName("lerna.json"), (FileName("packages"),)),
-                    (FileName("pnpm-workspace.yaml"), (FileName("packages"),)),
+                    (FileName("package.json"), ("workspaces",)),
+                    (FileName("lerna.json"), ("packages",)),
+                    (FileName("pnpm-workspace.yaml"), ("packages",)),
                 ),
             ),
             SemanticSearchLanguage.JSON: defaults

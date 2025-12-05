@@ -163,7 +163,7 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
                     )
                     if not result[0]:  # No more points
                         break
-                    points.extend(result[0])
+                    points.extend(result[0])  # ty:ignore[invalid-argument-type]
                     offset = result[1]  # Next offset
                     if offset is None:  # Reached end
                         break

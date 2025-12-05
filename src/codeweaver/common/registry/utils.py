@@ -58,7 +58,7 @@ def _get_sparse_config(
     """Get the config for sparse config, if any."""
     from codeweaver.core.types.dictview import DictView
 
-    normalized = _normalize_to_tuple(embedding_settings)
+    normalized = _normalize_to_tuple(embedding_settings)  # ty:ignore[invalid-argument-type]
     return next(
         (
             DictView(setting)
@@ -75,7 +75,7 @@ def _get_embedding_config(
     """Get the embedding model config."""
     from codeweaver.core.types.dictview import DictView
 
-    normalized = _normalize_to_tuple(embedding_settings)
+    normalized = _normalize_to_tuple(embedding_settings)  # ty:ignore[invalid-argument-type]
     return next(
         (DictView(setting) for setting in normalized if setting.get("model_settings")), None
     )
@@ -87,7 +87,7 @@ def _get_reranking_config(
     """Get the reranking model config."""
     from codeweaver.core.types.dictview import DictView
 
-    normalized = _normalize_to_tuple(reranking_settings)
+    normalized = _normalize_to_tuple(reranking_settings)  # ty:ignore[invalid-argument-type]
     return next(
         (
             DictView(setting)
@@ -104,7 +104,7 @@ def _get_agent_config(
     """Get the agent model config."""
     from codeweaver.core.types.dictview import DictView
 
-    normalized = _normalize_to_tuple(agent_settings)
+    normalized = _normalize_to_tuple(agent_settings)  # ty:ignore[invalid-argument-type]
     return next(
         (
             DictView(setting)

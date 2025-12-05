@@ -19,10 +19,15 @@ uv_venv_create_args = [
 ]
 
 [tools]
-python = "3.13"
+"pipx:reuse" = "latest"
+"pipx:tombi" = "latest"
+"pipx:ty" = "latest"
 gh = "latest"
 hk = "latest"
 pkl = "latest"
+python = "3.13"
+ruff = "latest"
+usage = "latest"
 uv = "latest"
 
 [env]
@@ -30,13 +35,15 @@ MISE_EXPERIMENTAL = "1"
 GH_REPO = "knitli/codeweaver"
 REMOTE_ORIGIN_URL = '''http://github.com/knitli/codeweaver.git'''
 # Use the project name derived from the current directory
-PROJECT_NAME = "{{ config_root | basename }}"
-CODEWEAVER_PROJECT_PATH = '''{{ config_root }}'''
+CODEWEAVER_PROJECT_PATH = '''{{ exec(command='git rev-parse --show-toplevel 2>/dev/null || echo ""') | trim }}'''
+PROJECT_NAME = '''{{ exec(command='basename \"$CODEWEAVER_PROJECT_PATH\"') | trim }}'''
 # Get version from git tags (uv-dynamic-versioning uses git as source)
 # Falls back to "dev" if git command fails
 CODEWEAVER_VERSION = '''{{ exec(command='git describe --tags --always --dirty 2>/dev/null || echo "dev"') | trim }}'''
 CI = '''{% if get_env(name="GITHUB_ACTIONS", default="") != "" %}true{% else %}false{% endif %}'''
+CFG_ROOT_MISE = '''{{ config_root }} '''
 _.path = [
+  "bin",
   "scripts/dev-env",
   "scripts/code-quality",
   "scripts/build",
@@ -45,12 +52,14 @@ _.path = [
   "scripts/utils",
   ".venv/bin",
 ]
-MISE_ENV = "dev"
+MISE_ENV = '''{% if get_env(name="CI", default="") == "true" %}ci{% else %}dev{% endif %}'''
 
 [tasks.info]
 description = "Print project information"
 run = '''
 echo "Project: $PROJECT_NAME"
+echo "Project Path: $CODEWEAVER_PROJECT_PATH"
+echo "Version: $CODEWEAVER_VERSION"
 echo "Virtual Environment: $VIRTUAL_ENV"
 '''
 run_windows = '''

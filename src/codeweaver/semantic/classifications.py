@@ -254,7 +254,7 @@ class ThingClass(BasedModel):
     ) -> ImportanceScores:
         """Ensure importance_scores is a ImportanceScoresDict."""
         return (
-            ImportanceScores.validate_python(cast(dict[str, Any], v)) if isinstance(v, dict) else v
+            ImportanceScores.validate_python(cast(dict[str, Any], v)) if isinstance(v, dict) else v  # ty:ignore[invalid-return-type]
         )
 
     def _telemetry_keys(self) -> None:

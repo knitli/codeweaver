@@ -86,9 +86,7 @@ def _create_parameter_from_field(field: FilterableField) -> inspect.Parameter:
         return inspect.Parameter(
             name=field_name, kind=inspect.Parameter.POSITIONAL_OR_KEYWORD, annotation=annotation
         )
-    annotation = Annotated[  # type: ignore
-        field_type | None, Field(description=field.description)
-    ]
+    annotation = Annotated[field_type | None, Field(description=field.description)]  # type: ignore
     return inspect.Parameter(
         name=field_name,
         kind=inspect.Parameter.POSITIONAL_OR_KEYWORD,

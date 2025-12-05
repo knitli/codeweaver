@@ -63,7 +63,7 @@ Fundamental types, protocols, and base classes.
 
 #### `engine/` - Indexing and Search Engine
 Core indexing, chunking, and search functionality.
-- **Components**: 
+- **Components**:
   - Indexer: File processing and chunk creation
   - Chunking service: AST-based code segmentation
   - Search pipeline: Query execution

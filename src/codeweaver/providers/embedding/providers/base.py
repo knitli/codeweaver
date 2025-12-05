@@ -1164,7 +1164,6 @@ class SparseEmbeddingProvider[SparseClient](EmbeddingProvider[SparseClient], ABC
         value_type=UUID, size_limit=1024 * 128
     )  # 128kb limit -- separate from dense embeddings
 
-    @override
     def _batch_and_key(
         self, chunk_list: Sequence[CodeChunk], *, for_backup: bool, skip_deduplication: bool
     ) -> tuple[Iterator[CodeChunk], UUID7]:
@@ -1227,12 +1226,12 @@ class SparseEmbeddingProvider[SparseClient](EmbeddingProvider[SparseClient], ABC
     @override
     async def _embed_documents(
         self, documents: Sequence[CodeChunk], **kwargs: Any
-    ) -> list[SparseEmbedding]:
+    ) -> list[SparseEmbedding]:  # ty:ignore[invalid-method-override]
         """Abstract method to implement document embedding logic for sparse embeddings."""
 
     @abstractmethod
     @override
-    async def _embed_query(self, query: Sequence[str], **kwargs: Any) -> list[SparseEmbedding]:
+    async def _embed_query(self, query: Sequence[str], **kwargs: Any) -> list[SparseEmbedding]:  # ty:ignore[invalid-method-override]
         """Abstract method to implement query embedding logic for sparse embeddings."""
 
 

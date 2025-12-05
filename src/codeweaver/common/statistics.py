@@ -473,8 +473,8 @@ class _CategoryStatistics(DataclassSerializationMixin):
         ):
             language = normalize_language(language)
         if language not in self.languages:
-            self.languages[language] = _LanguageStatistics(language=language)
-        return self.languages[language]
+            self.languages[language] = _LanguageStatistics(language=language)  # ty:ignore[invalid-assignment, invalid-argument-type]
+        return self.languages[language]  # ty:ignore[invalid-argument-type]
 
     @computed_field
     @property
@@ -579,7 +579,7 @@ class _CategoryStatistics(DataclassSerializationMixin):
         """Create a _CategoryStatistics from an ExtKind."""
         return cls(
             category=ext_kind.kind,
-            languages={ext_kind.language: _LanguageStatistics(language=ext_kind.language)},
+            languages={ext_kind.language: _LanguageStatistics(language=ext_kind.language)},  # ty:ignore[invalid-argument-type]
         )
 
 
@@ -619,7 +619,7 @@ class FileStatistics(DataclassSerializationMixin):
         elif self._other_files and path in self._other_files:
             # Handle explicitly added "other" files
             language_name = f".{path.stem}" if "." in path.name else path.name
-            self.categories[ChunkKind.OTHER].add_operation(language_name, operation, path)
+            self.categories[ChunkKind.OTHER].add_operation(language_name, operation, path)  # ty:ignore[invalid-argument-type]
 
     def add_file_from_discovered(
         self,
@@ -652,7 +652,11 @@ class FileStatistics(DataclassSerializationMixin):
                 else discovered_file.path.name
             )
             self.categories[ChunkKind.OTHER].add_operation(
-                language_name, operation, discovered_file.path
+                language_name
+                if isinstance(language_name, SemanticSearchLanguage | ConfigLanguage)
+                else LanguageName(language_name),
+                operation,
+                discovered_file.path,  # ty:ignore[invalid-argument-type]
             )
 
     @computed_field

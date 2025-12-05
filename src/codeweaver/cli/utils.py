@@ -120,12 +120,18 @@ def get_codeweaver_config_paths() -> tuple[Path, ...]:
     repo_paths = [
         project_path / f"{config_path}.{ext}"
         for config_path in (
-            "codeweaver",
-            ".codeweaver",
             ".codeweaver.local",
+            ".codeweaver",
             "codeweaver.local",
-            ".codeweaver/codeweaver",
+            "codeweaver",
             ".codeweaver/codeweaver.local",
+            ".codeweaver/codeweaver",
+            ".codeweaver/config.local",
+            ".codeweaver/config",
+            ".config/codeweaver/codeweaver.local",
+            ".config/codeweaver/codeweaver",
+            ".config/codeweaver/config.local",
+            ".config/codeweaver/config",
         )
         for ext in ("toml", "yaml", "yml", "json")
     ]

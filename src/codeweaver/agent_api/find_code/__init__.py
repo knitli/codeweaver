@@ -307,6 +307,8 @@ async def find_code(  # noqa: C901
         query_vector = build_query_vector(embeddings, query)
         strategies_used.append(query_vector.strategy)
 
+        # NOTE: The current post-search filtering is fairly inefficient. The better way to do this is to add a payload index to the vector store for the language field and filter at search time. This will be implemented after Alpha 1.
+
         # Step 4: Execute vector search
         candidates = await execute_vector_search(query_vector, context=context)  # THREAD CONTEXT
 
@@ -371,10 +373,9 @@ async def find_code(  # noqa: C901
         )
 
         # Step 12: Capture search telemetry
+        settings = _get_settings()
+        tools_over_privacy = settings["telemetry"]["tools_over_privacy"]
         try:
-            settings = _get_settings()
-            tools_over_privacy = settings["telemetry"]["tools_over_privacy"]
-
             # Get feature flags for A/B testing
             from codeweaver.common.telemetry import get_telemetry_client
 
@@ -411,11 +412,16 @@ async def find_code(  # noqa: C901
                 intent_type=intent or IntentType.UNDERSTAND,
                 strategies=strategies_used,
                 execution_time_ms=execution_time_ms,
-                tools_over_privacy=False,
+                tools_over_privacy=tools_over_privacy,
                 feature_flags=None,
             )
         except Exception:
-            logger.debug("Failed to capture error search telemetry")
+            logger.debug(
+                "Failed to capture error search telemetry",
+                exc_info=True,
+                stack_info=True,
+                extra={"execution_time_ms": execution_time_ms},
+            )
 
         return error_response
     else:

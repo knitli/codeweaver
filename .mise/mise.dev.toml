@@ -7,42 +7,20 @@ status.show_env = true
 
 [tools]
 "cargo:rust-parallel" = "latest"
-"cargo:tree-sitter-cli" = "latest"
 "pipx:claude-monitor" = "latest"
-"pipx:copychat" = "latest"
-"pipx:fastmcp" = "latest"
-"pipx:git+https://github.com/microsoft/mcp-interviewer.git" = "latest"
-"pipx:mike" = "latest"
-"pipx:mteb" = "latest"
 "pipx:reuse" = "latest"
 "pipx:tombi" = "latest"
 "pipx:ty" = "latest"
-ast-grep = "latest"
 gh = "latest"
-gitsign = "latest"
 hk = "latest"
-node = "24"
 ripgrep = "latest"
 ruff = "latest"
-shellcheck = "latest"
-shfmt = "latest"
 typos = "latest"
 usage = "latest"
 uv = "latest"
-yq = "latest"
 git-cliff = "latest"
-"pipx:smolcrawl" = "latest"
 
 [env]
-_.path = [
-  "scripts/dev-env",
-  "scripts/code-quality",
-  "scripts/build",
-  "scripts/language-support",
-  "scripts/testing",
-  "scripts/utils",
-  ".venv/bin",
-]
 MISE_ENV = "dev"
 
 [hooks]

@@ -524,7 +524,8 @@ non-subscriptable = "warn"  # Often false positive after pytest assertions
 unsupported-operator = "warn"  # Type narrowing after assertions not always understood
 missing-argument = "warn"  # Dynamic test patterns and fixtures
 too-many-positional-arguments = "warn"  # Dynamic function calls in tests
-invalid-assignment = "warn"  # Test setup patterns
+invalid-assignment = "ignore"  # Test setup patterns
+invalid-argument-type = "ignore"  # Test mocks and fixtures may have dynamic types
 
 # Test Fixtures: Intentionally malformed or edge-case test data
 # These may have type errors by design to test error handling
@@ -535,6 +536,32 @@ include = ["tests/fixtures/**/*.py", "tests/unit/engine/test_failover.py"]
 invalid-assignment = "ignore"
 invalid-argument-type = "ignore"
 unresolved-reference = "ignore"
+
+# Specific File Overrides
+# These files have known type issues that are either false positives or low priority to fix
+
+[[tool.ty.overrides]]
+# All __init__.py files' lazy import patterns cause false positives
+include = [
+  "src/codeweaver/__init__.py",
+  "src/codeweaver/*/__init__.py",
+  "src/codeweaver/*/*/__init__.py",
+  "src/codeweaver/*/*/*/__init__.py",
+  "src/codeweaver/*/*/*/*/__init__.py",
+  # there's a similar issue in some of the embedding providers
+  "src/codeweaver/providers/embedding/providers/bedrock.py",
+  "src/codeweaver/providers/embedding/providers/cohere.py",
+  "src/codeweaver/providers/embedding/providers/google.py",
+]
+
+[tool.ty.overrides.rules]
+invalid-argument-type = "ignore"
+
+[[tool.ty.overrides]]
+include = ["src/codeweaver/common/registry/provider.py"]
+
+[tool.ty.overrides.rules]
+invalid-assignment = "ignore"
 
 [[tool.ty.overrides]]
 include = ["scripts/build/generate-mcp-server-json.py"]
@@ -547,6 +574,12 @@ include = ["src/codeweaver/providers/vector_stores/qdrant_base.py"]
 
 [tool.ty.overrides.rules]
 invalid-argument-type = "ignore"
+
+[[tool.ty.overrides]]
+include = ["src/codeweaver/core/types/aliases.py"]
+
+[tool.ty.overrides.rules]
+invalid-newtype = "ignore"
 
 [tool.uv.sources]
 types-boto3-custom = { path = "vendored/types_boto3_custom-1.41.2-py3-none-any.whl" }

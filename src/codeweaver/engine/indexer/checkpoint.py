@@ -27,6 +27,7 @@ from pydantic_core import from_json, to_json
 from uuid_extensions import uuid7
 
 from codeweaver.common.utils.git import get_project_path
+from codeweaver.common.utils.lazy_importer import lazy_import
 from codeweaver.common.utils.utils import get_user_config_dir
 from codeweaver.config.indexer import IndexerSettings
 from codeweaver.config.providers import (
@@ -303,7 +304,9 @@ class CheckpointManager:
             project_path: Path to indexed codebase
             checkpoint_dir: Directory for checkpoint files (default: .codeweaver/)
         """
-        settings: DictView[CodeWeaverSettingsDict] = _get_settings_map()
+        settings: DictView[CodeWeaverSettingsDict] = lazy_import(
+            "codeweaver.config.settings", "get_settings_map"
+        )._resolve()()
 
         self.project_path: Path = (
             project_path or settings.get("project_path") or get_project_path()

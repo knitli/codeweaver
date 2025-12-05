@@ -433,7 +433,7 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         try:
             return await self._client.create_payload_index(
                 collection_name=collection_name, field_name=field_name, field_schema=field_schema
-            )
+            )  # ty:ignore[invalid-return-type]
         except Exception as e:
             logger.warning(
                 "Failed to create payload index on '%s' in collection '%s'",

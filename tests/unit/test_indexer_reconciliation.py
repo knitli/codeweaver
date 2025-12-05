@@ -442,8 +442,7 @@ class TestAutomaticReconciliation:
         # Use class-level patching to avoid Pydantic v2 model attribute setting issues
         with (
             patch(
-                "codeweaver.engine.indexer.indexer.Indexer._initialize_providers_async",
-                AsyncMock(),
+                "codeweaver.engine.indexer.indexer.Indexer._initialize_providers_async", AsyncMock()
             ),
             patch(
                 "codeweaver.engine.indexer.indexer.Indexer._perform_batch_indexing_async",
@@ -500,8 +499,7 @@ class TestAutomaticReconciliation:
         # Use module-level patching to avoid Pydantic model patching issues
         with (
             patch(
-                "codeweaver.engine.indexer.indexer.Indexer._initialize_providers_async",
-                AsyncMock(),
+                "codeweaver.engine.indexer.indexer.Indexer._initialize_providers_async", AsyncMock()
             ),
             patch(
                 "codeweaver.engine.indexer.indexer.Indexer._perform_batch_indexing_async",
@@ -703,9 +701,7 @@ class TestEdgeCases:
         assert result["chunks_updated"] == 0
 
     @pytest.mark.asyncio
-    async def test_single_dense_provider_only(
-        self, mock_indexer: Indexer, tmp_path: Path
-    ) -> None:
+    async def test_single_dense_provider_only(self, mock_indexer: Indexer, tmp_path: Path) -> None:
         """Test reconciliation when only dense provider is configured."""
         chunk_id = str(uuid4())
         test_file = tmp_path / "test.py"
@@ -750,9 +746,7 @@ class TestEdgeCases:
         assert result["chunks_updated"] == 1
 
     @pytest.mark.asyncio
-    async def test_single_sparse_provider_only(
-        self, mock_indexer: Indexer, tmp_path: Path
-    ) -> None:
+    async def test_single_sparse_provider_only(self, mock_indexer: Indexer, tmp_path: Path) -> None:
         """Test reconciliation when only sparse provider is configured."""
         chunk_id = str(uuid4())
         test_file = tmp_path / "test.py"
@@ -853,8 +847,7 @@ class TestReconciliationExceptionHandling:
         # Use class-level patching to avoid Pydantic v2 model attribute setting issues
         with (
             patch(
-                "codeweaver.engine.indexer.indexer.Indexer._initialize_providers_async",
-                AsyncMock(),
+                "codeweaver.engine.indexer.indexer.Indexer._initialize_providers_async", AsyncMock()
             ),
             patch(
                 "codeweaver.engine.indexer.indexer.Indexer._perform_batch_indexing_async",
@@ -913,8 +906,7 @@ class TestReconciliationExceptionHandling:
         # Use class-level patching to avoid Pydantic v2 model attribute setting issues
         with (
             patch(
-                "codeweaver.engine.indexer.indexer.Indexer._initialize_providers_async",
-                AsyncMock(),
+                "codeweaver.engine.indexer.indexer.Indexer._initialize_providers_async", AsyncMock()
             ),
             patch(
                 "codeweaver.engine.indexer.indexer.Indexer._perform_batch_indexing_async",
@@ -968,8 +960,7 @@ class TestReconciliationExceptionHandling:
         # Use class-level patching to avoid Pydantic v2 model attribute setting issues
         with (
             patch(
-                "codeweaver.engine.indexer.indexer.Indexer._initialize_providers_async",
-                AsyncMock(),
+                "codeweaver.engine.indexer.indexer.Indexer._initialize_providers_async", AsyncMock()
             ),
             patch(
                 "codeweaver.engine.indexer.indexer.Indexer._perform_batch_indexing_async",

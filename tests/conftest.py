@@ -353,10 +353,10 @@ def create_test_chunk_with_embeddings(
     # Create the base chunk
     chunk = CodeChunk(
         chunk_id=chunk_id,
-        ext_kind=ExtKind.from_language(language, ChunkKind.CODE),
+        ext_kind=ExtKind.from_language(language, ChunkKind.CODE),  # ty:ignore[invalid-argument-type]
         chunk_name=chunk_name,
         file_path=file_path,
-        language=language,
+        language=language,  # ty:ignore[invalid-argument-type]
         content=content,
         line_range=Span(start=line_start, end=line_end, _source_id=chunk_id),
     )

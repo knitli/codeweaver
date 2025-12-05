@@ -31,9 +31,11 @@ local linters = new Mapping<String, Step> {
         }
             ["shellcheck"] = new Step {
             batch = true
-            glob = List("scripts/{*.sh,*.bash}", "mise-tasks/{*.sh,*.bash}")
+            glob = List("scripts/{*.sh,*.bash}", ".mise/tasks/{*.sh,*.bash}")
             check = "shellcheck {{ files }}"
         }
+        ["shfmt"] = Builtins.shfmt
+
     }
 
     ["fix-ruff-patterns"] = new Step {
@@ -53,8 +55,6 @@ local linters = new Mapping<String, Step> {
         // fix = if (isCI()) "./scripts/code-quality/update-licenses.py add {{ files }}" else "./scripts/code-quality/update-licenses.py add --interactive {{ files }}"
     }
 
-
-    ["shfmt"] = Builtins.shfmt
 
     ["add-marks"] = new Step {
         glob = "tests/**/*.py"

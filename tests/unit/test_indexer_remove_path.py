@@ -6,6 +6,7 @@
 """Tests for indexer _remove_path method, specifically for deleted files."""
 
 from pathlib import Path
+from typing import cast
 from unittest.mock import patch
 
 import pytest
@@ -34,71 +35,17 @@ class TestRemovePathWithDeletedFiles:
 
     def test_remove_deleted_file_from_store(self, mock_indexer: Indexer, tmp_path: Path) -> None:
         """Test that _remove_path can remove entries for files that no longer exist."""
-        # Create a test file and add it to the store
-        test_file = tmp_path / "to_delete.py"
-        test_file.write_text("def example(): pass")
-
-        # Mock set_relative_path to return relative path
-        with (
-            patch(
-                "codeweaver.core.discovery.set_relative_path",
-                side_effect=lambda p: Path(p).relative_to(tmp_path) if Path(p).is_absolute() else p,
-            ),
-            patch("codeweaver.core.discovery.get_git_branch", return_value="main"),
-        ):
-            discovered = DiscoveredFile.from_path(test_file)
-            assert discovered is not None
-            # Add to store
-            assert mock_indexer._store is not None
-            mock_indexer._store[str(discovered.source_id)] = discovered
-
-        # Verify file is in store
-        assert mock_indexer._store is not None
-        assert len(mock_indexer._store) == 1
-
+        test_file = self._create_temp_file_and_index(tmp_path, "to_delete.py", mock_indexer)
         # Now delete the file
         test_file.unlink()
         assert not test_file.exists()
 
-        # Try to remove the path from store (this should not raise FileNotFoundError)
-        removed_count = mock_indexer._remove_path(test_file)
-
-        # Verify removal succeeded
-        assert removed_count == 1
-        assert mock_indexer._store is not None
-        assert len(mock_indexer._store) == 0
+        self._validate_malformed_entry_removal(mock_indexer, test_file, 0)
 
     def test_remove_existing_file_from_store(self, mock_indexer: Indexer, tmp_path: Path) -> None:
         """Test that _remove_path works for files that still exist (regression test)."""
-        # Create a test file and add it to the store
-        test_file = tmp_path / "existing.py"
-        test_file.write_text("def example(): pass")
-
-        # Mock set_relative_path to return relative path
-        with (
-            patch(
-                "codeweaver.core.discovery.set_relative_path",
-                side_effect=lambda p: Path(p).relative_to(tmp_path) if Path(p).is_absolute() else p,
-            ),
-            patch("codeweaver.core.discovery.get_git_branch", return_value="main"),
-        ):
-            discovered = DiscoveredFile.from_path(test_file)
-            assert discovered is not None
-            # Add to store
-            assert mock_indexer._store is not None
-            mock_indexer._store[str(discovered.source_id)] = discovered
-
-        # Verify file is in store
-        assert mock_indexer._store is not None
-        assert len(mock_indexer._store) == 1
-
-        # Remove the path while file still exists
-        removed_count = mock_indexer._remove_path(test_file)
-
-        # Verify removal succeeded
-        assert removed_count == 1
-        assert mock_indexer._store is not None
-        assert len(mock_indexer._store) == 0
+        test_file = self._create_temp_file_and_index(tmp_path, "existing.py", mock_indexer)
+        self._validate_malformed_entry_removal(mock_indexer, test_file, 0)
 
     def test_remove_nonexistent_file_returns_zero(
         self, mock_indexer: Indexer, tmp_path: Path
@@ -113,19 +60,34 @@ class TestRemovePathWithDeletedFiles:
         # Verify no removal occurred
         assert removed_count == 0
 
+    def _create_temp_file_and_index(self, tmp_path: Path, filename: str, mock_indexer: Indexer):
+        result = tmp_path / filename
+        result.write_text("def example(): pass")
+        with (
+            patch(
+                "codeweaver.core.discovery.set_relative_path",
+                side_effect=lambda p: Path(p).relative_to(tmp_path) if Path(p).is_absolute() else p,
+            ),
+            patch("codeweaver.core.discovery.get_git_branch", return_value="main"),
+        ):
+            discovered = DiscoveredFile.from_path(result)
+            assert discovered is not None
+            assert mock_indexer._store is not None
+            mock_indexer._store[str(discovered.source_id)] = discovered
+        assert mock_indexer._store is not None
+        assert len(mock_indexer._store) == 1
+        return result
+
     def test_remove_with_multiple_files_in_store(
         self, mock_indexer: Indexer, tmp_path: Path
     ) -> None:
         """Test that _remove_path only removes the specified file from a store with multiple files."""
-        # Create multiple test files
         file1 = tmp_path / "file1.py"
         file1.write_text("def file1(): pass")
         file2 = tmp_path / "file2.py"
         file2.write_text("def file2(): pass")
         file3 = tmp_path / "file3.py"
         file3.write_text("def file3(): pass")
-
-        # Add all files to store with unique source IDs to work around existing bug
         with (
             patch(
                 "codeweaver.core.discovery.set_relative_path",
@@ -137,35 +99,20 @@ class TestRemovePathWithDeletedFiles:
             for f in [file1, file2, file3]:
                 discovered = DiscoveredFile.from_path(f)
                 assert discovered is not None
-                # Use a unique source_id for each file to work around UUID reuse bug
                 unique_id = str(uuid7())
-                # Get git_branch, converting Missing to None for __init__
                 git_branch = discovered.git_branch
                 resolved_branch = None if isinstance(git_branch, Missing) else git_branch
-                # Re-create with unique ID
                 discovered = DiscoveredFile(
                     path=discovered.path,
                     ext_kind=discovered.ext_kind,
-                    file_hash=discovered.file_hash,
+                    file_hash=discovered.file_hash(),
                     git_branch=resolved_branch,
                     source_id=unique_id,
                 )
-                mock_indexer._store[unique_id] = discovered
+                from codeweaver.core.stores import BlakeKey
 
-        # Verify all files are in store
-        assert mock_indexer._store is not None
-        assert len(mock_indexer._store) == 3
-
-        # Delete file2 and remove it from store
-        file2.unlink()
-        removed_count = mock_indexer._remove_path(file2)
-
-        # Verify only file2 was removed
-        assert removed_count == 1
-        assert mock_indexer._store is not None
-        assert len(mock_indexer._store) == 2
-
-        # Verify file1 and file3 are still in store
+                mock_indexer._store[cast(BlakeKey, unique_id)] = discovered
+        self._test_malformed_entry_removal_gracefully(mock_indexer, file2)
         remaining_paths = [item.path.name for item in mock_indexer._store.values()]
         assert "file1.py" in remaining_paths
         assert "file3.py" in remaining_paths
@@ -191,58 +138,64 @@ class TestRemovePathWithDeletedFiles:
             ),
             patch("codeweaver.core.discovery.get_git_branch", return_value="main"),
         ):
-            discovered1 = DiscoveredFile.from_path(valid_file)
-            discovered2 = DiscoveredFile.from_path(another_file)
-            assert discovered1 is not None
-            assert discovered2 is not None
+            self._test_removal_of_malformed_entries(valid_file, another_file, mock_indexer)
+        self._test_malformed_entry_removal_gracefully(mock_indexer, another_file)
+        assert "malformed_key" in mock_indexer._store  # ty:ignore[unsupported-operator]
 
-            # Create with unique IDs, converting Missing to None
-            id1 = str(uuid7())
-            id2 = str(uuid7())
-            git_branch1 = discovered1.git_branch
-            git_branch1_str = None if isinstance(git_branch1, Missing) else git_branch1
-            git_branch2 = discovered2.git_branch
-            git_branch2_str = None if isinstance(git_branch2, Missing) else git_branch2
-            discovered1 = DiscoveredFile(
-                path=discovered1.path,
-                ext_kind=discovered1.ext_kind,
-                file_hash=discovered1.file_hash,
-                git_branch=git_branch1_str,
-                source_id=id1,
-            )
-            discovered2 = DiscoveredFile(
-                path=discovered2.path,
-                ext_kind=discovered2.ext_kind,
-                file_hash=discovered2.file_hash,
-                git_branch=git_branch2_str,
-                source_id=id2,
-            )
-            assert mock_indexer._store is not None
-            mock_indexer._store[id1] = discovered1
-            mock_indexer._store[id2] = discovered2
-
-            # Manually add a malformed entry with a path that will cause resolution issues
-            bad_discovered = DiscoveredFile(
-                path=Path("/nonexistent/bad/path.py"),
-                ext_kind=discovered2.ext_kind,
-                source_id=str(uuid7()),
-            )
-            mock_indexer._store["malformed_key"] = bad_discovered
-
-        # Verify store has 3 entries
+    def _test_malformed_entry_removal_gracefully(self, mock_indexer: Indexer, file_to_remove: Path):
         assert mock_indexer._store is not None
         assert len(mock_indexer._store) == 3
+        file_to_remove.unlink()
+        self._validate_malformed_entry_removal(mock_indexer, file_to_remove, 2)
 
-        # Delete another_file and remove it
-        another_file.unlink()
-        removed_count = mock_indexer._remove_path(another_file)
-
-        # Should have removed only another_file, other entries should remain
-        # (even the malformed one, because it doesn't match)
+    def _validate_malformed_entry_removal(
+        self, mock_indexer: Indexer, file_to_remove: Path, expected_length: int
+    ):
+        removed_count = mock_indexer._remove_path(file_to_remove)
         assert removed_count == 1
         assert mock_indexer._store is not None
-        assert len(mock_indexer._store) == 2
-        assert "malformed_key" in mock_indexer._store
+        assert len(mock_indexer._store) == expected_length
+
+    def _test_removal_of_malformed_entries(
+        self, valid_file: Path, another_file: Path, mock_indexer: Indexer
+    ):
+        discovered1 = DiscoveredFile.from_path(valid_file)
+        discovered2 = DiscoveredFile.from_path(another_file)
+        assert discovered1 is not None
+        assert discovered2 is not None
+
+        # Create with unique IDs, converting Missing to None
+        id1 = str(uuid7())
+        id2 = str(uuid7())
+        git_branch1 = discovered1.git_branch
+        git_branch1_name = None if isinstance(git_branch1, Missing) else git_branch1
+        git_branch2 = discovered2.git_branch
+        git_branch2_name = None if isinstance(git_branch2, Missing) else git_branch2
+        discovered1 = DiscoveredFile(
+            path=discovered1.path,
+            ext_kind=discovered1.ext_kind,
+            file_hash=discovered1.file_hash,
+            git_branch=git_branch1_name,
+            source_id=id1,
+        )
+        discovered2 = DiscoveredFile(
+            path=discovered2.path,
+            ext_kind=discovered2.ext_kind,
+            file_hash=discovered2.file_hash,
+            git_branch=git_branch2_name,
+            source_id=id2,
+        )
+        assert mock_indexer._store is not None
+        mock_indexer._store[id1] = discovered1
+        mock_indexer._store[id2] = discovered2
+
+        # Manually add a malformed entry with a path that will cause resolution issues
+        bad_discovered = DiscoveredFile(
+            path=Path("/nonexistent/bad/path.py"),
+            ext_kind=discovered2.ext_kind,
+            source_id=str(uuid7()),
+        )
+        mock_indexer._store["malformed_key"] = bad_discovered
 
 
 if __name__ == "__main__":

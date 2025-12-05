@@ -25,29 +25,15 @@ status.show_env = false  # Reduce CI output noise
 # ============================================================================
 # CI-Essential Tools Only
 # ============================================================================
-# These are the minimal tools required to run CI tasks:
-# - check, lint, format, test-cov, build
+# Only use core tools in root mise.toml
 # ============================================================================
-
-[tools]
-# Core language runtimes
-python = "3.13"
-uv = "latest"
-# Quality & validation tools
-"pipx:reuse" = "latest"  # License validation
-"pipx:ty" = "latest"  # Type checking
-hk = "latest"  # Task runner (used by check/format tasks)
-ruff = "latest"  # Python linting/formatting
-# CI/CD tools
-gh = "latest"  # GitHub CLI (for workflows)
-"pipx:tombi" = "latest"
 
 # ============================================================================
 # Environment Variables
 # ============================================================================
 [env]
 # Simplified PATH for CI (no dev scripts needed)
-_.path = [".venv/bin"]
+_.path = [".venv/bin", "bin"]
 # MISE_ENV is determined by the template in mise.toml based on GITHUB_ACTIONS
 
 # ============================================================================
