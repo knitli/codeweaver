@@ -76,4 +76,4 @@ jobs:
           MISE_EXPERIMENTAL: 1
           MISE_PATH: ${{ steps.setup-mise.outputs.MISE_PATH }}
         run: |
-          mise --version || echo "Mise not in path" || "$MISE_PATH" --version
+          mise --version || { echo "Mise not in path"; "$MISE_PATH" --version; }

@@ -121,7 +121,7 @@ runs:
         # Add mise to PATH since env export is disabled
         export PATH="$HOME/.local/share/mise/bin:$HOME/.local/share/mise/shims:$PATH"
         echo "MISE_PATH=$(which mise)" >> $GITHUB_OUTPUT
-        echo "MISE_ENV=$MISE_ENV" >> $GITHUB_OUTPUT
+        echo "MISE_ENV=${MISE_ENV:-}" >> $GITHUB_OUTPUT
         echo "PROFILE=${{ inputs.profile }}" >> $GITHUB_OUTPUT
         echo "PYTHON_VERSION=$(python --version | awk '{print $2}')" >> $GITHUB_OUTPUT
         echo "PYTHON_PATH=$(which python)" >> $GITHUB_OUTPUT
