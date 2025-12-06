@@ -79,6 +79,9 @@ runs:
           "pipx:ty" = "latest"
         cache: true
         cache_key_prefix: ${{ inputs.profile }}
+    - name: Activate Reviewer Profile Environment
+      if: inputs.profile == 'reviewer'
+      shell: bash
       id: mise-setup-reviewer
       run: |
         uv venv --allow-existing --seed --keyring-provider subprocess --python "${{ inputs.python-version }}" .venv
@@ -110,6 +113,10 @@ runs:
         cache: true
         cache_key_prefix: ${{ inputs.profile }}
       id: mise-setup-dev
+    - name: Activate Dev Profile Environment
+      if: inputs.profile == 'dev'
+      shell: bash
+      id: mise-setup-dev-activate
       run: |
         uv venv --allow-existing --seed --keyring-provider subprocess --python "${{ inputs.python-version }}" .venv
         source .venv/bin/activate
