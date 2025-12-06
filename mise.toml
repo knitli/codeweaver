@@ -278,11 +278,11 @@ flag "--marks [markers]" help="pytest markers to filter tests" default=""
 run = '''
 #!/bin/bash
 echo "Running tests..."
-uv run pytest
+uv run pytest "${usage_dir}" ${usage_marks:+-m "${usage_marks}"} -v "$@"
 '''
 run_windows = '''
 echo Running tests...
-uv run pytest
+uv run pytest "%usage_dir%" %usage_marks:~-3% -v %*
 '''
 
 [tasks.test-cov]

@@ -42,6 +42,7 @@ jobs:
           python-version: ${{ inputs.python-version }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           profile: "reviewer"
+          skip-checkout: true
         id: mise-outputs
 
       - name: Check code style and linting

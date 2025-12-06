@@ -49,6 +49,7 @@ jobs:
           # Because uv is in the pyproject.toml,
           # we want to avoid shadowing what we're setting up here.
           activate-venv: "false"
+          skip-checkout: true
         id: setup-uv
       - name: Build package with UV
         env:
