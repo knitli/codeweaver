@@ -50,6 +50,7 @@ runs:
       env:
         MISE_YES: 1
         MISE_EXPERIMENTAL: 1
+        UV_PYTHON_VERSION: ${{ inputs.python-version }}
       with:
         github_token: ${{ inputs.github-token }}
         experimental: true
@@ -64,6 +65,7 @@ runs:
         MISE_YES: 1
         MISE_EXPERIMENTAL: 1
         MISE_ENV: dev
+        UV_PYTHON_VERSION: ${{ inputs.python-version }}
       with:
         github_token: ${{ inputs.github-token }}
         experimental: true
@@ -83,6 +85,7 @@ runs:
         MISE_YES: 1
         MISE_EXPERIMENTAL: 1
         MISE_ENV: dev
+        UV_PYTHON_VERSION: ${{ inputs.python-version }}
       with:
         github_token: ${{ inputs.github-token }}
         experimental: true
@@ -90,7 +93,7 @@ runs:
         cache: true
         cache_key_prefix: ${{ inputs.profile }}
       id: mise-setup-dev
-        
+
     - name: Set outputs
       shell: bash
       id: mise-outputs
@@ -98,5 +101,8 @@ runs:
         echo "MISE_PATH=$(which mise)" >> $GITHUB_OUTPUT
         echo "MISE_ENV=$MISE_ENV" >> $GITHUB_OUTPUT
         echo "PROFILE=${{ inputs.profile }}" >> $GITHUB_OUTPUT
+        echo "PYTHON_VERSION=$(python --version | awk '{print $2}')" >> $GITHUB_OUTPUT
+        echo "PYTHON_PATH=$(which python)" >> $GITHUB_OUTPUT
+        echo "UV_PYTHON_VERSION=$(uv run python --version | awk '{print $2}')" >> $GITHUB_OUTPUT
 
 
