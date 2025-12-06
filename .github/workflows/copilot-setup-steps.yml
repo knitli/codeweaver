@@ -77,4 +77,3 @@ jobs:
           MISE_PATH: ${{ steps.setup-mise.outputs.MISE_PATH }}
         run: |
           mise --version || echo "Mise not in path" || "$MISE_PATH" --version
-          echo "Mise Python:"
