@@ -28,6 +28,23 @@ inputs:
     required: true
     default: 'minimal'
 
+outputs:
+  MISE_PATH:
+    description: Path to mise executable
+    value: ${{ steps.mise-outputs.outputs.MISE_PATH }}
+  MISE_ENV:
+    description: Mise environment name
+    value: ${{ steps.mise-outputs.outputs.MISE_ENV }}
+  PROFILE:
+    description: Profile used for setup
+    value: ${{ steps.mise-outputs.outputs.PROFILE }}
+  PYTHON_VERSION:
+    description: Python version installed
+    value: ${{ steps.mise-outputs.outputs.PYTHON_VERSION }}
+  PYTHON_PATH:
+    description: Path to Python executable
+    value: ${{ steps.mise-outputs.outputs.PYTHON_PATH }}
+
 runs:
   using: composite
   steps:
