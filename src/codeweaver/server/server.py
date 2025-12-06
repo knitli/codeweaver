@@ -41,6 +41,7 @@ from codeweaver.server.management import ManagementServer
 
 
 if TYPE_CHECKING:
+    from codeweaver.common.http_pool import HttpClientPool
     from codeweaver.common.utils import LazyImport
     from codeweaver.core.types import AnonymityConversion, FilteredKeyT
 
@@ -152,6 +153,15 @@ class CodeWeaverState(DataclassSerializationMixin):
     )
 
     telemetry: Annotated[PostHogClient | None, PrivateAttr(default=None)]
+
+    http_pool: Annotated[
+        "HttpClientPool | None",
+        Field(
+            default=None,
+            description="Shared HTTP client pool for provider connections (Voyage, Cohere, etc.)",
+            exclude=True,
+        ),
+    ] = None
 
     _mcp_http_server: Annotated[FastMCP[CwMcpHttpState] | None, PrivateAttr()] = None
 
@@ -279,6 +289,15 @@ async def _cleanup_state(
         except Exception:
             logging.getLogger(__name__).exception("Error shutting down telemetry client")
 
+    # Close HTTP client pools to release connections
+    if state.http_pool:
+        try:
+            await state.http_pool.close_all()
+            if verbose:
+                _logger.info("Closed HTTP client pools")
+        except Exception:
+            logging.getLogger(__name__).exception("Error closing HTTP client pools")
+
     if verbose:
         _logger.info("Exiting CodeWeaver lifespan context manager...")
 
@@ -396,7 +415,14 @@ def _initialize_cw_state(
     settings: CodeWeaverSettings | None = None, statistics: SessionStatistics | None = None
 ) -> CodeWeaverState:
     """Initialize application state if not already present."""
+    from codeweaver.common.http_pool import HttpClientPool
+
     resolved_settings = settings or get_settings._resolve()()
+
+    # Initialize HTTP client pool for connection reuse
+    http_pool = HttpClientPool.get_instance()
+    _logger.debug("Initialized HTTP client pool for provider connections")
+
     state = CodeWeaverState(  # type: ignore
         initialized=False,
         # for lazy imports, we need to call resolve() to get the function/object and then call it
@@ -416,6 +442,7 @@ def _initialize_cw_state(
         health_service=None,  # Initialize as None, will be set after CodeWeaverState construction
         failover_manager=None,  # Initialize as None, will be set after CodeWeaverState construction
         telemetry=PostHogClient.from_settings(),
+        http_pool=http_pool,
         indexer=Indexer.from_settings(),
     )
     state.health_service = _get_health_service()

@@ -49,6 +49,10 @@ class MistralEmbeddingProvider(EmbeddingProvider[Mistral]):
             api_key = os.environ.get(
                 "MISTRAL_API_KEY", kwargs.get("api_key")
             ) or client_options.get("api_key")
+            # Support connection pooling via async_client injection
+            # Mistral SDK accepts async_client as an AsyncHttpClient protocol (httpx.AsyncClient compatible)
+            if "httpx_client" in kwargs:
+                client_options["async_client"] = kwargs.pop("httpx_client")
             client = Mistral(api_key=api_key, **client_options)
 
         # Call super().__init__() FIRST which handles all Pydantic initialization
