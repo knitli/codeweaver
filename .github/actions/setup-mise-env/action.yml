@@ -57,6 +57,7 @@ runs:
         install: true
         cache: true
         cache_key_prefix: ${{ inputs.profile }}
+        env: false
       id: mise-setup-minimal
     - name: Setup Mise for Reviewer Profile
       if: inputs.profile == 'reviewer'
@@ -72,6 +73,7 @@ runs:
         install: true
         cache: true
         cache_key_prefix: ${{ inputs.profile }}
+        env: false
     - name: Activate Reviewer Profile Environment
       if: inputs.profile == 'reviewer'
       shell: bash
@@ -92,6 +94,7 @@ runs:
         install: true
         cache: true
         cache_key_prefix: ${{ inputs.profile }}
+        env: false
       id: mise-setup-dev
 
     - name: Set outputs
