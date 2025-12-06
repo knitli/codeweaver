@@ -53,6 +53,7 @@ jobs:
       - name: Build package with UV
         env:
           UV_PATH: ${{ steps.setup-uv.outputs.uv-path }}
+          UV_PYTHON: ${{ inputs.python-version }}
         run: |
           if [ "${{ inputs.clean-build }}" = "true" ]; then
             "$UV_PATH" build --clear

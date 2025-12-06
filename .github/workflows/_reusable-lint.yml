@@ -42,18 +42,29 @@ jobs:
           python-version: ${{ inputs.python-version }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           profile: "reviewer"
+        id: mise-outputs
 
       - name: Check code style and linting
+        env:
+          MISE_YES: 1
+          MISE_PYTHON: ${{ inputs.python-version }}
+          UV_PYTHON: ${{ inputs.python-version }}
+          MISE_EXPERIMENTAL: 1
+          PYTHON_PATH: ${{ steps.mise-outputs.outputs.PYTHON_PATH }}
         run: |
           export PATH="$HOME/.local/bin:$PATH"
-          export MISE_ENV=ci
           mise //:lint || echo "::warning::Lint checks failed but allowing workflow to continue"
         continue-on-error: true
 
       - name: Check formatting and licenses
         if: inputs.run-format-check
+        env:
+          MISE_YES: 1
+          MISE_PYTHON: ${{ inputs.python-version }}
+          UV_PYTHON: ${{ inputs.python-version }}
+          MISE_EXPERIMENTAL: 1
+          PYTHON_PATH: ${{ steps.mise-outputs.outputs.PYTHON_PATH }}
         run: |
           export PATH="$HOME/.local/bin:$PATH"
-          export MISE_ENV=ci
           mise //:format || echo "::warning::License checks or formatting checks failed but allowing workflow to continue"
         continue-on-error: true

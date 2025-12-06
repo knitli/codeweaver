@@ -66,6 +66,9 @@ jobs:
       CODEWEAVER_PROJECT_PATH: ${{ github.workspace }}
       MISE_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       MISE_EXPERIMENTAL: 1
+      MISE_YES: 1
+      MISE_PYTHON: ${{ matrix.python-version }}
+      UV_PYTHON: ${{ matrix.python-version }}
     steps:
       - name: Checkout code
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
@@ -78,14 +81,25 @@ jobs:
           python-version: ${{ matrix.python-version }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           profile: "dev"
+        id: mise-outputs
       - name: Run quality checks
         if: inputs.run-quality-checks
+        env:
+          MISE_YES: 1
+          MISE_PYTHON: ${{ matrix.python-version }}
+          UV_PYTHON: ${{ matrix.python-version }}
+          MISE_EXPERIMENTAL: 1
         run: |
           export PATH="$HOME/.local/bin:$PATH"
           mise //:check
         continue-on-error: true
 
       - name: Run tests with coverage
+        env:
+          MISE_YES: 1
+          MISE_PYTHON: ${{ matrix.python-version }}
+          UV_PYTHON: ${{ matrix.python-version }}
+          MISE_EXPERIMENTAL: 1
         run: |
           export PATH="$HOME/.local/bin:$PATH"
           mise //:test-cov -m "${{ inputs.test-markers }}"

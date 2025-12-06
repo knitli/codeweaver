@@ -50,7 +50,7 @@ runs:
       env:
         MISE_YES: 1
         MISE_EXPERIMENTAL: 1
-        UV_PYTHON_VERSION: ${{ inputs.python-version }}
+        UV_PYTHON: ${{ inputs.python-version }}
       with:
         github_token: ${{ inputs.github-token }}
         experimental: true
@@ -65,7 +65,7 @@ runs:
         MISE_YES: 1
         MISE_EXPERIMENTAL: 1
         MISE_ENV: dev
-        UV_PYTHON_VERSION: ${{ inputs.python-version }}
+        UV_PYTHON: ${{ inputs.python-version }}
       with:
         github_token: ${{ inputs.github-token }}
         experimental: true
@@ -85,7 +85,7 @@ runs:
         MISE_YES: 1
         MISE_EXPERIMENTAL: 1
         MISE_ENV: dev
-        UV_PYTHON_VERSION: ${{ inputs.python-version }}
+        UV_PYTHON: ${{ inputs.python-version }}
       with:
         github_token: ${{ inputs.github-token }}
         experimental: true
@@ -103,6 +103,6 @@ runs:
         echo "PROFILE=${{ inputs.profile }}" >> $GITHUB_OUTPUT
         echo "PYTHON_VERSION=$(python --version | awk '{print $2}')" >> $GITHUB_OUTPUT
         echo "PYTHON_PATH=$(which python)" >> $GITHUB_OUTPUT
-        echo "UV_PYTHON_VERSION=$(uv run python --version | awk '{print $2}')" >> $GITHUB_OUTPUT
+        echo "UV_PYTHON=$(uv run python --version | awk '{print $2}')" >> $GITHUB_OUTPUT
 
 
