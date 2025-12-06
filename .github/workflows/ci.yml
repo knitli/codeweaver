@@ -51,6 +51,11 @@ jobs:
       CODEWEAVER_VECTOR_STORE_URL: ${{ secrets.CODEWEAVER_VECTOR_STORE_URL }}
       QDRANT__SERVICE__API_KEY: ${{ secrets.QDRANT__SERVICE__API_KEY }}
       VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+    with:
+      python-versions: '["3.12", "3.13", "3.14"]'
+      test-markers: "not docker and not qdrant and not dev_only and not skip_ci and not network and not external_api and not flaky"
+      upload-coverage: true
+      run-quality-checks: true
 
   lint:
     name: Lint
@@ -63,4 +68,4 @@ jobs:
       - test
       - lint
     uses: ./.github/workflows/_reusable-build.yml
-    # No secrets needed for build job
+    # Build doesn't need secrets.

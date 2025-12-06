@@ -60,3 +60,21 @@ jobs:
         run: |
           chmod -R +x scripts
           chmod -R +x mise-tasks
+      - name: Setup Mise Environment
+        uses: ./.github/actions/setup-mise-env
+        with:
+          python-version: "3.13"
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          profile: "dev"
+          skip-checkout: "true"
+        id: setup-mise
+      - name: Verify Mise Setup
+        shell: bash
+        env:
+          MISE_PYTHON: "3.13"
+          MISE_YES: 1
+          MISE_EXPERIMENTAL: 1
+          MISE_PATH: ${{ steps.setup-mise.outputs.MISE_PATH }}
+        run: |
+          mise --version || echo "Mise not in path" || "$MISE_PATH" --version
+          echo "Mise Python:"
