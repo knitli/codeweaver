@@ -62,7 +62,7 @@ MISE_EXPERIMENTAL = "1"
 tools.uv = "latest"
 depends = ["source"]
 run = '''#!/usr/bin/env zsh
-print -P "%F{209}[codeweaver]%f Updating dependencies..."
+echo "${CW_PREFIX} Updating dependencies..."
 uv sync --extra full --group dev --group docs --group build --group test -U'''
 run_windows = '''
 echo [codeweaver] Updating dependencies...
@@ -76,12 +76,12 @@ shell = "zsh -c"
 env.MISE_EXPERIMENTAL = "1"
 env.MISE_YES = "1"
 run = [
-  "print -P \"%F{209}[codeweaver]%f Updating tools...\"",
+  "echo \"${CW_PREFIX} Updating tools...\"",
   "mise upgrade",
   "mise self-update",
   "mise prune",
   "mise reshim",
-  "print -P \"%F{209}[codeweaver]%f ✅ Tools updated! 🧰\"",
+  "echo \"${CW_PREFIX} ✅ Tools updated! 🧰\"",
 ]
 run_windows = [
   "echo [codeweaver] Updating tools...",
@@ -95,28 +95,26 @@ run_windows = [
 [tasks.test-watch]
 tools.uv = "latest"
 run = '''
-#!/bin/bash
-echo "Running tests in watch mode..."
+echo "${CW_PREFIX} Running tests in watch mode..."
 uv run pytest tests/ -f --tb=short
 '''
 run_windows = '''
-echo Running tests in watch mode...
+echo [codeweaver] Running tests in watch mode...
 uv run pytest tests/ -f --tb=short
 '''
 
 [tasks.build]
 # Building and packaging
 run = '''
-#!/bin/bash
-echo "Building package..."
+echo "${CW_PREFIX} Building package..."
 uv build &&
-echo "✅ Package built successfully!"
+echo "${CW_PREFIX} ✅ Package built successfully!"
 '''
 run_windows = '''
-echo Building package...
+echo [codeweaver] Building package...
 uv build
 if %ERRORLEVEL% equ 0 (
-    echo Package built successfully!
+    echo [codeweaver] Package built successfully!
 )
 '''
 
@@ -125,8 +123,7 @@ if %ERRORLEVEL% equ 0 (
 tools.uv = "latest"
 env.MISE_EXPERIMENTAL = "1"
 run = '''
-#!/usr/bin/env zsh
-print -P "%F{209}[codeweaver]%f Starting %F{209}CodeWeaver%f documentation server..."
+echo "${CW_PREFIX} Starting CodeWeaver documentation server..."
 mise //:docs-site/dev || true
 '''
 run_windows = '''
@@ -138,8 +135,7 @@ mise //:docs-site/dev || exit /b 0
 description = "Generate a filtered, PR-focused changelog (output to stdout)"
 tools.git-cliff = "latest"
 run = '''
-#!/usr/bin/env bash
-echo "Generating changelog..."
+echo "${CW_PREFIX} Generating changelog..."
 git-cliff
 '''
 
@@ -147,8 +143,7 @@ git-cliff
 description = "Generate changelog for unreleased changes (output to stdout)"
 tools.git-cliff = "latest"
 run = '''
-#!/usr/bin/env bash
-echo "Generating unreleased changelog..."
+echo "${CW_PREFIX} Generating unreleased changelog..."
 git-cliff --unreleased
 '''
 
@@ -156,10 +151,9 @@ git-cliff --unreleased
 description = "Update CHANGELOG.md with unreleased changes"
 tools.git-cliff = "latest"
 run = '''
-#!/usr/bin/env bash
-echo "Updating CHANGELOG.md with unreleased changes..."
+echo "${CW_PREFIX} Updating CHANGELOG.md with unreleased changes..."
 git-cliff --unreleased --prepend --output CHANGELOG.md &&
-echo "✅ CHANGELOG.md updated!"
+echo "${CW_PREFIX} ✅ CHANGELOG.md updated!"
 '''
 
 [tasks.changelog-tag]
@@ -169,10 +163,9 @@ arg "<tag>" help="Git tag to generate changelog for (e.g., v0.1.0)"
 '''
 tools.git-cliff = "latest"
 run = '''
-#!/usr/bin/env bash
-echo "Generating changelog for tag ${usage_tag:?}..."
+echo "${CW_PREFIX} Generating changelog for tag ${usage_tag:?}..."
 git-cliff --tag "${usage_tag:?}" --prepend --output CHANGELOG.md &&
-echo "✅ CHANGELOG.md generated for ${usage_tag:?}!"
+echo "${CW_PREFIX} ✅ CHANGELOG.md generated for ${usage_tag:?}!"
 '''
 
 [tasks.prepare-version]
@@ -194,7 +187,7 @@ BLUE='\033[0;34m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-echo -e "${BLUE}[codeweaver]${NC} Preparing version release..."
+echo -e "${CW_PREFIX} Preparing version release..."
 
 # Get version
 VERSION="${usage_version:-}"
@@ -208,36 +201,36 @@ if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9._-]+)?$ ]]; then
     exit 1
 fi
 
-echo -e "${BLUE}[codeweaver]${NC} Preparing version ${GREEN}v${VERSION}${NC}..."
+echo -e "${CW_PREFIX} Preparing version ${GREEN}v${VERSION}${NC}..."
 
 # Step 1: Run build preparation
-echo -e "${BLUE}[codeweaver]${NC} Step 1/7: Running build preparation..."
+echo -e "${CW_PREFIX} Step 1/7: Running build preparation..."
 uv run python scripts/build/prepare-build.py || {
     echo -e "${RED}Build preparation failed!${NC}"
     exit 1
 }
 
 # Step 2: Check for generated artifacts
-echo -e "${BLUE}[codeweaver]${NC} Step 2/7: Verifying generated artifacts..."
+echo -e "${CW_PREFIX} Step 2/7: Verifying generated artifacts..."
 if [ ! -f "src/codeweaver/data/node_types_cache.pkl" ]; then
     echo -e "${YELLOW}Warning: node_types_cache.pkl not found${NC}"
 fi
 
 # Step 3: Update CHANGELOG
-echo -e "${BLUE}[codeweaver]${NC} Step 3/7: Updating CHANGELOG.md..."
+echo -e "${CW_PREFIX} Step 3/7: Updating CHANGELOG.md..."
 git cliff --unreleased --bump --prepend CHANGELOG.md || {
     echo -e "${YELLOW}Warning: Failed to update CHANGELOG${NC}"
 }
 
 # Step 4: Ensure Reuse coverage
-echo -e "${BLUE}[codeweaver]${NC} Step 4/7: Ensuring Reuse coverage..."
+echo -e "${CW_PREFIX} Step 4/7: Ensuring Reuse coverage..."
 reuse lint || {
     echo -e "${RED}Reuse lint failed!${NC}"
     exit 1
 }
 
 # Step 5: Generate SBOM
-echo -e "${BLUE}[codeweaver]${NC} Step 5/7: Generating SBOM for version ${VERSION}..."
+echo -e "${CW_PREFIX} Step 5/7: Generating SBOM for version ${VERSION}..."
 reuse spdx --add-license-concluded --creator-person "automated[bot]" --creator-organization "Knitli Inc." -o sbom.spdx || {
     echo -e "${RED}SBOM generation failed!${NC}"
     exit 1
@@ -245,7 +238,7 @@ reuse spdx --add-license-concluded --creator-person "automated[bot]" --creator-o
 
 # Step 6: Commit if not disabled
 if [ -z "${usage_no_commit:-}" ]; then
-    echo -e "${BLUE}[codeweaver]${NC} Step 6/7: Committing build artifacts..."
+    echo -e "${CW_PREFIX} Step 6/7: Committing build artifacts..."
     git add src/codeweaver/data/node_types_cache.pkl 2>/dev/null || true
     git add CHANGELOG.md 2>/dev/null || true
     git add schema/ 2>/dev/null || true
@@ -269,7 +262,7 @@ fi
 
 # Step 7: Tag if not disabled
 if [ -z "${usage_no_tag:-}" ] && [ -z "${usage_no_commit:-}" ]; then
-    echo -e "${BLUE}[codeweaver]${NC} Step 7/7: Creating git tag v${VERSION}..."
+    echo -e "${CW_PREFIX} Step 7/7: Creating git tag v${VERSION}..."
     git tag -a "v${VERSION}" -m "Release v${VERSION}" || {
         echo -e "${RED}Tagging failed!${NC}"
         exit 1
@@ -281,7 +274,7 @@ fi
 
 # Push if requested
 if [ -n "${usage_push:-}" ]; then
-    echo -e "${BLUE}[codeweaver]${NC} Pushing to remote..."
+    echo -e "${CW_PREFIX} Pushing to remote..."
     git push && git push --tags || {
         echo -e "${RED}Push failed!${NC}"
         exit 1
@@ -308,11 +301,11 @@ exit 1
 '''
 
 [tasks.prepare-version.tools]
-uv = "latest"
-reuse = "latest"
-git-cliff = "latest"
 "cargo:tree-sitter-cli" = "latest"
+"pipx:reuse" = "latest"
+git-cliff = "latest"
 usage = "latest"
+uv = "latest"
 
 [tasks.prepare-version.env]
 GITHUB_REPO = "knitli/codeweaver"
