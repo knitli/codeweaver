@@ -18,8 +18,6 @@
 #
 # NOTE: This configuration inherits from `mise.toml`, so these are additions/overrides
 # ============================================================================
-extends = "mise.toml"
-
 [settings]
 status.show_env = false  # Reduce CI output noise
 

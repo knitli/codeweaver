@@ -39,6 +39,7 @@ jobs:
       MISE_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       MISE_ENV: "dev"
       MISE_YES: 1
+      TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
       # Limit CodeQL memory usage to prevent OOM kills on standard runners (7GB total RAM)
       # Note: Standard runners have ~7GB, so limit to 3GB to leave headroom for system
       CODEQL_RAM: 3072
@@ -52,6 +53,14 @@ jobs:
         with:
           fetch-depth: 2
           token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Setup Environment for Review
+        if: github.event_name == 'pull_request_review'
+        uses: ./.github/actions/setup-mise-env
+        with:
+          python-version: "3.13"
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          profile: "reviewer"
+          skip-checkout: "true"
       - name: PR Review
         if: github.event_name == 'pull_request_review'
         uses: anthropics/claude-code-action@e8bad572273ce919ba15fec95aef0ce974464753
@@ -66,7 +75,7 @@ jobs:
           use_commit_signing: true
           claude_args: |
             --max-turns 100
-            --allowedTools Bash,Batch,Glob,Grep,ToDoWrite,View,mcp__context7__get-library-docs,mcp__context7__resolve-library-id,mcp__sequential-thinking__sequentialthinking,mcp__github_ci__get_workflow_run_details,mcp__codeweaver__find_code
+            --allowedTools Bash,Batch,Glob,Grep,ToDoWrite,View,WebFetch,WebSearch,mcp__context7__get-library-docs,mcp__context7__resolve-library-id,mcp__sequential-thinking__sequentialthinking,mcp__github_ci__get_workflow_run_details,mcp__codeweaver__find_code,mcp__tavily__tavily_search,
             --mcp-config .mcp.json
           prompt: |
             REPO: ${{ github.repository }}
@@ -79,6 +88,14 @@ jobs:
             If you identify issues, briefly describe them. Provide a recommended fix with example implementation.
 
             Keep your feedback focused, actionable, and concise.
+      - name: Setup Environment for Issues
+        if: github.event_name == 'issues' || github.event.action == 'opened'
+        uses: ./.github/actions/setup-mise-env
+        with:
+          python-version: "3.13"
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          profile: "dev"
+          skip-checkout: "true"
       - name: Issue Opened
         if: github.event_name == 'issues' && github.event.action == 'opened'
         uses: anthropics/claude-code-action@e8bad572273ce919ba15fec95aef0ce974464753
@@ -93,7 +110,7 @@ jobs:
           base_branch: main
           claude_args: |
             --max-turns 100
-            --allowedTools Bash,Batch,Glob,Grep,ToDoWrite,View,mcp__context7__get-library-docs,mcp__context7__resolve-library-id,mcp__sequential-thinking__sequentialthinking,mcp__github_ci__get_workflow_run_details,mcp__codeweaver__find_code,WebFetch,WebSearch
+            --allowedTools Bash,Batch,Glob,Grep,ToDoWrite,View,mcp__context7__get-library-docs,mcp__context7__resolve-library-id,mcp__sequential-thinking__sequentialthinking,mcp__github_ci__get_workflow_run_details,mcp__codeweaver__find_code,WebFetch,WebSearch,mcp__tavily__tavily_search
             --mcp-config .mcp.json
           prompt: |
             REPO: ${{ github.repository }}
@@ -106,6 +123,14 @@ jobs:
               - If the issue covers the same topic as an existing open or closed issue, recommend closing the issue and linking to the relevant PR or issue.
               - Identify potential fixes and briefly describe them with links to relevant code.
               - If it's a feature request, estimate the difficulty of implementing the feature and potential impact on existing functionality and API.
+      - name: Setup Environment for PR Review Comments
+        if: github.event_name == 'pull_request_review_comment'
+        uses: ./.github/actions/setup-mise-env
+        with:
+          python-version: "3.13"
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          profile: "minimal"
+          skip-checkout: "true"
       - name: PR Review Comment
         if: github.event_name == 'pull_request_review_comment'
         uses: anthropics/claude-code-action@e8bad572273ce919ba15fec95aef0ce974464753
@@ -119,7 +144,7 @@ jobs:
           base_branch: main
           claude_args: |
             --max-turns 50
-            --allowedTools Bash,Batch,Glob,Grep,ToDoWrite,View,mcp__context7__get-library-docs,mcp__context7__resolve-library-id,mcp__sequential-thinking__sequentialthinking,mcp__github_ci__get_workflow_run_details,mcp__codeweaver__find_code
+            --allowedTools Bash,Batch,Glob,Grep,ToDoWrite,View,mcp__context7__get-library-docs,mcp__context7__resolve-library-id,mcp__sequential-thinking__sequentialthinking,mcp__github_ci__get_workflow_run_details,mcp__codeweaver__find_code,mcp__tavily__tavily_search,WebFetch,WebSearch
             --mcp-config .mcp.json
           prompt: |
             REPO: ${{ github.repository }}
@@ -132,9 +157,18 @@ jobs:
               - Consider possible security or performance effects.
               - Suggest improvements or alternatives where applicable.
               - If the changes are satisfactory and the code passes checks, approve the PR with a comment.
+      - name: Setup Environment for Assigned or Labeled Issues/PRs
+        if: |
+          (github.event_name == 'issues' && github.event.action == 'assigned') || (github.event_name == 'issues' && github.event.action == 'labeled' && github.event.label.name == 'claude') || (github.event_name == 'pull_request' && github.event.action == 'labeled' && github.event.label.name == 'claude')
+        uses: ./.github/actions/setup-mise-env
+        with:
+          python-version: "3.13"
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          profile: "dev"
+          skip-checkout: "true"
       - name: Issue Assigned or Labeled Claude
         if: |
-          (github.event_name == 'issues' && github.event.action == 'assigned') || (github.event_name == 'issues' && github.event.action == 'labeled' && github.event.label.name == 'claude')
+          (github.event_name == 'issues' && github.event.action == 'assigned') || (github.event_name == 'issues' && github.event.action == 'labeled' && github.event.label.name == 'claude') || (github.event_name == 'pull_request' && github.event.action == 'labeled' && github.event.label.name == 'claude')
         uses: anthropics/claude-code-action@e8bad572273ce919ba15fec95aef0ce974464753
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}

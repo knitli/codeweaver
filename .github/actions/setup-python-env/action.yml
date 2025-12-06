@@ -4,21 +4,13 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 
 name: Setup Python Environment
-description: Complete Python development environment setup with mise and UV caching
+description: Minimal Python environment setup
 
 inputs:
   python-version:
     description: Python version to install
     required: false
     default: '3.12'
-  cache-prefix:
-    description: Optional cache key prefix for specialized caches
-    required: false
-    default: ''
-  skip-mise-setup:
-    description: Skip running mise setup (useful if only need caching)
-    required: false
-    default: 'false'
   fetch-depth:
     description: Git fetch depth for checkout
     required: false
@@ -52,63 +44,3 @@ runs:
         # Support free-threaded Python (e.g., 3.13t, 3.14t)
         allow-prereleases: true
 
-    - name: Install system dependencies
-      shell: bash
-      run: |
-        sudo apt-get update && sudo apt-get install -y zsh curl git
-
-    - name: Cache mise tools
-      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
-      with:
-        path: |
-          ~/.local/share/mise
-          ~/.local/bin/mise
-          ~/.local/share/mise/shims
-          ~/.cache/mise
-          ~/.local/bin
-        # Unified cache key (no workflow-specific prefixes)
-        key: ${{ inputs.cache-prefix }}mise-${{ runner.os }}-${{ hashFiles('mise.ci.toml', 'mise.toml') }}
-        restore-keys: |
-          ${{ inputs.cache-prefix }}mise-${{ runner.os }}-
-
-    - name: Cache UV dependencies
-      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
-      with:
-        path: |
-          ~/.cache/uv
-          .venv
-        # Include Python version for matrix compatibility
-        key: ${{ inputs.cache-prefix }}uv-${{ runner.os }}-py${{ inputs.python-version }}-${{ hashFiles('uv.lock') }}
-        restore-keys: |
-          ${{ inputs.cache-prefix }}uv-${{ runner.os }}-py${{ inputs.python-version }}-
-          ${{ inputs.cache-prefix }}uv-${{ runner.os }}-
-
-    - name: Install mise
-      shell: bash
-      env:
-        MISE_GITHUB_TOKEN: ${{ inputs.github-token }}
-        MISE_ENV: "ci"
-        MISE_YES: 1
-      run: |
-        if [ ! -f "$HOME/.local/bin/mise" ]; then
-          # Install mise directly from GitHub releases for reliability
-          MISE_VERSION="v2025.11.7"
-          MISE_URL="https://github.com/jdx/mise/releases/download/${MISE_VERSION}/mise-${MISE_VERSION}-linux-x64.tar.gz"
-          mkdir -p "$HOME/.local/bin"
-          TMP_MISE_DIR="$(mktemp -d)"
-          curl -fsSL "$MISE_URL" | tar -xz -C "$TMP_MISE_DIR"
-          cp "$TMP_MISE_DIR/mise/bin/mise" "$HOME/.local/bin/"
-          rm -rf "$TMP_MISE_DIR"
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-        fi
-
-    - name: Install tools with mise
-      if: inputs.skip-mise-setup != 'true'
-      shell: bash
-      run: |
-        export PATH="$HOME/.local/bin:$PATH"
-        export MISE_ENV="ci"
-        export MISE_YES=1
-        mise trust --all
-        # Guard heavy setup with a timeout to limit runner memory and time usage in CI
-        timeout 10m mise run setup > /dev/null 2>&1 || true

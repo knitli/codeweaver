@@ -73,7 +73,7 @@ jobs:
           fi
 
       - name: Upload changelog artifact
-        uses: actions/upload-artifact@4b540d30404c5374296eb0061f5d53f85b8f4cc2
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
         with:
           name: changelog
           path: CHANGELOG.md

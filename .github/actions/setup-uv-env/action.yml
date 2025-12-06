@@ -1,0 +1,63 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+name: Setup UV Environment
+description: Minimal UV environment setup with caching
+
+inputs:
+  fetch-depth:
+    description: Git fetch depth for checkout
+    required: false
+    default: '1'
+  skip-checkout:
+    description: Skip checkout step (if already checked out by calling workflow)
+    required: false
+    default: 'false'
+  github-token:
+    description: GitHub token for mise installation (to avoid rate limits)
+    required: false
+    default: ''
+  python-version:
+    description: Python version to install
+    required: false
+    default: '3.12'
+  activate-venv:
+    description: Whether to activate the Python virtual environment
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout code
+      if: inputs.skip-checkout != 'true'
+      uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+      with:
+        fetch-depth: ${{ inputs.fetch-depth }}
+
+    - name: Setup UV and build
+      uses: astral-sh/setup-uv@9c12baee9699f1b4f4318d7175fab8635c2b8e45
+      with:
+        resolution-strategy: "highest"
+        python-version: ${{ inputs.python-version }}
+        activate-environment: ${{ inputs.activate-venv }}
+        github-token: ${{ inputs.github-token }}
+        enable-cache: "true"
+        cache-dependency-glob: |
+          **/pyproject.toml
+          **/uv.lock
+        cache-suffix: "highest"
+        restore-cache: "true"
+        save-cache: "true"
+        prune-cache: "true"
+        add-problem-matchers: "true"
+      id: setup-uv
+    - name: Export outputs
+      shell: bash
+      id: uv-outputs
+      run: |
+        echo "UV_PATH=${{ steps.setup-uv.outputs.uv-path }}" >> $GITHUB_OUTPUT
+        echo "UVX_PATH=${{ steps.setup-uv.outputs.uvx-path }}" >> $GITHUB_OUTPUT
+

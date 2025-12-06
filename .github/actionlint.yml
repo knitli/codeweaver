@@ -1,0 +1,9 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+paths:
+  .github/actions/setup-uv-env/action.yml:
+    ignore:
+      - '.*is not defined in object type.*'

@@ -11,10 +11,10 @@ on:
   workflow_call:
     inputs:
       python-versions:
-        description: 'JSON array of Python versions to test (e.g., ["3.12", "3.13"]). Experimental versions (3.13t, 3.14, 3.14t) are always included via matrix.include.'
+        description: 'JSON array of Python versions to test (e.g., ["3.12", "3.13"]). Experimental versions (3.13t, 3.14t) are always included via matrix.include.'
         required: false
         type: string
-        default: '["3.12", "3.13"]'
+        default: '["3.12", "3.13", "3.14"]'
       test-markers:
         description: "Pytest markers for test filtering"
         required: false
@@ -54,8 +54,6 @@ jobs:
           # Experimental free-threaded Python versions (no-GIL)
           - python-version: "3.13t"
             experimental: true
-          - python-version: "3.14"
-            experimental: true
           - python-version: "3.14t"
             experimental: true
     env:
@@ -72,26 +70,25 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
         with:
-          fetch-depth: 0
+          fetch-depth: 3
 
       - name: Setup Python environment
-        uses: ./.github/actions/setup-python-env
+        uses: ./.github/actions/setup-mise-env
         with:
           python-version: ${{ matrix.python-version }}
-          skip-checkout: "true"
           github-token: ${{ secrets.GITHUB_TOKEN }}
-
+          profile: "dev"
       - name: Run quality checks
         if: inputs.run-quality-checks
         run: |
           export PATH="$HOME/.local/bin:$PATH"
-          mise run check
+          mise //:check
         continue-on-error: true
 
       - name: Run tests with coverage
         run: |
           export PATH="$HOME/.local/bin:$PATH"
-          mise run test-cov -m "${{ inputs.test-markers }}"
+          mise //:test-cov -m "${{ inputs.test-markers }}"
 
       - name: Upload coverage to Codecov
         if: inputs.upload-coverage && matrix.python-version == '3.12'

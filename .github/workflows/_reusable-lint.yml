@@ -27,28 +27,32 @@ jobs:
       contents: read
     name: Lint and Format
     runs-on: ubuntu-latest
+    env:
+      MISE_ENV: ci
     steps:
       - name: Checkout code
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
         with:
-          fetch-depth: 0
+          fetch-depth: 1
 
       - name: Setup Python environment
-        uses: ./.github/actions/setup-python-env
+        uses: ./.github/actions/setup-mise-env
         with:
           python-version: ${{ inputs.python-version }}
-          skip-checkout: "true"
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          profile: "reviewer"
 
       - name: Check code style and linting
         run: |
           export PATH="$HOME/.local/bin:$PATH"
-          mise run lint || echo "::warning::Lint checks failed but allowing workflow to continue"
+          export MISE_ENV=ci
+          mise //:lint || echo "::warning::Lint checks failed but allowing workflow to continue"
         continue-on-error: true
 
       - name: Check formatting and licenses
         if: inputs.run-format-check
         run: |
           export PATH="$HOME/.local/bin:$PATH"
-          mise run format || echo "::warning::License checks or formatting checks failed but allowing workflow to continue"
+          export MISE_ENV=ci
+          mise //:format || echo "::warning::License checks or formatting checks failed but allowing workflow to continue"
         continue-on-error: true

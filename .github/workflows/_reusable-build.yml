@@ -41,24 +41,23 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup Python environment
-        uses: ./.github/actions/setup-python-env
+      - name: Setup UV and build
+        uses: ./.github/actions/setup-uv-env
         with:
           python-version: ${{ inputs.python-version }}
-          skip-mise-setup: "true" # Don't need full mise setup for building
-          skip-checkout: "true"
           github-token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Install UV and build tools
-        run: |
-          python -m pip install uv
-
-      - name: Build package
+          # Because uv is in the pyproject.toml,
+          # we want to avoid shadowing what we're setting up here.
+          activate-venv: "false"
+        id: setup-uv
+      - name: Build package with UV
+        env:
+          UV_PATH: ${{ steps.setup-uv.outputs.uv-path }}
         run: |
           if [ "${{ inputs.clean-build }}" = "true" ]; then
-            uv build --clear
+            "$UV_PATH" build --clear
           else
-            uv build
+            "$UV_PATH" build
           fi
 
       - name: Check build artifacts
@@ -70,8 +69,10 @@ jobs:
           done
 
       - name: Verify package integrity with twine
+        env:
+          UVX_PATH: ${{ steps.setup-uv.outputs.uvx-path }}
         run: |
-          uvx twine check dist/*
+          "$UVX_PATH" twine check dist/*
 
       - name: Upload build artifacts
         if: inputs.upload-artifacts

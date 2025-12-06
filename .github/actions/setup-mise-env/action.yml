@@ -1,0 +1,125 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+name: Setup Mise Environment
+description: Complete Python development environment setup with mise and UV caching
+
+inputs:
+  python-version:
+    description: Python version to install
+    required: false
+    default: '3.12'
+  fetch-depth:
+    description: Git fetch depth for checkout
+    required: false
+    default: '1'
+  skip-checkout:
+    description: Skip checkout step (if already checked out by calling workflow)
+    required: false
+    default: 'false'
+  github-token:
+    description: GitHub token for mise installation (to avoid rate limits)
+    required: false
+    default: ''
+  profile:
+    description: Task profile to use for mise setup one of 'minimal', 'reviewer', 'dev'
+    required: true
+    default: 'minimal'
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout code
+      if: inputs.skip-checkout != 'true'
+      uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+      with:
+        fetch-depth: ${{ inputs.fetch-depth }}
+    - name: Install system dependencies
+      shell: bash
+      run: |
+        sudo apt-get update && sudo apt-get install -y zsh curl git
+    - name: Free up disk space
+      shell: bash
+      run: ./scripts/dev-env/ci-free-disk-space.sh
+
+    - name: Setup Mise for Minimal Profile
+      if: inputs.profile == 'minimal'
+      uses: jdx/mise-action@eb508e65f0eb73d4fc9fc9505569833136217cc9
+      env:
+        MISE_YES: 1
+        MISE_EXPERIMENTAL: 1
+      with:
+        github_token: ${{ inputs.github-token }}
+        experimental: true
+        install: true
+        mise_toml: |
+          [tools]
+          python = "${{ inputs.python-version }}"
+          uv = "latest"
+        cache: true
+        cache_key_prefix: ${{ inputs.profile }}
+      id: mise-setup-minimal
+    - name: Setup Mise for Reviewer Profile
+      if: inputs.profile == 'reviewer'
+      uses: jdx/mise-action@eb508e65f0eb73d4fc9fc9505569833136217cc9
+      env:
+        MISE_YES: 1
+        MISE_EXPERIMENTAL: 1
+      with:
+        github_token: ${{ inputs.github-token }}
+        experimental: true
+        install: true
+        mise_toml: |
+          [tools]
+          python = "${{ inputs.python-version }}"
+          uv = "latest"
+          ruff = "latest"
+          "pipx:ty" = "latest"
+        cache: true
+        cache_key_prefix: ${{ inputs.profile }}
+      id: mise-setup-reviewer
+      run: |
+        uv venv --allow-existing --seed --keyring-provider subprocess --python "${{ inputs.python-version }}" .venv
+        source .venv/bin/activate
+        uv sync
+    - name: Setup Mise for Dev-Dev Profile
+      if: inputs.profile == 'dev'
+      uses: jdx/mise-action@eb508e65f0eb73d4fc9fc9505569833136217cc9
+      env:
+        MISE_YES: 1
+        MISE_EXPERIMENTAL: 1
+      with:
+        github_token: ${{ inputs.github-token }}
+        experimental: true
+        install: true
+        mise_toml: |
+          [tools]
+          "ast-grep" = "latest"
+          "pipx:reuse" = "latest"
+          "pipx:tombi" = "latest"
+          "pipx:ty" = "latest"
+          hk = "latest"
+          pkl = "latest"
+          python = "${{ inputs.python-version }}"
+          ripgrep = "latest"
+          ruff = "latest"
+          usage = "latest"
+          uv = "latest"
+        cache: true
+        cache_key_prefix: ${{ inputs.profile }}
+      id: mise-setup-dev
+      run: |
+        uv venv --allow-existing --seed --keyring-provider subprocess --python "${{ inputs.python-version }}" .venv
+        source .venv/bin/activate
+        uv sync --group dev --group test
+    - name: Set outputs
+      shell: bash
+      id: mise-outputs
+      run: |
+        echo "MISE_PATH=$(which mise)" >> $GITHUB_OUTPUT
+        echo "MISE_ENV=$MISE_ENV" >> $GITHUB_OUTPUT
+        echo "PROFILE=${{ inputs.profile }}" >> $GITHUB_OUTPUT
+
+

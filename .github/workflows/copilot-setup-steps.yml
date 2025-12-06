@@ -23,7 +23,6 @@ jobs:
       VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
       CODEWEAVER_PROJECT_PATH: ${{ github.workspace }}
       MISE_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      MISE_ENV: "dev"
       MISE_YES: 1
       # Limit CodeQL memory usage to prevent OOM kills on standard runners (7GB total RAM)
       # Note: Standard runners have ~7GB, so limit to 3GB to leave headroom for system
@@ -46,66 +45,18 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          fetch-depth: 2
       - name: Free up disk space
         run: ./scripts/dev-env/ci-free-disk-space.sh
-      - name: Cache mise tools
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+      - name: Setup Mise Environment
+        uses: ./.github/actions/setup-mise-env
         with:
-          path: |
-            ~/.local/share/mise
-            ~/.local/bin/mise
-            ~/.local/share/mise/shims
-            ~/.cache/mise
-            ~/.local/bin
-          key: mise-copilot-${{ runner.os }}-${{ hashFiles('mise.ci.toml') }}
-          restore-keys: |
-            mise-copilot-${{ runner.os }}-
-            mise-${{ runner.os }}-
-      - name: Cache UV dependencies
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
-        with:
-          path: |
-            ~/.cache/uv
-            .venv
-          key: uv-copilot-${{ runner.os }}-${{ hashFiles('uv.lock') }}
-          restore-keys: |
-            uv-copilot-${{ runner.os }}-
-            uv-${{ runner.os }}-
-      - uses: jdx/mise-action@fcec31d82eb5c88cd7eb3fe3c270cb093aeeef18
-        with:
-          # Disable automatic env export to avoid hanging on enter hook in CI
-          env: false
-      - name: Install Dependencies
-        run: |
-          sudo apt-get update && sudo apt-get install -y zsh curl git
-      - name: Setup Mise
-        run: |
-          current_dir="$(pwd)"
-          subdirs="$(ls -d -- */ 2>/dev/null || echo '')"
-          if [[ "$current_dir" != "*codeweaver*" && "$current_dir" =~ $subdirs ]]; then
-            cd codeweaver
-          fi
-          echo "Mise setup in directory: $(pwd)"
-          MISE="$(which mise || true)"
-          if [ -z "$MISE" ]; then
-            echo "mise not found on PATH; skipping install step"
-            exit 0
-          fi
-          export MISE
-          MISE_DIR="$(dirname "$MISE")"
-          export MISE_DIR
-          # Trust the config globally
-          "$MISE" --quiet -y trust
-          # Also set the trusted config paths environment variable for subprocesses
-          echo "MISE_TRUSTED_CONFIG_PATHS=$PWD/mise.toml:$PWD/mise.cloudagent.toml" >> "$GITHUB_ENV"
-          # Guard the install with a timeout to prevent OOM / runaway installs in CI
-          # If the install fails or timeouts, we continue with a warning so Copilot can still run.
-          timeout 10m "$MISE" --quiet -y install 2>&1 || echo "Warning: Some tools failed to install due to network limitations or timeout in CI environment"
-        env:
-          MISE_DIR: ${{ runner.temp }}/mise
-      - name: Configure Mise and Activate Environment
+          python-version: "3.13"
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          profile: "dev"
+          skip-checkout: "true"
+      - name: Make scripts executable
         run: |
           chmod -R +x scripts
-          echo "Setting up mise..."
-          # Trust the mise configuration - already performed in Setup Mise step
-          echo "Mise setup completed"
+          chmod -R +x mise-tasks

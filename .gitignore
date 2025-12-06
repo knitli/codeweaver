@@ -92,7 +92,7 @@ __pycache__/
 
 
 .pytest_cache
-
+test-results.xml
 dist/
 site/
 *.tar
