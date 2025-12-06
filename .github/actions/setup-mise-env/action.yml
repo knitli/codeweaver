@@ -101,6 +101,8 @@ runs:
       shell: bash
       id: mise-outputs
       run: |
+        # Add mise to PATH since env export is disabled
+        export PATH="$HOME/.local/share/mise/bin:$PATH"
         echo "MISE_PATH=$(which mise)" >> $GITHUB_OUTPUT
         echo "MISE_ENV=$MISE_ENV" >> $GITHUB_OUTPUT
         echo "PROFILE=${{ inputs.profile }}" >> $GITHUB_OUTPUT
