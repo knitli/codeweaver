@@ -49,13 +49,6 @@ jobs:
           fetch-depth: 2
       - name: Free up disk space
         run: ./scripts/dev-env/ci-free-disk-space.sh
-      - name: Setup Mise Environment
-        uses: ./.github/actions/setup-mise-env
-        with:
-          python-version: "3.13"
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          profile: "dev"
-          skip-checkout: "true"
       - name: Make scripts executable
         run: |
           chmod -R +x scripts
