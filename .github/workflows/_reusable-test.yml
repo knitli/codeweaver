@@ -86,27 +86,12 @@ jobs:
         id: setup-mise
       - name: Run quality checks
         if: ${{ inputs.run-quality-checks && matrix.experimental == false }}
-        env:
-          MISE_YES: 1
-          MISE_PYTHON: ${{ matrix.python-version }}
-          UV_PYTHON: ${{ matrix.python-version }}
-          MISE_EXPERIMENTAL: 1
-          MISE_PATH: ${{ steps.setup-mise.outputs.MISE_PATH }}
-        run: |
-          export PATH="$HOME/.local/bin:$PATH"
-          "$MISE_PATH" //:check 2>&1
+        run: mise run check 2>&1
         continue-on-error: true
+
       - name: Run tests with coverage
         if: ${{ matrix.experimental == false }}
-        env:
-          MISE_YES: 1
-          MISE_PYTHON: ${{ matrix.python-version }}
-          UV_PYTHON: ${{ matrix.python-version }}
-          MISE_EXPERIMENTAL: 1
-          MISE_PATH: ${{ steps.setup-mise.outputs.MISE_PATH }}
-        run: |
-          export PATH="$HOME/.local/bin:$PATH"
-          "$MISE_PATH" //:test-cov -m "${{ inputs.test-markers }}"
+        run: mise run test-cov -m "${{ inputs.test-markers }}"
       - name: Upload coverage to Codecov
         if: ${{ inputs.upload-coverage && matrix.python-version == '3.12' }}
         uses: codecov/codecov-action@5a1091511ad55cbe89839c7260b706298ca349f7
@@ -125,22 +110,19 @@ jobs:
             coverage.xml
           if-no-files-found: warn
 
-      # Run experimental last
+      # Experimental Python versions (free-threaded)
       - name: Setup Experimental Python environment
         if: ${{ matrix.experimental == true }}
         uses: ./.github/actions/setup-python-env
         with:
           python-version: ${{ matrix.python-version }}
           skip-checkout: true
-      - name: Setup Env for Experimental Python
+
+      - name: Install test dependencies for Experimental Python
         if: ${{ matrix.experimental == true }}
-        shell: bash
-        run: |
-          uv sync --no-extra --group test --resolution highest --frozen 2>&1
+        run: uv sync --group test --resolution highest
 
       - name: Run test coverage for experimental Python
         if: ${{ matrix.experimental == true }}
-        run: |
-          export PATH="$HOME/.local/bin:$PATH"
-          uv run -m pytest tests/ --cov=codeweaver --cov-report=xml --cov-report=term-missing --junit-xml=test-results.xml -v -m "${{ inputs.test-markers }}"
+        run: uv run pytest tests/ --cov=codeweaver --cov-report=xml --cov-report=term-missing --junit-xml=test-results.xml -v -m "${{ inputs.test-markers }}"
 
