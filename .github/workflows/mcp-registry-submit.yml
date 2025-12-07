@@ -112,44 +112,11 @@ jobs:
           echo "Please verify that the package was successfully published"
           exit 1
 
-      - name: Install mcp-publisher CLI
-        env:
-          MCP_PUBLISHER_VERSION: "v1.3.10"
-        run: |
-          ARCH="$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')"
-          OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
-          VERSION="${MCP_PUBLISHER_VERSION:- v1.3.10}"
-          # TODO: I don't know why we're doing all this to get and use the CLI when we could use the api directly
-          echo "Downloading mcp-publisher ${VERSION} for ${OS}/${ARCH}..."
-          assets="$(curl -L \
-          -H "Accept: application/vnd.github+json" \
-          -H "Authorization: Bearer <YOUR-TOKEN>" \
-          -H "X-GitHub-Api-Version: 2022-11-28" \
-          https://api.github.com/repos/OWNER/REPO/releases/latest)"
-          our_index="$(echo "$assets" | jq -r '.assets[].name' | grep -n "^mcp-publisher_${OS}_${ARCH}.tar.gz$" | cut -d: -f1)"
-          asset="$(echo "$assets" | jq -r ".assets[$((our_index - 1))]")"
-          download_url="$(echo "$asset" | jq -r '.browser_download_url')"
-          digest="$(echo "$asset" | jq -r '.digest' | cut -d: -f2)"
-          curl -L -o mcp-publisher.tar.gz "$download_url"
-          downloaded_digest="$(sha256sum mcp-publisher.tar.gz | awk '{print $1}')"
-          if [ "$digest" != "$downloaded_digest" ]; then
-            echo "ERROR: Checksum verification failed for mcp-publisher"
-            echo "Expected: $digest"
-            echo "Got:      $downloaded_digest"
-            exit 1
-          fi
-          tar xz < mcp-publisher.tar.gz mcp-publisher
-          sudo mv mcp-publisher /usr/local/bin/
-          chmod +x /usr/local/bin/mcp-publisher
-          rm mcp-publisher.tar.gz
-
-          echo "✓ mcp-publisher installed"
-          mcp-publisher --version || echo "Version check not available"
-
       - name: Submit to MCP Registry
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           MCP_REGISTRY_KEY: ${{ secrets.MCP_REGISTRY_KEY }}
+        id: submit-mcp
         run: |
           echo "Submitting to MCP Registry..."
 
@@ -183,8 +150,7 @@ jobs:
             --header "Content-Type: application/json" \
             --data @"$request_body")"
           token="$(echo "$response" | jq -r '.registry_token')"
-          rm "$indata" "$key_file" "$outfile"
-          rm "$request_body"
+          rm "$indata" "$key_file" "$outfile" "$request_body"
           if [ -z "$token" ] || [ "$token" = "null" ]; then
             echo "ERROR: Failed to obtain registry token"
             echo "Response: $response"
@@ -205,7 +171,7 @@ jobs:
             exit 1
           fi
           echo "✓ Successfully submitted to MCP Registry at $publication_time"
-          export MCP_PUBLICATION_TIME="$publication_time"
+          echo "MCP_PUBLICATION_TIME=$publication_time" >> "$GITHUB_OUTPUT"
           exit 0
 
       - name: Summary of MCP Registry Submission
@@ -217,7 +183,7 @@ jobs:
             echo "- **Version**: ${{ steps.version.outputs.version }}"
             echo "- **Status**: ${{ job.status }}"
             if [ -n "$MCP_PUBLICATION_TIME" ]; then
-              echo "- **Published At**: $MCP_PUBLICATION_TIME"
+              echo "- **Published At**: ${{ steps.submit-mcp.outputs.MCP_PUBLICATION_TIME }}"
             fi
             echo ""
           } >> "$GITHUB_STEP_SUMMARY"
