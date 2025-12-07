@@ -144,6 +144,7 @@ jobs:
           indata="$(mktemp)"
           echo -n "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" > "$indata"
 
+          umask 077
           key_file="$(mktemp)"
           echo "$MCP_REGISTRY_KEY" > "$key_file"
           chmod 600 "$key_file"
@@ -170,11 +171,10 @@ jobs:
             exit 1
           fi
           echo "✓ Obtained registry token"
-          export MCP_LOGIN_TOKEN="$token"
           publication_response="$(curl --request POST \
           --url https://registry.modelcontextprotocol.io/v0.1/publish \
           --header 'Accept: application/json, application/problem+json' \
-          --header "Authorization: Bearer $MCP_LOGIN_TOKEN" \
+          --header "Authorization: Bearer $token" \
           --header 'Content-Type: application/json' \
           --data @./server.json)"
           echo "Publication response: $publication_response"
@@ -195,7 +195,7 @@ jobs:
             echo ""
             echo "- **Version**: ${{ steps.version.outputs.version }}"
             echo "- **Status**: ${{ job.status }}"
-            if [ -n "$MCP_PUBLICATION_TIME" ]; then
+            if [ -n "${{ steps.submit-mcp.outputs.MCP_PUBLICATION_TIME }}" ]; then
               echo "- **Published At**: ${{ steps.submit-mcp.outputs.MCP_PUBLICATION_TIME }}"
             fi
             echo ""

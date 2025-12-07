@@ -157,14 +157,14 @@ run = [
   ". .venv/bin/activate 2>&1 || true",
   "mise x uv@latest -- uv sync --group dev --group test 2>&1",
   "git config include.path .gitconfig 2>&1 || true",
-  '''
+  '''bash -c "
   ignore_files=('src/codeweaver/_version.py' 'coverage.xml' 'test-results.xml')
-  for file in "${ignore_files[@]}"; do
-    if ! grep -qx "$file" .git/info/exclude; then
-      echo "$file" >> .git/info/exclude 2>&1
+  for file in \"\${ignore_files[@]}\"; do
+    if ! grep -qx \"\$file\" .git/info/exclude; then
+      echo \"\$file\" >> .git/info/exclude 2>&1
     fi
   done
-  ''',
+  "''',
   "echo \"[codeweaver] Cloud development environment setup complete!\"",
 ]
 
