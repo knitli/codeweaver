@@ -50,16 +50,17 @@ jobs:
           profile: "${{ env.PROFILE }}"
           skip-checkout: true
         id: mise-outputs
+      - name: Set Path
+        run: |
+          export PATH="$HOME/.local/bin:$HOME/.local/share/mise/bin:$HOME/.local/share/mise/shims:$PATH"
+          eval "$(mise activate bash)"
+          echo "PATH=$PATH" >> "$GITHUB_ENV"
 
       - name: Check code style and linting
         env:
           PYTHON_PATH: ${{ steps.mise-outputs.outputs.PYTHON_PATH }}
         shell: bash
         run: |
-          export PATH="$HOME/.local/bin:$HOME/.local/share/mise/bin:$PATH"
-          echo "PYTHON_PATH=$PYTHON_PATH" >> "$GITHUB_ENV"
-          eval "$(mise activate bash)"
-          echo "PATH=$PATH" >> "$GITHUB_ENV"
           mise use -g uv@latest
           mise //:lint || echo "::warning::Lint checks failed but allowing workflow to continue"
         continue-on-error: true

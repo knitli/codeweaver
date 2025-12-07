@@ -86,16 +86,18 @@ jobs:
           profile: "dev"
           skip-checkout: true
         id: setup-mise
+      - name: Set Path
+        if: ${{ matrix.experimental == false }}
+        run: |
+          export PATH="$HOME/.local/bin:$HOME/.local/share/mise/bin:$HOME/.local/share/mise/shims:$PATH"
+          eval "$(mise activate bash)"
+          echo "PATH=$PATH" >> "$GITHUB_ENV"
       - name: Run quality checks before tests
         if: ${{ inputs.run-quality-checks && matrix.experimental == false }}
         env:
           MISE_PATH: ${{ steps.setup-mise.outputs.MISE_PATH }}
         run: |
-          export PATH="$HOME/.local/bin:$HOME/.local/share/mise/bin:$HOME/.local/share/mise/shims:$PATH"
-          echo "MISE_PATH=$MISE_PATH" >> "$GITHUB_ENV"
-          eval "$(mise activate bash)"
           mise use -g uv@latest
-          echo "PATH=$PATH" >> "$GITHUB_ENV"
           mise //:check 2>&1
         continue-on-error: true
       - name: Run tests with coverage
@@ -128,12 +130,11 @@ jobs:
           python-version: ${{ matrix.python-version }}
           skip-checkout: true
         id: setup-python
-      - name: Setup Env for Experimental Python
+      - name: Set UV Path
         if: ${{ matrix.experimental == true }}
         shell: bash
-        env:
-          UV_PATH: ${{ steps.setup-python.outputs.UV_PATH }}
         run: |
+          UV_PATH="${{ steps.setup-python.outputs.UV_PATH }}"
           if [ -z "$UV_PATH" ]; then
             echo "UV_PATH is not set."
             if ! command -v uv &> /dev/null; then
@@ -142,8 +143,12 @@ jobs:
             fi
             UV_PATH="$(which uv)"
           fi
-          "$UV_PATH" sync --group test --resolution highest 2>&1
           echo "UV_PATH=$UV_PATH" >> "$GITHUB_ENV"
+      - name: Setup Env for Experimental Python
+        if: ${{ matrix.experimental == true }}
+        shell: bash
+        run: |
+          "$UV_PATH" sync --group test --resolution highest 2>&1
 
       - name: Run test coverage for experimental Python
         if: ${{ matrix.experimental == true }}

@@ -127,6 +127,11 @@ jobs:
           # we need to sign the timestamp with the private key, which is in MCP_REGISTRY_KEY
           # MCP_REGISTRY_KEY is expected to be in PEM format, and it uses ed25519 algorithm
           # unfortunately, pkeyutl can only work with files because of how it has to buffer the input for signing
+          # shellcheck disable=SC2329
+          cleanup() {
+            shred -u "$key_file" "$outfile" || rm -f "$key_file" "$outfile"
+          }
+          trap cleanup EXIT
 
           domain="knitli.com"
           indata="$(mktemp)"
@@ -152,7 +157,6 @@ jobs:
             --header "Content-Type: application/json" \
             --data @"$request_body")"
           token="$(echo "$response" | jq -r '.registry_token')"
-          rm "$indata" "$key_file" "$outfile" "$request_body"
           if [ -z "$token" ] || [ "$token" = "null" ]; then
             echo "ERROR: Failed to obtain registry token"
             echo "Response: $response"
