@@ -126,13 +126,12 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           skip-checkout: true
-        id: setup-uv
+        id: setup-python
       - name: Setup Env for Experimental Python
         if: ${{ matrix.experimental == true }}
         shell: bash
         env:
-          UV_PYTHON: ${{ matrix.python-version }}
-          UV_PATH: ${{ steps.setup-uv.outputs.UV_PATH }}
+          UV_PATH: ${{ steps.setup-python.outputs.UV_PATH }}
         run: |
           "$UV_PATH" sync --group test --resolution highest 2>&1
           echo "UV_PATH=$UV_PATH" >> "$GITHUB_ENV"
