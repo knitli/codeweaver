@@ -11,8 +11,8 @@ The `full` or `full-gpu` install flags (`pip install code-weaver[full]` or `pip 
 The recommended flag gives you access to:
     - All current vector, agent and data providers
     - All embedding and reranking providers except for Sentence Transformers (because these install paths are aligned with pydantic-ai's default dependencies, and Sentence Transformers is not a default dependency of pydantic-ai).
-- A-la-Carte installations: You can also use the `required-core` install flag (`pip install code-weaver[required-core]`) to install only the core dependencies of CodeWeaver, and then add individual providers using their own install flags (all prefixed with `provider-`), like:
-    `pip install code-weaver[required-core,provider-openai,provider-qdrant]`
+- A-la-Carte installations: You can also use the `required-core` install flag (`pip install code-weaver[required-core]`) to install only the core dependencies of CodeWeaver, and then add individual providers using their own install flags, like:
+    `pip install code-weaver[required-core,openai,qdrant]`
 
 """
 

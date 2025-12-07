@@ -39,7 +39,7 @@ case "$python_path" in
     ;;
 *)
     # Not in venv or python not found, source it
-    source .venv/bin/activate 2>/dev/null || true
+    . .venv/bin/activate 2>/dev/null || true
     ;;
 esac
 '''

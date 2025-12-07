@@ -107,7 +107,7 @@ class TestRemovePathWithDeletedFiles:
                 discovered = DiscoveredFile(
                     path=discovered.path,
                     ext_kind=discovered.ext_kind,
-                    file_hash=discovered.file_hash(),
+                    file_hash=discovered.file_hash,
                     git_branch=resolved_branch,
                     source_id=unique_id,
                 )

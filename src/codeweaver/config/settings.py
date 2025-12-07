@@ -521,12 +521,12 @@ class CodeWeaverSettings(BaseSettings):
             pattern=r"\d{1,2}\.\d{1,3}\.\d{1,3}",
             alias="schema_version",
         ),
-    ] = "1.1.0"
+    ] = "1.1.1"
 
     schema_: HttpUrl = Field(
         description="URL to the CodeWeaver settings schema",
         default_factory=lambda data: HttpUrl(
-            f"https://raw.githubusercontent.com/knitli/codeweaver/main/schema/v{data.get('__version__', data.get('schema_version')) or '1.1.0'}/codeweaver.schema.json"
+            f"https://raw.githubusercontent.com/knitli/codeweaver/main/schema/v{data.get('__version__', data.get('schema_version')) or '1.1.1'}/codeweaver.schema.json"
         ),
     )
 
