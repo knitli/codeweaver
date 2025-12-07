@@ -8,7 +8,9 @@ name: Submit to MCP Registry
 
 on:
   release:
-    types: [published]
+    types:
+      - published
+      - prereleased
   workflow_dispatch:
     inputs:
       version:

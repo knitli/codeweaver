@@ -28,6 +28,14 @@ inputs:
     required: false
     default: 'false'
 
+outputs:
+  UV_PATH:
+    description: Path to uv executable
+    value: ${{ steps.uv-outputs.outputs.UV_PATH }}
+  UVX_PATH:
+    description: Path to uvx executable
+    value: ${{ steps.uv-outputs.outputs.UVX_PATH }}
+
 runs:
   using: composite
   steps:

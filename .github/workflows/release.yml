@@ -6,6 +6,9 @@
 name: Release
 on:
   push:
+    branches:
+      - main
+      - staging
     tags:
       - v*
   workflow_dispatch:
@@ -29,6 +32,7 @@ jobs:
   tests:
     name: Run Tests
     # EFFICIENCY: Skip tests on tag push (rely on PR tests), but allow manual trigger
+    # TODO: Add smoke tests for releases
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'release'
     uses: ./.github/workflows/_reusable-test.yml
     with:

@@ -21,15 +21,21 @@ on:
         type: boolean
         default: true
 
+env:
+  MISE_EXPERIMENTAL: 1
+  MISE_YES: 1
+  PROFILE: "reviewer"
+
 jobs:
   lint:
     permissions:
       contents: read
     name: Lint and Format
-    runs-on: ubuntu-latest
     env:
-      MISE_ENV: ci
-      MISE_EXPERIMENTAL: 1
+      python-version: ${{ inputs.python-version }}
+      MISE_PYTHON: ${{ inputs.python-version }}
+      UV_PYTHON: ${{ inputs.python-version }}
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
@@ -39,33 +45,26 @@ jobs:
       - name: Setup Python environment
         uses: ./.github/actions/setup-mise-env
         with:
-          python-version: ${{ inputs.python-version }}
+          python-version: ${{ env.python-version }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          profile: "reviewer"
+          profile: "${{ env.PROFILE }}"
           skip-checkout: true
         id: mise-outputs
 
       - name: Check code style and linting
         env:
-          MISE_YES: 1
-          MISE_PYTHON: ${{ inputs.python-version }}
-          UV_PYTHON: ${{ inputs.python-version }}
-          MISE_EXPERIMENTAL: 1
           PYTHON_PATH: ${{ steps.mise-outputs.outputs.PYTHON_PATH }}
+        shell: bash
         run: |
-          export PATH="$HOME/.local/bin:$HOME/.local/share/mise/bin:$HOME/.local/share/mise/shims:$PATH"
+          export PATH="$HOME/.local/bin:$HOME/.local/share/mise/bin:$PATH"
+          echo "PYTHON_PATH=$PYTHON_PATH" >> "$GITHUB_ENV"
+          eval "$(mise activate bash)"
+          echo "PATH=$PATH" >> "$GITHUB_ENV"
           mise //:lint || echo "::warning::Lint checks failed but allowing workflow to continue"
         continue-on-error: true
 
       - name: Check formatting and licenses
-        if: inputs.run-format-check
-        env:
-          MISE_YES: 1
-          MISE_PYTHON: ${{ inputs.python-version }}
-          UV_PYTHON: ${{ inputs.python-version }}
-          MISE_EXPERIMENTAL: 1
-          PYTHON_PATH: ${{ steps.mise-outputs.outputs.PYTHON_PATH }}
+        if: ${{ inputs.run-format-check == true }}
         run: |
-          export PATH="$HOME/.local/bin:$HOME/.local/share/mise/bin:$HOME/.local/share/mise/shims:$PATH"
           mise //:format || echo "::warning::License checks or formatting checks failed but allowing workflow to continue"
         continue-on-error: true
