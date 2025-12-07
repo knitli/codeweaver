@@ -167,12 +167,12 @@ run = [
   ''',
   "echo \"[codeweaver] Cloud development environment setup complete!\"",
 ]
+
 [tasks.cloud-setup.env]
 ACTIVE_SHELL = '''{{ exec(command='basename "$SHELL" 2>/dev/null || echo bash') }}'''
 MISE_EXPERIMENTAL = "1"
 MISE_ENV = "dev"
 MISE_YES = "1"
-
 
 [tasks.fix-python]
 tools.uv = "latest"
