@@ -128,8 +128,15 @@ jobs:
           # MCP_REGISTRY_KEY is expected to be in PEM format, and it uses ed25519 algorithm
           # unfortunately, pkeyutl can only work with files because of how it has to buffer the input for signing
           # shellcheck disable=SC2329
+          indata=""
+          key_file=""
+          outfile=""
+          request_body=""
+          # shellcheck disable=SC2329
           cleanup() {
             shred -u "$key_file" "$outfile" || rm -f "$key_file" "$outfile"
+            # these aren't sensitive, but let's keep things tidy
+            rm -f "$indata" "$request_body"
           }
           trap cleanup EXIT
 
