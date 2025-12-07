@@ -163,7 +163,11 @@ def generate_server_yaml() -> dict:
         },
         "about": {
             "title": "CodeWeaver - Code Search for AI Agents",
-            "description": f"Semantic code search built for AI agents. Hybrid AST-aware context for {len(_languages())} languages with intelligent chunking, intent detection, and multi-provider support.",
+            "description": f"""Semantic code search for AI agents. Hybrid search across {len(_languages())} languages with {len(embedding_providers())} embedding providers.
+
+            Works offline with local models or cloud providers (Voyage, OpenAI, Cohere, etc.). AST-aware parsing, intelligent chunking, automatic failover.
+
+            One simple MCP tool for any client.""",
             "icon": "https://github.com/knitli/codeweaver/raw/refs/heads/main/docs/assets/codeweaver-favico.png",
         },
         "source": {

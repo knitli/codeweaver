@@ -5,25 +5,23 @@
 
 name: Setup Python Environment
 description: Minimal Python environment setup
-
 inputs:
   python-version:
     description: Python version to install
     required: false
-    default: '3.12'
+    default: "3.12"
   fetch-depth:
     description: Git fetch depth for checkout
     required: false
-    default: '0'
+    default: "0"
   skip-checkout:
     description: Skip checkout step (if already checked out by calling workflow)
     required: false
-    default: 'false'
+    default: "false"
   github-token:
     description: GitHub token for mise installation (to avoid rate limits)
     required: false
-    default: ''
-
+    default: ""
 outputs:
   PYTHON_PATH:
     description: Path to the Python executable
@@ -31,7 +29,6 @@ outputs:
   UV_PATH:
     description: Path to uv executable
     value: ${{ steps.python-setup.outputs.UV_PATH }}
-
 runs:
   using: composite
   steps:
@@ -40,11 +37,9 @@ runs:
       uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
       with:
         fetch-depth: ${{ inputs.fetch-depth }}
-
     - name: Free up disk space
       shell: bash
       run: ./scripts/dev-env/ci-free-disk-space.sh
-
     - name: Set up Python ${{ inputs.python-version }}
       uses: actions/setup-python@9b03c627221f32cb88b299427119da30671cf9cc # v5
       with:
@@ -59,5 +54,3 @@ runs:
         echo "PYTHON_PATH=$(which python)" >> "$GITHUB_OUTPUT"
         echo "UV_PATH=$(which uv)" >> "$GITHUB_OUTPUT"
       id: python-setup
-
-

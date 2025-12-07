@@ -6,26 +6,23 @@
 name: Reusable Lint Workflow
 permissions:
   contents: read
-
 on:
   workflow_call:
     inputs:
       python-version:
-        description: "Python version for linting"
+        description: Python version for linting
         required: false
         type: string
         default: "3.12"
       run-format-check:
-        description: "Run format/license checks"
+        description: Run format/license checks
         required: false
         type: boolean
         default: true
-
 env:
   MISE_EXPERIMENTAL: 1
   MISE_YES: 1
-  PROFILE: "reviewer"
-
+  PROFILE: reviewer
 jobs:
   lint:
     permissions:
@@ -41,13 +38,12 @@ jobs:
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
         with:
           fetch-depth: 1
-
       - name: Setup Python environment
         uses: ./.github/actions/setup-mise-env
         with:
           python-version: ${{ env.python-version }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          profile: "${{ env.PROFILE }}"
+          profile: ${{ env.PROFILE }}
           skip-checkout: true
         id: mise-outputs
       - name: Set Path
@@ -55,7 +51,6 @@ jobs:
           export PATH="$HOME/.local/bin:$HOME/.local/share/mise/bin:$HOME/.local/share/mise/shims:$PATH"
           eval "$(mise activate bash)"
           echo "PATH=$PATH" >> "$GITHUB_ENV"
-
       - name: Check code style and linting
         env:
           PYTHON_PATH: ${{ steps.mise-outputs.outputs.PYTHON_PATH }}
@@ -64,7 +59,6 @@ jobs:
           mise use -g uv@latest
           mise //:lint || echo "::warning::Lint checks failed but allowing workflow to continue"
         continue-on-error: true
-
       - name: Check formatting and licenses
         if: ${{ inputs.run-format-check == true }}
         run: |

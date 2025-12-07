@@ -37,23 +37,21 @@ jobs:
     uses: ./.github/workflows/_reusable-test.yml
     with:
       python-versions: '["3.12", "3.13", "3.14"]'
-      test-markers: "not docker and not qdrant and not dev_only and not skip_ci and not network and not external_api and not flaky"
+      test-markers: not docker and not qdrant and not dev_only and not skip_ci and not network and not external_api and not flaky
       upload-coverage: false
       run-quality-checks: true
     secrets: inherit
-
   build:
     name: Build Distribution
     needs: tests
     if: always() && (needs.tests.result == 'success' || needs.tests.result == 'skipped')
     uses: ./.github/workflows/_reusable-build.yml
     with:
-      artifact-name: "python-package-distributions"
+      artifact-name: python-package-distributions
       python-version: "3.12"
       upload-artifacts: true
       clean-build: true
     secrets: inherit
-
   github-release:
     name: Create GitHub Release
     needs:
@@ -85,84 +83,13 @@ jobs:
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
-
       - name: Install git-cliff
         uses: taiki-e/install-action@331a600f1b10a3fed8dc56f925012bede91ae51f
         with:
           tool: git-cliff@2.10.0
-
       - name: Generate release notes
         id: release_notes
-        run: |
-          # Get the latest release tag (before current)
-          PREVIOUS_TAG="$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+([ab]|rc|-alpha|-beta)?[0-9]*(\.[0-9]+)?$' | head -2 | tail -1 || echo "")"
-          CURRENT_TAG="${{ steps.version.outputs.tag }}"
-          VERSION="${{ steps.version.outputs.version }}"
-
-          echo "Previous tag: $PREVIOUS_TAG"
-          echo "Current tag: $CURRENT_TAG"
-
-          # Generate changelog using git-cliff.
-          # Note: We use '--strip header' to intentionally remove the changelog header (as defined in cliff.toml),
-          # so that only the changes section is extracted for embedding in the release notes.
-          if [ -n "$PREVIOUS_TAG" ] && [ "$PREVIOUS_TAG" != "$CURRENT_TAG" ]; then
-            # Generate changelog for the range between previous and current tag
-            git-cliff --strip header --tag "$CURRENT_TAG" "$PREVIOUS_TAG..$CURRENT_TAG" > changelog_section.md
-          else
-            # First release - get all commits
-            git-cliff --strip header --tag "$CURRENT_TAG" > changelog_section.md
-          fi
-
-          # Build complete release notes with installation instructions
-          cat > release_notes.md << 'EOF'
-          ## What's Changed
-
-          EOF
-
-          cat changelog_section.md >> release_notes.md
-
-          cat >> release_notes.md << 'EOF'
-
-          ## Installation
-
-          EOF
-
-          # Add pre-release specific installation instructions
-          if [[ "$VERSION" == *"a"* ]] || [[ "$VERSION" == *"b"* ]] || [[ "$VERSION" == *"rc"* ]]; then
-            cat >> release_notes.md << EOF
-          **This is a pre-release version.** Install with:
-          \`\`\`bash
-          pip install --pre code-weaver
-          # Or specific version:
-          pip install code-weaver==$VERSION
-          \`\`\`
-          EOF
-          else
-            cat >> release_notes.md << 'EOF'
-          Install from PyPI:
-          ```bash
-          pip install code-weaver
-          ```
-          EOF
-          fi
-
-          cat >> release_notes.md << 'EOF'
-
-          Or download the wheel/source distribution from the assets below.
-
-          ## Verification
-
-          All release artifacts are built from source and include:
-          - 📦 Wheel distribution (.whl)
-          - 📦 Source distribution (.tar.gz)
-
-          EOF
-
-          if [ -n "$PREVIOUS_TAG" ]; then
-            echo "**Full Changelog**: https://github.com/knitli/codeweaver/compare/$PREVIOUS_TAG...$CURRENT_TAG" >> release_notes.md
-          else
-            echo "**Full Changelog**: https://github.com/knitli/codeweaver/commits/$CURRENT_TAG" >> release_notes.md
-          fi
+        run: "# Get the latest release tag (before current)\nPREVIOUS_TAG=\"$(git tag --sort=-version:refname | grep -E '^v[0-9]+\\.[0-9]+\\.[0-9]+([ab]|rc|-alpha|-beta)?[0-9]*(\\.[0-9]+)?$' | head -2 | tail -1 || echo \"\")\"\nCURRENT_TAG=\"${{ steps.version.outputs.tag }}\"\nVERSION=\"${{ steps.version.outputs.version }}\"\n\necho \"Previous tag: $PREVIOUS_TAG\"\necho \"Current tag: $CURRENT_TAG\"\n\n# Generate changelog using git-cliff.\n# Note: We use '--strip header' to intentionally remove the changelog header (as defined in cliff.toml),\n# so that only the changes section is extracted for embedding in the release notes.\nif [ -n \"$PREVIOUS_TAG\" ] && [ \"$PREVIOUS_TAG\" != \"$CURRENT_TAG\" ]; then\n  # Generate changelog for the range between previous and current tag\n  git-cliff --strip header --tag \"$CURRENT_TAG\" \"$PREVIOUS_TAG..$CURRENT_TAG\" > changelog_section.md\nelse\n  # First release - get all commits\n  git-cliff --strip header --tag \"$CURRENT_TAG\" > changelog_section.md\nfi\n\n# Build complete release notes with installation instructions\ncat > release_notes.md << 'EOF'\n## What's Changed\n\nEOF\n\ncat changelog_section.md >> release_notes.md\n\ncat >> release_notes.md << 'EOF'\n\n## Installation\n\nEOF\n\n# Add pre-release specific installation instructions\nif [[ \"$VERSION\" == *\"a\"* ]] || [[ \"$VERSION\" == *\"b\"* ]] || [[ \"$VERSION\" == *\"rc\"* ]]; then\n  cat >> release_notes.md << EOF\n**This is a pre-release version.** Install with:\n\\`\\`\\`bash\npip install --pre code-weaver\n# Or specific version:\npip install code-weaver==$VERSION\n\\`\\`\\`\nEOF\nelse\n  cat >> release_notes.md << 'EOF'\nInstall from PyPI:\n```bash\npip install code-weaver\n```\nEOF\nfi\n\ncat >> release_notes.md << 'EOF'\n\nOr download the wheel/source distribution from the assets below.\n\n## Verification\n\nAll release artifacts are built from source and include:\n- \U0001F4E6 Wheel distribution (.whl)\n- \U0001F4E6 Source distribution (.tar.gz)\n\nEOF\n\nif [ -n \"$PREVIOUS_TAG\" ]; then\n  echo \"**Full Changelog**: https://github.com/knitli/codeweaver/compare/$PREVIOUS_TAG...$CURRENT_TAG\" >> release_notes.md\nelse\n  echo \"**Full Changelog**: https://github.com/knitli/codeweaver/commits/$CURRENT_TAG\" >> release_notes.md\nfi\n"
       - name: Create GitHub Release
         uses: softprops/action-gh-release@5be0e66d93ac7ed76da52eca8bb058f665c3a5fe
         with:
@@ -186,7 +113,6 @@ jobs:
     environment:
       name: production
       url: https://pypi.org/p/codeweaver
-
     permissions:
       id-token: write
       contents: read

@@ -22,11 +22,10 @@ jobs:
     uses: ./.github/workflows/_reusable-test.yml
     with:
       python-versions: '["3.12", "3.13"]'
-      test-markers: "not docker and not qdrant and not dev_only and not skip_ci"
+      test-markers: not docker and not qdrant and not dev_only and not skip_ci
       upload-coverage: false
       run-quality-checks: true
     secrets: inherit
-
   build:
     name: Build Distribution
     needs: tests
@@ -37,7 +36,6 @@ jobs:
       python-version: "3.12"
       upload-artifacts: true
       clean-build: true
-
   publish-to-testpypi:
     name: Publish to TestPyPI
     needs:

@@ -5,7 +5,6 @@
 # Triggers on release publication after PyPI package is available
 
 name: Submit to MCP Registry
-
 on:
   release:
     types:
@@ -14,25 +13,21 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version to submit (leave empty to use latest release)"
+        description: Version to submit (leave empty to use latest release)
         required: false
         type: string
-
 permissions:
   contents: read
-
 jobs:
   validate-and-submit:
     name: Validate and Submit to MCP Registry
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@b3498302c5c423fa896b97a26bb183df735d08f8
         with:
           ref: ${{ github.event.release.tag_name || github.ref }}
           fetch-depth: 1
-
       - name: Install uv
         uses: ./.github/actions/setup-uv-env
         with:
@@ -55,7 +50,6 @@ jobs:
 
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "Detected version: ${VERSION}"
-
       - name: Regenerate server.json from code
         run: |
           VERSION="${{ steps.version.outputs.version }}"
@@ -64,7 +58,6 @@ jobs:
           # Run the generation script (uses PEP 723 dependencies)
           uv run scripts/build/generate-mcp-server-json.py
           echo "✓ server.json regenerated"
-
       - name: Wait for PyPI package availability
         run: |
           VERSION="${{ steps.version.outputs.version }}"
@@ -113,7 +106,6 @@ jobs:
           echo "ERROR: Package not available on PyPI after ${MAX_ATTEMPTS} attempts"
           echo "Please verify that the package was successfully published"
           exit 1
-
       - name: Submit to MCP Registry
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -185,7 +177,6 @@ jobs:
           echo "✓ Successfully submitted to MCP Registry at $publication_time"
           echo "MCP_PUBLICATION_TIME=$publication_time" >> "$GITHUB_OUTPUT"
           exit 0
-
       - name: Summary of MCP Registry Submission
         if: always()
         run: |

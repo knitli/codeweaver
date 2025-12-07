@@ -6,42 +6,39 @@
 name: CI
 permissions:
   contents: read
-
 on:
   push:
     branches:
       - main
       - staging
     paths:
-      - "src/**"
-      - "tests/**"
-      - "pyproject.toml"
-      - "uv.lock"
-      - "**/mise.*.toml"
-      - "**/mise.toml"
-      - ".github/workflows/ci.yml"
-      - ".github/workflows/_reusable-*.yml"
-      - ".github/actions/**"
+      - src/**
+      - tests/**
+      - pyproject.toml
+      - uv.lock
+      - '**/mise.*.toml'
+      - '**/mise.toml'
+      - .github/workflows/ci.yml
+      - .github/workflows/_reusable-*.yml
+      - .github/actions/**
   pull_request:
     branches:
       - main
       - staging
     paths:
-      - "src/**"
-      - "tests/**"
-      - "pyproject.toml"
-      - "uv.lock"
-      - "mise.toml"
-      - "mise.ci.toml"
-      - ".github/workflows/ci.yml"
-      - ".github/workflows/_reusable-*.yml"
-      - ".github/actions/**"
+      - src/**
+      - tests/**
+      - pyproject.toml
+      - uv.lock
+      - mise.toml
+      - mise.ci.toml
+      - .github/workflows/ci.yml
+      - .github/workflows/_reusable-*.yml
+      - .github/actions/**
   workflow_dispatch:
-
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
-
 jobs:
   test:
     name: Test
@@ -52,15 +49,13 @@ jobs:
       QDRANT__SERVICE__API_KEY: ${{ secrets.QDRANT__SERVICE__API_KEY }}
       VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
     with:
-      test-markers: "not docker and not qdrant and not dev_only and not skip_ci and not network and not external_api and not flaky"
+      test-markers: not docker and not qdrant and not dev_only and not skip_ci and not network and not external_api and not flaky
       upload-coverage: true
       run-quality-checks: true
-
   lint:
     name: Lint
     uses: ./.github/workflows/_reusable-lint.yml
     secrets: inherit
-
   build:
     name: Build
     needs:

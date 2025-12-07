@@ -34,7 +34,7 @@ on:
   workflow_dispatch:
     inputs:
       update_description_only:
-        description: "Only update Docker Hub description (no build)"
+        description: Only update Docker Hub description (no build)
         required: false
         type: boolean
         default: false
@@ -61,10 +61,9 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
           repository: ${{ env.IMAGE_NAME }}
           readme-filepath: ./DOCKER.md
-          short-description: "The missing abstraction layer between AI and your code - deep, structural understanding for better AI results"
+          short-description: The missing abstraction layer between AI and your code - deep, structural understanding for better AI results
       - name: Confirmation
         run: echo "✅ Docker Hub description updated successfully!"
-
   # Build and test Docker image
   build:
     name: Build Docker Image
@@ -304,7 +303,7 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
           repository: ${{ env.IMAGE_NAME }}
           readme-filepath: ./DOCKER.md
-          short-description: "The missing abstraction layer between AI and your code - deep, structural understanding for better AI results"
+          short-description: The missing abstraction layer between AI and your code - deep, structural understanding for better AI results
       - name: Generate image summary
         run: |
           {

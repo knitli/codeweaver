@@ -6,27 +6,26 @@
 name: Reusable Test Workflow
 permissions:
   contents: read
-
 on:
   workflow_call:
     inputs:
       python-versions:
-        description: 'JSON array of Python versions to test (e.g., ["3.12", "3.13"]). Experimental versions (3.13t, 3.14t) are always included via matrix.include.'
+        description: JSON array of Python versions to test (e.g., ["3.12", "3.13"]). Experimental versions (3.13t, 3.14t) are always included via matrix.include.
         required: false
         type: string
         default: '["3.12", "3.13", "3.14"]'
       test-markers:
-        description: "Pytest markers for test filtering"
+        description: Pytest markers for test filtering
         required: false
         type: string
-        default: "not docker and not qdrant and not dev_only and not skip_ci and not network and not external_api"
+        default: not docker and not qdrant and not dev_only and not skip_ci and not network and not external_api
       upload-coverage:
-        description: "Upload coverage to Codecov"
+        description: Upload coverage to Codecov
         required: false
         type: boolean
         default: true
       run-quality-checks:
-        description: "Run quality checks before tests"
+        description: Run quality checks before tests
         required: false
         type: boolean
         default: true
@@ -43,7 +42,7 @@ env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   MISE_EXPERIMENTAL: 1
   MISE_YES: 1
-  PROFILE: "dev"
+  PROFILE: dev
   CODEWEAVER_PROJECT_PATH: ${{ github.workspace }}
   CODEWEAVER_TESTING: "true"
   CODEWEAVER_VECTOR_STORE_URL: ${{ secrets.CODEWEAVER_VECTOR_STORE_URL }}
@@ -51,7 +50,6 @@ env:
   VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
   MISE_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-
 jobs:
   test:
     name: Test Python ${{ matrix.python-version }}${{ matrix.experimental && ' (experimental)' || '' }}
@@ -61,12 +59,13 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ${{ fromJSON(inputs.python-versions) }}
-        experimental: [false]
+        experimental:
+          - false
         include:
           # Experimental free-threaded Python versions (no-GIL)
-          - python-version: "3.13t"
+          - python-version: 3.13t
             experimental: true
-          - python-version: "3.14t"
+          - python-version: 3.14t
             experimental: true
     env:
       MISE_PYTHON: ${{ matrix.python-version }}
@@ -76,14 +75,13 @@ jobs:
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
         with:
           fetch-depth: 3
-
       - name: Setup Python environment with Mise
         if: ${{ matrix.experimental == false }}
         uses: ./.github/actions/setup-mise-env
         with:
           python-version: ${{ matrix.python-version }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          profile: "dev"
+          profile: dev
           skip-checkout: true
         id: setup-mise
       - name: Set Path
@@ -112,7 +110,6 @@ jobs:
           files: ./coverage.xml
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
-
       - name: Upload test results
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
@@ -122,7 +119,6 @@ jobs:
             test-results.xml
             coverage.xml
           if-no-files-found: warn
-
       # Run experimental last
       - name: Setup Experimental Python environment
         if: ${{ matrix.experimental == true }}
@@ -156,7 +152,6 @@ jobs:
         shell: bash
         run: |
           uv sync --group test --resolution highest 2>&1
-
       - name: Run test coverage for experimental Python
         if: ${{ matrix.experimental == true }}
         run: |

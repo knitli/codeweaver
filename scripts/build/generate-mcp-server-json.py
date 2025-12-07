@@ -848,7 +848,7 @@ def generate_server_detail() -> ServerDetail:
     return ServerDetail(
         field_schema=AnyUrl("https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json"),
         name="com.knitli/codeweaver",
-        description=f"Semantic code search built for AI agents. Hybrid, AST-aware, context for {len(_languages())} languages.",
+        description=f"Semantic code search for AI agents. Hybrid search, {len(_languages())} languages, {len([provider for provider in Provider if provider != Provider.NOT_SET])} providers.",
         title="CodeWeaver - Code Search for AI Agents",
         version=__version__,
         repository=REPOSITORY,

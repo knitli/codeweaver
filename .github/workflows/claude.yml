@@ -19,7 +19,6 @@ on:
   pull_request_review:
     types:
       - submitted
-
 permissions:
   actions: read
   checks: read
@@ -27,14 +26,13 @@ permissions:
   contents: write
   discussions: write
   pull-requests: write
-
 env:
   CODEWEAVER_VECTOR_STORE_URL: ${{ secrets.CODEWEAVER_VECTOR_STORE_URL }}
   QDRANT__SERVICE__API_KEY: ${{ secrets.QDRANT__SERVICE__API_KEY }}
   VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
   CODEWEAVER_PROJECT_PATH: ${{ github.workspace }}
   MISE_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  MISE_ENV: "dev"
+  MISE_ENV: dev
   MISE_YES: 1
   TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
   # Limit CodeQL memory usage to prevent OOM kills on standard runners (7GB total RAM)
@@ -59,17 +57,16 @@ jobs:
         with:
           python-version: "3.13"
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          profile: "reviewer"
+          profile: reviewer
           skip-checkout: "true"
-
       - name: PR Review
         if: github.event_name == 'pull_request_review'
         uses: anthropics/claude-code-action@e8bad572273ce919ba15fec95aef0ce974464753
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          allowed_non_write_users: "Copilot"
-          trigger_phrase: "@claude"
+          allowed_non_write_users: Copilot
+          trigger_phrase: '@claude'
           assignee_trigger: claude
           label_trigger: claude
           base_branch: main
@@ -95,7 +92,7 @@ jobs:
         with:
           python-version: "3.13"
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          profile: "dev"
+          profile: dev
           skip-checkout: "true"
       - name: Issue Opened
         if: github.event_name == 'issues' && github.event.action == 'opened'
@@ -103,7 +100,7 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          trigger_phrase: "@claude"
+          trigger_phrase: '@claude'
           assignee_trigger: claude
           label_trigger: claude
           track_progress: true
@@ -130,7 +127,7 @@ jobs:
         with:
           python-version: "3.13"
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          profile: "minimal"
+          profile: minimal
           skip-checkout: "true"
       - name: PR Review Comment
         if: github.event_name == 'pull_request_review_comment'
@@ -138,7 +135,7 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          trigger_phrase: "@claude"
+          trigger_phrase: '@claude'
           assignee_trigger: claude
           label_trigger: claude
           use_commit_signing: true
@@ -166,7 +163,7 @@ jobs:
         with:
           python-version: "3.13"
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          profile: "dev"
+          profile: dev
           skip-checkout: "true"
       - name: Issue Assigned or Labeled Claude
         if: |
@@ -175,7 +172,7 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          trigger_phrase: "@claude"
+          trigger_phrase: '@claude'
           assignee_trigger: claude
           label_trigger: claude
           track_progress: true
