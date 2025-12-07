@@ -86,25 +86,14 @@ jobs:
           profile: "dev"
           skip-checkout: true
         id: setup-mise
-      - name: Set Path
-        if: ${{ matrix.experimental == false }}
-        env:
-          NEWPATH: ${{ steps.setup-mise.outputs.NEWPATH }}
-        shell: bash
-        run: |
-          echo "PROFILE=dev" >> "$GITHUB_ENV"
-          echo "PATH=$NEWPATH" >> "$GITHUB_ENV"
-      - name: Run quality checks before tests
+      - name: Run quality checks
         if: ${{ inputs.run-quality-checks && matrix.experimental == false }}
-        run: |
-          mise use -g uv@latest
-          mise //:check 2>&1
+        run: mise run check 2>&1
         continue-on-error: true
+
       - name: Run tests with coverage
         if: ${{ matrix.experimental == false }}
-        run: |
-          mise use -g uv@latest
-          mise //:test-cov -m "${{ inputs.test-markers }}"
+        run: mise run test-cov -m "${{ inputs.test-markers }}"
       - name: Upload coverage to Codecov
         if: ${{ inputs.upload-coverage && matrix.python-version == '3.12' }}
         uses: codecov/codecov-action@5a1091511ad55cbe89839c7260b706298ca349f7
@@ -123,42 +112,19 @@ jobs:
             coverage.xml
           if-no-files-found: warn
 
-      # Run experimental last
+      # Experimental Python versions (free-threaded)
       - name: Setup Experimental Python environment
         if: ${{ matrix.experimental == true }}
         uses: ./.github/actions/setup-python-env
         with:
           python-version: ${{ matrix.python-version }}
           skip-checkout: true
-        id: setup-python
-      - name: Set UV Path
+
+      - name: Install test dependencies for Experimental Python
         if: ${{ matrix.experimental == true }}
-        shell: bash
-        run: |
-          UV_PATH="${{ steps.setup-python.outputs.UV_PATH }}"
-          FINAL_PATH="$PATH"
-          if [ -z "$UV_PATH" ]; then
-            echo "UV_PATH is not set."
-            if [ -d ".venv" ]; then
-              FINAL_PATH=".venv/bin:$FINAL_PATH"
-            else
-              FINAL_PATH="$HOME/.local/bin:$HOME/.local/share/uv/bin:$HOME/.uv/bin:$FINAL_PATH"
-            fi
-            if ! PATH="$FINAL_PATH" command -v uv &> /dev/null; then
-              echo "uv could not be found even after adjusting PATH."
-              exit 1
-            fi
-            UV_PATH="$(PATH="$FINAL_PATH" which uv)"
-          fi
-          echo "PATH=$FINAL_PATH" >> "$GITHUB_ENV"
-          echo "UV_PATH=$UV_PATH" >> "$GITHUB_ENV"
-      - name: Setup Env for Experimental Python
-        if: ${{ matrix.experimental == true }}
-        shell: bash
-        run: |
-          uv sync --group test --resolution highest 2>&1
+        run: uv sync --group test --resolution highest
 
       - name: Run test coverage for experimental Python
         if: ${{ matrix.experimental == true }}
-        run: |
-          uv run -m pytest tests/ --cov=codeweaver --cov-report=xml --cov-report=term-missing --junit-xml=test-results.xml -v -m "${{ inputs.test-markers }}"
+        run: uv run pytest tests/ --cov=codeweaver --cov-report=xml --cov-report=term-missing --junit-xml=test-results.xml -v -m "${{ inputs.test-markers }}"
+

@@ -53,11 +53,10 @@ runs:
         allow-prereleases: true
     - name: Install pip packages
       shell: bash
+      id: python-setup
       run: |
         python -m pip install --upgrade pip setuptools wheel
         python -m pip install uv
         echo "PYTHON_PATH=$(which python)" >> "$GITHUB_OUTPUT"
         echo "UV_PATH=$(which uv)" >> "$GITHUB_OUTPUT"
-      id: python-setup
-
 
