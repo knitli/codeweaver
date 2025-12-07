@@ -44,6 +44,9 @@ outputs:
   PYTHON_PATH:
     description: Path to Python executable
     value: ${{ steps.mise-outputs.outputs.PYTHON_PATH }}
+  NEWPATH:
+    description: Updated PATH including mise and python paths
+    value: ${{ steps.mise-outputs.outputs.NEWPATH }}
 
 
 runs:
@@ -57,7 +60,7 @@ runs:
     - name: Install system dependencies
       shell: bash
       run: |
-        sudo apt-get update && sudo apt-get install -y zsh curl git
+        sudo apt-get update && sudo apt-get install -y curl git
     - name: Free up disk space
       shell: bash
       run: ./scripts/dev-env/ci-free-disk-space.sh
@@ -133,9 +136,19 @@ runs:
       id: mise-outputs
       run: |
         # Add mise to PATH since env export is disabled
-        export PATH="$HOME/.local/share/mise/bin:$HOME/.local/share/mise/shims:$PATH"
-        echo "MISE_PATH=$(which mise)" >> $GITHUB_OUTPUT
-        echo "MISE_ENV=${MISE_ENV:-}" >> $GITHUB_OUTPUT
-        echo "PROFILE=${{ inputs.profile }}" >> $GITHUB_OUTPUT
-        echo "PYTHON_VERSION=$(python --version | awk '{print $2}')" >> $GITHUB_OUTPUT
-        echo "PYTHON_PATH=$(which python)" >> $GITHUB_OUTPUT
+        if [ "${{ inputs.profile }}" == "dev" ]; then
+          echo "MISE_ENV=dev" >> "$GITHUB_OUTPUT"
+          mise //:cloud-setup 2>&1 || true
+        else
+          echo "MISE_ENV=" >> "$GITHUB_OUTPUT"
+        fi
+        # setup PATH
+        echo "MISE_PATH=$(which mise)" >> "$GITHUB_OUTPUT"
+        mise_bin_dir="$(dirname "$MISE_PATH")"
+        python_path="$(which python)"
+        python_bin_dir="$(dirname "$python_path")"
+        NEWPATH="$mise_bin_dir:$python_bin_dir:$PATH"
+        echo "NEWPATH=${NEWPATH}" >> "$GITHUB_OUTPUT"
+        echo "PROFILE=${{ inputs.profile }}" >> "$GITHUB_OUTPUT"
+        echo "PYTHON_VERSION=$(python --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+        echo "PYTHON_PATH=$python_path" >> "$GITHUB_OUTPUT"

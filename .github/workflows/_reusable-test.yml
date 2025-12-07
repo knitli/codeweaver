@@ -88,14 +88,13 @@ jobs:
         id: setup-mise
       - name: Set Path
         if: ${{ matrix.experimental == false }}
+        env:
+          NEWPATH: ${{ steps.setup-mise.outputs.NEWPATH }}
+        shell: bash
         run: |
-          export PATH="$HOME/.local/bin:$HOME/.local/share/mise/bin:$HOME/.local/share/mise/shims:$PATH"
-          eval "$(mise activate bash)"
-          echo "PATH=$PATH" >> "$GITHUB_ENV"
+          echo "PATH=$NEWPATH" >> "$GITHUB_ENV"
       - name: Run quality checks before tests
         if: ${{ inputs.run-quality-checks && matrix.experimental == false }}
-        env:
-          MISE_PATH: ${{ steps.setup-mise.outputs.MISE_PATH }}
         run: |
           mise use -g uv@latest
           mise //:check 2>&1
@@ -103,6 +102,7 @@ jobs:
       - name: Run tests with coverage
         if: ${{ matrix.experimental == false }}
         run: |
+          mise use -g uv@latest
           mise //:test-cov -m "${{ inputs.test-markers }}"
       - name: Upload coverage to Codecov
         if: ${{ inputs.upload-coverage && matrix.python-version == '3.12' }}
@@ -137,20 +137,26 @@ jobs:
           UV_PATH="${{ steps.setup-python.outputs.UV_PATH }}"
           if [ -z "$UV_PATH" ]; then
             echo "UV_PATH is not set."
+            if [ -d ".venv" ]; then
+              export PATH=".venv/bin:$PATH"
+            else
+              export PATH="$HOME/.local/bin:$HOME/.local/share/uv/bin:$HOME/.uv/bin:$PATH"
+            fi
             if ! command -v uv &> /dev/null; then
-              echo "uv could not be found"
+              echo "uv could not be found even after adjusting PATH."
               exit 1
             fi
             UV_PATH="$(which uv)"
           fi
+          echo "PATH=$PATH" >> "$GITHUB_ENV"
           echo "UV_PATH=$UV_PATH" >> "$GITHUB_ENV"
       - name: Setup Env for Experimental Python
         if: ${{ matrix.experimental == true }}
         shell: bash
         run: |
-          "$UV_PATH" sync --group test --resolution highest 2>&1
+          uv sync --group test --resolution highest 2>&1
 
       - name: Run test coverage for experimental Python
         if: ${{ matrix.experimental == true }}
         run: |
-          "$UV_PATH" run -m pytest tests/ --cov=codeweaver --cov-report=xml --cov-report=term-missing --junit-xml=test-results.xml -v -m "${{ inputs.test-markers }}"
+          uv run -m pytest tests/ --cov=codeweaver --cov-report=xml --cov-report=term-missing --junit-xml=test-results.xml -v -m "${{ inputs.test-markers }}"

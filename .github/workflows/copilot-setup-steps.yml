@@ -74,6 +74,7 @@ jobs:
           MISE_YES: 1
           MISE_EXPERIMENTAL: 1
           MISE_PATH: ${{ steps.setup-mise.outputs.MISE_PATH }}
+          NEWPATH: ${{ steps.setup-mise.outputs.NEWPATH }}
         run: |
-          export PATH="$HOME/.local/bin:$HOME/.local/share/mise/bin:$HOME/.local/share/mise/shims:$PATH"
+          export PATH="$NEWPATH"
           mise --version || { echo "Mise not in path"; "$MISE_PATH" --version; }
