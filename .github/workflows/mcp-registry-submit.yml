@@ -147,7 +147,6 @@ jobs:
           umask 077
           key_file="$(mktemp)"
           echo "$MCP_REGISTRY_KEY" > "$key_file"
-          chmod 600 "$key_file"
           outfile="$(mktemp)"
 
           openssl pkeyutl -sign -inkey "$key_file" -out "$outfile" -rawin  -in "$indata"
