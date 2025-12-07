@@ -94,6 +94,7 @@ jobs:
           export PATH="$HOME/.local/bin:$HOME/.local/share/mise/bin:$HOME/.local/share/mise/shims:$PATH"
           echo "MISE_PATH=$MISE_PATH" >> "$GITHUB_ENV"
           eval "$(mise activate bash)"
+          mise use -g uv@latest
           echo "PATH=$PATH" >> "$GITHUB_ENV"
           mise //:check 2>&1
         continue-on-error: true
@@ -133,6 +134,14 @@ jobs:
         env:
           UV_PATH: ${{ steps.setup-python.outputs.UV_PATH }}
         run: |
+          if [ -z "$UV_PATH" ]; then
+            echo "UV_PATH is not set."
+            if ! command -v uv &> /dev/null; then
+              echo "uv could not be found"
+              exit 1
+            fi
+            UV_PATH="$(which uv)"
+          fi
           "$UV_PATH" sync --group test --resolution highest 2>&1
           echo "UV_PATH=$UV_PATH" >> "$GITHUB_ENV"
 

@@ -60,6 +60,7 @@ jobs:
           echo "PYTHON_PATH=$PYTHON_PATH" >> "$GITHUB_ENV"
           eval "$(mise activate bash)"
           echo "PATH=$PATH" >> "$GITHUB_ENV"
+          mise use -g uv@latest
           mise //:lint || echo "::warning::Lint checks failed but allowing workflow to continue"
         continue-on-error: true
 
