@@ -93,7 +93,7 @@ jobs:
           MISE_EXPERIMENTAL: 1
           MISE_PATH: ${{ steps.setup-mise.outputs.MISE_PATH }}
         run: |
-          export PATH="$HOME/.local/share/mise/bin:$HOME/.local/bin:$PATH"
+          export PATH="$HOME/.local/bin:$HOME/.local/share/mise/bin:$HOME/.local/share/mise/shims:$PATH"
           "$MISE_PATH" //:check 2>&1
         continue-on-error: true
       - name: Run tests with coverage
@@ -105,7 +105,7 @@ jobs:
           MISE_EXPERIMENTAL: 1
           MISE_PATH: ${{ steps.setup-mise.outputs.MISE_PATH }}
         run: |
-          export PATH="$HOME/.local/share/mise/bin:$HOME/.local/bin:$PATH"
+          export PATH="$HOME/.local/bin:$HOME/.local/share/mise/bin:$HOME/.local/share/mise/shims:$PATH"
           "$MISE_PATH" //:test-cov -m "${{ inputs.test-markers }}"
       - name: Upload coverage to Codecov
         if: ${{ inputs.upload-coverage && matrix.python-version == '3.12' }}
@@ -141,5 +141,5 @@ jobs:
       - name: Run test coverage for experimental Python
         if: ${{ matrix.experimental == true }}
         run: |
-          export PATH="$HOME/.local/bin:$PATH"
+          export PATH="$HOME/.local/bin:$HOME/.local/share/mise/bin:$HOME/.local/share/mise/shims:$PATH"
           uv run -m pytest tests/ --cov=codeweaver --cov-report=xml --cov-report=term-missing --junit-xml=test-results.xml -v -m "${{ inputs.test-markers }}"

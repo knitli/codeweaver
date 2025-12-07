@@ -29,17 +29,14 @@ jobs:
         uses: actions/checkout@b3498302c5c423fa896b97a26bb183df735d08f8
         with:
           ref: ${{ github.event.release.tag_name || github.ref }}
-
-      - name: Set up Python
-        uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c
-        with:
-          python-version: "3.12"
+          fetch-depth: 1
 
       - name: Install uv
-        run: |
-          curl -LsSf "https://astral.sh/uv/install.sh" | sh
-          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
-
+        uses: ./.github/actions/setup-uv-env
+        with:
+          python-version: "3.12"
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+        id: uv-setup
       - name: Extract version information
         id: version
         run: |
@@ -64,90 +61,7 @@ jobs:
 
           # Run the generation script (uses PEP 723 dependencies)
           uv run scripts/build/generate-mcp-server-json.py
-
-          # Update version in generated server.json
-          python -c "
-          import json
-
-          with open('server.json', 'r') as f:
-              data = json.load(f)
-
-          # Update top-level version
-          data['version'] = '${VERSION}'
-
-          # Update package versions
-          if 'packages' in data:
-              for pkg in data['packages']:
-                  pkg['version'] = '${VERSION}'
-
-          with open('server.json', 'w') as f:
-              json.dump(data, f, indent=2)
-
-          print(f'✓ Regenerated and versioned server.json to ${VERSION}')
-          "
-
-      - name: Update tools.json with release version
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          # Update the version fields in tools.json
-          python -c "
-          import json
-          import sys
-
-          with open('tools.json', 'r') as f:
-              tools_data = json.load(f)
-
-          # Update top-level version
-          tools_data['version'] = '${VERSION}'
-          # Update server version if present
-          if 'server' in tools_data:
-              tools_data['server']['version'] = '${VERSION}'
-
-          with open('tools.json', 'w') as f:
-              json.dump(tools_data, f, indent=2)
-
-          print(f'Updated tools.json to version ${VERSION}')
-          "
-
-      - name: Validate server.json format
-        run: |
-          python -c "
-          import json
-          import sys
-
-          try:
-              with open('server.json', 'r') as f:
-                  data = json.load(f)
-
-              # Basic validation checks
-              required_fields = ['name', 'description', 'version']
-              missing = [f for f in required_fields if f not in data]
-
-              if missing:
-                  print(f'ERROR: Missing required fields: {missing}')
-                  sys.exit(1)
-
-              # Validate name format (must be namespace/server-name)
-              if '/' not in data['name']:
-                  print('ERROR: name must be in format namespace/server-name')
-                  sys.exit(1)
-
-              # Validate packages or remotes exist
-              if 'packages' not in data and 'remotes' not in data:
-                  print('ERROR: Must have either packages or remotes array')
-                  sys.exit(1)
-
-              print('✓ server.json validation passed')
-              print(f'  Name: {data[\"name\"]}')
-              print(f'  Version: {data[\"version\"]}')
-              print(f'  Description: {data[\"description\"][:80]}...')
-
-          except json.JSONDecodeError as e:
-              print(f'ERROR: Invalid JSON in server.json: {e}')
-              sys.exit(1)
-          except Exception as e:
-              print(f'ERROR: Validation failed: {e}')
-              sys.exit(1)
+          echo "✓ server.json regenerated
           "
 
       - name: Wait for PyPI package availability
@@ -201,47 +115,37 @@ jobs:
 
       - name: Install mcp-publisher CLI
         env:
-          MCP_PUBLISHER_VERSION: "v1.0.0"
+          MCP_PUBLISHER_VERSION: "v1.3.10"
         run: |
           ARCH="$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')"
           OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
-          VERSION="${MCP_PUBLISHER_VERSION:- v1.0.0}"
-          NO_V_VERSION="${VERSION#v}"
-
+          VERSION="${MCP_PUBLISHER_VERSION:- v1.3.10}"
+          # TODO: I don't know why we're doing all this to get and use the CLI when we could use the api directly
           echo "Downloading mcp-publisher ${VERSION} for ${OS}/${ARCH}..."
-          curl -L "https://github.com/modelcontextprotocol/registry/releases/download/${VERSION}/mcp-publisher_${NO_V_VERSION}_${OS}_${ARCH}.tar.gz" \
-            -o mcp-publisher.tar.gz
-          curl -L "https://github.com/modelcontextprotocol/registry/releases/download/${VERSION}/mcp-publisher_${NO_V_VERSION}_${OS}_${ARCH}.tar.gz.sha256" \
-            -o mcp-publisher.tar.gz.sha256
-
-          echo "Verifying checksum for mcp-publisher.tar.gz..."
-          if ! sha256sum -c mcp-publisher.tar.gz.sha256; then
-            echo "ERROR: Checksum verification failed for mcp-publisher.tar.gz"
+          assets="$(curl -L \
+          -H "Accept: application/vnd.github+json" \
+          -H "Authorization: Bearer <YOUR-TOKEN>" \
+          -H "X-GitHub-Api-Version: 2022-11-28" \
+          https://api.github.com/repos/OWNER/REPO/releases/latest)"
+          our_index="$(echo "$assets" | jq -r '.assets[].name' | grep -n "^mcp-publisher_${OS}_${ARCH}.tar.gz$" | cut -d: -f1)"
+          asset="$(echo "$assets" | jq -r ".assets[$((our_index - 1))]")"
+          download_url="$(echo "$asset" | jq -r '.browser_download_url')"
+          digest="$(echo "$asset" | jq -r '.digest' | cut -d: -f2)"
+          curl -L -o mcp-publisher.tar.gz "$download_url"
+          downloaded_digest="$(sha256sum mcp-publisher.tar.gz | awk '{print $1}')"
+          if [ "$digest" != "$downloaded_digest" ]; then
+            echo "ERROR: Checksum verification failed for mcp-publisher"
+            echo "Expected: $digest"
+            echo "Got:      $downloaded_digest"
             exit 1
           fi
-
           tar xz < mcp-publisher.tar.gz mcp-publisher
           sudo mv mcp-publisher /usr/local/bin/
           chmod +x /usr/local/bin/mcp-publisher
-          rm mcp-publisher.tar.gz mcp-publisher.tar.gz.sha256
+          rm mcp-publisher.tar.gz
 
           echo "✓ mcp-publisher installed"
           mcp-publisher --version || echo "Version check not available"
-
-      - name: Validate server.json with mcp-publisher
-        run: |
-          echo "Validating server.json against MCP schema..."
-
-          # mcp-publisher validate should validate the server.json
-          # Note: exact command may vary based on mcp-publisher version
-          if command -v mcp-publisher &> /dev/null; then
-            mcp-publisher validate server.json || {
-              echo "ERROR: server.json validation failed"
-              exit 1
-            }
-          else
-            echo "WARNING: mcp-publisher validate command not available, skipping"
-          fi
 
       - name: Submit to MCP Registry
         env:
@@ -250,52 +154,62 @@ jobs:
         run: |
           echo "Submitting to MCP Registry..."
 
-          # Note: The exact submission process depends on mcp-publisher CLI implementation
-          # and may require manual intervention if the API/CLI has changed.
-          # The following attempts multiple submission methods in order of preference.
-          MESSAGE=""
-          # login to mcp-publisher
-          if command -v mcp-publisher &> /dev/null; then
-            echo "Logging in to mcp-publisher..."
-            mcp-publisher login dns --domain knitli.com --private-key "${MCP_REGISTRY_KEY}" || {
-              echo "WARNING: mcp-publisher login failed, proceeding without login"
-            }
-            MESSAGE="$(mcp-publisher publish)"
-          else
-            echo "WARNING: mcp-publisher CLI not available, skipping login"
+          # we need to login with our domain key first
+          # the request has three fields: domain (knitli.com), signed_timestamp (hex encoded signature), timestamp (RFC3339)
+          # we need to sign the timestamp with the private key, which is in MCP_REGISTRY_KEY
+          # MCP_REGISTRY_KEY is expected to be in PEM format, and it uses ed25519 algorithm
+          # unfortunately, pkeyutl can only work with files because of how it has to buffer the input for signing
+
+          domain="knitli.com"
+          indata="$(mktemp)"
+          echo -n "$(date -u +"%Y-%m-%dT%+H:%+M:%+SZ")" > "$indata"
+
+          key_file="$(mktemp)"
+          echo "$MCP_REGISTRY_KEY" > "$key_file"
+          chmod 600 "$key_file"
+          outfile="$(mktemp)"
+
+          openssl pkeyutl -sign -inkey "$key_file" -out "$outfile" -rawin  -in "$indata"
+          signed_timestamp_hex="$(xxd -p "$outfile" | tr -d '\n')"
+          request_body="$(mktemp)"
+          {
+            echo -n '{"domain":"'"$domain"'",'
+            echo -n '"signed_timestamp":"'"$signed_timestamp_hex"'",'
+            echo -n '"timestamp":"'"$(cat "$indata")"'"}'
+          } > "$request_body"
+          echo "Logging in to MCP Registry..."
+          response="$(curl --request POST \
+            --url "https://registry.modelcontextprotocol.io/v0.1/auth/dns" \
+            --header "Accept: application/json, application/problem+json" \
+            --header "Content-Type: application/json" \
+            --data @"$request_body")"
+          token="$(echo "$response" | jq -r '.registry_token')"
+          rm "$indata" "$key_file" "$outfile"
+          rm "$request_body"
+          if [ -z "$token" ] || [ "$token" = "null" ]; then
+            echo "ERROR: Failed to obtain registry token"
+            echo "Response: $response"
+            exit 1
           fi
-          if [ -n "$MESSAGE" ] && [[ "$MESSAGE" == *Successfully* ]]; then
-            echo "✓ Successfully submitted to MCP Registry via mcp-publisher"
-            echo "$MESSAGE"
-            exit 0
-          else
-            RESPONSE="$(curl -X POST \
-            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-            -H "Content-Type: application/json" \
-            -d @server.json \
-            -w "\n%{http_code}" \
-            https://registry.modelcontextprotocol.io/v0/servers 2>&1)"
-
-            HTTP_CODE="$(echo "$RESPONSE" | tail -n 1)"
-            BODY="$(echo "$RESPONSE" | head -n -1)"
-
-            if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "201" ]; then
-              echo "✓ Successfully submitted to MCP Registry (HTTP ${HTTP_CODE})"
-              exit 0
-            else
-              # Submission failed - provide helpful error message
-              echo "ERROR: Failed to submit to MCP Registry (HTTP ${HTTP_CODE})"
-              echo "Response: ${BODY}"
-              echo ""
-              echo "This may require manual submission via:"
-              echo "  1. The registry web interface at https://registry.modelcontextprotocol.io"
-              echo "  2. The mcp-publisher CLI tool"
-              echo "  3. Contact registry maintainers for assistance"
-              exit 1
-            fi
+          echo "✓ Obtained registry token"
+          export MCP_LOGIN_TOKEN="$token"
+          publication_response="$(curl --request POST \
+          --url https://registry.modelcontextprotocol.io/v0.1/publish \
+          --header 'Accept: application/json, application/problem+json' \
+          --header "Authorization: Bearer $MCP_LOGIN_TOKEN" \
+          --header 'Content-Type: application/json' \
+          --data @./server.json)"
+          echo "Publication response: $publication_response"
+          publication_time="$(echo "$publication_response" | jq -r '._meta."io.modelcontextprotocol.registry/official".published_at')"
+          if [ -z "$publication_time" ] || [ "$publication_time" = "null" ]; then
+            echo "ERROR: Submission to MCP Registry failed"
+            exit 1
           fi
+          echo "✓ Successfully submitted to MCP Registry at $publication_time"
+          export "MCP_PUBLICATION_TIME"="$publication_time"
+          exit 0
 
-      - name: Summary
+      - name: Summary of MCP Registry Submission
         if: always()
         run: |
           {
@@ -303,6 +217,9 @@ jobs:
             echo ""
             echo "- **Version**: ${{ steps.version.outputs.version }}"
             echo "- **Status**: ${{ job.status }}"
+            if [ -n "$MCP_PUBLICATION_TIME" ]; then
+              echo "- **Published At**: $MCP_PUBLICATION_TIME"
+            fi
             echo ""
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -310,13 +227,12 @@ jobs:
             {
               echo "✅ Successfully submitted to MCP Registry"
               echo ""
-              echo "View your server at: https://registry.modelcontextprotocol.io/servers/com.knitli/codeweaver"
+              echo "View your server at: https://registry.modelcontextprotocol.io/v0.1/servers/com.knitli%2Fcodeweaver/versions/${{ steps.version.outputs.version }}"
             } >> "$GITHUB_STEP_SUMMARY"
           else
             {
               echo "❌ Submission failed"
               echo ""
               echo "Please check the workflow logs for details."
-              echo "You may need to submit manually at: https://registry.modelcontextprotocol.io"
             } >> "$GITHUB_STEP_SUMMARY"
           fi

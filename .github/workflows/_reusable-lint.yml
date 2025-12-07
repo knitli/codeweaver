@@ -53,7 +53,7 @@ jobs:
           MISE_EXPERIMENTAL: 1
           PYTHON_PATH: ${{ steps.mise-outputs.outputs.PYTHON_PATH }}
         run: |
-          export PATH="$HOME/.local/bin:$PATH"
+          export PATH="$HOME/.local/bin:$HOME/.local/share/mise/bin:$HOME/.local/share/mise/shims:$PATH"
           mise //:lint || echo "::warning::Lint checks failed but allowing workflow to continue"
         continue-on-error: true
 
@@ -66,6 +66,6 @@ jobs:
           MISE_EXPERIMENTAL: 1
           PYTHON_PATH: ${{ steps.mise-outputs.outputs.PYTHON_PATH }}
         run: |
-          export PATH="$HOME/.local/bin:$PATH"
+          export PATH="$HOME/.local/bin:$HOME/.local/share/mise/bin:$HOME/.local/share/mise/shims:$PATH"
           mise //:format || echo "::warning::License checks or formatting checks failed but allowing workflow to continue"
         continue-on-error: true

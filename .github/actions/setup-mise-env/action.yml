@@ -125,5 +125,3 @@ runs:
         echo "PROFILE=${{ inputs.profile }}" >> $GITHUB_OUTPUT
         echo "PYTHON_VERSION=$(python --version | awk '{print $2}')" >> $GITHUB_OUTPUT
         echo "PYTHON_PATH=$(which python)" >> $GITHUB_OUTPUT
-
-
