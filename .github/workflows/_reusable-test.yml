@@ -92,6 +92,7 @@ jobs:
           NEWPATH: ${{ steps.setup-mise.outputs.NEWPATH }}
         shell: bash
         run: |
+          echo "PROFILE=dev" >> "$GITHUB_ENV"
           echo "PATH=$NEWPATH" >> "$GITHUB_ENV"
       - name: Run quality checks before tests
         if: ${{ inputs.run-quality-checks && matrix.experimental == false }}

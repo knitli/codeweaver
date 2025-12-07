@@ -60,7 +60,7 @@ runs:
     - name: Install system dependencies
       shell: bash
       run: |
-        sudo apt-get update && sudo apt-get install -y curl git
+        sudo apt-get update && sudo apt-get install -y curl git readline-common lzma bzip2
     - name: Free up disk space
       shell: bash
       run: ./scripts/dev-env/ci-free-disk-space.sh
