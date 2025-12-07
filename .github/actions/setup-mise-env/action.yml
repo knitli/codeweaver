@@ -45,6 +45,7 @@ outputs:
     description: Path to Python executable
     value: ${{ steps.mise-outputs.outputs.PYTHON_PATH }}
 
+
 runs:
   using: composite
   steps:
@@ -94,6 +95,8 @@ runs:
     - name: Activate Reviewer Profile Environment
       if: inputs.profile == 'reviewer'
       shell: bash
+      env:
+        MISE_GITHUB_TOKEN: ${{ inputs.github-token }}
       id: mise-setup-reviewer
       run: |
         uv sync
@@ -113,6 +116,17 @@ runs:
         cache_key_prefix: ${{ inputs.profile }}
         env: false
       id: mise-setup-dev
+    - name: Activate Dev Profile Environment
+      if: inputs.profile == 'dev'
+      shell: bash
+      id: mise-setup-dev-activate
+      env:
+        MISE_ENV: dev
+        MISE_EXPERIMENTAL: 1
+        MISE_YES: 1
+        MISE_GITHUB_TOKEN: ${{ inputs.github-token }}
+      run: |
+        mise ://setup
 
     - name: Set outputs
       shell: bash

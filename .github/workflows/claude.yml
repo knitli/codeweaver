@@ -187,7 +187,7 @@ jobs:
             --mcp-config .mcp.json
           prompt: |
             REPO: ${{ github.repository }}
-            ISSUE/ PR NUMBER: ${{ github.event.issue.number  || github.event.pull_request.number }}
+            ISSUE/PR NUMBER: ${{ github.event.issue.number || github.event.pull_request.number }}
             When you are assigned an issue or it's labeled 'claude':
               - Your job is to resolve it.
               - Gather all necessary information about the issue from discussions and comments and the codebase.
