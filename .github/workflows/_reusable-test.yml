@@ -39,6 +39,18 @@ on:
         required: false
       VOYAGE_API_KEY:
         required: false
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  MISE_EXPERIMENTAL: 1
+  MISE_YES: 1
+  PROFILE: "dev"
+  CODEWEAVER_PROJECT_PATH: ${{ github.workspace }}
+  CODEWEAVER_TESTING: "true"
+  CODEWEAVER_VECTOR_STORE_URL: ${{ secrets.CODEWEAVER_VECTOR_STORE_URL }}
+  QDRANT__SERVICE__API_KEY: ${{ secrets.QDRANT__SERVICE__API_KEY }}
+  VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+  MISE_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
 jobs:
   test:
@@ -57,16 +69,6 @@ jobs:
           - python-version: "3.14t"
             experimental: true
     env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-      CODEWEAVER_TESTING: "true"
-      CODEWEAVER_VECTOR_STORE_URL: ${{ secrets.CODEWEAVER_VECTOR_STORE_URL }}
-      QDRANT__SERVICE__API_KEY: ${{ secrets.QDRANT__SERVICE__API_KEY }}
-      VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
-      CODEWEAVER_PROJECT_PATH: ${{ github.workspace }}
-      MISE_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      MISE_EXPERIMENTAL: 1
-      MISE_YES: 1
       MISE_PYTHON: ${{ matrix.python-version }}
       UV_PYTHON: ${{ matrix.python-version }}
     steps:
@@ -75,7 +77,7 @@ jobs:
         with:
           fetch-depth: 3
 
-      - name: Setup Python environment
+      - name: Setup Python environment with Mise
         if: ${{ matrix.experimental == false }}
         uses: ./.github/actions/setup-mise-env
         with:

@@ -21,12 +21,16 @@ on:
         type: boolean
         default: true
 
+env:
+  MISE_EXPERIMENTAL: 1
+  MISE_YES: 1
+  PROFILE: "reviewer"
+
 jobs:
   lint:
     permissions:
       contents: read
     name: Lint and Format
-    runs-on: ubuntu-latest
     env:
       MISE_EXPERIMENTAL: 1
       MISE_YES: 1
@@ -41,9 +45,9 @@ jobs:
       - name: Setup Python environment
         uses: ./.github/actions/setup-mise-env
         with:
-          python-version: ${{ inputs.python-version }}
+          python-version: ${{ env.python-version }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          profile: "reviewer"
+          profile: "${{ env.PROFILE }}"
           skip-checkout: true
 
       - name: Check code style and linting
