@@ -155,6 +155,9 @@ sources = ["{src,scripts,tests,mise-tasks}/*.py"]
 [tasks.check]
 tools.hk = "latest"
 tools.pkl = "latest"
+tools."pipx:ty" = "latest"
+tools."pipx:reuse" = "latest"
+tools.ruff = "latest"
 run = '''
 echo "${CW_PREFIX} Running quality checks..."
 hk check
