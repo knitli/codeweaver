@@ -136,7 +136,7 @@ jobs:
         if: ${{ matrix.experimental == true }}
         shell: bash
         run: |
-          uv sync --group test --resolution highest --frozen 2>&1
+          uv sync --group test --resolution highest 2>&1
 
       - name: Run test coverage for experimental Python
         if: ${{ matrix.experimental == true }}
