@@ -23,7 +23,7 @@ ruff = "latest"  # Python linting/formatting
 env.MISE_EXPERIMENTAL = "1"
 script = '''
 # PROFILE is set to 'dev' in a cloud CI environment for cloud agents. 'enter' tends to break there.
-if [ ! "$PROFILE" == "dev" ]; then
+if [ ! "$PROFILE" = "dev" ]; then
     mise //:enter
 fi
 '''

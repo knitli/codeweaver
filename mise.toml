@@ -140,9 +140,9 @@ run = [
   "echo \"[codeweaver] Setting up cloud development environment...\"",
   "ln -sf AGENTS.md CLAUDE.md",
   '''if ! command -v mise &>/dev/null; then
-      if [ -d "$HOME/.local/share/mise" || -d "$HOME/.mise" || -f "$HOME/.local/bin/mise" ]; then
+      if [ -d "$HOME/.local/share/mise" ] || [ -d "$HOME/.mise" ] || [ -f "$HOME/.local/bin/mise" ]; then
         export PATH="$HOME/.local/bin:$HOME/.mise/bin:$HOME/.local/share/mise/bin:$PATH"
-        if ! grep -qx "mise activate" "$HOME/.bashrc"; then
+        if ! grep -q "mise activate" "$HOME/.bashrc"; then
           echo "eval \"$(mise activate \"${ACTIVE_SHELL:-bash}\")\" 2>&1 || true" >> "$HOME/.bashrc"
         fi
       else
