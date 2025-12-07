@@ -138,7 +138,7 @@ runs:
         # Add mise to PATH since env export is disabled
         if [ "${{ inputs.profile }}" = "dev" ]; then
           echo "MISE_ENV=dev" >> "$GITHUB_OUTPUT"
-          mise //:cloud-setup 2>&1 || true
+          mise //:cloud-setup 2>&1
         else
           echo "MISE_ENV=" >> "$GITHUB_OUTPUT"
         fi

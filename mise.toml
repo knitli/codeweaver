@@ -150,11 +150,11 @@ run = [
         ./scripts/dev-env/install-mise.sh 2>&1 || true
       fi
   fi''',
-  "mise -y trust --all 2>&1 || true",
-  "mise install 2>&1 || true",
+  '''mise -y trust --all 2>&1 || { echo "[WARNING] mise -y trust --all failed during cloud-setup" >&2; }''',
+  '''mise install 2>&1 || { echo "[WARNING] mise install failed during cloud-setup" >&2; }''',
   "hk install --mise 2>&1 || mise x hk@latest -- hk install --mise 2>&1 || true",
   "mise x uv@latest -- uv venv --allow-existing --seed --keyring-provider subprocess --python {{ get_env(name='MISE_PYTHON', default='3.13') }} .venv 2>&1",
-  "source .venv/bin/activate 2>&1 || true",
+  ". .venv/bin/activate 2>&1 || true",
   "mise x uv@latest -- uv sync --group dev --group test 2>&1",
   "git config include.path .gitconfig 2>&1 || true",
   '''
