@@ -198,7 +198,10 @@ jobs:
             {
               echo "✅ Successfully submitted to MCP Registry"
               echo ""
-              echo "View your server at: https://registry.modelcontextprotocol.io/v0.1/servers/com.knitli%2Fcodeweaver/versions/${{ steps.version.outputs.version }}"
+              # Extract and encode server name from server.json
+              SERVER_NAME=$(jq -r '.name' server.json)
+              ENCODED_SERVER_NAME=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=''))" "$SERVER_NAME")
+              echo "View your server at: https://registry.modelcontextprotocol.io/v0.1/servers/${ENCODED_SERVER_NAME}/versions/${{ steps.version.outputs.version }}"
             } >> "$GITHUB_STEP_SUMMARY"
           else
             {
