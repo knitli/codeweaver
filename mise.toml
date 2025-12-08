@@ -277,7 +277,7 @@ for /f "delims=" %%f in ('git ls-files "*.toml" 2^>NUL') do (
 [tasks.format-fix.tools]
 "cargo:rust-parallel" = "latest"
 "pipx:tombi" = "latest"
-"yq" = "latest"
+yq = "latest"
 uv = "latest"
 
 [tasks.graph]
