@@ -45,6 +45,12 @@ outputs:
   PYTHON_PATH:
     description: Path to Python executable
     value: ${{ steps.mise-outputs.outputs.PYTHON_PATH }}
+  MISE_PYTHON_VERSION:
+    description: Python version used by mise
+    value: ${{ steps.mise-outputs.outputs.MISE_PYTHON_VERSION }}
+  MISE_PYTHON_PRECOMPILED_FLAVOR:
+    description: Precompiled flavor used by mise (if any)
+    value: ${{ steps.mise-outputs.outputs.MISE_PYTHON_PRECOMPILED_FLAVOR }}
 
 runs:
   using: composite
@@ -67,18 +73,19 @@ runs:
       run: |
         # We need to do this for all python versions so that the environment variable is set
         # Because we can't use inputs.python-version after this step
-        if [[ "${{ inputs.python-version }}" == *"t" ]]; then
-          echo "Setting up environment for free-threaded Python version '${{ inputs.python-version }}'..."
+        python_version="${{ inputs.python-version }}"
+        if [[ "$python_version" == *"t" ]]; then
+          echo "Setting up environment for free-threaded Python version '${python_version}'..."
           echo "MISE_PYTHON_PRECOMPILED_FLAVOR=freethreaded+pgo-full" >> $GITHUB_ENV
           echo "MISE_PYTHON_COMPILE=0" >> $GITHUB_ENV
-          python_version_clean="${{ inputs.python-version::-1 }}"
+          python_version_clean="${python_version:0:-1}"
           echo "MISE_PYTHON_VERSION=${python_version_clean}" >> $GITHUB_ENV
           echo "python_version=${python_version_clean}" >> $GITHUB_ENV
           uv_python_version="cpython-${python_version_clean}+freethreaded"
           echo "UV_PYTHON=${uv_python_version}" >> $GITHUB_ENV
         else
-          echo "python_version=${{ inputs.python-version }}" >> $GITHUB_ENV
-          echo "UV_PYTHON=${{ inputs.python-version }}" >> $GITHUB_ENV
+          echo "python_version=$python_version" >> $GITHUB_ENV
+          echo "UV_PYTHON=$python_version" >> $GITHUB_ENV
         fi
 
     - name: Setup Mise for Minimal Profile
@@ -104,6 +111,9 @@ runs:
         MISE_EXPERIMENTAL: 1
         MISE_ENV: dev
         UV_PYTHON: ${{ env.UV_PYTHON }}
+        MISE_PYTHON_COMPILE: 0
+        MISE_PYTHON_PRECOMPILED_FLAVOR: ${{ env.MISE_PYTHON_PRECOMPILED_FLAVOR || '' }}
+        MISE_PYTHON_VERSION: ${{ env.python_version }}
       with:
         github_token: ${{ inputs.github-token }}
         experimental: true
@@ -127,6 +137,8 @@ runs:
         MISE_EXPERIMENTAL: 1
         MISE_ENV: dev
         UV_PYTHON: ${{ env.UV_PYTHON }}
+        MISE_PYTHON_COMPILE: 0
+        MISE_PYTHON_PRECOMPILED_FLAVOR: ${{ env.MISE_PYTHON_PRECOMPILED_FLAVOR || '' }}
       with:
         github_token: ${{ inputs.github-token }}
         experimental: true
@@ -144,21 +156,20 @@ runs:
         MISE_EXPERIMENTAL: 1
         MISE_YES: 1
         MISE_GITHUB_TOKEN: ${{ inputs.github-token }}
+        MISE_PYTHON_COMPILE: 0
+        MISE_PYTHON_PRECOMPILED_FLAVOR: ${{ env.MISE_PYTHON_PRECOMPILED_FLAVOR || '' }}
+        MISE_PYTHON_VERSION: ${{ env.python_version }}
       run: |
-        mise //:setup
+
+        mise //:cloud-setup 2>&1
 
     - name: Set outputs
       shell: bash
       id: mise-outputs
+      env:
+        MISE_PYTHON_VERSION: ${{ env.python_version }}
+        MISE_PYTHON_PRECOMPILED_FLAVOR: ${{ env.MISE_PYTHON_PRECOMPILED_FLAVOR || '' }}
       run: |
-        # Add mise to PATH since env export is disabled
-        if [ "${{ inputs.profile }}" = "dev" ]; then
-          echo "MISE_ENV=dev" >> "$GITHUB_OUTPUT"
-          mise //:cloud-setup 2>&1
-        else
-          echo "MISE_ENV=" >> "$GITHUB_OUTPUT"
-        fi
-        # setup PATH
         MISE_PATH="$(which mise)"
         echo "MISE_PATH=$MISE_PATH" >> "$GITHUB_OUTPUT"
         mise_bin_dir="$(dirname "$MISE_PATH")"
@@ -167,3 +178,5 @@ runs:
         echo "profile=${{ inputs.profile }}" >> "$GITHUB_OUTPUT"
         echo "python_version=$(python --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
         echo "PYTHON_PATH=$python_path" >> "$GITHUB_OUTPUT"
+        echo "MISE_PYTHON_VERSION=${MISE_PYTHON_VERSION}" >> "$GITHUB_OUTPUT"
+        echo "MISE_PYTHON_PRECOMPILED_FLAVOR=${MISE_PYTHON_PRECOMPILED_FLAVOR}" >> "$GITHUB_OUTPUT"
