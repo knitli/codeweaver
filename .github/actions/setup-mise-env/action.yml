@@ -182,6 +182,8 @@ runs:
         mise_bin_dir="$(dirname "$MISE_PATH")"
         python_path="$(which python)"
         python_bin_dir="$(dirname "$python_path")"
+        echo "MISE_BIN_DIR=$mise_bin_dir" >> "$GITHUB_OUTPUT"
+        echo "PYTHON_BIN_DIR=$python_bin_dir" >> "$GITHUB_OUTPUT"
         echo "PROFILE=${{ inputs.profile }}" >> "$GITHUB_OUTPUT"
         echo "PYTHON_PATH=$python_path" >> "$GITHUB_OUTPUT"
         echo "MISE_PYTHON_VERSION=$MISE_PYTHON_VERSION" >> "$GITHUB_OUTPUT"
