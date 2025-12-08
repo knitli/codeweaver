@@ -166,6 +166,7 @@ runs:
         mise use -g uv@latest
         uv python install -U "cpython-${UV_PYTHON}" 2>&1
         mise sync python --uv
+        mise list python 2>&1
         new_mise_python_version="${MISE_PYTHON_VERSION}+freethreaded"
         echo "Telling mise to use $new_mise_python_version"
         mise use "python@${new_mise_python_version}" 2>&1
