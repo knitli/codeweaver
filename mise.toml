@@ -37,7 +37,6 @@ idiomatic_version_file_enable_tools = []
 experimental = true
 
 [settings.python]
-compile = true
 
 [tools]
 # most tools are defined in mise.dev.toml to keep CI workflows lightweight
