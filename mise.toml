@@ -87,7 +87,7 @@ echo "${CW_PREFIX} Sourcing virtual environment..."
 git rev-parse --show-toplevel || true
 if [ ! -d ".venv" ]; then
     echo "${CW_PREFIX} ⚠️  \033[0;31mVirtual environment not found. We'll try to proceed, but things may break!\033[0m"
-    uvx venv --seed --keyring-provider subprocess --python {{ get_env(name='MISE_PYTHON_VERSION', default='3.13') }} .venv
+    uv venv --seed --keyring-provider subprocess --python {{ get_env(name='MISE_PYTHON_VERSION', default='3.13') }} .venv
 fi
 . .venv/bin/activate || echo "${CW_PREFIX} ⚠️  \033[0;31mFailed to source virtual environment.\033[0m"
 '''
