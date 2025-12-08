@@ -53,7 +53,7 @@ python = '''{{ get_env(name="MISE_PYTHON_VERSION", default="3.13") }}'''
 uv = "latest"
 
 # Quick note for those unfamiliar with mise:
-#   - depite the namespace, tools prefixed with "pipx:" are installed via "uv" (I assume once upon a time they were installed with pipx before uv came along)
+#   - despite the namespace, tools prefixed with "pipx:" are installed via "uv" (I assume once upon a time they were installed with pipx before uv came along)
 #   - some tools have no prefix -- these are defined in mise's internal registry directly
 #   - The prefix refers to the "backend" used to install the tool -- most of the no-prefix tools are installed through `aqua` or github/gitlab releases, and failing that, `ubi`. Language-specific package managers (cargo/npm/go) are also used where appropriate.
 
@@ -225,13 +225,10 @@ echo "${CW_PREFIX} Applying formatting...hold onto your butts 🚬...🦖 "
 # mise -y //:fix-ruff-patterns || {  # there are some bugs to work out
 #    echo "${CW_PREFIX} ⚠️  \033[0;32mRuff pattern fixer encountered issues.\033[0m"}
 uv run ruff format .
-yaml_files="$(git ls-files "*.yaml" "*.yml" "*.json" 2>/dev/null)"
-if [ -n "$yaml_files" ]; then
-    printf '%s\n' $yaml_files | xargs -n1 yq -iP --indent=2  eval "." 2>/dev/null || true
-fi
+git ls-files "*.yaml" "*.yml" "*.json" 2>/dev/null | xargs -n1 yq -iP --indent=2 eval "." 2>/dev/null || true
 toml_files="$(git ls-files "*.toml" 2>/dev/null)"
 if [ -n "$toml_files" ]; then
-    tombi format $toml_files 2>/dev/null || true
+    printf '%s\n' "$toml_files" | xargs -n1 tombi format 2>/dev/null || true
 fi
 '''
 run_windows = '''

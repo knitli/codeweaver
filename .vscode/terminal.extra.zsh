@@ -30,7 +30,7 @@ if command -v mise >/dev/null 2>&1; then
 else
   REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo "${PWD}")"
   # Mise is not installed, run the install script
-    chmod -R +x "${REPO_ROOT}/scripts" || {
+  chmod -R +x "${REPO_ROOT}/scripts" || {
       print -P "%F{209}[codeweaver]%f %F{red}Failed to make install scripts executable!%f"
     }
     print -P "%F{209}[codeweaver]%f Installing Mise for the first time..."

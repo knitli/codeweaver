@@ -59,5 +59,8 @@ if [[ -f "${HOME}/.zshrc" ]]; then
   source "${HOME}/.zshrc"
 fi
 
-add-zsh-hook precmd _prompt
+autoload -Uz add-zsh-hook 2>/dev/null
+if (( $+functions[add-zsh-hook] )); then
+  add-zsh-hook precmd _prompt
+fi
 

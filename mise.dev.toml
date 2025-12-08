@@ -56,9 +56,11 @@ esac
 run_windows = '''
 @echo off
 set "pythonPath=%python_path%"
-if not %profile%==dev if not "%CI%"=="true" (
-    rem don't run
-    exit /b 0
+if not "%profile%"=="dev" (
+    if not "%CI%"=="true" (
+        rem don't run
+        exit /b 0
+    )
 )
 if not "%pythonPath%"=="%pythonPath:.venv\Scripts\python=%" (
     rem Already in venv, do nothing
@@ -82,7 +84,7 @@ run = [
   '''if ! command -v mise &>/dev/null; then
       if [ -d "$HOME/.local/share/mise" ] || [ -d "$HOME/.mise" ] || [ -f "$HOME/.local/bin/mise" ]; then
         export PATH="$HOME/.local/bin:$HOME/.mise/bin:$HOME/.local/share/mise/bin:$PATH"
-        if [ "ACTIVE_SHELL" = "bash" ] || [ "ACTIVE_SHELL" = "zsh" ] && ! grep -q "mise activate" "$HOME/.${ACTIVE_SHELL}rc"; then
+        if [ "$ACTIVE_SHELL" = "bash" ] || [ "$ACTIVE_SHELL" = "zsh" ] && ! grep -q "mise activate" "$HOME/.${ACTIVE_SHELL}rc"; then
           echo "eval \"$(mise activate \"${ACTIVE_SHELL}\")\" 2>&1 || true" >> "$HOME/.${ACTIVE_SHELL}rc"
         fi
       else

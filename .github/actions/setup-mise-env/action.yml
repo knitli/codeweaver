@@ -110,7 +110,7 @@ runs:
         MISE_EXPERIMENTAL: 1
         MISE_ENV: dev
         UV_PYTHON: ${{ env.UV_PYTHON }}
-        MISE_PYTHON_VERSION: ${{ env.python_version }}
+        MISE_PYTHON_VERSION: ${{ env.MISE_PYTHON_VERSION }}
       with:
         github_token: ${{ inputs.github-token }}
         experimental: true
@@ -147,7 +147,7 @@ runs:
       shell: bash
       id: mise-setup-dev-insert
       env:
-        MISE_PYTHON_VERSION: ${{ env.python_version }}
+        MISE_PYTHON_VERSION: ${{ env.MISE_PYTHON_VERSION }}
         UV_PYTHON: ${{ env.UV_PYTHON }}
       run: |
         echo "Inserting free-threaded Python version $UV_PYTHON into dev profile..."

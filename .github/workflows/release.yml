@@ -6,9 +6,6 @@
 name: Release
 on:
   push:
-    branches:
-      - main
-      - staging
     tags:
       - v*
   workflow_dispatch:
