@@ -48,12 +48,17 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           profile: "${{ env.PROFILE }}"
           skip-checkout: true
+        id: mise-setup
 
       - name: Check code style and linting
+        env:
+          MISE_PYTHON_VERSION: ${{ steps.mise-setup.outputs.MISE_PYTHON_VERSION }}
         run: mise run lint || echo "::warning::Lint checks failed but allowing workflow to continue"
         continue-on-error: true
 
       - name: Check formatting and licenses
         if: inputs.run-format-check
+        env:
+          MISE_PYTHON_VERSION: ${{ steps.mise-setup.outputs.MISE_PYTHON_VERSION }}
         run: mise run format || echo "::warning::License checks or formatting checks failed but allowing workflow to continue"
         continue-on-error: true

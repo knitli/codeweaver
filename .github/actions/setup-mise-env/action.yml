@@ -36,12 +36,9 @@ outputs:
   MISE_ENV:
     description: Mise environment name
     value: ${{ steps.mise-outputs.outputs.MISE_ENV }}
-  profile:
+  PROFILE:
     description: Profile used for setup
-    value: ${{ steps.mise-outputs.outputs.profile }}
-  python_version:
-    description: Python version installed
-    value: ${{ steps.mise-outputs.outputs.python_version }}
+    value: ${{ steps.mise-outputs.outputs.PROFILE }}
   PYTHON_PATH:
     description: Path to Python executable
     value: ${{ steps.mise-outputs.outputs.PYTHON_PATH }}
@@ -57,6 +54,9 @@ runs:
       uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
       with:
         fetch-depth: ${{ inputs.fetch-depth }}
+    - name: Free up disk space
+      shell: bash
+      run: ./scripts/dev-env/ci-free-disk-space.sh
     - name: Install system dependencies
       shell: bash
       run: |
@@ -64,21 +64,22 @@ runs:
         sudo apt-get update && sudo apt-get install -y curl git build-essential libssl-dev zlib1g-dev \
         libbz2-dev libreadline-dev libsqlite3-dev libncursesw5-dev xz-utils tk-dev libxml2-dev \
         libxmlsec1-dev libffi-dev liblzma-dev libzstd-dev
-    - name: Free up disk space
-      shell: bash
-      run: ./scripts/dev-env/ci-free-disk-space.sh
 
     - name: Set up Environment for Free-Threaded Python
       shell: bash
+      env:
+        MISE_PYTHON_VERSION: ${{ inputs.python-version }}
+        UV_PYTHON: ${{ inputs.python-version }}
+        PYTHON_VERSION: ${{ inputs.python-version }}
       run: |
-        if [[ "${inputs.python-version}" != *t ]]; then
-          echo "Using standard Python version ${inputs.python-version}..."
-          echo "MISE_PYTHON_VERSION=${inputs.python-version}" >> "$GITHUB_ENV"
-          echo "UV_PYTHON=${inputs.python-version}" >> "$GITHUB_ENV"
+        if [[ "${PYTHON_VERSION}" != *t ]]; then
+          echo "Using standard Python version ${PYTHON_VERSION}..."
+          echo "MISE_PYTHON_VERSION=${PYTHON_VERSION}" >> "$GITHUB_ENV"
+          echo "UV_PYTHON=${PYTHON_VERSION}" >> "$GITHUB_ENV"
           exit 0
         fi
-        echo "Setting up environment for free-threaded Python ${inputs.python-version}..."
-        python_version="${inputs.python-version}"
+        echo "Setting up environment for free-threaded Python ${PYTHON_VERSION}..."
+        python_version="${PYTHON_VERSION}"
         base_version="${python_version%t}"
         echo "Base version: ${base_version}"
         # I couldn't get Mise's handling of free-threaded Python versions to work correctly...
@@ -181,7 +182,6 @@ runs:
         mise_bin_dir="$(dirname "$MISE_PATH")"
         python_path="$(which python)"
         python_bin_dir="$(dirname "$python_path")"
-        echo "profile=${{ inputs.profile }}" >> "$GITHUB_OUTPUT"
-        echo "python_version=$(python --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+        echo "PROFILE=${{ inputs.profile }}" >> "$GITHUB_OUTPUT"
         echo "PYTHON_PATH=$python_path" >> "$GITHUB_OUTPUT"
         echo "MISE_PYTHON_VERSION=$MISE_PYTHON_VERSION" >> "$GITHUB_OUTPUT"
