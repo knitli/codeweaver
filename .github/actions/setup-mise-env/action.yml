@@ -152,7 +152,7 @@ runs:
         env: false
       id: mise-setup-dev
     - name: Insert Free-Threaded Python into Dev Profile
-      if: inputs.profile == 'dev' && matches(inputs.python-version, '^3\.\d+t$')
+      if: inputs.profile == 'dev' && endsWith(inputs.python-version, 't')
       shell: bash
       id: mise-setup-dev-insert
       env:
