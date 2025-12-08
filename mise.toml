@@ -218,10 +218,10 @@ echo "${CW_PREFIX} Applying formatting...hold onto your butts 🚬...🦖 "
 # mise -y //:fix-ruff-patterns || {  # there are some bugs to work out
 #    echo "${CW_PREFIX} ⚠️  \033[0;32mRuff pattern fixer encountered issues.\033[0m"}
 uv run ruff format .
-git ls-files "*.yaml" "*.yml" "*.json" 2>/dev/null | xargs -n1 yq -iP --indent=2 eval "." 2>/dev/null || true
+git ls-files "*.yaml" "*.yml" "*.json" 2>/dev/null | xargs -r yq -iP --indent=2 eval "." 2>/dev/null || true
 toml_files="$(git ls-files "*.toml" 2>/dev/null)"
 if [ -n "$toml_files" ]; then
-    printf '%s\n' "$toml_files" | xargs -n1 tombi format 2>/dev/null || true
+    printf '%s\n' "$toml_files" | xargs -r tombi format 2>/dev/null || true
 fi
 '''
 run_windows = '''

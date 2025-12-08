@@ -179,6 +179,16 @@ jobs:
           publication_time="$(echo "$publication_response" | jq -r '._meta."io.modelcontextprotocol.registry/official".published_at')"
           if [ -z "$publication_time" ] || [ "$publication_time" = "null" ]; then
             echo "ERROR: Submission to MCP Registry failed"
+            # Try to extract error details from the publication response
+            error_message="$(echo "$publication_response" | jq -r '.error // .message // .detail // empty')"
+            validation_errors="$(echo "$publication_response" | jq -r '.validation_errors // empty')"
+            if [ -n "$error_message" ]; then
+              echo "Error message: $error_message"
+            fi
+            if [ -n "$validation_errors" ] && [ "$validation_errors" != "null" ]; then
+              echo "Validation errors: $validation_errors"
+            fi
+            echo "Raw response: $publication_response"
             exit 1
           fi
           echo "✓ Successfully submitted to MCP Registry at $publication_time"

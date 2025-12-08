@@ -152,7 +152,7 @@ runs:
         env: false
       id: mise-setup-dev
     - name: Insert Free-Threaded Python into Dev Profile
-      if: inputs.profile == 'dev' && startsWith(inputs.python-version, '3.') && endsWith(inputs.python-version, 't')
+      if: inputs.profile == 'dev' && matches(inputs.python-version, '^3\.\d+t$')
       shell: bash
       id: mise-setup-dev-insert
       env:
@@ -163,6 +163,10 @@ runs:
         echo "Inserting free-threaded Python version $UV_PYTHON into dev profile..."
         mise x uv@latest -- uv python install -U "cpython-${UV_PYTHON}" 2>&1
         minor_version="$(mise x uv@latest -- uv run -p "$UV_PYTHON" --no-config python -c 'import sys; print(sys.version_info.minor)' 2>/dev/null)"
+        if [ -z "$minor_version" ]; then
+          echo "ERROR: Failed to determine Python minor version for $UV_PYTHON"
+          exit 1
+        fi
         mise sync python --uv
         new_mise_python_version="${MISE_PYTHON_VERSION}.${minor_version}+freethreaded"
         mise use "python@${new_mise_python_version}" 2>&1

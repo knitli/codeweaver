@@ -33,7 +33,7 @@ silent = "stdout"
 tools.uv = "latest"
 run = '''
 # profile is set to 'dev' in a cloud CI environment for cloud agents. 'enter' tends to break there.
-if [ "$profile" != "dev" ] && [ "$CI" != "true" ]; then
+if [ "$profile" = "dev" ] && [ "$CI" = "true" ]; then
     # don't run
     exit 0
 fi
