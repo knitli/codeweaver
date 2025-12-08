@@ -182,7 +182,7 @@ runs:
         MISE_PYTHON_VERSION: ${{ env.MISE_PYTHON_VERSION }}
         MISE_VERBOSE: ${{ inputs.mise-debug }}
       run: |
-        echo "starting cloud setup for $MISE_PYTHON_VERSION" 
+        echo "starting cloud setup for $MISE_PYTHON_VERSION"
         mise //:cloud-setup 2>&1
 
     - name: Set outputs

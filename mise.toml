@@ -204,7 +204,7 @@ hk fix
 "aqua:typos" = "latest"
 "pipx:reuse" = "latest"
 "aqua:tombi-toml/tombi" = "latest"
-"github:astral-sh/ty" = "0.0.1-alpha.32"
+"ubi:astral-sh/ty" = "latest"
 actionlint = "latest"
 hk = "latest"
 pkl = "latest"
