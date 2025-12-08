@@ -8,24 +8,18 @@ uv_venv_auto = true
 compile = true
 
 [tools]
-hk = { version = "latest" }
+hk = "latest"
 pkl = "latest"
 usage = "latest"
 uv = "latest"
 # Quality & validation tools
 "pipx:reuse" = "latest"  # License validation
-"aqua:tombi-toml/tombi" = "latest"
-"pipx:ty" = "latest"  # Type checking
+"aqua:tombi" = "latest"
+"github:astral-sh/ty" = "ty@0.0.1-alpha.32"  # Type checking
 ruff = "latest"  # Python linting/formatting
 
 [env]
-_.python.venv = { path = ".venv", create = true, uv_create_args = [
-  "--seed",
-  "--keyring-provider",
-  "subprocess",
-  "--python",
-  '{{ get_env(name="MISE_PYTHON_VERSION", default="3.13") }}'
-] }
+_.python.venv = { path = ".venv" }
 
 [hooks]
 [hooks.enter]
