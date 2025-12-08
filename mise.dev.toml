@@ -8,24 +8,29 @@ uv_venv_auto = true
 compile = true
 
 [tools]
-hk = "latest"
+hk = { version = "latest", postinstall = "hk install --mise" }
 pkl = "latest"
 usage = "latest"
 uv = "latest"
 # Quality & validation tools
 "pipx:reuse" = "latest"  # License validation
-"pipx:tombi" = "latest"
+"aqua:tombi-toml/tombi" = "latest"
 "pipx:ty" = "latest"  # Type checking
 ruff = "latest"  # Python linting/formatting
+
+[env]
+_.python.venv = { path = ".venv", create = true, uv_create_args = [
+  "--seed",
+  "--keyring-provider",
+  "subprocess",
+  "--python",
+  '{{ get_env(name="MISE_PYTHON_VERSION", default="3.13") }}'
+] }
 
 [hooks]
 [hooks.enter]
 env.MISE_EXPERIMENTAL = "1"
 script = '''
-# PROFILE is set to 'dev' in a cloud CI environment for cloud agents. 'enter' tends to break there.
-if [ "$PROFILE" != "dev" ]; then
-    mise //:enter
-fi
 '''
 
 [tasks]
@@ -33,6 +38,11 @@ fi
 silent = "stdout"
 tools.uv = "latest"
 run = '''
+# profile is set to 'dev' in a cloud CI environment for cloud agents. 'enter' tends to break there.
+if [ "$profile" != "dev" ] && [ "$CI" != "true" ]; then
+    # don't run
+    exit 0
+fi
 case "$python_path" in
 *.venv/bin/python*)
     # Already in venv, do nothing
@@ -46,6 +56,10 @@ esac
 run_windows = '''
 @echo off
 set "pythonPath=%python_path%"
+if not %profile%==dev if not "%CI%"=="true" (
+    rem don't run
+    exit /b 0
+)
 if not "%pythonPath%"=="%pythonPath:.venv\Scripts\python=%" (
     rem Already in venv, do nothing
 ) else (
@@ -60,6 +74,44 @@ if not "%pythonPath%"=="%pythonPath:.venv\Scripts\python=%" (
 ACTIVE_SHELL = '''{{ exec(command='basename "$SHELL" 2>/dev/null || echo zsh') }}'''
 python_path = '''{{ exec(command='command -v python 2>/dev/null || echo ""') }}'''
 MISE_EXPERIMENTAL = "1"
+
+[tasks.cloud-setup]
+run = [
+  "echo \"[codeweaver] Setting up cloud development environment...\"",
+  "ln -sf AGENTS.md CLAUDE.md",
+  '''if ! command -v mise &>/dev/null; then
+      if [ -d "$HOME/.local/share/mise" ] || [ -d "$HOME/.mise" ] || [ -f "$HOME/.local/bin/mise" ]; then
+        export PATH="$HOME/.local/bin:$HOME/.mise/bin:$HOME/.local/share/mise/bin:$PATH"
+        if [ "ACTIVE_SHELL" = "bash" ] || [ "ACTIVE_SHELL" = "zsh" ] && ! grep -q "mise activate" "$HOME/.${ACTIVE_SHELL}rc"; then
+          echo "eval \"$(mise activate \"${ACTIVE_SHELL}\")\" 2>&1 || true" >> "$HOME/.${ACTIVE_SHELL}rc"
+        fi
+      else
+        chmod +x scripts/dev-env/install-mise.sh 2>&1 || true
+        ./scripts/dev-env/install-mise.sh 2>&1 || true
+      fi
+  fi''',
+  '''mise trust --all 2>&1 || { echo "[WARNING] mise trust --all failed during cloud-setup" >&2; }''',
+  '''mise install 2>&1 || { echo "[WARNING] mise install failed during cloud-setup" >&2; }''',
+  "mise x uv@latest -- uv venv --allow-existing --seed --keyring-provider subprocess --python {{ get_env(name='MISE_PYTHON_VERSION', default='3.13') }} .venv 2>&1",
+  ". .venv/bin/activate 2>&1 || true",
+  "mise x uv@latest -- uv sync --extra full --group dev --group test 2>&1",
+  "git config include.path .gitconfig 2>&1 || true",
+  '''bash -c "
+  ignore_files=('src/codeweaver/_version.py' 'coverage.xml' 'test-results.xml')
+  for file in \"\${ignore_files[@]}\"; do
+    if ! grep -qx \"\$file\" .git/info/exclude; then
+      echo \"\$file\" >> .git/info/exclude 2>&1
+    fi
+  done
+  "''',
+  "echo \"[codeweaver] Cloud development environment setup complete!\"",
+]
+
+[tasks.cloud-setup.env]
+ACTIVE_SHELL = '''{{ exec(command='basename "$SHELL" 2>/dev/null || echo bash') }}'''
+MISE_EXPERIMENTAL = "1"
+MISE_ENV = "dev"
+MISE_YES = "1"
 
 [tasks.update-dependencies]
 tools.uv = "latest"
@@ -110,7 +162,7 @@ uv run pytest tests/ -f --tb=short
 # Building and packaging
 run = '''
 echo "${CW_PREFIX} Building package..."
-uv build &&
+uv build 2>&1 &&
 echo "${CW_PREFIX} ✅ Package built successfully!"
 '''
 run_windows = '''

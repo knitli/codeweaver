@@ -6,6 +6,27 @@
 # VS Code workspace-local zshrc
 # Loaded because VS Code sets ZDOTDIR to this directory for integrated terminals.
 
+typeset -i _mise_updated
+
+# replace default mise hook
+function _mise_hook {
+  local diff=${__MISE_DIFF}
+  source <(command mise hook-env -s zsh)
+  [[ ${diff} == ${__MISE_DIFF} ]]
+  _mise_updated=$?
+}
+
+_PROMPT="❱ "  # or _PROMPT=${PROMPT} to keep the default
+
+function _prompt {
+  if (( ${_mise_updated} )); then
+    PROMPT='%F{blue}${_PROMPT}%f'
+  else
+    PROMPT='%(?.%F{green}${_PROMPT}%f.%F{red}${_PROMPT}%f)'
+  fi
+}
+
+
 # Source repo dev shell init (idempotent), then hand off to user's normal zshrc.
 REPO_ROOT="${PWD}"
 if [[ -n "${VSCODE_CWD:-}" ]]; then
@@ -17,6 +38,17 @@ if [[ -f "${REPO_ROOT}/scripts/dev-env/dev-shell-init.zsh" ]]; then
   source "${REPO_ROOT}/scripts/dev-env/dev-shell-init.zsh"
 fi
 
+if [[ -f "${ZDOTDIR:-${HOME}}/.vscode/terminal.extra.zsh" ]]; then
+  source "${ZDOTDIR:-${HOME}}/.vscode/terminal.extra.zsh"
+fi
+
+# PERSONALIZE: You can add more *local* customizations in .vscode/terminal.local.zsh
+# (This file is gitignored so it won't be checked in.)
+if [[ -f "${ZDOTDIR:-${HOME}}/.vscode/terminal.local.zsh" ]]; then
+  source "${ZDOTDIR:-${HOME}}/.vscode/terminal.local.zsh"
+fi
+
+
 # After workspace init, source the user's real ~/.zshrc if it exists
 if [[ -f "${HOME}/.zshrc" ]]; then
   # Avoid infinite loop if ZDOTDIR points here
@@ -27,8 +59,5 @@ if [[ -f "${HOME}/.zshrc" ]]; then
   source "${HOME}/.zshrc"
 fi
 
-# PERSONALIZE: You can add more *local* customizations in .vscode/terminal.local.zsh
-# (This file is gitignored so it won't be checked in.)
-if [[ -f "${ZDOTDIR:-${HOME}}/.vscode/terminal.local.zsh" ]]; then
-  source "${ZDOTDIR:-${HOME}}/.vscode/terminal.local.zsh"
-fi
+add-zsh-hook precmd _prompt
+

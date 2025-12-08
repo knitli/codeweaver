@@ -28,6 +28,8 @@ _.path = [
 ]
 MISE_ENV = '''{% if get_env(name="CI", default="") == "true" %}""{% else %}dev{% endif %}'''
 CW_PREFIX = '''{% if get_env(name="CI", default="") == "true" %}[codeweaver]{% elif get_env(name="TERM", default="xterm-256color") == "*truecolor*" %}\033[38;2;181;108;48;m[codeweaver]\033[0m{% else %}\033[38;5;131m[codeweaver]\033[0m{% endif %}'''
+# this is a bit redundant but it makes it easier to override in CI environments
+MISE_PYTHON_VERSION = '''{{ get_env(name="MISE_PYTHON_VERSION", default="3.13") }}'''
 
 [settings]
 idiomatic_version_file_enable_tools = []
@@ -40,12 +42,19 @@ uv_venv_create_args = [
   "--keyring-provider",
   "subprocess",
   "--python",
-  "{{ get_env(name='MISE_PYTHON', default='3.13') }}",
+  "{{ get_env(name='MISE_PYTHON_VERSION', default='3.13') }}",
 ]
 
 [tools]
 # most tools are defined in mise.dev.toml to keep CI workflows lightweight
-python = "3.13"
+# Where needed, tools are defined at the task level here, which allows for more granular control
+python = '''{{ get_env(name="MISE_PYTHON_VERSION", default="3.13") }}'''
+uv = "latest"
+
+# Quick note for those unfamiliar with mise:
+#   - depite the namespace, tools prefixed with "pipx:" are installed via "uv" (I assume once upon a time they were installed with pipx before uv came along)
+#   - some tools have no prefix -- these are defined in mise's internal registry directly
+#   - The prefix refers to the "backend" used to install the tool -- most of the no-prefix tools are installed through `aqua` or github/gitlab releases, and failing that, `ubi`. Language-specific package managers (cargo/npm/go) are also used where appropriate.
 
 [tasks.info]
 description = "Print project information"
@@ -82,7 +91,11 @@ run = '''
 # Source the virtual environment
 echo "${CW_PREFIX} Sourcing virtual environment..."
 git rev-parse --show-toplevel || true
-source .venv/bin/activate
+if [ ! -d ".venv" ]; then
+    echo "${CW_PREFIX} ⚠️  \033[0;31mVirtual environment not found. We'll try to proceed, but things may break!\033[0m"
+    uvx venv --seed --keyring-provider subprocess --python {{ get_env(name='MISE_PYTHON_VERSION', default='3.13') }} .venv
+fi
+. .venv/bin/activate || echo "${CW_PREFIX} ⚠️  \033[0;31mFailed to source virtual environment.\033[0m"
 '''
 run_windows = '''
 echo [codeweaver] Sourcing virtual environment...
@@ -95,12 +108,10 @@ git rev-parse --show-toplevel
 run = [
   "echo \"${CW_PREFIX} Setting up development environment for the first time...\"",
   "mise set &>/dev/null",
-  "mise trust &>/dev/null",
-  "mise install &>/dev/null || true",
-  "hk install --mise &>/dev/null || true",
+  "mise trust --all &>/dev/null",
+  "mise install &>/dev/null || echo \"${CW_PREFIX} ⚠️  WARNING: mise install failed during setup.\"",
   "mise //:venv &>/dev/null",
   "mise //:sync &>/dev/null",
-  "mise env &>/dev/null || true",
   "git config include.path .gitconfig &>/dev/null || true",
   "echo 'src/codeweaver/_version.py' >> .git/info/exclude",
   "echo 'coverage.xml' >> .git/info/exclude",
@@ -111,9 +122,8 @@ run = [
 run_windows = [
   "echo [codeweaver] Setting up development environment for the first time...",
   "mise set > NUL 2>&1",
-  "mise trust > NUL 2>&1",
-  "mise install > NUL 2>&1 || echo.",
-  "hk install --mise > NUL 2>&1 || echo.",
+  "mise trust --all > NUL 2>&1",
+  "mise install > NUL 2>&1 || echo \"[codeweaver] WARNING: mise install failed during setup.\"",
   "mise //:venv > NUL 2>&1",
   "mise //:sync > NUL 2>&1",
   "mise env > NUL 2>&1",
@@ -134,45 +144,6 @@ ACTIVE_SHELL = '''{{ exec(command='basename "$SHELL" 2>/dev/null || echo zsh') }
 
 [tasks.setup.tools]
 uv = "latest"
-
-[tasks.cloud-setup]
-run = [
-  "echo \"[codeweaver] Setting up cloud development environment...\"",
-  "ln -sf AGENTS.md CLAUDE.md",
-  '''if ! command -v mise &>/dev/null; then
-      if [ -d "$HOME/.local/share/mise" ] || [ -d "$HOME/.mise" ] || [ -f "$HOME/.local/bin/mise" ]; then
-        export PATH="$HOME/.local/bin:$HOME/.mise/bin:$HOME/.local/share/mise/bin:$PATH"
-        if ! grep -q "mise activate" "$HOME/.bashrc"; then
-          echo "eval \"$(mise activate \"${ACTIVE_SHELL:-bash}\")\" 2>&1 || true" >> "$HOME/.bashrc"
-        fi
-      else
-        chmod +x scripts/dev-env/install-mise.sh 2>&1 || true
-        ./scripts/dev-env/install-mise.sh 2>&1 || true
-      fi
-  fi''',
-  '''mise -y trust --all 2>&1 || { echo "[WARNING] mise -y trust --all failed during cloud-setup" >&2; }''',
-  '''mise install 2>&1 || { echo "[WARNING] mise install failed during cloud-setup" >&2; }''',
-  "hk install --mise 2>&1 || mise x hk@latest -- hk install --mise 2>&1 || true",
-  "mise x uv@latest -- uv venv --allow-existing --seed --keyring-provider subprocess --python {{ get_env(name='MISE_PYTHON', default='3.13') }} .venv 2>&1",
-  ". .venv/bin/activate 2>&1 || true",
-  "mise x uv@latest -- uv sync --group dev --group test 2>&1",
-  "git config include.path .gitconfig 2>&1 || true",
-  '''bash -c "
-  ignore_files=('src/codeweaver/_version.py' 'coverage.xml' 'test-results.xml')
-  for file in \"\${ignore_files[@]}\"; do
-    if ! grep -qx \"\$file\" .git/info/exclude; then
-      echo \"\$file\" >> .git/info/exclude 2>&1
-    fi
-  done
-  "''',
-  "echo \"[codeweaver] Cloud development environment setup complete!\"",
-]
-
-[tasks.cloud-setup.env]
-ACTIVE_SHELL = '''{{ exec(command='basename "$SHELL" 2>/dev/null || echo bash') }}'''
-MISE_EXPERIMENTAL = "1"
-MISE_ENV = "dev"
-MISE_YES = "1"
 
 [tasks.fix-python]
 tools.uv = "latest"
@@ -210,7 +181,7 @@ hk check
 tools.uv = "latest"
 run = '''
 echo "Running linting checks..."
-if [[ "$CI" == "true" ]]; then
+if [ "$CI" = "true" ]; then
     uv run ruff check . --output-format=github
 else
     uv run ruff check .
@@ -236,10 +207,9 @@ hk fix
 '''
 
 [tasks.format.tools]
-"cargo:rust-parallel" = "latest"
-"cargo:typos" = "latest"
+"aqua:crates-ci/typos" = "latest"
 "pipx:reuse" = "latest"
-"pipx:tombi" = "latest"
+"aqua:tombi-toml/tombi" = "latest"
 "pipx:ty" = "latest"
 actionlint = "latest"
 hk = "latest"
@@ -254,13 +224,13 @@ echo "${CW_PREFIX} Applying formatting...hold onto your butts 🚬...🦖 "
 # mise -y //:fix-ruff-patterns || {  # there are some bugs to work out
 #    echo "${CW_PREFIX} ⚠️  \033[0;32mRuff pattern fixer encountered issues.\033[0m"}
 uv run ruff format .
-files="$(git ls-files "*.yaml" "*.yml" "*.json" 2>/dev/null)"
-if [ -n "$files" ]; then
-    echo "$files" | rust-parallel -d stderr -i - --no-run-if-empty yq -iP --indent=2 "." || true
+yaml_files="$(git ls-files "*.yaml" "*.yml" "*.json" 2>/dev/null)"
+if [ -n "$yaml_files" ]; then
+    printf '%s\n' $yaml_files | xargs -n1 yq -iP --indent=2  eval "." 2>/dev/null || true
 fi
-files="$(git ls-files "*.toml" 2>/dev/null)"
-if [ -n "$files" ]; then
-    tombi format $files 2>/dev/null || true
+toml_files="$(git ls-files "*.toml" 2>/dev/null)"
+if [ -n "$toml_files" ]; then
+    tombi format $toml_files 2>/dev/null || true
 fi
 '''
 run_windows = '''
@@ -275,9 +245,8 @@ for /f "delims=" %%f in ('git ls-files "*.toml" 2^>NUL') do (
 '''
 
 [tasks.format-fix.tools]
-"cargo:rust-parallel" = "latest"
-"pipx:tombi" = "latest"
-"yq" = "latest"
+"aqua:tombi-toml/tombi" = "latest"
+yq = "latest"
 uv = "latest"
 
 [tasks.graph]
@@ -296,7 +265,7 @@ env.MISE_EXPERIMENTAL = "1"
 tools.uv = "latest"
 run = '''
 echo "${CW_PREFIX} Setting up Python virtual environment..."
-uv venv --allow-existing --seed --keyring-provider subprocess --python 3.13 --refresh .venv &&
+uv venv --allow-existing --seed --keyring-provider subprocess --python {{ get_env(name="MISE_PYTHON_VERSION", default="3.13") }} --refresh .venv &&
 echo "${CW_PREFIX} ✅ Virtual environment is ready!"
 source .venv/bin/activate || echo "${CW_PREFIX} ⚠️  \033[0;31mFailed to source virtual environment.\033[0m"
 echo "${CW_PREFIX} Running dependency sync..."
@@ -304,7 +273,7 @@ mise //:sync &
 '''
 run_windows = '''
 echo [codeweaver] Setting up Python virtual environment...
-uv venv --allow-existing --seed --keyring-provider subprocess --python 3.13 --refresh .venv
+uv venv --allow-existing --seed --keyring-provider subprocess --python {{ get_env(name="MISE_PYTHON_VERSION", default="3.13") }} --refresh .venv
 if %ERRORLEVEL% equ 0 (
     echo [codeweaver] Virtual environment is ready!
     call .venv\Scripts\activate.bat
@@ -318,7 +287,7 @@ start /b mise //:sync
 
 [tasks.test]
 # Testing
-tools.python = '''{{ get_env(name="MISE_PYTHON", default="3.13") }}'''
+tools.python = '''{{ get_env(name="MISE_PYTHON_VERSION", default="3.13") }}'''
 tools.uv = "latest"
 usage = '''
 args "[dir]" help="directory to test" default="tests/"
@@ -335,7 +304,7 @@ uv run pytest "%usage_dir%" %usage_marks:~-3% -v %*
 
 [tasks.test-cov]
 tools.uv = "latest"
-tools.python = '''{{ get_env(name="MISE_PYTHON", default="3.13") }}'''
+tools.python = '''{{ get_env(name="MISE_PYTHON_VERSION", default="3.13") }}'''
 run = '''
 echo "${CW_PREFIX} Running tests with coverage..."
 uv sync --group test --inexact

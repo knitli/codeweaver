@@ -127,35 +127,34 @@ jobs:
           # we need to sign the timestamp with the private key, which is in MCP_REGISTRY_KEY
           # MCP_REGISTRY_KEY is expected to be in PEM format, and it uses ed25519 algorithm
           # unfortunately, pkeyutl can only work with files because of how it has to buffer the input for signing
-          # shellcheck disable=SC2329
-          indata=""
-          key_file=""
-          outfile=""
-          request_body=""
+
+          # setup temporary files and cleanup
+          umask 077
+          indata="$(mktemp)"
+          key_file="$(mktemp)"
+          outfile="$(mktemp)"
+          request_body="$(mktemp)"
           # shellcheck disable=SC2329
           cleanup() {
+            # ensure sensitive files are securely deleted -- on ubuntu, shred should be available
             shred -u "$key_file" "$outfile" || rm -f "$key_file" "$outfile"
-            # these aren't sensitive, but let's keep things tidy
+            # these aren't sensitive, but let's keep things tidy:
             rm -f "$indata" "$request_body"
           }
           trap cleanup EXIT
 
           domain="knitli.com"
-          indata="$(mktemp)"
-          echo -n "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" > "$indata"
+          timestamp="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          echo -n "$timestamp" > "$indata"
 
-          umask 077
-          key_file="$(mktemp)"
           echo "$MCP_REGISTRY_KEY" > "$key_file"
-          outfile="$(mktemp)"
-
+          # it wasn't easy to figure out how to do ed25519 signing with openssl, but this is the correct incantation with recent versions:
           openssl pkeyutl -sign -inkey "$key_file" -out "$outfile" -rawin  -in "$indata" || { echo "ERROR: Failed to sign timestamp"; exit 1; }
           signed_timestamp_hex="$(xxd -p "$outfile" | tr -d '\n')"
-          request_body="$(mktemp)"
           {
             echo -n '{"domain":"'"$domain"'",'
             echo -n '"signed_timestamp":"'"$signed_timestamp_hex"'",'
-            echo -n '"timestamp":"'"$(cat "$indata")"'"}'
+            echo -n '"timestamp":"'"$timestamp"'"}'
           } > "$request_body"
           echo "Logging in to MCP Registry..."
           response="$(curl --request POST \

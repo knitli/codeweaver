@@ -28,9 +28,9 @@ outputs:
   PYTHON_PATH:
     description: Path to the Python executable
     value: ${{ steps.python-setup.outputs.PYTHON_PATH }}
-  UV_PATH:
+  uv_path:
     description: Path to uv executable
-    value: ${{ steps.python-setup.outputs.UV_PATH }}
+    value: ${{ steps.python-setup.outputs.uv_path }}
 
 runs:
   using: composite
@@ -58,5 +58,5 @@ runs:
         python -m pip install --upgrade pip setuptools wheel
         python -m pip install uv
         echo "PYTHON_PATH=$(which python)" >> "$GITHUB_OUTPUT"
-        echo "UV_PATH=$(which uv)" >> "$GITHUB_OUTPUT"
+        echo "uv_path=$(which uv)" >> "$GITHUB_OUTPUT"
 

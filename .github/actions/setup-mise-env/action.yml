@@ -29,18 +29,19 @@ inputs:
     default: 'minimal'
 
 outputs:
+  # MISE_PATH, MISE_ENV, and PYTHON_PATH are typically in uppercase and may be case sensitive in some environments
   MISE_PATH:
     description: Path to mise executable
     value: ${{ steps.mise-outputs.outputs.MISE_PATH }}
   MISE_ENV:
     description: Mise environment name
     value: ${{ steps.mise-outputs.outputs.MISE_ENV }}
-  PROFILE:
+  profile:
     description: Profile used for setup
-    value: ${{ steps.mise-outputs.outputs.PROFILE }}
-  PYTHON_VERSION:
+    value: ${{ steps.mise-outputs.outputs.profile }}
+  python_version:
     description: Python version installed
-    value: ${{ steps.mise-outputs.outputs.PYTHON_VERSION }}
+    value: ${{ steps.mise-outputs.outputs.python_version }}
   PYTHON_PATH:
     description: Path to Python executable
     value: ${{ steps.mise-outputs.outputs.PYTHON_PATH }}
@@ -61,13 +62,32 @@ runs:
       shell: bash
       run: ./scripts/dev-env/ci-free-disk-space.sh
 
+    - name: Set up Environment for Free-Threaded Python
+      shell: bash
+      run: |
+        # We need to do this for all python versions so that the environment variable is set
+        # Because we can't use inputs.python-version after this step
+        if [[ "${{ inputs.python-version }}" == *"t" ]]; then
+          echo "Setting up environment for free-threaded Python version '${{ inputs.python-version }}'..."
+          echo "MISE_PYTHON_PRECOMPILED_FLAVOR=freethreaded+pgo-full" >> $GITHUB_ENV
+          echo "MISE_PYTHON_COMPILE=0" >> $GITHUB_ENV
+          python_version_clean="${{ inputs.python-version::-1 }}"
+          echo "MISE_PYTHON_VERSION=${python_version_clean}" >> $GITHUB_ENV
+          echo "python_version=${python_version_clean}" >> $GITHUB_ENV
+          uv_python_version="cpython-${python_version_clean}+freethreaded"
+          echo "UV_PYTHON=${uv_python_version}" >> $GITHUB_ENV
+        else
+          echo "python_version=${{ inputs.python-version }}" >> $GITHUB_ENV
+          echo "UV_PYTHON=${{ inputs.python-version }}" >> $GITHUB_ENV
+        fi
+
     - name: Setup Mise for Minimal Profile
       if: inputs.profile == 'minimal'
       uses: jdx/mise-action@eb508e65f0eb73d4fc9fc9505569833136217cc9
       env:
         MISE_YES: 1
         MISE_EXPERIMENTAL: 1
-        UV_PYTHON: ${{ inputs.python-version }}
+        UV_PYTHON: ${{ env.UV_PYTHON }}
       with:
         github_token: ${{ inputs.github-token }}
         experimental: true
@@ -83,7 +103,7 @@ runs:
         MISE_YES: 1
         MISE_EXPERIMENTAL: 1
         MISE_ENV: dev
-        UV_PYTHON: ${{ inputs.python-version }}
+        UV_PYTHON: ${{ env.UV_PYTHON }}
       with:
         github_token: ${{ inputs.github-token }}
         experimental: true
@@ -106,7 +126,7 @@ runs:
         MISE_YES: 1
         MISE_EXPERIMENTAL: 1
         MISE_ENV: dev
-        UV_PYTHON: ${{ inputs.python-version }}
+        UV_PYTHON: ${{ env.UV_PYTHON }}
       with:
         github_token: ${{ inputs.github-token }}
         experimental: true
@@ -144,8 +164,6 @@ runs:
         mise_bin_dir="$(dirname "$MISE_PATH")"
         python_path="$(which python)"
         python_bin_dir="$(dirname "$python_path")"
-        NEWPATH="$mise_bin_dir:$python_bin_dir:$PATH"
-        echo "NEWPATH=${NEWPATH}" >> "$GITHUB_OUTPUT"
-        echo "PROFILE=${{ inputs.profile }}" >> "$GITHUB_OUTPUT"
-        echo "PYTHON_VERSION=$(python --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+        echo "profile=${{ inputs.profile }}" >> "$GITHUB_OUTPUT"
+        echo "python_version=$(python --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
         echo "PYTHON_PATH=$python_path" >> "$GITHUB_OUTPUT"

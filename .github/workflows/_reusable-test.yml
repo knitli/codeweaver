@@ -69,7 +69,7 @@ jobs:
           - python-version: "3.14t"
             experimental: true
     env:
-      MISE_PYTHON: ${{ matrix.python-version }}
+      MISE_PYTHON_VERSION: ${{ matrix.python-version }}
       UV_PYTHON: ${{ matrix.python-version }}
     steps:
       - name: Checkout code
@@ -78,7 +78,6 @@ jobs:
           fetch-depth: 3
 
       - name: Setup Python environment with Mise
-        if: ${{ matrix.experimental == false }}
         uses: ./.github/actions/setup-mise-env
         with:
           python-version: ${{ matrix.python-version }}
@@ -87,12 +86,14 @@ jobs:
           skip-checkout: true
         id: setup-mise
       - name: Run quality checks
-        if: ${{ inputs.run-quality-checks && matrix.experimental == false }}
-        run: mise run check 2>&1
+        if: ${{ inputs.run-quality-checks }}
+        run: |
+          doctor_output="$(mise doctor)"
+          echo "$doctor_output"
+          mise run check 2>&1
         continue-on-error: true
 
       - name: Run tests with coverage
-        if: ${{ matrix.experimental == false }}
         run: mise run test-cov -m "${{ inputs.test-markers }}"
       - name: Upload coverage to Codecov
         if: ${{ inputs.upload-coverage && matrix.python-version == '3.12' }}
@@ -111,20 +112,3 @@ jobs:
             test-results.xml
             coverage.xml
           if-no-files-found: warn
-
-      # Experimental Python versions (free-threaded)
-      - name: Setup Experimental Python environment
-        if: ${{ matrix.experimental == true }}
-        uses: ./.github/actions/setup-python-env
-        with:
-          python-version: ${{ matrix.python-version }}
-          skip-checkout: true
-
-      - name: Install test dependencies for Experimental Python
-        if: ${{ matrix.experimental == true }}
-        run: uv sync --group test --resolution highest
-
-      - name: Run test coverage for experimental Python
-        if: ${{ matrix.experimental == true }}
-        run: uv run pytest tests/ --cov=codeweaver --cov-report=xml --cov-report=term-missing --junit-xml=test-results.xml -v -m "${{ inputs.test-markers }}"
-
