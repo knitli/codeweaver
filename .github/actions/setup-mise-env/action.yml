@@ -65,9 +65,8 @@ runs:
       shell: bash
       run: |
         # ensure build-python dependencies are installed
-        sudo apt-get update && sudo apt-get install -y curl git build-essential libssl-dev zlib1g-dev \
-        libbz2-dev libreadline-dev libsqlite3-dev libncursesw5-dev xz-utils tk-dev libxml2-dev \
-        libxmlsec1-dev libffi-dev liblzma-dev libzstd-dev
+        sudo mkdir -p /etc/apt/apt.conf.d/ && echo 'DPkg::Post-Invoke {"/bin/rm -f /var/cache/apt/archives/*.deb || true";};' | sudo tee /etc/apt/apt.conf.d/99-local-cleanup
+        sudo apt-get update && sudo apt-get install -y curl git libreadline-dev libbz2-dev zlib1g-dev
 
     - name: Set up Environment for Free-Threaded Python
       shell: bash
@@ -164,7 +163,8 @@ runs:
         MISE_VERBOSE: ${{ inputs.mise-debug }}
       run: |
         echo "Inserting free-threaded Python version $UV_PYTHON into dev profile..."
-        mise x uv@latest -- uv python install -U "cpython-${UV_PYTHON}" 2>&1
+        mise use -g uv@latest
+        uv python install -U "cpython-${UV_PYTHON}" 2>&1
         mise sync python --uv
         new_mise_python_version="${MISE_PYTHON_VERSION}+freethreaded"
         echo "Telling mise to use $new_mise_python_version"
