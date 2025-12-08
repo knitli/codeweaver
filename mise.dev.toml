@@ -14,8 +14,8 @@ usage = "latest"
 uv = "latest"
 # Quality & validation tools
 "pipx:reuse" = "latest"  # License validation
-"aqua:tombi" = "latest"
-"github:astral-sh/ty" = "ty@0.0.1-alpha.32"  # Type checking
+"aqua:tombi-toml/tombi" = "latest"
+"github:astral-sh/ty" = "0.0.1-alpha.32"  # Type checking
 ruff = "latest"  # Python linting/formatting
 
 [env]
