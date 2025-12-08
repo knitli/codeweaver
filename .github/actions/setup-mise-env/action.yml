@@ -101,6 +101,7 @@ runs:
         MISE_EXPERIMENTAL: 1
         UV_PYTHON: ${{ env.UV_PYTHON }}
         MISE_VERBOSE: ${{ inputs.mise-debug }}
+        MISE_PYTHON_COMPILE: 0
       with:
         github_token: ${{ inputs.github-token }}
         experimental: true
@@ -118,6 +119,7 @@ runs:
         MISE_ENV: dev
         UV_PYTHON: ${{ env.UV_PYTHON }}
         MISE_VERBOSE: ${{ inputs.mise-debug }}
+        MISE_PYTHON_COMPILE: 0
       with:
         github_token: ${{ inputs.github-token }}
         experimental: true
@@ -143,6 +145,7 @@ runs:
         MISE_ENV: dev
         MISE_VERBOSE: ${{ inputs.mise-debug }}
         UV_PYTHON: ${{ env.UV_PYTHON }}
+        MISE_PYTHON_COMPILE: 0
       with:
         github_token: ${{ inputs.github-token }}
         experimental: true
@@ -169,6 +172,7 @@ runs:
         fi
         mise sync python --uv
         new_mise_python_version="${MISE_PYTHON_VERSION}.${minor_version}+freethreaded"
+        echo "Telling mise to use $new_mise_python_version"
         mise use "python@${new_mise_python_version}" 2>&1
         echo "MISE_PYTHON_VERSION=${new_mise_python_version}" >> "$GITHUB_ENV"
     - name: Activate Dev Profile Environment
@@ -183,6 +187,7 @@ runs:
         MISE_PYTHON_VERSION: ${{ env.MISE_PYTHON_VERSION }}
         MISE_VERBOSE: ${{ inputs.mise-debug }}
       run: |
+        echo "starting cloud setup for $MISE_PYTHON_VERSION" 
         mise //:cloud-setup 2>&1
 
     - name: Set outputs
