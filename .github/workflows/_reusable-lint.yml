@@ -33,8 +33,6 @@ jobs:
     name: Lint and Format
     runs-on: ubuntu-latest
     env:
-      MISE_EXPERIMENTAL: 1
-      MISE_YES: 1
       MISE_PYTHON: ${{ inputs.python-version }}
       UV_PYTHON: ${{ inputs.python-version }}
     steps:
@@ -46,7 +44,7 @@ jobs:
       - name: Setup Python environment
         uses: ./.github/actions/setup-mise-env
         with:
-          python-version: ${{ env.python-version }}
+          python-version: ${{ inputs.python-version }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           profile: "${{ env.PROFILE }}"
           skip-checkout: true

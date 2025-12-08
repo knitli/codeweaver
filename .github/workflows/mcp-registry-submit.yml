@@ -33,7 +33,7 @@ jobs:
           ref: ${{ github.event.release.tag_name || github.ref }}
           fetch-depth: 1
 
-      - name: Install uv
+      - name: Setup UV and Python environment
         uses: ./.github/actions/setup-uv-env
         with:
           python-version: "3.12"
@@ -149,7 +149,7 @@ jobs:
           echo "$MCP_REGISTRY_KEY" > "$key_file"
           outfile="$(mktemp)"
 
-          openssl pkeyutl -sign -inkey "$key_file" -out "$outfile" -rawin  -in "$indata"
+          openssl pkeyutl -sign -inkey "$key_file" -out "$outfile" -rawin  -in "$indata" || { echo "ERROR: Failed to sign timestamp"; exit 1; }
           signed_timestamp_hex="$(xxd -p "$outfile" | tr -d '\n')"
           request_body="$(mktemp)"
           {

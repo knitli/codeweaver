@@ -29,7 +29,6 @@ jobs:
       MISE_ENV: dev
       MISE_EXPERIMENTAL: 1
       MISE_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      MISE_EXPERIMENTAL: 1
       MISE_YES: 1
       # Limit CodeQL memory usage to prevent OOM kills on standard runners (7GB total RAM)
       # Note: Standard runners have ~7GB, so limit to 3GB to leave headroom for system
