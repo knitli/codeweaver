@@ -8,7 +8,7 @@ uv_venv_auto = true
 compile = true
 
 [tools]
-hk = { version = "latest", postinstall = "hk install --mise" }
+hk = { version = "latest" }
 pkl = "latest"
 usage = "latest"
 uv = "latest"
@@ -92,6 +92,7 @@ run = [
   fi''',
   '''mise trust --all 2>&1 || { echo "[WARNING] mise trust --all failed during cloud-setup" >&2; }''',
   '''mise install 2>&1 || { echo "[WARNING] mise install failed during cloud-setup" >&2; }''',
+  '''mise x hk@latest -- hk install --mise 2>&1 || { echo "[WARNING] hk install failed during cloud-setup" >&2; }''',
   "mise x uv@latest -- uv venv --allow-existing --seed --keyring-provider subprocess --python {{ get_env(name='MISE_PYTHON_VERSION', default='3.13') }} .venv 2>&1",
   ". .venv/bin/activate 2>&1 || true",
   "mise x uv@latest -- uv sync --extra full --group dev --group test 2>&1",

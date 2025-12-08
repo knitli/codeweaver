@@ -30,6 +30,7 @@ MISE_ENV = '''{% if get_env(name="CI", default="") == "true" %}""{% else %}dev{%
 CW_PREFIX = '''{% if get_env(name="CI", default="") == "true" %}[codeweaver]{% elif get_env(name="TERM", default="xterm-256color") == "*truecolor*" %}\033[38;2;181;108;48;m[codeweaver]\033[0m{% else %}\033[38;5;131m[codeweaver]\033[0m{% endif %}'''
 # this is a bit redundant but it makes it easier to override in CI environments
 MISE_PYTHON_VERSION = '''{{ get_env(name="MISE_PYTHON_VERSION", default="3.13") }}'''
+HK_MISE = "1"
 
 [settings]
 idiomatic_version_file_enable_tools = []
