@@ -49,7 +49,7 @@ Without CodeWeaver:
   Claude: "Let me search for 'auth'... here are 50 files mentioning authentication"
   Result: Generic code, wrong context, wasted tokens
 
-With CodeWeaver:  
+With CodeWeaver:
   You: "Where do we validate OAuth tokens?"
   Claude gets: The exact 3 functions across 2 files, with surrounding context
   Result: Precise answers, focused context, actual understanding
@@ -214,7 +214,7 @@ with http:
 CodeWeaver exists because I believe AI agents need better context infrastructure. Right now:
 
 - Agents re-read the same huge files repeatedly
-- They get shallow, text-based context instead of structural understanding  
+- They get shallow, text-based context instead of structural understanding
 - Most tools are built for humans, not for how agents actually work
 - You don't control what context they see or how they get it
 

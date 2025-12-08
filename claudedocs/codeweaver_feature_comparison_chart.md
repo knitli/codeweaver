@@ -304,14 +304,14 @@ High Customization (Embedding Models)
          │                        (IDE Extension)
          │
     ─────┼───────────────────────────── Portability
-         │               
-         │  
+         │
+         │
          │
          │  ● Cursor   ● Copilot    ● Bloop
          │    (Cloud)     (Cloud)     (Desktop)
-         │                   
+         │
          ▼
-Low Customization (1-2 Models) 
+Low Customization (1-2 Models)
 ```
 
 **CodeWeaver's Position**:
