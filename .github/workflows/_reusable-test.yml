@@ -89,8 +89,6 @@ jobs:
         if: ${{ inputs.run-quality-checks }}
         env:
           MISE_PYTHON_VERSION: ${{ steps.setup-mise.outputs.MISE_PYTHON_VERSION }}
-          MISE_PYTHON_PRECOMPILED_FLAVOR: ${{ steps.setup-mise.outputs.MISE_PYTHON_PRECOMPILED_FLAVOR }}
-          MISE_PYTHON_COMPILE: 0
         run: |
           doctor_output="$(mise doctor)"
           echo "$doctor_output"
@@ -100,8 +98,6 @@ jobs:
       - name: Run tests with coverage
         env:
           MISE_PYTHON_VERSION: ${{ steps.setup-mise.outputs.MISE_PYTHON_VERSION }}
-          MISE_PYTHON_PRECOMPILED_FLAVOR: ${{ steps.setup-mise.outputs.MISE_PYTHON_PRECOMPILED_FLAVOR }}
-          MISE_PYTHON_COMPILE: 0
         run: mise run test-cov -m "${{ inputs.test-markers }}"
       - name: Upload coverage to Codecov
         if: ${{ inputs.upload-coverage && matrix.python-version == '3.12' }}

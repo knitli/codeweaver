@@ -268,7 +268,7 @@ run = '''
 echo "${CW_PREFIX} Setting up Python virtual environment..."
 uv venv --allow-existing --seed --keyring-provider subprocess --python {{ get_env(name="MISE_PYTHON_VERSION", default="3.13") }} --refresh .venv &&
 echo "${CW_PREFIX} ✅ Virtual environment is ready!"
-source .venv/bin/activate || echo "${CW_PREFIX} ⚠️  \033[0;31mFailed to source virtual environment.\033[0m"
+. .venv/bin/activate || echo "${CW_PREFIX} ⚠️  \033[0;31mFailed to source virtual environment.\033[0m"
 echo "${CW_PREFIX} Running dependency sync..."
 mise //:sync &
 '''
