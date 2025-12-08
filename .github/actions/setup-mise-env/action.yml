@@ -27,6 +27,10 @@ inputs:
     description: Task profile to use for mise setup one of 'minimal', 'reviewer', 'dev'
     required: true
     default: 'minimal'
+  mise-debug:
+    description: Enable debug output for mise commands
+    required: false
+    default: 'false'
 
 outputs:
   # MISE_PATH, MISE_ENV, and PYTHON_PATH are typically in uppercase and may be case sensitive in some environments
@@ -71,6 +75,7 @@ runs:
         MISE_PYTHON_VERSION: ${{ inputs.python-version }}
         UV_PYTHON: ${{ inputs.python-version }}
         PYTHON_VERSION: ${{ inputs.python-version }}
+        MISE_VERBOSE: ${{ inputs.mise-debug }}
       run: |
         if [[ "${PYTHON_VERSION}" != *t ]]; then
           echo "Using standard Python version ${PYTHON_VERSION}..."
@@ -95,6 +100,7 @@ runs:
         MISE_YES: 1
         MISE_EXPERIMENTAL: 1
         UV_PYTHON: ${{ env.UV_PYTHON }}
+        MISE_VERBOSE: ${{ inputs.mise-debug }}
       with:
         github_token: ${{ inputs.github-token }}
         experimental: true
@@ -111,7 +117,7 @@ runs:
         MISE_EXPERIMENTAL: 1
         MISE_ENV: dev
         UV_PYTHON: ${{ env.UV_PYTHON }}
-        MISE_PYTHON_VERSION: ${{ env.MISE_PYTHON_VERSION }}
+        MISE_VERBOSE: ${{ inputs.mise-debug }}
       with:
         github_token: ${{ inputs.github-token }}
         experimental: true
@@ -124,6 +130,7 @@ runs:
       shell: bash
       env:
         MISE_GITHUB_TOKEN: ${{ inputs.github-token }}
+        MISE_VERBOSE: ${{ inputs.mise-debug }}
       id: mise-setup-reviewer
       run: |
         uv sync
@@ -134,6 +141,7 @@ runs:
         MISE_YES: 1
         MISE_EXPERIMENTAL: 1
         MISE_ENV: dev
+        MISE_VERBOSE: ${{ inputs.mise-debug }}
         UV_PYTHON: ${{ env.UV_PYTHON }}
       with:
         github_token: ${{ inputs.github-token }}
@@ -150,9 +158,10 @@ runs:
       env:
         MISE_PYTHON_VERSION: ${{ env.MISE_PYTHON_VERSION }}
         UV_PYTHON: ${{ env.UV_PYTHON }}
+        MISE_VERBOSE: ${{ inputs.mise-debug }}
       run: |
         echo "Inserting free-threaded Python version $UV_PYTHON into dev profile..."
-        mise x uv@latest -- uv python install -U --default "cpython-${UV_PYTHON}" 2>&1
+        mise x uv@latest -- uv python install -U "cpython-${UV_PYTHON}" 2>&1
         minor_version="$(mise x uv@latest -- uv run -p "$UV_PYTHON" --no-config python -c 'import sys; print(sys.version_info.minor)' 2>/dev/null)"
         mise sync python --uv
         new_mise_python_version="${MISE_PYTHON_VERSION}.${minor_version}+freethreaded"
@@ -168,6 +177,7 @@ runs:
         MISE_YES: 1
         MISE_GITHUB_TOKEN: ${{ inputs.github-token }}
         MISE_PYTHON_VERSION: ${{ env.MISE_PYTHON_VERSION }}
+        MISE_VERBOSE: ${{ inputs.mise-debug }}
       run: |
         mise //:cloud-setup 2>&1
 
@@ -176,6 +186,7 @@ runs:
       id: mise-outputs
       env:
         MISE_PYTHON_VERSION: ${{ env.MISE_PYTHON_VERSION }}
+        MISE_VERBOSE: ${{ inputs.mise-debug }}
       run: |
         MISE_PATH="$(which mise)"
         echo "MISE_PATH=$MISE_PATH" >> "$GITHUB_OUTPUT"

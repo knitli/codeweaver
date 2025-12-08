@@ -84,6 +84,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           profile: "dev"
           skip-checkout: true
+          mise-debug: true
         id: setup-mise
       - name: Run quality checks
         if: ${{ inputs.run-quality-checks }}
