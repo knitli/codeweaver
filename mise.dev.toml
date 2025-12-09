@@ -92,6 +92,7 @@ run = [
   '''mise install 2>&1 || { echo "[WARNING] mise install failed during cloud-setup" >&2; }''',
   '''mise x hk@latest -- hk install --mise 2>&1 || { echo "[WARNING] hk install failed during cloud-setup" >&2; }''',
   '''mise use -g uv@latest 2>&1 || { echo "[WARNING] mise use -g uv@latest failed during cloud-setup" >&2; }''',
+  '''echo "[codeweaver] Ensuring Python version {{ get_env(name='MISE_PYTHON_VERSION', default='3.13') }} is installed..."''',
   "uv venv --allow-existing --seed --keyring-provider subprocess --python {{ get_env(name='MISE_PYTHON_VERSION', default='3.13') }} .venv 2>&1",
   ". .venv/bin/activate 2>&1 || true",
   "uv sync --extra full --group dev --group test 2>&1",
