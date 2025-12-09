@@ -29,11 +29,12 @@ jobs:
   tests:
     name: Run Tests
     # EFFICIENCY: Skip tests on tag push (rely on PR tests), but allow manual trigger
+    # TODO: Add smoke tests for releases
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'release'
     uses: ./.github/workflows/_reusable-test.yml
     with:
-      python-versions: '["3.12", "3.13"]'
-      test-markers: "not docker and not qdrant and not dev_only and not skip_ci and not network and not external_api"
+      python-versions: '["3.12", "3.13", "3.14"]'
+      test-markers: "not docker and not qdrant and not dev_only and not skip_ci and not network and not external_api and not flaky"
       upload-coverage: false
       run-quality-checks: true
     secrets: inherit

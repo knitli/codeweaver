@@ -33,13 +33,15 @@ jobs:
   build:
     name: Build Package
     runs-on: ubuntu-latest
+    env:
+      UV_PYTHON: ${{ inputs.python-version }}
     permissions:
       contents: read
     steps:
       - name: Checkout code
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
         with:
-          fetch-depth: 0
+          fetch-depth: 2
 
       - name: Setup UV and build
         uses: ./.github/actions/setup-uv-env
@@ -54,7 +56,6 @@ jobs:
       - name: Build package with UV
         env:
           UV_PATH: ${{ steps.setup-uv.outputs.uv-path }}
-          UV_PYTHON: ${{ inputs.python-version }}
         run: |
           if [ "${{ inputs.clean-build }}" = "true" ]; then
             "$UV_PATH" build --clear

@@ -27,6 +27,28 @@ inputs:
     description: Task profile to use for mise setup one of 'minimal', 'reviewer', 'dev'
     required: true
     default: 'minimal'
+  mise-debug:
+    description: Enable debug output for mise commands
+    required: false
+    default: 'false'
+
+outputs:
+  # MISE_PATH, MISE_ENV, and PYTHON_PATH are typically in uppercase and may be case sensitive in some environments
+  MISE_PATH:
+    description: Path to mise executable
+    value: ${{ steps.mise-outputs.outputs.MISE_PATH }}
+  MISE_ENV:
+    description: Mise environment name
+    value: ${{ steps.mise-outputs.outputs.MISE_ENV }}
+  PROFILE:
+    description: Profile used for setup
+    value: ${{ steps.mise-outputs.outputs.PROFILE }}
+  PYTHON_PATH:
+    description: Path to Python executable
+    value: ${{ steps.mise-outputs.outputs.PYTHON_PATH }}
+  MISE_PYTHON_VERSION:
+    description: Python version used by mise
+    value: ${{ steps.mise-outputs.outputs.MISE_PYTHON_VERSION }}
 
 runs:
   using: composite
@@ -36,13 +58,39 @@ runs:
       uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
       with:
         fetch-depth: ${{ inputs.fetch-depth }}
-    - name: Install system dependencies
-      shell: bash
-      run: |
-        sudo apt-get update && sudo apt-get install -y zsh curl git
     - name: Free up disk space
       shell: bash
       run: ./scripts/dev-env/ci-free-disk-space.sh
+    - name: Install system dependencies
+      shell: bash
+      run: |
+        # ensure build-python dependencies are installed
+        sudo mkdir -p /etc/apt/apt.conf.d/ && echo 'DPkg::Post-Invoke {"/bin/rm -f /var/cache/apt/archives/*.deb || true";};' | sudo tee /etc/apt/apt.conf.d/99-local-cleanup
+        sudo apt-get update && sudo apt-get install -y curl git libreadline-dev libbz2-dev zlib1g-dev
+
+    - name: Set up Environment for Free-Threaded Python
+      shell: bash
+      env:
+        MISE_PYTHON_VERSION: ${{ inputs.python-version }}
+        UV_PYTHON: ${{ inputs.python-version }}
+        PYTHON_VERSION: ${{ inputs.python-version }}
+        MISE_VERBOSE: ${{ inputs.mise-debug }}
+      run: |
+        if [[ "${PYTHON_VERSION}" != *t ]]; then
+          echo "Using standard Python version ${PYTHON_VERSION}..."
+          echo "MISE_PYTHON_VERSION=${PYTHON_VERSION}" >> "$GITHUB_ENV"
+          echo "UV_PYTHON=${PYTHON_VERSION}" >> "$GITHUB_ENV"
+          exit 0
+        fi
+        echo "Setting up environment for free-threaded Python ${PYTHON_VERSION}..."
+        python_version="${PYTHON_VERSION}"
+        base_version="${python_version%t}"
+        echo "Base version: ${base_version}"
+        # I couldn't get Mise's handling of free-threaded Python versions to work correctly...
+        # So, instead, we'll let mise install the base version, and use uv to get the free-threaded version
+        # and then sync uv and mise and tell mise to use that version
+        echo "MISE_PYTHON_VERSION=${base_version}" >> "$GITHUB_ENV"
+        echo "UV_PYTHON=${base_version}+freethreaded" >> "$GITHUB_ENV"
 
     - name: Setup Mise for Minimal Profile
       if: inputs.profile == 'minimal'
@@ -50,13 +98,16 @@ runs:
       env:
         MISE_YES: 1
         MISE_EXPERIMENTAL: 1
-        UV_PYTHON: ${{ inputs.python-version }}
+        UV_PYTHON: ${{ env.UV_PYTHON }}
+        MISE_VERBOSE: ${{ inputs.mise-debug }}
+        MISE_PYTHON_COMPILE: 0
       with:
         github_token: ${{ inputs.github-token }}
         experimental: true
         install: true
         cache: true
         cache_key_prefix: ${{ inputs.profile }}
+        env: false
       id: mise-setup-minimal
     - name: Setup Mise for Reviewer Profile
       if: inputs.profile == 'reviewer'
@@ -65,16 +116,22 @@ runs:
         MISE_YES: 1
         MISE_EXPERIMENTAL: 1
         MISE_ENV: dev
-        UV_PYTHON: ${{ inputs.python-version }}
+        UV_PYTHON: ${{ env.UV_PYTHON }}
+        MISE_VERBOSE: ${{ inputs.mise-debug }}
+        MISE_PYTHON_COMPILE: 0
       with:
         github_token: ${{ inputs.github-token }}
         experimental: true
         install: true
         cache: true
         cache_key_prefix: ${{ inputs.profile }}
+        env: false
     - name: Activate Reviewer Profile Environment
       if: inputs.profile == 'reviewer'
       shell: bash
+      env:
+        MISE_GITHUB_TOKEN: ${{ inputs.github-token }}
+        MISE_VERBOSE: ${{ inputs.mise-debug }}
       id: mise-setup-reviewer
       run: |
         uv sync
@@ -85,23 +142,72 @@ runs:
         MISE_YES: 1
         MISE_EXPERIMENTAL: 1
         MISE_ENV: dev
-        UV_PYTHON: ${{ inputs.python-version }}
+        MISE_VERBOSE: ${{ inputs.mise-debug }}
+        UV_PYTHON: ${{ env.UV_PYTHON }}
+        MISE_PYTHON_COMPILE: 0
       with:
         github_token: ${{ inputs.github-token }}
         experimental: true
         install: true
         cache: true
         cache_key_prefix: ${{ inputs.profile }}
+        env: false
       id: mise-setup-dev
+    - name: Insert Free-Threaded Python into Dev Profile
+      if: inputs.profile == 'dev' && endsWith(inputs.python-version, 't')
+      shell: bash
+      id: mise-setup-dev-insert
+      env:
+        MISE_PYTHON_VERSION: ${{ env.MISE_PYTHON_VERSION }}
+        UV_PYTHON: ${{ env.UV_PYTHON }}
+        MISE_VERBOSE: ${{ inputs.mise-debug }}
+      run: |
+        echo "Inserting free-threaded Python version $UV_PYTHON into dev profile..."
+        mise use -g uv@latest
+        uv python install -U "cpython-${UV_PYTHON}" 2>&1
+        # after a lot of trial and error, it seems that combined with setting MISE_PYTHON_VERSION to the base version, and using uv to install the free-threaded version, and syncing uv and mise, this works
+        # the favored version is now the free-threaded version -- as mise list python will show:
+        mise sync python --uv
+        mise list python 2>&1
+    - name: Activate Dev Profile Environment
+      if: inputs.profile == 'dev'
+      shell: bash
+      id: mise-setup-dev-activate
+      env:
+        MISE_ENV: dev
+        MISE_EXPERIMENTAL: 1
+        MISE_YES: 1
+        MISE_GITHUB_TOKEN: ${{ inputs.github-token }}
+        MISE_PYTHON_VERSION: ${{ env.MISE_PYTHON_VERSION }}
+        MISE_VERBOSE: ${{ inputs.mise-debug }}
+      run: |
+        echo "Activating shims"
+        eval "$(mise activate bash --shims)" 2>&1 || true
+        echo "starting cloud setup for $MISE_PYTHON_VERSION"
+        echo "Mise doctor output:"
+        mise doctor 2>&1
+        echo "Ensuring uv is set to latest..."
+        mise use -g uv@latest
+        echo "Starting cloud-setup task..."
+        mise //:cloud-setup 2>&1
 
     - name: Set outputs
       shell: bash
       id: mise-outputs
+      env:
+        MISE_PYTHON_VERSION: ${{ env.MISE_PYTHON_VERSION }}
+        MISE_ENV: ${{ env.MISE_ENV }}
+        MISE_VERBOSE: ${{ inputs.mise-debug }}
+        PROFILE: ${{ inputs.profile }}
       run: |
-        echo "MISE_PATH=$(which mise)" >> $GITHUB_OUTPUT
-        echo "MISE_ENV=$MISE_ENV" >> $GITHUB_OUTPUT
-        echo "PROFILE=${{ inputs.profile }}" >> $GITHUB_OUTPUT
-        echo "PYTHON_VERSION=$(python --version | awk '{print $2}')" >> $GITHUB_OUTPUT
-        echo "PYTHON_PATH=$(which python)" >> $GITHUB_OUTPUT
-
-
+        MISE_PATH="$(which mise)"
+        echo "MISE_PATH=$MISE_PATH" >> "$GITHUB_OUTPUT"
+        mise_bin_dir="$(dirname "$MISE_PATH")"
+        python_path="$(which python)"
+        python_bin_dir="$(dirname "$python_path")"
+        echo "MISE_BIN_DIR=$mise_bin_dir" >> "$GITHUB_OUTPUT"
+        echo "PYTHON_BIN_DIR=$python_bin_dir" >> "$GITHUB_OUTPUT"
+        echo "PROFILE=$PROFILE" >> "$GITHUB_OUTPUT"
+        echo "PYTHON_PATH=$python_path" >> "$GITHUB_OUTPUT"
+        echo "MISE_PYTHON_VERSION=$MISE_PYTHON_VERSION" >> "$GITHUB_OUTPUT"
+        echo "MISE_ENV=${MISE_ENV:-}" >> "$GITHUB_OUTPUT"

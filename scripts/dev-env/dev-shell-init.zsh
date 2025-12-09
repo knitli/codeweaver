@@ -18,7 +18,7 @@ __cw_this_file="${(%):-%N}"
 __cw_dirname() { builtin cd -- "${1%/*}" 2>/dev/null && pwd; }
 __cw_script_dir="$(__cw_dirname "$__cw_this_file")"
 
-# Compute repo root (script lives in <repo>/scripts)
+# Compute repo root (script lives in <repo>/scripts/dev-env/)
 if [[ -n "$__cw_script_dir" ]]; then
   REPO_ROOT="$(builtin cd "${__cw_script_dir}/../.." 2>/dev/null && pwd)"
 fi
@@ -44,19 +44,4 @@ if [[ ! -f "${_cw_venv_activate}" && -z "${CODEWEAVER_SILENT_SHELL:-}" ]]; then
   print -P "%F{yellow}[codeweaver]%f Create it with: %F{green}mise run venv "$REPO_ROOT/.venv" %f"
 fi
 
-# Source optional workspace extras if provided
-_cw_extras="${REPO_ROOT}/.vscode/terminal.extra.zsh"
-if [[ -f "${_cw_extras}" ]]; then
-  # shellcheck disable=SC1090
-  source "${_cw_extras}"
-fi
-
-# source optional (per-user) local workspace extras if provided
-# this file is gitignored
-_cw_local="${REPO_ROOT}/.vscode/terminal.local.zsh"
-if [[ -f "${_cw_local}" ]]; then
-  # shellcheck disable=SC1090
-  source "${_cw_local}"
-fi
-
-unset __cw_this_file __cw_script_dir _cw_repo_venv_path _cw_venv_activate _cw_extras
+unset __cw_this_file __cw_script_dir _cw_repo_venv_path _cw_venv_activate

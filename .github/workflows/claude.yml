@@ -19,6 +19,7 @@ on:
   pull_request_review:
     types:
       - submitted
+
 permissions:
   actions: read
   checks: read
@@ -26,27 +27,26 @@ permissions:
   contents: write
   discussions: write
   pull-requests: write
+
+env:
+  CODEWEAVER_VECTOR_STORE_URL: ${{ secrets.CODEWEAVER_VECTOR_STORE_URL }}
+  QDRANT__SERVICE__API_KEY: ${{ secrets.QDRANT__SERVICE__API_KEY }}
+  VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+  CODEWEAVER_PROJECT_PATH: ${{ github.workspace }}
+  MISE_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  MISE_ENV: "dev"
+  MISE_YES: 1
+  TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+  # Limit CodeQL memory usage to prevent OOM kills on standard runners (7GB total RAM)
+  # Note: Standard runners have ~7GB, so limit to 3GB to leave headroom for system
+  CODEQL_RAM: 3072
+  CODEQL_THREADS: 2
+  # Additional limits for CodeQL extractor and evaluator
+  CODEQL_EXTRACTOR_PYTHON_RAM: 2048
+  CODEQL_EVALUATOR_RAM: 2048
 jobs:
   claude-response:
-    # Alternative: Use ubuntu-latest-4-cores (16GB RAM) if OOM issues persist
-    # Requires GitHub Team/Enterprise plan
     runs-on: ubuntu-latest
-    env:
-      CODEWEAVER_VECTOR_STORE_URL: ${{ secrets.CODEWEAVER_VECTOR_STORE_URL }}
-      QDRANT__SERVICE__API_KEY: ${{ secrets.QDRANT__SERVICE__API_KEY }}
-      VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
-      CODEWEAVER_PROJECT_PATH: ${{ github.workspace }}
-      MISE_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      MISE_ENV: "dev"
-      MISE_YES: 1
-      TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
-      # Limit CodeQL memory usage to prevent OOM kills on standard runners (7GB total RAM)
-      # Note: Standard runners have ~7GB, so limit to 3GB to leave headroom for system
-      CODEQL_RAM: 3072
-      CODEQL_THREADS: 2
-      # Additional limits for CodeQL extractor and evaluator
-      CODEQL_EXTRACTOR_PYTHON_RAM: 2048
-      CODEQL_EVALUATOR_RAM: 2048
     steps:
       - name: Checkout Repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
@@ -61,6 +61,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           profile: "reviewer"
           skip-checkout: "true"
+
       - name: PR Review
         if: github.event_name == 'pull_request_review'
         uses: anthropics/claude-code-action@e8bad572273ce919ba15fec95aef0ce974464753
@@ -155,6 +156,7 @@ jobs:
               - Provide feedback on the code quality, functionality, and adherence to best practices.
               - Consider the library's existing code style and whether the code aligns with it.
               - Consider possible security or performance effects.
+              - If the code does not follow APIs as you would expect, remember that you have access to the context7 tool to look up library documentation. APIs may have changed since your training data.
               - Suggest improvements or alternatives where applicable.
               - If the changes are satisfactory and the code passes checks, approve the PR with a comment.
       - name: Setup Environment for Assigned or Labeled Issues/PRs
@@ -185,11 +187,13 @@ jobs:
             --mcp-config .mcp.json
           prompt: |
             REPO: ${{ github.repository }}
-            ISSUE NUMBER: ${{ github.event.issue.number }}
+            ISSUE/PR NUMBER: ${{ github.event.issue.number || github.event.pull_request.number }}
             When you are assigned an issue or it's labeled 'claude':
               - Your job is to resolve it.
               - Gather all necessary information about the issue from discussions and comments and the codebase.
               - If the issue involves external libraries, use the context7 tool to get the latest information on the API.
+              - Pay attention to external API versions--they may have changed since your training data, or even since the sources you research. When in doubt, use the tavily tool or web search to find the current documentation.
+              - Research similar issues in this repository and others to inform your approach.
               - Communicate with the issue reporter for clarification if needed.
               - Create an issue branch.
               - Develop a detailed plan to fix the problem.

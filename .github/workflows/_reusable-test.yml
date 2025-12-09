@@ -39,6 +39,18 @@ on:
         required: false
       VOYAGE_API_KEY:
         required: false
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  MISE_EXPERIMENTAL: 1
+  MISE_YES: 1
+  PROFILE: "dev"
+  CODEWEAVER_PROJECT_PATH: ${{ github.workspace }}
+  CODEWEAVER_TESTING: "true"
+  CODEWEAVER_VECTOR_STORE_URL: ${{ secrets.CODEWEAVER_VECTOR_STORE_URL }}
+  QDRANT__SERVICE__API_KEY: ${{ secrets.QDRANT__SERVICE__API_KEY }}
+  VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+  MISE_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
 jobs:
   test:
@@ -57,17 +69,7 @@ jobs:
           - python-version: "3.14t"
             experimental: true
     env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-      CODEWEAVER_TESTING: "true"
-      CODEWEAVER_VECTOR_STORE_URL: ${{ secrets.CODEWEAVER_VECTOR_STORE_URL }}
-      QDRANT__SERVICE__API_KEY: ${{ secrets.QDRANT__SERVICE__API_KEY }}
-      VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
-      CODEWEAVER_PROJECT_PATH: ${{ github.workspace }}
-      MISE_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      MISE_EXPERIMENTAL: 1
-      MISE_YES: 1
-      MISE_PYTHON: ${{ matrix.python-version }}
+      MISE_PYTHON_VERSION: ${{ matrix.python-version }}
       UV_PYTHON: ${{ matrix.python-version }}
     steps:
       - name: Checkout code
@@ -75,38 +77,29 @@ jobs:
         with:
           fetch-depth: 3
 
-      - name: Setup Python environment
-        if: ${{ matrix.experimental == false }}
+      - name: Setup Python environment with Mise
         uses: ./.github/actions/setup-mise-env
         with:
           python-version: ${{ matrix.python-version }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           profile: "dev"
           skip-checkout: true
+          mise-debug: true
         id: setup-mise
       - name: Run quality checks
-        if: ${{ inputs.run-quality-checks && matrix.experimental == false }}
+        if: ${{ inputs.run-quality-checks }}
         env:
-          MISE_YES: 1
-          MISE_PYTHON: ${{ matrix.python-version }}
-          UV_PYTHON: ${{ matrix.python-version }}
-          MISE_EXPERIMENTAL: 1
-          MISE_PATH: ${{ steps.setup-mise.outputs.MISE_PATH }}
+          MISE_PYTHON_VERSION: ${{ steps.setup-mise.outputs.MISE_PYTHON_VERSION }}
         run: |
-          export PATH="$HOME/.local/bin:$PATH"
-          "$MISE_PATH" //:check 2>&1
+          doctor_output="$(mise doctor)"
+          echo "$doctor_output"
+          mise run check 2>&1
         continue-on-error: true
+
       - name: Run tests with coverage
-        if: ${{ matrix.experimental == false }}
         env:
-          MISE_YES: 1
-          MISE_PYTHON: ${{ matrix.python-version }}
-          UV_PYTHON: ${{ matrix.python-version }}
-          MISE_EXPERIMENTAL: 1
-          MISE_PATH: ${{ steps.setup-mise.outputs.MISE_PATH }}
-        run: |
-          export PATH="$HOME/.local/bin:$PATH"
-          "$MISE_PATH" //:test-cov -m "${{ inputs.test-markers }}"
+          MISE_PYTHON_VERSION: ${{ steps.setup-mise.outputs.MISE_PYTHON_VERSION }}
+        run: mise run test-cov -m "${{ inputs.test-markers }}"
       - name: Upload coverage to Codecov
         if: ${{ inputs.upload-coverage && matrix.python-version == '3.12' }}
         uses: codecov/codecov-action@5a1091511ad55cbe89839c7260b706298ca349f7
@@ -124,23 +117,3 @@ jobs:
             test-results.xml
             coverage.xml
           if-no-files-found: warn
-
-      # Run experimental last
-      - name: Setup Experimental Python environment
-        if: ${{ matrix.experimental == true }}
-        uses: ./.github/actions/setup-python-env
-        with:
-          python-version: ${{ matrix.python-version }}
-          skip-checkout: true
-      - name: Setup Env for Experimental Python
-        if: ${{ matrix.experimental == true }}
-        shell: bash
-        run: |
-          uv sync --no-extra --group test --resolution highest --frozen 2>&1
-
-      - name: Run test coverage for experimental Python
-        if: ${{ matrix.experimental == true }}
-        run: |
-          export PATH="$HOME/.local/bin:$PATH"
-          uv run -m pytest tests/ --cov=codeweaver --cov-report=xml --cov-report=term-missing --junit-xml=test-results.xml -v -m "${{ inputs.test-markers }}"
-
