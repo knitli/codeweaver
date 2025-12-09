@@ -7,23 +7,28 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 
 # CodeWeaver Feature Comparison Chart
 
-**Last Updated**: December 7, 2025
+**Last Updated**: December 9, 2025
 
 ## Quick Reference Matrix
 
 | Feature | CodeWeaver | Serena | Cursor | Copilot Workspace | Sourcegraph Cody | Continue.dev | Bloop | Aider |
 |---------|-----------|--------|--------|-------------------|------------------|--------------|-------|-------|
 | **Approach** | Semantic search | Symbol lookup (LSP) | Semantic | Semantic | Keyword | Semantic | Semantic | Repo maps |
-| **Tool Count** | **1** | **17** | N/A | N/A | N/A | N/A | N/A | N/A |
-| **Prompt Overhead** | **~500 tokens** | **~17,000 tokens** | N/A | N/A | N/A | N/A | N/A | N/A |
+| **Tool Count** | **1** | **20+** | N/A | N/A | N/A | N/A | N/A | N/A |
+| **Prompt Overhead** | **~500 tokens** | **~16,000 tokens** | N/A | N/A | N/A | N/A | N/A | N/A |
 | **Search Speed** | Moderate (embeddings) | **Very fast (LSP)** | Moderate | Server-side | Fast | Moderate | Fast | On-demand |
-| **Embedding Providers** | **16+** | 0 (no embeddings) | 1-2 | 1 | 0 (deprecated) | 4-5 | 1 | 0 |
+| **Embedding Providers** | **17** | 0 (no embeddings) | 1-2 | 1 | 0 (deprecated) | 4-5 | 1 | 0 |
 | **Language Support** | **166+** | ~16 (LSP required) | ~50-100 | All (text) | All | ~165 | Unknown | ~165+ |
 | **Requires Language Server** | ❌ No | ✅ Yes | ❌ No | ❌ No | ❌ No | ❌ No | ❌ No | ❌ No |
 | **Symbol Precision** | ⚠️ Semantic match | **✅ Exact symbols** | ⚠️ Semantic | ⚠️ Semantic | ⚠️ Keyword | ⚠️ Semantic | ⚠️ Semantic | ✅ Exact |
 | **Concept Search** | **✅ Yes** | ❌ Symbols only | ✅ Yes | ✅ Yes | ⚠️ Limited | ✅ Yes | ✅ Yes | ❌ No |
 | **Editing Capabilities** | ❌ No | **✅ Yes (9 tools)** | ✅ Yes | ✅ Yes | ✅ Yes | ✅ Yes | ❌ No | ✅ Yes |
 
+**Notes**:
+- **Serena tool count**: Varies by context (20+ in claude-code, up to 35 total available)
+- **Serena prompt overhead**: Measured with 21 active tools in claude-code context (~16,000 tokens)
+- **Language counts**: CodeWeaver supports 166+ unique languages (27 with AST parsing, 139 with language-aware chunking)
+- **Continue.dev providers**: Updated to 7 (Transformers.js, Ollama, Voyage, OpenAI, Cohere, HuggingFace, Gemini)
 
 **Legend**:
 - ✅ **Full support/Yes**
@@ -38,10 +43,10 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 | Feature | CodeWeaver | Serena | Winner |
 |---------|-----------|--------|--------|
 | Search approach | Semantic (embeddings) | Symbol lookup (LSP) | **Different strengths** |
-| Language support | 170+ (no LSP needed) | ~16 (requires LSP) | **CodeWeaver** (breadth) |
+| Language support | 166+ (no LSP needed) | ~16 (requires LSP) | **CodeWeaver** (breadth) |
 | Search speed | Moderate (embedding lookup) | Very fast (LSP queries) | **Serena** |
-| Tool count | 1 (`find_code`) | 17 (8-9 search, 8-9 edit) | **CodeWeaver** (simplicity) |
-| Prompt overhead | ~500 tokens | ~17,000 tokens | **CodeWeaver** |
+| Tool count | 1 (`find_code`) | 20+ total tools | **CodeWeaver** (simplicity) |
+| Prompt overhead | ~500 tokens | ~16,000 tokens | **CodeWeaver** |
 | Symbol precision | Semantic match | Exact symbols | **Serena** |
 | Concept search | ✅ "authentication flow" | ❌ Must know symbol name | **CodeWeaver** |
 | Editing | ❌ No | ✅ Yes | **Serena** |
@@ -60,8 +65,8 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 - You're searching by concept: "where do we handle retries?"
 - You're in an unusual language (COBOL, Fortran, legacy codebases)
 - You don't have a language server running
-- You care about context efficiency (17k vs 500 tokens per turn)
-- You want ONE simple tool instead of choosing among 17
+- You care about context efficiency (16k vs 500 tokens per turn)
+- You want ONE simple tool instead of choosing among 20+
 
 **Real Talk**: Symbol lookup solves ~90% of code navigation needs. Serena is fast, precise, and proven. CodeWeaver targets the remaining 10% where semantic understanding matters, plus the long tail of languages LSP doesn't cover.
 
@@ -73,7 +78,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 
 | Solution | Providers | Models | Customization | Code-Specific |
 |----------|-----------|--------|---------------|---------------|
-| **CodeWeaver** | **20+** (Voyage, OpenAI, Cohere, Mistral, HuggingFace, Azure, AWS Bedrock, Google, Sentence Transformers, FastEmbed, etc.) | **50+** configured | **✅ Plugin architecture** | ✅ Voyage Code-2, Mistral Codestral |
+| **CodeWeaver** | **17** (Voyage, OpenAI, Cohere, Mistral, HuggingFace, Azure, AWS Bedrock, Google, Sentence Transformers, FastEmbed, etc.) | **50+** configured | **✅ Plugin architecture** | ✅ Voyage Code-2, Mistral Codestral |
 | Cursor | OpenAI, Custom | 1-2 | ❌ Limited | ❌ General-purpose |
 | Copilot Workspace | Microsoft/OpenAI | 1 | ❌ None | ❌ General-purpose |
 | Sourcegraph Cody | None (deprecated embeddings) | 0 | N/A | N/A |
@@ -108,7 +113,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 
 | Solution | AST Parsing | Languages (AST) | Fallback Method | Total Languages |
 |----------|-------------|----------------|-----------------|-----------------|
-| **CodeWeaver** | ✅ Tree-sitter | **26** | **✅ Intelligent delimiters (language family patterns)** | **170+** |
+| **CodeWeaver** | ✅ Tree-sitter | **27** | **✅ Language-aware chunking (family patterns)** | **166+** |
 | Cursor | ⚠️ Unspecified | ⚠️ Unknown | ⚠️ Unknown | ~50-100 (est.) |
 | Copilot Workspace | ❌ Language-agnostic | N/A | Text-based | All (basic) |
 | Sourcegraph Cody | ⚠️ Unspecified | ⚠️ Unknown | Keyword indexing | All |
@@ -117,9 +122,9 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 | Aider | ✅ Tree-sitter | ~165 | ✅ ctags | ~165+ |
 
 **CodeWeaver Advantages**:
-1. **Semantic-like chunking for 170+ languages** (not just line-based fallback)
+1. **Language-aware chunking for 166+ languages** (not just line-based fallback)
 2. **Cross-language AST normalization** (unique in market)
-3. **Language family intelligence** in delimiter chunker
+3. **Language family intelligence** in chunker
 
 ---
 
@@ -194,7 +199,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 
 | Feature | CodeWeaver | Cursor | Winner |
 |---------|-----------|--------|--------|
-| Embedding models | 50+ models, 20+ providers | 1-2 models | **CodeWeaver** |
+| Embedding models | 50+ models, 17 providers | 1-2 models | **CodeWeaver** |
 | Hybrid search | ✅ Dense + Sparse | ❌ Dense only | **CodeWeaver** |
 | Privacy | ✅ Local option, airgapped | ⚠️ Sends to cloud (experimental local) | **CodeWeaver** |
 | IDE integration | Via MCP | Native, deep | **Cursor** |
@@ -211,10 +216,10 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 
 | Feature | CodeWeaver | Continue.dev | Winner |
 |---------|-----------|--------------|--------|
-| Embedding providers | 20+ | 4-5 | **CodeWeaver** |
+| Embedding providers | 17 | 7 | **CodeWeaver** |
 | Embedding models | 50+ | 5-10 | **CodeWeaver** |
 | Hybrid search | ✅ Dense + Sparse | ⚠️ Dense + Keyword | **CodeWeaver** |
-| Language support | 170+ (semantic-like) | ~165 (AST + basic fallback) | **CodeWeaver** |
+| Language support | 166+ (language-aware) | ~165 (AST + basic fallback) | **CodeWeaver** |
 | Portability | ✅ MCP (any client) | ❌ VS Code/JetBrains only | **CodeWeaver** |
 | Reranking | 5 providers, 20+ models | Multiple options | **Tie** |
 | IDE integration | Via MCP | Native extension | **Continue.dev** |
@@ -232,7 +237,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 |---------|-----------|------------------|--------|
 | Search method | Semantic (embeddings) | Keyword (deprecated embeddings) | **Different philosophies** |
 | Scale | Mid-large repos | Massive repos (1M+ LOC) | **Cody** (proven at scale) |
-| Customization | 20+ embedding providers | N/A (uses keyword search) | **CodeWeaver** |
+| Customization | 17 embedding providers | N/A (uses keyword search) | **CodeWeaver** |
 | Enterprise features | Airgapped, local | Enterprise-proven, airgapped | **Tie** |
 | Repository understanding | Semantic chunks | Full-text + structural | **Different approaches** |
 
@@ -262,9 +267,9 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 
 ### ✅ Only CodeWeaver Has ALL of These:
 
-1. **20+ embedding providers, 50+ models** (4-10x more than any competitor)
+1. **17 embedding providers, 50+ models** (2-10x more than any competitor)
 2. **True hybrid search** (dense + sparse embeddings by default)
-3. **170+ language support** with semantic-like chunking (not just AST + line breaks)
+3. **166+ language support** with language-aware chunking (not just AST + line breaks)
 4. **Intelligent failover** (backup vector store with live file tracking)
 5. **Cross-language AST normalization** (unique in market)
 6. **Full offline/airgapped** capability with local providers
@@ -324,9 +329,9 @@ Low Customization (1-2 Models)
 ## Conclusion
 
 **CodeWeaver leads in**:
-1. Embedding provider diversity (16+ vs 1-5)
+1. Embedding provider diversity (17 vs 1-7)
 2. Hybrid search (dense + sparse by default)
-3. Language support breadth (170+ with semantic-like chunking)
+3. Language support breadth (166+ with language-aware chunking)
 4. Deployment flexibility (local/cloud/airgapped with failover)
 5. Portability (MCP-native, not IDE-locked)
 
@@ -346,5 +351,5 @@ Low Customization (1-2 Models)
 
 ---
 
-**Last Updated**: December 7, 2025
+**Last Updated**: December 9, 2025
 **Source**: CodeWeaver Competitive Analysis Research

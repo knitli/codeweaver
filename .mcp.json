@@ -3,59 +3,6 @@
     "codeweaver": {
       "type": "http",
       "url": "http://127.0.0.1:9328/mcp/"
-    },
-    "context7": {
-      "args": [
-        "-y",
-        "@upstash/context7-mcp@latest"
-      ],
-      "command": "npx",
-      "type": "stdio"
-    },
-    "mise": {
-      "args": [
-        "mcp"
-      ],
-      "command": "mise",
-      "env": {
-        "MISE_EXPERIMENTAL": "1",
-        "MISE_GITHUB_TOKEN": "${env:MISE_GITHUB_TOKEN}"
-      },
-      "type": "stdio"
-    },
-    "morph-llm-fast-apply": {
-      "args": [
-        "-y",
-        "@morph-llm/morph-fast-apply@latest"
-      ],
-      "command": "npx",
-      "env": {
-        "ALL_TOOLS": "false",
-        "MORPH_API_KEY": "${env:MORPH_API_KEY}"
-      },
-      "type": "stdio"
-    },
-    "serena": {
-      "args": [
-        "run",
-        "serena",
-        "start-mcp-server",
-        "--context",
-        "agent"
-      ],
-      "command": "uv",
-      "type": "stdio"
-    },
-    "tavily": {
-      "args": [
-        "-y",
-        "tavily-mcp@latest"
-      ],
-      "command": "npx",
-      "env": {
-        "TAVILY_API_KEY": "${env:TAVILY_API_KEY}"
-      },
-      "type": "stdio"
     }
   }
 }

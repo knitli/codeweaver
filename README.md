@@ -15,7 +15,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 
 # CodeWeaver
 
-### Semantic code search for Claude — across 170+ languages
+### Semantic code search for Claude — across 166+ languages
 
 [![Python Version][badge_python]][link_python]
 [![License][badge_license]][link_license]
@@ -66,15 +66,20 @@ With CodeWeaver:
 | Feature | CodeWeaver | Serena | Cursor | Copilot Workspace | Sourcegraph Cody | Continue.dev | Bloop | Aider |
 |---------|-----------|--------|--------|-------------------|------------------|--------------|-------|-------|
 | **Approach** | Semantic search | Symbol lookup (LSP) | Semantic | Semantic | Keyword | Semantic | Semantic | Repo maps |
-| **Tool Count** | **1** | **17** | N/A | N/A | N/A | N/A | N/A | N/A |
-| **Prompt Overhead** | **~500 tokens** | **~17,000 tokens** | N/A | N/A | N/A | N/A | N/A | N/A |
+| **Tool Count** | **1** | **20+** | N/A | N/A | N/A | N/A | N/A | N/A |
+| **Prompt Overhead** | **~500 tokens** | **~16,000 tokens** | N/A | N/A | N/A | N/A | N/A | N/A |
 | **Search Speed** | Moderate (embeddings) | **Very fast (LSP)** | Moderate | Server-side | Fast | Moderate | Fast | On-demand |
-| **Embedding Providers** | **16+** | 0 (no embeddings) | 1-2 | 1 | 0 (deprecated) | 4-5 | 1 | 0 |
+| **Embedding Providers** | **17** | 0 (no embeddings) | 1-2 | 1 | 0 (deprecated) | 4-5 | 1 | 0 |
 | **Language Support** | **166+** | ~16 (LSP required) | ~50-100 | All (text) | All | ~165 | Unknown | ~165+ |
 | **Requires Language Server** | ❌ No | ✅ Yes | ❌ No | ❌ No | ❌ No | ❌ No | ❌ No | ❌ No |
 | **Symbol Precision** | ⚠️ Semantic match | **✅ Exact symbols** | ⚠️ Semantic | ⚠️ Semantic | ⚠️ Keyword | ⚠️ Semantic | ⚠️ Semantic | ✅ Exact |
 | **Concept Search** | **✅ Yes** | ❌ Symbols only | ✅ Yes | ✅ Yes | ⚠️ Limited | ✅ Yes | ✅ Yes | ❌ No |
 | **Editing Capabilities** | ❌ No | **✅ Yes (9 tools)** | ✅ Yes | ✅ Yes | ✅ Yes | ✅ Yes | ❌ No | ✅ Yes |
+
+**Notes**:
+- **Serena tool count**: Varies by context (20+ in claude-code, up to 35 total available)
+- **Serena prompt overhead**: Measured with 21 active tools in claude-code context (~16,000 tokens)
+- **Language counts**: CodeWeaver supports 166+ unique languages (27 with AST parsing, 139 with intelligent delimiter-based chunking)
 
 📊 [See detailed competitive analysis →][competitive_analysis]
 
@@ -147,16 +152,16 @@ with http:
 
 ### 🔍 Smart Search
 - **Hybrid search** (sparse + dense vectors)
-- **AST-level understanding** (26 languages)
+- **AST-level understanding** (27 languages)
 - **Semantic relationships**
-- **Context-aware chunking** (166+ languages)
+- **Language-aware chunking** (166+ languages)
 
 </td>
 <td width="50%">
 
 ### 🌐 Language Support
-- **26 languages** with full AST/semantic parsing
-- **166+ languages** with intelligent chunking
+- **27 languages** with full AST/semantic parsing
+- **166+ languages** with language-aware chunking
 - **Cross-language normalization**
 - **Family heuristics** for smart fallback
 
@@ -175,9 +180,9 @@ with http:
 <td>
 
 ### 🔌 Provider Flexibility
-- **17+ embedding providers**
+- **17 embedding providers**
 - **50+ embedding models**
-- **Sparse & dense**embedding model support
+- **Sparse & dense** embedding model support
 - **5 reranking providers**
 - [See full provider list →][providers_list]
 
@@ -246,7 +251,7 @@ CodeWeaver addresses this with one focused capability: structural + semantic cod
 [arch_find_code]: <src/codeweaver/agent_api/find_code/ARCHITECTURE.md> "find_code Architecture"
 [architecture]: <ARCHITECTURE.md> "Overall Architecture"
 [bashandbone]: <https://github.com/bashandbone> "Adam Poulemanos' GitHub Profile"
-[competitive_analysis]: <src/codeweaver/claudedocs/competitive_feature_comparison_chart.md> "See how CodeWeaver stacks up"
+[competitive_analysis]: <src/codeweaver/docs/comparison.md> "See how CodeWeaver stacks up"
 [changelog]: <https://github.com/knitli/codeweaver/blob/main/CHANGELOG.md> "Changelog"
 [cla]: <CONTRIBUTORS_LICENSE_AGREEMENT.md> "Contributor License Agreement"
 [cli_guide]: <docs/CLI.md> "Command Line Reference"

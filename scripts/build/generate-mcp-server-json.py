@@ -827,7 +827,7 @@ def _create_field_meta() -> FieldMeta:
     caps["search_types"] = ["semantic", "hybrid", "traditional"]
 
     # Add chunking strategies
-    caps["chunking_strategies"] = ["semantic", "semantically-aware-delimiters"]
+    caps["chunking_strategies"] = ["semantic", "language-aware"]
 
     return FieldMeta(
         io_modelcontextprotocol_registry_publisher_provided={
