@@ -144,13 +144,16 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
                 if client_instance is None:
                     from openai import AsyncOpenAI
 
-                    client_kwargs = {
+                    client_kwargs: dict[str, Any] = {
                         "api_key": kwargs.get(
                             "api_key", "ollama" if provider == Provider.OLLAMA else None
                         )
                     }
                     if base_url:
                         client_kwargs["base_url"] = base_url
+                    # Support connection pooling via http_client injection
+                    if "http_client" in kwargs:
+                        client_kwargs["http_client"] = kwargs.pop("http_client")
                     client_instance = AsyncOpenAI(**client_kwargs)
 
                 # 3. Call parent __init__ FIRST with proper arguments
