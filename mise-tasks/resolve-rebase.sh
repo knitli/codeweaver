@@ -28,6 +28,8 @@ GLOBS=()
 
 if [[ -n "$usage_globs" ]]; then
     IFS=' ' read -r -a GLOBS <<< "$usage_globs"
+elif [[ $# -gt 0 ]]; then
+    GLOBS=("$@")
 fi
 
 MAIN_BRANCH="${usage_base_branch:-main}"
@@ -88,6 +90,8 @@ switch_to_target_if_not_in_rebase()
         echo "We'll stash any uncommitted changes first."
         git stash push -u -m "temp-stash-before-rebase-resolve-$(date +%s)"
         git checkout "$TARGET_BRANCH"
+    elif ! already_in_rebase; then
+        git stash push -u -m "temp-stash-before-rebase-resolve-$(date +%s)"
     fi
 }
 
@@ -186,7 +190,7 @@ move_to_next_conflict()
     conflicted=$(conflicted_files)
     if [[ -z "$conflicted" ]] && already_in_rebase; then
         echo "All conflicts resolved. Continuing rebase..."
-        git rebase --continue
+        git rebase --continue || true
     elif ! already_in_rebase; then
         echo "Looks like we're all done here. Get back to work!"
         exit 0
@@ -196,30 +200,34 @@ move_to_next_conflict()
 main()
        {
     switch_to_target_if_not_in_rebase
+    if ! already_in_rebase; then
+        if ! git rebase "$MAIN_BRANCH"; then
+            echo "Rebase paused due to conflicts; continuing automated resolution..."
+        fi
+    fi
     while true; do
         local conflicted
         local staged
         staged=$(staged_files)
         conflicted=$(conflicted_files)
-        if [[ -z "$conflicted" ]]; then
+        if [[ ${#conflicted[@]} -eq 0 ]]; then
             # If no conflicts but there are staged changes, handle them
-            if [[ "$staged" ]]; then
+            if [[ ${#staged[@]} -gt 0 ]]; then
                 handle_staged_changes "$staged"
             else
                 move_to_next_conflict
                 sleep 1
             fi
-        else
-            handle_conflicts "$staged"
-            move_to_next_conflict
-            sleep 1
         fi
+        handle_conflicts "$staged"
+        move_to_next_conflict
+        sleep 1
     done
 }
 
 # just getting the first element is OK since we just need to verify that at least one glob was provided
 # shellcheck disable=SC2128
-if [[ -z "$GLOBS" ]]; then
+if [[ ${#GLOBS[@]} -eq 0 ]]; then
     echo "You must specify at least one file glob that requires manual review during conflict resolution."
     exit 1
 fi
