@@ -30,7 +30,7 @@ There are some better implementations out there, but most are integrated into MC
 
 **Want to:**
 - Use your preferred IDE (VIM, Emacs, VS Code, whatever)?
-- Switch between different AI agent, embedding (sparse/dense and reranking) providers? 
+- Switch between different AI agent, embedding (sparse/dense and reranking) providers?
 - Deploy to your infrastructure?
 - Customize how context is indexed and retrieved?
 - Work offline or in airgapped environments?
@@ -59,7 +59,7 @@ CodeWeaver strives to approac:
 
 ## 4. Agent-First Tools
 
-Most MCP tools are literally just human tools and APIs with an MCP interface. AI agents are purpose-trained to *generate language*, and you've handed them a complex, many-faceted tool that can be used in many different ways, and said "figure it out." 
+Most MCP tools are literally just human tools and APIs with an MCP interface. AI agents are purpose-trained to *generate language*, and you've handed them a complex, many-faceted tool that can be used in many different ways, and said "figure it out."
 
 The harder, and better course, is to give AI agents tools *built for them*. Tools that allow them to do what they do best (generate code), and minimize their need to do things they aren't great at, like make decisions about what tool to use.
 

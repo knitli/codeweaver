@@ -286,7 +286,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 5. **Cross-language AST normalization** (unique in market)
 6. **Full offline/airgapped** capability with local providers
 7. **MCP-native architecture** (portable, works with any MCP client)
-8. **Move detection & deduplication** (doesn't re-embed moved files)
+8. **Move detection & deduplication** (doesn't re-embed moved files) [experimental]
 
 ---
 
