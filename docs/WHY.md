@@ -30,7 +30,7 @@ There are some better implementations out there, but most are integrated into MC
 
 **Want to:**
 - Use your preferred IDE (VIM, Emacs, VS Code, whatever)?
-- Switch between different AI agent, embedding (sparse/dense and reranking) providers? 
+- Switch between different AI agent, embedding (sparse/dense and reranking) providers?
 - Deploy to your infrastructure?
 - Customize how context is indexed and retrieved?
 - Work offline or in airgapped environments?
@@ -47,19 +47,21 @@ CodeWeaver's overall goal is to stop that cycle -- give agents exactly what they
 - Agents read entire files when they need a single function
 - They re-read the same files across multiple tool calls
 - They carry massive context windows that drive up token costs
-- Even well-meaning MCP tools contribute: several popular MCP servers have **15,000+ tokens in prompt overhead** -- all the prompts they supply **every single message** to tell an agent about their available tools and how to use them
+- Even well-meaning MCP tools contribute: several popular MCP servers have **16,000+ tokens in prompt overhead** -- all the prompts they supply **every single message** to tell an agent about their available tools and how to use them [^1]
 
-CodeWeaver takes a different approach:
+**CodeWeaver is following a different path**:
 - Returns only the relevant code fragments
 - Indexes once, serves efficiently
 - Minimal MCP protocol overhead (less than 1,000 tokens)
 - Smart caching and reuse
 
+[^1]: At current API costs ($3/million tokens) for Claude Sonnet 4.5, that's over $4 for a 100 turn session, which is pretty common when you have a large number of MCP tools.
+
 ## 4. Agent-First Tools
 
 Most MCP tools are literally just human tools and APIs with an MCP interface. AI agents are purpose-trained to *generate language*, and you've handed them a complex, many-faceted tool that can be used in many different ways, and said "figure it out."
 
-The harder, and better course, is to give AI agents tools *built for them*. Tools that allow them to do what they do best (generate code), and minimize their need to do things they aren't great at.
+The harder, and better course, is to give AI agents tools *built for them*. Tools that allow them to do what they do best (generate code), and minimize their need to do things they aren't great at, like make decisions about what tool to use.
 
 **Example:**
 - **Human tools**: Choose from 30 different search options, configure parameters, combine tools, parse results
@@ -77,8 +79,7 @@ I don't want to read a novella to figure out how to use a coding tool. But we as
 
 ## The Result Without CodeWeaver
 
-Models get random snippets. The indexing falls behind. Offline mode is a coin toss.
-Context is shallow, inconsistent, and fragile.
+You take your chances that the agent will get the context it needs to success at your task. I think we can change that.
 
 ## CodeWeaver's Path
 
@@ -88,8 +89,8 @@ Context is shallow, inconsistent, and fragile.
 * **Resilient design:** maintains a separate lightweight hybrid vector index that automatically kicks in when your primary providers fail. Your fallback is better than most tools' primary mode.
 * **Your infrastructure:** deploy however you want, wherever you want
 
-It's not trying to give AI all the tools.
-It gives AI one *great* tool.
+It's not trying to give AI *all the tools*.
+**CodeWeaver gives AI one *great* tool.**
 
 ---
 
@@ -97,10 +98,12 @@ It gives AI one *great* tool.
 
 CodeWeaver bets that **context quality matters more than context quantity**.
 
-Instead of giving agents every possible tool and letting them figure it out, we give them:
+Instead of giving agents every possible tool and letting them figure it out, I aim to give them:
 - Deep structural understanding of your codebase
 - Semantic relationships between components
 - Intent-aware search that understands what they're trying to accomplish
 - Reliable fallback that works even when everything else fails
 
-This makes agents more effective with less effort, lower cost, and better results.
+This makes agents more effective with less effort, lower cost, and better results.[^1]
+
+[^1]: At least, that's the plan.

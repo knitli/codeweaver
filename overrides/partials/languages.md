@@ -37,9 +37,9 @@
 - Tsx
 - Yaml
 
-### Languages with Smart Delimiter Support
+### Languages with Language-Aware Chunking
 
-These languages are parsed with our delimiter-based approach. We identify patterns common to families of languages to extract meaningful semantic-like structures and data:
+These languages use our language-aware chunking approach. We identify patterns common to families of languages to extract meaningful code structures:
 
 - Asciidoc
 - Assembly
