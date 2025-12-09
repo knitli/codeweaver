@@ -61,7 +61,7 @@ With CodeWeaver:
 
 ## How CodeWeaver Stacks Up
 
-## Quick Reference Matrix
+### Quick Reference Matrix
 
 | Feature | CodeWeaver | Serena | Cursor | Copilot Workspace | Sourcegraph Cody | Continue.dev | Bloop | Aider |
 |---------|-----------|--------|--------|-------------------|------------------|--------------|-------|-------|
@@ -130,7 +130,7 @@ To watch and handle your files, CodeWeaver always runs an HTTP server. You can c
 }
 ```
 
-with http:
+**with http:**
 ```json
 {
   "mcpServers": {
