@@ -18,17 +18,16 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 | **Prompt Overhead** | **~500 tokens** | **~16,000 tokens** | N/A | N/A | N/A | N/A | N/A | N/A |
 | **Search Speed** | Moderate (embeddings) | **Very fast (LSP)** | Moderate | Server-side | Fast | Moderate | Fast | On-demand |
 | **Embedding Providers** | **17** | 0 (no embeddings) | 1-2 | 1 | 0 (deprecated) | 4-5 | 1 | 0 |
-| **Language Support** | **166+** | ~16 (LSP required) | ~50-100 | All (text) | All | ~165 | Unknown | ~165+ |
+| **Language Support** | **166+** | ~30 (LSP required) | ~50-100 | All (text) | All | ~165 | Unknown | ~165+ |
 | **Requires Language Server** | ❌ No | ✅ Yes | ❌ No | ❌ No | ❌ No | ❌ No | ❌ No | ❌ No |
-| **Symbol Precision** | ⚠️ Semantic match | **✅ Exact symbols** | ⚠️ Semantic | ⚠️ Semantic | ⚠️ Keyword | ⚠️ Semantic | ⚠️ Semantic | ✅ Exact |
+| **Symbol Precision** | ⚠️ Semantic | **✅ Exact symbols** | ⚠️ Semantic | ⚠️ Semantic | ⚠️ Keyword | ⚠️ Semantic | ⚠️ Semantic | ✅ Exact |
 | **Concept Search** | **✅ Yes** | ❌ Symbols only | ✅ Yes | ✅ Yes | ⚠️ Limited | ✅ Yes | ✅ Yes | ❌ No |
 | **Editing Capabilities** | ❌ No | **✅ Yes (9 tools)** | ✅ Yes | ✅ Yes | ✅ Yes | ✅ Yes | ❌ No | ✅ Yes |
 
 **Notes**:
-- **Serena tool count**: Varies by context (20+ in claude-code, up to 35 total available)
+- **Serena tool count**: Varies by Serena's 'context' (20+ in claude-code, up to 35 total available)
 - **Serena prompt overhead**: Measured with 21 active tools in claude-code context (~16,000 tokens)
 - **Language counts**: CodeWeaver supports 166+ unique languages (27 with AST parsing, 139 with language-aware chunking)
-- **Continue.dev providers**: Updated to 7 (Transformers.js, Ollama, Voyage, OpenAI, Cohere, HuggingFace, Gemini)
 
 **Legend**:
 - ✅ **Full support/Yes**
@@ -43,7 +42,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 | Feature | CodeWeaver | Serena | Winner |
 |---------|-----------|--------|--------|
 | Search approach | Semantic (embeddings) | Symbol lookup (LSP) | **Different strengths** |
-| Language support | 166+ (no LSP needed) | ~16 (requires LSP) | **CodeWeaver** (breadth) |
+| Language support | 166+ (no LSP needed) | ~30 (requires LSP) | **CodeWeaver** (breadth) |
 | Search speed | Moderate (embedding lookup) | Very fast (LSP queries) | **Serena** |
 | Tool count | 1 (`find_code`) | 20+ total tools | **CodeWeaver** (simplicity) |
 | Prompt overhead | ~500 tokens | ~16,000 tokens | **CodeWeaver** |
@@ -55,14 +54,15 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 **The Core Tradeoff**:
 
 **Serena is better when**:
-- You know the symbol name you're looking for
-- You're working in one of the ~16 supported languages
+- Your agent knows the symbol name or can get the information through symbol lists
+- You're working in one of the ~30 supported languages
 - Speed matters (LSP is instant, embeddings take time)
 - You want editing capabilities too
 - You don't care about prompt token overhead
 
 **CodeWeaver is better when**:
-- You're searching by concept: "where do we handle retries?"
+- **You** want to search. CodeWeaver provides you with the same tool it gives to agents.
+- You/Your Agent are searching by concept: "where do we handle retries?"
 - You're in an unusual language (COBOL, Fortran, legacy codebases)
 - You don't have a language server running
 - You care about context efficiency (16k vs 500 tokens per turn)
@@ -70,7 +70,10 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 
 **Real Talk**: Symbol lookup solves ~90% of code navigation needs. Serena is fast, precise, and proven. CodeWeaver targets the remaining 10% where semantic understanding matters, plus the long tail of languages LSP doesn't cover.
 
-**They're complementary**: Use both. Serena for "find function X", CodeWeaver for "find where we handle edge cases in authentication."
+> [!TIP]
+> **They're complementary**
+>
+> Use both. If you're not concerned about prompt overhead, use Serena for "find function X" and its excellent editing capabilities, and use CodeWeaver for "find where we handle edge cases in authentication."
 
 ## Detailed Feature Breakdown
 
@@ -78,15 +81,15 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 
 | Solution | Providers | Models | Customization | Code-Specific |
 |----------|-----------|--------|---------------|---------------|
-| **CodeWeaver** | **17** (Voyage, OpenAI, Cohere, Mistral, HuggingFace, Azure, AWS Bedrock, Google, Sentence Transformers, FastEmbed, etc.) | **50+** configured | **✅ Plugin architecture** | ✅ Voyage Code-2, Mistral Codestral |
-| Cursor | OpenAI, Custom | 1-2 | ❌ Limited | ❌ General-purpose |
-| Copilot Workspace | Microsoft/OpenAI | 1 | ❌ None | ❌ General-purpose |
+| **CodeWeaver** | **17** (Voyage, OpenAI, Cohere, Mistral, HuggingFace, Azure, AWS Bedrock, Google, Sentence Transformers, FastEmbed, etc.) | **50+** configured | **✅ Plugin architecture** | ✅ Voyage Code-3, Mistral Codestral |
+| Cursor | OpenAI, Custom | 1-2 | ❌ Limited | ⚠️ Unknown |
+| Copilot Workspace | Microsoft/OpenAI | 1 | ❌ None | ⚠️ Unknown |
 | Sourcegraph Cody | None (deprecated embeddings) | 0 | N/A | N/A |
 | Continue.dev | Transformers.js, Ollama, Voyage, OpenAI, HuggingFace | 5-10 | ⚠️ Config-based | ✅ Voyage Code support |
 | Bloop | Local (unspecified) | 1 | ❌ None | ⚠️ Unknown |
 | Aider | None (uses repo maps) | 0 | N/A | N/A |
 
-**CodeWeaver Advantage**: **4-10x more provider options** than any competitor
+**CodeWeaver Advantage**: **4-10x more provider options** than any one else.
 
 ---
 
@@ -104,8 +107,8 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 
 **Industry Context**:
 - Hybrid search (dense + sparse) is industry best practice for code search
-- Voyage Code-2 with hybrid search shows **14.52% improvement** vs dense-only
-- Only **CodeWeaver and Continue.dev** offer true hybrid search (both vector types)
+- Voyage Code-3 with hybrid search shows **14.52% improvement** vs using Voyage Code-3 alone
+- **Only CodeWeaver** offers true hybrid search (both vector types with ranked results)
 
 ---
 
@@ -167,7 +170,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 4. Continue.dev (via Ollama)
 
 **CodeWeaver's Intelligent Failover**:
-- Primary vector store (Qdrant) fails → auto-switch to in-memory store
+- Primary vector store (Qdrant) fails → auto-switch to in-memory store with lightweight models
 - Maintains live file watching during failover
 - Seamless handover when primary recovers
 - **Zero functionality loss** (slightly reduced search quality only)
@@ -210,6 +213,9 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 - **CodeWeaver**: Teams needing customization, privacy, multi-IDE support
 - **Cursor**: Individual developers wanting seamless IDE experience
 
+> [!TIP]
+> CodeWeaver can make Cursor better, giving it richer context through MCP.
+
 ---
 
 ### CodeWeaver vs. Continue.dev
@@ -228,6 +234,9 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 **Best for**:
 - **CodeWeaver**: Multi-IDE teams, advanced customization, MCP ecosystem
 - **Continue.dev**: VS Code/JetBrains users wanting embedding flexibility with native integration
+
+> [!NOTE]
+> You can use CodeWeaver **with** Continue.dev or any other MCP client.
 
 ---
 
@@ -260,6 +269,9 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 **Best for**:
 - **CodeWeaver**: Interactive code search and discovery
 - **Aider**: Terminal-based AI pair programming context
+
+> [!TIP]
+> CodeWeaver can make Aider better, giving it richer context through MCP.
 
 ---
 
@@ -312,8 +324,8 @@ High Customization (Embedding Models)
          │
          │
          │
-         │  ● Cursor   ● Copilot    ● Bloop
-         │    (Cloud)     (Cloud)     (Desktop)
+         │  ● Cursor  ● Copilot    ● Bloop
+         │    (Cloud)    (Cloud)     (Desktop)
          │
          ▼
 Low Customization (1-2 Models)
@@ -328,28 +340,30 @@ Low Customization (1-2 Models)
 
 ## Conclusion
 
-**CodeWeaver leads in**:
+### Where CodeWeaver Leads
+
 1. Embedding provider diversity (17 vs 1-7)
 2. Hybrid search (dense + sparse by default)
 3. Language support breadth (166+ with language-aware chunking)
 4. Deployment flexibility (local/cloud/airgapped with failover)
 5. Portability (MCP-native, not IDE-locked)
 
-**Consider alternatives if**:
+### Consider Alternatives When...
+
 - You want deep native IDE integration → Cursor, Continue.dev
 - You need proven scale for massive repos → Sourcegraph Cody
 - You prefer simplicity over customization → Cursor, Bloop
 
-**CodeWeaver is best for**:
-- Teams requiring embedding customization
+### CodeWeaver is Best For...
+
+- Teams requiring embedding customization or wanting to tailor search and model selection
 - Multi-IDE environments
 - Privacy-sensitive/airgapped deployments
-- MCP ecosystem participants
+- Anyone using MCP tools regularly
 - People using multiple AI clients (like Claude + Copilot)
 - Multi-language projects benefiting from cross-language search
-- People using less-common languages, or maintaining legacy codebases who want modern support
+- Teams working with less-common languages, or maintaining legacy codebases who want modern support
 
 ---
 
 **Last Updated**: December 9, 2025
-**Source**: CodeWeaver Competitive Analysis Research

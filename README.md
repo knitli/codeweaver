@@ -108,7 +108,7 @@ cw server
 > - 🔑 [Voyage AI API key][voyage_ai] (generous free tier)
 > - 🗄️ [Qdrant instance][qdrant] (cloud or local, both free options)
 >
-> **Want full offline?** Use `cw init --profile offline` for local-only operation.
+> **Want full offline?** Use `cw init --profile quickstart` for local-only operation.
 
 🐳 **Prefer Docker?** [See Docker setup guide →][docker_guide]
 
@@ -130,7 +130,7 @@ To watch and handle your files, CodeWeaver always runs an HTTP server. You can c
 }
 ```
 
-**with http:**
+**or with http:**
 ```json
 {
   "mcpServers": {
@@ -216,11 +216,11 @@ To watch and handle your files, CodeWeaver always runs an HTTP server. You can c
 
 ### The Bigger Picture
 
-CodeWeaver exists because I believe AI agents need better context infrastructure. Right now:
+I started building CodeWeaver because I believe AI agents need better context infrastructure. Right now:
 
 - Agents re-read the same huge files repeatedly
 - They get shallow, text-based context instead of structural understanding
-- Most tools are built for humans, not for how agents actually work
+- They are mostly given tools built for humans, not for how they actually work
 - You don't control what context they see or how they get it
 
 CodeWeaver addresses this with one focused capability: structural + semantic code understanding that you control and can deploy however you want.
