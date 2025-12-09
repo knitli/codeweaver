@@ -79,8 +79,8 @@ run = [
       echo "[codeweaver] We couldn't find mise in your PATH. We'll try to install it for you."
       if [ -d "$HOME/.local/share/mise" ] || [ -d "$HOME/.mise" ] || [ -f "$HOME/.local/bin/mise" ]; then
         export PATH="$HOME/.local/bin:$HOME/.mise/bin:$HOME/.local/share/mise/bin:$PATH"
-        if ( [ "$ACTIVE_SHELL" = "bash" ] || [ "$ACTIVE_SHELL" = "zsh" ] ) && ! grep -q "mise activate" "$HOME/.${ACTIVE_SHELL}rc"; then
-          echo "eval \"$(mise activate \"${ACTIVE_SHELL}\")\" 2>&1 || true" >> "$HOME/.${ACTIVE_SHELL}rc"
+        if command -v mise &>/dev/null && ! grep -q "mise activate" "$HOME/.bashrc"; then
+          echo "eval \"$(mise activate bash)\" 2>&1 || true" >> "$HOME/.bashrc"
         fi
       else
         chmod +x scripts/dev-env/install-mise.sh 2>&1 || true
@@ -89,11 +89,12 @@ run = [
   fi''',
   "echo \"[codeweaver] Using mise...\"",
   '''mise trust --all 2>&1 || { echo "[WARNING] mise trust --all failed during cloud-setup" >&2; }''',
-  '''mise install 2>&1 || { echo "[WARNING] mise install failed during cloud-setup" >&2; }''',
+  '''mise -vv install 2>&1''',
+  '''mise tool ''',
   '''mise x hk@latest -- hk install --mise 2>&1 || { echo "[WARNING] hk install failed during cloud-setup" >&2; }''',
-  '''mise use -g uv@latest 2>&1 || { echo "[WARNING] mise use -g uv@latest failed during cloud-setup" >&2; }''',
-  '''echo "[codeweaver] Ensuring Python version {{ get_env(name='MISE_PYTHON_VERSION', default='3.13') }} is installed..."''',
-  "uv venv --allow-existing --seed --keyring-provider subprocess --python {{ get_env(name='MISE_PYTHON_VERSION', default='3.13') }} .venv 2>&1",
+  '''echo "[codeweaver] Ensuring Python version "$MISE_PYTHON_VERSION" is installed..."''',
+  '''echo "$(mise doctor)" 2>&1''',
+  "uv venv --allow-existing --seed --keyring-provider subprocess --python $MISE_PYTHON_VERSION .venv 2>&1",
   ". .venv/bin/activate 2>&1 || true",
   "uv sync --extra full --group dev --group test 2>&1",
   "git config include.path .gitconfig 2>&1 || true",
@@ -110,7 +111,6 @@ run = [
 
 [tasks.cloud-setup.env]
 MISE_PYTHON_VERSION = "{{ get_env(name='MISE_PYTHON_VERSION', default='3.13') }}"
-ACTIVE_SHELL = '''{{ exec(command='basename "$SHELL" 2>/dev/null || echo bash') }}'''
 MISE_EXPERIMENTAL = "1"
 MISE_ENV = "dev"
 MISE_YES = "1"
