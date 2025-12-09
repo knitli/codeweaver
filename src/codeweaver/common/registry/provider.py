@@ -549,6 +549,65 @@ class ProviderRegistry(BasedModel):
 
     # 🔧 NEW: Client Factory Methods
 
+    # Providers that support HTTP client injection for connection pooling
+    # Maps provider -> parameter name used by that provider's SDK
+    _POOLED_HTTP_PROVIDERS: ClassVar[dict[Provider, str]] = {
+        # Voyage/Cohere use 'httpx_client' parameter
+        Provider.VOYAGE: "httpx_client",
+        Provider.COHERE: "httpx_client",
+        # OpenAI-compatible providers use 'http_client' parameter
+        Provider.OPENAI: "http_client",
+        Provider.AZURE: "http_client",
+        Provider.FIREWORKS: "http_client",
+        Provider.GROQ: "http_client",
+        Provider.TOGETHER: "http_client",
+        Provider.OLLAMA: "http_client",
+        Provider.CEREBRAS: "http_client",
+        Provider.HEROKU: "http_client",
+        # Mistral uses 'httpx_client' (mapped to 'async_client' in provider)
+        Provider.MISTRAL: "httpx_client",
+    }
+
+    def _get_pooled_httpx_client(
+        self, provider: Provider, provider_kind: ProviderKind
+    ) -> Any:
+        """Get a pooled HTTP client for providers that support HTTP client injection.
+
+        This method provides connection pooling for HTTP-based providers,
+        reducing connection overhead and improving reliability during high-load operations.
+
+        Args:
+            provider: Provider enum (VOYAGE, COHERE, OPENAI, etc.)
+            provider_kind: Provider kind (embedding, reranking, etc.)
+
+        Returns:
+            Pooled httpx.AsyncClient if available, None otherwise (provider will create own client)
+        """
+        try:
+            from codeweaver.common.http_pool import get_http_pool
+
+            pool = get_http_pool()
+
+            # Provider-specific pool settings
+            # Longer read timeouts for embedding operations which can be slow
+            pool_overrides: dict[str, Any] = {
+                "max_connections": 50,
+                "read_timeout": 90.0,  # Embeddings can take time
+            }
+
+            # Create unique client name based on provider and kind
+            client_name = f"{provider.value.lower()}_{provider_kind.value.lower()}"
+            return pool.get_client_sync(client_name, **pool_overrides)
+        except (ImportError, AttributeError, RuntimeError) as e:
+            # Fallback to provider-created client if pool fails
+            logger.debug(
+                "Failed to get pooled HTTP client for %s (%s): %s. Provider will create own client.",
+                provider,
+                provider_kind,
+                e,
+            )
+            return None
+
     def collect_env_vars(self, provider: Provider) -> dict[str, str]:
         """Collect relevant environment variables for a provider.
 
@@ -818,6 +877,23 @@ class ProviderRegistry(BasedModel):
 
         provider_settings = provider_settings or {}
         merged_settings = provider_settings | client_options
+
+        # Inject pooled HTTP client for providers that support it
+        # This improves connection reuse and reduces overhead during high-load operations
+        param_name = self._POOLED_HTTP_PROVIDERS.get(provider)
+        if param_name is not None:
+            # Check if a client isn't already provided (via httpx_client or http_client)
+            if param_name not in merged_settings:
+                pooled_client = self._get_pooled_httpx_client(provider, provider_kind)
+                if pooled_client is not None:
+                    merged_settings[param_name] = pooled_client
+                    logger.debug(
+                        "Injected pooled HTTP client for %s provider (kind: %s, param: %s)",
+                        provider,
+                        provider_kind,
+                        param_name,
+                    )
+
         args, kwargs = clean_args(merged_settings, client_class)
         args = tuple(arg.get_secret_value() if isinstance(arg, SecretStr) else arg for arg in args)
         kwargs = {
