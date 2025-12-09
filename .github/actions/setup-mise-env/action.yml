@@ -168,6 +168,7 @@ runs:
         # the favored version is now the free-threaded version -- as mise list python will show:
         mise sync python --uv
         mise list python 2>&1
+        mise reshim
     - name: Activate Dev Profile Environment
       if: inputs.profile == 'dev'
       shell: bash
@@ -183,8 +184,6 @@ runs:
         echo "Activating shims"
         eval "$(mise activate bash --shims)" 2>&1 || true
         echo "starting cloud setup for $MISE_PYTHON_VERSION"
-        echo "Mise doctor output:"
-        mise doctor 2>&1
         echo "Ensuring uv is set to latest..."
         mise use -g uv@latest
         echo "Starting cloud-setup task..."
