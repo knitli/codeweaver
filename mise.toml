@@ -119,7 +119,6 @@ run_windows = [
   "mise install > NUL 2>&1 || echo \"[codeweaver] WARNING: mise install failed during setup.\"",
   "mise //:venv > NUL 2>&1",
   "mise //:sync > NUL 2>&1",
-  "mise env > NUL 2>&1",
   "git config include.path .gitconfig > NUL 2>&1",
   "echo src/codeweaver/_version.py >> .git\\info\\exclude",
   "echo coverage.xml >> .git\\info\\exclude",

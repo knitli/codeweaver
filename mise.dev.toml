@@ -48,11 +48,9 @@ esac
 run_windows = '''
 @echo off
 set "pythonPath=%python_path%"
-if not "%profile%"=="dev" (
-    if not "%CI%"=="true" (
-        rem don't run
-        exit /b 0
-    )
+if "%profile%"=="dev" if "%CI%"=="true" (
+    rem don't run
+    exit /b 0
 )
 if not "%pythonPath%"=="%pythonPath:.venv\Scripts\python=%" (
     rem Already in venv, do nothing
