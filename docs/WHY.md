@@ -49,7 +49,7 @@ CodeWeaver's overall goal is to stop that cycle -- give agents exactly what they
 - They carry massive context windows that drive up token costs
 - Even well-meaning MCP tools contribute: several popular MCP servers have **16,000+ tokens in prompt overhead** -- all the prompts they supply **every single message** to tell an agent about their available tools and how to use them [^1]
 
-CodeWeaver strives to approac:
+**CodeWeaver is following a different path**:
 - Returns only the relevant code fragments
 - Indexes once, serves efficiently
 - Minimal MCP protocol overhead (less than 1,000 tokens)
