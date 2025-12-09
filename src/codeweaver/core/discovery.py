@@ -159,6 +159,7 @@ class DiscoveredFile(DataclassSerializationMixin):
         return 0  # Return 0 for non-existent files (e.g., test fixtures)
 
     @computed_field
+    @property
     def file_hash(self) -> BlakeHashKey:
         """Return the blake3 hash of the file contents, if available."""
         if self._file_hash is not None:
@@ -181,7 +182,7 @@ class DiscoveredFile(DataclassSerializationMixin):
         """
         if other_path.is_file() and other_path.exists():
             file = type(self).from_path(other_path)
-            return bool(file and file.file_hash() == self.file_hash())
+            return bool(file and file.file_hash == self.file_hash)
         return False
 
     @computed_field

@@ -496,7 +496,7 @@ class Indexer(BasedModel):
                 logger.debug("Skipping non-text file: %s", path)
                 return
 
-            self._store.set(discovered_file.file_hash(), discovered_file)
+            self._store.set(discovered_file.file_hash, discovered_file)
             self._stats.files_discovered += 1
 
             # Track file discovery in session statistics
@@ -667,7 +667,7 @@ class Indexer(BasedModel):
                         async with self._manifest_lock:
                             self._file_manifest.add_file(
                                 path=relative_path,
-                                content_hash=discovered_file.file_hash(),
+                                content_hash=discovered_file.file_hash,
                                 chunk_ids=chunk_ids,
                                 dense_embedding_provider=model_info["dense_provider"],
                                 dense_embedding_model=model_info["dense_model"],
@@ -975,7 +975,7 @@ class Indexer(BasedModel):
                     async with self._manifest_lock:
                         self._file_manifest.add_file(
                             path=relative_path,
-                            content_hash=discovered_file.file_hash(),
+                            content_hash=discovered_file.file_hash,
                             chunk_ids=chunk_ids,
                             dense_embedding_provider=model_info["dense_provider"],
                             dense_embedding_model=model_info["dense_model"],
@@ -1518,7 +1518,7 @@ class Indexer(BasedModel):
                 discovered_file = DiscoveredFile.from_path(path)
                 if discovered_file and discovered_file.is_text:
                     discovered_files.append(discovered_file)
-                    self._store.set(discovered_file.file_hash(), discovered_file)
+                    self._store.set(discovered_file.file_hash, discovered_file)
             except Exception:
                 logger.warning("Failed to discover file %s", path, exc_info=True)
                 self._stats.files_with_errors.append(path)

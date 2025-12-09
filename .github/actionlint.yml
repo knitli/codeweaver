@@ -6,4 +6,4 @@
 paths:
   .github/actions/setup-uv-env/action.yml:
     ignore:
-      - '.*is not defined in object type.*'
+      - .*is not defined in object type.*

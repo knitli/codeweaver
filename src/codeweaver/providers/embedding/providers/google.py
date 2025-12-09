@@ -83,7 +83,7 @@ try:
 
 except ImportError as e:
     raise ConfigurationError(
-        "The 'google-genai' package is required to use the Google embedding provider. Please install it with 'pip install code-weaver[google]'."
+        r"The 'google-genai' package is required to use the Google embedding provider. Please install it with 'pip install code-weaver\[google]'."
     ) from e
 
 

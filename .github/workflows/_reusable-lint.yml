@@ -6,17 +6,16 @@
 name: Reusable Lint Workflow
 permissions:
   contents: read
-
 on:
   workflow_call:
     inputs:
       python-version:
-        description: "Python version for linting"
+        description: Python version for linting
         required: false
         type: string
         default: "3.12"
       run-format-check:
-        description: "Run format/license checks"
+        description: Run format/license checks
         required: false
         type: boolean
         default: true
@@ -31,7 +30,6 @@ jobs:
     permissions:
       contents: read
     name: Lint and Format
-    runs-on: ubuntu-latest
     env:
       MISE_PYTHON_VERSION: ${{ inputs.python-version }}
       UV_PYTHON: ${{ inputs.python-version }}
@@ -40,11 +38,10 @@ jobs:
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
         with:
           fetch-depth: 1
-
       - name: Setup Python environment
         uses: ./.github/actions/setup-mise-env
         with:
-          python-version: ${{ inputs.python-version }}
+          python-version: ${{ env.python-version }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           profile: "${{ env.PROFILE }}"
           skip-checkout: true
@@ -55,7 +52,6 @@ jobs:
           MISE_PYTHON_VERSION: ${{ steps.mise-setup.outputs.MISE_PYTHON_VERSION }}
         run: mise run lint || echo "::warning::Lint checks failed but allowing workflow to continue"
         continue-on-error: true
-
       - name: Check formatting and licenses
         if: inputs.run-format-check
         env:

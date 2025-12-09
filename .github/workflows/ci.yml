@@ -6,42 +6,39 @@
 name: CI
 permissions:
   contents: read
-
 on:
   push:
     branches:
       - main
       - staging
     paths:
-      - "src/**"
-      - "tests/**"
-      - "pyproject.toml"
-      - "uv.lock"
-      - "**/mise.*.toml"
-      - "**/mise.toml"
-      - ".github/workflows/ci.yml"
-      - ".github/workflows/_reusable-*.yml"
-      - ".github/actions/**"
+      - src/**
+      - tests/**
+      - pyproject.toml
+      - uv.lock
+      - '**/mise.*.toml'
+      - '**/mise.toml'
+      - .github/workflows/ci.yml
+      - .github/workflows/_reusable-*.yml
+      - .github/actions/**
   pull_request:
     branches:
       - main
       - staging
     paths:
-      - "src/**"
-      - "tests/**"
-      - "pyproject.toml"
-      - "uv.lock"
-      - "mise.toml"
-      - "mise.ci.toml"
-      - ".github/workflows/ci.yml"
-      - ".github/workflows/_reusable-*.yml"
-      - ".github/actions/**"
+      - src/**
+      - tests/**
+      - pyproject.toml
+      - uv.lock
+      - mise.toml
+      - mise.ci.toml
+      - .github/workflows/ci.yml
+      - .github/workflows/_reusable-*.yml
+      - .github/actions/**
   workflow_dispatch:
-
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
-
 jobs:
   test:
     name: Test
@@ -60,7 +57,6 @@ jobs:
     name: Lint
     uses: ./.github/workflows/_reusable-lint.yml
     secrets: inherit
-
   build:
     name: Build
     needs:

@@ -25,7 +25,6 @@ services:
     restart: unless-stopped
     networks:
       - codeweaver-network
-
   # CodeWeaver MCP Server
   # Semantic code search and context delivery for AI agents
   codeweaver:
@@ -34,21 +33,26 @@ services:
       dockerfile: Dockerfile
     container_name: codeweaver-server
     # Use HTTP transport for persistent service mode (daemon not needed in Docker)
-    command: ["codeweaver", "server", "--host", "0.0.0.0", "--port", "9328", "--transport", "streamable-http"]
+    command:
+      - codeweaver
+      - server
+      - --host
+      - 0.0.0.0
+      - --port
+      - "9328"
+      - --transport
+      - streamable-http
     ports:
       - ${CODEWEAVER_PORT:-9328}:9328
     volumes:
       # Mount your codebase to be indexed (read-only)
       # Changes on host are immediately visible in container
       - ${PROJECT_PATH:-.}:/workspace:ro
-
       # Persistent storage for checkpoints, config, and secrets
       # CRITICAL: This must persist between restarts for index checkpoints
       - codeweaver_config:/app/config
-
       # Application data and cache
       - codeweaver_data:/app/data
-
       # Note: Config auto-discovery
       # CodeWeaver finds codeweaver.toml in your project root automatically.
       # Just add it to PROJECT_PATH - no explicit mount needed.
@@ -62,7 +66,6 @@ services:
       #   - quickstart: FastEmbed/Sentence Transformers (free, local)
       #   - backup: Lightest local models + in-memory vectors
       - CODEWEAVER_PROFILE=${CODEWEAVER_PROFILE:-quickstart}
-
       # Vector store deployment type
       - CODEWEAVER_VECTOR_DEPLOYMENT=${VECTOR_DEPLOYMENT:-local}
       # For cloud deployment, set CODEWEAVER_VECTOR_URL
@@ -74,19 +77,15 @@ services:
       - CODEWEAVER_PROJECT_PATH=/workspace
       - CODEWEAVER_TOKEN_LIMIT=${TOKEN_LIMIT:-30000}
       - CODEWEAVER_PROJECT_NAME=${PROJECT_NAME}
-
       # Redirect user config to mounted volume for checkpoint persistence
       - XDG_CONFIG_HOME=/app/config
-
       # =================================================================
       # API Keys (Pass through to providers)
       # =================================================================
       # Required for 'recommended' profile
       - VOYAGE_API_KEY=${VOYAGE_API_KEY:-}
-
       # Required for agent functionality (future feature)
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
-
       # Optional: Alternative providers
       # - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       # - COHERE_API_KEY=${COHERE_API_KEY:-}
@@ -119,7 +118,6 @@ services:
           memory: 4G
         reservations:
           memory: 2G
-
 volumes:
   # Persistent storage for Qdrant vector database
   qdrant_storage:
@@ -130,7 +128,6 @@ volumes:
   # CodeWeaver application data
   codeweaver_data:
     driver: local
-
 networks:
   codeweaver-network:
     driver: bridge

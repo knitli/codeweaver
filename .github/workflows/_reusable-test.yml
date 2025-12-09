@@ -6,27 +6,26 @@
 name: Reusable Test Workflow
 permissions:
   contents: read
-
 on:
   workflow_call:
     inputs:
       python-versions:
-        description: 'JSON array of Python versions to test (e.g., ["3.12", "3.13"]). Experimental versions (3.13t, 3.14t) are always included via matrix.include.'
+        description: JSON array of Python versions to test (e.g., ["3.12", "3.13"]). Experimental versions (3.13t, 3.14t) are always included via matrix.include.
         required: false
         type: string
         default: '["3.12", "3.13", "3.14"]'
       test-markers:
-        description: "Pytest markers for test filtering"
+        description: Pytest markers for test filtering
         required: false
         type: string
-        default: "not docker and not qdrant and not dev_only and not skip_ci and not network and not external_api"
+        default: not docker and not qdrant and not dev_only and not skip_ci and not network and not external_api
       upload-coverage:
-        description: "Upload coverage to Codecov"
+        description: Upload coverage to Codecov
         required: false
         type: boolean
         default: true
       run-quality-checks:
-        description: "Run quality checks before tests"
+        description: Run quality checks before tests
         required: false
         type: boolean
         default: true
@@ -61,12 +60,13 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ${{ fromJSON(inputs.python-versions) }}
-        experimental: [false]
+        experimental:
+          - false
         include:
           # Experimental free-threaded Python versions (no-GIL)
-          - python-version: "3.13t"
+          - python-version: 3.13t
             experimental: true
-          - python-version: "3.14t"
+          - python-version: 3.14t
             experimental: true
     env:
       MISE_PYTHON_VERSION: ${{ matrix.python-version }}
@@ -82,7 +82,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          profile: "dev"
+          profile: dev
           skip-checkout: true
           mise-debug: true
         id: setup-mise
@@ -107,7 +107,6 @@ jobs:
           files: ./coverage.xml
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
-
       - name: Upload test results
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()

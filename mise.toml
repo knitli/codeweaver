@@ -137,6 +137,45 @@ ACTIVE_SHELL = '''{{ exec(command='basename "$SHELL" 2>/dev/null || echo zsh') }
 [tasks.setup.tools]
 uv = "latest"
 
+[tasks.cloud-setup]
+run = [
+  "echo \"[codeweaver] Setting up cloud development environment...\"",
+  "ln -sf AGENTS.md CLAUDE.md",
+  '''if ! command -v mise &>/dev/null; then
+      if [ -d "$HOME/.local/share/mise" ] || [ -d "$HOME/.mise" ] || [ -f "$HOME/.local/bin/mise" ]; then
+        export PATH="$HOME/.local/bin:$HOME/.mise/bin:$HOME/.local/share/mise/bin:$PATH"
+        if ! grep -q "mise activate" "$HOME/.bashrc"; then
+          echo "eval \"$(mise activate \"${ACTIVE_SHELL:-bash}\")\" 2>&1 || true" >> "$HOME/.bashrc"
+        fi
+      else
+        chmod +x scripts/dev-env/install-mise.sh 2>&1 || true
+        ./scripts/dev-env/install-mise.sh 2>&1 || true
+      fi
+  fi''',
+  "mise -y trust --all 2>&1 || true",
+  "mise install 2>&1 || true",
+  "hk install --mise 2>&1 || mise x hk@latest -- hk install --mise 2>&1 || true",
+  "mise x uv@latest -- uv venv --allow-existing --seed --keyring-provider subprocess --python {{ get_env(name='MISE_PYTHON', default='3.13') }} .venv 2>&1",
+  "source .venv/bin/activate 2>&1 || true",
+  "mise x uv@latest -- uv sync --group dev --group test 2>&1",
+  "git config include.path .gitconfig 2>&1 || true",
+  '''
+  ignore_files=('src/codeweaver/_version.py' 'coverage.xml' 'test-results.xml')
+  for file in "${ignore_files[@]}"; do
+    if ! grep -qx "$file" .git/info/exclude; then
+      echo "$file" >> .git/info/exclude 2>&1
+    fi
+  done
+  ''',
+  "echo \"[codeweaver] Cloud development environment setup complete!\"",
+]
+
+[tasks.cloud-setup.env]
+ACTIVE_SHELL = '''{{ exec(command='basename "$SHELL" 2>/dev/null || echo bash') }}'''
+MISE_EXPERIMENTAL = "1"
+MISE_ENV = "dev"
+MISE_YES = "1"
+
 [tasks.fix-python]
 tools.uv = "latest"
 tools.ast-grep = "latest"

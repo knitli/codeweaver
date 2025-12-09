@@ -22,6 +22,7 @@ from pydantic.alias_generators import to_camel, to_snake
 
 from codeweaver.config.providers import AWSProviderSettings
 from codeweaver.core.types.models import BasedModel
+from codeweaver.exceptions import ConfigurationError
 from codeweaver.exceptions import ValidationError as CodeWeaverValidationError
 from codeweaver.providers.provider import Provider
 from codeweaver.providers.reranking.capabilities.amazon import get_amazon_reranking_capabilities
@@ -222,7 +223,9 @@ try:
 
 except ImportError as e:
     logger.warning("Failed to import boto3", exc_info=True)
-    raise ImportError("boto3 is not installed. Please install it with `pip install boto3`.") from e
+    raise ConfigurationError(
+        r"boto3 is not installed. Please enable it with `pip install code-weaver\[bedrock]`."
+    ) from e
 
 
 def _to_doc_sources(documents: list[DocumentSource]) -> list[BedrockInlineDocumentSource]:

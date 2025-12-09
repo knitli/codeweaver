@@ -127,7 +127,8 @@ type FileExtensionT = Annotated[
         description="""A file extension string as the `FileExt` NewType, including the leading dot. E.g. '.txt'. May also be an exact filename like 'Makefile' that has no extension.""",
         pattern=r"""^(\.[^<>:;,?*|\\]+|[^<>:;,?*|\\]+)$""",
         min_length=2,
-        max_length=20,
+        # this may seem long but sometimes extensions are actually filenames, so we allow longer ones within reason
+        max_length=50,
     ),
 ]
 

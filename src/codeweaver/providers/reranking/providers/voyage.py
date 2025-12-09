@@ -38,7 +38,7 @@ except ImportError as e:
     from codeweaver.exceptions import ConfigurationError
 
     raise ConfigurationError(
-        "Voyage AI SDK is not installed. Please install it with `pip install code-weaver[voyage]`."
+        r"Voyage AI SDK is not installed. Please install it with `pip install code-weaver\[voyage]`."
     ) from e
 
 

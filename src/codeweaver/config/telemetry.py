@@ -73,7 +73,7 @@ class TelemetrySettings(BasedModel):
             If you want to disable telemetry, you have several options:
             1. set this setting to False in your codeweaver.toml/yaml/json file,
             2. set the environment variable `CODEWEAVER_ENABLE_TELEMETRY` to `false`
-            3. install CodeWeaver with the `codeweaver[recommended-no-telemetry]` extra, or use the a-la-carte install with `codeweaver[required-core]` and your choice of providers (like, `codeweaver[required-core,cli,provider-anthropic,provider-fastembed,provider-azure]`) to install without telemetry
+            3. install CodeWeaver with the `codeweaver[recommended-no-telemetry]` extra, or use the a-la-carte install with `codeweaver[required-core]` and your choice of providers (like, `codeweaver[anthropic,fastembed,azure]`) to install without telemetry
             4. Point the `CODEWEAVER__TELEMETRY__POSTHOG_PROJECT_KEY` environment variable to your own Posthog project (if you're a data nerd, or want to collect internal telemetry for your organization). If you disable telemetry, we won't collect any data at all."""
         ),
     ] = _set_bool_env_var("CODEWEAVER__TELEMETRY__DISABLE_TELEMETRY")

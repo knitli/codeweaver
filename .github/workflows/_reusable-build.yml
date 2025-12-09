@@ -4,31 +4,29 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 
 name: Reusable Build Workflow
-
 on:
   workflow_call:
     inputs:
       artifact-name:
-        description: "Name for the build artifacts"
+        description: Name for the build artifacts
         required: false
         type: string
-        default: "python-package-distributions"
+        default: python-package-distributions
       python-version:
-        description: "Python version for building"
+        description: Python version for building
         required: false
         type: string
         default: "3.12"
       upload-artifacts:
-        description: "Upload build artifacts"
+        description: Upload build artifacts
         required: false
         type: boolean
         default: true
       clean-build:
-        description: "Run clean build (uv build --clear)"
+        description: Run clean build (uv build --clear)
         required: false
         type: boolean
         default: false
-
 jobs:
   build:
     name: Build Package
@@ -62,21 +60,13 @@ jobs:
           else
             "$UV_PATH" build
           fi
-
       - name: Check build artifacts
-        run: |
-          ls -la dist/
-          echo "Built packages:"
-          for file in dist/*; do
-            echo "📦 $(basename "$file")"
-          done
-
+        run: "ls -la dist/\necho \"Built packages:\"\nfor file in dist/*; do\n  echo \"\U0001F4E6 $(basename \"$file\")\"\ndone\n"
       - name: Verify package integrity with twine
         env:
           UVX_PATH: ${{ steps.setup-uv.outputs.uvx-path }}
         run: |
           "$UVX_PATH" twine check dist/*
-
       - name: Upload build artifacts
         if: inputs.upload-artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

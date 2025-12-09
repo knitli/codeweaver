@@ -59,7 +59,7 @@ jobs:
         with:
           python-version: "3.13"
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          profile: "reviewer"
+          profile: reviewer
           skip-checkout: "true"
 
       - name: PR Review
@@ -68,8 +68,8 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          allowed_non_write_users: "Copilot"
-          trigger_phrase: "@claude"
+          allowed_non_write_users: Copilot
+          trigger_phrase: '@claude'
           assignee_trigger: claude
           label_trigger: claude
           base_branch: main
@@ -95,7 +95,7 @@ jobs:
         with:
           python-version: "3.13"
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          profile: "dev"
+          profile: dev
           skip-checkout: "true"
       - name: Issue Opened
         if: github.event_name == 'issues' && github.event.action == 'opened'
@@ -103,7 +103,7 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          trigger_phrase: "@claude"
+          trigger_phrase: '@claude'
           assignee_trigger: claude
           label_trigger: claude
           track_progress: true
@@ -130,7 +130,7 @@ jobs:
         with:
           python-version: "3.13"
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          profile: "minimal"
+          profile: minimal
           skip-checkout: "true"
       - name: PR Review Comment
         if: github.event_name == 'pull_request_review_comment'
@@ -138,7 +138,7 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          trigger_phrase: "@claude"
+          trigger_phrase: '@claude'
           assignee_trigger: claude
           label_trigger: claude
           use_commit_signing: true
@@ -166,7 +166,7 @@ jobs:
         with:
           python-version: "3.13"
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          profile: "dev"
+          profile: dev
           skip-checkout: "true"
       - name: Issue Assigned or Labeled Claude
         if: |
@@ -175,7 +175,7 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          trigger_phrase: "@claude"
+          trigger_phrase: '@claude'
           assignee_trigger: claude
           label_trigger: claude
           track_progress: true
