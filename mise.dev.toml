@@ -73,26 +73,30 @@ MISE_EXPERIMENTAL = "1"
 
 [tasks.cloud-setup]
 run = [
+  # This setup only runs in cloud environments, and for cloud agents or complex tasks.
+  # For cloud agents, the shell is *always* bash and may or may not be interactive.
   "echo \"[codeweaver] Setting up cloud development environment...\"",
   "ln -sf AGENTS.md CLAUDE.md",
   '''if ! command -v mise &>/dev/null; then
       echo "[codeweaver] We couldn't find mise in your PATH. We'll try to install it for you."
       if [ -d "$HOME/.local/share/mise" ] || [ -d "$HOME/.mise" ] || [ -f "$HOME/.local/bin/mise" ]; then
         export PATH="$HOME/.local/bin:$HOME/.mise/bin:$HOME/.local/share/mise/bin:$PATH"
-        if command -v mise &>/dev/null && ! grep -q "mise activate" "$HOME/.bashrc"; then
-          echo "eval \"$(mise activate bash)\" 2>&1 || true" >> "$HOME/.bashrc"
-        fi
       else
         chmod +x scripts/dev-env/install-mise.sh 2>&1 || true
         ./scripts/dev-env/install-mise.sh 2>&1 || true
       fi
   fi''',
   "echo \"[codeweaver] Using mise...\"",
+  '''if command -v mise &>/dev/null && ! grep -q "mise activate" "$HOME/.bashrc"; then
+    echo "eval \"$(mise activate bash)\" 2>&1 || true" >> "$HOME/.bashrc"
+    fi''',
+  '''if command -v mise &>/dev/null && ! grep -q "mise activate" "$HOME/.bash_profile"; then
+    echo "eval \"$(mise activate bash --shims)\" 2>&1 || true" >> "$HOME/.bash_profile"
+    fi''',
   '''mise trust --all 2>&1''',
   '''mise -vv install 2>&1''',
   '''mise x hk@latest -- hk install --mise 2>&1 || { echo "[WARNING] hk install failed during cloud-setup" >&2; }''',
   '''echo "[codeweaver] Ensuring Python version "$MISE_PYTHON_VERSION" is installed..."''',
-  '''echo "$(mise doctor)" 2>&1''',
   "uv venv --allow-existing --seed --keyring-provider subprocess --python $MISE_PYTHON_VERSION .venv 2>&1",
   ". .venv/bin/activate 2>&1 || true",
   "uv sync --extra full --group dev --group test 2>&1",

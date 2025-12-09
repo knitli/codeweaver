@@ -181,9 +181,11 @@ runs:
         MISE_PYTHON_VERSION: ${{ env.MISE_PYTHON_VERSION }}
         MISE_VERBOSE: ${{ inputs.mise-debug }}
       run: |
+        echo "Activating shims"
+        eval "$(mise activate bash --shims)" 2>&1 || true
         echo "starting cloud setup for $MISE_PYTHON_VERSION"
         echo "Mise doctor output:"
-        echo "$(mise doctor)" 2>&1
+        mise doctor 2>&1
         echo "Ensuring uv is set to latest..."
         mise use -g uv@latest
         echo "Starting cloud-setup task..."
