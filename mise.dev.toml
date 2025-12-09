@@ -88,9 +88,8 @@ run = [
       fi
   fi''',
   "echo \"[codeweaver] Using mise...\"",
-  '''mise trust --all 2>&1 || { echo "[WARNING] mise trust --all failed during cloud-setup" >&2; }''',
+  '''mise trust --all 2>&1''',
   '''mise -vv install 2>&1''',
-  '''mise tool ''',
   '''mise x hk@latest -- hk install --mise 2>&1 || { echo "[WARNING] hk install failed during cloud-setup" >&2; }''',
   '''echo "[codeweaver] Ensuring Python version "$MISE_PYTHON_VERSION" is installed..."''',
   '''echo "$(mise doctor)" 2>&1''',

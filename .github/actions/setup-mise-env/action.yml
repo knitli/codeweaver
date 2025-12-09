@@ -182,6 +182,11 @@ runs:
         MISE_VERBOSE: ${{ inputs.mise-debug }}
       run: |
         echo "starting cloud setup for $MISE_PYTHON_VERSION"
+        echo "Mise doctor output:"
+        echo "$(mise doctor)" 2>&1
+        echo "Ensuring uv is set to latest..."
+        mise use -g uv@latest
+        echo "Starting cloud-setup task..."
         mise //:cloud-setup 2>&1
 
     - name: Set outputs
@@ -189,7 +194,9 @@ runs:
       id: mise-outputs
       env:
         MISE_PYTHON_VERSION: ${{ env.MISE_PYTHON_VERSION }}
+        MISE_ENV: ${{ env.MISE_ENV }}
         MISE_VERBOSE: ${{ inputs.mise-debug }}
+        PROFILE: ${{ inputs.profile }}
       run: |
         MISE_PATH="$(which mise)"
         echo "MISE_PATH=$MISE_PATH" >> "$GITHUB_OUTPUT"
@@ -198,6 +205,7 @@ runs:
         python_bin_dir="$(dirname "$python_path")"
         echo "MISE_BIN_DIR=$mise_bin_dir" >> "$GITHUB_OUTPUT"
         echo "PYTHON_BIN_DIR=$python_bin_dir" >> "$GITHUB_OUTPUT"
-        echo "PROFILE=${{ inputs.profile }}" >> "$GITHUB_OUTPUT"
+        echo "PROFILE=$PROFILE" >> "$GITHUB_OUTPUT"
         echo "PYTHON_PATH=$python_path" >> "$GITHUB_OUTPUT"
         echo "MISE_PYTHON_VERSION=$MISE_PYTHON_VERSION" >> "$GITHUB_OUTPUT"
+        echo "MISE_ENV=${MISE_ENV:-}" >> "$GITHUB_OUTPUT"
