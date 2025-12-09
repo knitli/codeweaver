@@ -15,7 +15,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 
 # CodeWeaver
 
-### Semantic code search for Claude — across 166+ languages
+### Semantic code search for Claude, Gemini, ChatGPT — across 166+ languages
 
 [![Python Version][badge_python]][link_python]
 [![License][badge_license]][link_license]
@@ -24,9 +24,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 
 [Installation][nav_install] •
 [Features][nav_features] •
-[How It Works][nav_how_it_works] •
-[Documentation][nav_docs] •
-[Contributing][nav_contributing]
+[Comparison][nav_comparison]
 
 </div>
 
@@ -34,9 +32,9 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 
 ## What It Does
 
-**CodeWeaver gives Claude precise context from your codebase.** Not keyword grep. Not whole-file dumps. Actual structural understanding through hybrid semantic search.
+**CodeWeaver gives Claude and other AI agents precise context from your codebase.** Not keyword grep. Not whole-file dumps. Actual structural understanding through hybrid semantic search.
 
-Ask Claude questions like:
+You, or Claude, or your intern, can ask questions like:
 - *"Where do we handle OAuth tokens?"*
 - *"Find all API endpoint definitions"*
 - *"Show me error handling in the payment flow"*
@@ -70,7 +68,7 @@ With CodeWeaver:
 | **Prompt Overhead** | **~500 tokens** | **~16,000 tokens** | N/A | N/A | N/A | N/A | N/A | N/A |
 | **Search Speed** | Moderate (embeddings) | **Very fast (LSP)** | Moderate | Server-side | Fast | Moderate | Fast | On-demand |
 | **Embedding Providers** | **17** | 0 (no embeddings) | 1-2 | 1 | 0 (deprecated) | 4-5 | 1 | 0 |
-| **Language Support** | **166+** | ~16 (LSP required) | ~50-100 | All (text) | All | ~165 | Unknown | ~165+ |
+| **Language Support** | **166+** | ~30 (LSP required) | ~50-100 | All (text) | All | ~165 | Unknown | ~165+ |
 | **Requires Language Server** | ❌ No | ✅ Yes | ❌ No | ❌ No | ❌ No | ❌ No | ❌ No | ❌ No |
 | **Symbol Precision** | ⚠️ Semantic match | **✅ Exact symbols** | ⚠️ Semantic | ⚠️ Semantic | ⚠️ Keyword | ⚠️ Semantic | ⚠️ Semantic | ✅ Exact |
 | **Concept Search** | **✅ Yes** | ❌ Symbols only | ✅ Yes | ✅ Yes | ⚠️ Limited | ✅ Yes | ✅ Yes | ❌ No |
@@ -243,7 +241,7 @@ CodeWeaver addresses this with one focused capability: structural + semantic cod
 [badge_license]: <https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-green.svg> "License Badge"
 [badge_mcp]: <https://img.shields.io/badge/MCP-compatible-purple.svg> "MCP Compatible Badge"
 [badge_python]: <https://img.shields.io/badge/python-3.12%2B-blue.svg> "Python Version Badge"
-[badge_release]: <https://img.shields.io/badge/release-alpha%201-orange.svg> "Release Badge"
+[badge_release]: <https://img.shields.io/badge/release-alpha%205-orange.svg> "Release Badge"
 
 <!-- Other links -->
 
@@ -272,6 +270,7 @@ CodeWeaver addresses this with one focused capability: structural + semantic cod
 [mcp]: <https://modelcontextprotocol.io> "Learn About the Model Context Protocol"
 [nav_contributing]: <#-contributing> "Contributing Section"
 [nav_docs]: <#-documentation> "Documentation Section"
+[nav_comparison]: <#-quick_reference_matrix> "How CodeWeaver Compares"
 [nav_features]: <#-features> "Features Section"
 [nav_how_it_works]: <#-how-it-works> "How It Works Section"
 [nav_install]: <#-getting-started> "Installation Section"
