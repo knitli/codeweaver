@@ -270,7 +270,7 @@ CodeWeaver addresses this with one focused capability: structural + semantic cod
 [mcp]: <https://modelcontextprotocol.io> "Learn About the Model Context Protocol"
 [nav_contributing]: <#-contributing> "Contributing Section"
 [nav_docs]: <#-documentation> "Documentation Section"
-[nav_comparison]: <#-quick-reference-matrix> "How CodeWeaver Compares"
+[nav_comparison]: <#-quick_reference_matrix> "How CodeWeaver Compares"
 [nav_features]: <#-features> "Features Section"
 [nav_how_it_works]: <#-how-it-works> "How It Works Section"
 [nav_install]: <#-getting-started> "Installation Section"
