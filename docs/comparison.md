@@ -271,7 +271,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 - **Aider**: Terminal-based AI pair programming context
 
 > [!TIP]
-> CodeWeaver can make Aider better, giving it richer context through MCP.
+> Use CodeWeaver with Aider, giving it better context using MCP!
 
 ---
 
@@ -348,13 +348,13 @@ Low Customization (1-2 Models)
 4. Deployment flexibility (local/cloud/airgapped with failover)
 5. Portability (MCP-native, not IDE-locked)
 
-### Consider Alternatives When...
+#### Consider Alternatives When...
 
 - You want deep native IDE integration → Cursor, Continue.dev
 - You need proven scale for massive repos → Sourcegraph Cody
 - You prefer simplicity over customization → Cursor, Bloop
 
-### CodeWeaver is Best For...
+#### CodeWeaver is Best For...
 
 - Teams requiring embedding customization or wanting to tailor search and model selection
 - Multi-IDE environments
