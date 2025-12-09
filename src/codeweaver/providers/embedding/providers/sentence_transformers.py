@@ -34,7 +34,7 @@ try:
     from sentence_transformers import SentenceTransformer
 except ImportError as e:
     raise ConfigurationError(
-        'Please install the `sentence-transformers` package to use the Sentence Transformers provider, \nyou can use the `sentence-transformers` optional group -- `pip install "codeweaver[sentence-transformers]"` or `codeweaver[sentence-transformers-gpu]`'
+        r'Please install the `sentence-transformers` package to use the Sentence Transformers provider, \nyou can use the `sentence-transformers` optional group -- `pip install "code-weaver\[sentence-transformers]"` or `code-weaver\[sentence-transformers-gpu]`'
     ) from e
 
 # SparseEncoder is not available in all versions of sentence-transformers
@@ -129,8 +129,6 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
                 model_name_or_path=capabilities.name, **doc_kwargs.get("client_options", {})
             )
 
-        # Call super().__init__() FIRST which handles all Pydantic initialization
-        # The base class will set doc_kwargs, query_kwargs, and call _initialize()
         super().__init__(client=client, caps=capabilities, kwargs=kwargs)
 
     @property
@@ -163,10 +161,6 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
         )
         self.query_kwargs.pop("model_name", None)
         self.query_kwargs.pop("model_name_or_path", None)
-
-        # Note: _client is already set by __init__ when client is provided
-        # The old code here (self.client = self.client(name, ...)) was incorrect
-        # as it tried to call an instance as if it were a class
 
         if (
             (other := caps.other)
@@ -346,10 +340,6 @@ class SentenceTransformersSparseProvider(SparseEmbeddingProvider[_SparseEncoderT
         self.doc_kwargs.pop("model_name", None) or self.doc_kwargs.pop("model_name_or_path", None)
         self.query_kwargs.pop("model_name", None)
         self.query_kwargs.pop("model_name_or_path", None)
-
-        # Note: _client is already set by __init__ when client is provided
-        # The old code here (self.client = SparseEncoder(name, ...)) was incorrect
-        # as it tried to re-initialize an already-initialized client
 
     def _to_sparse_format(self, embedding: Any) -> SparseEmbedding:
         """Convert embedding to sparse format with indices and values."""

@@ -49,7 +49,7 @@ try:
     )
 except ImportError as e:
     raise ConfigurationError(
-        "FastEmbed is not installed. Please install it with `pip install code-weaver[fastembed]` or `codeweaver[fastembed-gpu]`."
+        r"FastEmbed is not installed. Please install it with `pip install code-weaver\[fastembed]` or `code-weaver\[fastembed-gpu]`."
     ) from e
 
 _TextEmbedding = get_text_embedder()

@@ -199,7 +199,7 @@ gh run list --workflow=publish.yml --limit=1
 python -m venv /tmp/test-pypi
 source /tmp/test-pypi/bin/activate
 
-pip install codeweaver==0.1.0
+pip install code-weaver==0.1.0
 
 python -c "import codeweaver; print(codeweaver.__version__)"
 
@@ -214,7 +214,7 @@ rm -rf /tmp/test-pypi
 **Success Criteria**:
 - ✅ GitHub Actions workflow succeeds
 - ✅ Package published to PyPI
-- ✅ Package installable via `pip install codeweaver`
+- ✅ Package installable via `pip install code-weaver`
 - ✅ Smoke tests pass
 - ✅ Version matches tag (e.g., `0.1.0`)
 

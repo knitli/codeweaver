@@ -155,7 +155,7 @@ class CodeWeaverState(DataclassSerializationMixin):
     telemetry: Annotated[PostHogClient | None, PrivateAttr(default=None)]
 
     http_pool: Annotated[
-        "HttpClientPool | None",
+        HttpClientPool | None,
         Field(
             default=None,
             description="Shared HTTP client pool for provider connections (Voyage, Cohere, etc.)",

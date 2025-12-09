@@ -34,8 +34,9 @@ from __future__ import annotations
 import asyncio
 import logging
 import threading
+
 from dataclasses import dataclass, field
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Self
 
 import httpx
 
@@ -112,9 +113,7 @@ class HttpClientPool:
 
     @classmethod
     def get_instance(
-        cls,
-        limits: PoolLimits | None = None,
-        timeouts: PoolTimeouts | None = None,
+        cls, limits: PoolLimits | None = None, timeouts: PoolTimeouts | None = None
     ) -> HttpClientPool:
         """Get or create the singleton HttpClientPool instance.
 
@@ -135,8 +134,7 @@ class HttpClientPool:
         with _instance_lock:
             if cls._instance is None:
                 cls._instance = cls(
-                    limits=limits or PoolLimits(),
-                    timeouts=timeouts or PoolTimeouts(),
+                    limits=limits or PoolLimits(), timeouts=timeouts or PoolTimeouts()
                 )
                 logger.debug(
                     "Created HttpClientPool singleton with limits=%s, timeouts=%s",
@@ -205,8 +203,7 @@ class HttpClientPool:
             limits = httpx.Limits(
                 max_connections=overrides.get("max_connections", self.limits.max_connections),
                 max_keepalive_connections=overrides.get(
-                    "max_keepalive_connections",
-                    self.limits.max_keepalive_connections,
+                    "max_keepalive_connections", self.limits.max_keepalive_connections
                 ),
                 keepalive_expiry=overrides.get("keepalive_expiry", self.limits.keepalive_expiry),
             )
@@ -275,10 +272,11 @@ class HttpClientPool:
                 limits = httpx.Limits(
                     max_connections=overrides.get("max_connections", self.limits.max_connections),
                     max_keepalive_connections=overrides.get(
-                        "max_keepalive_connections",
-                        self.limits.max_keepalive_connections,
+                        "max_keepalive_connections", self.limits.max_keepalive_connections
                     ),
-                    keepalive_expiry=overrides.get("keepalive_expiry", self.limits.keepalive_expiry),
+                    keepalive_expiry=overrides.get(
+                        "keepalive_expiry", self.limits.keepalive_expiry
+                    ),
                 )
 
                 timeout = httpx.Timeout(
@@ -289,9 +287,7 @@ class HttpClientPool:
                 )
 
                 self._clients[name] = httpx.AsyncClient(
-                    limits=limits,
-                    timeout=timeout,
-                    http2=overrides.get("http2", True),
+                    limits=limits, timeout=timeout, http2=overrides.get("http2", True)
                 )
 
                 logger.debug(
@@ -341,10 +337,11 @@ class HttpClientPool:
                 try:
                     await client.aclose()
                     logger.debug("Closed HTTP client pool for %s", name)
-                    return True
                 except (httpx.HTTPError, OSError) as e:
                     logger.warning("Error closing HTTP client pool for %s: %s", name, e)
                     # Client already removed from dict above
+                else:
+                    return True
             return False
 
     async def close_all(self) -> None:
@@ -372,11 +369,11 @@ class HttpClientPool:
             if client_names:
                 logger.debug("Closed %d HTTP client pool(s)", len(client_names))
 
-    async def __aenter__(self) -> HttpClientPool:
+    async def __aenter__(self) -> Self:
         """Async context manager entry."""
         return self
 
-    async def __aexit__(self, *args: Any) -> None:
+    async def __aexit__(self, *args: object) -> None:
         """Async context manager exit - closes all clients."""
         await self.close_all()
 
