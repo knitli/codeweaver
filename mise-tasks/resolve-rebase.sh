@@ -15,7 +15,7 @@ set -e
 # [USAGE] bin "resolve-rebase"
 # [USAGE] version "0.1.0"
 # [USAGE] about "Automates git merge conflict resolution during rebase, favoring main branch changes except for specified file types requiring manual review."
-# [USAGE] 
+# [USAGE]
 # [USAGE] flag "-r --review-staged" default=#false help="If set, the script will **not** *discard staged changes* from the rebased branch for non-targeted files. Instead, it will prompt for manual review of all staged changes." env="CW_DEV_REVIEW_STAGED"
 # [USAGE] flag "-b --base-branch <branch>" default="main" help="The base branch onto which the current branch is being rebased. Defaults to 'main'."
 # [USAGE] flag "-t --target-branch <branch>" default="{{ exec(command='$(git rev-parse --abbrev-ref HEAD)', default='HEAD') }}" help="The branch that is being rebased. Defaults to current branch."
