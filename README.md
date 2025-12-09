@@ -24,9 +24,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 
 [Installation][nav_install] •
 [Features][nav_features] •
-[How It Works][nav_how_it_works] •
-[Documentation][nav_docs] •
-[Contributing][nav_contributing]
+[Comparison][nav_comparison]
 
 </div>
 
@@ -36,7 +34,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 
 **CodeWeaver gives Claude and other AI agents precise context from your codebase.** Not keyword grep. Not whole-file dumps. Actual structural understanding through hybrid semantic search.
 
-You, or Claude, can ask questions like:
+You, or Claude, or your intern, can ask questions like:
 - *"Where do we handle OAuth tokens?"*
 - *"Find all API endpoint definitions"*
 - *"Show me error handling in the payment flow"*
@@ -272,6 +270,7 @@ CodeWeaver addresses this with one focused capability: structural + semantic cod
 [mcp]: <https://modelcontextprotocol.io> "Learn About the Model Context Protocol"
 [nav_contributing]: <#-contributing> "Contributing Section"
 [nav_docs]: <#-documentation> "Documentation Section"
+[nav_comparison]: <#-quick-reference-matrix> "How CodeWeaver Compares"
 [nav_features]: <#-features> "Features Section"
 [nav_how_it_works]: <#-how-it-works> "How It Works Section"
 [nav_install]: <#-getting-started> "Installation Section"
