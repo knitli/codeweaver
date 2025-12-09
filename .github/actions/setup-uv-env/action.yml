@@ -25,14 +25,16 @@ inputs:
   activate-venv:
     description: Whether to activate the Python virtual environment
     required: false
-    default: "false"
+    default: 'false'
+
 outputs:
-  UV_PATH:
+  uv-path:
     description: Path to uv executable
-    value: ${{ steps.uv-outputs.outputs.UV_PATH }}
-  UVX_PATH:
+    value: ${{ steps.setup-uv.outputs.uv-path }}
+  uvx-path:
     description: Path to uvx executable
-    value: ${{ steps.uv-outputs.outputs.UVX_PATH }}
+    value: ${{ steps.setup-uv.outputs.uvx-path }}
+
 runs:
   using: composite
   steps:
@@ -58,9 +60,4 @@ runs:
         prune-cache: "true"
         add-problem-matchers: "true"
       id: setup-uv
-    - name: Export outputs
-      shell: bash
-      id: uv-outputs
-      run: |
-        echo "UV_PATH=${{ steps.setup-uv.outputs.uv-path }}" >> $GITHUB_OUTPUT
-        echo "UVX_PATH=${{ steps.setup-uv.outputs.uvx-path }}" >> $GITHUB_OUTPUT
+

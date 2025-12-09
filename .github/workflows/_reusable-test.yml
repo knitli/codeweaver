@@ -42,7 +42,7 @@ env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   MISE_EXPERIMENTAL: 1
   MISE_YES: 1
-  PROFILE: dev
+  PROFILE: "dev"
   CODEWEAVER_PROJECT_PATH: ${{ github.workspace }}
   CODEWEAVER_TESTING: "true"
   CODEWEAVER_VECTOR_STORE_URL: ${{ secrets.CODEWEAVER_VECTOR_STORE_URL }}
@@ -50,6 +50,7 @@ env:
   VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
   MISE_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
 jobs:
   test:
     name: Test Python ${{ matrix.python-version }}${{ matrix.experimental && ' (experimental)' || '' }}
@@ -68,41 +69,37 @@ jobs:
           - python-version: 3.14t
             experimental: true
     env:
-      MISE_PYTHON: ${{ matrix.python-version }}
+      MISE_PYTHON_VERSION: ${{ matrix.python-version }}
       UV_PYTHON: ${{ matrix.python-version }}
     steps:
       - name: Checkout code
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
         with:
           fetch-depth: 3
+
       - name: Setup Python environment with Mise
-        if: ${{ matrix.experimental == false }}
         uses: ./.github/actions/setup-mise-env
         with:
           python-version: ${{ matrix.python-version }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           profile: dev
           skip-checkout: true
+          mise-debug: true
         id: setup-mise
-      - name: Set Path
-        if: ${{ matrix.experimental == false }}
+      - name: Run quality checks
+        if: ${{ inputs.run-quality-checks }}
         env:
-          NEWPATH: ${{ steps.setup-mise.outputs.NEWPATH }}
-        shell: bash
+          MISE_PYTHON_VERSION: ${{ steps.setup-mise.outputs.MISE_PYTHON_VERSION }}
         run: |
-          echo "PROFILE=dev" >> "$GITHUB_ENV"
-          echo "PATH=$NEWPATH" >> "$GITHUB_ENV"
-      - name: Run quality checks before tests
-        if: ${{ inputs.run-quality-checks && matrix.experimental == false }}
-        run: |
-          mise use -g uv@latest
-          mise //:check 2>&1
+          doctor_output="$(mise doctor)"
+          echo "$doctor_output"
+          mise run check 2>&1
         continue-on-error: true
+
       - name: Run tests with coverage
-        if: ${{ matrix.experimental == false }}
-        run: |
-          mise use -g uv@latest
-          mise //:test-cov -m "${{ inputs.test-markers }}"
+        env:
+          MISE_PYTHON_VERSION: ${{ steps.setup-mise.outputs.MISE_PYTHON_VERSION }}
+        run: mise run test-cov -m "${{ inputs.test-markers }}"
       - name: Upload coverage to Codecov
         if: ${{ inputs.upload-coverage && matrix.python-version == '3.12' }}
         uses: codecov/codecov-action@5a1091511ad55cbe89839c7260b706298ca349f7
@@ -119,40 +116,3 @@ jobs:
             test-results.xml
             coverage.xml
           if-no-files-found: warn
-      # Run experimental last
-      - name: Setup Experimental Python environment
-        if: ${{ matrix.experimental == true }}
-        uses: ./.github/actions/setup-python-env
-        with:
-          python-version: ${{ matrix.python-version }}
-          skip-checkout: true
-        id: setup-python
-      - name: Set UV Path
-        if: ${{ matrix.experimental == true }}
-        shell: bash
-        run: |
-          UV_PATH="${{ steps.setup-python.outputs.UV_PATH }}"
-          if [ -z "$UV_PATH" ]; then
-            echo "UV_PATH is not set."
-            if [ -d ".venv" ]; then
-              export PATH=".venv/bin:$PATH"
-            else
-              export PATH="$HOME/.local/bin:$HOME/.local/share/uv/bin:$HOME/.uv/bin:$PATH"
-            fi
-            if ! command -v uv &> /dev/null; then
-              echo "uv could not be found even after adjusting PATH."
-              exit 1
-            fi
-            UV_PATH="$(which uv)"
-          fi
-          echo "PATH=$PATH" >> "$GITHUB_ENV"
-          echo "UV_PATH=$UV_PATH" >> "$GITHUB_ENV"
-      - name: Setup Env for Experimental Python
-        if: ${{ matrix.experimental == true }}
-        shell: bash
-        run: |
-          uv sync --group test --resolution highest 2>&1
-      - name: Run test coverage for experimental Python
-        if: ${{ matrix.experimental == true }}
-        run: |
-          uv run -m pytest tests/ --cov=codeweaver --cov-report=xml --cov-report=term-missing --junit-xml=test-results.xml -v -m "${{ inputs.test-markers }}"

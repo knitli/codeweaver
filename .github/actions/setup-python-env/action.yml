@@ -21,14 +21,16 @@ inputs:
   github-token:
     description: GitHub token for mise installation (to avoid rate limits)
     required: false
-    default: ""
+    default: ''
+
 outputs:
   PYTHON_PATH:
     description: Path to the Python executable
     value: ${{ steps.python-setup.outputs.PYTHON_PATH }}
-  UV_PATH:
+  uv_path:
     description: Path to uv executable
-    value: ${{ steps.python-setup.outputs.UV_PATH }}
+    value: ${{ steps.python-setup.outputs.uv_path }}
+
 runs:
   using: composite
   steps:
@@ -48,9 +50,10 @@ runs:
         allow-prereleases: true
     - name: Install pip packages
       shell: bash
+      id: python-setup
       run: |
         python -m pip install --upgrade pip setuptools wheel
         python -m pip install uv
         echo "PYTHON_PATH=$(which python)" >> "$GITHUB_OUTPUT"
-        echo "UV_PATH=$(which uv)" >> "$GITHUB_OUTPUT"
-      id: python-setup
+        echo "uv_path=$(which uv)" >> "$GITHUB_OUTPUT"
+

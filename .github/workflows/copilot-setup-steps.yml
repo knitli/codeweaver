@@ -14,6 +14,7 @@ on:
   pull_request:
     paths:
       - .github/workflows/copilot-setup-steps.yml
+
 jobs:
   # The job MUST be called `copilot-setup-steps` or it will not be picked up by Copilot.
   copilot-setup-steps:
@@ -36,24 +37,15 @@ jobs:
       CODEQL_EXTRACTOR_PYTHON_RAM: 2048
       CODEQL_EVALUATOR_RAM: 2048
     runs-on: ubuntu-latest
-    # Add an overall job timeout so we don't let runaway installs exhaust the runner indefinitely
     timeout-minutes: 50
-    # Set the permissions to the lowest permissions possible needed for your steps.
-    # Copilot will be given its own token for its operations.
     permissions:
-      # If you want to clone the repository as part of your setup steps, for example to install dependencies, you'll need the `contents: read` permission.
       contents: write
     steps:
       - name: Checkout code
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
         with:
           fetch-depth: 2
-      - name: Free up disk space
-        run: ./scripts/dev-env/ci-free-disk-space.sh
-      - name: Make scripts executable
-        run: |
-          chmod -R +x scripts
-          chmod -R +x mise-tasks
+
       - name: Setup Mise Environment
         uses: ./.github/actions/setup-mise-env
         with:
@@ -61,13 +53,11 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           profile: dev
           skip-checkout: "true"
-        id: setup-mise
-      - name: Verify Mise Setup
-        shell: bash
-        env:
-          MISE_PYTHON: "3.13"
-          MISE_YES: 1
-          MISE_EXPERIMENTAL: 1
-          MISE_PATH: ${{ steps.setup-mise.outputs.MISE_PATH }}
+
+      - name: Make scripts executable
         run: |
-          mise --version || { echo "Mise not in path"; "$MISE_PATH" --version; }
+          chmod -R +x scripts
+          chmod -R +x mise-tasks
+
+      - name: Verify mise setup
+        run: mise --version

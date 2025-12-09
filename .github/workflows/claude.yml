@@ -19,6 +19,7 @@ on:
   pull_request_review:
     types:
       - submitted
+
 permissions:
   actions: read
   checks: read
@@ -26,13 +27,14 @@ permissions:
   contents: write
   discussions: write
   pull-requests: write
+
 env:
   CODEWEAVER_VECTOR_STORE_URL: ${{ secrets.CODEWEAVER_VECTOR_STORE_URL }}
   QDRANT__SERVICE__API_KEY: ${{ secrets.QDRANT__SERVICE__API_KEY }}
   VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
   CODEWEAVER_PROJECT_PATH: ${{ github.workspace }}
   MISE_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  MISE_ENV: dev
+  MISE_ENV: "dev"
   MISE_YES: 1
   TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
   # Limit CodeQL memory usage to prevent OOM kills on standard runners (7GB total RAM)
@@ -59,6 +61,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           profile: reviewer
           skip-checkout: "true"
+
       - name: PR Review
         if: github.event_name == 'pull_request_review'
         uses: anthropics/claude-code-action@e8bad572273ce919ba15fec95aef0ce974464753

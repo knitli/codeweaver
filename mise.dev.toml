@@ -4,8 +4,6 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 
 [settings.python]
-uv_venv_auto = true
-compile = true
 
 [tools]
 hk = "latest"
@@ -14,18 +12,17 @@ usage = "latest"
 uv = "latest"
 # Quality & validation tools
 "pipx:reuse" = "latest"  # License validation
-"pipx:tombi" = "latest"
-"pipx:ty" = "latest"  # Type checking
+"aqua:tombi-toml/tombi" = "latest"
+"ubi:astral-sh/ty" = "latest"
 ruff = "latest"  # Python linting/formatting
+
+[env]
+_.python.venv = { path = ".venv" }
 
 [hooks]
 [hooks.enter]
 env.MISE_EXPERIMENTAL = "1"
 script = '''
-# PROFILE is set to 'dev' in a cloud CI environment for cloud agents. 'enter' tends to break there.
-if [ ! "$PROFILE" = "dev" ]; then
-    mise //:enter
-fi
 '''
 
 [tasks]
@@ -33,6 +30,11 @@ fi
 silent = "stdout"
 tools.uv = "latest"
 run = '''
+# profile is set to 'dev' in a cloud CI environment for cloud agents. 'enter' tends to break there.
+if [ "$profile" = "dev" ] && [ "$CI" = "true" ]; then
+    # don't run
+    exit 0
+fi
 case "$python_path" in
 *.venv/bin/python*)
     # Already in venv, do nothing
@@ -46,6 +48,10 @@ esac
 run_windows = '''
 @echo off
 set "pythonPath=%python_path%"
+if "%profile%"=="dev" if "%CI%"=="true" (
+    rem don't run
+    exit /b 0
+)
 if not "%pythonPath%"=="%pythonPath:.venv\Scripts\python=%" (
     rem Already in venv, do nothing
 ) else (
@@ -60,6 +66,53 @@ if not "%pythonPath%"=="%pythonPath:.venv\Scripts\python=%" (
 ACTIVE_SHELL = '''{{ exec(command='basename "$SHELL" 2>/dev/null || echo zsh') }}'''
 python_path = '''{{ exec(command='command -v python 2>/dev/null || echo ""') }}'''
 MISE_EXPERIMENTAL = "1"
+
+[tasks.cloud-setup]
+run = [
+  # This setup only runs in cloud environments, and for cloud agents or complex tasks.
+  # For cloud agents, the shell is *always* bash and may or may not be interactive.
+  "echo \"[codeweaver] Setting up cloud development environment...\"",
+  "ln -sf AGENTS.md CLAUDE.md",
+  '''if ! command -v mise &>/dev/null; then
+      echo "[codeweaver] We couldn't find mise in your PATH. We'll try to install it for you."
+      if [ -d "$HOME/.local/share/mise" ] || [ -d "$HOME/.mise" ] || [ -f "$HOME/.local/bin/mise" ]; then
+        export PATH="$HOME/.local/bin:$HOME/.mise/bin:$HOME/.local/share/mise/bin:$PATH"
+      else
+        chmod +x scripts/dev-env/install-mise.sh 2>&1 || true
+        ./scripts/dev-env/install-mise.sh 2>&1 || true
+      fi
+  fi''',
+  "echo \"[codeweaver] Using mise...\"",
+  '''if command -v mise &>/dev/null && ! grep -q "mise activate" "$HOME/.bashrc"; then
+    echo "eval \"$(mise activate bash)\" 2>&1 || true" >> "$HOME/.bashrc"
+    fi''',
+  '''if command -v mise &>/dev/null && ! grep -q "mise activate" "$HOME/.bash_profile"; then
+    echo "eval \"$(mise activate bash --shims)\" 2>&1 || true" >> "$HOME/.bash_profile"
+    fi''',
+  '''mise trust --all 2>&1''',
+  '''mise -vv install 2>&1''',
+  '''mise x hk@latest -- hk install --mise 2>&1 || { echo "[WARNING] hk install failed during cloud-setup" >&2; }''',
+  '''echo "[codeweaver] Ensuring Python version "$MISE_PYTHON_VERSION" is installed..."''',
+  "uv venv --allow-existing --seed --keyring-provider subprocess --python $MISE_PYTHON_VERSION .venv 2>&1",
+  ". .venv/bin/activate 2>&1 || true",
+  "uv sync --extra full --group dev --group test 2>&1",
+  "git config include.path .gitconfig 2>&1 || true",
+  '''bash -c "
+  ignore_files=('src/codeweaver/_version.py' 'coverage.xml' 'test-results.xml')
+  for file in \"\${ignore_files[@]}\"; do
+    if ! grep -qx \"\$file\" .git/info/exclude; then
+      echo \"\$file\" >> .git/info/exclude 2>&1
+    fi
+  done
+  "''',
+  "echo \"[codeweaver] Cloud development environment setup complete!\"",
+]
+
+[tasks.cloud-setup.env]
+MISE_PYTHON_VERSION = "{{ get_env(name='MISE_PYTHON_VERSION', default='3.13') }}"
+MISE_EXPERIMENTAL = "1"
+MISE_ENV = "dev"
+MISE_YES = "1"
 
 [tasks.update-dependencies]
 tools.uv = "latest"
@@ -110,7 +163,7 @@ uv run pytest tests/ -f --tb=short
 # Building and packaging
 run = '''
 echo "${CW_PREFIX} Building package..."
-uv build &&
+uv build 2>&1 &&
 echo "${CW_PREFIX} ✅ Package built successfully!"
 '''
 run_windows = '''

@@ -19,20 +19,20 @@ on:
         required: false
         type: boolean
         default: true
+
 env:
   MISE_EXPERIMENTAL: 1
   MISE_YES: 1
-  PROFILE: reviewer
+  PROFILE: "reviewer"
+
 jobs:
   lint:
     permissions:
       contents: read
     name: Lint and Format
     env:
-      python-version: ${{ inputs.python-version }}
-      MISE_PYTHON: ${{ inputs.python-version }}
+      MISE_PYTHON_VERSION: ${{ inputs.python-version }}
       UV_PYTHON: ${{ inputs.python-version }}
-    runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
@@ -43,24 +43,18 @@ jobs:
         with:
           python-version: ${{ env.python-version }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          profile: ${{ env.PROFILE }}
+          profile: "${{ env.PROFILE }}"
           skip-checkout: true
-        id: mise-outputs
-      - name: Set Path
-        run: |
-          export PATH="$HOME/.local/bin:$HOME/.local/share/mise/bin:$HOME/.local/share/mise/shims:$PATH"
-          eval "$(mise activate bash)"
-          echo "PATH=$PATH" >> "$GITHUB_ENV"
+        id: mise-setup
+
       - name: Check code style and linting
         env:
-          PYTHON_PATH: ${{ steps.mise-outputs.outputs.PYTHON_PATH }}
-        shell: bash
-        run: |
-          mise use -g uv@latest
-          mise //:lint || echo "::warning::Lint checks failed but allowing workflow to continue"
+          MISE_PYTHON_VERSION: ${{ steps.mise-setup.outputs.MISE_PYTHON_VERSION }}
+        run: mise run lint || echo "::warning::Lint checks failed but allowing workflow to continue"
         continue-on-error: true
       - name: Check formatting and licenses
-        if: ${{ inputs.run-format-check == true }}
-        run: |
-          mise //:format || echo "::warning::License checks or formatting checks failed but allowing workflow to continue"
+        if: inputs.run-format-check
+        env:
+          MISE_PYTHON_VERSION: ${{ steps.mise-setup.outputs.MISE_PYTHON_VERSION }}
+        run: mise run format || echo "::warning::License checks or formatting checks failed but allowing workflow to continue"
         continue-on-error: true

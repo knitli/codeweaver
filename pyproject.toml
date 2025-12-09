@@ -121,7 +121,7 @@ dependencies = [
   # Core data models and validation
   "py-cpuinfo>=9.0.0",
   "pydantic>=2.12.5",
-  "pydantic-ai-slim>=1.27.0",
+  "pydantic-ai>=1.27.0",
   "pydantic-graph>=1.27.0",
   "pydantic-settings[toml,yaml]>=2.12.0",  # Pulls: tomli>=2.0.1, pyyaml>=6.0.1
   "qdrant-client>=1.16.1",
