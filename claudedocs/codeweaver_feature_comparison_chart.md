@@ -7,29 +7,23 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 
 # CodeWeaver Feature Comparison Chart
 
-**Last Updated**: November 17, 2025
+**Last Updated**: December 7, 2025
 
 ## Quick Reference Matrix
 
-| Feature | CodeWeaver | Cursor | Copilot Workspace | Sourcegraph Cody | Continue.dev | Bloop | Aider |
-|---------|-----------|--------|-------------------|------------------|--------------|-------|-------|
-| **Embedding Providers** | **20+** | 1-2 | 1 | 0 (deprecated) | 4-5 | 1 | 0 (no embeddings) |
-| **Embedding Models** | **50+** | 1-2 | 1 | 0 | 5-10 | 1 | 0 |
-| **Code-Specific Models** | ✅ Yes | ❌ No | ❌ No | N/A | ✅ Yes | ⚠️ Unclear | N/A |
-| **Hybrid Search** | **✅ Dense+Sparse** | ❌ Dense only | ❌ Dense only | ❌ Keyword only | ✅ Dense+Keyword | ⚠️ Dense+Regex | N/A |
-| **AST Semantic Parsing** | ✅ 26 langs | ⚠️ Unclear | ❌ No | ⚠️ Unclear | ✅ Tree-sitter | ⚠️ Unclear | ✅ Tree-sitter |
-| **Fallback Chunking** | **✅ 170+ langs** | ⚠️ Unclear | ✅ All | ⚠️ Unclear | ⚠️ Basic | ⚠️ Unclear | ✅ ctags |
-| **Total Language Support** | **170+** | ~50-100 | All (text) | All | ~165 | Unknown | ~165+ |
-| **Indexing Speed** | **3.2s (77k LOC)** | ⚠️ Unclear | Server-side | ⚠️ Unclear | ⚠️ Unclear | "Fast" | N/A |
-| **Live File Watching** | **✅ Instant** | ✅ Likely | ❌ No | ⚠️ Unclear | ✅ Yes | ⚠️ Unclear | ❌ No |
-| **Deduplication** | **✅ Move detect** | ❌ No | ❌ No | ❌ No | ❌ No | ❌ No | N/A |
-| **Local Deployment** | **✅ Full** | ⚠️ Experimental | ❌ No | ✅ Enterprise | ✅ Yes | ✅ Yes | ✅ Yes |
-| **Cloud Deployment** | ✅ Yes | ✅ Default | ✅ Only | ✅ Yes | ⚠️ Hybrid | ❌ No | ❌ No |
-| **Airgapped Support** | **✅ Full** | ❌ No | ❌ No | ✅ Enterprise | ✅ Yes | ✅ Yes | ✅ Yes |
-| **Portable (IDE-agnostic)** | **✅ MCP** | ❌ Cursor only | ❌ Cloud only | ⚠️ IDE-tied | ❌ IDE-tied | ⚠️ Desktop app | ✅ CLI |
-| **Intelligent Failover** | **✅ Yes** | ❌ No | ❌ No | ❌ No | ❌ No | ❌ No | N/A |
-| **Reranking Support** | ✅ 5 providers, 20+ models | ❌ No | ❌ No | ❌ No | ✅ Multiple | ❌ No | N/A |
-| **Cross-Language Normalization** | **✅ Yes** | ❌ No | ❌ No | ❌ No | ❌ No | ❌ No | ❌ No |
+| Feature | CodeWeaver | Serena | Cursor | Copilot Workspace | Sourcegraph Cody | Continue.dev | Bloop | Aider |
+|---------|-----------|--------|--------|-------------------|------------------|--------------|-------|-------|
+| **Approach** | Semantic search | Symbol lookup (LSP) | Semantic | Semantic | Keyword | Semantic | Semantic | Repo maps |
+| **Tool Count** | **1** | **17** | N/A | N/A | N/A | N/A | N/A | N/A |
+| **Prompt Overhead** | **~500 tokens** | **~17,000 tokens** | N/A | N/A | N/A | N/A | N/A | N/A |
+| **Search Speed** | Moderate (embeddings) | **Very fast (LSP)** | Moderate | Server-side | Fast | Moderate | Fast | On-demand |
+| **Embedding Providers** | **16+** | 0 (no embeddings) | 1-2 | 1 | 0 (deprecated) | 4-5 | 1 | 0 |
+| **Language Support** | **166+** | ~16 (LSP required) | ~50-100 | All (text) | All | ~165 | Unknown | ~165+ |
+| **Requires Language Server** | ❌ No | ✅ Yes | ❌ No | ❌ No | ❌ No | ❌ No | ❌ No | ❌ No |
+| **Symbol Precision** | ⚠️ Semantic match | **✅ Exact symbols** | ⚠️ Semantic | ⚠️ Semantic | ⚠️ Keyword | ⚠️ Semantic | ⚠️ Semantic | ✅ Exact |
+| **Concept Search** | **✅ Yes** | ❌ Symbols only | ✅ Yes | ✅ Yes | ⚠️ Limited | ✅ Yes | ✅ Yes | ❌ No |
+| **Editing Capabilities** | ❌ No | **✅ Yes (9 tools)** | ✅ Yes | ✅ Yes | ✅ Yes | ✅ Yes | ❌ No | ✅ Yes |
+
 
 **Legend**:
 - ✅ **Full support/Yes**
@@ -38,6 +32,40 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 - N/A **Not applicable** (different architecture)
 
 ---
+
+### CodeWeaver vs. Serena
+
+| Feature | CodeWeaver | Serena | Winner |
+|---------|-----------|--------|--------|
+| Search approach | Semantic (embeddings) | Symbol lookup (LSP) | **Different strengths** |
+| Language support | 170+ (no LSP needed) | ~16 (requires LSP) | **CodeWeaver** (breadth) |
+| Search speed | Moderate (embedding lookup) | Very fast (LSP queries) | **Serena** |
+| Tool count | 1 (`find_code`) | 17 (8-9 search, 8-9 edit) | **CodeWeaver** (simplicity) |
+| Prompt overhead | ~500 tokens | ~17,000 tokens | **CodeWeaver** |
+| Symbol precision | Semantic match | Exact symbols | **Serena** |
+| Concept search | ✅ "authentication flow" | ❌ Must know symbol name | **CodeWeaver** |
+| Editing | ❌ No | ✅ Yes | **Serena** |
+| Setup requirement | Vector store + embeddings | Language server (usually running) | **Serena** (simpler) |
+
+**The Core Tradeoff**:
+
+**Serena is better when**:
+- You know the symbol name you're looking for
+- You're working in one of the ~16 supported languages
+- Speed matters (LSP is instant, embeddings take time)
+- You want editing capabilities too
+- You don't care about prompt token overhead
+
+**CodeWeaver is better when**:
+- You're searching by concept: "where do we handle retries?"
+- You're in an unusual language (COBOL, Fortran, legacy codebases)
+- You don't have a language server running
+- You care about context efficiency (17k vs 500 tokens per turn)
+- You want ONE simple tool instead of choosing among 17
+
+**Real Talk**: Symbol lookup solves ~90% of code navigation needs. Serena is fast, precise, and proven. CodeWeaver targets the remaining 10% where semantic understanding matters, plus the long tail of languages LSP doesn't cover.
+
+**They're complementary**: Use both. Serena for "find function X", CodeWeaver for "find where we handle edge cases in authentication."
 
 ## Detailed Feature Breakdown
 
@@ -70,9 +98,9 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 | Aider | N/A | N/A | N/A (graph ranking) | N/A |
 
 **Industry Context**:
-- Hybrid search (dense + sparse) is industry best practice
+- Hybrid search (dense + sparse) is industry best practice for code search
 - Voyage Code-2 with hybrid search shows **14.52% improvement** vs dense-only
-- Only **CodeWeaver and Continue.dev** offer true hybrid search
+- Only **CodeWeaver and Continue.dev** offer true hybrid search (both vector types)
 
 ---
 
@@ -95,24 +123,23 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 
 ---
 
-### 4. Performance & Real-Time Updates
+### 4. Real-Time Updates & Indexing
 
-| Solution | Indexing Speed | Incremental Updates | File Watching | Move Detection |
-|----------|---------------|---------------------|---------------|----------------|
-| **CodeWeaver** | **3.2s for 77k LOC** (index) <br> ~5s total (remote embed) <br> ~20s total (local embed) | **✅ Instant** | **✅ Live** | **✅ Dedup on move** |
-| Cursor | ⚠️ Unclear | ✅ Likely | ✅ Likely | ❌ No |
-| Copilot Workspace | Server-side | ⚠️ Server-managed | ❌ Client-side | ❌ No |
-| Sourcegraph Cody | ⚠️ Unclear | ✅ Yes | ⚠️ Unclear | ❌ No |
-| Continue.dev | ⚠️ Unclear | ✅ Yes | ✅ Yes | ❌ No |
-| Bloop | "Fast" (Rust, Tantivy, Qdrant) | ⚠️ Unclear | ⚠️ Unclear | ❌ No |
-| Aider | N/A (on-demand) | ❌ No | ❌ No | N/A |
+| Solution | Incremental Updates | File Watching | Move Detection |
+|----------|---------------------|---------------|----------------|
+| **CodeWeaver** | **✅ Live** | **✅ Continuous** | **✅ Dedup on move** |
+| Cursor | ✅ Likely | ✅ Likely | ❌ No |
+| Copilot Workspace | ⚠️ Server-managed | ❌ Client-side | ❌ No |
+| Sourcegraph Cody | ✅ Yes | ⚠️ Unclear | ❌ No |
+| Continue.dev | ✅ Yes | ✅ Yes | ❌ No |
+| Bloop | ⚠️ Unclear | ⚠️ Unclear | ❌ No |
+| Aider | ❌ On-demand only | ❌ No | N/A |
 
-**Benchmark Context** (Visual Studio C++ indexing):
-- Gears of War: 6.5min → 2.5min (2.5x speedup)
-- Unreal Engine 5: 2.5min → 1min (2.7x speedup)
-- Chromium: 31min → 5min (6x speedup)
-
-**CodeWeaver's sub-5s total time** for mid-size repos is competitive with industry leaders
+**CodeWeaver's Real-Time Capabilities**:
+- **Live file watching**: Detects changes as they happen
+- **Incremental updates**: Only re-indexes changed files
+- **Move detection**: Recognizes when files are moved/renamed without re-embedding
+- **Continuous operation**: No manual re-indexing required
 
 ---
 
@@ -128,7 +155,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 | Bloop | ✅ Yes | ❌ No | ✅ Yes | ⚠️ Desktop app | ❌ No |
 | Aider | ✅ Yes | ❌ No | ✅ Yes | ✅ CLI | N/A |
 
-**Airgapped Deployment Leaders** (Enterprise 2024):
+**Airgapped Deployment Leaders**:
 1. Tabnine Enterprise (fully airgapped)
 2. **CodeWeaver** (local providers + failover)
 3. Sourcegraph Cody Enterprise
@@ -138,7 +165,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 - Primary vector store (Qdrant) fails → auto-switch to in-memory store
 - Maintains live file watching during failover
 - Seamless handover when primary recovers
-- **Zero functionality loss** (only slightly degraded results)
+- **Zero functionality loss** (slightly reduced search quality only)
 
 ---
 
@@ -204,7 +231,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 | Feature | CodeWeaver | Sourcegraph Cody | Winner |
 |---------|-----------|------------------|--------|
 | Search method | Semantic (embeddings) | Keyword (deprecated embeddings) | **Different philosophies** |
-| Scale | Mid-large repos | Massive repos (1M+ LOC) | **Cody** (for scale) |
+| Scale | Mid-large repos | Massive repos (1M+ LOC) | **Cody** (proven at scale) |
 | Customization | 20+ embedding providers | N/A (uses keyword search) | **CodeWeaver** |
 | Enterprise features | Airgapped, local | Enterprise-proven, airgapped | **Tie** |
 | Repository understanding | Semantic chunks | Full-text + structural | **Different approaches** |
@@ -252,8 +279,8 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 |----------|---------------------|-----|
 | **Individual dev, wants simplicity** | Cursor, Continue.dev | Native IDE integration, easy setup |
 | **Enterprise, airgapped environment** | **CodeWeaver**, Sourcegraph Cody Enterprise | No external API calls, full offline capability |
-| **Multi-IDE team** | **CodeWeaver** | MCP protocol works with any client |
-| **Massive repos (>1M LOC)** | Sourcegraph Cody | Proven scalability, keyword search scales better |
+| **Multi-IDE team** | **CodeWeaver** | MCP protocol and CLI works with any client |
+| **Massive repos (>1M LOC)** | Sourcegraph Cody | Proven scalability at enterprise scale |
 | **Terminal-based workflow** | Aider, ripgrep | CLI-first tools |
 | **GitHub-centric team** | Copilot Workspace | Native GitHub integration (issues, PRs, comments) |
 | **Custom embedding models** | **CodeWeaver**, Continue.dev | Provider flexibility |
@@ -270,27 +297,26 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 High Customization (Embedding Models)
          ▲
          │
-         │  ● CodeWeaver ⭐
-         │    (MCP Server)
+         │                              ● CodeWeaver ⭐
+         │                                (MCP Server)
          │
-         │           ● Continue.dev
-         │             (IDE Extension)
+         │                      ● Continue.dev
+         │                        (IDE Extension)
          │
-    ─────┼─────────────────────────────
+    ─────┼───────────────────────────── Portability
          │
-         │  ● Aider          ● Bloop
-         │    (CLI)            (Desktop)
          │
-         │  ● Cursor       ● Copilot
-         │    (Cloud)        (Cloud)
+         │
+         │  ● Cursor   ● Copilot    ● Bloop
+         │    (Cloud)     (Cloud)     (Desktop)
          │
          ▼
 Low Customization (1-2 Models)
 ```
 
 **CodeWeaver's Position**:
-- **Top tier** for embedding customization (20+ providers)
-- **High portability** via MCP protocol (not IDE-locked)
+- **Top tier** for embedding customization (16+ providers)
+- **High portability** via MCP protocol and CLI (not IDE-locked)
 - **Unique combination** of flexibility + portability + airgapped capability
 
 ---
@@ -298,7 +324,7 @@ Low Customization (1-2 Models)
 ## Conclusion
 
 **CodeWeaver leads in**:
-1. Embedding provider diversity (20+ vs 1-5)
+1. Embedding provider diversity (16+ vs 1-5)
 2. Hybrid search (dense + sparse by default)
 3. Language support breadth (170+ with semantic-like chunking)
 4. Deployment flexibility (local/cloud/airgapped with failover)
@@ -314,9 +340,11 @@ Low Customization (1-2 Models)
 - Multi-IDE environments
 - Privacy-sensitive/airgapped deployments
 - MCP ecosystem participants
+- People using multiple AI clients (like Claude + Copilot)
 - Multi-language projects benefiting from cross-language search
+- People using less-common languages, or maintaining legacy codebases who want modern support
 
 ---
 
-**Last Updated**: November 17, 2025
+**Last Updated**: December 7, 2025
 **Source**: CodeWeaver Competitive Analysis Research
