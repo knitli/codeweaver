@@ -241,7 +241,7 @@ CodeWeaver addresses this with one focused capability: structural + semantic cod
 [badge_license]: <https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-green.svg> "License Badge"
 [badge_mcp]: <https://img.shields.io/badge/MCP-compatible-purple.svg> "MCP Compatible Badge"
 [badge_python]: <https://img.shields.io/badge/python-3.12%2B-blue.svg> "Python Version Badge"
-[badge_release]: <https://img.shields.io/badge/release-alpha%201-orange.svg> "Release Badge"
+[badge_release]: <https://img.shields.io/badge/release-alpha%205-orange.svg> "Release Badge"
 
 <!-- Other links -->
 
