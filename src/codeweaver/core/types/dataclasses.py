@@ -146,7 +146,6 @@ class DataclassSerializationMixin:
         """
         return {}
 
-    # /sc:implement "Phase 1 fixes" --delegate auto --wave-mode auto --
     def serialize_for_telemetry(self) -> dict[str, Any]:
         """Serialize the model for telemetry output, filtering sensitive keys."""
         from codeweaver.core.types.aliases import FilteredKey, FilteredKeyT, LiteralStringT

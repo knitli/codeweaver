@@ -89,13 +89,15 @@ class TestConfigShow:
 class TestConfigValidation:
     """Tests for config validation."""
 
-    @pytest.mark.skip(reason="Provider validation not yet implemented in settings")
     def test_invalid_provider_rejected(self, temp_project: Path) -> None:
         """Test invalid provider names are rejected."""
         config_path = temp_project / "codeweaver.toml"
         config_content = """
-[embedding]
+[provider.embedding]
 provider = "invalid_provider_xyz"
+
+[provider.embedding.model_settings]
+model = "test-model"
 """
         config_path.write_text(config_content)
 
