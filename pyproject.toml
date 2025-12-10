@@ -389,6 +389,10 @@ addopts = [
   "--strict-config",
   "--strict-markers",
   "-ra",
+  # Exclude resource-intensive tests by default
+  # Override with: pytest -m "expensive" or pytest -m "requires_models" to run these tests
+  "-m",
+  "not expensive and not requires_models and not requires_gpu and not requires_api_keys",
 ]
 filterwarnings = [
   "error",
@@ -410,12 +414,16 @@ markers = [
   # Feature-specific
   "embeddings: Tests related to embedding functionality",
   "env_vars: Tests that depend on environment variables",
+  "expensive: Tests taking more than 30 seconds to complete",
   "external_api: Tests that interact with external APIs",
   "fixtures: Tests that heavily rely on pytest fixtures",
   # Stability & reliability
   "flaky: Tests that may occasionally fail due to timing or external factors",
   "indexing: Tests related to code indexing",
   "integration: Integration tests that test component interactions",
+  # Platform-specific
+  "linux_only: Tests that only run on Linux platforms",
+  "macos_only: Tests that only run on macOS platforms",
   "mcp: Tests related to MCP protocol functionality",
   "mock_only: Tests that only use mocked dependencies",
   "network: Tests that require network access",
@@ -424,7 +432,10 @@ markers = [
   "performance: Performance-related tests",
   "qdrant: Tests that require Qdrant vector database",
   # External dependencies
-  "real_providers: Tests that require real provider configurations",
+  "real_providers: Tests using actual embedding/vector store providers (not mocks)",
+  "requires_api_keys: Tests requiring external API credentials and authentication",
+  "requires_gpu: Tests requiring GPU hardware for execution",
+  "requires_models: Tests requiring ML model downloads and local model files",
   "retry: Tests that may need retries",
   "search: Tests related to search functionality",
   "server: Tests related to server functionality",
@@ -433,10 +444,12 @@ markers = [
   "slow: Tests that take a significant amount of time to run",
   "telemetry: Tests related to telemetry and metrics",
   "timeout: Tests with specific timeout requirements",
+  "timing_sensitive: Tests with strict timing requirements that may be environment-dependent",
   # Test categories
   "unit: Unit tests that test individual components in isolation",
   "validation: Validation tests that ensure system consistency",
   "voyageai: Tests that require VoyageAI API access",
+  "windows_only: Tests that only run on Windows platforms",
 ]
 minversion = "9.0"
 python_classes = ["Test*"]

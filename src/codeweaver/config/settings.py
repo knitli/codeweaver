@@ -533,9 +533,7 @@ class CodeWeaverSettings(BaseSettings):
 
     _map: Annotated[DictView[CodeWeaverSettingsDict] | None, PrivateAttr()] = None
 
-    _unset_fields: set[str] = Field(
-        default_factory=set, description="Set of fields that were Unset during initialization"
-    )
+    _unset_fields: Annotated[set[str], PrivateAttr(default_factory=set)] = set()
 
     def __init__(self, **kwargs: Any) -> None:
         """Initialize CodeWeaverSettings, loading from config file if provided."""

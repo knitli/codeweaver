@@ -108,8 +108,9 @@ jobs:
 
       - name: Download models for real provider tests
         run: |
-          python -c "from sentence_transformers import SentenceTransformer; print('Downloading IBM Granite...'); SentenceTransformer('ibm-granite/granite-embedding-english-r2')"
-          python -c "from sentence_transformers import CrossEncoder; print('Downloading MS MARCO...'); CrossEncoder('cross-encoder/ms-marco-MiniLM-L6-v2')"
+          uv pip install sentence-transformers
+          uv run python -c "from sentence_transformers import SentenceTransformer; print('Downloading IBM Granite...'); SentenceTransformer('ibm-granite/granite-embedding-english-r2')"
+          uv run python -c "from sentence_transformers import CrossEncoder; print('Downloading MS MARCO...'); CrossEncoder('cross-encoder/ms-marco-MiniLM-L6-v2')"
 
       - name: Run tests with coverage
         env:
