@@ -64,6 +64,7 @@ from typing import (
     Unpack,
     cast,
     overload,
+    override,
 )
 
 from ast_grep_py import (
@@ -138,8 +139,10 @@ class MetaVar(str, BaseEnum):
 
     __slots__ = ()
 
+    @override
     def __str__(self) -> str:
         """Return the string representation of the meta variable."""
+        # This is an intentional override to ensure that str(MetaVar) returns the correct value.
         return self.value
 
     def to_metavar(

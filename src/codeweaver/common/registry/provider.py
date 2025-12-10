@@ -568,9 +568,7 @@ class ProviderRegistry(BasedModel):
         Provider.MISTRAL: "httpx_client",
     }
 
-    def _get_pooled_httpx_client(
-        self, provider: Provider, provider_kind: ProviderKind
-    ) -> Any:
+    def _get_pooled_httpx_client(self, provider: Provider, provider_kind: ProviderKind) -> Any:
         """Get a pooled HTTP client for providers that support HTTP client injection.
 
         This method provides connection pooling for HTTP-based providers,
@@ -596,7 +594,7 @@ class ProviderRegistry(BasedModel):
             }
 
             # Create unique client name based on provider and kind
-            client_name = f"{provider.value.lower()}_{provider_kind.value.lower()}"
+            client_name = f"{provider.variable}_{provider_kind.variable}_client"
             return pool.get_client_sync(client_name, **pool_overrides)
         except (ImportError, AttributeError, RuntimeError) as e:
             # Fallback to provider-created client if pool fails
@@ -1778,7 +1776,7 @@ class ProviderRegistry(BasedModel):
             logger.debug(
                 "Failed to resolve %s provider %s: %s",
                 provider_kind.name,
-                provider.value,
+                provider.as_title,
                 e.__class__.__name__,
                 exc_info=True,
             )

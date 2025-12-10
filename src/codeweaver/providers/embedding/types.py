@@ -224,7 +224,7 @@ class ChunkEmbeddings(NamedTuple):
             )
         ):
             raise ValueError(
-                f"Embeddings are already set for {embedding_info.kind.value} in chunk {embedding_info.chunk_id}."
+                f"Embeddings are already set for {embedding_info.kind.variable} in chunk {embedding_info.chunk_id}."
             )
         if self.chunk.chunk_id != embedding_info.chunk_id:
             raise ValueError(

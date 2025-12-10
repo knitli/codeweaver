@@ -458,7 +458,7 @@ class SemanticChunker(BaseChunker):
                 message,
                 file_path=str(file_path) if file_path else None,
                 details={
-                    "language": self.language.value,
+                    "language": self.language.variable,
                     "line_number": line_number,
                     **(details or {}),
                 },
@@ -469,7 +469,7 @@ class SemanticChunker(BaseChunker):
 
             from codeweaver.semantic.ast_grep import FileThing
 
-            root: SgRoot = SgRoot(content, self.language.value)
+            root: SgRoot = SgRoot(content, self.language.variable)
 
             # Check for ERROR nodes which indicate syntax errors
             error_nodes: list[tuple[int, str]] = []
@@ -733,7 +733,9 @@ class SemanticChunker(BaseChunker):
         # Create delimiter chunker with same language
         delimiter_chunker = DelimiterChunker(
             governor=self.governor,
-            language=self.language.value if hasattr(self.language, "value") else str(self.language),
+            language=self.language.variable
+            if hasattr(self.language, "variable")
+            else str(self.language),
         )
 
         # Chunk the node text using delimiter patterns

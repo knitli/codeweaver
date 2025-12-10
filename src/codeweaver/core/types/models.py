@@ -11,7 +11,6 @@ import abc
 import sys as _sys
 
 from collections.abc import Callable, Generator, Iterator, Sequence
-from enum import Enum
 from functools import cached_property
 from typing import (
     TYPE_CHECKING,
@@ -34,6 +33,7 @@ from pydantic.fields import ComputedFieldInfo, FieldInfo
 from pydantic.main import IncEx
 
 from codeweaver.core.types.aliases import FilteredKey, FilteredKeyT, LiteralStringT
+from codeweaver.core.types.enum import BaseEnum
 
 
 if TYPE_CHECKING:
@@ -414,17 +414,13 @@ class BasedModel(BaseModel):
         }
 
 
-class EnvFormat(Enum):
+class EnvFormat(BaseEnum):
     """Supported data formats for MCP server inputs and outputs."""
 
     STRING = "string"
     NUMBER = "number"
     BOOLEAN = "boolean"
     FILEPATH = "filepath"
-
-    def __str__(self) -> str:
-        """String representation of the EnvFormat."""
-        return self.value
 
 
 class EnvVarInfo(NamedTuple):

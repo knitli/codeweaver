@@ -380,6 +380,7 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
                         "Search results may differ from expectations. "
                         "Consider rebuilding: cw index --clear",
                         collection_name,
+                        # these are qdrant types, so we access .value
                         actual_dense.distance.value,
                         expected_dense.distance.value,
                     )

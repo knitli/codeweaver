@@ -338,7 +338,7 @@ async def execute_vector_search(
             "msg": "Starting vector search",
             "extra": {
                 "phase": "vector_search",
-                "search_strategy": query_vector.strategy.value,
+                "search_strategy": query_vector.strategy.variable,
                 "has_dense": query_vector.dense is not None,
                 "has_sparse": query_vector.sparse is not None,
             },

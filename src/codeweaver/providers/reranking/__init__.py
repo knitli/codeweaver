@@ -99,7 +99,7 @@ def get_rerank_model_provider(provider: Provider) -> type[RerankingProvider[Any]
 
     # Get list of supported reranking providers dynamically
     supported_providers = [
-        p.value
+        p.variable
         for p in [
             Provider.VOYAGE,
             Provider.COHERE,

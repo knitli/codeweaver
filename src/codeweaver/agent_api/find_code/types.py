@@ -384,7 +384,7 @@ class StrategizedQuery(NamedTuple):
                 details={
                     "has_dense": self.has_dense(),
                     "has_sparse": self.has_sparse(),
-                    "strategy": self.strategy.value,
+                    "strategy": self.strategy.variable,
                 },
                 suggestions=[
                     "Ensure both embedding providers are configured",

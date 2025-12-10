@@ -1868,8 +1868,8 @@ class Indexer(BasedModel):
                     "files_discovered": len(discovered_files),
                     "languages": list({
                         (
-                            f.ext_kind.language.value
-                            if hasattr(f.ext_kind.language, "value")
+                            f.ext_kind.language.variable
+                            if hasattr(f.ext_kind.language, "variable")
                             else str(f.ext_kind.language)
                         )
                         for f in discovered_files

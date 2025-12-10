@@ -13,7 +13,6 @@ import time
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterator, Mapping, Sequence
-from enum import Enum
 from types import ModuleType
 from typing import (
     TYPE_CHECKING,
@@ -44,7 +43,7 @@ from tenacity import (
 from codeweaver.common.utils import LazyImport, lazy_import, uuid7
 from codeweaver.config.providers import EmbeddingModelSettings, SparseEmbeddingModelSettings
 from codeweaver.core.stores import BlakeStore, UUIDStore, make_blake_store, make_uuid_store
-from codeweaver.core.types.enum import AnonymityConversion
+from codeweaver.core.types.enum import AnonymityConversion, BaseEnum
 from codeweaver.core.types.models import BasedModel
 from codeweaver.exceptions import ProviderError
 from codeweaver.exceptions import ValidationError as CodeWeaverValidationError
@@ -70,7 +69,7 @@ _get_statistics: LazyImport[SessionStatistics] = lazy_import(
 logger = logging.getLogger(__name__)
 
 
-class CircuitBreakerState(Enum):
+class CircuitBreakerState(BaseEnum):
     """Circuit breaker states for provider resilience."""
 
     CLOSED = "closed"  # Normal operation
@@ -391,7 +390,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
     @property
     def circuit_breaker_state(self) -> str:
         """Get current circuit breaker state for health monitoring."""
-        return self._circuit_state.value
+        return self._circuit_state.variable
 
     @retry(
         stop=stop_after_attempt(5),
@@ -496,7 +495,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                 {
                     "msg": "No chunks to embed after deduplication",
                     "extra": {
-                        "provider": type(self)._provider.value,
+                        "provider": type(self)._provider.variable,
                         "document_count": len(documents),
                         "is_reprocessing": is_old_batch,
                         "batch_id": str(batch_id or cache_key) if batch_id or cache_key else None,
@@ -511,7 +510,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             {
                 "msg": "Starting document embedding",
                 "extra": {
-                    "provider": type(self)._provider.value,
+                    "provider": type(self)._provider.variable,
                     "document_count": len(documents),
                     "chunk_count": len(chunks),
                     "is_reprocessing": is_old_batch,
@@ -562,9 +561,9 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                 {
                     "msg": "Circuit breaker open",
                     "extra": {
-                        "provider": type(self)._provider.value,
+                        "provider": type(self)._provider.variable,
                         "document_count": len(documents),
-                        "circuit_state": self._circuit_state.value,
+                        "circuit_state": self._circuit_state.variable,
                     },
                 },
             )
@@ -577,7 +576,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                 {
                     "msg": "All retry attempts exhausted",
                     "extra": {
-                        "provider": type(self)._provider.value,
+                        "provider": type(self)._provider.variable,
                         "document_count": len(documents),
                         "failure_count": self._failure_count,
                     },
@@ -591,7 +590,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                 {
                     "msg": "Document embedding failed",
                     "extra": {
-                        "provider": type(self)._provider.value,
+                        "provider": type(self)._provider.variable,
                         "document_count": len(documents),
                         "error": str(e),
                         "error_type": type(e).__name__,
@@ -625,7 +624,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                 {
                     "msg": "Document embedding complete",
                     "extra": {
-                        "provider": type(self)._provider.value,
+                        "provider": type(self)._provider.variable,
                         "document_count": len(documents),
                         "embeddings_generated": len(results) if results else 0,
                     },
@@ -928,7 +927,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                             "expected_dimension": expected_dim,
                             "actual_dimension": actual_dim,
                             "model_name": self.model_name,
-                            "provider": type(self)._provider.value
+                            "provider": type(self)._provider.variable
                             if hasattr(type(self), "_provider")
                             else "unknown",
                             "for_backup": for_backup,
@@ -977,22 +976,22 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                 # Check if we already have this type of embedding
                 has_existing = (
                     (
-                        info.kind.value == "dense"
+                        info.kind.variable == "dense"
                         and not info.backup
                         and registered.dense is not None
                     )
                     or (
-                        info.kind.value == "sparse"
+                        info.kind.variable == "sparse"
                         and not info.backup
                         and registered.sparse is not None
                     )
                     or (
-                        info.kind.value == "dense"
+                        info.kind.variable == "dense"
                         and info.backup
                         and registered.backup_dense is not None
                     )
                     or (
-                        info.kind.value == "sparse"
+                        info.kind.variable == "sparse"
                         and info.backup
                         and registered.backup_sparse is not None
                     )

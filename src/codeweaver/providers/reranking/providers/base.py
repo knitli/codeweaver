@@ -280,7 +280,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
     @property
     def circuit_breaker_state(self) -> str:
         """Get current circuit breaker state for health monitoring."""
-        return self._circuit_state.value
+        return self._circuit_state.variable
 
     @retry(
         stop=stop_after_attempt(5),

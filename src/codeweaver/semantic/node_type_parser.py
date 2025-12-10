@@ -459,7 +459,7 @@ class NodeTypeFileLoader:
         # If using package resources, load directly
         if self.directory is None:
             data_dir = files("codeweaver.data") / "node_types"
-            filename = f"{language.value}-node-types.json"
+            filename = f"{language.variable}-node-types.json"
             resource = data_dir / filename
             return from_json(resource.read_bytes()) if resource.is_file() else None
         # Otherwise use file path

@@ -130,7 +130,7 @@ class EvidenceKind(int, BaseEnum):
             return "No evidence available for classification."
 
         summaries = (
-            f"- {kind.as_title}: {kind.statement} ({kind.value})"
+            f"- {kind.as_title}: {kind.statement} ({kind.variable})"
             for kind in sorted(kinds, reverse=True)
         )
         return "\n".join(summaries)
