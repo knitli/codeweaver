@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "codeweaver": {
+      "command": "codeweaver server --transport stdio",
+      "args": [
+        "server"
+      ],
+      "env": {},
+      "transport": "stdio",
+      "type": "stdio",
+      "timeout": 120,
+      "description": "CodeWeaver advanced code search and understanding server.",
+      "icon": "https://raw.githubusercontent.com/knitli/codeweaver/main/docs/assets/codeweaver-primary.svg"
+    }
+  }
+}

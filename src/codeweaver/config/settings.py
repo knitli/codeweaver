@@ -54,9 +54,9 @@ from pydantic_settings import (
 from codeweaver.common.utils.checks import is_test_environment
 from codeweaver.common.utils.lazy_importer import lazy_import
 from codeweaver.common.utils.utils import get_user_config_dir
+from codeweaver.config._logging import DefaultLoggingSettings, LoggingSettings
 from codeweaver.config.chunker import ChunkerSettings, DefaultChunkerSettings
 from codeweaver.config.indexer import DefaultIndexerSettings, IndexerSettings
-from codeweaver.config.logging import DefaultLoggingSettings, LoggingSettings
 from codeweaver.config.mcp import MCPServerConfig, StdioCodeWeaverConfig
 from codeweaver.config.middleware import DefaultMiddlewareSettings, MiddlewareOptions
 from codeweaver.config.providers import AllDefaultProviderSettings, ProviderSettings

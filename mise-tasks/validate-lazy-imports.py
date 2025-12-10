@@ -30,9 +30,24 @@ import ast
 import importlib
 import re
 import sys
+import warnings
 
 from pathlib import Path
 from typing import Literal, NamedTuple
+
+# Suppress Pydantic and OpenTelemetry warnings before imports
+# These warnings come from dependencies and are cosmetic
+warnings.filterwarnings(
+    "ignore",
+    message=r"The '(exclude|repr|frozen)' attribute.*was provided to the `Field\(\)` function",
+    category=UserWarning,
+    module=r"pydantic\._internal\._generate_schema",
+)
+warnings.filterwarnings(
+    "ignore",
+    message=r"You should use `.*` instead\. Deprecated since version",
+    category=DeprecationWarning,
+)
 
 import botocore.exceptions
 

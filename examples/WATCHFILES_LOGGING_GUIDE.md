@@ -281,8 +281,8 @@ FileWatcher
 
 ### Integration Points
 
-- `SerializableLoggingFilter` from `codeweaver.config.logging`
-- `setup_logger` from `codeweaver.common.logging`
+- `SerializableLoggingFilter` from `codeweaver.config._logging`
+- `setup_logger` from `codeweaver.common._logging`
 - `log_to_client_or_fallback` for FastMCP routing
 - Standard Python `logging` module
 

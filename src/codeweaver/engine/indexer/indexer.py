@@ -29,7 +29,7 @@ import rignore
 from pydantic import DirectoryPath, NonNegativeFloat, NonNegativeInt, PrivateAttr
 from watchfiles import Change
 
-from codeweaver.common.logging import log_to_client_or_fallback
+from codeweaver.common._logging import log_to_client_or_fallback
 from codeweaver.common.statistics import SessionStatistics, get_session_statistics
 from codeweaver.common.utils.git import set_relative_path
 from codeweaver.config.chunker import ChunkerSettings

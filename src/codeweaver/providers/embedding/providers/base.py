@@ -467,7 +467,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
 
         Optionally takes a `batch_id` parameter to reprocess a specific batch of documents.
         """
-        from codeweaver.common.logging import log_to_client_or_fallback
+        from codeweaver.common._logging import log_to_client_or_fallback
 
         is_old_batch = False
         if (batch_id and self._store and batch_id in self._store and not for_backup) or (

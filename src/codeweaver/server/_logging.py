@@ -11,7 +11,7 @@ import logging
 
 from typing import TYPE_CHECKING
 
-from codeweaver.config.logging import DefaultLoggingSettings, LoggingSettings
+from codeweaver.config._logging import DefaultLoggingSettings, LoggingSettings
 from codeweaver.core.types.sentinel import Unset
 
 
@@ -81,7 +81,7 @@ def setup_logger(settings: DictView[CodeWeaverSettingsDict]) -> logging.Logger:
     rich = app_logger_settings.get("use_rich", True)
     rich_options = app_logger_settings.get("rich_options", {})
     logging_kwargs = app_logger_settings.get("dict_config", None)
-    from codeweaver.common.logging import setup_logger as setup_global_logging
+    from codeweaver.common._logging import setup_logger as setup_global_logging
 
     app_logger = setup_global_logging(
         name="codeweaver",
@@ -96,3 +96,7 @@ def setup_logger(settings: DictView[CodeWeaverSettingsDict]) -> logging.Logger:
         _set_log_levels()  # Reuse the comprehensive suppression function
 
     return app_logger
+
+
+# because of potential namespace issues, we're going to defensively prevent possible bugs:
+from logging import getLogger as getLogger

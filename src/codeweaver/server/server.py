@@ -23,6 +23,7 @@ from pydantic.dataclasses import dataclass
 from starlette.middleware import Middleware as ASGIMiddleware
 
 from codeweaver import __version__ as version
+from codeweaver.common.http_pool import HttpClientPool
 from codeweaver.common.registry import ModelRegistry, ProviderRegistry, ServicesRegistry
 from codeweaver.common.statistics import SessionStatistics
 from codeweaver.common.telemetry.client import PostHogClient
@@ -41,7 +42,6 @@ from codeweaver.server.management import ManagementServer
 
 
 if TYPE_CHECKING:
-    from codeweaver.common.http_pool import HttpClientPool
     from codeweaver.common.utils import LazyImport
     from codeweaver.core.types import AnonymityConversion, FilteredKeyT
 

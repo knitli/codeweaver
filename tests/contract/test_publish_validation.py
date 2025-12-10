@@ -5,6 +5,7 @@
 
 """Contract test: validate package publishing and installation."""
 
+import re
 import subprocess
 import tempfile
 import urllib.error
@@ -17,33 +18,24 @@ import pytest
 
 @pytest.fixture
 def package_info():
-    """Get package name and version from build."""
-    project_root = Path(__file__).parent.parent.parent
+    """Get version from import."""
+    from codeweaver import __version__ as version
 
-    # Build package
-    import shutil
-
-    dist_dir = project_root / "dist"
-    if dist_dir.exists():
-        shutil.rmtree(dist_dir)
-
-    result = subprocess.run(
-        ["uv", "build"], capture_output=True, text=True, check=False, cwd=project_root
+    package_name = "code-weaver"  # PyPI normalized name
+    # to get the current package version, we need to read it from the source, but we'll probably have a dirty/non-release version so we need to adjust for that
+    version_pattern = re.compile(
+        r"^(?P<version>\d{1,3}\.\d{1,3}\.\d{1,3})(?P<pre_kind>[ab]|rc)?(?P<pre_release>\d*)\.?(dev\d+)?([+]g[\da-f]{7})?$"
     )
-
-    if result.returncode != 0:
-        pytest.skip(f"Build failed: {result.stderr}")
-
-    # Extract package info from wheel
-    wheels = list(dist_dir.glob("*.whl"))
-    if not wheels:
-        pytest.skip("No wheel found")
-
-    wheel_name = wheels[0].name
-    # Format: codeweaver_mcp-{version}-py3-none-any.whl
-    parts = wheel_name.split("-")
-    package_name = "codeweaver"  # PyPI normalized name
-    version = parts[1] if len(parts) > 1 else ""
+    match = version_pattern.match(version)
+    if not match:
+        pytest.fail(f"Version '{version}' does not match expected pattern")
+    # type checker doesn't understand we checked for None
+    assert match
+    # if alpha or beta, we don't need to worry about the semver part
+    if (pre_kind := match["pre_kind"]) and pre_kind == "rc":
+        pytest.skip("Release candidate version detected; skipping publish validation tests")
+    project_root = Path(__file__).parent.parent.parent
+    dist_dir = project_root / "dist"
 
     return {
         "package_name": package_name,
@@ -55,7 +47,6 @@ def package_info():
 
 @pytest.mark.integration
 @pytest.mark.external_api
-@pytest.mark.skip(reason="Requires actual TestPyPI/PyPI publish - run manually after publish")
 def test_validate_publish_output_testpypi(package_info: dict):
     """
     Contract test for TestPyPI publish validation.
@@ -121,7 +112,6 @@ def test_validate_publish_output_testpypi(package_info: dict):
 
 @pytest.mark.integration
 @pytest.mark.external_api
-@pytest.mark.skip(reason="Requires actual PyPI publish - run manually after production publish")
 def test_validate_publish_output_pypi(package_info: dict):
     """
     Contract test for PyPI publish validation.
@@ -132,7 +122,6 @@ def test_validate_publish_output_pypi(package_info: dict):
     - Is importable after installation
     - Has correct version
 
-    This test MUST be run manually after PyPI publish.
     """
     package_name = package_info["package_name"]
     version = package_info["version"]

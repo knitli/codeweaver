@@ -32,7 +32,7 @@ from fastmcp import Context
 from codeweaver.cli.utils import is_tty
 from codeweaver.common.utils.checks import is_ci
 from codeweaver.engine.indexer.indexer import Indexer
-from codeweaver.engine.watcher.logging import WatchfilesLogManager
+from codeweaver.engine.watcher._logging import WatchfilesLogManager
 from codeweaver.engine.watcher.types import FileChange
 
 

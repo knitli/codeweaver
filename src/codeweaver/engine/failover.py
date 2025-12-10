@@ -25,7 +25,7 @@ from fastmcp import Context
 from pydantic import Field, PrivateAttr
 from qdrant_client.http.models.models import CollectionInfo
 
-from codeweaver.common.logging import log_to_client_or_fallback
+from codeweaver.common._logging import log_to_client_or_fallback
 from codeweaver.config.profiles import _backup_profile, get_profile
 from codeweaver.config.providers import ProviderSettingsDict
 from codeweaver.core.types.models import BasedModel

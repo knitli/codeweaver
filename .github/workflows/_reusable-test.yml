@@ -29,6 +29,22 @@ on:
         required: false
         type: boolean
         default: true
+      runner-version:
+        description: The GitHub Actions runner version to use
+        required: false
+        type: string
+        default: ubuntu-latest
+      # note: if running benchmarks, all other tests are skipped
+      benchmark-tests:
+        description: Run benchmark tests
+        required: false
+        type: boolean
+        default: false
+      upload-benchmark-results:
+        description: Upload benchmark test results as artifacts
+        required: false
+        type: boolean
+        default: false
     secrets:
       CODECOV_TOKEN:
         required: false
@@ -38,6 +54,13 @@ on:
         required: false
       VOYAGE_API_KEY:
         required: false
+    outputs:
+      benchmark-available:
+        description: Whether benchmark results were generated
+        value: ${{ jobs.test.outputs.benchmark-available }}
+      test-status:
+        description: Overall test result status
+        value: ${{ jobs.test.result }}
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   MISE_EXPERIMENTAL: 1
@@ -54,8 +77,10 @@ env:
 jobs:
   test:
     name: Test Python ${{ matrix.python-version }}${{ matrix.experimental && ' (experimental)' || '' }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner-version }}
     continue-on-error: ${{ matrix.experimental || false }}
+    outputs:
+      benchmark-available: ${{ steps.benchmark-compare.outputs.benchmark-available }}
     strategy:
       fail-fast: false
       matrix:
@@ -91,8 +116,7 @@ jobs:
         env:
           MISE_PYTHON_VERSION: ${{ steps.setup-mise.outputs.MISE_PYTHON_VERSION }}
         run: |
-          doctor_output="$(mise doctor)"
-          echo "$doctor_output"
+          mise doctor 2>&1
           mise run check 2>&1
         continue-on-error: true
 
@@ -113,11 +137,12 @@ jobs:
           uv run python -c "from sentence_transformers import CrossEncoder; print('Downloading MS MARCO...'); CrossEncoder('cross-encoder/ms-marco-MiniLM-L6-v2')"
 
       - name: Run tests with coverage
+        if: ${{ !inputs.benchmark-tests }}
         env:
           MISE_PYTHON_VERSION: ${{ steps.setup-mise.outputs.MISE_PYTHON_VERSION }}
         run: mise run test-cov -m "${{ inputs.test-markers }}"
       - name: Upload coverage to Codecov
-        if: ${{ inputs.upload-coverage && matrix.python-version == '3.12' }}
+        if: ${{ inputs.upload-coverage && matrix.python-version == '3.12' && !inputs.benchmark-tests }}
         uses: codecov/codecov-action@5a1091511ad55cbe89839c7260b706298ca349f7
         with:
           files: ./coverage.xml
@@ -125,10 +150,58 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
       - name: Upload test results
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        if: always()
+        if: ${{ !inputs.benchmark-tests }}
         with:
           name: test-results-${{ matrix.python-version }}
           path: |
             test-results.xml
             coverage.xml
+          if-no-files-found: warn
+
+      - name: Run benchmark tests
+        if: ${{ inputs.benchmark-tests }}
+        env:
+          MISE_PYTHON_VERSION: ${{ steps.setup-mise.outputs.MISE_PYTHON_VERSION }}
+        run: |
+          mise run test -m "benchmark or performance or dev_only" --benchmark-only --benchmark-json=benchmark-results.json || true
+        continue-on-error: true
+      - name: Store benchmark results
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: ${{ inputs.benchmark-tests }}
+        with:
+          name: benchmark-results
+          path: benchmark-results.json
+
+      - name: Compare benchmark results
+        id: benchmark-compare
+        if: ${{ inputs.benchmark-tests && inputs.upload-benchmark-results }}
+        run: |
+          # Store benchmark results for comparison (simplified version)
+          if [ -f benchmark-results.json ]; then
+            echo "Benchmark results generated successfully"
+            echo "benchmark-available=true" >> $GITHUB_OUTPUT
+
+            # Extract key metrics (this is a simplified example)
+            echo "## Benchmark Summary" >> benchmark-summary.md
+            echo "" >> benchmark-summary.md
+            echo "Performance benchmark completed on $(date -u +"%Y-%m-%d %H:%M UTC")" >> benchmark-summary.md
+            echo "" >> benchmark-summary.md
+
+            # Parse JSON and extract metrics (basic example)
+            if command -v jq &> /dev/null; then
+              echo "### Test Execution Times" >> benchmark-summary.md
+              jq -r '.benchmarks[] | "- \(.name): \(.stats.mean)s (mean)"' benchmark-results.json >> benchmark-summary.md 2>/dev/null || echo "- Benchmark data available in artifact" >> benchmark-summary.md
+            else
+              echo "- Detailed results available in benchmark-results.json artifact" >> benchmark-summary.md
+            fi
+          else
+            echo "benchmark-available=false" >> $GITHUB_OUTPUT
+            echo "No benchmark results generated" > benchmark-summary.md
+          fi
+      - name: Upload benchmark summary
+        if: ${{ inputs.benchmark-tests && inputs.upload-benchmark-results }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: benchmark-summary
+          path: benchmark-summary.md
           if-no-files-found: warn

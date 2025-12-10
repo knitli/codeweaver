@@ -51,7 +51,7 @@ async def _embed_dense(
     query: str, dense_provider_enum: Any, context: Any
 ) -> RawEmbeddingVectors | None:
     """Attempt dense embedding, return None on failure."""
-    from codeweaver.common.logging import log_to_client_or_fallback
+    from codeweaver.common._logging import log_to_client_or_fallback
     from codeweaver.common.registry import get_provider_registry
 
     registry = get_provider_registry()
@@ -115,7 +115,7 @@ async def _embed_sparse(
     query: str, sparse_provider_enum: Any, context: Any
 ) -> SparseEmbedding | None:
     """Attempt sparse embedding, return None on failure."""
-    from codeweaver.common.logging import log_to_client_or_fallback
+    from codeweaver.common._logging import log_to_client_or_fallback
     from codeweaver.common.registry import get_provider_registry
 
     registry = get_provider_registry()
@@ -199,7 +199,7 @@ async def embed_query(query: str, context: Any = None) -> QueryResult:
     Raises:
         ValueError: If no embedding providers configured or both fail
     """
-    from codeweaver.common.logging import log_to_client_or_fallback
+    from codeweaver.common._logging import log_to_client_or_fallback
     from codeweaver.common.registry import get_provider_registry
     from codeweaver.providers.embedding.types import QueryResult
 
@@ -325,7 +325,7 @@ async def execute_vector_search(
     Raises:
         ValueError: If no vector store provider configured
     """
-    from codeweaver.common.logging import log_to_client_or_fallback
+    from codeweaver.common._logging import log_to_client_or_fallback
     from codeweaver.common.registry import get_provider_registry  # Lazy import
 
     registry = get_provider_registry()
@@ -403,7 +403,7 @@ async def rerank_results(
         - reranked_results is None if reranking unavailable or fails
         - strategy is SEMANTIC_RERANK if successful, None otherwise
     """
-    from codeweaver.common.logging import log_to_client_or_fallback
+    from codeweaver.common._logging import log_to_client_or_fallback
     from codeweaver.common.registry import get_provider_registry  # Lazy import
 
     registry = get_provider_registry()

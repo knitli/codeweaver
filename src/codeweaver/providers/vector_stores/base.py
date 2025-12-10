@@ -487,7 +487,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
         context: Any = None,
     ) -> list[SearchResult]:
         """Wrapper around search with retry logic and circuit breaker."""
-        from codeweaver.common.logging import log_to_client_or_fallback
+        from codeweaver.common._logging import log_to_client_or_fallback
 
         _ = self._check_circuit_breaker
 
@@ -586,7 +586,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
         self, chunks: list[CodeChunk], context: Any = None, *, for_backup: bool = False
     ) -> None:
         """Wrapper around upsert with retry logic and circuit breaker."""
-        from codeweaver.common.logging import log_to_client_or_fallback
+        from codeweaver.common._logging import log_to_client_or_fallback
 
         _ = self._check_circuit_breaker
 
