@@ -39,6 +39,7 @@ def temp_project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 @pytest.mark.unit
 @pytest.mark.config
+@pytest.mark.mock_only
 class TestConfigShow:
     """Tests for config show command - the main functionality of `config` command."""
 
@@ -86,6 +87,7 @@ class TestConfigShow:
 
 @pytest.mark.unit
 @pytest.mark.config
+@pytest.mark.mock_only
 class TestConfigValidation:
     """Tests for config validation."""
 
