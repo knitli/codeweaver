@@ -102,6 +102,18 @@ def _chunk_single_file(
                 else "unknown"
             )
             fallback_chunker = DelimiterChunker(governor, language=language)
+
+            # Log fallback event for observability
+            from codeweaver.engine.chunker import _logging as chunker_logging
+
+            chunker_logging.log_chunking_fallback(
+                file_path=file.path,
+                from_chunker=chunker,
+                to_chunker=fallback_chunker,
+                reason="parse_error",
+                extra_context={"error_type": type(e).__name__, "error_message": str(e)},
+            )
+
             chunks = fallback_chunker.chunk(content, file=file)
 
         logger.debug("Chunked %s: %d chunks generated", file.path, len(chunks))

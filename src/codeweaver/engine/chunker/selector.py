@@ -173,7 +173,7 @@ class ChunkerSelector:
             try:
                 semantic_chunker = SemanticChunker(self.governor, language)
                 # Wrap semantic chunker with graceful fallback to delimiter
-                lang_str = language.variable if hasattr(language, 'variable') else str(language)
+                lang_str = language.variable if hasattr(language, "variable") else str(language)
                 fallback = DelimiterChunker(self.governor, language=lang_str)
                 return GracefulChunker(primary=semantic_chunker, fallback=fallback)
             except (ParseError, NotImplementedError) as e:

@@ -117,6 +117,19 @@ class ResourceGovernor:
 
         elapsed = time.time() - self._start_time
         if elapsed > self.settings.chunk_timeout_seconds:
+            # Log resource limit violation for observability
+            from pathlib import Path
+
+            from codeweaver.engine.chunker import _logging as chunker_logging
+
+            chunker_logging.log_chunking_resource_limit(
+                file_path=Path("<governed>"),
+                limit_type="timeout",
+                limit_value=float(self.settings.chunk_timeout_seconds),
+                actual_value=elapsed,
+                extra_context={"chunk_count": self._chunk_count},
+            )
+
             raise ChunkingTimeoutError(
                 f"Chunking exceeded timeout of {self.settings.chunk_timeout_seconds}s",
                 timeout_seconds=float(self.settings.chunk_timeout_seconds),
@@ -133,6 +146,21 @@ class ResourceGovernor:
             ChunkLimitExceededError: When chunk count exceeds maximum
         """
         if self._chunk_count > self.settings.max_chunks_per_file:
+            # Log resource limit violation for observability
+            from pathlib import Path
+
+            from codeweaver.engine.chunker import _logging as chunker_logging
+
+            chunker_logging.log_chunking_resource_limit(
+                file_path=Path("<governed>"),
+                limit_type="chunk_count",
+                limit_value=float(self.settings.max_chunks_per_file),
+                actual_value=float(self._chunk_count),
+                extra_context={
+                    "elapsed_seconds": time.time() - self._start_time if self._start_time else 0
+                },
+            )
+
             raise ChunkLimitExceededError(
                 f"Exceeded maximum of {self.settings.max_chunks_per_file} chunks per file",
                 chunk_count=self._chunk_count,
