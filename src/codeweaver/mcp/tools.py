@@ -77,7 +77,7 @@ TOOL_DEFINITIONS: DictView[ToolCollectionDict] = DictView(
         **Optional Arguments:**
             - intent: Specify an intent to help narrow down the search results. Choose from: `understand`, `implement`, `debug`, `optimize`, `test`, `configure`, `document`.
             - token_limit: Set a maximum number of tokens to return (default is 30000).
-            - focus_languages: Filter results by programming language(s). A list of languages using their common names (like "python", "javascript", etc.). CodeWeaver supports over 160 programming languages.
+            - focus_languages: Filter results by programming language(s). A list of languages using their common names (like "python", "javascript", etc.). CodeWeaver supports over 166 programming languages.
 
         RETURNS:
             A detailed summary of ranked matches and metadata. Including:
@@ -85,7 +85,7 @@ TOOL_DEFINITIONS: DictView[ToolCollectionDict] = DictView(
                 - content: An object representing the code or documentation snippet or its syntax tree representation. These objects carry substantial metadata about the snippet depending on how it was retrieved. Metadata may include: language, size, importance, symbol, semantic role and relationships to other code snippets and symbols.
                 - file: The file and associated metadata where the snippet was found.
                 - span: A span object indicating the exact location of the snippet within the file.
-                - relevance_score: A numerical score indicating how relevant the snippet is to the query, normalized between 0 and 1.
+                - relevance_score: A numerical score indicating how relevant the snippet is to the query, normalized between 0 and 1. If all results have the same score, this is because they are ranked using reciprocal rank fusion and their scores are not directly comparable.
 
         """),
                 enabled=True,

@@ -127,7 +127,7 @@ class DataclassSerializationMixin:
             ):
                 # Add computed fields to the fields dict (keys only, values don't matter for iteration)
                 fields = {**fields, **dict.fromkeys(computed_field_names)}  # type: ignore
-            for field in cast(dict[str, Any], self.__pydantic_fields__):  # type: ignore
+            for field in cast(dict[str, Any], fields):  # type: ignore
                 if (attr := getattr(self, field, None)) and hasattr(attr, "serialize_for_cli"):
                     self_map[field] = attr.serialize_for_cli()
                 elif isinstance(attr, Sequence | Iterator) and not isinstance(attr, str):
@@ -146,6 +146,7 @@ class DataclassSerializationMixin:
         """
         return {}
 
+    # /sc:implement "Phase 1 fixes" --delegate auto --wave-mode auto --
     def serialize_for_telemetry(self) -> dict[str, Any]:
         """Serialize the model for telemetry output, filtering sensitive keys."""
         from codeweaver.core.types.aliases import FilteredKey, FilteredKeyT, LiteralStringT

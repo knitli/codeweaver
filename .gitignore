@@ -203,6 +203,7 @@ __pycache__/
 
 # Generated Files
 **/htmlcov/
+htmlcov/
 .coverage
 .coveragexml
 .vscode/.history/

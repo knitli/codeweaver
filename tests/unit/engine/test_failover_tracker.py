@@ -111,6 +111,23 @@ class TestRecordFileIndexed:
         assert "src/test.py" not in tracker.pending_changes
         assert tracker._dirty is False
 
+    def test_unchanged_file_reindex_is_idempotent(self, tmp_path: Path):
+        """Test that re-indexing a file with the same hash doesn't update pending_changes."""
+        tracker = self._get_tracker(tmp_path)
+        tracker.file_hashes["src/test.py"] = "same_hash"
+
+        # Record the file twice with the same hash
+        self._mock_file_recording(tmp_path, "same_hash", tracker)
+        initial_pending_size = len(tracker.pending_changes)
+        assert initial_pending_size == 0, "Unchanged file should not be in pending_changes"
+
+        # Second call should not change pending_changes
+        self._mock_file_recording(tmp_path, "same_hash", tracker)
+        assert len(tracker.pending_changes) == initial_pending_size, (
+            "Re-indexing unchanged file should not modify pending_changes set"
+        )
+        assert tracker._dirty is False
+
     def _mock_file_recording(self, tmp_path: Path, file_hash: str, tracker: FileChangeTracker):
         mock_file = MagicMock()
         mock_file.path = tmp_path / "src" / "test.py"

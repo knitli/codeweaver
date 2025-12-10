@@ -39,7 +39,7 @@ async def find_code_tool(
     *,
     token_limit: int = 30000,
     focus_languages: tuple[SemanticSearchLanguage | str, ...] | None = None,
-    context: Context,
+    context: Context | None = None,
 ) -> FindCodeResponseSummary:
     """CodeWeaver's `find_code` tool is an advanced code search function that leverages context and task-aware semantic search to identify and retrieve relevant code snippets from a codebase using natural language queries. `find_code` uses advanced sparse and dense embedding models, and reranking models to provide the best possible results. It is purpose-built for AI coding agents to assist with code understanding, implementation, debugging, optimization, testing, configuration, and documentation tasks.
 
@@ -50,7 +50,7 @@ async def find_code_tool(
         intent: Optional search intent. One of `understand`, `implement`, `debug`, `optimize`, `test`, `configure`, `document`
         token_limit: Maximum tokens to return (default: 30000)
         focus_languages: Optional language filter
-        context: MCP context for request tracking
+        context: MCP context for request tracking if available
 
     Returns:
         FindCodeResponseSummary with ranked matches and metadata
