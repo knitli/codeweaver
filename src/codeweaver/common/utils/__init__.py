@@ -10,7 +10,8 @@ from __future__ import annotations
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
-from codeweaver.common.utils.lazy_importer import LazyImport, create_lazy_getattr, lazy_import
+from codeweaver.common.utils.lazy_getter import create_lazy_getattr
+from codeweaver.common.utils.lazy_importer import LazyImport, lazy_import
 
 
 if TYPE_CHECKING:

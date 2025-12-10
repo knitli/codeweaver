@@ -72,11 +72,11 @@ depends = ["source"]
 tools.uv = "latest"
 run = '''
 echo "${CW_PREFIX} Syncing dependencies..."
-uv sync --extra full --group dev --group docs --group build --group test
+uv sync --extra full --group dev --group docs --group build --group test --no-install-workspace
 '''
 run_windows = '''
 echo [codeweaver] Syncing dependencies...
-uv sync --extra full --group dev --group docs --group build --group test
+uv sync --extra full --group dev --group docs --group build --group test --no-install-workspace
 '''
 
 [tasks.source]
@@ -104,7 +104,6 @@ run = [
   "mise trust --all &>/dev/null",
   "mise install &>/dev/null || echo \"${CW_PREFIX} ⚠️  WARNING: mise install failed during setup.\"",
   "mise //:venv &>/dev/null",
-  "mise //:sync &>/dev/null",
   "git config include.path .gitconfig &>/dev/null || true",
   "echo 'src/codeweaver/_version.py' >> .git/info/exclude",
   "echo 'coverage.xml' >> .git/info/exclude",
@@ -118,7 +117,6 @@ run_windows = [
   "mise trust --all > NUL 2>&1",
   "mise install > NUL 2>&1 || echo \"[codeweaver] WARNING: mise install failed during setup.\"",
   "mise //:venv > NUL 2>&1",
-  "mise //:sync > NUL 2>&1",
   "git config include.path .gitconfig > NUL 2>&1",
   "echo src/codeweaver/_version.py >> .git\\info\\exclude",
   "echo coverage.xml >> .git\\info\\exclude",
@@ -364,6 +362,31 @@ del /s /q *.pyc 2>NUL
 echo [codeweaver] Build artifacts cleaned!
 '''
 
+[tasks.deep-clean]
+run = '''
+echo "${CW_PREFIX} Performing deep clean..."
+mise //:clean
+rm -rf .venv
+mise cache clear
+# it's clean for uv, clear for mise
+# it pays to run this on uv from time to time -- when I did it, it was 56 GIGABYTES of cache!
+# I'm all for aggressive caching, but that seems excessive even for me.
+uv cache clean --force
+mise //:venv
+'''
+run_windows = '''
+echo [codeweaver] Performing deep clean...
+mise //:clean
+rd /s /q .venv
+mise cache clear
+uv cache clean --force
+mise //:venv
+'''
+
+[tasks.deep-clean.env]
+MISE_EXPERIMENTAL = "1"
+MISE_YES = "1"
+
 # Release and maintenance
 [tasks.version]
 tools.uv = "latest"
@@ -412,3 +435,9 @@ run = '''eval "$(mise activate "$ACTIVE_SHELL")" &>/dev/null'''
 run_windows = '''mise activate cmd'''
 hide = true
 env.ACTIVE_SHELL = '''{{ exec(command='basename "$SHELL" 2>/dev/null || echo zsh') }}'''
+
+[tasks.activate-shims]
+run = '''eval '"$(mise activate "${ACTIVE_SHELL:-zsh}" --shims)"' &>/dev/null'''
+run_windows = '''mise activate cmd --shims'''
+hide = true
+env.ACTIVE_SHELL = '''{{ exec(command='basename "$SHELL" 2>/dev/null || echo bash') }}'''

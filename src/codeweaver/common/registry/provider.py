@@ -862,7 +862,7 @@ class ProviderRegistry(BasedModel):
             model_name_or_path = provider_settings.get("model") if provider_settings else None
             if model_name_or_path:
                 return client_class(model_name=model_name_or_path, **client_options)
-            if (capabilities := self.get_configured_provider_settings(provider_kind)) and (
+            if (capabilities := self.get_configured_provider_settings(provider_kind)) and (  # type: ignore
                 model_settings := capabilities.get("model_settings")
             ):  # type: ignore
                 model: str = model_settings["model"]
@@ -878,19 +878,19 @@ class ProviderRegistry(BasedModel):
 
         # Inject pooled HTTP client for providers that support it
         # This improves connection reuse and reduces overhead during high-load operations
-        param_name = self._POOLED_HTTP_PROVIDERS.get(provider)
-        if param_name is not None:
-            # Check if a client isn't already provided (via httpx_client or http_client)
-            if param_name not in merged_settings:
-                pooled_client = self._get_pooled_httpx_client(provider, provider_kind)
-                if pooled_client is not None:
-                    merged_settings[param_name] = pooled_client
-                    logger.debug(
-                        "Injected pooled HTTP client for %s provider (kind: %s, param: %s)",
-                        provider,
-                        provider_kind,
-                        param_name,
-                    )
+        if (
+            (param_name := self._POOLED_HTTP_PROVIDERS.get(provider)) is not None
+            and param_name not in merged_settings
+            and (pooled_client := self._get_pooled_httpx_client(provider, provider_kind))
+            is not None
+        ):
+            merged_settings[param_name] = pooled_client
+            logger.debug(
+                "Injected pooled HTTP client for %s provider (kind: %s, param: %s)",
+                provider,
+                provider_kind,
+                param_name,
+            )
 
         args, kwargs = clean_args(merged_settings, client_class)
         args = tuple(arg.get_secret_value() if isinstance(arg, SecretStr) else arg for arg in args)

@@ -21,7 +21,7 @@ from pydantic_core import core_schema
 from pydantic_core._pydantic_core import PydanticOmit
 
 from codeweaver.core.types.aliases import LiteralStringT, SentinelName, SentinelNameT
-from codeweaver.core.types.models import BasedModel, clean_sentinel_from_schema
+from codeweaver.core.types.models import BasedModel
 
 
 class DontGenerateJsonSchema(GenerateJsonSchema):
@@ -192,4 +192,4 @@ class Unset(Sentinel):
 UNSET: Unset = Unset(name="Unset", module_name=Sentinel._get_module_name_generator()())  # type: ignore
 
 
-__all__ = ("UNSET", "Sentinel", "SentinelName", "Unset", "clean_sentinel_from_schema")
+__all__ = ("UNSET", "Sentinel", "SentinelName", "Unset")

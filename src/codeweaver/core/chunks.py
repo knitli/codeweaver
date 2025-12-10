@@ -48,6 +48,7 @@ from codeweaver.core.metadata import ChunkSource, ExtKind, Metadata, determine_e
 from codeweaver.core.spans import Span, SpanTuple
 from codeweaver.core.stores import BlakeHashKey
 from codeweaver.core.types import BasedModel, FilteredKeyT, LanguageNameT
+from codeweaver.core.types.utils import generate_field_title
 from codeweaver.core.utils import truncate_text
 
 
@@ -86,26 +87,63 @@ def _get_registry() -> EmbeddingRegistry:
 class BatchKeyIndex(NamedTuple):
     """Tuple representing the index of a chunk within a batch.
 
-    NOTE: While a CodeChunk can hypothetically have both primary and secondary batch keys for both dense and sparse embeddings,
-    in practice, it's unlikely. The secondary/backup embedding process uses ultralightweight models with narrower context windows than most users will have by default. Consequently, the chunkers will produce smaller chunks that fit within these context windows, and these chunks will be embedded separately from the primary embeddings.
+    NOTE: While a CodeChunk can hypothetically have both primary and secondary batch keys for both dense and sparse embeddings, in practice, it's unlikely. The secondary/backup embedding process uses ultralightweight models with narrower context windows than most users will have by default. Consequently, the chunkers will produce smaller chunks that fit within these context windows, and these chunks will be embedded separately from the primary embeddings.
     """
 
-    primary_dense: BatchKeys | None = None
-    primary_sparse: BatchKeys | None = None
-    secondary_dense: BatchKeys | None = None
-    secondary_sparse: BatchKeys | None = None
+    primary_dense: Annotated[
+        BatchKeys | None,
+        Field(
+            description="""UUID7 key for looking up the embedding batch of the chunk's primary dense embeddings.""",
+            field_title_generator=generate_field_title,
+        ),
+    ] = None
+    primary_sparse: Annotated[
+        BatchKeys | None,
+        Field(
+            description="""UUID7 key for looking up the embedding batch of the chunk's primary sparse embeddings.""",
+            field_title_generator=generate_field_title,
+        ),
+    ] = None
+    secondary_dense: Annotated[
+        BatchKeys | None,
+        Field(
+            description="""UUID7 key for looking up the embedding batch of the chunk's secondary dense embeddings.""",
+            field_title_generator=generate_field_title,
+        ),
+    ] = None
+    secondary_sparse: Annotated[
+        BatchKeys | None,
+        Field(
+            description="""UUID7 key for looking up the embedding batch of the chunk's secondary sparse embeddings.""",
+            field_title_generator=generate_field_title,
+        ),
+    ] = None
 
 
 class BatchKeys(NamedTuple):
     """Tuple representing batch keys for embedding operations."""
 
-    id: Annotated[UUID7, Field(description="""The embedding batch ID the chunk belongs to.""")]
-    idx: Annotated[
-        NonNegativeInt, Field(description="""The index of the chunk within the batch.""")
+    id: Annotated[
+        UUID7,
+        Field(
+            description="""The embedding batch ID the chunk belongs to.""",
+            field_title_generator=generate_field_title,
+        ),
     ]
-    sparse: Annotated[bool, Field(description="""Whether the batch's embeddings are sparse.""")] = (
-        False
-    )
+    idx: Annotated[
+        NonNegativeInt,
+        Field(
+            description="""The index of the chunk within the batch.""",
+            field_title_generator=generate_field_title,
+        ),
+    ]
+    sparse: Annotated[
+        bool,
+        Field(
+            description="""Whether the batch's embeddings are sparse.""",
+            field_title_generator=generate_field_title,
+        ),
+    ] = False
 
 
 class CodeChunkDict(TypedDict, total=False):

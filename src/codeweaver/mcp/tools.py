@@ -52,7 +52,6 @@ def get_bulk_tool(server: FastMCP[Any]) -> Tool:
             description=registration_info.get("description", "Bulk tool caller"),
             tags={"bulk", *CONTEXT_AGENT_TAGS},
             annotations=registration_info.get("annotations", ToolAnnotations()),
-            exclude_args=registration_info.get("exclude_args", []),
             serializer=registration_info.get("serializer"),
             output_schema=registration_info.get("output_schema", None),
             meta=registration_info.get("meta", {}),
@@ -90,10 +89,9 @@ TOOL_DEFINITIONS: DictView[ToolCollectionDict] = DictView(
 
         """),
                 enabled=True,
-                exclude_args=["context"],
                 tags={"user", "external"},
                 annotations=ToolAnnotations(
-                    title="Find Code Tool",
+                    title="CodeWeaver Find Code",
                     readOnlyHint=True,
                     destructiveHint=False,
                     idempotentHint=True,

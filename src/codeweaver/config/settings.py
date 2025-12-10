@@ -77,8 +77,9 @@ from codeweaver.config.types import (
 from codeweaver.core.types.aliases import FilteredKeyT
 from codeweaver.core.types.dictview import DictView
 from codeweaver.core.types.enum import AnonymityConversion
-from codeweaver.core.types.models import BasedModel, clean_sentinel_from_schema
+from codeweaver.core.types.models import BasedModel
 from codeweaver.core.types.sentinel import UNSET, Unset
+from codeweaver.core.types.utils import clean_sentinel_from_schema
 from codeweaver.mcp.middleware import McpMiddleware
 
 

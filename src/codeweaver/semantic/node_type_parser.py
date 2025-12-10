@@ -331,7 +331,7 @@ logger = logging.getLogger()
 #  - source_thing: the `type` of the containing node
 #  - is_file: maps from `root`
 #  - can_appear_anywhere: maps from `extra` (marks Things that can appear
-#    as children of any node)
+#    as children of any node; in nearly all instances, comments.)
 #
 # * Translation Algorithm:
 #  - We use a lazy registry pattern to manage Things and Categories, so they can hold references to each other while being constructed and immutable.
@@ -343,6 +343,11 @@ logger = logging.getLogger()
 #
 # * Approach: DTO classes for JSON structure, then conversion functions to keep pydantic validation
 # cleanly separated from parsing logic. We'll use NamedTuple for DTOs to keep them lightweight, but allow for methods if needed (unlike TypedDict).
+#
+# * Static at runtime
+#
+# In practice, CodeWeaver generates this data at build time and saves it as a pickle cache (python object) in `codeweaver.data`. This avoids the need for runtime parsing and speeds up startup.
+# We keep this capability within the code, vice in build generation, because we plan to use it dynamically in the future for new languages at runtime.
 # ===========================================================================
 
 

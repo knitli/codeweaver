@@ -21,6 +21,7 @@ from codeweaver.core.spans import Span
 from codeweaver.core.types import LanguageName
 from codeweaver.core.types.enum import BaseEnum
 from codeweaver.core.types.models import BASEDMODEL_CONFIG, BasedModel
+from codeweaver.core.types.utils import generate_field_title
 from codeweaver.exceptions import ValidationError
 from codeweaver.providers.embedding.types import SparseEmbedding
 
@@ -345,8 +346,14 @@ class StrategizedQuery(NamedTuple):
 
     query: str
     dense: Sequence[float] | Sequence[int] | None
-    sparse: Annotated[SparseEmbedding | None, Field(description="Sparse embedding data")]
-    strategy: Annotated[SearchStrategy, Field(description="Search strategy to use")]
+    sparse: Annotated[
+        SparseEmbedding | None,
+        Field(description="Sparse embedding data", field_title_generator=generate_field_title),
+    ]
+    strategy: Annotated[
+        SearchStrategy,
+        Field(description="Search strategy to use", field_title_generator=generate_field_title),
+    ]
 
     def is_empty(self) -> bool:
         """Check if both dense and sparse embeddings are None or empty."""

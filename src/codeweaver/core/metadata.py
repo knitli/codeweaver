@@ -324,10 +324,20 @@ class ExtLangPair(NamedTuple):
     Not all 'extensions' are actually file extensions, some are file names or special cases, like `Makefile` or `Dockerfile`.
     """
 
-    ext: FileExtensionT
-    """The file extension, including leading dot if it's a file extension. May also be a full file name."""
-
-    language: LanguageNameT | SemanticSearchLanguage | ConfigLanguage
+    ext: Annotated[
+        FileExtensionT,
+        Field(
+            description="The file extension, including leading dot if it's a file extension. May also be a full file name.",
+            title="File Extension",
+        ),
+    ]
+    language: Annotated[
+        LanguageNameT | SemanticSearchLanguage | ConfigLanguage,
+        Field(
+            description="The programming or config language associated with the file extension.",
+            title="Language",
+        ),
+    ]
     """The programming or config language associated with the file extension."""
 
     @property
@@ -581,8 +591,20 @@ def _categorize_language(
 class ExtKind(NamedTuple):
     """Represents a file extension and its associated kind."""
 
-    language: LanguageName | SemanticSearchLanguage | ConfigLanguage
-    kind: ChunkKind
+    language: Annotated[
+        LanguageName | SemanticSearchLanguage | ConfigLanguage,
+        Field(
+            description="The programming or config language associated with the file extension.",
+            title="Language",
+        ),
+    ]
+    kind: Annotated[
+        ChunkKind,
+        Field(
+            description="The kind of chunk represented by the file extension. An enum of chunk kinds.",
+            title="Chunk Kind",
+        ),
+    ]
 
     def __str__(self) -> str:
         """Return a string representation of the extension kind."""

@@ -26,7 +26,6 @@ from typing_extensions import TypeIs
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
 from codeweaver.cli.utils import get_settings_map_for
 from codeweaver.common.utils.lazy_importer import lazy_import
-from codeweaver.core.types.sentinel import Unset
 from codeweaver.daemon import check_daemon_health, spawn_daemon_process
 
 
@@ -228,6 +227,8 @@ async def start_cw_services(
 
 def get_network_settings() -> NetworkConfig:
     """Get network configuration from settings."""
+    from codeweaver.core.types.sentinel import Unset
+
     settings_map = _get_settings_map()
 
     management_host = (
@@ -354,6 +355,8 @@ async def start(
         display.print_error("Invalid host or port provided. Please check your inputs.")
         return
     get_project_path = lazy_import("codeweaver.common.utils.git", "get_project_path")
+    from codeweaver.core.types.sentinel import Unset
+
     project = (
         project or project_path
         if (project_path := settings_map.get("project_path")) is not Unset

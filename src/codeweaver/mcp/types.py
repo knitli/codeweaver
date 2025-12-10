@@ -21,7 +21,6 @@ class ToolRegistrationDict(TypedDict, total=False):
     description: NotRequired[str | None]
     tags: NotRequired[set[str] | None]
     annotations: NotRequired[ToolAnnotations | None]
-    exclude_args: NotRequired[list[str] | None]
     serializer: NotRequired[Callable[[Any], str] | None]
     output_schema: NotRequired[dict[str, Any] | None]
     meta: NotRequired[dict[str, Any] | None]

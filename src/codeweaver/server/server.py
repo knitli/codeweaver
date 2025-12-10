@@ -28,8 +28,8 @@ from codeweaver.common.statistics import SessionStatistics
 from codeweaver.common.telemetry.client import PostHogClient
 from codeweaver.common.utils import elapsed_time_to_human_readable, get_project_path, lazy_import
 from codeweaver.config.settings import CodeWeaverSettings
+from codeweaver.core.types.dataclasses import DATACLASS_CONFIG, DataclassSerializationMixin
 from codeweaver.core.types.enum import AnonymityConversion
-from codeweaver.core.types.models import DATACLASS_CONFIG, DataclassSerializationMixin
 from codeweaver.core.types.sentinel import Unset
 from codeweaver.engine.failover import VectorStoreFailoverManager
 from codeweaver.engine.indexer import Indexer
@@ -47,13 +47,13 @@ if TYPE_CHECKING:
 
 # lazy imports for default factory functions
 get_provider_registry: LazyImport[Callable[[], ProviderRegistry]] = lazy_import(
-    "codeweaver.common.registry", "get_provider_registry"
+    "codeweaver.common.registry.provider", "get_provider_registry"
 )
 get_services_registry: LazyImport[Callable[[], ServicesRegistry]] = lazy_import(
-    "codeweaver.common.registry", "get_services_registry"
+    "codeweaver.common.registry.services", "get_services_registry"
 )
 get_model_registry: LazyImport[Callable[[], ModelRegistry]] = lazy_import(
-    "codeweaver.common.registry", "get_model_registry"
+    "codeweaver.common.registry.models", "get_model_registry"
 )
 get_session_statistics: LazyImport[Callable[[], SessionStatistics]] = lazy_import(
     "codeweaver.common.statistics", "get_session_statistics"

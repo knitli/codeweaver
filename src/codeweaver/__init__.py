@@ -28,7 +28,7 @@ with contextlib.suppress(ImportError):
 
     warnings.simplefilter("ignore", PydanticDeprecatedSince212)
 
-from codeweaver.common.utils.lazy_importer import create_lazy_getattr
+from codeweaver.common.utils.lazy_getter import create_lazy_getattr
 
 
 def get_version() -> str:
