@@ -377,6 +377,7 @@ exclude = [
 source = "uv-dynamic-versioning"
 
 [tool.pytest]
+# tombi: format.rules.array-values-order.disabled = true
 addopts = [
   # While we don't chase coverage, we want to ensure a minimum bar to catch missing tests
   # We can raise this over time as the project matures
@@ -390,8 +391,8 @@ addopts = [
   "--strict-markers",
   # Exclude resource-intensive tests by default
   # Override with: pytest -m "expensive" or pytest -m "requires_models" to run these tests
-  "-m",
   "-ra",
+  "-m",
   "not expensive and not requires_models and not requires_gpu and not requires_api_keys",
 ]
 filterwarnings = [
