@@ -431,5 +431,5 @@ See `examples/watchfiles_logging_examples.py` for complete working examples incl
 - [Python logging docs](https://docs.python.org/3/library/logging.html)
 - [Rich logging docs](https://rich.readthedocs.io/en/stable/logging.html)
 - [watchfiles docs](https://watchfiles.helpmanual.io/)
-- CodeWeaver logging: `src/codeweaver/common/logging.py`
-- Configuration: `src/codeweaver/config/logging.py`
+- CodeWeaver logging: `src/codeweaver/common/_logging.py`
+- Configuration: `src/codeweaver/config/_logging.py`

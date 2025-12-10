@@ -35,6 +35,7 @@ import warnings
 from pathlib import Path
 from typing import Literal, NamedTuple
 
+
 # Suppress Pydantic and OpenTelemetry warnings before imports
 # These warnings come from dependencies and are cosmetic
 warnings.filterwarnings(

@@ -391,8 +391,8 @@ addopts = [
   # Exclude resource-intensive tests by default
   # Override with: pytest -m "expensive" or pytest -m "requires_models" to run these tests
   "-m",
-  "not expensive and not requires_models and not requires_gpu and not requires_api_keys",
   "-ra",
+  "not expensive and not requires_models and not requires_gpu and not requires_api_keys",
 ]
 filterwarnings = [
   "error",
