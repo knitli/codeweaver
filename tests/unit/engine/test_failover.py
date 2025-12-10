@@ -137,7 +137,7 @@ class TestBackupSyncPeriodically:
             # Wait for sync interval with timeout
             try:
                 await asyncio.wait_for(sync_called.wait(), timeout=0.5)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 pass  # Expected - sync should not be called
 
             # Cleanup
@@ -174,7 +174,7 @@ class TestBackupSyncPeriodically:
             # Wait for sync interval with timeout
             try:
                 await asyncio.wait_for(sync_called.wait(), timeout=0.5)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 pass  # Expected - sync should not be called
 
             # Cleanup
@@ -205,7 +205,7 @@ class TestBackupSyncPeriodically:
             # Wait for sync interval with timeout
             try:
                 await asyncio.wait_for(sync_called.wait(), timeout=0.5)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 pass  # Expected - sync should not be called
 
             # Cleanup
@@ -239,7 +239,7 @@ class TestBackupSyncPeriodically:
             try:
                 await asyncio.wait_for(sync_event.wait(), timeout=0.5)
                 sync_executed = True
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 sync_executed = False
 
             # Cleanup

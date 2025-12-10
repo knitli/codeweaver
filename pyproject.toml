@@ -256,11 +256,11 @@ voyageai = ["voyageai"]
 [dependency-groups]
 dev = [
   # black is used to format generated code
-  "black>=25.11.0",
+  "black>=25.12.0",
   "ruff>=0.14.8",
   "ty>=0.0.1a31",
   "types-boto3-custom",
-  "uv>=0.9.15",
+  "uv>=0.9.17",
 ]
 build = ["hatchling>=1.27.0", "twine>=6.2.0", "uv-dynamic-versioning>=0.11.2"]
 dev-helpers = [
@@ -276,7 +276,7 @@ docs = [
 ]
 test = [
   "dirty-equals>=0.11.0",
-  "pytest>=9.0.1",
+  "pytest>=9.0.2",
   "pytest-asyncio>=1.3.0",
   "pytest-cov>=7.0.0",
   "pytest-env>=1.2.0",
@@ -388,10 +388,10 @@ addopts = [
   "--import-mode=importlib",
   "--strict-config",
   "--strict-markers",
-  "-ra",
   # Exclude resource-intensive tests by default
   # Override with: pytest -m "expensive" or pytest -m "requires_models" to run these tests
   "-m",
+  "-ra",
   "not expensive and not requires_models and not requires_gpu and not requires_api_keys",
 ]
 filterwarnings = [
