@@ -302,7 +302,7 @@ def _list_reranking_models(
         display.console.print(table)
 
     except ImportError as e:
-        display.print_warning(f"Cannot list models for {provider.value}: {e}")
+        display.print_warning(f"Cannot list models for {provider.as_title}: {e}")
         display.print_info(
             f"Install provider dependencies: pip install 'codeweaver[{provider.variable.replace('_', '-')}']"
         )
@@ -331,7 +331,7 @@ def _list_sparse_embedding_models(
         display.console.print(table)
 
     except ImportError as e:
-        display.print_warning(f"Cannot list models for {provider.value}: {e}")
+        display.print_warning(f"Cannot list models for {provider.as_title}: {e}")
         display.print_info(
             f"Install provider dependencies: pip install 'codeweaver[{provider.variable.replace('_', '-')}']'"
         )

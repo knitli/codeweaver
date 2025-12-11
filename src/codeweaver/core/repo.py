@@ -19,8 +19,8 @@ from pydantic.dataclasses import dataclass
 from codeweaver.core.file_extensions import COMMON_TOOLING_PATHS, TEST_DIR_NAMES
 from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
 from codeweaver.core.types.aliases import FilteredKeyT, LiteralStringT
+from codeweaver.core.types.dataclasses import DATACLASS_CONFIG, DataclassSerializationMixin
 from codeweaver.core.types.enum import BaseEnum
-from codeweaver.core.types.models import DATACLASS_CONFIG, DataclassSerializationMixin
 
 
 if TYPE_CHECKING:

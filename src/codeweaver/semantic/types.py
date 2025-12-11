@@ -22,6 +22,7 @@ from codeweaver.core.language import SemanticSearchLanguage
 from codeweaver.core.types.aliases import LiteralStringT
 from codeweaver.core.types.enum import BaseEnum
 from codeweaver.core.types.models import BasedModel
+from codeweaver.core.types.utils import generate_field_title
 
 
 class SimpleNodeTypeDTO(TypedDict):
@@ -36,10 +37,19 @@ class SimpleNodeTypeDTO(TypedDict):
 
     # type is a Python keyword, so we use 'node' here and map it in the Field to prevent shadowing
     node: Annotated[
-        LiteralStringT, Field(description="Name of the node type.", validation_alias="type")
+        LiteralStringT,
+        Field(
+            description="Name of the node type.",
+            validation_alias="type",
+            field_title_generator=generate_field_title,
+        ),
     ]
     named: Annotated[
-        bool, Field(description="Whether the node type is named (true) or anonymous (false).")
+        bool,
+        Field(
+            description="Whether the node type is named (true) or anonymous (false).",
+            field_title_generator=generate_field_title,
+        ),
     ]
 
 
@@ -56,14 +66,25 @@ class ChildTypeDTO(NamedTuple):
     """
 
     multiple: Annotated[
-        bool, Field(description="Whether multiple children of this type are allowed.")
+        bool,
+        Field(
+            description="Whether multiple children of this type are allowed.",
+            field_title_generator=generate_field_title,
+        ),
     ]
     required: Annotated[
-        bool, Field(description="Whether at least one child of this type is required.")
+        bool,
+        Field(
+            description="Whether at least one child of this type is required.",
+            field_title_generator=generate_field_title,
+        ),
     ]
     types: Annotated[
         list[SimpleNodeTypeDTO],
-        Field(description="List of type objects for the allowed child types."),
+        Field(
+            description="List of type objects for the allowed child types.",
+            field_title_generator=generate_field_title,
+        ),
     ]
 
 
@@ -411,3 +432,6 @@ class ConnectionConstraint(Flag, BaseEnum):  # type:ignore  # we intentionally o
     def must_be_single(self) -> bool:
         """Check if this ConnectionConstraint requires exactly one child (ONLY_ONE)."""
         return self is ConnectionConstraint.ONLY_ONE
+
+
+__all__ = ("ConnectionClass", "ConnectionConstraint", "ThingKind", "TokenPurpose")

@@ -8,9 +8,10 @@ We usually try to keep types close to where they are used, but some types
 are used so widely that it makes sense to define them globally here.
 """
 
-from importlib import import_module
 from types import MappingProxyType
 from typing import TYPE_CHECKING
+
+from codeweaver.common.utils.lazy_getter import create_lazy_getattr
 
 
 if TYPE_CHECKING:
@@ -212,18 +213,7 @@ Maps class/function/type names to their respective module paths for lazy loading
 """
 
 
-def __getattr__(name: str) -> object:
-    """Dynamically import submodules and classes for the core package."""
-    if name in _dynamic_imports:
-        module_name, submodule_name = _dynamic_imports[name]
-        module = import_module(f"{module_name}.{submodule_name}")
-        result = getattr(module, name)
-        globals()[name] = result  # Cache in globals for future access
-        return result
-    if globals().get(name) is not None:
-        return globals()[name]
-    raise AttributeError(f"module {__name__} has no attribute {name}")
-
+__getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
 
 __all__ = (
     "BASEDMODEL_CONFIG",

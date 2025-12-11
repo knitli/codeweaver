@@ -41,6 +41,7 @@ from tenacity import (
 
 from codeweaver.core.types.enum import BaseEnum
 from codeweaver.core.types.models import BasedModel
+from codeweaver.core.types.utils import generate_field_title
 from codeweaver.exceptions import RerankingProviderError, ValidationError
 from codeweaver.providers.provider import Provider
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
@@ -71,14 +72,50 @@ class CircuitBreakerOpenError(Exception):
 class RerankingResult(NamedTuple):
     """Result of a reranking operation."""
 
-    original_index: int
-    batch_rank: int
-    score: float
-    chunk: CodeChunk
+    original_index: Annotated[
+        int,
+        Field(
+            description="Original index of the document", field_title_generator=generate_field_title
+        ),
+    ]
+    batch_rank: Annotated[
+        int,
+        Field(
+            description="Rank of the document in the batch",
+            field_title_generator=generate_field_title,
+        ),
+    ]
+    score: Annotated[
+        float,
+        Field(description="Score of the document", field_title_generator=generate_field_title),
+    ]
+    chunk: Annotated[
+        CodeChunk,
+        Field(
+            description="Code chunk associated with the document",
+            field_title_generator=generate_field_title,
+        ),
+    ]
     # Optional search metadata preserved from vector search results
-    original_score: float | None = None
-    dense_score: float | None = None
-    sparse_score: float | None = None
+    original_score: Annotated[
+        float | None,
+        Field(
+            description="Original score of the document", field_title_generator=generate_field_title
+        ),
+    ] = None
+    # currently CodeWeaver only uses Reciprocal Rank Fusion, returning combined ranks. But we keep these fields for potential future use.
+    dense_score: Annotated[
+        float | None,
+        Field(
+            description="Dense score of the document", field_title_generator=generate_field_title
+        ),
+    ] = None
+    sparse_score: Annotated[
+        float | None,
+        Field(
+            description="Sparse score of the document", field_title_generator=generate_field_title
+        ),
+    ] = None
 
 
 def _get_statistics() -> SessionStatistics:
@@ -131,8 +168,16 @@ def default_reranking_output_transformer(
 class QueryType(NamedTuple):
     """Represents a query and its associated metadata."""
 
-    query: str
-    docs: Sequence[CodeChunk]
+    query: Annotated[
+        str, Field(description="The query string", field_title_generator=generate_field_title)
+    ]
+
+    docs: Annotated[
+        Sequence[CodeChunk],
+        Field(
+            description="The document chunks to rerank", field_title_generator=generate_field_title
+        ),
+    ]
 
 
 class RerankingProvider[RerankingClient](BasedModel, ABC):
@@ -280,7 +325,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
     @property
     def circuit_breaker_state(self) -> str:
         """Get current circuit breaker state for health monitoring."""
-        return self._circuit_state.value
+        return self._circuit_state.variable
 
     @retry(
         stop=stop_after_attempt(5),

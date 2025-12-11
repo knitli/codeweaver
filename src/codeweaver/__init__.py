@@ -28,7 +28,26 @@ with contextlib.suppress(ImportError):
 
     warnings.simplefilter("ignore", PydanticDeprecatedSince212)
 
-from codeweaver.common.utils.lazy_importer import create_lazy_getattr
+# Suppress Pydantic 2.12+ UnsupportedFieldAttributeWarning
+# This warning is triggered when Field(exclude=True) is used in Annotated type aliases
+# See: https://github.com/wandb/wandb/issues/10662
+# The warning is cosmetic - the fields still work correctly, the exclude parameter is just ignored
+warnings.filterwarnings(
+    "ignore",
+    message=r"The '(exclude|repr|frozen)' attribute.*was provided to the `Field\(\)` function",
+    category=UserWarning,
+    module=r"pydantic\._internal\._generate_schema",
+)
+
+# Suppress OpenTelemetry deprecation warnings from dependencies
+# These are from opentelemetry internal API changes that dependencies haven't updated yet
+warnings.filterwarnings(
+    "ignore",
+    message=r"You should use `.*` instead\. Deprecated since version",
+    category=DeprecationWarning,
+)
+
+from codeweaver.common.utils.lazy_getter import create_lazy_getattr
 
 
 def get_version() -> str:

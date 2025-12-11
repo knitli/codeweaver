@@ -13,11 +13,11 @@ from __future__ import annotations
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
-from codeweaver.common.utils.lazy_importer import create_lazy_getattr
+from codeweaver.common.utils.lazy_getter import create_lazy_getattr
 
 
 if TYPE_CHECKING:
-    from codeweaver.engine.watcher.logging import WatchfilesLogManager
+    from codeweaver.engine.watcher._logging import WatchfilesLogManager
     from codeweaver.engine.watcher.types import FileChange, WatchfilesArgs
     from codeweaver.engine.watcher.watch_filters import (
         CodeFilter,
@@ -33,7 +33,7 @@ if TYPE_CHECKING:
 parent = __spec__.parent or "codeweaver.engine.watcher"
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
-    "WatchfilesLogManager": (parent, "logging"),
+    "WatchfilesLogManager": (parent, "_logging"),
     "FileChange": (parent, "types"),
     "WatchfilesArgs": (parent, "types"),
     "CodeFilter": (parent, "watch_filters"),

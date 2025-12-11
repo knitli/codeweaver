@@ -126,7 +126,7 @@ async def _run_http_server(
     # Setup logging
     if verbose or debug:
         from codeweaver.config.settings import get_settings_map
-        from codeweaver.server.logging import setup_logger
+        from codeweaver.server._logging import setup_logger
 
         setup_logger(get_settings_map())
 

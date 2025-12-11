@@ -199,7 +199,7 @@ def setup_middleware(
             case "LoggingMiddleware" | "StructuredLoggingMiddleware":
                 instance = mw(
                     **(middleware_settings.get("logging", {}))
-                    | {"logger": logging.getLogger("codeweaver.middleware.logging")}  # type: ignore[reportCallIssue]
+                    | {"logger": logging.getLogger("codeweaver.middleware._logging")}  # type: ignore[reportCallIssue]
                 )
             case "ResponseCachingMiddleware":
                 instance = mw(**middleware_settings.get("caching", {}))  # type: ignore

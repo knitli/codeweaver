@@ -177,7 +177,7 @@ class ConfigLanguage(BaseEnum):
         This is used to quickly look up the SemanticSearchLanguage based on ConfigLanguage.
         """
         if self.is_semantic_search_language:
-            return SemanticSearchLanguage.from_string(self.value)
+            return SemanticSearchLanguage.from_string(self.variable)
         return None
 
     @classmethod
@@ -771,7 +771,7 @@ class SemanticSearchLanguage(str, BaseEnum):
         Returns the corresponding ConfigLanguage if this SemanticSearchLanguage is a configuration language.
         """
         return (
-            ConfigLanguage.from_string(self.value)
+            ConfigLanguage.from_string(self.variable)
             if self in type(self).config_languages()
             else None
         )

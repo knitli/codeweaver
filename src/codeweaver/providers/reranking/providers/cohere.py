@@ -106,7 +106,7 @@ class CohereRerankingProvider(RerankingProvider[CohereClient]):
                     from codeweaver.exceptions import ConfigurationError
 
                     raise ConfigurationError(
-                        f"API key not found for {provider.value} provider. Please set the API key in the client kwargs or as an environment variable."
+                        f"API key not found for {provider.as_title} provider. Please set the API key in the client kwargs or as an environment variable."
                     )
 
             client = CohereClient(**client_options)

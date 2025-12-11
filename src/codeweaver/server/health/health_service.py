@@ -249,7 +249,7 @@ class HealthService:
     def _extract_circuit_breaker_state(self, circuit_state_raw: Any) -> str:
         """Extract circuit breaker state string from raw value.
 
-        Handles both string values, enum values, and mock objects with .value attribute.
+        Handles both string values, enum values, and mock objects with .variable attribute.
 
         Args:
             circuit_state_raw: Raw circuit breaker state (string, enum, or mock)
@@ -257,8 +257,8 @@ class HealthService:
         Returns:
             Circuit breaker state as string ("closed", "open", or "half_open")
         """
-        if hasattr(circuit_state_raw, "value"):
-            return circuit_state_raw.value
+        if hasattr(circuit_state_raw, "variable"):
+            return circuit_state_raw.variable
         return str(circuit_state_raw) if circuit_state_raw else "closed"
 
     async def _check_embedding_provider_health(self) -> EmbeddingProviderServiceInfo:
@@ -536,7 +536,7 @@ class HealthService:
                 try:
                     total = sum(f.stat().st_size for f in path.rglob("*") if f.is_file())
                     return total // (1024 * 1024)
-                except (PermissionError, OSError):
+                except OSError:
                     # Gracefully handle permission errors
                     return 0
 

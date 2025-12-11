@@ -46,7 +46,7 @@ Use TestPyPI to validate publishing before production:
 1. (Optional) Runs tests on Python 3.12, 3.13, 3.14
 2. Builds package with current version
 3. Validates with `twine check`
-4. Publishes to https://test.pypi.org/project/codeweaver/
+4. Publishes to https://test.pypi.org/project/code-weaver/
 
 ### Verifying TestPyPI Publish
 After workflow completes:
@@ -58,7 +58,7 @@ source /tmp/test-install/bin/activate
 # Install from TestPyPI
 pip install --index-url https://test.pypi.org/simple/ \
             --extra-index-url https://pypi.org/simple/ \
-            codeweaver
+            code-weaver
 
 # Verify
 python -c "import codeweaver; print(codeweaver.__version__)"
@@ -79,15 +79,15 @@ Production publishing is fully automated via git tags.
    ```bash
    git checkout main
    git pull origin main
-   git tag v0.1.0
-   git push origin v0.1.0
+   git tag v0.1.0a6  # or v0.1.0 for stable release
+   git push origin v0.1.0a6
    ```
 
 3. **GitHub Actions automatically**:
    - Runs tests on Python 3.12, 3.13, 3.14
    - Builds package
    - Validates metadata with `twine check`
-   - Publishes to https://pypi.org/project/codeweaver/
+   - Publishes to https://pypi.org/project/code-weaver/
    - Creates GitHub release with notes
 
 ### Monitoring Release
@@ -103,7 +103,7 @@ pip install code-weaver==0.1.0
 python -c "import codeweaver; print(codeweaver.__version__)"
 ```
 
-Check package page: https://pypi.org/project/codeweaver/0.1.0/
+Check package page: https://pypi.org/project/code-weaver/0.1.0/
 
 ## Workflow Details
 
@@ -240,7 +240,7 @@ If a broken version is published:
    ```
 
 2. **Yanking**: Mark version as "yanked" on PyPI (users can still install with `==version`)
-   - Go to https://pypi.org/manage/project/codeweaver/releases/
+   - Go to https://pypi.org/manage/project/code-weaver/releases/
    - Find the version
    - Click "Yank release"
    - Publish fixed version
@@ -256,7 +256,7 @@ If a broken version is published:
 
 ## Resources
 
-- PyPI Project: https://pypi.org/project/codeweaver/
-- TestPyPI Project: https://test.pypi.org/project/codeweaver/
+- PyPI Project: https://pypi.org/project/code-weaver/
+- TestPyPI Project: https://test.pypi.org/project/code-weaver/
 - GitHub Actions: https://github.com/knitli/codeweaver/actions
 - Trusted Publishing Guide: https://docs.pypi.org/trusted-publishers/

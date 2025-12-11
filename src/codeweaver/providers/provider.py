@@ -26,7 +26,7 @@ import os
 from typing import NotRequired, TypedDict, cast, is_typeddict
 
 from codeweaver.core.types.enum import BaseEnum
-from codeweaver.core.types.models import EnvVarInfo as ProviderEnvVarInfo
+from codeweaver.core.types.env import EnvVarInfo as ProviderEnvVarInfo
 from codeweaver.exceptions import ConfigurationError
 
 
@@ -113,7 +113,7 @@ class Provider(BaseEnum):
         self,
     ) -> tuple[ProviderEnvVars, ...] | None:
         """Get the environment variables used by the provider's client that are not part of CodeWeaver's settings."""
-        from codeweaver.core.types.models import EnvFormat
+        from codeweaver.core.types.env import EnvFormat
 
         httpx_env_vars = {
             "http_proxy": ProviderEnvVarInfo(

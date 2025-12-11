@@ -59,7 +59,7 @@ async def test_custom_configuration():
     base_config = {
         "url": os.environ["CODEWEAVER_VECTOR_STORE_URL"],
         "api_key": os.environ["QDRANT__SERVICE__API_KEY"],
-        "prefer_grpc": True,
+        "prefer_grpc": False,
     }
 
     # Test custom collection name

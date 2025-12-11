@@ -55,13 +55,29 @@ def _create_mock_file(file_path: Path) -> Mock:
 
 def test_selector_chooses_semantic_for_python(chunk_governor: ChunkGovernor) -> None:
     """Verify selector picks semantic for supported language."""
+    from codeweaver.engine.chunker.selector import GracefulChunker
+
     selector = ChunkerSelector(chunk_governor)
 
     # Create mock file with .py extension
     file = _create_mock_file(Path("test.py"))
 
     chunker = selector.select_for_file(file)
-    assert isinstance(chunker, SemanticChunker)
+    # Selector now wraps SemanticChunker in GracefulChunker for automatic fallback
+    assert isinstance(chunker, GracefulChunker)
+    assert isinstance(chunker.primary, SemanticChunker)
+
+    # Verify fallback configuration
+    assert isinstance(chunker.fallback, DelimiterChunker), (
+        "GracefulChunker should have DelimiterChunker as fallback"
+    )
+
+    # Verify fallback language matches the primary semantic language
+    from codeweaver.core.language import SemanticSearchLanguage
+
+    assert chunker.fallback._language == SemanticSearchLanguage.PYTHON, (
+        "Fallback language should match semantic language for .py files"
+    )
 
 
 def test_selector_falls_back_to_delimiter_for_unknown(chunk_governor: ChunkGovernor) -> None:

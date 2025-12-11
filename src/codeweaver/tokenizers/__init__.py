@@ -9,7 +9,7 @@ from __future__ import annotations
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Literal
 
-from codeweaver.common.utils import create_lazy_getattr
+from codeweaver.common.utils.lazy_getter import create_lazy_getattr
 
 
 if TYPE_CHECKING:

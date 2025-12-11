@@ -17,6 +17,8 @@ from codeweaver.common.utils.utils import uuid7
 from codeweaver.config.providers import QdrantConfig
 from codeweaver.core.language import SemanticSearchLanguage as Language
 from codeweaver.providers.vector_stores.qdrant import QdrantVectorStoreProvider
+
+# sourcery skip: dont-import-test-modules
 from tests.conftest import create_test_chunk_with_embeddings
 
 

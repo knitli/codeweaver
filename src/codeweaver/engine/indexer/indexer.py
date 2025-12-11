@@ -29,7 +29,7 @@ import rignore
 from pydantic import DirectoryPath, NonNegativeFloat, NonNegativeInt, PrivateAttr
 from watchfiles import Change
 
-from codeweaver.common.logging import log_to_client_or_fallback
+from codeweaver.common._logging import log_to_client_or_fallback
 from codeweaver.common.statistics import SessionStatistics, get_session_statistics
 from codeweaver.common.utils.git import set_relative_path
 from codeweaver.config.chunker import ChunkerSettings
@@ -1868,8 +1868,8 @@ class Indexer(BasedModel):
                     "files_discovered": len(discovered_files),
                     "languages": list({
                         (
-                            f.ext_kind.language.value
-                            if hasattr(f.ext_kind.language, "value")
+                            f.ext_kind.language.variable
+                            if hasattr(f.ext_kind.language, "variable")
                             else str(f.ext_kind.language)
                         )
                         for f in discovered_files

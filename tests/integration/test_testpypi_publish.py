@@ -32,8 +32,8 @@ def test_publish_to_testpypi():
     2. Select "Publish to TestPyPI" workflow
     3. Click "Run workflow"
     4. Wait for completion
-    5. Visit https://test.pypi.org/project/codeweaver/
+    5. Visit https://test.pypi.org/project/code-weaver/
     6. Verify package appears with correct version
-    7. Test installation: pip install --index-url https://test.pypi.org/simple/ codeweaver
+    7. Test installation: pip install --index-url https://test.pypi.org/simple/ code-weaver
     """
     pytest.skip("Requires manual GitHub Actions workflow execution")

@@ -256,11 +256,11 @@ voyageai = ["voyageai"]
 [dependency-groups]
 dev = [
   # black is used to format generated code
-  "black>=25.11.0",
+  "black>=25.12.0",
   "ruff>=0.14.8",
   "ty>=0.0.1a31",
   "types-boto3-custom",
-  "uv>=0.9.15",
+  "uv>=0.9.17",
 ]
 build = ["hatchling>=1.27.0", "twine>=6.2.0", "uv-dynamic-versioning>=0.11.2"]
 dev-helpers = [
@@ -276,7 +276,7 @@ docs = [
 ]
 test = [
   "dirty-equals>=0.11.0",
-  "pytest>=9.0.1",
+  "pytest>=9.0.2",
   "pytest-asyncio>=1.3.0",
   "pytest-cov>=7.0.0",
   "pytest-env>=1.2.0",
@@ -377,6 +377,7 @@ exclude = [
 source = "uv-dynamic-versioning"
 
 [tool.pytest]
+# tombi: format.rules.array-values-order.disabled = true
 addopts = [
   # While we don't chase coverage, we want to ensure a minimum bar to catch missing tests
   # We can raise this over time as the project matures
@@ -388,7 +389,11 @@ addopts = [
   "--import-mode=importlib",
   "--strict-config",
   "--strict-markers",
+  # Exclude resource-intensive tests by default
+  # Override with: pytest -m "expensive" or pytest -m "requires_models" to run these tests
   "-ra",
+  "-m",
+  "not expensive and not requires_models and not requires_gpu and not requires_api_keys",
 ]
 filterwarnings = [
   "error",
@@ -410,12 +415,16 @@ markers = [
   # Feature-specific
   "embeddings: Tests related to embedding functionality",
   "env_vars: Tests that depend on environment variables",
+  "expensive: Tests taking more than 30 seconds to complete",
   "external_api: Tests that interact with external APIs",
   "fixtures: Tests that heavily rely on pytest fixtures",
   # Stability & reliability
   "flaky: Tests that may occasionally fail due to timing or external factors",
   "indexing: Tests related to code indexing",
   "integration: Integration tests that test component interactions",
+  # Platform-specific
+  "linux_only: Tests that only run on Linux platforms",
+  "macos_only: Tests that only run on macOS platforms",
   "mcp: Tests related to MCP protocol functionality",
   "mock_only: Tests that only use mocked dependencies",
   "network: Tests that require network access",
@@ -424,7 +433,10 @@ markers = [
   "performance: Performance-related tests",
   "qdrant: Tests that require Qdrant vector database",
   # External dependencies
-  "real_providers: Tests that require real provider configurations",
+  "real_providers: Tests using actual embedding/vector store providers (not mocks)",
+  "requires_api_keys: Tests requiring external API credentials and authentication",
+  "requires_gpu: Tests requiring GPU hardware for execution",
+  "requires_models: Tests requiring ML model downloads and local model files",
   "retry: Tests that may need retries",
   "search: Tests related to search functionality",
   "server: Tests related to server functionality",
@@ -433,10 +445,12 @@ markers = [
   "slow: Tests that take a significant amount of time to run",
   "telemetry: Tests related to telemetry and metrics",
   "timeout: Tests with specific timeout requirements",
+  "timing_sensitive: Tests with strict timing requirements that may be environment-dependent",
   # Test categories
   "unit: Unit tests that test individual components in isolation",
   "validation: Validation tests that ensure system consistency",
   "voyageai: Tests that require VoyageAI API access",
+  "windows_only: Tests that only run on Windows platforms",
 ]
 minversion = "9.0"
 python_classes = ["Test*"]

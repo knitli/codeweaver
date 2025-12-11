@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     # Import everything for IDE and type checker support
     # These imports are never executed at runtime, only during type checking
+    from codeweaver.common._logging import log_to_client_or_fallback, setup_logger
     from codeweaver.common.http_pool import (
         HttpClientPool,
         PoolLimits,
@@ -20,7 +21,6 @@ if TYPE_CHECKING:
         reset_http_pool,
         reset_http_pool_sync,
     )
-    from codeweaver.common.logging import log_to_client_or_fallback, setup_logger
     from codeweaver.common.statistics import (
         FileStatistics,
         Identifier,
@@ -50,6 +50,7 @@ if TYPE_CHECKING:
         asyncio_or_uvloop,
         backup_file_path,
         clean_args,
+        create_lazy_getattr,
         elapsed_time_to_human_readable,
         ensure_iterable,
         estimate_tokens,
@@ -133,6 +134,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "asyncio_or_uvloop": (__spec__.parent, "utils"),
     "backup_file_path": (__spec__.parent, "utils"),
     "clean_args": (__spec__.parent, "utils"),
+    "create_lazy_getattr": (__spec__.parent, "utils"),
     "elapsed_time_to_human_readable": (__spec__.parent, "utils"),
     "ensure_iterable": (__spec__.parent, "utils"),
     "estimate_tokens": (__spec__.parent, "utils"),
@@ -177,7 +179,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "isfunction": (__spec__.parent, "utils"),
     "ismethod": (__spec__.parent, "utils"),
     "lazy_import": (__spec__.parent, "utils"),
-    "log_to_client_or_fallback": (__spec__.parent, "logging"),
+    "log_to_client_or_fallback": (__spec__.parent, "_logging"),
     "low_priority": (__spec__.parent, "utils"),
     "normalize_ext": (__spec__.parent, "utils"),
     "record_timed_http_request": (__spec__.parent, "statistics"),
@@ -186,7 +188,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "rpartial": (__spec__.parent, "utils"),
     "sanitize_unicode": (__spec__.parent, "utils"),
     "set_relative_path": (__spec__.parent, "utils"),
-    "setup_logger": (__spec__.parent, "logging"),
+    "setup_logger": (__spec__.parent, "_logging"),
     "timed_http": (__spec__.parent, "statistics"),
     "to_lowly_lowercase": (__spec__.parent, "utils"),
     "to_tokens": (__spec__.parent, "utils"),
@@ -239,6 +241,7 @@ __all__ = (
     "asyncio_or_uvloop",
     "backup_file_path",
     "clean_args",
+    "create_lazy_getattr",
     "elapsed_time_to_human_readable",
     "ensure_iterable",
     "estimate_tokens",

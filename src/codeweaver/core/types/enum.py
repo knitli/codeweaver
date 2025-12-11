@@ -13,19 +13,17 @@ from collections.abc import Callable, Generator, Iterator, Mapping, Sequence
 from enum import Enum, auto, unique
 from functools import cached_property
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Annotated, Any, Self, cast, override
+from typing import TYPE_CHECKING, Any, Self, cast, override
 
 import textcase
 
 from aenum import extend_enum  # type: ignore
-from pydantic import Field, computed_field
-from pydantic.dataclasses import dataclass
-
-from codeweaver.core.types.models import DATACLASS_CONFIG, DataclassSerializationMixin
+from pydantic import computed_field
 
 
 if TYPE_CHECKING:
     from codeweaver.core.types.aliases import FilteredKeyT
+    from codeweaver.core.types.dataclasses import BaseEnumData
 
 
 type EnumExtend = Callable[[Enum, str], Enum]
@@ -37,37 +35,9 @@ extend_enum: EnumExtend = extend_enum
 # ================================================
 
 
-@dataclass(config=DATACLASS_CONFIG, order=True, frozen=True)
-class BaseEnumData(DataclassSerializationMixin):
-    """A dataclass to hold enum member data.
-
-    `BaseEnumData` provides a standard structure for enum member data, including name, value, aliases, and description. Subclasses can extend this dataclass to include additional fields as needed.
-    """
-
-    aliases: Annotated[
-        tuple[str, ...],
-        Field(description="The aliases for the enum member.", default_factory=tuple, repr=False),
-    ]
-    _description: (
-        Annotated[str | None, Field(description="The description of the enum member.")] | None
-    ) = None
-
-    # These are just generic fields, define more in subclasses as needed.
-
-    def __init__(
-        self, aliases: Sequence[str] | None = None, description: str | None = None, **kwargs: Any
-    ) -> None:
-        """Initialize the BaseEnumData dataclass."""
-        object.__setattr__(self, "aliases", tuple(aliases) if aliases is not None else ())
-        object.__setattr__(self, "_description", description)
-        for key, val in kwargs.items():
-            object.__setattr__(self, key, val)
-        super().__init__()
-
-
 @unique
 class BaseDataclassEnum(Enum):
-    """A base enum class for enums with dataclass members. Does not come with its 'type' -- you must define that with `BaseEnumData` and subclass your implementation, like: `class MyDataclassEnum(MyCustomBaseEnumDataDataclass, BaseDataclassEnum): ...`."""
+    """A base enum class for enums with dataclass members. Does not come with its 'type' -- you must define that with `codeweaver.core.types.dataclasses.BaseEnumData` and subclass your implementation, like: `class MyDataclassEnum(MyCustomBaseEnumDataDataclass, BaseDataclassEnum): ...`."""
 
     @staticmethod
     def _multiply_variations(s: str) -> set[str]:
@@ -492,4 +462,4 @@ class AnonymityConversion(BaseEnum):
         return functions.get(self, lambda v: v)(values)
 
 
-__all__ = ("AnonymityConversion", "BaseDataclassEnum", "BaseEnum", "BaseEnumData")
+__all__ = ("AnonymityConversion", "BaseDataclassEnum", "BaseEnum")

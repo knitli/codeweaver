@@ -3,7 +3,57 @@
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
 
-"""Tests for automatic embedding reconciliation in the indexer."""
+"""Tests for automatic embedding reconciliation in the indexer.
+
+This module contains unit tests for the reconciliation functionality that detects
+and adds missing embeddings to existing chunks in the vector store.
+
+Test Organization:
+------------------
+
+UNIT TESTS (this file):
+    - TestAddMissingEmbeddings: Comprehensive unit tests for add_missing_embeddings_to_existing_chunks()
+        * Tests the core reconciliation logic directly
+        * Covers all embedding combination scenarios (dense-only, sparse-only, both, neither)
+        * Validates selective embedding generation based on existing vectors
+        * Tests manifest updates after successful reconciliation
+
+    - TestEdgeCases: Edge case and error handling for reconciliation logic
+        * Non-standard vector types (list vs dict representations)
+        * Empty or missing data scenarios
+        * Single-provider configurations
+        * Payload validation edge cases
+
+INTEGRATION TESTS (tests/integration/test_reconciliation_integration.py):
+    - Full prime_index() workflow testing with real Qdrant vector store
+    - Error handling during reconciliation (ProviderError, IndexingError, ConnectionError)
+    - Reconciliation skip conditions (force_reindex, no vector store, no providers)
+    - End-to-end validation of reconciliation behavior in production-like scenarios
+
+Design Rationale:
+-----------------
+We separate unit and integration tests for reconciliation because:
+
+1. Indexer is a Pydantic v2 BaseModel, which doesn't support reliable method patching
+   - Pydantic v2's internal architecture makes patch.object() and similar techniques fragile
+   - Class-level patching conflicts with Pydantic's descriptor system
+
+2. Integration tests provide better coverage for prime_index() integration
+   - They test real behavior without brittle mocking
+   - They exercise actual vector store interactions
+   - They validate error handling in realistic scenarios
+
+3. Unit tests focus on the reconciliation logic itself
+   - Direct testing of add_missing_embeddings_to_existing_chunks() works perfectly
+   - No Pydantic patching required (we mock at the provider level)
+   - Comprehensive coverage of all reconciliation paths
+
+This separation provides:
+- Fast, reliable unit tests for core logic
+- Realistic integration tests for workflow validation
+- No xfail tests or brittle mocking
+- Comprehensive coverage across both test types
+"""
 
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -380,141 +430,12 @@ class TestAddMissingEmbeddings:
         assert result["chunks_updated"] == 2
 
 
-class TestAutomaticReconciliation:
-    """Test automatic reconciliation during prime_index.
-
-    Note: These tests require extensive mocking of complex Pydantic models and
-    async initialization behavior. They are marked as integration tests to
-    avoid brittleness from class-level patching.
-    """
-
-    @pytest.fixture
-    def mock_indexer_with_reconciliation(self, tmp_path: Path):
-        """Create indexer for testing automatic reconciliation."""
-        indexer = Indexer(project_path=tmp_path, auto_initialize_providers=False)
-
-        indexer._file_manifest = IndexFileManifest(project_path=tmp_path)
-        indexer._vector_store = MagicMock()
-        indexer._vector_store.collection = "test_collection"
-
-        # Mock embedding providers
-        indexer._embedding_provider = AsyncMock()
-        indexer._embedding_provider.provider_name = "voyage"
-        indexer._embedding_provider.model_name = "voyage-3"
-
-        indexer._sparse_provider = AsyncMock()
-        indexer._sparse_provider.provider_name = "splade"
-        indexer._sparse_provider.model_name = "splade-v3"
-
-        return indexer
-
-    @pytest.mark.asyncio
-    @pytest.mark.integration
-    @pytest.mark.xfail(
-        reason="Pydantic v2 models don't support standard mock patching approaches. "
-        "The reconciliation logic is tested in TestAddMissingEmbeddings."
-    )
-    async def test_reconciliation_called_during_prime_index(
-        self, mock_indexer_with_reconciliation: Indexer, tmp_path: Path
-    ) -> None:
-        """Test that reconciliation is automatically called during prime_index.
-
-        This test verifies the integration of reconciliation into the indexing pipeline.
-        Due to complexity of mocking prime_index internals (provider initialization,
-        file discovery, batch indexing), this test is marked as integration.
-        """
-        # Add file to manifest indicating sparse embeddings are missing
-        mock_indexer_with_reconciliation._file_manifest.add_file(
-            path=Path("test.py"),
-            content_hash=get_blake_hash(b"content"),
-            chunk_ids=[str(uuid4())],
-            dense_embedding_provider="voyage",
-            dense_embedding_model="voyage-3",
-            has_dense_embeddings=True,
-            has_sparse_embeddings=False,  # Missing sparse
-        )
-
-        # Create mock async functions
-        mock_reconciliation = AsyncMock(
-            return_value={"chunks_updated": 0, "files_processed": 0, "errors": []}
-        )
-
-        # Use class-level patching to avoid Pydantic v2 model attribute setting issues
-        with (
-            patch(
-                "codeweaver.engine.indexer.indexer.Indexer._initialize_providers_async", AsyncMock()
-            ),
-            patch(
-                "codeweaver.engine.indexer.indexer.Indexer._perform_batch_indexing_async",
-                AsyncMock(),
-            ),
-            patch(
-                "codeweaver.engine.indexer.indexer.Indexer._get_current_embedding_models",
-                MagicMock(
-                    return_value={
-                        "dense_provider": "voyage",
-                        "dense_model": "voyage-3",
-                        "sparse_provider": "splade",
-                        "sparse_model": "splade-v3",
-                    }
-                ),
-            ),
-            patch(
-                "codeweaver.engine.indexer.indexer.Indexer.add_missing_embeddings_to_existing_chunks",
-                mock_reconciliation,
-            ),
-        ):
-            # Run prime_index (not force_reindex)
-            await mock_indexer_with_reconciliation.prime_index(force_reindex=False)
-
-            # Verify reconciliation was called
-            mock_reconciliation.assert_called_once()
-            call_args = mock_reconciliation.call_args
-            assert call_args[1]["add_sparse"] is True  # Should request sparse
-
-    @pytest.mark.asyncio
-    async def test_reconciliation_skipped_on_force_reindex(
-        self, mock_indexer_with_reconciliation: Indexer, tmp_path: Path
-    ) -> None:
-        """Test that reconciliation is skipped when force_reindex is True.
-
-        This test verifies that force_reindex bypasses reconciliation.
-        Since reconciliation is inside a conditional that checks force_reindex,
-        we can validate this without full prime_index mocking.
-        """
-        # Add file to manifest indicating sparse embeddings are missing
-        mock_indexer_with_reconciliation._file_manifest.add_file(
-            path=Path("test.py"),
-            content_hash=get_blake_hash(b"content"),
-            chunk_ids=[str(uuid4())],
-            has_dense_embeddings=True,
-            has_sparse_embeddings=False,
-        )
-
-        # Create mock async functions
-        mock_reconciliation = AsyncMock(
-            return_value={"chunks_updated": 0, "files_processed": 0, "errors": []}
-        )
-
-        # Use module-level patching to avoid Pydantic model patching issues
-        with (
-            patch(
-                "codeweaver.engine.indexer.indexer.Indexer._initialize_providers_async", AsyncMock()
-            ),
-            patch(
-                "codeweaver.engine.indexer.indexer.Indexer._perform_batch_indexing_async",
-                AsyncMock(),
-            ),
-            patch(
-                "codeweaver.engine.indexer.indexer.Indexer.add_missing_embeddings_to_existing_chunks",
-                mock_reconciliation,
-            ),
-        ):
-            # Run prime_index with force_reindex
-            await mock_indexer_with_reconciliation.prime_index(force_reindex=True)
-
-            # Verify reconciliation was NOT called
-            mock_reconciliation.assert_not_called()
+# NOTE: Integration tests for prime_index reconciliation are in
+# tests/integration/test_reconciliation_integration.py
+#
+# These tests use real Qdrant and exercise the actual code path,
+# avoiding Pydantic v2 mocking issues while providing better coverage
+# for error handling and conditional logic.
 
 
 class TestEdgeCases:
@@ -789,204 +710,6 @@ class TestEdgeCases:
         assert "" not in vectors  # Dense not present (empty string = default dense vector)
 
         assert result["chunks_updated"] == 1
-
-
-class TestReconciliationExceptionHandling:
-    """Test exception handling during reconciliation in prime_index.
-
-    Note: These tests verify that prime_index handles reconciliation failures
-    gracefully. They require complex mocking of the indexer's internal state
-    and are marked as integration tests.
-    """
-
-    @pytest.fixture
-    def mock_indexer_for_exceptions(self, tmp_path: Path):
-        """Create indexer for testing exception handling."""
-        indexer = Indexer(project_path=tmp_path, auto_initialize_providers=False)
-
-        indexer._file_manifest = IndexFileManifest(project_path=tmp_path)
-        indexer._vector_store = MagicMock()
-        indexer._vector_store.collection = "test_collection"
-
-        # Mock embedding providers
-        indexer._embedding_provider = AsyncMock()
-        indexer._embedding_provider.provider_name = "voyage"
-        indexer._embedding_provider.model_name = "voyage-3"
-
-        indexer._sparse_provider = AsyncMock()
-        indexer._sparse_provider.provider_name = "splade"
-        indexer._sparse_provider.model_name = "splade-v3"
-
-        return indexer
-
-    @pytest.mark.asyncio
-    @pytest.mark.integration
-    @pytest.mark.xfail(
-        reason="Pydantic v2 models don't support standard mock patching approaches. "
-        "The reconciliation error handling is tested indirectly via prime_index's "
-        "exception handling code paths."
-    )
-    async def test_prime_index_handles_provider_error(
-        self, mock_indexer_for_exceptions: Indexer, tmp_path: Path
-    ) -> None:
-        """Test that prime_index handles ProviderError during reconciliation gracefully."""
-        from codeweaver.exceptions import ProviderError
-
-        mock_indexer_for_exceptions._file_manifest.add_file(
-            path=Path("test.py"),
-            content_hash=get_blake_hash(b"content"),
-            chunk_ids=[str(uuid4())],
-            dense_embedding_provider="voyage",
-            dense_embedding_model="voyage-3",
-            has_dense_embeddings=True,
-            has_sparse_embeddings=False,
-        )
-
-        mock_reconciliation = AsyncMock(side_effect=ProviderError("Test provider error"))
-
-        # Use class-level patching to avoid Pydantic v2 model attribute setting issues
-        with (
-            patch(
-                "codeweaver.engine.indexer.indexer.Indexer._initialize_providers_async", AsyncMock()
-            ),
-            patch(
-                "codeweaver.engine.indexer.indexer.Indexer._perform_batch_indexing_async",
-                AsyncMock(),
-            ),
-            patch(
-                "codeweaver.engine.indexer.indexer.Indexer._get_current_embedding_models",
-                MagicMock(
-                    return_value={
-                        "dense_provider": "voyage",
-                        "dense_model": "voyage-3",
-                        "sparse_provider": "splade",
-                        "sparse_model": "splade-v3",
-                    }
-                ),
-            ),
-            patch(
-                "codeweaver.engine.indexer.indexer.Indexer.add_missing_embeddings_to_existing_chunks",
-                mock_reconciliation,
-            ),
-        ):
-            # Should not raise - error should be caught and logged
-            result = await mock_indexer_for_exceptions.prime_index(force_reindex=False)
-
-            # Verify reconciliation was called (and failed)
-            mock_reconciliation.assert_called_once()
-
-            # prime_index should still return normally
-            assert result is not None
-
-    @pytest.mark.asyncio
-    @pytest.mark.integration
-    @pytest.mark.xfail(
-        reason="Pydantic v2 models don't support standard mock patching approaches. "
-        "The reconciliation error handling is tested indirectly via prime_index's "
-        "exception handling code paths."
-    )
-    async def test_prime_index_handles_indexing_error(
-        self, mock_indexer_for_exceptions: Indexer, tmp_path: Path
-    ) -> None:
-        """Test that prime_index handles IndexingError during reconciliation gracefully."""
-        from codeweaver.exceptions import IndexingError
-
-        mock_indexer_for_exceptions._file_manifest.add_file(
-            path=Path("test.py"),
-            content_hash=get_blake_hash(b"content"),
-            chunk_ids=[str(uuid4())],
-            dense_embedding_provider="voyage",
-            dense_embedding_model="voyage-3",
-            has_dense_embeddings=True,
-            has_sparse_embeddings=False,
-        )
-
-        mock_reconciliation = AsyncMock(side_effect=IndexingError("Test indexing error"))
-
-        # Use class-level patching to avoid Pydantic v2 model attribute setting issues
-        with (
-            patch(
-                "codeweaver.engine.indexer.indexer.Indexer._initialize_providers_async", AsyncMock()
-            ),
-            patch(
-                "codeweaver.engine.indexer.indexer.Indexer._perform_batch_indexing_async",
-                AsyncMock(),
-            ),
-            patch(
-                "codeweaver.engine.indexer.indexer.Indexer._get_current_embedding_models",
-                MagicMock(
-                    return_value={
-                        "dense_provider": "voyage",
-                        "dense_model": "voyage-3",
-                        "sparse_provider": "splade",
-                        "sparse_model": "splade-v3",
-                    }
-                ),
-            ),
-            patch(
-                "codeweaver.engine.indexer.indexer.Indexer.add_missing_embeddings_to_existing_chunks",
-                mock_reconciliation,
-            ),
-        ):
-            # Should not raise - error should be caught and logged
-            result = await mock_indexer_for_exceptions.prime_index(force_reindex=False)
-
-            mock_reconciliation.assert_called_once()
-            assert result is not None
-
-    @pytest.mark.asyncio
-    @pytest.mark.integration
-    @pytest.mark.xfail(
-        reason="Pydantic v2 models don't support standard mock patching approaches. "
-        "The reconciliation error handling is tested indirectly via prime_index's "
-        "exception handling code paths."
-    )
-    async def test_prime_index_handles_connection_error(
-        self, mock_indexer_for_exceptions: Indexer, tmp_path: Path
-    ) -> None:
-        """Test that prime_index handles connection errors during reconciliation."""
-        mock_indexer_for_exceptions._file_manifest.add_file(
-            path=Path("test.py"),
-            content_hash=get_blake_hash(b"content"),
-            chunk_ids=[str(uuid4())],
-            dense_embedding_provider="voyage",
-            dense_embedding_model="voyage-3",
-            has_dense_embeddings=True,
-            has_sparse_embeddings=False,
-        )
-
-        mock_reconciliation = AsyncMock(side_effect=ConnectionError("Network error"))
-
-        # Use class-level patching to avoid Pydantic v2 model attribute setting issues
-        with (
-            patch(
-                "codeweaver.engine.indexer.indexer.Indexer._initialize_providers_async", AsyncMock()
-            ),
-            patch(
-                "codeweaver.engine.indexer.indexer.Indexer._perform_batch_indexing_async",
-                AsyncMock(),
-            ),
-            patch(
-                "codeweaver.engine.indexer.indexer.Indexer._get_current_embedding_models",
-                MagicMock(
-                    return_value={
-                        "dense_provider": "voyage",
-                        "dense_model": "voyage-3",
-                        "sparse_provider": "splade",
-                        "sparse_model": "splade-v3",
-                    }
-                ),
-            ),
-            patch(
-                "codeweaver.engine.indexer.indexer.Indexer.add_missing_embeddings_to_existing_chunks",
-                mock_reconciliation,
-            ),
-        ):
-            # Should not raise - connection errors should be caught
-            result = await mock_indexer_for_exceptions.prime_index(force_reindex=False)
-
-            mock_reconciliation.assert_called_once()
-            assert result is not None
 
 
 if __name__ == "__main__":

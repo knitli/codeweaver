@@ -25,8 +25,8 @@ from codeweaver.config.types import (
     FastMcpHttpRunArgs,
     FastMcpServerSettingsDict,
 )
+from codeweaver.core.types.dataclasses import DATACLASS_CONFIG, DataclassSerializationMixin
 from codeweaver.core.types.dictview import DictView
-from codeweaver.core.types.models import DATACLASS_CONFIG, DataclassSerializationMixin
 from codeweaver.core.types.sentinel import Unset
 from codeweaver.mcp.middleware import McpMiddleware
 

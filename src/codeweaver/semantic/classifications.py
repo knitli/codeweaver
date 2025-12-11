@@ -907,7 +907,7 @@ class AgentTask(BaseAgentTask, BaseDataclassEnum):
         ImportanceScoresDict(
             discovery=0.2, comprehension=0.3, modification=0.1, debugging=0.35, documentation=0.05
         ),
-        ("debugging", "debugger", "debug"),
+        ("debugging", "debugger", "debug", "fix", "troubleshoot", "bugfix"),
         "Predefined task for debugging code.",
     )
     DEFAULT = (
@@ -918,7 +918,7 @@ class AgentTask(BaseAgentTask, BaseDataclassEnum):
             debugging=0.05,
             documentation=0.05,
         ),
-        ("default",),
+        ("default", "general", "normal", "standard", "typical"),
         "Default task with balanced context weights.",
     )
     DOCUMENT = (
@@ -932,21 +932,38 @@ class AgentTask(BaseAgentTask, BaseDataclassEnum):
         ImportanceScoresDict(
             discovery=0.3, comprehension=0.3, modification=0.2, debugging=0.1, documentation=0.1
         ),
-        ("implement", "implementation", "implementing", "create"),
+        ("implement", "implementation", "implementing", "create", "build", "develop"),
         "Predefined task for implementing code.",
     )
     LOCAL_EDIT = (
         ImportanceScoresDict(
             discovery=0.4, comprehension=0.3, modification=0.2, debugging=0.05, documentation=0.05
         ),
-        ("local_edit", "editing", "edit", "modify", "modification", "local_change", "change"),
+        (
+            "local_edit",
+            "editing",
+            "edit",
+            "modify",
+            "modification",
+            "local_change",
+            "change",
+            "update",
+        ),
         "Predefined task for local code edits.",
     )
     REFACTOR = (
         ImportanceScoresDict(
             discovery=0.15, comprehension=0.25, modification=0.45, debugging=0.1, documentation=0.05
         ),
-        ("refactor", "refactoring", "restructure", "restructuring", "improve", "reorganize"),
+        (
+            "refactor",
+            "refactoring",
+            "restructure",
+            "restructuring",
+            "improve",
+            "reorganize",
+            "optimize",
+        ),
         "Predefined task for refactoring code.",
     )
     REVIEW = (
@@ -960,15 +977,26 @@ class AgentTask(BaseAgentTask, BaseDataclassEnum):
         ImportanceScoresDict(
             discovery=0.5, comprehension=0.2, modification=0.15, debugging=0.1, documentation=0.05
         ),
-        ("search", "find", "lookup", "explore", "investigate"),
-        "Predefined task for searching code.",
+        ("search", "find", "lookup", "explore", "investigate", "where", "locate"),
+        "Predefined task for searching code, such as for definitions, references, or explanations.",
     )
     TEST = (
         ImportanceScoresDict(
             discovery=0.5, comprehension=0.2, modification=0.2, debugging=0.4, documentation=0.1
         ),
-        ("test", "testing", "unittest", "tests", "write_tests", "test_code"),
-        "Predefined task for testing code or writing tests (discovery).",
+        (
+            "test",
+            "testing",
+            "unittest",
+            "tests",
+            "write_tests",
+            "test_code",
+            "fixtures",
+            "mocks",
+            "stubs",
+            "test_cases",
+        ),
+        "Predefined task for testing code or writing tests.",
     )
 
     def _telemetry_keys(self) -> None:

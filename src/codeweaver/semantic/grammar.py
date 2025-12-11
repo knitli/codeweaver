@@ -272,12 +272,8 @@ from codeweaver.core.types.aliases import (
     ThingNameT,
     ThingOrCategoryNameT,
 )
-from codeweaver.core.types.models import (
-    DATACLASS_CONFIG,
-    FROZEN_BASEDMODEL_CONFIG,
-    BasedModel,
-    DataclassSerializationMixin,
-)
+from codeweaver.core.types.dataclasses import DATACLASS_CONFIG, DataclassSerializationMixin
+from codeweaver.core.types.models import FROZEN_BASEDMODEL_CONFIG, BasedModel
 from codeweaver.semantic.classifications import ThingClass
 from codeweaver.semantic.types import (
     ConnectionClass,

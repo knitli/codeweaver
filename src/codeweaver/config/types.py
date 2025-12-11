@@ -37,9 +37,9 @@ from uvicorn.config import (
     WSProtocolType,
 )
 
+from codeweaver.config._logging import LoggingConfigDict
 from codeweaver.config.chunker import ChunkerSettingsDict
 from codeweaver.config.indexer import IndexerSettingsDict
-from codeweaver.config.logging import LoggingConfigDict
 from codeweaver.config.telemetry import TelemetrySettingsDict
 from codeweaver.core.types.enum import AnonymityConversion
 from codeweaver.core.types.models import BASEDMODEL_CONFIG, BasedModel
@@ -48,7 +48,7 @@ from codeweaver.mcp.middleware import McpMiddleware
 
 
 if TYPE_CHECKING:
-    from codeweaver.config.logging import LoggingSettings
+    from codeweaver.config._logging import LoggingSettings
     from codeweaver.config.middleware import MiddlewareOptions
     from codeweaver.config.providers import ProviderSettingsDict
     from codeweaver.core.types import AnonymityConversion, FilteredKeyT

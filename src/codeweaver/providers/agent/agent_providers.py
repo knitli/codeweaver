@@ -133,7 +133,7 @@ def get_agent_model_provider(provider: Provider) -> type[AgentProvider[Any]]:  #
 
     # Get list of supported agent providers dynamically
     supported_providers = [
-        p.value
+        p.variable
         for p in [
             Provider.OPENAI,
             Provider.DEEPSEEK,

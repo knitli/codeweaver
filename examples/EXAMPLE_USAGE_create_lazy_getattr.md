@@ -46,7 +46,7 @@ __all__ = ("TiktokenTokenizer", "Tokenizer", "Tokenizers", "get_tokenizer")
 ```python
 # src/codeweaver/tokenizers/__init__.py
 from types import MappingProxyType
-from codeweaver.common.utils import create_lazy_getattr
+from codeweaver.common.utils.lazy_getter import create_lazy_getattr
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "Tokenizer": (__spec__.parent, "base"),
@@ -74,7 +74,7 @@ Each package can be migrated independently:
 
 ```python
 # 1. Add import
-from codeweaver.common.utils import create_lazy_getattr
+from codeweaver.common.utils.lazy_getter import create_lazy_getattr
 
 # 2. Replace __getattr__ function with single line
 __getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)

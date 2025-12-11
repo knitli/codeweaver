@@ -50,7 +50,7 @@ async def find_code_tool(
         intent: Optional search intent. One of `understand`, `implement`, `debug`, `optimize`, `test`, `configure`, `document`
         token_limit: Maximum tokens to return (default: 30000)
         focus_languages: Optional language filter
-        context: MCP context for request tracking
+        context: MCP context for request tracking if available
 
     Returns:
         FindCodeResponseSummary with ranked matches and metadata

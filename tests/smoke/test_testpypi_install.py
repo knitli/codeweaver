@@ -18,7 +18,6 @@ pytestmark = [pytest.mark.e2e]
 
 @pytest.mark.external_api
 @pytest.mark.network
-@pytest.mark.skip(reason="Requires package published to TestPyPI - run manually after publish")
 def test_install_from_testpypi():
     """
     Smoke test for TestPyPI installation.
@@ -31,13 +30,16 @@ def test_install_from_testpypi():
 
     Manual execution steps:
     1. Publish package to TestPyPI first
-    2. Run: pytest tests/smoke/test_testpypi_install.py -v -s --no-skip
+    2. Run: pytest tests/smoke/test_testpypi_install.py -v -s
     3. Verify all checks pass
 
     NOTE: Requires:
     - Package published to test.pypi.org
     - Network access
     - Clean Python environment
+
+    This test will attempt to install the latest version available on TestPyPI.
+    If the package is not available, the test will fail with a clear error message.
     """
     # Get expected version from current build
     _ = Path(__file__).parent.parent.parent
@@ -58,6 +60,7 @@ def test_install_from_testpypi():
         python = venv_path / "bin" / "python"
 
         # Install from TestPyPI with extra-index-url for dependencies
+        # Note: The package is published as "code-weaver" on PyPI (see pyproject.toml)
         install_cmd = [
             str(pip),
             "install",
@@ -65,7 +68,7 @@ def test_install_from_testpypi():
             "https://test.pypi.org/simple/",
             "--extra-index-url",
             "https://pypi.org/simple/",
-            "codeweaver",
+            "code-weaver",
         ]
 
         result = subprocess.run(install_cmd, capture_output=True, text=True, check=False)
@@ -93,7 +96,7 @@ def test_testpypi_metadata():
     Verify package metadata is correct on TestPyPI.
 
     Manual validation:
-    1. Visit https://test.pypi.org/project/codeweaver/
+    1. Visit https://test.pypi.org/project/code-weaver/
     2. Verify metadata fields:
        - Description matches README
        - License: MIT OR Apache-2.0

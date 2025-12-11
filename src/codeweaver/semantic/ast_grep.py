@@ -64,6 +64,7 @@ from typing import (
     Unpack,
     cast,
     overload,
+    override,
 )
 
 from ast_grep_py import (
@@ -99,6 +100,7 @@ from codeweaver.core.language import SemanticSearchLanguage
 from codeweaver.core.types.aliases import FileExt, LiteralStringT, ThingName, ThingNameT
 from codeweaver.core.types.enum import AnonymityConversion, BaseEnum
 from codeweaver.core.types.models import BasedModel
+from codeweaver.core.types.utils import generate_field_title
 
 # Runtime imports needed for cast operations and type checking
 from codeweaver.semantic.grammar import Category, CompositeThing, Token
@@ -138,8 +140,10 @@ class MetaVar(str, BaseEnum):
 
     __slots__ = ()
 
+    @override
     def __str__(self) -> str:
         """Return the string representation of the meta variable."""
+        # This is an intentional override to ensure that str(MetaVar) returns the correct value.
         return self.value
 
     def to_metavar(
@@ -172,11 +176,19 @@ class Strictness(str, BaseEnum):
 class Position(NamedTuple):
     """Represents a `Pos` from ast-grep with pydantic validation. The position of the node in the source code."""
 
-    line: PositiveInt
-    column: PositiveInt
+    line: Annotated[
+        PositiveInt, Field(description="Line number", field_title_generator=generate_field_title)
+    ]
+    column: Annotated[
+        PositiveInt, Field(description="Column number", field_title_generator=generate_field_title)
+    ]
     idx: Annotated[
         NonNegativeInt,
-        Field(serialization_alias="index", description="""Byte index in the source"""),
+        Field(
+            serialization_alias="index",
+            description="""Byte index in the source""",
+            field_title_generator=generate_field_title,
+        ),
     ]
 
     @classmethod
@@ -326,6 +338,7 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
                 data["_node"].get_root().filename().suffix
                 or data["_node"].get_root().filename().name
             ),
+            field_title_generator=generate_field_title,
         ),
     ]
 

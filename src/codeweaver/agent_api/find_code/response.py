@@ -96,7 +96,7 @@ def generate_summary(code_matches: list[CodeMatch], intent_type: IntentType, que
         top_files: list[str] = list(top_unique_files)
         summary = (
             f"Found {len(code_matches)} relevant matches "
-            f"for {intent_type.value} query. "
+            f"for {intent_type.variable} query. "
             f"Top results in: {', '.join(top_files[:3])}"
         )
     else:

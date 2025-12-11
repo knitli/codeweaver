@@ -61,9 +61,9 @@ class EmbeddingRegistry(UUIDStore[ChunkEmbeddings]):
     def _fetch_model_by_kind(self, kind: EmbeddingKind) -> ModelNameT | None:
         """Fetch the set of models used for a specific embedding kind."""
         models = {
-            getattr(embeddings, f"{kind.value}_model", None)
+            getattr(embeddings, f"{kind.variable}_model", None)
             for embeddings in self.values()
-            if getattr(embeddings, f"has_{kind.value}")
+            if getattr(embeddings, f"has_{kind.variable}")
         }  # type: ignore
         if len(models) > 1:
             raise CodeWeaverValidationError(

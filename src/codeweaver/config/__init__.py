@@ -9,20 +9,13 @@ from __future__ import annotations
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
-from codeweaver.common.utils.lazy_importer import create_lazy_getattr
+from codeweaver.common.utils.lazy_getter import create_lazy_getattr
 
 
 if TYPE_CHECKING:
     # Import everything for IDE and type checker support
     # These imports are never executed at runtime, only during type checking
-    from codeweaver.config.chunker import (
-        ChunkerSettings,
-        ChunkerSettingsDict,
-        CustomDelimiter,
-        CustomLanguage,
-    )
-    from codeweaver.config.indexer import IndexerSettings, IndexerSettingsDict, RignoreSettings
-    from codeweaver.config.logging import (
+    from codeweaver.config._logging import (
         FilterID,
         FiltersDict,
         FormatterID,
@@ -35,6 +28,13 @@ if TYPE_CHECKING:
         LoggingSettings,
         SerializableLoggingFilter,
     )
+    from codeweaver.config.chunker import (
+        ChunkerSettings,
+        ChunkerSettingsDict,
+        CustomDelimiter,
+        CustomLanguage,
+    )
+    from codeweaver.config.indexer import IndexerSettings, IndexerSettingsDict, RignoreSettings
     from codeweaver.config.mcp import CodeWeaverMCPConfig, MCPConfig, StdioCodeWeaverConfig
     from codeweaver.config.middleware import (
         AVAILABLE_MIDDLEWARE,
@@ -112,19 +112,19 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "FastMcpServerSettingsDict": (__spec__.parent, "types"),
     "FastMcpStdioServerSettings": (__spec__.parent, "settings"),
     "FastembedGPUProviderSettings": (__spec__.parent, "providers"),
-    "FilterID": (__spec__.parent, "logging"),
-    "FiltersDict": (__spec__.parent, "logging"),
-    "FormatterID": (__spec__.parent, "logging"),
-    "FormattersDict": (__spec__.parent, "logging"),
-    "HandlerID": (__spec__.parent, "logging"),
-    "HandlersDict": (__spec__.parent, "logging"),
+    "FilterID": (__spec__.parent, "_logging"),
+    "FiltersDict": (__spec__.parent, "_logging"),
+    "FormatterID": (__spec__.parent, "_logging"),
+    "FormattersDict": (__spec__.parent, "_logging"),
+    "HandlerID": (__spec__.parent, "_logging"),
+    "HandlersDict": (__spec__.parent, "_logging"),
     "IndexerSettings": (__spec__.parent, "indexer"),
     "IndexerSettingsDict": (__spec__.parent, "indexer"),
-    "LoggerName": (__spec__.parent, "logging"),
-    "LoggersDict": (__spec__.parent, "logging"),
-    "LoggingConfigDict": (__spec__.parent, "logging"),
+    "LoggerName": (__spec__.parent, "_logging"),
+    "LoggersDict": (__spec__.parent, "_logging"),
+    "LoggingConfigDict": (__spec__.parent, "_logging"),
     "LoggingMiddlewareSettings": (__spec__.parent, "middleware"),
-    "LoggingSettings": (__spec__.parent, "logging"),
+    "LoggingSettings": (__spec__.parent, "_logging"),
     "MCPConfig": (__spec__.parent, "mcp"),
     "MCPConfigDict": (__spec__.parent, "types"),
     "MiddlewareOptions": (__spec__.parent, "middleware"),
@@ -137,7 +137,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "RerankingProviderSettings": (__spec__.parent, "providers"),
     "RetryMiddlewareSettings": (__spec__.parent, "middleware"),
     "RignoreSettings": (__spec__.parent, "indexer"),
-    "SerializableLoggingFilter": (__spec__.parent, "logging"),
+    "SerializableLoggingFilter": (__spec__.parent, "_logging"),
     "SparseEmbeddingModelSettings": (__spec__.parent, "providers"),
     "StdioCodeWeaverConfig": (__spec__.parent, "mcp"),
     "StdioCodeWeaverConfigDict": (__spec__.parent, "types"),
