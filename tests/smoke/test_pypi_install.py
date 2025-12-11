@@ -84,7 +84,7 @@ def test_pypi_metadata():
     Verify package metadata is correct on production PyPI.
 
     Manual validation:
-    1. Visit https://pypi.org/project/codeweaver/
+    1. Visit https://pypi.org/project/code-weaver/
     2. Verify metadata fields:
        - Description matches README
        - License: MIT OR Apache-2.0

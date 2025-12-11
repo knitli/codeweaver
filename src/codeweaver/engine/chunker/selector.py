@@ -230,13 +230,13 @@ class ChunkerSelector:
         ext = file.path.suffix
 
         # Return the enum itself (not .variable) for isinstance checks to work
-        return (
-            file.ext_kind.language
-            if isinstance(file.ext_kind.language, (SemanticSearchLanguage, ConfigLanguage))
-            else str(file.ext_kind.language)
-            if file.ext_kind
-            else ext.lstrip(".").lower()
-        )
+        if file.ext_kind:
+            return (
+                file.ext_kind.language
+                if isinstance(file.ext_kind.language, (SemanticSearchLanguage, ConfigLanguage))
+                else str(file.ext_kind.language)
+            )
+        return ext.lstrip(".").lower()
 
 
 class GracefulChunker(BaseChunker):

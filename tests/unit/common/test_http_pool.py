@@ -33,11 +33,7 @@ class TestPoolLimits:
 
     def test_custom_values(self):
         """Test custom pool limits."""
-        limits = PoolLimits(
-            max_connections=50,
-            max_keepalive_connections=10,
-            keepalive_expiry=10.0,
-        )
+        limits = PoolLimits(max_connections=50, max_keepalive_connections=10, keepalive_expiry=10.0)
         assert limits.max_connections == 50
         assert limits.max_keepalive_connections == 10
         assert limits.keepalive_expiry == 10.0
@@ -62,12 +58,7 @@ class TestPoolTimeouts:
 
     def test_custom_values(self):
         """Test custom pool timeouts."""
-        timeouts = PoolTimeouts(
-            connect=5.0,
-            read=120.0,
-            write=15.0,
-            pool=10.0,
-        )
+        timeouts = PoolTimeouts(connect=5.0, read=120.0, write=15.0, pool=10.0)
         assert timeouts.connect == 5.0
         assert timeouts.read == 120.0
         assert timeouts.write == 15.0
@@ -134,10 +125,7 @@ class TestHttpClientPool:
         """Test that get_client applies override settings correctly."""
         pool = HttpClientPool.get_instance()
         client = await pool.get_client(
-            "custom_provider",
-            max_connections=25,
-            read_timeout=120.0,
-            connect_timeout=5.0,
+            "custom_provider", max_connections=25, read_timeout=120.0, connect_timeout=5.0
         )
 
         # Verify client was created
@@ -161,11 +149,7 @@ class TestHttpClientPool:
     def test_get_client_sync_with_overrides(self):
         """Test that get_client_sync applies override settings correctly."""
         pool = HttpClientPool.get_instance()
-        client = pool.get_client_sync(
-            "custom_provider",
-            max_connections=25,
-            read_timeout=120.0,
-        )
+        client = pool.get_client_sync("custom_provider", max_connections=25, read_timeout=120.0)
 
         # Verify timeout overrides are actually applied
         assert client.timeout.read == 120.0
@@ -284,10 +268,7 @@ class TestHttpClientPool:
         custom_limits = PoolLimits(max_connections=50)
         custom_timeouts = PoolTimeouts(read=120.0)
 
-        pool = HttpClientPool.get_instance(
-            limits=custom_limits,
-            timeouts=custom_timeouts,
-        )
+        pool = HttpClientPool.get_instance(limits=custom_limits, timeouts=custom_timeouts)
 
         assert pool.limits.max_connections == 50
         assert pool.timeouts.read == 120.0

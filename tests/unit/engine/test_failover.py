@@ -127,7 +127,7 @@ class TestBackupSyncPeriodically:
         async def mock_sync():
             sync_called.set()
 
-        with patch.object(manager, '_sync_primary_to_backup', side_effect=mock_sync):
+        with patch.object(manager, "_sync_primary_to_backup", side_effect=mock_sync):
             # Override the sync interval for testing
             manager.backup_sync_interval = 0.1
 
@@ -167,7 +167,7 @@ class TestBackupSyncPeriodically:
         async def mock_sync():
             sync_called.set()
 
-        with patch.object(manager, '_sync_primary_to_backup', side_effect=mock_sync):
+        with patch.object(manager, "_sync_primary_to_backup", side_effect=mock_sync):
             # Override the sync interval for testing
             manager.backup_sync_interval = 0.1
 
@@ -198,7 +198,7 @@ class TestBackupSyncPeriodically:
         async def mock_sync():
             sync_called.set()
 
-        with patch.object(manager, '_sync_primary_to_backup', side_effect=mock_sync):
+        with patch.object(manager, "_sync_primary_to_backup", side_effect=mock_sync):
             # Override the sync interval for testing
             manager.backup_sync_interval = 0.1
 
@@ -231,7 +231,7 @@ class TestBackupSyncPeriodically:
         async def mock_sync():
             sync_event.set()
 
-        with patch.object(manager, '_sync_primary_to_backup', side_effect=mock_sync):
+        with patch.object(manager, "_sync_primary_to_backup", side_effect=mock_sync):
             # Override the sync interval for testing
             manager.backup_sync_interval = 0.1
 

@@ -74,6 +74,7 @@ def test_selector_chooses_semantic_for_python(chunk_governor: ChunkGovernor) -> 
 
     # Verify fallback language matches the primary semantic language
     from codeweaver.core.language import SemanticSearchLanguage
+
     assert chunker.fallback._language == SemanticSearchLanguage.PYTHON, (
         "Fallback language should match semantic language for .py files"
     )

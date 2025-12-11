@@ -30,8 +30,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # Copy dependency files first for better layer caching
-COPY pyproject.toml README.md ./
+COPY pyproject.toml README.md SECURITY.md sbom.spdx ./
 COPY LICENSE* ./
+COPY LICENSES/ LICENSES/
 
 # Copy .git directory for dynamic versioning during build
 COPY .git/ .git/

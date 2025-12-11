@@ -2,17 +2,53 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
-"""Integration test: Reconciliation path in prime_index().
+"""Integration tests for embedding reconciliation in the indexer.
 
-This tests the critical untested code path at indexer.py:1334-1400:
-    if not force_reindex and self._vector_store:
-        result = await self.add_missing_embeddings_to_existing_chunks(...)
+These tests exercise the reconciliation path in prime_index() using real
+Qdrant vector store instances. They replace the unit tests that were
+previously marked xfail due to Pydantic v2 mocking incompatibility.
 
-All other integration tests use force_reindex=True which bypasses this logic.
-This test validates the reconciliation workflow:
-1. Initial indexing with force_reindex=True
-2. Re-indexing with force_reindex=False to trigger reconciliation
-3. Verification that reconciliation was invoked and worked correctly
+Critical Code Path Tested (indexer.py:1334-1400):
+    if not force_reindex and self._vector_store and (...):
+        try:
+            result = await self.add_missing_embeddings_to_existing_chunks(...)
+        except (ProviderError, IndexingError) as e:
+            logger.warning(...)
+        except (ConnectionError, TimeoutError, OSError) as e:
+            logger.warning(...)
+
+Coverage Areas:
+--------------
+1. Reconciliation workflow during prime_index()
+   - test_prime_index_reconciliation_without_force_reindex
+   - test_reconciliation_with_add_dense_flag
+   - test_reconciliation_with_add_sparse_flag
+   - test_reconciliation_skipped_when_no_files_need_embeddings
+
+2. Error handling for various exception types
+   - test_reconciliation_handles_provider_error_gracefully (ProviderError)
+   - test_reconciliation_handles_indexing_error_gracefully (IndexingError)
+   - test_reconciliation_handles_connection_error_gracefully (ConnectionError)
+
+3. Conditional logic for when reconciliation should/shouldn't run
+   - test_reconciliation_not_called_when_force_reindex_true
+   - test_reconciliation_not_called_when_no_vector_store
+   - test_reconciliation_not_called_when_no_providers
+
+Why Integration Tests:
+---------------------
+- Indexer is a Pydantic v2 BaseModel (method patching unreliable)
+- Integration tests exercise real behavior without brittle mocking
+- Core reconciliation logic has comprehensive unit test coverage
+- This approach provides better test reliability and maintenance
+
+Related Unit Tests:
+------------------
+- tests/unit/test_indexer_reconciliation.py::TestAddMissingEmbeddings
+  * Direct testing of add_missing_embeddings_to_existing_chunks()
+  * Comprehensive coverage of reconciliation logic
+- tests/unit/test_indexer_reconciliation.py::TestEdgeCases
+  * Edge case handling and error scenarios
 """
 
 import logging
@@ -37,6 +73,62 @@ pytestmark = [pytest.mark.integration, pytest.mark.external_api]
 logger = logging.getLogger(__name__)
 
 
+def create_mock_provider_registry(
+    vector_store=None, embedding_provider=None, sparse_provider=None, reranking_provider=None
+):
+    """Create a mock provider registry for testing.
+
+    This helper creates a mock registry that returns the specified providers
+    when the Indexer queries for them. This allows testing with controlled
+    provider behavior while using the proper Indexer initialization path.
+
+    Args:
+        vector_store: Vector store provider instance
+        embedding_provider: Dense embedding provider instance
+        sparse_provider: Sparse embedding provider instance
+        reranking_provider: Reranking provider instance
+
+    Returns:
+        MagicMock configured to act as a ProviderRegistry
+    """
+    from enum import Enum
+
+    class TestProviderEnum(Enum):
+        TEST_VECTOR = "test_vector"
+        TEST_EMBEDDING = "test_embedding"
+        TEST_SPARSE = "test_sparse"
+        TEST_RERANKING = "test_reranking"
+
+    mock_registry = MagicMock()
+
+    def get_provider_enum_for(kind: str):
+        if kind == "vector_store":
+            return TestProviderEnum.TEST_VECTOR if vector_store else None
+        if kind == "embedding":
+            return TestProviderEnum.TEST_EMBEDDING if embedding_provider else None
+        if kind == "sparse_embedding":
+            return TestProviderEnum.TEST_SPARSE if sparse_provider else None
+        if kind == "reranking":
+            return TestProviderEnum.TEST_RERANKING if reranking_provider else None
+        return None
+
+    def get_provider_instance(enum_value, kind: str, singleton: bool = True):
+        if kind == "vector_store":
+            return vector_store
+        if kind == "embedding":
+            return embedding_provider
+        if kind == "sparse_embedding":
+            return sparse_provider
+        if kind == "reranking":
+            return reranking_provider
+        return None
+
+    mock_registry.get_provider_enum_for = MagicMock(side_effect=get_provider_enum_for)
+    mock_registry.get_provider_instance = MagicMock(side_effect=get_provider_instance)
+
+    return mock_registry
+
+
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_prime_index_reconciliation_without_force_reindex(
@@ -58,7 +150,9 @@ async def test_prime_index_reconciliation_without_force_reindex(
     """
     # Create unique collection
     collection_name = qdrant_test_manager.create_collection_name("reconcile")
-    await qdrant_test_manager.create_collection(collection_name, dense_vector_size=768)
+    await qdrant_test_manager.create_collection(
+        collection_name, dense_vector_size=768, sparse_vector_size=1000
+    )
 
     config = QdrantConfig(url=qdrant_test_manager.url, collection_name=collection_name)
     provider = QdrantVectorStoreProvider(config=config)
@@ -108,9 +202,7 @@ async def test_prime_index_reconciliation_without_force_reindex(
     mock_dense_provider = MagicMock()
     mock_dense_provider.model = "test-dense-model"
     mock_dense_provider.provider_name = "test-provider"
-    mock_dense_provider.get_async_embeddings = AsyncMock(
-        return_value=[[0.3] * 768, [0.4] * 768]
-    )
+    mock_dense_provider.get_async_embeddings = AsyncMock(return_value=[[0.3] * 768, [0.4] * 768])
 
     mock_sparse_provider = MagicMock()
     mock_sparse_provider.model = "test-sparse-model"
@@ -123,82 +215,110 @@ async def test_prime_index_reconciliation_without_force_reindex(
     )
 
     # Create indexer with real vector store but mocked embeddings
-    indexer = Indexer(
-        project_path=project_path,
+    # Use provider registry pattern for proper initialization
+    mock_registry = create_mock_provider_registry(
         vector_store=provider,
         embedding_provider=mock_dense_provider,
         sparse_provider=mock_sparse_provider,
     )
 
-    # Initialize file manifest by setting up chunk metadata
-    # Simulate manifest state where files have been indexed but may need reconciliation
-    indexer._file_manifest.track_file_processed(
-        file_path=Path("module1.py"),
-        chunk_ids=[chunk1.chunk_id],
-        dense_provider="test-provider",
-        dense_model="test-dense-model",
-        sparse_provider="test-sparse-provider",
-        sparse_model="test-sparse-model",
-    )
+    from codeweaver.config.settings import CodeWeaverSettings
 
-    indexer._file_manifest.track_file_processed(
-        file_path=Path("module2.py"),
-        chunk_ids=[chunk2.chunk_id],
-        dense_provider="test-provider",
-        dense_model="test-dense-model",
-        sparse_provider="test-sparse-provider",
-        sparse_model="test-sparse-model",
-    )
+    settings = CodeWeaverSettings(project_path=project_path)
+    settings_dict = settings.model_dump()
 
-    # Phase 2: Patch and monitor add_missing_embeddings_to_existing_chunks
-    # We want to verify this method is called during reconciliation
-    original_method = indexer.add_missing_embeddings_to_existing_chunks
-    call_tracker: dict[str, bool | int | dict | None] = {
-        "called": False,
-        "call_count": 0,
-        "result": None
-    }
+    with patch("codeweaver.common.registry.get_provider_registry", return_value=mock_registry):
+        indexer = await Indexer.from_settings_async(settings_dict)
 
-    async def tracked_add_missing_embeddings(*args, **kwargs):
-        """Wrapper to track calls to add_missing_embeddings_to_existing_chunks."""
-        call_tracker["called"] = True
-        count = call_tracker["call_count"]
-        call_tracker["call_count"] = (count if isinstance(count, int) else 0) + 1
-        result = await original_method(*args, **kwargs)
-        call_tracker["result"] = result
-        return result
+        # Initialize manifest manager (normally done in prime_index)
+        from codeweaver.engine.indexer.manifest import FileManifestManager
 
-    # Phase 3: Simulate scenario where files need reconciliation
-    # Update manifest to show files missing sparse embeddings
-    # This simulates a real scenario where dense embeddings exist but sparse don't
-    indexer._file_manifest.track_file_processed(
-        file_path=Path("module1.py"),
-        chunk_ids=[chunk1.chunk_id],
-        dense_provider="test-provider",
-        dense_model="test-dense-model",
-        sparse_provider=None,  # Missing sparse
-        sparse_model=None,
-    )
+        indexer._manifest_manager = FileManifestManager(project_path=project_path)
+        indexer._file_manifest = indexer._manifest_manager.create_new()
 
-    indexer._file_manifest.track_file_processed(
-        file_path=Path("module2.py"),
-        chunk_ids=[chunk2.chunk_id],
-        dense_provider="test-provider",
-        dense_model="test-dense-model",
-        sparse_provider=None,  # Missing sparse
-        sparse_model=None,
-    )
+        # Initialize file manifest by setting up chunk metadata
+        # Simulate manifest state where files have been indexed but may need reconciliation
+        indexer._file_manifest.add_file(
+            path=Path("module1.py"),
+            content_hash="test_hash_1",
+            chunk_ids=[str(chunk1.chunk_id)],
+            dense_embedding_provider="test-provider",
+            dense_embedding_model="test-dense-model",
+            sparse_embedding_provider="test-sparse-provider",
+            sparse_embedding_model="test-sparse-model",
+            has_dense_embeddings=True,
+            has_sparse_embeddings=True,
+        )
 
-    # Phase 4: Re-index WITHOUT force_reindex to trigger reconciliation path
-    with patch.object(indexer, "add_missing_embeddings_to_existing_chunks", tracked_add_missing_embeddings):
-        # Mock _index_files to avoid actual file processing during test
-        # We only want to test the reconciliation logic, not the full indexing pipeline
-        with patch.object(indexer, "_index_files", new_callable=AsyncMock) as mock_index:
-            mock_index.return_value = None
+        indexer._file_manifest.add_file(
+            path=Path("module2.py"),
+            content_hash="test_hash_2",
+            chunk_ids=[str(chunk2.chunk_id)],
+            dense_embedding_provider="test-provider",
+            dense_embedding_model="test-dense-model",
+            sparse_embedding_provider="test-sparse-provider",
+            sparse_embedding_model="test-sparse-model",
+            has_dense_embeddings=True,
+            has_sparse_embeddings=True,
+        )
 
-            # Call prime_index with force_reindex=False
-            # This should trigger the reconciliation path at indexer.py:1334-1400
-            await indexer.prime_index(force_reindex=False)
+        # Phase 2: Patch and monitor add_missing_embeddings_to_existing_chunks
+        # We want to verify this method is called during reconciliation
+        original_method = indexer.add_missing_embeddings_to_existing_chunks
+        call_tracker: dict[str, bool | int | dict | None] = {
+            "called": False,
+            "call_count": 0,
+            "result": None,
+        }
+
+        async def tracked_add_missing_embeddings(*args, **kwargs):
+            """Wrapper to track calls to add_missing_embeddings_to_existing_chunks."""
+            call_tracker["called"] = True
+            count = call_tracker["call_count"]
+            call_tracker["call_count"] = (count if isinstance(count, int) else 0) + 1
+            result = await original_method(*args, **kwargs)
+            call_tracker["result"] = result
+            return result
+
+        # Phase 3: Simulate scenario where files need reconciliation
+        # Update manifest to show files missing sparse embeddings
+        # This simulates a real scenario where dense embeddings exist but sparse don't
+        indexer._file_manifest.add_file(
+            path=Path("module1.py"),
+            content_hash="test_hash_1",
+            chunk_ids=[str(chunk1.chunk_id)],
+            dense_embedding_provider="test-provider",
+            dense_embedding_model="test-dense-model",
+            sparse_embedding_provider=None,  # Missing sparse
+            sparse_embedding_model=None,
+            has_dense_embeddings=True,
+            has_sparse_embeddings=False,
+        )
+
+        indexer._file_manifest.add_file(
+            path=Path("module2.py"),
+            content_hash="test_hash_2",
+            chunk_ids=[str(chunk2.chunk_id)],
+            dense_embedding_provider="test-provider",
+            dense_embedding_model="test-dense-model",
+            sparse_embedding_provider=None,  # Missing sparse
+            sparse_embedding_model=None,
+            has_dense_embeddings=True,
+            has_sparse_embeddings=False,
+        )
+
+        # Phase 4: Re-index WITHOUT force_reindex to trigger reconciliation path
+        with patch.object(
+            indexer, "add_missing_embeddings_to_existing_chunks", tracked_add_missing_embeddings
+        ):
+            # Mock _index_files to avoid actual file processing during test
+            # We only want to test the reconciliation logic, not the full indexing pipeline
+            with patch.object(indexer, "_index_files", new_callable=AsyncMock) as mock_index:
+                mock_index.return_value = None
+
+                # Call prime_index with force_reindex=False
+                # This should trigger the reconciliation path at indexer.py:1334-1400
+                await indexer.prime_index(force_reindex=False)
 
     # Phase 5: Verify reconciliation was invoked
     assert call_tracker["called"], (
@@ -266,27 +386,44 @@ async def test_reconciliation_with_add_dense_flag(
     mock_dense_provider.provider_name = "test-provider"
     mock_dense_provider.get_async_embeddings = AsyncMock(return_value=[[0.5] * 768])
 
-    indexer = Indexer(
-        project_path=project_path,
+    # Use provider registry pattern for proper initialization
+    mock_registry = create_mock_provider_registry(
         vector_store=provider,
         embedding_provider=mock_dense_provider,
         sparse_provider=None,  # No sparse provider
     )
 
-    # Track file as sparse-only in manifest
-    indexer._file_manifest.track_file_processed(
-        file_path=Path("module.py"),
-        chunk_ids=[chunk.chunk_id],
-        dense_provider=None,  # Missing dense
-        dense_model=None,
-        sparse_provider="test-sparse-provider",
-        sparse_model="test-sparse-model",
-    )
+    from codeweaver.config.settings import CodeWeaverSettings
 
-    # Call reconciliation directly to test add_dense flag
-    result = await indexer.add_missing_embeddings_to_existing_chunks(
-        add_dense=True, add_sparse=False
-    )
+    settings = CodeWeaverSettings(project_path=project_path)
+    settings_dict = settings.model_dump()
+
+    with patch("codeweaver.common.registry.get_provider_registry", return_value=mock_registry):
+        indexer = await Indexer.from_settings_async(settings_dict)
+
+        # Initialize manifest manager (normally done in prime_index)
+        from codeweaver.engine.indexer.manifest import FileManifestManager
+
+        indexer._manifest_manager = FileManifestManager(project_path=project_path)
+        indexer._file_manifest = indexer._manifest_manager.create_new()
+
+        # Track file as sparse-only in manifest
+        indexer._file_manifest.add_file(
+            path=Path("module.py"),
+            content_hash="test_hash_sparse",
+            chunk_ids=[str(chunk.chunk_id)],
+            dense_embedding_provider=None,
+            dense_embedding_model=None,
+            sparse_embedding_provider="test-sparse-provider",
+            sparse_embedding_model="test-sparse-model",
+            has_dense_embeddings=False,
+            has_sparse_embeddings=True,
+        )
+
+        # Call add_missing_embeddings_to_existing_chunks with add_dense=True
+        result = await indexer.add_missing_embeddings_to_existing_chunks(
+            add_dense=True, add_sparse=False
+        )
 
     # Verify result indicates dense embeddings were processed
     assert "files_processed" in result
@@ -342,27 +479,44 @@ async def test_reconciliation_with_add_sparse_flag(
         return_value=[{"indices": [7, 8, 9], "values": [0.3, 0.2, 0.1]}]
     )
 
-    indexer = Indexer(
-        project_path=project_path,
+    # Use provider registry pattern for proper initialization
+    mock_registry = create_mock_provider_registry(
         vector_store=provider,
         embedding_provider=None,  # No dense provider
         sparse_provider=mock_sparse_provider,
     )
 
-    # Track file as dense-only in manifest
-    indexer._file_manifest.track_file_processed(
-        file_path=Path("module.py"),
-        chunk_ids=[chunk.chunk_id],
-        dense_provider="test-provider",
-        dense_model="test-dense-model",
-        sparse_provider=None,  # Missing sparse
-        sparse_model=None,
-    )
+    from codeweaver.config.settings import CodeWeaverSettings
 
-    # Call reconciliation directly to test add_sparse flag
-    result = await indexer.add_missing_embeddings_to_existing_chunks(
-        add_dense=False, add_sparse=True
-    )
+    settings = CodeWeaverSettings(project_path=project_path)
+    settings_dict = settings.model_dump()
+
+    with patch("codeweaver.common.registry.get_provider_registry", return_value=mock_registry):
+        indexer = await Indexer.from_settings_async(settings_dict)
+
+        # Initialize manifest manager (normally done in prime_index)
+        from codeweaver.engine.indexer.manifest import FileManifestManager
+
+        indexer._manifest_manager = FileManifestManager(project_path=project_path)
+        indexer._file_manifest = indexer._manifest_manager.create_new()
+
+        # Track file as dense-only in manifest
+        indexer._file_manifest.add_file(
+            path=Path("module.py"),
+            content_hash="test_hash_dense",
+            chunk_ids=[str(chunk.chunk_id)],
+            dense_embedding_provider="test-provider",
+            dense_embedding_model="test-dense-model",
+            sparse_embedding_provider=None,  # Missing sparse
+            sparse_embedding_model=None,
+            has_dense_embeddings=True,
+            has_sparse_embeddings=False,
+        )
+
+        # Call reconciliation directly to test add_sparse flag
+        result = await indexer.add_missing_embeddings_to_existing_chunks(
+            add_dense=False, add_sparse=True
+        )
 
     # Verify result indicates sparse embeddings were processed
     assert "files_processed" in result
@@ -419,27 +573,44 @@ async def test_reconciliation_skipped_when_no_files_need_embeddings(
     mock_sparse_provider.model = "test-sparse-model"
     mock_sparse_provider.provider_name = "test-sparse-provider"
 
-    indexer = Indexer(
-        project_path=project_path,
+    # Use provider registry pattern for proper initialization
+    mock_registry = create_mock_provider_registry(
         vector_store=provider,
         embedding_provider=mock_dense_provider,
         sparse_provider=mock_sparse_provider,
     )
 
-    # Track file as having BOTH embeddings
-    indexer._file_manifest.track_file_processed(
-        file_path=Path("module.py"),
-        chunk_ids=[chunk.chunk_id],
-        dense_provider="test-provider",
-        dense_model="test-dense-model",
-        sparse_provider="test-sparse-provider",
-        sparse_model="test-sparse-model",
-    )
+    from codeweaver.config.settings import CodeWeaverSettings
 
-    # Call reconciliation - should return early with no work
-    result = await indexer.add_missing_embeddings_to_existing_chunks(
-        add_dense=True, add_sparse=True
-    )
+    settings = CodeWeaverSettings(project_path=project_path)
+    settings_dict = settings.model_dump()
+
+    with patch("codeweaver.common.registry.get_provider_registry", return_value=mock_registry):
+        indexer = await Indexer.from_settings_async(settings_dict)
+
+        # Initialize manifest manager (normally done in prime_index)
+        from codeweaver.engine.indexer.manifest import FileManifestManager
+
+        indexer._manifest_manager = FileManifestManager(project_path=project_path)
+        indexer._file_manifest = indexer._manifest_manager.create_new()
+
+        # Track file as having BOTH embeddings
+        indexer._file_manifest.add_file(
+            path=Path("module.py"),
+            content_hash="test_hash_both",
+            chunk_ids=[str(chunk.chunk_id)],
+            dense_embedding_provider="test-provider",
+            dense_embedding_model="test-dense-model",
+            sparse_embedding_provider="test-sparse-provider",
+            sparse_embedding_model="test-sparse-model",
+            has_dense_embeddings=True,
+            has_sparse_embeddings=True,
+        )
+
+        # Call reconciliation - should return early with no work
+        result = await indexer.add_missing_embeddings_to_existing_chunks(
+            add_dense=True, add_sparse=True
+        )
 
     # Verify no files were processed (all complete)
     assert result["files_processed"] == 0, "Should not process any files when all are complete"
@@ -448,3 +619,504 @@ async def test_reconciliation_skipped_when_no_files_need_embeddings(
     logger.info(f"Skip reconciliation result: {result}")
 
     print("✅ PASSED: Reconciliation correctly skipped when no work needed")
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_reconciliation_handles_provider_error_gracefully(
+    qdrant_test_manager, tmp_path, initialize_test_settings, caplog
+):
+    """Verify prime_index continues when reconciliation fails with ProviderError.
+
+    This test validates the error handling at indexer.py:1377-1388.
+    When add_missing_embeddings_to_existing_chunks raises ProviderError,
+    prime_index should log the error and continue successfully.
+    """
+    import logging
+
+    from codeweaver.exceptions import ProviderError
+
+    # Create unique collection
+    collection_name = qdrant_test_manager.create_collection_name("error_provider")
+    await qdrant_test_manager.create_collection(
+        collection_name, dense_vector_size=768, sparse_vector_size=1000
+    )
+
+    config = QdrantConfig(url=qdrant_test_manager.url, collection_name=collection_name)
+    provider = QdrantVectorStoreProvider(config=config)
+    await provider._initialize()
+
+    project_path = tmp_path / "test_error_project"
+    project_path.mkdir()
+
+    file1 = project_path / "module.py"
+    file1.write_text("def func():\n    pass\n")
+
+    # Create chunk with dense-only (to trigger sparse reconciliation)
+    chunk = create_test_chunk_with_embeddings(
+        chunk_id=uuid7(),
+        chunk_name="module.py:func",
+        file_path=Path("module.py"),
+        language=Language.PYTHON,
+        content="def func():\n    pass",
+        dense_embedding=[0.1] * 768,
+        sparse_embedding=None,  # Missing sparse
+        line_start=1,
+        line_end=2,
+    )
+
+    await provider.upsert([chunk])
+
+    # Create indexer with sparse provider that will fail
+    mock_sparse_provider = MagicMock()
+    mock_sparse_provider.model = "test-sparse-model"
+    mock_sparse_provider.provider_name = "test-sparse-provider"
+    # Make embedding generation fail with ProviderError
+    mock_sparse_provider.embed_document = AsyncMock(
+        side_effect=ProviderError("Simulated provider failure")
+    )
+
+    mock_dense_provider = MagicMock()
+    mock_dense_provider.model = "test-dense-model"
+    mock_dense_provider.provider_name = "test-provider"
+
+    mock_registry = create_mock_provider_registry(
+        vector_store=provider,
+        embedding_provider=mock_dense_provider,
+        sparse_provider=mock_sparse_provider,
+    )
+
+    from codeweaver.config.settings import CodeWeaverSettings
+
+    settings = CodeWeaverSettings(project_path=project_path)
+    settings_dict = settings.model_dump()
+
+    with caplog.at_level(logging.WARNING):
+        with patch("codeweaver.common.registry.get_provider_registry", return_value=mock_registry):
+            indexer = await Indexer.from_settings_async(settings_dict)
+
+            # Initialize manifest
+            from codeweaver.engine.indexer.manifest import FileManifestManager
+
+            indexer._manifest_manager = FileManifestManager(project_path=project_path)
+            indexer._file_manifest = indexer._manifest_manager.create_new()
+
+            # Set up manifest to show missing sparse embeddings
+            indexer._file_manifest.add_file(
+                path=Path("module.py"),
+                content_hash="test_hash",
+                chunk_ids=[str(chunk.chunk_id)],
+                dense_embedding_provider="test-provider",
+                dense_embedding_model="test-dense-model",
+                sparse_embedding_provider=None,
+                sparse_embedding_model=None,
+                has_dense_embeddings=True,
+                has_sparse_embeddings=False,
+            )
+
+            # Mock _index_files to avoid actual file processing
+            with patch.object(indexer, "_index_files", new_callable=AsyncMock) as mock_index:
+                mock_index.return_value = None
+
+                # This should NOT crash despite ProviderError during reconciliation
+                result = await indexer.prime_index(force_reindex=False)
+
+    # Verify prime_index completed successfully
+    assert result == 0  # 0 files indexed (we mocked _index_files)
+
+    # Verify error was logged
+    assert any(
+        "Automatic reconciliation failed" in record.message and "ProviderError" in record.message
+        for record in caplog.records
+    ), "Expected reconciliation error to be logged"
+
+    print("✅ PASSED: ProviderError handling verified")
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_reconciliation_handles_indexing_error_gracefully(
+    qdrant_test_manager, tmp_path, initialize_test_settings, caplog
+):
+    """Verify prime_index continues when reconciliation fails with IndexingError.
+
+    This test validates the error handling at indexer.py:1377-1388.
+    """
+    import logging
+
+    from codeweaver.exceptions import IndexingError
+
+    collection_name = qdrant_test_manager.create_collection_name("error_indexing")
+    await qdrant_test_manager.create_collection(
+        collection_name, dense_vector_size=768, sparse_vector_size=1000
+    )
+
+    config = QdrantConfig(url=qdrant_test_manager.url, collection_name=collection_name)
+    provider = QdrantVectorStoreProvider(config=config)
+    await provider._initialize()
+
+    project_path = tmp_path / "test_error_indexing"
+    project_path.mkdir()
+
+    file1 = project_path / "module.py"
+    file1.write_text("def func():\n    pass\n")
+
+    chunk = create_test_chunk_with_embeddings(
+        chunk_id=uuid7(),
+        chunk_name="module.py:func",
+        file_path=Path("module.py"),
+        language=Language.PYTHON,
+        content="def func():\n    pass",
+        dense_embedding=[0.1] * 768,
+        sparse_embedding=None,
+        line_start=1,
+        line_end=2,
+    )
+
+    await provider.upsert([chunk])
+
+    # Make vector store client fail with IndexingError
+    async def failing_update(*args, **kwargs):
+        raise IndexingError("Simulated indexing failure")
+
+    provider.client.update_vectors = failing_update
+
+    mock_sparse_provider = MagicMock()
+    mock_sparse_provider.model = "test-sparse-model"
+    mock_sparse_provider.provider_name = "test-sparse-provider"
+    mock_sparse_provider.embed_document = AsyncMock(
+        return_value=[{"indices": [1, 2], "values": [0.9, 0.8]}]
+    )
+
+    mock_dense_provider = MagicMock()
+    mock_dense_provider.model = "test-dense-model"
+    mock_dense_provider.provider_name = "test-provider"
+
+    mock_registry = create_mock_provider_registry(
+        vector_store=provider,
+        embedding_provider=mock_dense_provider,
+        sparse_provider=mock_sparse_provider,
+    )
+
+    from codeweaver.config.settings import CodeWeaverSettings
+
+    settings = CodeWeaverSettings(project_path=project_path)
+    settings_dict = settings.model_dump()
+
+    with caplog.at_level(logging.WARNING):
+        with patch("codeweaver.common.registry.get_provider_registry", return_value=mock_registry):
+            indexer = await Indexer.from_settings_async(settings_dict)
+
+            from codeweaver.engine.indexer.manifest import FileManifestManager
+
+            indexer._manifest_manager = FileManifestManager(project_path=project_path)
+            indexer._file_manifest = indexer._manifest_manager.create_new()
+
+            indexer._file_manifest.add_file(
+                path=Path("module.py"),
+                content_hash="test_hash",
+                chunk_ids=[str(chunk.chunk_id)],
+                dense_embedding_provider="test-provider",
+                dense_embedding_model="test-dense-model",
+                sparse_embedding_provider=None,
+                sparse_embedding_model=None,
+                has_dense_embeddings=True,
+                has_sparse_embeddings=False,
+            )
+
+            with patch.object(indexer, "_index_files", new_callable=AsyncMock) as mock_index:
+                mock_index.return_value = None
+                result = await indexer.prime_index(force_reindex=False)
+
+    assert result == 0
+    assert any("Automatic reconciliation failed" in record.message for record in caplog.records), (
+        "Expected reconciliation error to be logged"
+    )
+
+    print("✅ PASSED: IndexingError handling verified")
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_reconciliation_handles_connection_error_gracefully(
+    qdrant_test_manager, tmp_path, initialize_test_settings, caplog
+):
+    """Verify prime_index continues when reconciliation fails with ConnectionError.
+
+    This test validates the error handling at indexer.py:1389-1396.
+    """
+    import logging
+
+    collection_name = qdrant_test_manager.create_collection_name("error_connection")
+    await qdrant_test_manager.create_collection(
+        collection_name, dense_vector_size=768, sparse_vector_size=1000
+    )
+
+    config = QdrantConfig(url=qdrant_test_manager.url, collection_name=collection_name)
+    provider = QdrantVectorStoreProvider(config=config)
+    await provider._initialize()
+
+    project_path = tmp_path / "test_error_connection"
+    project_path.mkdir()
+
+    file1 = project_path / "module.py"
+    file1.write_text("def func():\n    pass\n")
+
+    chunk = create_test_chunk_with_embeddings(
+        chunk_id=uuid7(),
+        chunk_name="module.py:func",
+        file_path=Path("module.py"),
+        language=Language.PYTHON,
+        content="def func():\n    pass",
+        dense_embedding=[0.1] * 768,
+        sparse_embedding=None,
+        line_start=1,
+        line_end=2,
+    )
+
+    await provider.upsert([chunk])
+
+    # Make client.retrieve fail with ConnectionError
+    async def failing_retrieve(*args, **kwargs):
+        raise ConnectionError("Simulated connection failure")
+
+    provider.client.retrieve = failing_retrieve
+
+    mock_sparse_provider = MagicMock()
+    mock_sparse_provider.model = "test-sparse-model"
+    mock_sparse_provider.provider_name = "test-sparse-provider"
+
+    mock_dense_provider = MagicMock()
+    mock_dense_provider.model = "test-dense-model"
+    mock_dense_provider.provider_name = "test-provider"
+
+    mock_registry = create_mock_provider_registry(
+        vector_store=provider,
+        embedding_provider=mock_dense_provider,
+        sparse_provider=mock_sparse_provider,
+    )
+
+    from codeweaver.config.settings import CodeWeaverSettings
+
+    settings = CodeWeaverSettings(project_path=project_path)
+    settings_dict = settings.model_dump()
+
+    with caplog.at_level(logging.WARNING):
+        with patch("codeweaver.common.registry.get_provider_registry", return_value=mock_registry):
+            indexer = await Indexer.from_settings_async(settings_dict)
+
+            from codeweaver.engine.indexer.manifest import FileManifestManager
+
+            indexer._manifest_manager = FileManifestManager(project_path=project_path)
+            indexer._file_manifest = indexer._manifest_manager.create_new()
+
+            indexer._file_manifest.add_file(
+                path=Path("module.py"),
+                content_hash="test_hash",
+                chunk_ids=[str(chunk.chunk_id)],
+                dense_embedding_provider="test-provider",
+                dense_embedding_model="test-dense-model",
+                sparse_embedding_provider=None,
+                sparse_embedding_model=None,
+                has_dense_embeddings=True,
+                has_sparse_embeddings=False,
+            )
+
+            with patch.object(indexer, "_index_files", new_callable=AsyncMock) as mock_index:
+                mock_index.return_value = None
+                result = await indexer.prime_index(force_reindex=False)
+
+    assert result == 0
+    assert any("connection/IO error" in record.message for record in caplog.records), (
+        "Expected connection error to be logged"
+    )
+
+    print("✅ PASSED: ConnectionError handling verified")
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_reconciliation_not_called_when_force_reindex_true(
+    qdrant_test_manager, tmp_path, initialize_test_settings
+):
+    """Verify reconciliation is skipped when force_reindex=True.
+
+    This validates the conditional at indexer.py:1334-1338.
+    """
+    collection_name = qdrant_test_manager.create_collection_name("skip_reindex")
+    await qdrant_test_manager.create_collection(
+        collection_name, dense_vector_size=768, sparse_vector_size=1000
+    )
+
+    config = QdrantConfig(url=qdrant_test_manager.url, collection_name=collection_name)
+    provider = QdrantVectorStoreProvider(config=config)
+    await provider._initialize()
+
+    project_path = tmp_path / "test_skip"
+    project_path.mkdir()
+
+    file1 = project_path / "module.py"
+    file1.write_text("def func():\n    pass\n")
+
+    # Create mock that will fail if called (to detect unwanted reconciliation)
+    mock_sparse_provider = MagicMock()
+    mock_sparse_provider.model = "test-sparse-model"
+    mock_sparse_provider.provider_name = "test-sparse-provider"
+    mock_sparse_provider.embed_document = AsyncMock(
+        side_effect=Exception("Should not be called during force_reindex")
+    )
+
+    mock_dense_provider = MagicMock()
+    mock_dense_provider.model = "test-dense-model"
+    mock_dense_provider.provider_name = "test-provider"
+
+    mock_registry = create_mock_provider_registry(
+        vector_store=provider,
+        embedding_provider=mock_dense_provider,
+        sparse_provider=mock_sparse_provider,
+    )
+
+    from codeweaver.config.settings import CodeWeaverSettings
+
+    settings = CodeWeaverSettings(project_path=project_path)
+    settings_dict = settings.model_dump()
+
+    with patch("codeweaver.common.registry.get_provider_registry", return_value=mock_registry):
+        indexer = await Indexer.from_settings_async(settings_dict)
+
+        from codeweaver.engine.indexer.manifest import FileManifestManager
+
+        indexer._manifest_manager = FileManifestManager(project_path=project_path)
+        indexer._file_manifest = indexer._manifest_manager.create_new()
+
+        # Set up manifest to show missing embeddings
+        # (would trigger reconciliation if force_reindex=False)
+        indexer._file_manifest.add_file(
+            path=Path("module.py"),
+            content_hash="test_hash",
+            chunk_ids=["fake-chunk-id"],
+            dense_embedding_provider="test-provider",
+            dense_embedding_model="test-dense-model",
+            sparse_embedding_provider=None,
+            sparse_embedding_model=None,
+            has_dense_embeddings=True,
+            has_sparse_embeddings=False,
+        )
+
+        with patch.object(indexer, "_index_files", new_callable=AsyncMock) as mock_index:
+            mock_index.return_value = None
+
+            # Call with force_reindex=True
+            # If reconciliation runs, embed_document will raise exception
+            await indexer.prime_index(force_reindex=True)
+
+    # Test passes if we reach here without exception
+    # (embed_document was never called)
+    print("✅ PASSED: Reconciliation correctly skipped during force_reindex")
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_reconciliation_not_called_when_no_vector_store(tmp_path, initialize_test_settings):
+    """Verify reconciliation is skipped when no vector store is configured.
+
+    This validates the conditional at indexer.py:1334-1338.
+    """
+    project_path = tmp_path / "test_no_vs"
+    project_path.mkdir()
+
+    file1 = project_path / "module.py"
+    file1.write_text("def func():\n    pass\n")
+
+    # Create indexer WITHOUT vector store
+    mock_sparse_provider = MagicMock()
+    mock_sparse_provider.model = "test-sparse-model"
+    mock_sparse_provider.provider_name = "test-sparse-provider"
+
+    mock_dense_provider = MagicMock()
+    mock_dense_provider.model = "test-dense-model"
+    mock_dense_provider.provider_name = "test-provider"
+
+    # No vector store in registry
+    mock_registry = create_mock_provider_registry(
+        vector_store=None,  # No vector store
+        embedding_provider=mock_dense_provider,
+        sparse_provider=mock_sparse_provider,
+    )
+
+    from codeweaver.config.settings import CodeWeaverSettings
+
+    settings = CodeWeaverSettings(project_path=project_path)
+    settings_dict = settings.model_dump()
+
+    with patch("codeweaver.common.registry.get_provider_registry", return_value=mock_registry):
+        indexer = await Indexer.from_settings_async(settings_dict)
+
+        from codeweaver.engine.indexer.manifest import FileManifestManager
+
+        indexer._manifest_manager = FileManifestManager(project_path=project_path)
+        indexer._file_manifest = indexer._manifest_manager.create_new()
+
+        with patch.object(indexer, "_index_files", new_callable=AsyncMock) as mock_index:
+            mock_index.return_value = None
+
+            # Should not attempt reconciliation (no vector store)
+            result = await indexer.prime_index(force_reindex=False)
+
+    # Test passes if we reach here
+    assert result == 0
+    print("✅ PASSED: Reconciliation correctly skipped when no vector store")
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_reconciliation_not_called_when_no_providers(
+    qdrant_test_manager, tmp_path, initialize_test_settings
+):
+    """Verify reconciliation is skipped when no embedding providers configured.
+
+    This validates the conditional at indexer.py:1334-1338.
+    """
+    collection_name = qdrant_test_manager.create_collection_name("no_providers")
+    await qdrant_test_manager.create_collection(
+        collection_name, dense_vector_size=768, sparse_vector_size=1000
+    )
+
+    config = QdrantConfig(url=qdrant_test_manager.url, collection_name=collection_name)
+    provider = QdrantVectorStoreProvider(config=config)
+    await provider._initialize()
+
+    project_path = tmp_path / "test_no_providers"
+    project_path.mkdir()
+
+    file1 = project_path / "module.py"
+    file1.write_text("def func():\n    pass\n")
+
+    # Create registry with vector store but NO embedding providers
+    mock_registry = create_mock_provider_registry(
+        vector_store=provider,
+        embedding_provider=None,  # No dense provider
+        sparse_provider=None,  # No sparse provider
+    )
+
+    from codeweaver.config.settings import CodeWeaverSettings
+
+    settings = CodeWeaverSettings(project_path=project_path)
+    settings_dict = settings.model_dump()
+
+    with patch("codeweaver.common.registry.get_provider_registry", return_value=mock_registry):
+        indexer = await Indexer.from_settings_async(settings_dict)
+
+        from codeweaver.engine.indexer.manifest import FileManifestManager
+
+        indexer._manifest_manager = FileManifestManager(project_path=project_path)
+        indexer._file_manifest = indexer._manifest_manager.create_new()
+
+        with patch.object(indexer, "_index_files", new_callable=AsyncMock) as mock_index:
+            mock_index.return_value = None
+
+            # Should not attempt reconciliation (no providers)
+            result = await indexer.prime_index(force_reindex=False)
+
+    assert result == 0
+    print("✅ PASSED: Reconciliation correctly skipped when no providers")

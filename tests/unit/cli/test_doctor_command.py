@@ -59,7 +59,10 @@ class TestDoctorUnsetHandling:
         assert not isinstance(None, Unset)
 
     def test_doctor_handles_auto_detected_settings(
-        self, temp_project: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+        self,
+        temp_project: Path,
+        capsys: pytest.CaptureFixture[str],
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Test doctor handles settings with auto-detected fields correctly."""
         # Setup minimal provider configuration via env vars to avoid provider initialization errors
@@ -270,7 +273,9 @@ class TestDoctorConfigAssumptions:
         # Set env vars for complete config - use a provider that's guaranteed to be available
         monkeypatch.setenv("CODEWEAVER_PROJECT_PATH", str(temp_project))
         monkeypatch.setenv("CODEWEAVER_EMBEDDING_PROVIDER", "sentence-transformers")
-        monkeypatch.setenv("CODEWEAVER_EMBEDDING_MODEL", "ibm-granite/granite-embedding-small-english-r2")
+        monkeypatch.setenv(
+            "CODEWEAVER_EMBEDDING_MODEL", "ibm-granite/granite-embedding-small-english-r2"
+        )
         monkeypatch.setenv("CODEWEAVER_VECTOR_STORE_TYPE", "qdrant")
 
         # Create settings without config file
@@ -282,9 +287,17 @@ class TestDoctorConfigAssumptions:
         assert not isinstance(embedding_settings, Unset), "Embedding settings should not be Unset"
         # Verify provider is set (could be tuple or dict depending on configuration)
         if isinstance(embedding_settings, tuple):
-            assert embedding_settings[0]["provider"] in (Provider.SENTENCE_TRANSFORMERS, Provider.FASTEMBED, Provider.VOYAGE)
+            assert embedding_settings[0]["provider"] in (
+                Provider.SENTENCE_TRANSFORMERS,
+                Provider.FASTEMBED,
+                Provider.VOYAGE,
+            )
         else:
-            assert embedding_settings["provider"] in (Provider.SENTENCE_TRANSFORMERS, Provider.FASTEMBED, Provider.VOYAGE)
+            assert embedding_settings["provider"] in (
+                Provider.SENTENCE_TRANSFORMERS,
+                Provider.FASTEMBED,
+                Provider.VOYAGE,
+            )
 
     def test_config_sources_hierarchy(
         self, temp_project: Path, monkeypatch: pytest.MonkeyPatch
@@ -303,7 +316,9 @@ class TestDoctorConfigAssumptions:
         settings = CodeWeaverSettings()
 
         # Verify the env var was used
-        assert settings.project_path == custom_path, f"Expected {custom_path}, got {settings.project_path}"
+        assert settings.project_path == custom_path, (
+            f"Expected {custom_path}, got {settings.project_path}"
+        )
 
         # Also verify that provider settings are properly initialized (not Unset)
         embedding_settings = settings.provider.embedding

@@ -306,7 +306,8 @@ class TestInitMultipleClients:
         exit_code = None
         try:
             func, bound_args, _ = init_app.parse_args(
-                ["--mcp-only", "--client", "claude_desktop", "--project", str(project)], exit_on_error=False
+                ["--mcp-only", "--client", "claude_desktop", "--project", str(project)],
+                exit_on_error=False,
             )
             func(**bound_args.arguments)
         except SystemExit as e:
@@ -331,7 +332,8 @@ class TestInitMultipleClients:
             exit_code = None
             try:
                 func, bound_args, _ = init_app.parse_args(
-                    ["--mcp-only", "--client", client, "--project", str(project)], exit_on_error=False
+                    ["--mcp-only", "--client", client, "--project", str(project)],
+                    exit_on_error=False,
                 )
                 func(**bound_args.arguments)
             except SystemExit as e:
