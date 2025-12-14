@@ -1495,8 +1495,16 @@ class Indexer(BasedModel):
             await index_settings.set_inc_exc(project_path_value)
             logger.debug("inc_exc patterns initialized for project: %s", project_path_value)
 
-        walker_settings = index_settings.to_settings()
-        indexer = cls(walker_settings=walker_settings, project_path=settings_map["project_path"])
+        # Get project path for walker configuration
+        project_path_value = (
+            get_project_path()
+            if isinstance(settings_map["project_path"], Unset)
+            else settings_map["project_path"]
+        )
+
+        # Pass project_path to to_settings() to ensure walker uses correct path
+        walker_settings = index_settings.to_settings(project_path=project_path_value)
+        indexer = cls(walker_settings=walker_settings, project_path=project_path_value)
 
         # Initialize providers asynchronously
         await indexer._initialize_providers_async()

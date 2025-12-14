@@ -1,0 +1,50 @@
+{
+    "fireworks": [
+        "WhereIsAI/UAE-Large-V1",
+        "nomic-ai/modernbert-embed-base",
+        "thenlper/gte-base",
+        "thenlper/gte-large"
+    ],
+    "groq": [
+        "Alibaba-NLP/gte-modernbert-base"
+    ],
+    "hf-inference": [
+        "Alibaba-NLP/gte-modernbert-base",
+        "BAAI/bge-base-en-v1.5",
+        "BAAI/bge-large-en-v1",
+        "BAAI/bge-large-en-v1.5",
+        "BAAI/bge-m3",
+        "BAAI/bge-small-en-v1.5",
+        "Snowflake/snowflake-arctic-embed-l-v2.0",
+        "WhereIsAI/UAE-Large-V1",
+        "ibm-granite/granite-embedding-278m-multilingual",
+        "intfloat/multilingual-e5-large",
+        "intfloat/multilingual-e5-large-instruct",
+        "nomic-ai/modernbert-embed-base",
+        "sentence-transformers/LaBSE",
+        "sentence-transformers/all-MiniLM-L12-v2",
+        "sentence-transformers/all-MiniLM-L6-v2",
+        "sentence-transformers/all-mpnet-base-v2",
+        "sentence-transformers/gtr-t5-base",
+        "sentence-transformers/multi-qa-MiniLM-L6-cos-v1",
+        "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+        "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
+    ],
+    "ollama": [
+        "Snowflake/snowflake-arctic-embed-l-v2.0",
+        "ibm-granite/granite-embedding-278m-multilingual",
+        "ibm-granite/granite-embedding-30m-english",
+        "mixedbread-ai/mxbai-embed-large-v1",
+        "nomic-ai/nomic-embed-text-v1.5",
+        "sentence-transformers/all-MiniLM-L6-v2",
+        "BAAI/bge-large-en-v1.5",
+        "BAAI/bge-m3"
+    ],
+    "together": [
+        "Alibaba-NLP/gte-modernbert-base",
+        "BAAI/bge-base-en-v1.5",
+        "BAAI/bge-large-en-v1.5",
+        "WhereIsAI/UAE-Large-V1",
+        "intfloat/multilingual-e5-large-instruct"
+    ]
+}

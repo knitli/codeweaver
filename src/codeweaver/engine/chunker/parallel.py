@@ -108,7 +108,7 @@ def _chunk_single_file(
 
             chunker_logging.log_chunking_fallback(
                 file_path=file.path,
-                from_chunker=chunker,
+                from_chunker=chunker,  # ty: ignore[invalid-argument-type]
                 to_chunker=fallback_chunker,
                 reason="parse_error",
                 extra_context={"error_type": type(e).__name__, "error_message": str(e)},

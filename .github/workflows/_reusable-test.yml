@@ -58,16 +58,13 @@ on:
       benchmark-available:
         description: Whether benchmark results were generated
         value: ${{ jobs.test.outputs.benchmark-available }}
-      test-status:
-        description: Overall test result status
-        value: ${{ jobs.test.result }}
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   MISE_EXPERIMENTAL: 1
   MISE_YES: 1
   PROFILE: "dev"
   CODEWEAVER_PROJECT_PATH: ${{ github.workspace }}
-  CODEWEAVER_TESTING: "true"
+  CODEWEAVER_TEST_MODE: "true"
   CODEWEAVER_VECTOR_STORE_URL: ${{ secrets.CODEWEAVER_VECTOR_STORE_URL }}
   QDRANT__SERVICE__API_KEY: ${{ secrets.QDRANT__SERVICE__API_KEY }}
   VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
@@ -133,14 +130,22 @@ jobs:
       - name: Download models for real provider tests
         run: |
           uv pip install sentence-transformers
-          uv run python -c "from sentence_transformers import SentenceTransformer; print('Downloading IBM Granite...'); SentenceTransformer('ibm-granite/granite-embedding-english-r2')"
+          # Use the lightweight 30M model for faster test execution (10x faster than english-r2)
+          uv run python -c "from sentence_transformers import SentenceTransformer; print('Downloading IBM Granite 30M...'); SentenceTransformer('ibm-granite/granite-embedding-30m-english')"
           uv run python -c "from sentence_transformers import CrossEncoder; print('Downloading MS MARCO...'); CrossEncoder('cross-encoder/ms-marco-MiniLM-L6-v2')"
 
       - name: Run tests with coverage
         if: ${{ !inputs.benchmark-tests }}
         env:
           MISE_PYTHON_VERSION: ${{ steps.setup-mise.outputs.MISE_PYTHON_VERSION }}
-        run: mise run test-cov -m "${{ inputs.test-markers }}"
+          TEST_MARKERS: ${{ inputs.test-markers }}
+        run: |
+          # Add timeout for real provider tests (need 15+ min for CPU-based embedding)
+          if [[ "${TEST_MARKERS}" == *"real_providers"* ]]; then
+            mise run test-cov -m "${TEST_MARKERS}" --timeout=900
+          else
+            mise run test-cov -m "${TEST_MARKERS}"
+          fi
       - name: Upload coverage to Codecov
         if: ${{ inputs.upload-coverage && matrix.python-version == '3.12' && !inputs.benchmark-tests }}
         uses: codecov/codecov-action@5a1091511ad55cbe89839c7260b706298ca349f7
@@ -179,12 +184,13 @@ jobs:
           # Store benchmark results for comparison (simplified version)
           if [ -f benchmark-results.json ]; then
             echo "Benchmark results generated successfully"
-            echo "benchmark-available=true" >> $GITHUB_OUTPUT
+            echo "benchmark-available=true" >> "$GITHUB_OUTPUT"
 
             # Extract key metrics (this is a simplified example)
             echo "## Benchmark Summary" >> benchmark-summary.md
             echo "" >> benchmark-summary.md
-            echo "Performance benchmark completed on $(date -u +"%Y-%m-%d %H:%M UTC")" >> benchmark-summary.md
+            today="$(date -u +"%Y-%m-%d %H:%M UTC")"
+            echo "Performance benchmark completed on $today" >> benchmark-summary.md
             echo "" >> benchmark-summary.md
 
             # Parse JSON and extract metrics (basic example)
@@ -194,8 +200,9 @@ jobs:
             else
               echo "- Detailed results available in benchmark-results.json artifact" >> benchmark-summary.md
             fi
+            echo "benchmark-available=true" >> "$GITHUB_OUTPUT"
           else
-            echo "benchmark-available=false" >> $GITHUB_OUTPUT
+            echo "benchmark-available=false" >> "$GITHUB_OUTPUT"
             echo "No benchmark results generated" > benchmark-summary.md
           fi
       - name: Upload benchmark summary

@@ -328,6 +328,9 @@ echo [codeweaver] Running tests...
 uv run pytest "%usage_dir%" %usage_marks:~-3% -v %*
 '''
 
+[tasks.test.env]
+CODEWEAVER_TEST_MODE = "true"
+
 [tasks.test-cov]
 tools.uv = "latest"
 tools.python = '''{{ get_env(name="MISE_PYTHON_VERSION", default="3.13") }}'''
@@ -355,6 +358,9 @@ echo [codeweaver] Running fast unit tests...
 uv run pytest -m "unit and not expensive and not requires_models" -v %*
 '''
 
+[tasks.test-fast.env]
+CODEWEAVER_TEST_MODE = "true"
+
 [tasks.test-integration]
 description = "Run integration tests (excluding real providers)"
 tools.uv = "latest"
@@ -367,6 +373,9 @@ run_windows = '''
 echo [codeweaver] Running integration tests...
 uv run pytest -m "integration and not real_providers and not expensive" -v %*
 '''
+
+[tasks.test-integration.env]
+CODEWEAVER_TEST_MODE = "true"
 
 [tasks.test-real]
 description = "Run real provider tests (requires model downloads)"
@@ -381,6 +390,9 @@ echo [codeweaver] Running real provider tests (requires model downloads)...
 uv run pytest -m "real_providers" -v %*
 '''
 
+[tasks.test-real.env]
+CODEWEAVER_TEST_MODE = "true"
+
 [tasks.test-heavy]
 description = "Run heavy tests with model downloads"
 tools.uv = "latest"
@@ -393,6 +405,9 @@ run_windows = '''
 echo [codeweaver] Running heavy tests (requires models)...
 uv run pytest -m "requires_models or expensive" -v %*
 '''
+
+[tasks.test-heavy.env]
+CODEWEAVER_TEST_MODE = "true"
 
 [tasks.test-skip]
 description = "Show skipped tests"
@@ -452,6 +467,9 @@ run_windows = '''
 echo [codeweaver] Running ALL tests (including expensive ones)...
 uv run pytest -v %*
 '''
+
+[tasks.test-all.env]
+CODEWEAVER_TEST_MODE = "true"
 
 [tasks.clean]
 run = '''

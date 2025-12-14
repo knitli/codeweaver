@@ -660,6 +660,7 @@ class ProviderRegistry(BasedModel):
         provider_kind: ProviderKind | str,
         provider_settings: dict[str, Any] | None,
         client_options: dict[str, Any] | None,
+        caps: Any = None,
     ) -> Any:
         """Create client instance using CLIENT_MAP from capabilities.
 
@@ -668,6 +669,7 @@ class ProviderRegistry(BasedModel):
             provider_kind: Provider kind (embedding, reranking, vector_store, etc.)
             provider_settings: Provider-specific auth/config (API keys, endpoints, paths)
             client_options: User-specified client options (timeout, retries, etc.)
+            caps: Model capabilities (optional, used when provider_settings doesn't have model)
 
         Returns:
             Configured client instance ready for use, or None if:
@@ -750,7 +752,7 @@ class ProviderRegistry(BasedModel):
         # Create client based on provider type
         try:
             return self._instantiate_client(
-                provider, provider_kind, client_class, provider_settings, opts
+                provider, provider_kind, client_class, provider_settings, opts, caps
             )
         except Exception as e:
             logger.warning(
@@ -765,6 +767,7 @@ class ProviderRegistry(BasedModel):
         client_class: type[Any],
         provider_settings: dict[str, Any],
         client_options: dict[str, Any],
+        caps: Any = None,
     ) -> Any:
         """Instantiate a client with provider-specific configuration.
 
@@ -774,6 +777,7 @@ class ProviderRegistry(BasedModel):
             client_class: Resolved client class
             provider_settings: Provider-specific settings
             client_options: Client options
+            caps: Model capabilities (optional)
 
         Returns:
             Configured client instance
@@ -859,16 +863,30 @@ class ProviderRegistry(BasedModel):
                     # We need to call it first.
                     client_class = client_class()
 
+            # Filter out CodeWeaver-specific keys that aren't client parameters
+            # Keep: provider_settings, client_options (these go to the client)
+            # Remove: provider, enabled, model_settings, connection, other, api_key
+            codeweaver_keys = {"provider", "enabled", "model_settings", "connection", "other", "api_key"}
+            filtered_options = {k: v for k, v in (client_options or {}).items() if k not in codeweaver_keys}
+
             model_name_or_path = provider_settings.get("model") if provider_settings else None
             if model_name_or_path:
-                return client_class(model_name=model_name_or_path, **client_options)
+                # SentenceTransformer uses 'model_name_or_path', FastEmbed uses 'model_name'
+                param_name = "model_name_or_path" if provider == Provider.SENTENCE_TRANSFORMERS else "model_name"
+                return client_class(**{param_name: model_name_or_path}, **filtered_options)
+            # Try to get model from capabilities if provided
+            if caps and hasattr(caps, 'name'):
+                param_name = "model_name_or_path" if provider == Provider.SENTENCE_TRANSFORMERS else "model_name"
+                return client_class(**{param_name: caps.name}, **filtered_options)
             if (capabilities := self.get_configured_provider_settings(provider_kind)) and (  # type: ignore
                 model_settings := capabilities.get("model_settings")
             ):  # type: ignore
                 model: str = model_settings["model"]
-                return client_class(model_name=model, **client_options)
+                # SentenceTransformer uses 'model_name_or_path', FastEmbed uses 'model_name'
+                param_name = "model_name_or_path" if provider == Provider.SENTENCE_TRANSFORMERS else "model_name"
+                return client_class(**{param_name: model}, **filtered_options)
             # Let provider handle default model selection
-            return client_class(**client_options)
+            return client_class(**filtered_options)
 
         # Construct client based on what parameters it accepts
         from codeweaver.common.utils.introspect import clean_args
@@ -1110,11 +1128,12 @@ class ProviderRegistry(BasedModel):
             else:
                 provider_settings = kwargs.get("provider_settings")
             client_options = kwargs.get("client_options")
+            caps = kwargs.get("caps")
 
             # Create appropriate client using CLIENT_MAP
             try:
                 client = self._create_client_from_map(
-                    provider, provider_kind, provider_settings, client_options
+                    provider, provider_kind, provider_settings, client_options, caps
                 )
                 if client is not None:
                     kwargs["client"] = client
@@ -1241,6 +1260,10 @@ class ProviderRegistry(BasedModel):
                     "Check for typos in provider registration.",
                 ],
             )
+        # Keep 'caps' as-is - the base EmbeddingProvider.__init__ expects 'caps'
+        # Some providers (like SentenceTransformers) accept 'capabilities' in their __init__
+        # and convert it to 'caps' for the parent, but most use the base class __init__ directly
+        # which expects 'caps'. Let each provider handle its own parameter naming.
         return cast(EmbeddingProvider[Any], retrieved_cls(**kwargs_for_provider))  # ty: ignore[call-non-callable]  # I promise it is
 
     @overload
@@ -1476,9 +1499,18 @@ class ProviderRegistry(BasedModel):
         user_kwargs: dict[str, Any],
     ) -> None:
         """Add model settings to kwargs."""
-        model_settings = config.get("model_settings")
+        # If caps were provided explicitly in user_kwargs, use them directly
+        if "caps" in user_kwargs:
+            kwargs["caps"] = user_kwargs["caps"]
+            # Still continue to extract model_settings for other settings like dimension, etc.
+
+        model_settings = config.get("model_settings") if config else None
         if not model_settings:
-            return
+            # If no model settings and no caps, nothing to add
+            if "caps" not in kwargs:
+                return
+            # If caps are present but no model_settings, continue to set kwargs["kwargs"]
+            model_settings = {}
 
         if (model_name := user_kwargs.get("model") or model_settings.get("model")) and (
             caps := self._get_capabilities_for_model(model_name, config["provider"])

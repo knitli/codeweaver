@@ -477,14 +477,18 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
     def title(self) -> str:
         """Get a human-readable title for the node."""
         name = humanize(self.name)
-        language = humanize(str(self.language))
+        language = humanize(self.language.as_title)
         classification = (
             humanize(self.classification.name.as_title) if self.classification else "Not classified"
         )
         text_snippet = humanize(self.text.strip().splitlines()[0])
         if len(text_snippet) > 25:
             text_snippet = f"{text_snippet[:22]}..."
-        return f"{language}-{name}-{classification}: '{text_snippet}'"
+        return (
+            f"{language}-{name}-{classification}: '{text_snippet}'"
+            if text_snippet
+            else f"{language}-{name}-{classification}"
+        )
 
     @computed_field
     @property

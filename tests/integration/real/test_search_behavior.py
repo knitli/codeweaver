@@ -32,7 +32,7 @@ import pytest
 
 
 @pytest.fixture
-async def indexed_test_project(known_test_codebase, real_provider_registry):
+async def indexed_test_project(known_test_codebase):
     """Create pre-indexed test project with configured settings.
 
     This fixture:
@@ -45,11 +45,12 @@ async def indexed_test_project(known_test_codebase, real_provider_registry):
     Tests using this fixture can call find_code() without worrying about
     indexing - the project is already indexed and settings are configured.
     """
-    from codeweaver.config.settings import CodeWeaverSettings
+    from codeweaver.config.settings import get_settings
     from codeweaver.engine.indexer.indexer import Indexer
 
-    # Configure settings with project path
-    settings = CodeWeaverSettings(project_path=known_test_codebase)
+    # Use global test settings (auto-loaded from codeweaver.test.local.toml)
+    # Don't create new settings - that would override the test config
+    settings = get_settings()
     settings_dict = settings.model_dump()
 
     # Patch provider registry and settings
@@ -59,12 +60,11 @@ async def indexed_test_project(known_test_codebase, real_provider_registry):
         call_count[0] += 1
         return 1000000.0 + call_count[0] * 0.001
 
+    # Trust the config system - codeweaver.test.toml loaded via CODEWEAVER_TEST_MODE="true"
+    # Only patch get_project_path to ensure test codebase collection name coordination
     with (
-        patch(
-            "codeweaver.common.registry.get_provider_registry", return_value=real_provider_registry
-        ),
         patch("codeweaver.agent_api.find_code.time.time", side_effect=mock_time),
-        patch("codeweaver.config.settings.get_settings", return_value=settings),
+        patch("codeweaver.common.utils.git.get_project_path", return_value=known_test_codebase),
     ):
         # Create and initialize indexer
         indexer = await Indexer.from_settings_async(settings_dict)

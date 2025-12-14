@@ -196,6 +196,8 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
                 return self._walkable(p, is_new=True, delete=False)
             case Change.modified:
                 return self._walkable(p, is_new=False, delete=False)
+            case _:
+                return False
 
     def _walkable(self, path: Path, *, is_new: bool = False, delete: bool = False) -> bool:
         """Check if a path is walkable (not ignored) using the rignore walker.

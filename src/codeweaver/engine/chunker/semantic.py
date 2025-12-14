@@ -812,11 +812,7 @@ class SemanticChunker(BaseChunker):
             from_chunker=self,
             to_chunker=delimiter_chunker,
             reason="oversized_chunk",
-            extra_context={
-                "node_name": node.name,
-                "node_kind": node.kind(),
-                "node_text_length": len(node.text),
-            },
+            extra_context={"node_name": node.name, "node_text_length": len(node.text)},
         )
 
         # Chunk the node text using delimiter patterns

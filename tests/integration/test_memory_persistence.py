@@ -47,15 +47,18 @@ async def test_inmemory_persistence():
         provider1 = MemoryVectorStoreProvider(_provider=Provider.MEMORY, config=config)
         await provider1._initialize()
 
-        # Get the actual dimension from the created collection
-        # Default dimension when no embedding provider configured is 512 (from base.py)
+        # Get the actual dimension from the embedding provider configuration
+        # This dynamically adapts to whatever model is configured (testing profile uses minishlab/potion-base-8M = 256 dims)
+        dense_caps = provider1._embedding_caps.get("dense")
+        embedding_dim = dense_caps.default_dimension if dense_caps else 512
+
         chunk = create_test_chunk_with_embeddings(
             chunk_id=uuid7(),
             chunk_name="memory_test.py:func",
             file_path=Path("memory_test.py"),
             language=Language.PYTHON,
             content="test function",
-            dense_embedding=[0.7] * 512,  # Match default dimension (512)
+            dense_embedding=[0.7] * embedding_dim,  # Match actual configured dimension
             line_start=1,
             line_end=5,
         )
@@ -75,11 +78,15 @@ async def test_inmemory_persistence():
         # Verify: Chunk restored from disk
         from codeweaver.agent_api.find_code.types import SearchStrategy, StrategizedQuery
 
+        # Use the same dimension as we used for upserting
+        dense_caps2 = provider2._embedding_caps.get("dense")
+        embedding_dim2 = dense_caps2.default_dimension if dense_caps2 else 512
+
         results = await provider2.search(
             StrategizedQuery(
                 query="test function",
                 strategy=SearchStrategy.DENSE_ONLY,
-                dense=[0.7] * 512,  # Match default dimension (512)
+                dense=[0.7] * embedding_dim2,  # Match actual configured dimension
                 sparse=None,
             )
         )

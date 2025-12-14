@@ -573,7 +573,7 @@ async def test_feature_name(real_providers, known_test_codebase):
 ```bash
 # Download models manually
 uv pip install sentence-transformers
-uv run python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('ibm-granite/granite-embedding-english-r2')"
+uv run python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('ibm-granite/granite-embedding-30m-english')"
 uv run python -c "from sentence_transformers import CrossEncoder; CrossEncoder('cross-encoder/ms-marco-MiniLM-L6-v2')"
 ```
 

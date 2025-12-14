@@ -104,11 +104,12 @@ classifiers = [
 dependencies = [
   # Core functionality
   "aenum>=3.1.16",
-  "ast-grep-py>=0.40.0",
+  "ast-grep-py>=0.40.1",
   "blake3>=1.0.8",
   # CLI framework and output
   "cyclopts>=4.3.0",
-  "fastembed>=0.7.4",
+  # onnxruntime currently does not support python 3.14
+  "fastembed>=0.7.4; python_version < '3.14'",
   # MCP server framework
   "fastmcp>=2.13.3",
   "httpx[http2]>=0.28.1",
@@ -121,12 +122,15 @@ dependencies = [
   # Core data models and validation
   "py-cpuinfo>=9.0.0",
   "pydantic>=2.12.5",
-  "pydantic-ai>=1.27.0",
-  "pydantic-graph>=1.27.0",
+  "pydantic-ai-slim>=1.30.1",
+  "pydantic-graph>=1.30.1",
   "pydantic-settings[toml,yaml]>=2.12.0",  # Pulls: tomli>=2.0.1, pyyaml>=6.0.1
   "qdrant-client>=1.16.1",
   "rich>=14.2.0",
   "rignore>=0.7.6",
+  # until onnxruntime supports python 3.14, we'll substitute fastembed with sentence-transformers for 3.14 to keep equivalent functionality
+  # this is less than desirable because sentence-transformers is a *very heavy* dependency compared to fastembed
+  "sentence-transformers>=5.1.2; python_version <= '3.14'",
   "tenacity>=9.1.2",
   "textcase>=0.4.5",
   "tiktoken>=0.12.0",
@@ -175,9 +179,9 @@ bedrock = [
 cohere = ["pydantic-ai-slim[cohere]"]
 # ==== Data Sources ====
 duckduckgo = ["pydantic-ai-slim[duckduckgo]"]
-fastembed = ["fastembed", "py-cpuinfo"]
+fastembed = ["fastembed; python_version < '3.14'", "py-cpuinfo"]
 # Requires additional setup, see https://qdrant.github.io/fastembed/examples/FastEmbed_GPU/
-fastembed-gpu = ["fastembed-gpu", "py-cpuinfo"]
+fastembed-gpu = ["fastembed-gpu; python_version < '3.14'", "py-cpuinfo"]
 # workos AuthKit middleware - see https://gofastmcp.com/integrations/authkit
 # No additional dependencies required, it's purely REST-based.
 # Enable with environment variables:
@@ -199,8 +203,9 @@ full = [
 full-gpu = [
   "permit-fastmcp",
   "eunomia-mcp",
-  "fastembed-gpu",
+  "fastembed-gpu; python_version < '3.14'",
   "permit-fastmcp",
+  "pydantic-ai-slim[openai,cohere,google,anthropic,groq,mistral,bedrock,huggingface,duckduckgo,tavily,retries]",
   "pydantic-settings[yaml,toml,aws-secrets-manager,azure-key-vault,gcp-secret-manager]",
   "sentence-transformers",
   # see note below about why this is commented out
@@ -209,7 +214,7 @@ full-gpu = [
 gcp-secret-manager = ["pydantic-settings[yaml,toml,gcp-secret-manager]"]
 google = ["pydantic-ai-slim[google]"]
 gpu-support = [
-  "fastembed-gpu",
+  "fastembed-gpu; python_version < '3.14'",
   # see note below about why this is commented out
   #  "sentence-transformers[onnx-gpu]; python_version>='3.12' and python_version<'3.14'",
 ]
@@ -225,10 +230,21 @@ mistral = ["pydantic-ai-slim[mistral]"]
 # which all use the OpenAI API
 openai = ["pydantic-ai-slim[openai]"]
 qdrant = ["qdrant-client"]
-recommended-local-only = [
-  "fastembed",
+recommended = [
+  "fastembed; python_version < '3.14'",
   "sentence-transformers",
   "tokenizers",
+  "py-cpuinfo",
+  "voyageai",
+  "pydantic-ai-slim[openai,anthropic,duckduckgo,tavily,retries]",
+]
+recommended-local-only = [
+  "fastembed; python_version < '3.14'",
+  "sentence-transformers",
+  "tokenizers",
+  "py-cpuinfo",
+  # openai for ollama local models
+  "pydantic-ai-slim[openai,duckduckgo,retries]",
 ]
 sentence-transformers = [
   "sentence-transformers",
@@ -458,8 +474,10 @@ python_files = ["*_test.py", "test_*.py"]
 python_functions = ["test_*"]
 testpaths = ["tests"]
 asyncio_mode = "auto"
-timeout = "300"
+timeout = "600"
 timeout_method = "thread"
+# Override timeout for specific markers
+timeout_func_only = true  # Don't timeout on setup/teardown
 
 [tool.ty.environment]
 python-version = "3.12"
@@ -589,6 +607,12 @@ include = ["src/codeweaver/core/types/aliases.py"]
 
 [tool.ty.overrides.rules]
 invalid-newtype = "ignore"
+
+[tool.uv]
+conflicts = [
+  [{ extra = "full-gpu" }, { extra = "full" }],
+  [{ extra = "fastembed" }, { extra = "fastembed-gpu" }]
+]
 
 [tool.uv.sources]
 types-boto3-custom = { path = "vendored/types_boto3_custom-1.41.2-py3-none-any.whl" }

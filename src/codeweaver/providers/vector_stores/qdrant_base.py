@@ -26,6 +26,8 @@ from qdrant_client.http.models.models import (
     CollectionsResponse,
     Datatype,
     Distance,
+    Document,
+    Modifier,
     PointStruct,
     QueryResponse,
     SparseIndexParams,
@@ -106,7 +108,9 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         """
         return client is not None and isinstance(client, AsyncQdrantClient)
 
-    def _generate_metadata(self, *, for_backup: bool = False) -> CollectionMetadata:
+    def _generate_metadata(
+        self, *, for_backup: bool = False, collection_name: str | None = None
+    ) -> CollectionMetadata:
         """Generate collection metadata from current provider configuration.
 
         Returns:
@@ -138,13 +142,19 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         quantization_config = BinaryQuantization() if self.dense_dtype == "binary" else None
         if self.dense_dtype in ("binary", "int8") or for_backup:
             datatype = Datatype.UINT8
+        sparse_model = (
+            getattr(self._embedding_caps["backup_sparse"], "name", None)
+            if for_backup
+            else self.sparse_model
+        )
+        sparse_model = sparse_model or "qdrant/bm25"
         return CollectionMetadata.model_validate({
             "provider": self._provider.variable,
             "created_at": datetime.now(UTC),
             "project_name": project_name,
             "vector_config": {
                 "dense": VectorParams(
-                    size=getattr(self._embedding_caps["backup_dense"], "default_dimension", 384)
+                    size=getattr(self._embedding_caps["backup_dense"], "default_dimension", 256)
                     if for_backup
                     else (
                         self._settings.get("dense", {}).get("dimension") or dense_dim
@@ -162,17 +172,21 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
                 )
             },
             "sparse_config": {
-                "sparse": SparseVectorParams(index=SparseIndexParams(datatype=Datatype.FLOAT16))
+                "sparse": SparseVectorParams(
+                    index=SparseIndexParams(datatype=Datatype.FLOAT16),
+                    modifier=Modifier.IDF if sparse_model == "qdrant/bm25" else None,
+                )
             },
-            "collection_name": self.config.get("collection_name")
+            "collection_name": collection_name
+            or self.config.get("collection_name")
             or self._default_collection_name(),
             "is_backup": for_backup,
             "dense_model": getattr(self._embedding_caps["backup_dense"], "name", None)
             if for_backup
             else self.dense_model,
-            "sparse_model": getattr(self._embedding_caps["backup_sparse"], "name", None)
-            if for_backup
-            else self.sparse_model,
+            # if there is no configured sparse model,
+            # we generate an IDF index w/ bm25
+            "sparse_model": sparse_model,
         })
 
     def _default_collection_name(self) -> str:
@@ -183,6 +197,13 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
 
     async def _initialize(self) -> None:
         """Initialize the Qdrant provider with configurations."""
+        # Skip re-initialization if already initialized (critical for in-memory providers)
+        if self._client is not None:
+            logger.debug(
+                "%s already initialized, skipping re-initialization", self.__class__.__name__
+            )
+            return
+
         # Preserve any explicitly provided collection_name before fetching registry config
         # This is critical for test isolation where tests provide their own collection names
         provided_collection_name = self.config.get("collection_name") if self.config else None
@@ -300,7 +321,9 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
                 self._known_collections.add(collection_name)
                 return
             await self._client.create_collection(
-                **self._generate_metadata(for_backup=for_backup).to_collection()
+                **self._generate_metadata(
+                    for_backup=for_backup, collection_name=collection_name
+                ).to_collection()
             )
             self._known_collections.add(collection_name)
             return  # we don't need to validate because it's new
@@ -310,7 +333,9 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
                     self._known_collections |= {col.name for col in collections.collections}
                 if collection_name not in self._known_collections:
                     await self._client.create_collection(
-                        **self._generate_metadata(for_backup=for_backup).to_collection()
+                        **self._generate_metadata(
+                            for_backup=for_backup, collection_name=collection_name
+                        ).to_collection()
                     )
                     self._known_collections.add(collection_name)
                     return  # we don't need to validate because it's new
@@ -611,6 +636,8 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
                     self._prepare_sparse_vector_data(sparse_emb, SparseVector, vectors)
             elif isinstance(sparse_info, CodeWeaverSparseEmbedding):
                 self._prepare_sparse_vector_data(sparse_info, SparseVector, vectors)
+        if not sparse_info:
+            vectors["sparse"] = Document(text=chunk.content, model="qdrant/bm25")
         return vectors
 
     def _prepare_sparse_vector_data(
@@ -822,7 +849,6 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
             List of PointStruct objects.
         """
         points: list[PointStruct] = []
-
         for chunk in chunks:
             vectors = self._prepare_vectors(chunk)
             payload = self._create_payload(chunk, for_backup=for_backup)

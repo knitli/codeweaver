@@ -54,6 +54,9 @@ class MockVectorStoreProvider:
         self._circuit_state = circuit_state
         self._client = MagicMock()
         self._initialized = False
+        # Add config attribute to match real provider interface
+        self.config = MagicMock()
+        self.config.backup_sync_interval = 300  # 5 minutes default
 
     @property
     def circuit_breaker_state(self) -> CircuitBreakerState:

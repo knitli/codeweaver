@@ -831,6 +831,9 @@ class CodeWeaverSettings(BaseSettings):
             - AWS Secrets Manager
             - Azure Key Vault
             - Google Secret Manager
+
+        #! IMPORTANT
+        If the environment variable `CODEWEAVER_TEST_MODE` is set to "true", test config paths like codeweaver.test.toml become the *only* config sources. All others get ignored. It's important this get set and unset when testing is over.
         """
         config_files: list[PydanticBaseSettingsSource] = []
         cls._ensure_settings_dirs()
@@ -890,6 +893,10 @@ class CodeWeaverSettings(BaseSettings):
                 config_files.append(_class(settings_cls, Path(f"{loc}.{ext}")))
                 if ext == "yaml":
                     config_files.append(_class(settings_cls, Path(f"{loc}.yml")))
+        # if we're testing, we want to control and isolate test configs
+        # Still allow init_settings so tests can programmatically override config
+        if is_test_mode:
+            return (init_settings, *config_files)
         other_sources: list[PydanticBaseSettingsSource] = []
         if any(env for env in os.environ if env.startswith("AWS_SECRETS_MANAGER")):
             other_sources.append(

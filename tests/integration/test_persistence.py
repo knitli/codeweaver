@@ -33,9 +33,11 @@ async def test_persistence_across_restarts(qdrant_test_manager):
     When: I restart CodeWeaver
     Then: System retrieves previously stored embeddings without re-embedding
     """
-    # Create unique collection
+    # Create unique collection with sparse vector support (needed for BM25)
     collection_name = qdrant_test_manager.create_collection_name("persist")
-    await qdrant_test_manager.create_collection(collection_name, dense_vector_size=768)
+    await qdrant_test_manager.create_collection(
+        collection_name, dense_vector_size=768, sparse_vector_size=1000
+    )
 
     config = QdrantConfig(url=qdrant_test_manager.url, collection_name=collection_name)
 

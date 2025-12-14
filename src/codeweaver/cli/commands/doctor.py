@@ -213,6 +213,9 @@ def _identify_missing_dependencies(
         and match["name"]
         != "py-cpuinfo"  # it's technically required, but it's for optimizations; not strictly required
     ]
+    python_version = sys.version_info
+    if python_version >= (3, 14) and any(pkg[0] == "uuid_extensions" for pkg in required_packages):
+        required_packages = [pkg for pkg in required_packages if pkg[0] != "uuid_extensions"]
 
     for display_name, module_name, _version in required_packages:
         if find_spec(module_name):

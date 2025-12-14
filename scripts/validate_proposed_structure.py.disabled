@@ -1,0 +1,315 @@
+#!/usr/bin/env python3
+"""Validate the proposed monorepo package structure against actual dependencies."""
+# TEMPORARILY DISABLED until refactor complete. This script isn't currently used in any processes.
+
+import ast
+import json
+
+from collections import defaultdict
+from pathlib import Path
+
+
+class DetailedImportAnalyzer(ast.NodeVisitor):
+    """Analyze imports at the file level."""
+
+    def __init__(self, package_root: str):
+        self.package_root = package_root
+        self.imports: dict[str, list[tuple[str, int]]] = defaultdict(
+            list
+        )  # import -> [(file, line)]
+
+    def visit_Import(self, node: ast.Import) -> None:
+        """Visit import statements."""
+        for alias in node.names:
+            if alias.name.startswith(self.package_root):
+                self.imports[alias.name].append((alias.name, node.lineno))
+        self.generic_visit(node)
+
+    def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
+        """Visit from...import statements."""
+        if node.module and node.module.startswith(self.package_root):
+            for name in node.names:
+                full_import = f"{node.module}.{name.name}"
+                self.imports[node.module].append((full_import, node.lineno))
+        self.generic_visit(node)
+
+
+def analyze_file_imports(file_path: Path, package_root: str) -> dict[str, list[tuple[str, int]]]:
+    """Analyze imports in a single file with line numbers."""
+    try:
+        with file_path.open(encoding="utf-8") as f:
+            tree = ast.parse(f.read(), filename=str(file_path))
+
+        analyzer = DetailedImportAnalyzer(package_root)
+        analyzer.visit(tree)
+        return dict(analyzer.imports)
+    except (SyntaxError, UnicodeDecodeError) as e:
+        print(f"Warning: Could not parse {file_path}: {e}")
+        return {}
+
+
+def get_module_path(import_str: str) -> str:
+    """Extract module path from import string."""
+    # codeweaver.core.types.models -> codeweaver.core
+    parts = import_str.split(".")
+    return ".".join(parts[:2]) if len(parts) >= 2 else import_str
+
+
+def analyze_proposed_structure():
+    """Analyze the proposed package structure."""
+    src_dir = Path("src/codeweaver")
+
+    # Define proposed packages
+    proposed_packages = {
+        "codeweaver-core": {
+            "includes": ["core", "exceptions"],
+            "description": "Core types and exceptions",
+            "intended_deps": [],
+        },
+        "codeweaver-semantic": {
+            "includes": ["semantic", "data"],
+            "description": "AST analytics",
+            "intended_deps": ["codeweaver-core"],
+        },
+        "codeweaver-utils": {
+            "includes": ["common/utils"],
+            "description": "Utility functions",
+            "intended_deps": ["codeweaver-core"],
+        },
+        "codeweaver-tokenizers": {
+            "includes": ["tokenizers"],
+            "description": "Tokenization utilities",
+            "intended_deps": ["codeweaver-core"],
+        },
+        "codeweaver-daemon": {
+            "includes": ["daemon"],
+            "description": "Daemon management",
+            "intended_deps": [],
+        },
+        "codeweaver-telemetry": {
+            "includes": ["common/telemetry", "common/statistics"],
+            "description": "Telemetry and statistics",
+            "intended_deps": ["codeweaver-core"],
+        },
+        "codeweaver-providers": {
+            "includes": ["providers"],
+            "description": "Provider implementations",
+            "intended_deps": [
+                "codeweaver-core",
+                "codeweaver-tokenizers",
+                "codeweaver-telemetry",
+                "codeweaver-utils",
+            ],
+        },
+        "codeweaver-engine": {
+            "includes": ["engine", "common/registry", "config"],
+            "description": "Chunking and indexing engine",
+            "intended_deps": [
+                "codeweaver-core",
+                "codeweaver-semantic",
+                "codeweaver-providers",
+                "codeweaver-utils",
+                "codeweaver-telemetry",
+            ],
+        },
+        "codeweaver": {
+            "includes": ["cli", "server", "mcp", "agent_api", "main"],
+            "description": "Main application package",
+            "intended_deps": ["codeweaver-engine", "codeweaver-providers", "codeweaver-daemon"],
+        },
+    }
+
+    # Map source paths to proposed packages
+    path_to_package = {}
+    for pkg_name, pkg_info in proposed_packages.items():
+        for include_path in pkg_info["includes"]:
+            # Normalize path
+            normalized = include_path.replace("/", ".")
+            # Handle both 'core' and 'codeweaver.core' formats
+            if not normalized.startswith("codeweaver."):
+                normalized = f"codeweaver.{normalized}"
+            path_to_package[normalized] = pkg_name
+
+    # Special handling for exceptions (it's a file, not a package)
+    path_to_package["codeweaver.exceptions"] = "codeweaver-core"
+
+    # Analyze actual dependencies
+    file_dependencies = {}
+
+    for py_file in src_dir.rglob("*.py"):
+        if py_file.name == "__init__.py":
+            continue
+
+        rel_path = py_file.relative_to(src_dir.parent)
+        file_key = str(rel_path).replace("/", ".").replace(".py", "")
+
+        imports = analyze_file_imports(py_file, "codeweaver")
+        if imports:
+            file_dependencies[file_key] = imports
+
+    # Build package-to-package dependencies from file imports
+    package_deps = defaultdict(set)
+    violations = defaultdict(list)
+
+    for file_path, imports in file_dependencies.items():
+        # Determine which proposed package this file belongs to
+        source_pkg = None
+        for path_prefix, pkg_name in path_to_package.items():
+            if file_path.startswith(path_prefix):
+                source_pkg = pkg_name
+                break
+
+        if not source_pkg:
+            # File not in any proposed package (probably common/logging etc)
+            continue
+
+        # Check each import
+        for import_path in imports:
+            target_module = get_module_path(import_path)
+
+            # Find target package
+            target_pkg = None
+            for path_prefix, pkg_name in path_to_package.items():
+                if import_path.startswith(path_prefix) or target_module == path_prefix:
+                    target_pkg = pkg_name
+                    break
+
+            if not target_pkg or target_pkg == source_pkg:
+                continue
+
+            # Record dependency
+            package_deps[source_pkg].add(target_pkg)
+
+            # Check if this violates intended dependencies
+            intended = proposed_packages[source_pkg]["intended_deps"]
+            if target_pkg not in intended and target_pkg != source_pkg:
+                violations[source_pkg].append({
+                    "file": file_path,
+                    "imports_from": target_pkg,
+                    "import": import_path,
+                    "allowed": intended,
+                })
+
+    # Generate report
+    print("=" * 80)
+    print("PROPOSED PACKAGE STRUCTURE VALIDATION")
+    print("=" * 80)
+
+    print("\n📦 Proposed Packages:\n")
+    for pkg_name, pkg_info in proposed_packages.items():
+        print(f"{pkg_name}")
+        print(f"  Description: {pkg_info['description']}")
+        print(f"  Includes: {', '.join(pkg_info['includes'])}")
+        print(
+            f"  Intended deps: {', '.join(pkg_info['intended_deps']) if pkg_info['intended_deps'] else 'None'}"
+        )
+        actual_deps = package_deps.get(pkg_name, set())
+        print(f"  Actual deps: {', '.join(sorted(actual_deps)) if actual_deps else 'None'}")
+        print()
+
+    print("\n🔍 Dependency Validation:\n")
+
+    for pkg_name in proposed_packages:
+        intended = set(proposed_packages[pkg_name]["intended_deps"])
+        actual = package_deps.get(pkg_name, set())
+
+        extra = actual - intended
+        intended - actual  # This is expected if not all imports are made yet
+
+        if extra:
+            print(f"❌ {pkg_name}")
+            print(f"   Unexpected dependencies: {', '.join(sorted(extra))}")
+        elif not actual and not intended:
+            print(f"✅ {pkg_name} - No dependencies (as intended)")
+        elif actual == intended:
+            print(f"✅ {pkg_name} - All dependencies match")
+        elif actual.issubset(intended):
+            print(f"🟡 {pkg_name} - Dependencies are subset of intended (OK)")
+        else:
+            print(f"⚠️ {pkg_name} - Partial match")
+
+    print("\n\n🚨 Dependency Violations:\n")
+
+    if violations:
+        for pkg_name, pkg_violations in sorted(violations.items()):
+            print(f"\n{pkg_name} ({len(pkg_violations)} violations):")
+
+            # Group by target package
+            by_target = defaultdict(list)
+            for v in pkg_violations:
+                by_target[v["imports_from"]].append(v)
+
+            for target_pkg, viols in sorted(by_target.items()):
+                print(f"\n  → {target_pkg} ({len(viols)} imports)")
+                # Show a few examples
+                for v in viols[:5]:
+                    print(f"     • {v['file']}")
+                    print(f"       imports: {v['import']}")
+                if len(viols) > 5:
+                    print(f"     ... and {len(viols) - 5} more")
+    else:
+        print("✅ No violations detected!")
+
+    # Save detailed report
+    output = {
+        "proposed_packages": proposed_packages,
+        "actual_dependencies": {k: list(v) for k, v in package_deps.items()},
+        "violations": dict(violations.items()),
+    }
+
+    output_file = Path("claudedocs/proposed_structure_validation.json")
+    with output_file.open(output_file, "w") as f:
+        json.dump(output, f, indent=2)
+
+    print(f"\n\n📄 Detailed report saved to: {output_file}")
+
+    # Summary
+    print("\n" + "=" * 80)
+    print("SUMMARY")
+    print("=" * 80)
+
+    total_violations = sum(len(v) for v in violations.values())
+    clean_packages = len([p for p in proposed_packages if p not in violations])
+
+    print(f"\nTotal packages: {len(proposed_packages)}")
+    print(f"Clean packages: {clean_packages}")
+    print(f"Packages with violations: {len(violations)}")
+    print(f"Total dependency violations: {total_violations}")
+
+    if total_violations == 0:
+        print("\n✅ Proposed structure is VALID - no refactoring needed!")
+    elif total_violations < 20:
+        print("\n🟡 Proposed structure is MOSTLY VALID - minor refactoring needed")
+    elif total_violations < 50:
+        print("\n⚠️ Proposed structure requires MODERATE refactoring")
+    else:
+        print("\n🔴 Proposed structure requires SIGNIFICANT refactoring")
+
+    # Provide actionable recommendations
+    print("\n\n🎯 Next Steps:\n")
+
+    if total_violations == 0:
+        print("1. ✅ Structure is ready - proceed with monorepo setup")
+        print("2. ✅ Configure uv workspace")
+        print("3. ✅ Create package directories")
+    else:
+        print("Refactoring priorities (highest impact):\n")
+
+        # Sort by violation count
+        sorted_violations = sorted(violations.items(), key=lambda x: len(x[1]), reverse=True)
+
+        for i, (pkg_name, viols) in enumerate(sorted_violations[:5], 1):
+            print(f"{i}. {pkg_name} ({len(viols)} violations)")
+
+            # Identify most common violating dependencies
+            target_counts = defaultdict(int)
+            for v in viols:
+                target_counts[v["imports_from"]] += 1
+
+            top_targets = sorted(target_counts.items(), key=lambda x: x[1], reverse=True)[:3]
+            for target, count in top_targets:
+                print(f"   - Remove dependency on {target} ({count} imports)")
+
+
+if __name__ == "__main__":
+    analyze_proposed_structure()

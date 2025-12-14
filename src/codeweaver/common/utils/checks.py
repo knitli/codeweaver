@@ -106,17 +106,22 @@ def file_is_binary(file_path: Path) -> bool:
 
 def is_test_environment() -> bool:
     """Check if the code is running in a test environment."""
-    pytest_loaded = "pytest" in sys.modules
-    pytest_flagged = any(arg.startswith("-m") and "pytest" in arg for arg in sys.argv)
-    test_mode_disabled = os.environ.get("CODEWEAVER_TEST_MODE", "0") not in {
+    # Check if CODEWEAVER_TEST_MODE is explicitly enabled
+    test_mode_enabled = os.environ.get("CODEWEAVER_TEST_MODE", "0") in {
         "1",
         "true",
         "True",
         "TRUE",
     }
+    if test_mode_enabled:
+        return True
+
+    # Fallback: detect pytest environment
+    pytest_loaded = "pytest" in sys.modules
+    pytest_flagged = any(arg.startswith("-m") and "pytest" in arg for arg in sys.argv)
     pytest_current_test = bool(os.environ.get("PYTEST_CURRENT_TEST"))
 
-    return pytest_loaded or (pytest_flagged and (test_mode_disabled or pytest_current_test))
+    return pytest_loaded or (pytest_flagged and pytest_current_test)
 
 
 def is_wsl() -> bool:

@@ -44,7 +44,7 @@ def run_command(
     Returns:
         CompletedProcess with stdout/stderr
     """
-    return subprocess.run(cmd, check=check, capture_output=capture, text=True, timeout=300)
+    return subprocess.run(cmd, check=check, capture_output=capture, text=True, timeout=600)
 
 
 def find_free_port() -> int:

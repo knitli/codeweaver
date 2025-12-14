@@ -104,7 +104,7 @@ jobs:
       MISE_YES: 1
       PROFILE: "dev"
       CODEWEAVER_PROJECT_PATH: ${{ github.workspace }}
-      CODEWEAVER_TESTING: "true"
+      CODEWEAVER_TEST_MODE: "true"
       MISE_PYTHON_VERSION: "3.12"
       UV_PYTHON: "3.12"
     steps:
@@ -180,7 +180,7 @@ jobs:
         with:
           name: benchmark-results
           path: ./benchmarks/
-      
+
       - name: Download benchmark summary
         if: needs.weekly-benchmarks.result != 'skipped'
         uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16
@@ -188,21 +188,21 @@ jobs:
         with:
           name: benchmark-summary
           path: ./benchmarks/
-      
+
       - name: Check test results
         id: check-results
+        env:
+          linux_result: ${{ needs.weekly-comprehensive-linux.result }}
+          windows_result: ${{ needs.weekly-comprehensive-windows.result }}
+          macos_result: ${{ needs.weekly-comprehensive-macos.result }}
+          benchmark_result: ${{ needs.weekly-benchmarks.result }}
+          coverage_result: ${{ needs.weekly-coverage-report.result }}
         run: |
-          linux_result="${{ needs.weekly-comprehensive-linux.result }}"
-          windows_result="${{ needs.weekly-comprehensive-windows.result }}"
-          macos_result="${{ needs.weekly-comprehensive-macos.result }}"
-          benchmark_result="${{ needs.weekly-benchmarks.result }}"
-          coverage_result="${{ needs.weekly-coverage-report.result }}"
-
-          echo "Linux Tests: $linux_result"
-          echo "Windows Tests: $windows_result"
-          echo "macOS Tests: $macos_result"
-          echo "Benchmarks: $benchmark_result"
-          echo "Coverage Report: $coverage_result"
+          echo "Linux Tests: ${linux_result}"
+          echo "Windows Tests: ${windows_result}"
+          echo "macOS Tests: ${macos_result}"
+          echo "Benchmarks: ${benchmark_result}"
+          echo "Coverage Report: ${coverage_result}"
 
           # Calculate overall status
           critical_failure=false
@@ -217,119 +217,131 @@ jobs:
           fi
 
           if [ "$critical_failure" == "true" ]; then
-            echo "status=failure" >> $GITHUB_OUTPUT
+            echo "status=failure" >> "$GITHUB_OUTPUT"
             echo "Overall Status: FAILURE ❌"
           elif [ "$platform_warnings" == "true" ]; then
-            echo "status=warning" >> $GITHUB_OUTPUT
+            echo "status=warning" >> "$GITHUB_OUTPUT"
             echo "Overall Status: WARNING ⚠️ (Platform-specific failures)"
           else
-            echo "status=success" >> $GITHUB_OUTPUT
+            echo "status=success" >> "$GITHUB_OUTPUT"
             echo "Overall Status: SUCCESS ✅"
           fi
 
       - name: Generate comprehensive summary
         run: |
-          echo "# Weekly Comprehensive Test Results 📊" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Week Ending**: $(date -u +"%Y-%m-%d")" >> $GITHUB_STEP_SUMMARY
-          echo "**Test Date**: $(date -u +"%Y-%m-%d %H:%M UTC")" >> $GITHUB_STEP_SUMMARY
-          echo "**Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "# Weekly Comprehensive Test Results 📊"
+            echo ""
+            echo "**Week Ending**: $(date -u +"%Y-%m-%d")"
+            echo "**Test Date**: $(date -u +"%Y-%m-%d %H:%M UTC")"
+            echo "**Commit**: ${{ github.sha }}"
+            echo ""
+          } >> "${GITHUB_STEP_SUMMARY}"
 
-          echo "## Platform Test Results" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "## Platform Test Results"
+            echo ""
+          } >> "${GITHUB_STEP_SUMMARY}"
 
           linux="${{ needs.weekly-comprehensive-linux.result }}"
           windows="${{ needs.weekly-comprehensive-windows.result }}"
           macos="${{ needs.weekly-comprehensive-macos.result }}"
 
           # Linux Tests
-          if [ "$linux" == "success" ]; then
-            echo "- ✅ **Linux**: PASSED (Python 3.12, 3.13, 3.14)" >> $GITHUB_STEP_SUMMARY
-          elif [ "$linux" == "failure" ]; then
-            echo "- ❌ **Linux**: FAILED" >> $GITHUB_STEP_SUMMARY
+          if [ "${linux}" == "success" ]; then
+            echo "- ✅ **Linux**: PASSED (Python 3.12, 3.13, 3.14)" >> "${GITHUB_STEP_SUMMARY}"
+          elif [ "${linux}" == "failure" ]; then
+            echo "- ❌ **Linux**: FAILED" >> "${GITHUB_STEP_SUMMARY}"
           else
-            echo "- ⚠️ **Linux**: $linux" >> $GITHUB_STEP_SUMMARY
+            echo "- ⚠️ **Linux**: ${linux}" >> "${GITHUB_STEP_SUMMARY}"
           fi
 
           # Windows Tests
-          if [ "$windows" == "success" ]; then
-            echo "- ✅ **Windows**: PASSED (Python 3.12, 3.13)" >> $GITHUB_STEP_SUMMARY
-          elif [ "$windows" == "failure" ]; then
-            echo "- ⚠️ **Windows**: FAILED (Non-blocking)" >> $GITHUB_STEP_SUMMARY
-          elif [ "$windows" == "skipped" ]; then
-            echo "- ⏭️ **Windows**: SKIPPED" >> $GITHUB_STEP_SUMMARY
+          if [ "${windows}" == "success" ]; then
+            echo "- ✅ **Windows**: PASSED (Python 3.12, 3.13)" >> "${GITHUB_STEP_SUMMARY}"
+          elif [ "${windows}" == "failure" ]; then
+            echo "- ⚠️ **Windows**: FAILED (Non-blocking)" >> "${GITHUB_STEP_SUMMARY}"
+          elif [ "${windows}" == "skipped" ]; then
+            echo "- ⏭️ **Windows**: SKIPPED" >> "${GITHUB_STEP_SUMMARY}"
           else
-            echo "- ⚠️ **Windows**: $windows" >> $GITHUB_STEP_SUMMARY
+            echo "- ⚠️ **Windows**: ${windows}" >> "${GITHUB_STEP_SUMMARY}"
           fi
 
           # macOS Tests
-          if [ "$macos" == "success" ]; then
-            echo "- ✅ **macOS**: PASSED (Python 3.12, 3.13)" >> $GITHUB_STEP_SUMMARY
-          elif [ "$macos" == "failure" ]; then
-            echo "- ⚠️ **macOS**: FAILED (Non-blocking)" >> $GITHUB_STEP_SUMMARY
-          elif [ "$macos" == "skipped" ]; then
-            echo "- ⏭️ **macOS**: SKIPPED" >> $GITHUB_STEP_SUMMARY
+          if [ "${macos}" == "success" ]; then
+            echo "- ✅ **macOS**: PASSED (Python 3.12, 3.13)" >> "${GITHUB_STEP_SUMMARY}"
+          elif [ "${macos}" == "failure" ]; then
+            echo "- ⚠️ **macOS**: FAILED (Non-blocking)" >> "${GITHUB_STEP_SUMMARY}"
+          elif [ "${macos}" == "skipped" ]; then
+            echo "- ⏭️ **macOS**: SKIPPED" >> "${GITHUB_STEP_SUMMARY}"
           else
-            echo "- ⚠️ **macOS**: $macos" >> $GITHUB_STEP_SUMMARY
+            echo "- ⚠️ **macOS**: ${macos}" >> "${GITHUB_STEP_SUMMARY}"
           fi
 
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## Additional Test Suites" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
+          {
+            echo ""
+            echo "## Additional Test Suites"
+            echo ""
+          } >> "${GITHUB_STEP_SUMMARY}"
 
           benchmark="${{ needs.weekly-benchmarks.result }}"
           coverage="${{ needs.weekly-coverage-report.result }}"
 
           # Benchmarks
-          if [ "$benchmark" == "success" ]; then
-            echo "- ✅ **Performance Benchmarks**: COMPLETED" >> $GITHUB_STEP_SUMMARY
+          if [ "${benchmark}" == "success" ]; then
+            echo "- ✅ **Performance Benchmarks**: COMPLETED" >> "${GITHUB_STEP_SUMMARY}"
             # Include benchmark summary if available
             if [ -f "./benchmarks/benchmark-summary.md" ]; then
-              echo "" >> $GITHUB_STEP_SUMMARY
-              echo "### Benchmark Results" >> $GITHUB_STEP_SUMMARY
-              cat ./benchmarks/benchmark-summary.md >> $GITHUB_STEP_SUMMARY
+              {
+                echo ""
+                echo "### Benchmark Results"
+                cat ./benchmarks/benchmark-summary.md
+              } >> "${GITHUB_STEP_SUMMARY}"
             fi
-          elif [ "$benchmark" == "failure" ]; then
-            echo "- ⚠️ **Performance Benchmarks**: FAILED (Non-blocking)" >> $GITHUB_STEP_SUMMARY
-          elif [ "$benchmark" == "skipped" ]; then
-            echo "- ⏭️ **Performance Benchmarks**: SKIPPED" >> $GITHUB_STEP_SUMMARY
+          elif [ "${benchmark}" == "failure" ]; then
+            echo "- ⚠️ **Performance Benchmarks**: FAILED (Non-blocking)" >> "${GITHUB_STEP_SUMMARY}"
+          elif [ "${benchmark}" == "skipped" ]; then
+            echo "- ⏭️ **Performance Benchmarks**: SKIPPED" >> "${GITHUB_STEP_SUMMARY}"
           else
-            echo "- ⚠️ **Performance Benchmarks**: $benchmark" >> $GITHUB_STEP_SUMMARY
+            echo "- ⚠️ **Performance Benchmarks**: ${benchmark}" >> "${GITHUB_STEP_SUMMARY}"
           fi
 
           # Coverage
-          if [ "$coverage" == "success" ]; then
-            echo "- ✅ **Coverage Report**: GENERATED" >> $GITHUB_STEP_SUMMARY
-          elif [ "$coverage" == "failure" ]; then
-            echo "- ⚠️ **Coverage Report**: FAILED" >> $GITHUB_STEP_SUMMARY
+          if [ "${coverage}" == "success" ]; then
+            echo "- ✅ **Coverage Report**: GENERATED" >> "${GITHUB_STEP_SUMMARY}"
+          elif [ "${coverage}" == "failure" ]; then
+            echo "- ⚠️ **Coverage Report**: FAILED" >> "${GITHUB_STEP_SUMMARY}"
           else
-            echo "- ⚠️ **Coverage Report**: $coverage" >> $GITHUB_STEP_SUMMARY
+            echo "- ⚠️ **Coverage Report**: ${coverage}" >> "${GITHUB_STEP_SUMMARY}"
           fi
 
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## Overall Status" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
+          {
+            echo ""
+            echo "## Overall Status"
+            echo ""
+          } >> "${GITHUB_STEP_SUMMARY}"
 
           status="${{ steps.check-results.outputs.status }}"
-          if [ "$status" == "success" ]; then
-            echo "✅ **All critical tests passed across all platforms**" >> $GITHUB_STEP_SUMMARY
-          elif [ "$status" == "warning" ]; then
-            echo "⚠️ **Linux tests passed, but some platform-specific failures detected**" >> $GITHUB_STEP_SUMMARY
-          elif [ "$status" == "failure" ]; then
-            echo "❌ **Critical test failures detected on Linux**" >> $GITHUB_STEP_SUMMARY
+          if [ "${status}" == "success" ]; then
+            echo "✅ **All critical tests passed across all platforms**" >> "${GITHUB_STEP_SUMMARY}"
+          elif [ "${status}" == "warning" ]; then
+            echo "⚠️ **Linux tests passed, but some platform-specific failures detected**" >> "${GITHUB_STEP_SUMMARY}"
+          elif [ "${status}" == "failure" ]; then
+            echo "❌ **Critical test failures detected on Linux**" >> "${GITHUB_STEP_SUMMARY}"
           else
-            echo "❓ **Unknown status**" >> $GITHUB_STEP_SUMMARY
+            echo "❓ **Unknown status**" >> "${GITHUB_STEP_SUMMARY}"
           fi
 
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## Artifacts" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- Test Results: Check workflow artifacts for platform-specific results" >> $GITHUB_STEP_SUMMARY
-          echo "- Coverage Report: Full HTML coverage report available in artifacts" >> $GITHUB_STEP_SUMMARY
-          echo "- Benchmark Results: Performance metrics available in artifacts" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "View full results: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
+          {
+            echo ""
+            echo "## Artifacts"
+            echo ""
+            echo "- Test Results: Check workflow artifacts for platform-specific results"
+            echo "- Coverage Report: Full HTML coverage report available in artifacts"
+            echo "- Benchmark Results: Performance metrics available in artifacts"
+            echo ""
+            echo "View full results: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          } >> "${GITHUB_STEP_SUMMARY}"
 
       - name: Create issue on failure
         if: steps.check-results.outputs.status == 'failure'
@@ -337,7 +349,7 @@ jobs:
         with:
           script: |
             const title = `📊 Weekly Tests Failed - Week of ${new Date().toISOString().split('T')[0]}`;
-            
+
             // Read benchmark summary if available
             const fs = require('fs');
             let benchmarkInfo = '';
@@ -349,7 +361,7 @@ jobs:
             } catch (err) {
               console.log('No benchmark summary available');
             }
-            
+
             const body = `## Weekly Comprehensive Test Failure Report
 
             **Week Ending**: ${new Date().toISOString().split('T')[0]}

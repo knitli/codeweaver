@@ -12,9 +12,15 @@ import time
 
 from typing import TYPE_CHECKING, Annotated, Any
 
-from anthropic._models import computed_field
 from fastmcp import FastMCP
-from pydantic import ConfigDict, Field, NonNegativeFloat, NonNegativeInt, PrivateAttr
+from pydantic import (
+    ConfigDict,
+    Field,
+    NonNegativeFloat,
+    NonNegativeInt,
+    PrivateAttr,
+    computed_field,
+)
 from pydantic.dataclasses import dataclass
 
 from codeweaver.common.utils.lazy_importer import lazy_import

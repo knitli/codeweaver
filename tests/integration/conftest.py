@@ -9,8 +9,10 @@
 from __future__ import annotations
 
 import contextlib
+import os
 
 from collections.abc import AsyncGenerator, Generator
+from importlib.util import find_spec
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -18,16 +20,33 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from codeweaver.common.registry.provider import ProviderRegistry
-from codeweaver.providers.provider import Provider
+from codeweaver.providers.embedding.providers.fastembed import FastEmbedEmbeddingProvider
 from codeweaver.providers.vector_stores.inmemory import MemoryVectorStoreProvider
 
 
 if TYPE_CHECKING:
+    from codeweaver.config.providers import (
+        EmbeddingProviderSettings,
+        RerankingProviderSettings,
+        SparseEmbeddingProviderSettings,
+    )
+    from codeweaver.config.types import CodeWeaverSettingsDict
     from codeweaver.core.chunks import CodeChunk
+    from codeweaver.core.types.dictview import DictView
+    from codeweaver.providers.embedding.capabilities.base import (
+        EmbeddingModelCapabilities,
+        SparseEmbeddingModelCapabilities,
+    )
+    from codeweaver.providers.embedding.providers.fastembed import (
+        FastEmbedEmbeddingProvider,
+        FastEmbedSparseProvider,
+    )
     from codeweaver.providers.embedding.providers.sentence_transformers import (
         SentenceTransformersEmbeddingProvider,
         SentenceTransformersSparseProvider,
     )
+    from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
+    from codeweaver.providers.reranking.providers.fastembed import FastEmbedRerankingProvider
     from codeweaver.providers.reranking.providers.sentence_transformers import (
         SentenceTransformersRerankingProvider,
     )
@@ -35,6 +54,55 @@ if TYPE_CHECKING:
 # ===========================================================================
 # CLI Mock Fixtures
 # ===========================================================================
+
+os.environ["CODEWEAVER_TEST_MODE"] = "true"
+
+# Disable SSL verification warnings for tests (WSL time sync issues cause false positives)
+import warnings
+
+from urllib3.exceptions import SystemTimeWarning
+
+
+warnings.filterwarnings("ignore", category=SystemTimeWarning)
+
+
+def _set_settings() -> DictView[CodeWeaverSettingsDict]:
+    """Get the global settings for tests.
+
+    With CODEWEAVER_TEST_MODE="true", CodeWeaverSettings automatically loads
+    codeweaver.test.toml which uses lightweight models:
+    - embedding: minishlab/potion-base-8M (256-dim, fast)
+    - sparse: qdrant/bm25 (fast BM25 tokenization)
+    - reranking: cross-encoder/ms-marco-TinyBERT-L2-v2 (tiny, fast)
+    - vector_store: memory (in-memory, no Docker needed)
+
+    No manual loading needed - the config system handles it automatically.
+    """
+    from codeweaver.config.settings import get_settings_map
+
+    # Just return the settings map - config system already loaded codeweaver.test.toml
+    # because CODEWEAVER_TEST_MODE="true" (set at top of this file)
+    return get_settings_map()
+
+
+_settings: DictView[CodeWeaverSettingsDict] = _set_settings()
+
+HAS_SENTENCE_TRANSFORMERS = find_spec("sentence_transformers") is not None
+HAS_FASTEMBED = find_spec("fastembed") is not None
+
+
+def _get_configs(
+    *, sparse: bool = False, rerank: bool = False
+) -> EmbeddingProviderSettings | SparseEmbeddingProviderSettings | RerankingProviderSettings:
+    """Get the model name for testing based on available libraries."""
+    from codeweaver.config.profiles import get_profile
+
+    profile = get_profile("backup", vector_deployment="local")
+    if rerank:
+        # reranking is a tuple with one element
+        return profile["reranking"][0]  # ty:ignore[non-subscriptable,invalid-key]
+    # the profile returns single values for each setting -- so while it can be a tuple, it isn't.
+    return profile["sparse_embedding"] if sparse else profile["embedding"]  # ty:ignore[invalid-key,invalid-return-type]
 
 
 @pytest.fixture
@@ -81,27 +149,37 @@ def mock_embedding_provider() -> AsyncMock:
     return mock_provider
 
 
+def _get_caps() -> tuple[
+    EmbeddingModelCapabilities, SparseEmbeddingModelCapabilities, RerankingModelCapabilities
+]:
+    from codeweaver.common.registry.models import get_model_registry
+
+    model_registry = get_model_registry()
+    settings = (_get_configs(), _get_configs(sparse=True), _get_configs(rerank=True))
+    return (
+        model_registry.get_embedding_capabilities(
+            settings[0]["provider"], settings[0]["model_settings"]["model"]
+        )[0],  # ty:ignore[non-subscriptable]
+        model_registry.get_sparse_embedding_capabilities(
+            settings[1]["provider"], settings[1]["model_settings"]["model"]
+        )[0],  # ty:ignore[non-subscriptable]
+        model_registry.get_reranking_capabilities(
+            settings[2]["provider"], settings[2]["model_settings"]["model"]
+        )[0],  # ty:ignore[non-subscriptable]
+    )
+
+
 @pytest.fixture
-def actual_dense_embedding_provider() -> SentenceTransformersEmbeddingProvider:
+def actual_dense_embedding_provider() -> (
+    SentenceTransformersEmbeddingProvider | FastEmbedEmbeddingProvider
+):
     """Provide an actual dense embedding provider using SentenceTransformers."""
-    from sentence_transformers import SentenceTransformer
+    caps, _, _ = _get_caps()
+    from codeweaver.common.registry.provider import get_provider_registry
 
-    from codeweaver.providers.embedding.capabilities.ibm_granite import (
-        get_ibm_granite_embedding_capabilities,
-    )
-    from codeweaver.providers.embedding.providers.sentence_transformers import (
-        SentenceTransformersEmbeddingProvider,
-    )
-
-    # nice lightweight model
-    caps = next(
-        cap
-        for cap in get_ibm_granite_embedding_capabilities()
-        if cap.name == "ibm-granite/granite-embedding-english-r2"
-    )
-    return SentenceTransformersEmbeddingProvider(
-        capabilities=caps, client=SentenceTransformer(caps.name)
-    )
+    registry = get_provider_registry()
+    # Registry will get capabilities from the configured "testing" profile settings
+    return registry.get_provider_instance(caps.provider, "embedding", singleton=True)  # type: ignore
 
 
 @pytest.fixture
@@ -122,28 +200,18 @@ def mock_sparse_provider() -> AsyncMock:
 
 
 @pytest.fixture
-def actual_sparse_embedding_provider() -> SentenceTransformersSparseProvider:
+def actual_sparse_embedding_provider() -> (
+    SentenceTransformersSparseProvider | FastEmbedSparseProvider
+):
     """Provide an actual sparse embedding provider using SentenceTransformers."""
-    # Check if SparseEncoder is available in sentence_transformers
-    try:
-        from sentence_transformers import SparseEncoder
-    except ImportError:
-        pytest.skip(
-            "SparseEncoder not available in sentence_transformers. "
-            "This feature may require a different version of sentence-transformers."
-        )
+    _, caps, _ = _get_caps()
+    from codeweaver.common.registry.provider import get_provider_registry
 
-    from codeweaver.providers.embedding.capabilities.base import get_sparse_caps
-    from codeweaver.providers.embedding.providers.sentence_transformers import (
-        SentenceTransformersSparseProvider,
-    )
-
-    cap = next(
-        cap
-        for cap in get_sparse_caps()
-        if cap.name == "opensearch-project/opensearch-neural-sparse-encoding-doc-v2-mini"
-    )
-    return SentenceTransformersSparseProvider(capabilities=cap, client=SparseEncoder(cap.name))
+    registry = get_provider_registry()
+    # Pass caps explicitly so registry doesn't need to look them up from global settings
+    return registry.get_provider_instance(
+        caps.provider, "sparse_embedding", singleton=True, caps=caps
+    )  # type: ignore
 
 
 @pytest.fixture
@@ -200,6 +268,22 @@ def mock_vector_store() -> AsyncMock:
 
 
 @pytest.fixture
+def actual_vector_store() -> MemoryVectorStoreProvider:
+    """Provide an actual in-memory vector store provider.
+
+    Creates the instance directly without going through registry to avoid
+    registry caching issues in tests. This ensures we get a fresh instance
+    that can be properly initialized and controlled by the test.
+    """
+    from codeweaver.providers.provider import Provider
+    from codeweaver.providers.vector_stores.inmemory import MemoryVectorStoreProvider
+
+    # Create instance directly, not through registry
+    # This avoids the real registry's singleton cache
+    return MemoryVectorStoreProvider(_provider=Provider.MEMORY)
+
+
+@pytest.fixture
 def mock_reranking_provider() -> AsyncMock:
     """Provide a mock reranking provider."""
     from typing import NamedTuple
@@ -227,47 +311,16 @@ def mock_reranking_provider() -> AsyncMock:
 
 
 @pytest.fixture
-def actual_reranking_provider() -> SentenceTransformersRerankingProvider:
+def actual_reranking_provider() -> (
+    SentenceTransformersRerankingProvider | FastEmbedRerankingProvider
+):
     """Provide an actual reranking provider using SentenceTransformers."""
-    from sentence_transformers import CrossEncoder
+    _, _, caps = _get_caps()
+    from codeweaver.common.registry.provider import get_provider_registry
 
-    from codeweaver.providers.reranking.capabilities.ms_marco import (
-        get_marco_reranking_capabilities,
-    )
-    from codeweaver.providers.reranking.providers.sentence_transformers import (
-        SentenceTransformersRerankingProvider,
-    )
-
-    # Use the correct cross-encoder model name
-    # The Xenova models don't exist - need to use cross-encoder namespace
-    model_name = "cross-encoder/ms-marco-MiniLM-L6-v2"
-
-    # Find or create the capability for this model
-    caps = next(
-        (
-            cap
-            for cap in get_marco_reranking_capabilities()
-            if "L6-v2" in cap.name or "L-6-v2" in cap.name
-        ),
-        None,
-    )
-
-    if caps is None:
-        # Create a basic capability if not found
-        from codeweaver.providers.provider import Provider
-        from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
-
-        caps = RerankingModelCapabilities(
-            name=model_name,
-            max_input=512,
-            context_window=512,
-            tokenizer="tokenizers",
-            tokenizer_model=model_name,
-            supports_custom_prompt=False,
-            provider=Provider.SENTENCE_TRANSFORMERS,
-        )
-
-    return SentenceTransformersRerankingProvider(caps=caps, client=CrossEncoder(model_name))
+    registry = get_provider_registry()
+    # Pass caps explicitly so registry doesn't need to look them up from global settings
+    return registry.get_provider_instance(caps.provider, "reranking", singleton=True, caps=caps)  # type: ignore
 
 
 # ===========================================================================
@@ -379,76 +432,34 @@ def mock_settings_with_providers() -> MagicMock:
 
 @pytest.fixture
 def real_embedding_provider(
-    actual_dense_embedding_provider: SentenceTransformersEmbeddingProvider,
-) -> SentenceTransformersEmbeddingProvider:
-    """Provide a REAL embedding provider for behavior validation.
-
-    Uses the existing actual_dense_embedding_provider fixture which is already
-    working and tested. This avoids duplicating provider initialization logic.
-
-    Model: IBM Granite English R2 - lightweight, fast, good quality
-    No API key required - runs entirely locally.
-
-    Use this fixture for tests marked with @pytest.mark.real_providers.
-
-    Note: This fixture found a production bug! The SentenceTransformersEmbeddingProvider
-    has a Pydantic initialization issue where it sets instance attributes before
-    calling super().__init__(). The actual_dense_embedding_provider works around this.
-    """
+    actual_dense_embedding_provider: SentenceTransformersEmbeddingProvider
+    | FastEmbedEmbeddingProvider,
+) -> SentenceTransformersEmbeddingProvider | FastEmbedEmbeddingProvider:
+    """Provide a REAL embedding provider for behavior validation."""
     return actual_dense_embedding_provider
 
 
 @pytest.fixture
-def real_sparse_provider(mock_sparse_provider: MagicMock) -> SentenceTransformersSparseProvider:
-    """Provide a sparse embedding provider - real if available, mock otherwise.
-
-    **SparseEncoder Availability:**
-    SparseEncoder is not available in current sentence-transformers version.
-    Falls back to mock provider to allow tests to run without sparse encoding.
-
-    This is expected for Alpha 1 release - sparse encoding is optional.
-    Tests will use dense embeddings only when sparse is unavailable.
-
-    Model (when available): OpenSearch neural sparse encoding
-    Fallback: Mock provider with sparse format compatibility
-    """
+def real_sparse_provider(
+    actual_sparse_embedding_provider: SentenceTransformersSparseProvider | FastEmbedSparseProvider,
+) -> SentenceTransformersSparseProvider | FastEmbedSparseProvider:
+    """Provide a sparse embedding provider - real if available, mock otherwise."""
     # Check if SparseEncoder is available
-    try:
-        from sentence_transformers import SparseEncoder
-
-        from codeweaver.providers.embedding.capabilities.base import get_sparse_caps
-        from codeweaver.providers.embedding.providers.sentence_transformers import (
-            SentenceTransformersSparseProvider,
-        )
-
-        cap = next(
-            cap
-            for cap in get_sparse_caps()
-            if cap.name == "opensearch-project/opensearch-neural-sparse-encoding-doc-v2-mini"
-        )
-        return SentenceTransformersSparseProvider(capabilities=cap, client=SparseEncoder(cap.name))
-    except ImportError:
-        # SparseEncoder not available - use mock provider
-        # This allows tests to run without sparse encoding
-        return mock_sparse_provider
+    return actual_sparse_embedding_provider
 
 
 @pytest.fixture
 def real_reranking_provider(
     actual_reranking_provider: SentenceTransformersRerankingProvider,
 ) -> SentenceTransformersRerankingProvider:
-    """Provide a REAL reranking provider for relevance scoring validation.
-
-    Uses the existing actual_reranking_provider fixture.
-
-    Model: MS MARCO MiniLM - lightweight cross-encoder for reranking
-    No API key required - runs entirely locally.
-    """
+    """Provide a REAL reranking provider for relevance scoring validation."""
     return actual_reranking_provider
 
 
 @pytest.fixture
-async def real_vector_store(tmp_path: Path) -> AsyncGenerator[MemoryVectorStoreProvider]:
+async def real_vector_store(
+    known_test_codebase: Path, actual_vector_store: MemoryVectorStoreProvider
+) -> AsyncGenerator[MemoryVectorStoreProvider]:
     """Provide a REAL Qdrant vector store in memory mode for behavior validation.
 
     Creates an actual in-memory Qdrant instance that:
@@ -463,29 +474,29 @@ async def real_vector_store(tmp_path: Path) -> AsyncGenerator[MemoryVectorStoreP
 
     Perfect for CI - no Docker required, just in-memory mode.
     """
-    from qdrant_client import AsyncQdrantClient
+    from codeweaver.common.utils.utils import generate_collection_name
 
-    from codeweaver.config.providers import MemoryConfig
+    instance: MemoryVectorStoreProvider = actual_vector_store
 
-    # Create in-memory Qdrant client
-    client = AsyncQdrantClient(location=":memory:")
+    # CRITICAL FIX: Generate collection name from known_test_codebase (test project path), not codeweaver project path
+    # This ensures indexer and search use the same collection name for test isolation
+    # known_test_codebase = tmp_path / "test_codebase", matching the path used by indexed_test_project
+    collection_name = generate_collection_name(project_path=known_test_codebase)
 
-    # Create config for the vector store
-    config = MemoryConfig(
-        persist_path=tmp_path / "vector_store", collection_name="test_real_collection"
-    )
+    # Explicitly set collection name in config to override any global settings
+    if not instance.config:
+        instance.config = {}
+    instance.config["collection_name"] = collection_name
 
-    # Create the vector store provider
-    provider = MemoryVectorStoreProvider(_provider=Provider.MEMORY, client=client, config=config)
+    # Initialize before accessing client
+    await instance._initialize()
+    client = instance.client
 
-    # Initialize (creates collection if needed)
-    await provider._initialize()
-
-    yield provider
+    yield instance
 
     # Cleanup: Delete collection after test
     with contextlib.suppress(Exception):
-        await client.delete_collection(config.collection_name)
+        await client.delete_collection(collection_name)
 
 
 @pytest.fixture
@@ -840,21 +851,23 @@ def real_provider_registry(
 
     class RealProviderEnum(Enum):
         SENTENCE_TRANSFORMERS = "sentence_transformers"
-        OPENSEARCH = "opensearch"
-        QDRANT_MEMORY = "qdrant_memory"
-        MS_MARCO = "ms_marco"
+        OPENAI = "openai"
+        FASTEMBED = "fastembed"
+        MEMORY = "memory"
 
     mock_registry = MagicMock()
 
     # Configure get_provider_enum_for to return real provider enums
     def get_provider_enum_for(kind: str) -> RealProviderEnum | None:
-        if kind == "embedding":
-            return RealProviderEnum.SENTENCE_TRANSFORMERS
-        if kind == "sparse_embedding":
-            return RealProviderEnum.OPENSEARCH
         if kind == "vector_store":
-            return RealProviderEnum.QDRANT_MEMORY
-        return RealProviderEnum.MS_MARCO if kind == "reranking" else None
+            return RealProviderEnum.MEMORY
+        # For testing/backup profile, prefer SentenceTransformers with lightweight models
+        # (minishlab/potion-base-8M is 256 dims vs BAAI/bge-small-en-v1.5 at 384 dims)
+        return (
+            RealProviderEnum.SENTENCE_TRANSFORMERS
+            if HAS_SENTENCE_TRANSFORMERS
+            else RealProviderEnum.FASTEMBED
+        )
 
     mock_registry.get_provider_enum_for = MagicMock(side_effect=get_provider_enum_for)
 

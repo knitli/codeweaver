@@ -404,7 +404,7 @@ async def start(
                 management_host=management_host,
                 management_port=management_port,
                 mcp_host=mcp_host,
-                mcp_port=mcp_port,
+                mcp_port=mcp_port or 4329,
                 config_file=config_file,
             )
 

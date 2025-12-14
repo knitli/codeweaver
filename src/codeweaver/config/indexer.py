@@ -481,6 +481,7 @@ class IndexerSettings(BasedModel):
                 from codeweaver.common.utils.git import get_project_path
 
                 project_path = get_project_path()
+
         rignore_settings["path"] = project_path
 
         # Configure .gitignore and other ignore file reading
@@ -619,9 +620,14 @@ class IndexerSettings(BasedModel):
         """Cached property for the filter function."""
         return self.construct_filter()
 
-    def to_settings(self) -> RignoreSettings:
-        """Serialize to `RignoreSettings`."""
-        return self._as_settings()
+    def to_settings(self, project_path: Path | None = None) -> RignoreSettings:
+        """Serialize to `RignoreSettings`.
+
+        Args:
+            project_path: Optional project path to use for walker configuration.
+                        If not provided, falls back to global settings or get_project_path().
+        """
+        return self._as_settings(project_path=project_path)
 
 
 if not IndexerSettings.__pydantic_complete__:

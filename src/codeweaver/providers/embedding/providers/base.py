@@ -823,8 +823,15 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
 
             profile = get_profile("backup", "local")
             if isinstance(profile["embedding"], dict):
-                return profile["embedding"]["model_settings"]["dimension"]
-            return cast(tuple, profile["embedding"])[0]["model_settings"]["dimension"]
+                # Use .get() to safely access dimension, fall back to default_dimension if not present
+                backup_dim = profile["embedding"]["model_settings"].get("dimension")
+                if backup_dim:
+                    return backup_dim
+            else:
+                backup_dim = cast(tuple, profile["embedding"])[0]["model_settings"].get("dimension")
+                if backup_dim:
+                    return backup_dim
+            # If dimension not in backup profile, fall through to use default_dimension
         default_dim = self.caps.default_dimension
         model_settings = self._get_model_settings(sparse=sparse)
         if model_settings and model_settings.get("dimension"):
@@ -921,6 +928,16 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             if not isinstance(first_embedding, SparseEmbedding):
                 actual_dim = len(first_embedding)
                 if actual_dim != expected_dim:
+                    # Debug logging
+                    logger.debug(
+                        "Dimension mismatch DEBUG: model_name=%s, caps.name=%s, caps.default_dimension=%s, for_backup=%s, expected=%s, actual=%s",
+                        self.model_name,
+                        self.caps.name,
+                        self.caps.default_dimension,
+                        for_backup,
+                        expected_dim,
+                        actual_dim,
+                    )
                     raise CodeWeaverValidationError(
                         f"Embedding dimension mismatch: expected {expected_dim}, got {actual_dim}",
                         details={
