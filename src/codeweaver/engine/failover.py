@@ -25,7 +25,7 @@ from fastmcp import Context
 from pydantic import Field, PrivateAttr
 from qdrant_client.http.models.models import CollectionInfo
 
-from codeweaver.common.logging import log_to_client_or_fallback
+from codeweaver.common._logging import log_to_client_or_fallback
 from codeweaver.config.profiles import _backup_profile, get_profile
 from codeweaver.config.providers import ProviderSettingsDict
 from codeweaver.core.types.models import BasedModel
@@ -197,7 +197,13 @@ class VectorStoreFailoverManager(BasedModel):
         )
 
         # Initialize chunk indexes
-        primary_collection_name = _get_collection_name(secondary=False)
+        # Use provider's config collection_name if available (important for tests with explicit collection names)
+        # The provider's .collection property may be None before _initialize(), but config always has it
+        # Fall back to _get_collection_name() if provider config doesn't have collection_name set
+        primary_collection_name = (
+            (primary_store.config.get("collection_name") if primary_store else None)
+            or _get_collection_name(secondary=False)
+        )
         backup_collection_name = _get_collection_name(secondary=True)
         # Initialize _last_indexed_count to current state to avoid skipping first sync
         if indexer and indexer.stats:

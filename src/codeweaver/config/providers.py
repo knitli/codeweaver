@@ -411,11 +411,9 @@ def _get_default_sparse_embedding_settings() -> DeterminedDefaults:
                 return DeterminedDefaults(
                     provider=Provider.FASTEMBED, model="prithivida/Splade_PP_en_v1", enabled=True
                 )
-    # Sentence-Transformers and Fastembed are the *only* sparse embedding options we support
-    logger.warning(
-        "No sparse embedding provider libraries found. Sparse embedding functionality disabled."
-    )
-    return DeterminedDefaults(provider=Provider.NOT_SET, model="NONE", enabled=False)
+    # qdrant_client has built-in BM25 support
+    # if FastEmbed isn't available, it will use that automatically
+    return DeterminedDefaults(provider=Provider.FASTEMBED, model="qdrant/bm25", enabled=True)
 
 
 _sparse_embedding_defaults = _get_default_sparse_embedding_settings()
@@ -466,7 +464,7 @@ HAS_ANTHROPIC = util.find_spec("anthropic") is not None
 DefaultAgentProviderSettings = AgentProviderSettings(
     provider=Provider.ANTHROPIC,
     enabled=HAS_ANTHROPIC,
-    model="claude-sonnet-4-latest",
+    model="claude-haiku-4.5-latest",
     model_settings=AgentModelSettings(),
 )
 

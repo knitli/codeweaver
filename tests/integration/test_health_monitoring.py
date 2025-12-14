@@ -131,8 +131,9 @@ def mock_provider_registry(mocker) -> MagicMock:
     embedding_provider_enum = mocker.MagicMock()
     embedding_instance = mocker.MagicMock()
     embedding_instance.model_name = "voyage-code-3"
+    # FIX: Use .variable instead of .value to match BaseEnum interface
     embedding_instance.circuit_breaker_state = mocker.MagicMock()
-    embedding_instance.circuit_breaker_state.value = "closed"
+    embedding_instance.circuit_breaker_state.variable = "closed"
     registry.get_embedding_provider.return_value = embedding_provider_enum
     registry.get_embedding_provider_instance.return_value = embedding_instance
 
@@ -149,8 +150,9 @@ def mock_provider_registry(mocker) -> MagicMock:
     reranking_provider_enum = mocker.MagicMock()
     reranking_instance = mocker.MagicMock()
     reranking_instance.model_name = "voyage-rerank-2.5"
+    # FIX: Use .variable instead of .value to match BaseEnum interface
     reranking_instance.circuit_breaker_state = mocker.MagicMock()
-    reranking_instance.circuit_breaker_state.value = "closed"
+    reranking_instance.circuit_breaker_state.variable = "closed"
     registry.get_reranking_provider.return_value = reranking_provider_enum
     registry.get_reranking_provider_instance.return_value = reranking_instance
 
@@ -368,7 +370,8 @@ async def test_health_status_degraded(health_service: HealthService, mocker):
     embedding_instance = (
         health_service._provider_registry.get_embedding_provider_instance.return_value
     )
-    embedding_instance.circuit_breaker_state.value = "open"
+    # FIX: Use .variable instead of .value to match BaseEnum interface
+    embedding_instance.circuit_breaker_state.variable = "open"
 
     response = await health_service.get_health_response()
 
@@ -402,7 +405,8 @@ async def test_health_status_unhealthy(health_service: HealthService, mocker):
             embedding_mock = mocker.MagicMock()
             embedding_mock.model_name = "voyage-code-3"
             embedding_mock.circuit_breaker_state = mocker.MagicMock()
-            embedding_mock.circuit_breaker_state.value = "closed"
+            # FIX: Use .variable instead of .value to match BaseEnum interface
+            embedding_mock.circuit_breaker_state.variable = "closed"
             return embedding_mock
         if provider_type == "sparse_embedding":
             return mocker.MagicMock()
@@ -410,7 +414,8 @@ async def test_health_status_unhealthy(health_service: HealthService, mocker):
             reranking_mock = mocker.MagicMock()
             reranking_mock.model_name = "voyage-rerank-2.5"
             reranking_mock.circuit_breaker_state = mocker.MagicMock()
-            reranking_mock.circuit_breaker_state.value = "closed"
+            # FIX: Use .variable instead of .value to match BaseEnum interface
+            reranking_mock.circuit_breaker_state.variable = "closed"
             return reranking_mock
         # Return a valid mock for any other case to avoid None
         return mocker.MagicMock()
@@ -527,14 +532,16 @@ async def test_health_circuit_breaker_exposure(health_service: HealthService, mo
     embedding_instance = (
         health_service._provider_registry.get_embedding_provider_instance.return_value
     )
-    embedding_instance.circuit_breaker_state.value = "half_open"
+    # FIX: Use .variable instead of .value to match BaseEnum interface
+    embedding_instance.circuit_breaker_state.variable = "half_open"
 
     response2 = await health_service.get_health_response()
     assert response2.services.embedding_provider.circuit_breaker_state == "half_open"
     assert response2.services.embedding_provider.status == "up"
 
     # Test open state (service down)
-    embedding_instance.circuit_breaker_state.value = "open"
+    # FIX: Use .variable instead of .value to match BaseEnum interface
+    embedding_instance.circuit_breaker_state.variable = "open"
 
     response3 = await health_service.get_health_response()
     assert response3.services.embedding_provider.circuit_breaker_state == "open"

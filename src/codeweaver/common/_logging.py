@@ -20,7 +20,7 @@ from pydantic_core import to_json
 from codeweaver.cli.utils import is_tty
 from codeweaver.common.utils.checks import is_ci
 from codeweaver.common.utils.lazy_importer import lazy_import
-from codeweaver.config.logging import LoggingConfigDict
+from codeweaver.config._logging import LoggingConfigDict
 
 
 if TYPE_CHECKING:

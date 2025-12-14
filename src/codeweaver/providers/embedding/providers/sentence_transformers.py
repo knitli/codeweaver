@@ -117,19 +117,25 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
 
     def __init__(
         self,
-        capabilities: EmbeddingModelCapabilities,
+        caps: EmbeddingModelCapabilities,
         client: SentenceTransformer | None = None,
         **kwargs: Any,
     ) -> None:
-        """Initialize the Sentence Transformers embedding provider."""
+        """Initialize the Sentence Transformers embedding provider.
+
+        Args:
+            caps: Model capabilities (matches base class parameter name)
+            client: Optional pre-initialized SentenceTransformer client
+            **kwargs: Additional keyword arguments
+        """
         # Initialize client if not provided
         if client is None:
             doc_kwargs = {**type(self)._doc_kwargs, **(kwargs or {})}
             client = SentenceTransformer(
-                model_name_or_path=capabilities.name, **doc_kwargs.get("client_options", {})
+                model_name_or_path=caps.name, **doc_kwargs.get("client_options", {})
             )
 
-        super().__init__(client=client, caps=capabilities, kwargs=kwargs)
+        super().__init__(client=client, caps=caps, kwargs=kwargs)
 
     @property
     def base_url(self) -> str | None:
@@ -197,7 +203,14 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
                 "use_auth_token",
                 "token",
             }
-        } | {**kwargs, "convert_to_numpy": True}
+        }
+        # Filter incoming kwargs to remove dict structure keys before merging
+        filtered_kwargs = {
+            k: v for k, v in kwargs.items()
+            if k not in {"client_options", "kwargs"}
+        }
+        encode_kwargs.update({**filtered_kwargs, "convert_to_numpy": True})
+
         embed_partial = rpartial(self.client.encode, **encode_kwargs)  # type: ignore
         loop = asyncio.get_running_loop()
         results: np.ndarray = await loop.run_in_executor(None, embed_partial, preprocessed)  # type: ignore
@@ -229,7 +242,14 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
                 "use_auth_token",
                 "token",
             }
-        } | {**kwargs, "convert_to_numpy": True}
+        }
+        # Filter incoming kwargs to remove dict structure keys before merging
+        filtered_kwargs = {
+            k: v for k, v in kwargs.items()
+            if k not in {"client_options", "kwargs"}
+        }
+        encode_kwargs.update({**filtered_kwargs, "convert_to_numpy": True})
+
         embed_partial = rpartial(self.client.encode, **encode_kwargs)  # type: ignore
         loop = asyncio.get_running_loop()
         results: np.ndarray = await loop.run_in_executor(None, embed_partial, preprocessed)  # type: ignore
@@ -296,11 +316,17 @@ class SentenceTransformersSparseProvider(SparseEmbeddingProvider[_SparseEncoderT
 
     def __init__(
         self,
-        capabilities: SparseEmbeddingModelCapabilities,
+        caps: SparseEmbeddingModelCapabilities,
         client: _SparseEncoderType | None = None,  # type: ignore
         **kwargs: Any,
     ) -> None:
-        """Initialize the Sentence Transformers sparse embedding provider."""
+        """Initialize the Sentence Transformers sparse embedding provider.
+
+        Args:
+            caps: Model capabilities (matches base class parameter name)
+            client: Optional pre-initialized SparseEncoder client
+            **kwargs: Additional keyword arguments
+        """
         if not HAS_SPARSE_ENCODER:
             raise ConfigurationError(
                 "SparseEncoder is not available in the installed version of sentence-transformers. "
@@ -311,12 +337,12 @@ class SentenceTransformersSparseProvider(SparseEmbeddingProvider[_SparseEncoderT
         if client is None:
             doc_kwargs = {**type(self)._doc_kwargs, **(kwargs or {})}
             client = _SparseEncoderType(  # type: ignore
-                model_name_or_path=capabilities.name, **doc_kwargs.get("client_options", {})
+                model_name_or_path=caps.name, **doc_kwargs.get("client_options", {})
             )
 
         # Call super().__init__() FIRST which handles all Pydantic initialization
         # The base class will set doc_kwargs, query_kwargs, and call _initialize()
-        super().__init__(client=client, caps=capabilities, kwargs=kwargs)  # type: ignore
+        super().__init__(client=client, caps=caps, kwargs=kwargs)  # type: ignore
 
     @property
     def base_url(self) -> str | None:

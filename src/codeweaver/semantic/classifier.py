@@ -27,6 +27,7 @@ from codeweaver.common.utils.utils import rpartial
 from codeweaver.core.language import SemanticSearchLanguage
 from codeweaver.core.types.aliases import CategoryName, CategoryNameT, ThingNameT
 from codeweaver.core.types.enum import BaseEnum
+from codeweaver.core.types.utils import generate_field_title
 from codeweaver.semantic.classifications import ImportanceRank, SemanticClass
 
 
@@ -130,7 +131,7 @@ class EvidenceKind(int, BaseEnum):
             return "No evidence available for classification."
 
         summaries = (
-            f"- {kind.as_title}: {kind.statement} ({kind.value})"
+            f"- {kind.as_title}: {kind.statement} ({kind.variable})"
             for kind in sorted(kinds, reverse=True)
         )
         return "\n".join(summaries)
@@ -149,29 +150,40 @@ class GrammarClassificationResult(NamedTuple):
     """
 
     classification: Annotated[
-        SemanticClass, Field(description="Semantic classification assigned to the node")
+        SemanticClass,
+        Field(
+            description="Semantic classification assigned to the node",
+            field_title_generator=generate_field_title,
+        ),
     ]
     rank: Annotated[
         ImportanceRank,
         Field(
             description="Importance rank (1-5), lower is more important",
             default_factory=lambda data: ImportanceRank.from_classification(data["classification"]),
+            field_title_generator=generate_field_title,
         ),
     ]
     classification_method: ClassificationMethod
-    evidence: Annotated[
-        tuple[EvidenceKind, ...],
-        Field(description="Kinds of evidence used for classification", default_factory=tuple),
-    ]
+    evidence: tuple[EvidenceKind, ...] = Field(
+        description="Kinds of evidence used for classification",
+        default_factory=tuple,
+        field_title_generator=generate_field_title,
+    )
     adjustment: Annotated[
-        int, Field(description="Manual adjustment to confidence. Any integer.")
+        int,
+        Field(
+            description="Manual adjustment to confidence. Any integer.",
+            field_title_generator=generate_field_title,
+        ),
     ] = 0
 
     alternate_classifications: (
         Annotated[
             dict[SemanticClass, tuple[EvidenceKind, ...]],
             Field(
-                description="Alternate classifications for the node. Only used when there are multiple classifications and none above the confidence threshold."
+                description="Alternate classifications for the node. Only used when there are multiple classifications and none above the confidence threshold.",
+                field_title_generator=generate_field_title,
             ),
         ]
         | None
@@ -180,14 +192,16 @@ class GrammarClassificationResult(NamedTuple):
     assessment_comment: Annotated[
         str | None,
         Field(
-            description="Optional human-readable comment regarding the classification assessment."
+            description="Optional human-readable comment regarding the classification assessment.",
+            field_title_generator=generate_field_title,
         ),
     ] = None
 
     differentiator: Annotated[
         Callable[[AstThing[SgNode]], SemanticClass | None] | None,
         Field(
-            description="Optional function to differentiate between alternate classifications based on AST node context. The function receives an AstThing and returns a SemanticClass or None."
+            description="Optional function to differentiate between alternate classifications based on AST node context. The function receives an AstThing and returns a SemanticClass or None.",
+            field_title_generator=generate_field_title,
         ),
     ] = None
 
@@ -1068,3 +1082,6 @@ class GrammarBasedClassifier:
             evidence=(EvidenceKind.ROLES, EvidenceKind.CONNECTIONS),
             adjustment=10,
         )
+
+
+__all__ = ("GrammarBasedClassifier", "GrammarClassificationResult")

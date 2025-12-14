@@ -173,7 +173,7 @@ class ChunkingService:
                     file.path,
                     extra={
                         "file_path": str(file.path),
-                        "ext_kind": file.ext_kind.value if file.ext_kind else None,  # type: ignore
+                        "ext_kind": file.ext_kind.language if file.ext_kind else None,  # type: ignore
                     },  # type: ignore
                 )
                 # Log full traceback only at debug level

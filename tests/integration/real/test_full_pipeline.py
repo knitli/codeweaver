@@ -24,37 +24,36 @@ from unittest.mock import patch
 import pytest
 
 
-# Skip all tests in this module if models can't be downloaded
-pytestmark = pytest.mark.skip(
-    reason="Real integration tests require model downloads - run manually with network access"
-)
-
-
 # =============================================================================
 # Fixtures
 # =============================================================================
 
 
 @pytest.fixture
-async def indexed_test_project(known_test_codebase, real_provider_registry):
+async def indexed_test_project(known_test_codebase):
     """Create pre-indexed test project with configured settings.
 
     This fixture:
-    1. Configures CodeWeaverSettings with project path
-    2. Patches the provider registry with real providers
+    1. Configures CodeWeaverSettings with project path (via get_project_path patch)
+    2. Uses codeweaver.test.toml config (auto-loaded via CODEWEAVER_TEST_MODE="true")
     3. Creates and initializes the Indexer
-    4. Indexes the test codebase
+    4. Indexes the test codebase (~5 files, ~15-20 chunks)
     5. Yields the project path for tests
+
+    **Performance Note:** This fixture performs REAL indexing with actual embeddings,
+    which can take 2-5 minutes on CPU. The lightweight 30M model is used for speed.
+    Ensure pytest timeout is set to at least 10 minutes for tests using this fixture.
 
     Tests using this fixture can call find_code() without worrying about
     indexing - the project is already indexed and settings are configured.
     """
-    from codeweaver.config.settings import CodeWeaverSettings
+    from codeweaver.config.settings import get_settings
     from codeweaver.engine.indexer.indexer import Indexer
 
-    # Configure settings with project path
-    settings = CodeWeaverSettings(project_path=known_test_codebase)
-    settings_dict = settings.model_dump()
+    # Use global test settings (auto-loaded from codeweaver.test.local.toml)
+    # Don't create new settings - that would override the test config
+    settings = get_settings()
+    serialized_settings = settings.model_dump()
 
     # Patch provider registry and settings
     call_count = [0]
@@ -63,15 +62,14 @@ async def indexed_test_project(known_test_codebase, real_provider_registry):
         call_count[0] += 1
         return 1000000.0 + call_count[0] * 0.001
 
+    # Trust the config system - codeweaver.test.toml loaded via CODEWEAVER_TEST_MODE="true"
+    # Only patch get_project_path to ensure test codebase collection name coordination
     with (
-        patch(
-            "codeweaver.common.registry.get_provider_registry", return_value=real_provider_registry
-        ),
         patch("codeweaver.agent_api.find_code.time.time", side_effect=mock_time),
-        patch("codeweaver.config.settings.get_settings", return_value=settings),
+        patch("codeweaver.common.utils.git.get_project_path", return_value=known_test_codebase),
     ):
         # Create and initialize indexer
-        indexer = await Indexer.from_settings_async(settings_dict)
+        indexer = await Indexer.from_settings_async(serialized_settings)
         await indexer.prime_index()
 
         yield known_test_codebase
@@ -85,6 +83,7 @@ async def indexed_test_project(known_test_codebase, real_provider_registry):
 @pytest.mark.integration
 @pytest.mark.real_providers
 @pytest.mark.asyncio
+@pytest.mark.timeout(600)  # 10 minutes for real embedding generation + indexing
 async def test_full_pipeline_index_then_search(indexed_test_project):
     """Validate complete workflow: index fresh codebase, then search it.
 
@@ -132,6 +131,7 @@ async def test_full_pipeline_index_then_search(indexed_test_project):
 @pytest.mark.integration
 @pytest.mark.real_providers
 @pytest.mark.asyncio
+@pytest.mark.timeout(600)  # 10 minutes for real embedding generation + indexing
 async def test_incremental_indexing_updates_search_results(
     indexed_test_project, real_provider_registry
 ):
@@ -218,6 +218,7 @@ def process_refund(transaction_id: str) -> None:
 @pytest.mark.integration
 @pytest.mark.real_providers
 @pytest.mark.asyncio
+@pytest.mark.timeout(900)  # 15 minutes for 20 files with real embeddings
 async def test_pipeline_handles_large_codebase(tmp_path, real_provider_registry):
     """Validate pipeline handles larger codebase (~20 files) efficiently.
 
@@ -310,6 +311,7 @@ class {module_name.capitalize()}Handler:
 @pytest.mark.integration
 @pytest.mark.real_providers
 @pytest.mark.asyncio
+@pytest.mark.timeout(600)  # 10 minutes for real embedding generation + indexing
 async def test_pipeline_handles_file_updates(indexed_test_project, real_provider_registry):
     """Validate that modifying files updates their embeddings.
 
@@ -401,6 +403,7 @@ def generate_jwt(user_id: str) -> str:
 @pytest.mark.integration
 @pytest.mark.real_providers
 @pytest.mark.asyncio
+@pytest.mark.timeout(600)  # 10 minutes for real embedding generation + indexing
 async def test_pipeline_coordination_with_errors(tmp_path, real_provider_registry):
     """Validate pipeline handles partial failures gracefully.
 
@@ -478,6 +481,7 @@ def another_working_function():
 @pytest.mark.real_providers
 @pytest.mark.benchmark
 @pytest.mark.asyncio
+@pytest.mark.timeout(600)  # 10 minutes including fixture setup
 async def test_search_performance_with_real_providers(indexed_test_project):
     """Validate search performance meets requirements with real providers.
 
@@ -531,6 +535,7 @@ async def test_search_performance_with_real_providers(indexed_test_project):
 @pytest.mark.benchmark
 @pytest.mark.slow
 @pytest.mark.asyncio
+@pytest.mark.timeout(1200)  # 20 minutes for 50 files with real embeddings
 async def test_indexing_performance_with_real_providers(tmp_path, real_provider_registry):
     """Validate indexing performance is acceptable for real-world usage.
 

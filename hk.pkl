@@ -1,7 +1,15 @@
+/// The hk.pkl is the configuration for `hk` <https://hk.jdx.dev>
+/// `hk` provides commit and push hooks, but is many times faster than pre-commit and similar tools
+/// If you're new to `pkl` see <https://pkl-lang.org/main/current/language-reference/index.html>
 amends "package://github.com/jdx/hk/releases/download/v1.2.0/hk@1.2.0#/Config.pkl"
 import "package://github.com/jdx/hk/releases/download/v1.2.0/hk@1.2.0#/Builtins.pkl"
 
 local function isCI() = (read?("env:CI")?.toBoolean() ?? false) || (read?("env:GITHUB_ACTIONS")?.toBoolean() ?? false)
+
+local typosFilter = List( "*README", "*.{login,astro,bash,bash_logout,bashrc,browserlistrc,conf,config,csh,css,cts,fish,gitattributes,gitmodules,html,htmx,ini,j2,jinja,jinja2,json,json5,jsonc,jsonl,ksh,md,mdown,mdtext,mdtxt,mdwn,mdx,mk,mkd,mts,nix,nu,pkl,profile,py,quokka,rs,sass,scss,sh,sh,shellcheckrc,sql,sqlite,stylelintrc,svelte,tcsh,toml,ts,tsx,txt,yaml,yml,zlogin,zlogout,zprofile,zsh,zshenv,zshrc}", "*Dockerfile*", "*Makefile*", "*makefile*", "CHANGELOG*", "CODE_OF_CONDUCT*", "CONTRIBUTING*", "HACKING*", "LICENSE", "README*", "SECURITY*", "UNLICENSE").filter((f) -> !f.endsWith("hf_models.json") && !f.contains("external"))
+
+local isBashAndBone = (read?("env:GF_FETCH_U")?.toString() == "bashandbone" ?? false)
+local useInteractive = !isCI() && !isBashAndBone
 
 local linters = new Mapping<String, Step> {
     // we don't perform these in CI to reduce download times and cache sizes
@@ -15,6 +23,7 @@ local linters = new Mapping<String, Step> {
             glob = List("*.toml", "*.toml.*", ".*.toml")
             check = "tombi format --check {{ files }}"
             fix = "tombi format {{ files }}"
+            stage = List("*.toml,", "*.toml.*", ".*.toml")
         }
         // yaml
 
@@ -23,13 +32,15 @@ local linters = new Mapping<String, Step> {
         batch = false
         check  = "printf '%s\\n' {{ files }} | xargs -n1 yq -P eval '.' >/dev/null"
         fix = "printf '%s\\n' {{ files }} | xargs -n1 yq -iP --indent=2 '.'"
+        stage = List("*.{yaml,yml,json,jsonc}")
         }
     
         ["typos"] = new Step {
             workspace_indicator = "_typos.toml"
-            glob = List( "*README", "*.{login,astro,bash,bash_logout,bashrc,browserlistrc,conf,config,csh,css,cts,fish,gitattributes,gitmodules,html,htmx,ini,j2,jinja,jinja2,json,json5,jsonc,jsonl,ksh,md,mdown,mdtext,mdtxt,mdwn,mdx,mk,mkd,mts,nix,nu,pkl,profile,py,quokka,rs,sass,scss,sh,sh,shellcheckrc,sql,sqlite,stylelintrc,svelte,tcsh,toml,ts,tsx,txt,yaml,yml,zlogin,zlogout,zprofile,zsh,zshenv,zshrc}", "*Dockerfile*", "*Makefile*", "*makefile*", "CHANGELOG*", "CODE_OF_CONDUCT*", "CONTRIBUTING*", "HACKING*", "LICENSE", "README*", "SECURITY*", "UNLICENSE").filter((f) -> !f.endsWith("hf_models.json") && !f.contains("external"))
+            glob = typosFilter
             check = "typos -j 8 {{ files }}"
             fix = "typos --write-changes {{ files }}"
+            stage = typosFilter
         }
             ["shellcheck"] = new Step {
             batch = true
@@ -37,7 +48,9 @@ local linters = new Mapping<String, Step> {
             check = "shellcheck {{ files }}"
         }
 
-            ["shfmt"] = Builtins.shfmt
+            ["shfmt"] = (Builtins.shfmt) {
+                stage = Builtins.shfmt.glob
+            }
 
     }
 
@@ -45,17 +58,19 @@ local linters = new Mapping<String, Step> {
         glob = "src/**/*.py"
         fix = "./scripts/code-quality/fix-ruff-patterns.sh {{ files }}"
         check = "./scripts/code-quality/fix-ruff-patterns.sh --dry-run {{ files }}"
+        stage = List("src/**/*.py")
     }
 
     ["ruff"] = (Builtins.ruff) {
-        fix = "ruff check --fix {{ files }} && ruff check --select I --fix {{ files }} && ruff format {{ files }}"
+        fix = "ruff check --fix --unsafe-fixes {{ files }} && ruff check --select I --fix {{ files }} && ruff format {{ files }}"
+        stage = List("src/**/*.py", "tests/**/*.py", "scripts/**/*.py", "mise-tasks/**/*.py")
     }
 
     ["reuse"] = new Step {
         check = "reuse lint"
-        interactive = !isCI()
+        interactive = useInteractive
         // this doesn't work ... until we can figure it out, linting only
-        // fix = if (isCI()) "./scripts/code-quality/update-licenses.py add {{ files }}" else "./scripts/code-quality/update-licenses.py add --interactive {{ files }}"
+        fix = if (useInteractive) "./scripts/code-quality/update-licenses.py add {{ files }}" else "./scripts/code-quality/update-licenses.py add --interactive {{ files }}"
     }
 
 
@@ -66,7 +81,7 @@ local linters = new Mapping<String, Step> {
 
     ["validate-lazy-imports"] = new Step {
         glob = "{src,tests}/**/*.py"
-        check = "uv run --no-cache mise-tasks/validate-lazy-imports.py {{ files }}"
+        check = "uv run --refresh-package code-weaver mise-tasks/validate-lazy-imports.py {{ files }}"
     }
 
     // ty typechecker for python
@@ -79,6 +94,7 @@ local linters = new Mapping<String, Step> {
         glob = "*.{py,md,txt,toml,ini,cfg,conf,sh,bash,js,ts,tsx,rs,go,java,css,scss,html,xml}"
         check = "hk util end-of-file-fixer {{ files }}"
         fix = "hk util end-of-file-fixer --fix {{ files }}"
+        stage = List("*.{py,md,txt,toml,ini,cfg,conf,sh,bash,js,ts,tsx,rs,go,java,css,scss,html,xml}")
     }
     ["check-added-large-files"] = new Step {
         glob = "*"
@@ -96,12 +112,14 @@ local linters = new Mapping<String, Step> {
         glob = "*.{py,md,txt,toml,ini,cfg,conf,sh,bash,yml,yaml,json,jsonc,js,ts,tsx,rs,go,java,css,scss,html,xml}"
         check = "hk util trailing-whitespace {{ files }}"
         fix = "hk util trailing-whitespace --fix {{ files }}"
+        stage = List("*.{py,md,txt,toml,ini,cfg,conf,sh,bash,yml,yaml,json,jsonc,js,ts,tsx,rs,go,java,css,scss,html,xml}")
     }
     ["check-python-debug-statements"] = new Step {
         glob = "*.py"
         check = "hk util python-debug-statements {{ files }}"
     }
 }
+
 
 hooks {
     ["pre-commit"] {

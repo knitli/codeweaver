@@ -28,6 +28,7 @@ from typing import Annotated, Literal, NamedTuple, NotRequired, Required, TypedD
 
 from pydantic import Field, PositiveInt
 
+from codeweaver.core.types.utils import generate_field_title
 from codeweaver.engine.chunker.delimiters.kind import DelimiterKind
 
 
@@ -84,34 +85,59 @@ class DelimiterPattern(NamedTuple):
         ... )
     """
 
-    starts: Annotated[list[str], Field(description="The start delimiters.")]
+    starts: Annotated[
+        list[str],
+        Field(description="The start delimiters.", field_title_generator=generate_field_title),
+    ]
 
-    ends: Annotated[list[str] | Literal["ANY"], Field(description="The end delimiters.")]
+    ends: Annotated[
+        list[str] | Literal["ANY"],
+        Field(description="The end delimiters.", field_title_generator=generate_field_title),
+    ]  # "ANY" means any end delimiter
 
-    kind: Annotated[DelimiterKind, Field(description="The kind of delimiter.")] = (
-        DelimiterKind.UNKNOWN
-    )
+    kind: Annotated[
+        DelimiterKind,
+        Field(description="The kind of delimiter.", field_title_generator=generate_field_title),
+    ] = DelimiterKind.UNKNOWN
     priority_override: (
-        Annotated[PositiveInt, Field(gt=0, lt=100, description="The priority of the delimiter.")]
+        Annotated[
+            PositiveInt,
+            Field(
+                gt=0,
+                lt=100,
+                description="The priority of the delimiter.",
+                field_title_generator=generate_field_title,
+            ),
+        ]
         | None
     ) = None
     inclusive: Annotated[
-        bool | None, Field(description="Whether to include the delimiters in the resulting chunk.")
+        bool | None,
+        Field(
+            description="Whether to include the delimiters in the resulting chunk.",
+            field_title_generator=generate_field_title,
+        ),
     ] = None
     take_whole_lines: Annotated[
         bool | None,
         Field(
-            description="Whether to expand the chunk to include whole lines if matched within it."
+            description="Whether to expand the chunk to include whole lines if matched within it.",
+            field_title_generator=generate_field_title,
         ),
     ] = None
-    nestable: Annotated[bool | None, Field(description="Whether the delimiter can be nested.")] = (
-        None
-    )
+    nestable: Annotated[
+        bool | None,
+        Field(
+            description="Whether the delimiter can be nested.",
+            field_title_generator=generate_field_title,
+        ),
+    ] = None
 
     formatter: Annotated[
         Callable[[str], str] | None,
         Field(
-            exclude=True, description="An optional formatter function to apply to the chunk text."
+            description="An optional formatter function to apply to the chunk text.",
+            field_title_generator=generate_field_title,
         ),
     ] = None
 

@@ -49,6 +49,29 @@ def _get_project_name() -> str:
     )
 
 
+def _get_memory_config() -> MemoryConfig:
+    from codeweaver.config.settings import get_settings_map
+    from codeweaver.core.types.sentinel import Unset
+
+    settings_map = get_settings_map()
+    if (
+        (provider_settings := settings_map.get("providers"))
+        and provider_settings is not Unset
+        and (vector_settings := provider_settings.get("vector_store"))
+        and vector_settings is not Unset
+    ):
+        vector_store_config = (
+            vector_settings[0] if isinstance(vector_settings, tuple) else vector_settings
+        )
+        if (
+            memory_config := vector_store_config["provider_settings"]
+            if vector_store_config["provider"] == Provider.MEMORY
+            else None
+        ):
+            return memory_config
+    return MemoryConfig()
+
+
 class MemoryVectorStoreProvider(QdrantBaseProvider):
     """In-memory vector store with JSON persistence for development/testing.
 
@@ -56,7 +79,8 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
     Suitable for small codebases (<10k chunks) and testing scenarios.
     """
 
-    config: MemoryConfig = MemoryConfig()
+    _provider: ClassVar[Literal[Provider.MEMORY]] = Provider.MEMORY
+    config: MemoryConfig = _get_memory_config()
     _client: AsyncQdrantClient | None = None
 
     def model_post_init(self, __context: Any, /) -> None:
@@ -75,8 +99,6 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
     def base_url(self) -> str | None:
         """Get the base URL for the memory provider - always :memory:."""
         return ":memory:"
-
-    _provider: ClassVar[Literal[Provider.MEMORY]] = Provider.MEMORY
 
     async def _init_provider(self) -> None:  # type: ignore
         """Initialize in-memory Qdrant client and restore from disk.
@@ -213,12 +235,28 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
                     async with self._collection_metadata_lock:  # type: ignore
                         self._collection_metadata[col.name] = metadata.model_dump(mode="json")  # type: ignore
 
+                def _serialize_vector(vector: Any) -> Any:
+                    """Serialize vector data, converting SparseVector to JSON-compatible format."""
+                    from qdrant_client.models import SparseVector
+
+                    if isinstance(vector, SparseVector):
+                        return {"indices": list(vector.indices), "values": list(vector.values)}
+                    if isinstance(vector, dict):
+                        return {k: _serialize_vector(v) for k, v in vector.items()}
+                    if isinstance(vector, list):
+                        return vector
+                    return vector
+
                 collections_data[col.name] = {
                     "metadata": metadata.model_dump(mode="json"),
                     "vectors_config": {"dense": {"size": dense_size, "distance": "Cosine"}},
                     "sparse_vectors_config": {"sparse": {}},
                     "points": [
-                        {"id": str(point.id), "vector": point.vector, "payload": point.payload}
+                        {
+                            "id": str(point.id),
+                            "vector": _serialize_vector(point.vector),
+                            "payload": point.payload,
+                        }
                         for point in points
                     ],
                 }
@@ -316,6 +354,20 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
                     async with self._collection_metadata_lock:  # type: ignore
                         self._collection_metadata[collection_name] = collection_data["metadata"]  # type: ignore
 
+                def _deserialize_vector(vector: Any) -> Any:
+                    """Deserialize vector data, converting sparse dict to SparseVector."""
+                    from qdrant_client.models import SparseVector
+
+                    if isinstance(vector, dict):
+                        # Check if it's a serialized sparse vector
+                        if "indices" in vector and "values" in vector:
+                            return SparseVector(indices=vector["indices"], values=vector["values"])
+                        # Otherwise recursively deserialize dict values
+                        return {k: _deserialize_vector(v) for k, v in vector.items()}
+                    if isinstance(vector, list):
+                        return vector
+                    return vector
+
                 # Restore points in batches
                 points_data = collection_data.get("points", [])
                 for i in range(0, len(points_data), 100):
@@ -323,7 +375,7 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
                     points = [
                         PointStruct(
                             id=point["id"],
-                            vector=point["vector"],
+                            vector=_deserialize_vector(point["vector"]),
                             payload=point["payload"],  # type: ignore
                         )
                         for point in batch

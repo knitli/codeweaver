@@ -18,11 +18,9 @@ from __future__ import annotations
 import json
 
 from collections import Counter, defaultdict
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
-
-from pydantic import Field
-from pydantic.dataclasses import dataclass
 
 from codeweaver.core.language import SemanticSearchLanguage
 
@@ -37,36 +35,36 @@ class GrammarStructureStats:
     unnamed_nodes: int = 0
 
     # Abstract type patterns
-    abstract_types: dict[str, list[str]] = Field(default_factory=dict)
+    abstract_types: dict[str, list[str]] = field(default_factory=dict)
     abstract_type_count: int = 0
 
     # Field patterns
     nodes_with_fields: int = 0
-    common_field_names: Counter[str] = Field(default_factory=Counter)
-    field_semantic_roles: dict[str, list[str]] = Field(default_factory=lambda: defaultdict(list))
+    common_field_names: Counter[str] = field(default_factory=Counter)
+    field_semantic_roles: dict[str, list[str]] = field(default_factory=lambda: defaultdict(list))
 
     # Children patterns
     nodes_with_children: int = 0
     nodes_with_both: int = 0  # both fields and children
 
     # Extra patterns
-    extra_nodes: list[str] = Field(default_factory=list)
+    extra_nodes: list[str] = field(default_factory=list)
     extra_node_count: int = 0
 
     # Root patterns
-    root_nodes: list[str] = Field(default_factory=list)
+    root_nodes: list[str] = field(default_factory=list)
 
     # Q1: Category references in connections
-    field_references: dict[str, set[str]] = Field(default_factory=lambda: defaultdict(set))
-    children_references: dict[str, set[str]] = Field(default_factory=lambda: defaultdict(set))
-    category_references_in_fields: Counter[str] = Field(default_factory=Counter)
-    category_references_in_children: Counter[str] = Field(default_factory=Counter)
-    concrete_references_in_fields: Counter[str] = Field(default_factory=Counter)
-    concrete_references_in_children: Counter[str] = Field(default_factory=Counter)
+    field_references: dict[str, set[str]] = field(default_factory=lambda: defaultdict(set))
+    children_references: dict[str, set[str]] = field(default_factory=lambda: defaultdict(set))
+    category_references_in_fields: Counter[str] = field(default_factory=Counter)
+    category_references_in_children: Counter[str] = field(default_factory=Counter)
+    concrete_references_in_fields: Counter[str] = field(default_factory=Counter)
+    concrete_references_in_children: Counter[str] = field(default_factory=Counter)
 
     # Q2: Multiple category membership
-    concrete_to_categories: dict[str, set[str]] = Field(default_factory=lambda: defaultdict(set))
-    multi_category_things: dict[str, list[str]] = Field(default_factory=dict)
+    concrete_to_categories: dict[str, set[str]] = field(default_factory=lambda: defaultdict(set))
+    multi_category_things: dict[str, list[str]] = field(default_factory=dict)
 
     def summary(self) -> str:
         """Generate summary statistics."""

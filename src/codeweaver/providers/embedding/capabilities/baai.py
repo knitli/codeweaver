@@ -127,7 +127,7 @@ BGE_LARGE_EN_335M_CAPABILITIES: PartialCapabilities = {
 
 BAAI_BGE_SMALL_EN_V1_5_CAPABILITIES: PartialCapabilities = {
     "name": "BAAI/bge-small-en-v1.5",
-    "default_dimension": 512,
+    "default_dimension": 384,
     "context_window": 512,
     "preferred_metrics": ("cosine", "dot", "euclidean"),
     "supports_context_chunk_embedding": False,

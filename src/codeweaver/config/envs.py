@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Any, Literal, TypedDict, get_args
 from pydantic import AnyUrl, SecretStr
 
 from codeweaver.core.types.dictview import DictView
-from codeweaver.core.types.models import EnvFormat, EnvVarInfo
+from codeweaver.core.types.env import EnvFormat, EnvVarInfo
 
 
 if TYPE_CHECKING:

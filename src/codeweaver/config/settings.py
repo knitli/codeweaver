@@ -54,9 +54,9 @@ from pydantic_settings import (
 from codeweaver.common.utils.checks import is_test_environment
 from codeweaver.common.utils.lazy_importer import lazy_import
 from codeweaver.common.utils.utils import get_user_config_dir
+from codeweaver.config._logging import DefaultLoggingSettings, LoggingSettings
 from codeweaver.config.chunker import ChunkerSettings, DefaultChunkerSettings
 from codeweaver.config.indexer import DefaultIndexerSettings, IndexerSettings
-from codeweaver.config.logging import DefaultLoggingSettings, LoggingSettings
 from codeweaver.config.mcp import MCPServerConfig, StdioCodeWeaverConfig
 from codeweaver.config.middleware import DefaultMiddlewareSettings, MiddlewareOptions
 from codeweaver.config.providers import AllDefaultProviderSettings, ProviderSettings
@@ -77,8 +77,9 @@ from codeweaver.config.types import (
 from codeweaver.core.types.aliases import FilteredKeyT
 from codeweaver.core.types.dictview import DictView
 from codeweaver.core.types.enum import AnonymityConversion
-from codeweaver.core.types.models import BasedModel, clean_sentinel_from_schema
+from codeweaver.core.types.models import BasedModel
 from codeweaver.core.types.sentinel import UNSET, Unset
+from codeweaver.core.types.utils import clean_sentinel_from_schema
 from codeweaver.mcp.middleware import McpMiddleware
 
 
@@ -532,9 +533,7 @@ class CodeWeaverSettings(BaseSettings):
 
     _map: Annotated[DictView[CodeWeaverSettingsDict] | None, PrivateAttr()] = None
 
-    _unset_fields: Annotated[
-        set[str], Field(description="Set of fields that were unset", exclude=True)
-    ] = set()
+    _unset_fields: Annotated[set[str], PrivateAttr(default_factory=set)] = set()
 
     def __init__(self, **kwargs: Any) -> None:
         """Initialize CodeWeaverSettings, loading from config file if provided."""
@@ -832,6 +831,9 @@ class CodeWeaverSettings(BaseSettings):
             - AWS Secrets Manager
             - Azure Key Vault
             - Google Secret Manager
+
+        #! IMPORTANT
+        If the environment variable `CODEWEAVER_TEST_MODE` is set to "true", test config paths like codeweaver.test.toml become the *only* config sources. All others get ignored. It's important this get set and unset when testing is over.
         """
         config_files: list[PydanticBaseSettingsSource] = []
         cls._ensure_settings_dirs()
@@ -891,6 +893,10 @@ class CodeWeaverSettings(BaseSettings):
                 config_files.append(_class(settings_cls, Path(f"{loc}.{ext}")))
                 if ext == "yaml":
                     config_files.append(_class(settings_cls, Path(f"{loc}.yml")))
+        # if we're testing, we want to control and isolate test configs
+        # Still allow init_settings so tests can programmatically override config
+        if is_test_mode:
+            return (init_settings, *config_files)
         other_sources: list[PydanticBaseSettingsSource] = []
         if any(env for env in os.environ if env.startswith("AWS_SECRETS_MANAGER")):
             other_sources.append(

@@ -1,0 +1,1744 @@
+{
+  "proposed_packages": {
+    "codeweaver-core": {
+      "includes": [
+        "core",
+        "exceptions"
+      ],
+      "description": "Core types and exceptions",
+      "intended_deps": []
+    },
+    "codeweaver-semantic": {
+      "includes": [
+        "semantic",
+        "data"
+      ],
+      "description": "AST analytics",
+      "intended_deps": [
+        "codeweaver-core"
+      ]
+    },
+    "codeweaver-utils": {
+      "includes": [
+        "common/utils"
+      ],
+      "description": "Utility functions",
+      "intended_deps": [
+        "codeweaver-core"
+      ]
+    },
+    "codeweaver-tokenizers": {
+      "includes": [
+        "tokenizers"
+      ],
+      "description": "Tokenization utilities",
+      "intended_deps": [
+        "codeweaver-core"
+      ]
+    },
+    "codeweaver-daemon": {
+      "includes": [
+        "daemon"
+      ],
+      "description": "Daemon management",
+      "intended_deps": []
+    },
+    "codeweaver-telemetry": {
+      "includes": [
+        "common/telemetry",
+        "common/statistics"
+      ],
+      "description": "Telemetry and statistics",
+      "intended_deps": [
+        "codeweaver-core"
+      ]
+    },
+    "codeweaver-providers": {
+      "includes": [
+        "providers"
+      ],
+      "description": "Provider implementations",
+      "intended_deps": [
+        "codeweaver-core",
+        "codeweaver-tokenizers",
+        "codeweaver-telemetry",
+        "codeweaver-utils"
+      ]
+    },
+    "codeweaver-engine": {
+      "includes": [
+        "engine",
+        "common/registry",
+        "config"
+      ],
+      "description": "Chunking and indexing engine",
+      "intended_deps": [
+        "codeweaver-core",
+        "codeweaver-semantic",
+        "codeweaver-providers",
+        "codeweaver-utils",
+        "codeweaver-telemetry"
+      ]
+    },
+    "codeweaver": {
+      "includes": [
+        "cli",
+        "server",
+        "mcp",
+        "agent_api",
+        "main"
+      ],
+      "description": "Main application package",
+      "intended_deps": [
+        "codeweaver-engine",
+        "codeweaver-providers",
+        "codeweaver-daemon"
+      ]
+    }
+  },
+  "actual_dependencies": {
+    "codeweaver-core": [
+      "codeweaver-providers",
+      "codeweaver-semantic",
+      "codeweaver-utils",
+      "codeweaver",
+      "codeweaver-tokenizers"
+    ],
+    "codeweaver": [
+      "codeweaver-core",
+      "codeweaver-engine",
+      "codeweaver-providers",
+      "codeweaver-semantic",
+      "codeweaver-telemetry",
+      "codeweaver-daemon",
+      "codeweaver-utils"
+    ],
+    "codeweaver-engine": [
+      "codeweaver-core",
+      "codeweaver-providers",
+      "codeweaver-semantic",
+      "codeweaver-telemetry",
+      "codeweaver-utils",
+      "codeweaver"
+    ],
+    "codeweaver-telemetry": [
+      "codeweaver-core",
+      "codeweaver-engine",
+      "codeweaver-semantic",
+      "codeweaver-utils",
+      "codeweaver"
+    ],
+    "codeweaver-semantic": [
+      "codeweaver-core",
+      "codeweaver-utils"
+    ],
+    "codeweaver-providers": [
+      "codeweaver-core",
+      "codeweaver-engine",
+      "codeweaver-telemetry",
+      "codeweaver-utils",
+      "codeweaver",
+      "codeweaver-tokenizers"
+    ],
+    "codeweaver-utils": [
+      "codeweaver",
+      "codeweaver-core",
+      "codeweaver-engine",
+      "codeweaver-providers"
+    ]
+  },
+  "violations": {
+    "codeweaver-core": [
+      {
+        "file": "codeweaver.exceptions",
+        "imports_from": "codeweaver",
+        "import": "codeweaver.cli.utils",
+        "allowed": []
+      },
+      {
+        "file": "codeweaver.core.chunks",
+        "imports_from": "codeweaver-utils",
+        "import": "codeweaver.common.utils",
+        "allowed": []
+      },
+      {
+        "file": "codeweaver.core.chunks",
+        "imports_from": "codeweaver-providers",
+        "import": "codeweaver.providers.embedding.registry",
+        "allowed": []
+      },
+      {
+        "file": "codeweaver.core.chunks",
+        "imports_from": "codeweaver-providers",
+        "import": "codeweaver.providers.embedding.types",
+        "allowed": []
+      },
+      {
+        "file": "codeweaver.core.chunks",
+        "imports_from": "codeweaver-tokenizers",
+        "import": "codeweaver.tokenizers.base",
+        "allowed": []
+      },
+      {
+        "file": "codeweaver.core.chunks",
+        "imports_from": "codeweaver-utils",
+        "import": "codeweaver.common.utils.utils",
+        "allowed": []
+      },
+      {
+        "file": "codeweaver.core.file_extensions",
+        "imports_from": "codeweaver-utils",
+        "import": "codeweaver.common.utils",
+        "allowed": []
+      },
+      {
+        "file": "codeweaver.core.language",
+        "imports_from": "codeweaver-utils",
+        "import": "codeweaver.common.utils",
+        "allowed": []
+      },
+      {
+        "file": "codeweaver.core.spans",
+        "imports_from": "codeweaver-utils",
+        "import": "codeweaver.common.utils",
+        "allowed": []
+      },
+      {
+        "file": "codeweaver.core.metadata",
+        "imports_from": "codeweaver-utils",
+        "import": "codeweaver.common.utils",
+        "allowed": []
+      },
+      {
+        "file": "codeweaver.core.metadata",
+        "imports_from": "codeweaver-semantic",
+        "import": "codeweaver.semantic.ast_grep",
+        "allowed": []
+      },
+      {
+        "file": "codeweaver.core.discovery",
+        "imports_from": "codeweaver-utils",
+        "import": "codeweaver.common.utils",
+        "allowed": []
+      },
+      {
+        "file": "codeweaver.core.discovery",
+        "imports_from": "codeweaver-utils",
+        "import": "codeweaver.common.utils.git",
+        "allowed": []
+      },
+      {
+        "file": "codeweaver.core.discovery",
+        "imports_from": "codeweaver-semantic",
+        "import": "codeweaver.semantic.ast_grep",
+        "allowed": []
+      },
+      {
+        "file": "codeweaver.core.stores",
+        "imports_from": "codeweaver-utils",
+        "import": "codeweaver.common.utils.utils",
+        "allowed": []
+      }
+    ],
+    "codeweaver": [
+      {
+        "file": "codeweaver.main",
+        "imports_from": "codeweaver-utils",
+        "import": "codeweaver.common.utils",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.main",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.exceptions",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.main",
+        "imports_from": "codeweaver-telemetry",
+        "import": "codeweaver.common.statistics",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.main",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.core.types.sentinel",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.main",
+        "imports_from": "codeweaver-utils",
+        "import": "codeweaver.common.utils.procs",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.mcp.tools",
+        "imports_from": "codeweaver-utils",
+        "import": "codeweaver.common.utils.lazy_importer",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.mcp.tools",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.core.types",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.mcp.user_agent",
+        "imports_from": "codeweaver-utils",
+        "import": "codeweaver.common.utils",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.mcp.user_agent",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.core.language",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.mcp.user_agent",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.exceptions",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.mcp.state",
+        "imports_from": "codeweaver-utils",
+        "import": "codeweaver.common.utils.lazy_importer",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.mcp.state",
+        "imports_from": "codeweaver-utils",
+        "import": "codeweaver.common.utils.utils",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.mcp.state",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.core.types.dataclasses",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.mcp.state",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.core.types.dictview",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.mcp.state",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.core.types.sentinel",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.mcp.server",
+        "imports_from": "codeweaver-utils",
+        "import": "codeweaver.common.utils",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.mcp.server",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.core.types",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.mcp.server",
+        "imports_from": "codeweaver-telemetry",
+        "import": "codeweaver.common.statistics",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.server._logging",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.core.types.sentinel",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.server._logging",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.core.types",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.server.background_services",
+        "imports_from": "codeweaver-utils",
+        "import": "codeweaver.common.utils.utils",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.server.background_services",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.core.types.sentinel",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.server.background_services",
+        "imports_from": "codeweaver-utils",
+        "import": "codeweaver.common.utils",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.server.management",
+        "imports_from": "codeweaver-telemetry",
+        "import": "codeweaver.common.statistics",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.server.management",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.core.types",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.server.server",
+        "imports_from": "codeweaver-telemetry",
+        "import": "codeweaver.common.statistics",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.server.server",
+        "imports_from": "codeweaver-telemetry",
+        "import": "codeweaver.common.telemetry.client",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.server.server",
+        "imports_from": "codeweaver-utils",
+        "import": "codeweaver.common.utils",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.server.server",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.core.types.dataclasses",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.server.server",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.core.types.enum",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.server.server",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.core.types.sentinel",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.server.server",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.exceptions",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.server.server",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.core.types",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.server.server",
+        "imports_from": "codeweaver-telemetry",
+        "import": "codeweaver.common.telemetry.events",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.server.lifespan",
+        "imports_from": "codeweaver-telemetry",
+        "import": "codeweaver.common.statistics",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.server.lifespan",
+        "imports_from": "codeweaver-utils",
+        "import": "codeweaver.common.utils",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.server.lifespan",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.core.types.sentinel",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.cli.utils",
+        "imports_from": "codeweaver-utils",
+        "import": "codeweaver.common.utils.git",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.cli.utils",
+        "imports_from": "codeweaver-utils",
+        "import": "codeweaver.common.utils.lazy_importer",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.cli.utils",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.core.types",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.cli.utils",
+        "imports_from": "codeweaver-utils",
+        "import": "codeweaver.common.utils",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.cli.ui.error_handler",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.exceptions",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.cli.commands.doctor",
+        "imports_from": "codeweaver-utils",
+        "import": "codeweaver.common.utils.git",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.cli.commands.doctor",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.core.types.sentinel",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.cli.commands.doctor",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.exceptions",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.cli.commands.status",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.core.types.sentinel",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.cli.commands.stop",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.core.types.sentinel",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.cli.commands.config",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.core.types.dictview",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.cli.commands.config",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.exceptions",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.cli.commands.config",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.core.types.sentinel",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.cli.commands.start",
+        "imports_from": "codeweaver-utils",
+        "import": "codeweaver.common.utils.lazy_importer",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.cli.commands.start",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.core.types.dictview",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.cli.commands.start",
+        "imports_from": "codeweaver-telemetry",
+        "import": "codeweaver.common.statistics",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.cli.commands.start",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.core.types.sentinel",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.cli.commands.list",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.exceptions",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.cli.commands.index",
+        "imports_from": "codeweaver-utils",
+        "import": "codeweaver.common.utils.git",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.cli.commands.index",
+        "imports_from": "codeweaver-utils",
+        "import": "codeweaver.common.utils.utils",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.cli.commands.index",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.core.types.dictview",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.cli.commands.index",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.exceptions",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.cli.commands.index",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.core.types",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.cli.commands.index",
+        "imports_from": "codeweaver-utils",
+        "import": "codeweaver.common.utils",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.cli.commands.init",
+        "imports_from": "codeweaver-utils",
+        "import": "codeweaver.common.utils.utils",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.cli.commands.init",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.exceptions",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.cli.commands.server",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.exceptions",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.cli.commands.server",
+        "imports_from": "codeweaver-utils",
+        "import": "codeweaver.common.utils",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.cli.commands.search",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.exceptions",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.cli.commands.search",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.core.types.dictview",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.server.health.models",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.core.types",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.server.health.models",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.core.types.aliases",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.server.health.models",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.core.types.enum",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.server.health.health_service",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.exceptions",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.server.health.health_service",
+        "imports_from": "codeweaver-telemetry",
+        "import": "codeweaver.common.statistics",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.server.health.health_service",
+        "imports_from": "codeweaver-utils",
+        "import": "codeweaver.common.utils",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.agent_api.find_code.intent",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.core.types",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.agent_api.find_code.pipeline",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.exceptions",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.agent_api.find_code.scoring",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.core.chunks",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.agent_api.find_code.scoring",
+        "imports_from": "codeweaver-semantic",
+        "import": "codeweaver.semantic.classifications",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.agent_api.find_code.response",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.core.language",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.agent_api.find_code.response",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.core.types",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.agent_api.find_code.conversion",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.core.discovery",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.agent_api.find_code.conversion",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.core.spans",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.agent_api.find_code.conversion",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.core.metadata",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.agent_api.find_code.filters",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.core.chunks",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.agent_api.find_code.results",
+        "imports_from": "codeweaver-utils",
+        "import": "codeweaver.common.utils",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.agent_api.find_code.results",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.core.chunks",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.agent_api.find_code.results",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.core.discovery",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.agent_api.find_code.results",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.core.metadata",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.agent_api.find_code.results",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.core.types.models",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.agent_api.find_code.results",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.core.types.aliases",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.agent_api.find_code.results",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.core.types.enum",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.agent_api.find_code.results",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.core.types",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.agent_api.find_code.types",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.core.chunks",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.agent_api.find_code.types",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.core.discovery",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.agent_api.find_code.types",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.core.language",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.agent_api.find_code.types",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.core.spans",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.agent_api.find_code.types",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.core.types",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.agent_api.find_code.types",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.core.types.enum",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.agent_api.find_code.types",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.core.types.models",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.agent_api.find_code.types",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.core.types.utils",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.agent_api.find_code.types",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.exceptions",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.mcp.middleware.statistics",
+        "imports_from": "codeweaver-telemetry",
+        "import": "codeweaver.common.statistics",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      },
+      {
+        "file": "codeweaver.mcp.middleware.statistics",
+        "imports_from": "codeweaver-core",
+        "import": "codeweaver.exceptions",
+        "allowed": [
+          "codeweaver-engine",
+          "codeweaver-providers",
+          "codeweaver-daemon"
+        ]
+      }
+    ],
+    "codeweaver-telemetry": [
+      {
+        "file": "codeweaver.common.statistics",
+        "imports_from": "codeweaver-utils",
+        "import": "codeweaver.common.utils",
+        "allowed": [
+          "codeweaver-core"
+        ]
+      },
+      {
+        "file": "codeweaver.common.statistics",
+        "imports_from": "codeweaver-utils",
+        "import": "codeweaver.common.utils.utils",
+        "allowed": [
+          "codeweaver-core"
+        ]
+      },
+      {
+        "file": "codeweaver.common.statistics",
+        "imports_from": "codeweaver-semantic",
+        "import": "codeweaver.semantic.classifications",
+        "allowed": [
+          "codeweaver-core"
+        ]
+      },
+      {
+        "file": "codeweaver.common.statistics",
+        "imports_from": "codeweaver",
+        "import": "codeweaver.server",
+        "allowed": [
+          "codeweaver-core"
+        ]
+      },
+      {
+        "file": "codeweaver.common.telemetry.client",
+        "imports_from": "codeweaver-utils",
+        "import": "codeweaver.common.utils.utils",
+        "allowed": [
+          "codeweaver-core"
+        ]
+      },
+      {
+        "file": "codeweaver.common.telemetry.client",
+        "imports_from": "codeweaver-engine",
+        "import": "codeweaver.config._project",
+        "allowed": [
+          "codeweaver-core"
+        ]
+      },
+      {
+        "file": "codeweaver.common.telemetry.client",
+        "imports_from": "codeweaver-engine",
+        "import": "codeweaver.config.settings",
+        "allowed": [
+          "codeweaver-core"
+        ]
+      },
+      {
+        "file": "codeweaver.common.telemetry.client",
+        "imports_from": "codeweaver-engine",
+        "import": "codeweaver.config.telemetry",
+        "allowed": [
+          "codeweaver-core"
+        ]
+      },
+      {
+        "file": "codeweaver.common.telemetry.events",
+        "imports_from": "codeweaver",
+        "import": "codeweaver.agent_api.find_code.intent",
+        "allowed": [
+          "codeweaver-core"
+        ]
+      },
+      {
+        "file": "codeweaver.common.telemetry.events",
+        "imports_from": "codeweaver",
+        "import": "codeweaver.agent_api.find_code.types",
+        "allowed": [
+          "codeweaver-core"
+        ]
+      }
+    ],
+    "codeweaver-semantic": [
+      {
+        "file": "codeweaver.semantic.classifier",
+        "imports_from": "codeweaver-utils",
+        "import": "codeweaver.common.utils.utils",
+        "allowed": [
+          "codeweaver-core"
+        ]
+      },
+      {
+        "file": "codeweaver.semantic.ast_grep",
+        "imports_from": "codeweaver-utils",
+        "import": "codeweaver.common.utils",
+        "allowed": [
+          "codeweaver-core"
+        ]
+      },
+      {
+        "file": "codeweaver.semantic.ast_grep",
+        "imports_from": "codeweaver-utils",
+        "import": "codeweaver.common.utils.textify",
+        "allowed": [
+          "codeweaver-core"
+        ]
+      },
+      {
+        "file": "codeweaver.semantic.grammar",
+        "imports_from": "codeweaver-utils",
+        "import": "codeweaver.common.utils",
+        "allowed": [
+          "codeweaver-core"
+        ]
+      }
+    ],
+    "codeweaver-engine": [
+      {
+        "file": "codeweaver.config._logging",
+        "imports_from": "codeweaver",
+        "import": "codeweaver.cli.utils",
+        "allowed": [
+          "codeweaver-core",
+          "codeweaver-semantic",
+          "codeweaver-providers",
+          "codeweaver-utils",
+          "codeweaver-telemetry"
+        ]
+      },
+      {
+        "file": "codeweaver.config.settings",
+        "imports_from": "codeweaver",
+        "import": "codeweaver.mcp.middleware",
+        "allowed": [
+          "codeweaver-core",
+          "codeweaver-semantic",
+          "codeweaver-providers",
+          "codeweaver-utils",
+          "codeweaver-telemetry"
+        ]
+      },
+      {
+        "file": "codeweaver.config.types",
+        "imports_from": "codeweaver",
+        "import": "codeweaver.mcp.middleware",
+        "allowed": [
+          "codeweaver-core",
+          "codeweaver-semantic",
+          "codeweaver-providers",
+          "codeweaver-utils",
+          "codeweaver-telemetry"
+        ]
+      },
+      {
+        "file": "codeweaver.config.middleware",
+        "imports_from": "codeweaver",
+        "import": "codeweaver.mcp.middleware",
+        "allowed": [
+          "codeweaver-core",
+          "codeweaver-semantic",
+          "codeweaver-providers",
+          "codeweaver-utils",
+          "codeweaver-telemetry"
+        ]
+      },
+      {
+        "file": "codeweaver.engine.watcher.watcher",
+        "imports_from": "codeweaver",
+        "import": "codeweaver.cli.utils",
+        "allowed": [
+          "codeweaver-core",
+          "codeweaver-semantic",
+          "codeweaver-providers",
+          "codeweaver-utils",
+          "codeweaver-telemetry"
+        ]
+      }
+    ],
+    "codeweaver-providers": [
+      {
+        "file": "codeweaver.providers.vector_stores.utils",
+        "imports_from": "codeweaver-engine",
+        "import": "codeweaver.common.registry.models",
+        "allowed": [
+          "codeweaver-core",
+          "codeweaver-tokenizers",
+          "codeweaver-telemetry",
+          "codeweaver-utils"
+        ]
+      },
+      {
+        "file": "codeweaver.providers.vector_stores.utils",
+        "imports_from": "codeweaver-engine",
+        "import": "codeweaver.config.settings",
+        "allowed": [
+          "codeweaver-core",
+          "codeweaver-tokenizers",
+          "codeweaver-telemetry",
+          "codeweaver-utils"
+        ]
+      },
+      {
+        "file": "codeweaver.providers.vector_stores.qdrant_base",
+        "imports_from": "codeweaver",
+        "import": "codeweaver.agent_api.find_code.results",
+        "allowed": [
+          "codeweaver-core",
+          "codeweaver-tokenizers",
+          "codeweaver-telemetry",
+          "codeweaver-utils"
+        ]
+      },
+      {
+        "file": "codeweaver.providers.vector_stores.qdrant_base",
+        "imports_from": "codeweaver",
+        "import": "codeweaver.agent_api.find_code.types",
+        "allowed": [
+          "codeweaver-core",
+          "codeweaver-tokenizers",
+          "codeweaver-telemetry",
+          "codeweaver-utils"
+        ]
+      },
+      {
+        "file": "codeweaver.providers.vector_stores.qdrant_base",
+        "imports_from": "codeweaver-engine",
+        "import": "codeweaver.config.providers",
+        "allowed": [
+          "codeweaver-core",
+          "codeweaver-tokenizers",
+          "codeweaver-telemetry",
+          "codeweaver-utils"
+        ]
+      },
+      {
+        "file": "codeweaver.providers.vector_stores.qdrant_base",
+        "imports_from": "codeweaver-engine",
+        "import": "codeweaver.engine.search",
+        "allowed": [
+          "codeweaver-core",
+          "codeweaver-tokenizers",
+          "codeweaver-telemetry",
+          "codeweaver-utils"
+        ]
+      },
+      {
+        "file": "codeweaver.providers.vector_stores.qdrant_base",
+        "imports_from": "codeweaver-engine",
+        "import": "codeweaver.common.registry.provider",
+        "allowed": [
+          "codeweaver-core",
+          "codeweaver-tokenizers",
+          "codeweaver-telemetry",
+          "codeweaver-utils"
+        ]
+      },
+      {
+        "file": "codeweaver.providers.vector_stores.qdrant_base",
+        "imports_from": "codeweaver-engine",
+        "import": "codeweaver.config.settings",
+        "allowed": [
+          "codeweaver-core",
+          "codeweaver-tokenizers",
+          "codeweaver-telemetry",
+          "codeweaver-utils"
+        ]
+      },
+      {
+        "file": "codeweaver.providers.vector_stores.base",
+        "imports_from": "codeweaver",
+        "import": "codeweaver.agent_api.find_code.types",
+        "allowed": [
+          "codeweaver-core",
+          "codeweaver-tokenizers",
+          "codeweaver-telemetry",
+          "codeweaver-utils"
+        ]
+      },
+      {
+        "file": "codeweaver.providers.vector_stores.base",
+        "imports_from": "codeweaver-engine",
+        "import": "codeweaver.config.providers",
+        "allowed": [
+          "codeweaver-core",
+          "codeweaver-tokenizers",
+          "codeweaver-telemetry",
+          "codeweaver-utils"
+        ]
+      },
+      {
+        "file": "codeweaver.providers.vector_stores.base",
+        "imports_from": "codeweaver-engine",
+        "import": "codeweaver.engine.search",
+        "allowed": [
+          "codeweaver-core",
+          "codeweaver-tokenizers",
+          "codeweaver-telemetry",
+          "codeweaver-utils"
+        ]
+      },
+      {
+        "file": "codeweaver.providers.vector_stores.base",
+        "imports_from": "codeweaver",
+        "import": "codeweaver.agent_api.find_code.results",
+        "allowed": [
+          "codeweaver-core",
+          "codeweaver-tokenizers",
+          "codeweaver-telemetry",
+          "codeweaver-utils"
+        ]
+      },
+      {
+        "file": "codeweaver.providers.vector_stores.base",
+        "imports_from": "codeweaver-engine",
+        "import": "codeweaver.common.registry",
+        "allowed": [
+          "codeweaver-core",
+          "codeweaver-tokenizers",
+          "codeweaver-telemetry",
+          "codeweaver-utils"
+        ]
+      },
+      {
+        "file": "codeweaver.providers.vector_stores.base",
+        "imports_from": "codeweaver-engine",
+        "import": "codeweaver.config.profiles",
+        "allowed": [
+          "codeweaver-core",
+          "codeweaver-tokenizers",
+          "codeweaver-telemetry",
+          "codeweaver-utils"
+        ]
+      },
+      {
+        "file": "codeweaver.providers.vector_stores.base",
+        "imports_from": "codeweaver-engine",
+        "import": "codeweaver.common.registry.provider",
+        "allowed": [
+          "codeweaver-core",
+          "codeweaver-tokenizers",
+          "codeweaver-telemetry",
+          "codeweaver-utils"
+        ]
+      },
+      {
+        "file": "codeweaver.providers.vector_stores.qdrant",
+        "imports_from": "codeweaver-engine",
+        "import": "codeweaver.config.providers",
+        "allowed": [
+          "codeweaver-core",
+          "codeweaver-tokenizers",
+          "codeweaver-telemetry",
+          "codeweaver-utils"
+        ]
+      },
+      {
+        "file": "codeweaver.providers.vector_stores.inmemory",
+        "imports_from": "codeweaver-engine",
+        "import": "codeweaver.config.providers",
+        "allowed": [
+          "codeweaver-core",
+          "codeweaver-tokenizers",
+          "codeweaver-telemetry",
+          "codeweaver-utils"
+        ]
+      },
+      {
+        "file": "codeweaver.providers.vector_stores.inmemory",
+        "imports_from": "codeweaver-engine",
+        "import": "codeweaver.config.settings",
+        "allowed": [
+          "codeweaver-core",
+          "codeweaver-tokenizers",
+          "codeweaver-telemetry",
+          "codeweaver-utils"
+        ]
+      },
+      {
+        "file": "codeweaver.providers.reranking.providers.bedrock",
+        "imports_from": "codeweaver-engine",
+        "import": "codeweaver.config.providers",
+        "allowed": [
+          "codeweaver-core",
+          "codeweaver-tokenizers",
+          "codeweaver-telemetry",
+          "codeweaver-utils"
+        ]
+      },
+      {
+        "file": "codeweaver.providers.reranking.providers.voyage",
+        "imports_from": "codeweaver-engine",
+        "import": "codeweaver.common.registry.models",
+        "allowed": [
+          "codeweaver-core",
+          "codeweaver-tokenizers",
+          "codeweaver-telemetry",
+          "codeweaver-utils"
+        ]
+      },
+      {
+        "file": "codeweaver.providers.embedding.providers.base",
+        "imports_from": "codeweaver-engine",
+        "import": "codeweaver.config.providers",
+        "allowed": [
+          "codeweaver-core",
+          "codeweaver-tokenizers",
+          "codeweaver-telemetry",
+          "codeweaver-utils"
+        ]
+      },
+      {
+        "file": "codeweaver.providers.embedding.providers.base",
+        "imports_from": "codeweaver-engine",
+        "import": "codeweaver.common.registry.provider",
+        "allowed": [
+          "codeweaver-core",
+          "codeweaver-tokenizers",
+          "codeweaver-telemetry",
+          "codeweaver-utils"
+        ]
+      },
+      {
+        "file": "codeweaver.providers.embedding.providers.base",
+        "imports_from": "codeweaver-engine",
+        "import": "codeweaver.config.profiles",
+        "allowed": [
+          "codeweaver-core",
+          "codeweaver-tokenizers",
+          "codeweaver-telemetry",
+          "codeweaver-utils"
+        ]
+      },
+      {
+        "file": "codeweaver.providers.embedding.providers.bedrock",
+        "imports_from": "codeweaver-engine",
+        "import": "codeweaver.common.registry.models",
+        "allowed": [
+          "codeweaver-core",
+          "codeweaver-tokenizers",
+          "codeweaver-telemetry",
+          "codeweaver-utils"
+        ]
+      }
+    ],
+    "codeweaver-utils": [
+      {
+        "file": "codeweaver.common.utils.checks",
+        "imports_from": "codeweaver",
+        "import": "codeweaver.cli.utils",
+        "allowed": [
+          "codeweaver-core"
+        ]
+      },
+      {
+        "file": "codeweaver.common.utils.utils",
+        "imports_from": "codeweaver-engine",
+        "import": "codeweaver.config.types",
+        "allowed": [
+          "codeweaver-core"
+        ]
+      },
+      {
+        "file": "codeweaver.common.utils.utils",
+        "imports_from": "codeweaver-providers",
+        "import": "codeweaver.providers.provider",
+        "allowed": [
+          "codeweaver-core"
+        ]
+      },
+      {
+        "file": "codeweaver.common.utils.utils",
+        "imports_from": "codeweaver-engine",
+        "import": "codeweaver.config.settings",
+        "allowed": [
+          "codeweaver-core"
+        ]
+      }
+    ]
+  }
+}

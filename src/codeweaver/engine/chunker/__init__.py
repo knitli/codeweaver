@@ -6,9 +6,10 @@
 
 from __future__ import annotations
 
-from importlib import import_module
 from types import MappingProxyType
 from typing import TYPE_CHECKING
+
+from codeweaver.common.utils.lazy_getter import create_lazy_getattr
 
 
 if TYPE_CHECKING:
@@ -16,8 +17,11 @@ if TYPE_CHECKING:
     from codeweaver.engine.chunker.delimiter import DelimiterChunker
     from codeweaver.engine.chunker.delimiter_model import Boundary, Delimiter, DelimiterMatch
     from codeweaver.engine.chunker.delimiters import (
+        DelimiterDict,
+        DelimiterKind,
         DelimiterPattern,
         LanguageFamily,
+        LineStrategy,
         detect_language_family,
         expand_pattern,
     )
@@ -52,10 +56,13 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "ChunkingTimeoutError": (__spec__.parent, "exceptions"),
     "Delimiter": (__spec__.parent, "delimiter_model"),
     "DelimiterChunker": (__spec__.parent, "delimiter"),
+    "DelimiterDict": (__spec__.parent, "delimiters"),
+    "DelimiterKind": (__spec__.parent, "delimiter_model"),
     "DelimiterMatch": (__spec__.parent, "delimiter_model"),
     "DelimiterPattern": (__spec__.parent, "delimiters"),
     "GracefulChunker": (__spec__.parent, "selector"),
     "LanguageFamily": (__spec__.parent, "delimiters"),
+    "LineStrategy": (__spec__.parent, "delimiters"),
     "OversizedChunkError": (__spec__.parent, "exceptions"),
     "ParseError": (__spec__.parent, "exceptions"),
     "ResourceGovernor": (__spec__.parent, "governance"),
@@ -71,18 +78,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
 })
 
 
-def __getattr__(name: str) -> object:
-    """Dynamically import submodules and classes for the chunker package."""
-    if name in _dynamic_imports:
-        module_name, submodule_name = _dynamic_imports[name]
-        module = import_module(f"{module_name}.{submodule_name}")
-        result = getattr(module, name)
-        globals()[name] = result  # Cache in globals for future access
-        return result
-    if globals().get(name) is not None:
-        return globals()[name]
-    raise AttributeError(f"module {__name__} has no attribute {name}")
-
+__getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
 
 __all__ = (
     "ASTDepthExceededError",
@@ -95,10 +91,13 @@ __all__ = (
     "ChunkingTimeoutError",
     "Delimiter",
     "DelimiterChunker",
+    "DelimiterDict",
+    "DelimiterKind",
     "DelimiterMatch",
     "DelimiterPattern",
     "GracefulChunker",
     "LanguageFamily",
+    "LineStrategy",
     "OversizedChunkError",
     "ParseError",
     "ResourceGovernor",

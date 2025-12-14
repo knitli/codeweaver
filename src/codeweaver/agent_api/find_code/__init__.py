@@ -69,7 +69,7 @@ from codeweaver.agent_api.find_code.scoring import (
     process_unranked_results,
 )
 from codeweaver.agent_api.find_code.types import CodeMatch, FindCodeResponseSummary, SearchStrategy
-from codeweaver.common.logging import log_to_client_or_fallback
+from codeweaver.common._logging import log_to_client_or_fallback
 from codeweaver.common.telemetry.events import capture_search_event
 from codeweaver.core.spans import Span
 from codeweaver.semantic.classifications import AgentTask

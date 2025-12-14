@@ -24,11 +24,10 @@ from uuid import UUID
 
 from pydantic import UUID7, DirectoryPath, Field, NonNegativeInt
 from pydantic_core import from_json, to_json
-from uuid_extensions import uuid7
 
 from codeweaver.common.utils.git import get_project_path
 from codeweaver.common.utils.lazy_importer import lazy_import
-from codeweaver.common.utils.utils import get_user_config_dir
+from codeweaver.common.utils.utils import get_user_config_dir, uuid7
 from codeweaver.config.indexer import IndexerSettings
 from codeweaver.config.providers import (
     EmbeddingProviderSettings,

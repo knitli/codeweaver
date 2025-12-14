@@ -171,7 +171,11 @@ class ChunkerSelector:
         # Try semantic first for supported languages
         if isinstance(language, SemanticSearchLanguage):
             try:
-                return SemanticChunker(self.governor, language)
+                semantic_chunker = SemanticChunker(self.governor, language)
+                # Wrap semantic chunker with graceful fallback to delimiter
+                lang_str = language.variable if hasattr(language, "variable") else str(language)
+                fallback = DelimiterChunker(self.governor, language=lang_str)
+                return GracefulChunker(primary=semantic_chunker, fallback=fallback)
             except (ParseError, NotImplementedError) as e:
                 logger.warning(
                     "Semantic chunking unavailable for %s: %s. Using delimiter fallback.",
@@ -225,14 +229,14 @@ class ChunkerSelector:
         """
         ext = file.path.suffix
 
-        # SemanticSearchLanguage.from_extension returns None for unknown
-        return (
-            file.ext_kind.language.variable
-            if isinstance(file.ext_kind.language, SemanticSearchLanguage | ConfigLanguage)
-            else str(file.ext_kind.language)
-            if file.ext_kind
-            else ext.lstrip(".").lower()
-        )
+        # Return the enum itself (not .variable) for isinstance checks to work
+        if file.ext_kind:
+            return (
+                file.ext_kind.language
+                if isinstance(file.ext_kind.language, (SemanticSearchLanguage, ConfigLanguage))
+                else str(file.ext_kind.language)
+            )
+        return ext.lstrip(".").lower()
 
 
 class GracefulChunker(BaseChunker):

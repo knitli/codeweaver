@@ -20,8 +20,6 @@ import threading
 
 from typing import Any, cast
 
-from jsonpatch import MappingProxyType
-
 from codeweaver.exceptions import CodeWeaverError
 
 
@@ -393,65 +391,4 @@ def lazy_import[Import: Any](
     return LazyImport(module_name, *attrs)
 
 
-def create_lazy_getattr(
-    dynamic_imports: MappingProxyType[str, tuple[str, str]],
-    module_globals: dict[str, object],
-    module_name: str,
-) -> object:
-    """
-    Create a standardized __getattr__ function for package lazy imports.
-
-    This eliminates duplicating __getattr__ logic across every package __init__.py.
-    The function handles dynamic imports, caching, and proper error messages.
-
-    Args:
-        dynamic_imports: Mapping of {attribute_name: (parent_module, submodule_name)}
-        module_globals: The globals() dict from the calling module (for caching)
-        module_name: The __name__ of the calling module (for error messages)
-
-    Returns:
-        A configured __getattr__ function ready for use
-
-    Examples:
-        In your package/__init__.py:
-
-        >>> from types import MappingProxyType
-        >>> from codeweaver.common.utils import create_lazy_getattr
-        >>>
-        >>> _dynamic_imports = MappingProxyType({
-        ...     "MyClass": (__spec__.parent, "module"),
-        ...     "my_function": (__spec__.parent, "helpers"),
-        ... })
-        >>>
-        >>> __getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
-
-        Now importing from your package works with lazy loading:
-
-        >>> from mypackage import MyClass  # Only imports when accessed
-    """
-
-    def __getattr__(name: str) -> object:  # noqa: N807
-        """Dynamically import submodules and classes for the package."""
-        if name in dynamic_imports:
-            parent_module, submodule_name = dynamic_imports[name]
-            module = __import__(f"{parent_module}.{submodule_name}", fromlist=[""])
-            result = getattr(module, name)
-            if isinstance(result, LazyImport):
-                result = result._resolve()  # Force resolution if it's a LazyImport
-            module_globals[name] = result  # Cache for future access
-            return result
-
-        # Check if already cached
-        if name in module_globals:
-            return module_globals[name]
-
-        raise AttributeError(f"module {module_name!r} has no attribute {name!r}")
-
-    __getattr__.__module__ = module_name
-    __getattr__.__doc__ = f"""
-    Dynamic __getattr__ for lazy imports in module {module_name!r}."""
-
-    return __getattr__
-
-
-__all__ = ("LazyImport", "create_lazy_getattr", "lazy_import")
+__all__ = ("LazyImport", "lazy_import")

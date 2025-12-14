@@ -30,22 +30,32 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # Copy dependency files first for better layer caching
-COPY pyproject.toml README.md ./
+COPY pyproject.toml README.md SECURITY.md sbom.spdx ./
 COPY LICENSE* ./
+COPY LICENSES/ LICENSES/
 
-# Copy .git directory for dynamic versioning during build
-COPY .git/ .git/
+# Create minimal package structure for initial dependency installation
+# This allows Docker to cache the expensive dependency layer
+RUN mkdir -p src/codeweaver && \
+    echo "# Placeholder for initial build" > src/codeweaver/__init__.py
 
-# Copy the entire source code
-COPY src/ src/
-COPY typings/ typings/
-
-# Install pip and setuptools, then install the package
+# Install dependencies BEFORE copying source code and .git
+# This layer is cached unless pyproject.toml changes
 # Note: In some CI environments, you may need to skip SSL verification
 # If you encounter SSL errors, you can add --trusted-host pypi.org --trusted-host files.pythonhosted.org
 # hadolint ignore=DL3013
 RUN python -m pip install --no-cache-dir --upgrade pip setuptools wheel && \
     python -m pip install --no-cache-dir .
+
+# NOW copy source code (frequent changes don't trigger dependency reinstall)
+COPY src/ src/
+COPY typings/ typings/
+
+# Copy .git for dynamic versioning (after dependencies are installed)
+COPY .git/ .git/
+
+# Reinstall package with actual source code (fast, dependencies already installed)
+RUN python -m pip install --no-cache-dir --no-deps --force-reinstall .
 
 # =============================================================================
 # Stage 2: Runtime - Minimal production image

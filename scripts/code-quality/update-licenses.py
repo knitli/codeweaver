@@ -21,14 +21,26 @@ from functools import cache, partial
 from pathlib import Path
 from typing import Annotated, NamedTuple
 
+import reuse.comment
 import rignore
 
 from cyclopts import App, Group, Parameter, validators
 from pydantic_core._pydantic_core import from_json
+from reuse.comment import EXTENSION_COMMENT_STYLE_MAP, CppCommentStyle, TSXCommentStyle
 
 
+# TODO: Use reuse programmatically instead of the CLI
+
+# patch reuse.comment
+EXTENSION_COMMENT_STYLE_MAP = EXTENSION_COMMENT_STYLE_MAP | {
+    ".astro": TSXCommentStyle,
+    ".pkl": CppCommentStyle,
+    ".jsonc": CppCommentStyle,
+}
+reuse.comment.globals()["EXTENSION_COMMENT_STYLE_MAP"] = EXTENSION_COMMENT_STYLE_MAP
+
+__version__ = "0.2.4"
 BASE_PATH = Path(__file__).parent.parent.parent
-__version__ = "0.1.4"
 CONTRIBUTORS_GROUP = Group(
     "Contributors",
     default_parameter=Parameter(negative=()),
@@ -51,6 +63,32 @@ app = App(
     default_parameter=Parameter(negative=()),
     help_on_error=True,
 )
+
+
+def is_right_pkl(path: Path) -> bool:
+    """Check if a .pkl file is binary (python pkl) or if it's a config file."""
+    if path.suffix != ".pkl":
+        return False
+    if path.name in (
+        "hk.pkl",
+        "hk.local.pkl",
+        "fileGroups.pkl",
+        "helpers.pkl",
+        "toolchain.pkl",
+        "workspace.pkl",
+        "tasks.pkl",
+    ):
+        return True
+    # check for binary
+    try:
+        content = path.read_bytes()
+        return not bool(
+            content.translate(
+                None, bytearray({7, 8, 9, 10, 12, 13, 27} | set(range(0x20, 0x100)) - {0x7F})
+            )
+        )
+    except Exception:
+        return False
 
 
 def run_command(cmd: list[str], paths: list[Path]) -> None:

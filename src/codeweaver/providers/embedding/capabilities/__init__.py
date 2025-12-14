@@ -15,7 +15,7 @@ from importlib.util import find_spec
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
-from codeweaver.common.utils.lazy_importer import create_lazy_getattr
+from codeweaver.common.utils.lazy_getter import create_lazy_getattr
 
 
 if TYPE_CHECKING:
@@ -37,6 +37,9 @@ if TYPE_CHECKING:
         get_intfloat_embedding_capabilities,
     )
     from codeweaver.providers.embedding.capabilities.jinaai import get_jinaai_embedding_capabilities
+    from codeweaver.providers.embedding.capabilities.minishlab import (
+        get_minishlab_embedding_capabilities,
+    )
     from codeweaver.providers.embedding.capabilities.mistral import (
         get_mistral_embedding_capabilities,
     )
@@ -82,6 +85,7 @@ dependency_map = {
     "groq": "openai",
     "hf-inference": "huggingface_hub[inference]",
     "litellm": "openai",
+    "minishlab": "sentence_transformers",
     "mistral": "mistralai",
     "ollama": "openai",
     "openai": "openai",
@@ -143,6 +147,9 @@ def load_default_capabilities() -> Generator[EmbeddingModelCapabilities]:
         get_intfloat_embedding_capabilities,
     )
     from codeweaver.providers.embedding.capabilities.jinaai import get_jinaai_embedding_capabilities
+    from codeweaver.providers.embedding.capabilities.minishlab import (
+        get_minishlab_embedding_capabilities,
+    )
     from codeweaver.providers.embedding.capabilities.mistral import (
         get_mistral_embedding_capabilities,
     )
@@ -182,6 +189,7 @@ def load_default_capabilities() -> Generator[EmbeddingModelCapabilities]:
         get_ibm_granite_embedding_capabilities,
         get_intfloat_embedding_capabilities,
         get_jinaai_embedding_capabilities,
+        get_minishlab_embedding_capabilities,
         get_mistral_embedding_capabilities,
         get_mixedbread_ai_embedding_capabilities,
         get_nomic_ai_embedding_capabilities,
@@ -216,6 +224,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "get_ibm_granite_embedding_capabilities": (__spec__.parent, "ibm_granite"),
     "get_intfloat_embedding_capabilities": (__spec__.parent, "intfloat"),
     "get_jinaai_embedding_capabilities": (__spec__.parent, "jinaai"),
+    "get_minishlab_embedding_capabilities": (__spec__.parent, "minishlab"),
     "get_mistral_embedding_capabilities": (__spec__.parent, "mistral"),
     "get_mixedbread_ai_embedding_capabilities": (__spec__.parent, "mixedbread_ai"),
     "get_nomic_ai_embedding_capabilities": (__spec__.parent, "nomic_ai"),
@@ -247,6 +256,7 @@ __all__ = (
     "get_ibm_granite_embedding_capabilities",
     "get_intfloat_embedding_capabilities",
     "get_jinaai_embedding_capabilities",
+    "get_minishlab_embedding_capabilities",
     "get_mistral_embedding_capabilities",
     "get_mixedbread_ai_embedding_capabilities",
     "get_nomic_ai_embedding_capabilities",

@@ -51,15 +51,15 @@ from codeweaver.common.types import (
 from codeweaver.common.utils import uuid7
 from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
 from codeweaver.core.metadata import ChunkKind, ExtKind
-from codeweaver.core.types.aliases import LanguageName, LanguageNameT
+from codeweaver.core.types.aliases import FilteredKey, FilteredKeyT, LanguageName, LanguageNameT
+from codeweaver.core.types.dataclasses import DATACLASS_CONFIG, DataclassSerializationMixin
 from codeweaver.core.types.enum import AnonymityConversion, BaseEnum
-from codeweaver.core.types.models import DATACLASS_CONFIG, DataclassSerializationMixin
+from codeweaver.core.types.utils import generate_field_title
 
 
 if TYPE_CHECKING:
     from codeweaver.core.chunks import CodeChunk
     from codeweaver.core.discovery import DiscoveredFile
-    from codeweaver.core.types import AnonymityConversion, FilteredKeyT
 
 
 @dataclass(config=DATACLASS_CONFIG | ConfigDict(extra="forbid", defer_build=True))
@@ -354,8 +354,6 @@ class _LanguageStatistics(DataclassSerializationMixin):
     )
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
-        from codeweaver.core.types import AnonymityConversion, FilteredKey
-
         return {
             FilteredKey("unique_files"): AnonymityConversion.FORBIDDEN,
             FilteredKey("chunk_sizes"): AnonymityConversion.DISTRIBUTION,
@@ -601,8 +599,6 @@ class FileStatistics(DataclassSerializationMixin):
     )
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
-        from codeweaver.core.types import AnonymityConversion, FilteredKey
-
         return {FilteredKey("_other_files"): AnonymityConversion.COUNT}
 
     def add_file(
@@ -934,7 +930,9 @@ class Identifier(NamedTuple):
     """A named tuple for request identifiers."""
 
     request_id: str | int | None = None
-    uuid: UUID7_STR = Field(default_factory=lambda: uuid7().hex)
+    uuid: UUID7_STR = Field(
+        default_factory=lambda: uuid7().hex, field_title_generator=generate_field_title
+    )
 
     @property
     def timestamp(self) -> int:
@@ -972,11 +970,10 @@ class FailoverStats(DataclassSerializationMixin):
     backup_file_size_bytes: NonNegativeInt = 0
     chunks_in_failover: NonNegativeInt = 0
 
-    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
+    def _telemetry_keys(self) -> None:
         """Define telemetry anonymization for failover statistics."""
         # Most failover stats are safe to send as-is (counts, states)
         # No identifying information in failover statistics
-        return {}
 
 
 @dataclass(kw_only=True, config=DATACLASS_CONFIG | ConfigDict(defer_build=True))
@@ -1073,8 +1070,6 @@ class SessionStatistics(DataclassSerializationMixin):
                 setattr(self, attr, [])
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
-        from codeweaver.core.types import AnonymityConversion, FilteredKey
-
         return {
             FilteredKey("_successful_request_log"): AnonymityConversion.FORBIDDEN,
             FilteredKey("_failed_request_log"): AnonymityConversion.FORBIDDEN,

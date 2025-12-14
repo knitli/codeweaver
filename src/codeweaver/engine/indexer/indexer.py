@@ -29,7 +29,7 @@ import rignore
 from pydantic import DirectoryPath, NonNegativeFloat, NonNegativeInt, PrivateAttr
 from watchfiles import Change
 
-from codeweaver.common.logging import log_to_client_or_fallback
+from codeweaver.common._logging import log_to_client_or_fallback
 from codeweaver.common.statistics import SessionStatistics, get_session_statistics
 from codeweaver.common.utils.git import set_relative_path
 from codeweaver.config.chunker import ChunkerSettings
@@ -1495,8 +1495,16 @@ class Indexer(BasedModel):
             await index_settings.set_inc_exc(project_path_value)
             logger.debug("inc_exc patterns initialized for project: %s", project_path_value)
 
-        walker_settings = index_settings.to_settings()
-        indexer = cls(walker_settings=walker_settings, project_path=settings_map["project_path"])
+        # Get project path for walker configuration
+        project_path_value = (
+            get_project_path()
+            if isinstance(settings_map["project_path"], Unset)
+            else settings_map["project_path"]
+        )
+
+        # Pass project_path to to_settings() to ensure walker uses correct path
+        walker_settings = index_settings.to_settings(project_path=project_path_value)
+        indexer = cls(walker_settings=walker_settings, project_path=project_path_value)
 
         # Initialize providers asynchronously
         await indexer._initialize_providers_async()
@@ -1868,8 +1876,8 @@ class Indexer(BasedModel):
                     "files_discovered": len(discovered_files),
                     "languages": list({
                         (
-                            f.ext_kind.language.value
-                            if hasattr(f.ext_kind.language, "value")
+                            f.ext_kind.language.variable
+                            if hasattr(f.ext_kind.language, "variable")
                             else str(f.ext_kind.language)
                         )
                         for f in discovered_files

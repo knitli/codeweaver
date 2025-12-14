@@ -32,9 +32,11 @@ async def test_incremental_updates(qdrant_test_manager):
     When: File is re-indexed
     Then: System updates only affected embeddings in both sparse and dense indexes
     """
-    # Create unique collection
+    # Create unique collection with sparse vector support (needed for BM25)
     collection_name = qdrant_test_manager.create_collection_name("incremental")
-    await qdrant_test_manager.create_collection(collection_name, dense_vector_size=768)
+    await qdrant_test_manager.create_collection(
+        collection_name, dense_vector_size=768, sparse_vector_size=1000
+    )
 
     config = QdrantConfig(url=qdrant_test_manager.url, collection_name=collection_name)
     provider = QdrantVectorStoreProvider(config=config)
