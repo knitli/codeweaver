@@ -48,6 +48,7 @@ def _create_mock_file(file_path: Path) -> Mock:
     # Create mock DiscoveredFile
     file = Mock()
     file.path = mock_path
+    file.absolute_path = mock_path
     file.ext_kind = mock_ext_kind
 
     return file

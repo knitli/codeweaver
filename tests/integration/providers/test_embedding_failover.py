@@ -1,3 +1,4 @@
+# sourcery skip: name-type-suffix
 # SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
@@ -96,7 +97,7 @@ async def primary_embedding_provider():
     }  # type: ignore
     caps = EmbeddingModelCapabilities.model_validate(caps_dict)
 
-    return SentenceTransformersEmbeddingProvider(capabilities=caps, client=model)
+    return SentenceTransformersEmbeddingProvider(caps=caps, client=model)
 
 
 @pytest.fixture
@@ -128,7 +129,7 @@ async def backup_embedding_provider():
     }  # type: ignore
     caps = EmbeddingModelCapabilities.model_validate(caps_dict)
 
-    return SentenceTransformersEmbeddingProvider(capabilities=caps, client=model)
+    return SentenceTransformersEmbeddingProvider(caps=caps, client=model)
 
 
 @pytest.mark.asyncio

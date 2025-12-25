@@ -70,9 +70,9 @@ mise run lint           # Linting verification
 
 ### 3. Run Tests
 ```bash
-mise run test           # Run all tests
-# OR for specific coverage:
-mise run test-cov       # With coverage report
+mise run test                    # Run all tests
+mise run test --cov              # With coverage report
+mise run test --profile fast     # Fast unit tests only
 ```
 
 **If tests fail**: Investigate and fix root cause. Do NOT comment out failing tests.
@@ -181,7 +181,7 @@ This runs the full suite:
 1. `mise run check` - Type checking
 2. `mise run lint` - Linting
 3. `mise run format` - Format verification
-4. `mise run test-cov` - Tests with coverage
+4. `mise run test --cov` - Tests with coverage
 5. `mise run build` - Package build
 
 **All steps must pass before considering task complete.**

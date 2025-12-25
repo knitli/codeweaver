@@ -50,6 +50,7 @@ class DiscoveredFile(DataclassSerializationMixin):
         AfterValidator(set_relative_path),
     ]
     ext_kind: ExtKind | None = None
+    project_path: Path | None = None
 
     _file_hash: Annotated[
         BlakeHashKey | None,
@@ -87,10 +88,12 @@ class DiscoveredFile(DataclassSerializationMixin):
         ext_kind: ExtKind | None = None,
         file_hash: BlakeKey | None = None,
         git_branch: str | None = None,
+        project_path: Path | None = None,
         **kwargs: Any,
     ) -> None:
         """Initialize DiscoveredFile with optional file_hash and git_branch."""
         object.__setattr__(self, "path", path)
+        object.__setattr__(self, "project_path", project_path)
         if ext_kind:
             object.__setattr__(self, "ext_kind", ext_kind)
         else:
@@ -120,18 +123,28 @@ class DiscoveredFile(DataclassSerializationMixin):
         }
 
     @classmethod
-    def from_path(cls, path: Path, *, file_hash: BlakeKey | None = None) -> DiscoveredFile | None:
+    def from_path(
+        cls, path: Path, *, file_hash: BlakeKey | None = None, project_path: Path | None = None
+    ) -> DiscoveredFile | None:
         """Create a DiscoveredFile from a file path."""
         branch = get_git_branch(path if path.is_dir() else path.parent) or "main"
-        if ext_kind := (ext_kind := ExtKind.from_file(path)):
+        if ext_kind := ExtKind.from_file(path):
             new_hash = get_blake_hash(path.read_bytes())
             if file_hash and new_hash != file_hash:
                 logger.warning(
                     "Provided file_hash does not match computed hash for %s. Using computed hash.",
                     path,
                 )
+
+            # Ensure path is relative to project_path if provided
+            final_path = set_relative_path(path, base_path=project_path) or path
+
             return cls(
-                path=path, ext_kind=ext_kind, file_hash=new_hash, git_branch=cast(str, branch)
+                path=final_path,
+                ext_kind=ext_kind,
+                file_hash=new_hash,
+                git_branch=cast(str, branch),
+                project_path=project_path,
             )
         return None
 
@@ -150,12 +163,27 @@ class DiscoveredFile(DataclassSerializationMixin):
             return get_git_branch(self.path.parent) or Missing  # type: ignore
         return self._git_branch
 
+    @property
+    def absolute_path(self) -> Path:
+        """Return the absolute path to the file."""
+        if self.path.is_absolute():
+            return self.path
+        if self.project_path:
+            return self.project_path / self.path
+
+        from codeweaver.core.utils import get_project_path
+
+        try:
+            return get_project_path() / self.path
+        except FileNotFoundError:
+            return self.path
+
     @computed_field
     @property
     def size(self) -> NonNegativeInt:
         """Return the size of the file in bytes."""
-        if self.ext_kind and self.path.exists() and self.path.is_file():
-            return self.path.stat().st_size
+        if self.ext_kind and self.absolute_path.exists() and self.absolute_path.is_file():
+            return self.absolute_path.stat().st_size
         return 0  # Return 0 for non-existent files (e.g., test fixtures)
 
     @computed_field
@@ -185,55 +213,63 @@ class DiscoveredFile(DataclassSerializationMixin):
             return bool(file and file.file_hash == self.file_hash)
         return False
 
-    @computed_field
-    @cached_property
-    def is_binary(self) -> bool:
-        """Check if a file is binary by reading its first 1024 bytes."""
+    @staticmethod
+    def is_path_binary(path: Path) -> bool:
+        """Check if a file at path is binary by reading its first 1024 bytes."""
         try:
-            with self.path.open("rb") as f:
+            with path.open("rb") as f:
                 chunk = f.read(1024)
+                if not chunk:
+                    return False
                 if b"\0" in chunk:
                     return True
                 text_characters = bytearray({7, 8, 9, 10, 12, 13, 27} | set(range(0x20, 0x100)))
                 nontext = chunk.translate(None, text_characters)
+                return bool(nontext) / len(chunk) > 0.30
         except Exception:
             return False
-        else:
-            # Empty files are not binary
-            return False if len(chunk) == 0 else bool(nontext) / len(chunk) > 0.30
+
+    @staticmethod
+    def is_path_text(path: Path) -> bool:
+        """Check if a file at path is text."""
+        if DiscoveredFile.is_path_binary(path):
+            return False
+        try:
+            content = path.read_text(encoding="utf-8", errors="replace")
+            return bool(content.strip())
+        except Exception:
+            return False
+
+    @computed_field
+    @cached_property
+    def is_binary(self) -> bool:
+        """Check if a file is binary by reading its first 1024 bytes."""
+        return self.is_path_binary(self.path)
 
     @computed_field
     @cached_property
     def is_text(self) -> bool:
         """Check if a file is text by reading its first 1024 bytes."""
-        if not self.is_binary and self.contents.rstrip():
-            return True
-        if self.is_binary:
-            try:
-                if self.path.read_text(encoding="utf-8", errors="replace").rstrip():
-                    return True
-            except Exception:
-                return False
-        return False
+        return self.is_path_text(self.path)
 
     @property
     def contents(self) -> str:
         """Return the normalized contents of the file."""
         with contextlib.suppress(Exception):
-            return self.normalize_content(self.path.read_text(errors="replace"))
+            return self.normalize_content(self.absolute_path.read_text(errors="replace"))
         return ""
 
     @property
     def raw_contents(self) -> bytes:
         """Return the raw contents of the file."""
         with contextlib.suppress(Exception):
-            return self.path.read_bytes()
+            return self.absolute_path.read_bytes()
         return b""
 
     @property
     def is_config_file(self) -> bool:
         """Return True if the file is a recognized configuration file."""
-        return is_semantic_config_ext(self.path.suffix)
+        return is_semantic_config_ext(self.absolute_path.suffix)
 
     def ast(self) -> FileThing[SgRoot] | None:
         """Return the AST of the file, if applicable."""
@@ -247,7 +283,7 @@ class DiscoveredFile(DataclassSerializationMixin):
         ):
             from codeweaver.semantic.ast_grep import FileThing
 
-            return cast(FileThing[SgRoot], FileThing.from_file(self.path))
+            return cast(FileThing[SgRoot], FileThing.from_file(self.absolute_path))
         return None
 
     @staticmethod

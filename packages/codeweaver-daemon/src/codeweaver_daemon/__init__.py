@@ -62,9 +62,8 @@ def _get_daemon_cmd_and_args(
     """Resolve the daemon executable and arguments."""
     cw_cmd = shutil.which("cw") or shutil.which("codeweaver")
     if not cw_cmd:
-        path_to_cli = (Path(__file__).parent / "cli" / "__main__.py").resolve()
         cw_cmd = sys.executable
-        cw_args = [str(path_to_cli), "start"]
+        cw_args = ["-m", "codeweaver.cli", "start"]
     else:
         cw_args = ["start"]
 

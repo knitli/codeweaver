@@ -15,7 +15,7 @@ from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple, cast
 
 from codeweaver.common.utils.lazy_importer import LazyImport, lazy_import
-from codeweaver.providers.provider import Provider, ProviderKind
+from codeweaver.core.types.provider import Provider, ProviderKind
 
 
 if TYPE_CHECKING:
@@ -103,14 +103,12 @@ CLIENT_MAP: MappingProxyType[LiteralProvider, tuple[Client, ...]] = cast(
             ),
         ),
         Provider.MEMORY: (
-            (
-                Client(
-                    provider=Provider.QDRANT,
-                    kind=ProviderKind.VECTOR_STORE,
-                    client=lazy_import("qdrant_client", "AsyncQdrantClient"),
-                    provider_class=lazy_import(
-                        "codeweaver.providers.vector_stores.inmemory", "MemoryVectorStoreProvider"
-                    ),
+            Client(
+                provider=Provider.MEMORY,  # ty:ignore[invalid-argument-type]
+                kind=ProviderKind.VECTOR_STORE,
+                client=lazy_import("qdrant_client", "AsyncQdrantClient"),
+                provider_class=lazy_import(
+                    "codeweaver.providers.vector_stores.inmemory", "MemoryVectorStoreProvider"
                 ),
             ),
         ),

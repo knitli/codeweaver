@@ -83,7 +83,7 @@ async def background_services_lifespan(
     # Initialize CodeWeaverState
     from codeweaver.server.server import _initialize_cw_state
 
-    background_state: CodeWeaverState = _initialize_cw_state(settings, statistics)
+    background_state: CodeWeaverState = await _initialize_cw_state(settings, statistics)
 
     indexing_task = None
 

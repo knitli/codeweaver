@@ -18,8 +18,8 @@ from cyclopts import App
 from rich.table import Table
 
 from codeweaver.cli.ui import CLIErrorHandler, get_display
+from codeweaver.core.types.provider import Provider, ProviderKind
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
-from codeweaver.providers.provider import Provider, ProviderKind
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 
 

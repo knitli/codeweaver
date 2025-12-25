@@ -19,7 +19,7 @@ def get_marco_reranking_capabilities() -> Sequence[RerankingModelCapabilities]:
     """
     Get the MS-Marco MiniLM reranking capabilities.
     """
-    from codeweaver.providers.provider import Provider
+    from codeweaver.core.types.provider import Provider
     from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
     from codeweaver.providers.reranking.capabilities.types import PartialRerankingCapabilitiesDict
 

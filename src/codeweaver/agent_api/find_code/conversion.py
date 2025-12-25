@@ -21,7 +21,7 @@ from codeweaver.core.spans import Span
 
 
 if TYPE_CHECKING:
-    from codeweaver.agent_api.find_code.results import SearchResult
+    from codeweaver.core.types.search import SearchResult
 
 
 def convert_search_result_to_code_match(result: SearchResult) -> CodeMatch:

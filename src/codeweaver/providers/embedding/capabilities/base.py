@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Annotated, Any, Literal, Self
 from pydantic import ConfigDict, Field, PositiveFloat, PositiveInt
 
 from codeweaver.core.types.models import BASEDMODEL_CONFIG, BasedModel
-from codeweaver.providers.provider import Provider
+from codeweaver.core.types.provider import Provider
 
 
 if TYPE_CHECKING:

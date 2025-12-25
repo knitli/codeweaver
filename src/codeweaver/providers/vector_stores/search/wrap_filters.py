@@ -20,8 +20,8 @@ from typing import Annotated, Any
 
 from pydantic import Field
 
-from codeweaver.engine.search.condition import FilterableField
-from codeweaver.engine.search.filter_factory import make_filter
+from codeweaver.providers.vector_stores.search.condition import FilterableField
+from codeweaver.providers.vector_stores.search.filter_factory import make_filter
 
 
 def make_partial_function(

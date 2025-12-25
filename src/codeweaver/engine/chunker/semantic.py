@@ -125,15 +125,22 @@ class SemanticChunker(BaseChunker):
             size_limit=256 * 1024,  # 256KB cache for content hashes
         )
 
-    def __init__(self, governor: ChunkGovernor, language: SemanticSearchLanguage) -> None:
+    def __init__(
+        self,
+        governor: ChunkGovernor,
+        language: SemanticSearchLanguage,
+        tokenizer: Any | None = None,
+    ) -> None:
         """Initialize semantic chunker with governor and language.
 
         Args:
             governor: Configuration for chunking behavior and resource limits
             language: Target semantic search language for parsing
+            tokenizer: Optional tokenizer for accurate token counting
         """
         super().__init__(governor)
         self.language = language
+        self.tokenizer = tokenizer
 
         # Use importance threshold from settings, fallback to default
         if governor.settings is not None:
@@ -302,14 +309,16 @@ class SemanticChunker(BaseChunker):
             governor.check_timeout()
 
             node_text = node.text
-            tokens = len(node_text) // 4  # Rough approximation
+            if self.tokenizer:
+                tokens = self.tokenizer.count_tokens(node_text)
+            else:
+                tokens = len(node_text) // 4  # Rough approximation
 
             if tokens <= self.chunk_limit:
                 chunks.append(self._create_chunk_from_node(node, file_path, source_id))
+                governor.register_chunk()
             else:
-                chunks.extend(self._handle_oversized_node(node, file_path, source_id))
-
-            governor.register_chunk()
+                chunks.extend(self._handle_oversized_node(node, file_path, source_id, governor))
 
         return chunks
 
@@ -751,7 +760,7 @@ class SemanticChunker(BaseChunker):
         return metadata
 
     def _handle_oversized_node(
-        self, node: AstThing[SgNode], file_path: Path | None, source_id: UUID7
+        self, node: AstThing[SgNode], file_path: Path | None, source_id: UUID7, governor: Any
     ) -> list[CodeChunk]:
         """Handle nodes exceeding token limit via multi-tiered strategy.
 
@@ -766,6 +775,7 @@ class SemanticChunker(BaseChunker):
             node: Oversized AstThing node
             file_path: Optional file path for context
             source_id: Shared source ID for all chunks from this file
+            governor: Resource governor for limit enforcement
 
         Returns:
             List of chunks derived from oversized node
@@ -776,13 +786,20 @@ class SemanticChunker(BaseChunker):
             child_chunks: list[CodeChunk] = []
 
             for child in children:
-                child_tokens = len(child.text) // 4
+                governor.check_timeout()
+                if self.tokenizer:
+                    child_tokens = self.tokenizer.count_tokens(child.text)
+                else:
+                    child_tokens = len(child.text) // 4
 
                 if child_tokens <= self.chunk_limit:
                     child_chunks.append(self._create_chunk_from_node(child, file_path, source_id))
+                    governor.register_chunk()
                 else:
-                    # Recursive handling for oversized children
-                    child_chunks.extend(self._handle_oversized_node(child, file_path, source_id))
+                    # Recursive handling for oversized children with governor
+                    child_chunks.extend(
+                        self._handle_oversized_node(child, file_path, source_id, governor)
+                    )
 
             if child_chunks:
                 return child_chunks
@@ -823,6 +840,27 @@ class SemanticChunker(BaseChunker):
 
         # Get delimiter chunks
         delimiter_chunks = delimiter_chunker.chunk(node.text, file=temp_file)
+
+        # If delimiter chunking didn't actually split it (produced 1 chunk >= original size)
+        # OR if it produced no chunks, we MUST return a single chunk to avoid infinite recursion
+        # if the caller keeps trying to split it.
+        if not delimiter_chunks or (
+            len(delimiter_chunks) == 1 and len(delimiter_chunks[0].content) >= len(node.text)
+        ):
+            metadata = self._build_metadata(node)
+            chunk = CodeChunk(
+                content=node.text,
+                line_range=Span(
+                    node.range.start.line + 1, node.range.end.line + 1, source_id
+                ),  # type: ignore[call-arg]
+                ext_kind=ExtKind.from_file(file_path) if file_path else None,
+                file_path=file_path,
+                language=self.language,
+                source=ChunkSource.SEMANTIC,
+                metadata=metadata,
+            )
+            governor.register_chunk()
+            return [chunk]
 
         # Enhance each chunk with semantic fallback metadata
         metadata = self._build_metadata(node)

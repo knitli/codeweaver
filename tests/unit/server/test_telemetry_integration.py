@@ -68,7 +68,7 @@ def create_find_code_response(
 ):
     """Create a FindCodeResponseSummary with all required fields."""
     from codeweaver.agent_api.find_code.intent import IntentType
-    from codeweaver.agent_api.find_code.types import FindCodeResponseSummary, SearchStrategy
+    from codeweaver.core.types.search import SearchStrategy
 
     return FindCodeResponseSummary(
         matches=matches or [],
@@ -281,8 +281,8 @@ class TestSearchEvent:
     def test_search_event_creation(self) -> None:
         """Test SearchEvent can be created."""
         from codeweaver.agent_api.find_code.intent import IntentType
-        from codeweaver.agent_api.find_code.types import SearchStrategy
         from codeweaver.common.telemetry.events import SearchEvent
+        from codeweaver.core.types.search import SearchStrategy
 
         response = create_find_code_response()
 
@@ -302,8 +302,8 @@ class TestSearchEvent:
     def test_search_event_to_posthog_event(self) -> None:
         """Test SearchEvent converts to PostHog event format."""
         from codeweaver.agent_api.find_code.intent import IntentType
-        from codeweaver.agent_api.find_code.types import SearchStrategy
         from codeweaver.common.telemetry.events import SearchEvent
+        from codeweaver.core.types.search import SearchStrategy
 
         response = create_find_code_response(
             total_matches=10,
@@ -339,8 +339,8 @@ class TestSearchEvent:
     def test_search_event_with_tools_over_privacy(self) -> None:
         """Test SearchEvent includes query details when tools_over_privacy=True."""
         from codeweaver.agent_api.find_code.intent import IntentType
-        from codeweaver.agent_api.find_code.types import SearchStrategy
         from codeweaver.common.telemetry.events import SearchEvent
+        from codeweaver.core.types.search import SearchStrategy
 
         response = create_find_code_response()
 
@@ -367,8 +367,8 @@ class TestSearchEvent:
     def test_search_event_without_tools_over_privacy(self) -> None:
         """Test SearchEvent excludes query details when tools_over_privacy=False."""
         from codeweaver.agent_api.find_code.intent import IntentType
-        from codeweaver.agent_api.find_code.types import SearchStrategy
         from codeweaver.common.telemetry.events import SearchEvent
+        from codeweaver.core.types.search import SearchStrategy
 
         response = create_find_code_response()
 
@@ -458,8 +458,8 @@ class TestConvenienceFunctions:
     def test_capture_search_event_respects_opt_out(self) -> None:
         """Test capture_search_event doesn't capture when disabled."""
         from codeweaver.agent_api.find_code.intent import IntentType
-        from codeweaver.agent_api.find_code.types import SearchStrategy
         from codeweaver.common.telemetry.events import capture_search_event
+        from codeweaver.core.types.search import SearchStrategy
 
         with patch("codeweaver.common.telemetry.get_telemetry_client") as mock_get_client:
             mock_client = MagicMock()

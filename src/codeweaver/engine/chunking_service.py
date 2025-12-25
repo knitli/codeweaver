@@ -17,7 +17,16 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from codeweaver.core.chunks import CodeChunk
-from codeweaver.engine.chunker import ChunkerSelector, ChunkGovernor, chunk_files_parallel
+from codeweaver.di import depends
+from codeweaver.di.providers import (
+    GovernorDep,
+    SettingsDep,
+    TokenizerDep,
+    get_chunk_governor,
+    get_settings,
+    get_tokenizer,
+)
+from codeweaver.engine.chunker import ChunkerSelector, chunk_files_parallel
 from codeweaver.engine.chunker.delimiter import DelimiterChunker
 from codeweaver.engine.chunker.exceptions import ChunkingError
 
@@ -62,19 +71,29 @@ class ChunkingService:
     """
 
     def __init__(
-        self, governor: ChunkGovernor, *, enable_parallel: bool = True, parallel_threshold: int = 3
+        self,
+        governor: GovernorDep = depends(get_chunk_governor),
+        tokenizer: TokenizerDep = depends(get_tokenizer),
+        settings: SettingsDep = depends(get_settings),
+        *,
+        enable_parallel: bool = True,
+        parallel_threshold: int = 3,
     ) -> None:
         """Initialize the chunking service.
 
         Args:
             governor: ChunkGovernor providing resource limits and configuration
+            tokenizer: Tokenizer for accurate token counting
+            settings: Global settings for project path context
             enable_parallel: Whether to use parallel processing (default: True)
             parallel_threshold: Minimum number of files to trigger parallel processing
         """
         self.governor = governor
+        self.tokenizer = tokenizer
+        self.settings = settings
         self.enable_parallel = enable_parallel
         self.parallel_threshold = parallel_threshold
-        self._selector = ChunkerSelector(governor)
+        self._selector = ChunkerSelector(governor, tokenizer)
 
     def chunk_files(
         self,
@@ -113,7 +132,11 @@ class ChunkingService:
                 "Chunking %d files in parallel (threshold: %d)", len(files), self.parallel_threshold
             )
             yield from chunk_files_parallel(
-                files, self.governor, max_workers=max_workers, executor_type=executor_type
+                files,
+                self.governor,
+                max_workers=max_workers,
+                executor_type=executor_type,
+                tokenizer=self.tokenizer,
             )
         else:
             logger.debug("Chunking %d files sequentially", len(files))
@@ -132,13 +155,27 @@ class ChunkingService:
         Yields:
             Tuples of (file_path, chunks) for successfully chunked files
         """
+        from codeweaver.common.utils.git import get_project_path
+        from codeweaver.core.types.sentinel import Unset
+        from codeweaver.di import Depends
+
+        if isinstance(self.settings, Depends):
+            from codeweaver.config.settings import get_settings
+            self.settings = get_settings()
+
+        project_path = (
+            get_project_path()
+            if not self.settings or isinstance(self.settings.project_path, Unset)
+            else self.settings.project_path
+        )
+
         for file in files:
             try:
                 # Select appropriate chunker
                 chunker = self._selector.select_for_file(file)
 
                 # Read file content
-                content = file.path.read_text(encoding="utf-8", errors="ignore")
+                content = file.absolute_path.read_text(encoding="utf-8", errors="ignore")
 
                 # Chunk the file with fallback for parse errors
                 try:
@@ -199,8 +236,14 @@ class ChunkingService:
         Raises:
             Exception: If chunking fails (after fallback attempts)
         """
+        from codeweaver.di import Depends
+
+        if isinstance(self.settings, Depends):
+            from codeweaver.config.settings import get_settings
+            self.settings = get_settings()
+
         chunker = self._selector.select_for_file(file)
-        content = file.path.read_text(encoding="utf-8", errors="ignore")
+        content = file.absolute_path.read_text(encoding="utf-8", errors="ignore")
 
         try:
             return chunker.chunk(content, file=file)

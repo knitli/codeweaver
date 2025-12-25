@@ -17,8 +17,8 @@ from typing import Any, ClassVar, cast
 import numpy as np
 
 from codeweaver.common.utils.utils import rpartial
+from codeweaver.core.types.provider import Provider
 from codeweaver.exceptions import ValidationError as CodeWeaverValidationError
-from codeweaver.providers.provider import Provider
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 from codeweaver.providers.reranking.providers.base import RerankingProvider
 

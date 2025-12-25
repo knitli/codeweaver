@@ -39,12 +39,25 @@ from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
 from codeweaver.core.stores import BlakeStore, get_blake_hash, make_blake_store
 from codeweaver.core.types.dictview import DictView
 from codeweaver.core.types.models import BasedModel
+from codeweaver.di import depends
+from codeweaver.di.providers import (
+    ChunkingServiceDep,
+    EmbeddingDep,
+    SettingsDep,
+    SparseEmbeddingDep,
+    VectorStoreDep,
+    get_chunking_service,
+    get_embedding_provider,
+    get_settings,
+    get_sparse_embedding_provider,
+    get_vector_store,
+)
 from codeweaver.engine.chunking_service import ChunkingService
 from codeweaver.engine.indexer.checkpoint import CheckpointManager, IndexingCheckpoint
 from codeweaver.engine.indexer.manifest import FileManifestManager, IndexFileManifest
 from codeweaver.engine.indexer.progress import IndexingStats
 from codeweaver.engine.watcher.types import FileChange
-from codeweaver.exceptions import IndexingError, ProviderError
+from codeweaver.exceptions import IndexingError, InitializationError, ProviderError
 
 
 logger = logging.getLogger(__name__)
@@ -95,7 +108,7 @@ _user_config: None | UserProviderSelectionDict = None
 
 def _get_user_provider_config() -> UserProviderSelectionDict:
     from codeweaver.common.registry.provider import get_provider_config_for
-    from codeweaver.providers.provider import ProviderKind
+    from codeweaver.core.types.provider import ProviderKind
 
     global _user_config
     if _user_config is None:
@@ -167,8 +180,12 @@ class Indexer(BasedModel):
         self,
         walker: rignore.Walker | None = None,
         store: BlakeStore[DiscoveredFile] | None = None,
-        chunking_service: Any | None = None,  # ChunkingService type
+        chunking_service: ChunkingServiceDep = depends(get_chunking_service),
         *,
+        embedding_provider: EmbeddingDep = depends(get_embedding_provider),
+        sparse_provider: SparseEmbeddingDep = depends(get_sparse_embedding_provider),
+        vector_store: VectorStoreDep = depends(get_vector_store),
+        settings: SettingsDep = depends(get_settings),
         auto_initialize_providers: bool = True,
         project_path: Path | None = None,
         walker_settings: dict[str, Any] | None = None,
@@ -216,15 +233,18 @@ class Indexer(BasedModel):
         from codeweaver.core.discovery import DiscoveredFile
 
         self._store = store or make_blake_store(value_type=DiscoveredFile)
-        self._chunking_service = chunking_service or _get_chunking_service()
+        self._chunking_service = chunking_service
+        self._settings = settings
         self._stats = IndexingStats()
         from codeweaver.common.statistics import get_session_statistics
 
         self._session_statistics = get_session_statistics()
         # Pipeline provider Fields (initialized lazily on first use)
-        self._embedding_provider: Any | None = None
-        self._sparse_provider: Any | None = None
-        self._vector_store: Any | None = None
+        self._embedding_provider = embedding_provider
+        self._sparse_provider = sparse_provider
+        self._vector_store = vector_store
+        # We consider providers initialized if they were all provided (not Depends markers)
+        # In practice, _initialize_providers_async will handle the logic of what to initialize
         self._providers_initialized: bool = False
 
         # Initialize checkpoint manager
@@ -320,32 +340,69 @@ class Indexer(BasedModel):
                     self._duplicate_sparse_count,
                 )
 
-    async def _initialize_providers_async(self) -> None:
+    async def _initialize_providers_async(self, vector_store: Any | None = None) -> None:
         """Initialize pipeline providers asynchronously from global registry.
 
         This is idempotent and can be safely called multiple times.
         Providers that fail to initialize will be set to None with appropriate logging.
+
+        Args:
+            vector_store: Optional pre-initialized vector store instance to use
         """
+        from codeweaver.di import Depends
+
+        print(
+            f"DEBUG: _initialize_providers_async called. self._embedding_provider type: {type(self._embedding_provider)}"
+        )
+
         if self._providers_initialized:
             return
 
         # Initialize embedding provider (dense)
-        try:
-            self._embedding_provider = _get_embedding_instance(sparse=False)
+        if self._embedding_provider is None or isinstance(self._embedding_provider, Depends):
+            try:
+                self._embedding_provider = _get_embedding_instance(sparse=False)
+                if self._embedding_provider:
+                    await self._embedding_provider.initialize_async()
+                    logger.debug(
+                        "Initialized embedding provider: %s",
+                        type(self._embedding_provider).__name__,
+                    )
+            except Exception as e:
+                logger.warning("Could not initialize embedding provider: %s", e)
+                self._embedding_provider = None
+        else:
             logger.debug(
-                "Initialized embedding provider: %s", type(self._embedding_provider).__name__
+                "Using injected embedding provider: %s", type(self._embedding_provider).__name__
             )
-        except Exception as e:
-            logger.warning("Could not initialize embedding provider: %s", e)
-            self._embedding_provider = None
 
         # Initialize sparse embedding provider
-        try:
-            self._sparse_provider = _get_embedding_instance(sparse=True)
-            logger.debug("Initialized sparse provider: %s", type(self._sparse_provider).__name__)
-        except Exception as e:
-            logger.debug("Could not initialize sparse embedding provider: %s", e)
-            self._sparse_provider = None
+        if self._sparse_provider is None or isinstance(self._sparse_provider, Depends):
+            try:
+                self._sparse_provider = _get_embedding_instance(sparse=True)
+                if self._sparse_provider:
+                    await self._sparse_provider.initialize_async()
+                    logger.debug(
+                        "Initialized sparse provider: %s", type(self._sparse_provider).__name__
+                    )
+            except Exception as e:
+                logger.debug("Could not initialize sparse embedding provider: %s", e)
+                self._sparse_provider = None
+        else:
+            logger.debug("Using injected sparse provider: %s", type(self._sparse_provider).__name__)
+
+        # Resolve other core services if they were provided as Depends objects
+        if self._chunking_service is None or isinstance(self._chunking_service, Depends):
+            from codeweaver.di import get_container
+            from codeweaver.engine.chunking_service import ChunkingService
+            try:
+                self._chunking_service = await get_container().resolve(ChunkingService)
+            except Exception:
+                self._chunking_service = _get_chunking_service()
+
+        if self._settings is None or isinstance(self._settings, Depends):
+            from codeweaver.config.settings import get_settings
+            self._settings = get_settings()
 
         # Warn if no embedding providers available
         if not self._embedding_provider and not self._sparse_provider:
@@ -354,75 +411,84 @@ class Indexer(BasedModel):
             )
 
         # Initialize vector store with failover support
-        try:
-            from codeweaver.engine.failover import VectorStoreFailoverManager
-
-            # Get primary vector store instance
-            primary_store = _get_vector_store_instance()
-            if primary_store:
-                await primary_store._initialize()
-
-            # Create and initialize failover manager
-            self._failover_manager = VectorStoreFailoverManager()
-            await self._failover_manager.initialize(
-                primary_store=primary_store,
-                project_path=self._checkpoint_manager.project_path,
-                indexer=self,
+        if vector_store is not None:
+            self._vector_store = vector_store
+            logger.info("Using injected vector store: %s", type(self._vector_store).__name__)
+        elif self._vector_store is not None and not isinstance(self._vector_store, Depends):
+            logger.info(
+                "Using injected vector store from constructor: %s",
+                type(self._vector_store).__name__,
             )
+        else:
+            try:
+                from codeweaver.engine.failover import VectorStoreFailoverManager
 
-            # Use the active store (initially primary, switches to backup on failure)
-            self._vector_store = self._failover_manager.active_store
+                # Get primary vector store instance
+                primary_store = _get_vector_store_instance()
+                if primary_store:
+                    await primary_store._initialize()
 
-            if self._vector_store:
-                logger.info(
-                    "Vector store initialized with backup failover support: %s",
-                    type(self._vector_store).__name__,
+                # Create and initialize failover manager
+                self._failover_manager = VectorStoreFailoverManager()
+                await self._failover_manager.initialize(
+                    primary_store=primary_store,
+                    project_path=self._checkpoint_manager.project_path,
+                    indexer=self,
                 )
-            else:
-                logger.debug("No vector store available (primary failed to initialize)")
 
-        except Exception as e:
-            # Provide specific guidance for common connection errors
-            error_msg = str(e).lower()
-            if any(
-                indicator in error_msg
-                for indicator in [
-                    "illegal request line",
-                    "connection refused",
-                    "connect error",
-                    "cannot connect",
-                    "connection error",
-                    "failed to connect",
-                ]
-            ):
-                # Log at debug level - health checks will display this to users
-                logger.debug(
-                    "Failed to connect to PRIMARY Qdrant vector store. "
-                    "Please verify:\n"
-                    "  - Qdrant is running (default: http://localhost:6333 for HTTP, :6334 for gRPC)\n"
-                    "  - The configured URL matches your Qdrant instance\n"
-                    "  - Check firewall/network settings if using remote Qdrant\n"
-                    "  Original error: %s",
-                    e,
-                )
-            elif "timeout" in error_msg or "timed out" in error_msg:
-                logger.warning(
-                    "Qdrant connection timed out. Please verify:\n"
-                    "  - Qdrant server is responsive\n"
-                    "  - Network latency is acceptable\n"
-                    "  - Consider increasing timeout settings\n"
-                )
-            elif "unauthorized" in error_msg or "authentication" in error_msg:
-                logger.warning(
-                    "Qdrant authentication failed. Please verify:\n"
-                    "  - API key is correctly configured\n"
-                    "  - Authentication credentials are valid\n"
-                )
-            else:
-                logger.warning("Could not initialize vector store.", exc_info=True)
+                # Use the active store (initially primary, switches to backup on failure)
+                self._vector_store = self._failover_manager.active_store
 
-            self._vector_store = None
-            self._failover_manager = None
+                if self._vector_store:
+                    logger.info(
+                        "Vector store initialized with backup failover support: %s",
+                        type(self._vector_store).__name__,
+                    )
+                else:
+                    logger.debug("No vector store available (primary failed to initialize)")
+
+            except Exception as e:
+                # Provide specific guidance for common connection errors
+                error_msg = str(e).lower()
+                if any(
+                    indicator in error_msg
+                    for indicator in [
+                        "illegal request line",
+                        "connection refused",
+                        "connect error",
+                        "cannot connect",
+                        "connection error",
+                        "failed to connect",
+                    ]
+                ):
+                    # Log at debug level - health checks will display this to users
+                    logger.debug(
+                        "Failed to connect to PRIMARY Qdrant vector store. "
+                        "Please verify:\n"
+                        "  - Qdrant is running (default: http://localhost:6333 for HTTP, :6334 for gRPC)\n"
+                        "  - The configured URL matches your Qdrant instance\n"
+                        "  - Check firewall/network settings if using remote Qdrant\n"
+                        "  Original error: %s",
+                        e,
+                    )
+                elif "timeout" in error_msg or "timed out" in error_msg:
+                    logger.warning(
+                        "Qdrant connection timed out. Please verify:\n"
+                        "  - Qdrant server is responsive\n"
+                        "  - Network latency is acceptable\n"
+                        "  - Consider increasing timeout settings\n"
+                    )
+                elif "unauthorized" in error_msg or "authentication" in error_msg:
+                    logger.warning(
+                        "Qdrant authentication failed. Please verify:\n"
+                        "  - API key is correctly configured\n"
+                        "  - Authentication credentials are valid\n"
+                    )
+                else:
+                    logger.warning("Could not initialize vector store.", exc_info=True)
+
+                self._vector_store = None
+                self._failover_manager = None
 
         # Ensure chunking service is initialized
         self._chunking_service = self._chunking_service or _get_chunking_service()
@@ -444,23 +510,31 @@ class Indexer(BasedModel):
 
         # Get dense embedding provider info
         if self._embedding_provider:
-            provider_name = type(self._embedding_provider).__name__.replace("Provider", "").lower()
-            result["dense_provider"] = provider_name
-            # Try to get model name from provider - use model_name property if available
+            # Prefer explicit provider_name attribute
+            if hasattr(self._embedding_provider, "provider_name"):
+                result["dense_provider"] = str(self._embedding_provider.provider_name)
+            else:
+                provider_name = (
+                    type(self._embedding_provider).__name__.replace("Provider", "").lower()
+                )
+                result["dense_provider"] = provider_name
+
+            # Try to get model name from provider
             if hasattr(self._embedding_provider, "model_name"):
                 result["dense_model"] = str(self._embedding_provider.model_name)
-            elif hasattr(self._embedding_provider, "model"):
-                result["dense_model"] = str(self._embedding_provider.model)
 
         # Get sparse embedding provider info
         if self._sparse_provider:
-            provider_name = type(self._sparse_provider).__name__.replace("Provider", "").lower()
-            result["sparse_provider"] = provider_name
-            # Try to get model name from provider - use model_name property if available
+            # Prefer explicit provider_name attribute
+            if hasattr(self._sparse_provider, "provider_name"):
+                result["sparse_provider"] = str(self._sparse_provider.provider_name)
+            else:
+                provider_name = type(self._sparse_provider).__name__.replace("Provider", "").lower()
+                result["sparse_provider"] = provider_name
+
+            # Try to get model name from provider
             if hasattr(self._sparse_provider, "model_name"):
                 result["sparse_model"] = str(self._sparse_provider.model_name)
-            elif hasattr(self._sparse_provider, "model"):
-                result["sparse_model"] = str(self._sparse_provider.model)
 
         return result
 
@@ -479,7 +553,7 @@ class Indexer(BasedModel):
             # Delete old chunks if file is being reindexed (already exists in manifest)
             # This prevents stale embeddings from accumulating in the vector store
             if self._file_manifest and self._vector_store:
-                relative_path = set_relative_path(path)
+                relative_path = set_relative_path(path, base_path=self._project_path)
                 if relative_path and self._file_manifest.has_file(relative_path):
                     try:
                         await self._vector_store.delete_by_file(path)
@@ -491,9 +565,14 @@ class Indexer(BasedModel):
 
             # 1. Discover and store file metadata
             self._last_indexing_phase = "discovery"
-            discovered_file = DiscoveredFile.from_path(path)
-            if not discovered_file or not discovered_file.is_text:
+            # Use absolute path for text check to ensure it works regardless of CWD
+            if not DiscoveredFile.is_path_text(path):
                 logger.debug("Skipping non-text file: %s", path)
+                return
+
+            discovered_file = DiscoveredFile.from_path(path, project_path=self._project_path)
+            if not discovered_file:
+                logger.debug("Failed to discover file: %s", path)
                 return
 
             self._store.set(discovered_file.file_hash, discovered_file)
@@ -659,7 +738,7 @@ class Indexer(BasedModel):
             # Only update if all critical operations succeeded and we have chunks
             if self._file_manifest and updated_chunks and self._manifest_lock:
                 chunk_ids = [str(chunk.chunk_id) for chunk in updated_chunks]
-                if relative_path := set_relative_path(path):
+                if relative_path := set_relative_path(path, base_path=self._project_path):
                     try:
                         # Get current embedding model info
                         model_info = self._get_current_embedding_models()
@@ -822,7 +901,7 @@ class Indexer(BasedModel):
             if (
                 self._file_manifest
                 and self._manifest_lock
-                and (relative_path := set_relative_path(path))
+                and (relative_path := set_relative_path(path, base_path=self._project_path))
             ):
                 try:
                     async with self._manifest_lock:
@@ -967,7 +1046,9 @@ class Indexer(BasedModel):
                 logger.debug("No chunks found for file: %s", discovered_file.path)
                 continue
 
-            if relative_path := set_relative_path(discovered_file.path):
+            if relative_path := set_relative_path(
+                discovered_file.path, base_path=self._project_path
+            ):
                 try:
                     # Get current embedding model info
                     model_info = self._get_current_embedding_models()
@@ -1070,7 +1151,7 @@ class Indexer(BasedModel):
                 current_hash = get_blake_hash(path.read_bytes())
 
                 # Convert to relative path for manifest lookup
-                relative_path = set_relative_path(path)
+                relative_path = set_relative_path(path, base_path=self._project_path)
                 if not relative_path:
                     # If can't convert to relative, treat as new file
                     files_to_index.append(path)
@@ -1111,7 +1192,11 @@ class Indexer(BasedModel):
         # Detect deleted files (in manifest but not on disk)
         # Convert all discovered files to relative paths for comparison
         manifest_files = self._file_manifest.get_all_file_paths()
-        all_files_relative = {set_relative_path(p) for p in all_files if set_relative_path(p)}
+        all_files_relative = {
+            set_relative_path(p, base_path=self._project_path)
+            for p in all_files
+            if set_relative_path(p, base_path=self._project_path)
+        }
         deleted_files = manifest_files - all_files_relative
 
         if deleted_files:
@@ -1280,8 +1365,21 @@ class Indexer(BasedModel):
         Returns:
             Number of files indexed
         """
+        import sys
+
+        print(
+            f"DEBUG: Indexer.prime_index called on {self} (class from {sys.modules[self.__class__.__module__].__file__})"
+        )
+        sys.stdout.flush()
         # Initialize providers asynchronously (idempotent)
-        await self._initialize_providers_async()
+        # Preserve injected vector_store if already set
+        await self._initialize_providers_async(vector_store=self._vector_store)
+        import sys
+
+        print(
+            f"DEBUG: Indexer.prime_index using vector_store={self._vector_store} (id={id(self._vector_store)}) with collection={getattr(self._vector_store, '_collection', 'N/A')}"
+        )
+        sys.stdout.flush()
 
         # Load file manifest for incremental indexing (unless force_reindex)
         if not force_reindex:
@@ -1451,7 +1549,9 @@ class Indexer(BasedModel):
 
     @classmethod
     async def from_settings_async(
-        cls, settings: DictView[CodeWeaverSettingsDict] | None = None
+        cls,
+        settings: DictView[CodeWeaverSettingsDict] | None = None,
+        vector_store: Any | None = None,
     ) -> Indexer:
         """Create an Indexer instance from settings with full async initialization.
 
@@ -1460,6 +1560,7 @@ class Indexer(BasedModel):
 
         Args:
             settings: Optional settings dictionary view
+            vector_store: Optional pre-initialized vector store instance to use
 
         Returns:
             Fully initialized Indexer instance
@@ -1507,24 +1608,22 @@ class Indexer(BasedModel):
         indexer = cls(walker_settings=walker_settings, project_path=project_path_value)
 
         # Initialize providers asynchronously
-        await indexer._initialize_providers_async()
+        await indexer._initialize_providers_async(vector_store=vector_store)
 
         return indexer
 
     def _discover_files_for_batch(self, files: list[Path]) -> list[DiscoveredFile]:
-        """Convert file paths to DiscoveredFile objects.
-
-        Args:
-            files: List of file paths to discover
-
-        Returns:
-            List of valid DiscoveredFile objects
-        """
+        """Convert file paths to DiscoveredFile objects."""
         discovered_files: list[DiscoveredFile] = []
         for path in files:
             try:
-                discovered_file = DiscoveredFile.from_path(path)
-                if discovered_file and discovered_file.is_text:
+                # Use absolute path for text check to ensure it works regardless of CWD
+                if not DiscoveredFile.is_path_text(path):
+                    logger.debug("Skipping non-text file: %s", path)
+                    continue
+
+                discovered_file = DiscoveredFile.from_path(path, project_path=self._project_path)
+                if discovered_file:
                     discovered_files.append(discovered_file)
                     self._store.set(discovered_file.file_hash, discovered_file)
             except Exception:
@@ -1970,14 +2069,15 @@ class Indexer(BasedModel):
         if self._file_manifest and self._vector_store:
             files_deleted = 0
             for file_path in files:
-                relative_path = set_relative_path(file_path)
-                if relative_path and self._file_manifest.has_file(relative_path):
+                # Ensure we have a relative path string for manifest lookup
+                rel_path = set_relative_path(file_path, base_path=self._project_path)
+                if rel_path and self._file_manifest.has_file(Path(rel_path)):
                     try:
                         await self._vector_store.delete_by_file(file_path)
                         files_deleted += 1
                     except Exception:
                         logger.warning(
-                            "Failed to delete old chunks for: %s", relative_path, exc_info=True
+                            "Failed to delete old chunks for: %s", rel_path, exc_info=True
                         )
             if files_deleted > 0:
                 logger.debug("Deleted old chunks for %d reindexed files in batch", files_deleted)
@@ -2394,6 +2494,9 @@ class Indexer(BasedModel):
             - chunks_updated: Number of chunks updated
             - errors: List of errors encountered
         """
+        print(
+            f"DEBUG: add_missing_embeddings_to_existing_chunks called. self._sparse_provider type: {type(self._sparse_provider)}"
+        )
         if not self._file_manifest:
             return {"error": "No manifest loaded", "files_processed": 0, "chunks_updated": 0}
 
@@ -2426,12 +2529,12 @@ class Indexer(BasedModel):
         # Get current embedding configuration
         current_models = self._get_current_embedding_models()
 
-        # Find files needing embeddings
+        # Get files that need specific embedding types added
         files_needing = self._file_manifest.get_files_needing_embeddings(
-            current_dense_provider=current_models["dense_provider"],
-            current_dense_model=current_models["dense_model"],
-            current_sparse_provider=current_models["sparse_provider"],
-            current_sparse_model=current_models["sparse_model"],
+            current_dense_provider=current_models["dense_provider"] if add_dense else None,
+            current_dense_model=current_models["dense_model"] if add_dense else None,
+            current_sparse_provider=current_models["sparse_provider"] if add_sparse else None,
+            current_sparse_model=current_models["sparse_model"] if add_sparse else None,
         )
 
         files_to_process: list[Path] = []
@@ -2448,6 +2551,9 @@ class Indexer(BasedModel):
         # Deduplicate files to avoid double processing
         files_to_process = list(set(files_to_process))
         if not files_to_process:
+            print(
+                f"DEBUG: No files need embedding reconciliation. Criteria: add_dense={add_dense}, add_sparse={add_sparse}, current_models={current_models}"
+            )
             logger.info("No files need embedding updates")
             return {"files_processed": 0, "chunks_updated": 0, "errors": []}
 
@@ -2458,10 +2564,13 @@ class Indexer(BasedModel):
         chunks_updated = 0
         errors: list[str] = []
 
-        for file_path in files_to_process:
+        for rel_path in files_to_process:
+            if not self._project_path:
+                raise InitializationError("Project path is not set")
+            file_path = self._project_path / rel_path
             try:
                 # Get chunk IDs for this file from manifest
-                chunk_ids = self._file_manifest.get_chunk_ids_for_file(file_path)
+                chunk_ids = self._file_manifest.get_chunk_ids_for_file(rel_path)
                 if not chunk_ids:
                     continue
 
@@ -2482,25 +2591,18 @@ class Indexer(BasedModel):
                 # For each retrieved point, generate the missing embedding
                 updates: list[tuple[str, dict[str, list[float]]]] = []
                 for point in retrieved:
-                    # Reconstruct CodeChunk from payload (simplified - may need adjustment)
+                    # Reconstruct CodeChunk from payload
                     payload = point.payload
                     if not payload:
                         continue
 
                     # Check which vector types already exist in this point
-                    # Handle various vector representations from Qdrant:
-                    # - dict[str, list[float]]: Named vectors
-                    # - Mapping (e.g., NamedVectors): Mapping-like objects with vector names
-                    # - list[float]: Single unnamed vector
-                    # - None: No vectors
                     from collections.abc import Mapping
 
                     existing_vectors = point.vector if hasattr(point, "vector") else {}
                     if isinstance(existing_vectors, Mapping):
-                        # Already a mapping (dict or NamedVectors), use keys as-is
                         existing_vector_names = set(existing_vectors.keys())
                     elif existing_vectors:
-                        # Single unnamed vector (list), treat as dense with empty string key
                         existing_vector_names = {""}
                     else:
                         existing_vector_names = set()
@@ -2512,25 +2614,23 @@ class Indexer(BasedModel):
                     if (
                         add_dense
                         and self._embedding_provider
-                        and "" not in existing_vector_names  # Check if dense vector missing
+                        and "" not in existing_vector_names
                         and (chunk_text := payload.get("text", ""))
                     ):
                         # Use embedding provider to generate dense embedding
-                        dense_emb = await self._embedding_provider.embed_document([chunk_text])
+                        dense_emb = await self._embedding_provider.embed_documents([chunk_text])
                         if dense_emb and len(dense_emb) > 0:
-                            # Use empty string for default dense vector
                             vectors_to_add[""] = dense_emb[0]
 
                     # Only add sparse if requested AND not already present
                     if (
                         add_sparse
                         and self._sparse_provider
-                        and "sparse" not in existing_vector_names  # Check if sparse vector missing
+                        and "sparse" not in existing_vector_names
                         and (chunk_text := payload.get("text", ""))
                     ):
-                        sparse_emb = await self._sparse_provider.embed_document([chunk_text])
+                        sparse_emb = await self._sparse_provider.embed_documents([chunk_text])
                         if sparse_emb and len(sparse_emb) > 0:
-                            # Sparse vector name
                             vectors_to_add["sparse"] = sparse_emb[0]
 
                     if vectors_to_add:
@@ -2552,12 +2652,11 @@ class Indexer(BasedModel):
                         # Only update manifest if vector store update succeeded
                         if self._manifest_lock:
                             async with self._manifest_lock:
-                                if (relative_path := set_relative_path(file_path)) and (
-                                    entry := self._file_manifest.get_file(relative_path)
-                                ):
-                                    # Update the entry to reflect new embeddings
+                                # Ensure we have a Path object for manifest lookup
+                                manifest_path = Path(rel_path)
+                                if entry := self._file_manifest.get_file(manifest_path):
                                     self._file_manifest.add_file(
-                                        path=relative_path,
+                                        path=manifest_path,
                                         content_hash=entry["content_hash"],
                                         chunk_ids=entry["chunk_ids"],
                                         dense_embedding_provider=current_models["dense_provider"]

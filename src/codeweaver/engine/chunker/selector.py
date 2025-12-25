@@ -73,14 +73,16 @@ class ChunkerSelector:
         4. Return fresh chunker instance (never reused across files)
     """
 
-    def __init__(self, governor: ChunkGovernor) -> None:
+    def __init__(self, governor: ChunkGovernor, tokenizer: Any | None = None) -> None:
         """Initialize selector with chunk governor.
 
         Args:
             governor: ChunkGovernor instance for resource management and
                 configuration. Passed to created chunker instances.
+            tokenizer: Optional tokenizer for accurate token counting.
         """
         self.governor = governor
+        self.tokenizer = tokenizer
 
     def select_for_file_path(self, file_path: Any) -> BaseChunker:
         """Select best chunker for given file path (convenience method).
@@ -143,15 +145,15 @@ class ChunkerSelector:
         if self.governor.settings is not None:
             max_size_bytes = self.governor.settings.performance.max_file_size_mb * 1024 * 1024
             try:
-                file_size = file.path.stat().st_size
+                file_size = file.absolute_path.stat().st_size
                 if file_size > max_size_bytes:
                     logger.warning(
                         "File %s exceeds max size limit (%d MB > %d MB). Skipping chunking.",
-                        file.path,
+                        file.absolute_path,
                         file_size / (1024 * 1024),
                         self.governor.settings.performance.max_file_size_mb,
                         extra={
-                            "file_path": str(file.path),
+                            "file_path": str(file.absolute_path),
                             "file_size_mb": file_size / (1024 * 1024),
                             "max_size_mb": self.governor.settings.performance.max_file_size_mb,
                         },
@@ -161,9 +163,9 @@ class ChunkerSelector:
             except OSError as e:
                 logger.warning(
                     "Could not stat file %s: %s",
-                    file.path,
+                    file.absolute_path,
                     e,
-                    extra={"file_path": str(file.path), "error": str(e)},
+                    extra={"file_path": str(file.absolute_path), "error": str(e)},
                 )
 
         language = self._detect_language(file)
@@ -171,7 +173,7 @@ class ChunkerSelector:
         # Try semantic first for supported languages
         if isinstance(language, SemanticSearchLanguage):
             try:
-                semantic_chunker = SemanticChunker(self.governor, language)
+                semantic_chunker = SemanticChunker(self.governor, language, self.tokenizer)
                 # Wrap semantic chunker with graceful fallback to delimiter
                 lang_str = language.variable if hasattr(language, "variable") else str(language)
                 fallback = DelimiterChunker(self.governor, language=lang_str)
@@ -227,7 +229,7 @@ class ChunkerSelector:
             >>> selector._detect_language(file_xyz)
             'xyz'
         """
-        ext = file.path.suffix
+        ext = file.absolute_path.suffix
 
         # Return the enum itself (not .variable) for isinstance checks to work
         if file.ext_kind:

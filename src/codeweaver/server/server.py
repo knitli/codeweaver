@@ -31,12 +31,13 @@ from codeweaver.common.utils import elapsed_time_to_human_readable, get_project_
 from codeweaver.config.settings import CodeWeaverSettings
 from codeweaver.core.types.dataclasses import DATACLASS_CONFIG, DataclassSerializationMixin
 from codeweaver.core.types.enum import AnonymityConversion
+from codeweaver.core.types.provider import Provider as Provider
 from codeweaver.core.types.sentinel import Unset
+from codeweaver.di import get_container
 from codeweaver.engine.failover import VectorStoreFailoverManager
 from codeweaver.engine.indexer import Indexer
 from codeweaver.exceptions import InitializationError
 from codeweaver.mcp.state import CwMcpHttpState
-from codeweaver.providers.provider import Provider as Provider
 from codeweaver.server.health.health_service import HealthService
 from codeweaver.server.management import ManagementServer
 
@@ -341,7 +342,7 @@ async def lifespan(
     if isinstance(settings.project_path, Unset):
         settings.project_path = get_project_path()
 
-    state = _initialize_cw_state(settings, statistics)
+    state = await _initialize_cw_state(settings, statistics)
 
     if not isinstance(state, CodeWeaverState):
         raise InitializationError(
@@ -351,101 +352,118 @@ async def lifespan(
 
     indexing_task = None
 
-    try:
-        if verbose or debug:
-            _logger.info("Ensuring services set up...")
-        from codeweaver.server.background_services import run_background_indexing
+    async with get_container().lifespan():
+        try:
+            if verbose or debug:
+                _logger.info("Ensuring services set up...")
+            from codeweaver.server.background_services import run_background_indexing
 
-        # Start background indexing task
-        indexing_task = asyncio.create_task(
-            run_background_indexing(state, status_display, verbose=verbose, debug=debug)
-        )
-
-        # Perform health checks and display results
-        status_display.print_step("Health checks...")
-
-        if state.health_service:
-            health_response = await state.health_service.get_health_response()
-
-            # Vector store health with degraded handling
-            vs_status = health_response.services.vector_store.status
-            status_display.print_health_check("Vector store (Qdrant)", vs_status)
-
-            # Show helpful message for degraded/down vector store
-            if vs_status in ("down", "degraded") and not (verbose or debug):
-                status_display.console.print(
-                    "  [dim]Unable to connect. Continuing with sparse-only search.[/dim]"
-                )
-                status_display.console.print(
-                    "  [dim]To enable semantic search: docker run -p 6333:6333 qdrant/qdrant[/dim]"
-                )
-            elif vs_status in ("down", "degraded"):
-                _logger.warning(
-                    "Failed to connect to Qdrant. Check configuration and ensure Qdrant is running."
-                )
-
-            # Embeddings health
-            status_display.print_health_check(
-                "Embeddings (Voyage AI)",
-                health_response.services.embedding_provider.status,
-                model=health_response.services.embedding_provider.model,
+            # Start background indexing task
+            indexing_task = asyncio.create_task(
+                run_background_indexing(state, status_display, verbose=verbose, debug=debug)
             )
 
-            # Sparse embeddings health
-            status_display.print_health_check(
-                f"Sparse embeddings ({health_response.services.sparse_embedding.provider})",
-                health_response.services.sparse_embedding.status,
-            )
-        if not state.failover_manager:
-            state.failover_manager = VectorStoreFailoverManager()
-        status_display.print_ready()
+            # Perform health checks and display results
+            status_display.print_step("Health checks...")
 
-        if verbose or debug:
-            _logger.info("Lifespan start actions complete, server initialized.")
-        state.initialized = True
-        yield state
-    except Exception:
-        state.initialized = False
-        raise
-    finally:
-        await _cleanup_state(state, indexing_task, status_display, verbose=verbose or debug)
+            if state.health_service:
+                health_response = await state.health_service.get_health_response()
+
+                # Vector store health with degraded handling
+                vs_status = health_response.services.vector_store.status
+                status_display.print_health_check("Vector store (Qdrant)", vs_status)
+
+                # Show helpful message for degraded/down vector store
+                if vs_status in ("down", "degraded") and not (verbose or debug):
+                    status_display.console.print(
+                        "  [dim]Unable to connect. Continuing with sparse-only search.[/dim]"
+                    )
+                    status_display.console.print(
+                        "  [dim]To enable semantic search: docker run -p 6333:6333 qdrant/qdrant[/dim]"
+                    )
+                elif vs_status in ("down", "degraded"):
+                    _logger.warning(
+                        "Failed to connect to Qdrant. Check configuration and ensure Qdrant is running."
+                    )
+
+                # Embeddings health
+                status_display.print_health_check(
+                    "Embeddings (Voyage AI)",
+                    health_response.services.embedding_provider.status,
+                    model=health_response.services.embedding_provider.model,
+                )
+
+                # Sparse embeddings health
+                status_display.print_health_check(
+                    f"Sparse embeddings ({health_response.services.sparse_embedding.provider})",
+                    health_response.services.sparse_embedding.status,
+                )
+            if not state.failover_manager:
+                state.failover_manager = VectorStoreFailoverManager()
+            status_display.print_ready()
+
+            if verbose or debug:
+                _logger.info("Lifespan start actions complete, server initialized.")
+            state.initialized = True
+            yield state
+        except Exception:
+            state.initialized = False
+            raise
+        finally:
+            await _cleanup_state(state, indexing_task, status_display, verbose=verbose or debug)
 
 
-def _initialize_cw_state(
+async def _initialize_cw_state(
     settings: CodeWeaverSettings | None = None, statistics: SessionStatistics | None = None
 ) -> CodeWeaverState:
     """Initialize application state if not already present."""
     from codeweaver.common.http_pool import HttpClientPool
+    from codeweaver.di import get_container
+    from codeweaver.server.health.health_service import HealthService
 
     resolved_settings = settings or get_settings._resolve()()
+    container = get_container()
 
     # Initialize HTTP client pool for connection reuse
     http_pool = HttpClientPool.get_instance()
     _logger.debug("Initialized HTTP client pool for provider connections")
 
+    # Resolve core components via DI
+    indexer = await container.resolve(Indexer)
+    stats = statistics or await container.resolve(SessionStatistics)
+
     state = CodeWeaverState(  # type: ignore
         initialized=False,
         # for lazy imports, we need to call resolve() to get the function/object and then call it
         settings=resolved_settings,
-        statistics=statistics or get_session_statistics._resolve()(),
+        statistics=stats,
         project_path=get_project_path()
         if isinstance(resolved_settings.project_path, Unset)
         else resolved_settings.project_path,
         config_path=None
         if isinstance(resolved_settings.config_file, Unset)
         else resolved_settings.config_file,
-        provider_registry=get_provider_registry._resolve()(),
-        services_registry=get_services_registry._resolve()(),
-        model_registry=get_model_registry._resolve()(),
+        provider_registry=await container.resolve(ProviderRegistry),
+        services_registry=await container.resolve(ServicesRegistry),
+        model_registry=await container.resolve(ModelRegistry),
         # middleware stack is for ASGIMiddleware; we haven't integrated this yet
         middleware_stack=(),
         health_service=None,  # Initialize as None, will be set after CodeWeaverState construction
-        failover_manager=None,  # Initialize as None, will be set after CodeWeaverState construction
+        failover_manager=await container.resolve(VectorStoreFailoverManager),
         telemetry=PostHogClient.from_settings(),
         http_pool=http_pool,
-        indexer=Indexer.from_settings(),
+        indexer=indexer,
     )
-    state.health_service = _get_health_service()
+
+    # Initialize health service with components
+    state.health_service = HealthService(
+        provider_registry=state.provider_registry,
+        statistics=state.statistics,
+        indexer=state.indexer,
+        failover_manager=state.failover_manager,
+        startup_stopwatch=float(state.startup_stopwatch),
+    )
+
     # Start telemetry session with metadata
     if state.telemetry and state.telemetry.enabled:
         state.telemetry.start_session({

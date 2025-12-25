@@ -126,7 +126,7 @@ def _recommended_default(
 
     This profile leans towards high-quality providers, but without excessive cost or setup. It uses Voyage AI for embeddings and rerankings, which has a generous free tier and class-leading performance. Qdrant can be deployed locally for free or as a cloud service with a generous free tier. Anthropic Claude Haiku is used for agents, which has a strong balance of cost and performance.
     """
-    from codeweaver.providers.provider import Provider
+    from codeweaver.core.types.provider import Provider
 
     return ProviderSettingsDict(
         embedding=(
@@ -181,7 +181,7 @@ def _quickstart_default(
 
     This profile uses free-tier or open-source providers to allow for immediate use without cost.
     """
-    from codeweaver.providers.provider import Provider
+    from codeweaver.core.types.provider import Provider
 
     return ProviderSettingsDict(
         embedding=(
@@ -244,7 +244,7 @@ def _backup_profile() -> ProviderSettingsDict:
 
     Together this set of models can run entirely locally, with very low resource usage, making them ideal for development, testing, and as CodeWeaver's fallback profile.
     """
-    from codeweaver.providers.provider import Provider
+    from codeweaver.core.types.provider import Provider
 
     # NOTE: qdrant/bm25 doesn't require FASTEMBED -- Fastembed can generate with it, but so can the qdrant_client itself
     # We lose true sparse embeddings with bm25, but it's a good lightweight backup option

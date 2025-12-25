@@ -38,14 +38,14 @@ local linters = new Mapping<String, Step> {
         ["typos"] = new Step {
             workspace_indicator = "_typos.toml"
             glob = typosFilter
-            check = "typos -j 8 {{ files }}"
-            fix = "typos --write-changes {{ files }}"
+            check = "mise x typos@latest -- typos -j 8 {{ files }}"
+            fix = "mise x typos@latest -- typos --write-changes {{ files }}"
             stage = typosFilter
         }
             ["shellcheck"] = new Step {
             batch = true
-            glob = List("scripts/{*.sh,*.bash}", "mise-tasks/{*.sh,*.bash}")
-            check = "shellcheck {{ files }}"
+            glob = List("scripts/{*.sh,*.bash}", "mise-tasks/{*.sh,*.bash}", "packages/**/{*.sh,*.bash}")
+            check = "mise x shellcheck@latest -- shellcheck {{ files }}"
         }
 
             ["shfmt"] = (Builtins.shfmt) {
@@ -58,12 +58,12 @@ local linters = new Mapping<String, Step> {
         glob = "src/**/*.py"
         fix = "./scripts/code-quality/fix-ruff-patterns.sh {{ files }}"
         check = "./scripts/code-quality/fix-ruff-patterns.sh --dry-run {{ files }}"
-        stage = List("src/**/*.py")
+        stage = List("src/**/*.py", "packages/**/*.py", "tests/**/*.py", "scripts/**/*.py", "mise-tasks/**/*.py")
     }
 
     ["ruff"] = (Builtins.ruff) {
         fix = "ruff check --fix --unsafe-fixes {{ files }} && ruff check --select I --fix {{ files }} && ruff format {{ files }}"
-        stage = List("src/**/*.py", "tests/**/*.py", "scripts/**/*.py", "mise-tasks/**/*.py")
+        stage = List("src/**/*.py", "packages/**/*.py", "tests/**/*.py", "scripts/**/*.py", "mise-tasks/**/*.py")
     }
 
     ["reuse"] = new Step {
@@ -86,7 +86,7 @@ local linters = new Mapping<String, Step> {
 
     // ty typechecker for python
     ["ty"] = new Step {
-        glob = "{src,tests,scripts,mise-tasks}/**/*.py"
+        glob = "{src,packages,tests,scripts,mise-tasks}/**/*.py"
         check = "ty check {{ files }}"
     }
 

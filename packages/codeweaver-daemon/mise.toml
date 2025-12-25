@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+#
+
+[tasks]
+[tasks.test]
+
+[tasks.graph]
+usage = '''
+arg "[dir]" help="python directory to generate a graph for" default="src"
+'''
+run = '''mise x -- ruff analyze graph --target-version py312 --python .venv/bin/python "${usage_dir:-src/}"'''
+run_windows = '''mise x -- ruff analyze graph --target-version py312 --python .venv\Scripts\python.exe .'''

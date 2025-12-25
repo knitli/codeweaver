@@ -42,22 +42,22 @@ from pydantic import (
 )
 from pydantic_core import to_json
 
-from codeweaver.common.utils import ensure_iterable, set_relative_path, uuid7
 from codeweaver.core.language import SemanticSearchLanguage
 from codeweaver.core.metadata import ChunkSource, ExtKind, Metadata, determine_ext_kind
 from codeweaver.core.spans import Span, SpanTuple
 from codeweaver.core.stores import BlakeHashKey
 from codeweaver.core.types import BasedModel, FilteredKeyT, LanguageNameT
 from codeweaver.core.types.utils import generate_field_title
-from codeweaver.core.utils import truncate_text
+from codeweaver.core.utils import ensure_iterable, set_relative_path, truncate_text, uuid7
 
 
 if TYPE_CHECKING:
+    from codeweaver_tokenizers.base import Tokenizer
+
     from codeweaver.core.discovery import DiscoveredFile
     from codeweaver.core.types import AnonymityConversion
     from codeweaver.providers.embedding.registry import EmbeddingRegistry
     from codeweaver.providers.embedding.types import EmbeddingBatchInfo
-    from codeweaver.tokenizers.base import Tokenizer
 
 # ---------------------------------------------------------------------------
 # *                    Code Search and Chunks
@@ -528,7 +528,7 @@ class CodeChunk(BasedModel):
     @classmethod
     def chunkify(cls, text: StructuredDataInput) -> Iterator[CodeChunk]:
         """Convert text to a CodeChunk."""
-        from codeweaver.common.utils.utils import ensure_iterable
+        from codeweaver.core.utils import ensure_iterable
 
         yield from (
             item

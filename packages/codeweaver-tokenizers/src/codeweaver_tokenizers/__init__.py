@@ -9,19 +9,19 @@ from __future__ import annotations
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Literal
 
-from codeweaver.common.utils.lazy_getter import create_lazy_getattr
+from codeweaver_tokenizers.utils import create_lazy_getattr
 
 
 if TYPE_CHECKING:
-    from codeweaver.tokenizers.base import Tokenizer
-    from codeweaver.tokenizers.tiktoken import TiktokenTokenizer
-    from codeweaver.tokenizers.tokenizers import Tokenizers
+    from codeweaver_tokenizers.base import Tokenizer
+    from codeweaver_tokenizers.tiktoken import TiktokenTokenizer
+    from codeweaver_tokenizers.tokenizers import Tokenizers
 
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
-    "Tokenizer": (__spec__.parent, "base"),
-    "TiktokenTokenizer": (__spec__.parent, "tiktoken"),
-    "Tokenizers": (__spec__.parent, "tokenizers"),
+    "Tokenizer": ("codeweaver_tokenizers", "base"),
+    "TiktokenTokenizer": ("codeweaver_tokenizers", "tiktoken"),
+    "Tokenizers": ("codeweaver_tokenizers", "tokenizers"),
 })
 
 __getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
@@ -39,12 +39,12 @@ def get_tokenizer(tokenizer: Literal["tiktoken", "tokenizers"], model: str) -> T
         The tokenizer class corresponding to the specified type and model.
     """
     if tokenizer == "tiktoken":
-        from codeweaver.tokenizers.tiktoken import TiktokenTokenizer
+        from codeweaver_tokenizers.tiktoken import TiktokenTokenizer
 
         return TiktokenTokenizer(model)
 
     if tokenizer == "tokenizers":
-        from codeweaver.tokenizers.tokenizers import Tokenizers
+        from codeweaver_tokenizers.tokenizers import Tokenizers
 
         return Tokenizers(model)
 

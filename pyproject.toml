@@ -106,13 +106,14 @@ dependencies = [
   "aenum>=3.1.16",
   "ast-grep-py>=0.40.1",
   "blake3>=1.0.8",
+  "code-weaver-daemon",
+  "code-weaver-tokenizers",
   # CLI framework and output
   "cyclopts>=4.3.0",
   # onnxruntime currently does not support python 3.14
   "fastembed>=0.7.4; python_version < '3.14'",
   # MCP server framework
   "fastmcp>=2.13.3",
-  "httpx[http2]>=0.28.1",
   "mcp>=1.19.0",
   # Numerical and ML
   "numpy>=2.3.5",
@@ -133,8 +134,6 @@ dependencies = [
   "sentence-transformers>=5.1.2; python_version <= '3.14'",
   "tenacity>=9.1.2",
   "textcase>=0.4.5",
-  "tiktoken>=0.12.0",
-  "tokenizers>=0.22.1",
   "tomli-w>=1.2.0",
   "typing_extensions>=4.15.0",
   "uuid7>=0.1.0; python_version < '3.14'",
@@ -416,6 +415,7 @@ filterwarnings = [
   "ignore::DeprecationWarning",
   "ignore::PendingDeprecationWarning",
   "ignore::UserWarning",
+  "ignore::urllib3.exceptions.SystemTimeWarning",
 ]
 markers = [
   "async_test: Asynchronous tests (in addition to pytest.mark.asyncio)",
@@ -614,7 +614,12 @@ conflicts = [
   [{ extra = "fastembed" }, { extra = "fastembed-gpu" }]
 ]
 
+[tool.uv.workspace]
+members = ["packages/*"]
+
 [tool.uv.sources]
+code-weaver-daemon = { workspace = true }
+code-weaver-tokenizers = { workspace = true }
 types-boto3-custom = { path = "vendored/types_boto3_custom-1.41.2-py3-none-any.whl" }
 
 [tool.uv-dynamic-versioning]

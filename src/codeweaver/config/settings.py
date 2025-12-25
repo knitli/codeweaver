@@ -379,7 +379,7 @@ class CodeWeaverSettings(BaseSettings):
             description="""Root path of the codebase to analyze. CodeWeaver will try to detect the project path automatically if you don't provide one.""",
             validate_default=False,
         ),
-    ] = _resolve_env_settings_path(directory=True)
+    ] = UNSET
 
     project_name: Annotated[
         str | Unset,
@@ -387,7 +387,7 @@ class CodeWeaverSettings(BaseSettings):
             description="""Project name (auto-detected from directory if None)""",
             validate_default=False,
         ),
-    ] = os.environ.get("CODEWEAVER_PROJECT_NAME", UNSET)
+    ] = UNSET
 
     provider: Annotated[
         ProviderSettings | Unset,
@@ -549,16 +549,19 @@ class CodeWeaverSettings(BaseSettings):
         self._unset_fields = {
             field for field in type(self).model_fields if getattr(self, field) is Unset
         }
-        self.project_path = (
-            lazy_import("codeweaver.common.utils", "get_project_path")()
-            if isinstance(self.project_path, Unset)
-            else self.project_path
-        )  # type: ignore
-        self.project_name = (
-            cast(DirectoryPath, self.project_path).name  # type: ignore
-            if isinstance(self.project_name, Unset)
-            else self.project_name  # type: ignore
-        )
+        # Re-check environment variable for project_path before falling back to auto-detection
+        if isinstance(self.project_path, Unset):
+            env_path = _resolve_env_settings_path(directory=True)
+            if not isinstance(env_path, Unset):
+                self.project_path = env_path
+            else:
+                self.project_path = lazy_import("codeweaver.common.utils", "get_project_path")()
+        # Re-check environment variable for project_name before falling back to auto-detection
+        if isinstance(self.project_name, Unset):
+            if env_name := os.environ.get("CODEWEAVER_PROJECT_NAME"):
+                self.project_name = env_name
+            else:
+                self.project_name = cast(DirectoryPath, self.project_path).name
         self.profile = None if isinstance(self.profile, Unset) else self.profile
         if self.profile:
             self._setup_profile()
@@ -894,9 +897,20 @@ class CodeWeaverSettings(BaseSettings):
                 if ext == "yaml":
                     config_files.append(_class(settings_cls, Path(f"{loc}.yml")))
         # if we're testing, we want to control and isolate test configs
-        # Still allow init_settings so tests can programmatically override config
+        # Still allow init_settings and env vars so tests can programmatically override config
         if is_test_mode:
-            return (init_settings, *config_files)
+            return (
+                init_settings,
+                EnvSettingsSource(
+                    settings_cls,
+                    env_prefix="CODEWEAVER_",
+                    case_sensitive=False,
+                    env_nested_delimiter="__",
+                    env_parse_enums=True,
+                    env_ignore_empty=True,
+                ),
+                *config_files,
+            )
         other_sources: list[PydanticBaseSettingsSource] = []
         if any(env for env in os.environ if env.startswith("AWS_SECRETS_MANAGER")):
             other_sources.append(

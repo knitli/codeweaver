@@ -19,6 +19,7 @@ import contextlib
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, NamedTuple
 
+from codeweaver_daemon import check_daemon_health, spawn_daemon_process
 from cyclopts import App, Parameter
 from pydantic import FilePath, PositiveInt
 from typing_extensions import TypeIs
@@ -26,7 +27,6 @@ from typing_extensions import TypeIs
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
 from codeweaver.cli.utils import get_settings_map_for
 from codeweaver.common.utils.lazy_importer import lazy_import
-from codeweaver.daemon import check_daemon_health, spawn_daemon_process
 
 
 if TYPE_CHECKING:

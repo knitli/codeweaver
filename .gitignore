@@ -20,6 +20,7 @@ hk.local.pkl.license
 
 # CLAUDE.md -- we symlink this file from AGENTS.md in the setup script
 CLAUDE.md
+GEMINI.md
 
 # non-public working files
 .workbench/
@@ -226,3 +227,6 @@ test-results.xml
 .codeweaver/local.env
 mise.local.toml
 mise.local.env
+
+.gemini/
+gha-creds-*.json

@@ -3,6 +3,8 @@
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
 
+[prepare.uv]
+
 [settings.python]
 
 [tools]
@@ -11,10 +13,13 @@ pkl = "latest"
 usage = "latest"
 uv = "latest"
 # Quality & validation tools
-"pipx:reuse" = "latest"  # License validation
 "aqua:tombi-toml/tombi" = "latest"
 "ubi:astral-sh/ty" = "latest"
 ruff = "latest"  # Python linting/formatting
+
+[tools."pipx:reuse"]
+version = "latest"
+python = "3.13.11"
 
 [env]
 _.python.venv = { path = ".venv" }

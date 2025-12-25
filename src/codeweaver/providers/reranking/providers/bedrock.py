@@ -22,9 +22,9 @@ from pydantic.alias_generators import to_camel, to_snake
 
 from codeweaver.config.providers import AWSProviderSettings
 from codeweaver.core.types.models import BasedModel
+from codeweaver.core.types.provider import Provider
 from codeweaver.exceptions import ConfigurationError
 from codeweaver.exceptions import ValidationError as CodeWeaverValidationError
-from codeweaver.providers.provider import Provider
 from codeweaver.providers.reranking.capabilities.amazon import get_amazon_reranking_capabilities
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 from codeweaver.providers.reranking.providers.base import RerankingProvider, RerankingResult

@@ -27,6 +27,7 @@ from typing import (
     override,
 )
 
+from codeweaver_tokenizers import Tokenizer, get_tokenizer
 from pydantic import ConfigDict, Field, PositiveInt, PrivateAttr, SkipValidation, TypeAdapter
 from pydantic import ValidationError as PydanticValidationError
 from pydantic.main import IncEx
@@ -41,11 +42,10 @@ from tenacity import (
 
 from codeweaver.core.types.enum import BaseEnum
 from codeweaver.core.types.models import BasedModel
+from codeweaver.core.types.provider import Provider
 from codeweaver.core.types.utils import generate_field_title
 from codeweaver.exceptions import RerankingProviderError, ValidationError
-from codeweaver.providers.provider import Provider
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
-from codeweaver.tokenizers import Tokenizer, get_tokenizer
 
 
 if TYPE_CHECKING:

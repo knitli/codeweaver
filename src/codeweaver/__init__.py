@@ -92,6 +92,8 @@ __version__: Final[str] = get_version()
 
 
 if TYPE_CHECKING:
+    from codeweaver_tokenizers import TiktokenTokenizer, Tokenizer, Tokenizers
+
     from codeweaver.agent_api import find_code
     from codeweaver.cli import CLIErrorHandler, StatusDisplay
     from codeweaver.common import (
@@ -468,7 +470,6 @@ if TYPE_CHECKING:
         StatisticsInfo,
         VectorStoreServiceInfo,
     )
-    from codeweaver.tokenizers import TiktokenTokenizer, Tokenizer, Tokenizers
 
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
@@ -794,15 +795,15 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "ThingNameT": (__spec__.parent, "core"),
     "ThingRegistry": (__spec__.parent, "semantic"),
     "ThingType": (__spec__.parent, "semantic"),
-    "TiktokenTokenizer": (__spec__.parent, "tokenizers"),
+    "TiktokenTokenizer": ("codeweaver_tokenizers", ""),
     "TimingStatistics": (__spec__.parent, "common"),
     "TimingStatisticsDict": (__spec__.parent, "common"),
     "Token": (__spec__.parent, "semantic"),
     "TokenCategory": (__spec__.parent, "common"),
     "TokenCounter": (__spec__.parent, "common"),
     "TokenPurpose": (__spec__.parent, "semantic"),
-    "Tokenizer": (__spec__.parent, "tokenizers"),
-    "Tokenizers": (__spec__.parent, "tokenizers"),
+    "Tokenizer": ("codeweaver_tokenizers", ""),
+    "Tokenizers": ("codeweaver_tokenizers", ""),
     "ToolAnnotationsDict": (__spec__.parent, "mcp"),
     "ToolOrPromptName": (__spec__.parent, "common"),
     "ToolRegistrationDict": (__spec__.parent, "mcp"),

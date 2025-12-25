@@ -15,10 +15,10 @@ from uuid import uuid4
 
 import pytest
 
-from codeweaver.agent_api.find_code.types import StrategizedQuery
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.language import SemanticSearchLanguage as Language
 from codeweaver.core.spans import Span
+from codeweaver.core.types.search import SearchStrategy, StrategizedQuery
 from codeweaver.providers.provider import Provider
 from codeweaver.providers.vector_stores.inmemory import MemoryVectorStoreProvider
 
@@ -215,7 +215,6 @@ class TestMemoryProviderContract:
         await provider2._initialize()
 
         # Verify data was restored
-        from codeweaver.agent_api.find_code.types import SearchStrategy
 
         results = await provider2.search(
             StrategizedQuery(

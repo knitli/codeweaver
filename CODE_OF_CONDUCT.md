@@ -1,3 +1,10 @@
+<!--
+SPDX-FileCopyrightText: 2025 Knitli Inc.
+SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+
+SPDX-License-Identifier: MIT OR Apache-2.0
+-->
+
 # Community Expectations
 
 CodeWeaver welcomes everyone. Everyone deserves a place to contribute, share, help, and build. Your age, gender, race, disability, sexual orientation, or identity do not change this.

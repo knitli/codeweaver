@@ -118,8 +118,8 @@ class TestStartDaemonBackground:
 
         # Mock subprocess.Popen and shutil.which in the daemon module
         with (
-            patch("codeweaver.daemon.shutil.which") as mock_which,
-            patch("codeweaver.daemon.subprocess.Popen") as mock_popen,
+            patch("codeweaver_daemon.shutil.which") as mock_which,
+            patch("codeweaver_daemon.subprocess.Popen") as mock_popen,
         ):
             # Simulate finding cw executable
             mock_which.return_value = "/usr/local/bin/cw"
@@ -150,8 +150,8 @@ class TestStartDaemonBackground:
         display = StatusDisplay()
 
         with (
-            patch("codeweaver.daemon.shutil.which") as mock_which,
-            patch("codeweaver.daemon.subprocess.Popen") as mock_popen,
+            patch("codeweaver_daemon.shutil.which") as mock_which,
+            patch("codeweaver_daemon.subprocess.Popen") as mock_popen,
         ):
             # Simulate not finding cw executable
             mock_which.return_value = None
@@ -182,8 +182,8 @@ class TestStartDaemonBackground:
         display = StatusDisplay()
 
         with (
-            patch("codeweaver.daemon.shutil.which") as mock_which,
-            patch("codeweaver.daemon.subprocess.Popen") as mock_popen,
+            patch("codeweaver_daemon.shutil.which") as mock_which,
+            patch("codeweaver_daemon.subprocess.Popen") as mock_popen,
         ):
             mock_which.return_value = "/usr/local/bin/cw"
             mock_popen.return_value = MagicMock()

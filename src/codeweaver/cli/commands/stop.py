@@ -11,13 +11,13 @@ from __future__ import annotations
 
 from typing import Annotated
 
+from codeweaver_daemon import check_daemon_health, request_daemon_shutdown, wait_for_daemon_shutdown
 from cyclopts import App, Parameter
 from pydantic import PositiveInt
 
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
 from codeweaver.config.settings import get_settings_map
 from codeweaver.core.types.sentinel import Unset
-from codeweaver.daemon import check_daemon_health, request_daemon_shutdown, wait_for_daemon_shutdown
 
 
 _display: StatusDisplay = get_display()

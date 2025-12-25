@@ -17,10 +17,14 @@ from collections.abc import Callable
 from typing import Any
 
 from codeweaver.core.file_extensions import METADATA_PATH
-from codeweaver.engine.search.condition import FieldCondition, Filter, FilterableField
-from codeweaver.engine.search.match import MatchAny, MatchExcept, MatchValue
-from codeweaver.engine.search.payload import PayloadSchemaType
-from codeweaver.engine.search.range import Range
+from codeweaver.providers.vector_stores.search.condition import (
+    FieldCondition,
+    Filter,
+    FilterableField,
+)
+from codeweaver.providers.vector_stores.search.match import MatchAny, MatchExcept, MatchValue
+from codeweaver.providers.vector_stores.search.payload import PayloadSchemaType
+from codeweaver.providers.vector_stores.search.range import Range
 
 
 ArbitraryFilter = dict[str, Any]
@@ -217,7 +221,7 @@ def to_qdrant_filter(filter_obj: Filter | None) -> Filter | None:
         for future filter transformations or field mapping customizations.
 
     Examples:
-        >>> from codeweaver.engine.search import Filter, FieldCondition, MatchAny
+        >>> from codeweaver.providers.vector_stores.search import Filter, FieldCondition, MatchAny
         >>> # Filter by file paths
         >>> filter_obj = Filter(
         ...     must=[
@@ -241,7 +245,7 @@ def to_qdrant_filter(filter_obj: Filter | None) -> Filter | None:
         >>> assert qdrant_filter is not None
 
         >>> # Filter by line range
-        >>> from codeweaver.engine.search import Range
+        >>> from codeweaver.providers.vector_stores.search import Range
         >>> filter_obj = Filter(
         ...     must=[FieldCondition(key="line_start", range=Range(gte=10, lte=100))]
         ... )

@@ -75,7 +75,7 @@ async def test_incremental_updates(qdrant_test_manager):
     await provider.upsert([chunk_v2])
 
     # Verify: Old chunk gone, new chunk present
-    from codeweaver.agent_api.find_code.types import SearchStrategy, StrategizedQuery
+    from codeweaver.core.types.search import SearchStrategy, StrategizedQuery
 
     results = await provider.search(
         StrategizedQuery(

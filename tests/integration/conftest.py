@@ -60,10 +60,16 @@ os.environ["CODEWEAVER_TEST_MODE"] = "true"
 # Disable SSL verification warnings for tests (WSL time sync issues cause false positives)
 import warnings
 
-from urllib3.exceptions import SystemTimeWarning
 
+with contextlib.suppress(ImportError):
+    from urllib3.exceptions import SystemTimeWarning
 
-warnings.filterwarnings("ignore", category=SystemTimeWarning)
+    warnings.filterwarnings("ignore", category=SystemTimeWarning)
+
+# Also suppress general SSL and verification warnings that can be triggered by time issues
+warnings.filterwarnings("ignore", message=".*System time is way off.*")
+warnings.filterwarnings("ignore", message=".*SSL verification errors.*")
+warnings.filterwarnings("ignore", category=UserWarning, module="urllib3")
 
 
 def _set_settings() -> DictView[CodeWeaverSettingsDict]:
@@ -170,7 +176,7 @@ def _get_caps() -> tuple[
 
 
 @pytest.fixture
-def actual_dense_embedding_provider() -> (
+async def actual_dense_embedding_provider() -> (
     SentenceTransformersEmbeddingProvider | FastEmbedEmbeddingProvider
 ):
     """Provide an actual dense embedding provider using SentenceTransformers."""
@@ -179,7 +185,10 @@ def actual_dense_embedding_provider() -> (
 
     registry = get_provider_registry()
     # Registry will get capabilities from the configured "testing" profile settings
-    return registry.get_provider_instance(caps.provider, "embedding", singleton=True)  # type: ignore
+    provider = registry.get_provider_instance(caps.provider, "embedding", singleton=True)  # type: ignore
+    if hasattr(provider, "initialize_async"):
+        await provider.initialize_async()  # type: ignore
+    return provider  # ty:ignore[invalid-return-type]
 
 
 @pytest.fixture
@@ -200,7 +209,7 @@ def mock_sparse_provider() -> AsyncMock:
 
 
 @pytest.fixture
-def actual_sparse_embedding_provider() -> (
+async def actual_sparse_embedding_provider() -> (
     SentenceTransformersSparseProvider | FastEmbedSparseProvider
 ):
     """Provide an actual sparse embedding provider using SentenceTransformers."""
@@ -209,20 +218,23 @@ def actual_sparse_embedding_provider() -> (
 
     registry = get_provider_registry()
     # Pass caps explicitly so registry doesn't need to look them up from global settings
-    return registry.get_provider_instance(
+    provider = registry.get_provider_instance(
         caps.provider, "sparse_embedding", singleton=True, caps=caps
     )  # type: ignore
+    if hasattr(provider, "initialize_async"):
+        await provider.initialize_async()  # type: ignore
+    return provider  # ty:ignore[invalid-return-type]
 
 
 @pytest.fixture
 def mock_vector_store() -> AsyncMock:
     """Provide a mock vector store that returns search results."""
-    from codeweaver.agent_api.find_code.results import SearchResult
     from codeweaver.common.utils.utils import uuid7
     from codeweaver.core.chunks import CodeChunk
     from codeweaver.core.language import SemanticSearchLanguage
     from codeweaver.core.metadata import ChunkKind, ExtKind
     from codeweaver.core.spans import Span
+    from codeweaver.core.types.search import SearchResult
 
     mock_store = AsyncMock()
 
@@ -267,20 +279,57 @@ def mock_vector_store() -> AsyncMock:
     return mock_store
 
 
+_shared_memory_vector_store: MemoryVectorStoreProvider | None = None
+
+
 @pytest.fixture
-def actual_vector_store() -> MemoryVectorStoreProvider:
+async def actual_vector_store() -> MemoryVectorStoreProvider:
     """Provide an actual in-memory vector store provider.
 
-    Creates the instance directly without going through registry to avoid
-    registry caching issues in tests. This ensures we get a fresh instance
-    that can be properly initialized and controlled by the test.
+    Uses a singleton instance and a FIXED collection name to ensure that
+    different components (e.g., Indexer and Search) share the same in-memory data.
     """
-    from codeweaver.providers.provider import Provider
+    from codeweaver.common.registry import get_provider_registry
+    from codeweaver.providers.provider import Provider, ProviderKind
     from codeweaver.providers.vector_stores.inmemory import MemoryVectorStoreProvider
 
-    # Create instance directly, not through registry
-    # This avoids the real registry's singleton cache
-    return MemoryVectorStoreProvider(_provider=Provider.MEMORY)
+    global _shared_memory_vector_store
+    if _shared_memory_vector_store is None:
+        # Pass collection_name in config so model_post_init uses it
+        _shared_memory_vector_store = MemoryVectorStoreProvider(
+            config={"collection_name": "codeweaver-test-collection"}, _provider=Provider.MEMORY
+        )
+
+        # Ensure it's initialized
+        await _shared_memory_vector_store._initialize()
+
+        # CRITICAL: Register this instance in the global registry singleton cache
+        registry = get_provider_registry()
+        instance_cache = registry._get_instance_cache_for_kind(ProviderKind.VECTOR_STORE)
+        instance_cache[Provider.MEMORY] = _shared_memory_vector_store
+
+    import sys
+
+    print(
+        f"DEBUG: actual_vector_store returning instance {id(_shared_memory_vector_store)} with collection {getattr(_shared_memory_vector_store, '_collection', 'N/A')}"
+    )
+    sys.stdout.flush()
+    return _shared_memory_vector_store
+
+
+@pytest.fixture(autouse=True)
+async def cleanup_shared_vector_store(
+    actual_vector_store: MemoryVectorStoreProvider,
+) -> AsyncGenerator[None, None]:
+    """Automatically clean up the shared vector store after each test."""
+    yield
+    # Use private attributes to check for initialization without raising ProviderError
+    if actual_vector_store and actual_vector_store._client and actual_vector_store._collection:
+        with contextlib.suppress(Exception):
+            await actual_vector_store._client.delete_collection(actual_vector_store._collection)
+            # Clear known collections cache
+            if hasattr(actual_vector_store, "_known_collections"):
+                actual_vector_store._known_collections.clear()
 
 
 @pytest.fixture
@@ -311,7 +360,7 @@ def mock_reranking_provider() -> AsyncMock:
 
 
 @pytest.fixture
-def actual_reranking_provider() -> (
+async def actual_reranking_provider() -> (
     SentenceTransformersRerankingProvider | FastEmbedRerankingProvider
 ):
     """Provide an actual reranking provider using SentenceTransformers."""
@@ -320,7 +369,10 @@ def actual_reranking_provider() -> (
 
     registry = get_provider_registry()
     # Pass caps explicitly so registry doesn't need to look them up from global settings
-    return registry.get_provider_instance(caps.provider, "reranking", singleton=True, caps=caps)  # type: ignore
+    provider = registry.get_provider_instance(caps.provider, "reranking", singleton=True, caps=caps)  # type: ignore
+    if hasattr(provider, "initialize_async"):
+        await provider.initialize_async()  # type: ignore
+    return provider  # ty:ignore[invalid-return-type]
 
 
 # ===========================================================================
@@ -375,19 +427,24 @@ def mock_provider_registry(
 
 
 @pytest.fixture
-def configured_providers(mock_provider_registry: MagicMock) -> Generator[MagicMock, None, None]:
-    """Fixture that patches the provider registry with mock providers.
-
-    This fixture automatically configures the provider registry for tests
-    that need embedding, vector store, and reranking providers.
-
-    Usage:
-        @pytest.mark.asyncio
-        async def test_something(configured_providers):
-            # find_code and other functions will use mock providers
-            response = await find_code("test query")
-    """
+def configured_providers(
+    mock_provider_registry: MagicMock,
+    mock_embedding_provider: MagicMock,
+    mock_sparse_provider: MagicMock,
+    mock_vector_store: MagicMock,
+    mock_reranking_provider: MagicMock,
+) -> Generator[MagicMock, None, None]:
+    """Fixture that patches the provider registry with mock providers."""
     # Patch both the provider registry and time.time to ensure monotonic timing
+    from codeweaver.di import get_container
+    from codeweaver.providers.embedding.providers.base import EmbeddingProvider
+    from codeweaver.providers.reranking.providers.base import RerankingProvider
+    from codeweaver.providers.vector_stores.base import VectorStoreProvider
+
+    container = get_container()
+    container.override(EmbeddingProvider, mock_embedding_provider)
+    container.override(VectorStoreProvider, mock_vector_store)
+    container.override(RerankingProvider, mock_reranking_provider)
 
     call_count = [0]  # Use list for mutable counter
 
@@ -403,6 +460,7 @@ def configured_providers(mock_provider_registry: MagicMock) -> Generator[MagicMo
         patch("codeweaver.agent_api.find_code.time.time", side_effect=mock_time),
     ):
         yield mock_provider_registry
+        container.clear_overrides()
 
 
 # ===========================================================================
@@ -474,29 +532,24 @@ async def real_vector_store(
 
     Perfect for CI - no Docker required, just in-memory mode.
     """
-    from codeweaver.common.utils.utils import generate_collection_name
-
     instance: MemoryVectorStoreProvider = actual_vector_store
 
-    # CRITICAL FIX: Generate collection name from known_test_codebase (test project path), not codeweaver project path
-    # This ensures indexer and search use the same collection name for test isolation
-    # known_test_codebase = tmp_path / "test_codebase", matching the path used by indexed_test_project
-    collection_name = generate_collection_name(project_path=known_test_codebase)
+    # FORCE fixed collection name for test alignment
+    collection_name = "codeweaver-test-collection"
 
     # Explicitly set collection name in config to override any global settings
     if not instance.config:
         instance.config = {}
     instance.config["collection_name"] = collection_name
+    instance._collection = collection_name
 
-    # Initialize before accessing client
-    await instance._initialize()
-    client = instance.client
-
+    # Already initialized by actual_vector_store fixture
     yield instance
 
     # Cleanup: Delete collection after test
-    with contextlib.suppress(Exception):
-        await client.delete_collection(collection_name)
+    if instance._client:
+        with contextlib.suppress(Exception):
+            await instance._client.delete_collection(collection_name)
 
 
 @pytest.fixture

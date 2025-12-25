@@ -60,6 +60,13 @@ if TYPE_CHECKING:
         DeserializationKwargs,
         SerializationKwargs,
     )
+    from codeweaver.core.types.delimiter import (
+        DelimiterDict,
+        DelimiterKind,
+        DelimiterPattern,
+        LanguageFamily,
+        LineStrategy,
+    )
     from codeweaver.core.types.dictview import DictView
     from codeweaver.core.types.enum import AnonymityConversion, BaseDataclassEnum, BaseEnum
     from codeweaver.core.types.env import EnvFormat, EnvVarInfo
@@ -69,6 +76,7 @@ if TYPE_CHECKING:
         BasedModel,
         RootedRoot,
     )
+    from codeweaver.core.types.search import SearchResult, SearchStrategy, StrategizedQuery
     from codeweaver.core.types.sentinel import UNSET, Sentinel, Unset
     from codeweaver.core.types.utils import generate_field_title, generate_title
 
@@ -84,6 +92,9 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "CategoryNameT": (__spec__.parent, "aliases"),
     "DATACLASS_CONFIG": (__spec__.parent, "dataclasses"),
     "DataclassSerializationMixin": (__spec__.parent, "dataclasses"),
+    "DelimiterDict": (__spec__.parent, "delimiter"),
+    "DelimiterKind": (__spec__.parent, "delimiter"),
+    "DelimiterPattern": (__spec__.parent, "delimiter"),
     "DeserializationKwargs": (__spec__.parent, "dataclasses"),
     "DevToolName": (__spec__.parent, "aliases"),
     "DevToolNameT": (__spec__.parent, "aliases"),
@@ -107,8 +118,10 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "FilePathT": (__spec__.parent, "aliases"),
     "FilteredKey": (__spec__.parent, "aliases"),
     "FilteredKeyT": (__spec__.parent, "aliases"),
+    "LanguageFamily": (__spec__.parent, "delimiter"),
     "LanguageName": (__spec__.parent, "aliases"),
     "LanguageNameT": (__spec__.parent, "aliases"),
+    "LineStrategy": (__spec__.parent, "delimiter"),
     "LiteralStringT": (__spec__.parent, "aliases"),
     "LlmToolName": (__spec__.parent, "aliases"),
     "LlmToolNameT": (__spec__.parent, "aliases"),
@@ -119,10 +132,13 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "Role": (__spec__.parent, "aliases"),
     "RoleT": (__spec__.parent, "aliases"),
     "RootedRoot": (__spec__.parent, "models"),
+    "SearchResult": (__spec__.parent, "search"),
+    "SearchStrategy": (__spec__.parent, "search"),
     "Sentinel": (__spec__.parent, "sentinel"),
     "SentinelName": (__spec__.parent, "aliases"),
     "SentinelNameT": (__spec__.parent, "aliases"),
     "SerializationKwargs": (__spec__.parent, "dataclasses"),
+    "StrategizedQuery": (__spec__.parent, "search"),
     "ThingName": (__spec__.parent, "aliases"),
     "ThingNameT": (__spec__.parent, "aliases"),
     "ThingOrCategoryNameT": (__spec__.parent, "aliases"),
@@ -150,6 +166,9 @@ __all__ = (
     "CategoryName",
     "CategoryNameT",
     "DataclassSerializationMixin",
+    "DelimiterDict",
+    "DelimiterKind",
+    "DelimiterPattern",
     "DeserializationKwargs",
     "DevToolName",
     "DevToolNameT",
@@ -172,8 +191,10 @@ __all__ = (
     "FilePathT",
     "FilteredKey",
     "FilteredKeyT",
+    "LanguageFamily",
     "LanguageName",
     "LanguageNameT",
+    "LineStrategy",
     "LiteralStringT",
     "LlmToolName",
     "LlmToolNameT",
@@ -184,10 +205,13 @@ __all__ = (
     "Role",
     "RoleT",
     "RootedRoot",
+    "SearchResult",
+    "SearchStrategy",
     "Sentinel",
     "SentinelName",
     "SentinelNameT",
     "SerializationKwargs",
+    "StrategizedQuery",
     "ThingName",
     "ThingNameT",
     "ThingOrCategoryNameT",

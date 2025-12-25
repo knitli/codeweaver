@@ -24,7 +24,7 @@ from typing import Literal
 from pydantic import FutureDate
 
 from codeweaver.core.types import FROZEN_BASEDMODEL_CONFIG, BasedModel, LiteralStringT
-from codeweaver.providers.provider import Provider
+from codeweaver.core.types.provider import Provider
 
 
 class LiteLLMModelSpec(BasedModel):

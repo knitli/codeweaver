@@ -20,12 +20,12 @@ from rich.console import Console
 from codeweaver.common.registry.types import LiteralModelKinds
 from codeweaver.core.types.aliases import LiteralStringT, ModelName
 from codeweaver.core.types.models import BasedModel
+from codeweaver.core.types.provider import Provider
 from codeweaver.providers.agent import AgentModel, AgentProfile, AgentProfileSpec
 from codeweaver.providers.embedding.capabilities.base import (
     EmbeddingModelCapabilities,
     SparseEmbeddingModelCapabilities,
 )
-from codeweaver.providers.provider import Provider
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 
 
@@ -338,7 +338,7 @@ class ModelRegistry(BasedModel):
     ):
         """Get all configured models for a specific kind."""
         from codeweaver.common.registry.provider import get_provider_config_for
-        from codeweaver.providers.provider import ProviderKind
+        from codeweaver.core.types.provider import ProviderKind
 
         kind = kind if isinstance(kind, ProviderKind) else ProviderKind.from_string(kind)
         if settings := get_provider_config_for(kind):

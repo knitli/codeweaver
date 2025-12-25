@@ -199,13 +199,17 @@ async def test_prime_index_reconciliation_without_force_reindex(
     # We mock the providers to avoid real network calls but keep the reconciliation logic
     mock_dense_provider = MagicMock()
     mock_dense_provider.model = "test-dense-model"
-    mock_dense_provider.model_name = "test-dense-model"  # _get_current_embedding_models checks this first
+    mock_dense_provider.model_name = (
+        "test-dense-model"  # _get_current_embedding_models checks this first
+    )
     mock_dense_provider.provider_name = "test-provider"
     mock_dense_provider.get_async_embeddings = AsyncMock(return_value=[[0.3] * 768, [0.4] * 768])
 
     mock_sparse_provider = MagicMock()
     mock_sparse_provider.model = "test-sparse-model"
-    mock_sparse_provider.model_name = "test-sparse-model"  # _get_current_embedding_models checks this first
+    mock_sparse_provider.model_name = (
+        "test-sparse-model"  # _get_current_embedding_models checks this first
+    )
     mock_sparse_provider.provider_name = "test-sparse-provider"
     mock_sparse_provider.get_async_embeddings = AsyncMock(
         return_value=[
@@ -693,8 +697,6 @@ async def test_reconciliation_handles_provider_error_gracefully(
     When add_missing_embeddings_to_existing_chunks raises ProviderError,
     prime_index should log the error and continue successfully.
     """
-    import logging
-
     from codeweaver.exceptions import ProviderError
 
     # Set caplog to capture INFO level logs (to see "Checking for missing embeddings")
@@ -1095,7 +1097,7 @@ async def test_reconciliation_not_called_when_force_reindex_true(
 
     # Mock _initialize_providers_async to prevent Qdrant connection attempts during test setup
     # We manually set providers afterward, so we don't need the automatic initialization
-    async def mock_init_providers_async(self):
+    async def mock_init_providers_async(self, vector_store=None):
         pass  # Skip provider initialization
 
     with patch("codeweaver.common.registry.get_provider_registry", return_value=mock_registry):
@@ -1172,7 +1174,7 @@ async def test_reconciliation_not_called_when_no_vector_store(tmp_path, initiali
 
     # Mock _initialize_providers_async to prevent Qdrant connection attempts during test setup
     # We manually set providers afterward, so we don't need the automatic initialization
-    async def mock_init_providers_async(self):
+    async def mock_init_providers_async(self, vector_store=None):
         pass  # Skip provider initialization
 
     with patch("codeweaver.common.registry.get_provider_registry", return_value=mock_registry):
@@ -1236,7 +1238,7 @@ async def test_reconciliation_not_called_when_no_providers(
 
     # Mock _initialize_providers_async to prevent Qdrant connection attempts during test setup
     # We manually set providers afterward, so we don't need the automatic initialization
-    async def mock_init_providers_async(self):
+    async def mock_init_providers_async(self, vector_store=None):
         pass  # Skip provider initialization
 
     with patch("codeweaver.common.registry.get_provider_registry", return_value=mock_registry):

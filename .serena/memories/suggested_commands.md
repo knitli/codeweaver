@@ -53,17 +53,20 @@ uv run ty check .       # Run ty (pyright) type checker
 
 ### Basic Testing
 ```bash
-mise run test           # Run all tests
-mise run test-cov       # Run tests with coverage report
-mise run test-watch     # Run tests in watch mode
+mise run test                       # Run all tests
+mise run test --cov                 # Run tests with coverage report
+mise run test --profile fast        # Fast unit tests (CI subset)
+mise run test --profile integration # Integration tests
+mise run test --profile real        # Real provider tests
+mise run test-watch                 # Run tests in watch mode
 ```
 
-### Targeted Testing (use pytest directly)
+### Targeted Testing (custom markers)
 ```bash
-pytest -m "unit"                    # Unit tests only
-pytest -m "integration"             # Integration tests only
-pytest -m "not network"             # Skip network-dependent tests
-pytest -m "not external_api"        # Skip external API tests
+mise run test -m "unit"                    # Unit tests only
+mise run test -m "integration"             # Integration tests only
+mise run test -m "not network"             # Skip network-dependent tests
+mise run test -m "not external_api"        # Skip external API tests
 pytest tests/specific_test.py       # Run specific test file
 ```
 
@@ -168,8 +171,9 @@ mise run sync           # Install new dependencies
 
 ### Testing Changes
 ```bash
-mise run test           # Quick test run
-mise run test-cov       # Detailed coverage report
+mise run test                # Quick test run
+mise run test --cov          # Detailed coverage report
+mise run test --profile fast # Fast unit tests only
 ```
 
 ## Entry Points

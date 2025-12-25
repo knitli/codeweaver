@@ -14,6 +14,13 @@ conflicts = [[
     { package = "code-weaver", extra = "fastembed-gpu" },
 ]]
 
+[manifest]
+members = [
+    "code-weaver",
+    "code-weaver-daemon",
+    "code-weaver-tokenizers",
+]
+
 [[package]]
 name = "aenum"
 version = "3.1.16"
@@ -661,10 +668,11 @@ dependencies = [
     { name = "aenum" },
     { name = "ast-grep-py" },
     { name = "blake3" },
+    { name = "code-weaver-daemon" },
+    { name = "code-weaver-tokenizers" },
     { name = "cyclopts" },
     { name = "fastembed", marker = "python_full_version < '3.14' or (extra == 'extra-11-code-weaver-fastembed' and extra == 'extra-11-code-weaver-fastembed-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu')" },
     { name = "fastmcp" },
-    { name = "httpx", extra = ["http2"] },
     { name = "mcp" },
     { name = "numpy" },
     { name = "posthog" },
@@ -680,8 +688,6 @@ dependencies = [
     { name = "sentence-transformers", marker = "python_full_version < '3.15' or (extra == 'extra-11-code-weaver-fastembed' and extra == 'extra-11-code-weaver-fastembed-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu')" },
     { name = "tenacity" },
     { name = "textcase" },
-    { name = "tiktoken" },
-    { name = "tokenizers" },
     { name = "tomli-w" },
     { name = "typing-extensions" },
     { name = "uuid7", marker = "python_full_version < '3.14' or (extra == 'extra-11-code-weaver-fastembed' and extra == 'extra-11-code-weaver-fastembed-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu')" },
@@ -837,6 +843,8 @@ requires-dist = [
     { name = "aenum", specifier = ">=3.1.16" },
     { name = "ast-grep-py", specifier = ">=0.40.1" },
     { name = "blake3", specifier = ">=1.0.8" },
+    { name = "code-weaver-daemon", editable = "packages/codeweaver-daemon" },
+    { name = "code-weaver-tokenizers", editable = "packages/codeweaver-tokenizers" },
     { name = "cyclopts", specifier = ">=4.3.0" },
     { name = "eunomia-mcp", marker = "extra == 'auth-eunomia'" },
     { name = "eunomia-mcp", marker = "extra == 'full'" },
@@ -849,7 +857,6 @@ requires-dist = [
     { name = "fastembed-gpu", marker = "python_full_version < '3.14' and extra == 'full-gpu'" },
     { name = "fastembed-gpu", marker = "python_full_version < '3.14' and extra == 'gpu-support'" },
     { name = "fastmcp", specifier = ">=2.13.3" },
-    { name = "httpx", extras = ["http2"], specifier = ">=0.28.1" },
     { name = "mcp", specifier = ">=1.19.0" },
     { name = "numpy", specifier = ">=2.3.5" },
     { name = "permit-fastmcp", marker = "extra == 'auth-permitio'" },
@@ -899,8 +906,6 @@ requires-dist = [
     { name = "sentence-transformers", marker = "extra == 'sentence-transformers'" },
     { name = "tenacity", specifier = ">=9.1.2" },
     { name = "textcase", specifier = ">=0.4.5" },
-    { name = "tiktoken", specifier = ">=0.12.0" },
-    { name = "tokenizers", specifier = ">=0.22.1" },
     { name = "tokenizers", marker = "extra == 'in-memory'" },
     { name = "tokenizers", marker = "extra == 'recommended'" },
     { name = "tokenizers", marker = "extra == 'recommended-local-only'" },
@@ -954,6 +959,56 @@ test = [
 ]
 
 [[package]]
+name = "code-weaver-daemon"
+version = "0.1.0"
+source = { editable = "packages/codeweaver-daemon" }
+dependencies = [
+    { name = "httpx", extra = ["http2"] },
+]
+
+[package.optional-dependencies]
+test = [
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-cov" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "httpx", extras = ["http2"], specifier = ">=0.28.1" },
+    { name = "pytest", marker = "extra == 'test'" },
+    { name = "pytest-asyncio", marker = "extra == 'test'" },
+    { name = "pytest-cov", marker = "extra == 'test'" },
+]
+provides-extras = ["test"]
+
+[[package]]
+name = "code-weaver-tokenizers"
+version = "0.1.0"
+source = { editable = "packages/codeweaver-tokenizers" }
+dependencies = [
+    { name = "tiktoken" },
+    { name = "tokenizers" },
+    { name = "typing-extensions" },
+]
+
+[package.optional-dependencies]
+test = [
+    { name = "pytest" },
+    { name = "pytest-cov" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "pytest", marker = "extra == 'test'" },
+    { name = "pytest-cov", marker = "extra == 'test'" },
+    { name = "tiktoken", specifier = ">=0.12.0" },
+    { name = "tokenizers", specifier = ">=0.22.1" },
+    { name = "typing-extensions", specifier = ">=4.15.0" },
+]
+provides-extras = ["test"]
+
+[[package]]
 name = "cohere"
 version = "5.20.0"
 source = { registry = "https://pypi.org/simple" }
@@ -987,7 +1042,7 @@ name = "coloredlogs"
 version = "15.0.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "humanfriendly" },
+    { name = "humanfriendly", marker = "python_full_version < '3.14' or (extra == 'extra-11-code-weaver-fastembed' and extra == 'extra-11-code-weaver-fastembed-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/cc/c7/eed8f27100517e8c0e6b923d5f0845d0cb99763da6fdee00478f91db7325/coloredlogs-15.0.1.tar.gz", hash = "sha256:7c991aa71a4577af2f82600d8f8f3a89f936baeaf9b50a9c197da014e5bf16b0", size = 278520, upload-time = "2021-06-11T10:22:45.202Z" }
 wheels = [
@@ -1375,16 +1430,16 @@ name = "fastembed"
 version = "0.7.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "huggingface-hub" },
-    { name = "loguru" },
-    { name = "mmh3" },
-    { name = "numpy" },
-    { name = "onnxruntime" },
-    { name = "pillow" },
-    { name = "py-rust-stemmers" },
-    { name = "requests" },
-    { name = "tokenizers" },
-    { name = "tqdm" },
+    { name = "huggingface-hub", marker = "python_full_version < '3.14' or (extra == 'extra-11-code-weaver-fastembed' and extra == 'extra-11-code-weaver-fastembed-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu')" },
+    { name = "loguru", marker = "python_full_version < '3.14' or (extra == 'extra-11-code-weaver-fastembed' and extra == 'extra-11-code-weaver-fastembed-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu')" },
+    { name = "mmh3", marker = "python_full_version < '3.14' or (extra == 'extra-11-code-weaver-fastembed' and extra == 'extra-11-code-weaver-fastembed-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu')" },
+    { name = "numpy", marker = "python_full_version < '3.14' or (extra == 'extra-11-code-weaver-fastembed' and extra == 'extra-11-code-weaver-fastembed-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu')" },
+    { name = "onnxruntime", marker = "python_full_version < '3.14' or (extra == 'extra-11-code-weaver-fastembed' and extra == 'extra-11-code-weaver-fastembed-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu')" },
+    { name = "pillow", marker = "python_full_version < '3.14' or (extra == 'extra-11-code-weaver-fastembed' and extra == 'extra-11-code-weaver-fastembed-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu')" },
+    { name = "py-rust-stemmers", marker = "python_full_version < '3.14' or (extra == 'extra-11-code-weaver-fastembed' and extra == 'extra-11-code-weaver-fastembed-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu')" },
+    { name = "requests", marker = "python_full_version < '3.14' or (extra == 'extra-11-code-weaver-fastembed' and extra == 'extra-11-code-weaver-fastembed-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu')" },
+    { name = "tokenizers", marker = "python_full_version < '3.14' or (extra == 'extra-11-code-weaver-fastembed' and extra == 'extra-11-code-weaver-fastembed-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu')" },
+    { name = "tqdm", marker = "python_full_version < '3.14' or (extra == 'extra-11-code-weaver-fastembed' and extra == 'extra-11-code-weaver-fastembed-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/4c/c2/9c708680de1b54480161e0505f9d6d3d8eb47a1dc1a1f7f3c5106ba355d2/fastembed-0.7.4.tar.gz", hash = "sha256:8b8a4ea860ca295002f4754e8f5820a636e1065a9444959e18d5988d7f27093b", size = 68807, upload-time = "2025-12-05T12:08:10.447Z" }
 wheels = [
@@ -1396,16 +1451,16 @@ name = "fastembed-gpu"
 version = "0.7.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "huggingface-hub" },
-    { name = "loguru" },
-    { name = "mmh3" },
-    { name = "numpy" },
-    { name = "onnxruntime-gpu" },
-    { name = "pillow" },
-    { name = "py-rust-stemmers" },
-    { name = "requests" },
-    { name = "tokenizers" },
-    { name = "tqdm" },
+    { name = "huggingface-hub", marker = "python_full_version < '3.14' or (extra == 'extra-11-code-weaver-fastembed' and extra == 'extra-11-code-weaver-fastembed-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu')" },
+    { name = "loguru", marker = "python_full_version < '3.14' or (extra == 'extra-11-code-weaver-fastembed' and extra == 'extra-11-code-weaver-fastembed-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu')" },
+    { name = "mmh3", marker = "python_full_version < '3.14' or (extra == 'extra-11-code-weaver-fastembed' and extra == 'extra-11-code-weaver-fastembed-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu')" },
+    { name = "numpy", marker = "python_full_version < '3.14' or (extra == 'extra-11-code-weaver-fastembed' and extra == 'extra-11-code-weaver-fastembed-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu')" },
+    { name = "onnxruntime-gpu", marker = "python_full_version < '3.14' or (extra == 'extra-11-code-weaver-fastembed' and extra == 'extra-11-code-weaver-fastembed-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu')" },
+    { name = "pillow", marker = "python_full_version < '3.14' or (extra == 'extra-11-code-weaver-fastembed' and extra == 'extra-11-code-weaver-fastembed-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu')" },
+    { name = "py-rust-stemmers", marker = "python_full_version < '3.14' or (extra == 'extra-11-code-weaver-fastembed' and extra == 'extra-11-code-weaver-fastembed-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu')" },
+    { name = "requests", marker = "python_full_version < '3.14' or (extra == 'extra-11-code-weaver-fastembed' and extra == 'extra-11-code-weaver-fastembed-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu')" },
+    { name = "tokenizers", marker = "python_full_version < '3.14' or (extra == 'extra-11-code-weaver-fastembed' and extra == 'extra-11-code-weaver-fastembed-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu')" },
+    { name = "tqdm", marker = "python_full_version < '3.14' or (extra == 'extra-11-code-weaver-fastembed' and extra == 'extra-11-code-weaver-fastembed-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/de/b0/9d528c2dfc319d218a9829b9018e480cd23d620492636817321ad0fb5cce/fastembed_gpu-0.7.3.tar.gz", hash = "sha256:2ed106290677b4cc93e3a8467fd3fbcbf288c1e11fa02cebed67f02a7ccb2427", size = 66636, upload-time = "2025-08-29T11:20:05.13Z" }
 wheels = [
@@ -1936,7 +1991,7 @@ name = "humanfriendly"
 version = "10.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pyreadline3", marker = "sys_platform == 'win32' or (extra == 'extra-11-code-weaver-fastembed' and extra == 'extra-11-code-weaver-fastembed-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu')" },
+    { name = "pyreadline3", marker = "(python_full_version < '3.14' and sys_platform == 'win32') or (python_full_version >= '3.14' and extra == 'extra-11-code-weaver-fastembed' and extra == 'extra-11-code-weaver-fastembed-gpu') or (python_full_version >= '3.14' and extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu') or (sys_platform != 'win32' and extra == 'extra-11-code-weaver-fastembed' and extra == 'extra-11-code-weaver-fastembed-gpu') or (sys_platform != 'win32' and extra != 'extra-11-code-weaver-fastembed-gpu' and extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu') or (sys_platform != 'win32' and extra != 'extra-11-code-weaver-fastembed' and extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/cc/3f/2c29224acb2e2df4d2046e4c73ee2662023c58ff5b113c4c1adac0886c43/humanfriendly-10.0.tar.gz", hash = "sha256:6b0b831ce8f15f7300721aa49829fc4e83921a9a301cc7f606be6686a2288ddc", size = 360702, upload-time = "2021-09-17T21:40:43.31Z" }
 wheels = [
@@ -3100,12 +3155,12 @@ name = "onnxruntime"
 version = "1.23.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "coloredlogs" },
-    { name = "flatbuffers" },
-    { name = "numpy" },
-    { name = "packaging" },
-    { name = "protobuf" },
-    { name = "sympy" },
+    { name = "coloredlogs", marker = "python_full_version < '3.14' or (extra == 'extra-11-code-weaver-fastembed' and extra == 'extra-11-code-weaver-fastembed-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu')" },
+    { name = "flatbuffers", marker = "python_full_version < '3.14' or (extra == 'extra-11-code-weaver-fastembed' and extra == 'extra-11-code-weaver-fastembed-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu')" },
+    { name = "numpy", marker = "python_full_version < '3.14' or (extra == 'extra-11-code-weaver-fastembed' and extra == 'extra-11-code-weaver-fastembed-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu')" },
+    { name = "packaging", marker = "python_full_version < '3.14' or (extra == 'extra-11-code-weaver-fastembed' and extra == 'extra-11-code-weaver-fastembed-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu')" },
+    { name = "protobuf", marker = "python_full_version < '3.14' or (extra == 'extra-11-code-weaver-fastembed' and extra == 'extra-11-code-weaver-fastembed-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu')" },
+    { name = "sympy", marker = "python_full_version < '3.14' or (extra == 'extra-11-code-weaver-fastembed' and extra == 'extra-11-code-weaver-fastembed-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu')" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/1b/9e/f748cd64161213adeef83d0cb16cb8ace1e62fa501033acdd9f9341fff57/onnxruntime-1.23.2-cp312-cp312-macosx_13_0_arm64.whl", hash = "sha256:b8f029a6b98d3cf5be564d52802bb50a8489ab73409fa9db0bf583eabb7c2321", size = 17195929, upload-time = "2025-10-22T03:47:36.24Z" },
@@ -3127,12 +3182,12 @@ name = "onnxruntime-gpu"
 version = "1.23.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "coloredlogs" },
-    { name = "flatbuffers" },
-    { name = "numpy" },
-    { name = "packaging" },
-    { name = "protobuf" },
-    { name = "sympy" },
+    { name = "coloredlogs", marker = "python_full_version < '3.14' or (extra == 'extra-11-code-weaver-fastembed' and extra == 'extra-11-code-weaver-fastembed-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu')" },
+    { name = "flatbuffers", marker = "python_full_version < '3.14' or (extra == 'extra-11-code-weaver-fastembed' and extra == 'extra-11-code-weaver-fastembed-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu')" },
+    { name = "numpy", marker = "python_full_version < '3.14' or (extra == 'extra-11-code-weaver-fastembed' and extra == 'extra-11-code-weaver-fastembed-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu')" },
+    { name = "packaging", marker = "python_full_version < '3.14' or (extra == 'extra-11-code-weaver-fastembed' and extra == 'extra-11-code-weaver-fastembed-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu')" },
+    { name = "protobuf", marker = "python_full_version < '3.14' or (extra == 'extra-11-code-weaver-fastembed' and extra == 'extra-11-code-weaver-fastembed-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu')" },
+    { name = "sympy", marker = "python_full_version < '3.14' or (extra == 'extra-11-code-weaver-fastembed' and extra == 'extra-11-code-weaver-fastembed-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu')" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/6c/d9/b7140a4f1615195938c7e358c0804bb84271f0d6886b5cbf105c6cb58aae/onnxruntime_gpu-1.23.2-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:4f2d1f720685d729b5258ec1b36dee1de381b8898189908c98cbeecdb2f2b5c2", size = 300509596, upload-time = "2025-10-22T16:56:31.728Z" },

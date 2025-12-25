@@ -37,17 +37,16 @@ from qdrant_client.http.models.models import (
 )
 from typing_extensions import TypeIs
 
-from codeweaver.agent_api.find_code.results import SearchResult
-from codeweaver.agent_api.find_code.types import StrategizedQuery
 from codeweaver.config.providers import VectorStoreProviderSettings
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.types import DictView
-from codeweaver.engine.search import Filter
+from codeweaver.core.types.provider import Provider
+from codeweaver.core.types.search import SearchResult, SearchStrategy, StrategizedQuery
 from codeweaver.exceptions import ProviderError
 from codeweaver.providers.embedding.types import SparseEmbedding as CodeWeaverSparseEmbedding
-from codeweaver.providers.provider import Provider
 from codeweaver.providers.vector_stores.base import MixedQueryInput, VectorStoreProvider
 from codeweaver.providers.vector_stores.metadata import CollectionMetadata, HybridVectorPayload
+from codeweaver.providers.vector_stores.search import Filter
 
 
 logger = logging.getLogger(__name__)
@@ -534,7 +533,7 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         Raises:
             ProviderError: Invalid vector input format.
         """
-        from codeweaver.agent_api.find_code.types import SearchStrategy, StrategizedQuery
+        from codeweaver.core.types.search import StrategizedQuery
         from codeweaver.providers.embedding.types import SparseEmbedding
 
         if isinstance(vector, StrategizedQuery):
@@ -585,7 +584,7 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         Returns:
             List of SearchResult objects.
         """
-        from codeweaver.agent_api.find_code.results import SearchResult
+        from codeweaver.core.types.search import SearchResult
 
         # Handle both query_points (QueryResponse) and search (list) results
         points = results.points if isinstance(results, QueryResponse) else results

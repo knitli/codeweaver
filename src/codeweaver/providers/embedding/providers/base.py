@@ -29,6 +29,7 @@ from typing import (
 )
 from uuid import UUID
 
+from codeweaver_tokenizers import Tokenizer, get_tokenizer
 from pydantic import UUID7, ConfigDict, Field, SkipValidation
 from pydantic.main import IncEx
 from pydantic.types import PositiveInt
@@ -45,13 +46,12 @@ from codeweaver.config.providers import EmbeddingModelSettings, SparseEmbeddingM
 from codeweaver.core.stores import BlakeStore, UUIDStore, make_blake_store, make_uuid_store
 from codeweaver.core.types.enum import AnonymityConversion, BaseEnum
 from codeweaver.core.types.models import BasedModel
+from codeweaver.core.types.provider import Provider
 from codeweaver.exceptions import ProviderError
 from codeweaver.exceptions import ValidationError as CodeWeaverValidationError
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.registry import EmbeddingRegistry
 from codeweaver.providers.embedding.types import SparseEmbedding
-from codeweaver.providers.provider import Provider
-from codeweaver.tokenizers import Tokenizer, get_tokenizer
 
 
 statistics_module: LazyImport[ModuleType] = lazy_import("codeweaver.common.statistics")
@@ -254,6 +254,27 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         Args:
             caps: The embedding model capabilities (passed since pydantic may not have set _caps yet).
         """
+
+    @classmethod
+    def clear_deduplication_stores(cls) -> None:
+        """Clear class-level deduplication stores.
+
+        This is primarily useful for testing to ensure clean state between test runs.
+        """
+        cls._store = make_uuid_store(value_type=list, size_limit=1024 * 1024 * 3)
+        cls._backup_store = make_uuid_store(value_type=list, size_limit=1024 * 1024)
+        cls._hash_store = make_blake_store(value_type=UUID, size_limit=1024 * 256)
+        cls._backup_hash_store = make_blake_store(value_type=UUID, size_limit=1024 * 128)
+
+    async def initialize_async(self) -> None:
+        """Perform asynchronous initialization of the provider.
+
+        Subclasses should override this method to perform any async setup,
+        such as loading models or establishing connections, that should
+        not block the event loop during provider creation.
+        """
+        # Default implementation does nothing
+        return
 
     @property
     def name(self) -> Provider:
@@ -1179,6 +1200,12 @@ class SparseEmbeddingProvider[SparseClient](EmbeddingProvider[SparseClient], ABC
     _backup_hash_store: ClassVar[BlakeStore[UUID7]] = make_blake_store(
         value_type=UUID, size_limit=1024 * 128
     )  # 128kb limit -- separate from dense embeddings
+
+    @classmethod
+    def clear_deduplication_stores(cls) -> None:
+        """Clear class-level deduplication stores for sparse embeddings."""
+        cls._hash_store = make_blake_store(value_type=UUID, size_limit=1024 * 256)
+        cls._backup_hash_store = make_blake_store(value_type=UUID, size_limit=1024 * 128)
 
     def _batch_and_key(
         self, chunk_list: Sequence[CodeChunk], *, for_backup: bool, skip_deduplication: bool

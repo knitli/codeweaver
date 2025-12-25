@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 def get_amazon_reranking_capabilities() -> tuple[RerankingModelCapabilities, ...]:
     """Get the capabilities of the Amazon reranking model."""
-    from codeweaver.providers.provider import Provider
+    from codeweaver.core.types.provider import Provider
     from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 
     return (

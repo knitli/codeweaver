@@ -25,6 +25,7 @@ import numpy as np
 from pydantic import SkipValidation
 
 from codeweaver.common.utils.utils import rpartial
+from codeweaver.core.types.provider import Provider
 from codeweaver.exceptions import ConfigurationError
 from codeweaver.providers.embedding.capabilities.base import (
     EmbeddingModelCapabilities,
@@ -32,7 +33,6 @@ from codeweaver.providers.embedding.capabilities.base import (
 )
 from codeweaver.providers.embedding.providers import EmbeddingProvider
 from codeweaver.providers.embedding.providers.base import SparseEmbeddingProvider
-from codeweaver.providers.provider import Provider
 
 
 if TYPE_CHECKING:

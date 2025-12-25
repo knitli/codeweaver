@@ -61,7 +61,7 @@ async def test_partial_embeddings(qdrant_test_manager):
     await provider.upsert([chunk])
 
     # Verify chunk is searchable with sparse vector
-    from codeweaver.agent_api.find_code.types import SearchStrategy, StrategizedQuery
+    from codeweaver.core.types.search import SearchStrategy, StrategizedQuery
     from codeweaver.providers.embedding.types import SparseEmbedding
 
     # Use same sparse embedding for search to ensure we find the chunk

@@ -34,8 +34,8 @@ from pydantic_ai.settings import merge_model_settings
 from codeweaver.common.utils.utils import get_user_config_dir
 from codeweaver.core.types import DictView
 from codeweaver.core.types.models import BasedModel
+from codeweaver.core.types.provider import Provider
 from codeweaver.core.types.sentinel import Unset
-from codeweaver.providers.provider import Provider
 
 
 if TYPE_CHECKING:
@@ -643,7 +643,7 @@ class ProviderSettings(BasedModel):
         Args:
             setting_name: The name of the setting or ProviderKind to check.
         """
-        from codeweaver.providers.provider import ProviderKind
+        from codeweaver.core.types.provider import ProviderKind
 
         setting = (
             setting_name
@@ -765,7 +765,7 @@ class ProviderSettings(BasedModel):
         Args:
             kind: The kind of provider or ProviderKind to get settings for.
         """
-        from codeweaver.providers.provider import ProviderKind
+        from codeweaver.core.types.provider import ProviderKind
 
         setting_field = (
             kind

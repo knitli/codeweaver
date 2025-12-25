@@ -15,13 +15,12 @@ import logging
 import os
 import sys
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
 from functools import cache
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, cast, overload
+from typing import TYPE_CHECKING, Literal, overload
 
-from pydantic import UUID7, NonNegativeFloat
-from pydantic.types import NonNegativeInt
+from pydantic import UUID7
 
 
 if TYPE_CHECKING:
@@ -29,19 +28,11 @@ if TYPE_CHECKING:
     from codeweaver.core.types import CategoryName, DictView, LiteralStringT
 
 
+from codeweaver.core.utils import elapsed_time_to_human_readable, get_user_config_dir, uuid7
+from codeweaver.core.utils import ensure_iterable as ensure_iterable
+
+
 logger = logging.getLogger(__name__)
-
-if sys.version_info < (3, 14):
-    from uuid_extensions import uuid7 as uuid7_gen
-else:
-    from uuid import uuid7 as uuid7_gen
-
-
-def uuid7() -> UUID7:
-    """Generate a new UUID7."""
-    return cast(
-        UUID7, uuid7_gen()
-    )  # it's always UUID7 and not str | int | bytes because we don't take kwargs
 
 
 @overload
@@ -93,10 +84,7 @@ def dict_set_to_tuple(d: DictInputTypesT) -> DictOutputTypesT:
 
 
 def estimate_tokens(text: str | bytes, encoder: str = "cl100k_base") -> int:
-    """Estimate the number of tokens in a text using tiktoken. Defaults to cl100k_base encoding.
-
-    Most embedding and reranking models *don't* use this encoding, but it's fast and a reasonable estimate for most texts.
-    """
+    """Estimate the number of tokens in a text using tiktoken. Defaults to cl100k_base encoding."""
     import tiktoken
 
     encoding = tiktoken.get_encoding(encoder)
@@ -111,8 +99,8 @@ def _check_env_var(var_name: str) -> str | None:
 
 
 def get_possible_env_vars() -> tuple[tuple[str, str], ...] | None:
-    """Get a tuple of any resolved environment variables for all providers and provider environment variables. If none are set, returns None."""
-    from codeweaver.providers.provider import Provider
+    """Get a tuple of any resolved environment variables for all providers."""
+    from codeweaver.core.types.provider import Provider
 
     env_vars = sorted({item[1][0] for item in Provider.all_envs()})
     found_vars = tuple(
@@ -121,47 +109,8 @@ def get_possible_env_vars() -> tuple[tuple[str, str], ...] | None:
     return found_vars or None
 
 
-# Even Python's latest and greatest typing (as of 3.12+), Python can't properly express this function.
-# You can't combine `TypeVarTuple` with `ParamSpec`, or use `Concatenate` to
-# express combining some args and some kwargs, particularly from the right.
 def rpartial[**P, R](func: Callable[P, R], *args: object, **kwargs: object) -> Callable[P, R]:
-    """Return a new function that behaves like func called with the given arguments from the right.
-
-    `rpartial` is like `functools.partial`, but it appends the given arguments to the right.
-    It's useful for functions that take a variable number of arguments, especially when you want to fix keywords and modifier-type arguments, which tend to come at the end of the argument list.
-    You can supply any number of contiguous positional and keyword arguments from the right.
-
-    Examples:
-        ```python
-        def example_function(a: int, b: int, c: int) -> int:
-            return a + b + c
-
-
-        # Create a new function with the last argument fixed
-        # this is equivalent to: lambda a, b: example_function(a, b, 3)
-        new_function = rpartial(example_function, 3)
-
-        # Call the new function with the remaining arguments
-        result = new_function(1, 2)
-        print(result)  # Output: 6
-        ```
-
-        ```python
-        # with keyword arguments
-
-        # we'll fix a positional argument and a keyword argument
-        def more_complex_example(x: int, y: int, z: int = 0, flag: bool = False) -> int:
-            if flag:
-                return x + y + z
-            return x * y * z
-
-
-        new_function = rpartial(
-            more_complex_example, z=5, flag=True
-        )  # could also do `rpartial(more_complex_example, 5, flag=True)` if z was positional-only
-        result = new_function(2, 3)  # returns 10 (2 + 3 + 5)
-        ```
-    """
+    """Return a new function that behaves like func called with the given arguments from the right."""
 
     def partial_right(*fargs: P.args, **fkwargs: P.kwargs) -> R:
         """Return a new partial object which when called will behave like func called with the
@@ -170,31 +119,6 @@ def rpartial[**P, R](func: Callable[P, R], *args: object, **kwargs: object) -> C
         return func(*(fargs + args), **dict(fkwargs | kwargs))
 
     return partial_right
-
-
-def ensure_iterable[T](value: Iterable[T] | T) -> Iterable[T]:
-    """Ensure the value is iterable.
-
-    Note: If you pass `ensure_iterable` a `Mapping` (like a `dict`), it will yield the keys of the mapping, not its items/values.
-    """
-    if isinstance(value, Iterable) and not isinstance(value, (bytes | bytearray | str)):
-        yield from cast(Iterable[T], value)
-    else:
-        yield cast(T, value)
-
-
-@cache
-def get_user_config_dir(*, base_only: bool = False) -> Path:
-    """Get the user configuration directory based on the operating system."""
-    import platform
-
-    if (system := platform.system()) == "Windows":
-        config_dir = Path(os.getenv("APPDATA", Path("~\\AppData\\Roaming").expanduser()))
-    if system == "Darwin":
-        config_dir = Path.home() / "Library" / "Application Support"
-    else:
-        config_dir = Path(os.getenv("XDG_CONFIG_HOME", Path.home() / ".config"))
-    return config_dir if base_only else config_dir / "codeweaver"
 
 
 def _try_for_settings() -> DictView[CodeWeaverSettingsDict] | None:
@@ -212,8 +136,8 @@ def _try_for_settings() -> DictView[CodeWeaverSettingsDict] | None:
 
 def _get_project_name() -> str:
     """Get the project name from settings or fallback to the project path name."""
-    from codeweaver.common.utils.git import get_project_path
     from codeweaver.core.types.sentinel import Unset
+    from codeweaver.core.utils import get_project_path
 
     project_name = None
     if (
@@ -243,29 +167,14 @@ def generate_collection_name(
     project_name = project_name or _get_project_name()
     collection_suffix = "-backup" if is_backup else ""
     if not project_path:
-        from codeweaver.common.utils.git import get_project_path
+        from codeweaver.core.utils import get_project_path
 
         project_path = get_project_path()
     from codeweaver.core.stores import get_blake_hash
 
     blake_hash = get_blake_hash(str(project_path.absolute()).encode("utf-8"))[:8]
-    return f"{project_name}-{blake_hash}{collection_suffix}"
-
-
-def elapsed_time_to_human_readable(elapsed_seconds: NonNegativeFloat | NonNegativeInt) -> str:
-    """Convert elapsed time between start_time and end_time to a human-readable format."""
-    minutes, sec = divmod(int(elapsed_seconds), 60)
-    hours, min_ = divmod(minutes, 60)
-    days, hr = divmod(hours, 24)
-    parts: list[str] = []
-    if days > 0:
-        parts.append(f"{days}d")
-    if hr > 0:
-        parts.append(f"{hr}h")
-    if min_ > 0:
-        parts.append(f"{min_}m")
-    parts.append(f"{sec}s")
-    return " ".join(parts)
+    result = f"{project_name}-{blake_hash}{collection_suffix}"
+    return result
 
 
 __all__ = (

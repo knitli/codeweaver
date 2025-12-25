@@ -13,7 +13,7 @@ from pydantic import PositiveFloat, PositiveInt
 
 
 if TYPE_CHECKING:
-    from codeweaver.providers.provider import Provider
+    from codeweaver.core.types.provider import Provider
 
 
 class EmbeddingSettingsDict(TypedDict, total=False):

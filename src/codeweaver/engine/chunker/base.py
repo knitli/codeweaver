@@ -62,7 +62,7 @@ def _get_capabilities() -> (
 ):
     """Retrieve the capabilities."""
     from codeweaver.common.registry.models import get_model_registry
-    from codeweaver.providers.provider import ProviderKind
+    from codeweaver.core.types.provider import ProviderKind
 
     registry = get_model_registry()
     embedding_caps = registry.configured_models_for_kind(ProviderKind.EMBEDDING)

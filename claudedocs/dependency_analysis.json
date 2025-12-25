@@ -1,37 +1,36 @@
 {
   "dependencies": {
     "codeweaver": [
-      "codeweaver.mcp",
-      "codeweaver.server",
       "codeweaver.config",
-      "codeweaver.exceptions",
-      "codeweaver.providers",
-      "codeweaver.daemon",
-      "codeweaver.cli",
+      "codeweaver.server",
       "codeweaver.common",
+      "codeweaver.mcp",
+      "codeweaver.exceptions",
+      "codeweaver.cli",
       "codeweaver.core"
     ],
     "codeweaver.mcp": [
+      "codeweaver.config",
       "codeweaver.server",
       "codeweaver.common",
-      "codeweaver.config",
-      "codeweaver.exceptions",
+      "codeweaver.core",
       "codeweaver.agent_api",
-      "codeweaver.core"
+      "codeweaver.exceptions"
     ],
     "codeweaver.engine": [
-      "codeweaver.semantic",
-      "codeweaver.config",
-      "codeweaver.exceptions",
+      "codeweaver.di",
       "codeweaver.providers",
-      "codeweaver.cli",
+      "codeweaver.semantic",
       "codeweaver.common",
-      "codeweaver.core"
+      "codeweaver.exceptions",
+      "codeweaver.core",
+      "codeweaver.cli",
+      "codeweaver.config"
     ],
     "codeweaver.common": [
+      "codeweaver.config",
       "codeweaver.server",
       "codeweaver.semantic",
-      "codeweaver.config",
       "codeweaver.providers",
       "codeweaver.exceptions",
       "codeweaver.cli",
@@ -39,71 +38,101 @@
       "codeweaver.core"
     ],
     "codeweaver.server": [
-      "codeweaver.mcp",
-      "codeweaver.engine",
       "codeweaver.config",
-      "codeweaver.providers",
+      "codeweaver.di",
+      "codeweaver.common",
+      "codeweaver.mcp",
       "codeweaver.exceptions",
       "codeweaver.cli",
-      "codeweaver.common",
+      "codeweaver.engine",
       "codeweaver.core"
     ],
     "codeweaver.cli": [
-      "codeweaver.mcp",
-      "codeweaver.server",
-      "codeweaver.engine",
       "codeweaver.config",
+      "codeweaver.server",
       "codeweaver.providers",
-      "codeweaver.exceptions",
-      "codeweaver.agent_api",
-      "codeweaver.daemon",
       "codeweaver.common",
-      "codeweaver.core",
-      "codeweaver.main"
+      "codeweaver.mcp",
+      "codeweaver.main",
+      "codeweaver.exceptions",
+      "codeweaver.engine",
+      "codeweaver.agent_api",
+      "codeweaver.core"
+    ],
+    "codeweaver.di": [
+      "codeweaver.config",
+      "codeweaver.server",
+      "codeweaver.providers",
+      "codeweaver.common",
+      "codeweaver.exceptions",
+      "codeweaver.engine",
+      "codeweaver.core"
     ],
     "codeweaver.core": [
+      "codeweaver.providers",
       "codeweaver.semantic",
       "codeweaver.common",
-      "codeweaver.providers",
-      "codeweaver.tokenizers"
+      "codeweaver.engine",
+      "codeweaver.exceptions"
     ],
     "codeweaver.semantic": [
       "codeweaver.common",
       "codeweaver.core"
     ],
     "codeweaver.config": [
-      "codeweaver.mcp",
-      "codeweaver.engine",
       "codeweaver.providers",
-      "codeweaver.exceptions",
-      "codeweaver.cli",
       "codeweaver.common",
-      "codeweaver.core"
+      "codeweaver.mcp",
+      "codeweaver.cli",
+      "codeweaver.core",
+      "codeweaver.exceptions"
     ],
     "codeweaver.providers": [
-      "codeweaver.common",
-      "codeweaver.engine",
-      "codeweaver.tokenizers",
       "codeweaver.config",
       "codeweaver.exceptions",
-      "codeweaver.agent_api",
+      "codeweaver.common",
       "codeweaver.core"
     ],
     "codeweaver.agent_api": [
-      "codeweaver.server",
-      "codeweaver.semantic",
-      "codeweaver.exceptions",
+      "codeweaver.di",
       "codeweaver.providers",
+      "codeweaver.semantic",
       "codeweaver.common",
-      "codeweaver.core"
+      "codeweaver.server",
+      "codeweaver.core",
+      "codeweaver.exceptions"
     ]
   },
   "metrics": {
+    "codeweaver.config": {
+      "afferent": 8,
+      "efferent": 6,
+      "instability": 0.43,
+      "total_coupling": 14
+    },
     "codeweaver": {
       "afferent": 0,
-      "efferent": 9,
+      "efferent": 7,
       "instability": 1.0,
-      "total_coupling": 9
+      "total_coupling": 7
+    },
+    "codeweaver.server": {
+      "afferent": 6,
+      "efferent": 8,
+      "instability": 0.57,
+      "total_coupling": 14
+    },
+    "codeweaver.di": {
+      "afferent": 3,
+      "efferent": 7,
+      "instability": 0.7,
+      "total_coupling": 10
+    },
+    "codeweaver.common": {
+      "afferent": 11,
+      "efferent": 8,
+      "instability": 0.42,
+      "total_coupling": 19
     },
     "codeweaver.mcp": {
       "afferent": 4,
@@ -111,90 +140,59 @@
       "instability": 0.6,
       "total_coupling": 10
     },
-    "codeweaver.server": {
-      "afferent": 5,
-      "efferent": 8,
-      "instability": 0.62,
-      "total_coupling": 13
-    },
-    "codeweaver.engine": {
-      "afferent": 4,
-      "efferent": 7,
-      "instability": 0.64,
-      "total_coupling": 11
-    },
-    "codeweaver.tokenizers": {
-      "afferent": 2,
-      "efferent": 0,
-      "instability": 0.0,
-      "total_coupling": 2
-    },
     "codeweaver.semantic": {
       "afferent": 4,
       "efferent": 2,
       "instability": 0.33,
       "total_coupling": 6
     },
-    "codeweaver.config": {
-      "afferent": 7,
-      "efferent": 7,
-      "instability": 0.5,
-      "total_coupling": 14
-    },
     "codeweaver.providers": {
-      "afferent": 8,
-      "efferent": 7,
-      "instability": 0.47,
-      "total_coupling": 15
-    },
-    "codeweaver.exceptions": {
-      "afferent": 9,
-      "efferent": 0,
-      "instability": 0.0,
-      "total_coupling": 9
-    },
-    "codeweaver.agent_api": {
-      "afferent": 4,
-      "efferent": 6,
-      "instability": 0.6,
-      "total_coupling": 10
-    },
-    "codeweaver.daemon": {
-      "afferent": 2,
-      "efferent": 0,
-      "instability": 0.0,
-      "total_coupling": 2
-    },
-    "codeweaver.cli": {
-      "afferent": 5,
-      "efferent": 11,
-      "instability": 0.69,
-      "total_coupling": 16
-    },
-    "codeweaver.common": {
-      "afferent": 10,
-      "efferent": 8,
-      "instability": 0.44,
-      "total_coupling": 18
-    },
-    "codeweaver.core": {
-      "afferent": 10,
+      "afferent": 7,
       "efferent": 4,
-      "instability": 0.29,
-      "total_coupling": 14
+      "instability": 0.36,
+      "total_coupling": 11
     },
     "codeweaver.main": {
       "afferent": 1,
       "efferent": 0,
       "instability": 0.0,
       "total_coupling": 1
+    },
+    "codeweaver.exceptions": {
+      "afferent": 11,
+      "efferent": 0,
+      "instability": 0.0,
+      "total_coupling": 11
+    },
+    "codeweaver.cli": {
+      "afferent": 5,
+      "efferent": 10,
+      "instability": 0.67,
+      "total_coupling": 15
+    },
+    "codeweaver.engine": {
+      "afferent": 4,
+      "efferent": 8,
+      "instability": 0.67,
+      "total_coupling": 12
+    },
+    "codeweaver.agent_api": {
+      "afferent": 3,
+      "efferent": 7,
+      "instability": 0.7,
+      "total_coupling": 10
+    },
+    "codeweaver.core": {
+      "afferent": 11,
+      "efferent": 5,
+      "instability": 0.31,
+      "total_coupling": 16
     }
   },
   "package_files": {
     "codeweaver": [
       "codeweaver/exceptions.py",
       "codeweaver/_version.py",
-      "codeweaver/daemon.py",
       "codeweaver/main.py"
     ],
     "codeweaver.mcp": [
@@ -205,11 +203,6 @@
       "codeweaver/mcp/server.py",
       "codeweaver/mcp/middleware/statistics.py"
     ],
-    "codeweaver.tokenizers": [
-      "codeweaver/tokenizers/base.py",
-      "codeweaver/tokenizers/tokenizers.py",
-      "codeweaver/tokenizers/tiktoken.py"
-    ],
     "codeweaver.engine": [
       "codeweaver/engine/failover.py",
       "codeweaver/engine/failover_tracker.py",
@@ -219,13 +212,6 @@
       "codeweaver/engine/indexer/progress.py",
       "codeweaver/engine/indexer/indexer.py",
       "codeweaver/engine/indexer/manifest.py",
-      "codeweaver/engine/search/filter_factory.py",
-      "codeweaver/engine/search/condition.py",
-      "codeweaver/engine/search/wrap_filters.py",
-      "codeweaver/engine/search/payload.py",
-      "codeweaver/engine/search/geo.py",
-      "codeweaver/engine/search/range.py",
-      "codeweaver/engine/search/match.py",
       "codeweaver/engine/chunker/parallel.py",
       "codeweaver/engine/chunker/_logging.py",
       "codeweaver/engine/chunker/exceptions.py",
@@ -296,11 +282,18 @@
       "codeweaver/cli/commands/server.py",
       "codeweaver/cli/commands/search.py"
     ],
+    "codeweaver.di": [
+      "codeweaver/di/depends.py",
+      "codeweaver/di/providers.py",
+      "codeweaver/di/container.py",
+      "codeweaver/di/types.py"
+    ],
     "codeweaver.core": [
       "codeweaver/core/utils.py",
       "codeweaver/core/chunks.py",
       "codeweaver/core/file_extensions.py",
       "codeweaver/core/language.py",
+      "codeweaver/core/search_types.py",
       "codeweaver/core/spans.py",
       "codeweaver/core/metadata.py",
       "codeweaver/core/discovery.py",
@@ -310,11 +303,13 @@
       "codeweaver/core/types/sentinel.py",
       "codeweaver/core/types/dictview.py",
       "codeweaver/core/types/enum.py",
+      "codeweaver/core/types/provider.py",
       "codeweaver/core/types/utils.py",
       "codeweaver/core/types/models.py",
       "codeweaver/core/types/dataclasses.py",
       "codeweaver/core/types/aliases.py",
-      "codeweaver/core/types/env.py"
+      "codeweaver/core/types/env.py",
+      "codeweaver/core/types/delimiter.py"
     ],
     "codeweaver.semantic": [
       "codeweaver/semantic/node_type_parser.py",
@@ -375,6 +370,14 @@
       "codeweaver/providers/reranking/providers/bedrock.py",
       "codeweaver/providers/reranking/providers/sentence_transformers.py",
       "codeweaver/providers/reranking/providers/voyage.py",
+      "codeweaver/providers/vector_stores/search/filter_factory.py",
+      "codeweaver/providers/vector_stores/search/condition.py",
+      "codeweaver/providers/vector_stores/search/wrap_filters.py",
+      "codeweaver/providers/vector_stores/search/payload.py",
+      "codeweaver/providers/vector_stores/search/geo.py",
+      "codeweaver/providers/vector_stores/search/range.py",
+      "codeweaver/providers/vector_stores/search/match.py",
+      "codeweaver/providers/embedding/capabilities/minishlab.py",
       "codeweaver/providers/embedding/capabilities/mixedbread_ai.py",
       "codeweaver/providers/embedding/capabilities/nomic_ai.py",
       "codeweaver/providers/embedding/capabilities/qwen.py",
@@ -420,304 +423,81 @@
   },
   "cycles": [
     [
-      "codeweaver.mcp",
-      "codeweaver.server",
-      "codeweaver.mcp"
-    ],
-    [
-      "codeweaver.server",
-      "codeweaver.engine",
-      "codeweaver.semantic",
-      "codeweaver.common",
-      "codeweaver.server"
-    ],
-    [
-      "codeweaver.semantic",
-      "codeweaver.common",
-      "codeweaver.semantic"
-    ],
-    [
-      "codeweaver.mcp",
-      "codeweaver.server",
-      "codeweaver.engine",
-      "codeweaver.semantic",
-      "codeweaver.common",
-      "codeweaver.config",
-      "codeweaver.mcp"
-    ],
-    [
-      "codeweaver.engine",
-      "codeweaver.semantic",
-      "codeweaver.common",
-      "codeweaver.config",
-      "codeweaver.engine"
-    ],
-    [
-      "codeweaver.common",
-      "codeweaver.config",
-      "codeweaver.providers",
-      "codeweaver.common"
-    ],
-    [
-      "codeweaver.engine",
-      "codeweaver.semantic",
-      "codeweaver.common",
-      "codeweaver.config",
-      "codeweaver.providers",
-      "codeweaver.engine"
-    ],
-    [
       "codeweaver.config",
       "codeweaver.providers",
       "codeweaver.config"
     ],
     [
-      "codeweaver.server",
-      "codeweaver.engine",
-      "codeweaver.semantic",
-      "codeweaver.common",
       "codeweaver.config",
       "codeweaver.providers",
-      "codeweaver.agent_api",
+      "codeweaver.common",
+      "codeweaver.config"
+    ],
+    [
+      "codeweaver.config",
+      "codeweaver.providers",
+      "codeweaver.common",
+      "codeweaver.server",
+      "codeweaver.config"
+    ],
+    [
+      "codeweaver.config",
+      "codeweaver.providers",
+      "codeweaver.common",
+      "codeweaver.server",
+      "codeweaver.di",
+      "codeweaver.config"
+    ],
+    [
+      "codeweaver.server",
+      "codeweaver.di",
       "codeweaver.server"
     ],
     [
-      "codeweaver.semantic",
+      "codeweaver.providers",
       "codeweaver.common",
-      "codeweaver.config",
-      "codeweaver.providers",
-      "codeweaver.agent_api",
-      "codeweaver.semantic"
-    ],
-    [
-      "codeweaver.providers",
-      "codeweaver.agent_api",
+      "codeweaver.server",
+      "codeweaver.di",
       "codeweaver.providers"
     ],
     [
       "codeweaver.common",
-      "codeweaver.config",
-      "codeweaver.providers",
-      "codeweaver.agent_api",
+      "codeweaver.server",
+      "codeweaver.di",
       "codeweaver.common"
     ],
     [
+      "codeweaver.di",
+      "codeweaver.engine",
+      "codeweaver.di"
+    ],
+    [
+      "codeweaver.providers",
+      "codeweaver.common",
+      "codeweaver.server",
+      "codeweaver.di",
+      "codeweaver.engine",
+      "codeweaver.providers"
+    ],
+    [
+      "codeweaver.common",
+      "codeweaver.server",
+      "codeweaver.di",
+      "codeweaver.engine",
       "codeweaver.semantic",
-      "codeweaver.common",
-      "codeweaver.config",
-      "codeweaver.providers",
-      "codeweaver.agent_api",
-      "codeweaver.core",
-      "codeweaver.semantic"
-    ],
-    [
-      "codeweaver.common",
-      "codeweaver.config",
-      "codeweaver.providers",
-      "codeweaver.agent_api",
-      "codeweaver.core",
       "codeweaver.common"
     ],
     [
       "codeweaver.providers",
-      "codeweaver.agent_api",
+      "codeweaver.common",
+      "codeweaver.server",
+      "codeweaver.di",
+      "codeweaver.engine",
+      "codeweaver.semantic",
       "codeweaver.core",
       "codeweaver.providers"
     ],
     [
-      "codeweaver.mcp",
-      "codeweaver.server",
-      "codeweaver.engine",
-      "codeweaver.semantic",
-      "codeweaver.common",
-      "codeweaver.config",
-      "codeweaver.cli",
-      "codeweaver.mcp"
-    ],
-    [
-      "codeweaver.server",
-      "codeweaver.engine",
-      "codeweaver.semantic",
-      "codeweaver.common",
-      "codeweaver.config",
-      "codeweaver.cli",
-      "codeweaver.server"
-    ],
-    [
-      "codeweaver.engine",
-      "codeweaver.semantic",
-      "codeweaver.common",
-      "codeweaver.config",
-      "codeweaver.cli",
-      "codeweaver.engine"
-    ],
-    [
-      "codeweaver.config",
-      "codeweaver.cli",
-      "codeweaver.config"
-    ],
-    [
-      "codeweaver.common",
-      "codeweaver.config",
-      "codeweaver.cli",
-      "codeweaver.common"
-    ],
-    [
-      "codeweaver.common",
-      "codeweaver.config",
-      "codeweaver.common"
-    ],
-    [
-      "codeweaver.server",
-      "codeweaver.mcp",
-      "codeweaver.server"
-    ],
-    [
-      "codeweaver.common",
-      "codeweaver.server",
-      "codeweaver.mcp",
-      "codeweaver.common"
-    ],
-    [
-      "codeweaver.mcp",
-      "codeweaver.config",
-      "codeweaver.mcp"
-    ],
-    [
-      "codeweaver.engine",
-      "codeweaver.semantic",
-      "codeweaver.common",
-      "codeweaver.server",
-      "codeweaver.mcp",
-      "codeweaver.config",
-      "codeweaver.engine"
-    ],
-    [
-      "codeweaver.common",
-      "codeweaver.server",
-      "codeweaver.mcp",
-      "codeweaver.config",
-      "codeweaver.providers",
-      "codeweaver.common"
-    ],
-    [
-      "codeweaver.engine",
-      "codeweaver.semantic",
-      "codeweaver.common",
-      "codeweaver.server",
-      "codeweaver.mcp",
-      "codeweaver.config",
-      "codeweaver.providers",
-      "codeweaver.engine"
-    ],
-    [
-      "codeweaver.server",
-      "codeweaver.mcp",
-      "codeweaver.config",
-      "codeweaver.providers",
-      "codeweaver.agent_api",
-      "codeweaver.server"
-    ],
-    [
-      "codeweaver.semantic",
-      "codeweaver.common",
-      "codeweaver.server",
-      "codeweaver.mcp",
-      "codeweaver.config",
-      "codeweaver.providers",
-      "codeweaver.agent_api",
-      "codeweaver.semantic"
-    ],
-    [
-      "codeweaver.common",
-      "codeweaver.server",
-      "codeweaver.mcp",
-      "codeweaver.config",
-      "codeweaver.providers",
-      "codeweaver.agent_api",
-      "codeweaver.common"
-    ],
-    [
-      "codeweaver.semantic",
-      "codeweaver.common",
-      "codeweaver.server",
-      "codeweaver.mcp",
-      "codeweaver.config",
-      "codeweaver.providers",
-      "codeweaver.agent_api",
-      "codeweaver.core",
-      "codeweaver.semantic"
-    ],
-    [
-      "codeweaver.common",
-      "codeweaver.server",
-      "codeweaver.mcp",
-      "codeweaver.config",
-      "codeweaver.providers",
-      "codeweaver.agent_api",
-      "codeweaver.core",
-      "codeweaver.common"
-    ],
-    [
-      "codeweaver.mcp",
-      "codeweaver.config",
-      "codeweaver.cli",
-      "codeweaver.mcp"
-    ],
-    [
-      "codeweaver.server",
-      "codeweaver.mcp",
-      "codeweaver.config",
-      "codeweaver.cli",
-      "codeweaver.server"
-    ],
-    [
-      "codeweaver.engine",
-      "codeweaver.semantic",
-      "codeweaver.common",
-      "codeweaver.server",
-      "codeweaver.mcp",
-      "codeweaver.config",
-      "codeweaver.cli",
-      "codeweaver.engine"
-    ],
-    [
-      "codeweaver.common",
-      "codeweaver.server",
-      "codeweaver.mcp",
-      "codeweaver.config",
-      "codeweaver.cli",
-      "codeweaver.common"
-    ],
-    [
-      "codeweaver.common",
-      "codeweaver.server",
-      "codeweaver.mcp",
-      "codeweaver.config",
-      "codeweaver.common"
-    ],
-    [
-      "codeweaver.engine",
-      "codeweaver.semantic",
-      "codeweaver.common",
-      "codeweaver.server",
-      "codeweaver.engine"
-    ],
-    [
-      "codeweaver.common",
-      "codeweaver.server",
-      "codeweaver.common"
-    ],
-    [
-      "codeweaver.common",
-      "codeweaver.server",
-      "codeweaver.mcp",
-      "codeweaver.config",
-      "codeweaver.engine",
-      "codeweaver.semantic",
-      "codeweaver.common"
-    ],
-    [
       "codeweaver.semantic",
       "codeweaver.core",
       "codeweaver.semantic"
@@ -725,683 +505,939 @@
     [
       "codeweaver.common",
       "codeweaver.server",
-      "codeweaver.mcp",
-      "codeweaver.config",
+      "codeweaver.di",
       "codeweaver.engine",
       "codeweaver.semantic",
       "codeweaver.core",
       "codeweaver.common"
+    ],
+    [
+      "codeweaver.engine",
+      "codeweaver.semantic",
+      "codeweaver.core",
+      "codeweaver.engine"
     ],
     [
       "codeweaver.common",
       "codeweaver.server",
-      "codeweaver.mcp",
-      "codeweaver.config",
+      "codeweaver.di",
       "codeweaver.engine",
-      "codeweaver.semantic",
-      "codeweaver.core",
-      "codeweaver.providers",
       "codeweaver.common"
     ],
     [
-      "codeweaver.engine",
-      "codeweaver.semantic",
-      "codeweaver.core",
-      "codeweaver.providers",
-      "codeweaver.engine"
-    ],
-    [
       "codeweaver.config",
-      "codeweaver.engine",
-      "codeweaver.semantic",
-      "codeweaver.core",
       "codeweaver.providers",
-      "codeweaver.config"
-    ],
-    [
-      "codeweaver.server",
-      "codeweaver.mcp",
-      "codeweaver.config",
-      "codeweaver.engine",
-      "codeweaver.semantic",
-      "codeweaver.core",
-      "codeweaver.providers",
-      "codeweaver.agent_api",
-      "codeweaver.server"
-    ],
-    [
-      "codeweaver.semantic",
-      "codeweaver.core",
-      "codeweaver.providers",
-      "codeweaver.agent_api",
-      "codeweaver.semantic"
-    ],
-    [
       "codeweaver.common",
       "codeweaver.server",
-      "codeweaver.mcp",
-      "codeweaver.config",
-      "codeweaver.engine",
-      "codeweaver.semantic",
-      "codeweaver.core",
-      "codeweaver.providers",
-      "codeweaver.agent_api",
-      "codeweaver.common"
-    ],
-    [
-      "codeweaver.core",
-      "codeweaver.providers",
-      "codeweaver.agent_api",
-      "codeweaver.core"
-    ],
-    [
-      "codeweaver.core",
-      "codeweaver.providers",
-      "codeweaver.core"
-    ],
-    [
-      "codeweaver.config",
-      "codeweaver.engine",
-      "codeweaver.config"
-    ],
-    [
-      "codeweaver.mcp",
-      "codeweaver.config",
-      "codeweaver.engine",
-      "codeweaver.cli",
-      "codeweaver.mcp"
-    ],
-    [
-      "codeweaver.server",
-      "codeweaver.mcp",
-      "codeweaver.config",
-      "codeweaver.engine",
-      "codeweaver.cli",
-      "codeweaver.server"
-    ],
-    [
-      "codeweaver.engine",
-      "codeweaver.cli",
-      "codeweaver.engine"
-    ],
-    [
-      "codeweaver.config",
+      "codeweaver.di",
       "codeweaver.engine",
       "codeweaver.cli",
       "codeweaver.config"
     ],
     [
+      "codeweaver.server",
+      "codeweaver.di",
+      "codeweaver.engine",
+      "codeweaver.cli",
+      "codeweaver.server"
+    ],
+    [
+      "codeweaver.providers",
       "codeweaver.common",
       "codeweaver.server",
-      "codeweaver.mcp",
-      "codeweaver.config",
+      "codeweaver.di",
+      "codeweaver.engine",
+      "codeweaver.cli",
+      "codeweaver.providers"
+    ],
+    [
+      "codeweaver.common",
+      "codeweaver.server",
+      "codeweaver.di",
       "codeweaver.engine",
       "codeweaver.cli",
       "codeweaver.common"
     ],
     [
+      "codeweaver.config",
+      "codeweaver.providers",
       "codeweaver.common",
       "codeweaver.server",
-      "codeweaver.mcp",
-      "codeweaver.config",
+      "codeweaver.di",
       "codeweaver.engine",
-      "codeweaver.common"
+      "codeweaver.cli",
+      "codeweaver.mcp",
+      "codeweaver.config"
     ],
     [
       "codeweaver.server",
+      "codeweaver.di",
+      "codeweaver.engine",
+      "codeweaver.cli",
       "codeweaver.mcp",
-      "codeweaver.common",
       "codeweaver.server"
     ],
     [
       "codeweaver.common",
-      "codeweaver.semantic",
-      "codeweaver.common"
-    ],
-    [
-      "codeweaver.common",
-      "codeweaver.semantic",
-      "codeweaver.core",
-      "codeweaver.common"
-    ],
-    [
-      "codeweaver.common",
-      "codeweaver.semantic",
-      "codeweaver.core",
-      "codeweaver.providers",
-      "codeweaver.common"
-    ],
-    [
-      "codeweaver.semantic",
-      "codeweaver.core",
-      "codeweaver.providers",
+      "codeweaver.server",
+      "codeweaver.di",
       "codeweaver.engine",
-      "codeweaver.semantic"
+      "codeweaver.cli",
+      "codeweaver.mcp",
+      "codeweaver.common"
+    ],
+    [
+      "codeweaver.di",
+      "codeweaver.engine",
+      "codeweaver.cli",
+      "codeweaver.mcp",
+      "codeweaver.agent_api",
+      "codeweaver.di"
+    ],
+    [
+      "codeweaver.providers",
+      "codeweaver.common",
+      "codeweaver.server",
+      "codeweaver.di",
+      "codeweaver.engine",
+      "codeweaver.cli",
+      "codeweaver.mcp",
+      "codeweaver.agent_api",
+      "codeweaver.providers"
+    ],
+    [
+      "codeweaver.common",
+      "codeweaver.server",
+      "codeweaver.di",
+      "codeweaver.engine",
+      "codeweaver.cli",
+      "codeweaver.mcp",
+      "codeweaver.agent_api",
+      "codeweaver.common"
+    ],
+    [
+      "codeweaver.server",
+      "codeweaver.di",
+      "codeweaver.engine",
+      "codeweaver.cli",
+      "codeweaver.mcp",
+      "codeweaver.agent_api",
+      "codeweaver.server"
+    ],
+    [
+      "codeweaver.engine",
+      "codeweaver.cli",
+      "codeweaver.engine"
+    ],
+    [
+      "codeweaver.config",
+      "codeweaver.providers",
+      "codeweaver.common",
+      "codeweaver.server",
+      "codeweaver.di",
+      "codeweaver.engine",
+      "codeweaver.config"
+    ],
+    [
+      "codeweaver.common",
+      "codeweaver.server",
+      "codeweaver.common"
+    ],
+    [
+      "codeweaver.providers",
+      "codeweaver.common",
+      "codeweaver.providers"
     ],
     [
       "codeweaver.mcp",
-      "codeweaver.common",
-      "codeweaver.semantic",
-      "codeweaver.core",
+      "codeweaver.config",
       "codeweaver.providers",
+      "codeweaver.common",
+      "codeweaver.server",
+      "codeweaver.di",
       "codeweaver.engine",
+      "codeweaver.cli",
+      "codeweaver.mcp"
+    ],
+    [
+      "codeweaver.di",
+      "codeweaver.engine",
+      "codeweaver.cli",
+      "codeweaver.agent_api",
+      "codeweaver.di"
+    ],
+    [
+      "codeweaver.providers",
+      "codeweaver.common",
+      "codeweaver.server",
+      "codeweaver.di",
+      "codeweaver.engine",
+      "codeweaver.cli",
+      "codeweaver.agent_api",
+      "codeweaver.providers"
+    ],
+    [
+      "codeweaver.common",
+      "codeweaver.server",
+      "codeweaver.di",
+      "codeweaver.engine",
+      "codeweaver.cli",
+      "codeweaver.agent_api",
+      "codeweaver.common"
+    ],
+    [
+      "codeweaver.server",
+      "codeweaver.di",
+      "codeweaver.engine",
+      "codeweaver.cli",
+      "codeweaver.agent_api",
+      "codeweaver.server"
+    ],
+    [
+      "codeweaver.mcp",
+      "codeweaver.config",
+      "codeweaver.providers",
+      "codeweaver.common",
+      "codeweaver.server",
+      "codeweaver.mcp"
+    ],
+    [
+      "codeweaver.mcp",
       "codeweaver.config",
       "codeweaver.mcp"
     ],
     [
-      "codeweaver.engine",
+      "codeweaver.di",
       "codeweaver.config",
-      "codeweaver.engine"
-    ],
-    [
       "codeweaver.providers",
-      "codeweaver.engine",
-      "codeweaver.config",
-      "codeweaver.providers"
-    ],
-    [
-      "codeweaver.mcp",
       "codeweaver.common",
-      "codeweaver.semantic",
-      "codeweaver.core",
-      "codeweaver.providers",
-      "codeweaver.engine",
+      "codeweaver.server",
+      "codeweaver.di"
+    ],
+    [
       "codeweaver.config",
-      "codeweaver.cli",
-      "codeweaver.mcp"
+      "codeweaver.providers",
+      "codeweaver.common",
+      "codeweaver.server",
+      "codeweaver.mcp",
+      "codeweaver.config"
     ],
     [
       "codeweaver.server",
       "codeweaver.mcp",
-      "codeweaver.common",
-      "codeweaver.semantic",
-      "codeweaver.core",
-      "codeweaver.providers",
-      "codeweaver.engine",
-      "codeweaver.config",
-      "codeweaver.cli",
       "codeweaver.server"
     ],
     [
-      "codeweaver.engine",
-      "codeweaver.config",
-      "codeweaver.cli",
-      "codeweaver.engine"
+      "codeweaver.common",
+      "codeweaver.server",
+      "codeweaver.mcp",
+      "codeweaver.common"
     ],
     [
       "codeweaver.providers",
-      "codeweaver.engine",
-      "codeweaver.config",
-      "codeweaver.cli",
+      "codeweaver.common",
+      "codeweaver.server",
+      "codeweaver.mcp",
+      "codeweaver.core",
       "codeweaver.providers"
+    ],
+    [
+      "codeweaver.common",
+      "codeweaver.server",
+      "codeweaver.mcp",
+      "codeweaver.core",
+      "codeweaver.semantic",
+      "codeweaver.common"
+    ],
+    [
+      "codeweaver.core",
+      "codeweaver.semantic",
+      "codeweaver.core"
+    ],
+    [
+      "codeweaver.common",
+      "codeweaver.server",
+      "codeweaver.mcp",
+      "codeweaver.core",
+      "codeweaver.common"
+    ],
+    [
+      "codeweaver.engine",
+      "codeweaver.di",
+      "codeweaver.config",
+      "codeweaver.providers",
+      "codeweaver.common",
+      "codeweaver.server",
+      "codeweaver.mcp",
+      "codeweaver.core",
+      "codeweaver.engine"
+    ],
+    [
+      "codeweaver.di",
+      "codeweaver.config",
+      "codeweaver.providers",
+      "codeweaver.common",
+      "codeweaver.server",
+      "codeweaver.mcp",
+      "codeweaver.agent_api",
+      "codeweaver.di"
+    ],
+    [
+      "codeweaver.providers",
+      "codeweaver.common",
+      "codeweaver.server",
+      "codeweaver.mcp",
+      "codeweaver.agent_api",
+      "codeweaver.providers"
+    ],
+    [
+      "codeweaver.common",
+      "codeweaver.server",
+      "codeweaver.mcp",
+      "codeweaver.agent_api",
+      "codeweaver.common"
     ],
     [
       "codeweaver.server",
       "codeweaver.mcp",
-      "codeweaver.common",
-      "codeweaver.semantic",
-      "codeweaver.core",
-      "codeweaver.providers",
-      "codeweaver.engine",
-      "codeweaver.config",
-      "codeweaver.cli",
       "codeweaver.agent_api",
       "codeweaver.server"
     ],
     [
+      "codeweaver.config",
+      "codeweaver.providers",
+      "codeweaver.common",
+      "codeweaver.server",
+      "codeweaver.cli",
+      "codeweaver.config"
+    ],
+    [
+      "codeweaver.server",
+      "codeweaver.cli",
+      "codeweaver.server"
+    ],
+    [
+      "codeweaver.providers",
+      "codeweaver.common",
+      "codeweaver.server",
+      "codeweaver.cli",
+      "codeweaver.providers"
+    ],
+    [
+      "codeweaver.common",
+      "codeweaver.server",
+      "codeweaver.cli",
+      "codeweaver.common"
+    ],
+    [
+      "codeweaver.engine",
+      "codeweaver.di",
+      "codeweaver.config",
+      "codeweaver.providers",
+      "codeweaver.common",
+      "codeweaver.server",
+      "codeweaver.cli",
+      "codeweaver.engine"
+    ],
+    [
+      "codeweaver.engine",
+      "codeweaver.di",
+      "codeweaver.config",
+      "codeweaver.providers",
+      "codeweaver.common",
+      "codeweaver.server",
+      "codeweaver.engine"
+    ],
+    [
+      "codeweaver.engine",
+      "codeweaver.di",
+      "codeweaver.engine"
+    ],
+    [
+      "codeweaver.common",
+      "codeweaver.config",
+      "codeweaver.providers",
+      "codeweaver.common"
+    ],
+    [
+      "codeweaver.providers",
+      "codeweaver.core",
+      "codeweaver.providers"
+    ],
+    [
+      "codeweaver.common",
+      "codeweaver.config",
+      "codeweaver.providers",
+      "codeweaver.core",
+      "codeweaver.semantic",
+      "codeweaver.common"
+    ],
+    [
+      "codeweaver.common",
+      "codeweaver.config",
+      "codeweaver.providers",
+      "codeweaver.core",
+      "codeweaver.common"
+    ],
+    [
+      "codeweaver.config",
+      "codeweaver.providers",
+      "codeweaver.core",
+      "codeweaver.engine",
+      "codeweaver.di",
+      "codeweaver.config"
+    ],
+    [
+      "codeweaver.config",
+      "codeweaver.providers",
+      "codeweaver.core",
+      "codeweaver.engine",
+      "codeweaver.di",
+      "codeweaver.server",
+      "codeweaver.config"
+    ],
+    [
+      "codeweaver.di",
+      "codeweaver.server",
+      "codeweaver.di"
+    ],
+    [
+      "codeweaver.common",
+      "codeweaver.config",
+      "codeweaver.providers",
+      "codeweaver.core",
+      "codeweaver.engine",
+      "codeweaver.di",
+      "codeweaver.server",
+      "codeweaver.common"
+    ],
+    [
+      "codeweaver.config",
+      "codeweaver.providers",
+      "codeweaver.core",
+      "codeweaver.engine",
+      "codeweaver.di",
+      "codeweaver.server",
+      "codeweaver.mcp",
+      "codeweaver.config"
+    ],
+    [
+      "codeweaver.common",
+      "codeweaver.config",
+      "codeweaver.providers",
+      "codeweaver.core",
+      "codeweaver.engine",
+      "codeweaver.di",
+      "codeweaver.server",
+      "codeweaver.mcp",
+      "codeweaver.common"
+    ],
+    [
+      "codeweaver.core",
+      "codeweaver.engine",
+      "codeweaver.di",
+      "codeweaver.server",
+      "codeweaver.mcp",
+      "codeweaver.core"
+    ],
+    [
+      "codeweaver.di",
+      "codeweaver.server",
+      "codeweaver.mcp",
+      "codeweaver.agent_api",
+      "codeweaver.di"
+    ],
+    [
+      "codeweaver.providers",
+      "codeweaver.core",
+      "codeweaver.engine",
+      "codeweaver.di",
+      "codeweaver.server",
+      "codeweaver.mcp",
+      "codeweaver.agent_api",
+      "codeweaver.providers"
+    ],
+    [
+      "codeweaver.common",
+      "codeweaver.config",
+      "codeweaver.providers",
+      "codeweaver.core",
+      "codeweaver.engine",
+      "codeweaver.di",
+      "codeweaver.server",
+      "codeweaver.mcp",
+      "codeweaver.agent_api",
+      "codeweaver.common"
+    ],
+    [
+      "codeweaver.core",
+      "codeweaver.engine",
+      "codeweaver.di",
+      "codeweaver.server",
+      "codeweaver.mcp",
+      "codeweaver.agent_api",
+      "codeweaver.core"
+    ],
+    [
+      "codeweaver.config",
+      "codeweaver.providers",
+      "codeweaver.core",
+      "codeweaver.engine",
+      "codeweaver.di",
+      "codeweaver.server",
+      "codeweaver.cli",
+      "codeweaver.config"
+    ],
+    [
+      "codeweaver.providers",
+      "codeweaver.core",
+      "codeweaver.engine",
+      "codeweaver.di",
+      "codeweaver.server",
+      "codeweaver.cli",
+      "codeweaver.providers"
+    ],
+    [
+      "codeweaver.common",
+      "codeweaver.config",
+      "codeweaver.providers",
+      "codeweaver.core",
+      "codeweaver.engine",
+      "codeweaver.di",
+      "codeweaver.server",
+      "codeweaver.cli",
+      "codeweaver.common"
+    ],
+    [
+      "codeweaver.engine",
+      "codeweaver.di",
+      "codeweaver.server",
+      "codeweaver.cli",
+      "codeweaver.engine"
+    ],
+    [
+      "codeweaver.core",
+      "codeweaver.engine",
+      "codeweaver.di",
+      "codeweaver.server",
+      "codeweaver.cli",
+      "codeweaver.core"
+    ],
+    [
+      "codeweaver.engine",
+      "codeweaver.di",
+      "codeweaver.server",
+      "codeweaver.engine"
+    ],
+    [
+      "codeweaver.core",
+      "codeweaver.engine",
+      "codeweaver.di",
+      "codeweaver.server",
+      "codeweaver.core"
+    ],
+    [
+      "codeweaver.providers",
+      "codeweaver.core",
+      "codeweaver.engine",
+      "codeweaver.di",
+      "codeweaver.providers"
+    ],
+    [
+      "codeweaver.common",
+      "codeweaver.config",
+      "codeweaver.providers",
+      "codeweaver.core",
+      "codeweaver.engine",
+      "codeweaver.di",
+      "codeweaver.common"
+    ],
+    [
+      "codeweaver.core",
+      "codeweaver.engine",
+      "codeweaver.di",
+      "codeweaver.core"
+    ],
+    [
+      "codeweaver.providers",
+      "codeweaver.core",
+      "codeweaver.engine",
+      "codeweaver.providers"
+    ],
+    [
+      "codeweaver.common",
+      "codeweaver.config",
+      "codeweaver.providers",
+      "codeweaver.core",
+      "codeweaver.engine",
+      "codeweaver.common"
+    ],
+    [
+      "codeweaver.core",
+      "codeweaver.engine",
+      "codeweaver.core"
+    ],
+    [
+      "codeweaver.config",
+      "codeweaver.providers",
+      "codeweaver.core",
+      "codeweaver.engine",
+      "codeweaver.config"
+    ],
+    [
+      "codeweaver.common",
+      "codeweaver.config",
+      "codeweaver.common"
+    ],
+    [
+      "codeweaver.server",
+      "codeweaver.config",
+      "codeweaver.providers",
+      "codeweaver.common",
+      "codeweaver.server"
+    ],
+    [
+      "codeweaver.common",
+      "codeweaver.semantic",
+      "codeweaver.common"
+    ],
+    [
+      "codeweaver.providers",
+      "codeweaver.common",
       "codeweaver.semantic",
       "codeweaver.core",
-      "codeweaver.providers",
-      "codeweaver.engine",
+      "codeweaver.providers"
+    ],
+    [
+      "codeweaver.common",
+      "codeweaver.semantic",
+      "codeweaver.core",
+      "codeweaver.common"
+    ],
+    [
       "codeweaver.config",
+      "codeweaver.providers",
+      "codeweaver.common",
+      "codeweaver.semantic",
+      "codeweaver.core",
+      "codeweaver.engine",
+      "codeweaver.di",
+      "codeweaver.config"
+    ],
+    [
+      "codeweaver.server",
+      "codeweaver.config",
+      "codeweaver.providers",
+      "codeweaver.common",
+      "codeweaver.semantic",
+      "codeweaver.core",
+      "codeweaver.engine",
+      "codeweaver.di",
+      "codeweaver.server"
+    ],
+    [
+      "codeweaver.providers",
+      "codeweaver.common",
+      "codeweaver.semantic",
+      "codeweaver.core",
+      "codeweaver.engine",
+      "codeweaver.di",
+      "codeweaver.providers"
+    ],
+    [
+      "codeweaver.common",
+      "codeweaver.semantic",
+      "codeweaver.core",
+      "codeweaver.engine",
+      "codeweaver.di",
+      "codeweaver.common"
+    ],
+    [
+      "codeweaver.providers",
+      "codeweaver.common",
+      "codeweaver.semantic",
+      "codeweaver.core",
+      "codeweaver.engine",
+      "codeweaver.providers"
+    ],
+    [
+      "codeweaver.semantic",
+      "codeweaver.core",
+      "codeweaver.engine",
+      "codeweaver.semantic"
+    ],
+    [
+      "codeweaver.common",
+      "codeweaver.semantic",
+      "codeweaver.core",
+      "codeweaver.engine",
+      "codeweaver.common"
+    ],
+    [
+      "codeweaver.config",
+      "codeweaver.providers",
+      "codeweaver.common",
+      "codeweaver.semantic",
+      "codeweaver.core",
+      "codeweaver.engine",
       "codeweaver.cli",
+      "codeweaver.config"
+    ],
+    [
+      "codeweaver.server",
+      "codeweaver.config",
+      "codeweaver.providers",
+      "codeweaver.common",
+      "codeweaver.semantic",
+      "codeweaver.core",
+      "codeweaver.engine",
+      "codeweaver.cli",
+      "codeweaver.server"
+    ],
+    [
+      "codeweaver.providers",
+      "codeweaver.common",
+      "codeweaver.semantic",
+      "codeweaver.core",
+      "codeweaver.engine",
+      "codeweaver.cli",
+      "codeweaver.providers"
+    ],
+    [
+      "codeweaver.common",
+      "codeweaver.semantic",
+      "codeweaver.core",
+      "codeweaver.engine",
+      "codeweaver.cli",
+      "codeweaver.common"
+    ],
+    [
+      "codeweaver.config",
+      "codeweaver.providers",
+      "codeweaver.common",
+      "codeweaver.semantic",
+      "codeweaver.core",
+      "codeweaver.engine",
+      "codeweaver.cli",
+      "codeweaver.mcp",
+      "codeweaver.config"
+    ],
+    [
+      "codeweaver.server",
+      "codeweaver.config",
+      "codeweaver.providers",
+      "codeweaver.common",
+      "codeweaver.semantic",
+      "codeweaver.core",
+      "codeweaver.engine",
+      "codeweaver.cli",
+      "codeweaver.mcp",
+      "codeweaver.server"
+    ],
+    [
+      "codeweaver.common",
+      "codeweaver.semantic",
+      "codeweaver.core",
+      "codeweaver.engine",
+      "codeweaver.cli",
+      "codeweaver.mcp",
+      "codeweaver.common"
+    ],
+    [
+      "codeweaver.core",
+      "codeweaver.engine",
+      "codeweaver.cli",
+      "codeweaver.mcp",
+      "codeweaver.core"
+    ],
+    [
+      "codeweaver.providers",
+      "codeweaver.common",
+      "codeweaver.semantic",
+      "codeweaver.core",
+      "codeweaver.engine",
+      "codeweaver.cli",
+      "codeweaver.mcp",
+      "codeweaver.agent_api",
+      "codeweaver.providers"
+    ],
+    [
+      "codeweaver.semantic",
+      "codeweaver.core",
+      "codeweaver.engine",
+      "codeweaver.cli",
+      "codeweaver.mcp",
       "codeweaver.agent_api",
       "codeweaver.semantic"
     ],
     [
-      "codeweaver.providers",
-      "codeweaver.engine",
-      "codeweaver.config",
-      "codeweaver.cli",
-      "codeweaver.agent_api",
-      "codeweaver.providers"
-    ],
-    [
       "codeweaver.common",
       "codeweaver.semantic",
       "codeweaver.core",
-      "codeweaver.providers",
       "codeweaver.engine",
-      "codeweaver.config",
-      "codeweaver.cli",
-      "codeweaver.agent_api",
-      "codeweaver.common"
-    ],
-    [
-      "codeweaver.core",
-      "codeweaver.providers",
-      "codeweaver.engine",
-      "codeweaver.config",
-      "codeweaver.cli",
-      "codeweaver.agent_api",
-      "codeweaver.core"
-    ],
-    [
-      "codeweaver.common",
-      "codeweaver.semantic",
-      "codeweaver.core",
-      "codeweaver.providers",
-      "codeweaver.engine",
-      "codeweaver.config",
-      "codeweaver.cli",
-      "codeweaver.common"
-    ],
-    [
-      "codeweaver.core",
-      "codeweaver.providers",
-      "codeweaver.engine",
-      "codeweaver.config",
-      "codeweaver.cli",
-      "codeweaver.core"
-    ],
-    [
-      "codeweaver.common",
-      "codeweaver.semantic",
-      "codeweaver.core",
-      "codeweaver.providers",
-      "codeweaver.engine",
-      "codeweaver.config",
-      "codeweaver.common"
-    ],
-    [
-      "codeweaver.core",
-      "codeweaver.providers",
-      "codeweaver.engine",
-      "codeweaver.config",
-      "codeweaver.core"
-    ],
-    [
-      "codeweaver.providers",
-      "codeweaver.engine",
-      "codeweaver.providers"
-    ],
-    [
-      "codeweaver.common",
-      "codeweaver.semantic",
-      "codeweaver.core",
-      "codeweaver.providers",
-      "codeweaver.engine",
-      "codeweaver.common"
-    ],
-    [
-      "codeweaver.core",
-      "codeweaver.providers",
-      "codeweaver.engine",
-      "codeweaver.core"
-    ],
-    [
       "codeweaver.cli",
       "codeweaver.mcp",
+      "codeweaver.agent_api",
+      "codeweaver.common"
+    ],
+    [
       "codeweaver.server",
-      "codeweaver.engine",
-      "codeweaver.semantic",
-      "codeweaver.common",
       "codeweaver.config",
+      "codeweaver.providers",
+      "codeweaver.common",
+      "codeweaver.semantic",
+      "codeweaver.core",
+      "codeweaver.engine",
+      "codeweaver.cli",
+      "codeweaver.mcp",
+      "codeweaver.agent_api",
+      "codeweaver.server"
+    ],
+    [
+      "codeweaver.core",
+      "codeweaver.engine",
+      "codeweaver.cli",
+      "codeweaver.mcp",
+      "codeweaver.agent_api",
+      "codeweaver.core"
+    ],
+    [
+      "codeweaver.core",
+      "codeweaver.engine",
+      "codeweaver.cli",
+      "codeweaver.core"
+    ],
+    [
+      "codeweaver.config",
+      "codeweaver.providers",
+      "codeweaver.common",
+      "codeweaver.semantic",
+      "codeweaver.core",
+      "codeweaver.engine",
+      "codeweaver.config"
+    ],
+    [
+      "codeweaver.cli",
+      "codeweaver.config",
+      "codeweaver.providers",
+      "codeweaver.common",
+      "codeweaver.server",
+      "codeweaver.di",
+      "codeweaver.engine",
       "codeweaver.cli"
     ],
     [
       "codeweaver.cli",
-      "codeweaver.mcp",
-      "codeweaver.server",
-      "codeweaver.engine",
-      "codeweaver.semantic",
-      "codeweaver.common",
-      "codeweaver.cli"
-    ],
-    [
-      "codeweaver.cli",
-      "codeweaver.mcp",
-      "codeweaver.server",
-      "codeweaver.engine",
-      "codeweaver.cli"
-    ],
-    [
-      "codeweaver.cli",
-      "codeweaver.mcp",
-      "codeweaver.server",
-      "codeweaver.cli"
-    ],
-    [
-      "codeweaver.semantic",
-      "codeweaver.common",
-      "codeweaver.server",
-      "codeweaver.mcp",
       "codeweaver.config",
-      "codeweaver.engine",
-      "codeweaver.semantic"
-    ],
-    [
-      "codeweaver.common",
-      "codeweaver.server",
-      "codeweaver.mcp",
-      "codeweaver.config",
-      "codeweaver.engine",
       "codeweaver.providers",
+      "codeweaver.common",
+      "codeweaver.server",
+      "codeweaver.cli"
+    ],
+    [
+      "codeweaver.cli",
+      "codeweaver.config",
+      "codeweaver.providers",
+      "codeweaver.common",
+      "codeweaver.cli"
+    ],
+    [
+      "codeweaver.cli",
+      "codeweaver.config",
+      "codeweaver.cli"
+    ],
+    [
+      "codeweaver.di",
+      "codeweaver.config",
+      "codeweaver.providers",
+      "codeweaver.common",
+      "codeweaver.server",
+      "codeweaver.mcp",
+      "codeweaver.core",
+      "codeweaver.engine",
+      "codeweaver.di"
+    ],
+    [
+      "codeweaver.providers",
+      "codeweaver.common",
+      "codeweaver.server",
+      "codeweaver.mcp",
+      "codeweaver.core",
+      "codeweaver.engine",
+      "codeweaver.providers"
+    ],
+    [
+      "codeweaver.common",
+      "codeweaver.server",
+      "codeweaver.mcp",
+      "codeweaver.core",
+      "codeweaver.engine",
       "codeweaver.common"
     ],
     [
-      "codeweaver.engine",
-      "codeweaver.providers",
-      "codeweaver.engine"
-    ],
-    [
       "codeweaver.config",
-      "codeweaver.engine",
       "codeweaver.providers",
+      "codeweaver.common",
+      "codeweaver.server",
+      "codeweaver.mcp",
+      "codeweaver.core",
+      "codeweaver.engine",
+      "codeweaver.cli",
       "codeweaver.config"
     ],
     [
       "codeweaver.server",
       "codeweaver.mcp",
-      "codeweaver.config",
+      "codeweaver.core",
       "codeweaver.engine",
-      "codeweaver.providers",
-      "codeweaver.agent_api",
+      "codeweaver.cli",
       "codeweaver.server"
     ],
     [
-      "codeweaver.semantic",
+      "codeweaver.providers",
       "codeweaver.common",
       "codeweaver.server",
       "codeweaver.mcp",
-      "codeweaver.config",
-      "codeweaver.engine",
-      "codeweaver.providers",
-      "codeweaver.agent_api",
-      "codeweaver.semantic"
-    ],
-    [
-      "codeweaver.common",
-      "codeweaver.server",
-      "codeweaver.mcp",
-      "codeweaver.config",
-      "codeweaver.engine",
-      "codeweaver.providers",
-      "codeweaver.agent_api",
-      "codeweaver.common"
-    ],
-    [
       "codeweaver.core",
-      "codeweaver.semantic",
-      "codeweaver.common",
-      "codeweaver.server",
-      "codeweaver.mcp",
-      "codeweaver.config",
-      "codeweaver.engine",
-      "codeweaver.providers",
-      "codeweaver.agent_api",
-      "codeweaver.core"
-    ],
-    [
-      "codeweaver.core",
-      "codeweaver.semantic",
-      "codeweaver.common",
-      "codeweaver.server",
-      "codeweaver.mcp",
-      "codeweaver.config",
-      "codeweaver.engine",
-      "codeweaver.providers",
-      "codeweaver.core"
-    ],
-    [
-      "codeweaver.core",
-      "codeweaver.semantic",
-      "codeweaver.common",
-      "codeweaver.server",
-      "codeweaver.mcp",
-      "codeweaver.config",
       "codeweaver.engine",
       "codeweaver.cli",
-      "codeweaver.core"
-    ],
-    [
-      "codeweaver.core",
-      "codeweaver.semantic",
-      "codeweaver.common",
-      "codeweaver.server",
-      "codeweaver.mcp",
-      "codeweaver.config",
-      "codeweaver.engine",
-      "codeweaver.core"
-    ],
-    [
-      "codeweaver.core",
-      "codeweaver.semantic",
-      "codeweaver.common",
-      "codeweaver.server",
-      "codeweaver.mcp",
-      "codeweaver.config",
-      "codeweaver.core"
-    ],
-    [
-      "codeweaver.core",
-      "codeweaver.semantic",
-      "codeweaver.common",
-      "codeweaver.server",
-      "codeweaver.mcp",
-      "codeweaver.core"
-    ],
-    [
-      "codeweaver.core",
-      "codeweaver.semantic",
-      "codeweaver.common",
-      "codeweaver.server",
-      "codeweaver.core"
-    ],
-    [
-      "codeweaver.core",
-      "codeweaver.semantic",
-      "codeweaver.common",
-      "codeweaver.core"
-    ],
-    [
-      "codeweaver.core",
-      "codeweaver.semantic",
-      "codeweaver.core"
-    ],
-    [
-      "codeweaver.semantic",
-      "codeweaver.common",
-      "codeweaver.server",
-      "codeweaver.mcp",
-      "codeweaver.config",
-      "codeweaver.engine",
-      "codeweaver.providers",
-      "codeweaver.agent_api",
-      "codeweaver.core",
-      "codeweaver.semantic"
+      "codeweaver.providers"
     ],
     [
       "codeweaver.common",
       "codeweaver.server",
       "codeweaver.mcp",
-      "codeweaver.config",
-      "codeweaver.engine",
-      "codeweaver.providers",
-      "codeweaver.agent_api",
       "codeweaver.core",
-      "codeweaver.common"
-    ],
-    [
-      "codeweaver.config",
-      "codeweaver.mcp",
-      "codeweaver.server",
       "codeweaver.engine",
-      "codeweaver.semantic",
-      "codeweaver.common",
-      "codeweaver.config"
-    ],
-    [
-      "codeweaver.common",
-      "codeweaver.providers",
-      "codeweaver.common"
-    ],
-    [
-      "codeweaver.engine",
-      "codeweaver.semantic",
-      "codeweaver.common",
-      "codeweaver.providers",
-      "codeweaver.engine"
-    ],
-    [
-      "codeweaver.config",
-      "codeweaver.mcp",
-      "codeweaver.server",
-      "codeweaver.engine",
-      "codeweaver.semantic",
-      "codeweaver.common",
-      "codeweaver.providers",
-      "codeweaver.config"
-    ],
-    [
-      "codeweaver.server",
-      "codeweaver.engine",
-      "codeweaver.semantic",
-      "codeweaver.common",
-      "codeweaver.providers",
-      "codeweaver.agent_api",
-      "codeweaver.server"
-    ],
-    [
-      "codeweaver.semantic",
-      "codeweaver.common",
-      "codeweaver.providers",
-      "codeweaver.agent_api",
-      "codeweaver.semantic"
-    ],
-    [
-      "codeweaver.common",
-      "codeweaver.providers",
-      "codeweaver.agent_api",
-      "codeweaver.common"
-    ],
-    [
-      "codeweaver.semantic",
-      "codeweaver.common",
-      "codeweaver.providers",
-      "codeweaver.agent_api",
-      "codeweaver.core",
-      "codeweaver.semantic"
-    ],
-    [
-      "codeweaver.common",
-      "codeweaver.providers",
-      "codeweaver.agent_api",
-      "codeweaver.core",
+      "codeweaver.cli",
       "codeweaver.common"
     ],
     [
       "codeweaver.mcp",
-      "codeweaver.server",
+      "codeweaver.core",
       "codeweaver.engine",
-      "codeweaver.semantic",
-      "codeweaver.common",
       "codeweaver.cli",
       "codeweaver.mcp"
     ],
     [
-      "codeweaver.server",
-      "codeweaver.engine",
-      "codeweaver.semantic",
-      "codeweaver.common",
-      "codeweaver.cli",
-      "codeweaver.server"
-    ],
-    [
-      "codeweaver.engine",
-      "codeweaver.semantic",
-      "codeweaver.common",
-      "codeweaver.cli",
-      "codeweaver.engine"
-    ],
-    [
+      "codeweaver.di",
       "codeweaver.config",
-      "codeweaver.mcp",
-      "codeweaver.server",
-      "codeweaver.engine",
-      "codeweaver.semantic",
-      "codeweaver.common",
-      "codeweaver.cli",
-      "codeweaver.config"
-    ],
-    [
-      "codeweaver.common",
-      "codeweaver.cli",
-      "codeweaver.common"
-    ],
-    [
-      "codeweaver.config",
-      "codeweaver.mcp",
-      "codeweaver.server",
-      "codeweaver.engine",
-      "codeweaver.config"
-    ],
-    [
-      "codeweaver.config",
-      "codeweaver.mcp",
-      "codeweaver.server",
-      "codeweaver.config"
-    ],
-    [
-      "codeweaver.config",
-      "codeweaver.mcp",
-      "codeweaver.config"
-    ],
-    [
       "codeweaver.providers",
       "codeweaver.common",
       "codeweaver.server",
       "codeweaver.mcp",
-      "codeweaver.config",
-      "codeweaver.engine",
-      "codeweaver.semantic",
       "codeweaver.core",
-      "codeweaver.providers"
-    ],
-    [
-      "codeweaver.providers",
-      "codeweaver.common",
-      "codeweaver.server",
-      "codeweaver.mcp",
-      "codeweaver.config",
-      "codeweaver.engine",
-      "codeweaver.providers"
-    ],
-    [
-      "codeweaver.providers",
-      "codeweaver.common",
-      "codeweaver.server",
-      "codeweaver.mcp",
-      "codeweaver.config",
-      "codeweaver.engine",
-      "codeweaver.cli",
-      "codeweaver.providers"
-    ],
-    [
-      "codeweaver.server",
-      "codeweaver.mcp",
-      "codeweaver.config",
       "codeweaver.engine",
       "codeweaver.cli",
       "codeweaver.agent_api",
-      "codeweaver.server"
+      "codeweaver.di"
     ],
     [
       "codeweaver.providers",
       "codeweaver.common",
       "codeweaver.server",
       "codeweaver.mcp",
-      "codeweaver.config",
+      "codeweaver.core",
       "codeweaver.engine",
       "codeweaver.cli",
       "codeweaver.agent_api",
@@ -1411,65 +1447,300 @@
       "codeweaver.common",
       "codeweaver.server",
       "codeweaver.mcp",
-      "codeweaver.config",
+      "codeweaver.core",
       "codeweaver.engine",
       "codeweaver.cli",
       "codeweaver.agent_api",
       "codeweaver.common"
     ],
     [
+      "codeweaver.server",
+      "codeweaver.mcp",
+      "codeweaver.core",
+      "codeweaver.engine",
+      "codeweaver.cli",
+      "codeweaver.agent_api",
+      "codeweaver.server"
+    ],
+    [
+      "codeweaver.core",
+      "codeweaver.engine",
+      "codeweaver.cli",
+      "codeweaver.agent_api",
+      "codeweaver.core"
+    ],
+    [
+      "codeweaver.config",
       "codeweaver.providers",
       "codeweaver.common",
       "codeweaver.server",
       "codeweaver.mcp",
+      "codeweaver.core",
+      "codeweaver.engine",
+      "codeweaver.config"
+    ],
+    [
+      "codeweaver.providers",
       "codeweaver.config",
       "codeweaver.providers"
     ],
     [
-      "codeweaver.providers",
+      "codeweaver.config",
+      "codeweaver.common",
+      "codeweaver.config"
+    ],
+    [
+      "codeweaver.config",
       "codeweaver.common",
       "codeweaver.server",
+      "codeweaver.config"
+    ],
+    [
+      "codeweaver.config",
+      "codeweaver.common",
+      "codeweaver.server",
+      "codeweaver.di",
+      "codeweaver.config"
+    ],
+    [
+      "codeweaver.providers",
+      "codeweaver.config",
+      "codeweaver.common",
+      "codeweaver.server",
+      "codeweaver.di",
       "codeweaver.providers"
     ],
     [
       "codeweaver.providers",
+      "codeweaver.config",
       "codeweaver.common",
+      "codeweaver.server",
+      "codeweaver.di",
+      "codeweaver.engine",
+      "codeweaver.providers"
+    ],
+    [
+      "codeweaver.core",
+      "codeweaver.providers",
+      "codeweaver.config",
+      "codeweaver.common",
+      "codeweaver.server",
+      "codeweaver.di",
+      "codeweaver.engine",
+      "codeweaver.semantic",
+      "codeweaver.core"
+    ],
+    [
+      "codeweaver.core",
+      "codeweaver.providers",
+      "codeweaver.config",
+      "codeweaver.common",
+      "codeweaver.server",
+      "codeweaver.di",
+      "codeweaver.engine",
+      "codeweaver.core"
+    ],
+    [
+      "codeweaver.config",
+      "codeweaver.common",
+      "codeweaver.server",
+      "codeweaver.di",
+      "codeweaver.engine",
+      "codeweaver.cli",
+      "codeweaver.config"
+    ],
+    [
+      "codeweaver.providers",
+      "codeweaver.config",
+      "codeweaver.common",
+      "codeweaver.server",
+      "codeweaver.di",
+      "codeweaver.engine",
+      "codeweaver.cli",
+      "codeweaver.providers"
+    ],
+    [
+      "codeweaver.config",
+      "codeweaver.common",
+      "codeweaver.server",
+      "codeweaver.di",
+      "codeweaver.engine",
+      "codeweaver.cli",
+      "codeweaver.mcp",
+      "codeweaver.config"
+    ],
+    [
+      "codeweaver.core",
+      "codeweaver.providers",
+      "codeweaver.config",
+      "codeweaver.common",
+      "codeweaver.server",
+      "codeweaver.di",
+      "codeweaver.engine",
+      "codeweaver.cli",
+      "codeweaver.mcp",
+      "codeweaver.core"
+    ],
+    [
+      "codeweaver.providers",
+      "codeweaver.config",
+      "codeweaver.common",
+      "codeweaver.server",
+      "codeweaver.di",
+      "codeweaver.engine",
+      "codeweaver.cli",
+      "codeweaver.mcp",
+      "codeweaver.agent_api",
+      "codeweaver.providers"
+    ],
+    [
+      "codeweaver.core",
+      "codeweaver.providers",
+      "codeweaver.config",
+      "codeweaver.common",
+      "codeweaver.server",
+      "codeweaver.di",
+      "codeweaver.engine",
+      "codeweaver.cli",
+      "codeweaver.mcp",
+      "codeweaver.agent_api",
+      "codeweaver.core"
+    ],
+    [
+      "codeweaver.core",
+      "codeweaver.providers",
+      "codeweaver.config",
+      "codeweaver.common",
+      "codeweaver.server",
+      "codeweaver.di",
+      "codeweaver.engine",
+      "codeweaver.cli",
+      "codeweaver.core"
+    ],
+    [
+      "codeweaver.config",
+      "codeweaver.common",
+      "codeweaver.server",
+      "codeweaver.di",
+      "codeweaver.engine",
+      "codeweaver.config"
+    ],
+    [
+      "codeweaver.core",
+      "codeweaver.providers",
+      "codeweaver.config",
+      "codeweaver.common",
+      "codeweaver.server",
+      "codeweaver.di",
+      "codeweaver.core"
+    ],
+    [
+      "codeweaver.core",
+      "codeweaver.providers",
+      "codeweaver.config",
+      "codeweaver.common",
+      "codeweaver.server",
+      "codeweaver.core"
+    ],
+    [
+      "codeweaver.providers",
+      "codeweaver.config",
+      "codeweaver.common",
+      "codeweaver.providers"
+    ],
+    [
+      "codeweaver.core",
+      "codeweaver.providers",
+      "codeweaver.config",
+      "codeweaver.common",
+      "codeweaver.core"
+    ],
+    [
+      "codeweaver.core",
+      "codeweaver.providers",
+      "codeweaver.config",
+      "codeweaver.core"
+    ],
+    [
+      "codeweaver.core",
+      "codeweaver.providers",
+      "codeweaver.core"
+    ],
+    [
+      "codeweaver.semantic",
+      "codeweaver.common",
+      "codeweaver.config",
+      "codeweaver.providers",
+      "codeweaver.core",
+      "codeweaver.semantic"
+    ],
+    [
+      "codeweaver.semantic",
+      "codeweaver.common",
+      "codeweaver.config",
+      "codeweaver.providers",
+      "codeweaver.core",
+      "codeweaver.engine",
+      "codeweaver.di",
+      "codeweaver.server",
+      "codeweaver.mcp",
+      "codeweaver.agent_api",
+      "codeweaver.semantic"
+    ],
+    [
+      "codeweaver.semantic",
+      "codeweaver.common",
+      "codeweaver.config",
+      "codeweaver.providers",
+      "codeweaver.core",
+      "codeweaver.engine",
+      "codeweaver.semantic"
+    ],
+    [
+      "codeweaver.semantic",
+      "codeweaver.common",
+      "codeweaver.semantic"
+    ],
+    [
+      "codeweaver.providers",
+      "codeweaver.config",
+      "codeweaver.common",
+      "codeweaver.server",
+      "codeweaver.di",
+      "codeweaver.engine",
+      "codeweaver.semantic",
+      "codeweaver.core",
       "codeweaver.providers"
     ],
     [
       "codeweaver.agent_api",
+      "codeweaver.di",
+      "codeweaver.config",
+      "codeweaver.providers",
+      "codeweaver.common",
       "codeweaver.server",
       "codeweaver.mcp",
-      "codeweaver.common",
-      "codeweaver.semantic",
       "codeweaver.core",
-      "codeweaver.providers",
       "codeweaver.engine",
-      "codeweaver.config",
       "codeweaver.cli",
       "codeweaver.agent_api"
     ],
     [
       "codeweaver.agent_api",
-      "codeweaver.server",
-      "codeweaver.mcp",
-      "codeweaver.common",
-      "codeweaver.semantic",
-      "codeweaver.core",
+      "codeweaver.di",
+      "codeweaver.config",
       "codeweaver.providers",
-      "codeweaver.agent_api"
-    ],
-    [
-      "codeweaver.agent_api",
-      "codeweaver.server",
-      "codeweaver.mcp",
       "codeweaver.common",
+      "codeweaver.server",
+      "codeweaver.mcp",
       "codeweaver.agent_api"
     ],
     [
       "codeweaver.agent_api",
-      "codeweaver.server",
-      "codeweaver.mcp",
+      "codeweaver.di",
+      "codeweaver.config",
+      "codeweaver.providers",
+      "codeweaver.common",
       "codeweaver.agent_api"
     ]
   ]

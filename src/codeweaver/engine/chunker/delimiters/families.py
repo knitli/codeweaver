@@ -23,82 +23,14 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING
 
-import textcase
-
 from pydantic import NonNegativeFloat, NonNegativeInt
 
-from codeweaver.core.types.enum import BaseEnum
+from codeweaver.core.types.delimiter import LanguageFamily
 
 
 if TYPE_CHECKING:
-    from codeweaver.engine.chunker.delimiters.kind import DelimiterKind
+    from codeweaver.core.types.delimiter import DelimiterKind, LanguageFamily
     from codeweaver.engine.chunker.delimiters.patterns import DelimiterPattern
-
-
-class LanguageFamily(str, BaseEnum):
-    """Major language family classifications based on syntax patterns.
-
-    Language families group languages with similar delimiter patterns, enabling:
-    - Code reuse through shared delimiter definitions
-    - Reasonable defaults for unknown/undefined languages
-    - Simplified language-specific delimiter composition
-
-    Families are detected by characteristic delimiter presence in code samples.
-    """
-
-    C_STYLE = "c_style"  # C, C++, Java, JavaScript, Rust, Go, C#, Swift
-    FUNCTIONAL_STYLE = "functional_style"  # Haskell, Elm, PureScript, Agda
-    LATEX_STYLE = "latex_style"  # TeX, LaTeX, ConTeXt
-    LISP_STYLE = "lisp_style"  # Lisp, Scheme, Clojure, Racket
-    MARKUP_STYLE = "markup_style"  # HTML, XML, JSX, Vue, Svelte
-    MATLAB_STYLE = "matlab_style"  # MATLAB, Octave
-    ML_STYLE = "ml_style"  # OCaml, F#, Standard ML, Reason
-    PLAIN_TEXT = "plain_text"  # Plain text, config files, logs
-    PYTHON_STYLE = "python_style"  # Python, CoffeeScript, Nim
-    RUBY_STYLE = "ruby_style"  # Ruby, Crystal
-    SHELL_STYLE = "shell_style"  # Bash, Zsh, Fish, PowerShell
-    UNKNOWN = "unknown"  # Unclassified or insufficient information
-
-    __slots__ = ()
-
-    @classmethod
-    def from_known_language(cls, language: str | BaseEnum) -> LanguageFamily:
-        """Map known languages to their families.
-
-        Provides deterministic mapping for known languages, avoiding the need
-        for heuristic detection. This is the preferred method when the language
-        is already known from file extensions or other metadata.
-
-        Args:
-            language: Language name (string) or BaseEnum with `.variable` attribute
-
-        Returns:
-            The corresponding LanguageFamily, or UNKNOWN if not recognized
-
-        Example:
-            >>> LanguageFamily.from_known_language("python")
-            <LanguageFamily.PYTHON_STYLE: 'python_style'>
-
-            >>> LanguageFamily.from_known_language("typescript")
-            <LanguageFamily.C_STYLE: 'c_style'>
-        """
-        # Normalize to snake_case string
-        lang = language.variable if isinstance(language, BaseEnum) else textcase.snake(language)
-
-        # Use dictionary lookup for better performance and reduced complexity
-        lang_variants = {
-            lang.replace("_", ""),
-            lang.replace("plus_plus", "++"),
-            lang.replace("sharp", "#"),
-            lang.rstrip("ml"),  # reasonml -> reason
-            lang.rstrip("script"),  # coffeescript -> coffee
-        }
-        if language_found := _LANGUAGE_TO_FAMILY.get(lang):
-            return language_found
-        for variant in lang_variants:
-            if language_found := _LANGUAGE_TO_FAMILY.get(variant):
-                return language_found
-        return cls.UNKNOWN
 
 
 # Language-to-family mapping for known languages

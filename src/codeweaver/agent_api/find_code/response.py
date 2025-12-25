@@ -13,12 +13,16 @@ from __future__ import annotations
 
 import contextlib
 
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from codeweaver.agent_api.find_code.intent import IntentType
-from codeweaver.agent_api.find_code.types import CodeMatch, FindCodeResponseSummary, SearchStrategy
 from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
 from codeweaver.core.types import LanguageName
+from codeweaver.core.types.search import SearchStrategy
+
+
+if TYPE_CHECKING:
+    from codeweaver.agent_api.find_code.types import CodeMatch, FindCodeResponseSummary
 
 
 def get_indexer_state_info() -> tuple[
@@ -145,6 +149,8 @@ def build_success_response(
     Returns:
         FindCodeResponseSummary with all fields populated
     """
+    from codeweaver.agent_api.find_code.types import FindCodeResponseSummary
+
     # Determine search mode from strategies
     search_mode = None
     if SearchStrategy.HYBRID_SEARCH in strategies_used:
@@ -204,6 +210,7 @@ def build_error_response(
     """
     # Get indexing state from global application state
     indexing_state, index_coverage = get_indexer_state_info()
+    from codeweaver.agent_api.find_code.types import FindCodeResponseSummary
     from codeweaver.common.registry.provider import get_provider_registry
     from codeweaver.providers.vector_stores.base import VectorStoreProvider
 

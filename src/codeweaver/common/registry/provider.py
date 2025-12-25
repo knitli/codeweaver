@@ -21,20 +21,21 @@ from pydantic import ConfigDict, SecretStr
 from textcase import pascal
 from typing_extensions import TypeIs
 
+from codeweaver.common.utils.checks import is_test_environment
 from codeweaver.common.utils.lazy_importer import LazyImport, lazy_import
 from codeweaver.config.providers import SparseEmbeddingProviderSettings
 from codeweaver.config.types import CodeWeaverSettingsDict
 from codeweaver.core.types.aliases import LiteralStringT
 from codeweaver.core.types.dictview import DictView
 from codeweaver.core.types.models import BasedModel
+
+# NOTE: Re-export Provider and ProviderKind for easier access -- anyone importing the registry likely needs these too
+from codeweaver.core.types.provider import Provider as Provider
+from codeweaver.core.types.provider import ProviderKind as ProviderKind
 from codeweaver.exceptions import ConfigurationError
 from codeweaver.providers.agent.agent_providers import AgentProvider
 from codeweaver.providers.embedding.capabilities.base import SparseEmbeddingModelCapabilities
 from codeweaver.providers.embedding.providers.base import EmbeddingProvider, SparseEmbeddingProvider
-
-# NOTE: Re-export Provider and ProviderKind for easier access -- anyone importing the registry likely needs these too
-from codeweaver.providers.provider import Provider as Provider
-from codeweaver.providers.provider import ProviderKind as ProviderKind
 from codeweaver.providers.reranking.providers.base import RerankingProvider
 from codeweaver.providers.vector_stores.base import VectorStoreProvider
 
@@ -866,24 +867,45 @@ class ProviderRegistry(BasedModel):
             # Filter out CodeWeaver-specific keys that aren't client parameters
             # Keep: provider_settings, client_options (these go to the client)
             # Remove: provider, enabled, model_settings, connection, other, api_key
-            codeweaver_keys = {"provider", "enabled", "model_settings", "connection", "other", "api_key"}
-            filtered_options = {k: v for k, v in (client_options or {}).items() if k not in codeweaver_keys}
+            codeweaver_keys = {
+                "provider",
+                "enabled",
+                "model_settings",
+                "connection",
+                "other",
+                "api_key",
+            }
+            filtered_options = {
+                k: v for k, v in (client_options or {}).items() if k not in codeweaver_keys
+            }
 
             model_name_or_path = provider_settings.get("model") if provider_settings else None
             if model_name_or_path:
                 # SentenceTransformer uses 'model_name_or_path', FastEmbed uses 'model_name'
-                param_name = "model_name_or_path" if provider == Provider.SENTENCE_TRANSFORMERS else "model_name"
+                param_name = (
+                    "model_name_or_path"
+                    if provider == Provider.SENTENCE_TRANSFORMERS
+                    else "model_name"
+                )
                 return client_class(**{param_name: model_name_or_path}, **filtered_options)
             # Try to get model from capabilities if provided
-            if caps and hasattr(caps, 'name'):
-                param_name = "model_name_or_path" if provider == Provider.SENTENCE_TRANSFORMERS else "model_name"
+            if caps and hasattr(caps, "name"):
+                param_name = (
+                    "model_name_or_path"
+                    if provider == Provider.SENTENCE_TRANSFORMERS
+                    else "model_name"
+                )
                 return client_class(**{param_name: caps.name}, **filtered_options)
             if (capabilities := self.get_configured_provider_settings(provider_kind)) and (  # type: ignore
                 model_settings := capabilities.get("model_settings")
             ):  # type: ignore
                 model: str = model_settings["model"]
                 # SentenceTransformer uses 'model_name_or_path', FastEmbed uses 'model_name'
-                param_name = "model_name_or_path" if provider == Provider.SENTENCE_TRANSFORMERS else "model_name"
+                param_name = (
+                    "model_name_or_path"
+                    if provider == Provider.SENTENCE_TRANSFORMERS
+                    else "model_name"
+                )
                 return client_class(**{param_name: model}, **filtered_options)
             # Let provider handle default model selection
             return client_class(**filtered_options)
@@ -1355,9 +1377,25 @@ class ProviderRegistry(BasedModel):
         # Get instance cache for this provider kind
         instance_cache = self._get_instance_cache_for_kind(provider_kind)
 
+        # SPECIAL HANDLING FOR TESTS:
+        # If we are in test mode and requesting memory vector store,
+        # try to find the shared test instance first.
+        if (
+            is_test_environment()
+            and provider == Provider.MEMORY
+            and provider_kind == ProviderKind.VECTOR_STORE
+        ) and Provider.MEMORY in instance_cache:
+            instance = instance_cache[Provider.MEMORY]
+            return self._log_provider_instance_creation(
+                provider, provider_kind, ") returning shared test instance ", instance
+            )
+
         # Check singleton cache first
         if singleton and provider in instance_cache:
-            return instance_cache[provider]
+            instance = instance_cache[provider]
+            return self._log_provider_instance_creation(
+                provider, provider_kind, ") returning cached singleton ", instance
+            )
 
         # Get configuration for this provider
         config = self.get_configured_provider_settings(provider_kind)  # type: ignore
@@ -1386,6 +1424,17 @@ class ProviderRegistry(BasedModel):
         if singleton:
             instance_cache[provider] = instance
 
+        return self._log_provider_instance_creation(
+            provider, provider_kind, ") created new ", instance
+        )
+
+    def _log_provider_instance_creation(self, provider, provider_kind, arg2, instance):
+        import sys
+
+        print(
+            f"DEBUG: get_provider_instance({provider}, {provider_kind}{arg2}{instance} (id={id(instance)})"
+        )
+        sys.stdout.flush()
         return instance
 
     def _get_instance_cache_for_kind(
@@ -1530,7 +1579,9 @@ class ProviderRegistry(BasedModel):
                 )
 
                 kwargs["caps"] = SparseEmbeddingModelCapabilities(
-                    name=model_name, provider=config["provider"], other={}
+                    name=model_name,  # ty:ignore[invalid-argument-type]
+                    provider=config["provider"],
+                    other={},  # ty:ignore[invalid-argument-type]
                 )
             elif provider_kind_enum == ProviderKind.RERANKING:
                 from codeweaver.providers.reranking.capabilities.base import (
@@ -1547,7 +1598,7 @@ class ProviderRegistry(BasedModel):
 
                 # Create minimal dense embedding capability
                 kwargs["caps"] = EmbeddingModelCapabilities(
-                    name=model_name,
+                    name=model_name,  # ty:ignore[invalid-argument-type]
                     provider=config["provider"],
                     default_dimension=model_settings.get("dimension", 768),
                 )

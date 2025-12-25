@@ -76,7 +76,7 @@ async def test_inmemory_persistence():
         await provider2._initialize()
 
         # Verify: Chunk restored from disk
-        from codeweaver.agent_api.find_code.types import SearchStrategy, StrategizedQuery
+        from codeweaver.core.types.search import SearchStrategy, StrategizedQuery
 
         # Use the same dimension as we used for upserting
         dense_caps2 = provider2._embedding_caps.get("dense")

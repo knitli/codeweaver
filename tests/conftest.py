@@ -81,7 +81,7 @@ class MockTokenizer:
 
 
 def _mock_get_tokenizer(tokenizer: str, model: str) -> MockTokenizer:
-    """Mock replacement for codeweaver.tokenizers.get_tokenizer."""
+    """Mock replacement for codeweaver_tokenizers.get_tokenizer."""
     return MockTokenizer(model)
 
 
@@ -113,7 +113,7 @@ def mock_tokenizer_for_unit_tests(
     if should_mock:
         # Patch get_tokenizer to return our mock in all modules that use it
         modules_to_patch = [
-            "codeweaver.tokenizers.get_tokenizer",
+            "codeweaver_tokenizers.get_tokenizer",
             "codeweaver.providers.embedding.providers.base.get_tokenizer",
             "codeweaver.providers.reranking.providers.base.get_tokenizer",
             "codeweaver.providers.reranking.capabilities.base.get_tokenizer",
@@ -181,20 +181,29 @@ def temp_test_file(tmp_path: Path) -> Path:
 
 
 @pytest.fixture(autouse=True)
-def clear_semantic_chunker_stores() -> GeneratorType:
-    """Clear SemanticChunker class-level deduplication stores before each test.
+def clear_all_deduplication_stores() -> GeneratorType:
+    """Clear all class-level deduplication stores before each test.
 
-    This prevents test interference where chunks from one test are marked as
-    duplicates in subsequent tests. The stores are class-level by design for
-    production use (cross-file deduplication within a session), but need to be
-    reset between test runs for isolation.
+    This prevents test interference where chunks or embeddings from one test are
+    marked as duplicates in subsequent tests.
     """
+    from codeweaver.common.utils.utils import generate_collection_name
     from codeweaver.engine.chunker.semantic import SemanticChunker
+    from codeweaver.providers.embedding.providers.base import (
+        EmbeddingProvider,
+        SparseEmbeddingProvider,
+    )
 
+    generate_collection_name.cache_clear()
     SemanticChunker.clear_deduplication_stores()
+    EmbeddingProvider.clear_deduplication_stores()
+    SparseEmbeddingProvider.clear_deduplication_stores()
     yield
-    # Optional: Clear again after test for extra safety
+    # Clear again after test for extra safety
+    generate_collection_name.cache_clear()
     SemanticChunker.clear_deduplication_stores()
+    EmbeddingProvider.clear_deduplication_stores()
+    SparseEmbeddingProvider.clear_deduplication_stores()
 
 
 # ===========================================================================

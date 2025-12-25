@@ -42,22 +42,22 @@ except ImportError:
     # Fallback if httpcore or qdrant_client not available
     RETRYABLE_EXCEPTIONS = (ConnectionError, TimeoutError, OSError, httpx.TimeoutException)
 
-from codeweaver.agent_api.find_code.types import StrategizedQuery
 from codeweaver.config.providers import EmbeddingModelSettings, SparseEmbeddingModelSettings
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.types.enum import BaseEnum
 from codeweaver.core.types.models import BasedModel
-from codeweaver.engine.search import Filter
+from codeweaver.core.types.provider import Provider
+from codeweaver.core.types.search import StrategizedQuery
 from codeweaver.exceptions import ProviderError
 from codeweaver.providers.embedding.capabilities.base import (
     EmbeddingModelCapabilities,
     SparseEmbeddingModelCapabilities,
 )
-from codeweaver.providers.provider import Provider
+from codeweaver.providers.vector_stores.search import Filter
 
 
 if TYPE_CHECKING:
-    from codeweaver.agent_api.find_code.results import SearchResult
+    from codeweaver.core.types.search import SearchResult
 
 
 logger = logging.getLogger(__name__)

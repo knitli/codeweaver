@@ -21,8 +21,8 @@ from pydantic import FilePath
 
 from codeweaver.common.utils import lazy_import
 from codeweaver.config.types import CodeWeaverSettingsDict
+from codeweaver.core.types.provider import Provider as Provider  # needed for pydantic models
 from codeweaver.exceptions import InitializationError
-from codeweaver.providers.provider import Provider as Provider  # needed for pydantic models
 
 
 class UvicornAccessLogFilter(logging.Filter):
@@ -192,7 +192,7 @@ async def _run_http_server(
 
 
 # Re-export from shared daemon module for backward compatibility
-from codeweaver.daemon import start_daemon_if_needed as _start_daemon_if_needed
+from codeweaver_daemon import start_daemon_if_needed as _start_daemon_if_needed
 
 
 async def _run_stdio_server(

@@ -19,7 +19,7 @@ def get_mixed_bread_reranking_capabilities() -> Sequence[RerankingModelCapabilit
     """
     Get the reranking capabilities for Mixed Bread AI models.
     """
-    from codeweaver.providers.provider import Provider
+    from codeweaver.core.types.provider import Provider
     from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 
     models = ("large-v2", "base-v2", "xsmall-v1", "base-v1")

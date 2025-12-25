@@ -24,8 +24,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from codeweaver.core.types.provider import Provider
 from codeweaver.providers.embedding.capabilities.types import PartialCapabilities
-from codeweaver.providers.provider import Provider
 
 
 if TYPE_CHECKING:

@@ -54,7 +54,7 @@ def get_vector_store_provider(settings: VectorStoreProviderSettings) -> VectorSt
         >>> isinstance(provider, QdrantVectorStoreProvider)
         True
     """
-    from codeweaver.providers.provider import Provider
+    from codeweaver.core.types.provider import Provider
     from codeweaver.providers.vector_stores.inmemory import MemoryVectorStoreProvider
     from codeweaver.providers.vector_stores.qdrant import QdrantVectorStoreProvider
 

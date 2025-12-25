@@ -40,26 +40,32 @@ pytest
 mise run test
 
 # Fast unit tests only (CI subset)
-mise run test-fast
+mise run test --profile fast
 ```
 
 ### Common Test Commands
 
 ```bash
 # Integration tests (excluding real providers)
-mise run test-integration
+mise run test --profile integration
 
 # Real provider tests (requires model downloads)
-mise run test-real
+mise run test --profile real
 
 # Heavy tests with models and benchmarks
-mise run test-heavy
+mise run test --profile heavy
 
 # All tests including expensive ones
-mise run test-all
+mise run test --profile all
 
 # With coverage reporting
-mise run test-cov
+mise run test --cov
+
+# Custom markers
+mise run test -m "unit and not expensive"
+
+# Specific directory with profile
+mise run test --profile fast tests/unit
 ```
 
 ## Test Organization
@@ -663,7 +669,7 @@ pytest -vv
 
 ```bash
 # Generate coverage report
-mise run test-cov
+mise run test --cov
 
 # View HTML coverage report
 open htmlcov/index.html
@@ -806,7 +812,7 @@ omit = ["scripts/*", "mise-tasks/*", "typings/*", ".venv/*"]
 
 2. **Verify coverage:**
    ```bash
-   mise run test-cov
+   mise run test --cov
    # Check coverage.xml or htmlcov/index.html
    ```
 

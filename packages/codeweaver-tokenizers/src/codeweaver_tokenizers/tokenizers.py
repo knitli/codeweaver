@@ -15,7 +15,7 @@ from typing import Any, Literal
 
 from typing_extensions import TypeIs
 
-from codeweaver.tokenizers.base import Tokenizer
+from codeweaver_tokenizers.base import Tokenizer
 
 
 logger = logging.getLogger(__name__)

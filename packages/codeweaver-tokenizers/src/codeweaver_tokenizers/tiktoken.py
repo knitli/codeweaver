@@ -11,7 +11,7 @@ from typing import Any
 
 import tiktoken
 
-from codeweaver.tokenizers.base import Tokenizer
+from codeweaver_tokenizers.base import Tokenizer
 
 
 class TiktokenTokenizer(Tokenizer[tiktoken.Encoding]):

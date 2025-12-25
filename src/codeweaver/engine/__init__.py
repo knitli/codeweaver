@@ -44,7 +44,16 @@ if TYPE_CHECKING:
         source_id_for,
     )
     from codeweaver.engine.chunking_service import ChunkingService
-    from codeweaver.engine.search import (
+    from codeweaver.engine.watcher import (
+        CodeFilter,
+        ConfigFilter,
+        DefaultFilter,
+        DocsFilter,
+        ExtensionFilter,
+        FileWatcher,
+        IgnoreFilter,
+    )
+    from codeweaver.providers.vector_stores.search import (
         AnyVariants,
         ArbitraryFilter,
         Condition,
@@ -80,15 +89,6 @@ if TYPE_CHECKING:
         ValueVariants,
         make_partial_function,
         wrap_filters,
-    )
-    from codeweaver.engine.watcher import (
-        CodeFilter,
-        ConfigFilter,
-        DefaultFilter,
-        DocsFilter,
-        ExtensionFilter,
-        FileWatcher,
-        IgnoreFilter,
     )
 
 parent = __spec__.parent or "codeweaver.engine"

@@ -23,7 +23,7 @@ from codeweaver.semantic.classifications import AgentTask
 
 
 if TYPE_CHECKING:
-    from codeweaver.agent_api.find_code.results import SearchResult
+    from codeweaver.core.types.search import SearchResult
     from codeweaver.providers.reranking.providers.base import RerankingResult
 
 

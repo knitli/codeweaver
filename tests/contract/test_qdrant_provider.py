@@ -22,9 +22,9 @@ from uuid import UUID
 
 import pytest
 
-from codeweaver.agent_api.find_code.types import StrategizedQuery
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.spans import Span
+from codeweaver.core.types.search import SearchStrategy, StrategizedQuery
 from codeweaver.providers.vector_stores.qdrant import QdrantVectorStoreProvider
 
 
@@ -276,7 +276,6 @@ class TestQdrantProviderContract:
         await asyncio.sleep(1.0)
 
         # Verify chunks were stored
-        from codeweaver.agent_api.find_code.types import SearchStrategy
 
         results = await qdrant_provider.search(
             StrategizedQuery(

@@ -1,3 +1,8 @@
+// SPDX-FileCopyrightText: 2025 Knitli Inc.
+// SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+//
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
 // CodeWeaver Dependency Graph
 // Render with: dot -Tpng dependency_graph.dot -o dependency_graph.png
 // Or view at: https://dreampuf.github.io/GraphvizOnline/

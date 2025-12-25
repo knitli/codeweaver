@@ -10,12 +10,12 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Annotated, Any, Literal, cast
 
+from codeweaver_tokenizers.base import Tokenizer
 from pydantic import ConfigDict, Field, NonNegativeInt, PositiveInt
 
 from codeweaver.core.types.models import BasedModel
+from codeweaver.core.types.provider import Provider
 from codeweaver.exceptions import ValidationError as CodeWeaverValidationError
-from codeweaver.providers.provider import Provider
-from codeweaver.tokenizers.base import Tokenizer
 
 
 if TYPE_CHECKING:
@@ -92,7 +92,7 @@ class RerankingModelCapabilities(BasedModel):
     @property
     def token_processor(self) -> Tokenizer[Any]:
         """Return the tokenizer for the model."""
-        from codeweaver.tokenizers import get_tokenizer
+        from codeweaver_tokenizers import get_tokenizer
 
         if self.tokenizer and self.tokenizer_model:
             return get_tokenizer(self.tokenizer, self.tokenizer_model)

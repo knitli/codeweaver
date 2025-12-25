@@ -20,7 +20,7 @@ from codeweaver.common.utils.lazy_getter import create_lazy_getattr
 
 
 if TYPE_CHECKING:
-    from codeweaver.engine.search.condition import (
+    from codeweaver.providers.vector_stores.search.condition import (
         Condition,
         FieldCondition,
         Filter,
@@ -34,19 +34,19 @@ if TYPE_CHECKING:
         NestedCondition,
         ValuesCount,
     )
-    from codeweaver.engine.search.filter_factory import (
+    from codeweaver.providers.vector_stores.search.filter_factory import (
         ArbitraryFilter,
         make_filter,
         to_qdrant_filter,
     )
-    from codeweaver.engine.search.geo import (
+    from codeweaver.providers.vector_stores.search.geo import (
         GeoBoundingBox,
         GeoLineString,
         GeoPoint,
         GeoPolygon,
         GeoRadius,
     )
-    from codeweaver.engine.search.match import (
+    from codeweaver.providers.vector_stores.search.match import (
         AnyVariants,
         ExtendedPointId,
         Match,
@@ -57,17 +57,20 @@ if TYPE_CHECKING:
         MatchValue,
         ValueVariants,
     )
-    from codeweaver.engine.search.payload import (
+    from codeweaver.providers.vector_stores.search.payload import (
         Entry,
         PayloadField,
         PayloadMetadata,
         PayloadSchemaType,
     )
-    from codeweaver.engine.search.range import DatetimeRange, Range, RangeInterface
-    from codeweaver.engine.search.wrap_filters import make_partial_function, wrap_filters
+    from codeweaver.providers.vector_stores.search.range import DatetimeRange, Range, RangeInterface
+    from codeweaver.providers.vector_stores.search.wrap_filters import (
+        make_partial_function,
+        wrap_filters,
+    )
 
 
-parent = __spec__.parent or "codeweaver.engine.search"
+parent = __spec__.parent or "codeweaver.providers.vector_stores.search"
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "Condition": (parent, "condition"),

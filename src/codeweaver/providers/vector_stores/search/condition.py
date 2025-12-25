@@ -18,10 +18,10 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, StrictInt, StrictStr
 
-from codeweaver.engine.search.geo import GeoBoundingBox, GeoPolygon, GeoRadius
-from codeweaver.engine.search.match import Match
-from codeweaver.engine.search.payload import PayloadField, PayloadSchemaType
-from codeweaver.engine.search.range import RangeInterface
+from codeweaver.providers.vector_stores.search.geo import GeoBoundingBox, GeoPolygon, GeoRadius
+from codeweaver.providers.vector_stores.search.match import Match
+from codeweaver.providers.vector_stores.search.payload import PayloadField, PayloadSchemaType
+from codeweaver.providers.vector_stores.search.range import RangeInterface
 
 
 class MinShould(BaseModel, extra="forbid"):

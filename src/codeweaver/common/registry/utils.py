@@ -21,7 +21,7 @@ if TYPE_CHECKING:
         VectorStoreProviderSettings,
     )
     from codeweaver.core.types.dictview import DictView
-    from codeweaver.providers.provider import ProviderKind
+    from codeweaver.core.types.provider import ProviderKind
 
 
 _provider_settings: DictView[ProviderSettingsDict] | None = None
@@ -151,7 +151,7 @@ def get_model_config(
     | None
 ):
     """Get the model settings for a specific provider kind."""
-    from codeweaver.providers.provider import ProviderKind
+    from codeweaver.core.types.provider import ProviderKind
 
     provider_settings = get_provider_settings()
     kind = ProviderKind.from_string(kind) if isinstance(kind, str) else kind  # type: ignore

@@ -79,7 +79,12 @@ mise run check
 mise run test
 
 # Run with coverage
-mise run test-cov
+mise run test --cov
+
+# Run specific test profile
+mise run test --profile fast        # Fast unit tests
+mise run test --profile integration # Integration tests
+mise run test --profile real        # Real provider tests
 
 # Watch mode
 mise run test-watch

@@ -14,8 +14,8 @@ from typing import Any
 from pydantic import SecretStr
 
 from codeweaver.config.providers import QdrantConfig
+from codeweaver.core.types.provider import Provider
 from codeweaver.exceptions import ProviderError
-from codeweaver.providers.provider import Provider
 from codeweaver.providers.vector_stores.qdrant_base import QdrantBaseProvider
 
 

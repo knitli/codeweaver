@@ -197,13 +197,18 @@ def session_statistics() -> SessionStatistics:
 
 @pytest.fixture
 def health_service(
-    mock_provider_registry: MagicMock, session_statistics: SessionStatistics
+    mock_provider_registry: MagicMock, session_statistics: SessionStatistics, mocker
 ) -> HealthService:
     """Create health service instance."""
+    mock_failover = mocker.MagicMock()
+    mock_failover._failover_active = False
+    mock_failover._primary_store = None
+
     return HealthService(
         provider_registry=mock_provider_registry,
         statistics=session_statistics,
         indexer=None,
+        failover_manager=mock_failover,
         startup_stopwatch=time.monotonic(),
     )
 

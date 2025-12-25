@@ -28,12 +28,12 @@ import pytest
 from qdrant_client import models
 from qdrant_client.async_qdrant_client import AsyncQdrantClient
 
-from codeweaver.agent_api.find_code.types import SearchStrategy, StrategizedQuery
 from codeweaver.config.providers import MemoryConfig, QdrantConfig
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.language import SemanticSearchLanguage
 from codeweaver.core.metadata import ChunkKind, ExtKind
 from codeweaver.core.spans import Span
+from codeweaver.core.types.search import SearchStrategy, StrategizedQuery
 from codeweaver.providers.provider import Provider
 from codeweaver.providers.vector_stores.inmemory import MemoryVectorStoreProvider
 from codeweaver.providers.vector_stores.qdrant import QdrantVectorStoreProvider

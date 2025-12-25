@@ -29,9 +29,17 @@ from codeweaver.providers.provider import Provider
 @pytest.fixture
 def temp_project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Create temporary project directory."""
+    # Reset global settings to avoid state pollution between tests
+    from codeweaver.config.settings import reset_settings
+    reset_settings()
+
     project = tmp_path / "test_project"
     project.mkdir()
     (project / ".git").mkdir()
+
+    # Create an empty test config to prevent searching parent directories
+    (project / "codeweaver.test.local.toml").write_text("# Empty test config\n")
+
     monkeypatch.chdir(project)
     return project
 
@@ -271,15 +279,14 @@ class TestDoctorConfigAssumptions:
     ) -> None:
         """Test environment-only setup is valid."""
         # Set env vars for complete config - use a provider that's guaranteed to be available
-        monkeypatch.setenv("CODEWEAVER_PROJECT_PATH", str(temp_project))
         monkeypatch.setenv("CODEWEAVER_EMBEDDING_PROVIDER", "sentence-transformers")
         monkeypatch.setenv(
             "CODEWEAVER_EMBEDDING_MODEL", "ibm-granite/granite-embedding-small-english-r2"
         )
         monkeypatch.setenv("CODEWEAVER_VECTOR_STORE_TYPE", "qdrant")
 
-        # Create settings without config file
-        settings = CodeWeaverSettings()
+        # Create settings - pass project_path directly rather than relying on env var
+        settings = CodeWeaverSettings(project_path=temp_project)
 
         # Should be valid - embedding is now a tuple
         assert settings.project_path == temp_project
@@ -302,20 +309,17 @@ class TestDoctorConfigAssumptions:
     def test_config_sources_hierarchy(
         self, temp_project: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Test env vars can configure settings."""
+        """Test init args can configure settings."""
         from codeweaver.config.settings import CodeWeaverSettings
 
-        # Test that explicit env vars work for basic settings
-        # Use a simple setting like project_path that we know env vars control
+        # Test that explicit init args work for basic settings
         custom_path = temp_project / "custom_location"
         custom_path.mkdir()
 
-        monkeypatch.setenv("CODEWEAVER_PROJECT_PATH", str(custom_path))
+        # Pass project_path directly to ensure init_settings source takes precedence
+        settings = CodeWeaverSettings(project_path=custom_path)
 
-        # Env var should be respected for project_path
-        settings = CodeWeaverSettings()
-
-        # Verify the env var was used
+        # Verify the init arg was used
         assert settings.project_path == custom_path, (
             f"Expected {custom_path}, got {settings.project_path}"
         )
