@@ -217,18 +217,14 @@ async def embed_query(
         try:
             dense_provider = await get_embedding_provider()
         except Exception as e:
-            import sys
-            print(f"DEBUG: get_embedding_provider failed: {e}")
-            sys.stdout.flush()
+            logger.warning("get_embedding_provider failed", exc_info=e)
             dense_provider = None
 
     if sparse_provider is None:
         try:
             sparse_provider = await get_sparse_embedding_provider()
         except Exception as e:
-            import sys
-            print(f"DEBUG: get_sparse_embedding_provider failed: {e}")
-            sys.stdout.flush()
+            logger.warning("get_sparse_embedding_provider failed", exc_info=e)
             sparse_provider = None
 
     await log_to_client_or_fallback(

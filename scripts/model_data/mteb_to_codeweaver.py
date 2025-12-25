@@ -3,7 +3,7 @@
 # requires-python = "3.13"
 # dependencies = ["pydantic>=2.12.5", "black>=25.12.0", "rich>=14.2.0", "cyclopts>=4.3.0", "mteb>=2.3.10", "fastembed>=0.7.4"]
 # ///
-# SPDX-FileCopyrightText: 2025 (c) 2025 Knitli Inc.
+
 # SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #

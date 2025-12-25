@@ -1429,12 +1429,14 @@ class ProviderRegistry(BasedModel):
         )
 
     def _log_provider_instance_creation(self, provider, provider_kind, arg2, instance):
-        import sys
-
-        print(
-            f"DEBUG: get_provider_instance({provider}, {provider_kind}{arg2}{instance} (id={id(instance)})"
+        logger.debug(
+            "get_provider_instance(%r, %r% s%r (id=%d))",
+            provider,
+            provider_kind,
+            arg2,
+            instance,
+            id(instance),
         )
-        sys.stdout.flush()
         return instance
 
     def _get_instance_cache_for_kind(
