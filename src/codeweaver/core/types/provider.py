@@ -112,7 +112,6 @@ class Provider(BaseEnum):
         """Get the environment variables used by the provider's client that are not part of CodeWeaver's settings."""
         from codeweaver.core.types.env import EnvFormat
         from codeweaver.core.types.env import EnvVarInfo as ProviderEnvVarInfo
-        from codeweaver.providers.provider import ProviderEnvVars
 
         httpx_env_vars = {
             "http_proxy": ProviderEnvVarInfo(
@@ -504,41 +503,23 @@ class Provider(BaseEnum):
 
     def is_embedding_provider(self) -> bool:
         """Check if the provider is an embedding provider."""
-        from codeweaver.providers.capabilities import get_provider_kinds
-        from codeweaver.providers.types import LiteralProvider
-
-        return any(
-            kind == ProviderKind.EMBEDDING
-            for kind in get_provider_kinds(cast(LiteralProvider, self))
-        )
+        return any(kind == ProviderKind.EMBEDDING for kind in get_provider_kinds(self))
 
     def is_sparse_provider(self) -> bool:
         """Check if the provider is a sparse embedding provider."""
-        from codeweaver.providers.capabilities import get_provider_kinds
-        from codeweaver.providers.types import LiteralProvider
-
-        return ProviderKind.SPARSE_EMBEDDING in get_provider_kinds(cast(LiteralProvider, self))
+        return ProviderKind.SPARSE_EMBEDDING in get_provider_kinds(self)
 
     def is_reranking_provider(self) -> bool:
         """Check if the provider is a reranking provider."""
-        from codeweaver.providers.capabilities import get_provider_kinds
-        from codeweaver.providers.types import LiteralProvider
-
-        return ProviderKind.RERANKING in get_provider_kinds(cast(LiteralProvider, self))
+        return ProviderKind.RERANKING in get_provider_kinds(self)
 
     def is_agent_provider(self) -> bool:
         """Check if the provider is an agent model provider."""
-        from codeweaver.providers.capabilities import get_provider_kinds
-        from codeweaver.providers.types import LiteralProvider
-
-        return ProviderKind.AGENT in get_provider_kinds(cast(LiteralProvider, self))
+        return ProviderKind.AGENT in get_provider_kinds(self)
 
     def is_data_provider(self) -> bool:
         """Check if the provider is a data provider."""
-        from codeweaver.providers.capabilities import get_provider_kinds
-        from codeweaver.providers.types import LiteralProvider
-
-        return ProviderKind.DATA in get_provider_kinds(cast(LiteralProvider, self))
+        return ProviderKind.DATA in get_provider_kinds(self)
 
     def get_env_api_key(self) -> str | None:
         """Get the API key from environment variables, if set."""
@@ -558,3 +539,55 @@ class Provider(BaseEnum):
                     if (env_var := env_info.get(var)) and (env := env_var.env) and os.getenv(env):
                         return True
         return False
+
+
+from types import MappingProxyType
+
+
+PROVIDER_CAPABILITIES: MappingProxyType[Provider, tuple[ProviderKind, ...]] = MappingProxyType({
+    Provider.ANTHROPIC: (ProviderKind.AGENT,),
+    Provider.AZURE: (ProviderKind.AGENT, ProviderKind.EMBEDDING),
+    Provider.BEDROCK: (ProviderKind.EMBEDDING, ProviderKind.RERANKING, ProviderKind.AGENT),
+    Provider.CEREBRAS: (ProviderKind.AGENT,),
+    Provider.COHERE: (ProviderKind.EMBEDDING, ProviderKind.RERANKING, ProviderKind.AGENT),
+    Provider.DEEPSEEK: (ProviderKind.AGENT,),
+    Provider.DUCKDUCKGO: (ProviderKind.DATA,),
+    Provider.FASTEMBED: (
+        ProviderKind.EMBEDDING,
+        ProviderKind.RERANKING,
+        ProviderKind.SPARSE_EMBEDDING,
+    ),
+    Provider.FIREWORKS: (ProviderKind.AGENT, ProviderKind.EMBEDDING),
+    Provider.GITHUB: (ProviderKind.AGENT, ProviderKind.EMBEDDING),
+    Provider.GOOGLE: (ProviderKind.AGENT, ProviderKind.EMBEDDING),
+    Provider.X_AI: (ProviderKind.AGENT,),
+    Provider.GROQ: (ProviderKind.AGENT, ProviderKind.EMBEDDING),
+    Provider.HEROKU: (ProviderKind.AGENT, ProviderKind.EMBEDDING),
+    Provider.HUGGINGFACE_INFERENCE: (ProviderKind.AGENT, ProviderKind.EMBEDDING),
+    Provider.LITELLM: (ProviderKind.AGENT,),
+    Provider.MISTRAL: (ProviderKind.AGENT, ProviderKind.EMBEDDING),
+    Provider.MEMORY: (ProviderKind.VECTOR_STORE,),
+    Provider.MOONSHOT: (ProviderKind.AGENT,),
+    Provider.OLLAMA: (ProviderKind.AGENT, ProviderKind.EMBEDDING),
+    Provider.OPENAI: (ProviderKind.AGENT, ProviderKind.EMBEDDING),
+    Provider.OPENROUTER: (ProviderKind.AGENT,),
+    Provider.PERPLEXITY: (ProviderKind.AGENT,),
+    Provider.QDRANT: (ProviderKind.VECTOR_STORE,),
+    Provider.SENTENCE_TRANSFORMERS: (
+        ProviderKind.EMBEDDING,
+        ProviderKind.RERANKING,
+        ProviderKind.SPARSE_EMBEDDING,
+    ),
+    Provider.TAVILY: (ProviderKind.DATA,),
+    Provider.TOGETHER: (ProviderKind.AGENT, ProviderKind.EMBEDDING),
+    Provider.VERCEL: (ProviderKind.AGENT, ProviderKind.EMBEDDING),
+    Provider.VOYAGE: (ProviderKind.EMBEDDING, ProviderKind.RERANKING),
+})
+
+
+def get_provider_kinds(provider: Provider) -> tuple[ProviderKind, ...]:
+    """Get capabilities for a provider."""
+    return PROVIDER_CAPABILITIES.get(provider, (ProviderKind.DATA,))
+
+
+__all__ = ("Provider", "ProviderKind", "get_provider_kinds")

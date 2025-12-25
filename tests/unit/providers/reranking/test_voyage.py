@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from codeweaver.common.utils.utils import uuid7
+from codeweaver.core import uuid7
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.language import SemanticSearchLanguage
 from codeweaver.core.metadata import ChunkKind, ExtKind
@@ -178,7 +178,7 @@ class TestVoyageRerankingProviderReranking:
         )
         from pathlib import Path
 
-        from codeweaver.common.utils.utils import uuid7
+        from codeweaver.core import uuid7
         from codeweaver.core.language import SemanticSearchLanguage
         from codeweaver.core.metadata import ChunkKind, ExtKind
         from codeweaver.core.spans import Span

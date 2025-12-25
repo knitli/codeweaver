@@ -27,6 +27,7 @@ async def test_get_embedding_provider():
         assert result is mock_instance
         mock_registry.get_provider_enum_for.assert_called_with("embedding")
 
+
 @pytest.mark.asyncio
 async def test_get_sparse_embedding_provider():
     mock_registry = MagicMock()
@@ -39,6 +40,7 @@ async def test_get_sparse_embedding_provider():
         assert result is mock_instance
         mock_registry.get_provider_enum_for.assert_called_with("sparse_embedding")
 
+
 @pytest.mark.asyncio
 async def test_get_vector_store():
     mock_registry = MagicMock()
@@ -50,6 +52,7 @@ async def test_get_vector_store():
         result = await get_vector_store()
         assert result is mock_instance
         mock_registry.get_provider_enum_for.assert_called_with("vector_store")
+
 
 @pytest.mark.asyncio
 async def test_get_reranking_provider():

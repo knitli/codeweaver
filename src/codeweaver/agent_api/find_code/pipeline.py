@@ -246,7 +246,11 @@ async def embed_query(
     if dense_provider:
         try:
             dense_query_embedding = await dense_provider.embed_query(query)
-            if isinstance(dense_query_embedding, list) and len(dense_query_embedding) > 0 and isinstance(dense_query_embedding[0], list):
+            if (
+                isinstance(dense_query_embedding, list)
+                and len(dense_query_embedding) > 0
+                and isinstance(dense_query_embedding[0], list)
+            ):
                 pass
             elif dense_query_embedding:
                 dense_query_embedding = [dense_query_embedding]
@@ -275,10 +279,7 @@ async def embed_query(
                 "warning",
                 {
                     "msg": "Sparse embedding failed",
-                    "extra": {
-                        "phase": "query_embedding",
-                        "error": str(e),
-                    },
+                    "extra": {"phase": "query_embedding", "error": str(e)},
                 },
             )
             sparse_query_embedding = None
@@ -339,9 +340,7 @@ def build_query_vector(query_result: QueryResult, query: str) -> StrategizedQuer
 
 
 async def execute_vector_search(
-    query_vector: StrategizedQuery,
-    context: Any = None,
-    vector_store: VectorStoreDep | None = None
+    query_vector: StrategizedQuery, context: Any = None, vector_store: VectorStoreDep | None = None
 ) -> list[SearchResult]:
     """Execute vector search against configured vector store.
 
@@ -398,7 +397,7 @@ async def rerank_results(
     query: str,
     candidates: list[SearchResult],
     context: Any = None,
-    reranking: RerankingDep | None = None
+    reranking: RerankingDep | None = None,
 ) -> tuple[list[Any] | None, SearchStrategy | None]:
     """Rerank search results using configured reranking provider.
 
@@ -419,6 +418,7 @@ async def rerank_results(
     if reranking is None:
         try:
             from codeweaver.di.providers import get_reranking_provider
+
             reranking = await get_reranking_provider()
         except Exception:
             reranking = None

@@ -197,7 +197,7 @@ python scripts/validate_proposed_structure.py
 
 ### Priority 1: Break Provider → Engine Dependency (1 week)
 - Move `common/registry` → `core/registry`
-- Extract search types from `agent_api` → `core/search_types.py`
+- Extract search types from `agent_api` → `core/types/search.py`
 - Extract provider config types → `core/provider_config.py`
 
 ### Priority 2: Fix Core → Utils Circular Dependency (2-3 days)

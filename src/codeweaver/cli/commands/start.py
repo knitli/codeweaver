@@ -26,7 +26,7 @@ from typing_extensions import TypeIs
 
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
 from codeweaver.cli.utils import get_settings_map_for
-from codeweaver.common.utils.lazy_importer import lazy_import
+from codeweaver.core import lazy_import
 
 
 if TYPE_CHECKING:
@@ -354,7 +354,7 @@ async def start(
     ):
         display.print_error("Invalid host or port provided. Please check your inputs.")
         return
-    get_project_path = lazy_import("codeweaver.common.utils.git", "get_project_path")
+    get_project_path = lazy_import("codeweaver.core", "get_project_path")
     from codeweaver.core.types.sentinel import Unset
 
     project = (

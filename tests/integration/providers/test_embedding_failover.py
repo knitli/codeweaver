@@ -58,7 +58,7 @@ def cleanup_registry():
 @pytest.fixture
 def sample_chunk() -> CodeChunk:
     """Create a sample code chunk for testing."""
-    from codeweaver.common.utils import uuid7
+    from codeweaver.core import uuid7
 
     return CodeChunk(
         content="def test_function():\n    return 42",

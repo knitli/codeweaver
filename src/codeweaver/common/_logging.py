@@ -18,15 +18,14 @@ from fastmcp import Context
 from pydantic_core import to_json
 
 from codeweaver.cli.utils import is_tty
-from codeweaver.common.utils.checks import is_ci
-from codeweaver.common.utils.lazy_importer import lazy_import
 from codeweaver.config._logging import LoggingConfigDict
+from codeweaver.core import is_ci, lazy_import
 
 
 if TYPE_CHECKING:
     from rich.logging import RichHandler
 
-    from codeweaver.common import LazyImport
+    from codeweaver.core import LazyImport
 else:
     RichHandler: LazyImport[RichHandler] = lazy_import("rich.logging", "RichHandler")
 
@@ -40,7 +39,7 @@ SESSION_LOG_FILENAME = "session.log"
 
 def get_session_log_path() -> Path:
     """Get the path to the session log file in the user config directory."""
-    from codeweaver.common.utils.utils import get_user_config_dir
+    from codeweaver.core import get_user_config_dir
 
     config_dir = get_user_config_dir()
     config_dir.mkdir(parents=True, exist_ok=True)

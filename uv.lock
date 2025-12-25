@@ -967,6 +967,9 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+build = [
+    { name = "hatchling" },
+]
 test = [
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -975,12 +978,13 @@ test = [
 
 [package.metadata]
 requires-dist = [
+    { name = "hatchling", marker = "extra == 'build'" },
     { name = "httpx", extras = ["http2"], specifier = ">=0.28.1" },
     { name = "pytest", marker = "extra == 'test'" },
     { name = "pytest-asyncio", marker = "extra == 'test'" },
     { name = "pytest-cov", marker = "extra == 'test'" },
 ]
-provides-extras = ["test"]
+provides-extras = ["build", "test"]
 
 [[package]]
 name = "code-weaver-tokenizers"

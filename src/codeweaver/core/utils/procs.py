@@ -14,6 +14,7 @@ import sys
 
 from contextlib import contextmanager
 from functools import cache
+from importlib.util import find_spec
 from typing import TYPE_CHECKING
 
 from pydantic import PositiveInt
@@ -56,20 +57,21 @@ def effective_cpu_count() -> PositiveInt:
     Returns:
         Effective number of CPUs as a positive integer
     """
-    try:
-        import psutil
-
-        cpu_count = get_cpu_count()
-        cgroup_limits = psutil.Process().cpu_affinity()
-        effective_count = min(len(cgroup_limits), cpu_count)  # type: ignore[arg-type]
-        # WSL reports full CPU count, but will sometimes hang or crash if all are used
-        return _wsl_count(effective_count)
-    except ImportError:
+    if not find_spec("psutil"):
         return _wsl_count(get_cpu_count())
+    import psutil
+
+    cpu_count = get_cpu_count()
+    cgroup_limits = psutil.Process().cpu_affinity()
+    effective_count = min(len(cgroup_limits), cpu_count)  # type: ignore[arg-type]
+    # WSL reports full CPU count, but will sometimes hang or crash if all are used
+    return _wsl_count(effective_count)
 
 
 def _wsl_count(count: PositiveInt) -> PositiveInt:
     """Adjust CPU count for WSL environments.
+
+    Most users run WSL with default settings, which exposes all host CPUs to the WSL instance. If we actually try to use all CPUs, WSL can hang or crash. To avoid this, we halve the CPU count in WSL environments.
 
     Args:
         count: Original CPU count
@@ -77,7 +79,7 @@ def _wsl_count(count: PositiveInt) -> PositiveInt:
     Returns:
         Adjusted CPU count for WSL environments
     """
-    from codeweaver.common.utils.checks import is_wsl
+    from codeweaver.core import is_wsl
 
     return max(int(count / 2), 1) if is_wsl() else count
 
@@ -85,10 +87,6 @@ def _wsl_count(count: PositiveInt) -> PositiveInt:
 @cache
 def asyncio_or_uvloop() -> object:
     """Set uvloop as the event loop policy if available and appropriate."""
-    import platform
-
-    from importlib.util import find_spec
-
     if (
         sys.platform not in {"win32", "cygwin", "wasi", "ios"}
         and platform.python_implementation() == "CPython"

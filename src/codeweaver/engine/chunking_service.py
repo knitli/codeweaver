@@ -155,12 +155,13 @@ class ChunkingService:
         Yields:
             Tuples of (file_path, chunks) for successfully chunked files
         """
-        from codeweaver.common.utils.git import get_project_path
+        from codeweaver.core import get_project_path
         from codeweaver.core.types.sentinel import Unset
         from codeweaver.di import Depends
 
         if isinstance(self.settings, Depends):
             from codeweaver.config.settings import get_settings
+
             self.settings = get_settings()
 
         project_path = (
@@ -240,6 +241,7 @@ class ChunkingService:
 
         if isinstance(self.settings, Depends):
             from codeweaver.config.settings import get_settings
+
             self.settings = get_settings()
 
         chunker = self._selector.select_for_file(file)

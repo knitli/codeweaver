@@ -31,9 +31,9 @@ from watchfiles import Change
 
 from codeweaver.common._logging import log_to_client_or_fallback
 from codeweaver.common.statistics import SessionStatistics, get_session_statistics
-from codeweaver.common.utils.git import set_relative_path
 from codeweaver.config.chunker import ChunkerSettings
 from codeweaver.config.settings import Unset
+from codeweaver.core import set_relative_path
 from codeweaver.core.discovery import DiscoveredFile
 from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
 from codeweaver.core.stores import BlakeStore, get_blake_hash, make_blake_store
@@ -200,7 +200,7 @@ class Indexer(BasedModel):
             project_path: Project path for checkpoint management (preferred)
             walker_settings: Settings dict for creating rignore.Walker instances
         """
-        from codeweaver.common.utils.git import get_project_path
+        from codeweaver.core import get_project_path
 
         self._project_path = (
             project_path
@@ -351,8 +351,9 @@ class Indexer(BasedModel):
         """
         from codeweaver.di import Depends
 
-        print(
-            f"DEBUG: _initialize_providers_async called. self._embedding_provider type: {type(self._embedding_provider)}"
+        logger.debug(
+            "_initialize_providers_async called. self._embedding_provider type: %s",
+            type(self._embedding_provider),
         )
 
         if self._providers_initialized:
@@ -395,6 +396,7 @@ class Indexer(BasedModel):
         if self._chunking_service is None or isinstance(self._chunking_service, Depends):
             from codeweaver.di import get_container
             from codeweaver.engine.chunking_service import ChunkingService
+
             try:
                 self._chunking_service = await get_container().resolve(ChunkingService)
             except Exception:
@@ -402,6 +404,7 @@ class Indexer(BasedModel):
 
         if self._settings is None or isinstance(self._settings, Depends):
             from codeweaver.config.settings import get_settings
+
             self._settings = get_settings()
 
         # Warn if no embedding providers available
@@ -1367,8 +1370,10 @@ class Indexer(BasedModel):
         """
         import sys
 
-        print(
-            f"DEBUG: Indexer.prime_index called on {self} (class from {sys.modules[self.__class__.__module__].__file__})"
+        logger.debug(
+            "Indexer.prime_index called on %s (class from %s)",
+            self,
+            sys.modules[self.__class__.__module__].__file__,
         )
         sys.stdout.flush()
         # Initialize providers asynchronously (idempotent)
@@ -1376,8 +1381,11 @@ class Indexer(BasedModel):
         await self._initialize_providers_async(vector_store=self._vector_store)
         import sys
 
-        print(
-            f"DEBUG: Indexer.prime_index using vector_store={self._vector_store} (id={id(self._vector_store)}) with collection={getattr(self._vector_store, '_collection', 'N/A')}"
+        logger.debug(
+            "Indexer.prime_index using vector_store=%s (id=%s) with collection=%s",
+            self._vector_store,
+            id(self._vector_store),
+            getattr(self._vector_store, "_collection", "N/A"),
         )
         sys.stdout.flush()
 
@@ -1565,9 +1573,9 @@ class Indexer(BasedModel):
         Returns:
             Fully initialized Indexer instance
         """
-        from codeweaver.common.utils.git import get_project_path
         from codeweaver.config.indexer import DefaultIndexerSettings, IndexerSettings
         from codeweaver.config.settings import get_settings_map
+        from codeweaver.core import get_project_path
 
         settings_map = settings or get_settings_map()
         indexer_data = settings_map["indexer"]
@@ -1681,7 +1689,7 @@ class Indexer(BasedModel):
             batch_size: Number of chunks per batch
             progress_callback: Optional callback for progress updates
         """
-        from codeweaver.common.utils.procs import low_priority
+        from codeweaver.core import low_priority
         from codeweaver.providers.embedding.registry import get_embedding_registry
 
         total_chunks = len(chunks)
@@ -2494,8 +2502,9 @@ class Indexer(BasedModel):
             - chunks_updated: Number of chunks updated
             - errors: List of errors encountered
         """
-        print(
-            f"DEBUG: add_missing_embeddings_to_existing_chunks called. self._sparse_provider type: {type(self._sparse_provider)}"
+        logger.debug(
+            "add_missing_embeddings_to_existing_chunks called. self._sparse_provider type: %s",
+            type(self._sparse_provider),
         )
         if not self._file_manifest:
             return {"error": "No manifest loaded", "files_processed": 0, "chunks_updated": 0}
@@ -2551,8 +2560,12 @@ class Indexer(BasedModel):
         # Deduplicate files to avoid double processing
         files_to_process = list(set(files_to_process))
         if not files_to_process:
-            print(
-                f"DEBUG: No files need embedding reconciliation. Criteria: add_dense={add_dense}, add_sparse={add_sparse}, current_models={current_models}"
+            logger.debug(
+                "No files need embedding reconciliation. Criteria: add_dense={add_dense}, add_sparse={add_sparse}, current_models={current_models}"
+                "No files need embedding reconciliation. Criteria: add_dense=%s, add_sparse=%s, current_models=%s",
+                add_dense,
+                add_sparse,
+                current_models,
             )
             logger.info("No files need embedding updates")
             return {"files_processed": 0, "chunks_updated": 0, "errors": []}

@@ -181,7 +181,7 @@ from codeweaver.core.search_types import SearchResult
 **Prepare core types:**
 ```bash
 # Move SearchResult types to core
-mkdir -p src/codeweaver/core/search_types.py
+mkdir -p src/codeweaver/core/types/search.py
 # Extract from agent_api/find_code/types.py
 ```
 

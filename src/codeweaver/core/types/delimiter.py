@@ -73,10 +73,18 @@ class DelimiterKind(str, BaseEnum):
     def is_code_element(self) -> bool:
         """Whether the delimiter kind represents a code element like functions or classes."""
         return self in {
-            DelimiterKind.FUNCTION, DelimiterKind.CLASS, DelimiterKind.METHOD,
-            DelimiterKind.INTERFACE, DelimiterKind.STRUCT, DelimiterKind.ENUM,
-            DelimiterKind.TYPE_ALIAS, DelimiterKind.IMPL_BLOCK, DelimiterKind.EXTENSION,
-            DelimiterKind.NAMESPACE, DelimiterKind.MODULE, DelimiterKind.MODULE_BOUNDARY,
+            DelimiterKind.FUNCTION,
+            DelimiterKind.CLASS,
+            DelimiterKind.METHOD,
+            DelimiterKind.INTERFACE,
+            DelimiterKind.STRUCT,
+            DelimiterKind.ENUM,
+            DelimiterKind.TYPE_ALIAS,
+            DelimiterKind.IMPL_BLOCK,
+            DelimiterKind.EXTENSION,
+            DelimiterKind.NAMESPACE,
+            DelimiterKind.MODULE,
+            DelimiterKind.MODULE_BOUNDARY,
         }
 
     @property
@@ -88,7 +96,9 @@ class DelimiterKind(str, BaseEnum):
     def is_control_flow(self) -> bool:
         """Whether the delimiter kind represents control flow constructs."""
         return self in {
-            DelimiterKind.CONDITIONAL, DelimiterKind.LOOP, DelimiterKind.TRY_CATCH,
+            DelimiterKind.CONDITIONAL,
+            DelimiterKind.LOOP,
+            DelimiterKind.TRY_CATCH,
             DelimiterKind.CONTEXT_MANAGER,
         }
 
@@ -96,14 +106,18 @@ class DelimiterKind(str, BaseEnum):
     def is_commentary(self) -> bool:
         """Whether the delimiter kind represents commentary like comments or docstrings."""
         return self in {
-            DelimiterKind.COMMENT_LINE, DelimiterKind.COMMENT_BLOCK, DelimiterKind.DOCSTRING,
+            DelimiterKind.COMMENT_LINE,
+            DelimiterKind.COMMENT_BLOCK,
+            DelimiterKind.DOCSTRING,
         }
 
     @property
     def is_generic(self) -> bool:
         """Whether the delimiter kind represents generic or unknown content."""
         return self in {
-            DelimiterKind.PARAGRAPH, DelimiterKind.WHITESPACE, DelimiterKind.GENERIC,
+            DelimiterKind.PARAGRAPH,
+            DelimiterKind.WHITESPACE,
+            DelimiterKind.GENERIC,
             DelimiterKind.UNKNOWN,
         }
 
@@ -116,8 +130,11 @@ class DelimiterKind(str, BaseEnum):
     def is_meta(self) -> bool:
         """Whether the delimiter kind represents meta constructs like annotations or decorators."""
         return self in {
-            DelimiterKind.ANNOTATION, DelimiterKind.DECORATOR, DelimiterKind.PROPERTY,
-            DelimiterKind.PRAGMA, DelimiterKind.WHITESPACE,
+            DelimiterKind.ANNOTATION,
+            DelimiterKind.DECORATOR,
+            DelimiterKind.PROPERTY,
+            DelimiterKind.PRAGMA,
+            DelimiterKind.WHITESPACE,
         }
 
     @property
@@ -161,12 +178,23 @@ class DelimiterKind(str, BaseEnum):
     def infer_nestable(self) -> bool:
         """Infer whether the delimiter kind is nestable."""
         return self in {
-            DelimiterKind.FUNCTION, DelimiterKind.CLASS, DelimiterKind.INTERFACE,
-            DelimiterKind.STRUCT, DelimiterKind.ENUM, DelimiterKind.IMPL_BLOCK,
-            DelimiterKind.EXTENSION, DelimiterKind.NAMESPACE, DelimiterKind.CONDITIONAL,
-            DelimiterKind.LOOP, DelimiterKind.TRY_CATCH, DelimiterKind.CONTEXT_MANAGER,
-            DelimiterKind.BLOCK, DelimiterKind.ARRAY, DelimiterKind.TUPLE,
-            DelimiterKind.STRING, DelimiterKind.TEMPLATE_STRING,
+            DelimiterKind.FUNCTION,
+            DelimiterKind.CLASS,
+            DelimiterKind.INTERFACE,
+            DelimiterKind.STRUCT,
+            DelimiterKind.ENUM,
+            DelimiterKind.IMPL_BLOCK,
+            DelimiterKind.EXTENSION,
+            DelimiterKind.NAMESPACE,
+            DelimiterKind.CONDITIONAL,
+            DelimiterKind.LOOP,
+            DelimiterKind.TRY_CATCH,
+            DelimiterKind.CONTEXT_MANAGER,
+            DelimiterKind.BLOCK,
+            DelimiterKind.ARRAY,
+            DelimiterKind.TUPLE,
+            DelimiterKind.STRING,
+            DelimiterKind.TEMPLATE_STRING,
         }
 
     def infer_inline_strategy(self) -> LineStrategy:
@@ -205,7 +233,6 @@ class LanguageFamily(str, BaseEnum):
     @classmethod
     def from_known_language(cls, language: str | BaseEnum) -> LanguageFamily:
         """Get the language family from a known programming language."""
-        from codeweaver.engine.chunker.delimiters.families import _LANGUAGE_TO_FAMILY
         lang = language.variable if isinstance(language, BaseEnum) else textcase.snake(language)
         lang_variants = {
             lang.replace("_", ""),
@@ -222,8 +249,215 @@ class LanguageFamily(str, BaseEnum):
         return cls.UNKNOWN
 
 
+# Language-to-family mapping for known languages
+_LANGUAGE_TO_FAMILY: dict[str, LanguageFamily] = {
+    "agda": LanguageFamily.FUNCTIONAL_STYLE,
+    "amslatex": LanguageFamily.LATEX_STYLE,
+    "asciidoc": LanguageFamily.MARKUP_STYLE,
+    "assembly": LanguageFamily.SHELL_STYLE,  # ; comments
+    "assemblyscript": LanguageFamily.C_STYLE,
+    "astro": LanguageFamily.MARKUP_STYLE,
+    "bash": LanguageFamily.SHELL_STYLE,
+    "batch": LanguageFamily.SHELL_STYLE,
+    "beamer": LanguageFamily.LATEX_STYLE,
+    "beef": LanguageFamily.C_STYLE,
+    "c": LanguageFamily.C_STYLE,
+    "c#": LanguageFamily.C_STYLE,
+    "c++": LanguageFamily.C_STYLE,
+    "carbon": LanguageFamily.C_STYLE,
+    "chapel": LanguageFamily.FUNCTIONAL_STYLE,
+    "clojure": LanguageFamily.LISP_STYLE,
+    "cmake": LanguageFamily.SHELL_STYLE,
+    "cmd": LanguageFamily.SHELL_STYLE,
+    "cobol": LanguageFamily.UNKNOWN,  # Unique syntax, we have custom patterns for it
+    "coffeescript": LanguageFamily.PYTHON_STYLE,
+    "commonlisp": LanguageFamily.LISP_STYLE,
+    "confluence": LanguageFamily.MARKUP_STYLE,
+    "context": LanguageFamily.LATEX_STYLE,
+    "coq": LanguageFamily.ML_STYLE,
+    "cpp": LanguageFamily.C_STYLE,
+    "creole": LanguageFamily.MARKUP_STYLE,
+    "crystal": LanguageFamily.RUBY_STYLE,
+    "csh": LanguageFamily.SHELL_STYLE,
+    "csharp": LanguageFamily.C_STYLE,
+    "css": LanguageFamily.C_STYLE,  # C-style comments and blocks
+    "csv": LanguageFamily.PLAIN_TEXT,
+    "cuda": LanguageFamily.C_STYLE,
+    "cue": LanguageFamily.C_STYLE,
+    "cython": LanguageFamily.PYTHON_STYLE,
+    "dart": LanguageFamily.C_STYLE,
+    "devicetree": LanguageFamily.C_STYLE,
+    "dhall": LanguageFamily.FUNCTIONAL_STYLE,
+    "dlang": LanguageFamily.C_STYLE,
+    "docbook": LanguageFamily.MARKUP_STYLE,
+    "docker": LanguageFamily.SHELL_STYLE,
+    "dockerfile": LanguageFamily.SHELL_STYLE,
+    "duck": LanguageFamily.FUNCTIONAL_STYLE,
+    "dyck": LanguageFamily.LISP_STYLE,  # Dyck language (parenthesis-based)
+    "ecl": LanguageFamily.LISP_STYLE,
+    "eclisp": LanguageFamily.LISP_STYLE,
+    "eiffel": LanguageFamily.ML_STYLE,
+    "elixirscript": LanguageFamily.RUBY_STYLE,
+    "elisp": LanguageFamily.LISP_STYLE,
+    "elixir": LanguageFamily.RUBY_STYLE,  # Similar syntax to Ruby
+    "elm": LanguageFamily.FUNCTIONAL_STYLE,
+    "elmish": LanguageFamily.FUNCTIONAL_STYLE,
+    "elvish": LanguageFamily.SHELL_STYLE,
+    "emacs": LanguageFamily.LISP_STYLE,
+    "erlang": LanguageFamily.FUNCTIONAL_STYLE,
+    "eta": LanguageFamily.FUNCTIONAL_STYLE,
+    "excel": LanguageFamily.MARKUP_STYLE,  # Formulas and XML-based files
+    "f#": LanguageFamily.ML_STYLE,
+    "factor": LanguageFamily.LISP_STYLE,
+    "fish": LanguageFamily.SHELL_STYLE,
+    "fortran": LanguageFamily.MATLAB_STYLE,
+    "frege": LanguageFamily.FUNCTIONAL_STYLE,
+    "fsharp": LanguageFamily.ML_STYLE,
+    "gleam": LanguageFamily.FUNCTIONAL_STYLE,
+    "gnuplot": LanguageFamily.MATLAB_STYLE,
+    "go": LanguageFamily.C_STYLE,
+    "gosu": LanguageFamily.C_STYLE,
+    "graphql": LanguageFamily.MARKUP_STYLE,
+    "groovy": LanguageFamily.C_STYLE,
+    "hack": LanguageFamily.C_STYLE,
+    "haskell": LanguageFamily.FUNCTIONAL_STYLE,
+    "hcl": LanguageFamily.SHELL_STYLE,
+    "help": LanguageFamily.MARKUP_STYLE,
+    "hjson": LanguageFamily.MARKUP_STYLE,
+    "hlsl": LanguageFamily.C_STYLE,
+    "html": LanguageFamily.MARKUP_STYLE,
+    "hy": LanguageFamily.LISP_STYLE,  # Lisp on Python
+    "idris": LanguageFamily.FUNCTIONAL_STYLE,
+    "imba": LanguageFamily.C_STYLE,
+    "ini": LanguageFamily.SHELL_STYLE,  # # comments
+    "info": LanguageFamily.MARKUP_STYLE,  # .info files
+    "io": LanguageFamily.LISP_STYLE,
+    "janet": LanguageFamily.LISP_STYLE,
+    "java": LanguageFamily.C_STYLE,
+    "javascript": LanguageFamily.C_STYLE,
+    "jelly": LanguageFamily.MARKUP_STYLE,
+    "jinja": LanguageFamily.MARKUP_STYLE,
+    "jruby": LanguageFamily.RUBY_STYLE,
+    "json": LanguageFamily.MARKUP_STYLE,
+    "jsx": LanguageFamily.MARKUP_STYLE,
+    "jule": LanguageFamily.C_STYLE,
+    "julia": LanguageFamily.MATLAB_STYLE,
+    "jupyter": LanguageFamily.PYTHON_STYLE,  # Primarily Python, but can contain other languages and is JSON-based
+    "just": LanguageFamily.SHELL_STYLE,
+    "kotlin": LanguageFamily.C_STYLE,
+    "lagda": LanguageFamily.FUNCTIONAL_STYLE,  # Literate Agda
+    "latex": LanguageFamily.LATEX_STYLE,
+    "less": LanguageFamily.C_STYLE,
+    "lhs": LanguageFamily.FUNCTIONAL_STYLE,  # Literate Haskell
+    "lisp": LanguageFamily.LISP_STYLE,
+    "livescript": LanguageFamily.PYTHON_STYLE,
+    "lua": LanguageFamily.RUBY_STYLE,  # Similar end-based syntax
+    "lualatex": LanguageFamily.LATEX_STYLE,
+    "lucee": LanguageFamily.C_STYLE,
+    "make": LanguageFamily.SHELL_STYLE,
+    "man": LanguageFamily.MARKUP_STYLE,  # manpages (i.e. '.1', '.2' files)
+    "markdown": LanguageFamily.MARKUP_STYLE,
+    "matlab": LanguageFamily.MATLAB_STYLE,
+    "mediawiki": LanguageFamily.MARKUP_STYLE,
+    "mojo": LanguageFamily.PYTHON_STYLE,
+    "move": LanguageFamily.C_STYLE,
+    "mruby": LanguageFamily.RUBY_STYLE,
+    "newick": LanguageFamily.PLAIN_TEXT,  # Newick format for tree visualization with minimal syntax
+    "nim": LanguageFamily.PYTHON_STYLE,
+    "nimble": LanguageFamily.PYTHON_STYLE,
+    "nix": LanguageFamily.FUNCTIONAL_STYLE,
+    "nushell": LanguageFamily.C_STYLE,  # hard to classify, leaning C-style despite being a shell language
+    "objective-c": LanguageFamily.C_STYLE,
+    "objective_c": LanguageFamily.C_STYLE,
+    "objectivec": LanguageFamily.C_STYLE,
+    "ocaml": LanguageFamily.ML_STYLE,
+    "octave": LanguageFamily.MATLAB_STYLE,
+    "odin": LanguageFamily.C_STYLE,
+    "opal": LanguageFamily.RUBY_STYLE,
+    "org": LanguageFamily.MARKUP_STYLE,
+    "pascal": LanguageFamily.ML_STYLE,  # (* *) comments, begin/end blocks
+    "perl": LanguageFamily.SHELL_STYLE,
+    "pharo": LanguageFamily.ML_STYLE,
+    "php": LanguageFamily.C_STYLE,  # //, /* */, { } blocks - C-like syntax
+    "pkl": LanguageFamily.C_STYLE,
+    "plaintex": LanguageFamily.LATEX_STYLE,
+    "pony": LanguageFamily.FUNCTIONAL_STYLE,
+    "powershell": LanguageFamily.SHELL_STYLE,
+    "properties": LanguageFamily.SHELL_STYLE,  # # comments
+    "protobuf": LanguageFamily.MARKUP_STYLE,
+    "purescript": LanguageFamily.FUNCTIONAL_STYLE,
+    "python": LanguageFamily.PYTHON_STYLE,
+    "qb64": LanguageFamily.UNKNOWN,
+    "qml": LanguageFamily.C_STYLE,
+    "r": LanguageFamily.MATLAB_STYLE,
+    "racket": LanguageFamily.LISP_STYLE,
+    "rake": LanguageFamily.RUBY_STYLE,
+    "raku": LanguageFamily.FUNCTIONAL_STYLE,
+    "rakudo": LanguageFamily.SHELL_STYLE,
+    "rdoc": LanguageFamily.MARKUP_STYLE,
+    "reason": LanguageFamily.ML_STYLE,
+    "reasonml": LanguageFamily.ML_STYLE,
+    "red": LanguageFamily.LISP_STYLE,
+    "rescript": LanguageFamily.C_STYLE,
+    "restructuredtext": LanguageFamily.MARKUP_STYLE,
+    "ring": LanguageFamily.C_STYLE,
+    "rmarkdown": LanguageFamily.MARKUP_STYLE,
+    "rmd": LanguageFamily.MARKUP_STYLE,  # R Markdown
+    "rnw": LanguageFamily.LATEX_STYLE,  # R + LaTeX
+    "ruby": LanguageFamily.RUBY_STYLE,
+    "rust": LanguageFamily.C_STYLE,
+    "rtf": LanguageFamily.PLAIN_TEXT,
+    "sas": LanguageFamily.MATLAB_STYLE,
+    "sass": LanguageFamily.PYTHON_STYLE,  # Indentation-based
+    "scala": LanguageFamily.C_STYLE,
+    "scheme": LanguageFamily.LISP_STYLE,
+    "scilab": LanguageFamily.MATLAB_STYLE,
+    "scss": LanguageFamily.C_STYLE,
+    "sh": LanguageFamily.SHELL_STYLE,
+    "shell": LanguageFamily.SHELL_STYLE,
+    "smali": LanguageFamily.SHELL_STYLE,
+    "sml": LanguageFamily.ML_STYLE,
+    "solidity": LanguageFamily.C_STYLE,
+    "sql": LanguageFamily.FUNCTIONAL_STYLE,  # -- comments (like Haskell)
+    "standard": LanguageFamily.ML_STYLE,
+    "standardml": LanguageFamily.ML_STYLE,
+    "svelte": LanguageFamily.MARKUP_STYLE,
+    "svg": LanguageFamily.MARKUP_STYLE,
+    "swift": LanguageFamily.C_STYLE,
+    "tex": LanguageFamily.LATEX_STYLE,
+    "texinfo": LanguageFamily.MARKUP_STYLE,
+    "text": LanguageFamily.PLAIN_TEXT,
+    "textile": LanguageFamily.MARKUP_STYLE,
+    "toml": LanguageFamily.MARKUP_STYLE,
+    "tsx": LanguageFamily.MARKUP_STYLE,
+    "tsv": LanguageFamily.PLAIN_TEXT,
+    "typescript": LanguageFamily.C_STYLE,
+    "txt": LanguageFamily.PLAIN_TEXT,
+    "vala": LanguageFamily.C_STYLE,
+    "vale": LanguageFamily.FUNCTIONAL_STYLE,
+    "vbscript": LanguageFamily.UNKNOWN,  # Unique syntax
+    "verilog": LanguageFamily.C_STYLE,
+    "vhdl": LanguageFamily.C_STYLE,
+    "visualbasic6": LanguageFamily.UNKNOWN,
+    "vlang": LanguageFamily.C_STYLE,
+    "vue": LanguageFamily.MARKUP_STYLE,
+    "wiki": LanguageFamily.MARKUP_STYLE,
+    "xaml": LanguageFamily.MARKUP_STYLE,
+    "xelatex": LanguageFamily.LATEX_STYLE,
+    "xml": LanguageFamily.MARKUP_STYLE,
+    "xonsh": LanguageFamily.PYTHON_STYLE,
+    "yaml": LanguageFamily.MARKUP_STYLE,
+    "yml": LanguageFamily.MARKUP_STYLE,
+    "yard": LanguageFamily.MARKUP_STYLE,
+    "yardoc": LanguageFamily.MARKUP_STYLE,
+    "zig": LanguageFamily.C_STYLE,
+    "zsh": LanguageFamily.SHELL_STYLE,
+}
+
+
 class DelimiterDict(TypedDict, total=False):
     """A dictionary representation of a delimiter pattern."""
+
     start: Required[str]
     end: Required[str]
     kind: NotRequired[DelimiterKind]
@@ -235,6 +469,7 @@ class DelimiterDict(TypedDict, total=False):
 
 class DelimiterPattern(NamedTuple):
     """A pattern for matching delimiters in code."""
+
     starts: Annotated[
         list[str],
         Field(description="The start delimiters.", field_title_generator=generate_field_title),
@@ -297,8 +532,12 @@ class DelimiterPattern(NamedTuple):
                 end=end if self.ends != "ANY" else "",
                 kind=self.kind,
                 priority_override=self.priority_override or self.kind.default_priority,
-                inclusive=self.inclusive if self.inclusive is not None else self.kind.infer_inline_strategy().inclusive,
-                take_whole_lines=self.take_whole_lines if self.take_whole_lines is not None else self.kind.infer_inline_strategy().take_whole_lines,
+                inclusive=self.inclusive
+                if self.inclusive is not None
+                else self.kind.infer_inline_strategy().inclusive,
+                take_whole_lines=self.take_whole_lines
+                if self.take_whole_lines is not None
+                else self.kind.infer_inline_strategy().take_whole_lines,
                 nestable=self.nestable if self.nestable is not None else self.kind.infer_nestable(),
             )
             for start, end in zip(
@@ -310,7 +549,7 @@ class DelimiterPattern(NamedTuple):
 
     def format(self, text: str) -> str:
         """Format the given text using the delimiter's formatter, if one is defined."""
-        return self.formatter(text) if self.formatter     else text
+        return self.formatter(text) if self.formatter else text
 
 
 __all__ = ("DelimiterDict", "DelimiterKind", "DelimiterPattern", "LanguageFamily", "LineStrategy")

@@ -28,8 +28,8 @@ from typing import Any, Self
 from pydantic import HttpUrl
 from pydantic.types import SecretStr
 
-from codeweaver.common.utils.utils import uuid7
 from codeweaver.config._project import CODEWEAVER_POSTHOG_PROJECT_KEY
+from codeweaver.core import uuid7
 from codeweaver.core.types.aliases import UUID7HexT
 from codeweaver.core.types.sentinel import Unset
 

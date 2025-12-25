@@ -25,8 +25,6 @@ from typing import Literal, overload
 
 from pydantic import AnyHttpUrl
 
-from codeweaver.common.utils.git import get_project_path
-from codeweaver.common.utils.utils import get_user_config_dir
 from codeweaver.config.providers import (
     AgentModelSettings,
     AgentProviderSettings,
@@ -42,6 +40,7 @@ from codeweaver.config.providers import (
     SparseEmbeddingProviderSettings,
     VectorStoreProviderSettings,
 )
+from codeweaver.core import get_project_path, get_user_config_dir
 from codeweaver.core.stores import get_blake_hash
 
 
@@ -254,8 +253,8 @@ def _backup_profile() -> ProviderSettingsDict:
             enabled=True,
             model_settings=SparseEmbeddingModelSettings(model="qdrant/bm25"),
         ),
-    # For the dense embeddings, we essentially choose the lightest available model
-    # potion-base-8M is a static embedding model, which again loses some quality, but is extremely light weight and virtually instant
+        # For the dense embeddings, we essentially choose the lightest available model
+        # potion-base-8M is a static embedding model, which again loses some quality, but is extremely light weight and virtually instant
         "embedding": EmbeddingProviderSettings(
             provider=Provider.SENTENCE_TRANSFORMERS if HAS_ST else Provider.FASTEMBED,
             model_settings=EmbeddingModelSettings(

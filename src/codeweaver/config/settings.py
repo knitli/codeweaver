@@ -51,9 +51,6 @@ from pydantic_settings import (
     YamlConfigSettingsSource,
 )
 
-from codeweaver.common.utils.checks import is_test_environment
-from codeweaver.common.utils.lazy_importer import lazy_import
-from codeweaver.common.utils.utils import get_user_config_dir
 from codeweaver.config._logging import DefaultLoggingSettings, LoggingSettings
 from codeweaver.config.chunker import ChunkerSettings, DefaultChunkerSettings
 from codeweaver.config.indexer import DefaultIndexerSettings, IndexerSettings
@@ -74,12 +71,14 @@ from codeweaver.config.types import (
     StdioCodeWeaverConfigDict,
     UvicornServerSettings,
 )
+from codeweaver.core import is_test_environment, lazy_import
 from codeweaver.core.types.aliases import FilteredKeyT
 from codeweaver.core.types.dictview import DictView
 from codeweaver.core.types.enum import AnonymityConversion
 from codeweaver.core.types.models import BasedModel
 from codeweaver.core.types.sentinel import UNSET, Unset
 from codeweaver.core.types.utils import clean_sentinel_from_schema
+from codeweaver.core.utils import get_user_config_dir
 from codeweaver.mcp.middleware import McpMiddleware
 
 
@@ -555,7 +554,7 @@ class CodeWeaverSettings(BaseSettings):
             if not isinstance(env_path, Unset):
                 self.project_path = env_path
             else:
-                self.project_path = lazy_import("codeweaver.common.utils", "get_project_path")()
+                self.project_path = lazy_import("codeweaver.core", "get_project_path")()
         # Re-check environment variable for project_name before falling back to auto-detection
         if isinstance(self.project_name, Unset):
             if env_name := os.environ.get("CODEWEAVER_PROJECT_NAME"):
@@ -749,7 +748,7 @@ class CodeWeaverSettings(BaseSettings):
                 cls.model_config["yaml_file"] = path
             case _:
                 raise ValueError(f"Unsupported configuration file format: {extension}")
-        from codeweaver.common.utils import get_project_path
+        from codeweaver.core import get_project_path
 
         return cls(project_path=get_project_path(), **{**kwargs, "config_file": path})  # type: ignore
 
@@ -773,7 +772,7 @@ class CodeWeaverSettings(BaseSettings):
     def project_root(self) -> Path:
         """Get the project root directory. Alias for `project_path`."""
         if isinstance(self.project_path, Unset):
-            from codeweaver.common.utils.git import get_project_path
+            from codeweaver.core import get_project_path
 
             self.project_path = get_project_path()
         return self.project_path.resolve()
@@ -1051,7 +1050,7 @@ class CodeWeaverSettings(BaseSettings):
         obj: CodeWeaverSettings, path: Path | None = None, **override_kwargs: Any
     ) -> Any:
         """Convert an object to a serializable form."""
-        from codeweaver.common.utils.git import get_project_path
+        from codeweaver.core import get_project_path
 
         kwargs = {
             "indent": 4,
@@ -1184,7 +1183,7 @@ def get_settings(config_file: FilePath | None = None) -> CodeWeaverSettings:
         _settings = CodeWeaverSettings()  # type: ignore
 
     if isinstance(_settings.project_path, Unset):
-        from codeweaver.common.utils import get_project_path
+        from codeweaver.core import get_project_path
 
         _settings.project_path = get_project_path()
     if isinstance(_settings.project_name, Unset):

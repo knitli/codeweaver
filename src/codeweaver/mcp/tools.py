@@ -17,8 +17,7 @@ from fastmcp.tools import Tool
 from mcp.types import ToolAnnotations
 
 from codeweaver.agent_api.find_code.types import FindCodeResponseSummary
-from codeweaver.common.utils.lazy_importer import lazy_import
-from codeweaver.core.types import DictView
+from codeweaver.core import DictView, lazy_import
 from codeweaver.mcp.types import ToolRegistrationDict
 from codeweaver.mcp.user_agent import find_code_tool
 

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Annotated, Any
 
+from codeweaver.di.container import Container
 from codeweaver.di.depends import Depends
 
 
@@ -194,26 +195,18 @@ async def get_health_service(
 
 
 async def get_file_watcher(
-    indexer: IndexerDep,
-    ignore_filter: IgnoreFilterDep,
-    settings: SettingsDep,
+    indexer: IndexerDep, ignore_filter: IgnoreFilterDep, settings: SettingsDep
 ) -> Any:
     """Resolve the file watcher."""
-    from codeweaver.common.utils.git import get_project_path
+    from codeweaver.core import get_project_path
     from codeweaver.core.types.sentinel import Unset
     from codeweaver.engine.watcher.watcher import FileWatcher
 
     project_path = (
-        get_project_path()
-        if isinstance(settings.project_path, Unset)
-        else settings.project_path
+        get_project_path() if isinstance(settings.project_path, Unset) else settings.project_path
     )
 
-    return await FileWatcher.create(
-        project_path,
-        indexer=indexer,
-        file_filter=ignore_filter,
-    )
+    return await FileWatcher.create(project_path, indexer=indexer, file_filter=ignore_filter)
 
 
 def setup_default_container(container: Container) -> None:

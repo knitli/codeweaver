@@ -21,9 +21,37 @@ class ImportAnalyzer(ast.NodeVisitor):
     def __init__(self, package_root: str):
         self.package_root = package_root
         self.imports: set[str] = set()
+        self.in_type_checking = False
+
+    def visit_If(self, node: ast.If) -> None:
+        """Visit If nodes to detect TYPE_CHECKING blocks."""
+        is_type_checking = False
+        if isinstance(node.test, ast.Name) and node.test.id == "TYPE_CHECKING":
+            is_type_checking = True
+        elif (
+            isinstance(node.test, ast.Attribute)
+            and isinstance(node.test.value, ast.Name)
+            and node.test.value.id == "typing"
+            and node.test.attr == "TYPE_CHECKING"
+        ):
+            is_type_checking = True
+
+        if is_type_checking:
+            old_val = self.in_type_checking
+            self.in_type_checking = True
+            # Don't visit the body if it's a TYPE_CHECKING block
+            # Actually, we want to skip it, so we don't call generic_visit(node) for the body
+            # but we might want to visit the orelse
+            for item in node.orelse:
+                self.visit(item)
+            self.in_type_checking = old_val
+        else:
+            self.generic_visit(node)
 
     def visit_Import(self, node: ast.Import) -> None:
         """Visit import statements."""
+        if self.in_type_checking:
+            return
         for alias in node.names:
             if alias.name.startswith(self.package_root):
                 self.imports.add(alias.name)
@@ -31,6 +59,8 @@ class ImportAnalyzer(ast.NodeVisitor):
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
         """Visit from...import statements."""
+        if self.in_type_checking:
+            return
         if node.module and node.module.startswith(self.package_root):
             self.imports.add(node.module)
         self.generic_visit(node)
@@ -82,9 +112,6 @@ def analyze_dependencies() -> tuple[dict[str, set[str]], dict[str, list[str]]]:
 
     # Find all Python files
     for py_file in codeweaver_dir.rglob("*.py"):
-        if py_file.name == "__init__.py":
-            continue
-
         # Get the package this file belongs to
         file_package = get_package_name(py_file, src_dir)
         top_level_pkg = extract_top_level_package(file_package)

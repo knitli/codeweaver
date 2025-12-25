@@ -17,11 +17,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple, cast
 
-from codeweaver.common.utils import uuid7
-from codeweaver.core.chunks import CodeChunk
-from codeweaver.core.metadata import Metadata
-from codeweaver.core.spans import Span
-from codeweaver.core.stores import get_blake_hash
+from codeweaver.core import CodeChunk, Metadata, Span, get_blake_hash, uuid7
 from codeweaver.engine.chunker.base import BaseChunker, ChunkGovernor
 from codeweaver.engine.chunker.delimiter_model import Boundary, Delimiter, DelimiterMatch
 from codeweaver.engine.chunker.exceptions import (
@@ -33,7 +29,7 @@ from codeweaver.engine.chunker.exceptions import (
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.discovery import DiscoveredFile
+    from codeweaver.core import DiscoveredFile
 
 
 PERFORMANCE_THRESHOLD_MS = 1000.0  # 1 second

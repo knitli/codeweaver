@@ -14,7 +14,7 @@ from functools import partial
 from typing import TYPE_CHECKING, Any
 
 from codeweaver.cli.ui.status_display import IndexingProgress, StatusDisplay
-from codeweaver.common.utils.utils import elapsed_time_to_human_readable
+from codeweaver.core import elapsed_time_to_human_readable
 
 
 if TYPE_CHECKING:

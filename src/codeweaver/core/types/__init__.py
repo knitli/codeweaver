@@ -9,11 +9,13 @@ from __future__ import annotations
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
-from codeweaver.common.utils.lazy_getter import create_lazy_getattr
+from codeweaver.core.utils import create_lazy_getattr
 
 
 if TYPE_CHECKING:
     from codeweaver.core.types.aliases import (
+        BlakeHashKey,
+        BlakeKey,
         CategoryName,
         CategoryNameT,
         DevToolName,
@@ -68,6 +70,13 @@ if TYPE_CHECKING:
         LineStrategy,
     )
     from codeweaver.core.types.dictview import DictView
+    from codeweaver.core.types.embeddings import (
+        EmbeddingKind,
+        QueryResult,
+        RawEmbeddingVectors,
+        SparseEmbedding,
+        StoredEmbeddingVectors,
+    )
     from codeweaver.core.types.enum import AnonymityConversion, BaseDataclassEnum, BaseEnum
     from codeweaver.core.types.env import EnvFormat, EnvVarInfo
     from codeweaver.core.types.models import (
@@ -76,8 +85,14 @@ if TYPE_CHECKING:
         BasedModel,
         RootedRoot,
     )
+    from codeweaver.core.types.provider import (
+        Provider,
+        ProviderEnvVars,
+        ProviderKind,
+        get_provider_kinds,
+    )
     from codeweaver.core.types.search import SearchResult, SearchStrategy, StrategizedQuery
-    from codeweaver.core.types.sentinel import UNSET, Sentinel, Unset
+    from codeweaver.core.types.sentinel import MISSING, UNSET, Missing, Sentinel, Unset
     from codeweaver.core.types.utils import generate_field_title, generate_title
 
 
@@ -88,6 +103,8 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "BaseEnum": (__spec__.parent, "enum"),
     "BaseEnumData": (__spec__.parent, "dataclasses"),
     "BasedModel": (__spec__.parent, "models"),
+    "BlakeHashKey": (__spec__.parent, "aliases"),
+    "BlakeKey": (__spec__.parent, "aliases"),
     "CategoryName": (__spec__.parent, "aliases"),
     "CategoryNameT": (__spec__.parent, "aliases"),
     "DATACLASS_CONFIG": (__spec__.parent, "dataclasses"),
@@ -103,6 +120,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "DirectoryNameT": (__spec__.parent, "aliases"),
     "DirectoryPath": (__spec__.parent, "aliases"),
     "DirectoryPathT": (__spec__.parent, "aliases"),
+    "EmbeddingKind": (__spec__.parent, "embeddings"),
     "EmbeddingModelName": (__spec__.parent, "aliases"),
     "EmbeddingModelNameT": (__spec__.parent, "aliases"),
     "EnvFormat": (__spec__.parent, "env"),
@@ -125,8 +143,15 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "LiteralStringT": (__spec__.parent, "aliases"),
     "LlmToolName": (__spec__.parent, "aliases"),
     "LlmToolNameT": (__spec__.parent, "aliases"),
+    "MISSING": (__spec__.parent, "sentinel"),
+    "Missing": (__spec__.parent, "sentinel"),
     "ModelName": (__spec__.parent, "aliases"),
     "ModelNameT": (__spec__.parent, "aliases"),
+    "Provider": (__spec__.parent, "provider"),
+    "ProviderEnvVars": (__spec__.parent, "provider"),
+    "ProviderKind": (__spec__.parent, "provider"),
+    "QueryResult": (__spec__.parent, "embeddings"),
+    "RawEmbeddingVectors": (__spec__.parent, "embeddings"),
     "RerankingModelName": (__spec__.parent, "aliases"),
     "RerankingModelNameT": (__spec__.parent, "aliases"),
     "Role": (__spec__.parent, "aliases"),
@@ -138,6 +163,8 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "SentinelName": (__spec__.parent, "aliases"),
     "SentinelNameT": (__spec__.parent, "aliases"),
     "SerializationKwargs": (__spec__.parent, "dataclasses"),
+    "SparseEmbedding": (__spec__.parent, "embeddings"),
+    "StoredEmbeddingVectors": (__spec__.parent, "embeddings"),
     "StrategizedQuery": (__spec__.parent, "search"),
     "ThingName": (__spec__.parent, "aliases"),
     "ThingNameT": (__spec__.parent, "aliases"),
@@ -146,6 +173,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "UUID7Hex": (__spec__.parent, "aliases"),
     "UUID7HexT": (__spec__.parent, "aliases"),
     "Unset": (__spec__.parent, "sentinel"),
+    "get_provider_kinds": (__spec__.parent, "provider"),
     "generate_field_title": (__spec__.parent, "utils"),
     "generate_title": (__spec__.parent, "utils"),
 })
@@ -157,12 +185,15 @@ __all__ = (
     "BASEDMODEL_CONFIG",
     "DATACLASS_CONFIG",
     "FROZEN_BASEDMODEL_CONFIG",
+    "MISSING",
     "UNSET",
     "AnonymityConversion",
     "BaseDataclassEnum",
     "BaseEnum",
     "BaseEnumData",
     "BasedModel",
+    "BlakeHashKey",
+    "BlakeKey",
     "CategoryName",
     "CategoryNameT",
     "DataclassSerializationMixin",
@@ -177,6 +208,7 @@ __all__ = (
     "DirectoryNameT",
     "DirectoryPath",
     "DirectoryPathT",
+    "EmbeddingKind",
     "EmbeddingModelName",
     "EmbeddingModelNameT",
     "EnvFormat",
@@ -198,8 +230,14 @@ __all__ = (
     "LiteralStringT",
     "LlmToolName",
     "LlmToolNameT",
+    "Missing",
     "ModelName",
     "ModelNameT",
+    "Provider",
+    "ProviderEnvVars",
+    "ProviderKind",
+    "QueryResult",
+    "RawEmbeddingVectors",
     "RerankingModelName",
     "RerankingModelNameT",
     "Role",
@@ -211,6 +249,8 @@ __all__ = (
     "SentinelName",
     "SentinelNameT",
     "SerializationKwargs",
+    "SparseEmbedding",
+    "StoredEmbeddingVectors",
     "StrategizedQuery",
     "ThingName",
     "ThingNameT",
@@ -220,6 +260,7 @@ __all__ = (
     "Unset",
     "generate_field_title",
     "generate_title",
+    "get_provider_kinds",
 )
 
 

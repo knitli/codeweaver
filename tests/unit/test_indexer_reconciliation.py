@@ -118,9 +118,7 @@ class TestAddMissingEmbeddings:
 
         # Mock point
         mock_point = Point(
-            id=chunk_id,
-            vector={"": [0.1] * 384},
-            payload={"text": "print('hello')"}
+            id=chunk_id, vector={"": [0.1] * 384}, payload={"text": "print('hello')"}
         )
         mock_indexer._vector_store.client.retrieve.return_value = [mock_point]
 

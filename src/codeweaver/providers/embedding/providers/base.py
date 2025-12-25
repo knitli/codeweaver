@@ -41,12 +41,20 @@ from tenacity import (
     wait_exponential,
 )
 
-from codeweaver.common.utils import LazyImport, lazy_import, uuid7
 from codeweaver.config.providers import EmbeddingModelSettings, SparseEmbeddingModelSettings
-from codeweaver.core.stores import BlakeStore, UUIDStore, make_blake_store, make_uuid_store
-from codeweaver.core.types.enum import AnonymityConversion, BaseEnum
-from codeweaver.core.types.models import BasedModel
-from codeweaver.core.types.provider import Provider
+from codeweaver.core import (
+    AnonymityConversion,
+    BasedModel,
+    BaseEnum,
+    BlakeStore,
+    LazyImport,
+    Provider,
+    UUIDStore,
+    lazy_import,
+    make_blake_store,
+    make_uuid_store,
+    uuid7,
+)
 from codeweaver.exceptions import ProviderError
 from codeweaver.exceptions import ValidationError as CodeWeaverValidationError
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
@@ -846,13 +854,11 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             if isinstance(profile["embedding"], dict):
                 # Use .get() to safely access dimension, fall back to default_dimension if not present
                 backup_dim = profile["embedding"]["model_settings"].get("dimension")
-                if backup_dim:
-                    return backup_dim
             else:
                 backup_dim = cast(tuple, profile["embedding"])[0]["model_settings"].get("dimension")
-                if backup_dim:
-                    return backup_dim
-            # If dimension not in backup profile, fall through to use default_dimension
+            if backup_dim:
+                return backup_dim
+                # If dimension not in backup profile, fall through to use default_dimension
         default_dim = self.caps.default_dimension
         model_settings = self._get_model_settings(sparse=sparse)
         if model_settings and model_settings.get("dimension"):

@@ -105,6 +105,7 @@ class HealthService:
                 self._provider_registry = await container.resolve(ProviderRegistry)
             except Exception:
                 from codeweaver.common.registry import get_provider_registry
+
                 self._provider_registry = get_provider_registry()
 
         if isinstance(self._statistics, Depends):
@@ -112,6 +113,7 @@ class HealthService:
                 self._statistics = await container.resolve(SessionStatistics)
             except Exception:
                 from codeweaver.common.statistics import get_session_statistics
+
                 self._statistics = get_session_statistics()
 
         if isinstance(self._indexer, Depends):
@@ -570,7 +572,7 @@ class HealthService:
             cpu_percent = process.cpu_percent(interval=0.1)
 
             # Disk usage
-            from codeweaver.common.utils import get_user_config_dir
+            from codeweaver.core import get_user_config_dir
 
             config_dir = Path(get_user_config_dir())
             index_dir = config_dir / ".indexes"

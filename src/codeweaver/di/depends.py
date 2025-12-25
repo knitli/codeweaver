@@ -16,9 +16,9 @@ from codeweaver.core.types.sentinel import Sentinel
 
 class DependsPlaceholder(Sentinel):
     """Indicates that a parameter's value should be injected by the DI container.
-    
+
     DependencyPlaceholder primarily serves as a placeholder to satisfy type checkers and linters, indicating that the actual value will be provided by the DI container at runtime.
-    
+
     Usage:
         async def my_function(
             embedding:  Annotated[EmbeddingProvider, Depends[EmbeddingProvider](get_embedding)] = INJECTED
@@ -33,16 +33,16 @@ INJECTED = DependsPlaceholder(
 )  # ty:ignore[invalid-argument-type]
 
 
-class Depends[T: Any]:
+class Depends:
     """Dependency marker, inspired by FastAPI.
 
     Usage:
-        def my_service(provider: EmbeddingProvider = Depends(get_embedding)):
+        def my_service(provider: Annotated[ServiceProvider, Depends(service_factory)] = INJECTED) -> None:
             ...
     """
 
     def __init__(
-        self, dependency: Callable[..., T] | None = None, *, use_cache: bool = True
+        self, dependency: Callable[..., Any] | None = None, *, use_cache: bool = True
     ) -> None:
         """Initialize the dependency marker.
 

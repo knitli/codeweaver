@@ -6,25 +6,11 @@
 
 from __future__ import annotations
 
-from types import MappingProxyType
-from typing import TYPE_CHECKING, Any, Literal
+from typing import Any, Literal
 
-from codeweaver_tokenizers.utils import create_lazy_getattr
-
-
-if TYPE_CHECKING:
-    from codeweaver_tokenizers.base import Tokenizer
-    from codeweaver_tokenizers.tiktoken import TiktokenTokenizer
-    from codeweaver_tokenizers.tokenizers import Tokenizers
-
-
-_dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
-    "Tokenizer": ("codeweaver_tokenizers", "base"),
-    "TiktokenTokenizer": ("codeweaver_tokenizers", "tiktoken"),
-    "Tokenizers": ("codeweaver_tokenizers", "tokenizers"),
-})
-
-__getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
+from codeweaver_tokenizers.base import Tokenizer
+from codeweaver_tokenizers.tiktoken import TiktokenTokenizer
+from codeweaver_tokenizers.tokenizers import Tokenizers
 
 
 def get_tokenizer(tokenizer: Literal["tiktoken", "tokenizers"], model: str) -> Tokenizer[Any]:
@@ -51,8 +37,14 @@ def get_tokenizer(tokenizer: Literal["tiktoken", "tokenizers"], model: str) -> T
     raise ValueError(f"Unsupported tokenizer type: {tokenizer}")
 
 
-__all__ = ("TiktokenTokenizer", "Tokenizer", "Tokenizers", "get_tokenizer")
+def estimate_tokens(text: str | bytes, encoder: str = "cl100k_base") -> int:
+    """Estimate the number of tokens in a text using tiktoken. Defaults to cl100k_base encoding."""
+    import tiktoken
+
+    encoding = tiktoken.get_encoding(encoder)
+    if isinstance(text, bytes):
+        text = text.decode("utf-8", errors="ignore")
+    return len(encoding.encode(text))
 
 
-def __dir__() -> list[str]:
-    return list(__all__)
+__all__ = ("TiktokenTokenizer", "Tokenizer", "Tokenizers", "estimate_tokens", "get_tokenizer")

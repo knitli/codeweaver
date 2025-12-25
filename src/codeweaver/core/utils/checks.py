@@ -20,8 +20,6 @@ from typing import Any
 from pydantic import BaseModel, TypeAdapter
 from typing_extensions import TypeIs
 
-from codeweaver.common.utils.git import in_codeweaver_clone
-
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +53,8 @@ def has_package(package_name: str) -> bool:
 
 def is_debug() -> bool:
     """Check if the application is running in debug mode."""
+    from codeweaver.core import in_codeweaver_clone
+
     env = os.getenv("CODEWEAVER_DEBUG")
 
     explicit_true = (env in ("1", "true", "True", "TRUE")) if env is not None else False
@@ -107,12 +107,7 @@ def file_is_binary(file_path: Path) -> bool:
 def is_test_environment() -> bool:
     """Check if the code is running in a test environment."""
     # Check if CODEWEAVER_TEST_MODE is explicitly enabled
-    test_mode_enabled = os.environ.get("CODEWEAVER_TEST_MODE", "0") in {
-        "1",
-        "true",
-        "True",
-        "TRUE",
-    }
+    test_mode_enabled = os.environ.get("CODEWEAVER_TEST_MODE", "0") in {"1", "true", "True", "TRUE"}
     if test_mode_enabled:
         return True
 
@@ -141,7 +136,7 @@ def is_wsl() -> bool:
 
 def is_wsl_vscode() -> bool:
     """Check if the code is running inside WSL with VSCode integration."""
-    from codeweaver.cli.utils import we_are_in_vscode
+    from codeweaver.core import we_are_in_vscode
 
     return is_wsl() and we_are_in_vscode()
 

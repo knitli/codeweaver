@@ -30,7 +30,7 @@ import watchfiles
 from fastmcp import Context
 
 from codeweaver.cli.utils import is_tty
-from codeweaver.common.utils.checks import is_ci
+from codeweaver.core import is_ci
 from codeweaver.di import depends
 from codeweaver.di.providers import IgnoreFilterDep, IndexerDep, get_ignore_filter, get_indexer
 from codeweaver.engine.indexer.indexer import Indexer

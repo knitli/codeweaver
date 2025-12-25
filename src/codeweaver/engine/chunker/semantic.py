@@ -37,22 +37,25 @@ from uuid import UUID
 from ast_grep_py import SgNode
 from pydantic import UUID7
 
-from codeweaver.common.utils import uuid7
-from codeweaver.core.chunks import CodeChunk
-from codeweaver.core.language import SemanticSearchLanguage
-from codeweaver.core.metadata import ChunkSource, ExtKind, Metadata, SemanticMetadata
-from codeweaver.core.spans import Span
-from codeweaver.core.stores import (
+from codeweaver.core import (
     BlakeHashKey,
     BlakeStore,
+    ChunkSource,
+    CodeChunk,
+    ExtKind,
+    Metadata,
+    SemanticSearchLanguage,
+    Span,
     UUIDStore,
     get_blake_hash,
     make_blake_store,
     make_uuid_store,
+    uuid7,
 )
 from codeweaver.engine.chunker.base import BaseChunker
 from codeweaver.engine.chunker.exceptions import ASTDepthExceededError, BinaryFileError, ParseError
 from codeweaver.engine.chunker.governance import ResourceGovernor
+from codeweaver.semantic.types import SemanticMetadata
 
 
 if TYPE_CHECKING:
@@ -850,9 +853,7 @@ class SemanticChunker(BaseChunker):
             metadata = self._build_metadata(node)
             chunk = CodeChunk(
                 content=node.text,
-                line_range=Span(
-                    node.range.start.line + 1, node.range.end.line + 1, source_id
-                ),  # type: ignore[call-arg]
+                line_range=Span(node.range.start.line + 1, node.range.end.line + 1, source_id),  # type: ignore[call-arg]
                 ext_kind=ExtKind.from_file(file_path) if file_path else None,
                 file_path=file_path,
                 language=self.language,

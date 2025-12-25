@@ -4,9 +4,11 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 
 
+from typing import Annotated
+
 import pytest
 
-from codeweaver.di import Container, Depends
+from codeweaver.di import INJECTED, Container, Depends
 
 
 class MockService:
@@ -19,7 +21,7 @@ async def mock_factory() -> MockService:
 
 
 class NestedService:
-    def __init__(self, service: MockService = Depends(mock_factory)):  # ty:ignore[invalid-parameter-default]
+    def __init__(self, service: Annotated[MockService, Depends(mock_factory)] = INJECTED):  # ty:ignore[invalid-parameter-default]
         self.service = service
 
 

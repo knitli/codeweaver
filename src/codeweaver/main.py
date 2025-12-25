@@ -19,9 +19,9 @@ from typing import Any, Literal, cast
 from fastmcp import FastMCP
 from pydantic import FilePath
 
-from codeweaver.common.utils import lazy_import
 from codeweaver.config.types import CodeWeaverSettingsDict
-from codeweaver.core.types.provider import Provider as Provider  # needed for pydantic models
+from codeweaver.core import Provider as Provider
+from codeweaver.core import lazy_import
 from codeweaver.exceptions import InitializationError
 
 
@@ -106,8 +106,8 @@ async def _run_http_server(
     """
     from codeweaver.cli.ui import StatusDisplay
     from codeweaver.common.statistics import get_session_statistics
-    from codeweaver.common.utils import get_project_path
     from codeweaver.config.settings import get_settings
+    from codeweaver.core import get_project_path
     from codeweaver.core.types.sentinel import Unset
     from codeweaver.mcp.server import create_http_server
     from codeweaver.mcp.state import CwMcpHttpState
@@ -348,7 +348,7 @@ async def run(
 
 
 if __name__ == "__main__":
-    from codeweaver.common.utils.procs import asyncio_or_uvloop
+    from codeweaver.core import asyncio_or_uvloop
 
     asyncio = asyncio_or_uvloop()
     try:

@@ -255,3 +255,12 @@ async def wait_for_daemon_shutdown(
 
     logger.warning("Daemon did not shut down within %s seconds", max_wait_seconds)
     return False
+
+
+__all__ = (
+    "check_daemon_health",
+    "request_daemon_shutdown",
+    "spawn_daemon_process",
+    "start_daemon_if_needed",
+    "wait_for_daemon_shutdown",
+)

@@ -45,12 +45,12 @@ class CodeMatch(BasedModel):
     model_config = BASEDMODEL_CONFIG | ConfigDict(defer_build=True)
 
     # File information
-    file: Annotated[DiscoveredFile, Field(description="""File information""", )]
+    file: Annotated[DiscoveredFile, Field(description="""File information""")]
 
     # Content
-    content: Annotated[CodeChunk, Field(description="""The relevant code chunk.""", )]
+    content: Annotated[CodeChunk, Field(description="""The relevant code chunk.""")]
 
-    span: Annotated[Span, Field(description="""Start and end line numbers""", )]
+    span: Annotated[Span, Field(description="""Start and end line numbers""")]
 
     # Relevance scoring
     relevance_score: Annotated[
@@ -75,11 +75,12 @@ class CodeMatch(BasedModel):
     ]
 
     match_type: Annotated[
-        CodeMatchType, Field(description="""The type of match for this code match""", )]
+        CodeMatchType, Field(description="""The type of match for this code match""")
+    ]
 
     related_symbols: Annotated[
         tuple[str, ...],
-        Field(default_factory=tuple, description="""Related functions, classes, or symbols""", ),
+        Field(default_factory=tuple, description="""Related functions, classes, or symbols"""),
     ]
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
@@ -138,7 +139,7 @@ class FindCodeSubmission(BasedModel):
 
     model_config = BASEDMODEL_CONFIG
 
-    query: Annotated[str, Field(description="""Your code search query in natural language.""", )]
+    query: Annotated[str, Field(description="""Your code search query in natural language.""")]
 
     intent: Annotated[
         IntentType | None,
@@ -156,24 +157,28 @@ class FindCodeResponseSummary(BasedModel):
 
     # Core results
     matches: Annotated[
-        list[CodeMatch], Field(description="""Relevant code matches ranked by relevance""", )]
+        list[CodeMatch], Field(description="""Relevant code matches ranked by relevance""")
+    ]
 
     summary: Annotated[
         str, Field(description="""High-level summary or explanation of findings""", max_length=1000)
     ]
 
     query_intent: Annotated[
-        IntentType | None, Field(description="""Detected or specified intent""", )]
+        IntentType | None, Field(description="""Detected or specified intent""")
+    ]
 
     total_matches: Annotated[
-        NonNegativeInt, Field(description="""Total matches found *before* ranking""", )]
+        NonNegativeInt, Field(description="""Total matches found *before* ranking""")
+    ]
 
     total_results: Annotated[
-        NonNegativeInt, Field(description="""Total results returned in this response""", )]
+        NonNegativeInt, Field(description="""Total results returned in this response""")
+    ]
 
-    token_count: Annotated[NonNegativeInt, Field(description="""Actual tokens used in response""", )]
+    token_count: Annotated[NonNegativeInt, Field(description="""Actual tokens used in response""")]
 
-    execution_time_ms: Annotated[NonNegativeFloat, Field(description="""Total processing time""", )]
+    execution_time_ms: Annotated[NonNegativeFloat, Field(description="""Total processing time""")]
 
     # Operational status fields
     status: Annotated[
@@ -219,7 +224,8 @@ class FindCodeResponseSummary(BasedModel):
 
     # Context information
     search_strategy: Annotated[
-        tuple[SearchStrategy, ...], Field(description="""Search methods used""", )]
+        tuple[SearchStrategy, ...], Field(description="""Search methods used""")
+    ]
 
     languages_found: Annotated[
         tuple[SemanticSearchLanguage | LanguageName, ...],
@@ -314,9 +320,4 @@ if not FindCodeResponseSummary.__pydantic_complete__:
     _ = FindCodeResponseSummary.model_rebuild()
 
 
-__all__ = (
-    "CodeMatch",
-    "CodeMatchType",
-    "FindCodeResponseSummary",
-    "FindCodeSubmission",
-)
+__all__ = ("CodeMatch", "CodeMatchType", "FindCodeResponseSummary", "FindCodeSubmission")

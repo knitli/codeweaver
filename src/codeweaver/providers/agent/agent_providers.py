@@ -182,8 +182,8 @@ def infer_agent_provider_class(provider: str | Provider) -> type[AgentProvider[P
 
 def load_default_agent_providers() -> Generator[type[AgentProvider[Provider]], None, None]:
     """Load the default providers."""
+    from codeweaver.core import get_provider_kinds
     from codeweaver.core.types.provider import Provider, ProviderKind
-    from codeweaver.providers.capabilities import get_provider_kinds
 
     for provider in Provider:
         kinds = get_provider_kinds(provider)  # type: ignore

@@ -15,6 +15,7 @@ from codeweaver.providers.embedding.providers.base import EmbeddingProvider
 # Suppress logging for cleaner output
 logging.getLogger("codeweaver").setLevel(logging.ERROR)
 
+
 async def benchmark_initialization():
     print("--- Performance Baseline: Initialization ---")
 
@@ -29,6 +30,7 @@ async def benchmark_initialization():
     end = time.perf_counter()
     print(f"Container.resolve(Indexer):   {(end - start) * 1000:.2f}ms")
 
+
 async def benchmark_embedding():
     print("\n--- Performance Baseline: Embedding (Local/Mock) ---")
     container = get_container()
@@ -42,10 +44,12 @@ async def benchmark_embedding():
     except Exception as e:
         print(f"Embedding benchmark skipped: {e}")
 
+
 async def main():
     await benchmark_initialization()
     # Embedding might require API keys or local models, skip if not available
     # await benchmark_embedding()
+
 
 if __name__ == "__main__":
     asyncio.run(main())

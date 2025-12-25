@@ -146,7 +146,7 @@ def _get_project_name() -> str:
             if hasattr(settings, "project_name") and not isinstance(settings.project_name, Unset):
                 return cast(str, settings.project_name)
     with contextlib.suppress(Exception):
-        from codeweaver.common.utils.git import get_project_path
+        from codeweaver.core import get_project_path
 
         project_name = get_project_path().name
         globals()["_init"] = False
@@ -156,7 +156,7 @@ def _get_project_name() -> str:
 
 def get_storage_path() -> DirectoryPath:
     """Get the default storage directory for index and checkpoint data."""
-    from codeweaver.common.utils import get_user_config_dir
+    from codeweaver.core import get_user_config_dir
 
     return Path(get_user_config_dir()) / ".indexes"
 
@@ -478,7 +478,7 @@ class IndexerSettings(BasedModel):
             else:
                 # Fallback to our method for trying to identify it directly
                 # this finds the git root or uses the current working directory as a last resort
-                from codeweaver.common.utils.git import get_project_path
+                from codeweaver.core import get_project_path
 
                 project_path = get_project_path()
 

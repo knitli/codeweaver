@@ -4,6 +4,120 @@
 
 [tasks]
 [tasks.test]
+# Testing with flexible profiles and marker selection
+tools.python = '''{{ get_env(name="MISE_PYTHON_VERSION", default="3.13") }}'''
+tools.uv = "latest"
+usage = '''
+arg "[dir]" help="directory to test" default="tests/"
+flag "-m --marks <markers>" help="pytest markers to filter tests"
+flag "-p --profile <profile>" {
+  help "Test profile preset"
+  choices "fast" "integration" "real" "heavy" "all" "skip-list"
+}
+flag "--cov" help="Run with coverage reporting"
+'''
+run = '''
+echo "${CW_PREFIX} Running tests..."
+
+# Set markers based on profile
+PYTEST_MARKS="${usage_marks}"
+case "${usage_profile}" in
+  fast)
+    PYTEST_MARKS="unit and not expensive and not requires_models"
+    echo "${CW_PREFIX} Running fast unit tests (CI subset)..."
+    ;;
+  integration)
+    PYTEST_MARKS="integration and not real_providers and not expensive"
+    echo "${CW_PREFIX} Running integration tests..."
+    ;;
+  real)
+    PYTEST_MARKS="real_providers"
+    echo "${CW_PREFIX} Running real provider tests (requires model downloads)..."
+    ;;
+  heavy)
+    PYTEST_MARKS="requires_models or expensive"
+    echo "${CW_PREFIX} Running heavy tests (requires models)..."
+    ;;
+  skip-list)
+    echo "${CW_PREFIX} Listing skipped tests..."
+    uv run pytest --collect-only -m "skip" "$@"
+    exit 0
+    ;;
+  all)
+    echo "${CW_PREFIX} Running ALL tests (including expensive ones)..."
+    ;;
+esac
+
+# Build pytest command
+PYTEST_CMD="uv run pytest \"${usage_dir}\""
+if [ -n "$PYTEST_MARKS" ]; then
+  PYTEST_CMD="$PYTEST_CMD -m \"$PYTEST_MARKS\""
+fi
+if [ "${usage_cov}" = "true" ]; then
+  uv sync --group test --inexact
+  PYTEST_CMD="$PYTEST_CMD --cov=codeweaver --cov-report=xml --cov-report=term-missing --junit-xml=test-results.xml"
+fi
+PYTEST_CMD="$PYTEST_CMD -v \"\$@\""
+
+eval "$PYTEST_CMD"
+'''
+run_windows = '''
+echo [codeweaver] Running tests...
+set PYTEST_MARKS=%usage_marks%
+if "%usage_profile%"=="fast" (
+    set PYTEST_MARKS=unit and not expensive and not requires_models
+    echo [codeweaver] Running fast unit tests...
+)
+if "%usage_profile%"=="integration" (
+    set PYTEST_MARKS=integration and not real_providers and not expensive
+    echo [codeweaver] Running integration tests...
+)
+if "%usage_profile%"=="real" (
+    set PYTEST_MARKS=real_providers
+    echo [codeweaver] Running real provider tests...
+)
+if "%usage_profile%"=="heavy" (
+    set PYTEST_MARKS=requires_models or expensive
+    echo [codeweaver] Running heavy tests...
+)
+if "%usage_profile%"=="skip-list" (
+    echo [codeweaver] Listing skipped tests...
+    uv run pytest --collect-only -m "skip" %*
+    exit /b 0
+)
+if "%usage_profile%"=="all" (
+    echo [codeweaver] Running ALL tests...
+)
+
+if defined PYTEST_MARKS (
+    set PYTEST_ARGS=-m "%PYTEST_MARKS%"
+) else (
+    set PYTEST_ARGS=
+)
+if "%usage_cov%"=="true" (
+    uv sync --group test --inexact
+    uv run pytest "%usage_dir%" %PYTEST_ARGS% --cov=codeweaver --cov-report=xml --cov-report=term-missing --junit-xml=test-results.xml -v %*
+) else (
+    uv run pytest "%usage_dir%" %PYTEST_ARGS% -v %*
+)
+'''
+
+[tasks.test.env]
+CODEWEAVER_TEST_MODE = "true"
+
+[tasks.test-cov]
+tools.uv = "latest"
+tools.python = '''{{ get_env(name="MISE_PYTHON_VERSION", default="3.13") }}'''
+run = '''
+echo "${CW_PREFIX} Running tests with coverage..."
+uv sync --group test --inexact
+uv run pytest tests/ --cov=codeweaver --cov-report=xml --cov-report=term-missing --junit-xml=test-results.xml -v "$@"
+'''
+run_windows = '''
+echo [codeweaver] Running tests with coverage...
+uv sync --group test --inexact
+uv run pytest tests/ --cov=codeweaver --cov-report=xml --cov-report=term-missing --junit-xml=test-results.xml -v %*
+'''
 
 [tasks.graph]
 usage = '''

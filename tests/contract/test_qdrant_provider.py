@@ -77,7 +77,7 @@ async def qdrant_provider(qdrant_test_manager):
 
 def _register_chunk_embeddings(chunk, dense=None, sparse=None):
     """Helper to register embeddings for a test chunk in the global registry."""
-    from codeweaver.common.utils.utils import uuid7
+    from codeweaver.core import uuid7
     from codeweaver.providers.embedding.registry import get_embedding_registry
     from codeweaver.providers.embedding.types import ChunkEmbeddings, EmbeddingBatchInfo
 
@@ -138,7 +138,7 @@ def _register_chunk_embeddings(chunk, dense=None, sparse=None):
 @pytest.fixture
 def sample_chunk():
     """Create a sample CodeChunk for testing with proper embedding registration."""
-    from codeweaver.common.utils.utils import uuid7
+    from codeweaver.core import uuid7
 
     chunk = CodeChunk.model_construct(
         chunk_name="test.py:test_function",
@@ -253,7 +253,7 @@ class TestQdrantProviderContract:
         """Test upserting a batch of chunks and verify they can be retrieved via search."""
         from pathlib import Path
 
-        from codeweaver.common.utils.utils import uuid7
+        from codeweaver.core import uuid7
         from codeweaver.core.chunks import CodeChunk, Span
 
         chunks = []

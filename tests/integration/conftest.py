@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import contextlib
+import logging
 import os
 
 from collections.abc import AsyncGenerator, Generator
@@ -50,6 +51,8 @@ if TYPE_CHECKING:
     from codeweaver.providers.reranking.providers.sentence_transformers import (
         SentenceTransformersRerankingProvider,
     )
+
+logger = logging.getLogger(__name__)
 
 # ===========================================================================
 # CLI Mock Fixtures
@@ -229,7 +232,7 @@ async def actual_sparse_embedding_provider() -> (
 @pytest.fixture
 def mock_vector_store() -> AsyncMock:
     """Provide a mock vector store that returns search results."""
-    from codeweaver.common.utils.utils import uuid7
+    from codeweaver.core import uuid7
     from codeweaver.core.chunks import CodeChunk
     from codeweaver.core.language import SemanticSearchLanguage
     from codeweaver.core.metadata import ChunkKind, ExtKind
@@ -310,8 +313,10 @@ async def actual_vector_store() -> MemoryVectorStoreProvider:
 
     import sys
 
-    print(
-        f"DEBUG: actual_vector_store returning instance {id(_shared_memory_vector_store)} with collection {getattr(_shared_memory_vector_store, '_collection', 'N/A')}"
+    logger.debug(
+        "actual_vector_store returning instance %d with collection %s",
+        id(_shared_memory_vector_store),
+        getattr(_shared_memory_vector_store, "_collection", "N/A"),
     )
     sys.stdout.flush()
     return _shared_memory_vector_store

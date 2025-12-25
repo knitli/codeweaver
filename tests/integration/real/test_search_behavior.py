@@ -64,7 +64,7 @@ async def indexed_test_project(known_test_codebase):
     # Only patch get_project_path to ensure test codebase collection name coordination
     with (
         patch("codeweaver.agent_api.find_code.time.time", side_effect=mock_time),
-        patch("codeweaver.common.utils.git.get_project_path", return_value=known_test_codebase),
+        patch("codeweaver.core.get_project_path", return_value=known_test_codebase),
     ):
         # Create and initialize indexer
         indexer = await Indexer.from_settings_async(settings_dict)

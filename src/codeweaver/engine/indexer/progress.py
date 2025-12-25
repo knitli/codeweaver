@@ -30,7 +30,7 @@ from rich.progress import (
 )
 from rich.table import Table
 
-from codeweaver.common.utils.utils import elapsed_time_to_human_readable
+from codeweaver.core import elapsed_time_to_human_readable
 from codeweaver.core.types.dataclasses import DataclassSerializationMixin
 from codeweaver.core.types.enum import BaseEnum
 

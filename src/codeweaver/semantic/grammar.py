@@ -260,7 +260,7 @@ from pydantic import (
 )
 from pydantic.dataclasses import dataclass
 
-from codeweaver.common.utils import LazyImport, lazy_import
+from codeweaver.core import LazyImport, lazy_import
 from codeweaver.core.language import SemanticSearchLanguage
 from codeweaver.core.types.aliases import (
     CategoryName,
@@ -995,9 +995,11 @@ class DirectConnection(Connection):
 
             Tree-sitter equivalent: Field name in grammar
             """,
-            default_factory=lambda name: role_name_normalizer(name)  # type: ignore
-            if isinstance(name, str)
-            else role_name_normalizer(name["role"]),  # type: ignore
+            default_factory=lambda name: (
+                role_name_normalizer(name)  # type: ignore
+                if isinstance(name, str)
+                else role_name_normalizer(name["role"])
+            ),  # type: ignore
         ),
     ]
 

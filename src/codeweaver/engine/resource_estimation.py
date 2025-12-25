@@ -99,8 +99,8 @@ def estimate_file_count(project_path: Path | None = None) -> NonNegativeInt:
         Estimated file count
     """
     if project_path is None:
-        from codeweaver.common.utils.git import get_project_path
         from codeweaver.config.settings import get_settings
+        from codeweaver.core import get_project_path
         from codeweaver.core.types import Unset
 
         settings = get_settings()

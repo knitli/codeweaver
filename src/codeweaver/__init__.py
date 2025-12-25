@@ -47,7 +47,7 @@ warnings.filterwarnings(
     category=DeprecationWarning,
 )
 
-from codeweaver.common.utils.lazy_getter import create_lazy_getattr
+from codeweaver.core import create_lazy_getattr
 
 
 def get_version() -> str:

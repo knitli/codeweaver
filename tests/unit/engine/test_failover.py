@@ -602,10 +602,7 @@ class TestSyncBackToPrimary:
         from datetime import UTC, datetime
         from pathlib import Path as PathlibPath
 
-        from codeweaver.common.utils import uuid7
-        from codeweaver.core.chunks import CodeChunk
-        from codeweaver.core.metadata import Metadata
-        from codeweaver.core.spans import Span
+        from codeweaver.core import CodeChunk, Metadata, Span, uuid7
         from codeweaver.providers.vector_stores.metadata import HybridVectorPayload
 
         chunk = CodeChunk(

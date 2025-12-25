@@ -176,6 +176,7 @@ async def _ensure_index_ready(
         container = get_container()
         if vector_store:
             from codeweaver.providers.vector_stores.base import VectorStoreProvider
+
             container.override(VectorStoreProvider, vector_store)
 
         indexer = await container.resolve(Indexer)
@@ -200,7 +201,7 @@ _set_max = get_max_tokens()
 _set_max_results = get_max_results()
 
 
-async def find_code(  # noqa: C901
+async def find_code(
     query: str,
     *,
     intent: IntentType | None = None,
@@ -232,29 +233,6 @@ async def find_code(  # noqa: C901
     Returns:
         FindCodeResponseSummary with ranked matches and metadata
     """
-    from codeweaver.di import DependsPlaceholder, get_container
-    from codeweaver.providers.embedding.providers.base import EmbeddingProvider
-    from codeweaver.providers.reranking.providers.base import RerankingProvider
-    from codeweaver.providers.vector_stores.base import VectorStoreProvider
-
-    container = get_container()
-
-    if isinstance(vector_store, DependsPlaceholder):
-        vector_store = await container.resolve(VectorStoreProvider)
-    if isinstance(embedding_provider, DependsPlaceholder):
-        embedding_provider = await container.resolve(EmbeddingProvider)
-    if isinstance(sparse_provider, DependsPlaceholder):
-        try:
-            # Resolving sparse_embedding might return None if not configured
-            sparse_provider = await container._call_with_injection(get_sparse_embedding_provider)
-        except Exception:
-            sparse_provider = None
-    if isinstance(reranking_provider, DependsPlaceholder):
-        try:
-            reranking_provider = await container.resolve(RerankingProvider)
-        except Exception:
-            reranking_provider = None
-
     start_time = time.monotonic()
     strategies_used: list[SearchStrategy] = []
 
@@ -330,7 +308,7 @@ async def find_code(  # noqa: C901
 
         # Step 9: Sort and limit
         scored_candidates.sort(
-            key=lambda x: (x.relevance_score if x.relevance_score is not None else x.score),
+            key=lambda x: x.relevance_score if x.relevance_score is not None else x.score,
             reverse=True,
         )
         search_results = scored_candidates[:max_results]

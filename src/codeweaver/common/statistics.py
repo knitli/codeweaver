@@ -48,13 +48,13 @@ from codeweaver.common.types import (
     TimingStatisticsDict,
     ToolOrPromptName,
 )
-from codeweaver.common.utils import uuid7
 from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
 from codeweaver.core.metadata import ChunkKind, ExtKind
 from codeweaver.core.types.aliases import FilteredKey, FilteredKeyT, LanguageName, LanguageNameT
 from codeweaver.core.types.dataclasses import DATACLASS_CONFIG, DataclassSerializationMixin
 from codeweaver.core.types.enum import AnonymityConversion, BaseEnum
 from codeweaver.core.types.utils import generate_field_title
+from codeweaver.core.utils import uuid7, uuid7_as_timestamp
 
 
 if TYPE_CHECKING:
@@ -937,15 +937,11 @@ class Identifier(NamedTuple):
     @property
     def timestamp(self) -> int:
         """Get the timestamp from the UUID7."""
-        from codeweaver.common.utils.utils import uuid7_as_timestamp
-
         return cast(int, uuid7_as_timestamp(self.uuid)) if self.uuid else 0
 
     @property
     def as_datetime(self) -> datetime:
         """Get the datetime from the timestamp."""
-        from codeweaver.common.utils.utils import uuid7_as_timestamp
-
         return (
             id_time
             if (id_time := uuid7_as_timestamp(self.uuid, as_datetime=True))
@@ -1032,17 +1028,6 @@ class SessionStatistics(DataclassSerializationMixin):
             self.index_statistics = FileStatistics()
         if not self.token_statistics:
             self.token_statistics = TokenCounter()
-        if not self.semantic_statistics:
-            # Lazy import to avoid circular dependencies
-            try:
-                from collections import Counter
-
-                from codeweaver.semantic.classifications import UsageMetrics
-
-                self.semantic_statistics = UsageMetrics(category_usage_counts=Counter())
-            except ImportError:
-                # If semantic module not available, leave as None
-                self.semantic_statistics = None
         if not self.failover_statistics:
             self.failover_statistics = FailoverStats()
         self.timing_statistics = TimingStatistics(

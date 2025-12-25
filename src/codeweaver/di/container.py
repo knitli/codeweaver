@@ -15,7 +15,7 @@ from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from typing import Annotated, Any, cast, get_args, get_origin
 
-from codeweaver.di.depends import Depends
+from codeweaver.di.depends import Depends, DependsPlaceholder
 
 
 logger = logging.getLogger(__name__)
@@ -122,8 +122,6 @@ class Container[T]:
         kwargs = {}
         for name, param in signature.parameters.items():
             # Check if the default is the INJECTED sentinel
-            from codeweaver.di.depends import DependsPlaceholder
-
             if marker := self._find_depends_marker(param):
                 kwargs[name] = await self._resolve_dependency(name, param, marker)
             elif isinstance(param.default, DependsPlaceholder):
@@ -165,8 +163,12 @@ class Container[T]:
         if target_type is inspect.Parameter.empty or target_type is Any:
             return None
 
-        # Check if this type is registered in the container
-        if target_type in self._factories or target_type in self._overrides:
+        # Check if this type is registered in the container or is a concrete class
+        if (
+            target_type in self._factories
+            or target_type in self._overrides
+            or isinstance(target_type, type)
+        ):
             return Depends(dependency=None)  # Will resolve by type
 
         return None

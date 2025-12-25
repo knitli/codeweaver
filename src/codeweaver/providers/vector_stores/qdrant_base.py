@@ -115,8 +115,8 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         Returns:
             CollectionMetadata configured according to provider settings.
         """
-        from codeweaver.common.utils.git import get_project_path
         from codeweaver.config.settings import get_settings_map
+        from codeweaver.core import get_project_path
 
         settings_map = get_settings_map()
         project_name = (
@@ -190,7 +190,7 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
 
     def _default_collection_name(self) -> str:
         """Generate a default collection name based on the provider settings."""
-        from codeweaver.common.utils.utils import generate_collection_name
+        from codeweaver.core import generate_collection_name
 
         return generate_collection_name(is_backup=False)
 

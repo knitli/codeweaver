@@ -63,9 +63,8 @@ async def background_services_lifespan(
         CodeWeaverState instance for background services
     """
     from codeweaver.cli.ui import StatusDisplay
-    from codeweaver.common.utils import get_project_path
     from codeweaver.config.settings import get_settings
-    from codeweaver.core.types.sentinel import Unset
+    from codeweaver.core import Unset, get_project_path
 
     # Create StatusDisplay if not provided
     if status_display is None:

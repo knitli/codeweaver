@@ -34,7 +34,7 @@ def mock_governor():
 @pytest.fixture
 def mock_discovered_file():
     """Create mock DiscoveredFile."""
-    from codeweaver.common.utils import uuid7
+    from codeweaver.core import uuid7
 
     def _make_file(path_str):
         path = Path(path_str)

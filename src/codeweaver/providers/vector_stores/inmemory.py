@@ -16,8 +16,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, cast
 
-from codeweaver.common.utils.utils import get_user_config_dir
 from codeweaver.config.providers import MemoryConfig
+from codeweaver.core import get_user_config_dir
 from codeweaver.core.types.provider import Provider
 from codeweaver.exceptions import PersistenceError, ProviderError
 from codeweaver.providers.vector_stores.qdrant_base import QdrantBaseProvider
@@ -114,7 +114,7 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
             PersistenceError: Failed to restore from persistence file.
             ValidationError: Persistence file format invalid.
         """
-        from codeweaver.common.utils.checks import is_test_environment
+        from codeweaver.core import is_test_environment
 
         # Use the values captured in model_post_init before self.config was overwritten
         persist_path_config = getattr(self, "_initial_persist_path", get_user_config_dir())
@@ -145,19 +145,23 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
 
         import sys
 
-        print(
-            f"DEBUG: MemoryVectorStoreProvider._init_provider instance {id(self)} with client {id(client)} and collection {self._collection}"
+        logger.debug(
+            "MemoryVectorStoreProvider._init_provider instance %s with client %s and collection %s",
+            id(self),
+            id(client),
+            self._collection,
         )
         sys.stdout.flush()
 
         # Ensure collection exists
         if self._collection:
             await self._ensure_collection(self._collection)
-            print(
-                f"DEBUG: MemoryVectorStoreProvider ensured collection {self._collection} in client {id(client)}"
+            logger.debug(
+                "MemoryVectorStoreProvider ensured collection %s in client %s",
+                self._collection,
+                id(client),
             )
             sys.stdout.flush()
-
         # Restore from disk if persistence file exists (and not in test mode)
         if not is_test_environment() and persist_path.exists():
             await self._restore_from_disk()
@@ -176,7 +180,7 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
         Returns:
             An initialized AsyncQdrantClient.
         """
-        from codeweaver.common.utils.checks import is_test_environment
+        from codeweaver.core import is_test_environment
 
         if is_test_environment():
             import sys
@@ -185,12 +189,14 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
                 MemoryVectorStoreProvider._shared_client = AsyncQdrantClient(
                     location=":memory:", **(self.config.get("client_options", {}))
                 )
-                print(
-                    f"DEBUG: MemoryVectorStoreProvider created NEW _shared_client {id(MemoryVectorStoreProvider._shared_client)}"
+                logger.debug(
+                    "MemoryVectorStoreProvider created NEW _shared_client %s",
+                    id(MemoryVectorStoreProvider._shared_client),
                 )
             else:
-                print(
-                    f"DEBUG: MemoryVectorStoreProvider using EXISTING _shared_client {id(MemoryVectorStoreProvider._shared_client)}"
+                logger.debug(
+                    "MemoryVectorStoreProvider using EXISTING _shared_client %s",
+                    id(MemoryVectorStoreProvider._shared_client),
                 )
             sys.stdout.flush()
             return MemoryVectorStoreProvider._shared_client
@@ -454,7 +460,7 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
             return
 
         # check if we are in a test environment
-        from codeweaver.common.utils import is_test_environment
+        from codeweaver.core import is_test_environment
 
         if is_test_environment():
             # In tests, we don't close the shared client as it's used by multiple tests
@@ -481,41 +487,25 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
         if self._client:
             await self._client.close()
 
-    async def create_collection(
-        self,
-        collection_name: str,
-        dense_dim: int | None = None,
-        distance: str | None = None,
-        **kwargs: Any,
-    ) -> None:
-        """Create a new collection."""
-        import sys
-
-        print(
-            f"DEBUG: MemoryVectorStoreProvider.create_collection {collection_name} in client {id(self._client)}"
-        )
-        sys.stdout.flush()
-        await super()._ensure_collection(
-            collection_name=collection_name, dense_dim=dense_dim, distance=distance, **kwargs
-        )
-
     async def upsert(self, chunks: list[CodeChunk], *, for_backup: bool = False) -> None:
         """Insert or update code chunks with hybrid embeddings."""
-        import sys
-
-        print(
-            f"DEBUG: MemoryVectorStoreProvider.upsert instance {id(self)} to collection: {self._collection} with {len(chunks)} chunks"
+        logger.debug(
+            "MemoryVectorStoreProvider.upsert instance %s to collection: %s with %d chunks",
+            id(self),
+            self._collection,
+            len(chunks),
         )
-        sys.stdout.flush()
         await super().upsert(chunks, for_backup=for_backup)
 
         # Verify count
         if self._client and self._collection:
             info = await self._client.get_collection(self._collection)
-            print(
-                f"DEBUG: Collection {self._collection} now has {info.points_count} points in client {id(self._client)}"
+            logger.debug(
+                "Collection %s now has %d points in client %s",
+                self._collection,
+                info.points_count,
+                id(self._client),
             )
-            sys.stdout.flush()
 
     async def search(
         self, vector: StrategizedQuery | MixedQueryInput, query_filter: Filter | None = None
@@ -525,12 +515,17 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
 
         if self._client and self._collection:
             info = await self._client.get_collection(self._collection)
-            print(
-                f"DEBUG: MemoryVectorStoreProvider.search instance {id(self)} in collection: {self._collection} (points: {info.points_count})"
+            logger.debug(
+                "MemoryVectorStoreProvider.search instance %s in collection: %s (points: %d)",
+                id(self),
+                self._collection,
+                info.points_count,
             )
         else:
-            print(
-                f"DEBUG: MemoryVectorStoreProvider.search instance {id(self)} in collection: {self._collection} (client or collection missing)"
+            logger.debug(
+                "MemoryVectorStoreProvider.search instance %s in collection: %s (client or collection missing)",
+                id(self),
+                self._collection,
             )
         sys.stdout.flush()
         return await super().search(vector, query_filter=query_filter)

@@ -17,7 +17,7 @@ from warnings import filterwarnings
 
 from pydantic import ConfigDict, SecretStr, SkipValidation
 
-from codeweaver.common.utils.utils import rpartial
+from codeweaver.core import rpartial
 from codeweaver.core.types.provider import Provider
 from codeweaver.exceptions import ProviderError
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities

@@ -21,7 +21,7 @@ from starlette.requests import Request
 from codeweaver.agent_api.find_code import find_code
 from codeweaver.agent_api.find_code.intent import IntentType
 from codeweaver.agent_api.find_code.types import FindCodeResponseSummary
-from codeweaver.common.utils import lazy_import
+from codeweaver.core import lazy_import
 from codeweaver.core.language import SemanticSearchLanguage
 
 

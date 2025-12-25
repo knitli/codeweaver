@@ -17,8 +17,8 @@ from typing import Any
 from fastmcp import Context
 
 from codeweaver.common._logging import log_to_client_or_fallback, setup_logger
-from codeweaver.common.utils.normalize import validate_regex_pattern
 from codeweaver.config._logging import SerializableLoggingFilter
+from codeweaver.core import validate_regex_pattern
 
 
 def normalize_and_validate_patterns(

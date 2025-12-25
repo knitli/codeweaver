@@ -187,7 +187,7 @@ def clear_all_deduplication_stores() -> GeneratorType:
     This prevents test interference where chunks or embeddings from one test are
     marked as duplicates in subsequent tests.
     """
-    from codeweaver.common.utils.utils import generate_collection_name
+    from codeweaver.core import generate_collection_name
     from codeweaver.engine.chunker.semantic import SemanticChunker
     from codeweaver.providers.embedding.providers.base import (
         EmbeddingProvider,
@@ -353,7 +353,7 @@ def create_test_chunk_with_embeddings(
         CodeChunk with embeddings registered in the global registry
     """
 
-    from codeweaver.common.utils.utils import uuid7
+    from codeweaver.core import uuid7
     from codeweaver.core.chunks import BatchKeys, CodeChunk
     from codeweaver.core.spans import Span
     from codeweaver.providers.embedding.registry import get_embedding_registry

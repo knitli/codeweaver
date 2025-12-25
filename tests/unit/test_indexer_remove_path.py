@@ -11,9 +11,7 @@ from unittest.mock import patch
 
 import pytest
 
-from codeweaver.common.utils import uuid7
-from codeweaver.common.utils.git import Missing
-from codeweaver.core.discovery import DiscoveredFile
+from codeweaver.core import DiscoveredFile, Missing, uuid7
 from codeweaver.engine.indexer.indexer import Indexer
 from codeweaver.engine.indexer.manifest import IndexFileManifest
 
@@ -40,7 +38,9 @@ class TestRemovePathWithDeletedFiles:
         return indexer
 
     @pytest.mark.asyncio
-    async def test_remove_deleted_file_from_store(self, mock_indexer: Indexer, tmp_path: Path) -> None:
+    async def test_remove_deleted_file_from_store(
+        self, mock_indexer: Indexer, tmp_path: Path
+    ) -> None:
         """Test that _remove_path can remove entries for files that no longer exist."""
         test_file = self._create_temp_file_and_index(tmp_path, "to_delete.py", mock_indexer)
         # Now delete the file
@@ -50,7 +50,9 @@ class TestRemovePathWithDeletedFiles:
         self._validate_malformed_entry_removal(mock_indexer, test_file, 0)
 
     @pytest.mark.asyncio
-    async def test_remove_existing_file_from_store(self, mock_indexer: Indexer, tmp_path: Path) -> None:
+    async def test_remove_existing_file_from_store(
+        self, mock_indexer: Indexer, tmp_path: Path
+    ) -> None:
         """Test that _remove_path works for files that still exist (regression test)."""
         test_file = self._create_temp_file_and_index(tmp_path, "existing.py", mock_indexer)
         self._validate_malformed_entry_removal(mock_indexer, test_file, 0)
@@ -75,7 +77,9 @@ class TestRemovePathWithDeletedFiles:
         with (
             patch(
                 "codeweaver.core.discovery.set_relative_path",
-                side_effect=lambda p, **kwargs: Path(p).relative_to(tmp_path) if Path(p).is_absolute() else p,
+                side_effect=lambda p, **kwargs: (
+                    Path(p).relative_to(tmp_path) if Path(p).is_absolute() else p
+                ),
             ),
             patch("codeweaver.core.discovery.get_git_branch", return_value="main"),
         ):
@@ -101,7 +105,9 @@ class TestRemovePathWithDeletedFiles:
         with (
             patch(
                 "codeweaver.core.discovery.set_relative_path",
-                side_effect=lambda p, **kwargs: Path(p).relative_to(tmp_path) if Path(p).is_absolute() else p,
+                side_effect=lambda p, **kwargs: (
+                    Path(p).relative_to(tmp_path) if Path(p).is_absolute() else p
+                ),
             ),
             patch("codeweaver.core.discovery.get_git_branch", return_value="main"),
         ):
@@ -145,7 +151,9 @@ class TestRemovePathWithDeletedFiles:
         with (
             patch(
                 "codeweaver.core.discovery.set_relative_path",
-                side_effect=lambda p, **kwargs: Path(p).relative_to(tmp_path) if Path(p).is_absolute() else p,
+                side_effect=lambda p, **kwargs: (
+                    Path(p).relative_to(tmp_path) if Path(p).is_absolute() else p
+                ),
             ),
             patch("codeweaver.core.discovery.get_git_branch", return_value="main"),
         ):

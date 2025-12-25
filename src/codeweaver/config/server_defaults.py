@@ -12,13 +12,13 @@ from functools import cache
 from pathlib import Path
 from typing import Literal, overload
 
-from codeweaver.common.utils.utils import get_user_config_dir
 from codeweaver.config.types import (
     EndpointSettingsDict,
     FastMcpHttpRunArgs,
     FastMcpServerSettingsDict,
     UvicornServerSettings,
 )
+from codeweaver.core import get_user_config_dir
 
 
 logger = logging.getLogger(__name__)

@@ -31,6 +31,7 @@ def temp_project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Create temporary project directory."""
     # Reset global settings to avoid state pollution between tests
     from codeweaver.config.settings import reset_settings
+
     reset_settings()
 
     project = tmp_path / "test_project"
@@ -111,7 +112,7 @@ class TestDoctorImports:
     def test_import_paths_correct(self) -> None:
         """Test all import paths are correct."""
         # Should not raise ImportError
-        from codeweaver.common.utils.utils import get_user_config_dir
+        from codeweaver.core import get_user_config_dir
 
         config_dir = get_user_config_dir()
         assert config_dir.exists() or config_dir.parent.exists()
@@ -119,7 +120,7 @@ class TestDoctorImports:
     def test_import_from_common_utils_succeeds(self) -> None:
         """Test importing from common.utils now works via __init__.py exports."""
         # Should not raise ImportError due to __init__.py exports
-        from codeweaver.common.utils import get_user_config_dir
+        from codeweaver.core import get_user_config_dir
 
         config_dir = get_user_config_dir()
         assert config_dir is not None

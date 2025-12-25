@@ -117,9 +117,7 @@ class TestStalePointRemovalInIndexFile:
         # Add file to manifest
         rel_path = Path("modified.py")
         mock_indexer._file_manifest.add_file(
-            path=rel_path,
-            content_hash=get_blake_hash(b"old content"),
-            chunk_ids=["old-chunk-1"],
+            path=rel_path, content_hash=get_blake_hash(b"old content"), chunk_ids=["old-chunk-1"]
         )
 
         # Make delete_by_file raise an exception
@@ -150,9 +148,7 @@ class TestStalePointRemovalInBatchIndexing:
         # Add only modified_file to manifest - ENSURE IT MATCHES LOOKUP KEY
         rel_path = Path("modified.py")
         mock_indexer._file_manifest.add_file(
-            path=rel_path,
-            content_hash=get_blake_hash(b"old content"),
-            chunk_ids=["old-chunk-1"],
+            path=rel_path, content_hash=get_blake_hash(b"old content"), chunk_ids=["old-chunk-1"]
         )
 
         # Index batch
@@ -194,9 +190,7 @@ class TestOrphanDetectionInValidation:
     """Test that validate_manifest_with_vector_store detects orphaned chunks."""
 
     @pytest.mark.asyncio
-    async def test_detects_orphaned_chunks(
-        self, mock_indexer: Indexer, tmp_path: Path
-    ) -> None:
+    async def test_detects_orphaned_chunks(self, mock_indexer: Indexer, tmp_path: Path) -> None:
         """Test that orphaned chunks in vector store are detected."""
         # Use valid UUIDs for chunk IDs
         chunk_id_1 = str(uuid4())
@@ -233,9 +227,7 @@ class TestOrphanDetectionInValidation:
         assert result["missing_chunks"] == 0
 
     @pytest.mark.asyncio
-    async def test_detects_missing_chunks(
-        self, mock_indexer: Indexer, tmp_path: Path
-    ) -> None:
+    async def test_detects_missing_chunks(self, mock_indexer: Indexer, tmp_path: Path) -> None:
         """Test that missing chunks are still detected correctly."""
         # Use valid UUIDs for chunk IDs
         chunk_id_1 = str(uuid4())
@@ -301,9 +293,7 @@ class TestOrphanDetectionInValidation:
         assert len(result["files_with_missing_chunks"]) == 0
 
     @pytest.mark.asyncio
-    async def test_handles_empty_manifest(
-        self, mock_indexer: Indexer, tmp_path: Path
-    ) -> None:
+    async def test_handles_empty_manifest(self, mock_indexer: Indexer, tmp_path: Path) -> None:
         """Test validation handles empty manifest correctly."""
         # Empty manifest (no files added)
         orphan_id = str(uuid4())

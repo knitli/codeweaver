@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import SkipValidation
 
-from codeweaver.common.utils.utils import rpartial
+from codeweaver.core import rpartial
 from codeweaver.core.types.provider import Provider
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 from codeweaver.providers.reranking.providers.base import RerankingProvider, RerankingResult

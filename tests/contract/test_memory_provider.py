@@ -78,7 +78,7 @@ async def memory_provider(memory_config, test_embedding_caps):
 @pytest.fixture
 def sample_chunk():
     """Create a sample CodeChunk for testing."""
-    from codeweaver.common.utils.utils import uuid7
+    from codeweaver.core import uuid7
     from codeweaver.core.chunks import BatchKeys
     from codeweaver.core.metadata import ChunkKind, ExtKind
     from codeweaver.providers.embedding.registry import get_embedding_registry

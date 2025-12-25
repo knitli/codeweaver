@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING, NamedTuple, TypedDict, cast
 
 from pydantic import computed_field
 
-from codeweaver.common.utils import LazyImport, lazy_import, normalize_ext
+from codeweaver.core.utils import LazyImport, lazy_import, normalize_ext
 from codeweaver.core.types.aliases import (
     DirectoryName,
     DirectoryNameT,
@@ -32,6 +32,7 @@ from codeweaver.core.types.aliases import (
     LiteralStringT,
 )
 from codeweaver.core.types.enum import BaseEnum
+
 
 
 if TYPE_CHECKING:

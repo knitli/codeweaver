@@ -58,8 +58,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from codeweaver.common.utils.utils import uuid7
 from codeweaver.config.providers import QdrantConfig
+from codeweaver.core import uuid7
 from codeweaver.core.language import SemanticSearchLanguage as Language
 from codeweaver.engine.indexer.indexer import Indexer
 from codeweaver.providers.vector_stores.qdrant import QdrantVectorStoreProvider

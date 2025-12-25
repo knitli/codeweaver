@@ -17,20 +17,16 @@ from typing import TYPE_CHECKING, Annotated, Any, cast
 from pydantic import UUID7, AfterValidator, Field, NonNegativeInt, computed_field, model_validator
 from pydantic.dataclasses import dataclass
 
-from codeweaver.common.utils import get_git_branch, sanitize_unicode, set_relative_path, uuid7
-from codeweaver.common.utils.git import MISSING, Missing
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.language import is_semantic_config_ext
 from codeweaver.core.metadata import ExtKind
 from codeweaver.core.stores import BlakeHashKey, BlakeKey, get_blake_hash
-from codeweaver.core.types.dataclasses import DATACLASS_CONFIG, DataclassSerializationMixin
+from codeweaver.core.types import DATACLASS_CONFIG, MISSING, DataclassSerializationMixin, Missing
+from codeweaver.core.utils import get_git_branch, sanitize_unicode, set_relative_path, uuid7
 
 
 if TYPE_CHECKING:
-    from ast_grep_py import SgRoot
-
     from codeweaver.core.types import AnonymityConversion, FilteredKeyT
-    from codeweaver.semantic.ast_grep import FileThing
 
 
 logger = logging.getLogger(__name__)
@@ -270,21 +266,6 @@ class DiscoveredFile(DataclassSerializationMixin):
     def is_config_file(self) -> bool:
         """Return True if the file is a recognized configuration file."""
         return is_semantic_config_ext(self.absolute_path.suffix)
-
-    def ast(self) -> FileThing[SgRoot] | None:
-        """Return the AST of the file, if applicable."""
-        from codeweaver.core.language import SemanticSearchLanguage
-
-        if (
-            self.is_text
-            and self.ext_kind is not None
-            and self.ext_kind.language in SemanticSearchLanguage
-            and isinstance(self.ext_kind.language, SemanticSearchLanguage)
-        ):
-            from codeweaver.semantic.ast_grep import FileThing
-
-            return cast(FileThing[SgRoot], FileThing.from_file(self.absolute_path))
-        return None
 
     @staticmethod
     def normalize_content(content: str | bytes | bytearray) -> str:

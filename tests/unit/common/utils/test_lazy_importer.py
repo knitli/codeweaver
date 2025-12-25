@@ -11,7 +11,7 @@ from types import ModuleType
 
 import pytest
 
-from codeweaver.common.utils.lazy_importer import LazyImport, lazy_import
+from codeweaver.core import LazyImport, lazy_import
 
 
 pytestmark = [pytest.mark.unit]

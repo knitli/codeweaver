@@ -21,17 +21,20 @@ from pydantic import ConfigDict, SecretStr
 from textcase import pascal
 from typing_extensions import TypeIs
 
-from codeweaver.common.utils.checks import is_test_environment
-from codeweaver.common.utils.lazy_importer import LazyImport, lazy_import
 from codeweaver.config.providers import SparseEmbeddingProviderSettings
 from codeweaver.config.types import CodeWeaverSettingsDict
-from codeweaver.core.types.aliases import LiteralStringT
-from codeweaver.core.types.dictview import DictView
-from codeweaver.core.types.models import BasedModel
+from codeweaver.core import (
+    BasedModel,
+    DictView,
+    LazyImport,
+    LiteralStringT,
+    is_test_environment,
+    lazy_import,
+)
 
 # NOTE: Re-export Provider and ProviderKind for easier access -- anyone importing the registry likely needs these too
-from codeweaver.core.types.provider import Provider as Provider
-from codeweaver.core.types.provider import ProviderKind as ProviderKind
+from codeweaver.core import Provider as Provider
+from codeweaver.core import ProviderKind as ProviderKind
 from codeweaver.exceptions import ConfigurationError
 from codeweaver.providers.agent.agent_providers import AgentProvider
 from codeweaver.providers.embedding.capabilities.base import SparseEmbeddingModelCapabilities
@@ -847,7 +850,7 @@ class ProviderRegistry(BasedModel):
             if provider == Provider.FASTEMBED:
                 # Set default cache_dir to persistent location if not provided
                 if "cache_dir" not in (client_options or {}):
-                    from codeweaver.common.utils.utils import get_user_config_dir
+                    from codeweaver.core import get_user_config_dir
 
                     models_cache = get_user_config_dir() / ".models"
                     models_cache.mkdir(parents=True, exist_ok=True)
@@ -911,7 +914,7 @@ class ProviderRegistry(BasedModel):
             return client_class(**filtered_options)
 
         # Construct client based on what parameters it accepts
-        from codeweaver.common.utils.introspect import clean_args
+        from codeweaver.core import clean_args
 
         provider_settings = provider_settings or {}
         merged_settings = provider_settings | client_options
@@ -1656,7 +1659,7 @@ class ProviderRegistry(BasedModel):
                 client_options[key] = value
             elif key == "cache_dir":
                 # Set default cache_dir to persistent location
-                from codeweaver.common.utils.utils import get_user_config_dir
+                from codeweaver.core import get_user_config_dir
 
                 models_cache = get_user_config_dir() / ".models"
                 models_cache.mkdir(parents=True, exist_ok=True)

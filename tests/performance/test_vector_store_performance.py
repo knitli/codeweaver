@@ -51,7 +51,7 @@ def create_test_chunk(
     sparse_indices: int = 50,
 ) -> CodeChunk:
     """Create a test CodeChunk with embeddings."""
-    from codeweaver.common.utils import uuid7
+    from codeweaver.core import uuid7
 
     chunk_id = uuid7()
     [0.1] * dense_dim
@@ -114,7 +114,7 @@ async def qdrant_store(qdrant_test_manager) -> QdrantVectorStoreProvider:
 @pytest.fixture
 async def memory_store() -> AsyncGenerator[MemoryVectorStoreProvider, None]:
     """Create a MemoryVectorStoreProvider for testing."""
-    from codeweaver.common.utils.utils import uuid7
+    from codeweaver.core import uuid7
 
     with tempfile.TemporaryDirectory() as tmpdir:
         config = MemoryConfig(

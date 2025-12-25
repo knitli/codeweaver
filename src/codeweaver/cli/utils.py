@@ -13,8 +13,8 @@ from typing import TYPE_CHECKING
 
 from pydantic import NonNegativeInt
 
-from codeweaver.common.utils.git import get_project_path
-from codeweaver.common.utils.lazy_importer import LazyImport, lazy_import
+from codeweaver.core import LazyImport, get_project_path, lazy_import
+from codeweaver.core.utils import in_ide, we_are_in_jetbrains, we_are_in_vscode
 
 
 if TYPE_CHECKING:
@@ -26,31 +26,6 @@ if TYPE_CHECKING:
 
 
 console: LazyImport[Console] = lazy_import("rich.console", "Console")
-
-
-def we_are_in_vscode() -> bool:
-    """Detect if we are running inside VSCode."""
-    env = os.environ
-    return (
-        any(
-            v
-            for k, v in env.items()
-            if k in {"VSCODE_GIT_IPC_HANDLE", "VSSCODE_INJECTION", "VSCODE_IPC_HOOK_CLI"}
-            if v and v not in {"0", "false", "False", ""}
-        )
-        or os.environ.get("TERM_PROGRAM") == "vscode"
-    )
-
-
-def we_are_in_jetbrains() -> bool:
-    """Detect if we are running inside a JetBrains IDE."""
-    env = os.environ
-    return env.get("TERMINAL_EMULATOR") == "JetBrains-JediTerm"
-
-
-def in_ide() -> bool:
-    """Detect if we are running inside an IDE."""
-    return we_are_in_vscode() or we_are_in_jetbrains()
 
 
 def resolve_project_root() -> Path:
@@ -107,8 +82,8 @@ def format_file_link(file_path: str | Path, line: NonNegativeInt | None = None) 
 
 def get_codeweaver_config_paths() -> tuple[Path, ...]:
     """Get all possible CodeWeaver configuration file paths."""
-    from codeweaver.common.utils import get_user_config_dir
     from codeweaver.config.settings import get_settings_map
+    from codeweaver.core import get_user_config_dir
 
     settings_map = get_settings_map()
     project_path = (

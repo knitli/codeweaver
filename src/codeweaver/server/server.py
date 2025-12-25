@@ -27,12 +27,17 @@ from codeweaver.common.http_pool import HttpClientPool
 from codeweaver.common.registry import ModelRegistry, ProviderRegistry, ServicesRegistry
 from codeweaver.common.statistics import SessionStatistics
 from codeweaver.common.telemetry.client import PostHogClient
-from codeweaver.common.utils import elapsed_time_to_human_readable, get_project_path, lazy_import
 from codeweaver.config.settings import CodeWeaverSettings
-from codeweaver.core.types.dataclasses import DATACLASS_CONFIG, DataclassSerializationMixin
-from codeweaver.core.types.enum import AnonymityConversion
-from codeweaver.core.types.provider import Provider as Provider
-from codeweaver.core.types.sentinel import Unset
+from codeweaver.core import (
+    DATACLASS_CONFIG,
+    AnonymityConversion,
+    DataclassSerializationMixin,
+    Unset,
+    elapsed_time_to_human_readable,
+    get_project_path,
+    lazy_import,
+)
+from codeweaver.core import Provider as Provider
 from codeweaver.di import get_container
 from codeweaver.engine.failover import VectorStoreFailoverManager
 from codeweaver.engine.indexer import Indexer
@@ -43,7 +48,7 @@ from codeweaver.server.management import ManagementServer
 
 
 if TYPE_CHECKING:
-    from codeweaver.common.utils import LazyImport
+    from codeweaver.core import LazyImport
     from codeweaver.core.types import AnonymityConversion, FilteredKeyT
 
 # lazy imports for default factory functions

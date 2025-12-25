@@ -309,7 +309,7 @@ class TestPersistence:
 
     def test_load_handles_corrupt_file(self, tmp_path: Path):
         """Test that load handles corrupt file gracefully."""
-        from codeweaver.common.utils.utils import backup_file_path
+        from codeweaver.core import backup_file_path
 
         # Create corrupt file
         persist_path = backup_file_path(project_path=tmp_path)

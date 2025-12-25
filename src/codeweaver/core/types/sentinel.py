@@ -192,4 +192,11 @@ class Unset(Sentinel):
 UNSET: Unset = Unset(name="Unset", module_name=Sentinel._get_module_name_generator()())  # type: ignore
 
 
-__all__ = ("UNSET", "Sentinel", "SentinelName", "Unset")
+class Missing(Sentinel):
+    """Sentinel for missing values."""
+
+
+MISSING: Missing = Missing(name=SentinelName("MISSING"), module_name=__name__)
+
+
+__all__ = ("MISSING", "UNSET", "Missing", "Sentinel", "SentinelName", "Unset")

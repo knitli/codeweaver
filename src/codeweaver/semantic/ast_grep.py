@@ -94,13 +94,21 @@ from pydantic import (
     computed_field,
 )
 
-from codeweaver.common.utils import LazyImport, lazy_import, uuid7
-from codeweaver.common.utils.textify import humanize
-from codeweaver.core.language import SemanticSearchLanguage
-from codeweaver.core.types.aliases import FileExt, LiteralStringT, ThingName, ThingNameT
-from codeweaver.core.types.enum import AnonymityConversion, BaseEnum
-from codeweaver.core.types.models import BasedModel
-from codeweaver.core.types.utils import generate_field_title
+from codeweaver.core import (
+    AnonymityConversion,
+    BasedModel,
+    BaseEnum,
+    FileExt,
+    LazyImport,
+    LiteralStringT,
+    SemanticSearchLanguage,
+    ThingName,
+    ThingNameT,
+    generate_field_title,
+    humanize,
+    lazy_import,
+    uuid7,
+)
 
 # Runtime imports needed for cast operations and type checking
 from codeweaver.semantic.grammar import Category, CompositeThing, Token
@@ -779,7 +787,7 @@ __all__ = (
 # Rebuild models to resolve forward references
 with contextlib.suppress(Exception):
     from codeweaver.core.chunks import CodeChunk
-    from codeweaver.core.metadata import SemanticMetadata
+    from codeweaver.semantic.types import SemanticMetadata
 
     for model in (FileThing, AstThing, SemanticMetadata, CodeChunk):
         if model.__pydantic_complete__:

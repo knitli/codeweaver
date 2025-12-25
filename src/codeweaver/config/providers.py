@@ -31,7 +31,7 @@ from pydantic import Field, PositiveFloat, PositiveInt, SecretStr, computed_fiel
 from pydantic_ai.settings import ModelSettings as AgentModelSettings
 from pydantic_ai.settings import merge_model_settings
 
-from codeweaver.common.utils.utils import get_user_config_dir
+from codeweaver.core import get_user_config_dir
 from codeweaver.core.types import DictView
 from codeweaver.core.types.models import BasedModel
 from codeweaver.core.types.provider import Provider

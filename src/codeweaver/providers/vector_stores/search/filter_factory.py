@@ -221,7 +221,11 @@ def to_qdrant_filter(filter_obj: Filter | None) -> Filter | None:
         for future filter transformations or field mapping customizations.
 
     Examples:
-        >>> from codeweaver.providers.vector_stores.search import Filter, FieldCondition, MatchAny
+        >>> from codeweaver.providers.vector_stores.search import (
+        ...     Filter,
+        ...     FieldCondition,
+        ...     MatchAny,
+        ... )
         >>> # Filter by file paths
         >>> filter_obj = Filter(
         ...     must=[

@@ -8,8 +8,9 @@ import pytest
 from codeweaver_tokenizers import get_tokenizer
 
 
-def test_get_tokenizer_tiktoken():
-    # cl100k_base is used by gpt-4
+@pytest.mark.unit
+def test_get_tokenizer_tiktoken() -> None:
+    """Test getting the Tiktoken tokenizer."""
     tokenizer = get_tokenizer("tiktoken", "cl100k_base")
     assert tokenizer is not None
 
@@ -18,13 +19,19 @@ def test_get_tokenizer_tiktoken():
     assert len(tokens) > 0
     assert tokenizer.decode(tokens) == text
 
-def test_tokenizer_estimate():
+
+@pytest.mark.unit
+def test_tokenizer_estimate() -> None:
+    """Test the estimate method of the tokenizer."""
     tokenizer = get_tokenizer("tiktoken", "cl100k_base")
     text = "This is a test of the emergency broadcast system."
     estimate = tokenizer.estimate(text)
     actual = len(tokenizer.encode(text))
     assert estimate == actual
 
-def test_invalid_tokenizer_type():
+
+@pytest.mark.unit
+def test_invalid_tokenizer_type() -> None:
+    """Test that an invalid tokenizer type raises a ValueError."""
     with pytest.raises(ValueError, match="Unsupported tokenizer type"):
         get_tokenizer("invalid", "model")

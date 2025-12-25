@@ -28,7 +28,7 @@ from rich.prompt import Confirm
 
 from codeweaver.cli.ui import CLIErrorHandler, get_display
 from codeweaver.cli.utils import resolve_project_root
-from codeweaver.common.utils.utils import get_user_config_dir
+from codeweaver.core import get_user_config_dir
 from codeweaver.exceptions import CodeWeaverError
 
 
@@ -339,7 +339,7 @@ def _get_client_config_path(
 
 def _get_user_config_path(sys, provider: str, file_name: str, os):
     """Get user config path for specific provider based on OS."""
-    from codeweaver.common.utils.utils import get_user_config_dir
+    from codeweaver.core import get_user_config_dir
 
     user_configdir = get_user_config_dir(base_only=True)
     return user_configdir / provider / file_name

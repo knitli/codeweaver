@@ -246,9 +246,9 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
         Returns:
             Configured IgnoreFilter instance (may need async initialization)
         """
-        from codeweaver.common.utils.git import get_project_path
         from codeweaver.config.indexer import DefaultIndexerSettings, IndexerSettings
         from codeweaver.config.settings import get_settings_map
+        from codeweaver.core import get_project_path
 
         settings = settings or get_settings_map()
         index_settings = (
@@ -291,9 +291,9 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
         Returns:
             Fully initialized IgnoreFilter instance
         """
-        from codeweaver.common.utils.git import get_project_path
         from codeweaver.config.indexer import DefaultIndexerSettings, IndexerSettings
         from codeweaver.config.settings import get_settings_map
+        from codeweaver.core import get_project_path
 
         settings = settings or get_settings_map()
         index_settings = (

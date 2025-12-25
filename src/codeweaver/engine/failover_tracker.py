@@ -26,7 +26,7 @@ from typing import TYPE_CHECKING, Annotated, Any
 
 from pydantic import Field, PrivateAttr
 
-from codeweaver.common.utils.git import set_relative_path
+from codeweaver.core import set_relative_path
 from codeweaver.core.stores import BlakeHashKey
 from codeweaver.core.types.models import BasedModel
 
@@ -104,7 +104,7 @@ class FileChangeTracker(BasedModel):
         """
         super().__init__(**data)
         self._project_path = project_path
-        from codeweaver.common.utils.utils import backup_file_path
+        from codeweaver.core import backup_file_path
 
         self._persist_path = backup_file_path(project_path=project_path)
         self._dirty = False
@@ -306,7 +306,7 @@ class FileChangeTracker(BasedModel):
         Returns:
             Loaded or new FileChangeTracker instance
         """
-        from codeweaver.common.utils.utils import backup_file_path
+        from codeweaver.core import backup_file_path
 
         persist_path = backup_file_path(project_path=project_path)
 
