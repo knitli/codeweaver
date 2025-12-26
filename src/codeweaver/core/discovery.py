@@ -221,7 +221,7 @@ class DiscoveredFile(DataclassSerializationMixin):
                     return True
                 text_characters = bytearray({7, 8, 9, 10, 12, 13, 27} | set(range(0x20, 0x100)))
                 nontext = chunk.translate(None, text_characters)
-                return bool(nontext) / len(chunk) > 0.30
+                return len(nontext) / len(chunk) > 0.30
         except Exception:
             return False
 

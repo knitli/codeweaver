@@ -477,7 +477,7 @@ asyncio_mode = "auto"
 timeout = "600"
 timeout_method = "thread"
 # Override timeout for specific markers
-timeout_func_only = true  # Don't timeout on setup/teardown
+timeout_func_only = true  # Only apply timeout to test functions, not setup/teardown
 
 [tool.ty.environment]
 python-version = "3.12"
