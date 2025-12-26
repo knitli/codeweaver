@@ -1433,7 +1433,7 @@ class ProviderRegistry(BasedModel):
 
     def _log_provider_instance_creation(self, provider, provider_kind, arg2, instance):
         logger.debug(
-            "get_provider_instance(%r, %r% s%r (id=%d))",
+            "get_provider_instance(%r, %r, %s, %r (id=%d))",
             provider,
             provider_kind,
             arg2,

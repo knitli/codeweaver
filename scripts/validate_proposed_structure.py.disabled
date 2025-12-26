@@ -260,11 +260,11 @@ def analyze_proposed_structure():
     output = {
         "proposed_packages": proposed_packages,
         "actual_dependencies": {k: list(v) for k, v in package_deps.items()},
-        "violations": dict(violations.items()),
+        "violations": dict(violations),
     }
 
     output_file = Path("claudedocs/proposed_structure_validation.json")
-    with output_file.open(output_file, "w") as f:
+    with output_file.open("w") as f:
         json.dump(output, f, indent=2)
 
     print(f"\n\n📄 Detailed report saved to: {output_file}")

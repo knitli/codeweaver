@@ -270,7 +270,7 @@ def _backup_profile() -> ProviderSettingsDict:
             model_settings=RerankingModelSettings(
                 model="cross-encoder/ms-marco-TinyBERT-L2-v2"
                 if HAS_ST
-                else "jinai/jina-reranker-v1-tiny-en"
+                else "jinaai/jina-reranker-v1-tiny-en"
             ),
         ),
     )
