@@ -22,9 +22,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from codeweaver.core.utils import (
-    MISSING,
-    Missing,
+from codeweaver.core.types.sentinel import MISSING, Missing
+from codeweaver.core.utils.filesystem import (
     _get_branch_from_origin,
     _get_git_dir,
     _root_path_checks_out,
