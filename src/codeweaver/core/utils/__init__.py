@@ -76,6 +76,9 @@ if TYPE_CHECKING:
         isclass,
         isfunction,
         ismethod,
+        keyword_args,
+        positional_args,
+        takes_kwargs,
     )
     from codeweaver.core.utils.procs import (
         asyncio_or_uvloop,
@@ -155,6 +158,9 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "isclass": (__spec__.parent, "introspect"),
     "isfunction": (__spec__.parent, "introspect"),
     "ismethod": (__spec__.parent, "introspect"),
+    "keyword_args": (__spec__.parent, "introspect"),
+    "positional_args": (__spec__.parent, "introspect"),
+    "takes_kwargs": (__spec__.parent, "introspect"),
     "low_priority": (__spec__.parent, "procs"),
     "normalize_ext": (__spec__.parent, "filesystem"),
     "rpartial": (__spec__.parent, "general"),
@@ -172,7 +178,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "we_are_in_vscode": (__spec__.parent, "environment"),
 })
 
-__getattr = create_lazy_getattr(
+__getattr__ = create_lazy_getattr(
     dynamic_imports=_dynamic_imports, module_globals=globals(), module_name=__name__
 )
 
@@ -236,6 +242,9 @@ __all__ = (
     "isclass",
     "isfunction",
     "ismethod",
+    "keyword_args",
+    "positional_args",
+    "takes_kwargs",
     "lazy_import",
     "low_priority",
     "normalize_ext",

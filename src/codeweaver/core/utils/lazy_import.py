@@ -168,11 +168,7 @@ def create_lazy_getattr(
             parent_module, submodule_name = dynamic_imports[name]
             module = __import__(f"{parent_module}.{submodule_name}", fromlist=[""])
             result = getattr(module, name)
-            if (
-                hasattr(result, "_resolve")
-                and result._resolve is not None
-                and callable(result._resolve)
-            ):
+            if isinstance(result, LazyImport):
                 result = result._resolve()
             module_globals[name] = result  # Cache for future access
             return result
