@@ -68,6 +68,7 @@ from codeweaver.agent_api.find_code.scoring import (
     process_reranked_results,
     process_unranked_results,
 )
+from codeweaver.agent_api.find_code.types import CodeMatch, FindCodeResponseSummary
 from codeweaver.common._logging import log_to_client_or_fallback
 from codeweaver.common.telemetry.events import capture_search_event
 from codeweaver.core.spans import Span
@@ -78,7 +79,6 @@ from codeweaver.semantic.classifications import AgentTask
 
 
 if TYPE_CHECKING:
-    from codeweaver.agent_api.find_code.types import CodeMatch, FindCodeResponseSummary
     from codeweaver.config.types import CodeWeaverSettingsDict
     from codeweaver.core.types.dictview import DictView
 
@@ -130,6 +130,16 @@ async def _check_index_status(
         - index_exists: True if collection exists in vector store
         - chunk_count: Number of chunks in collection (0 if doesn't exist)
     """
+    if vector_store is None or hasattr(vector_store, "__pydantic_serializer__"):
+        try:
+            from codeweaver.di import get_container
+            from codeweaver.providers.vector_stores.base import VectorStoreProvider
+
+            vector_store = await get_container().resolve(VectorStoreProvider)
+        except Exception:
+            logger.warning("No vector store provider provided")
+            return False, 0
+
     if vector_store is None:
         logger.warning("No vector store provider provided")
         return False, 0
@@ -235,6 +245,41 @@ async def find_code(
     """
     start_time = time.monotonic()
     strategies_used: list[SearchStrategy] = []
+
+    # Manually resolve providers if not injected (DI fallback)
+    from codeweaver.di import get_container
+    from codeweaver.providers.embedding.providers.base import EmbeddingProvider
+    from codeweaver.providers.vector_stores.base import VectorStoreProvider
+
+    container = get_container()
+
+    if vector_store is None or hasattr(vector_store, "__pydantic_serializer__"):
+        try:
+            vector_store = await container.resolve(VectorStoreProvider)
+        except Exception:
+            vector_store = None
+
+    if embedding_provider is None or hasattr(embedding_provider, "__pydantic_serializer__"):
+        try:
+            embedding_provider = await container.resolve(EmbeddingProvider)
+        except Exception:
+            embedding_provider = None
+
+    if sparse_provider is None or hasattr(sparse_provider, "__pydantic_serializer__"):
+        try:
+            from codeweaver.providers.embedding.providers.base import SparseEmbeddingProvider
+
+            sparse_provider = await container.resolve(SparseEmbeddingProvider)
+        except Exception:
+            sparse_provider = None
+
+    if reranking_provider is None or hasattr(reranking_provider, "__pydantic_serializer__"):
+        try:
+            from codeweaver.providers.reranking.providers.base import RerankingProvider
+
+            reranking_provider = await container.resolve(RerankingProvider)
+        except Exception:
+            reranking_provider = None
 
     try:
         # Step 0: Auto-index if needed

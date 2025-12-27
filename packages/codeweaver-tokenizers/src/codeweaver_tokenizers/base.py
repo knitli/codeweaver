@@ -38,7 +38,9 @@ class Tokenizer[Encoder](ABC):
         """Decode a list of token IDs back into text."""
 
     @abstractmethod
-    def decode_batch(self, token_lists: Sequence[Sequence[int]], **kwargs: Any) -> Sequence[str]:
+    def decode_batch(
+        self, token_lists: Sequence[Sequence[int]], **kwargs: Any
+    ) -> Sequence[str]:
         """Decode a batch of token ID lists back into text."""
 
     @staticmethod
@@ -61,7 +63,9 @@ class Tokenizer[Encoder](ABC):
         """Estimate the number of tokens in the given text."""
         return len(self.encode(text, **kwargs))
 
-    def estimate_batch(self, texts: Sequence[str] | Sequence[bytes], **kwargs: Any) -> int:
+    def estimate_batch(
+        self, texts: Sequence[str] | Sequence[bytes], **kwargs: Any
+    ) -> int:
         """Estimate the number of tokens in a batch of texts."""
         return sum(len(batch) for batch in self.encode_batch(texts, **kwargs))
 

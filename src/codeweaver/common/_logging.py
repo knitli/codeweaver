@@ -17,9 +17,8 @@ from typing import TYPE_CHECKING, Any, Literal
 from fastmcp import Context
 from pydantic_core import to_json
 
-from codeweaver.cli.utils import is_tty
 from codeweaver.config._logging import LoggingConfigDict
-from codeweaver.core import is_ci, lazy_import
+from codeweaver.core import is_ci, is_tty, lazy_import
 
 
 if TYPE_CHECKING:

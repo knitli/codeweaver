@@ -24,7 +24,9 @@ logger = logging.getLogger(__name__)
 
 
 async def check_daemon_health(
-    management_host: str = "127.0.0.1", management_port: int = 9329, timeout_at: float = 5.0
+    management_host: str = "127.0.0.1",
+    management_port: int = 9329,
+    timeout_at: float = 5.0,
 ) -> bool:
     """Check if the CodeWeaver daemon is healthy.
 
@@ -111,7 +113,9 @@ def spawn_daemon_process(
     )
 
     # Determine working directory for the daemon
-    working_dir = project.resolve() if isinstance(project, Path) and project.exists() else None
+    working_dir = (
+        project.resolve() if isinstance(project, Path) and project.exists() else None
+    )
 
     try:
         # Start daemon as detached subprocess
@@ -134,7 +138,9 @@ def spawn_daemon_process(
         logger.warning("Failed to spawn daemon", exc_info=e)
         return False
     else:
-        logger.debug("Spawned daemon process with command: %s %s", cw_cmd, " ".join(cw_args))
+        logger.debug(
+            "Spawned daemon process with command: %s %s", cw_cmd, " ".join(cw_args)
+        )
         return True
 
 
@@ -166,7 +172,9 @@ async def start_daemon_if_needed(
     """
     # First check if already running
     if await check_daemon_health(management_host, management_port):
-        logger.debug("Daemon already running at %s:%d", management_host, management_port)
+        logger.debug(
+            "Daemon already running at %s:%d", management_host, management_port
+        )
         return True
 
     logger.info("Starting CodeWeaver daemon...")
@@ -197,7 +205,9 @@ async def start_daemon_if_needed(
 
 
 async def request_daemon_shutdown(
-    management_host: str = "127.0.0.1", management_port: int = 9329, timeout_at: float = 10.0
+    management_host: str = "127.0.0.1",
+    management_port: int = 9329,
+    timeout_at: float = 10.0,
 ) -> bool:
     """Request daemon shutdown via management server endpoint.
 
@@ -218,7 +228,8 @@ async def request_daemon_shutdown(
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(
-                f"http://{management_host}:{management_port}/shutdown", timeout=timeout_at
+                f"http://{management_host}:{management_port}/shutdown",
+                timeout=timeout_at,
             )
             return response.status_code in (200, 202)
     except Exception as e:
@@ -249,7 +260,9 @@ async def wait_for_daemon_shutdown(
         elapsed += check_interval
 
         # Daemon is shut down when health check fails
-        if not await check_daemon_health(management_host, management_port, timeout_at=2.0):
+        if not await check_daemon_health(
+            management_host, management_port, timeout_at=2.0
+        ):
             logger.info("Daemon shut down successfully")
             return True
 

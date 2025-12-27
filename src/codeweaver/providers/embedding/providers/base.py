@@ -913,7 +913,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         return [
             serialized
             if (serialized := chunk.serialize_for_embedding()) and isinstance(serialized, str)
-            else serialized.decode("utf-8")
+            else serialized.decode("utf-8")  # ty:ignore[unresolved-attribute]
             for chunk in chunks
             if chunk
         ]

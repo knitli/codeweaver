@@ -10,7 +10,7 @@ import re
 def update_imports(root_dir):
     pattern1 = re.compile(r"from codeweaver.providers.provider import ([^,\n]+(?:, [^,\n]+)*)")
 
-    for root, dirs, files in os.walk(root_dir):
+    for root, _dirs, files in os.walk(root_dir):
         for file in files:
             if file.endswith(".py"):
                 path = os.path.join(root, file)

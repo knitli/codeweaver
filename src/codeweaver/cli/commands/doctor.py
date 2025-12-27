@@ -26,8 +26,7 @@ from pydantic import FilePath, ValidationError
 from rich.table import Table
 
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
-from codeweaver.cli.utils import get_codeweaver_config_paths
-from codeweaver.core import get_project_path, is_git_dir
+from codeweaver.core import get_codeweaver_config_paths, get_project_path, is_git_dir
 from codeweaver.core.types.provider import ProviderKind
 from codeweaver.core.types.sentinel import Unset
 

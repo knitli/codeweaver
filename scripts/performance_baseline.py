@@ -20,13 +20,13 @@ async def benchmark_initialization():
     print("--- Performance Baseline: Initialization ---")
 
     start = time.perf_counter()
-    indexer = await Indexer.from_settings_async()
+    await Indexer.from_settings_async()
     end = time.perf_counter()
     print(f"Indexer.from_settings_async(): {(end - start) * 1000:.2f}ms")
 
     container = get_container()
     start = time.perf_counter()
-    indexer_di = await container.resolve(Indexer)
+    await container.resolve(Indexer)
     end = time.perf_counter()
     print(f"Container.resolve(Indexer):   {(end - start) * 1000:.2f}ms")
 

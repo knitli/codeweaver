@@ -13,7 +13,9 @@ from codeweaver_tokenizers.tiktoken import TiktokenTokenizer
 from codeweaver_tokenizers.tokenizers import Tokenizers
 
 
-def get_tokenizer(tokenizer: Literal["tiktoken", "tokenizers"], model: str) -> Tokenizer[Any]:
+def get_tokenizer(
+    tokenizer: Literal["tiktoken", "tokenizers"], model: str
+) -> Tokenizer[Any]:
     """
     Get the tokenizer class based on the specified tokenizer type and model.
 
@@ -47,4 +49,10 @@ def estimate_tokens(text: str | bytes, encoder: str = "cl100k_base") -> int:
     return len(encoding.encode(text))
 
 
-__all__ = ("TiktokenTokenizer", "Tokenizer", "Tokenizers", "estimate_tokens", "get_tokenizer")
+__all__ = (
+    "TiktokenTokenizer",
+    "Tokenizer",
+    "Tokenizers",
+    "estimate_tokens",
+    "get_tokenizer",
+)

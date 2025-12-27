@@ -117,6 +117,25 @@ def _get_project_name() -> str:
     return get_project_path().name
 
 
+def supported_languages() -> list[str]:
+    """Return the supported languages."""
+    from codeweaver.core.file_extensions import ALL_LANGUAGES
+    from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
+
+    semantic = {lang.variable for lang in SemanticSearchLanguage}
+    all_languages = {str(lang) for lang in ALL_LANGUAGES if str(lang).lower() not in semantic}
+    return sorted(
+        all_languages
+        | {f"{lang} (AST support)" for lang in SemanticSearchLanguage}
+        | {lang.variable for lang in ConfigLanguage if not lang.is_semantic_search_language}
+    )
+
+
+def supported_language_count() -> int:
+    """Return the count of supported languages."""
+    return len(supported_languages())
+
+
 __all__ = (
     "DictInputTypesT",
     "DictOutputTypesT",
@@ -124,4 +143,6 @@ __all__ = (
     "ensure_iterable",
     "generate_collection_name",
     "rpartial",
+    "supported_language_count",
+    "supported_languages",
 )

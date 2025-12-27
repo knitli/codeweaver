@@ -96,10 +96,8 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
         # These will be used in _init_provider after base class overwrites self.config
         persist_path_config = self.config.get("persist_path", get_user_config_dir())
         object.__setattr__(self, "_initial_persist_path", persist_path_config)
-        object.__setattr__(self, "_initial_auto_persist", self.config.get("auto_persist", True))
-        object.__setattr__(
-            self, "_initial_persist_interval", self.config.get("persist_interval", 300)
-        )
+        object.__setattr__(self, "_initial_auto_persist", self.config.get("auto_persist"))
+        object.__setattr__(self, "_initial_persist_interval", self.config.get("persist_interval"))
         super().model_post_init(__context)
 
     @property
@@ -122,13 +120,19 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
         # If path doesn't end with .json, treat it as a directory and append default filename
         if persist_path.suffix != ".json":
             persist_path = persist_path / f"{_get_project_name()}_vector_store.json"
-        auto_persist = getattr(self, "_initial_auto_persist", True)
-        persist_interval = getattr(self, "_initial_persist_interval", 300)
 
-        # Disable persistence in test mode
-        if is_test_environment():
-            auto_persist = False
-            logger.debug("Test mode detected: persistence disabled for %s", self.__class__.__name__)
+        # Logic for auto_persist:
+        # 1. If explicitly provided in config, use that value.
+        # 2. If not provided, disable in test mode, enable otherwise.
+        auto_persist_raw = getattr(self, "_initial_auto_persist", None)
+        if auto_persist_raw is not None:
+            auto_persist = bool(auto_persist_raw)
+        else:
+            auto_persist = not is_test_environment()
+
+        persist_interval = getattr(self, "_initial_persist_interval", None)
+        if persist_interval is None:
+            persist_interval = 300
 
         # Store as private attributes
         object.__setattr__(self, "_persist_path", persist_path)

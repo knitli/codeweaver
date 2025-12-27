@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Annotated, Any
 
-from codeweaver.di.container import Container
+from codeweaver.di.container import Container, get_container
 from codeweaver.di.depends import Depends
 
 
@@ -25,6 +25,14 @@ if TYPE_CHECKING:
     from codeweaver.providers.reranking.providers.base import RerankingProvider
     from codeweaver.providers.vector_stores.base import VectorStoreProvider
     from codeweaver.server.health.health_service import HealthService
+
+
+# ===========================================================================
+# *                            Legacy DI Bridge
+#
+# * This is a bridge between the old registry system and the new DI system.
+# * It will die a needed death with phase 3 of the monorepo plan :)
+# ===========================================================================
 
 
 async def get_embedding_provider() -> EmbeddingProvider:
@@ -89,7 +97,6 @@ async def get_chunk_governor() -> ChunkGovernor:
 
 async def get_chunking_service() -> ChunkingService:
     """Resolve the chunking service."""
-    from codeweaver.di import get_container
     from codeweaver.engine.chunking_service import ChunkingService
 
     # ChunkingService will have its own dependencies resolved by the container
@@ -215,7 +222,6 @@ def setup_default_container(container: Container) -> None:
     from codeweaver.common.statistics import SessionStatistics
     from codeweaver.config.settings import CodeWeaverSettings
     from codeweaver.engine.chunker import ChunkGovernor
-    from codeweaver.engine.chunking_service import ChunkingService
     from codeweaver.engine.failover import VectorStoreFailoverManager
     from codeweaver.engine.indexer.indexer import Indexer
     from codeweaver.providers.embedding.providers.base import EmbeddingProvider
@@ -232,7 +238,6 @@ def setup_default_container(container: Container) -> None:
     container.register(VectorStoreProvider, get_vector_store)
     container.register(RerankingProvider, get_reranking_provider)
     container.register(ChunkGovernor, get_chunk_governor)
-    container.register(ChunkingService, get_chunking_service)
     container.register(Indexer, get_indexer)
     container.register(VectorStoreFailoverManager, get_failover_manager)
     container.register(HealthService, get_health_service)
@@ -256,3 +261,25 @@ StatisticsDep = Annotated[Any, Depends(get_statistics)]
 FailoverManagerDep = Annotated[Any, Depends(get_failover_manager)]
 HealthServiceDep = Annotated[Any, Depends(get_health_service)]
 FileWatcherDep = Annotated[Any, Depends(get_file_watcher)]
+
+__all__ = (
+    "ChunkingServiceDep",
+    "Container",
+    "Depends",
+    "EmbeddingDep",
+    "FailoverManagerDep",
+    "FileWatcherDep",
+    "GovernorDep",
+    "HealthServiceDep",
+    "IgnoreFilterDep",
+    "IndexerDep",
+    "ModelRegistryDep",
+    "ProviderRegistryDep",
+    "RerankingDep",
+    "ServicesRegistryDep",
+    "SettingsDep",
+    "SparseEmbeddingDep",
+    "StatisticsDep",
+    "TokenizerDep",
+    "VectorStoreDep",
+)

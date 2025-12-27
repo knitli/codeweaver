@@ -4,6 +4,7 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 experimental_monorepo_root = true
 
+
 [env]
 MISE_EXPERIMENTAL = "1"
 GH_REPO = "knitli/codeweaver"
@@ -31,6 +32,12 @@ CW_PREFIX = '''{% if get_env(name="CI", default="") == "true" %}[codeweaver]{% e
 # this is a bit redundant but it makes it easier to override in CI environments
 MISE_PYTHON_VERSION = '''{{ get_env(name="MISE_PYTHON_VERSION", default="3.13") }}'''
 HK_MISE = "1"
+
+[shell_alias]
+mx = 'mise x'
+mr = 'mise r'
+start-serena = '''uvx -p 3.13.11 --from git+https://github.com/oraios/serena serena start-mcp-server --project {{ get_env(name="CODEWEAVER_PROJECT_PATH", default=exec(command="pwd")) }} --transport streamable-http --port 9121 --host 127.0.0.1'''
+
 
 [settings]
 idiomatic_version_file_enable_tools = []

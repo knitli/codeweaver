@@ -246,6 +246,7 @@ import logging
 
 from collections import defaultdict
 from collections.abc import Iterator
+from contextvars import ContextVar
 from functools import cached_property
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Annotated, Any, ClassVar, Literal, TypedDict, cast, override
@@ -300,6 +301,8 @@ type ThingType = CompositeThing | Token
 type ThingOrCategoryType = CompositeThing | Token | Category
 
 _classifier: GrammarBasedClassifier | None = None
+
+_resolving_grammar: ContextVar[bool] = ContextVar("_resolving_grammar", default=False)
 
 
 def _get_classifier() -> GrammarBasedClassifier:
@@ -415,11 +418,18 @@ class Thing(BasedModel):
     @property
     def categories(self) -> frozenset[Category]:
         """Resolve Categories from registry by name."""
-        return frozenset(
-            cat
-            for name in self.category_names
-            if (cat := registry().get_category_by_name(name, language=self.language))  # type: ignore
-        )
+        if _resolving_grammar.get():
+            return frozenset()
+
+        token = _resolving_grammar.set(True)
+        try:
+            return frozenset(
+                cat
+                for name in self.category_names
+                if (cat := registry().get_category_by_name(name, language=self.language))  # type: ignore
+            )
+        finally:
+            _resolving_grammar.reset(token)
 
     @property
     def has_categories(self) -> bool:
@@ -739,15 +749,22 @@ class Category(BasedModel):
     @property
     def member_things(self) -> frozenset[CompositeThing | Token]:
         """Resolve member Things from registry by name."""
-        from codeweaver.semantic.registry import get_registry
+        if _resolving_grammar.get():
+            return frozenset()
 
-        registry = get_registry()
-        return frozenset(
-            thing
-            for name in self.member_thing_names
-            if (thing := registry.get_thing_by_name(name, language=self.language))
-            and not isinstance(thing, Category)
-        )
+        token = _resolving_grammar.set(True)
+        try:
+            from codeweaver.semantic.registry import get_registry
+
+            registry = get_registry()
+            return frozenset(
+                thing
+                for name in self.member_thing_names
+                if (thing := registry.get_thing_by_name(name, language=self.language))
+                and not isinstance(thing, Category)
+            )
+        finally:
+            _resolving_grammar.reset(token)
 
     def __str__(self) -> str:
         """String representation of the Category."""
@@ -886,14 +903,21 @@ class Connection(BasedModel):
     @property
     def target_things(self) -> frozenset[ThingOrCategoryType]:
         """Resolve target Things/Categories from registry by name."""
-        from codeweaver.semantic.registry import get_registry
+        if _resolving_grammar.get():
+            return frozenset()
 
-        registry = get_registry()
-        return frozenset(
-            thing
-            for name in self.target_thing_names
-            if (thing := registry.get_thing_by_name(name, language=self.language))
-        )
+        token = _resolving_grammar.set(True)
+        try:
+            from codeweaver.semantic.registry import get_registry
+
+            registry = get_registry()
+            return frozenset(
+                thing
+                for name in self.target_thing_names
+                if (thing := registry.get_thing_by_name(name, language=self.language))
+            )
+        finally:
+            _resolving_grammar.reset(token)
 
     def __contains__(self, thing: ThingOrCategoryType | ThingOrCategoryNameT) -> bool:
         """Check if this Connection can point to the specified Thing or Category by name or instance."""

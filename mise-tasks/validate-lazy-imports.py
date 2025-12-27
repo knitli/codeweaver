@@ -56,7 +56,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.rule import Rule
 
-from codeweaver.cli.utils import format_file_link, is_tty
+from codeweaver.core import format_file_link, is_tty
 
 
 console = Console(markup=True, emoji=True)

@@ -93,7 +93,11 @@ if TYPE_CHECKING:
     )
     from codeweaver.core.types.search import SearchResult, SearchStrategy, StrategizedQuery
     from codeweaver.core.types.sentinel import MISSING, UNSET, Missing, Sentinel, Unset
-    from codeweaver.core.types.utils import generate_field_title, generate_title
+    from codeweaver.core.types.utils import (
+        clean_sentinel_from_schema,
+        generate_field_title,
+        generate_title,
+    )
 
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
@@ -173,6 +177,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "UUID7Hex": (__spec__.parent, "aliases"),
     "UUID7HexT": (__spec__.parent, "aliases"),
     "Unset": (__spec__.parent, "sentinel"),
+    "clean_sentinel_from_schema": (__spec__.parent, "utils"),
     "get_provider_kinds": (__spec__.parent, "provider"),
     "generate_field_title": (__spec__.parent, "utils"),
     "generate_title": (__spec__.parent, "utils"),
@@ -258,6 +263,7 @@ __all__ = (
     "UUID7Hex",
     "UUID7HexT",
     "Unset",
+    "clean_sentinel_from_schema",
     "generate_field_title",
     "generate_title",
     "get_provider_kinds",

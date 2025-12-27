@@ -35,6 +35,11 @@ class TestRemovePathWithDeletedFiles:
         indexer = await container.resolve(Indexer)
         indexer._project_path = tmp_path
         indexer._file_manifest = IndexFileManifest(project_path=tmp_path)
+
+        # Clear store to avoid pollution between tests if Indexer is a singleton
+        if indexer._store:
+            indexer._store.clear()
+
         return indexer
 
     @pytest.mark.asyncio

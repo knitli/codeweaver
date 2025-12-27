@@ -25,8 +25,7 @@ from pydantic import FilePath, PositiveInt
 from typing_extensions import TypeIs
 
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
-from codeweaver.cli.utils import get_settings_map_for
-from codeweaver.core import lazy_import
+from codeweaver.core import get_settings_map_for, lazy_import
 
 
 if TYPE_CHECKING:

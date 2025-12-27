@@ -313,7 +313,7 @@ class SemanticChunker(BaseChunker):
 
             node_text = node.text
             if self.tokenizer:
-                tokens = self.tokenizer.count_tokens(node_text)
+                tokens = self.tokenizer.estimate(node_text)
             else:
                 tokens = len(node_text) // 4  # Rough approximation
 
@@ -791,7 +791,7 @@ class SemanticChunker(BaseChunker):
             for child in children:
                 governor.check_timeout()
                 if self.tokenizer:
-                    child_tokens = self.tokenizer.count_tokens(child.text)
+                    child_tokens = self.tokenizer.estimate(child.text)
                 else:
                     child_tokens = len(child.text) // 4
 

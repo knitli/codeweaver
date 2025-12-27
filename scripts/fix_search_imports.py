@@ -10,7 +10,7 @@ def update_search_imports(root_dir):
     old_import = "codeweaver.engine.search"
     new_import = "codeweaver.providers.vector_stores.search"
 
-    for root, dirs, files in os.walk(root_dir):
+    for root, _dirs, files in os.walk(root_dir):
         for file in files:
             if file.endswith(".py"):
                 path = os.path.join(root, file)

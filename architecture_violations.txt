@@ -1,0 +1,215 @@
+Analyzing dependencies...
+
+=== Architectural Violations ===
+
+Package: codeweaver
+  FAILED: src/codeweaver/agent_api/__init__.py
+    -> Imports: codeweaver (codeweaver-unknown)
+    (Unmapped import)
+  FAILED: src/codeweaver/server/management.py
+    -> Imports: codeweaver (codeweaver-unknown)
+    (Unmapped import)
+  FAILED: src/codeweaver/server/server.py
+    -> Imports: codeweaver (codeweaver-unknown)
+    (Unmapped import)
+  FAILED: src/codeweaver/cli/__main__.py
+    -> Imports: codeweaver (codeweaver-unknown)
+    (Unmapped import)
+  FAILED: src/codeweaver/cli/ui/status_display.py
+    -> Imports: codeweaver (codeweaver-unknown)
+    (Unmapped import)
+  FAILED: src/codeweaver/cli/commands/server.py
+    -> Imports: codeweaver.main (codeweaver-unknown)
+    (Unmapped import)
+
+Package: codeweaver-core
+  FAILED: src/codeweaver/exceptions.py
+    -> Imports: codeweaver.cli.utils (codeweaver)
+    (Not in allowed dependencies: set())
+  FAILED: src/codeweaver/common/_logging.py
+    -> Imports: codeweaver.cli.utils (codeweaver)
+    (Not in allowed dependencies: set())
+  FAILED: src/codeweaver/common/_logging.py
+    -> Imports: codeweaver.config._logging (codeweaver-engine)
+    (Not in allowed dependencies: set())
+  FAILED: src/codeweaver/common/statistics.py
+    -> Imports: codeweaver.server (codeweaver)
+    (Not in allowed dependencies: set())
+  FAILED: src/codeweaver/di/providers.py
+    -> Imports: codeweaver.engine.chunking_service (codeweaver-engine)
+    (Not in allowed dependencies: set())
+  FAILED: src/codeweaver/di/providers.py
+    -> Imports: codeweaver.common.registry (codeweaver-engine)
+    (Not in allowed dependencies: set())
+  FAILED: src/codeweaver/di/providers.py
+    -> Imports: codeweaver.engine.watcher.watch_filters (codeweaver-engine)
+    (Not in allowed dependencies: set())
+  FAILED: src/codeweaver/di/providers.py
+    -> Imports: codeweaver.providers.embedding.providers.base (codeweaver-providers)
+    (Not in allowed dependencies: set())
+  FAILED: src/codeweaver/di/providers.py
+    -> Imports: codeweaver.engine.failover (codeweaver-engine)
+    (Not in allowed dependencies: set())
+  FAILED: src/codeweaver/di/providers.py
+    -> Imports: codeweaver_tokenizers (codeweaver-tokenizers)
+    (Not in allowed dependencies: set())
+  FAILED: src/codeweaver/di/providers.py
+    -> Imports: codeweaver.config.settings (codeweaver-engine)
+    (Not in allowed dependencies: set())
+  FAILED: src/codeweaver/di/providers.py
+    -> Imports: codeweaver.engine.chunker (codeweaver-engine)
+    (Not in allowed dependencies: set())
+  FAILED: src/codeweaver/di/providers.py
+    -> Imports: codeweaver.engine.watcher.watcher (codeweaver-engine)
+    (Not in allowed dependencies: set())
+  FAILED: src/codeweaver/di/providers.py
+    -> Imports: codeweaver.providers.vector_stores.base (codeweaver-providers)
+    (Not in allowed dependencies: set())
+  FAILED: src/codeweaver/di/providers.py
+    -> Imports: codeweaver.config.chunker (codeweaver-engine)
+    (Not in allowed dependencies: set())
+  FAILED: src/codeweaver/di/providers.py
+    -> Imports: codeweaver.engine.indexer.indexer (codeweaver-engine)
+    (Not in allowed dependencies: set())
+  FAILED: src/codeweaver/di/providers.py
+    -> Imports: codeweaver.server.health.health_service (codeweaver)
+    (Not in allowed dependencies: set())
+  FAILED: src/codeweaver/di/providers.py
+    -> Imports: codeweaver.providers.reranking.providers.base (codeweaver-providers)
+    (Not in allowed dependencies: set())
+  FAILED: src/codeweaver/core/chunks.py
+    -> Imports: codeweaver.providers.embedding.registry (codeweaver-providers)
+    (Not in allowed dependencies: set())
+  FAILED: src/codeweaver/core/chunks.py
+    -> Imports: codeweaver_tokenizers.base (codeweaver-tokenizers)
+    (Not in allowed dependencies: set())
+  FAILED: src/codeweaver/core/chunks.py
+    -> Imports: codeweaver.providers.embedding.types (codeweaver-providers)
+    (Not in allowed dependencies: set())
+  FAILED: src/codeweaver/core/__init__.py
+    -> Imports: codeweaver.semantic.types (codeweaver-semantic)
+    (Not in allowed dependencies: set())
+  FAILED: src/codeweaver/core/utils/general.py
+    -> Imports: codeweaver.config.types (codeweaver-engine)
+    (Not in allowed dependencies: set())
+  FAILED: src/codeweaver/core/utils/general.py
+    -> Imports: codeweaver.config.settings (codeweaver-engine)
+    (Not in allowed dependencies: set())
+
+Package: codeweaver-daemon
+  ✅ No violations found
+
+Package: codeweaver-engine
+  FAILED: src/codeweaver/engine/watcher/watcher.py
+    -> Imports: codeweaver.cli.utils (codeweaver)
+    (Not in allowed dependencies: {'codeweaver-core', 'codeweaver-semantic', 'codeweaver-providers'})
+  FAILED: src/codeweaver/config/settings.py
+    -> Imports: codeweaver.mcp.middleware (codeweaver)
+    (Not in allowed dependencies: {'codeweaver-core', 'codeweaver-semantic', 'codeweaver-providers'})
+  FAILED: src/codeweaver/config/types.py
+    -> Imports: codeweaver.mcp.middleware (codeweaver)
+    (Not in allowed dependencies: {'codeweaver-core', 'codeweaver-semantic', 'codeweaver-providers'})
+  FAILED: src/codeweaver/config/middleware.py
+    -> Imports: codeweaver.mcp.middleware (codeweaver)
+    (Not in allowed dependencies: {'codeweaver-core', 'codeweaver-semantic', 'codeweaver-providers'})
+
+Package: codeweaver-providers
+  FAILED: src/codeweaver/providers/embedding/providers/base.py
+    -> Imports: codeweaver_tokenizers (codeweaver-tokenizers)
+    (Not in allowed dependencies: {'codeweaver-core', 'codeweaver-telemetry'})
+  FAILED: src/codeweaver/providers/embedding/providers/base.py
+    -> Imports: codeweaver.common.registry.provider (codeweaver-engine)
+    (Not in allowed dependencies: {'codeweaver-core', 'codeweaver-telemetry'})
+  FAILED: src/codeweaver/providers/embedding/providers/base.py
+    -> Imports: codeweaver.config.providers (codeweaver-engine)
+    (Not in allowed dependencies: {'codeweaver-core', 'codeweaver-telemetry'})
+  FAILED: src/codeweaver/providers/embedding/providers/base.py
+    -> Imports: codeweaver.config.profiles (codeweaver-engine)
+    (Not in allowed dependencies: {'codeweaver-core', 'codeweaver-telemetry'})
+  FAILED: src/codeweaver/providers/embedding/providers/bedrock.py
+    -> Imports: codeweaver.common.registry.models (codeweaver-engine)
+    (Not in allowed dependencies: {'codeweaver-core', 'codeweaver-telemetry'})
+  FAILED: src/codeweaver/providers/vector_stores/utils.py
+    -> Imports: codeweaver.config.settings (codeweaver-engine)
+    (Not in allowed dependencies: {'codeweaver-core', 'codeweaver-telemetry'})
+  FAILED: src/codeweaver/providers/vector_stores/utils.py
+    -> Imports: codeweaver.common.registry.models (codeweaver-engine)
+    (Not in allowed dependencies: {'codeweaver-core', 'codeweaver-telemetry'})
+  FAILED: src/codeweaver/providers/vector_stores/qdrant_base.py
+    -> Imports: codeweaver.config.providers (codeweaver-engine)
+    (Not in allowed dependencies: {'codeweaver-core', 'codeweaver-telemetry'})
+  FAILED: src/codeweaver/providers/vector_stores/qdrant_base.py
+    -> Imports: codeweaver.common.registry.provider (codeweaver-engine)
+    (Not in allowed dependencies: {'codeweaver-core', 'codeweaver-telemetry'})
+  FAILED: src/codeweaver/providers/vector_stores/qdrant_base.py
+    -> Imports: codeweaver.config.settings (codeweaver-engine)
+    (Not in allowed dependencies: {'codeweaver-core', 'codeweaver-telemetry'})
+  FAILED: src/codeweaver/providers/vector_stores/base.py
+    -> Imports: codeweaver.common.registry (codeweaver-engine)
+    (Not in allowed dependencies: {'codeweaver-core', 'codeweaver-telemetry'})
+  FAILED: src/codeweaver/providers/vector_stores/base.py
+    -> Imports: codeweaver.common.registry.provider (codeweaver-engine)
+    (Not in allowed dependencies: {'codeweaver-core', 'codeweaver-telemetry'})
+  FAILED: src/codeweaver/providers/vector_stores/base.py
+    -> Imports: codeweaver.config.providers (codeweaver-engine)
+    (Not in allowed dependencies: {'codeweaver-core', 'codeweaver-telemetry'})
+  FAILED: src/codeweaver/providers/vector_stores/base.py
+    -> Imports: codeweaver.config.profiles (codeweaver-engine)
+    (Not in allowed dependencies: {'codeweaver-core', 'codeweaver-telemetry'})
+  FAILED: src/codeweaver/providers/vector_stores/qdrant.py
+    -> Imports: codeweaver.config.providers (codeweaver-engine)
+    (Not in allowed dependencies: {'codeweaver-core', 'codeweaver-telemetry'})
+  FAILED: src/codeweaver/providers/vector_stores/__init__.py
+    -> Imports: codeweaver.config.providers (codeweaver-engine)
+    (Not in allowed dependencies: {'codeweaver-core', 'codeweaver-telemetry'})
+  FAILED: src/codeweaver/providers/vector_stores/inmemory.py
+    -> Imports: codeweaver.config.providers (codeweaver-engine)
+    (Not in allowed dependencies: {'codeweaver-core', 'codeweaver-telemetry'})
+  FAILED: src/codeweaver/providers/vector_stores/inmemory.py
+    -> Imports: codeweaver.config.settings (codeweaver-engine)
+    (Not in allowed dependencies: {'codeweaver-core', 'codeweaver-telemetry'})
+  FAILED: src/codeweaver/providers/reranking/capabilities/cohere.py
+    -> Imports: codeweaver_tokenizers (codeweaver-tokenizers)
+    (Not in allowed dependencies: {'codeweaver-core', 'codeweaver-telemetry'})
+  FAILED: src/codeweaver/providers/reranking/capabilities/base.py
+    -> Imports: codeweaver_tokenizers.base (codeweaver-tokenizers)
+    (Not in allowed dependencies: {'codeweaver-core', 'codeweaver-telemetry'})
+  FAILED: src/codeweaver/providers/reranking/capabilities/base.py
+    -> Imports: codeweaver_tokenizers (codeweaver-tokenizers)
+    (Not in allowed dependencies: {'codeweaver-core', 'codeweaver-telemetry'})
+  FAILED: src/codeweaver/providers/reranking/capabilities/voyage.py
+    -> Imports: codeweaver_tokenizers (codeweaver-tokenizers)
+    (Not in allowed dependencies: {'codeweaver-core', 'codeweaver-telemetry'})
+  FAILED: src/codeweaver/providers/reranking/providers/base.py
+    -> Imports: codeweaver_tokenizers (codeweaver-tokenizers)
+    (Not in allowed dependencies: {'codeweaver-core', 'codeweaver-telemetry'})
+  FAILED: src/codeweaver/providers/reranking/providers/bedrock.py
+    -> Imports: codeweaver.config.providers (codeweaver-engine)
+    (Not in allowed dependencies: {'codeweaver-core', 'codeweaver-telemetry'})
+  FAILED: src/codeweaver/providers/reranking/providers/voyage.py
+    -> Imports: codeweaver.common.registry.models (codeweaver-engine)
+    (Not in allowed dependencies: {'codeweaver-core', 'codeweaver-telemetry'})
+
+Package: codeweaver-semantic
+  ✅ No violations found
+
+Package: codeweaver-telemetry
+  FAILED: src/codeweaver/common/telemetry/client.py
+    -> Imports: codeweaver.config.settings (codeweaver-engine)
+    (Not in allowed dependencies: {'codeweaver-core'})
+  FAILED: src/codeweaver/common/telemetry/client.py
+    -> Imports: codeweaver.config.telemetry (codeweaver-engine)
+    (Not in allowed dependencies: {'codeweaver-core'})
+  FAILED: src/codeweaver/common/telemetry/client.py
+    -> Imports: codeweaver.config._project (codeweaver-engine)
+    (Not in allowed dependencies: {'codeweaver-core'})
+  FAILED: src/codeweaver/common/telemetry/events.py
+    -> Imports: codeweaver.agent_api.find_code.intent (codeweaver)
+    (Not in allowed dependencies: {'codeweaver-core'})
+  FAILED: src/codeweaver/common/telemetry/events.py
+    -> Imports: codeweaver.agent_api.find_code.types (codeweaver)
+    (Not in allowed dependencies: {'codeweaver-core'})
+
+Package: codeweaver-tokenizers
+  ✅ No violations found
+

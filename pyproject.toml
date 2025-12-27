@@ -273,6 +273,7 @@ dev = [
   # black is used to format generated code
   "black>=25.12.0",
   "ruff>=0.14.8",
+  "serena>=0.9.1",
   "ty>=0.0.1a31",
   "types-boto3-custom",
   "uv>=0.9.17",

@@ -2,13 +2,8 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
-"""CodeWeaver: Extensible MCP server for semantic code search.
-
-As a convenience, we lazily export (almost) every type in CodeWeaver so you can easily make use of them.
-
-**Important**: You should not take these exports to mean it's CodeWeaver's public API. We are in alpha and the API **will change** substantially, and sometimes without notice. Once we're stable, then we'll adopt a more routined approach to public APIs.
-
-(are we exporting too much? Yes. We'll refine this over time as we better understand what users need. For now, enjoy the convenience of having everything available.)
+"""
+CodeWeaver - Intelligent codebase context discovery.
 """
 
 from __future__ import annotations

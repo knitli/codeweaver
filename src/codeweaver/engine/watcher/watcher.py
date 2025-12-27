@@ -29,10 +29,8 @@ import watchfiles
 
 from fastmcp import Context
 
-from codeweaver.cli.utils import is_tty
-from codeweaver.core import is_ci
-from codeweaver.di import depends
-from codeweaver.di.providers import IgnoreFilterDep, IndexerDep, get_ignore_filter, get_indexer
+from codeweaver.core import is_ci, is_tty
+from codeweaver.di import INJECTED, IgnoreFilterDep, IndexerDep
 from codeweaver.engine.indexer.indexer import Indexer
 from codeweaver.engine.watcher._logging import WatchfilesLogManager
 from codeweaver.engine.watcher.types import FileChange
@@ -56,9 +54,9 @@ class FileWatcher:
         handler: Awaitable[Callable[[set[FileChange]], Any]]
         | Callable[[set[FileChange]], Any]
         | None = None,
-        file_filter: IgnoreFilterDep = depends(get_ignore_filter),
+        file_filter: IgnoreFilterDep = INJECTED,
         walker: Any | None = None,  # Keep for compatibility
-        indexer: IndexerDep = depends(get_indexer),
+        indexer: IndexerDep = INJECTED,
         status_display: Any | None = None,
         capture_watchfiles_output: bool = True,
         watchfiles_log_level: int = logging.WARNING,

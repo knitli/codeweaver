@@ -35,13 +35,17 @@ class TiktokenTokenizer(Tokenizer[tiktoken.Encoding]):
         self, texts: Sequence[str] | Sequence[bytes], **kwargs: Any
     ) -> Sequence[Sequence[int]]:
         """Encode a batch of texts into a list of token ID lists."""
-        return self._encoder.encode_batch([self._to_string(text) for text in texts], **kwargs)
+        return self._encoder.encode_batch(
+            [self._to_string(text) for text in texts], **kwargs
+        )
 
     def decode(self, tokens: Sequence[int], **kwargs: Any) -> str:
         """Decode a list of token IDs back into text."""
         return self._encoder.decode(tokens, **kwargs)
 
-    def decode_batch(self, token_lists: Sequence[Sequence[int]], **kwargs: Any) -> Sequence[str]:
+    def decode_batch(
+        self, token_lists: Sequence[Sequence[int]], **kwargs: Any
+    ) -> Sequence[str]:
         """Decode a batch of token ID lists back into texts."""
         return self._encoder.decode_batch(token_lists, **kwargs)
 

@@ -207,24 +207,31 @@ async def embed_query(
         ValueError: If no embedding providers configured or both fail
     """
     from codeweaver.common._logging import log_to_client_or_fallback
-    from codeweaver.di.providers import get_embedding_provider, get_sparse_embedding_provider
     from codeweaver.providers.embedding.types import QueryResult
 
     _query_cv.set(query.strip())
 
     # Manually resolve providers if not injected (DI fallback)
-    if dense_provider is None:
+    from codeweaver.di import get_container
+    from codeweaver.providers.embedding.providers.base import EmbeddingProvider
+
+    container = get_container()
+
+    if dense_provider is None or hasattr(
+        dense_provider, "__pydantic_serializer__"
+    ):  # Handle sentinel
         try:
-            dense_provider = await get_embedding_provider()
+            dense_provider = await container.resolve(EmbeddingProvider)
         except Exception as e:
-            logger.warning("get_embedding_provider failed", exc_info=e)
+            logger.warning("Failed to resolve dense provider: %s", e)
             dense_provider = None
 
-    if sparse_provider is None:
+    if sparse_provider is None or hasattr(sparse_provider, "__pydantic_serializer__"):
         try:
-            sparse_provider = await get_sparse_embedding_provider()
-        except Exception as e:
-            logger.warning("get_sparse_embedding_provider failed", exc_info=e)
+            from codeweaver.providers.embedding.providers.base import SparseEmbeddingProvider
+
+            sparse_provider = await container.resolve(SparseEmbeddingProvider)
+        except Exception:
             sparse_provider = None
 
     await log_to_client_or_fallback(
@@ -415,11 +422,12 @@ async def rerank_results(
     from codeweaver.common._logging import log_to_client_or_fallback
 
     # Manually resolve provider if not injected (DI fallback)
-    if reranking is None:
+    if reranking is None or hasattr(reranking, "__pydantic_serializer__"):
         try:
-            from codeweaver.di.providers import get_reranking_provider
+            from codeweaver.di import get_container
+            from codeweaver.providers.reranking.providers.base import RerankingProvider
 
-            reranking = await get_reranking_provider()
+            reranking = await get_container().resolve(RerankingProvider)
         except Exception:
             reranking = None
 

@@ -19,7 +19,7 @@ from pydantic import FilePath
 from rich.table import Table
 
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
-from codeweaver.cli.utils import is_codeweaver_config_path
+from codeweaver.core import is_codeweaver_config_path
 
 
 class ConfigProfile(StrEnum):

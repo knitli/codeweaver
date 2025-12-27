@@ -51,6 +51,7 @@ import contextlib
 import logging
 
 from collections.abc import Iterator, Sequence
+from contextvars import ContextVar
 from functools import cached_property
 from pathlib import Path
 from types import ModuleType
@@ -123,6 +124,8 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 registry_module: LazyImport[ModuleType] = lazy_import("codeweaver.semantic.registry")
+
+_resolving_ast_thing: ContextVar[set[int]] = ContextVar("_resolving_ast_thing", default=set())
 
 # re-export Ast Grep's rules and config types:
 AstGrepSearchTypes = (
@@ -352,9 +355,13 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
 
     thing_id: Annotated[UUID7, Field(description="""The unique ID of the node""")] = uuid7()
 
-    parent_thing_id: Annotated[UUID7 | None, Field(description="""The ID of the parent node""")] = (
-        None
-    )
+    def __repr__(self) -> str:
+        """Return a string representation of the node."""
+        return f"AstThing(name={self.name}, language={self.language.variable}, thing_id={self.thing_id})"
+
+    def __str__(self) -> str:
+        """Return a string representation of the node."""
+        return f"{self.language.variable} node: {self.name}"
 
     def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
         from codeweaver.core.types.aliases import FilteredKey
@@ -408,12 +415,26 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
         parent_thing_id: UUID7 | None = None,
     ) -> AstThing[SgNode]:
         """Create an AstThing from an ast-grep `SgNode`."""
-        return cls.model_construct(
-            _node=sg_node,
-            language=language,
-            thing_id=thing_id or uuid7(),
-            parent_thing_id=parent_thing_id,
+        # Use object.__new__ to completely bypass Pydantic's initialization
+        # and prevent recursion in init_private_attributes/model_post_init
+        instance = object.__new__(cls)
+
+        # Manually set all fields
+        object.__setattr__(instance, "language", language)
+        object.__setattr__(instance, "thing_id", thing_id or uuid7())
+        object.__setattr__(instance, "parent_thing_id", parent_thing_id)
+
+        # Manually set Pydantic internal state
+        object.__setattr__(
+            instance, "__pydantic_fields_set__", {"language", "thing_id", "parent_thing_id"}
         )
+        object.__setattr__(instance, "__pydantic_extra__", None)
+        object.__setattr__(instance, "__pydantic_private__", None)
+
+        # Set our private attribute
+        object.__setattr__(instance, "_node", sg_node)
+
+        return instance
 
     # ================================================
     # *      Identity and Metadata Properties       *

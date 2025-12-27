@@ -215,7 +215,7 @@ def test_local_installation():
         shutil.rmtree(dist_dir)
 
     result = subprocess.run(
-        ["uv", "build"], capture_output=True, text=True, check=False, cwd=project_root
+        ["uv", "build", "--all"], capture_output=True, text=True, check=False, cwd=project_root
     )
 
     if result.returncode != 0:
@@ -242,8 +242,12 @@ def test_local_installation():
         python = venv_path / "bin" / "python"
 
         # Install from local wheel
+        # Use --find-links to allow pip to find other workspace member wheels in the dist directory
         result = subprocess.run(
-            [str(pip), "install", str(wheel_path)], capture_output=True, text=True, check=False
+            [str(pip), "install", "--find-links", str(dist_dir), str(wheel_path)],
+            capture_output=True,
+            text=True,
+            check=False,
         )
         assert result.returncode == 0, f"Installation failed: {result.stderr}"
 

@@ -33,6 +33,9 @@ WORKDIR /app
 COPY pyproject.toml README.md SECURITY.md sbom.spdx ./
 COPY LICENSE* ./
 COPY LICENSES/ LICENSES/
+COPY packages/ packages/
+COPY .git/ .git/
+COPY typings/ typings/
 
 # Create minimal package structure for initial dependency installation
 # This allows Docker to cache the expensive dependency layer
@@ -45,17 +48,13 @@ RUN mkdir -p src/codeweaver && \
 # If you encounter SSL errors, you can add --trusted-host pypi.org --trusted-host files.pythonhosted.org
 # hadolint ignore=DL3013
 RUN python -m pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    python -m pip install --no-cache-dir .
+    python -m pip install --no-cache-dir ./packages/codeweaver-daemon ./packages/codeweaver-tokenizers .
 
 # NOW copy source code (frequent changes don't trigger dependency reinstall)
 COPY src/ src/
-COPY typings/ typings/
-
-# Copy .git for dynamic versioning (after dependencies are installed)
-COPY .git/ .git/
 
 # Reinstall package with actual source code (fast, dependencies already installed)
-RUN python -m pip install --no-cache-dir --no-deps --force-reinstall .
+RUN python -m pip install --no-cache-dir --no-deps --force-reinstall ./packages/codeweaver-daemon ./packages/codeweaver-tokenizers .
 
 # =============================================================================
 # Stage 2: Runtime - Minimal production image

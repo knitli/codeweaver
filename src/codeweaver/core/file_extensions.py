@@ -12,14 +12,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Literal, TypedDict, cast
 
-from codeweaver.core.utils import (
-    COMMON_LLM_TOOLING_PATHS,
-    COMMON_TOOLING_PATHS,
-    lazy_import,
-)
 from codeweaver.core.types.aliases import (
-    DevToolName,
-    DevToolNameT,
     DirectoryName,
     DirectoryNameT,
     FileExt,
@@ -29,9 +22,8 @@ from codeweaver.core.types.aliases import (
     LanguageName,
     LanguageNameT,
     LiteralStringT,
-    LlmToolName,
-    LlmToolNameT,
 )
+from codeweaver.core.utils import COMMON_LLM_TOOLING_PATHS, COMMON_TOOLING_PATHS, lazy_import
 
 
 if TYPE_CHECKING:

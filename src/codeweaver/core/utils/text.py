@@ -193,7 +193,8 @@ MAX_REGEX_PATTERN_LENGTH = 8192
 # Very simple heuristic to flag obviously dangerous nested quantifiers that are common in ReDoS patterns,
 # e.g., (.+)+, (\w+)*, (a|aa)+, etc. This is not exhaustive but catches many foot-guns.
 _NESTED_QUANTIFIER_RE = re.compile(
-    r"(?:\([^)]*\)|\[[^\]]*\]|\\.|.)(?:\+|\*|\{[^}]*\})\s*(?:\+|\*|\{[^}]*\})"
+    r"(?:\([^)]*[\+*|][^)]*\)|\[[^\]]*\]|\\.|.)(?:\+|\*|\{[^}]*\})\s*(?:\+|\*|\{[^}]*\})|"
+    r"\([^)]*(?:\+|\*|\{[^}]*\}|\|)[^)]*\)(?:\+|\*|\{[^}]*\})"
 )
 
 
@@ -215,7 +216,7 @@ def _walk_pattern(s: str) -> str:
     n = len(s)
 
     # First character after a backslash that we consider valid in Python's `re` syntax or as an escaped metachar.
-    legal_next = set("AbBdDsSwWZzGAfnrtvxuUN0123456789") | set(".*+?^$|()[]{}\\")
+    legal_next = set("AbBdDsSwWZzGAfnrtvxuUN0123456789kg") | set(".*+?^$|()[]{}\\-")
 
     while i < n:
         ch = s[i]

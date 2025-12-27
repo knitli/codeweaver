@@ -588,6 +588,14 @@ async def test_search_performance_with_real_providers(indexed_test_project, actu
 
     search_time = time.time() - start_time
 
+    print(f"DEBUG: Search returned {len(response.matches)} matches")
+    if not response.matches:
+        print(f"DEBUG: Response summary: {response.summary}")
+        print(f"DEBUG: Response warnings: {response.warnings}")
+        # Check if vector store has data
+        info = await actual_vector_store.client.get_collection(actual_vector_store.collection)
+        print(f"DEBUG: Collection {actual_vector_store.collection} has {info.points_count} points")
+
     # Validate results returned
     assert len(response.matches) > 0, "Search should return results"
 

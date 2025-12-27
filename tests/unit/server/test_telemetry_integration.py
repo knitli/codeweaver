@@ -68,6 +68,7 @@ def create_find_code_response(
 ):
     """Create a FindCodeResponseSummary with all required fields."""
     from codeweaver.agent_api.find_code.intent import IntentType
+    from codeweaver.agent_api.find_code.types import FindCodeResponseSummary
     from codeweaver.core.types.search import SearchStrategy
 
     return FindCodeResponseSummary(

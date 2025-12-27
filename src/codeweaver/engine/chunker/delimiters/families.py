@@ -37,7 +37,6 @@ if TYPE_CHECKING:
 
 
 def defined_languages() -> tuple[str, ...]:
-
     """Get a list of all languages with defined families.
 
     Returns:

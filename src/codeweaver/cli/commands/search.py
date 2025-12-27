@@ -24,8 +24,8 @@ from codeweaver.agent_api.find_code import find_code
 from codeweaver.agent_api.find_code.intent import IntentType
 from codeweaver.agent_api.find_code.types import CodeMatch, FindCodeResponseSummary
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
-from codeweaver.cli.utils import resolve_project_root
 from codeweaver.config.settings import get_settings_map
+from codeweaver.core import resolve_project_root
 from codeweaver.exceptions import CodeWeaverError
 
 

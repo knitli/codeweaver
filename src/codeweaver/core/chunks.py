@@ -353,23 +353,33 @@ class CodeChunk(BasedModel):
             if k in ("name", "context", "semantic_meta")
         }  # type: ignore
 
-    def serialize_for_embedding(self) -> SerializedCodeChunk[CodeChunk]:
-        """Serialize the CodeChunk for embedding."""
-        self_map = self.model_dump(
-            round_trip=True,
-            exclude_none=True,
-            exclude=self._base_excludes,
-            exclude_computed_fields=True,  # Exclude all computed fields
-            warnings=False,  # Suppress serialization warnings
-        )
-        if metadata := self.metadata:
-            metadata = {k: v for k, v in metadata.items() if k in ("name", "tags", "semantic_meta")}
-        self_map["version"] = self._version
-        self_map["metadata"] = metadata
-        ordered_self_map = {k: self_map[k] for k in self._serialization_order if self_map.get(k)}
-        return to_json({k: v for k, v in ordered_self_map.items() if v}, round_trip=True).decode(
-            "utf-8"
-        )
+    def serialize_for_embedding(self) -> str:
+        """Serialize the CodeChunk for embedding.
+
+        Returns a JSON string containing the most relevant fields for semantic search.
+        """
+        # Build a plain dict with only the fields we want to include in the embedding
+        # This avoids Pydantic serialization issues with computed fields and circular refs
+        data = {
+            "title": self.title,
+            "name": self.name,
+            "content": self.content,
+            "file_path": str(self.file_path) if self.file_path else None,
+            "language": str(self.language) if self.language else None,
+            "source": str(self.source) if self.source else None,
+            "chunk_version": self._version,
+        }
+
+        # Include select metadata if available
+        if self.metadata:
+            metadata = {
+                k: v for k, v in self.metadata.items() if k in ("name", "tags", "semantic_meta")
+            }
+            if metadata:
+                data["metadata"] = metadata
+
+        # Use pydantic_core.to_json for fast, reliable serialization
+        return to_json({k: v for k, v in data.items() if v is not None}).decode("utf-8")
 
     @property
     def _base_excludes(self) -> set[str]:
@@ -486,8 +496,8 @@ class CodeChunk(BasedModel):
     @computed_field
     @cached_property
     def length(self) -> PositiveInt:
-        """Return the length of the serialized content in characters."""
-        return len(self.serialize_for_embedding())
+        """Return the length of the chunk content in characters."""
+        return len(self.content)
 
     @computed_field
     @property
@@ -496,7 +506,7 @@ class CodeChunk(BasedModel):
 
         Uses rough approximation of 1 token per 4 characters.
         """
-        return len(self.serialize_for_embedding()) // 4
+        return len(self.content) // 4
 
     def token_count(self, tokenizer_instance: Tokenizer[Any]) -> PositiveInt:
         """Return the token count for the chunk content."""

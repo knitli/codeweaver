@@ -7,7 +7,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 from typing import Annotated, Literal, NamedTuple, cast
 
 from pydantic import UUID7, Field, NonNegativeInt, PositiveInt
@@ -21,7 +20,6 @@ from codeweaver.core.types.embeddings import (
     SparseEmbedding,
     StoredEmbeddingVectors,
 )
-from codeweaver.core.types.enum import BaseEnum
 from codeweaver.core.types.utils import generate_field_title
 from codeweaver.exceptions import ConfigurationError
 

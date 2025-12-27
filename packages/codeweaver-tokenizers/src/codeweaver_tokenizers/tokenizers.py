@@ -24,7 +24,8 @@ try:
     from tokenizers import Tokenizer as TokenizersTokenizer
 except ImportError as e:
     logger.warning(
-        "Failed to import 'tokenizers' package, you may need to install it.", exc_info=True
+        "Failed to import 'tokenizers' package, you may need to install it.",
+        exc_info=True,
     )
     raise ImportError(
         "The 'tokenizers' package is required for this module. Please install it with 'pip install tokenizers'."
@@ -47,13 +48,17 @@ class Tokenizers(Tokenizer[TokenizersTokenizer]):
         """Initialize tokenizers encoder."""
         self._encoder = TokenizersTokenizer.from_pretrained(encoder, **(kwargs or {}))
         if not _is_tokenizer(self._encoder):
-            raise TypeError(f"Expected a Tokenizers instance, got {type(self._encoder)}")
+            raise TypeError(
+                f"Expected a Tokenizers instance, got {type(self._encoder)}"
+            )
 
     def encode(self, text: str | bytes, **kwargs: Any) -> list[int]:
         """Encode text into a list of token IDs."""
         return self._encoder.encode(self._to_string(text), **kwargs)
 
-    def encode_batch(self, texts: Sequence[str | bytes], **kwargs: Any) -> Sequence[Sequence[int]]:
+    def encode_batch(
+        self, texts: Sequence[str | bytes], **kwargs: Any
+    ) -> Sequence[Sequence[int]]:
         """Encode a batch of texts into a list of token ID lists."""
         return [self._encoder.encode(self._to_string(txt), **kwargs) for txt in texts]
 
@@ -61,7 +66,9 @@ class Tokenizers(Tokenizer[TokenizersTokenizer]):
         """Decode a list of token IDs back into text."""
         return self._encoder.decode(tokens, **kwargs)
 
-    def decode_batch(self, token_lists: Sequence[Sequence[int]], **kwargs: Any) -> Sequence[str]:
+    def decode_batch(
+        self, token_lists: Sequence[Sequence[int]], **kwargs: Any
+    ) -> Sequence[str]:
         """Decode a batch of token ID lists back into texts."""
         return self._encoder.decode_batch(token_lists, **kwargs)
 

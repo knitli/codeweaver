@@ -27,8 +27,7 @@ from pydantic_core import to_json as to_json
 from rich.prompt import Confirm
 
 from codeweaver.cli.ui import CLIErrorHandler, get_display
-from codeweaver.cli.utils import resolve_project_root
-from codeweaver.core import get_user_config_dir
+from codeweaver.core import get_user_config_dir, resolve_project_root
 from codeweaver.exceptions import CodeWeaverError
 
 

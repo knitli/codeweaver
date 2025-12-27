@@ -53,6 +53,8 @@ class SemanticScorer(BasedModel):
         Returns:
             Final importance score incorporating base score and contextual adjustments
         """
+        from codeweaver.semantic.classifications import ImportanceScores
+
         # Start with base semantic score
         base_scores = (
             thing.classification.importance_scores

@@ -21,13 +21,11 @@ from typing import (
     NamedTuple,
     NotRequired,
     Required,
-    Self,
     TypedDict,
     cast,
 )
 
-from ast_grep_py import SgNode
-from pydantic import UUID7, ConfigDict, Field, PositiveFloat, SkipValidation
+from pydantic import UUID7, Field, PositiveFloat
 
 from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage, has_semantic_extension
 from codeweaver.core.types.aliases import (
@@ -38,8 +36,6 @@ from codeweaver.core.types.aliases import (
     LiteralStringT,
 )
 from codeweaver.core.types.enum import BaseEnum
-from codeweaver.core.types.models import FROZEN_BASEDMODEL_CONFIG, BasedModel
-from codeweaver.core.utils import uuid7
 
 
 if TYPE_CHECKING:

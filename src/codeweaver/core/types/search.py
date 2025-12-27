@@ -16,8 +16,8 @@ from pydantic import AfterValidator, ConfigDict, Field, NonNegativeFloat
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.discovery import DiscoveredFile
 from codeweaver.core.metadata import Metadata
-from codeweaver.core.types.enum import BaseEnum
 from codeweaver.core.types.embeddings import SparseEmbedding
+from codeweaver.core.types.enum import BaseEnum
 from codeweaver.core.types.models import BasedModel
 from codeweaver.core.types.utils import generate_field_title
 from codeweaver.core.utils import set_relative_path

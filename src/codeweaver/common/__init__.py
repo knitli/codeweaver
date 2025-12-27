@@ -72,7 +72,6 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "ToolOrPromptName": (__spec__.parent, "types"),
     "add_failed_request": (__spec__.parent, "statistics"),
     "add_successful_request": (__spec__.parent, "statistics"),
-
     "get_http_pool": (__spec__.parent, "http_pool"),
     "get_session_statistics": (__spec__.parent, "statistics"),
     "log_to_client_or_fallback": (__spec__.parent, "_logging"),

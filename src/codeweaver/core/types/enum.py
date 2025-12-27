@@ -303,17 +303,21 @@ class BaseEnum(Enum):
     @classmethod
     def _value_type(cls) -> type[int | str]:
         """Return the type of the enum values."""
-        if all(isinstance(member.value, str) for member in cls.__members__.values() if member):
+        # Use simple heuristic: check the first member's value type
+        # All members must have the same type by convention in this project.
+        if not cls.__members__:
             return str
-        if all(
-            isinstance(member.value, int)
-            for member in cls.__members__.values()
-            if member and member.value
-        ):
-            return int
-        raise TypeError(
-            f"All members of {cls.__qualname__} must have the same value type and must be either str or int."
-        )
+        first_member = next(iter(cls.__members__.values()))
+        # Handle cases where member might be None during initialization
+        if first_member is None:
+            return str
+        # Use object.__getattribute__ to avoid triggering property recursion
+        try:
+            val = object.__getattribute__(first_member, "_value_")
+        except AttributeError:
+            val = first_member.value
+
+        return type(val) if isinstance(val, int | str) else str
 
     def __lt__(self, other: Self) -> bool:
         """Less than comparison for enum members."""

@@ -26,9 +26,7 @@ class ImportAnalyzer(ast.NodeVisitor):
     def visit_If(self, node: ast.If) -> None:
         """Visit If nodes to detect TYPE_CHECKING blocks."""
         is_type_checking = False
-        if isinstance(node.test, ast.Name) and node.test.id == "TYPE_CHECKING":
-            is_type_checking = True
-        elif (
+        if (isinstance(node.test, ast.Name) and node.test.id == "TYPE_CHECKING") or (
             isinstance(node.test, ast.Attribute)
             and isinstance(node.test.value, ast.Name)
             and node.test.value.id == "typing"

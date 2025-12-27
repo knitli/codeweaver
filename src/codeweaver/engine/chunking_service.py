@@ -164,7 +164,7 @@ class ChunkingService:
 
             self.settings = get_settings()
 
-        project_path = (
+        (
             get_project_path()
             if not self.settings or isinstance(self.settings.project_path, Unset)
             else self.settings.project_path
