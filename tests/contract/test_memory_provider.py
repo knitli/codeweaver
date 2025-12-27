@@ -15,10 +15,10 @@ from uuid import uuid4
 
 import pytest
 
-from codeweaver.agent_api.find_code.types import StrategizedQuery
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.language import SemanticSearchLanguage as Language
 from codeweaver.core.spans import Span
+from codeweaver.core.types.search import SearchStrategy, StrategizedQuery
 from codeweaver.providers.provider import Provider
 from codeweaver.providers.vector_stores.inmemory import MemoryVectorStoreProvider
 
@@ -78,7 +78,7 @@ async def memory_provider(memory_config, test_embedding_caps):
 @pytest.fixture
 def sample_chunk():
     """Create a sample CodeChunk for testing."""
-    from codeweaver.common.utils.utils import uuid7
+    from codeweaver.core import uuid7
     from codeweaver.core.chunks import BatchKeys
     from codeweaver.core.metadata import ChunkKind, ExtKind
     from codeweaver.providers.embedding.registry import get_embedding_registry
@@ -215,7 +215,6 @@ class TestMemoryProviderContract:
         await provider2._initialize()
 
         # Verify data was restored
-        from codeweaver.agent_api.find_code.types import SearchStrategy
 
         results = await provider2.search(
             StrategizedQuery(

@@ -108,6 +108,7 @@ async def failover_manager(mock_primary_store: Mock, mock_backup_store: Mock, tm
 
 @pytest.mark.integration
 @pytest.mark.async_test
+@pytest.mark.mock_only
 class TestPhase4StatusFlow:
     """Integration tests for Phase 4 status reporting system."""
 
@@ -272,7 +273,7 @@ class TestPhase4StatusFlow:
         """Test that find_code responses can include failover metadata."""
         # Create a mock FindCodeResponseSummary
         from codeweaver.agent_api.find_code.intent import IntentType
-        from codeweaver.agent_api.find_code.types import SearchStrategy
+        from codeweaver.core.types.search import SearchStrategy
 
         response = FindCodeResponseSummary(
             matches=[],
@@ -396,6 +397,8 @@ class TestPhase4StatusFlow:
 
 
 @pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.mock_only
 class TestPhase4CLIStatus:
     """Integration tests for CLI status command."""
 
@@ -442,6 +445,8 @@ class TestPhase4CLIStatus:
 
 
 @pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.mock_only
 class TestPhase4FailoverStats:
     """Integration tests for FailoverStats dataclass."""
 

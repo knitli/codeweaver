@@ -19,15 +19,13 @@ import contextlib
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, NamedTuple
 
+from codeweaver_daemon import check_daemon_health, spawn_daemon_process
 from cyclopts import App, Parameter
 from pydantic import FilePath, PositiveInt
 from typing_extensions import TypeIs
 
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
-from codeweaver.cli.utils import get_settings_map_for
-from codeweaver.common.utils.lazy_importer import lazy_import
-from codeweaver.core.types.sentinel import Unset
-from codeweaver.daemon import check_daemon_health, spawn_daemon_process
+from codeweaver.core import get_settings_map_for, lazy_import
 
 
 if TYPE_CHECKING:
@@ -228,6 +226,8 @@ async def start_cw_services(
 
 def get_network_settings() -> NetworkConfig:
     """Get network configuration from settings."""
+    from codeweaver.core.types.sentinel import Unset
+
     settings_map = _get_settings_map()
 
     management_host = (
@@ -353,7 +353,9 @@ async def start(
     ):
         display.print_error("Invalid host or port provided. Please check your inputs.")
         return
-    get_project_path = lazy_import("codeweaver.common.utils.git", "get_project_path")
+    get_project_path = lazy_import("codeweaver.core", "get_project_path")
+    from codeweaver.core.types.sentinel import Unset
+
     project = (
         project or project_path
         if (project_path := settings_map.get("project_path")) is not Unset
@@ -401,7 +403,7 @@ async def start(
                 management_host=management_host,
                 management_port=management_port,
                 mcp_host=mcp_host,
-                mcp_port=mcp_port,
+                mcp_port=mcp_port or 4329,
                 config_file=config_file,
             )
 

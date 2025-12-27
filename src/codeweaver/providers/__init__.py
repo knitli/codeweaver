@@ -42,7 +42,6 @@ if TYPE_CHECKING:
         CLIENT_MAP,
         PROVIDER_CAPABILITIES,
         VECTOR_PROVIDER_CAPABILITIES,
-        get_provider_kinds,
     )
     from codeweaver.providers.data import get_data_provider, load_default_data_providers
     from codeweaver.providers.embedding import (

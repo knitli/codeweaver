@@ -20,10 +20,10 @@ from fastmcp.client.transports import StreamableHttpTransport
 from fastmcp.server.proxy import FastMCPProxy, ProxyClient
 from fastmcp.tools import Tool
 
-from codeweaver.common.utils import lazy_import
 from codeweaver.config.middleware import MiddlewareOptions, default_for_transport
 from codeweaver.config.settings import FastMcpHttpServerSettings, FastMcpStdioServerSettings
 from codeweaver.config.types import FastMcpHttpRunArgs, FastMcpServerSettingsDict
+from codeweaver.core import lazy_import
 from codeweaver.core.types import DictView, Unset
 from codeweaver.mcp.middleware import McpMiddleware
 
@@ -199,7 +199,7 @@ def setup_middleware(
             case "LoggingMiddleware" | "StructuredLoggingMiddleware":
                 instance = mw(
                     **(middleware_settings.get("logging", {}))
-                    | {"logger": logging.getLogger("codeweaver.middleware.logging")}  # type: ignore[reportCallIssue]
+                    | {"logger": logging.getLogger("codeweaver.middleware._logging")}  # type: ignore[reportCallIssue]
                 )
             case "ResponseCachingMiddleware":
                 instance = mw(**middleware_settings.get("caching", {}))  # type: ignore

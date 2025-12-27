@@ -20,7 +20,6 @@ from typing import (
     Annotated,
     Any,
     Literal,
-    NewType,
     NotRequired,
     Required,
     TypedDict,
@@ -44,39 +43,18 @@ from pydantic import (
 )
 from typing_extensions import TypeIs
 
-from codeweaver.common.utils.utils import uuid7
+from codeweaver.core.types.aliases import BlakeHashKey, BlakeKey
 from codeweaver.core.types.models import BasedModel
+from codeweaver.core.utils import get_blake_hash, get_blake_hash_generic, uuid7
 
 
 if TYPE_CHECKING:
     from codeweaver.core.types import AnonymityConversion, FilteredKeyT
 
-try:
-    # there are a handful of rare situations where users might not be able to install blake3
-    # luckily the apis are the same
-    from blake3 import blake3
-except ImportError:
-    from hashlib import blake2b as blake3
-
-
-BlakeKey = NewType("BlakeKey", str)
-BlakeHashKey = Annotated[
-    BlakeKey, Field(description="""A blake3 hash key string""", min_length=64, max_length=64)
-]
 
 HashKeyKind = TypeVar(
     "HashKeyKind", Annotated[UUID7, Tag("uuid")], Annotated[BlakeHashKey, Tag("blake")]
 )
-
-
-def get_blake_hash[AnyStr: (str, bytes)](value: AnyStr) -> BlakeHashKey:
-    """Hash a value using blake3 and return the hex digest."""
-    return BlakeKey(blake3(value.encode("utf-8") if isinstance(value, str) else value).hexdigest())
-
-
-def get_blake_hash_generic(value: str | bytes) -> BlakeHashKey:
-    """Hash a value using blake3 and return the hex digest - generic version."""
-    return BlakeKey(blake3(value.encode("utf-8") if isinstance(value, str) else value).hexdigest())
 
 
 def to_uuid() -> UUID7:

@@ -41,12 +41,9 @@ pytestmark = [pytest.mark.integration, pytest.mark.external_api]
 
 
 @pytest.mark.skipif(
-    not os.environ.get("VOYAGE_API_KEY")
-    or not os.environ.get("QDRANT__SERVICE__API_KEY")
-    or not os.environ.get("CODEWEAVER_VECTOR_STORE_URL"),
-    reason="VOYAGE_API_KEY, QDRANT__SERVICE__API_KEY, and CODEWEAVER_VECTOR_STORE_URL environment variables required",
+    not os.environ.get("VOYAGE_API_KEY"), reason="VOYAGE_API_KEY environment variable required"
 )
-async def test_custom_configuration():
+async def test_custom_configuration(qdrant_test_manager):
     """
     User Story: Customize provider settings like collection names.
 
@@ -54,13 +51,12 @@ async def test_custom_configuration():
     When: Vector store is initialized
     Then: Provider respects my custom configuration
     """
+    # Get configuration from qdrant_test_manager
+    qdrant_url = qdrant_test_manager.url
+    qdrant_api_key = qdrant_test_manager.api_key
 
     # Get base test config with proper authentication
-    base_config = {
-        "url": os.environ["CODEWEAVER_VECTOR_STORE_URL"],
-        "api_key": os.environ["QDRANT__SERVICE__API_KEY"],
-        "prefer_grpc": True,
-    }
+    base_config = {"url": qdrant_url, "api_key": qdrant_api_key, "prefer_grpc": False}
 
     # Test custom collection name
     config = QdrantConfig(**{

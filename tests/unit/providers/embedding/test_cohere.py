@@ -178,7 +178,7 @@ class TestCohereEmbeddingProviderEmbedding:
         mock_cohere_client.embed.return_value = mock_response
 
         provider = CohereEmbeddingProvider(caps=cohere_capabilities, _client=mock_cohere_client)
-        from codeweaver.common.utils.utils import uuid7
+        from codeweaver.core import uuid7
         from codeweaver.core.language import SemanticSearchLanguage
         from codeweaver.core.metadata import ChunkKind, ExtKind
         from codeweaver.core.spans import Span
@@ -267,7 +267,7 @@ class TestCohereEmbeddingProviderEmbedding:
 
         from pathlib import Path
 
-        from codeweaver.common.utils.utils import uuid7
+        from codeweaver.core import uuid7
         from codeweaver.core.language import SemanticSearchLanguage
         from codeweaver.core.metadata import ChunkKind, ExtKind
         from codeweaver.core.spans import Span
@@ -315,7 +315,7 @@ class TestCohereEmbeddingProviderErrorHandling:
         provider = CohereEmbeddingProvider(caps=cohere_capabilities, _client=mock_cohere_client)
         from pathlib import Path
 
-        from codeweaver.common.utils.utils import uuid7
+        from codeweaver.core import uuid7
         from codeweaver.core.language import SemanticSearchLanguage
         from codeweaver.core.metadata import ChunkKind, ExtKind
         from codeweaver.core.spans import Span

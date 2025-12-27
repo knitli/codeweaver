@@ -104,14 +104,16 @@ classifiers = [
 dependencies = [
   # Core functionality
   "aenum>=3.1.16",
-  "ast-grep-py>=0.40.0",
+  "ast-grep-py>=0.40.1",
   "blake3>=1.0.8",
+  "code-weaver-daemon",
+  "code-weaver-tokenizers",
   # CLI framework and output
   "cyclopts>=4.3.0",
-  "fastembed>=0.7.4",
+  # onnxruntime currently does not support python 3.14
+  "fastembed>=0.7.4; python_version < '3.14'",
   # MCP server framework
   "fastmcp>=2.13.3",
-  "httpx[http2]>=0.28.1",
   "mcp>=1.19.0",
   # Numerical and ML
   "numpy>=2.3.5",
@@ -121,16 +123,17 @@ dependencies = [
   # Core data models and validation
   "py-cpuinfo>=9.0.0",
   "pydantic>=2.12.5",
-  "pydantic-ai>=1.27.0",
-  "pydantic-graph>=1.27.0",
+  "pydantic-ai-slim>=1.30.1",
+  "pydantic-graph>=1.30.1",
   "pydantic-settings[toml,yaml]>=2.12.0",  # Pulls: tomli>=2.0.1, pyyaml>=6.0.1
   "qdrant-client>=1.16.1",
   "rich>=14.2.0",
   "rignore>=0.7.6",
+  # until onnxruntime supports python 3.14, we'll substitute fastembed with sentence-transformers for 3.14 to keep equivalent functionality
+  # this is less than desirable because sentence-transformers is a *very heavy* dependency compared to fastembed
+  "sentence-transformers>=5.1.2; python_version <= '3.14'",
   "tenacity>=9.1.2",
   "textcase>=0.4.5",
-  "tiktoken>=0.12.0",
-  "tokenizers>=0.22.1",
   "tomli-w>=1.2.0",
   "typing_extensions>=4.15.0",
   "uuid7>=0.1.0; python_version < '3.14'",
@@ -175,9 +178,9 @@ bedrock = [
 cohere = ["pydantic-ai-slim[cohere]"]
 # ==== Data Sources ====
 duckduckgo = ["pydantic-ai-slim[duckduckgo]"]
-fastembed = ["fastembed", "py-cpuinfo"]
+fastembed = ["fastembed; python_version < '3.14'", "py-cpuinfo"]
 # Requires additional setup, see https://qdrant.github.io/fastembed/examples/FastEmbed_GPU/
-fastembed-gpu = ["fastembed-gpu", "py-cpuinfo"]
+fastembed-gpu = ["fastembed-gpu; python_version < '3.14'", "py-cpuinfo"]
 # workos AuthKit middleware - see https://gofastmcp.com/integrations/authkit
 # No additional dependencies required, it's purely REST-based.
 # Enable with environment variables:
@@ -199,8 +202,9 @@ full = [
 full-gpu = [
   "permit-fastmcp",
   "eunomia-mcp",
-  "fastembed-gpu",
+  "fastembed-gpu; python_version < '3.14'",
   "permit-fastmcp",
+  "pydantic-ai-slim[openai,cohere,google,anthropic,groq,mistral,bedrock,huggingface,duckduckgo,tavily,retries]",
   "pydantic-settings[yaml,toml,aws-secrets-manager,azure-key-vault,gcp-secret-manager]",
   "sentence-transformers",
   # see note below about why this is commented out
@@ -209,7 +213,7 @@ full-gpu = [
 gcp-secret-manager = ["pydantic-settings[yaml,toml,gcp-secret-manager]"]
 google = ["pydantic-ai-slim[google]"]
 gpu-support = [
-  "fastembed-gpu",
+  "fastembed-gpu; python_version < '3.14'",
   # see note below about why this is commented out
   #  "sentence-transformers[onnx-gpu]; python_version>='3.12' and python_version<'3.14'",
 ]
@@ -225,10 +229,21 @@ mistral = ["pydantic-ai-slim[mistral]"]
 # which all use the OpenAI API
 openai = ["pydantic-ai-slim[openai]"]
 qdrant = ["qdrant-client"]
-recommended-local-only = [
-  "fastembed",
+recommended = [
+  "fastembed; python_version < '3.14'",
   "sentence-transformers",
   "tokenizers",
+  "py-cpuinfo",
+  "voyageai",
+  "pydantic-ai-slim[openai,anthropic,duckduckgo,tavily,retries]",
+]
+recommended-local-only = [
+  "fastembed; python_version < '3.14'",
+  "sentence-transformers",
+  "tokenizers",
+  "py-cpuinfo",
+  # openai for ollama local models
+  "pydantic-ai-slim[openai,duckduckgo,retries]",
 ]
 sentence-transformers = [
   "sentence-transformers",
@@ -256,11 +271,12 @@ voyageai = ["voyageai"]
 [dependency-groups]
 dev = [
   # black is used to format generated code
-  "black>=25.11.0",
+  "black>=25.12.0",
   "ruff>=0.14.8",
+  "serena>=0.9.1",
   "ty>=0.0.1a31",
   "types-boto3-custom",
-  "uv>=0.9.15",
+  "uv>=0.9.17",
 ]
 build = ["hatchling>=1.27.0", "twine>=6.2.0", "uv-dynamic-versioning>=0.11.2"]
 dev-helpers = [
@@ -276,7 +292,7 @@ docs = [
 ]
 test = [
   "dirty-equals>=0.11.0",
-  "pytest>=9.0.1",
+  "pytest>=9.0.2",
   "pytest-asyncio>=1.3.0",
   "pytest-cov>=7.0.0",
   "pytest-env>=1.2.0",
@@ -377,6 +393,7 @@ exclude = [
 source = "uv-dynamic-versioning"
 
 [tool.pytest]
+# tombi: format.rules.array-values-order.disabled = true
 addopts = [
   # While we don't chase coverage, we want to ensure a minimum bar to catch missing tests
   # We can raise this over time as the project matures
@@ -388,13 +405,18 @@ addopts = [
   "--import-mode=importlib",
   "--strict-config",
   "--strict-markers",
+  # Exclude resource-intensive tests by default
+  # Override with: pytest -m "expensive" or pytest -m "requires_models" to run these tests
   "-ra",
+  "-m",
+  "not expensive and not requires_models and not requires_gpu and not requires_api_keys",
 ]
 filterwarnings = [
   "error",
   "ignore::DeprecationWarning",
   "ignore::PendingDeprecationWarning",
   "ignore::UserWarning",
+  "ignore::urllib3.exceptions.SystemTimeWarning",
 ]
 markers = [
   "async_test: Asynchronous tests (in addition to pytest.mark.asyncio)",
@@ -410,12 +432,16 @@ markers = [
   # Feature-specific
   "embeddings: Tests related to embedding functionality",
   "env_vars: Tests that depend on environment variables",
+  "expensive: Tests taking more than 30 seconds to complete",
   "external_api: Tests that interact with external APIs",
   "fixtures: Tests that heavily rely on pytest fixtures",
   # Stability & reliability
   "flaky: Tests that may occasionally fail due to timing or external factors",
   "indexing: Tests related to code indexing",
   "integration: Integration tests that test component interactions",
+  # Platform-specific
+  "linux_only: Tests that only run on Linux platforms",
+  "macos_only: Tests that only run on macOS platforms",
   "mcp: Tests related to MCP protocol functionality",
   "mock_only: Tests that only use mocked dependencies",
   "network: Tests that require network access",
@@ -424,7 +450,10 @@ markers = [
   "performance: Performance-related tests",
   "qdrant: Tests that require Qdrant vector database",
   # External dependencies
-  "real_providers: Tests that require real provider configurations",
+  "real_providers: Tests using actual embedding/vector store providers (not mocks)",
+  "requires_api_keys: Tests requiring external API credentials and authentication",
+  "requires_gpu: Tests requiring GPU hardware for execution",
+  "requires_models: Tests requiring ML model downloads and local model files",
   "retry: Tests that may need retries",
   "search: Tests related to search functionality",
   "server: Tests related to server functionality",
@@ -433,10 +462,12 @@ markers = [
   "slow: Tests that take a significant amount of time to run",
   "telemetry: Tests related to telemetry and metrics",
   "timeout: Tests with specific timeout requirements",
+  "timing_sensitive: Tests with strict timing requirements that may be environment-dependent",
   # Test categories
   "unit: Unit tests that test individual components in isolation",
   "validation: Validation tests that ensure system consistency",
   "voyageai: Tests that require VoyageAI API access",
+  "windows_only: Tests that only run on Windows platforms",
 ]
 minversion = "9.0"
 python_classes = ["Test*"]
@@ -444,8 +475,10 @@ python_files = ["*_test.py", "test_*.py"]
 python_functions = ["test_*"]
 testpaths = ["tests"]
 asyncio_mode = "auto"
-timeout = "300"
+timeout = "600"
 timeout_method = "thread"
+# Override timeout for specific markers
+timeout_func_only = true  # Only apply timeout to test functions, not setup/teardown
 
 [tool.ty.environment]
 python-version = "3.12"
@@ -576,7 +609,18 @@ include = ["src/codeweaver/core/types/aliases.py"]
 [tool.ty.overrides.rules]
 invalid-newtype = "ignore"
 
+[tool.uv]
+conflicts = [
+  [{ extra = "full-gpu" }, { extra = "full" }],
+  [{ extra = "fastembed" }, { extra = "fastembed-gpu" }]
+]
+
+[tool.uv.workspace]
+members = ["packages/*"]
+
 [tool.uv.sources]
+code-weaver-daemon = { workspace = true }
+code-weaver-tokenizers = { workspace = true }
 types-boto3-custom = { path = "vendored/types_boto3_custom-1.41.2-py3-none-any.whl" }
 
 [tool.uv-dynamic-versioning]

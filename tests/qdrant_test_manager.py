@@ -102,14 +102,14 @@ def _find_qdrant_container(container_name: str) -> str | None:
 
 
 def _start_qdrant_container(
-    *, port: int = 6333, container_name: str = "qdrant-test", image: str = "qdrant/qdrant:latest"
+    *, port: int = 6333, container_name: str = "qdrant-test", image: str = "qdrant/qdrant:v1.16.1"
 ) -> bool:
     """Start a Qdrant Docker container for testing.
 
     Args:
         port: Host port to bind to (default: 6333)
         container_name: Name for the container (default: qdrant-test)
-        image: Docker image to use (default: qdrant/qdrant:latest)
+        image: Docker image to use (default: qdrant/qdrant:v1.16.1)
 
     Returns:
         True if container started successfully, False otherwise
@@ -254,7 +254,7 @@ class QdrantTestManager:
         self.auto_start_docker = auto_start_docker and not env_skip_docker
 
         # Container settings for Docker auto-start
-        self.docker_image = os.getenv("QDRANT_TEST_IMAGE", "qdrant/qdrant:latest")
+        self.docker_image = os.getenv("QDRANT_TEST_IMAGE", "qdrant/qdrant:v1.16.1")
         self.container_name = os.getenv("QDRANT_TEST_CONTAINER_NAME", "qdrant-test")
         self._docker_started = False
 

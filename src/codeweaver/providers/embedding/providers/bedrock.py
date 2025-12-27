@@ -37,11 +37,11 @@ from pydantic.alias_generators import to_camel, to_snake
 from types_boto3_bedrock_runtime.client import BedrockRuntimeClient
 
 from codeweaver.core.types.models import BasedModel
+from codeweaver.core.types.provider import Provider
 from codeweaver.exceptions import ConfigurationError, ProviderError
 from codeweaver.exceptions import ValidationError as CodeWeaverValidationError
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.providers.base import EmbeddingProvider
-from codeweaver.providers.provider import Provider
 
 
 if TYPE_CHECKING:

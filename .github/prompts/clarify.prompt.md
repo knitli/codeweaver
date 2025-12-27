@@ -1,10 +1,7 @@
 <!--
-SPDX-FileCopyrightText: 2025 Knitli Inc.
-SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
-
-SPDX-License-Identifier: MIT OR Apache-2.0
+SPDX-FileCopyrightText: 2025 Github Inc.
+SPDX-License-Identifier: MIT
 -->
-
 ---
 description: Identify underspecified areas in the current feature spec by asking up to 5 highly targeted clarification questions and encoding answers back into the spec.
 ---

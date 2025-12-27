@@ -157,7 +157,7 @@ class TestVoyageEmbeddingProviderEmbedding:
         )
         from pathlib import Path
 
-        from codeweaver.common.utils.utils import uuid7
+        from codeweaver.core import uuid7
         from codeweaver.core.metadata import ChunkKind, ExtKind
         from codeweaver.core.spans import Span
 
@@ -283,7 +283,7 @@ class TestVoyageEmbeddingProviderEmbedding:
 
             from pathlib import Path
 
-            from codeweaver.common.utils.utils import uuid7
+            from codeweaver.core import uuid7
             from codeweaver.core.metadata import ChunkKind, ExtKind
             from codeweaver.core.spans import Span
 
@@ -341,7 +341,7 @@ class TestVoyageEmbeddingProviderErrorHandling:
 
         from pathlib import Path
 
-        from codeweaver.common.utils.utils import uuid7
+        from codeweaver.core import uuid7
         from codeweaver.core.metadata import ChunkKind, ExtKind
         from codeweaver.core.spans import Span
 

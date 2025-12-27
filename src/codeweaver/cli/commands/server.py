@@ -91,7 +91,7 @@ async def server(
     """
     display = StatusDisplay()
     error_handler = CLIErrorHandler(display, verbose=verbose, debug=debug)
-    from codeweaver.common.utils import is_wsl_vscode
+    from codeweaver.core import is_wsl_vscode
 
     if is_wsl_vscode():
         display.print_warning(

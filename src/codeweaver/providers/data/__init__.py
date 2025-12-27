@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import contextlib
 
-from codeweaver.providers.provider import Provider
+from codeweaver.core.types.provider import Provider
 
 
 def get_data_provider(provider: Provider) -> type | None:

@@ -14,7 +14,7 @@ import pytest
 # Skip this entire module if the cohere package is not installed
 pytest.importorskip("cohere", reason="cohere package is required for these tests")
 
-from codeweaver.common.utils.utils import uuid7
+from codeweaver.core import uuid7
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.language import SemanticSearchLanguage
 from codeweaver.core.metadata import ChunkKind, ExtKind
@@ -184,7 +184,7 @@ class TestCohereRerankingProviderReranking:
         )
         from pathlib import Path
 
-        from codeweaver.common.utils.utils import uuid7
+        from codeweaver.core import uuid7
         from codeweaver.core.language import SemanticSearchLanguage
         from codeweaver.core.metadata import ChunkKind, ExtKind
         from codeweaver.core.spans import Span
@@ -244,7 +244,7 @@ class TestCohereRerankingProviderReranking:
         )
         from pathlib import Path
 
-        from codeweaver.common.utils.utils import uuid7
+        from codeweaver.core import uuid7
         from codeweaver.core.language import SemanticSearchLanguage
         from codeweaver.core.metadata import ChunkKind, ExtKind
         from codeweaver.core.spans import Span

@@ -118,8 +118,8 @@ class TestStartDaemonBackground:
 
         # Mock subprocess.Popen and shutil.which in the daemon module
         with (
-            patch("codeweaver.daemon.shutil.which") as mock_which,
-            patch("codeweaver.daemon.subprocess.Popen") as mock_popen,
+            patch("codeweaver_daemon.shutil.which") as mock_which,
+            patch("codeweaver_daemon.subprocess.Popen") as mock_popen,
         ):
             # Simulate finding cw executable
             mock_which.return_value = "/usr/local/bin/cw"
@@ -150,8 +150,8 @@ class TestStartDaemonBackground:
         display = StatusDisplay()
 
         with (
-            patch("codeweaver.daemon.shutil.which") as mock_which,
-            patch("codeweaver.daemon.subprocess.Popen") as mock_popen,
+            patch("codeweaver_daemon.shutil.which") as mock_which,
+            patch("codeweaver_daemon.subprocess.Popen") as mock_popen,
         ):
             # Simulate not finding cw executable
             mock_which.return_value = None
@@ -168,10 +168,10 @@ class TestStartDaemonBackground:
 
             assert result is True
             call_args = mock_popen.call_args[0][0]
-            # Should use sys.executable with the CLI __main__.py path
+            # Should use sys.executable with the CLI module
             assert sys.executable in call_args[0]
-            # Should run the CLI __main__.py file directly
-            assert any("__main__.py" in str(arg) for arg in call_args)
+            # Should run the CLI module
+            assert any("codeweaver.cli" in str(arg) for arg in call_args)
             assert "start" in call_args
 
     def test_start_daemon_background_passes_options(self, temp_project: Path) -> None:
@@ -182,8 +182,8 @@ class TestStartDaemonBackground:
         display = StatusDisplay()
 
         with (
-            patch("codeweaver.daemon.shutil.which") as mock_which,
-            patch("codeweaver.daemon.subprocess.Popen") as mock_popen,
+            patch("codeweaver_daemon.shutil.which") as mock_which,
+            patch("codeweaver_daemon.subprocess.Popen") as mock_popen,
         ):
             mock_which.return_value = "/usr/local/bin/cw"
             mock_popen.return_value = MagicMock()

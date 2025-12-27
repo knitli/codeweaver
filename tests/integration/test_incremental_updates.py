@@ -12,8 +12,8 @@ from pathlib import Path
 
 import pytest
 
-from codeweaver.common.utils.utils import uuid7
 from codeweaver.config.providers import QdrantConfig
+from codeweaver.core import uuid7
 from codeweaver.core.language import SemanticSearchLanguage as Language
 from codeweaver.providers.vector_stores.qdrant import QdrantVectorStoreProvider
 
@@ -32,9 +32,11 @@ async def test_incremental_updates(qdrant_test_manager):
     When: File is re-indexed
     Then: System updates only affected embeddings in both sparse and dense indexes
     """
-    # Create unique collection
+    # Create unique collection with sparse vector support (needed for BM25)
     collection_name = qdrant_test_manager.create_collection_name("incremental")
-    await qdrant_test_manager.create_collection(collection_name, dense_vector_size=768)
+    await qdrant_test_manager.create_collection(
+        collection_name, dense_vector_size=768, sparse_vector_size=1000
+    )
 
     config = QdrantConfig(url=qdrant_test_manager.url, collection_name=collection_name)
     provider = QdrantVectorStoreProvider(config=config)
@@ -73,7 +75,7 @@ async def test_incremental_updates(qdrant_test_manager):
     await provider.upsert([chunk_v2])
 
     # Verify: Old chunk gone, new chunk present
-    from codeweaver.agent_api.find_code.types import SearchStrategy, StrategizedQuery
+    from codeweaver.core.types.search import SearchStrategy, StrategizedQuery
 
     results = await provider.search(
         StrategizedQuery(

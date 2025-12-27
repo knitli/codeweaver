@@ -1,0 +1,10 @@
+<!--
+SPDX-FileCopyrightText: 2025 Knitli Inc.
+SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+
+SPDX-License-Identifier: MIT OR Apache-2.0
+-->
+
+# codeweaver-tokenizers
+
+Independent tokenizer package for CodeWeaver.

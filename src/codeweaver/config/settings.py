@@ -51,12 +51,9 @@ from pydantic_settings import (
     YamlConfigSettingsSource,
 )
 
-from codeweaver.common.utils.checks import is_test_environment
-from codeweaver.common.utils.lazy_importer import lazy_import
-from codeweaver.common.utils.utils import get_user_config_dir
+from codeweaver.config._logging import DefaultLoggingSettings, LoggingSettings
 from codeweaver.config.chunker import ChunkerSettings, DefaultChunkerSettings
 from codeweaver.config.indexer import DefaultIndexerSettings, IndexerSettings
-from codeweaver.config.logging import DefaultLoggingSettings, LoggingSettings
 from codeweaver.config.mcp import MCPServerConfig, StdioCodeWeaverConfig
 from codeweaver.config.middleware import DefaultMiddlewareSettings, MiddlewareOptions
 from codeweaver.config.providers import AllDefaultProviderSettings, ProviderSettings
@@ -74,12 +71,19 @@ from codeweaver.config.types import (
     StdioCodeWeaverConfigDict,
     UvicornServerSettings,
 )
-from codeweaver.core.types.aliases import FilteredKeyT
-from codeweaver.core.types.dictview import DictView
-from codeweaver.core.types.enum import AnonymityConversion
-from codeweaver.core.types.models import BasedModel, clean_sentinel_from_schema
-from codeweaver.core.types.sentinel import UNSET, Unset
-from codeweaver.mcp.middleware import McpMiddleware
+from codeweaver.core import (
+    UNSET,
+    AnonymityConversion,
+    BasedModel,
+    DictView,
+    FilteredKeyT,
+    Unset,
+    clean_sentinel_from_schema,
+    get_user_config_dir,
+    is_test_environment,
+    lazy_import,
+)
+from codeweaver.mcp import McpMiddleware
 
 
 logger = logging.getLogger(__name__)
@@ -378,7 +382,7 @@ class CodeWeaverSettings(BaseSettings):
             description="""Root path of the codebase to analyze. CodeWeaver will try to detect the project path automatically if you don't provide one.""",
             validate_default=False,
         ),
-    ] = _resolve_env_settings_path(directory=True)
+    ] = UNSET
 
     project_name: Annotated[
         str | Unset,
@@ -386,7 +390,7 @@ class CodeWeaverSettings(BaseSettings):
             description="""Project name (auto-detected from directory if None)""",
             validate_default=False,
         ),
-    ] = os.environ.get("CODEWEAVER_PROJECT_NAME", UNSET)
+    ] = UNSET
 
     provider: Annotated[
         ProviderSettings | Unset,
@@ -532,9 +536,7 @@ class CodeWeaverSettings(BaseSettings):
 
     _map: Annotated[DictView[CodeWeaverSettingsDict] | None, PrivateAttr()] = None
 
-    _unset_fields: Annotated[
-        set[str], Field(description="Set of fields that were unset", exclude=True)
-    ] = set()
+    _unset_fields: Annotated[set[str], PrivateAttr(default_factory=set)] = set()
 
     def __init__(self, **kwargs: Any) -> None:
         """Initialize CodeWeaverSettings, loading from config file if provided."""
@@ -550,16 +552,19 @@ class CodeWeaverSettings(BaseSettings):
         self._unset_fields = {
             field for field in type(self).model_fields if getattr(self, field) is Unset
         }
-        self.project_path = (
-            lazy_import("codeweaver.common.utils", "get_project_path")()
-            if isinstance(self.project_path, Unset)
-            else self.project_path
-        )  # type: ignore
-        self.project_name = (
-            cast(DirectoryPath, self.project_path).name  # type: ignore
-            if isinstance(self.project_name, Unset)
-            else self.project_name  # type: ignore
-        )
+        # Re-check environment variable for project_path before falling back to auto-detection
+        if isinstance(self.project_path, Unset):
+            env_path = _resolve_env_settings_path(directory=True)
+            if not isinstance(env_path, Unset):
+                self.project_path = env_path
+            else:
+                self.project_path = lazy_import("codeweaver.core", "get_project_path")()
+        # Re-check environment variable for project_name before falling back to auto-detection
+        if isinstance(self.project_name, Unset):
+            if env_name := os.environ.get("CODEWEAVER_PROJECT_NAME"):
+                self.project_name = env_name
+            else:
+                self.project_name = cast(DirectoryPath, self.project_path).name
         self.profile = None if isinstance(self.profile, Unset) else self.profile
         if self.profile:
             self._setup_profile()
@@ -747,7 +752,7 @@ class CodeWeaverSettings(BaseSettings):
                 cls.model_config["yaml_file"] = path
             case _:
                 raise ValueError(f"Unsupported configuration file format: {extension}")
-        from codeweaver.common.utils import get_project_path
+        from codeweaver.core import get_project_path
 
         return cls(project_path=get_project_path(), **{**kwargs, "config_file": path})  # type: ignore
 
@@ -771,7 +776,7 @@ class CodeWeaverSettings(BaseSettings):
     def project_root(self) -> Path:
         """Get the project root directory. Alias for `project_path`."""
         if isinstance(self.project_path, Unset):
-            from codeweaver.common.utils.git import get_project_path
+            from codeweaver.core import get_project_path
 
             self.project_path = get_project_path()
         return self.project_path.resolve()
@@ -832,6 +837,9 @@ class CodeWeaverSettings(BaseSettings):
             - AWS Secrets Manager
             - Azure Key Vault
             - Google Secret Manager
+
+        #! IMPORTANT
+        If the environment variable `CODEWEAVER_TEST_MODE` is set to "true", test config paths like codeweaver.test.toml become the *only* config sources. All others get ignored. It's important this get set and unset when testing is over.
         """
         config_files: list[PydanticBaseSettingsSource] = []
         cls._ensure_settings_dirs()
@@ -891,6 +899,21 @@ class CodeWeaverSettings(BaseSettings):
                 config_files.append(_class(settings_cls, Path(f"{loc}.{ext}")))
                 if ext == "yaml":
                     config_files.append(_class(settings_cls, Path(f"{loc}.yml")))
+        # if we're testing, we want to control and isolate test configs
+        # Still allow init_settings and env vars so tests can programmatically override config
+        if is_test_mode:
+            return (
+                init_settings,
+                EnvSettingsSource(
+                    settings_cls,
+                    env_prefix="CODEWEAVER_",
+                    case_sensitive=False,
+                    env_nested_delimiter="__",
+                    env_parse_enums=True,
+                    env_ignore_empty=True,
+                ),
+                *config_files,
+            )
         other_sources: list[PydanticBaseSettingsSource] = []
         if any(env for env in os.environ if env.startswith("AWS_SECRETS_MANAGER")):
             other_sources.append(
@@ -1031,7 +1054,7 @@ class CodeWeaverSettings(BaseSettings):
         obj: CodeWeaverSettings, path: Path | None = None, **override_kwargs: Any
     ) -> Any:
         """Convert an object to a serializable form."""
-        from codeweaver.common.utils.git import get_project_path
+        from codeweaver.core import get_project_path
 
         kwargs = {
             "indent": 4,
@@ -1164,7 +1187,7 @@ def get_settings(config_file: FilePath | None = None) -> CodeWeaverSettings:
         _settings = CodeWeaverSettings()  # type: ignore
 
     if isinstance(_settings.project_path, Unset):
-        from codeweaver.common.utils import get_project_path
+        from codeweaver.core import get_project_path
 
         _settings.project_path = get_project_path()
     if isinstance(_settings.project_name, Unset):

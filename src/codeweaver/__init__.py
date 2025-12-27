@@ -2,13 +2,8 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
-"""CodeWeaver: Extensible MCP server for semantic code search.
-
-As a convenience, we lazily export (almost) every type in CodeWeaver so you can easily make use of them.
-
-**Important**: You should not take these exports to mean it's CodeWeaver's public API. We are in alpha and the API **will change** substantially, and sometimes without notice. Once we're stable, then we'll adopt a more routined approach to public APIs.
-
-(are we exporting too much? Yes. We'll refine this over time as we better understand what users need. For now, enjoy the convenience of having everything available.)
+"""
+CodeWeaver - Intelligent codebase context discovery.
 """
 
 from __future__ import annotations
@@ -28,7 +23,26 @@ with contextlib.suppress(ImportError):
 
     warnings.simplefilter("ignore", PydanticDeprecatedSince212)
 
-from codeweaver.common.utils.lazy_importer import create_lazy_getattr
+# Suppress Pydantic 2.12+ UnsupportedFieldAttributeWarning
+# This warning is triggered when Field(exclude=True) is used in Annotated type aliases
+# See: https://github.com/wandb/wandb/issues/10662
+# The warning is cosmetic - the fields still work correctly, the exclude parameter is just ignored
+warnings.filterwarnings(
+    "ignore",
+    message=r"The '(exclude|repr|frozen)' attribute.*was provided to the `Field\(\)` function",
+    category=UserWarning,
+    module=r"pydantic\._internal\._generate_schema",
+)
+
+# Suppress OpenTelemetry deprecation warnings from dependencies
+# These are from opentelemetry internal API changes that dependencies haven't updated yet
+warnings.filterwarnings(
+    "ignore",
+    message=r"You should use `.*` instead\. Deprecated since version",
+    category=DeprecationWarning,
+)
+
+from codeweaver.core import create_lazy_getattr
 
 
 def get_version() -> str:
@@ -73,6 +87,8 @@ __version__: Final[str] = get_version()
 
 
 if TYPE_CHECKING:
+    from codeweaver_tokenizers import TiktokenTokenizer, Tokenizer, Tokenizers
+
     from codeweaver.agent_api import find_code
     from codeweaver.cli import CLIErrorHandler, StatusDisplay
     from codeweaver.common import (
@@ -449,7 +465,6 @@ if TYPE_CHECKING:
         StatisticsInfo,
         VectorStoreServiceInfo,
     )
-    from codeweaver.tokenizers import TiktokenTokenizer, Tokenizer, Tokenizers
 
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
@@ -775,15 +790,15 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "ThingNameT": (__spec__.parent, "core"),
     "ThingRegistry": (__spec__.parent, "semantic"),
     "ThingType": (__spec__.parent, "semantic"),
-    "TiktokenTokenizer": (__spec__.parent, "tokenizers"),
+    "TiktokenTokenizer": ("codeweaver_tokenizers", ""),
     "TimingStatistics": (__spec__.parent, "common"),
     "TimingStatisticsDict": (__spec__.parent, "common"),
     "Token": (__spec__.parent, "semantic"),
     "TokenCategory": (__spec__.parent, "common"),
     "TokenCounter": (__spec__.parent, "common"),
     "TokenPurpose": (__spec__.parent, "semantic"),
-    "Tokenizer": (__spec__.parent, "tokenizers"),
-    "Tokenizers": (__spec__.parent, "tokenizers"),
+    "Tokenizer": ("codeweaver_tokenizers", ""),
+    "Tokenizers": ("codeweaver_tokenizers", ""),
     "ToolAnnotationsDict": (__spec__.parent, "mcp"),
     "ToolOrPromptName": (__spec__.parent, "common"),
     "ToolRegistrationDict": (__spec__.parent, "mcp"),

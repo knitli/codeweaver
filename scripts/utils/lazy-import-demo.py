@@ -23,7 +23,7 @@ from pathlib import Path
 repo_root = Path(__file__).parent.parent
 sys.path.insert(0, str(repo_root / "src"))
 
-from codeweaver.common.utils.lazy_importer import lazy_import
+from codeweaver.core import lazy_import
 
 
 def demo_basic_usage() -> None:

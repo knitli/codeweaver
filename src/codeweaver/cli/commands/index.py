@@ -18,9 +18,8 @@ from cyclopts import App
 from pydantic import FilePath
 
 from codeweaver.cli.ui import CLIErrorHandler, IndexingProgress, StatusDisplay, get_display
-from codeweaver.common.utils.git import get_project_path
-from codeweaver.common.utils.utils import get_user_config_dir
 from codeweaver.config.types import CodeWeaverSettingsDict
+from codeweaver.core import get_project_path, get_user_config_dir
 from codeweaver.core.types.dictview import DictView
 from codeweaver.exceptions import CodeWeaverError
 
@@ -110,8 +109,8 @@ def _derive_collection_name(
     Returns:
         Derived collection name string
     """
-    from codeweaver.common.utils.utils import generate_collection_name
     from codeweaver.config.providers import ProviderSettings
+    from codeweaver.core import generate_collection_name
 
     # Default collection name
     collection_name = generate_collection_name()
@@ -465,7 +464,7 @@ async def index(
     """
     display = _display or get_display()
     error_handler = CLIErrorHandler(display, verbose=verbose, debug=debug)
-    from codeweaver.common.utils import is_wsl_vscode
+    from codeweaver.core import is_wsl_vscode
 
     if is_wsl_vscode():
         display.print_warning(

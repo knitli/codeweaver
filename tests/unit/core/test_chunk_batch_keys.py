@@ -18,10 +18,7 @@ from pathlib import Path
 
 import pytest
 
-from codeweaver.common.utils import uuid7
-from codeweaver.core.chunks import BatchKeys, CodeChunk
-from codeweaver.core.metadata import ChunkSource, ExtKind, Metadata
-from codeweaver.core.spans import Span
+from codeweaver.core import BatchKeys, ChunkSource, CodeChunk, ExtKind, Metadata, Span, uuid7
 
 
 pytestmark = [pytest.mark.unit]

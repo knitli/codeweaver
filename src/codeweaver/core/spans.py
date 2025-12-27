@@ -14,8 +14,8 @@ from pydantic import UUID7, Field, NonNegativeInt, PositiveInt, computed_field, 
 from pydantic.dataclasses import dataclass
 from typing_extensions import TypeIs
 
-from codeweaver.common.utils import uuid7
-from codeweaver.core.types.models import DATACLASS_CONFIG, DataclassSerializationMixin
+from codeweaver.core.types.dataclasses import DATACLASS_CONFIG, DataclassSerializationMixin
+from codeweaver.core.utils import uuid7
 
 
 # ===========================================================================

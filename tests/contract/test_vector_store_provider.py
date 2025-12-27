@@ -14,7 +14,7 @@ from typing import get_type_hints
 
 import pytest
 
-from codeweaver.agent_api.find_code.results import SearchResult
+from codeweaver.core.types.search import SearchResult
 from codeweaver.providers.vector_stores.base import VectorStoreProvider
 
 

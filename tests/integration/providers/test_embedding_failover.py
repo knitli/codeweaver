@@ -1,3 +1,4 @@
+# sourcery skip: name-type-suffix
 # SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
@@ -57,7 +58,7 @@ def cleanup_registry():
 @pytest.fixture
 def sample_chunk() -> CodeChunk:
     """Create a sample code chunk for testing."""
-    from codeweaver.common.utils import uuid7
+    from codeweaver.core import uuid7
 
     return CodeChunk(
         content="def test_function():\n    return 42",
@@ -96,7 +97,7 @@ async def primary_embedding_provider():
     }  # type: ignore
     caps = EmbeddingModelCapabilities.model_validate(caps_dict)
 
-    return SentenceTransformersEmbeddingProvider(capabilities=caps, client=model)
+    return SentenceTransformersEmbeddingProvider(caps=caps, client=model)
 
 
 @pytest.fixture
@@ -128,7 +129,7 @@ async def backup_embedding_provider():
     }  # type: ignore
     caps = EmbeddingModelCapabilities.model_validate(caps_dict)
 
-    return SentenceTransformersEmbeddingProvider(capabilities=caps, client=model)
+    return SentenceTransformersEmbeddingProvider(caps=caps, client=model)
 
 
 @pytest.mark.asyncio

@@ -37,7 +37,7 @@ def _handle_too_large(token_list: Sequence[int]) -> tuple[bool, NonNegativeInt]:
 def _voyage_max_limit(chunks: list[CodeChunk], query: str) -> tuple[bool, NonNegativeInt]:
     """Check if the number of chunks exceeds the maximum limit."""
     try:
-        from codeweaver.tokenizers import get_tokenizer
+        from codeweaver_tokenizers import get_tokenizer
 
     except ImportError as e:
         from codeweaver.exceptions import ConfigurationError
@@ -82,7 +82,7 @@ def _voyage_max_limit(chunks: list[CodeChunk], query: str) -> tuple[bool, NonNeg
 
 def _get_voyage_capabilities() -> PartialRerankingCapabilitiesDict:
     """Get the common capabilities for Voyage models."""
-    from codeweaver.providers.provider import Provider
+    from codeweaver.core.types.provider import Provider
 
     return {
         "name": "rerank-2.5",

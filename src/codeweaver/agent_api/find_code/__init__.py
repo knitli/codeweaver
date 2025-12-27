@@ -49,7 +49,7 @@ import logging
 import time
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, NamedTuple
+from typing import TYPE_CHECKING, NamedTuple
 
 from fastmcp.server.context import Context
 from pydantic import NonNegativeInt, PositiveInt
@@ -68,10 +68,13 @@ from codeweaver.agent_api.find_code.scoring import (
     process_reranked_results,
     process_unranked_results,
 )
-from codeweaver.agent_api.find_code.types import CodeMatch, FindCodeResponseSummary, SearchStrategy
-from codeweaver.common.logging import log_to_client_or_fallback
+from codeweaver.agent_api.find_code.types import CodeMatch, FindCodeResponseSummary
+from codeweaver.common._logging import log_to_client_or_fallback
 from codeweaver.common.telemetry.events import capture_search_event
 from codeweaver.core.spans import Span
+from codeweaver.core.types.search import SearchStrategy
+from codeweaver.di import INJECTED
+from codeweaver.di.providers import EmbeddingDep, RerankingDep, SparseEmbeddingDep, VectorStoreDep
 from codeweaver.semantic.classifications import AgentTask
 
 
@@ -95,113 +98,98 @@ class MatchedSection(NamedTuple):
 
 
 def get_max_tokens() -> int:
-    """Get maximum tokens allowed in find_code response.
-
-    Returns:
-        Maximum tokens (int)
-    """
+    """Get maximum tokens allowed in find_code response."""
     settings = _get_settings()
     return settings["token_limit"]
 
 
 def get_max_results() -> int:
-    """Get maximum results allowed in find_code response.
-
-    Returns:
-        Maximum results (int)
-    """
+    """Get maximum results allowed in find_code response."""
     settings = _get_settings()
     return settings["max_results"]
 
 
 def _get_settings() -> DictView[CodeWeaverSettingsDict]:
-    """Get settings view from codeweaver settings.
-
-    Returns:
-        CodeWeaverSettings instance
-    """
+    """Get settings view from codeweaver settings."""
     from codeweaver.config.settings import get_settings_map
 
     return get_settings_map()
 
 
-async def _check_index_status(context: Any | None) -> tuple[bool, int]:
+async def _check_index_status(
+    context: Context | None, vector_store: VectorStoreDep = INJECTED
+) -> tuple[bool, int]:
     """Check if index exists and get chunk count.
 
     Args:
         context: Optional MCP context
+        vector_store: Optional pre-initialized vector store instance
 
     Returns:
         Tuple of (index_exists, chunk_count) where:
         - index_exists: True if collection exists in vector store
         - chunk_count: Number of chunks in collection (0 if doesn't exist)
     """
-    from codeweaver.common.registry import get_provider_registry
+    if vector_store is None or hasattr(vector_store, "__pydantic_serializer__"):
+        try:
+            from codeweaver.di import get_container
+            from codeweaver.providers.vector_stores.base import VectorStoreProvider
+
+            vector_store = await get_container().resolve(VectorStoreProvider)
+        except Exception:
+            logger.warning("No vector store provider provided")
+            return False, 0
+
+    if vector_store is None:
+        logger.warning("No vector store provider provided")
+        return False, 0
 
     try:
-        _ = _get_settings()  # Ensure settings loaded
-        registry = get_provider_registry()
+        # Initialize if needed
+        if hasattr(vector_store, "_initialize"):
+            await vector_store._initialize()
 
-        # Get vector store provider
-        provider_enum = registry.get_provider_enum_for("vector_store")
-        if not provider_enum:
-            logger.warning("No vector store provider configured")
-            return False, 0
-
-        vector_store = registry.get_provider_instance(provider_enum, "vector_store", singleton=True)
-        if not vector_store:
-            logger.warning("Could not get vector store instance")
-            return False, 0
-
-        # Initialize vector store if needed
-        await vector_store._initialize()
-
-        # Check if collection exists
+        # Check collection
         collection_name = vector_store.collection
         if not collection_name:
-            logger.warning("No collection name configured")
             return False, 0
 
-        # Use qdrant client directly to check existence and count
-        client = vector_store.client
-        collection_exists = await client.collection_exists(collection_name)
-
-        if not collection_exists:
-            logger.info("Collection %s does not exist", collection_name)
+        exists = await vector_store.client.collection_exists(collection_name)
+        if not exists:
             return False, 0
 
-        # Get count
-        count_result = await client.count(collection_name)
-        chunk_count = count_result.count if hasattr(count_result, "count") else 0
-
-        logger.info("Collection %s exists with %d chunks", collection_name, chunk_count)
+        info = await vector_store.client.get_collection(collection_name)
     except Exception as e:
         logger.warning("Failed to check index status: %s", e)
         return False, 0
     else:
-        return True, chunk_count
+        return True, info.points_count or 0
 
 
-async def _ensure_index_ready(context: Any | None) -> None:
+async def _ensure_index_ready(
+    context: Context | None, vector_store: VectorStoreDep | None = None
+) -> None:
     """Ensure index is ready by running indexer if needed.
 
-    This function blocks until initial indexing is complete. It uses the
-    direct Indexer pattern from cli.commands.index (no server needed).
+    This function blocks until initial indexing is complete.
 
     Args:
         context: Optional MCP context
-
-    Raises:
-        Does not raise - logs warnings and continues on failure
+        vector_store: Optional pre-initialized vector store instance to use
     """
+    from codeweaver.di import get_container
     from codeweaver.engine.indexer import Indexer
 
     try:
         logger.info("Auto-indexing: Starting initial indexing...")
 
-        settings = _get_settings()
+        container = get_container()
+        if vector_store:
+            from codeweaver.providers.vector_stores.base import VectorStoreProvider
 
-        indexer = await Indexer.from_settings_async(settings)
+            container.override(VectorStoreProvider, vector_store)
+
+        indexer = await container.resolve(Indexer)
 
         # Run initial indexing (blocks until complete)
         await indexer.prime_index()
@@ -217,14 +205,13 @@ async def _ensure_index_ready(context: Any | None) -> None:
 
     except Exception as e:
         logger.warning("Auto-indexing failed: %s", e)
-        # Don't fail find_code - let it try to search anyway
 
 
 _set_max = get_max_tokens()
 _set_max_results = get_max_results()
 
 
-async def find_code(  # noqa: C901
+async def find_code(
     query: str,
     *,
     intent: IntentType | None = None,
@@ -232,45 +219,71 @@ async def find_code(  # noqa: C901
     focus_languages: tuple[str, ...] | None = None,
     max_results: int = _set_max_results,
     context: Context | None = None,
+    vector_store: VectorStoreDep = INJECTED,
+    embedding_provider: EmbeddingDep = INJECTED,
+    sparse_provider: SparseEmbeddingDep = INJECTED,
+    reranking_provider: RerankingDep = INJECTED,
 ) -> FindCodeResponseSummary:
     """Find relevant code based on semantic search with intent-driven ranking.
 
-    This is the main entry point for the CodeWeaver search pipeline:
-    0. Auto-index if needed (blocks if empty, background if incremental)
-    1. Intent detection (keyword-based for v0.1)
-    2. Query embedding (dense + sparse)
-    3. Hybrid vector search
-    4. Apply static dense/sparse weights
-    5. Rerank (if provider available)
-    6. Rescore with semantic importance weights
-    7. Sort, limit, and build response
+    This is the main entry point for the CodeWeaver search pipeline.
 
     Args:
-        query: Natural language search query
-        intent: Optional explicit intent (if None, will be detected)
+        query: Natural language query
+        intent: Optional IntentType to override detection
         token_limit: Maximum tokens to return (default: 30000)
         focus_languages: Optional language filter
         max_results: Maximum number of results to return (default: 30)
         context: Optional FastMCP Context for client communication
+        vector_store: Injected vector store instance
+        embedding_provider: Injected dense embedding provider
+        sparse_provider: Injected sparse embedding provider
+        reranking_provider: Injected reranking provider
 
     Returns:
         FindCodeResponseSummary with ranked matches and metadata
-
-    Examples:
-        >>> response = await find_code("how does authentication work")
-        >>> response.query_intent
-        IntentType.UNDERSTAND
-
-        >>> response = await find_code("fix login bug", intent=IntentType.DEBUG)
-        >>> response.search_strategy
-        (SearchStrategy.HYBRID_SEARCH, SearchStrategy.SEMANTIC_RERANK)
     """
     start_time = time.monotonic()
     strategies_used: list[SearchStrategy] = []
 
+    # Manually resolve providers if not injected (DI fallback)
+    from codeweaver.di import get_container
+    from codeweaver.providers.embedding.providers.base import EmbeddingProvider
+    from codeweaver.providers.vector_stores.base import VectorStoreProvider
+
+    container = get_container()
+
+    if vector_store is None or hasattr(vector_store, "__pydantic_serializer__"):
+        try:
+            vector_store = await container.resolve(VectorStoreProvider)
+        except Exception:
+            vector_store = None
+
+    if embedding_provider is None or hasattr(embedding_provider, "__pydantic_serializer__"):
+        try:
+            embedding_provider = await container.resolve(EmbeddingProvider)
+        except Exception:
+            embedding_provider = None
+
+    if sparse_provider is None or hasattr(sparse_provider, "__pydantic_serializer__"):
+        try:
+            from codeweaver.providers.embedding.providers.base import SparseEmbeddingProvider
+
+            sparse_provider = await container.resolve(SparseEmbeddingProvider)
+        except Exception:
+            sparse_provider = None
+
+    if reranking_provider is None or hasattr(reranking_provider, "__pydantic_serializer__"):
+        try:
+            from codeweaver.providers.reranking.providers.base import RerankingProvider
+
+            reranking_provider = await container.resolve(RerankingProvider)
+        except Exception:
+            reranking_provider = None
+
     try:
         # Step 0: Auto-index if needed
-        index_exists, chunk_count = await _check_index_status(context)
+        index_exists, chunk_count = await _check_index_status(context, vector_store=vector_store)
 
         if not index_exists or chunk_count == 0:
             # Full indexing needed - BLOCK and wait
@@ -281,13 +294,10 @@ async def find_code(  # noqa: C901
                     "message": "The code index is not ready. Starting index. This could take awhile..."
                 },
             )
-            await _ensure_index_ready(context)
-        # If index exists with chunks, proceed to search
-        # (incremental updates handled by background watcher if server running)
+            await _ensure_index_ready(context, vector_store=vector_store)
 
         # Step 1: Intent detection
         if intent is not None:
-            query_intent_obj = None
             intent_type = intent
             confidence = 1.0
         else:
@@ -301,18 +311,23 @@ async def find_code(  # noqa: C901
         logger.info("Query intent detected: %s (confidence: %.2f)", intent_type, confidence)
 
         # Step 2: Embed query (dense + sparse)
-        embeddings = await embed_query(query, context=context)  # THREAD CONTEXT
+        embeddings = await embed_query(
+            query,
+            context=context,
+            dense_provider=embedding_provider,
+            sparse_provider=sparse_provider,
+        )
 
         # Step 3: Build query vector and determine strategy
         query_vector = build_query_vector(embeddings, query)
         strategies_used.append(query_vector.strategy)
 
-        # NOTE: The current post-search filtering is fairly inefficient. The better way to do this is to add a payload index to the vector store for the language field and filter at search time. This will be implemented after Alpha 1.
-
         # Step 4: Execute vector search
-        candidates = await execute_vector_search(query_vector, context=context)  # THREAD CONTEXT
+        candidates = await execute_vector_search(
+            query_vector, context=context, vector_store=vector_store
+        )
 
-        # Step 5: Post-search filtering (alpha 1 simple approach)
+        # Step 5: Post-search filtering
         candidates = apply_filters(
             candidates,
             include_tests=intent_type in {IntentType.DEBUG, IntentType.TEST},
@@ -321,16 +336,10 @@ async def find_code(  # noqa: C901
 
         logger.info("Vector search returned %d candidates after filtering", len(candidates))
 
-        # Step 6: Apply static dense/sparse weights (alpha 1)
-        # This step is currently handled by the vector store itself.
-        # After Alpha 1 we can re-examine the need for this step.
-        # if SearchStrategy.HYBRID_SEARCH in strategies_used:
-        #     apply_hybrid_weights(candidates)
-
         # Step 7: Rerank (optional, if provider configured)
         reranked_results, rerank_strategy = await rerank_results(
-            query, candidates, context=context
-        )  # THREAD CONTEXT
+            query, candidates, context=context, reranking=reranking_provider
+        )
         if rerank_strategy:
             strategies_used.append(rerank_strategy)
 
@@ -344,7 +353,7 @@ async def find_code(  # noqa: C901
 
         # Step 9: Sort and limit
         scored_candidates.sort(
-            key=lambda x: (x.relevance_score if x.relevance_score is not None else x.score),
+            key=lambda x: x.relevance_score if x.relevance_score is not None else x.score,
             reverse=True,
         )
         search_results = scored_candidates[:max_results]
@@ -376,7 +385,6 @@ async def find_code(  # noqa: C901
         settings = _get_settings()
         tools_over_privacy = settings["telemetry"]["tools_over_privacy"]
         try:
-            # Get feature flags for A/B testing
             from codeweaver.common.telemetry import get_telemetry_client
 
             client = get_telemetry_client()
@@ -395,16 +403,13 @@ async def find_code(  # noqa: C901
                 feature_flags=feature_flags,
             )
         except Exception:
-            # Never fail find_code due to telemetry
             logger.debug("Failed to capture search telemetry")
 
     except Exception as e:
-        logger.warning("find_code failed")
-        # Return empty response on failure (graceful degradation)
+        logger.warning("find_code failed: %s", e, exc_info=True)
         execution_time_ms = (time.monotonic() - start_time) * 1000
         error_response = build_error_response(e, intent, execution_time_ms)
 
-        # Capture error telemetry
         try:
             capture_search_event(
                 response=error_response,
@@ -416,12 +421,7 @@ async def find_code(  # noqa: C901
                 feature_flags=None,
             )
         except Exception:
-            logger.debug(
-                "Failed to capture error search telemetry",
-                exc_info=True,
-                stack_info=True,
-                extra={"execution_time_ms": execution_time_ms},
-            )
+            logger.debug("Failed to capture error search telemetry")
 
         return error_response
     else:

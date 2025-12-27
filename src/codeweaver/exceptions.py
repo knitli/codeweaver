@@ -49,13 +49,10 @@ class LocationInfo(NamedTuple):
             return None
 
 
-def _is_tty() -> bool:
-    """Check if the output is a TTY in an interactive terminal."""
-    return sys.stdout.isatty() if hasattr(sys, "stdout") and sys.stdout else False
-
-
 def _get_issue_information() -> tuple[str, ...]:
     """Generate issue reporting information."""
+    from codeweaver.core import is_tty as _is_tty
+
     if _is_tty():
         return (
             "[dark orange]CodeWeaver[/dark orange] [bold magenta]is in alpha[/bold magenta]. Please report possible bugs at https://github.com/knitli/codeweaver/issues",
@@ -118,7 +115,8 @@ class CodeWeaverError(Exception):
     def __str__(self) -> str:
         """Return descriptive error message with context details."""
         # Start with base message
-        from codeweaver.cli.utils import format_file_link
+        from codeweaver.core import format_file_link
+        from codeweaver.core import is_tty as _is_tty
 
         if _is_tty():
             location_info = (
@@ -285,10 +283,41 @@ class MissingValueError(CodeWeaverError):
         self.field = field
 
 
+class DependencyNotAvailableError(CodeWeaverError):
+    """Dependency not available error.
+
+    Raised when a required optional dependency is not installed.
+    """
+
+    def __init__(
+        self,
+        msg: str | None,
+        dependency_name: str,
+        required_package: str,
+        details: dict[str, Any] | None = None,
+        suggestions: list[str] | None = None,
+    ) -> None:
+        """Initialize DependencyNotAvailableError.
+
+        Args:
+            dependency_name: The name of the missing dependency
+            required_package: The name of the required package
+        """
+        super().__init__(
+            message=msg
+            or f"Required dependency '{dependency_name}' from package '{required_package}' is not available. Please install the package to proceed.",
+            details=details,
+            suggestions=suggestions,
+        )
+        self.dependency_name = dependency_name
+        self.required_package = required_package
+
+
 __all__ = (
     "CodeWeaverError",
     "CollectionNotFoundError",
     "ConfigurationError",
+    "DependencyNotAvailableError",
     "DimensionMismatchError",
     "IndexingError",
     "InitializationError",

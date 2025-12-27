@@ -33,14 +33,14 @@ from codeweaver.exceptions import ConfigurationError
 
 
 if TYPE_CHECKING:
-    from codeweaver.providers.provider import Provider
+    from codeweaver.core.types.provider import Provider
 
 
 def get_agent_model_provider(provider: Provider) -> type[AgentProvider[Any]]:  # noqa: C901
     # It's long, but it's not complex.
     # sourcery skip: low-code-quality, no-long-functions
     """Get the agent model provider."""
-    from codeweaver.providers.provider import Provider
+    from codeweaver.core.types.provider import Provider
 
     if provider == Provider.OPENAI:
         from pydantic_ai.providers.openai import OpenAIProvider as OpenAIAgentProvider
@@ -133,7 +133,7 @@ def get_agent_model_provider(provider: Provider) -> type[AgentProvider[Any]]:  #
 
     # Get list of supported agent providers dynamically
     supported_providers = [
-        p.value
+        p.variable
         for p in [
             Provider.OPENAI,
             Provider.DEEPSEEK,
@@ -172,7 +172,7 @@ def get_agent_model_provider(provider: Provider) -> type[AgentProvider[Any]]:  #
 
 def infer_agent_provider_class(provider: str | Provider) -> type[AgentProvider[Provider]]:
     """Infer the provider from the provider name."""
-    from codeweaver.providers.provider import Provider
+    from codeweaver.core.types.provider import Provider
 
     if not isinstance(provider, Provider):
         provider = Provider.from_string(provider)
@@ -182,8 +182,8 @@ def infer_agent_provider_class(provider: str | Provider) -> type[AgentProvider[P
 
 def load_default_agent_providers() -> Generator[type[AgentProvider[Provider]], None, None]:
     """Load the default providers."""
-    from codeweaver.providers.capabilities import get_provider_kinds
-    from codeweaver.providers.provider import Provider, ProviderKind
+    from codeweaver.core import get_provider_kinds
+    from codeweaver.core.types.provider import Provider, ProviderKind
 
     for provider in Provider:
         kinds = get_provider_kinds(provider)  # type: ignore

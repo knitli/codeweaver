@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from codeweaver.providers.provider import Provider
+from codeweaver.core.types.provider import Provider
 
 
 if TYPE_CHECKING:

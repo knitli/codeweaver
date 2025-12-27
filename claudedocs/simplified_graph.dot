@@ -1,0 +1,69 @@
+// SPDX-FileCopyrightText: 2025 Knitli Inc.
+// SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+//
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
+// Simplified CodeWeaver Dependency Graph - Showing Only Major Dependencies
+// Render with: dot -Tpng simplified_graph.dot -o simplified_graph.png
+
+digraph SimplifiedDependencies {
+    rankdir=LR;
+    node [shape=box, style=filled, fontname="Arial"];
+
+    // Extraction Ready (Green)
+    tokenizers [label="tokenizers\n✅ READY", fillcolor=lightgreen];
+    exceptions [label="exceptions\n✅ READY", fillcolor=lightgreen];
+    daemon [label="daemon\n✅ READY", fillcolor=lightgreen];
+
+    // Stable Domain (Green)
+    core [label="core\n🟢 STABLE\n(I=0.29)", fillcolor=lightgreen];
+    semantic [label="semantic\n🟢 STABLE\n(I=0.33)", fillcolor=lightgreen];
+
+    // Moderate Complexity (Yellow)
+    providers [label="providers\n🟡 MODERATE\n(I=0.47)", fillcolor=yellow];
+    config [label="config\n🟡 MODERATE\n(I=0.50)", fillcolor=yellow];
+
+    // High Complexity (Red)
+    common [label="common\n🔴 GOD OBJECT\n(18 connections)", fillcolor=pink];
+    cli [label="cli\n🔴 HIGH FAN-OUT\n(11 deps)", fillcolor=orange];
+    engine [label="engine\n🟡 COMPLEX\n(I=0.64)", fillcolor=orange];
+    server [label="server\n🟡 COMPLEX\n(I=0.62)", fillcolor=orange];
+    mcp [label="mcp\n🟡 COMPLEX\n(I=0.60)", fillcolor=orange];
+    agent_api [label="agent_api\n🟡 COMPLEX\n(I=0.60)", fillcolor=orange];
+
+    // Clean dependencies (no cycles)
+    core -> tokenizers;
+    providers -> tokenizers;
+
+    // Problematic cycles
+    core -> semantic [color=red, penwidth=2];
+    semantic -> core [color=red, penwidth=2];
+
+    core -> common [color=red, penwidth=2];
+    common -> core [color=red, penwidth=2];
+
+    providers -> agent_api [color=red, penwidth=2];
+    agent_api -> providers [color=red, penwidth=2];
+
+    config -> providers [color=red, penwidth=2];
+    providers -> config [color=red, penwidth=2];
+
+    server -> mcp [color=red, penwidth=2];
+    mcp -> server [color=red, penwidth=2];
+
+    engine -> config [color=red, penwidth=2];
+    config -> engine [color=red, penwidth=2];
+
+    // Common as hub (showing major connections only)
+    common -> server [color=red, penwidth=3, label="VIOLATION"];
+    common -> config [color=red, penwidth=2];
+    common -> providers [color=red, penwidth=2];
+    common -> semantic [color=red, penwidth=2];
+
+    label=<<b>Simplified View - Major Circular Dependencies</b><br/>
+        ✅ Ready for extraction<br/>
+        🟢 Stable, can be separated with refactoring<br/>
+        🟡 Moderate complexity<br/>
+        🔴 High complexity, should remain in main package>;
+    labelloc="t";
+}

@@ -9,12 +9,7 @@ Tests the clean_args function and related introspection utilities.
 
 import pytest
 
-from codeweaver.common.utils.introspect import (
-    clean_args,
-    keyword_args,
-    positional_args,
-    takes_kwargs,
-)
+from codeweaver.core import clean_args, keyword_args, positional_args, takes_kwargs
 
 
 pytestmark = [pytest.mark.unit]

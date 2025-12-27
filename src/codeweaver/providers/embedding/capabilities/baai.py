@@ -8,11 +8,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Literal
 
+from codeweaver.core.types.provider import Provider
 from codeweaver.providers.embedding.capabilities.types import (
     EmbeddingCapabilitiesDict,
     PartialCapabilities,
 )
-from codeweaver.providers.provider import Provider
 
 
 if TYPE_CHECKING:
@@ -127,7 +127,7 @@ BGE_LARGE_EN_335M_CAPABILITIES: PartialCapabilities = {
 
 BAAI_BGE_SMALL_EN_V1_5_CAPABILITIES: PartialCapabilities = {
     "name": "BAAI/bge-small-en-v1.5",
-    "default_dimension": 512,
+    "default_dimension": 384,
     "context_window": 512,
     "preferred_metrics": ("cosine", "dot", "euclidean"),
     "supports_context_chunk_embedding": False,

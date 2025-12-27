@@ -31,11 +31,11 @@ from pydantic import Field, PositiveFloat, PositiveInt, SecretStr, computed_fiel
 from pydantic_ai.settings import ModelSettings as AgentModelSettings
 from pydantic_ai.settings import merge_model_settings
 
-from codeweaver.common.utils.utils import get_user_config_dir
+from codeweaver.core import get_user_config_dir
 from codeweaver.core.types import DictView
 from codeweaver.core.types.models import BasedModel
+from codeweaver.core.types.provider import Provider
 from codeweaver.core.types.sentinel import Unset
-from codeweaver.providers.provider import Provider
 
 
 if TYPE_CHECKING:
@@ -411,11 +411,9 @@ def _get_default_sparse_embedding_settings() -> DeterminedDefaults:
                 return DeterminedDefaults(
                     provider=Provider.FASTEMBED, model="prithivida/Splade_PP_en_v1", enabled=True
                 )
-    # Sentence-Transformers and Fastembed are the *only* sparse embedding options we support
-    logger.warning(
-        "No sparse embedding provider libraries found. Sparse embedding functionality disabled."
-    )
-    return DeterminedDefaults(provider=Provider.NOT_SET, model="NONE", enabled=False)
+    # qdrant_client has built-in BM25 support
+    # if FastEmbed isn't available, it will use that automatically
+    return DeterminedDefaults(provider=Provider.FASTEMBED, model="qdrant/bm25", enabled=True)
 
 
 _sparse_embedding_defaults = _get_default_sparse_embedding_settings()
@@ -466,7 +464,7 @@ HAS_ANTHROPIC = util.find_spec("anthropic") is not None
 DefaultAgentProviderSettings = AgentProviderSettings(
     provider=Provider.ANTHROPIC,
     enabled=HAS_ANTHROPIC,
-    model="claude-sonnet-4-latest",
+    model="claude-haiku-4.5-latest",
     model_settings=AgentModelSettings(),
 )
 
@@ -645,7 +643,7 @@ class ProviderSettings(BasedModel):
         Args:
             setting_name: The name of the setting or ProviderKind to check.
         """
-        from codeweaver.providers.provider import ProviderKind
+        from codeweaver.core.types.provider import ProviderKind
 
         setting = (
             setting_name
@@ -767,7 +765,7 @@ class ProviderSettings(BasedModel):
         Args:
             kind: The kind of provider or ProviderKind to get settings for.
         """
-        from codeweaver.providers.provider import ProviderKind
+        from codeweaver.core.types.provider import ProviderKind
 
         setting_field = (
             kind

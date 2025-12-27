@@ -11,9 +11,7 @@ from unittest.mock import patch
 
 import pytest
 
-from codeweaver.common.utils import uuid7
-from codeweaver.common.utils.git import Missing
-from codeweaver.core.discovery import DiscoveredFile
+from codeweaver.core import DiscoveredFile, Missing, uuid7
 from codeweaver.engine.indexer.indexer import Indexer
 from codeweaver.engine.indexer.manifest import IndexFileManifest
 
@@ -27,15 +25,27 @@ class TestRemovePathWithDeletedFiles:
     """Test that _remove_path correctly handles deleted files."""
 
     @pytest.fixture
-    def mock_indexer(self, tmp_path: Path):
-        """Create an indexer with mocked dependencies."""
-        indexer = Indexer(project_path=tmp_path, auto_initialize_providers=False)
-        indexer._file_manifest = IndexFileManifest(project_path=tmp_path)
-        # Ensure project path is set
+    async def mock_indexer(self, tmp_path: Path):
+        """Create an indexer with mocked dependencies using DI."""
+        from codeweaver.di import get_container
+
+        container = get_container()
+        container.clear_overrides()
+
+        indexer = await container.resolve(Indexer)
         indexer._project_path = tmp_path
+        indexer._file_manifest = IndexFileManifest(project_path=tmp_path)
+
+        # Clear store to avoid pollution between tests if Indexer is a singleton
+        if indexer._store:
+            indexer._store.clear()
+
         return indexer
 
-    def test_remove_deleted_file_from_store(self, mock_indexer: Indexer, tmp_path: Path) -> None:
+    @pytest.mark.asyncio
+    async def test_remove_deleted_file_from_store(
+        self, mock_indexer: Indexer, tmp_path: Path
+    ) -> None:
         """Test that _remove_path can remove entries for files that no longer exist."""
         test_file = self._create_temp_file_and_index(tmp_path, "to_delete.py", mock_indexer)
         # Now delete the file
@@ -44,12 +54,16 @@ class TestRemovePathWithDeletedFiles:
 
         self._validate_malformed_entry_removal(mock_indexer, test_file, 0)
 
-    def test_remove_existing_file_from_store(self, mock_indexer: Indexer, tmp_path: Path) -> None:
+    @pytest.mark.asyncio
+    async def test_remove_existing_file_from_store(
+        self, mock_indexer: Indexer, tmp_path: Path
+    ) -> None:
         """Test that _remove_path works for files that still exist (regression test)."""
         test_file = self._create_temp_file_and_index(tmp_path, "existing.py", mock_indexer)
         self._validate_malformed_entry_removal(mock_indexer, test_file, 0)
 
-    def test_remove_nonexistent_file_returns_zero(
+    @pytest.mark.asyncio
+    async def test_remove_nonexistent_file_returns_zero(
         self, mock_indexer: Indexer, tmp_path: Path
     ) -> None:
         """Test that _remove_path returns 0 for paths not in store."""
@@ -68,7 +82,9 @@ class TestRemovePathWithDeletedFiles:
         with (
             patch(
                 "codeweaver.core.discovery.set_relative_path",
-                side_effect=lambda p: Path(p).relative_to(tmp_path) if Path(p).is_absolute() else p,
+                side_effect=lambda p, **kwargs: (
+                    Path(p).relative_to(tmp_path) if Path(p).is_absolute() else p
+                ),
             ),
             patch("codeweaver.core.discovery.get_git_branch", return_value="main"),
         ):
@@ -80,7 +96,8 @@ class TestRemovePathWithDeletedFiles:
         assert len(mock_indexer._store) == 1
         return result
 
-    def test_remove_with_multiple_files_in_store(
+    @pytest.mark.asyncio
+    async def test_remove_with_multiple_files_in_store(
         self, mock_indexer: Indexer, tmp_path: Path
     ) -> None:
         """Test that _remove_path only removes the specified file from a store with multiple files."""
@@ -93,7 +110,9 @@ class TestRemovePathWithDeletedFiles:
         with (
             patch(
                 "codeweaver.core.discovery.set_relative_path",
-                side_effect=lambda p: Path(p).relative_to(tmp_path) if Path(p).is_absolute() else p,
+                side_effect=lambda p, **kwargs: (
+                    Path(p).relative_to(tmp_path) if Path(p).is_absolute() else p
+                ),
             ),
             patch("codeweaver.core.discovery.get_git_branch", return_value="main"),
         ):
@@ -120,7 +139,8 @@ class TestRemovePathWithDeletedFiles:
         assert "file3.py" in remaining_paths
         assert "file2.py" not in remaining_paths
 
-    def test_remove_handles_malformed_entries_gracefully(
+    @pytest.mark.asyncio
+    async def test_remove_handles_malformed_entries_gracefully(
         self, mock_indexer: Indexer, tmp_path: Path
     ) -> None:
         """Test that _remove_path handles malformed entries without breaking cleanup."""
@@ -136,7 +156,9 @@ class TestRemovePathWithDeletedFiles:
         with (
             patch(
                 "codeweaver.core.discovery.set_relative_path",
-                side_effect=lambda p: Path(p).relative_to(tmp_path) if Path(p).is_absolute() else p,
+                side_effect=lambda p, **kwargs: (
+                    Path(p).relative_to(tmp_path) if Path(p).is_absolute() else p
+                ),
             ),
             patch("codeweaver.core.discovery.get_git_branch", return_value="main"),
         ):
@@ -147,7 +169,8 @@ class TestRemovePathWithDeletedFiles:
     def _test_malformed_entry_removal_gracefully(self, mock_indexer: Indexer, file_to_remove: Path):
         assert mock_indexer._store is not None
         assert len(mock_indexer._store) == 3
-        file_to_remove.unlink()
+        if file_to_remove.exists():
+            file_to_remove.unlink()
         self._validate_malformed_entry_removal(mock_indexer, file_to_remove, 2)
 
     def _validate_malformed_entry_removal(
@@ -198,7 +221,3 @@ class TestRemovePathWithDeletedFiles:
             source_id=str(uuid7()),
         )
         mock_indexer._store["malformed_key"] = bad_discovered
-
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])

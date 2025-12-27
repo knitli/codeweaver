@@ -13,7 +13,6 @@ import time
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterator, Mapping, Sequence
-from enum import Enum
 from types import ModuleType
 from typing import (
     TYPE_CHECKING,
@@ -30,6 +29,7 @@ from typing import (
 )
 from uuid import UUID
 
+from codeweaver_tokenizers import Tokenizer, get_tokenizer
 from pydantic import UUID7, ConfigDict, Field, SkipValidation
 from pydantic.main import IncEx
 from pydantic.types import PositiveInt
@@ -41,18 +41,25 @@ from tenacity import (
     wait_exponential,
 )
 
-from codeweaver.common.utils import LazyImport, lazy_import, uuid7
 from codeweaver.config.providers import EmbeddingModelSettings, SparseEmbeddingModelSettings
-from codeweaver.core.stores import BlakeStore, UUIDStore, make_blake_store, make_uuid_store
-from codeweaver.core.types.enum import AnonymityConversion
-from codeweaver.core.types.models import BasedModel
+from codeweaver.core import (
+    AnonymityConversion,
+    BasedModel,
+    BaseEnum,
+    BlakeStore,
+    LazyImport,
+    Provider,
+    UUIDStore,
+    lazy_import,
+    make_blake_store,
+    make_uuid_store,
+    uuid7,
+)
 from codeweaver.exceptions import ProviderError
 from codeweaver.exceptions import ValidationError as CodeWeaverValidationError
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.registry import EmbeddingRegistry
 from codeweaver.providers.embedding.types import SparseEmbedding
-from codeweaver.providers.provider import Provider
-from codeweaver.tokenizers import Tokenizer, get_tokenizer
 
 
 statistics_module: LazyImport[ModuleType] = lazy_import("codeweaver.common.statistics")
@@ -70,7 +77,7 @@ _get_statistics: LazyImport[SessionStatistics] = lazy_import(
 logger = logging.getLogger(__name__)
 
 
-class CircuitBreakerState(Enum):
+class CircuitBreakerState(BaseEnum):
     """Circuit breaker states for provider resilience."""
 
     CLOSED = "closed"  # Normal operation
@@ -256,6 +263,27 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             caps: The embedding model capabilities (passed since pydantic may not have set _caps yet).
         """
 
+    @classmethod
+    def clear_deduplication_stores(cls) -> None:
+        """Clear class-level deduplication stores.
+
+        This is primarily useful for testing to ensure clean state between test runs.
+        """
+        cls._store = make_uuid_store(value_type=list, size_limit=1024 * 1024 * 3)
+        cls._backup_store = make_uuid_store(value_type=list, size_limit=1024 * 1024)
+        cls._hash_store = make_blake_store(value_type=UUID, size_limit=1024 * 256)
+        cls._backup_hash_store = make_blake_store(value_type=UUID, size_limit=1024 * 128)
+
+    async def initialize_async(self) -> None:
+        """Perform asynchronous initialization of the provider.
+
+        Subclasses should override this method to perform any async setup,
+        such as loading models or establishing connections, that should
+        not block the event loop during provider creation.
+        """
+        # Default implementation does nothing
+        return
+
     @property
     def name(self) -> Provider:
         """Get the name of the embedding provider."""
@@ -391,7 +419,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
     @property
     def circuit_breaker_state(self) -> str:
         """Get current circuit breaker state for health monitoring."""
-        return self._circuit_state.value
+        return self._circuit_state.variable
 
     @retry(
         stop=stop_after_attempt(5),
@@ -468,7 +496,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
 
         Optionally takes a `batch_id` parameter to reprocess a specific batch of documents.
         """
-        from codeweaver.common.logging import log_to_client_or_fallback
+        from codeweaver.common._logging import log_to_client_or_fallback
 
         is_old_batch = False
         if (batch_id and self._store and batch_id in self._store and not for_backup) or (
@@ -496,7 +524,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                 {
                     "msg": "No chunks to embed after deduplication",
                     "extra": {
-                        "provider": type(self)._provider.value,
+                        "provider": type(self)._provider.variable,
                         "document_count": len(documents),
                         "is_reprocessing": is_old_batch,
                         "batch_id": str(batch_id or cache_key) if batch_id or cache_key else None,
@@ -511,7 +539,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             {
                 "msg": "Starting document embedding",
                 "extra": {
-                    "provider": type(self)._provider.value,
+                    "provider": type(self)._provider.variable,
                     "document_count": len(documents),
                     "chunk_count": len(chunks),
                     "is_reprocessing": is_old_batch,
@@ -562,9 +590,9 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                 {
                     "msg": "Circuit breaker open",
                     "extra": {
-                        "provider": type(self)._provider.value,
+                        "provider": type(self)._provider.variable,
                         "document_count": len(documents),
-                        "circuit_state": self._circuit_state.value,
+                        "circuit_state": self._circuit_state.variable,
                     },
                 },
             )
@@ -577,7 +605,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                 {
                     "msg": "All retry attempts exhausted",
                     "extra": {
-                        "provider": type(self)._provider.value,
+                        "provider": type(self)._provider.variable,
                         "document_count": len(documents),
                         "failure_count": self._failure_count,
                     },
@@ -591,7 +619,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                 {
                     "msg": "Document embedding failed",
                     "extra": {
-                        "provider": type(self)._provider.value,
+                        "provider": type(self)._provider.variable,
                         "document_count": len(documents),
                         "error": str(e),
                         "error_type": type(e).__name__,
@@ -625,7 +653,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                 {
                     "msg": "Document embedding complete",
                     "extra": {
-                        "provider": type(self)._provider.value,
+                        "provider": type(self)._provider.variable,
                         "document_count": len(documents),
                         "embeddings_generated": len(results) if results else 0,
                     },
@@ -824,8 +852,13 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
 
             profile = get_profile("backup", "local")
             if isinstance(profile["embedding"], dict):
-                return profile["embedding"]["model_settings"]["dimension"]
-            return cast(tuple, profile["embedding"])[0]["model_settings"]["dimension"]
+                # Use .get() to safely access dimension, fall back to default_dimension if not present
+                backup_dim = profile["embedding"]["model_settings"].get("dimension")
+            else:
+                backup_dim = cast(tuple, profile["embedding"])[0]["model_settings"].get("dimension")
+            if backup_dim:
+                return backup_dim
+                # If dimension not in backup profile, fall through to use default_dimension
         default_dim = self.caps.default_dimension
         model_settings = self._get_model_settings(sparse=sparse)
         if model_settings and model_settings.get("dimension"):
@@ -880,7 +913,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         return [
             serialized
             if (serialized := chunk.serialize_for_embedding()) and isinstance(serialized, str)
-            else serialized.decode("utf-8")
+            else serialized.decode("utf-8")  # ty:ignore[unresolved-attribute]
             for chunk in chunks
             if chunk
         ]
@@ -922,13 +955,23 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             if not isinstance(first_embedding, SparseEmbedding):
                 actual_dim = len(first_embedding)
                 if actual_dim != expected_dim:
+                    # Debug logging
+                    logger.debug(
+                        "Dimension mismatch DEBUG: model_name=%s, caps.name=%s, caps.default_dimension=%s, for_backup=%s, expected=%s, actual=%s",
+                        self.model_name,
+                        self.caps.name,
+                        self.caps.default_dimension,
+                        for_backup,
+                        expected_dim,
+                        actual_dim,
+                    )
                     raise CodeWeaverValidationError(
                         f"Embedding dimension mismatch: expected {expected_dim}, got {actual_dim}",
                         details={
                             "expected_dimension": expected_dim,
                             "actual_dimension": actual_dim,
                             "model_name": self.model_name,
-                            "provider": type(self)._provider.value
+                            "provider": type(self)._provider.variable
                             if hasattr(type(self), "_provider")
                             else "unknown",
                             "for_backup": for_backup,
@@ -977,22 +1020,22 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                 # Check if we already have this type of embedding
                 has_existing = (
                     (
-                        info.kind.value == "dense"
+                        info.kind.variable == "dense"
                         and not info.backup
                         and registered.dense is not None
                     )
                     or (
-                        info.kind.value == "sparse"
+                        info.kind.variable == "sparse"
                         and not info.backup
                         and registered.sparse is not None
                     )
                     or (
-                        info.kind.value == "dense"
+                        info.kind.variable == "dense"
                         and info.backup
                         and registered.backup_dense is not None
                     )
                     or (
-                        info.kind.value == "sparse"
+                        info.kind.variable == "sparse"
                         and info.backup
                         and registered.backup_sparse is not None
                     )
@@ -1163,6 +1206,12 @@ class SparseEmbeddingProvider[SparseClient](EmbeddingProvider[SparseClient], ABC
     _backup_hash_store: ClassVar[BlakeStore[UUID7]] = make_blake_store(
         value_type=UUID, size_limit=1024 * 128
     )  # 128kb limit -- separate from dense embeddings
+
+    @classmethod
+    def clear_deduplication_stores(cls) -> None:
+        """Clear class-level deduplication stores for sparse embeddings."""
+        cls._hash_store = make_blake_store(value_type=UUID, size_limit=1024 * 256)
+        cls._backup_hash_store = make_blake_store(value_type=UUID, size_limit=1024 * 128)
 
     def _batch_and_key(
         self, chunk_list: Sequence[CodeChunk], *, for_backup: bool, skip_deduplication: bool

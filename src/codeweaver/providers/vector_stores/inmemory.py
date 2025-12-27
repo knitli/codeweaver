@@ -14,14 +14,20 @@ import logging
 
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, ClassVar, Literal, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, cast
 
-from codeweaver.common.utils.utils import get_user_config_dir
 from codeweaver.config.providers import MemoryConfig
+from codeweaver.core import get_user_config_dir
+from codeweaver.core.types.provider import Provider
 from codeweaver.exceptions import PersistenceError, ProviderError
-from codeweaver.providers.provider import Provider
 from codeweaver.providers.vector_stores.qdrant_base import QdrantBaseProvider
 
+
+if TYPE_CHECKING:
+    from codeweaver.core.chunks import CodeChunk
+    from codeweaver.core.types.search import SearchResult, StrategizedQuery
+    from codeweaver.providers.vector_stores.base import MixedQueryInput
+    from codeweaver.providers.vector_stores.search import Filter
 
 try:
     from qdrant_client import AsyncQdrantClient
@@ -49,6 +55,29 @@ def _get_project_name() -> str:
     )
 
 
+def _get_memory_config() -> MemoryConfig:
+    from codeweaver.config.settings import get_settings_map
+    from codeweaver.core.types.sentinel import Unset
+
+    settings_map = get_settings_map()
+    if (
+        (provider_settings := settings_map.get("providers"))
+        and provider_settings is not Unset
+        and (vector_settings := provider_settings.get("vector_store"))
+        and vector_settings is not Unset
+    ):
+        vector_store_config = (
+            vector_settings[0] if isinstance(vector_settings, tuple) else vector_settings
+        )
+        if (
+            memory_config := vector_store_config["provider_settings"]
+            if vector_store_config["provider"] == Provider.MEMORY
+            else None
+        ):
+            return memory_config
+    return MemoryConfig()
+
+
 class MemoryVectorStoreProvider(QdrantBaseProvider):
     """In-memory vector store with JSON persistence for development/testing.
 
@@ -56,8 +85,10 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
     Suitable for small codebases (<10k chunks) and testing scenarios.
     """
 
-    config: MemoryConfig = MemoryConfig()
+    _provider: ClassVar[Literal[Provider.MEMORY]] = Provider.MEMORY
+    config: MemoryConfig = _get_memory_config()
     _client: AsyncQdrantClient | None = None
+    _shared_client: ClassVar[AsyncQdrantClient | None] = None
 
     def model_post_init(self, __context: Any, /) -> None:
         """Capture config values before they get overwritten during initialization."""
@@ -65,18 +96,14 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
         # These will be used in _init_provider after base class overwrites self.config
         persist_path_config = self.config.get("persist_path", get_user_config_dir())
         object.__setattr__(self, "_initial_persist_path", persist_path_config)
-        object.__setattr__(self, "_initial_auto_persist", self.config.get("auto_persist", True))
-        object.__setattr__(
-            self, "_initial_persist_interval", self.config.get("persist_interval", 300)
-        )
+        object.__setattr__(self, "_initial_auto_persist", self.config.get("auto_persist"))
+        object.__setattr__(self, "_initial_persist_interval", self.config.get("persist_interval"))
         super().model_post_init(__context)
 
     @property
     def base_url(self) -> str | None:
         """Get the base URL for the memory provider - always :memory:."""
         return ":memory:"
-
-    _provider: ClassVar[Literal[Provider.MEMORY]] = Provider.MEMORY
 
     async def _init_provider(self) -> None:  # type: ignore
         """Initialize in-memory Qdrant client and restore from disk.
@@ -85,14 +112,27 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
             PersistenceError: Failed to restore from persistence file.
             ValidationError: Persistence file format invalid.
         """
+        from codeweaver.core import is_test_environment
+
         # Use the values captured in model_post_init before self.config was overwritten
         persist_path_config = getattr(self, "_initial_persist_path", get_user_config_dir())
         persist_path = Path(persist_path_config)
         # If path doesn't end with .json, treat it as a directory and append default filename
         if persist_path.suffix != ".json":
             persist_path = persist_path / f"{_get_project_name()}_vector_store.json"
-        auto_persist = getattr(self, "_initial_auto_persist", True)
-        persist_interval = getattr(self, "_initial_persist_interval", 300)
+
+        # Logic for auto_persist:
+        # 1. If explicitly provided in config, use that value.
+        # 2. If not provided, disable in test mode, enable otherwise.
+        auto_persist_raw = getattr(self, "_initial_auto_persist", None)
+        if auto_persist_raw is not None:
+            auto_persist = bool(auto_persist_raw)
+        else:
+            auto_persist = not is_test_environment()
+
+        persist_interval = getattr(self, "_initial_persist_interval", None)
+        if persist_interval is None:
+            persist_interval = 300
 
         # Store as private attributes
         object.__setattr__(self, "_persist_path", persist_path)
@@ -107,8 +147,27 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
         client = await self._build_client()
         object.__setattr__(self, "_client", client)
 
-        # Restore from disk if persistence file exists
-        if persist_path.exists():
+        import sys
+
+        logger.debug(
+            "MemoryVectorStoreProvider._init_provider instance %s with client %s and collection %s",
+            id(self),
+            id(client),
+            self._collection,
+        )
+        sys.stdout.flush()
+
+        # Ensure collection exists
+        if self._collection:
+            await self._ensure_collection(self._collection)
+            logger.debug(
+                "MemoryVectorStoreProvider ensured collection %s in client %s",
+                self._collection,
+                id(client),
+            )
+            sys.stdout.flush()
+        # Restore from disk if persistence file exists (and not in test mode)
+        if not is_test_environment() and persist_path.exists():
             await self._restore_from_disk()
 
         # Set up periodic persistence if configured
@@ -117,11 +176,35 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
             object.__setattr__(self, "_periodic_task", periodic_task)
 
     async def _build_client(self) -> AsyncQdrantClient:
-        """Build the Qdrant Async client in in-memory mode.
+        """Build the Qdrant Async client.
+
+        In test mode, returns a class-level shared client to ensure data is shared
+        between different provider instances.
 
         Returns:
             An initialized AsyncQdrantClient.
         """
+        from codeweaver.core import is_test_environment
+
+        if is_test_environment():
+            import sys
+
+            if MemoryVectorStoreProvider._shared_client is None:
+                MemoryVectorStoreProvider._shared_client = AsyncQdrantClient(
+                    location=":memory:", **(self.config.get("client_options", {}))
+                )
+                logger.debug(
+                    "MemoryVectorStoreProvider created NEW _shared_client %s",
+                    id(MemoryVectorStoreProvider._shared_client),
+                )
+            else:
+                logger.debug(
+                    "MemoryVectorStoreProvider using EXISTING _shared_client %s",
+                    id(MemoryVectorStoreProvider._shared_client),
+                )
+            sys.stdout.flush()
+            return MemoryVectorStoreProvider._shared_client
+
         return AsyncQdrantClient(location=":memory:", **(self.config.get("client_options", {})))
 
     async def _persist_to_disk(self) -> None:
@@ -213,12 +296,26 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
                     async with self._collection_metadata_lock:  # type: ignore
                         self._collection_metadata[col.name] = metadata.model_dump(mode="json")  # type: ignore
 
+                def _serialize_vector(vector: Any) -> Any:
+                    """Serialize vector data, converting SparseVector to JSON-compatible format."""
+                    from qdrant_client.models import SparseVector
+
+                    if isinstance(vector, SparseVector):
+                        return {"indices": list(vector.indices), "values": list(vector.values)}
+                    if isinstance(vector, dict):
+                        return {k: _serialize_vector(v) for k, v in vector.items()}
+                    return vector
+
                 collections_data[col.name] = {
                     "metadata": metadata.model_dump(mode="json"),
                     "vectors_config": {"dense": {"size": dense_size, "distance": "Cosine"}},
                     "sparse_vectors_config": {"sparse": {}},
                     "points": [
-                        {"id": str(point.id), "vector": point.vector, "payload": point.payload}
+                        {
+                            "id": str(point.id),
+                            "vector": _serialize_vector(point.vector),
+                            "payload": point.payload,
+                        }
                         for point in points
                     ],
                 }
@@ -316,6 +413,18 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
                     async with self._collection_metadata_lock:  # type: ignore
                         self._collection_metadata[collection_name] = collection_data["metadata"]  # type: ignore
 
+                def _deserialize_vector(vector: Any) -> Any:
+                    """Deserialize vector data, converting sparse dict to SparseVector."""
+                    from qdrant_client.models import SparseVector
+
+                    if isinstance(vector, dict):
+                        # Check if it's a serialized sparse vector
+                        if "indices" in vector and "values" in vector:
+                            return SparseVector(indices=vector["indices"], values=vector["values"])
+                        # Otherwise recursively deserialize dict values
+                        return {k: _deserialize_vector(v) for k, v in vector.items()}
+                    return vector
+
                 # Restore points in batches
                 points_data = collection_data.get("points", [])
                 for i in range(0, len(points_data), 100):
@@ -323,7 +432,7 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
                     points = [
                         PointStruct(
                             id=point["id"],
-                            vector=point["vector"],
+                            vector=_deserialize_vector(point["vector"]),
                             payload=point["payload"],  # type: ignore
                         )
                         for point in batch
@@ -349,11 +458,19 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
                 # Log error but continue to avoid data loss
                 logger.warning("Periodic persistence failed", exc_info=True)
 
-    async def _on_shutdown(self) -> None:
-        """Cleanup handler for graceful shutdown.
+    async def close(self) -> None:
+        """Close Qdrant client and stop background tasks."""
+        if not self._client:
+            return
 
-        Performs final persistence and cancels background tasks.
-        """
+        # check if we are in a test environment
+        from codeweaver.core import is_test_environment
+
+        if is_test_environment():
+            # In tests, we don't close the shared client as it's used by multiple tests
+            return
+
+        # Shutdown sequence
         self._shutdown = True
 
         # Cancel periodic task
@@ -373,6 +490,49 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
         # Close client
         if self._client:
             await self._client.close()
+
+    async def upsert(self, chunks: list[CodeChunk], *, for_backup: bool = False) -> None:
+        """Insert or update code chunks with hybrid embeddings."""
+        logger.debug(
+            "MemoryVectorStoreProvider.upsert instance %s to collection: %s with %d chunks",
+            id(self),
+            self._collection,
+            len(chunks),
+        )
+        await super().upsert(chunks, for_backup=for_backup)
+
+        # Verify count
+        if self._client and self._collection:
+            info = await self._client.get_collection(self._collection)
+            logger.debug(
+                "Collection %s now has %d points in client %s",
+                self._collection,
+                info.points_count,
+                id(self._client),
+            )
+
+    async def search(
+        self, vector: StrategizedQuery | MixedQueryInput, query_filter: Filter | None = None
+    ) -> list[SearchResult]:
+        """Search for similar vectors."""
+        import sys
+
+        if self._client and self._collection:
+            info = await self._client.get_collection(self._collection)
+            logger.debug(
+                "MemoryVectorStoreProvider.search instance %s in collection: %s (points: %d)",
+                id(self),
+                self._collection,
+                info.points_count,
+            )
+        else:
+            logger.debug(
+                "MemoryVectorStoreProvider.search instance %s in collection: %s (client or collection missing)",
+                id(self),
+                self._collection,
+            )
+        sys.stdout.flush()
+        return await super().search(vector, query_filter=query_filter)
 
     async def handle_persistence(self) -> None:
         """Trigger persistence if auto_persist is enabled.

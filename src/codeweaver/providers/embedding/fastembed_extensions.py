@@ -127,7 +127,6 @@ def get_text_embedder() -> type[TextEmbedding]:
         },
     }
     """
-    embedder = TextEmbedding
     """
     TODO: Temporarily disabled until we can work out the bugs on added dense models in Fastembed.
     # Get existing model names from native FastEmbed registry
@@ -147,7 +146,7 @@ def get_text_embedder() -> type[TextEmbedding]:
         ]
         embedder.EMBEDDINGS_REGISTRY.append(custom_embedder)
     """
-    return embedder
+    return TextEmbedding
 
 
 __all__ = ("get_sparse_embedder", "get_text_embedder")

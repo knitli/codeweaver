@@ -18,8 +18,8 @@ from cyclopts import App
 from rich.table import Table
 
 from codeweaver.cli.ui import CLIErrorHandler, get_display
+from codeweaver.core.types.provider import Provider, ProviderKind
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
-from codeweaver.providers.provider import Provider, ProviderKind
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 
 
@@ -302,7 +302,7 @@ def _list_reranking_models(
         display.console.print(table)
 
     except ImportError as e:
-        display.print_warning(f"Cannot list models for {provider.value}: {e}")
+        display.print_warning(f"Cannot list models for {provider.as_title}: {e}")
         display.print_info(
             f"Install provider dependencies: pip install 'codeweaver[{provider.variable.replace('_', '-')}']"
         )
@@ -331,7 +331,7 @@ def _list_sparse_embedding_models(
         display.console.print(table)
 
     except ImportError as e:
-        display.print_warning(f"Cannot list models for {provider.value}: {e}")
+        display.print_warning(f"Cannot list models for {provider.as_title}: {e}")
         display.print_info(
             f"Install provider dependencies: pip install 'codeweaver[{provider.variable.replace('_', '-')}']'"
         )

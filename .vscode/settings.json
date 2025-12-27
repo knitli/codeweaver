@@ -30,7 +30,8 @@
     "codeweaver/.vscode/mcp.json: codeweaver": {
       "allowedModels": [
         "copilot/claude-haiku-4.5",
-        "copilot/claude-sonnet-4.5"
+        "copilot/claude-sonnet-4.5",
+        "copilot/gemini-3-flash"
       ]
     }
   }

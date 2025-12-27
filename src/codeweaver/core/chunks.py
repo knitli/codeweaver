@@ -42,21 +42,22 @@ from pydantic import (
 )
 from pydantic_core import to_json
 
-from codeweaver.common.utils import ensure_iterable, set_relative_path, uuid7
 from codeweaver.core.language import SemanticSearchLanguage
 from codeweaver.core.metadata import ChunkSource, ExtKind, Metadata, determine_ext_kind
 from codeweaver.core.spans import Span, SpanTuple
 from codeweaver.core.stores import BlakeHashKey
 from codeweaver.core.types import BasedModel, FilteredKeyT, LanguageNameT
-from codeweaver.core.utils import truncate_text
+from codeweaver.core.types.utils import generate_field_title
+from codeweaver.core.utils import ensure_iterable, set_relative_path, truncate_text, uuid7
 
 
 if TYPE_CHECKING:
+    from codeweaver_tokenizers.base import Tokenizer
+
     from codeweaver.core.discovery import DiscoveredFile
     from codeweaver.core.types import AnonymityConversion
     from codeweaver.providers.embedding.registry import EmbeddingRegistry
     from codeweaver.providers.embedding.types import EmbeddingBatchInfo
-    from codeweaver.tokenizers.base import Tokenizer
 
 # ---------------------------------------------------------------------------
 # *                    Code Search and Chunks
@@ -86,26 +87,63 @@ def _get_registry() -> EmbeddingRegistry:
 class BatchKeyIndex(NamedTuple):
     """Tuple representing the index of a chunk within a batch.
 
-    NOTE: While a CodeChunk can hypothetically have both primary and secondary batch keys for both dense and sparse embeddings,
-    in practice, it's unlikely. The secondary/backup embedding process uses ultralightweight models with narrower context windows than most users will have by default. Consequently, the chunkers will produce smaller chunks that fit within these context windows, and these chunks will be embedded separately from the primary embeddings.
+    NOTE: While a CodeChunk can hypothetically have both primary and secondary batch keys for both dense and sparse embeddings, in practice, it's unlikely. The secondary/backup embedding process uses ultralightweight models with narrower context windows than most users will have by default. Consequently, the chunkers will produce smaller chunks that fit within these context windows, and these chunks will be embedded separately from the primary embeddings.
     """
 
-    primary_dense: BatchKeys | None = None
-    primary_sparse: BatchKeys | None = None
-    secondary_dense: BatchKeys | None = None
-    secondary_sparse: BatchKeys | None = None
+    primary_dense: Annotated[
+        BatchKeys | None,
+        Field(
+            description="""UUID7 key for looking up the embedding batch of the chunk's primary dense embeddings.""",
+            field_title_generator=generate_field_title,
+        ),
+    ] = None
+    primary_sparse: Annotated[
+        BatchKeys | None,
+        Field(
+            description="""UUID7 key for looking up the embedding batch of the chunk's primary sparse embeddings.""",
+            field_title_generator=generate_field_title,
+        ),
+    ] = None
+    secondary_dense: Annotated[
+        BatchKeys | None,
+        Field(
+            description="""UUID7 key for looking up the embedding batch of the chunk's secondary dense embeddings.""",
+            field_title_generator=generate_field_title,
+        ),
+    ] = None
+    secondary_sparse: Annotated[
+        BatchKeys | None,
+        Field(
+            description="""UUID7 key for looking up the embedding batch of the chunk's secondary sparse embeddings.""",
+            field_title_generator=generate_field_title,
+        ),
+    ] = None
 
 
 class BatchKeys(NamedTuple):
     """Tuple representing batch keys for embedding operations."""
 
-    id: Annotated[UUID7, Field(description="""The embedding batch ID the chunk belongs to.""")]
-    idx: Annotated[
-        NonNegativeInt, Field(description="""The index of the chunk within the batch.""")
+    id: Annotated[
+        UUID7,
+        Field(
+            description="""The embedding batch ID the chunk belongs to.""",
+            field_title_generator=generate_field_title,
+        ),
     ]
-    sparse: Annotated[bool, Field(description="""Whether the batch's embeddings are sparse.""")] = (
-        False
-    )
+    idx: Annotated[
+        NonNegativeInt,
+        Field(
+            description="""The index of the chunk within the batch.""",
+            field_title_generator=generate_field_title,
+        ),
+    ]
+    sparse: Annotated[
+        bool,
+        Field(
+            description="""Whether the batch's embeddings are sparse.""",
+            field_title_generator=generate_field_title,
+        ),
+    ] = False
 
 
 class CodeChunkDict(TypedDict, total=False):
@@ -315,23 +353,33 @@ class CodeChunk(BasedModel):
             if k in ("name", "context", "semantic_meta")
         }  # type: ignore
 
-    def serialize_for_embedding(self) -> SerializedCodeChunk[CodeChunk]:
-        """Serialize the CodeChunk for embedding."""
-        self_map = self.model_dump(
-            round_trip=True,
-            exclude_none=True,
-            exclude=self._base_excludes,
-            exclude_computed_fields=True,  # Exclude all computed fields
-            warnings=False,  # Suppress serialization warnings
-        )
-        if metadata := self.metadata:
-            metadata = {k: v for k, v in metadata.items() if k in ("name", "tags", "semantic_meta")}
-        self_map["version"] = self._version
-        self_map["metadata"] = metadata
-        ordered_self_map = {k: self_map[k] for k in self._serialization_order if self_map.get(k)}
-        return to_json({k: v for k, v in ordered_self_map.items() if v}, round_trip=True).decode(
-            "utf-8"
-        )
+    def serialize_for_embedding(self) -> str:
+        """Serialize the CodeChunk for embedding.
+
+        Returns a JSON string containing the most relevant fields for semantic search.
+        """
+        # Build a plain dict with only the fields we want to include in the embedding
+        # This avoids Pydantic serialization issues with computed fields and circular refs
+        data = {
+            "title": self.title,
+            "name": self.name,
+            "content": self.content,
+            "file_path": str(self.file_path) if self.file_path else None,
+            "language": str(self.language) if self.language else None,
+            "source": str(self.source) if self.source else None,
+            "chunk_version": self._version,
+        }
+
+        # Include select metadata if available
+        if self.metadata:
+            metadata = {
+                k: v for k, v in self.metadata.items() if k in ("name", "tags", "semantic_meta")
+            }
+            if metadata:
+                data["metadata"] = metadata
+
+        # Use pydantic_core.to_json for fast, reliable serialization
+        return to_json({k: v for k, v in data.items() if v is not None}).decode("utf-8")
 
     @property
     def _base_excludes(self) -> set[str]:
@@ -448,8 +496,8 @@ class CodeChunk(BasedModel):
     @computed_field
     @cached_property
     def length(self) -> PositiveInt:
-        """Return the length of the serialized content in characters."""
-        return len(self.serialize_for_embedding())
+        """Return the length of the chunk content in characters."""
+        return len(self.content)
 
     @computed_field
     @property
@@ -458,7 +506,7 @@ class CodeChunk(BasedModel):
 
         Uses rough approximation of 1 token per 4 characters.
         """
-        return len(self.serialize_for_embedding()) // 4
+        return len(self.content) // 4
 
     def token_count(self, tokenizer_instance: Tokenizer[Any]) -> PositiveInt:
         """Return the token count for the chunk content."""
@@ -490,7 +538,7 @@ class CodeChunk(BasedModel):
     @classmethod
     def chunkify(cls, text: StructuredDataInput) -> Iterator[CodeChunk]:
         """Convert text to a CodeChunk."""
-        from codeweaver.common.utils.utils import ensure_iterable
+        from codeweaver.core.utils import ensure_iterable
 
         yield from (
             item

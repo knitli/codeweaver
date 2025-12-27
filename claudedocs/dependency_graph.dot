@@ -1,0 +1,170 @@
+// SPDX-FileCopyrightText: 2025 Knitli Inc.
+// SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+//
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
+// CodeWeaver Dependency Graph
+// Render with: dot -Tpng dependency_graph.dot -o dependency_graph.png
+// Or view at: https://dreampuf.github.io/GraphvizOnline/
+
+digraph CodeWeaverDependencies {
+    // Graph settings
+    rankdir=TB;
+    concentrate=true;
+    node [shape=box, style=filled, fontname="Arial"];
+    edge [fontsize=10, fontname="Arial"];
+
+    // Define clusters for architectural layers
+    subgraph cluster_app {
+        label="Application Layer";
+        style=filled;
+        color=lightgrey;
+
+        cli [label="codeweaver.cli\n(15 files)\nInstability: 0.69", fillcolor=orange];
+        server [label="codeweaver.server\n(9 files)\nInstability: 0.62", fillcolor=orange];
+        mcp [label="codeweaver.mcp\n(6 files)\nInstability: 0.60", fillcolor=orange];
+    }
+
+    subgraph cluster_business {
+        label="Business Layer";
+        style=filled;
+        color=lightblue;
+
+        engine [label="codeweaver.engine\n(33 files)\nInstability: 0.64", fillcolor=orange];
+        agent_api [label="codeweaver.agent_api\n(8 files)\nInstability: 0.60", fillcolor=orange];
+    }
+
+    subgraph cluster_service {
+        label="Service Layer";
+        style=filled;
+        color=lightyellow;
+
+        config [label="codeweaver.config\n(13 files)\nInstability: 0.50", fillcolor=yellow];
+        providers [label="codeweaver.providers\n(63 files)\nInstability: 0.47", fillcolor=yellow];
+    }
+
+    subgraph cluster_domain {
+        label="Domain Layer";
+        style=filled;
+        color=lightgreen;
+
+        core [label="codeweaver.core\n(18 files)\nInstability: 0.29", fillcolor=lightgreen];
+        semantic [label="codeweaver.semantic\n(9 files)\nInstability: 0.33", fillcolor=lightgreen];
+    }
+
+    subgraph cluster_utility {
+        label="Utility Layer";
+        style=filled;
+        color=white;
+
+        common [label="codeweaver.common\n(21 files)\nInstability: 0.44", fillcolor=pink];
+        exceptions [label="codeweaver.exceptions\n(1 file)\nInstability: 0.00", fillcolor=lightgreen];
+        tokenizers [label="codeweaver.tokenizers\n(3 files)\nInstability: 0.00", fillcolor=lightgreen];
+        daemon [label="codeweaver.daemon\n(0 files)\nInstability: 0.00", fillcolor=lightgreen];
+    }
+
+    // Application Layer dependencies
+    cli -> server [color=red, penwidth=2, label="cycle"];
+    cli -> mcp [color=red, penwidth=2];
+    cli -> engine;
+    cli -> config [color=red, penwidth=2, label="cycle"];
+    cli -> providers;
+    cli -> agent_api;
+    cli -> common [color=red, penwidth=2, label="cycle"];
+    cli -> core;
+    cli -> daemon;
+    cli -> exceptions;
+
+    server -> mcp [color=red, penwidth=2, label="cycle"];
+    server -> engine;
+    server -> config;
+    server -> providers;
+    server -> common [color=red, penwidth=2, label="cycle"];
+    server -> core;
+    server -> exceptions;
+
+    mcp -> server [color=red, penwidth=2, label="cycle"];
+    mcp -> config [color=red, penwidth=2, label="cycle"];
+    mcp -> common;
+    mcp -> agent_api;
+    mcp -> core;
+    mcp -> exceptions;
+
+    // Business Layer dependencies
+    engine -> semantic;
+    engine -> config [color=red, penwidth=2, label="cycle"];
+    engine -> providers [color=red, penwidth=2, label="cycle"];
+    engine -> cli [color=red, penwidth=2, label="cycle"];
+    engine -> common;
+    engine -> core;
+    engine -> exceptions;
+
+    agent_api -> server [color=red, penwidth=2, label="cycle"];
+    agent_api -> semantic;
+    agent_api -> providers [color=red, penwidth=2, label="cycle"];
+    agent_api -> common;
+    agent_api -> core;
+    agent_api -> exceptions;
+
+    // Service Layer dependencies
+    config -> mcp [color=red, penwidth=2, label="cycle"];
+    config -> engine [color=red, penwidth=2, label="cycle"];
+    config -> providers [color=red, penwidth=2, label="cycle"];
+    config -> cli [color=red, penwidth=2, label="cycle"];
+    config -> common [color=red, penwidth=2, label="cycle"];
+    config -> core;
+    config -> exceptions;
+
+    providers -> engine [color=red, penwidth=2, label="cycle"];
+    providers -> config [color=red, penwidth=2, label="cycle"];
+    providers -> agent_api [color=red, penwidth=2, label="cycle"];
+    providers -> common [color=red, penwidth=2, label="cycle"];
+    providers -> core [color=red, penwidth=2, label="cycle"];
+    providers -> tokenizers;
+    providers -> exceptions;
+
+    // Domain Layer dependencies
+    core -> semantic [color=red, penwidth=2, label="cycle"];
+    core -> common [color=red, penwidth=2, label="cycle"];
+    core -> providers [color=red, penwidth=2, label="cycle"];
+    core -> tokenizers;
+
+    semantic -> core [color=red, penwidth=2, label="cycle"];
+    semantic -> common [color=red, penwidth=2, label="cycle"];
+
+    // Utility Layer dependencies
+    common -> server [color=red, penwidth=2, label="VIOLATION"];
+    common -> semantic [color=red, penwidth=2, label="cycle"];
+    common -> config [color=red, penwidth=2, label="cycle"];
+    common -> providers [color=red, penwidth=2, label="cycle"];
+    common -> cli [color=red, penwidth=2, label="VIOLATION"];
+    common -> agent_api;
+    common -> core [color=red, penwidth=2, label="cycle"];
+    common -> exceptions;
+
+    // Legend
+    subgraph cluster_legend {
+        label="Legend";
+        style=filled;
+        color=white;
+
+        legend_clean [label="Clean Dependency", shape=box, fillcolor=white];
+        legend_cycle [label="Circular Dependency", shape=box, fillcolor=white];
+        legend_violation [label="Layer Violation\n(Utility → App)", shape=box, fillcolor=white];
+
+        legend_clean -> legend_cycle [style=invis];
+        legend_cycle -> legend_violation [style=invis];
+    }
+
+    // Styling for legend
+    legend_clean -> legend_clean [style=solid, color=black, label="normal"];
+    legend_cycle -> legend_cycle [style=solid, color=red, penwidth=2, label="cycle"];
+
+    // Annotations
+    label=<<b>CodeWeaver Cross-Package Dependencies</b><br/>
+        Red edges = Circular dependencies (133 total)<br/>
+        Color coding: Green=Stable (I&lt;0.3), Yellow=Moderate (0.3&lt;I&lt;0.7), Orange=Unstable (I&gt;0.7)<br/>
+        Pink=God Object (common package with 18 connections)>;
+    labelloc="t";
+    fontsize=14;
+}

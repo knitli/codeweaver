@@ -13,8 +13,8 @@ import multiprocessing
 from collections.abc import Sequence
 from typing import Any, ClassVar
 
+from codeweaver.core.types.provider import Provider
 from codeweaver.exceptions import ProviderError
-from codeweaver.providers.provider import Provider
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 from codeweaver.providers.reranking.providers.base import RerankingProvider
 

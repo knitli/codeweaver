@@ -21,20 +21,24 @@ from pydantic import ConfigDict, SecretStr
 from textcase import pascal
 from typing_extensions import TypeIs
 
-from codeweaver.common.utils.lazy_importer import LazyImport, lazy_import
 from codeweaver.config.providers import SparseEmbeddingProviderSettings
 from codeweaver.config.types import CodeWeaverSettingsDict
-from codeweaver.core.types.aliases import LiteralStringT
-from codeweaver.core.types.dictview import DictView
-from codeweaver.core.types.models import BasedModel
+from codeweaver.core import (
+    BasedModel,
+    DictView,
+    LazyImport,
+    LiteralStringT,
+    is_test_environment,
+    lazy_import,
+)
+
+# NOTE: Re-export Provider and ProviderKind for easier access -- anyone importing the registry likely needs these too
+from codeweaver.core import Provider as Provider
+from codeweaver.core import ProviderKind as ProviderKind
 from codeweaver.exceptions import ConfigurationError
 from codeweaver.providers.agent.agent_providers import AgentProvider
 from codeweaver.providers.embedding.capabilities.base import SparseEmbeddingModelCapabilities
 from codeweaver.providers.embedding.providers.base import EmbeddingProvider, SparseEmbeddingProvider
-
-# NOTE: Re-export Provider and ProviderKind for easier access -- anyone importing the registry likely needs these too
-from codeweaver.providers.provider import Provider as Provider
-from codeweaver.providers.provider import ProviderKind as ProviderKind
 from codeweaver.providers.reranking.providers.base import RerankingProvider
 from codeweaver.providers.vector_stores.base import VectorStoreProvider
 
@@ -568,9 +572,7 @@ class ProviderRegistry(BasedModel):
         Provider.MISTRAL: "httpx_client",
     }
 
-    def _get_pooled_httpx_client(
-        self, provider: Provider, provider_kind: ProviderKind
-    ) -> Any:
+    def _get_pooled_httpx_client(self, provider: Provider, provider_kind: ProviderKind) -> Any:
         """Get a pooled HTTP client for providers that support HTTP client injection.
 
         This method provides connection pooling for HTTP-based providers,
@@ -596,7 +598,7 @@ class ProviderRegistry(BasedModel):
             }
 
             # Create unique client name based on provider and kind
-            client_name = f"{provider.value.lower()}_{provider_kind.value.lower()}"
+            client_name = f"{provider.variable}_{provider_kind.variable}_client"
             return pool.get_client_sync(client_name, **pool_overrides)
         except (ImportError, AttributeError, RuntimeError) as e:
             # Fallback to provider-created client if pool fails
@@ -662,6 +664,7 @@ class ProviderRegistry(BasedModel):
         provider_kind: ProviderKind | str,
         provider_settings: dict[str, Any] | None,
         client_options: dict[str, Any] | None,
+        caps: Any = None,
     ) -> Any:
         """Create client instance using CLIENT_MAP from capabilities.
 
@@ -670,6 +673,7 @@ class ProviderRegistry(BasedModel):
             provider_kind: Provider kind (embedding, reranking, vector_store, etc.)
             provider_settings: Provider-specific auth/config (API keys, endpoints, paths)
             client_options: User-specified client options (timeout, retries, etc.)
+            caps: Model capabilities (optional, used when provider_settings doesn't have model)
 
         Returns:
             Configured client instance ready for use, or None if:
@@ -752,7 +756,7 @@ class ProviderRegistry(BasedModel):
         # Create client based on provider type
         try:
             return self._instantiate_client(
-                provider, provider_kind, client_class, provider_settings, opts
+                provider, provider_kind, client_class, provider_settings, opts, caps
             )
         except Exception as e:
             logger.warning(
@@ -767,6 +771,7 @@ class ProviderRegistry(BasedModel):
         client_class: type[Any],
         provider_settings: dict[str, Any],
         client_options: dict[str, Any],
+        caps: Any = None,
     ) -> Any:
         """Instantiate a client with provider-specific configuration.
 
@@ -776,6 +781,7 @@ class ProviderRegistry(BasedModel):
             client_class: Resolved client class
             provider_settings: Provider-specific settings
             client_options: Client options
+            caps: Model capabilities (optional)
 
         Returns:
             Configured client instance
@@ -844,7 +850,7 @@ class ProviderRegistry(BasedModel):
             if provider == Provider.FASTEMBED:
                 # Set default cache_dir to persistent location if not provided
                 if "cache_dir" not in (client_options or {}):
-                    from codeweaver.common.utils.utils import get_user_config_dir
+                    from codeweaver.core import get_user_config_dir
 
                     models_cache = get_user_config_dir() / ".models"
                     models_cache.mkdir(parents=True, exist_ok=True)
@@ -861,38 +867,73 @@ class ProviderRegistry(BasedModel):
                     # We need to call it first.
                     client_class = client_class()
 
+            # Filter out CodeWeaver-specific keys that aren't client parameters
+            # Keep: provider_settings, client_options (these go to the client)
+            # Remove: provider, enabled, model_settings, connection, other, api_key
+            codeweaver_keys = {
+                "provider",
+                "enabled",
+                "model_settings",
+                "connection",
+                "other",
+                "api_key",
+            }
+            filtered_options = {
+                k: v for k, v in (client_options or {}).items() if k not in codeweaver_keys
+            }
+
             model_name_or_path = provider_settings.get("model") if provider_settings else None
             if model_name_or_path:
-                return client_class(model_name=model_name_or_path, **client_options)
-            if (capabilities := self.get_configured_provider_settings(provider_kind)) and (
+                # SentenceTransformer uses 'model_name_or_path', FastEmbed uses 'model_name'
+                param_name = (
+                    "model_name_or_path"
+                    if provider == Provider.SENTENCE_TRANSFORMERS
+                    else "model_name"
+                )
+                return client_class(**{param_name: model_name_or_path}, **filtered_options)
+            # Try to get model from capabilities if provided
+            if caps and hasattr(caps, "name"):
+                param_name = (
+                    "model_name_or_path"
+                    if provider == Provider.SENTENCE_TRANSFORMERS
+                    else "model_name"
+                )
+                return client_class(**{param_name: caps.name}, **filtered_options)
+            if (capabilities := self.get_configured_provider_settings(provider_kind)) and (  # type: ignore
                 model_settings := capabilities.get("model_settings")
             ):  # type: ignore
                 model: str = model_settings["model"]
-                return client_class(model_name=model, **client_options)
+                # SentenceTransformer uses 'model_name_or_path', FastEmbed uses 'model_name'
+                param_name = (
+                    "model_name_or_path"
+                    if provider == Provider.SENTENCE_TRANSFORMERS
+                    else "model_name"
+                )
+                return client_class(**{param_name: model}, **filtered_options)
             # Let provider handle default model selection
-            return client_class(**client_options)
+            return client_class(**filtered_options)
 
         # Construct client based on what parameters it accepts
-        from codeweaver.common.utils.introspect import clean_args
+        from codeweaver.core import clean_args
 
         provider_settings = provider_settings or {}
         merged_settings = provider_settings | client_options
 
         # Inject pooled HTTP client for providers that support it
         # This improves connection reuse and reduces overhead during high-load operations
-        param_name = self._POOLED_HTTP_PROVIDERS.get(provider)
-        if param_name is not None:
-            # Check if a client isn't already provided (via httpx_client or http_client)
-            if param_name not in merged_settings:
-                pooled_client = self._get_pooled_httpx_client(provider, provider_kind)
-                if pooled_client is not None:
-                    merged_settings[param_name] = pooled_client
-                    logger.debug(
-                        "Injected pooled HTTP client for %s provider (kind: %s, param: %s)",
-                        provider,
-                        provider_kind,
-                        param_name,
-                    )
+        if (
+            (param_name := self._POOLED_HTTP_PROVIDERS.get(provider)) is not None
+            and param_name not in merged_settings
+            and (pooled_client := self._get_pooled_httpx_client(provider, provider_kind))
+            is not None
+        ):
+            merged_settings[param_name] = pooled_client
+            logger.debug(
+                "Injected pooled HTTP client for %s provider (kind: %s, param: %s)",
+                provider,
+                provider_kind,
+                param_name,
+            )
 
         args, kwargs = clean_args(merged_settings, client_class)
         args = tuple(arg.get_secret_value() if isinstance(arg, SecretStr) else arg for arg in args)
@@ -1112,11 +1153,12 @@ class ProviderRegistry(BasedModel):
             else:
                 provider_settings = kwargs.get("provider_settings")
             client_options = kwargs.get("client_options")
+            caps = kwargs.get("caps")
 
             # Create appropriate client using CLIENT_MAP
             try:
                 client = self._create_client_from_map(
-                    provider, provider_kind, provider_settings, client_options
+                    provider, provider_kind, provider_settings, client_options, caps
                 )
                 if client is not None:
                     kwargs["client"] = client
@@ -1243,6 +1285,10 @@ class ProviderRegistry(BasedModel):
                     "Check for typos in provider registration.",
                 ],
             )
+        # Keep 'caps' as-is - the base EmbeddingProvider.__init__ expects 'caps'
+        # Some providers (like SentenceTransformers) accept 'capabilities' in their __init__
+        # and convert it to 'caps' for the parent, but most use the base class __init__ directly
+        # which expects 'caps'. Let each provider handle its own parameter naming.
         return cast(EmbeddingProvider[Any], retrieved_cls(**kwargs_for_provider))  # ty: ignore[call-non-callable]  # I promise it is
 
     @overload
@@ -1334,9 +1380,25 @@ class ProviderRegistry(BasedModel):
         # Get instance cache for this provider kind
         instance_cache = self._get_instance_cache_for_kind(provider_kind)
 
+        # SPECIAL HANDLING FOR TESTS:
+        # If we are in test mode and requesting memory vector store,
+        # try to find the shared test instance first.
+        if (
+            is_test_environment()
+            and provider == Provider.MEMORY
+            and provider_kind == ProviderKind.VECTOR_STORE
+        ) and Provider.MEMORY in instance_cache:
+            instance = instance_cache[Provider.MEMORY]
+            return self._log_provider_instance_creation(
+                provider, provider_kind, ") returning shared test instance ", instance
+            )
+
         # Check singleton cache first
         if singleton and provider in instance_cache:
-            return instance_cache[provider]
+            instance = instance_cache[provider]
+            return self._log_provider_instance_creation(
+                provider, provider_kind, ") returning cached singleton ", instance
+            )
 
         # Get configuration for this provider
         config = self.get_configured_provider_settings(provider_kind)  # type: ignore
@@ -1365,6 +1427,19 @@ class ProviderRegistry(BasedModel):
         if singleton:
             instance_cache[provider] = instance
 
+        return self._log_provider_instance_creation(
+            provider, provider_kind, ") created new ", instance
+        )
+
+    def _log_provider_instance_creation(self, provider, provider_kind, arg2, instance):
+        logger.debug(
+            "get_provider_instance(%r, %r, %s, %r (id=%d))",
+            provider,
+            provider_kind,
+            arg2,
+            instance,
+            id(instance),
+        )
         return instance
 
     def _get_instance_cache_for_kind(
@@ -1478,9 +1553,18 @@ class ProviderRegistry(BasedModel):
         user_kwargs: dict[str, Any],
     ) -> None:
         """Add model settings to kwargs."""
-        model_settings = config.get("model_settings")
+        # If caps were provided explicitly in user_kwargs, use them directly
+        if "caps" in user_kwargs:
+            kwargs["caps"] = user_kwargs["caps"]
+            # Still continue to extract model_settings for other settings like dimension, etc.
+
+        model_settings = config.get("model_settings") if config else None
         if not model_settings:
-            return
+            # If no model settings and no caps, nothing to add
+            if "caps" not in kwargs:
+                return
+            # If caps are present but no model_settings, continue to set kwargs["kwargs"]
+            model_settings = {}
 
         if (model_name := user_kwargs.get("model") or model_settings.get("model")) and (
             caps := self._get_capabilities_for_model(model_name, config["provider"])
@@ -1500,7 +1584,9 @@ class ProviderRegistry(BasedModel):
                 )
 
                 kwargs["caps"] = SparseEmbeddingModelCapabilities(
-                    name=model_name, provider=config["provider"], other={}
+                    name=model_name,  # ty:ignore[invalid-argument-type]
+                    provider=config["provider"],
+                    other={},  # ty:ignore[invalid-argument-type]
                 )
             elif provider_kind_enum == ProviderKind.RERANKING:
                 from codeweaver.providers.reranking.capabilities.base import (
@@ -1517,7 +1603,7 @@ class ProviderRegistry(BasedModel):
 
                 # Create minimal dense embedding capability
                 kwargs["caps"] = EmbeddingModelCapabilities(
-                    name=model_name,
+                    name=model_name,  # ty:ignore[invalid-argument-type]
                     provider=config["provider"],
                     default_dimension=model_settings.get("dimension", 768),
                 )
@@ -1573,7 +1659,7 @@ class ProviderRegistry(BasedModel):
                 client_options[key] = value
             elif key == "cache_dir":
                 # Set default cache_dir to persistent location
-                from codeweaver.common.utils.utils import get_user_config_dir
+                from codeweaver.core import get_user_config_dir
 
                 models_cache = get_user_config_dir() / ".models"
                 models_cache.mkdir(parents=True, exist_ok=True)
@@ -1778,7 +1864,7 @@ class ProviderRegistry(BasedModel):
             logger.debug(
                 "Failed to resolve %s provider %s: %s",
                 provider_kind.name,
-                provider.value,
+                provider.as_title,
                 e.__class__.__name__,
                 exc_info=True,
             )

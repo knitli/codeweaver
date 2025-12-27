@@ -59,6 +59,12 @@ UUID7HexT = Annotated[
     ),
 ]
 
+BlakeKey = NewType("BlakeKey", str)
+BlakeHashKey = Annotated[
+    BlakeKey, Field(description="""A blake3 hash key string""", min_length=64, max_length=64)
+]
+
+
 # ================================================
 # *       File and Directory NewTypes/Aliases
 # ================================================
@@ -270,6 +276,8 @@ type LlmToolNameT = Annotated[
 
 
 __all__ = (
+    "BlakeHashKey",
+    "BlakeKey",
     "CategoryName",
     "CategoryNameT",
     "DevToolName",

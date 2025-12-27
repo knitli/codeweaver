@@ -7,8 +7,6 @@
 Implements pattern-based chunking using delimiter pairs (e.g., braces, parentheses).
 Uses a three-phase algorithm: match detection, boundary extraction with nesting support,
 and priority-based overlap resolution.
-
-Architecture follows the specification in chunker-architecture-spec.md §3.3-3.5.
 """
 
 from __future__ import annotations
@@ -19,11 +17,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple, cast
 
-from codeweaver.common.utils import uuid7
-from codeweaver.core.chunks import CodeChunk
-from codeweaver.core.metadata import Metadata
-from codeweaver.core.spans import Span
-from codeweaver.core.stores import get_blake_hash
+from codeweaver.core import CodeChunk, Metadata, Span, get_blake_hash, uuid7
 from codeweaver.engine.chunker.base import BaseChunker, ChunkGovernor
 from codeweaver.engine.chunker.delimiter_model import Boundary, Delimiter, DelimiterMatch
 from codeweaver.engine.chunker.exceptions import (
@@ -35,7 +29,10 @@ from codeweaver.engine.chunker.exceptions import (
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.discovery import DiscoveredFile
+    from codeweaver.core import DiscoveredFile
+
+
+PERFORMANCE_THRESHOLD_MS = 1000.0  # 1 second
 
 
 class StringParseState(NamedTuple):
@@ -112,6 +109,8 @@ class DelimiterChunker(BaseChunker):
             OversizedChunkError: If individual chunks exceed token limit
             ParseError: If delimiter matching fails
         """
+        import time
+
         from codeweaver.core.types.aliases import UUID7Hex
         from codeweaver.engine.chunker.governance import ResourceGovernor
 
@@ -122,6 +121,8 @@ class DelimiterChunker(BaseChunker):
         file_path = file.path if file else None
         self._validate_content_encoding(content, file_path)
         performance_settings = self._get_performance_settings()
+
+        start_time = time.perf_counter()
 
         with ResourceGovernor(performance_settings) as governor:
             try:
@@ -147,6 +148,20 @@ class DelimiterChunker(BaseChunker):
                     details={"error": str(e), "language": self._language},
                 ) from e
             else:
+                # Check for performance warnings
+                duration_ms = (time.perf_counter() - start_time) * 1000
+
+                if duration_ms > PERFORMANCE_THRESHOLD_MS:
+                    from codeweaver.engine.chunker import _logging as chunker_logging
+
+                    chunker_logging.log_chunking_performance_warning(
+                        file_path=file_path or Path("<unknown>"),
+                        chunker_type=self,
+                        duration_ms=duration_ms,
+                        threshold_ms=PERFORMANCE_THRESHOLD_MS,
+                        extra_context={"chunk_count": len(chunks), "file_size_bytes": len(content)},
+                    )
+
                 return chunks
 
     def _validate_content_encoding(self, content: str, file_path: Path | None) -> None:

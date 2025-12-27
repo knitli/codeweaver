@@ -44,10 +44,11 @@ env/
 
 # Documentation
 docs/
-# Exclude all Markdown files to keep the image lean, except README.md which is needed by the Dockerfile.
+# Exclude all Markdown files to keep the image lean, except README.md and SECURITY.md which are needed by the Dockerfile/hatchling.
 # If you want other documentation (e.g., DOCKER.md) included in the image, adjust these rules.
 *.md
 !README.md
+!SECURITY.md
 mkdocs.yml
 overrides/
 
@@ -93,15 +94,14 @@ temp/
 tmp/
 .cache/
 
-# Licenses and Legal (keep LICENSE files, ignore LICENSES dir)
-LICENSES/
+# Licenses and Legal (keep LICENSE files and LICENSES dir for build)
+# LICENSES/ directory and SECURITY.md are needed by hatchling for package build
 CONTRIBUTORS_LICENSE_AGREEMENT.md
-SECURITY.md
 
 # Project specific
 .codeweaver/
 codeweaver.toml
-sbom.spdx
+# sbom.spdx is needed by hatchling for package build
 NOTES.md
 PRODUCT.md
 ARCHITECTURE.md

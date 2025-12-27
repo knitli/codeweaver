@@ -173,6 +173,28 @@ Benefits:
 ✅ FastAPI-like patterns (familiar)
 ```
 
+## Transport-Agnostic Design
+
+The DI Container is a foundational component (in `core`) that serves multiple entry points without depending on them.
+
+```
+      ┌──────────────────────────┐
+      │      DI Container        │
+      │  (codeweaver-core)       │
+      └───────────┬──────────────┘
+                  │
+        ┌─────────┼─────────┐
+        ▼         ▼         ▼
+  ┌──────────┐┌──────────┐┌──────────┐
+  │  Daemon  ││   CLI    ││MCP Server│
+  │(Watcher) ││(Indexer) ││(FastMCP) │
+  └──────────┘└──────────┘└──────────┘
+```
+
+- **Independence**: The container and its factories do not import `fastmcp`.
+- **Consistency**: The same injection logic powers the background daemon and the HTTP server.
+- **Portability**: Supports future non-MCP agentic features natively.
+
 ## Dependency Flow Comparison
 
 ### Current (Manual)

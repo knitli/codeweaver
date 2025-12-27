@@ -51,6 +51,7 @@ import contextlib
 import logging
 
 from collections.abc import Iterator, Sequence
+from contextvars import ContextVar
 from functools import cached_property
 from pathlib import Path
 from types import ModuleType
@@ -64,6 +65,7 @@ from typing import (
     Unpack,
     cast,
     overload,
+    override,
 )
 
 from ast_grep_py import (
@@ -93,12 +95,21 @@ from pydantic import (
     computed_field,
 )
 
-from codeweaver.common.utils import LazyImport, lazy_import, uuid7
-from codeweaver.common.utils.textify import humanize
-from codeweaver.core.language import SemanticSearchLanguage
-from codeweaver.core.types.aliases import FileExt, LiteralStringT, ThingName, ThingNameT
-from codeweaver.core.types.enum import AnonymityConversion, BaseEnum
-from codeweaver.core.types.models import BasedModel
+from codeweaver.core import (
+    AnonymityConversion,
+    BasedModel,
+    BaseEnum,
+    FileExt,
+    LazyImport,
+    LiteralStringT,
+    SemanticSearchLanguage,
+    ThingName,
+    ThingNameT,
+    generate_field_title,
+    humanize,
+    lazy_import,
+    uuid7,
+)
 
 # Runtime imports needed for cast operations and type checking
 from codeweaver.semantic.grammar import Category, CompositeThing, Token
@@ -113,6 +124,8 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 registry_module: LazyImport[ModuleType] = lazy_import("codeweaver.semantic.registry")
+
+_resolving_ast_thing: ContextVar[set[int]] = ContextVar("_resolving_ast_thing", default=set())
 
 # re-export Ast Grep's rules and config types:
 AstGrepSearchTypes = (
@@ -138,8 +151,10 @@ class MetaVar(str, BaseEnum):
 
     __slots__ = ()
 
+    @override
     def __str__(self) -> str:
         """Return the string representation of the meta variable."""
+        # This is an intentional override to ensure that str(MetaVar) returns the correct value.
         return self.value
 
     def to_metavar(
@@ -172,11 +187,19 @@ class Strictness(str, BaseEnum):
 class Position(NamedTuple):
     """Represents a `Pos` from ast-grep with pydantic validation. The position of the node in the source code."""
 
-    line: PositiveInt
-    column: PositiveInt
+    line: Annotated[
+        PositiveInt, Field(description="Line number", field_title_generator=generate_field_title)
+    ]
+    column: Annotated[
+        PositiveInt, Field(description="Column number", field_title_generator=generate_field_title)
+    ]
     idx: Annotated[
         NonNegativeInt,
-        Field(serialization_alias="index", description="""Byte index in the source"""),
+        Field(
+            serialization_alias="index",
+            description="""Byte index in the source""",
+            field_title_generator=generate_field_title,
+        ),
     ]
 
     @classmethod
@@ -326,14 +349,19 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
                 data["_node"].get_root().filename().suffix
                 or data["_node"].get_root().filename().name
             ),
+            field_title_generator=generate_field_title,
         ),
     ]
 
     thing_id: Annotated[UUID7, Field(description="""The unique ID of the node""")] = uuid7()
 
-    parent_thing_id: Annotated[UUID7 | None, Field(description="""The ID of the parent node""")] = (
-        None
-    )
+    def __repr__(self) -> str:
+        """Return a string representation of the node."""
+        return f"AstThing(name={self.name}, language={self.language.variable}, thing_id={self.thing_id})"
+
+    def __str__(self) -> str:
+        """Return a string representation of the node."""
+        return f"{self.language.variable} node: {self.name}"
 
     def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
         from codeweaver.core.types.aliases import FilteredKey
@@ -387,12 +415,26 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
         parent_thing_id: UUID7 | None = None,
     ) -> AstThing[SgNode]:
         """Create an AstThing from an ast-grep `SgNode`."""
-        return cls.model_construct(
-            _node=sg_node,
-            language=language,
-            thing_id=thing_id or uuid7(),
-            parent_thing_id=parent_thing_id,
+        # Use object.__new__ to completely bypass Pydantic's initialization
+        # and prevent recursion in init_private_attributes/model_post_init
+        instance = object.__new__(cls)
+
+        # Manually set all fields
+        object.__setattr__(instance, "language", language)
+        object.__setattr__(instance, "thing_id", thing_id or uuid7())
+        object.__setattr__(instance, "parent_thing_id", parent_thing_id)
+
+        # Manually set Pydantic internal state
+        object.__setattr__(
+            instance, "__pydantic_fields_set__", {"language", "thing_id", "parent_thing_id"}
         )
+        object.__setattr__(instance, "__pydantic_extra__", None)
+        object.__setattr__(instance, "__pydantic_private__", None)
+
+        # Set our private attribute
+        object.__setattr__(instance, "_node", sg_node)
+
+        return instance
 
     # ================================================
     # *      Identity and Metadata Properties       *
@@ -464,14 +506,18 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
     def title(self) -> str:
         """Get a human-readable title for the node."""
         name = humanize(self.name)
-        language = humanize(str(self.language))
+        language = humanize(self.language.as_title)
         classification = (
             humanize(self.classification.name.as_title) if self.classification else "Not classified"
         )
         text_snippet = humanize(self.text.strip().splitlines()[0])
         if len(text_snippet) > 25:
             text_snippet = f"{text_snippet[:22]}..."
-        return f"{language}-{name}-{classification}: '{text_snippet}'"
+        return (
+            f"{language}-{name}-{classification}: '{text_snippet}'"
+            if text_snippet
+            else f"{language}-{name}-{classification}"
+        )
 
     @computed_field
     @property
@@ -762,7 +808,7 @@ __all__ = (
 # Rebuild models to resolve forward references
 with contextlib.suppress(Exception):
     from codeweaver.core.chunks import CodeChunk
-    from codeweaver.core.metadata import SemanticMetadata
+    from codeweaver.semantic.types import SemanticMetadata
 
     for model in (FileThing, AstThing, SemanticMetadata, CodeChunk):
         if model.__pydantic_complete__:

@@ -18,7 +18,6 @@ from typing import TYPE_CHECKING, NamedTuple, TypedDict, cast
 
 from pydantic import computed_field
 
-from codeweaver.common.utils import LazyImport, lazy_import, normalize_ext
 from codeweaver.core.types.aliases import (
     DirectoryName,
     DirectoryNameT,
@@ -32,6 +31,7 @@ from codeweaver.core.types.aliases import (
     LiteralStringT,
 )
 from codeweaver.core.types.enum import BaseEnum
+from codeweaver.core.utils import LazyImport, lazy_import, normalize_ext
 
 
 if TYPE_CHECKING:
@@ -177,7 +177,7 @@ class ConfigLanguage(BaseEnum):
         This is used to quickly look up the SemanticSearchLanguage based on ConfigLanguage.
         """
         if self.is_semantic_search_language:
-            return SemanticSearchLanguage.from_string(self.value)
+            return SemanticSearchLanguage.from_string(self.variable)
         return None
 
     @classmethod
@@ -771,7 +771,7 @@ class SemanticSearchLanguage(str, BaseEnum):
         Returns the corresponding ConfigLanguage if this SemanticSearchLanguage is a configuration language.
         """
         return (
-            ConfigLanguage.from_string(self.value)
+            ConfigLanguage.from_string(self.variable)
             if self in type(self).config_languages()
             else None
         )

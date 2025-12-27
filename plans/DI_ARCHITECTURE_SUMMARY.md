@@ -53,6 +53,8 @@ class Indexer:
 3. **Factories** - Hide complex instantiation logic
 4. **Type Aliases** - Clean service signatures
 
+**Note:** The DI system is strictly **transport-agnostic** (resides in `core`). It functions identically in CLI, background daemon, or MCP server modes.
+
 ## Key Benefits
 
 | Benefit | Impact |

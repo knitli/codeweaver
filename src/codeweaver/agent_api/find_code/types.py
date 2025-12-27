@@ -8,8 +8,7 @@ Types and models for the find_code agent API.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-from typing import TYPE_CHECKING, Annotated, Any, Literal, NamedTuple
+from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 from pydantic import ConfigDict, Field, NonNegativeFloat, NonNegativeInt, model_validator
 
@@ -21,33 +20,14 @@ from codeweaver.core.spans import Span
 from codeweaver.core.types import LanguageName
 from codeweaver.core.types.enum import BaseEnum
 from codeweaver.core.types.models import BASEDMODEL_CONFIG, BasedModel
+from codeweaver.core.types.search import SearchStrategy
 from codeweaver.exceptions import ValidationError
-from codeweaver.providers.embedding.types import SparseEmbedding
 
 
 if TYPE_CHECKING:
-    from qdrant_client.http.models import FusionQuery, Prefetch
     from rich.table import Table
 
     from codeweaver.core.types import AnonymityConversion, FilteredKeyT
-
-
-class SearchStrategy(BaseEnum):
-    """Enumeration of search types."""
-
-    COMMIT_SEARCH = "commit_search"
-    FILE_DISCOVERY = "file_discovery"
-    LANGUAGE_SEARCH = "language_search"
-    SYMBOL_SEARCH = "symbol_search"
-    TEXT_SEARCH = "text_search"
-    HYBRID_SEARCH = "hybrid_search"
-    SEMANTIC_RERANK = "semantic_rerank"
-    SPARSE_ONLY = "sparse_only"
-    DENSE_ONLY = "dense_only"
-    KEYWORD_FALLBACK = "keyword_fallback"
-
-    # Alias for HYBRID_SEARCH for backward compatibility
-    HYBRID = HYBRID_SEARCH
 
 
 class CodeMatchType(BaseEnum):
@@ -77,7 +57,7 @@ class CodeMatch(BasedModel):
         NonNegativeFloat,
         Field(
             le=1.0,
-            description="""\
+            description="""
         Adjusted relevance score (0.0-1.0).
 
         This is not the raw similarity score returned by a vector database. CodeWeaver applies multiple layers of adjustments based on factors such as:
@@ -340,150 +320,4 @@ if not FindCodeResponseSummary.__pydantic_complete__:
     _ = FindCodeResponseSummary.model_rebuild()
 
 
-class StrategizedQuery(NamedTuple):
-    """NamedTuple representing a strategized query for code search."""
-
-    query: str
-    dense: Sequence[float] | Sequence[int] | None
-    sparse: Annotated[SparseEmbedding | None, Field(description="Sparse embedding data")]
-    strategy: Annotated[SearchStrategy, Field(description="Search strategy to use")]
-
-    def is_empty(self) -> bool:
-        """Check if both dense and sparse embeddings are None or empty."""
-        dense_empty = self.dense is None or len(self.dense) == 0
-        sparse_empty = self.sparse is None or (
-            len(self.sparse.indices) == 0 and len(self.sparse.values) == 0
-        )
-        return dense_empty and sparse_empty
-
-    def has_dense(self) -> bool:
-        """Check if dense embedding is present and non-empty."""
-        return self.dense is not None and len(self.dense) > 0
-
-    def has_sparse(self) -> bool:
-        """Check if sparse embedding is present and non-empty."""
-        return (
-            self.sparse is not None and len(self.sparse.indices) > 0 and len(self.sparse.values) > 0
-        )
-
-    def is_hybrid(self) -> bool:
-        """Check if both dense and sparse embeddings are present and non-empty."""
-        return self.has_dense() and self.has_sparse()
-
-    def to_hybrid_query(
-        self, query_kwargs: dict[str, Any], kwargs: dict[str, Any]
-    ) -> dict[str, FusionQuery | list[Prefetch] | Any]:
-        """Convert to a FusionQuery for hybrid search."""
-        from qdrant_client.http.models import Prefetch, Rrf, RrfQuery, SparseVector
-
-        from codeweaver.exceptions import QueryError
-
-        if not self.is_hybrid():
-            raise QueryError(
-                "Cannot create hybrid query: both dense and sparse embeddings required",
-                details={
-                    "has_dense": self.has_dense(),
-                    "has_sparse": self.has_sparse(),
-                    "strategy": self.strategy.value,
-                },
-                suggestions=[
-                    "Ensure both embedding providers are configured",
-                    "Use dense-only or sparse-only search if one provider fails",
-                    "Check embedding provider logs for errors",
-                ],
-            )
-
-        # Convert sparse dict to SparseVector with indices and values
-        assert self.sparse is not None  # noqa: S101
-        sparse_vector = SparseVector(
-            indices=list(self.sparse.indices), values=list(self.sparse.values)
-        )
-
-        # Extract Prefetch-specific parameters (limit, score_threshold, filter, params)
-        prefetch_params = {
-            k: v
-            for k, v in query_kwargs.items()
-            if k in ("limit", "score_threshold", "filter", "params")
-        }
-
-        # Extract top-level query_points parameters
-        # Note: limit is needed at BOTH levels - prefetch limit controls initial retrieval,
-        # top-level limit controls final results after fusion
-        top_level_params = {
-            k: v
-            for k, v in query_kwargs.items()
-            if k
-            in (
-                "with_payload",
-                "with_vectors",
-                "query_filter",
-                "limit",  # Required for hybrid search - controls final result count after fusion
-                "offset",
-                "consistency",
-                "shard_key_selector",
-                "timeout",
-                "lookup_from",
-            )
-            and v is not None
-        }
-
-        # Use bare vectors with 'using' parameter for named vector search in Prefetch
-        assert self.dense is not None  # noqa: S101
-        return {
-            "query": RrfQuery(rrf=Rrf(k=2)),
-            "prefetch": [
-                Prefetch(query=list(self.dense), using="dense", **prefetch_params),
-                Prefetch(query=sparse_vector, using="sparse", **prefetch_params),
-            ],
-            **top_level_params,  # Include top-level query_points parameters
-            **kwargs,
-        }
-
-    def to_query(self, kwargs: dict[str, Any]) -> dict[str, FusionQuery | list[Prefetch] | Any]:
-        """Convert to a query dict based on available embeddings.
-
-        For sparse-only queries, returns query_points parameters.
-        For dense-only queries, returns query_points parameters.
-        For hybrid queries, delegates to to_hybrid_query.
-        """
-        from codeweaver.exceptions import QueryError
-
-        if self.is_empty():
-            raise QueryError(
-                "Cannot create query: at least one embedding type required",
-                details={
-                    "has_dense": self.has_dense(),
-                    "has_sparse": self.has_sparse(),
-                    "query": self.query,
-                },
-                suggestions=[
-                    "Configure at least one embedding provider (dense or sparse)",
-                    "Verify embedding provider initialization succeeded",
-                    "Check embedding provider logs for errors",
-                ],
-            )
-        if self.is_hybrid():
-            return self.to_hybrid_query({}, kwargs)
-        from qdrant_client.http.models import SparseVector
-
-        if self.has_dense():
-            # Dense-only: Use query_points API with dense vector and using="dense"
-            assert self.dense is not None  # noqa: S101
-            return {"query": list(self.dense), "using": "dense", **kwargs}
-
-        # Sparse-only: Use SparseVector with query_points API
-        assert self.sparse is not None  # noqa: S101
-        sparse_vector = SparseVector(
-            indices=list(self.sparse.indices), values=list(self.sparse.values)
-        )
-        # Return query_points parameters with using="sparse"
-        return {"query": sparse_vector, "using": "sparse", **kwargs}
-
-
-__all__ = (
-    "CodeMatch",
-    "CodeMatchType",
-    "FindCodeResponseSummary",
-    "SearchStrategy",
-    "StrategizedQuery",
-)
+__all__ = ("CodeMatch", "CodeMatchType", "FindCodeResponseSummary", "FindCodeSubmission")

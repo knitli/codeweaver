@@ -14,6 +14,17 @@ import time
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Literal, NoReturn, cast
 
+from codeweaver.di import depends
+from codeweaver.di.providers import (
+    FailoverManagerDep,
+    IndexerDep,
+    ProviderRegistryDep,
+    StatisticsDep,
+    get_failover_manager,
+    get_indexer,
+    get_provider_registry,
+    get_statistics,
+)
 from codeweaver.exceptions import ConfigurationError
 from codeweaver.server.health.models import (
     EmbeddingProviderServiceInfo,
@@ -31,9 +42,7 @@ from codeweaver.server.health.models import (
 
 
 if TYPE_CHECKING:
-    from codeweaver.common.registry import ProviderRegistry
-    from codeweaver.common.statistics import FileStatistics, SessionStatistics
-    from codeweaver.engine.failover import VectorStoreFailoverManager
+    from codeweaver.common.statistics import FileStatistics
     from codeweaver.engine.indexer import Indexer
 
 
@@ -46,26 +55,26 @@ class HealthService:
     def __init__(
         self,
         *,
-        provider_registry: ProviderRegistry,
-        statistics: SessionStatistics,
-        indexer: Indexer | None = None,
-        failover_manager: VectorStoreFailoverManager | None = None,
-        startup_stopwatch: float,
+        provider_registry: ProviderRegistryDep = depends(get_provider_registry),
+        statistics: StatisticsDep = depends(get_statistics),
+        indexer: IndexerDep = depends(get_indexer),
+        failover_manager: FailoverManagerDep = depends(get_failover_manager),
+        startup_stopwatch: float | None = None,
     ) -> None:
         """Initialize health service.
 
         Args:
             provider_registry: Provider registry for accessing embedding/vector store providers
             statistics: Session statistics for query metrics
-            indexer: Indexer instance for indexing progress (optional)
-            failover_manager: Failover manager for vector store failover (optional)
-            startup_stopwatch: Server startup monotonic time (from time.monotonic())
+            indexer: Indexer instance for indexing progress
+            failover_manager: Failover manager for vector store failover
+            startup_stopwatch: Server startup monotonic time (optional, will use current time if not provided)
         """
         self._provider_registry = provider_registry
         self._statistics = statistics
         self._indexer = indexer
         self._failover_manager = failover_manager
-        self._startup_stopwatch = startup_stopwatch
+        self._startup_stopwatch = startup_stopwatch or time.monotonic()
         self._last_indexed: str | None = None
         self._indexed_languages: set[str] = set()
 
@@ -81,12 +90,52 @@ class HealthService:
         """Add a language to the set of indexed languages."""
         self._indexed_languages.add(language)
 
+    async def _resolve_dependencies(self) -> None:
+        """Resolve dependencies if they were provided as Depends objects."""
+        from codeweaver.common.registry import ProviderRegistry
+        from codeweaver.common.statistics import SessionStatistics
+        from codeweaver.di import Depends, get_container
+        from codeweaver.engine.failover import VectorStoreFailoverManager
+        from codeweaver.engine.indexer import Indexer
+
+        container = get_container()
+
+        if isinstance(self._provider_registry, Depends):
+            try:
+                self._provider_registry = await container.resolve(ProviderRegistry)
+            except Exception:
+                from codeweaver.common.registry import get_provider_registry
+
+                self._provider_registry = get_provider_registry()
+
+        if isinstance(self._statistics, Depends):
+            try:
+                self._statistics = await container.resolve(SessionStatistics)
+            except Exception:
+                from codeweaver.common.statistics import get_session_statistics
+
+                self._statistics = get_session_statistics()
+
+        if isinstance(self._indexer, Depends):
+            try:
+                self._indexer = await container.resolve(Indexer)
+            except Exception:
+                self._indexer = None
+
+        if isinstance(self._failover_manager, Depends):
+            try:
+                self._failover_manager = await container.resolve(VectorStoreFailoverManager)
+            except Exception:
+                self._failover_manager = None
+
     async def get_health_response(self) -> HealthResponse:
         """Collect health information from all components and return complete response.
 
         Returns:
             HealthResponse with current system health
         """
+        await self._resolve_dependencies()
+
         # Collect component health in parallel
         indexing_info_task = asyncio.create_task(self._get_indexing_info())
         services_info_task = asyncio.create_task(self._get_services_info())
@@ -199,7 +248,7 @@ class HealthService:
 
     async def _check_vector_store_health(self) -> VectorStoreServiceInfo:
         """Check vector store health with latency measurement."""
-        from codeweaver.providers.provider import ProviderKind
+        from codeweaver.core.types.provider import ProviderKind
 
         def raise_error() -> NoReturn:
             """Helper to raise error for missing provider."""
@@ -249,7 +298,7 @@ class HealthService:
     def _extract_circuit_breaker_state(self, circuit_state_raw: Any) -> str:
         """Extract circuit breaker state string from raw value.
 
-        Handles both string values, enum values, and mock objects with .value attribute.
+        Handles both string values, enum values, and mock objects with .variable attribute.
 
         Args:
             circuit_state_raw: Raw circuit breaker state (string, enum, or mock)
@@ -257,8 +306,8 @@ class HealthService:
         Returns:
             Circuit breaker state as string ("closed", "open", or "half_open")
         """
-        if hasattr(circuit_state_raw, "value"):
-            return circuit_state_raw.value
+        if hasattr(circuit_state_raw, "variable"):
+            return circuit_state_raw.variable
         return str(circuit_state_raw) if circuit_state_raw else "closed"
 
     async def _check_embedding_provider_health(self) -> EmbeddingProviderServiceInfo:
@@ -523,7 +572,7 @@ class HealthService:
             cpu_percent = process.cpu_percent(interval=0.1)
 
             # Disk usage
-            from codeweaver.common.utils import get_user_config_dir
+            from codeweaver.core import get_user_config_dir
 
             config_dir = Path(get_user_config_dir())
             index_dir = config_dir / ".indexes"
@@ -536,7 +585,7 @@ class HealthService:
                 try:
                     total = sum(f.stat().st_size for f in path.rglob("*") if f.is_file())
                     return total // (1024 * 1024)
-                except (PermissionError, OSError):
+                except OSError:
                     # Gracefully handle permission errors
                     return 0
 

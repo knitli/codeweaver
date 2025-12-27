@@ -1,0 +1,47 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+#:tombi schema.strict = false
+
+[project]
+name = "code-weaver-tokenizers"
+version = "0.1.0"
+description = "Ready-to-use tokenizers for CodeWeaver"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "tiktoken>=0.12.0",
+  "tokenizers>=0.22.1",
+  "typing_extensions>=4.15.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest", "pytest-cov"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/codeweaver_tokenizers"]
+
+[tool.pytest]
+addopts = ["--cov-report=term-missing", "--cov=codeweaver_tokenizers"]
+markers = [
+  "asyncio: Marks tests as asyncio tests",
+  "expensive: Tests that are resource-intensive and may take a long time to run",
+  "fast: Fast unit tests that do not require external resources",
+  "heavy: Tests that require model downloads or are otherwise resource-intensive",
+  "integration: Integration tests that may require external resources but not real model providers",
+  "real_providers: Tests that interact with real model providers and may require model downloads",
+  "requires_models: Tests that require model downloads to run",
+  "skip: Tests that are skipped by default unless explicitly requested",
+  "unit: Standard unit tests that do not require external resources",
+]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.ruff.lint]
+per-file-ignores = { "tests/*" = ["S101"] }

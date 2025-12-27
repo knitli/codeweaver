@@ -1,0 +1,109 @@
+// SPDX-FileCopyrightText: 2025 Knitli Inc.
+// SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+//
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
+// Proposed CodeWeaver Package Structure
+// Shows the clean layered architecture after refactoring
+// Render with: dot -Tpng proposed_structure.dot -o proposed_structure.png
+
+digraph ProposedStructure {
+    rankdir=TB;
+    node [shape=box, style=filled, fontname="Arial"];
+
+    // Layer 1: Foundation (no dependencies)
+    subgraph cluster_foundation {
+        label="Layer 1: Foundation (No Dependencies)";
+        style=filled;
+        color=lightgreen;
+
+        core [label="codeweaver-core\n• Types & models\n• Exceptions\n• Registry\n• Search types\n• Provider configs", fillcolor=lightgreen];
+        tokenizers [label="codeweaver-tokenizers\n• Tokenization utils", fillcolor=lightgreen];
+        daemon [label="codeweaver-daemon\n• Daemon management", fillcolor=lightgreen];
+    }
+
+    // Layer 2: Utilities
+    subgraph cluster_utilities {
+        label="Layer 2: Utilities (Depend on Core)";
+        style=filled;
+        color=lightblue;
+
+        utils [label="codeweaver-utils\n• Common utilities", fillcolor=lightblue];
+        semantic [label="codeweaver-semantic\n• AST analysis", fillcolor=lightblue];
+        telemetry [label="codeweaver-telemetry\n• Statistics & events", fillcolor=lightblue];
+    }
+
+    // Layer 3: Services
+    subgraph cluster_services {
+        label="Layer 3: Services (Depend on Lower Layers)";
+        style=filled;
+        color=lightyellow;
+
+        providers [label="codeweaver-providers\n• Embedding providers\n• Vector stores\n• Reranking", fillcolor=lightyellow];
+    }
+
+    // Layer 4: Business Logic
+    subgraph cluster_business {
+        label="Layer 4: Business Logic";
+        style=filled;
+        color=lightgoldenrod;
+
+        engine [label="codeweaver-engine\n• Chunking\n• Indexing\n• Watching\n• Config", fillcolor=lightgoldenrod];
+    }
+
+    // Layer 5: Application
+    subgraph cluster_app {
+        label="Layer 5: Application";
+        style=filled;
+        color=lightcoral;
+
+        app [label="codeweaver\n• CLI\n• Server\n• MCP\n• Agent API", fillcolor=lightcoral];
+    }
+
+    // Clean downward dependencies
+    utils -> core;
+    semantic -> core;
+    telemetry -> core;
+    telemetry -> utils;
+
+    providers -> core;
+    providers -> tokenizers;
+    providers -> telemetry;
+    providers -> utils;
+
+    engine -> core;
+    engine -> semantic;
+    engine -> providers;
+    engine -> utils;
+    engine -> telemetry;
+    engine -> daemon [style=dashed, label="optional"];
+
+    app -> engine;
+    app -> providers;
+    app -> core;
+    app -> semantic;
+    app -> telemetry;
+    app -> utils;
+    app -> daemon [style=dashed];
+    app -> tokenizers;
+
+    // Legend
+    subgraph cluster_legend {
+        label="Legend";
+        style=filled;
+        color=white;
+
+        leg1 [label="Solid = Required", shape=box, fillcolor=white];
+        leg2 [label="Dashed = Optional", shape=box, fillcolor=white];
+
+        leg1 -> leg2 [style=invis];
+    }
+
+    label=<<b>Proposed CodeWeaver Package Structure</b><br/>
+        ✅ No circular dependencies<br/>
+        ✅ Clear layered architecture<br/>
+        ✅ Dependencies flow downward only<br/>
+        Effort: 3-4 weeks of refactoring>;
+    labelloc="t";
+    fontsize=14;
+}

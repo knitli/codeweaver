@@ -46,17 +46,16 @@ class TestFileChangeTrackerBasics:
     def test_has_pending_changes_true_when_changes(self, tmp_path: Path):
         """Test has_pending_changes with pending changes."""
         tracker = self._get_tracker(tmp_path)
-        tracker.pending_changes = self._setup_file_change_tracker_with_deletion(tmp_path)
+        tracker.pending_changes = {"a.py", "b.py"}
+
+        assert tracker.has_pending_changes is True
 
     def test_has_pending_changes_true_when_deletions(self, tmp_path: Path):
         """Test has_pending_changes with pending deletions."""
         tracker = self._get_tracker(tmp_path)
-        tracker.pending_deletions = self._setup_file_change_tracker_with_deletion(tmp_path)
+        tracker.pending_deletions = {"c.py"}
 
-    def _setup_file_change_tracker_with_deletion(self, tmp_path):
-        tracker = self._get_tracker(tmp_path)
         assert tracker.has_pending_changes is True
-        return {"a.py"}
 
     def test_has_pending_changes_false_when_empty(self, tmp_path: Path):
         """Test has_pending_changes when empty."""
@@ -78,6 +77,10 @@ class TestFileChangeTrackerBasics:
 class TestRecordFileIndexed:
     """Tests for record_file_indexed method."""
 
+    def _get_tracker(self, tmp_path: Path) -> FileChangeTracker:
+        """Create a FileChangeTracker for testing."""
+        return FileChangeTracker(project_path=tmp_path)
+
     def test_records_new_file(self, tmp_path: Path):
         """Test recording a new file."""
         tracker = self._get_tracker(tmp_path)
@@ -95,7 +98,7 @@ class TestRecordFileIndexed:
     def _validate_test_recorded_file(
         self, tmp_path: Path, file_hash: str, tracker: FileChangeTracker
     ):
-        self._validate_test_recorded_file(tmp_path, file_hash, tracker)
+        self._mock_file_recording(tmp_path, file_hash, tracker)
         assert "src/test.py" in tracker.pending_changes
         assert tracker.file_hashes["src/test.py"] == file_hash
 
@@ -106,6 +109,23 @@ class TestRecordFileIndexed:
 
         self._mock_file_recording(tmp_path, "same_hash", tracker)
         assert "src/test.py" not in tracker.pending_changes
+        assert tracker._dirty is False
+
+    def test_unchanged_file_reindex_is_idempotent(self, tmp_path: Path):
+        """Test that re-indexing a file with the same hash doesn't update pending_changes."""
+        tracker = self._get_tracker(tmp_path)
+        tracker.file_hashes["src/test.py"] = "same_hash"
+
+        # Record the file twice with the same hash
+        self._mock_file_recording(tmp_path, "same_hash", tracker)
+        initial_pending_size = len(tracker.pending_changes)
+        assert initial_pending_size == 0, "Unchanged file should not be in pending_changes"
+
+        # Second call should not change pending_changes
+        self._mock_file_recording(tmp_path, "same_hash", tracker)
+        assert len(tracker.pending_changes) == initial_pending_size, (
+            "Re-indexing unchanged file should not modify pending_changes set"
+        )
         assert tracker._dirty is False
 
     def _mock_file_recording(self, tmp_path: Path, file_hash: str, tracker: FileChangeTracker):
@@ -289,7 +309,7 @@ class TestPersistence:
 
     def test_load_handles_corrupt_file(self, tmp_path: Path):
         """Test that load handles corrupt file gracefully."""
-        from codeweaver.common.utils.utils import backup_file_path
+        from codeweaver.core import backup_file_path
 
         # Create corrupt file
         persist_path = backup_file_path(project_path=tmp_path)

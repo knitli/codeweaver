@@ -71,6 +71,7 @@ class GoogleEmbeddingTasks(BaseEnum):
         "fact_verification",
     ]:
         """Returns the enum value."""
+        # normally we use .variable for string conversion, but it's more explicit this way (even if it's probably the same)
         return self.value
 
 

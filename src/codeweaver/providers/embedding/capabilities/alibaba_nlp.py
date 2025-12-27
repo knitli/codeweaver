@@ -8,12 +8,12 @@ from __future__ import annotations
 
 from typing import Literal
 
+from codeweaver.core.types.provider import Provider
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.capabilities.types import (
     EmbeddingCapabilitiesDict,
     PartialCapabilities,
 )
-from codeweaver.providers.provider import Provider
 
 
 type AlibabaNlpProvider = Literal[

@@ -11,7 +11,6 @@ import threading
 import time
 
 from abc import ABC, abstractmethod
-from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, TypedDict, cast, overload
 
@@ -43,21 +42,22 @@ except ImportError:
     # Fallback if httpcore or qdrant_client not available
     RETRYABLE_EXCEPTIONS = (ConnectionError, TimeoutError, OSError, httpx.TimeoutException)
 
-from codeweaver.agent_api.find_code.types import StrategizedQuery
 from codeweaver.config.providers import EmbeddingModelSettings, SparseEmbeddingModelSettings
 from codeweaver.core.chunks import CodeChunk
+from codeweaver.core.types.enum import BaseEnum
 from codeweaver.core.types.models import BasedModel
-from codeweaver.engine.search import Filter
+from codeweaver.core.types.provider import Provider
+from codeweaver.core.types.search import StrategizedQuery
 from codeweaver.exceptions import ProviderError
 from codeweaver.providers.embedding.capabilities.base import (
     EmbeddingModelCapabilities,
     SparseEmbeddingModelCapabilities,
 )
-from codeweaver.providers.provider import Provider
+from codeweaver.providers.vector_stores.search import Filter
 
 
 if TYPE_CHECKING:
-    from codeweaver.agent_api.find_code.results import SearchResult
+    from codeweaver.core.types.search import SearchResult
 
 
 logger = logging.getLogger(__name__)
@@ -85,7 +85,7 @@ class EmbeddingSettingsDict(TypedDict):
 _embedding_caps_lock = threading.Lock()
 
 
-class CircuitBreakerState(Enum):
+class CircuitBreakerState(BaseEnum):
     """Circuit breaker states for provider resilience."""
 
     CLOSED = "closed"  # Normal operation
@@ -280,7 +280,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
             raise ProviderError(
                 "Vector store client not initialized",
                 details={
-                    "provider": type(self)._provider.value
+                    "provider": type(self)._provider.variable
                     if hasattr(self, "_provider")
                     else "unknown",
                     "client_type": type(self).__name__,
@@ -459,7 +459,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
     @property
     def circuit_breaker_state(self) -> str:
         """Get current circuit breaker state for health monitoring."""
-        return self._circuit_state.value
+        return self._circuit_state.variable
 
     @abstractmethod
     async def list_collections(self) -> list[str] | None:
@@ -487,7 +487,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
         context: Any = None,
     ) -> list[SearchResult]:
         """Wrapper around search with retry logic and circuit breaker."""
-        from codeweaver.common.logging import log_to_client_or_fallback
+        from codeweaver.common._logging import log_to_client_or_fallback
 
         _ = self._check_circuit_breaker
 
@@ -500,7 +500,10 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
                 "debug",
                 {
                     "msg": "Vector store search successful",
-                    "extra": {"provider": type(self)._provider.value, "results_count": len(result)},
+                    "extra": {
+                        "provider": type(self)._provider.variable,
+                        "results_count": len(result),
+                    },
                 },
             )
         except RETRYABLE_EXCEPTIONS as e:
@@ -512,7 +515,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
                 {
                     "msg": "Vector store search failed",
                     "extra": {
-                        "provider": type(self)._provider.value,
+                        "provider": type(self)._provider.variable,
                         "error": str(e),
                         "error_type": type(e).__name__,
                         "attempt": self._failure_count,
@@ -528,7 +531,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
                 {
                     "msg": "Non-retryable error in vector store search",
                     "extra": {
-                        "provider": type(self)._provider.value,
+                        "provider": type(self)._provider.variable,
                         "error": str(e),
                         "error_type": type(e).__name__,
                     },
@@ -583,7 +586,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
         self, chunks: list[CodeChunk], context: Any = None, *, for_backup: bool = False
     ) -> None:
         """Wrapper around upsert with retry logic and circuit breaker."""
-        from codeweaver.common.logging import log_to_client_or_fallback
+        from codeweaver.common._logging import log_to_client_or_fallback
 
         _ = self._check_circuit_breaker
 
@@ -592,7 +595,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
             "debug",
             {
                 "msg": "Starting vector store upsert",
-                "extra": {"provider": type(self)._provider.value, "chunks_count": len(chunks)},
+                "extra": {"provider": type(self)._provider.variable, "chunks_count": len(chunks)},
             },
         )
 
@@ -605,7 +608,10 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
                 "debug",
                 {
                     "msg": "Vector store upsert successful",
-                    "extra": {"provider": type(self)._provider.value, "chunks_count": len(chunks)},
+                    "extra": {
+                        "provider": type(self)._provider.variable,
+                        "chunks_count": len(chunks),
+                    },
                 },
             )
         except RETRYABLE_EXCEPTIONS as e:
@@ -617,7 +623,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
                 {
                     "msg": "Vector store upsert failed",
                     "extra": {
-                        "provider": type(self)._provider.value,
+                        "provider": type(self)._provider.variable,
                         "chunks_count": len(chunks),
                         "error": str(e),
                         "error_type": type(e).__name__,
@@ -634,7 +640,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
                 {
                     "msg": "Non-retryable error in vector store upsert",
                     "extra": {
-                        "provider": type(self)._provider.value,
+                        "provider": type(self)._provider.variable,
                         "chunks_count": len(chunks),
                         "error": str(e),
                         "error_type": type(e).__name__,

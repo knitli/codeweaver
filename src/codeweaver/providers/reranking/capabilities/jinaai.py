@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 def get_jinaai_reranking_capabilities() -> Sequence[RerankingModelCapabilities]:
     """Get the JinaAI reranking model capabilities."""
-    from codeweaver.providers.provider import Provider
+    from codeweaver.core.types.provider import Provider
     from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 
     capabilities = {

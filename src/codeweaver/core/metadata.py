@@ -21,15 +21,12 @@ from typing import (
     NamedTuple,
     NotRequired,
     Required,
-    Self,
     TypedDict,
     cast,
 )
 
-from ast_grep_py import SgNode
-from pydantic import UUID7, ConfigDict, Field, PositiveFloat, SkipValidation
+from pydantic import UUID7, Field, PositiveFloat
 
-from codeweaver.common.utils import uuid7
 from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage, has_semantic_extension
 from codeweaver.core.types.aliases import (
     FileExt,
@@ -39,11 +36,10 @@ from codeweaver.core.types.aliases import (
     LiteralStringT,
 )
 from codeweaver.core.types.enum import BaseEnum
-from codeweaver.core.types.models import FROZEN_BASEDMODEL_CONFIG, BasedModel
 
 
 if TYPE_CHECKING:
-    from codeweaver.semantic.ast_grep import AstThing
+    pass
 
 
 # ------------------------------------------------
@@ -79,108 +75,6 @@ class ChunkSource(BaseEnum):
     FILE = "file"  # the whole file is the chunk
     SEMANTIC = "semantic"  # semantic chunking, e.g. from AST nodes
     EXTERNAL = "external"  # from internet or similar external sources, not from code files
-
-
-def _set_symbol(data: Any) -> str | None:
-    """Helper function to set the symbol field based on the primary_thing."""
-    from codeweaver.semantic.ast_grep import AstThing
-
-    if (
-        (thing := data.get("thing")) is not None
-        and isinstance(thing, AstThing)
-        and thing.symbol
-        and (0 < len(thing.symbol.strip()) < 20)
-    ):
-        return thing.symbol
-    return None
-
-
-class SemanticMetadata(BasedModel):
-    """Metadata associated with the semantics of a code chunk."""
-
-    model_config = FROZEN_BASEDMODEL_CONFIG | ConfigDict(
-        validate_assignment=True, arbitrary_types_allowed=True
-    )
-
-    language: Annotated[
-        SemanticSearchLanguage | str,
-        Field(description="""The programming language of the code chunk"""),
-    ]
-    thing: Any = None  # AstThing[SgNode] | None - using Any to avoid forward reference issues
-    positional_connections: Any = ()  # tuple[AstThing[SgNode], ...] - using Any to avoid forward reference issues
-    symbol: Annotated[
-        str | None,
-        Field(description="""The symbol represented by the node""", default_factory=_set_symbol),
-    ]
-    thing_id: UUID7 = uuid7()
-    parent_thing_id: UUID7 | None = None
-    is_partial_node: Annotated[
-        bool,
-        Field(
-            description="""Whether the node is a partial node. Partial nodes are created when the node is too large for the context window."""
-        ),
-    ] = False
-
-    def _telemetry_keys(self) -> None:
-        return None  # we'll exclude identifying info in the value types
-
-    def __getstate__(self) -> dict[str, Any]:
-        """Custom pickle support - exclude unpicklable AST nodes."""
-        state = self.__dict__.copy()
-        # Remove unpicklable fields (SgNode and AstThing objects)
-        state["thing"] = None
-        state["positional_connections"] = ()  # Clear AST node references
-        return state
-
-    def __setstate__(self, state: dict[str, Any]) -> None:
-        """Custom pickle support - restore state without AST nodes."""
-        self.__dict__.update(state)
-
-    def _serialize_for_cli(self) -> dict[str, Any]:
-        """Serialize the SemanticMetadata for CLI output."""
-        self_map = self.model_dump(
-            mode="python",
-            round_trip=True,
-            exclude_none=True,
-            # we can exclude language because the parent classes will include it
-            exclude={"model_config", "thing_id", "parent_thing_id", "language"},
-        )
-        return {
-            k: v.serialize_for_cli() if hasattr(v, "serialize_for_cli") else v
-            for k, v in self_map.items()
-        }
-
-    @classmethod
-    def from_parent_meta(
-        cls, child: AstThing[SgNode], parent_meta: SemanticMetadata, **overrides: Any
-    ) -> Self:
-        """Create a SemanticMetadata instance from a parent SemanticMetadata instance."""
-        return cls(
-            language=parent_meta.language,
-            thing=child,
-            positional_connections=tuple(child.positional_connections),
-            thing_id=child.thing_id or uuid7(),
-            parent_thing_id=parent_meta.thing_id,
-            **overrides,
-        )
-
-    @classmethod
-    def from_node(cls, thing: AstThing[SgNode] | SgNode, language: SemanticSearchLanguage) -> Self:
-        """Create a SemanticMetadata instance from an AST node."""
-        from codeweaver.semantic.ast_grep import AstThing
-
-        if isinstance(thing, SgNode):
-            thing = AstThing.from_sg_node(thing, language=language)
-        # Use model_construct to bypass validation since AstThing may not be fully defined yet
-        return cls.model_construct(
-            language=language or thing.language or "",
-            thing=thing,
-            positional_connections=tuple(thing.positional_connections),
-            thing_id=thing.thing_id,
-            symbol=thing.symbol,
-            parent_thing_id=thing.parent_thing_id,
-            is_partial_node=False,  # if we're creating from a full node, it's not partial
-        )
 
 
 class Metadata(TypedDict, total=False):
@@ -234,9 +128,7 @@ class Metadata(TypedDict, total=False):
             Field(description="""Tags associated with the code chunk, if applicable"""),
         ]
     ]
-    semantic_meta: NotRequired[
-        SkipValidation[SemanticMetadata | None]  # type: ignore[valid-type]
-    ]
+    semantic_meta: NotRequired[Annotated[Any | None, Field(description="""Semantic metadata""")]]
     context: Annotated[
         dict[str, Any] | None,
         Field(
@@ -324,10 +216,20 @@ class ExtLangPair(NamedTuple):
     Not all 'extensions' are actually file extensions, some are file names or special cases, like `Makefile` or `Dockerfile`.
     """
 
-    ext: FileExtensionT
-    """The file extension, including leading dot if it's a file extension. May also be a full file name."""
-
-    language: LanguageNameT | SemanticSearchLanguage | ConfigLanguage
+    ext: Annotated[
+        FileExtensionT,
+        Field(
+            description="The file extension, including leading dot if it's a file extension. May also be a full file name.",
+            title="File Extension",
+        ),
+    ]
+    language: Annotated[
+        LanguageNameT | SemanticSearchLanguage | ConfigLanguage,
+        Field(
+            description="The programming or config language associated with the file extension.",
+            title="Language",
+        ),
+    ]
     """The programming or config language associated with the file extension."""
 
     @property
@@ -581,8 +483,20 @@ def _categorize_language(
 class ExtKind(NamedTuple):
     """Represents a file extension and its associated kind."""
 
-    language: LanguageName | SemanticSearchLanguage | ConfigLanguage
-    kind: ChunkKind
+    language: Annotated[
+        LanguageName | SemanticSearchLanguage | ConfigLanguage,
+        Field(
+            description="The programming or config language associated with the file extension.",
+            title="Language",
+        ),
+    ]
+    kind: Annotated[
+        ChunkKind,
+        Field(
+            description="The kind of chunk represented by the file extension. An enum of chunk kinds.",
+            title="Chunk Kind",
+        ),
+    ]
 
     def __str__(self) -> str:
         """Return a string representation of the extension kind."""
@@ -697,7 +611,6 @@ __all__ = (
     "ChunkSource",
     "ExtKind",
     "Metadata",
-    "SemanticMetadata",
     "determine_ext_kind",
     "get_ext_lang_pair_for_file",
     "get_language_from_extension",

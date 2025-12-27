@@ -14,8 +14,7 @@ from functools import partial
 from typing import TYPE_CHECKING, Any
 
 from codeweaver.cli.ui.status_display import IndexingProgress, StatusDisplay
-from codeweaver.common.utils.utils import elapsed_time_to_human_readable
-from codeweaver.core.types.sentinel import Unset
+from codeweaver.core import elapsed_time_to_human_readable
 
 
 if TYPE_CHECKING:
@@ -121,20 +120,14 @@ async def start_watcher(
     state: CodeWeaverState, status_display: StatusDisplay
 ) -> asyncio.Task[None | int]:
     """Start the file watcher as an asynchronous task."""
-    import rignore
+    from codeweaver.di import get_container
+    from codeweaver.engine.watcher.watcher import FileWatcher
 
-    from codeweaver.common.utils import get_project_path
-    from codeweaver.engine.watcher import FileWatcher, IgnoreFilter
+    # Use DI container to resolve FileWatcher with all its dependencies
+    watcher = await get_container().resolve(FileWatcher)
 
-    watcher = await FileWatcher.create(
-        get_project_path()
-        if isinstance(state.settings.project_path, Unset)
-        else state.settings.project_path,
-        file_filter=await IgnoreFilter.from_settings_async(),
-        walker=rignore.Walker(**state.indexer._walker_settings),  # ty: ignore[invalid-argument-type]
-        indexer=state.indexer,
-        status_display=status_display,  # Pass status_display to watcher
-    )
+    # We may still need to set the status display if it's not handled by DI
+    watcher._status_display = status_display
 
     # Run watcher in a separate task so we can cancel it cleanly
     return asyncio.create_task(watcher.run())

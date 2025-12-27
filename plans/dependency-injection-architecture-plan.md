@@ -22,8 +22,9 @@ This document provides a comprehensive analysis of CodeWeaver's current dependen
 1. [Current State Analysis](#current-state-analysis)
 2. [Problem Statement](#problem-statement)
 3. [Design Goals](#design-goals)
-4. [Proposed Architecture](#proposed-architecture)
-5. [Implementation Phases](#implementation-phases)
+4. [Transport-Agnostic Guarantee](#transport-agnostic-guarantee)
+5. [Proposed Architecture](#proposed-architecture)
+6. [Implementation Phases](#implementation-phases)
 6. [Migration Strategy](#migration-strategy)
 7. [Risk Analysis](#risk-analysis)
 8. [Success Criteria](#success-criteria)
@@ -187,6 +188,21 @@ Our DI architecture must satisfy these constitutional principles:
 8. **Provider Agnostic**: Works uniformly across all provider types
 9. **Async First**: Native async/await support
 10. **Minimal Breaking Changes**: Phase in without disrupting alpha 1.
+
+---
+
+## Transport-Agnostic Guarantee
+
+CodeWeaver is designed to operate in multiple modes: as a background daemon (indexing, file watching), as a CLI tool, and as an MCP server. To ensure future extensibility and support agentic features outside of the MCP protocol, the DI architecture must remain strictly transport-agnostic.
+
+### Core Principles of Independence
+
+1. **Package Placement**: The DI infrastructure (Container, Depends) MUST reside in a foundation package (e.g., `codeweaver-core`) that has no dependency on `fastmcp` or server-specific code.
+2. **Lifecycle Independence**: Dependency resolution and provider instantiation MUST NOT require a running HTTP server or FastMCP context. The system must function identically when called from a CLI command or a background thread.
+3. **Dual-Mode Bootstrap**:
+   - **Daemon/CLI Mode**: The system initializes a global container to power the Indexer and Watcher.
+   - **Server Mode**: FastMCP endpoints resolve dependencies from the same underlying container. FastMCP "consumes" the DI system but does not "own" or define it.
+4. **Context Separation**: Request-scoped information (like FastMCP's `Context` for request IDs or client logging) should be passed as method arguments to resolved services, rather than being stored within the injected services themselves.
 
 ---
 

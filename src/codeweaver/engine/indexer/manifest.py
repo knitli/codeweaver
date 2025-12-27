@@ -23,7 +23,7 @@ from typing import TYPE_CHECKING, Annotated, Any, NotRequired, Required, TypedDi
 from pydantic import Field, NonNegativeInt, computed_field
 from pydantic_core import from_json
 
-from codeweaver.common.utils.utils import get_user_config_dir
+from codeweaver.core import get_user_config_dir
 from codeweaver.core.stores import BlakeHashKey
 from codeweaver.core.types.enum import AnonymityConversion
 from codeweaver.core.types.models import BasedModel

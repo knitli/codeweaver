@@ -7,14 +7,20 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 from typing import Annotated, Literal, NamedTuple, cast
 
 from pydantic import UUID7, Field, NonNegativeInt, PositiveInt
 
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.types.aliases import LiteralStringT, ModelName, ModelNameT
-from codeweaver.core.types.enum import BaseEnum
+from codeweaver.core.types.embeddings import (
+    EmbeddingKind,
+    QueryResult,
+    RawEmbeddingVectors,
+    SparseEmbedding,
+    StoredEmbeddingVectors,
+)
+from codeweaver.core.types.utils import generate_field_title
 from codeweaver.exceptions import ConfigurationError
 
 
@@ -22,56 +28,69 @@ class InvalidEmbeddingModelError(ConfigurationError):
     """Exception raised when an invalid embedding model is encountered."""
 
 
-type RawEmbeddingVectors = Sequence[float] | Sequence[int]
-type StoredEmbeddingVectors = tuple[float, ...] | tuple[int, ...]
-
-
-class SparseEmbedding(NamedTuple):
-    """NamedTuple representing sparse embedding with indices and values.
-
-    Sparse embeddings are represented as two parallel arrays:
-    - indices: positions in the vocabulary that have non-zero values
-    - values: weights/importance scores for those positions
-
-    This format is used by SPLADE, SparseEncoder and similar models.
-    """
-
-    indices: Annotated[Sequence[int], Field(description="Indices of non-zero embedding values")]
-    values: Annotated[
-        Sequence[float], Field(description="Values (weights) of non-zero embedding indices")
-    ]
-
-    def to_tuple(self) -> SparseEmbedding:
-        """Convert to a SparseEmbedding with tuples for indices and values."""
-        return self._replace(indices=tuple(self.indices), values=tuple(self.values))
-
-
-class EmbeddingKind(BaseEnum):
-    """Enum representing the kind of embedding."""
-
-    DENSE = "dense"
-    SPARSE = "sparse"
-
-
-class QueryResult(NamedTuple):
-    """NamedTuple representing the result of an embedding query."""
-
-    dense: RawEmbeddingVectors | None
-    sparse: SparseEmbedding | None
-
-
 class EmbeddingBatchInfo(NamedTuple):
     """NamedTuple representing metadata about a CodeChunk's embedding within a batch."""
 
-    batch_id: UUID7
-    batch_index: NonNegativeInt
-    kind: EmbeddingKind
-    chunk_id: UUID7
-    model: ModelNameT
-    embeddings: StoredEmbeddingVectors | SparseEmbedding
-    dimension: PositiveInt | Literal[0]
-    dtype: Literal["float32", "float16", "int8", "binary"] = "float32"
-    backup: bool = False
+    batch_id: Annotated[
+        UUID7,
+        Field(
+            description="Unique identifier for the batch",
+            field_title_generator=generate_field_title,
+        ),
+    ]
+    batch_index: Annotated[
+        NonNegativeInt,
+        Field(
+            description="Index of the chunk within the batch",
+            field_title_generator=generate_field_title,
+        ),
+    ]
+    kind: Annotated[
+        EmbeddingKind,
+        Field(
+            description="Kind of embedding (dense or sparse)",
+            field_title_generator=generate_field_title,
+        ),
+    ]
+    chunk_id: Annotated[
+        UUID7,
+        Field(
+            description="Unique identifier for the chunk",
+            field_title_generator=generate_field_title,
+        ),
+    ]
+    model: Annotated[
+        ModelNameT,
+        Field(
+            description="Name of the model used for embedding",
+            field_title_generator=generate_field_title,
+        ),
+    ]
+    embeddings: Annotated[
+        StoredEmbeddingVectors | SparseEmbedding,
+        Field(
+            description="The embedding vectors (dense or sparse)",
+            field_title_generator=generate_field_title,
+        ),
+    ]
+    dimension: Annotated[
+        PositiveInt | Literal[0],
+        Field(
+            description="Dimensionality of the embedding",
+            field_title_generator=generate_field_title,
+        ),
+    ]
+    dtype: Annotated[
+        Literal["float32", "float16", "int8", "binary"],
+        Field(description="Data type of the embedding", field_title_generator=generate_field_title),
+    ] = "float32"
+    backup: Annotated[
+        bool,
+        Field(
+            description="Whether this embedding is for the backup vector store",
+            field_title_generator=generate_field_title,
+        ),
+    ] = False
 
     @classmethod
     def create_dense(
@@ -155,22 +174,70 @@ class EmbeddingBatchInfo(NamedTuple):
 
 
 class EmbeddingModelInfo(NamedTuple):
-    """NamedTuple representing information about an embedding model."""
+    """NamedTuple representing information about configured embedding models."""
 
-    dense: ModelNameT | None
-    sparse: ModelNameT | None
-    backup_dense: ModelNameT | None
-    backup_sparse: ModelNameT | None
+    dense: Annotated[
+        ModelNameT | None,
+        Field(description="Dense embedding model name", field_title_generator=generate_field_title),
+    ]
+    sparse: Annotated[
+        ModelNameT | None,
+        Field(
+            description="Sparse embedding model name", field_title_generator=generate_field_title
+        ),
+    ]
+    backup_dense: Annotated[
+        ModelNameT | None,
+        Field(
+            description="Backup dense embedding model name",
+            field_title_generator=generate_field_title,
+        ),
+    ]
+    backup_sparse: Annotated[
+        ModelNameT | None,
+        Field(
+            description="Backup sparse embedding model name",
+            field_title_generator=generate_field_title,
+        ),
+    ]
 
 
 class ChunkEmbeddings(NamedTuple):
     """NamedTuple representing the embeddings associated with a specific CodeChunk."""
 
-    sparse: EmbeddingBatchInfo | None
-    dense: EmbeddingBatchInfo | None
-    chunk: CodeChunk
-    backup_dense: EmbeddingBatchInfo | None = None
-    backup_sparse: EmbeddingBatchInfo | None = None
+    sparse: Annotated[
+        EmbeddingBatchInfo | None,
+        Field(
+            description="Sparse embedding information", field_title_generator=generate_field_title
+        ),
+    ]
+    dense: Annotated[
+        EmbeddingBatchInfo | None,
+        Field(
+            description="Dense embedding information", field_title_generator=generate_field_title
+        ),
+    ]
+    chunk: Annotated[
+        CodeChunk,
+        Field(
+            description="The code chunk associated with the embeddings",
+            field_title_generator=generate_field_title,
+        ),
+    ]
+    backup_dense: Annotated[
+        EmbeddingBatchInfo | None,
+        Field(
+            description="Backup dense embedding information",
+            field_title_generator=generate_field_title,
+        ),
+    ] = None
+    backup_sparse: Annotated[
+        EmbeddingBatchInfo | None,
+        Field(
+            description="Backup sparse embedding information",
+            field_title_generator=generate_field_title,
+        ),
+    ] = None
 
     @property
     def is_complete(self) -> bool:
@@ -224,7 +291,7 @@ class ChunkEmbeddings(NamedTuple):
             )
         ):
             raise ValueError(
-                f"Embeddings are already set for {embedding_info.kind.value} in chunk {embedding_info.chunk_id}."
+                f"Embeddings are already set for {embedding_info.kind.variable} in chunk {embedding_info.chunk_id}."
             )
         if self.chunk.chunk_id != embedding_info.chunk_id:
             raise ValueError(

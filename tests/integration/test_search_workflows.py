@@ -551,7 +551,7 @@ async def test_search_strategy_reporting(test_project_path: Path, configured_pro
     """
     from codeweaver.agent_api.find_code import find_code
     from codeweaver.agent_api.find_code.intent import IntentType
-    from codeweaver.agent_api.find_code.types import SearchStrategy
+    from codeweaver.core.types.search import SearchStrategy
 
     response = await find_code(
         query="how does authentication work",

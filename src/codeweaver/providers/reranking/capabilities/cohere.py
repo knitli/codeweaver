@@ -10,9 +10,8 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, cast
 
+from codeweaver_tokenizers import get_tokenizer
 from pydantic import NonNegativeInt
-
-from codeweaver.tokenizers import get_tokenizer
 
 
 if TYPE_CHECKING:
@@ -47,7 +46,7 @@ def _get_common_capabilities() -> PartialRerankingCapabilitiesDict:
 
 def get_cohere_reranking_capabilities() -> tuple[RerankingModelCapabilities, ...]:
     """Get the capabilities of the Cohere reranking model."""
-    from codeweaver.providers.provider import Provider
+    from codeweaver.core.types.provider import Provider
     from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 
     base_capabilities = _get_common_capabilities()

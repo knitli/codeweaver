@@ -14,8 +14,8 @@ from collections.abc import Callable
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple, cast
 
-from codeweaver.common.utils.lazy_importer import LazyImport, lazy_import
-from codeweaver.providers.provider import Provider, ProviderKind
+from codeweaver.core import LazyImport, lazy_import
+from codeweaver.core.types.provider import PROVIDER_CAPABILITIES, Provider, ProviderKind
 
 
 if TYPE_CHECKING:
@@ -25,49 +25,6 @@ if TYPE_CHECKING:
 
 VECTOR_PROVIDER_CAPABILITIES: MappingProxyType[LiteralProvider, str] = cast(
     "MappingProxyType[LiteralProvider, str]", MappingProxyType({Provider.QDRANT: "placeholder"})
-)
-
-PROVIDER_CAPABILITIES: MappingProxyType[LiteralProvider, tuple[LiteralProviderKind, ...]] = cast(
-    "MappingProxyType[LiteralProvider, tuple[LiteralProviderKind, ...]]",
-    MappingProxyType({
-        Provider.ANTHROPIC: (ProviderKind.AGENT,),
-        Provider.AZURE: (ProviderKind.AGENT, ProviderKind.EMBEDDING),
-        Provider.BEDROCK: (ProviderKind.EMBEDDING, ProviderKind.RERANKING, ProviderKind.AGENT),
-        Provider.CEREBRAS: (ProviderKind.AGENT,),
-        Provider.COHERE: (ProviderKind.EMBEDDING, ProviderKind.RERANKING, ProviderKind.AGENT),
-        Provider.DEEPSEEK: (ProviderKind.AGENT,),
-        Provider.DUCKDUCKGO: (ProviderKind.DATA,),
-        Provider.FASTEMBED: (
-            ProviderKind.EMBEDDING,
-            ProviderKind.RERANKING,
-            ProviderKind.SPARSE_EMBEDDING,
-        ),
-        Provider.FIREWORKS: (ProviderKind.AGENT, ProviderKind.EMBEDDING),
-        Provider.GITHUB: (ProviderKind.AGENT, ProviderKind.EMBEDDING),
-        Provider.GOOGLE: (ProviderKind.AGENT, ProviderKind.EMBEDDING),
-        Provider.X_AI: (ProviderKind.AGENT,),
-        Provider.GROQ: (ProviderKind.AGENT, ProviderKind.EMBEDDING),
-        Provider.HEROKU: (ProviderKind.AGENT, ProviderKind.EMBEDDING),
-        Provider.HUGGINGFACE_INFERENCE: (ProviderKind.AGENT, ProviderKind.EMBEDDING),
-        Provider.LITELLM: (ProviderKind.AGENT,),
-        Provider.MISTRAL: (ProviderKind.AGENT, ProviderKind.EMBEDDING),
-        Provider.MEMORY: (ProviderKind.VECTOR_STORE,),
-        Provider.MOONSHOT: (ProviderKind.AGENT,),
-        Provider.OLLAMA: (ProviderKind.AGENT, ProviderKind.EMBEDDING),
-        Provider.OPENAI: (ProviderKind.AGENT, ProviderKind.EMBEDDING),
-        Provider.OPENROUTER: (ProviderKind.AGENT,),
-        Provider.PERPLEXITY: (ProviderKind.AGENT,),
-        Provider.QDRANT: (ProviderKind.VECTOR_STORE,),
-        Provider.SENTENCE_TRANSFORMERS: (
-            ProviderKind.EMBEDDING,
-            ProviderKind.RERANKING,
-            ProviderKind.SPARSE_EMBEDDING,
-        ),
-        Provider.TAVILY: (ProviderKind.DATA,),
-        Provider.TOGETHER: (ProviderKind.AGENT, ProviderKind.EMBEDDING),
-        Provider.VERCEL: (ProviderKind.AGENT, ProviderKind.EMBEDDING),
-        Provider.VOYAGE: (ProviderKind.EMBEDDING, ProviderKind.RERANKING),
-    }),
 )
 
 
@@ -103,14 +60,12 @@ CLIENT_MAP: MappingProxyType[LiteralProvider, tuple[Client, ...]] = cast(
             ),
         ),
         Provider.MEMORY: (
-            (
-                Client(
-                    provider=Provider.QDRANT,
-                    kind=ProviderKind.VECTOR_STORE,
-                    client=lazy_import("qdrant_client", "AsyncQdrantClient"),
-                    provider_class=lazy_import(
-                        "codeweaver.providers.vector_stores.inmemory", "MemoryVectorStoreProvider"
-                    ),
+            Client(
+                provider=Provider.MEMORY,  # ty:ignore[invalid-argument-type]
+                kind=ProviderKind.VECTOR_STORE,
+                client=lazy_import("qdrant_client", "AsyncQdrantClient"),
+                provider_class=lazy_import(
+                    "codeweaver.providers.vector_stores.inmemory", "MemoryVectorStoreProvider"
                 ),
             ),
         ),
@@ -454,19 +409,9 @@ CLIENT_MAP: MappingProxyType[LiteralProvider, tuple[Client, ...]] = cast(
 )
 
 
-def get_provider_kinds(provider: LiteralProvider) -> tuple[LiteralProviderKind, ...]:
-    """Get capabilities for a provider."""
-    return PROVIDER_CAPABILITIES.get(provider, (ProviderKind.DATA,))
-
-
 def get_client_map(provider: LiteralProvider) -> tuple[Client, ...]:
     """Get the full client map as a flat tuple."""
     return CLIENT_MAP.get(provider, ())
 
 
-__all__ = (
-    "CLIENT_MAP",
-    "PROVIDER_CAPABILITIES",
-    "VECTOR_PROVIDER_CAPABILITIES",
-    "get_provider_kinds",
-)
+__all__ = ("CLIENT_MAP", "PROVIDER_CAPABILITIES", "VECTOR_PROVIDER_CAPABILITIES")

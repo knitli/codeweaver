@@ -25,8 +25,6 @@ from typing import Literal, overload
 
 from pydantic import AnyHttpUrl
 
-from codeweaver.common.utils.git import get_project_path
-from codeweaver.common.utils.utils import get_user_config_dir
 from codeweaver.config.providers import (
     AgentModelSettings,
     AgentProviderSettings,
@@ -42,6 +40,7 @@ from codeweaver.config.providers import (
     SparseEmbeddingProviderSettings,
     VectorStoreProviderSettings,
 )
+from codeweaver.core import get_project_path, get_user_config_dir
 from codeweaver.core.stores import get_blake_hash
 
 
@@ -126,7 +125,7 @@ def _recommended_default(
 
     This profile leans towards high-quality providers, but without excessive cost or setup. It uses Voyage AI for embeddings and rerankings, which has a generous free tier and class-leading performance. Qdrant can be deployed locally for free or as a cloud service with a generous free tier. Anthropic Claude Haiku is used for agents, which has a strong balance of cost and performance.
     """
-    from codeweaver.providers.provider import Provider
+    from codeweaver.core.types.provider import Provider
 
     return ProviderSettingsDict(
         embedding=(
@@ -141,6 +140,7 @@ def _recommended_default(
                 provider=Provider.FASTEMBED,
                 enabled=True,
                 # Splade is a strong sparse embedding model that works well for code search
+                # Splade models are slow to generate embeddings, but lightning fast at inference time
                 # This version comes without license complications associated with `naver`'s versions
                 # There is a v2 available, but not yet supported by FastEmbed
                 model_settings=SparseEmbeddingModelSettings(model="prithivida/Splade_PP_en_v1"),
@@ -180,7 +180,7 @@ def _quickstart_default(
 
     This profile uses free-tier or open-source providers to allow for immediate use without cost.
     """
-    from codeweaver.providers.provider import Provider
+    from codeweaver.core.types.provider import Provider
 
     return ProviderSettingsDict(
         embedding=(
@@ -239,11 +239,29 @@ def _quickstart_default(
 def _backup_profile() -> ProviderSettingsDict:
     """Backup profile for local development with backup vector store.
 
-    We choose the lightest models available for either FastEmbed or Sentence Transformers, depending on availability.
-    """
-    from codeweaver.providers.provider import Provider
+    Exposed through the CLI as the "testing" profile. We choose the lightest models available for either FastEmbed or Sentence Transformers, depending on availability.
 
-    backup_settings = _quickstart_default("local")
+    Together this set of models can run entirely locally, with very low resource usage, making them ideal for development, testing, and as CodeWeaver's fallback profile.
+    """
+    from codeweaver.core.types.provider import Provider
+
+    # NOTE: qdrant/bm25 doesn't require FASTEMBED -- Fastembed can generate with it, but so can the qdrant_client itself
+    # We lose true sparse embeddings with bm25, but it's a good lightweight backup option
+    backup_settings = _quickstart_default("local") | {
+        "sparse_embedding": SparseEmbeddingProviderSettings(
+            provider=Provider.FASTEMBED,
+            enabled=True,
+            model_settings=SparseEmbeddingModelSettings(model="qdrant/bm25"),
+        ),
+        # For the dense embeddings, we essentially choose the lightest available model
+        # potion-base-8M is a static embedding model, which again loses some quality, but is extremely light weight and virtually instant
+        "embedding": EmbeddingProviderSettings(
+            provider=Provider.SENTENCE_TRANSFORMERS if HAS_ST else Provider.FASTEMBED,
+            model_settings=EmbeddingModelSettings(
+                model="minishlab/potion-base-8M" if HAS_ST else "BAAI/bge-small-en-v1.5"
+            ),
+        ),
+    }
 
     backup_settings["reranking"] = (
         RerankingProviderSettings(
@@ -252,7 +270,7 @@ def _backup_profile() -> ProviderSettingsDict:
             model_settings=RerankingModelSettings(
                 model="cross-encoder/ms-marco-TinyBERT-L2-v2"
                 if HAS_ST
-                else "Xenova/ms-marco-MiniLM-L-6-v2"
+                else "jinaai/jina-reranker-v1-tiny-en"
             ),
         ),
     )

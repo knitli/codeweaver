@@ -30,9 +30,25 @@ import ast
 import importlib
 import re
 import sys
+import warnings
 
 from pathlib import Path
 from typing import Literal, NamedTuple
+
+
+# Suppress Pydantic and OpenTelemetry warnings before imports
+# These warnings come from dependencies and are cosmetic
+warnings.filterwarnings(
+    "ignore",
+    message=r"The '(exclude|repr|frozen)' attribute.*was provided to the `Field\(\)` function",
+    category=UserWarning,
+    module=r"pydantic\._internal\._generate_schema",
+)
+warnings.filterwarnings(
+    "ignore",
+    message=r"You should use `.*` instead\. Deprecated since version",
+    category=DeprecationWarning,
+)
 
 import botocore.exceptions
 
@@ -40,7 +56,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.rule import Rule
 
-from codeweaver.cli.utils import format_file_link, is_tty
+from codeweaver.core import format_file_link, is_tty
 
 
 console = Console(markup=True, emoji=True)
@@ -68,9 +84,9 @@ IS_EXCEPTION = (
     "codeweaver.__version__",
     "codeweaver.common.CODEWEAVER_PREFIX",
     "codeweaver.agent_api.get_user_agent",
-    "codeweaver.common.utils.LazyImport",
-    "codeweaver.common.utils.create_lazy_getattr",
-    "codeweaver.common.utils.lazy_import",
+    "codeweaver.core.utils.create_lazy_getattr",
+    "codeweaver.core.utils.LazyImport",
+    "codeweaver.core.utils.lazy_import",
     "codeweaver.mcp.middleware.default_middleware_for_transport",
     "codeweaver.mcp.middleware.McpMiddleware",
     "codeweaver.providers.agent.AgentProfile",

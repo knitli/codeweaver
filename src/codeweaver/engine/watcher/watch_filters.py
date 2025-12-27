@@ -196,6 +196,8 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
                 return self._walkable(p, is_new=True, delete=False)
             case Change.modified:
                 return self._walkable(p, is_new=False, delete=False)
+            case _:
+                return False
 
     def _walkable(self, path: Path, *, is_new: bool = False, delete: bool = False) -> bool:
         """Check if a path is walkable (not ignored) using the rignore walker.
@@ -244,9 +246,9 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
         Returns:
             Configured IgnoreFilter instance (may need async initialization)
         """
-        from codeweaver.common.utils.git import get_project_path
         from codeweaver.config.indexer import DefaultIndexerSettings, IndexerSettings
         from codeweaver.config.settings import get_settings_map
+        from codeweaver.core import get_project_path
 
         settings = settings or get_settings_map()
         index_settings = (
@@ -289,9 +291,9 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
         Returns:
             Fully initialized IgnoreFilter instance
         """
-        from codeweaver.common.utils.git import get_project_path
         from codeweaver.config.indexer import DefaultIndexerSettings, IndexerSettings
         from codeweaver.config.settings import get_settings_map
+        from codeweaver.core import get_project_path
 
         settings = settings or get_settings_map()
         index_settings = (

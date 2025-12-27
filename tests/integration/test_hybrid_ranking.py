@@ -12,10 +12,10 @@ from pathlib import Path
 
 import pytest
 
-from codeweaver.agent_api.find_code.types import SearchStrategy, StrategizedQuery
-from codeweaver.common.utils.utils import uuid7
 from codeweaver.config.providers import QdrantConfig
+from codeweaver.core import uuid7
 from codeweaver.core.language import SemanticSearchLanguage as Language
+from codeweaver.core.types.search import SearchStrategy, StrategizedQuery
 from codeweaver.providers.vector_stores.qdrant import QdrantVectorStoreProvider
 
 # sourcery skip: dont-import-test-modules

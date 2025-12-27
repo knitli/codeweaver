@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Annotated, Any, Literal, Self
 from pydantic import ConfigDict, Field, PositiveFloat, PositiveInt
 
 from codeweaver.core.types.models import BASEDMODEL_CONFIG, BasedModel
-from codeweaver.providers.provider import Provider
+from codeweaver.core.types.provider import Provider
 
 
 if TYPE_CHECKING:
@@ -222,11 +222,12 @@ class SparseEmbeddingModelCapabilities(BasedModel):
 def get_sparse_caps() -> tuple[SparseEmbeddingModelCapabilities, ...]:
     """Get sparse embedding model capabilities."""
     caps = {  # type: ignore
-        # Qdrant's bm25 model has no tokenizer, so we'll just use the same tokenizer as their other sparse model
+        # Qdrant's bm25 model has no tokenizer because it isn't actually a learned model
         "Qdrant/bm25": {
             "name": "Qdrant/bm25",
             "multilingual": True,
             "tokenizer_model": "Qdrant/all_miniLM_L6_v2_with_attentions",
+            "_available": True,
         },
         "Qdrant/bm42-all-minilm-l6-v2-attentions": {
             "name": "Qdrant/bm42-all-minilm-l6-v2-attentions",

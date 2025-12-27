@@ -34,7 +34,7 @@ def mock_governor():
 @pytest.fixture
 def mock_discovered_file():
     """Create mock DiscoveredFile."""
-    from codeweaver.common.utils import uuid7
+    from codeweaver.core import uuid7
 
     def _make_file(path_str):
         path = Path(path_str)
@@ -97,11 +97,12 @@ def test_e2e_degradation_chain(mock_governor, mock_discovered_file):
     selector = ChunkerSelector(mock_governor)
     file = mock_discovered_file(str(fixture_path))
 
-    # Should gracefully degrade and still produce chunks
-    # (implementation will add fallback logic)
-    with pytest.raises(Exception):  # Will fail until fallback implemented
-        chunker = selector.select_for_file(file)
-        chunker.chunk(content, file=file)
+    # Should gracefully degrade and still produce chunks via fallback
+    chunker = selector.select_for_file(file)
+    chunks = chunker.chunk(content, file=file)
+
+    # Should produce at least some chunks through degradation
+    assert len(chunks) > 0, "Degradation should produce chunks"
 
 
 # =============================================================================

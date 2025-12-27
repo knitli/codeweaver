@@ -14,7 +14,7 @@ from pydantic import PositiveInt
 
 
 if TYPE_CHECKING:
-    from codeweaver.providers.provider import Provider
+    from codeweaver.core.types.provider import Provider
 
 type PartialRerankingCapabilitiesDict = dict[
     Literal[

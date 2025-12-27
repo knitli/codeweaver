@@ -273,7 +273,7 @@ class TestCodeMatchSchema:
         """Verify span tuple validation (2 elements, start <= end, >= 1)."""
         from pathlib import Path
 
-        from codeweaver.common.utils.utils import uuid7
+        from codeweaver.core import uuid7
         from codeweaver.core.chunks import CodeChunk
         from codeweaver.core.discovery import DiscoveredFile
         from codeweaver.core.metadata import ExtKind
@@ -399,7 +399,7 @@ class TestContractExamples:
         """Verify response can represent the simple search example from contract."""
         from pathlib import Path
 
-        from codeweaver.common.utils.utils import uuid7
+        from codeweaver.core import uuid7
         from codeweaver.core.chunks import CodeChunk
         from codeweaver.core.discovery import DiscoveredFile
         from codeweaver.core.metadata import ExtKind

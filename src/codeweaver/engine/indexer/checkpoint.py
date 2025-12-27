@@ -24,11 +24,7 @@ from uuid import UUID
 
 from pydantic import UUID7, DirectoryPath, Field, NonNegativeInt
 from pydantic_core import from_json, to_json
-from uuid_extensions import uuid7
 
-from codeweaver.common.utils.git import get_project_path
-from codeweaver.common.utils.lazy_importer import lazy_import
-from codeweaver.common.utils.utils import get_user_config_dir
 from codeweaver.config.indexer import IndexerSettings
 from codeweaver.config.providers import (
     EmbeddingProviderSettings,
@@ -36,10 +32,18 @@ from codeweaver.config.providers import (
     SparseEmbeddingProviderSettings,
     VectorStoreProviderSettings,
 )
-from codeweaver.core.stores import BlakeHashKey, BlakeKey, get_blake_hash
-from codeweaver.core.types.dictview import DictView
-from codeweaver.core.types.models import BasedModel
-from codeweaver.core.types.sentinel import Unset
+from codeweaver.core import (
+    BasedModel,
+    BlakeHashKey,
+    BlakeKey,
+    DictView,
+    Unset,
+    get_blake_hash,
+    get_project_path,
+    get_user_config_dir,
+    lazy_import,
+    uuid7,
+)
 
 
 if TYPE_CHECKING:
@@ -77,7 +81,6 @@ def _get_settings_map() -> DictView[CheckpointSettingsFingerprint]:
 
     We don't want to cache this -- we want the latest settings each time. DictView always reflects changes, but we're creating a new instance here.
     """
-    from codeweaver.common.utils.git import get_project_path
     from codeweaver.config.indexer import DefaultIndexerSettings
     from codeweaver.config.providers import (
         DefaultEmbeddingProviderSettings,
@@ -86,6 +89,7 @@ def _get_settings_map() -> DictView[CheckpointSettingsFingerprint]:
         DefaultVectorStoreProviderSettings,
     )
     from codeweaver.config.settings import get_settings
+    from codeweaver.core import get_project_path
 
     settings = get_settings()
     if isinstance(settings.provider, Unset) or settings.provider is None:

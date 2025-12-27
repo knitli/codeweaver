@@ -5,6 +5,7 @@
 
 """Tests for vector store failover functionality."""
 
+import asyncio
 import json
 
 from pathlib import Path
@@ -53,6 +54,9 @@ class MockVectorStoreProvider:
         self._circuit_state = circuit_state
         self._client = MagicMock()
         self._initialized = False
+        # Add config attribute to match real provider interface
+        self.config = MagicMock()
+        self.config.backup_sync_interval = 300  # 5 minutes default
 
     @property
     def circuit_breaker_state(self) -> CircuitBreakerState:
@@ -114,26 +118,138 @@ class TestBackupSyncPeriodically:
     @pytest.mark.asyncio
     async def test_sync_skipped_when_no_primary(self, tmp_path: Path):
         """Test sync is skipped when primary store is None."""
-        # Skip this test - relies on async timing which is flaky
-        pytest.skip("Timing-dependent test - integration test instead")
+        manager = VectorStoreFailoverManager(backup_enabled=True, backup_sync_interval=30)
+
+        # Initialize without primary store (primary is None)
+        manager._primary_store = None
+        manager._project_path = tmp_path
+
+        # Mock _sync_primary_to_backup to track if it's called
+        sync_called = asyncio.Event()
+
+        async def mock_sync():
+            sync_called.set()
+
+        with patch.object(manager, "_sync_primary_to_backup", side_effect=mock_sync):
+            # Override the sync interval for testing
+            manager.backup_sync_interval = 0.1
+
+            # Start the sync task
+            manager._backup_sync_task = asyncio.create_task(manager._sync_backup_periodically())
+
+            # Wait for sync interval with timeout
+            try:
+                await asyncio.wait_for(sync_called.wait(), timeout=0.5)
+            except TimeoutError:
+                pass  # Expected - sync should not be called
+
+            # Cleanup
+            manager._backup_sync_task.cancel()
+            try:
+                await manager._backup_sync_task
+            except asyncio.CancelledError:
+                pass
+
+            # Verify sync was not called due to missing primary
+            assert not sync_called.is_set()
 
     @pytest.mark.asyncio
     async def test_sync_skipped_during_failover(self, tmp_path: Path):
         """Test sync is skipped when in failover mode."""
-        # Skip this test - relies on async timing which is flaky
-        pytest.skip("Timing-dependent test - integration test instead")
+        primary = MockVectorStoreProvider()
+        manager = VectorStoreFailoverManager(backup_enabled=True, backup_sync_interval=30)
+
+        await manager.initialize(primary, tmp_path)
+
+        # Set failover mode active
+        manager._failover_active = True
+
+        # Mock _sync_primary_to_backup to track if it's called
+        sync_called = asyncio.Event()
+
+        async def mock_sync():
+            sync_called.set()
+
+        with patch.object(manager, "_sync_primary_to_backup", side_effect=mock_sync):
+            # Override the sync interval for testing
+            manager.backup_sync_interval = 0.1
+
+            # Wait for sync interval with timeout
+            try:
+                await asyncio.wait_for(sync_called.wait(), timeout=0.5)
+            except TimeoutError:
+                pass  # Expected - sync should not be called
+
+            # Cleanup
+            await manager.shutdown()
+
+            # Verify sync was not called due to failover mode
+            assert not sync_called.is_set()
 
     @pytest.mark.asyncio
     async def test_sync_skipped_when_primary_unhealthy(self, tmp_path: Path):
         """Test sync is skipped when circuit breaker is open."""
-        # Skip this test - relies on async timing which is flaky
-        pytest.skip("Timing-dependent test - integration test instead")
+        # Create primary with open circuit breaker
+        primary = MockVectorStoreProvider(circuit_state=CircuitBreakerState.OPEN)
+        manager = VectorStoreFailoverManager(backup_enabled=True, backup_sync_interval=30)
+
+        await manager.initialize(primary, tmp_path)
+
+        # Mock _sync_primary_to_backup to track if it's called
+        sync_called = asyncio.Event()
+
+        async def mock_sync():
+            sync_called.set()
+
+        with patch.object(manager, "_sync_primary_to_backup", side_effect=mock_sync):
+            # Override the sync interval for testing
+            manager.backup_sync_interval = 0.1
+
+            # Wait for sync interval with timeout
+            try:
+                await asyncio.wait_for(sync_called.wait(), timeout=0.5)
+            except TimeoutError:
+                pass  # Expected - sync should not be called
+
+            # Cleanup
+            await manager.shutdown()
+
+            # Verify sync was not called due to open circuit breaker
+            assert not sync_called.is_set()
 
     @pytest.mark.asyncio
     async def test_sync_executes_when_conditions_met(self, tmp_path: Path):
         """Test sync executes when all conditions are met."""
-        # Skip this test - relies on async timing which is flaky
-        pytest.skip("Timing-dependent test - integration test instead")
+        primary = MockVectorStoreProvider(circuit_state=CircuitBreakerState.CLOSED)
+        manager = VectorStoreFailoverManager(backup_enabled=True, backup_sync_interval=30)
+
+        await manager.initialize(primary, tmp_path)
+
+        # Ensure failover is NOT active
+        manager._failover_active = False
+
+        # Use an event to signal when sync is called
+        sync_event = asyncio.Event()
+
+        async def mock_sync():
+            sync_event.set()
+
+        with patch.object(manager, "_sync_primary_to_backup", side_effect=mock_sync):
+            # Override the sync interval for testing
+            manager.backup_sync_interval = 0.1
+
+            # Wait for sync to execute (with timeout)
+            try:
+                await asyncio.wait_for(sync_event.wait(), timeout=0.5)
+                sync_executed = True
+            except TimeoutError:
+                sync_executed = False
+
+            # Cleanup
+            await manager.shutdown()
+
+            # Verify sync was executed when all conditions were met
+            assert sync_executed
 
 
 class TestSyncPrimaryToBackup:
@@ -486,10 +602,7 @@ class TestSyncBackToPrimary:
         from datetime import UTC, datetime
         from pathlib import Path as PathlibPath
 
-        from codeweaver.common.utils import uuid7
-        from codeweaver.core.chunks import CodeChunk
-        from codeweaver.core.metadata import Metadata
-        from codeweaver.core.spans import Span
+        from codeweaver.core import CodeChunk, Metadata, Span, uuid7
         from codeweaver.providers.vector_stores.metadata import HybridVectorPayload
 
         chunk = CodeChunk(

@@ -22,7 +22,7 @@ from codeweaver.core.types.models import FROZEN_BASEDMODEL_CONFIG, BasedModel
 
 
 if TYPE_CHECKING:
-    from codeweaver.engine.chunker.delimiters import DelimiterPattern, LanguageFamily
+    from codeweaver.core.types.delimiter import DelimiterPattern, LanguageFamily
 
 
 logger = logging.getLogger(__name__)
@@ -256,8 +256,8 @@ class ChunkerSettings(BasedModel):
         to resolve forward references to LanguageFamily and DelimiterPattern types
         used in CustomLanguage and CustomDelimiter models.
         """
-        # Import the actual types now (after module initialization)
-        from codeweaver.engine.chunker.delimiters import DelimiterPattern, LanguageFamily
+        # Import the actual types now from core
+        from codeweaver.core.types.delimiter import DelimiterPattern, LanguageFamily
 
         # Pass the types to model_rebuild so Pydantic can resolve string annotations
         namespace = {"DelimiterPattern": DelimiterPattern, "LanguageFamily": LanguageFamily}

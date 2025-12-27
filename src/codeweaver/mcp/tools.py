@@ -17,8 +17,7 @@ from fastmcp.tools import Tool
 from mcp.types import ToolAnnotations
 
 from codeweaver.agent_api.find_code.types import FindCodeResponseSummary
-from codeweaver.common.utils.lazy_importer import lazy_import
-from codeweaver.core.types import DictView
+from codeweaver.core import DictView, lazy_import
 from codeweaver.mcp.types import ToolRegistrationDict
 from codeweaver.mcp.user_agent import find_code_tool
 
@@ -52,7 +51,6 @@ def get_bulk_tool(server: FastMCP[Any]) -> Tool:
             description=registration_info.get("description", "Bulk tool caller"),
             tags={"bulk", *CONTEXT_AGENT_TAGS},
             annotations=registration_info.get("annotations", ToolAnnotations()),
-            exclude_args=registration_info.get("exclude_args", []),
             serializer=registration_info.get("serializer"),
             output_schema=registration_info.get("output_schema", None),
             meta=registration_info.get("meta", {}),
@@ -78,7 +76,7 @@ TOOL_DEFINITIONS: DictView[ToolCollectionDict] = DictView(
         **Optional Arguments:**
             - intent: Specify an intent to help narrow down the search results. Choose from: `understand`, `implement`, `debug`, `optimize`, `test`, `configure`, `document`.
             - token_limit: Set a maximum number of tokens to return (default is 30000).
-            - focus_languages: Filter results by programming language(s). A list of languages using their common names (like "python", "javascript", etc.). CodeWeaver supports over 160 programming languages.
+            - focus_languages: Filter results by programming language(s). A list of languages using their common names (like "python", "javascript", etc.). CodeWeaver supports over 166 programming languages.
 
         RETURNS:
             A detailed summary of ranked matches and metadata. Including:
@@ -86,14 +84,13 @@ TOOL_DEFINITIONS: DictView[ToolCollectionDict] = DictView(
                 - content: An object representing the code or documentation snippet or its syntax tree representation. These objects carry substantial metadata about the snippet depending on how it was retrieved. Metadata may include: language, size, importance, symbol, semantic role and relationships to other code snippets and symbols.
                 - file: The file and associated metadata where the snippet was found.
                 - span: A span object indicating the exact location of the snippet within the file.
-                - relevance_score: A numerical score indicating how relevant the snippet is to the query, normalized between 0 and 1.
+                - relevance_score: A numerical score indicating how relevant the snippet is to the query, normalized between 0 and 1. If all results have the same score, this is because they are ranked using reciprocal rank fusion and their scores are not directly comparable.
 
         """),
                 enabled=True,
-                exclude_args=["context"],
                 tags={"user", "external"},
                 annotations=ToolAnnotations(
-                    title="Find Code Tool",
+                    title="CodeWeaver Find Code",
                     readOnlyHint=True,
                     destructiveHint=False,
                     idempotentHint=True,

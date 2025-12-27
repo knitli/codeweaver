@@ -284,7 +284,7 @@ pytest -m "integration and real_providers"
 ### Tests fail with "Model not found"
 ```bash
 # Download models manually
-python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('ibm-granite/granite-embedding-english-r2')"
+python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('ibm-granite/granite-embedding-30m-english')"
 ```
 
 ### Tests fail with dimension mismatch

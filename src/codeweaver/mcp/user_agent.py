@@ -21,7 +21,7 @@ from starlette.requests import Request
 from codeweaver.agent_api.find_code import find_code
 from codeweaver.agent_api.find_code.intent import IntentType
 from codeweaver.agent_api.find_code.types import FindCodeResponseSummary
-from codeweaver.common.utils import lazy_import
+from codeweaver.core import lazy_import
 from codeweaver.core.language import SemanticSearchLanguage
 
 
@@ -50,7 +50,7 @@ async def find_code_tool(
         intent: Optional search intent. One of `understand`, `implement`, `debug`, `optimize`, `test`, `configure`, `document`
         token_limit: Maximum tokens to return (default: 30000)
         focus_languages: Optional language filter
-        context: MCP context for request tracking
+        context: MCP context for request tracking if available
 
     Returns:
         FindCodeResponseSummary with ranked matches and metadata

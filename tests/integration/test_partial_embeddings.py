@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from codeweaver.common.utils.utils import uuid7
+from codeweaver.core import uuid7
 from codeweaver.core.language import SemanticSearchLanguage as Language
 from codeweaver.providers.vector_stores.qdrant import QdrantVectorStoreProvider
 from tests.conftest import create_test_chunk_with_embeddings
@@ -61,7 +61,7 @@ async def test_partial_embeddings(qdrant_test_manager):
     await provider.upsert([chunk])
 
     # Verify chunk is searchable with sparse vector
-    from codeweaver.agent_api.find_code.types import SearchStrategy, StrategizedQuery
+    from codeweaver.core.types.search import SearchStrategy, StrategizedQuery
     from codeweaver.providers.embedding.types import SparseEmbedding
 
     # Use same sparse embedding for search to ensure we find the chunk

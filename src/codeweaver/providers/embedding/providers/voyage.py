@@ -13,10 +13,10 @@ from pydantic import PrivateAttr, SkipValidation
 from voyageai.object.embeddings import EmbeddingsObject
 
 from codeweaver.core.chunks import CodeChunk
+from codeweaver.core.types.provider import Provider
 from codeweaver.exceptions import ConfigurationError
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.providers import EmbeddingProvider
-from codeweaver.providers.provider import Provider
 
 
 try:

@@ -22,8 +22,9 @@ from typing import TYPE_CHECKING, Any, Protocol, Self
 
 if TYPE_CHECKING:
     from codeweaver.agent_api.find_code.intent import IntentType
-    from codeweaver.agent_api.find_code.types import FindCodeResponseSummary, SearchStrategy
+    from codeweaver.agent_api.find_code.types import FindCodeResponseSummary
     from codeweaver.common.statistics import SessionStatistics
+    from codeweaver.core.types.search import SearchStrategy
 
 
 class TelemetryEvent(Protocol):
@@ -266,10 +267,12 @@ class SearchEvent:
 
         properties: dict[str, Any] = {
             # Core search info
-            "intent": self._intent_type.value
-            if hasattr(self._intent_type, "value")
+            "intent": self._intent_type.variable
+            if hasattr(self._intent_type, "variable")
             else str(self._intent_type),
-            "strategies": [s.value if hasattr(s, "value") else str(s) for s in self._strategies],
+            "strategies": [
+                s.variable if hasattr(s, "variable") else str(s) for s in self._strategies
+            ],
             "search_mode": base_data.get("search_mode"),
             # Timing
             "execution_time_ms": round(self._execution_time_ms, 2),
@@ -316,8 +319,8 @@ class SearchEvent:
             match_types: dict[str, int] = {}
             for match in matches_data:
                 mt = match.get("match_type", "unknown")
-                if hasattr(mt, "value"):
-                    mt = mt.value
+                if hasattr(mt, "variable"):
+                    mt = mt.variable
                 match_types[str(mt)] = match_types.get(str(mt), 0) + 1
             properties["match_types"] = match_types
 

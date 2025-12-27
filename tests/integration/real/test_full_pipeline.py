@@ -18,16 +18,12 @@ Performance: ~5-15s per test due to full indexing + search.
 
 from __future__ import annotations
 
+import os
+
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-
-
-# Skip all tests in this module if models can't be downloaded
-pytestmark = pytest.mark.skip(
-    reason="Real integration tests require model downloads - run manually with network access"
-)
 
 
 # =============================================================================
@@ -36,25 +32,39 @@ pytestmark = pytest.mark.skip(
 
 
 @pytest.fixture
-async def indexed_test_project(known_test_codebase, real_provider_registry):
+async def indexed_test_project(known_test_codebase, actual_vector_store):
     """Create pre-indexed test project with configured settings.
 
     This fixture:
     1. Configures CodeWeaverSettings with project path
-    2. Patches the provider registry with real providers
-    3. Creates and initializes the Indexer
-    4. Indexes the test codebase
+    2. Uses codeweaver.test.toml config (auto-loaded via CODEWEAVER_TEST_MODE="true")
+    3. Creates and initializes the Indexer with shared vector store
+    4. Indexes the test codebase (~5 files, ~15-20 chunks)
     5. Yields the project path for tests
+
+    **Performance Note:** This fixture performs REAL indexing with actual embeddings,
+    which can take 2-5 minutes on CPU. The lightweight 30M model is used for speed.
+    Ensure pytest timeout is set to at least 10 minutes for tests using this fixture.
 
     Tests using this fixture can call find_code() without worrying about
     indexing - the project is already indexed and settings are configured.
     """
-    from codeweaver.config.settings import CodeWeaverSettings
+    import inspect
+    import logging
+
+    from codeweaver.config.settings import CodeWeaverSettings, reset_settings
     from codeweaver.engine.indexer.indexer import Indexer
 
-    # Configure settings with project path
+    logger = logging.getLogger(__name__)
+
+    logger.debug("Indexer imported from: %s", inspect.getfile(Indexer))
+
+    # Reset settings to ensure a clean state for this fixture
+    reset_settings()
+
+    # Create settings explicitly with the test codebase path
     settings = CodeWeaverSettings(project_path=known_test_codebase)
-    settings_dict = settings.model_dump()
+    serialized_settings = settings.view
 
     # Patch provider registry and settings
     call_count = [0]
@@ -63,18 +73,26 @@ async def indexed_test_project(known_test_codebase, real_provider_registry):
         call_count[0] += 1
         return 1000000.0 + call_count[0] * 0.001
 
+    # Trust the config system - codeweaver.test.toml loaded via CODEWEAVER_TEST_MODE="true"
+    # We must patch get_settings to return our test settings so find_code finds the right index
     with (
-        patch(
-            "codeweaver.common.registry.get_provider_registry", return_value=real_provider_registry
-        ),
-        patch("codeweaver.agent_api.find_code.time.time", side_effect=mock_time),
+        patch.dict(os.environ, {"CODEWEAVER_PROJECT_PATH": str(known_test_codebase)}),
         patch("codeweaver.config.settings.get_settings", return_value=settings),
+        patch("codeweaver.config.settings.get_settings_map", return_value=serialized_settings),
+        patch("codeweaver.agent_api.find_code.time.time", side_effect=mock_time),
+        patch("codeweaver.core.get_project_path", return_value=known_test_codebase),
     ):
-        # Create and initialize indexer
-        indexer = await Indexer.from_settings_async(settings_dict)
-        await indexer.prime_index()
+        # Create and initialize indexer using our explicit settings and shared vector store
+        indexer = await Indexer.from_settings_async(
+            serialized_settings, vector_store=actual_vector_store
+        )
+        # Use force_reindex=True to ensure we actually index files in every test run
+        await indexer.prime_index(force_reindex=True)
 
         yield known_test_codebase
+
+    # Cleanup settings after fixture
+    reset_settings()
 
 
 # =============================================================================
@@ -85,7 +103,8 @@ async def indexed_test_project(known_test_codebase, real_provider_registry):
 @pytest.mark.integration
 @pytest.mark.real_providers
 @pytest.mark.asyncio
-async def test_full_pipeline_index_then_search(indexed_test_project):
+@pytest.mark.timeout(600)  # 10 minutes for real embedding generation + indexing
+async def test_full_pipeline_index_then_search(indexed_test_project, actual_vector_store):
     """Validate complete workflow: index fresh codebase, then search it.
 
     This is the MOST IMPORTANT real provider test. It validates that:
@@ -110,7 +129,9 @@ async def test_full_pipeline_index_then_search(indexed_test_project):
 
     # Search for specific functionality in the indexed codebase
     search_response = await find_code(
-        query="authentication user login", intent=IntentType.UNDERSTAND
+        query="authentication user login",
+        intent=IntentType.UNDERSTAND,
+        vector_store=actual_vector_store,
     )
 
     # Validate search found the code we indexed
@@ -132,8 +153,9 @@ async def test_full_pipeline_index_then_search(indexed_test_project):
 @pytest.mark.integration
 @pytest.mark.real_providers
 @pytest.mark.asyncio
+@pytest.mark.timeout(600)  # 10 minutes for real embedding generation + indexing
 async def test_incremental_indexing_updates_search_results(
-    indexed_test_project, real_provider_registry
+    indexed_test_project, real_provider_registry, actual_vector_store
 ):
     """Validate that adding new files updates search results.
 
@@ -199,14 +221,24 @@ def process_refund(transaction_id: str) -> None:
         patch("codeweaver.agent_api.find_code.time.time", side_effect=mock_time),
     ):
         settings = CodeWeaverSettings(project_path=indexed_test_project)
-        indexer = await Indexer.from_settings_async(settings.model_dump())
-        await indexer.prime_index()
+        serialized_settings = settings.view
 
-        # Search for new file's content
-        response = await find_code(
-            query="payment processing credit card Stripe", intent=IntentType.UNDERSTAND
-        )
+        with (
+            patch.dict(os.environ, {"CODEWEAVER_PROJECT_PATH": str(indexed_test_project)}),
+            patch("codeweaver.config.settings.get_settings", return_value=settings),
+            patch("codeweaver.config.settings.get_settings_map", return_value=serialized_settings),
+        ):
+            indexer = await Indexer.from_settings_async(
+                serialized_settings, vector_store=actual_vector_store
+            )
+            await indexer.prime_index(force_reindex=True)
 
+            # Search for new file's content
+            response = await find_code(
+                query="payment processing credit card Stripe",
+                intent=IntentType.UNDERSTAND,
+                vector_store=actual_vector_store,
+            )
     # Validate new file appears in results
     result_files = [r.file_path.name for r in response.matches]
     assert "payments.py" in result_files, (
@@ -218,7 +250,10 @@ def process_refund(transaction_id: str) -> None:
 @pytest.mark.integration
 @pytest.mark.real_providers
 @pytest.mark.asyncio
-async def test_pipeline_handles_large_codebase(tmp_path, real_provider_registry):
+@pytest.mark.timeout(900)  # 15 minutes for 20 files with real embeddings
+async def test_pipeline_handles_large_codebase(
+    tmp_path, real_provider_registry, actual_vector_store
+):
     """Validate pipeline handles larger codebase (~20 files) efficiently.
 
     **What this validates:**
@@ -284,16 +319,27 @@ class {module_name.capitalize()}Handler:
         patch("codeweaver.agent_api.find_code.time.time", side_effect=mock_time),
     ):
         settings = CodeWeaverSettings(project_path=large_codebase)
+        serialized_settings = settings.view
 
-        # Measure indexing performance
-        start_time = time.time()
-        indexer = await Indexer.from_settings_async(settings.model_dump())
-        await indexer.prime_index()
-        indexing_time = time.time() - start_time
+        with (
+            patch.dict(os.environ, {"CODEWEAVER_PROJECT_PATH": str(large_codebase)}),
+            patch("codeweaver.config.settings.get_settings", return_value=settings),
+            patch("codeweaver.config.settings.get_settings_map", return_value=serialized_settings),
+        ):
+            # Measure indexing performance
+            start_time = time.time()
+            indexer = await Indexer.from_settings_async(
+                serialized_settings, vector_store=actual_vector_store
+            )
+            await indexer.prime_index(force_reindex=True)
+            indexing_time = time.time() - start_time
 
-        # Search
-        response = await find_code(query="module function", intent=IntentType.UNDERSTAND)
-
+            # Search
+            response = await find_code(
+                query="module function",
+                intent=IntentType.UNDERSTAND,
+                vector_store=actual_vector_store,
+            )
     # Validate indexing completed
     assert response is not None, "Indexing should complete"
 
@@ -310,7 +356,10 @@ class {module_name.capitalize()}Handler:
 @pytest.mark.integration
 @pytest.mark.real_providers
 @pytest.mark.asyncio
-async def test_pipeline_handles_file_updates(indexed_test_project, real_provider_registry):
+@pytest.mark.timeout(600)  # 10 minutes for real embedding generation + indexing
+async def test_pipeline_handles_file_updates(
+    indexed_test_project, real_provider_registry, actual_vector_store
+):
     """Validate that modifying files updates their embeddings.
 
     **What this validates:**
@@ -375,12 +424,24 @@ def generate_jwt(user_id: str) -> str:
         patch("codeweaver.agent_api.find_code.time.time", side_effect=mock_time),
     ):
         settings = CodeWeaverSettings(project_path=indexed_test_project)
-        indexer = await Indexer.from_settings_async(settings.model_dump())
-        await indexer.prime_index()
+        serialized_settings = settings.view
 
-        # Search should now find OAuth content
-        response_after = await find_code(query="OAuth2 JWT token", intent=IntentType.UNDERSTAND)
+        with (
+            patch.dict(os.environ, {"CODEWEAVER_PROJECT_PATH": str(indexed_test_project)}),
+            patch("codeweaver.config.settings.get_settings", return_value=settings),
+            patch("codeweaver.config.settings.get_settings_map", return_value=serialized_settings),
+        ):
+            indexer = await Indexer.from_settings_async(
+                serialized_settings, vector_store=actual_vector_store
+            )
+            await indexer.prime_index(force_reindex=True)
 
+            # Search should now find OAuth content
+            response_after = await find_code(
+                query="OAuth2 JWT token",
+                intent=IntentType.UNDERSTAND,
+                vector_store=actual_vector_store,
+            )
     # Validate updated content is found
     result_files = [r.file_path.name for r in response_after.matches[:3]]
     assert "auth.py" in result_files, "Updated auth.py should still be findable after modification"
@@ -401,7 +462,10 @@ def generate_jwt(user_id: str) -> str:
 @pytest.mark.integration
 @pytest.mark.real_providers
 @pytest.mark.asyncio
-async def test_pipeline_coordination_with_errors(tmp_path, real_provider_registry):
+@pytest.mark.timeout(600)  # 10 minutes for real embedding generation + indexing
+async def test_pipeline_coordination_with_errors(
+    tmp_path, real_provider_registry, actual_vector_store
+):
     """Validate pipeline handles partial failures gracefully.
 
     **What this validates:**
@@ -459,10 +523,21 @@ def another_working_function():
         patch("codeweaver.agent_api.find_code.time.time", side_effect=mock_time),
     ):
         settings = CodeWeaverSettings(project_path=mixed_codebase)
-        indexer = await Indexer.from_settings_async(settings.model_dump())
-        await indexer.prime_index()
+        serialized_settings = settings.view
 
-        response = await find_code(query="function", intent=IntentType.UNDERSTAND)
+        with (
+            patch.dict(os.environ, {"CODEWEAVER_PROJECT_PATH": str(mixed_codebase)}),
+            patch("codeweaver.config.settings.get_settings", return_value=settings),
+            patch("codeweaver.config.settings.get_settings_map", return_value=serialized_settings),
+        ):
+            indexer = await Indexer.from_settings_async(
+                serialized_settings, vector_store=actual_vector_store
+            )
+            await indexer.prime_index(force_reindex=True)
+
+            response = await find_code(
+                query="function", intent=IntentType.UNDERSTAND, vector_store=actual_vector_store
+            )
 
     # Should index good files even if bad file fails
     # At minimum, shouldn't crash completely
@@ -478,7 +553,8 @@ def another_working_function():
 @pytest.mark.real_providers
 @pytest.mark.benchmark
 @pytest.mark.asyncio
-async def test_search_performance_with_real_providers(indexed_test_project):
+@pytest.mark.timeout(600)  # 10 minutes including fixture setup
+async def test_search_performance_with_real_providers(indexed_test_project, actual_vector_store):
     """Validate search performance meets requirements with real providers.
 
     **Performance Requirement (FR-037):**
@@ -505,10 +581,20 @@ async def test_search_performance_with_real_providers(indexed_test_project):
     start_time = time.time()
 
     response = await find_code(
-        query="authentication database API configuration", intent=IntentType.UNDERSTAND
+        query="authentication database API configuration",
+        intent=IntentType.UNDERSTAND,
+        vector_store=actual_vector_store,
     )
 
     search_time = time.time() - start_time
+
+    print(f"DEBUG: Search returned {len(response.matches)} matches")
+    if not response.matches:
+        print(f"DEBUG: Response summary: {response.summary}")
+        print(f"DEBUG: Response warnings: {response.warnings}")
+        # Check if vector store has data
+        info = await actual_vector_store.client.get_collection(actual_vector_store.collection)
+        print(f"DEBUG: Collection {actual_vector_store.collection} has {info.points_count} points")
 
     # Validate results returned
     assert len(response.matches) > 0, "Search should return results"
@@ -531,7 +617,10 @@ async def test_search_performance_with_real_providers(indexed_test_project):
 @pytest.mark.benchmark
 @pytest.mark.slow
 @pytest.mark.asyncio
-async def test_indexing_performance_with_real_providers(tmp_path, real_provider_registry):
+@pytest.mark.timeout(1200)  # 20 minutes for 50 files with real embeddings
+async def test_indexing_performance_with_real_providers(
+    tmp_path, real_provider_registry, actual_vector_store
+):
     """Validate indexing performance is acceptable for real-world usage.
 
     **What this validates:**
@@ -577,14 +666,24 @@ def function_{i}(param):
         patch("codeweaver.agent_api.find_code.time.time", side_effect=mock_time),
     ):
         settings = CodeWeaverSettings(project_path=perf_codebase)
+        serialized_settings = settings.view
 
-        # Measure indexing performance
-        start_time = time.time()
-        indexer = await Indexer.from_settings_async(settings.model_dump())
-        await indexer.prime_index()
-        indexing_time = time.time() - start_time
+        with (
+            patch.dict(os.environ, {"CODEWEAVER_PROJECT_PATH": str(perf_codebase)}),
+            patch("codeweaver.config.settings.get_settings", return_value=settings),
+            patch("codeweaver.config.settings.get_settings_map", return_value=serialized_settings),
+        ):
+            # Measure indexing performance
+            start_time = time.time()
+            indexer = await Indexer.from_settings_async(
+                serialized_settings, vector_store=actual_vector_store
+            )
+            await indexer.prime_index(force_reindex=True)
+            indexing_time = time.time() - start_time
 
-        response = await find_code(query="function", intent=IntentType.UNDERSTAND)
+            response = await find_code(
+                query="function", intent=IntentType.UNDERSTAND, vector_store=actual_vector_store
+            )
 
     # Validate indexing completed
     assert response is not None, "Indexing should complete"

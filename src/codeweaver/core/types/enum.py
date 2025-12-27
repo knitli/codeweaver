@@ -13,19 +13,17 @@ from collections.abc import Callable, Generator, Iterator, Mapping, Sequence
 from enum import Enum, auto, unique
 from functools import cached_property
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Annotated, Any, Self, cast, override
+from typing import TYPE_CHECKING, Any, Self, cast, override
 
 import textcase
 
 from aenum import extend_enum  # type: ignore
-from pydantic import Field, computed_field
-from pydantic.dataclasses import dataclass
-
-from codeweaver.core.types.models import DATACLASS_CONFIG, DataclassSerializationMixin
+from pydantic import computed_field
 
 
 if TYPE_CHECKING:
     from codeweaver.core.types.aliases import FilteredKeyT
+    from codeweaver.core.types.dataclasses import BaseEnumData
 
 
 type EnumExtend = Callable[[Enum, str], Enum]
@@ -37,37 +35,9 @@ extend_enum: EnumExtend = extend_enum
 # ================================================
 
 
-@dataclass(config=DATACLASS_CONFIG, order=True, frozen=True)
-class BaseEnumData(DataclassSerializationMixin):
-    """A dataclass to hold enum member data.
-
-    `BaseEnumData` provides a standard structure for enum member data, including name, value, aliases, and description. Subclasses can extend this dataclass to include additional fields as needed.
-    """
-
-    aliases: Annotated[
-        tuple[str, ...],
-        Field(description="The aliases for the enum member.", default_factory=tuple, repr=False),
-    ]
-    _description: (
-        Annotated[str | None, Field(description="The description of the enum member.")] | None
-    ) = None
-
-    # These are just generic fields, define more in subclasses as needed.
-
-    def __init__(
-        self, aliases: Sequence[str] | None = None, description: str | None = None, **kwargs: Any
-    ) -> None:
-        """Initialize the BaseEnumData dataclass."""
-        object.__setattr__(self, "aliases", tuple(aliases) if aliases is not None else ())
-        object.__setattr__(self, "_description", description)
-        for key, val in kwargs.items():
-            object.__setattr__(self, key, val)
-        super().__init__()
-
-
 @unique
 class BaseDataclassEnum(Enum):
-    """A base enum class for enums with dataclass members. Does not come with its 'type' -- you must define that with `BaseEnumData` and subclass your implementation, like: `class MyDataclassEnum(MyCustomBaseEnumDataDataclass, BaseDataclassEnum): ...`."""
+    """A base enum class for enums with dataclass members. Does not come with its 'type' -- you must define that with `codeweaver.core.types.dataclasses.BaseEnumData` and subclass your implementation, like: `class MyDataclassEnum(MyCustomBaseEnumDataDataclass, BaseDataclassEnum): ...`."""
 
     @staticmethod
     def _multiply_variations(s: str) -> set[str]:
@@ -333,17 +303,21 @@ class BaseEnum(Enum):
     @classmethod
     def _value_type(cls) -> type[int | str]:
         """Return the type of the enum values."""
-        if all(isinstance(member.value, str) for member in cls.__members__.values() if member):
+        # Use simple heuristic: check the first member's value type
+        # All members must have the same type by convention in this project.
+        if not cls.__members__:
             return str
-        if all(
-            isinstance(member.value, int)
-            for member in cls.__members__.values()
-            if member and member.value
-        ):
-            return int
-        raise TypeError(
-            f"All members of {cls.__qualname__} must have the same value type and must be either str or int."
-        )
+        first_member = next(iter(cls.__members__.values()))
+        # Handle cases where member might be None during initialization
+        if first_member is None:
+            return str
+        # Use object.__getattribute__ to avoid triggering property recursion
+        try:
+            val = object.__getattribute__(first_member, "_value_")
+        except AttributeError:
+            val = first_member.value
+
+        return type(val) if isinstance(val, int | str) else str
 
     def __lt__(self, other: Self) -> bool:
         """Less than comparison for enum members."""
@@ -492,4 +466,4 @@ class AnonymityConversion(BaseEnum):
         return functions.get(self, lambda v: v)(values)
 
 
-__all__ = ("AnonymityConversion", "BaseDataclassEnum", "BaseEnum", "BaseEnumData")
+__all__ = ("AnonymityConversion", "BaseDataclassEnum", "BaseEnum")

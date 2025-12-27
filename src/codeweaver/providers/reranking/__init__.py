@@ -12,8 +12,8 @@ from typing import TYPE_CHECKING, Any, Literal
 
 
 if TYPE_CHECKING:
+    from codeweaver.core.types.provider import Provider
     from codeweaver.exceptions import ConfigurationError
-    from codeweaver.providers.provider import Provider
     from codeweaver.providers.reranking.capabilities import (
         dependency_map,
         get_alibaba_reranking_capabilities,
@@ -68,7 +68,7 @@ type KnownRerankModelName = Literal[
 
 def get_rerank_model_provider(provider: Provider) -> type[RerankingProvider[Any]]:
     """Get rerank model provider."""
-    from codeweaver.providers.provider import Provider
+    from codeweaver.core.types.provider import Provider
 
     if provider in {Provider.VOYAGE}:
         from codeweaver.providers.reranking.providers.voyage import VoyageRerankingProvider
@@ -99,7 +99,7 @@ def get_rerank_model_provider(provider: Provider) -> type[RerankingProvider[Any]
 
     # Get list of supported reranking providers dynamically
     supported_providers = [
-        p.value
+        p.variable
         for p in [
             Provider.VOYAGE,
             Provider.COHERE,

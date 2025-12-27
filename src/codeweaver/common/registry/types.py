@@ -15,7 +15,7 @@ from pydantic import ConfigDict, Field, computed_field
 
 from codeweaver.core.types.enum import BaseEnum
 from codeweaver.core.types.models import BasedModel
-from codeweaver.providers.provider import ProviderKind
+from codeweaver.core.types.provider import ProviderKind
 
 
 type ServiceName = Annotated[

@@ -82,7 +82,7 @@ async def test_my_search_quality(real_providers, known_test_codebase):
 ### "Can't find model"
 ```bash
 # Download models manually
-python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('ibm-granite/granite-embedding-english-r2')"
+python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('ibm-granite/granite-embedding-30m-english')"
 ```
 
 ### "Test fails - auth.py not found"

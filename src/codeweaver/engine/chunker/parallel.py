@@ -39,7 +39,7 @@ import multiprocessing
 from collections.abc import Iterator
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from codeweaver.engine.chunker.delimiter import DelimiterChunker
 from codeweaver.engine.chunker.exceptions import ChunkingError
@@ -56,7 +56,7 @@ logger = logging.getLogger(__name__)
 
 
 def _chunk_single_file(
-    file: DiscoveredFile, governor: ChunkGovernor
+    file: DiscoveredFile, governor: ChunkGovernor, tokenizer: Any | None = None
 ) -> tuple[Path, list[CodeChunk]] | tuple[Path, None]:
     """Chunk a single file using appropriate chunker with graceful fallback.
 
@@ -67,6 +67,7 @@ def _chunk_single_file(
     Args:
         file: DiscoveredFile to chunk
         governor: ChunkGovernor configuration for chunking behavior
+        tokenizer: Optional tokenizer for accurate token counting
 
     Returns:
         Tuple of (file_path, chunks) on success, or (file_path, None) on error.
@@ -80,7 +81,7 @@ def _chunk_single_file(
         - Never raises exceptions to caller
     """
     try:
-        selector = ChunkerSelector(governor)
+        selector = ChunkerSelector(governor, tokenizer)
         chunker = selector.select_for_file(file)
         content = file.path.read_text(encoding="utf-8", errors="ignore")
 
@@ -102,6 +103,18 @@ def _chunk_single_file(
                 else "unknown"
             )
             fallback_chunker = DelimiterChunker(governor, language=language)
+
+            # Log fallback event for observability
+            from codeweaver.engine.chunker import _logging as chunker_logging
+
+            chunker_logging.log_chunking_fallback(
+                file_path=file.path,
+                from_chunker=chunker,  # ty: ignore[invalid-argument-type]
+                to_chunker=fallback_chunker,
+                reason="parse_error",
+                extra_context={"error_type": type(e).__name__, "error_message": str(e)},
+            )
+
             chunks = fallback_chunker.chunk(content, file=file)
 
         logger.debug("Chunked %s: %d chunks generated", file.path, len(chunks))
@@ -128,6 +141,7 @@ def chunk_files_parallel(
     *,
     max_workers: int | None = None,
     executor_type: str | None = None,
+    tokenizer: Any | None = None,
 ) -> Iterator[tuple[Path, list[CodeChunk]]]:
     """Chunk multiple files in parallel using process or thread pool.
 
@@ -144,6 +158,7 @@ def chunk_files_parallel(
         executor_type: Type of executor to use - "process" or "thread" or None.
             If None, uses settings from governor or defaults to "process".
             Process-based is better for CPU-bound parsing, thread-based for I/O.
+        tokenizer: Optional tokenizer for accurate token counting
 
     Yields:
         Tuples of (file_path, chunks) for successfully chunked files.
@@ -216,7 +231,7 @@ def chunk_files_parallel(
     logger.info("Starting parallel chunking of %d files with %d workers", total_files, max_workers)
     with executor_class(max_workers=max_workers) as executor:
         future_to_file: dict[Future[tuple[Path, list[CodeChunk] | None]], DiscoveredFile] = {
-            executor.submit(_chunk_single_file, file, governor): file for file in files
+            executor.submit(_chunk_single_file, file, governor, tokenizer): file for file in files
         }
         for future in as_completed(future_to_file):
             future_to_file[future]

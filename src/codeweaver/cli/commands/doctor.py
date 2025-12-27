@@ -26,16 +26,15 @@ from pydantic import FilePath, ValidationError
 from rich.table import Table
 
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
-from codeweaver.cli.utils import get_codeweaver_config_paths
-from codeweaver.common.utils.git import get_project_path, is_git_dir
+from codeweaver.core import get_codeweaver_config_paths, get_project_path, is_git_dir
+from codeweaver.core.types.provider import ProviderKind
 from codeweaver.core.types.sentinel import Unset
-from codeweaver.providers.provider import ProviderKind
 
 
 if TYPE_CHECKING:
     from codeweaver.config.providers import ProviderSettings
     from codeweaver.config.settings import CodeWeaverSettings
-    from codeweaver.providers.provider import Provider
+    from codeweaver.core.types.provider import Provider
 
 
 # Module-level display for check functions
@@ -213,6 +212,9 @@ def _identify_missing_dependencies(
         and match["name"]
         != "py-cpuinfo"  # it's technically required, but it's for optimizations; not strictly required
     ]
+    python_version = sys.version_info
+    if python_version >= (3, 14) and any(pkg[0] == "uuid_extensions" for pkg in required_packages):
+        required_packages = [pkg for pkg in required_packages if pkg[0] != "uuid_extensions"]
 
     for display_name, module_name, _version in required_packages:
         if find_spec(module_name):
@@ -354,7 +356,7 @@ type DeploymentType = Literal["local docker", "cloud", "local", "remote", "in-me
 
 async def check_vector_store_config(settings: ProviderSettings) -> DoctorCheck:
     """Check vector store configuration with Docker/Cloud detection."""
-    from codeweaver.providers.provider import Provider
+    from codeweaver.core.types.provider import Provider
 
     check = DoctorCheck("Vector Store Configuration")
 
@@ -600,7 +602,7 @@ def check_provider_availability(settings: ProviderSettings) -> list[DoctorCheck]
                     ["Configure providers in your codeweaver configuration."],
                 )
             ]
-        from codeweaver.providers.provider import ProviderKind
+        from codeweaver.core.types.provider import ProviderKind
 
         for kind, provider_configs in configs.items():
             if not provider_configs:

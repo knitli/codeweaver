@@ -112,7 +112,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: production
-      url: https://pypi.org/p/codeweaver
+      url: https://pypi.org/p/code-weaver
     permissions:
       id-token: write
       contents: read

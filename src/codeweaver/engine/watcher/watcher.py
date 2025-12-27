@@ -29,10 +29,10 @@ import watchfiles
 
 from fastmcp import Context
 
-from codeweaver.cli.utils import is_tty
-from codeweaver.common.utils.checks import is_ci
+from codeweaver.core import is_ci, is_tty
+from codeweaver.di import INJECTED, IgnoreFilterDep, IndexerDep
 from codeweaver.engine.indexer.indexer import Indexer
-from codeweaver.engine.watcher.logging import WatchfilesLogManager
+from codeweaver.engine.watcher._logging import WatchfilesLogManager
 from codeweaver.engine.watcher.types import FileChange
 
 
@@ -54,10 +54,10 @@ class FileWatcher:
         handler: Awaitable[Callable[[set[FileChange]], Any]]
         | Callable[[set[FileChange]], Any]
         | None = None,
-        file_filter: watchfiles.BaseFilter | None = None,
-        walker: rignore.Walker | None = None,
-        indexer: Indexer | None = None,  # NEW: Accept optional indexer
-        status_display: Any | None = None,  # NEW: Accept optional status display
+        file_filter: IgnoreFilterDep = INJECTED,
+        walker: Any | None = None,  # Keep for compatibility
+        indexer: IndexerDep = INJECTED,
+        status_display: Any | None = None,
         capture_watchfiles_output: bool = True,
         watchfiles_log_level: int = logging.WARNING,
         watchfiles_use_rich: bool = USE_RICH,
@@ -72,9 +72,8 @@ class FileWatcher:
         Args:
             *paths: Paths to watch for changes
             handler: Optional callback for file changes
-            file_filter: Optional filter for file changes
-            walker: Optional rignore walker for initial indexing
-            indexer: Optional indexer instance to use (if None, creates new one)
+            file_filter: Optional filter for file changes (defaults to injected IgnoreFilter)
+            indexer: Optional indexer instance to use (defaults to injected Indexer)
             status_display: Optional StatusDisplay instance for user-facing output
             capture_watchfiles_output: Enable watchfiles logging capture
             watchfiles_log_level: Minimum log level (default: WARNING)
@@ -91,6 +90,7 @@ class FileWatcher:
         self.handler = handler or self._default_handler
         self.context = context
         self._status_display = status_display
+        self._indexer = indexer
         # Initialize log manager if capture enabled
         self._log_manager = None
         if capture_watchfiles_output:
@@ -103,9 +103,6 @@ class FileWatcher:
                 route_to_context=route_logs_to_context,
             )
 
-        from codeweaver.config.settings import get_settings_map
-        from codeweaver.core.discovery import DiscoveredFile
-        from codeweaver.core.stores import make_blake_store
         from codeweaver.engine.watcher.types import WatchfilesArgs
 
         watch_args = (
@@ -128,20 +125,6 @@ class FileWatcher:
         )
         watch_args["recursive"] = True  # we always want recursive watching
 
-        # Use provided indexer or create new one
-        self._indexer = (
-            indexer
-            or getattr(self, "_indexer", None)
-            or (
-                Indexer(
-                    walker=walker,
-                    store=make_blake_store(value_type=DiscoveredFile),
-                    project_path=get_settings_map()["project_path"],
-                )
-                if walker
-                else Indexer.from_settings(get_settings_map())
-            )
-        )
         self._watch_args = watch_args
         self.watcher = None
         # Note: Call initialize() to perform initial indexing and start watching

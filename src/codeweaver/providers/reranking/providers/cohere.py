@@ -15,8 +15,8 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import SkipValidation
 
-from codeweaver.common.utils.utils import rpartial
-from codeweaver.providers.provider import Provider
+from codeweaver.core import rpartial
+from codeweaver.core.types.provider import Provider
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 from codeweaver.providers.reranking.providers.base import RerankingProvider, RerankingResult
 
@@ -106,7 +106,7 @@ class CohereRerankingProvider(RerankingProvider[CohereClient]):
                     from codeweaver.exceptions import ConfigurationError
 
                     raise ConfigurationError(
-                        f"API key not found for {provider.value} provider. Please set the API key in the client kwargs or as an environment variable."
+                        f"API key not found for {provider.as_title} provider. Please set the API key in the client kwargs or as an environment variable."
                     )
 
             client = CohereClient(**client_options)

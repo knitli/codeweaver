@@ -12,10 +12,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Literal, TypedDict, cast
 
-from codeweaver.common.utils import lazy_import
 from codeweaver.core.types.aliases import (
-    DevToolName,
-    DevToolNameT,
     DirectoryName,
     DirectoryNameT,
     FileExt,
@@ -25,14 +22,13 @@ from codeweaver.core.types.aliases import (
     LanguageName,
     LanguageNameT,
     LiteralStringT,
-    LlmToolName,
-    LlmToolNameT,
 )
+from codeweaver.core.utils import COMMON_LLM_TOOLING_PATHS, COMMON_TOOLING_PATHS, lazy_import
 
 
 if TYPE_CHECKING:
-    from codeweaver.common.utils import LazyImport
     from codeweaver.core.metadata import ExtLangPair
+    from codeweaver.core.utils import LazyImport
 
 
 LangPair: LazyImport[ExtLangPair] = lazy_import("codeweaver.core.metadata", "ExtLangPair")
@@ -543,114 +539,6 @@ def all_js_exts(stem: str) -> tuple[str, ...]:
     return (f"{stem}.js", f"{stem}.cjs", f"{stem}.mjs", f"{stem}.ts", f"{stem}.cts", f"{stem}.mts")
 
 
-COMMON_TOOLING_PATHS: tuple[tuple[DevToolNameT, tuple[Path, ...]], ...] = (
-    (DevToolName("ast-grep"), (Path("sgconfig.yml"),)),
-    (DevToolName("cargo"), (Path("Cargo.toml"), Path("Cargo.lock"), Path(".cargo"))),
-    (
-        DevToolName("docker"),
-        (
-            Path("Dockerfile"),
-            Path("docker-compose.yml"),
-            Path("docker-compose.yaml"),
-            Path("docker"),
-        ),
-    ),
-    (
-        DevToolName("devcontainer"),
-        (
-            Path(".devcontainer"),
-            Path(".devcontainer/devcontainer.json"),
-            Path(".devcontainer/devcontainer.local.json"),
-        ),
-    ),
-    (DevToolName("bazel"), (Path("WORKSPACE"), Path("BUILD.bazel"), Path("BUILD"))),
-    (
-        DevToolName("cmake"),
-        (
-            Path("CMakeLists.txt"),
-            Path("CMakeCache.txt"),
-            Path("cmake-build-debug"),
-            Path("CMakeFiles"),
-        ),
-    ),
-    (DevToolName("biome"), (Path("biome.json"), *all_js_exts("biome.config"))),
-    (
-        DevToolName("bun"),
-        (Path("bun.lockb"), Path("bunfig.toml"), Path("bunfig.json"), Path("bun.lock")),
-    ),
-    (DevToolName("changesets"), (Path(".changeset"),)),
-    (DevToolName("composer"), (Path("composer.json"), Path("composer.lock"))),
-    (DevToolName("esbuild"), (Path("esbuild.config.js"), Path("esbuild.config.ts"))),
-    (
-        DevToolName("gradle"),
-        (
-            Path("build.gradle"),
-            Path("build.gradle.kts"),
-            Path("gradlew"),
-            Path("gradlew.bat"),
-            Path("gradle"),
-            Path("settings.gradle"),
-            Path("settings.gradle.kts"),
-        ),
-    ),
-    (DevToolName("deno"), (Path("deno.json"), Path("deno.jsonc"), Path("deno.lock"))),
-    (DevToolName("hardhat"), (Path("hardhat.config.js"), Path("hardhat.config.ts"))),
-    (DevToolName("hk"), (Path("hk.pkl"),)),
-    (DevToolName("husky"), (Path(".husky"), Path(".husky/pre-commit"), Path(".husky/pre-push"))),
-    (DevToolName("intellij"), (Path(".idea"), Path(".idea/misc.xml"), Path(".idea/modules.xml"))),
-    (DevToolName("just"), (Path("Justfile"), Path("justfile"))),
-    (DevToolName("lerna"), (Path("lerna.json"),)),
-    (
-        DevToolName("maven"),
-        (Path("pom.xml"), Path("settings.xml"), Path(".mvn"), Path("mvnw"), Path("mvnw.cmd")),
-    ),
-    (DevToolName("mise"), (Path("mise.toml"),)),
-    (DevToolName("moon"), (Path("moon.yml"), Path("moon.yaml"), Path(".moon"))),
-    (DevToolName("nextjs"), (Path("next.config.js"), Path("next.config.ts"))),
-    (DevToolName("npm"), (Path("package-lock.json"), Path(".npmrc"))),
-    (DevToolName("nuxt"), (Path("nuxt.config.js"), Path("nuxt.config.ts"))),
-    (DevToolName("nx"), (Path("nx.json"), Path("workspace.json"), Path("angular.json"))),
-    (DevToolName("pnpm"), (Path("pnpm-lock.yaml"), Path("pnpm-workspace.yaml"))),
-    (DevToolName("poetry"), (Path("poetry.lock"),)),
-    (DevToolName("pre-commit"), (Path(".pre-commit-config.yaml"), Path(".pre-commit-config.yml"))),
-    (
-        DevToolName("proto"),
-        (Path("proto.toml"), Path("proto.pkl"), Path("prototools.toml"), Path("prototools.pkl")),
-    ),
-    (DevToolName("rollbar"), (Path("rollbar.config.js"), Path("rollbar.config.ts"))),
-    (DevToolName("rollup"), (Path("rollup.config.js"), Path("rollup.config.ts"))),
-    (DevToolName("ruff"), (Path("ruff.toml"), Path(".ruff.toml"))),
-    (DevToolName("rush"), (Path("rush.json"),)),
-    (
-        DevToolName("sbt"),
-        (Path("build.sbt"), Path("project/build.properties"), Path("project/plugins.sbt")),
-    ),
-    (DevToolName("skaffold"), (Path("skaffold.yaml"), Path("skaffold.yml"))),
-    (
-        DevToolName("stylelint"),
-        (
-            Path(".stylelintrc"),
-            Path(".stylelintrc.json"),
-            Path(".stylelintrc.yaml"),
-            Path(".stylelintrc.yml"),
-        ),
-    ),
-    (DevToolName("tailwind"), (Path("tailwind.config.js"), Path("tailwind.config.ts"))),
-    (DevToolName("typos"), (Path("_typos.toml"), Path(".typos.toml"), Path("typos.toml"))),
-    (DevToolName("turborepo"), (Path("turbo.json"),)),
-    (DevToolName("uv"), (Path("uv.toml"), Path("uv.lock"))),
-    (DevToolName("vite"), (Path("vite.config.js"), Path("vite.config.ts"))),
-    (DevToolName("vitest"), (Path("vitest.config.js"), Path("vitest.config.ts"))),
-    (
-        DevToolName("vscode"),
-        (Path(".vscode"), Path(".vscode/settings.json"), Path(".vscode/launch.json")),
-    ),
-    (DevToolName("webpack"), (Path("webpack.config.js"), Path("webpack.config.ts"))),
-    (DevToolName("xtask"), (Path("xtask"), Path("xtask/src/main.rs"))),
-    (DevToolName("yarn"), (Path("yarn.lock"), Path(".yarn"), Path(".yarnrc"), Path(".yarnrc.yml"))),
-)
-"""Common paths for build and development tooling used in projects. This needs expansion, pull requests are welcome!"""
-
 type LlmTool = Literal[
     "agents",
     "claude",
@@ -664,43 +552,6 @@ type LlmTool = Literal[
     "serena",
     "specify",
 ]
-
-COMMON_LLM_TOOLING_PATHS: tuple[tuple[LlmToolNameT, tuple[Path, ...]], ...] = (
-    (LlmToolName("agents"), (Path("AGENTS.md"),)),
-    (LlmToolName("codex"), (Path(".codex"),)),
-    (
-        LlmToolName("claude"),
-        (Path("CLAUDE.md"), Path(".claude"), Path("claudedocs"), Path(".claude/commands")),
-    ),
-    (
-        LlmToolName("codeweaver"),
-        (
-            Path("codeweaver.local.toml"),
-            Path("codeweaver.local.yaml"),
-            Path("codeweaver.local.json"),
-            Path(".codeweaver"),
-        ),
-    ),
-    (LlmToolName("continue"), (Path(".continue"),)),
-    (LlmToolName("copilot"), (Path(".github/chatmodes"), Path(".github/prompts"))),
-    (LlmToolName("cursor"), (Path(".cursor"), Path(".cursor/config.yml"))),
-    (
-        LlmToolName("mcp"),
-        (Path(".mcp.json"), Path("mcp.json"), Path(".roo/mcp.json"), Path(".vscode/mcp.json")),
-    ),
-    (LlmToolName("roo"), (Path(".roo"), Path(".roomodes"), Path(".roo/commands"))),
-    (LlmToolName("serena"), (Path(".serena"), Path(".serena/project.yml"))),
-    (
-        LlmToolName("specify"),
-        (
-            Path(".specify"),
-            Path(".specify/memory"),
-            Path(".specify/scripts/bash"),
-            Path(".specify/templates"),
-        ),
-    ),
-)
-"""Common paths for LLM tooling used in projects. This needs expansion -- right now it's literally just what I've used."""
 
 _js_fam_paths = frozenset((
     Path("package.json"),

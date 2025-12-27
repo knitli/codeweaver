@@ -19,10 +19,10 @@ from typing import Any, Literal, cast
 from fastmcp import FastMCP
 from pydantic import FilePath
 
-from codeweaver.common.utils import lazy_import
 from codeweaver.config.types import CodeWeaverSettingsDict
+from codeweaver.core import Provider as Provider
+from codeweaver.core import lazy_import
 from codeweaver.exceptions import InitializationError
-from codeweaver.providers.provider import Provider as Provider  # needed for pydantic models
 
 
 class UvicornAccessLogFilter(logging.Filter):
@@ -106,8 +106,8 @@ async def _run_http_server(
     """
     from codeweaver.cli.ui import StatusDisplay
     from codeweaver.common.statistics import get_session_statistics
-    from codeweaver.common.utils import get_project_path
     from codeweaver.config.settings import get_settings
+    from codeweaver.core import get_project_path
     from codeweaver.core.types.sentinel import Unset
     from codeweaver.mcp.server import create_http_server
     from codeweaver.mcp.state import CwMcpHttpState
@@ -126,7 +126,7 @@ async def _run_http_server(
     # Setup logging
     if verbose or debug:
         from codeweaver.config.settings import get_settings_map
-        from codeweaver.server.logging import setup_logger
+        from codeweaver.server._logging import setup_logger
 
         setup_logger(get_settings_map())
 
@@ -192,7 +192,7 @@ async def _run_http_server(
 
 
 # Re-export from shared daemon module for backward compatibility
-from codeweaver.daemon import start_daemon_if_needed as _start_daemon_if_needed
+from codeweaver_daemon import start_daemon_if_needed as _start_daemon_if_needed
 
 
 async def _run_stdio_server(
@@ -348,7 +348,7 @@ async def run(
 
 
 if __name__ == "__main__":
-    from codeweaver.common.utils.procs import asyncio_or_uvloop
+    from codeweaver.core import asyncio_or_uvloop
 
     asyncio = asyncio_or_uvloop()
     try:
