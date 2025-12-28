@@ -52,6 +52,7 @@ from codeweaver.core import (
     make_uuid_store,
     uuid7,
 )
+from codeweaver.di.depends import DependsPlaceholder
 from codeweaver.engine.chunker.base import BaseChunker
 from codeweaver.engine.chunker.exceptions import ASTDepthExceededError, BinaryFileError, ParseError
 from codeweaver.engine.chunker.governance import ResourceGovernor
@@ -144,6 +145,12 @@ class SemanticChunker(BaseChunker):
         super().__init__(governor)
         self.language = language
         self.tokenizer = tokenizer
+        if isinstance(self.tokenizer, DependsPlaceholder):
+            from codeweaver_tokenizers.tiktoken import TiktokenTokenizer
+
+            from codeweaver.di.depends import depends
+
+            self.tokenizer = depends(TiktokenTokenizer)
 
         # Use importance threshold from settings, fallback to default
         if governor.settings is not None:
@@ -312,11 +319,7 @@ class SemanticChunker(BaseChunker):
             governor.check_timeout()
 
             node_text = node.text
-            if self.tokenizer:
-                tokens = self.tokenizer.estimate(node_text)
-            else:
-                tokens = len(node_text) // 4  # Rough approximation
-
+            tokens = self.tokenizer.estimate(node_text) if self.tokenizer else len(node_text) // 4
             if tokens <= self.chunk_limit:
                 chunks.append(self._create_chunk_from_node(node, file_path, source_id))
                 governor.register_chunk()
@@ -536,26 +539,20 @@ class SemanticChunker(BaseChunker):
 
             root: SgRoot = SgRoot(content, self.language.variable)
 
-            # Check for ERROR nodes which indicate syntax errors
-            error_nodes: list[tuple[int, str]] = []
+            # Efficiently find all ERROR nodes indicating syntax errors
+            error_nodes_raw = root.root().find_all(kind="ERROR")
 
-            def find_errors(node: SgNode) -> None:
-                """Recursively find ERROR nodes in AST."""
-                if node.kind() == "ERROR":
-                    error_nodes.append((node.range().start.line + 1, node.text()[:50]))
-                for child in node.children():
-                    find_errors(child)
-
-            find_errors(root.root())
-
-            if error_nodes:
+            if error_nodes_raw:
+                error_nodes = [
+                    (node.range().start.line + 1, node.text()[:50]) for node in error_nodes_raw
+                ]
                 error_details = "; ".join(
                     f"line {line}: {text}..." for line, text in error_nodes[:3]
                 )
                 raise_parse_error(
                     f"Syntax errors found in {file_path or 'content'}: {error_details}",
                     e=None,
-                    line_number=error_nodes[0][0] if error_nodes else None,
+                    line_number=error_nodes[0][0],
                     details={
                         "language": self.language.as_title,
                         "error_count": len(error_nodes),
@@ -609,18 +606,31 @@ class SemanticChunker(BaseChunker):
         """
         chunkable: list[AstThing[SgNode]] = []
 
-        # Recursively check depth for all nodes in the tree
-        def check_tree_depth(node: AstThing[SgNode]) -> None:
-            self._check_ast_depth(node, max_depth, file_path)
+        # Single-pass optimized traversal that tracks depth and finds chunkable nodes
+        def traverse(node: AstThing[SgNode], depth: int) -> None:
+            # Check depth limit
+            if depth > max_depth:
+                raise ASTDepthExceededError(
+                    (
+                        f"AST nesting depth of {depth} levels exceeds the configured maximum of {max_depth} levels. "
+                        f"This typically indicates deeply nested code structures that may cause performance issues."
+                    ),
+                    actual_depth=depth,
+                    max_depth=max_depth,
+                    file_path=str(file_path) if file_path else None,
+                )
+
+            # Check if this node is chunkable
+            if self._is_chunkable(node):
+                chunkable.append(node)
+
+            # Recurse into children
             for child in node.positional_connections:
-                check_tree_depth(child)
+                traverse(child, depth + 1)
 
-        # Check depth for entire tree
+        # Start traversal from root's children
         for child_thing in root.root.positional_connections:
-            check_tree_depth(child_thing)
-
-            if self._is_chunkable(child_thing):
-                chunkable.append(child_thing)
+            traverse(child_thing, 1)
 
         return chunkable
 
@@ -660,6 +670,9 @@ class SemanticChunker(BaseChunker):
         Protects against stack overflow and excessive memory usage during
         traversal of pathologically deep AST structures.
 
+        Note: This method is now primarily used for legacy support or individual checks.
+        Primary depth enforcement happens in _find_chunkable_nodes traversal.
+
         Args:
             node: AstThing node to check
             max_depth: Maximum safe nesting depth
@@ -668,7 +681,8 @@ class SemanticChunker(BaseChunker):
         Raises:
             ASTDepthExceededError: If node depth exceeds maximum
         """
-        depth = len(list(node.ancestors()))
+        # Calculate depth efficiently if needed, but prefer passing depth during traversal
+        depth = len(list(node._node.ancestors()))  # Use raw node to avoid AstThing overhead
         if depth > max_depth:
             raise ASTDepthExceededError(
                 (

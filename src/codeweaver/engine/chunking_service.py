@@ -16,17 +16,13 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from codeweaver_tokenizers.base import Tokenizer
+
+from codeweaver.config.settings import CodeWeaverSettings
 from codeweaver.core.chunks import CodeChunk
-from codeweaver.di import depends
-from codeweaver.di.providers import (
-    GovernorDep,
-    SettingsDep,
-    TokenizerDep,
-    get_chunk_governor,
-    get_settings,
-    get_tokenizer,
-)
+from codeweaver.di import INJECTED, GovernorDep, SettingsDep, TokenizerDep
 from codeweaver.engine.chunker import ChunkerSelector, chunk_files_parallel
+from codeweaver.engine.chunker.base import ChunkGovernor
 from codeweaver.engine.chunker.delimiter import DelimiterChunker
 from codeweaver.engine.chunker.exceptions import ChunkingError
 
@@ -72,9 +68,9 @@ class ChunkingService:
 
     def __init__(
         self,
-        governor: GovernorDep = depends(get_chunk_governor),
-        tokenizer: TokenizerDep = depends(get_tokenizer),
-        settings: SettingsDep = depends(get_settings),
+        governor: GovernorDep = INJECTED[ChunkGovernor],
+        tokenizer: TokenizerDep = INJECTED[Tokenizer],
+        settings: SettingsDep = INJECTED[CodeWeaverSettings],
         *,
         enable_parallel: bool = True,
         parallel_threshold: int = 3,
@@ -157,9 +153,9 @@ class ChunkingService:
         """
         from codeweaver.core import get_project_path
         from codeweaver.core.types.sentinel import Unset
-        from codeweaver.di import Depends
+        from codeweaver.di import Depends, DependsPlaceholder
 
-        if isinstance(self.settings, Depends):
+        if isinstance(self.settings, (Depends, DependsPlaceholder)):
             from codeweaver.config.settings import get_settings
 
             self.settings = get_settings()
@@ -209,6 +205,7 @@ class ChunkingService:
                 logger.warning(
                     "Skipping file %s: chunking failed",
                     file.path,
+                    exc_info=True,  # Enable exc_info to see the error
                     extra={
                         "file_path": str(file.path),
                         "ext_kind": file.ext_kind.language if file.ext_kind else None,  # type: ignore
@@ -237,9 +234,9 @@ class ChunkingService:
         Raises:
             Exception: If chunking fails (after fallback attempts)
         """
-        from codeweaver.di import Depends
+        from codeweaver.di import Depends, DependsPlaceholder
 
-        if isinstance(self.settings, Depends):
+        if isinstance(self.settings, (Depends, DependsPlaceholder)):
             from codeweaver.config.settings import get_settings
 
             self.settings = get_settings()

@@ -23,6 +23,8 @@ import pytest
 
 from watchfiles.main import Change
 
+from codeweaver.config.settings import CodeWeaverSettings, reset_settings
+from codeweaver.di import get_container
 from codeweaver.engine.indexer import Indexer
 
 
@@ -127,9 +129,32 @@ def test_project_path(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def indexer(test_project_path: Path) -> Indexer:
-    """Create indexer instance for test project."""
-    return Indexer(project_path=test_project_path, auto_initialize_providers=True)
+async def indexer(test_project_path: Path) -> Indexer:
+    """Create indexer instance for test project using DI container."""
+    from codeweaver.config.settings import get_settings
+
+    # Reset settings to ensure a clean state
+    reset_settings()
+
+    # Get standard settings but override the project path for this test
+    container = get_container()
+
+    # Define a factory that returns settings with the test project path
+    async def get_test_settings() -> CodeWeaverSettings:
+        # Get fresh settings instance after reset
+        settings = get_settings()
+        # Ensure we don't load existing config files that might point elsewhere
+        # We can do this by setting test mode or just explicitly setting paths
+        settings.project_path = test_project_path
+        settings.project_name = f"test_project_{test_project_path.name}"
+        return settings
+
+    # Override CodeWeaverSettings in the container
+    container.override(CodeWeaverSettings, get_test_settings)
+
+    # Resolve indexer from container - this will now use the overridden settings
+    # and properly initialize all dependencies (chunking_service, etc.)
+    return await container.resolve(Indexer)
 
 
 @pytest.mark.integration
@@ -166,6 +191,7 @@ async def test_auto_indexing_on_startup(indexer: Indexer, test_project_path: Pat
 
     # Should discover 5 files (auth.py, database.py, test_auth.py, README.md, .gitignore)
     # Note: .gitignore itself might be indexed depending on filtering rules
+    assert isinstance(discovered_count, int)
     assert discovered_count >= 4, f"Expected ≥4 files, got {discovered_count}"
 
     # Verify stats updated
@@ -222,6 +248,7 @@ async def test_indexing_completes_successfully(indexer: Indexer, test_project_pa
 
     # All discovered files should be processed
     # Note: May have errors if providers not configured, that's acceptable
+    assert isinstance(discovered_count, int)
     assert stats.files_discovered == discovered_count
 
     # Should have created chunks (unless providers unavailable)
@@ -248,8 +275,21 @@ async def test_indexing_error_recovery(test_project_path: Path):
     corrupted_file = test_project_path / "corrupted.bin"
     corrupted_file.write_bytes(b"\x00\x01\x02\xff\xfe\xfd")
 
-    # Create indexer
-    indexer = Indexer(project_path=test_project_path, auto_initialize_providers=True)
+    # Resolve indexer from container with overridden settings
+    from codeweaver.config.settings import get_settings, reset_settings
+    from codeweaver.di import get_container
+
+    reset_settings()
+    container = get_container()
+
+    async def get_test_settings() -> CodeWeaverSettings:
+        settings = get_settings()
+        settings.project_path = test_project_path
+        settings.project_name = f"test_project_recovery_{test_project_path.name}"
+        return settings
+
+    container.override(CodeWeaverSettings, get_test_settings)
+    indexer = await container.resolve(Indexer)
 
     # Run indexing
     await indexer.prime_index(force_reindex=True)

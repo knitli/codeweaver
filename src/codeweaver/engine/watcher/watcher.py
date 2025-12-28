@@ -34,6 +34,7 @@ from codeweaver.di import INJECTED, IgnoreFilterDep, IndexerDep
 from codeweaver.engine.indexer.indexer import Indexer
 from codeweaver.engine.watcher._logging import WatchfilesLogManager
 from codeweaver.engine.watcher.types import FileChange
+from codeweaver.engine.watcher.watch_filters import IgnoreFilter
 
 
 USE_RICH = not is_ci() and is_tty()
@@ -54,9 +55,9 @@ class FileWatcher:
         handler: Awaitable[Callable[[set[FileChange]], Any]]
         | Callable[[set[FileChange]], Any]
         | None = None,
-        file_filter: IgnoreFilterDep = INJECTED,
+        file_filter: IgnoreFilterDep = INJECTED[IgnoreFilter],
         walker: Any | None = None,  # Keep for compatibility
-        indexer: IndexerDep = INJECTED,
+        indexer: IndexerDep = INJECTED[Indexer],
         status_display: Any | None = None,
         capture_watchfiles_output: bool = True,
         watchfiles_log_level: int = logging.WARNING,

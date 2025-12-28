@@ -20,14 +20,10 @@ pytestmark = [pytest.mark.unit]
 
 
 @pytest.fixture
-async def mock_indexer(tmp_path: Path):
+async def mock_indexer(tmp_path: Path, clean_container):
     """Create an indexer with mocked dependencies using DI."""
-    from codeweaver.di import get_container
     from codeweaver.engine.chunking_service import ChunkingService
     from codeweaver.providers.vector_stores.base import VectorStoreProvider
-
-    container = get_container()
-    container.clear_overrides()
 
     # Mock vector store
     mock_vs = AsyncMock(spec=VectorStoreProvider)
@@ -45,26 +41,31 @@ async def mock_indexer(tmp_path: Path):
     mock_cs.chunk_file = MagicMock(return_value=[])
     mock_cs.initialize = AsyncMock()
 
-    # Apply overrides
-    container.override(VectorStoreProvider, mock_vs)
-    container.override(ChunkingService, mock_cs)
+    # Apply overrides using context manager
+    overrides = {
+        VectorStoreProvider: lambda: mock_vs,
+        ChunkingService: lambda: mock_cs,
+    }
 
-    indexer = await container.resolve(Indexer)
+    with clean_container.use_overrides(overrides):
+        indexer = await clean_container.resolve(Indexer)
 
-    # Ensure project path matches tmp_path
-    indexer._project_path = tmp_path
-    indexer._checkpoint_manager.project_path = tmp_path
-    indexer._manifest_manager.project_path = tmp_path
+        # Ensure project path matches tmp_path
+        indexer._project_path = tmp_path
+        if indexer._checkpoint_manager:
+            indexer._checkpoint_manager.project_path = tmp_path
+        if indexer._manifest_manager:
+            indexer._manifest_manager.project_path = tmp_path
 
-    # Set up manifest
-    indexer._file_manifest = IndexFileManifest(project_path=tmp_path)
+        # Set up manifest
+        indexer._file_manifest = IndexFileManifest(project_path=tmp_path)
 
-    # Manually set providers to avoid initialization overhead
-    indexer._vector_store = mock_vs
-    indexer._chunking_service = mock_cs
-    indexer._providers_initialized = True
+        # Manually set providers to avoid initialization overhead
+        indexer._vector_store = mock_vs
+        indexer._chunking_service = mock_cs
+        indexer._providers_initialized = True
 
-    return indexer
+        yield indexer
 
 
 class TestStalePointRemovalInIndexFile:

@@ -49,7 +49,7 @@ import logging
 import time
 
 from pathlib import Path
-from typing import TYPE_CHECKING, NamedTuple
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 from fastmcp.server.context import Context
 from pydantic import NonNegativeInt, PositiveInt
@@ -75,6 +75,9 @@ from codeweaver.core.spans import Span
 from codeweaver.core.types.search import SearchStrategy
 from codeweaver.di import INJECTED
 from codeweaver.di.providers import EmbeddingDep, RerankingDep, SparseEmbeddingDep, VectorStoreDep
+from codeweaver.providers.embedding.providers.base import EmbeddingProvider
+from codeweaver.providers.reranking.providers.base import RerankingProvider
+from codeweaver.providers.vector_stores.base import VectorStoreProvider
 from codeweaver.semantic.classifications import AgentTask
 
 
@@ -117,7 +120,7 @@ def _get_settings() -> DictView[CodeWeaverSettingsDict]:
 
 
 async def _check_index_status(
-    context: Context | None, vector_store: VectorStoreDep = INJECTED
+    context: Context | None, vector_store: VectorStoreDep = INJECTED[VectorStoreProvider]
 ) -> tuple[bool, int]:
     """Check if index exists and get chunk count.
 
@@ -130,7 +133,9 @@ async def _check_index_status(
         - index_exists: True if collection exists in vector store
         - chunk_count: Number of chunks in collection (0 if doesn't exist)
     """
-    if vector_store is None or hasattr(vector_store, "__pydantic_serializer__"):
+    from codeweaver.di import Depends, DependsPlaceholder
+
+    if vector_store is None or isinstance(vector_store, (Depends, DependsPlaceholder)):
         try:
             from codeweaver.di import get_container
             from codeweaver.providers.vector_stores.base import VectorStoreProvider
@@ -167,44 +172,36 @@ async def _check_index_status(
 
 
 async def _ensure_index_ready(
-    context: Context | None, vector_store: VectorStoreDep | None = None
+    context: Any, vector_store: VectorStoreProvider | None = None
 ) -> None:
-    """Ensure index is ready by running indexer if needed.
+    """Ensure that the codebase is indexed before performing a search.
 
-    This function blocks until initial indexing is complete.
-
-    Args:
-        context: Optional MCP context
-        vector_store: Optional pre-initialized vector store instance to use
+    If indexing is already complete or in progress, this is a no-op.
     """
-    from codeweaver.di import get_container
-    from codeweaver.engine.indexer import Indexer
+    from codeweaver.server import get_state
 
-    try:
-        logger.info("Auto-indexing: Starting initial indexing...")
+    state = get_state()
+    indexer = state.indexer
 
-        container = get_container()
-        if vector_store:
-            from codeweaver.providers.vector_stores.base import VectorStoreProvider
+    if indexer:
+        # Resolve providers before checking if index exists
+        # This is needed because prime_index initializes providers lazily
+        if not indexer._providers_initialized:
+            await indexer._initialize_providers_async(vector_store=vector_store)
 
-            container.override(VectorStoreProvider, vector_store)
+        # Check if index exists by querying vector store for any chunks
+        # This is more robust than relying on manifest which might be out of sync
+        if indexer._vector_store:
+            try:
+                # Prime the index if no collections exist or if current is empty
+                # prime_index handles incremental indexing via manifest
+                # We enable reconciliation by default to fix any partial indexes
+                await indexer.prime_index(add_dense=True, add_sparse=True)
+            except Exception as e:
+                logger.warning("Auto-indexing failed: %s", e)
 
-        indexer = await container.resolve(Indexer)
-
-        # Run initial indexing (blocks until complete)
-        await indexer.prime_index()
-
-        # Log success
-        stats = indexer.stats
-        logger.info(
-            "Auto-indexing complete: %d files, %d chunks in %.2fs",
-            stats.files_processed,
-            stats.chunks_indexed,
-            stats.elapsed_time(),
-        )
-
-    except Exception as e:
-        logger.warning("Auto-indexing failed: %s", e)
+    else:
+        pass
 
 
 _set_max = get_max_tokens()
@@ -219,10 +216,10 @@ async def find_code(
     focus_languages: tuple[str, ...] | None = None,
     max_results: int = _set_max_results,
     context: Context | None = None,
-    vector_store: VectorStoreDep = INJECTED,
-    embedding_provider: EmbeddingDep = INJECTED,
-    sparse_provider: SparseEmbeddingDep = INJECTED,
-    reranking_provider: RerankingDep = INJECTED,
+    vector_store: VectorStoreDep = INJECTED[VectorStoreProvider],
+    embedding_provider: EmbeddingDep = INJECTED[EmbeddingProvider],
+    sparse_provider: SparseEmbeddingDep = INJECTED[Any],
+    reranking_provider: RerankingDep = INJECTED[RerankingProvider | None],
 ) -> FindCodeResponseSummary:
     """Find relevant code based on semantic search with intent-driven ranking.
 
@@ -247,25 +244,27 @@ async def find_code(
     strategies_used: list[SearchStrategy] = []
 
     # Manually resolve providers if not injected (DI fallback)
-    from codeweaver.di import get_container
+    from codeweaver.di import Depends, DependsPlaceholder, get_container
     from codeweaver.providers.embedding.providers.base import EmbeddingProvider
     from codeweaver.providers.vector_stores.base import VectorStoreProvider
 
     container = get_container()
 
-    if vector_store is None or hasattr(vector_store, "__pydantic_serializer__"):
+    if vector_store is None or isinstance(vector_store, (Depends, DependsPlaceholder)):
         try:
             vector_store = await container.resolve(VectorStoreProvider)
         except Exception:
             vector_store = None
 
-    if embedding_provider is None or hasattr(embedding_provider, "__pydantic_serializer__"):
+    if embedding_provider is None or isinstance(
+        embedding_provider, (Depends, DependsPlaceholder)
+    ):
         try:
             embedding_provider = await container.resolve(EmbeddingProvider)
         except Exception:
             embedding_provider = None
 
-    if sparse_provider is None or hasattr(sparse_provider, "__pydantic_serializer__"):
+    if sparse_provider is None or isinstance(sparse_provider, (Depends, DependsPlaceholder)):
         try:
             from codeweaver.providers.embedding.providers.base import SparseEmbeddingProvider
 
@@ -273,7 +272,9 @@ async def find_code(
         except Exception:
             sparse_provider = None
 
-    if reranking_provider is None or hasattr(reranking_provider, "__pydantic_serializer__"):
+    if reranking_provider is None or isinstance(
+        reranking_provider, (Depends, DependsPlaceholder)
+    ):
         try:
             from codeweaver.providers.reranking.providers.base import RerankingProvider
 

@@ -23,7 +23,7 @@ import time
 from functools import cache
 from importlib.util import find_spec
 from types import TracebackType
-from typing import Any, Self
+from typing import TYPE_CHECKING, Any, Self
 
 from pydantic import HttpUrl
 from pydantic.types import SecretStr
@@ -32,6 +32,10 @@ from codeweaver.config._project import CODEWEAVER_POSTHOG_PROJECT_KEY
 from codeweaver.core import uuid7
 from codeweaver.core.types.aliases import UUID7HexT
 from codeweaver.core.types.sentinel import Unset
+
+
+if TYPE_CHECKING:
+    from codeweaver.config.settings import CodeWeaverSettings
 
 
 NO_HOG = find_spec("posthog") is None
@@ -115,7 +119,14 @@ class PostHogClient:
 
         # Prefer environment variable, fallback to hardcoded key if not provided
         if api_key is None:
-            api_key = os.environ.get("CODEWEAVER_POSTHOG_API_KEY", CODEWEAVER_POSTHOG_PROJECT_KEY)
+            api_key = (
+                os.environ.get("CODEWEAVER_POSTHOG_API_KEY")
+                or os.environ.get("CODEWEAVER__TELEMETRY__API_KEY")
+                or os.environ.get("CODEWEAVER__TELEMETRY__POSTHOG_PROJECT_KEY")
+                or CODEWEAVER_POSTHOG_PROJECT_KEY
+            )
+            if isinstance(api_key, SecretStr):
+                api_key = api_key.get_secret_value()
 
         # Check at runtime if posthog is available (allows testing with mocked modules)
         if find_spec("posthog") is None:
@@ -132,9 +143,7 @@ class PostHogClient:
         if self.enabled and api_key:
             try:
                 self._client = Posthog(
-                    project_api_key=api_key
-                    if isinstance(api_key, str)
-                    else api_key.get_secret_value(),
+                    project_api_key=api_key,
                     host=host,
                     # Disable debug mode in production
                     debug=False,
@@ -157,7 +166,7 @@ class PostHogClient:
             self.logger.info("Telemetry disabled by configuration")
 
     @classmethod
-    def from_settings(cls) -> PostHogClient:
+    def from_settings(cls, settings: CodeWeaverSettings | None = None) -> PostHogClient:
         """
         Create PostHog client from telemetry settings.
 
@@ -167,7 +176,7 @@ class PostHogClient:
         from codeweaver.config.settings import get_settings
         from codeweaver.config.telemetry import TelemetrySettings
 
-        settings = get_settings().telemetry
+        settings = get_settings().telemetry  # ty:ignore[invalid-assignment]
         if not isinstance(settings, TelemetrySettings):
             from codeweaver.config.telemetry import DefaultTelemetrySettings
 

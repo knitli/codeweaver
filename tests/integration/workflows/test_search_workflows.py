@@ -115,9 +115,6 @@ async def test_cli_search_returns_results(test_project_path: Path, initialized_c
     Given: Test project path
     When: CLI search command executed via find_code_tool
     Then: Returns valid FindCodeResponseSummary structure
-
-    Note: Currently validates stub response. When find_code is re-enabled,
-    this test will validate actual search results.
     """
     from codeweaver.mcp.user_agent import find_code_tool
 
@@ -477,6 +474,8 @@ async def test_no_results_scenario(initialized_cw_state):
 @pytest.mark.network
 @pytest.mark.asyncio
 @pytest.mark.benchmark
+@pytest.mark.performance
+@pytest.mark.timing_sensitive
 async def test_search_performance(test_project_path: Path, initialized_cw_state):
     """T010: Search performance meets <3s requirement for ≤10k files (FR-037).
 
@@ -542,7 +541,7 @@ async def test_search_response_time_tracking(initialized_cw_state):
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_search_strategy_reporting(test_project_path: Path, configured_providers):
+async def test_search_strategy_reporting(test_project_path: Path, initialized_cw_state):
     """T010: Search strategy correctly reported in response.
 
     Given: Search with embeddings available
@@ -570,7 +569,7 @@ async def test_search_strategy_reporting(test_project_path: Path, configured_pro
 @pytest.mark.integration
 @pytest.mark.network
 @pytest.mark.asyncio
-async def test_search_languages_found(initialized_cw_state):
+async def test_search_languages_found(test_project_path: Path, initialized_cw_state):
     """T010: Languages found correctly reported.
 
     Given: Search across codebase

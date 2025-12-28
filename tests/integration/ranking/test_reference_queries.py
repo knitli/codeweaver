@@ -81,7 +81,7 @@ def load_reference_queries() -> list[ReferenceQuery]:
         FileNotFoundError: If reference_queries.yml not found
         yaml.YAMLError: If YAML is malformed
     """
-    fixture_path = Path(__file__).parent.parent / "fixtures" / "reference_queries.yml"
+    fixture_path = Path(__file__).parent.parent.parent / "fixtures" / "reference_queries.yml"
 
     if not fixture_path.exists():
         raise FileNotFoundError(f"Reference queries fixture not found: {fixture_path}")

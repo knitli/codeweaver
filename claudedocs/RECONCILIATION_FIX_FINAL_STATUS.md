@@ -1,199 +1,77 @@
-<!--
-SPDX-FileCopyrightText: 2025 Knitli Inc.
-SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+# Indexer Refactoring and Reconciliation Fix Plan
 
-SPDX-License-Identifier: MIT OR Apache-2.0
--->
+## 1. Executive Summary
+This document outlines the root causes of the massive performance bottlenecks and test failures observed in the integration test suite (particularly `test_search_workflows.py` and `test_reconciliation_integration.py`). It summarizes completed optimizations and provides a detailed roadmap for refactoring `src/codeweaver/engine/indexer/indexer.py` to meet the project's reliability and performance requirements.
 
-# Reconciliation Test Fix - Final Status
+## 2. Work Done So Far
 
-## Overview
-Fixed Pydantic v2 mocking errors in `tests/integration/test_reconciliation_integration.py`.
+### 2.1 Dependency Injection (DI) Container Enhancements
+- **Robust String Resolution**: Updated `Container` to support string annotations (crucial for `from __future__ import annotations`) by evaluating them against module globals.
+- **Annotated Type Support**: Improved unwrapping of `Annotated` types to ensure that custom type aliases (e.g., `SettingsDep`, `ProviderRegistryDep`) resolve to their underlying registered classes or factories.
+- **Required Parameter Auto-resolution**: Modified `_call_with_injection` to attempt auto-resolution for required parameters based on type hints, even if they lack an explicit `INJECTED` sentinel.
+- **Factory Registration**: Registered all core classes AND their factory functions in `providers.py` to ensure `Depends(get_...)` correctly maps to the intended singletons or overrides.
 
-**Status**: 6 of 10 tests passing (60% fixed)
+### 2.2 Semantic Chunker Optimizations
+- **O(N) Tree Traversal**: Refactored `_find_chunkable_nodes` from an $O(N \cdot D)$ walk (where $D$ is depth) to a single-pass $O(N)$ recursive traversal. This fixed massive hangs on deeply nested files (like the 201-level `deep_nesting.py` fixture).
+- **Efficient Error Detection**: Replaced manual recursive error finding with the native `ast-grep` `find_all(kind="ERROR")` call, allowing the system to identify malformed files nearly instantaneously.
+- **Log Noise Reduction**: Moved full stack traces for expected `ParseError` and `ASTDepthExceededError` to the `DEBUG` level, significantly reducing log bloat during large indexing runs.
 
-## Fixes Applied
+### 2.3 Chunker Selection Improvements
+- **Size-Based Guardrails**: Implemented a 500KB limit for `SemanticChunker`. Files exceeding this size (like large JSON node-type definitions) now automatically use the faster `DelimiterChunker`, preventing resource exhaustion and "5000 chunks per file" errors.
 
-### 1. Correct Method Names ✅
-**Problem**: Tests patched non-existent `_index_files` method
-**Solution**: Changed to `_perform_batch_indexing_async` (7 occurrences)
+---
 
-```python
-# Before
-with patch.object(indexer, "_index_files", AsyncMock()):
+## 3. The `indexer.py` Problem Statement
 
-# After
-object.__setattr__(indexer, "_perform_batch_indexing_async", mock_perform_batch)
-```
+Despite the optimizations above, the `Indexer` remains the primary source of test failures due to three architectural flaws:
 
-### 2. Pydantic v2 Mocking Compatibility ✅
-**Problem**: `patch.object()` triggers `__pydantic_extra__` AttributeError
-**Solution**: Use `object.__setattr__()` to bypass Pydantic validation
+### 3.1 Project Path Resolution Failure
+**Problem**: In `__init__`, the `Indexer` was falling back to the global `get_project_path()` (the current working directory) before the DI container could inject the overridden test settings.
+**Consequence**: Integration tests meant to index 5 small files in a `/tmp` directory instead indexed the *entire CodeWeaver source tree* (700+ files, 30,000+ chunks), leading to timeouts and "Collection not found" errors when Search and Indexer mismatched collections.
 
-```python
-# Pydantic v2 compatible mocking pattern
-async def mock_method(*args, **kwargs):
-    return None
+### 3.2 Reconciliation Phase Early Exit
+**Problem**: `prime_index` was designed to return early if `files_to_index` was empty (i.e., all files on disk matched the manifest hashes).
+**Consequence**: This bypassed the **Automatic Reconciliation** phase. If a previous indexing run was interrupted or if a user added a new embedding provider (e.g., switched from dense-only to hybrid), the system would never detect or fix the missing embeddings because no *files* had changed.
 
-object.__setattr__(pydantic_instance, "method_name", mock_method)
-```
+### 3.3 Missing Parameters and Regression
+**Problem**: A previous edit introduced a regression where `add_dense` and `add_sparse` variables were used in `prime_index` but were not defined as parameters or local variables.
+**Consequence**: This triggered `NameError` during the reconciliation phase, crashing the indexing process.
 
-### 3. Prevent Early Return ✅
-**Problem**: `prime_index()` returns early if no files discovered (line 1314-1317)
-**Solution**: Mock `_discover_files_to_index` to return test files
+---
 
-```python
-def mock_discover_files(progress_callback=None):
-    return [file1, file2]
+## 4. Proposed `indexer.py` Changes
 
-object.__setattr__(indexer, "_discover_files_to_index", mock_discover_files)
-```
+To address these issues, the following specific changes are required:
 
-### 4. Provider Initialization ✅
-**Problem**: `from_settings_async()` tries to connect to Qdrant and fails
-**Solution**: Mock `_initialize_providers_async` and manually set providers
+### 4.1 Refactor `__init__`
+- **Logic**: Modify the constructor to store the `settings` dependency immediately and defer `_project_path` resolution if settings are uninitialized.
+- **Fix**: Remove the aggressive fallback to `get_project_path()` in the constructor to allow `_initialize_providers_async` to set the path from overridden settings later.
 
-```python
-# Skip automatic provider initialization
-async def mock_init_providers_async(self):
-    pass
+### 4.2 Enhance `_initialize_providers_async`
+- **Logic**: Ensure this method acts as the "final sync" point for all managers.
+- **Fix**: Force-sync `_project_path`, `_checkpoint_manager.project_path`, and `_manifest_manager.project_path` with `self._settings.project_path`.
+- **Collection Sync**: If using `VectorStoreFailoverManager`, ensure the `collection` name is correctly propagated from the primary store to the active store instance.
 
-with patch.object(Indexer, "_initialize_providers_async", mock_init_providers_async):
-    indexer = await Indexer.from_settings_async(settings_dict)
+### 4.3 Refactor `prime_index` REACHABILITY
+- **Logic**: Change the control flow to make reconciliation an independent phase.
+- **Change**:
+  ```python
+  if files_to_index:
+      await self._perform_batch_indexing_async(...)
+  else:
+      logger.info("No new files to index")
+  
+  # ALWAYS run this unless force_reindex is True
+  if not force_reindex and (self._embedding_provider or self._sparse_provider):
+      await self.run_reconciliation(...)
+  ```
+- **Signature Fix**: Add `add_dense: bool = True` and `add_sparse: bool = True` to the `prime_index` signature.
 
-# Manually set required attributes for reconciliation
-object.__setattr__(indexer, "_vector_store", provider)
-object.__setattr__(indexer, "_embedding_provider", mock_dense_provider)
-object.__setattr__(indexer, "_sparse_provider", mock_sparse_provider)
-```
+### 4.4 Return Type Consistency
+- **Fix**: Update the return logic to return a `dict` (reconciliation summary) if reconciliation ran, or an `int` (files indexed) otherwise. Update all integration test assertions to handle this union type.
 
-## Test Results
-
-### ✅ Passing Tests (6/10)
-
-1. **test_reconciliation_with_add_dense_flag** - Tests adding dense embeddings specifically
-2. **test_reconciliation_with_add_sparse_flag** - Tests adding sparse embeddings specifically
-3. **test_reconciliation_skipped_when_no_files_need_embeddings** - Tests early exit when all complete
-4. **test_reconciliation_not_called_when_force_reindex_true** - Tests force_reindex flag
-5. **test_reconciliation_not_called_when_no_vector_store** - Tests missing vector store condition
-6. **test_reconciliation_not_called_when_no_providers** - Tests missing provider condition
-
-### ❌ Failing Tests (4/10)
-
-1. **test_prime_index_reconciliation_without_force_reindex** - Main reconciliation path test
-2. **test_reconciliation_handles_provider_error_gracefully** - ProviderError handling
-3. **test_reconciliation_handles_indexing_error_gracefully** - IndexingError handling
-4. **test_reconciliation_handles_connection_error_gracefully** - ConnectionError handling
-
-**Common Failure**: "add_missing_embeddings_to_existing_chunks was NOT called"
-
-## Root Cause Analysis - Remaining Failures
-
-### Hypothesis
-The reconciliation code path (indexer.py:1334-1400) requires ALL of these conditions:
-
-```python
-if (
-    not force_reindex          # ✅ Set to False in tests
-    and self._vector_store     # ✅ Manually set via object.__setattr__
-    and (self._embedding_provider or self._sparse_provider)  # ✅ Manually set
-):
-    # Check if files need embeddings
-    files_needing = self._file_manifest.get_files_needing_embeddings(...)
-
-    needs_dense = bool(files_needing.get("dense_only") and self._embedding_provider)
-    needs_sparse = bool(files_needing.get("sparse_only") and self._sparse_provider)
-
-    if needs_dense or needs_sparse:  # ⚠️ POTENTIAL ISSUE
-        # Reconciliation runs here
-```
-
-### Potential Issues
-
-1. **Manifest State**: `get_files_needing_embeddings()` may not be returning files that need reconciliation
-   - Test sets manifest with files missing sparse embeddings
-   - But method might not detect them due to model mismatch
-
-2. **Model Configuration**: `_get_current_embedding_models()` may return different models than manifest expects
-   - Manifest shows `test-provider/test-dense-model`
-   - Current models from mocked providers might differ
-
-3. **Discovery Timing**: Files in manifest might not match discovered files
-   - Mocked `_discover_files_to_index` returns `[file1, file2]`
-   - But manifest might have different file paths
-
-## Recommended Next Steps
-
-### Option 1: Debug Manifest State
-Add logging to see what `get_files_needing_embeddings()` returns:
-
-```python
-# In test, before calling prime_index
-current_models = {
-    "dense_provider": mock_dense_provider.provider_name,
-    "dense_model": mock_dense_provider.model,
-    "sparse_provider": mock_sparse_provider.provider_name if mock_sparse_provider else None,
-    "sparse_model": mock_sparse_provider.model if mock_sparse_provider else None,
-}
-
-files_needing = indexer._file_manifest.get_files_needing_embeddings(**current_models)
-print(f"Files needing embeddings: {files_needing}")
-```
-
-### Option 2: Simplify Test Approach
-Instead of testing through `prime_index()`, directly call `add_missing_embeddings_to_existing_chunks()`:
-
-```python
-# Simpler test that bypasses prime_index complexity
-result = await indexer.add_missing_embeddings_to_existing_chunks(
-    add_dense=False,
-    add_sparse=True
-)
-
-assert result["files_processed"] > 0
-```
-
-**Note**: Tests 2-4 (add_dense_flag, add_sparse_flag, skipped_when_no_files) already use this simpler approach and ALL PASS.
-
-### Option 3: Accept Partial Fix
-- 6/10 tests passing is significant progress
-- The 3 passing "add_dense/sparse/skip" tests cover the core reconciliation logic
-- The 3 passing "not_called" tests cover the conditional gates
-- The 4 failing tests are all integration tests through `prime_index()`
-
-**Conclusion**: The core reconciliation logic is properly tested. The `prime_index()` integration tests may require deeper investigation into manifest/model coordination.
-
-## Files Modified
-
-- `/home/knitli/codeweaver/tests/integration/test_reconciliation_integration.py` (all 10 test functions)
-  - 7 method name changes
-  - 10+ object.__setattr__ calls
-  - 7 mock_init_providers_async additions
-  - 4 _discover_files_to_index mocks
-  - 4 explicit provider attribute settings
-
-## Key Learnings
-
-### Pydantic v2 Mocking Pattern
-```python
-# Always use object.__setattr__ for Pydantic v2 BaseModel instances
-object.__setattr__(pydantic_instance, "attribute", value)
-object.__setattr__(pydantic_instance, "method", mock_function)
-```
-
-### Private Attribute Access in Pydantic
-```python
-# Private attributes (PrivateAttr) require object.__setattr__
-# Regular fields use normal assignment after model creation
-```
-
-### Integration Test Complexity
-- Integration tests testing through multiple layers are brittle
-- Direct unit tests of target methods are more reliable
-- Mock at the narrowest scope possible
-
-## References
-
-- Indexer source: `src/codeweaver/engine/indexer/indexer.py:1334-1400`
-- Test file: `tests/integration/test_reconciliation_integration.py`
-- Pydantic v2 migration: https://docs.pydantic.dev/latest/migration/
+## 5. Summary of Refactoring Benefits
+1. **Accuracy**: Tests will only touch files they own, ensuring 100% reproducible results.
+2. **Speed**: Indexing time for search tests will drop from minutes/hours to seconds.
+3. **Resilience**: The system will automatically heal missing embeddings even on "up-to-date" files.
+4. **DI Compliance**: Moves the codebase closer to a "pure DI" model where components are truly decoupled from the global environment.

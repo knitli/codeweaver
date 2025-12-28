@@ -7,9 +7,37 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 
 # Dependency Injection Architecture Plan for CodeWeaver v0.2/v0.3
 
-**Status**: Planning / Analysis  
-**Created**: 2025-10-31  
+**Status**: ✅ Core Implementation Complete (Type-Safe INJECTED Pattern)
+**Created**: 2025-10-31
+**Updated**: 2025-12-27 (Type-safe injection implementation)
 **Target**: 2nd or 3rd alpha feature release
+
+## Implementation Update (2025-12-27)
+
+**✅ Type-Safe Dependency Injection Implemented**
+
+The core DI system described in this document has been implemented with an enhanced type-safe pattern:
+
+```python
+from codeweaver.di import INJECTED
+from codeweaver.di.providers import EmbeddingDep
+from codeweaver.providers.embedding.providers.base import EmbeddingProvider
+
+# Recommended: Type-safe INJECTED with subscript syntax
+async def my_function(
+    embedding: EmbeddingDep = INJECTED[EmbeddingProvider]
+) -> None:
+    # Type checkers see EmbeddingProvider, DI container injects the dependency
+    ...
+```
+
+The `INJECTED[Type]` pattern provides:
+- ✅ No function calls in signatures (uses subscript operator)
+- ✅ Type checker satisfaction (no `ty:ignore` needed)
+- ✅ Runtime DI container recognition
+- ✅ Full backward compatibility
+
+See `src/codeweaver/di/README.md` for complete usage documentation.
 
 ## Executive Summary
 

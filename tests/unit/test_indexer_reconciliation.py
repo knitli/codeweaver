@@ -33,17 +33,14 @@ class TestAddMissingEmbeddings:
     """Test the add_missing_embeddings_to_existing_chunks method."""
 
     @pytest.fixture
-    async def mock_indexer(self, tmp_path: Path):
+    async def mock_indexer(self, tmp_path: Path, clean_container):
         """Create an indexer with mocked dependencies for reconciliation testing."""
-        from codeweaver.di import get_container
+        from codeweaver.engine.indexer.indexer import Indexer
         from codeweaver.providers.embedding.providers.base import EmbeddingProvider
         from codeweaver.providers.vector_stores.base import VectorStoreProvider
 
-        container = get_container()
-        container.clear_overrides()
-
         # Mock vector store
-        mock_vs = MagicMock()
+        mock_vs = MagicMock(spec=VectorStoreProvider)
         mock_vs.collection = "test_collection"
         mock_vs.client = MagicMock()
         mock_vs.client.retrieve = AsyncMock()
@@ -64,32 +61,45 @@ class TestAddMissingEmbeddings:
         mock_sp.model_name = "bm25"
         mock_sp.initialize_async = AsyncMock()
 
-        # Apply overrides
-        container.override(VectorStoreProvider, mock_vs)
-        container.override(EmbeddingProvider, mock_ep)
+        # Apply overrides using the new context manager
+        from codeweaver.di.providers import get_sparse_embedding_provider, get_indexer
+        
+        overrides = {
+            VectorStoreProvider: lambda: mock_vs,
+            EmbeddingProvider: lambda: mock_ep,
+            get_sparse_embedding_provider: lambda: mock_sp,
+        }
 
-        indexer = await container.resolve(Indexer)
+        with clean_container.use_overrides(overrides):
+            # Resolve indexer via container - this ensures all dependencies are injected
+            indexer = await clean_container.resolve(Indexer)
 
-        # Ensure project path matches tmp_path
-        indexer._project_path = tmp_path
-        indexer._checkpoint_manager.project_path = tmp_path
-        indexer._manifest_manager.project_path = tmp_path
+            # Set necessary path state that isn't handled by default injection
+            indexer._project_path = tmp_path
+            if indexer._checkpoint_manager:
+                indexer._checkpoint_manager.project_path = tmp_path
+            if indexer._manifest_manager:
+                indexer._manifest_manager.project_path = tmp_path
 
-        # Set up manifest
-        indexer._file_manifest = IndexFileManifest(project_path=tmp_path)
+            # Set up manifest
+            from codeweaver.engine.indexer.manifest import IndexFileManifest
+            indexer._file_manifest = IndexFileManifest(project_path=tmp_path)
 
-        # Manually set providers
-        indexer._vector_store = mock_vs
-        indexer._embedding_provider = mock_ep
-        indexer._sparse_provider = mock_sp
-        indexer._providers_initialized = True
+            # Mark as initialized to avoid actual network/provider calls
+            indexer._providers_initialized = True
+            
+            # Manually ensure internal fields are set if DI resolution didn't pick them up
+            # (which can happen if they are resolved as Any or aliases)
+            indexer._vector_store = mock_vs
+            indexer._embedding_provider = mock_ep
+            indexer._sparse_provider = mock_sp
 
-        # Mock manifest lock
-        indexer._manifest_lock = AsyncMock()
-        indexer._manifest_lock.__aenter__ = AsyncMock()
-        indexer._manifest_lock.__aexit__ = AsyncMock()
+            # Mock manifest lock
+            indexer._manifest_lock = AsyncMock()
+            indexer._manifest_lock.__aenter__ = AsyncMock()
+            indexer._manifest_lock.__aexit__ = AsyncMock()
 
-        return indexer
+            yield indexer
 
     @pytest.mark.asyncio
     async def test_only_adds_sparse_when_dense_exists(

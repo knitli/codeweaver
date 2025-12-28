@@ -131,7 +131,7 @@ def test_project_path(tmp_path: Path) -> Path:
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_sparse_only_fallback(initialize_test_settings):
+async def test_sparse_only_fallback(initialize_test_settings, clean_container):
     """T013: Search falls back to sparse-only when dense embedding fails.
 
     Given: VoyageAI embedding API unavailable
@@ -140,16 +140,12 @@ async def test_sparse_only_fallback(initialize_test_settings):
     """
     from codeweaver.agent_api.find_code import find_code
     from codeweaver.core.types.search import SearchStrategy
-    from codeweaver.di import get_container
     from codeweaver.providers.embedding.providers.base import (
         EmbeddingProvider,
         SparseEmbeddingProvider,
     )
     from codeweaver.providers.embedding.types import SparseEmbedding
     from codeweaver.providers.vector_stores.base import VectorStoreProvider
-
-    container = get_container()
-    container.clear_overrides()
 
     # Dense embedding fails
     mock_dense_provider = AsyncMock(spec=EmbeddingProvider)
@@ -171,13 +167,14 @@ async def test_sparse_only_fallback(initialize_test_settings):
     mock_collection_info.points_count = 100
     mock_vector_store.client.get_collection.return_value = mock_collection_info
 
-    # Apply overrides - use lambdas because Mocks are callable and the container
-    # would try to call them as factories otherwise.
-    container.override(EmbeddingProvider, lambda: mock_dense_provider)
-    container.override(SparseEmbeddingProvider, lambda: mock_sparse_provider)
-    container.override(VectorStoreProvider, lambda: mock_vector_store)
+    # Apply overrides using context manager
+    overrides = {
+        EmbeddingProvider: lambda: mock_dense_provider,
+        SparseEmbeddingProvider: lambda: mock_sparse_provider,
+        VectorStoreProvider: lambda: mock_vector_store,
+    }
 
-    try:
+    with clean_container.use_overrides(overrides):
         # Execute search
         result = await find_code("test query")
 
@@ -190,8 +187,6 @@ async def test_sparse_only_fallback(initialize_test_settings):
 
         # Should have called sparse embedding
         mock_sparse_provider.embed_query.assert_called_once()
-    finally:
-        container.clear_overrides()
 
 
 @pytest.mark.integration
@@ -301,40 +296,59 @@ async def test_circuit_breaker_half_open():
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_indexing_continues_on_file_errors(initialize_test_settings, test_project_path: Path):
+async def test_indexing_continues_on_file_errors(initialize_test_settings, test_project_path: Path, clean_container):
     """T013: Indexing continues when file processing errors occur.
 
     Given: 2 good Python files and 2 binary files (filtered out)
     When: Indexing runs
     Then: Successfully discovers and processes the 2 Python files
     """
+    from codeweaver.config.settings import CodeWeaverSettings
     from codeweaver.engine.indexer import Indexer
 
-    indexer = Indexer(
-        project_path=test_project_path,
-        auto_initialize_providers=False,  # Skip provider init for this test
-    )
+    # Configure settings for this test
+    async def get_test_settings() -> CodeWeaverSettings:
+        from codeweaver.config.settings import get_settings
+        settings = get_settings()
+        settings.project_path = test_project_path
+        return settings
 
-    # Run indexing
-    discovered_count = await indexer.prime_index(force_reindex=True)
+    overrides = {
+        CodeWeaverSettings: get_test_settings,
+    }
 
-    # Should discover the 2 Python files (.bin files are filtered out during discovery)
-    assert discovered_count >= 2
+    with clean_container.use_overrides(overrides):
+        # Resolve Indexer via DI
+        indexer = await clean_container.resolve(Indexer)
+        
+        # Ensure it's not trying to hit real APIs
+        indexer._providers_initialized = True
+        
+        # Manually set walker settings if they didn't get picked up
+        # Indexer uses _walker_settings internally
+        indexer._walker_settings = {"path": str(test_project_path)}
 
-    # Allow indexing to complete
-    await asyncio.sleep(1)
+        # Run indexing
+        discovered_count = await indexer.prime_index(force_reindex=True)
 
-    stats = indexer.stats
+        # Should discover the 2 Python files (.bin files are filtered out during discovery)
+        assert isinstance(discovered_count, int)
+        assert discovered_count >= 2
 
-    # Should have discovered at least 2 Python files
-    assert stats.total_files_discovered() >= 2
+        # Allow indexing to complete
+        await asyncio.sleep(1)
 
-    # Binary files are filtered out before processing, so no errors expected
+        stats = indexer.stats
+
+        # Should have discovered at least 2 Python files
+        assert stats.total_files_discovered() >= 2
+
+        # Binary files are filtered out before processing, so no errors expected
 
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_warning_at_25_errors(initialize_test_settings, tmp_path: Path):
+async def test_warning_at_25_errors(initialize_test_settings, tmp_path: Path, clean_container):
     # sourcery skip: remove-assert-true, remove-redundant-if
     """T013: Warning displayed when ≥25 file processing errors occur.
 
@@ -342,6 +356,7 @@ async def test_warning_at_25_errors(initialize_test_settings, tmp_path: Path):
     When: Indexing encounters ≥25 errors
     Then: Warning displayed to stderr
     """
+    from codeweaver.config.settings import CodeWeaverSettings
     from codeweaver.engine.indexer import Indexer
 
     # Create project with many corrupted files
@@ -356,7 +371,18 @@ async def test_warning_at_25_errors(initialize_test_settings, tmp_path: Path):
     (project_root / "good1.py").write_text("def test(): pass")
     (project_root / "good2.py").write_text("def hello(): pass")
 
-    indexer = Indexer(project_path=project_root, auto_initialize_providers=False)
+    # Configure settings for this test
+    async def get_test_settings() -> CodeWeaverSettings:
+        from codeweaver.config.settings import get_settings
+        settings = get_settings()
+        settings.project_path = project_root
+        return settings
+
+    clean_container.override(CodeWeaverSettings, get_test_settings)
+    
+    # Resolve Indexer via DI
+    indexer = await clean_container.resolve(Indexer)
+    indexer._providers_initialized = True
 
     # Capture stderr
     import io
@@ -383,50 +409,66 @@ async def test_warning_at_25_errors(initialize_test_settings, tmp_path: Path):
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_health_shows_degraded_status(initialize_test_settings):
+async def test_health_shows_degraded_status(initialize_test_settings, clean_container):
     """T013: Health endpoint shows degraded status when some services down.
 
     Given: Embedding API down, sparse search working
     When: Query /health/ endpoint
     Then: Status = degraded, circuit_breaker_state = open
     """
-    from codeweaver.common.statistics import get_session_statistics
+    from codeweaver.common.registry import ProviderRegistry
+    from codeweaver.common.statistics import SessionStatistics
     from codeweaver.server.health.health_service import HealthService
 
     # Mock provider registry with degraded state
-    with patch("codeweaver.common.registry.get_provider_registry") as mock_registry:
-        mock_reg = MagicMock()
-        mock_registry.return_value = mock_reg
+    mock_reg = MagicMock() # Use loose mock to avoid spec mismatch issues
 
-        # Dense embedding provider with open circuit breaker
-        mock_dense = MagicMock()
-        mock_dense.circuit_breaker_state = CircuitBreakerState.OPEN
-        mock_reg.get_embedding_provider_instance.return_value = mock_dense
+    # Dense embedding provider with open circuit breaker
+    mock_dense = MagicMock()
+    mock_dense.circuit_breaker_state = CircuitBreakerState.OPEN
+    mock_reg.get_provider_instance.side_effect = lambda enum, kind, **kw: (
+        mock_dense if kind == "embedding" else 
+        mock_sparse if kind == "sparse_embedding" else
+        mock_vector
+    )
+    
+    # Also handle the get_X_provider_instance methods if they are used
+    mock_reg.get_embedding_provider_instance.return_value = mock_dense
 
-        # Sparse embedding provider working
-        mock_sparse = MagicMock()
-        mock_sparse.circuit_breaker_state = CircuitBreakerState.CLOSED
-        mock_reg.get_sparse_embedding_provider_instance.return_value = mock_sparse
+    # Sparse embedding provider working
+    mock_sparse = MagicMock()
+    mock_sparse.circuit_breaker_state = CircuitBreakerState.CLOSED
+    mock_reg.get_sparse_embedding_provider_instance.return_value = mock_sparse
 
-        # Vector store working
-        mock_vector = AsyncMock()
-        mock_vector.health_check = AsyncMock(return_value={"status": "up"})
-        mock_reg.get_vector_store_provider_instance.return_value = mock_vector
+    # Vector store working
+    mock_vector = AsyncMock()
+    mock_vector.health_check = AsyncMock(return_value={"status": "up"})
+    mock_reg.get_vector_store_provider_instance.return_value = mock_vector
 
-        # Get the session statistics instance
-        stats = get_session_statistics()
+    # Mock the stats object
+    mock_stats = MagicMock(spec=SessionStatistics)
+    mock_timing = MagicMock()
+    mock_stats.get_timing_statistics.return_value = mock_timing
 
-        # Create health service
-        health_service = HealthService(
-            provider_registry=mock_reg, startup_stopwatch=time.monotonic(), statistics=stats
-        )
+    # Apply overrides
+    from codeweaver.di.providers import get_statistics
+    overrides = {
+        ProviderRegistry: lambda: mock_reg,
+        SessionStatistics: lambda: mock_stats,
+        get_statistics: lambda: mock_stats,
+    }
+
+    with clean_container.use_overrides(overrides):
+        # Resolve health service via DI
+        health_service = await clean_container.resolve(HealthService)
+        # Manually set stopwatch to ensure consistent timing
+        health_service.startup_stopwatch = time.monotonic()
 
         # Get health response
         response = await health_service.get_health_response()
 
         # Should be degraded (sparse works, dense down)
         assert response.status in ["degraded", "healthy"]
-        # Note: Exact status depends on health service implementation
 
         # Circuit breaker state should be exposed
         if hasattr(response, "services") and hasattr(response.services, "embedding_provider"):
@@ -485,7 +527,7 @@ async def test_retry_with_exponential_backoff():
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_graceful_shutdown_with_checkpoint(initialize_test_settings):
+async def test_graceful_shutdown_with_checkpoint(initialize_test_settings, clean_container):
     """T013: Server saves checkpoint on graceful shutdown.
 
     Given: Indexing in progress
@@ -495,15 +537,30 @@ async def test_graceful_shutdown_with_checkpoint(initialize_test_settings):
     # Create test project
     import tempfile
 
+    from codeweaver.config.settings import CodeWeaverSettings
     from codeweaver.engine.indexer import CheckpointManager, Indexer
 
     with tempfile.TemporaryDirectory() as tmpdir:
         project_root = Path(tmpdir)
         (project_root / "test.py").write_text("def test(): pass")
 
-        indexer = Indexer(project_path=project_root, auto_initialize_providers=False)
+        # Configure settings for this test
+        async def get_test_settings() -> CodeWeaverSettings:
+            from codeweaver.config.settings import get_settings
+            settings = get_settings()
+            settings.project_path = project_root
+            return settings
+
+        clean_container.override(CodeWeaverSettings, get_test_settings)
+        
+        # Resolve Indexer via DI
+        indexer = await clean_container.resolve(Indexer)
+        indexer._providers_initialized = True
 
         # Start indexing
+        # Note: we need to ensure walker settings are present on the indexer instance
+        indexer._walker_settings = {"path": str(project_root)}
+
         indexer.prime_index(force_reindex=True)
 
         # Simulate SIGTERM by calling signal handler
@@ -522,7 +579,7 @@ async def test_graceful_shutdown_with_checkpoint(initialize_test_settings):
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_error_logging_structured():
+async def test_error_logging_structured(clean_container):
     # sourcery skip: use-contextlib-suppress
     """T013: Errors logged with structured format (FR-040).
 
@@ -567,6 +624,7 @@ async def test_error_logging_structured():
         # Create temporary directory with a file that will cause processing errors
         import tempfile
 
+        from codeweaver.config.settings import CodeWeaverSettings
         from codeweaver.engine.indexer import Indexer
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -575,7 +633,20 @@ async def test_error_logging_structured():
             corrupt_file = test_path / "test.py"
             corrupt_file.write_bytes(b"\xff\xfe" * 100)  # Invalid UTF-8
 
-            indexer = Indexer(project_path=test_path, auto_initialize_providers=False)
+            # Configure settings for this test
+            async def get_test_settings() -> CodeWeaverSettings:
+                from codeweaver.config.settings import get_settings
+                settings = get_settings()
+                settings.project_path = test_path
+                return settings
+
+            clean_container.override(CodeWeaverSettings, get_test_settings)
+            
+            # Resolve Indexer via DI
+            indexer = await clean_container.resolve(Indexer)
+            indexer._providers_initialized = True
+            indexer._walker_settings = {"path": str(test_path)}
+            
             await indexer.prime_index(force_reindex=True)
 
         # Check log output has error messages

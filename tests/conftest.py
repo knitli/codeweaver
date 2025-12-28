@@ -498,3 +498,36 @@ def reset_cli_settings_cache() -> GeneratorType:
     reset_settings()
     yield
     reset_settings()
+
+
+@pytest.fixture(autouse=True)
+def reset_di_container() -> GeneratorType:
+    """Reset DI container between tests to ensure isolation."""
+    from codeweaver.di.container import reset_container
+
+    reset_container()
+    yield
+    reset_container()
+
+
+@pytest.fixture
+def clean_container():
+    """Provides a fresh DI container with all overrides cleared.
+
+    Usage:
+        def test_something(clean_container):
+            clean_container.override(...)
+    """
+    from codeweaver.di import get_container
+    container = get_container()
+    container.clear_overrides()
+    yield container
+    container.clear_overrides()
+
+
+@pytest.fixture
+def test_project_path(tmp_path: Path) -> Path:
+    """Create a test project path for CLI testing."""
+    project = tmp_path / "test_project"
+    project.mkdir()
+    return project

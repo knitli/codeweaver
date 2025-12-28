@@ -22,6 +22,7 @@ import os
 
 from pathlib import Path
 from unittest.mock import patch
+from typing import AsyncGenerator
 
 import pytest
 
@@ -32,22 +33,12 @@ import pytest
 
 
 @pytest.fixture
-async def indexed_test_project(known_test_codebase, actual_vector_store):
-    """Create pre-indexed test project with configured settings.
+async def setup_indexed_codebase(
+    known_test_codebase: Path, actual_vector_store, clean_container
+) -> AsyncGenerator[Path, None]:
+    """Fixture to ensure the known test codebase is indexed.
 
-    This fixture:
-    1. Configures CodeWeaverSettings with project path
-    2. Uses codeweaver.test.toml config (auto-loaded via CODEWEAVER_TEST_MODE="true")
-    3. Creates and initializes the Indexer with shared vector store
-    4. Indexes the test codebase (~5 files, ~15-20 chunks)
-    5. Yields the project path for tests
-
-    **Performance Note:** This fixture performs REAL indexing with actual embeddings,
-    which can take 2-5 minutes on CPU. The lightweight 30M model is used for speed.
-    Ensure pytest timeout is set to at least 10 minutes for tests using this fixture.
-
-    Tests using this fixture can call find_code() without worrying about
-    indexing - the project is already indexed and settings are configured.
+    Uses a shared in-memory vector store across all tests for efficiency.
     """
     import inspect
     import logging
@@ -64,28 +55,31 @@ async def indexed_test_project(known_test_codebase, actual_vector_store):
 
     # Create settings explicitly with the test codebase path
     settings = CodeWeaverSettings(project_path=known_test_codebase)
-    serialized_settings = settings.view
-
-    # Patch provider registry and settings
+    
+    # Patch time for deterministic behavior if needed (still using patch for non-DI components)
     call_count = [0]
 
     def mock_time() -> float:
         call_count[0] += 1
         return 1000000.0 + call_count[0] * 0.001
 
-    # Trust the config system - codeweaver.test.toml loaded via CODEWEAVER_TEST_MODE="true"
-    # We must patch get_settings to return our test settings so find_code finds the right index
+    # Override settings and vector store in container
+    from codeweaver.providers.vector_stores.base import VectorStoreProvider
+    
+    overrides = {
+        CodeWeaverSettings: lambda: settings,
+        VectorStoreProvider: lambda: actual_vector_store,
+    }
+
     with (
         patch.dict(os.environ, {"CODEWEAVER_PROJECT_PATH": str(known_test_codebase)}),
-        patch("codeweaver.config.settings.get_settings", return_value=settings),
-        patch("codeweaver.config.settings.get_settings_map", return_value=serialized_settings),
         patch("codeweaver.agent_api.find_code.time.time", side_effect=mock_time),
         patch("codeweaver.core.get_project_path", return_value=known_test_codebase),
+        clean_container.use_overrides(overrides)
     ):
-        # Create and initialize indexer using our explicit settings and shared vector store
-        indexer = await Indexer.from_settings_async(
-            serialized_settings, vector_store=actual_vector_store
-        )
+        # Resolve Indexer via DI
+        indexer = await clean_container.resolve(Indexer)
+        
         # Use force_reindex=True to ensure we actually index files in every test run
         await indexer.prime_index(force_reindex=True)
 

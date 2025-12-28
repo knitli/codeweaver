@@ -510,7 +510,11 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
         classification = (
             humanize(self.classification.name.as_title) if self.classification else "Not classified"
         )
-        text_snippet = humanize(self.text.strip().splitlines()[0])
+
+        # Safely handle empty text for snippet
+        lines = self.text.strip().splitlines()
+        text_snippet = humanize(lines[0]) if lines else ""
+
         if len(text_snippet) > 25:
             text_snippet = f"{text_snippet[:22]}..."
         return (

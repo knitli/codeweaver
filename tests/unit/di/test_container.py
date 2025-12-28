@@ -21,7 +21,7 @@ async def mock_factory() -> MockService:
 
 
 class NestedService:
-    def __init__(self, service: Annotated[MockService, Depends(mock_factory)] = INJECTED):  # ty:ignore[invalid-parameter-default]
+    def __init__(self, service: Annotated[MockService, Depends(mock_factory)] = INJECTED[MockService]):
         self.service = service
 
 

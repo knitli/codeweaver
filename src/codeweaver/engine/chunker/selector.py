@@ -168,10 +168,19 @@ class ChunkerSelector:
                     extra={"file_path": str(file.absolute_path), "error": str(e)},
                 )
 
+        # Performance optimization: large files (>500KB) should avoid semantic chunking
+        # as it can be very slow and produce excessive chunks for non-code files (like large JSON)
+        is_large_file = False
+        try:
+            if file.absolute_path.stat().st_size > 500 * 1024:
+                is_large_file = True
+        except (OSError, AttributeError):
+            pass
+
         language = self._detect_language(file)
 
-        # Try semantic first for supported languages
-        if isinstance(language, SemanticSearchLanguage):
+        # Try semantic first for supported languages, unless file is too large
+        if isinstance(language, SemanticSearchLanguage) and not is_large_file:
             try:
                 semantic_chunker = SemanticChunker(self.governor, language, self.tokenizer)
                 # Wrap semantic chunker with graceful fallback to delimiter
@@ -295,45 +304,38 @@ class GracefulChunker(BaseChunker):
         file: DiscoveredFile | None = None,
         context: dict[str, Any] | None = None,
     ) -> list[CodeChunk]:
-        """Try primary chunker, fall back on error.
-
-        Attempts to chunk content using the primary chunker. If any exception
-        occurs, logs a warning and retries with the fallback chunker.
-
-        Args:
-            content: Source code content to chunk
-            file: Optional DiscoveredFile with metadata and source_id
-            context: Optional additional context for chunking
-
-        Returns:
-            List of CodeChunk objects from either primary or fallback chunker
-
-        Raises:
-            Any exception raised by the fallback chunker. Primary exceptions
-            are caught and logged but not propagated.
-
-        Examples:
-            >>> from codeweaver.core.discovery import DiscoveredFile
-            >>> from pathlib import Path
-            >>> content = "def foo(): pass"
-            >>> file = DiscoveredFile.from_path(Path("test.py"))
-            >>> chunks = graceful_chunker.chunk(content, file=file)
-            >>> # Returns chunks from primary if successful, fallback on error
-        """
+        """Try primary chunker, fall back on error."""
         try:
             return self.primary.chunk(content, file=file, context=context)
         except Exception as e:
-            logger.warning(
-                "Primary chunker failed: %s. Using fallback.",
-                e,
-                extra={
-                    "file_path": str(file.path) if file else None,
-                    "primary_chunker": type(self.primary).__name__,
-                    "fallback_chunker": type(self.fallback).__name__,
-                    "error_type": type(e).__name__,
-                },
-                exc_info=True,
-            )
+            # Don't log full warning for common resource limit errors if they already logged themselves
+            from codeweaver.engine.chunker.exceptions import ChunkLimitExceededError
+
+            error_msg = str(e).splitlines()[0] if str(e) else type(e).__name__
+
+            if isinstance(e, ChunkLimitExceededError):
+                logger.info(
+                    "Switching to fallback chunker for %s: %s",
+                    file.path if file else "<unknown>",
+                    error_msg,
+                )
+            else:
+                logger.warning(
+                    "Primary chunker (%s) failed for %s: %s. Using fallback (%s).",
+                    type(self.primary).__name__,
+                    file.path if file else "<unknown>",
+                    error_msg,
+                    type(self.fallback).__name__,
+                    extra={
+                        "file_path": str(file.path) if file else None,
+                        "primary_chunker": type(self.primary).__name__,
+                        "fallback_chunker": type(self.fallback).__name__,
+                        "error_type": type(e).__name__,
+                    },
+                )
+            # Log full traceback at debug level for troubleshooting
+            logger.debug("Primary chunker failure details:", exc_info=True)
+
             return self.fallback.chunk(content, file=file, context=context)
 
 

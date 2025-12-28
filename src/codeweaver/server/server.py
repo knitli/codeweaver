@@ -218,9 +218,15 @@ def get_state() -> CodeWeaverState:
     """Get the current application state."""
     global _state
     if _state is None:
-        raise InitializationError(
-            "CodeWeaverState has not been initialized yet. Ensure the server is properly set up before accessing the state."
-        )
+        try:
+            # Try to resolve via DI if not set globally
+            import asyncio
+
+            return asyncio.run(get_container().resolve(CodeWeaverState))
+        except Exception as e:
+            raise InitializationError(
+                "CodeWeaverState has not been initialized yet. Ensure the server is properly set up before accessing the state."
+            ) from e
     return _state
 
 
@@ -422,52 +428,31 @@ async def _initialize_cw_state(
     settings: CodeWeaverSettings | None = None, statistics: SessionStatistics | None = None
 ) -> CodeWeaverState:
     """Initialize application state if not already present."""
-    from codeweaver.common.http_pool import HttpClientPool
     from codeweaver.di import get_container
-    from codeweaver.server.health.health_service import HealthService
 
-    resolved_settings = settings or get_settings._resolve()()
     container = get_container()
 
-    # Initialize HTTP client pool for connection reuse
-    http_pool = HttpClientPool.get_instance()
-    _logger.debug("Initialized HTTP client pool for provider connections")
+    # Resolve CodeWeaverState via container
+    # This will use get_state factory which injects all dependencies correctly
+    state = await container.resolve(CodeWeaverState)
 
-    # Resolve core components via DI
-    indexer = await container.resolve(Indexer)
-    stats = statistics or await container.resolve(SessionStatistics)
+    # Initialize health service with components (if not already set by factory)
+    if not state.health_service:
+        from codeweaver.server.health.health_service import HealthService
 
-    state = CodeWeaverState(  # type: ignore
-        initialized=False,
-        # for lazy imports, we need to call resolve() to get the function/object and then call it
-        settings=resolved_settings,
-        statistics=stats,
-        project_path=get_project_path()
-        if isinstance(resolved_settings.project_path, Unset)
-        else resolved_settings.project_path,
-        config_path=None
-        if isinstance(resolved_settings.config_file, Unset)
-        else resolved_settings.config_file,
-        provider_registry=await container.resolve(ProviderRegistry),
-        services_registry=await container.resolve(ServicesRegistry),
-        model_registry=await container.resolve(ModelRegistry),
-        # middleware stack is for ASGIMiddleware; we haven't integrated this yet
-        middleware_stack=(),
-        health_service=None,  # Initialize as None, will be set after CodeWeaverState construction
-        failover_manager=await container.resolve(VectorStoreFailoverManager),
-        telemetry=PostHogClient.from_settings(),
-        http_pool=http_pool,
-        indexer=indexer,
-    )
+        state.health_service = HealthService(
+            provider_registry=state.provider_registry,
+            statistics=state.statistics,
+            indexer=state.indexer,
+            failover_manager=state.failover_manager,
+            startup_stopwatch=float(state.startup_stopwatch),
+        )
 
-    # Initialize health service with components
-    state.health_service = HealthService(
-        provider_registry=state.provider_registry,
-        statistics=state.statistics,
-        indexer=state.indexer,
-        failover_manager=state.failover_manager,
-        startup_stopwatch=float(state.startup_stopwatch),
-    )
+    # Ensure telemetry is initialized
+    if not state.telemetry:
+        from codeweaver.common.telemetry.client import PostHogClient
+
+        state.telemetry = PostHogClient.from_settings(state.settings)
 
     # Start telemetry session with metadata
     if state.telemetry and state.telemetry.enabled:

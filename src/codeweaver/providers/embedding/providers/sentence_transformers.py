@@ -2,8 +2,8 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
-
 # sourcery skip: avoid-single-character-names-variables
+# ruff: noqa: S101
 """Provider for Sentence Transformers models."""
 
 from __future__ import annotations

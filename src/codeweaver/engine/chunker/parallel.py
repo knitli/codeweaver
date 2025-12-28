@@ -83,7 +83,7 @@ def _chunk_single_file(
     try:
         selector = ChunkerSelector(governor, tokenizer)
         chunker = selector.select_for_file(file)
-        content = file.path.read_text(encoding="utf-8", errors="ignore")
+        content = file.absolute_path.read_text(encoding="utf-8", errors="ignore")
 
         try:
             chunks = chunker.chunk(content, file=file)

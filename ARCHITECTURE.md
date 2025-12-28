@@ -504,13 +504,15 @@ async def find_code(query: str, **dynamic_filters): ...
 ```
 
 #### Dependency Injection
-Explicit dependencies, organized pipelines
+Explicit dependencies, organized pipelines. Type-safe injection with `INJECTED[Type]` syntax.
 
 ```python
+from codeweaver.di import INJECTED
+
 async def search(
     query: str,
-    embedding_provider: EmbeddingProvider = Depends(get_embedding_provider),
-    vector_store: VectorStore = Depends(get_vector_store),
+    embedding_provider: EmbeddingProvider = INJECTED[EmbeddingProvider],
+    vector_store: VectorStore = INJECTED[VectorStore],
 ): ...
 ```
 

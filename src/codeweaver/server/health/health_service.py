@@ -14,17 +14,17 @@ import time
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Literal, NoReturn, cast
 
-from codeweaver.di import depends
+from codeweaver.common.registry import ProviderRegistry
+from codeweaver.common.statistics import SessionStatistics
+from codeweaver.di import INJECTED
 from codeweaver.di.providers import (
     FailoverManagerDep,
     IndexerDep,
     ProviderRegistryDep,
     StatisticsDep,
-    get_failover_manager,
-    get_indexer,
-    get_provider_registry,
-    get_statistics,
 )
+from codeweaver.engine.failover import VectorStoreFailoverManager
+from codeweaver.engine.indexer.indexer import Indexer
 from codeweaver.exceptions import ConfigurationError
 from codeweaver.server.health.models import (
     EmbeddingProviderServiceInfo,
@@ -43,7 +43,6 @@ from codeweaver.server.health.models import (
 
 if TYPE_CHECKING:
     from codeweaver.common.statistics import FileStatistics
-    from codeweaver.engine.indexer import Indexer
 
 
 logger = logging.getLogger(__name__)
@@ -55,10 +54,10 @@ class HealthService:
     def __init__(
         self,
         *,
-        provider_registry: ProviderRegistryDep = depends(get_provider_registry),
-        statistics: StatisticsDep = depends(get_statistics),
-        indexer: IndexerDep = depends(get_indexer),
-        failover_manager: FailoverManagerDep = depends(get_failover_manager),
+        provider_registry: ProviderRegistryDep = INJECTED[ProviderRegistry],
+        statistics: StatisticsDep = INJECTED[SessionStatistics],
+        indexer: IndexerDep = INJECTED[Indexer],
+        failover_manager: FailoverManagerDep = INJECTED[VectorStoreFailoverManager],
         startup_stopwatch: float | None = None,
     ) -> None:
         """Initialize health service.
@@ -94,13 +93,14 @@ class HealthService:
         """Resolve dependencies if they were provided as Depends objects."""
         from codeweaver.common.registry import ProviderRegistry
         from codeweaver.common.statistics import SessionStatistics
-        from codeweaver.di import Depends, get_container
+        from codeweaver.di import get_container, is_depends_marker
         from codeweaver.engine.failover import VectorStoreFailoverManager
         from codeweaver.engine.indexer import Indexer
 
         container = get_container()
+        logger.debug("HealthService resolving dependencies. Statistics type: %s", type(self._statistics))
 
-        if isinstance(self._provider_registry, Depends):
+        if is_depends_marker(self._provider_registry):
             try:
                 self._provider_registry = await container.resolve(ProviderRegistry)
             except Exception:
@@ -108,21 +108,26 @@ class HealthService:
 
                 self._provider_registry = get_provider_registry()
 
-        if isinstance(self._statistics, Depends):
+        if is_depends_marker(self._statistics):
+            from codeweaver.common.statistics import SessionStatistics
             try:
+                # Use container to ensure overrides are respected
                 self._statistics = await container.resolve(SessionStatistics)
-            except Exception:
+                logger.debug("Resolved statistics from container: %s", type(self._statistics))
+            except Exception as e:
+                logger.debug("Failed to resolve statistics from container: %s", e)
                 from codeweaver.common.statistics import get_session_statistics
 
                 self._statistics = get_session_statistics()
+                logger.debug("Fallback to get_session_statistics: %s", type(self._statistics))
 
-        if isinstance(self._indexer, Depends):
+        if is_depends_marker(self._indexer):
             try:
                 self._indexer = await container.resolve(Indexer)
             except Exception:
                 self._indexer = None
 
-        if isinstance(self._failover_manager, Depends):
+        if is_depends_marker(self._failover_manager):
             try:
                 self._failover_manager = await container.resolve(VectorStoreFailoverManager)
             except Exception:

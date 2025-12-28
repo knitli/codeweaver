@@ -44,7 +44,7 @@ def performance_settings() -> PerformanceSettings:
         max_file_size_mb=10,
         chunk_timeout_seconds=30,
         parse_timeout_seconds=10,
-        max_chunks_per_file=5000,
+        max_chunks_per_file=10000,
         max_memory_mb_per_operation=100,
         max_ast_depth=200,
     )

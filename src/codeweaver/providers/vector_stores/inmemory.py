@@ -517,6 +517,9 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
         """Search for similar vectors."""
         import sys
 
+        if not self._client:
+            await self._initialize()
+
         if self._client and self._collection:
             info = await self._client.get_collection(self._collection)
             logger.debug(

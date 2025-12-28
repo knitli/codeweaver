@@ -1,0 +1,15 @@
+FAILED tests/integration/chunker/test_e2e.py::test_e2e_real_python_file - TypeError: '>' not supported between instances of 'Mock' and 'int'
+FAILED tests/integration/chunker/test_e2e.py::test_e2e_degradation_chain - TypeError: '>' not supported between instances of 'Mock' and 'int'
+
+FAILED tests/integration/indexing/test_server_indexing.py::test_server_starts_without_errors - assert None is not None
+ +  where None = Indexer()._project_path
+
+FAILED tests/integration/server/test_health_monitoring.py::test_health_performance - AssertionError: Mean latency 154.06ms is higher than expected
+assert 154.05977749003796 < 150
+
+FAILED tests/integration/workflows/test_reconciliation_integration.py::test_reconciliation_handles_indexing_error_gracefully - NameError: name 'indexer' is not defined
+FAILED tests/integration/workflows/test_reconciliation_integration.py::test_reconciliation_handles_connection_error_gracefully - NameError: name 'indexer' is not defined
+FAILED tests/integration/workflows/test_search_workflows.py::test_search_performance - AssertionError: Search took 4715.5ms, expected <3000ms (FR-037)
+assert 4715.458154678345 < 3000
+==================================================================== 3 failed, 34 passed in 68.09s (0:01:08) ====================================================================
+<sys>:0: RuntimeWarning: coroutine 'AsyncMockMixin._execute_mock_call' was never awaited

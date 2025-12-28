@@ -27,6 +27,7 @@ Environment Variables:
 
 from __future__ import annotations
 
+import importlib
 import os
 
 from typing import Annotated, Any, NotRequired, TypedDict
@@ -52,28 +53,30 @@ class TelemetrySettings(BasedModel):
 
     We collect basic telemetry data **by default** to help us improve CodeWeaver. **We do not collect _any_ potentially identifying information.**
             We **DO _NOT_ collect**:
-                - hash file paths and repository names,
-                - screen out potential secrets,
-                - don't collect any queries or results content (unless you explicitly tell us we can, see `value_tools_more_than_privacy`).
+                - file paths and repository names (all hashed),
+                - potential secrets (explicitly not included in serialization),
+                - any queries or results content (unless you explicitly tell us we can, see `tools_over_privacy`).
             If enabled, we **DO collect**:
                 - usage patterns,
                 - errors,
                 - performance metrics,
                 - settings usage (e.g., which providers you use, whether you explicitly set certain settings, etc).
-            Well, technically we don't collect anything yet -- telemetry isn't wired up -- but when we do, this is what we will collect. This helps us make CodeWeaver better for everyone.  **We will never sell your data or show you ads. We only use it to improve CodeWeaver.**
-    We pass all data we collect through filters in CodeWeaver before we send it to PostHog, and at PostHog, we have additional filters set up at the entry point (before we can see it) to further ensure we don't collect any potentially identifying information.
+            This helps us make CodeWeaver better for everyone.  **We will never sell your data or show you ads. We only use it to improve CodeWeaver.**
+    CodeWeaver implements a granular privacy-first approach to telemetry. *Every single serializable class must define its own `__telemetry_keys__` method to explicitly list which fields are safe to serialize for telemetry purposes.* This ensures that no potentially identifying information is ever collected.
+
+    We further screen data on ingest at Posthog to filter out any potential secrets or PII before we actually see and store it.
     """
 
     disable_telemetry: Annotated[
         bool | Unset,
         Field(
             description="""
-            hash file paths, repository names, and screen out potential secrets, and we don't collect any queries or results content (unless you explicitly tell us we can, see `value_tools_more_than_privacy`). We only collect data on usage patterns, errors, and performance. This helps us make CodeWeaver better for everyone.  **We will never sell your data or show you ads. We only use it to improve CodeWeaver.**
+            hash file paths, repository names, and screen out potential secrets, and we don't collect any queries or results content (unless you explicitly tell us we can, see `tools_over_privacy`). We only collect data on usage patterns, errors, and performance. This helps us make CodeWeaver better for everyone.  **We will never sell your data or show you ads. We only use it to improve CodeWeaver.**
 
             If you want to disable telemetry, you have several options:
             1. set this setting to False in your codeweaver.toml/yaml/json file,
-            2. set the environment variable `CODEWEAVER_ENABLE_TELEMETRY` to `false`
-            3. install CodeWeaver with the `codeweaver[recommended-no-telemetry]` extra, or use the a-la-carte install with `codeweaver[required-core]` and your choice of providers (like, `codeweaver[anthropic,fastembed,azure]`) to install without telemetry
+            2. set the environment variable `CODEWEAVER__TELEMETRY__DISABLE_TELEMETRY` to `false`
+            3. Don't install the telemetry package (e.g., `code-weaver[no-telemetry]`).
             4. Point the `CODEWEAVER__TELEMETRY__POSTHOG_PROJECT_KEY` environment variable to your own Posthog project (if you're a data nerd, or want to collect internal telemetry for your organization). If you disable telemetry, we won't collect any data at all."""
         ),
     ] = _set_bool_env_var("CODEWEAVER__TELEMETRY__DISABLE_TELEMETRY")
@@ -143,6 +146,9 @@ class TelemetrySettings(BasedModel):
             self.batch_size = 10  # default batch size
         if isinstance(self.batch_interval_seconds, Unset):
             self.batch_interval_seconds = 60  # default batch interval
+        if self.tools_over_privacy and importlib.util.find_spec("code-weaver") is None:
+            # not running a full install, tools_over_privacy is not applicable
+            self.tools_over_privacy = False
 
     def _dismantle_telemetry(self) -> None:
         """Disable telemetry by setting turning everything off."""

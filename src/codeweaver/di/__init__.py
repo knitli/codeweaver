@@ -17,8 +17,14 @@ from codeweaver.core import create_lazy_getattr
 
 
 if TYPE_CHECKING:
-    from codeweaver.di.container import Container, get_container
-    from codeweaver.di.depends import INJECTED, Depends, DependsPlaceholder, depends
+    from codeweaver.di.container import Container, get_container, reset_container
+    from codeweaver.di.depends import (
+        INJECTED,
+        Depends,
+        DependsPlaceholder,
+        depends,
+        is_depends_marker,
+    )
     from codeweaver.di.providers import (
         ChunkingServiceDep,
         EmbeddingDep,
@@ -35,6 +41,7 @@ if TYPE_CHECKING:
         SettingsDep,
         SparseEmbeddingDep,
         StatisticsDep,
+        TelemetryDep,
         TokenizerDep,
         VectorStoreDep,
     )
@@ -44,9 +51,11 @@ if TYPE_CHECKING:
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "Container": (__spec__.parent, "container"),
     "get_container": (__spec__.parent, "container"),
+    "reset_container": (__spec__.parent, "container"),
     "INJECTED": (__spec__.parent, "depends"),
     "Depends": (__spec__.parent, "depends"),
     "DependsPlaceholder": (__spec__.parent, "depends"),
+    "is_depends_marker": (__spec__.parent, "depends"),
     "depends": (__spec__.parent, "depends"),
     "ChunkingServiceDep": (__spec__.parent, "providers"),
     "ComponentLifecycle": (__spec__.parent, "types"),
@@ -65,6 +74,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "SettingsDep": (__spec__.parent, "providers"),
     "SparseEmbeddingDep": (__spec__.parent, "providers"),
     "StatisticsDep": (__spec__.parent, "providers"),
+    "TelemetryDep": (__spec__.parent, "providers"),
     "TokenizerDep": (__spec__.parent, "providers"),
     "VectorStoreDep": (__spec__.parent, "providers"),
 })
@@ -94,8 +104,16 @@ __all__ = (
     "SettingsDep",
     "SparseEmbeddingDep",
     "StatisticsDep",
+    "TelemetryDep",
     "TokenizerDep",
     "VectorStoreDep",
     "depends",
     "get_container",
+    "is_depends_marker",
+    "reset_container",
 )
+
+
+def __dir__() -> list[str]:
+    """Return the list of attributes for the module."""
+    return list(__all__)

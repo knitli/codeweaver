@@ -293,7 +293,9 @@ async def actual_vector_store() -> MemoryVectorStoreProvider:
     different components (e.g., Indexer and Search) share the same in-memory data.
     """
     from codeweaver.common.registry import get_provider_registry
+    from codeweaver.di import get_container
     from codeweaver.providers.provider import Provider, ProviderKind
+    from codeweaver.providers.vector_stores.base import VectorStoreProvider
     from codeweaver.providers.vector_stores.inmemory import MemoryVectorStoreProvider
 
     global _shared_memory_vector_store
@@ -310,6 +312,9 @@ async def actual_vector_store() -> MemoryVectorStoreProvider:
         registry = get_provider_registry()
         instance_cache = registry._get_instance_cache_for_kind(ProviderKind.VECTOR_STORE)
         instance_cache[Provider.MEMORY] = _shared_memory_vector_store
+
+        # ALSO register in DI container
+        get_container().override(VectorStoreProvider, _shared_memory_vector_store)
 
     import sys
 
@@ -1009,52 +1014,40 @@ def real_providers(real_provider_registry: MagicMock) -> Generator[ProviderRegis
 
 
 @pytest.fixture
-def initialized_cw_state(tmp_path: Path) -> Generator[Any, None, None]:
-    """Initialize CodeWeaverState for integration tests that call find_code_tool.
+async def initialized_cw_state(tmp_path: Path, actual_vector_store, clean_container) -> AsyncGenerator[Any, None]:
+    """Initialize CodeWeaverState for integration tests using DI.
 
-    This fixture ensures CodeWeaverState is properly initialized before tests that
-    call find_code_tool, which requires CodeWeaverState.get_state() to succeed.
-
-    The fixture creates a minimal CodeWeaverState with:
-    - Settings initialized
-    - Registries initialized (provider, services, model)
-    - Statistics tracking
-    - No failover manager (optional for basic tests)
-
-    Usage:
-        @pytest.mark.asyncio
-        async def test_something(initialized_cw_state):
-            # find_code_tool will work now
-            response = await find_code_tool("test query", ...)
+    This fixture ensures CodeWeaverState is properly initialized via the DI
+    container, allowing for consistent dependency resolution and overrides.
     """
-    from codeweaver.common.registry import (
-        get_model_registry,
-        get_provider_registry,
-        get_services_registry,
-    )
-    from codeweaver.common.statistics import get_session_statistics
-    from codeweaver.common.telemetry.client import PostHogClient
-    from codeweaver.config.settings import get_settings
+    from codeweaver.config.settings import CodeWeaverSettings, reset_settings
+    from codeweaver.providers.vector_stores.base import VectorStoreProvider
     from codeweaver.server.server import CodeWeaverState
 
-    # Initialize settings
-    settings = get_settings()
-    yield CodeWeaverState(
-        initialized=True,
-        settings=settings,
-        project_path=tmp_path,
-        config_path=None,
-        provider_registry=get_provider_registry(),
-        services_registry=get_services_registry(),
-        model_registry=get_model_registry(),
-        statistics=get_session_statistics(),
-        middleware_stack=(),
-        indexer=None,
-        health_service=None,
-        failover_manager=None,
-        telemetry=PostHogClient.from_settings(),
-    )
+    # Reset state to ensure isolation
+    reset_settings()
+
+    # Factory for test settings
+    async def get_test_settings() -> CodeWeaverSettings:
+        from codeweaver.config.settings import get_settings
+        # This properly initializes the singleton with defaults from codeweaver.test.toml
+        # including the "providers" dict
+        settings = get_settings()
+        settings.project_path = tmp_path
+        settings.project_name = f"test_workflow_{tmp_path.name}"
+        return settings
+
+    # Apply overrides using context manager
+    overrides = {
+        CodeWeaverSettings: get_test_settings,
+        VectorStoreProvider: lambda: actual_vector_store,
+    }
+
+    with clean_container.use_overrides(overrides):
+        # Resolve state via container (this will trigger resolution of all deps)
+        state = await clean_container.resolve(CodeWeaverState)
+        yield state
+
     # Cleanup: Reset global state
     from codeweaver.server import server
-
     server._state = None

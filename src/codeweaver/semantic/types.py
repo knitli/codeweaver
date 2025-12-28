@@ -231,9 +231,8 @@ class NodeTypeDTO(BasedModel):
 
 def _set_symbol(data: Any) -> str | None:
     """Helper function to set the symbol field based on the primary_thing."""
-    if (thing := data.get("thing")) is not None and (symbol := getattr(thing, "symbol", None)):
-        if isinstance(symbol, str) and (0 < len(symbol.strip()) < 20):
-            return symbol
+    if (thing := data.get("thing")) is not None and (symbol := getattr(thing, "symbol", None)) and isinstance(symbol, str) and (0 < len(symbol.strip()) < 20):
+        return symbol
     return None
 
 

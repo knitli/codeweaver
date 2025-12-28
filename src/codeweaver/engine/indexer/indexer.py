@@ -19,6 +19,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import signal
+import sys
 import time
 
 from pathlib import Path
@@ -26,38 +27,46 @@ from typing import TYPE_CHECKING, Annotated, Any, Protocol, TypedDict
 
 import rignore
 
-from pydantic import DirectoryPath, NonNegativeFloat, NonNegativeInt, PrivateAttr
+from pydantic import PrivateAttr
+from pydantic.types import DirectoryPath, NonNegativeFloat, NonNegativeInt
 from watchfiles import Change
 
 from codeweaver.common._logging import log_to_client_or_fallback
 from codeweaver.common.statistics import SessionStatistics, get_session_statistics
 from codeweaver.config.chunker import ChunkerSettings
-from codeweaver.config.settings import Unset
-from codeweaver.core import set_relative_path
-from codeweaver.core.discovery import DiscoveredFile
-from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
-from codeweaver.core.stores import BlakeStore, get_blake_hash, make_blake_store
-from codeweaver.core.types.dictview import DictView
-from codeweaver.core.types.models import BasedModel
-from codeweaver.di import depends
-from codeweaver.di.providers import (
+from codeweaver.config.settings import CodeWeaverSettings
+from codeweaver.core import (
+    BasedModel,
+    BlakeStore,
+    CodeChunk,
+    ConfigLanguage,
+    DictView,
+    DiscoveredFile,
+    SemanticSearchLanguage,
+    Unset,
+    get_blake_hash,
+    make_blake_store,
+    set_relative_path,
+)
+from codeweaver.di import (
+    INJECTED,
     ChunkingServiceDep,
     EmbeddingDep,
     SettingsDep,
     SparseEmbeddingDep,
     VectorStoreDep,
-    get_chunking_service,
-    get_embedding_provider,
-    get_settings,
-    get_sparse_embedding_provider,
-    get_vector_store,
+    get_container,
+    is_depends_marker,
 )
+from codeweaver.engine.chunker import ChunkGovernor
 from codeweaver.engine.chunking_service import ChunkingService
 from codeweaver.engine.indexer.checkpoint import CheckpointManager, IndexingCheckpoint
 from codeweaver.engine.indexer.manifest import FileManifestManager, IndexFileManifest
 from codeweaver.engine.indexer.progress import IndexingStats
 from codeweaver.engine.watcher.types import FileChange
 from codeweaver.exceptions import IndexingError, InitializationError, ProviderError
+from codeweaver.providers.embedding.providers.base import EmbeddingProvider
+from codeweaver.providers.vector_stores.base import VectorStoreProvider
 
 
 logger = logging.getLogger(__name__)
@@ -145,7 +154,6 @@ def _get_vector_store_instance() -> Any | None:
 def _get_chunking_service() -> ChunkingService:
     """Stub function to get chunking service instance."""
     from codeweaver.config.settings import get_settings
-    from codeweaver.engine.chunker import ChunkGovernor
     from codeweaver.engine.chunking_service import ChunkingService
 
     chunk_settings = get_settings().chunker
@@ -180,12 +188,12 @@ class Indexer(BasedModel):
         self,
         walker: rignore.Walker | None = None,
         store: BlakeStore[DiscoveredFile] | None = None,
-        chunking_service: ChunkingServiceDep = depends(get_chunking_service),
+        chunking_service: ChunkingServiceDep = INJECTED[ChunkingService],
         *,
-        embedding_provider: EmbeddingDep = depends(get_embedding_provider),
-        sparse_provider: SparseEmbeddingDep = depends(get_sparse_embedding_provider),
-        vector_store: VectorStoreDep = depends(get_vector_store),
-        settings: SettingsDep = depends(get_settings),
+        embedding_provider: EmbeddingDep = INJECTED[EmbeddingProvider],
+        sparse_provider: SparseEmbeddingDep = INJECTED[Any],
+        vector_store: VectorStoreDep = INJECTED[VectorStoreProvider],
+        settings: SettingsDep = INJECTED[CodeWeaverSettings],
         auto_initialize_providers: bool = True,
         project_path: Path | None = None,
         walker_settings: dict[str, Any] | None = None,
@@ -200,12 +208,11 @@ class Indexer(BasedModel):
             project_path: Project path for checkpoint management (preferred)
             walker_settings: Settings dict for creating rignore.Walker instances
         """
-        from codeweaver.core import get_project_path
-
+        super().__init__()
         self._project_path = (
             project_path
-            if project_path and not isinstance(project_path, Unset) and project_path.exists()
-            else get_project_path()
+            if project_path and not isinstance(project_path, (Unset, type(None)))
+            else None
         )
         # Store walker settings for creating fresh walkers
         # If walker is provided but not settings, extract settings from project_path
@@ -248,7 +255,9 @@ class Indexer(BasedModel):
         self._providers_initialized: bool = False
 
         # Initialize checkpoint manager
-        self._checkpoint_manager = CheckpointManager(project_path=self._project_path)
+        self._checkpoint_manager = (
+            CheckpointManager(project_path=self._project_path) if self._project_path else None
+        )
 
         self._checkpoint = None
         self._last_checkpoint_time = time.time()
@@ -258,7 +267,9 @@ class Indexer(BasedModel):
         self._original_sigint_handler = None
 
         # Initialize file manifest manager
-        self._manifest_manager = FileManifestManager(project_path=self._project_path)
+        self._manifest_manager = (
+            FileManifestManager(project_path=self._project_path) if self._project_path else None
+        )
 
         self._file_manifest = None
         self._manifest_lock = None  # Initialize as None, created lazily in async context
@@ -274,7 +285,8 @@ class Indexer(BasedModel):
         self._register_signal_handlers()
 
         logger.info("Indexer initialized")
-        logger.info("Using project path: %s", self._checkpoint_manager.project_path)
+        if self._checkpoint_manager:
+            logger.info("Using project path: %s", self._checkpoint_manager.project_path)
         logger.debug("Providers will be initialized lazily on first use")
 
     def _register_signal_handlers(self) -> None:
@@ -288,7 +300,7 @@ class Indexer(BasedModel):
             """Handle shutdown signal by setting shutdown flag.
 
             This is intentionally minimal to avoid blocking in signal handler.
-            Checkpoint saving happens in the finally block of prime_index.
+            Checkpoint saving happens in the finally blocks of async methods.
             """
             signal_name = signal.Signals(signum).name
             logger.info("Received %s signal, requesting shutdown...", signal_name)
@@ -349,8 +361,6 @@ class Indexer(BasedModel):
         Args:
             vector_store: Optional pre-initialized vector store instance to use
         """
-        from codeweaver.di import Depends
-
         logger.debug(
             "_initialize_providers_async called. self._embedding_provider type: %s",
             type(self._embedding_provider),
@@ -360,7 +370,7 @@ class Indexer(BasedModel):
             return
 
         # Initialize embedding provider (dense)
-        if self._embedding_provider is None or isinstance(self._embedding_provider, Depends):
+        if self._embedding_provider is None or is_depends_marker(self._embedding_provider):
             try:
                 self._embedding_provider = _get_embedding_instance(sparse=False)
                 if self._embedding_provider:
@@ -378,7 +388,7 @@ class Indexer(BasedModel):
             )
 
         # Initialize sparse embedding provider
-        if self._sparse_provider is None or isinstance(self._sparse_provider, Depends):
+        if self._sparse_provider is None or is_depends_marker(self._sparse_provider):
             try:
                 self._sparse_provider = _get_embedding_instance(sparse=True)
                 if self._sparse_provider:
@@ -393,19 +403,43 @@ class Indexer(BasedModel):
             logger.debug("Using injected sparse provider: %s", type(self._sparse_provider).__name__)
 
         # Resolve other core services if they were provided as Depends objects
-        if self._chunking_service is None or isinstance(self._chunking_service, Depends):
-            from codeweaver.di import get_container
+        if self._chunking_service is None or is_depends_marker(self._chunking_service):
             from codeweaver.engine.chunking_service import ChunkingService
 
             try:
+                # Resolve via container to support registration, singletons, and overrides
                 self._chunking_service = await get_container().resolve(ChunkingService)
             except Exception:
+                # Fallback to legacy factory
                 self._chunking_service = _get_chunking_service()
 
-        if self._settings is None or isinstance(self._settings, Depends):
-            from codeweaver.config.settings import get_settings
+        if self._settings is None or is_depends_marker(self._settings):
+            from codeweaver.config.settings import CodeWeaverSettings
 
-            self._settings = get_settings()
+            try:
+                # Resolve via container to support registration, singletons, and overrides
+                self._settings = await get_container().resolve(CodeWeaverSettings)
+            except Exception:
+                from codeweaver.config.settings import get_settings
+
+                self._settings = get_settings()
+
+        # Ensure walker settings are configured if we have a project path
+        # This handles cases where providers were initialized before project path was set
+        # ONLY auto-configure if they are currently empty or Depends placeholder
+        if (
+            not self._walker_settings or is_depends_marker(self._walker_settings)
+        ) and self._project_path:
+            if self._settings:
+                self._walker_settings = self._settings.indexer.to_settings(
+                    project_path=self._project_path
+                )
+            else:
+                self._walker_settings = {"path": self._project_path}
+            logger.debug(
+                "Configured walker settings from project path in prime_index: %s",
+                self._project_path,
+            )
 
         # Warn if no embedding providers available
         if not self._embedding_provider and not self._sparse_provider:
@@ -413,17 +447,19 @@ class Indexer(BasedModel):
                 "⚠️  No embedding providers initialized - indexing will proceed without embeddings"
             )
 
-        # Initialize vector store with failover support
+        # Try to initialize failover manager if vector store is not provided
         if vector_store is not None:
             self._vector_store = vector_store
             logger.info("Using injected vector store: %s", type(self._vector_store).__name__)
-        elif self._vector_store is not None and not isinstance(self._vector_store, Depends):
+        elif self._vector_store is not None and not is_depends_marker(self._vector_store):
             logger.info(
                 "Using injected vector store from constructor: %s",
                 type(self._vector_store).__name__,
             )
         else:
             try:
+                self._vector_store = await get_container().resolve(VectorStoreProvider)
+            except Exception:
                 from codeweaver.engine.failover import VectorStoreFailoverManager
 
                 # Get primary vector store instance
@@ -435,7 +471,9 @@ class Indexer(BasedModel):
                 self._failover_manager = VectorStoreFailoverManager()
                 await self._failover_manager.initialize(
                     primary_store=primary_store,
-                    project_path=self._checkpoint_manager.project_path,
+                    project_path=self._checkpoint_manager.project_path
+                    if self._checkpoint_manager
+                    else None,
                     indexer=self,
                 )
 
@@ -449,49 +487,6 @@ class Indexer(BasedModel):
                     )
                 else:
                     logger.debug("No vector store available (primary failed to initialize)")
-
-            except Exception as e:
-                # Provide specific guidance for common connection errors
-                error_msg = str(e).lower()
-                if any(
-                    indicator in error_msg
-                    for indicator in [
-                        "illegal request line",
-                        "connection refused",
-                        "connect error",
-                        "cannot connect",
-                        "connection error",
-                        "failed to connect",
-                    ]
-                ):
-                    # Log at debug level - health checks will display this to users
-                    logger.debug(
-                        "Failed to connect to PRIMARY Qdrant vector store. "
-                        "Please verify:\n"
-                        "  - Qdrant is running (default: http://localhost:6333 for HTTP, :6334 for gRPC)\n"
-                        "  - The configured URL matches your Qdrant instance\n"
-                        "  - Check firewall/network settings if using remote Qdrant\n"
-                        "  Original error: %s",
-                        e,
-                    )
-                elif "timeout" in error_msg or "timed out" in error_msg:
-                    logger.warning(
-                        "Qdrant connection timed out. Please verify:\n"
-                        "  - Qdrant server is responsive\n"
-                        "  - Network latency is acceptable\n"
-                        "  - Consider increasing timeout settings\n"
-                    )
-                elif "unauthorized" in error_msg or "authentication" in error_msg:
-                    logger.warning(
-                        "Qdrant authentication failed. Please verify:\n"
-                        "  - API key is correctly configured\n"
-                        "  - Authentication credentials are valid\n"
-                    )
-                else:
-                    logger.warning("Could not initialize vector store.", exc_info=True)
-
-                self._vector_store = None
-                self._failover_manager = None
 
         # Ensure chunking service is initialized
         self._chunking_service = self._chunking_service or _get_chunking_service()
@@ -514,8 +509,9 @@ class Indexer(BasedModel):
         # Get dense embedding provider info
         if self._embedding_provider:
             # Prefer explicit provider_name attribute
-            if hasattr(self._embedding_provider, "provider_name"):
-                result["dense_provider"] = str(self._embedding_provider.provider_name)
+            p_name = getattr(self._embedding_provider, "provider_name", None)
+            if isinstance(p_name, str):
+                result["dense_provider"] = p_name
             else:
                 provider_name = (
                     type(self._embedding_provider).__name__.replace("Provider", "").lower()
@@ -529,8 +525,9 @@ class Indexer(BasedModel):
         # Get sparse embedding provider info
         if self._sparse_provider:
             # Prefer explicit provider_name attribute
-            if hasattr(self._sparse_provider, "provider_name"):
-                result["sparse_provider"] = str(self._sparse_provider.provider_name)
+            p_name = getattr(self._sparse_provider, "provider_name", None)
+            if isinstance(p_name, str):
+                result["sparse_provider"] = p_name
             else:
                 provider_name = type(self._sparse_provider).__name__.replace("Provider", "").lower()
                 result["sparse_provider"] = provider_name
@@ -1353,23 +1350,25 @@ class Indexer(BasedModel):
         self,
         *,
         force_reindex: bool = False,
+        add_dense: bool = True,
+        add_sparse: bool = True,
         progress_callback: ProgressCallback | None = None,
         status_display: Any | None = None,
-    ) -> int:
+    ) -> int | dict[str, Any]:
         """Perform an initial indexing pass using the configured rignore walker.
 
         Enhanced with persistence support, incremental indexing, and batch processing.
 
         Args:
             force_reindex: If True, skip persistence checks and reindex everything
+            add_dense: Whether to add dense embeddings during reconciliation
+            add_sparse: Whether to add sparse embeddings during reconciliation
             progress_callback: Optional callback for granular progress updates
             status_display: Optional StatusDisplay instance for clean user-facing output
 
         Returns:
-            Number of files indexed
+            Number of files indexed (int) or reconciliation summary (dict) if reconciliation ran
         """
-        import sys
-
         logger.debug(
             "Indexer.prime_index called on %s (class from %s)",
             self,
@@ -1379,15 +1378,31 @@ class Indexer(BasedModel):
         # Initialize providers asynchronously (idempotent)
         # Preserve injected vector_store if already set
         await self._initialize_providers_async(vector_store=self._vector_store)
-        import sys
 
         logger.debug(
             "Indexer.prime_index using vector_store=%s (id=%s) with collection=%s",
             self._vector_store,
             id(self._vector_store),
-            getattr(self._vector_store, "_collection", "N/A"),
+            getattr(self._vector_store, "collection", "N/A"),
         )
         sys.stdout.flush()
+
+        # Ensure walker settings are configured if we have a project path
+        # This handles cases where providers were initialized before project path was set
+        # ONLY auto-configure if they are currently empty or Depends placeholder
+        if (
+            not self._walker_settings or is_depends_marker(self._walker_settings)
+        ) and self._project_path:
+            if self._settings:
+                self._walker_settings = self._settings.indexer.to_settings(
+                    project_path=self._project_path
+                )
+            else:
+                self._walker_settings = {"path": self._project_path}
+            logger.debug(
+                "Configured walker settings from project path in prime_index: %s",
+                self._project_path,
+            )
 
         # Load file manifest for incremental indexing (unless force_reindex)
         if not force_reindex:
@@ -1417,95 +1432,38 @@ class Indexer(BasedModel):
             except Exception:
                 logger.warning("Failed to clean up deleted files", exc_info=True)
 
-        if not files_to_index:
-            logger.info("No files to index (all up to date)")
-            self._finalize_indexing()
-            return 0
+        if files_to_index:
+            # Report discovery phase complete
+            if progress_callback:
+                progress_callback(
+                    "discovery", self._stats.files_discovered, self._stats.files_discovered
+                )
 
-        # Report discovery phase complete
-        if progress_callback:
-            progress_callback(
-                "discovery", self._stats.files_discovered, self._stats.files_discovered
-            )
-
-        # Index files in batch
-        await self._perform_batch_indexing_async(files_to_index, progress_callback)
+            # Index files in batch
+            await self._perform_batch_indexing_async(files_to_index, progress_callback)
+        else:
+            logger.info("No new files to index (all up to date)")
 
         # Perform automatic reconciliation: detect and fix missing embeddings
-        # Initialize tracking variables for exception handling context
-        dense_file_count = 0
-        sparse_file_count = 0
-        current_models: dict[str, str | None] = {}
-
-        if (
-            not force_reindex
-            and self._vector_store
-            and (self._embedding_provider or self._sparse_provider)
-        ):
-            try:
-                logger.info("Checking for missing embeddings in vector store...")
-
-                # Get current embedding configuration
-                current_models = self._get_current_embedding_models()
-
-                # Check if any files need embeddings
-                files_needing = self._file_manifest.get_files_needing_embeddings(
-                    current_dense_provider=current_models["dense_provider"],
-                    current_dense_model=current_models["dense_model"],
-                    current_sparse_provider=current_models["sparse_provider"],
-                    current_sparse_model=current_models["sparse_model"],
-                )
-
-                needs_dense = bool(files_needing.get("dense_only") and self._embedding_provider)
-                needs_sparse = bool(files_needing.get("sparse_only") and self._sparse_provider)
-
-                if needs_dense or needs_sparse:
-                    dense_file_count = len(files_needing.get("dense_only", []))
-                    sparse_file_count = len(files_needing.get("sparse_only", []))
-                    if needs_dense:
-                        logger.info("Found %d files needing dense embeddings", dense_file_count)
-                    if needs_sparse:
-                        logger.info("Found %d files needing sparse embeddings", sparse_file_count)
-
-                    logger.info("Starting automatic reconciliation...")
-                    reconciliation_result = await self.add_missing_embeddings_to_existing_chunks(
-                        add_dense=needs_dense, add_sparse=needs_sparse
-                    )
-
-                    if reconciliation_result["chunks_updated"] > 0:
-                        logger.info(
-                            "Reconciliation complete: updated %d chunks across %d files",
-                            reconciliation_result["chunks_updated"],
-                            reconciliation_result["files_processed"],
-                        )
-                    else:
-                        logger.debug("Reconciliation complete: no chunks needed updating")
-            except (ProviderError, IndexingError) as e:
-                # Provider or indexing errors are expected failure modes
-                logger.warning(
-                    "Automatic reconciliation failed: %s (collection=%s, dense_files=%d, sparse_files=%d, dense_provider=%s, sparse_provider=%s)",
-                    str(e),
-                    self._vector_store.collection if self._vector_store else "unknown",
-                    dense_file_count,
-                    sparse_file_count,
-                    current_models.get("dense_provider", "none"),
-                    current_models.get("sparse_provider", "none"),
-                    exc_info=True,
-                )
-            except (ConnectionError, TimeoutError, OSError) as e:
-                # Network/IO errors that may be transient
-                logger.warning(
-                    "Automatic reconciliation failed due to connection/IO error: %s (collection=%s)",
-                    str(e),
-                    self._vector_store.collection if self._vector_store else "unknown",
-                    exc_info=True,
-                )
+        # ALWAYS run this unless force_reindex is True
+        reconciliation_result = None
+        if not force_reindex and (self._embedding_provider or self._sparse_provider):
+            reconciliation_result = await self.run_reconciliation(
+                add_dense=add_dense, add_sparse=add_sparse
+            )
 
         # Finalize and report
         self._finalize_indexing()
 
         # Log duplicate summary
         self._log_duplicate_summary(status_display)
+
+        # Return reconciliation result if it ran and found anything, otherwise files processed
+        if reconciliation_result and (
+            reconciliation_result.get("files_processed", 0) > 0
+            or reconciliation_result.get("errors")
+        ):
+            return reconciliation_result
 
         return self._stats.files_processed
 
@@ -2180,11 +2138,11 @@ class Indexer(BasedModel):
                         if discovered_abs == path_abs:
                             to_delete.append(key)
                 except Exception:
-                    # defensive: malformed entry shouldn't break cleanup
+                    # Defensive: malformed entry shouldn't break cleanup
                     logger.warning("Error checking stored item for deletion", exc_info=True)
                     continue
             except Exception:
-                # defensive: malformed entry shouldn't break cleanup
+                # Defensive: malformed entry shouldn't break cleanup
                 logger.warning("Error checking stored item for deletion", exc_info=True)
                 continue
         for key in to_delete:
@@ -2262,7 +2220,12 @@ class Indexer(BasedModel):
         checkpoint.chunks_created = self._stats.chunks_created
         checkpoint.chunks_embedded = self._stats.chunks_embedded
         checkpoint.chunks_indexed = self._stats.chunks_indexed
-        checkpoint.files_with_errors = [str(p) for p in self._stats.files_with_errors]
+        type(self._stats).files_with_errors = [  # ty: ignore[invalid-assignment]
+            path
+            for p in self._stats.files_with_errors
+            if p and isinstance(p, str) and (path := Path(p)).exists()
+        ]
+
         checkpoint.settings_hash = settings_hash
 
         # Update manifest info
@@ -2561,7 +2524,6 @@ class Indexer(BasedModel):
         files_to_process = list(set(files_to_process))
         if not files_to_process:
             logger.debug(
-                "No files need embedding reconciliation. Criteria: add_dense={add_dense}, add_sparse={add_sparse}, current_models={current_models}"
                 "No files need embedding reconciliation. Criteria: add_dense=%s, add_sparse=%s, current_models=%s",
                 add_dense,
                 add_sparse,
@@ -2701,6 +2663,9 @@ class Indexer(BasedModel):
                         # Save manifest after each successful file processing
                         self._save_file_manifest()
 
+                    except (ProviderError, IndexingError):
+                        # Re-raise these specific errors so they can be handled by reconciliation logic
+                        raise
                     except Exception as update_error:
                         logger.warning(
                             "Failed to batch update vectors for file %s: %s",
@@ -2709,6 +2674,9 @@ class Indexer(BasedModel):
                         )
                         errors.append(f"{file_path}: {update_error}")
                         # Skip this file - don't update manifest or increment counter
+            except (ProviderError, IndexingError):
+                # Re-raise these specific errors so they can be handled by reconciliation logic
+                raise
             except Exception as e:
                 error_msg = f"{file_path}: {e}"
                 logger.warning(
@@ -2732,6 +2700,119 @@ class Indexer(BasedModel):
             "errors": errors[:10],  # Limit errors in response
             "total_errors": len(errors),
         }
+
+    async def run_reconciliation(
+        self, *, add_dense: bool = True, add_sparse: bool = True
+    ) -> dict[str, Any]:
+        """Perform automatic reconciliation: detect and fix missing embeddings.
+
+        This method identifies chunks that are missing either dense or sparse
+        embeddings and adds them using the current providers.
+
+        Args:
+            add_dense: Whether to add dense embeddings to chunks that lack them
+            add_sparse: Whether to add sparse embeddings to chunks that lack them
+
+        Returns:
+            Dictionary with reconciliation results
+        """
+        # Perform automatic reconciliation: detect and fix missing embeddings
+        # Initialize tracking variables for exception handling context
+        dense_file_count = 0
+        sparse_file_count = 0
+        current_models: dict[str, str | None] = {}
+        reconciliation_result: dict[str, Any] = {
+            "files_processed": 0,
+            "chunks_updated": 0,
+            "errors": [],
+        }
+
+        if not self._vector_store or not (self._embedding_provider or self._sparse_provider):
+            logger.debug("Reconciliation skipped: no vector store or embedding providers")
+            return reconciliation_result
+
+        try:
+            logger.info("Checking for missing embeddings in vector store...")
+
+            # Get current embedding configuration
+            current_models = self._get_current_embedding_models()
+
+            # Check if any files need embeddings
+            print(
+                f"DEBUG run_reconciliation: manifest files={list(self._file_manifest.files.keys())}"
+            )
+            files_needing = self._file_manifest.get_files_needing_embeddings(
+                current_dense_provider=current_models["dense_provider"],
+                current_dense_model=current_models["dense_model"],
+                current_sparse_provider=current_models["sparse_provider"],
+                current_sparse_model=current_models["sparse_model"],
+            )
+            print(f"DEBUG run_reconciliation: files_needing={files_needing}")
+
+            needs_dense = bool(
+                add_dense and files_needing.get("dense_only") and self._embedding_provider
+            )
+            needs_sparse = bool(
+                add_sparse and files_needing.get("sparse_only") and self._sparse_provider
+            )
+            print(
+                f"DEBUG run_reconciliation: needs_dense={needs_dense}, needs_sparse={needs_sparse}"
+            )
+
+            if needs_dense or needs_sparse:
+                dense_file_count = len(files_needing.get("dense_only", []))
+                sparse_file_count = len(files_needing.get("sparse_only", []))
+                if needs_dense:
+                    logger.info("Found %d files needing dense embeddings", dense_file_count)
+                if needs_sparse:
+                    logger.info("Found %d files needing sparse embeddings", sparse_file_count)
+
+                logger.info("Starting automatic reconciliation...")
+                reconciliation_result = await self.add_missing_embeddings_to_existing_chunks(
+                    add_dense=needs_dense, add_sparse=needs_sparse
+                )
+                print(
+                    f"DEBUG run_reconciliation: add_missing_embeddings_to_existing_chunks returned={reconciliation_result}"
+                )
+
+                if reconciliation_result.get("chunks_updated", 0) > 0:
+                    logger.info(
+                        "Reconciliation complete: updated %d chunks across %d files",
+                        reconciliation_result["chunks_updated"],
+                        reconciliation_result["files_processed"],
+                    )
+                else:
+                    logger.debug("Reconciliation complete: no chunks needed updating")
+            else:
+                logger.info("No files need embedding reconciliation")
+
+        except (ProviderError, IndexingError) as e:
+            # Provider or indexing errors are expected failure modes
+            logger.warning(
+                "Automatic reconciliation failed: %s (collection=%s, dense_files=%d, sparse_files=%d, dense_provider=%s, sparse_provider=%s)",
+                str(e),
+                self._vector_store.collection if self._vector_store else "unknown",
+                dense_file_count,
+                sparse_file_count,
+                current_models.get("dense_provider", "none"),
+                current_models.get("sparse_provider", "none"),
+                exc_info=True,
+            )
+            reconciliation_result["errors"].append(str(e))
+        except (ConnectionError, TimeoutError, OSError) as e:
+            # Network/IO errors that may be transient
+            logger.warning(
+                "Automatic reconciliation failed due to connection/IO error: %s (collection=%s)",
+                str(e),
+                self._vector_store.collection if self._vector_store else "unknown",
+                exc_info=True,
+            )
+            reconciliation_result["errors"].append(str(e))
+        except Exception as e:
+            logger.exception("Unexpected error during reconciliation")
+            reconciliation_result["errors"].append(str(e))
+
+        return reconciliation_result
 
 
 __all__ = ("Indexer",)
