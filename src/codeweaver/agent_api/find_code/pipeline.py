@@ -279,7 +279,27 @@ async def embed_query(
     sparse_query_embedding = None
     if sparse_provider:
         try:
-            sparse_query_embedding = await sparse_provider.embed_query(query)
+            result = await sparse_provider.embed_query(query)
+            
+            # Standardize sparse embedding format
+            from codeweaver.core.types.embeddings import SparseEmbedding
+            
+            if isinstance(result, SparseEmbedding):
+                sparse_query_embedding = result
+            elif isinstance(result, list) and len(result) > 0:
+                # Handle list[SparseEmbedding] or list[dict]
+                item = result[0]
+                if isinstance(item, SparseEmbedding):
+                    sparse_query_embedding = item
+                elif isinstance(item, dict) and "indices" in item and "values" in item:
+                    sparse_query_embedding = SparseEmbedding(**item)
+                else:
+                    logger.warning("Unexpected sparse embedding format in list: %s", type(item))
+            elif isinstance(result, dict) and "indices" in result and "values" in result:
+                sparse_query_embedding = SparseEmbedding(**result)
+            else:
+                logger.warning("Unexpected sparse embedding format: %s", type(result))
+                
         except Exception as e:
             await log_to_client_or_fallback(
                 context,

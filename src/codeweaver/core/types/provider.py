@@ -298,7 +298,20 @@ class Provider(BaseEnum):
                             description="One of: 'debug', 'info', 'warning', 'error'",
                             choices={"debug", "info", "warning", "error"},
                         ),
-                        other=httpx_env_vars,
+                        other=httpx_env_vars
+                        | {
+                            "organization": ProviderEnvVarInfo(
+                                env="OPENAI_ORG_ID", description="Organization ID for OpenAI."
+                            ),
+                            "project": ProviderEnvVarInfo(
+                                env="OPENAI_PROJECT_ID",
+                                description="An openai project id for tracking usage.",
+                            ),
+                            "webhook_secret": ProviderEnvVarInfo(
+                                env="OPENAI_WEBHOOK_SECRET",
+                                description="Webhook secret for verifying incoming webhooks from OpenAI.",
+                            ),
+                        },
                     ),
                 )
             case Provider.HUGGINGFACE_INFERENCE:

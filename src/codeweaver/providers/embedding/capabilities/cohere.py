@@ -8,14 +8,14 @@
 from __future__ import annotations
 
 from types import MappingProxyType
-from typing import TYPE_CHECKING
+from typing import ClassVar, Literal
 
 from codeweaver.core.types.provider import Provider
+from codeweaver.providers.embedding.capabilities.base import (
+    EmbeddingModelCapabilities,
+    EmbeddingModelSpec,
+)
 from codeweaver.providers.embedding.capabilities.types import PartialCapabilities
-
-
-if TYPE_CHECKING:
-    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 
 
 MODEL_MAP: MappingProxyType[Provider, tuple[str, ...]] = MappingProxyType({
@@ -100,6 +100,36 @@ def get_cohere_embedding_capabilities() -> tuple[EmbeddingModelCapabilities, ...
                     })
                 )
     return tuple(EmbeddingModelCapabilities.model_validate(m) for m in output_models)
+
+
+class BaseCohereEmbeddingSpec(EmbeddingModelSpec):
+    """Base spec for Cohere embedding models."""
+
+    model_map: ClassVar[MappingProxyType[Provider, tuple[str, ...]]] = MODEL_MAP
+
+    model_maker: ClassVar[Literal["cohere"]] = "cohere"
+
+    mapped_names: MappingProxyType[str, str]
+    """Map from Cohere model names to provider-specific model names."""
+
+    @classmethod
+    def models(cls) -> tuple[str, ...]:
+        """Get the models available for this provider."""
+        return cls.model_map[cls.provider]
+
+
+class CohereAzureEmbeddingSpec(BaseCohereEmbeddingSpec):
+    """Spec for Cohere embedding models on Azure."""
+
+    provider: ClassVar[Provider] = Provider.AZURE
+
+    mapped_names: MappingProxyType[str, str] = MappingProxyType(
+        zip(MODEL_MAP[Provider.AZURE], MODEL_MAP[Provider.AZURE], strict=True)
+    )
+
+    capabilities: tuple[EmbeddingModelCapabilities, ...] = tuple(
+        cap for cap in get_cohere_embedding_capabilities() if cap.provider == Provider.AZURE
+    )
 
 
 __all__ = ("get_cohere_embedding_capabilities",)

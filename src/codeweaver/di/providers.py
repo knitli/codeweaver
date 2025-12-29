@@ -180,12 +180,14 @@ async def get_indexer(
     """Resolve the indexer service."""
     from codeweaver.engine.indexer.indexer import Indexer
 
+    # project_path is needed for manifest and checkpoint managers
     return Indexer(
         settings=settings,
         chunking_service=chunking_service,
         embedding_provider=embedding_provider,
         sparse_provider=sparse_provider,
         vector_store=vector_store,
+        project_path=settings.project_path,
     )
 
 
@@ -328,7 +330,7 @@ def setup_default_container(container: Container) -> None:
     from codeweaver.engine.chunking_service import ChunkingService
     from codeweaver.engine.failover import VectorStoreFailoverManager
     from codeweaver.engine.indexer.indexer import Indexer
-    from codeweaver.providers.embedding.providers.base import EmbeddingProvider
+    from codeweaver.providers.embedding.providers.base import EmbeddingProvider, SparseEmbeddingProvider
     from codeweaver.providers.reranking.providers.base import RerankingProvider
     from codeweaver.providers.vector_stores.base import VectorStoreProvider
     from codeweaver.server.health.health_service import HealthService
@@ -341,6 +343,7 @@ def setup_default_container(container: Container) -> None:
     container.register(SessionStatistics, get_statistics)
     container.register(CodeWeaverSettings, get_settings)
     container.register(EmbeddingProvider, get_embedding_provider)
+    container.register(SparseEmbeddingProvider, get_sparse_embedding_provider)
     container.register(VectorStoreProvider, get_vector_store)
     container.register(RerankingProvider, get_reranking_provider)
     container.register(ChunkGovernor, get_chunk_governor)
@@ -358,6 +361,7 @@ def setup_default_container(container: Container) -> None:
     container.register(get_statistics, get_statistics)
     container.register(get_settings, get_settings)
     container.register(get_embedding_provider, get_embedding_provider)
+    container.register(get_sparse_embedding_provider, get_sparse_embedding_provider)
     container.register(get_vector_store, get_vector_store)
     container.register(get_reranking_provider, get_reranking_provider)
     container.register(get_chunk_governor, get_chunk_governor)

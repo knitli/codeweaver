@@ -129,32 +129,27 @@ def test_project_path(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-async def indexer(test_project_path: Path) -> Indexer:
+async def indexer(test_project_path: Path, clean_container) -> Indexer:
     """Create indexer instance for test project using DI container."""
     from codeweaver.config.settings import get_settings
 
-    # Reset settings to ensure a clean state
-    reset_settings()
-
-    # Get standard settings but override the project path for this test
-    container = get_container()
-
     # Define a factory that returns settings with the test project path
     async def get_test_settings() -> CodeWeaverSettings:
-        # Get fresh settings instance after reset
+        # Get fresh settings instance
+        from codeweaver.config.settings import reset_settings
+        reset_settings()
         settings = get_settings()
         # Ensure we don't load existing config files that might point elsewhere
-        # We can do this by setting test mode or just explicitly setting paths
         settings.project_path = test_project_path
         settings.project_name = f"test_project_{test_project_path.name}"
         return settings
 
     # Override CodeWeaverSettings in the container
-    container.override(CodeWeaverSettings, get_test_settings)
+    clean_container.override(CodeWeaverSettings, get_test_settings)
 
     # Resolve indexer from container - this will now use the overridden settings
     # and properly initialize all dependencies (chunking_service, etc.)
-    return await container.resolve(Indexer)
+    return await clean_container.resolve(Indexer)
 
 
 @pytest.mark.integration

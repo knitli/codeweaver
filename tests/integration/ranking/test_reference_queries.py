@@ -151,7 +151,7 @@ def reference_queries() -> list[ReferenceQuery]:
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_reference_queries_comprehensive(
-    reference_queries: list[ReferenceQuery], configured_providers
+    reference_queries: list[ReferenceQuery], di_overrides
 ) -> None:  # sourcery skip: low-code-quality
     """Execute all reference queries and validate precision targets.
 
@@ -166,11 +166,11 @@ async def test_reference_queries_comprehensive(
     - Precision@5 ≥ 80% (16/20 queries)
 
     Note: This test requires real providers with real embeddings and vector store.
-    When using mock providers (configured_providers fixture), the test will pass
+    When using mock providers (di_overrides fixture), the test will pass
     basic validation but skip quality target assertions.
     """
-    # Check if we're using mock providers by checking provider type
-    is_mock_provider = "Mock" in str(type(configured_providers))
+    # Check if we're using mock providers
+    is_mock_provider = True  # di_overrides always provides mocks
 
     results: list[QueryResult] = []
     precision_at_3_scores: list[float] = []

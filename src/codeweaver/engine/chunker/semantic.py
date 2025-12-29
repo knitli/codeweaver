@@ -133,7 +133,7 @@ class SemanticChunker(BaseChunker):
         self,
         governor: ChunkGovernor,
         language: SemanticSearchLanguage,
-        tokenizer: Any | None = None,
+        tokenizer: Tokenizer | None = None,
     ) -> None:
         """Initialize semantic chunker with governor and language.
 
@@ -144,13 +144,23 @@ class SemanticChunker(BaseChunker):
         """
         super().__init__(governor)
         self.language = language
-        self.tokenizer = tokenizer
-        if isinstance(self.tokenizer, DependsPlaceholder):
-            from codeweaver_tokenizers.tiktoken import TiktokenTokenizer
-
-            from codeweaver.di.depends import depends
-
-            self.tokenizer = depends(TiktokenTokenizer)
+        
+        # Handle tokenizer injection
+        from codeweaver_tokenizers.base import Tokenizer
+        from codeweaver.di import is_depends_marker
+        
+        if tokenizer is None or is_depends_marker(tokenizer):
+            try:
+                # Try to resolve from container if not provided
+                from codeweaver.di import get_container
+                from codeweaver_tokenizers import get_tokenizer
+                
+                # Default to tokenizers/gpt-4 if nothing else available
+                self.tokenizer = get_tokenizer("tokenizers", "gpt-4")
+            except Exception:
+                self.tokenizer = None
+        else:
+            self.tokenizer = tokenizer
 
         # Use importance threshold from settings, fallback to default
         if governor.settings is not None:

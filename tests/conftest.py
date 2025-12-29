@@ -12,6 +12,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from types import AsyncGeneratorType, GeneratorType
 from typing import Any, cast
+from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
 import pytest
@@ -90,6 +91,99 @@ def _mock_get_tokenizer(tokenizer: str, model: str) -> MockTokenizer:
 # ===========================================================================
 # Note: Qdrant configuration now handled by qdrant_test_manager fixture
 # See tests/qdrant_test_manager.py for details
+
+
+# ===========================================================================
+# *                    Mock Provider Fixtures
+# ===========================================================================
+
+
+@pytest.fixture
+def mock_embedding_provider() -> AsyncMock:
+    """Provide a mock embedding provider that returns test embeddings."""
+    mock_provider = AsyncMock()
+    mock_provider.model_name = "mock-dense-model"
+    mock_provider.provider_name = "mock-provider"
+    mock_provider.embed_query = AsyncMock(
+        return_value=[[0.1] * 384]
+    )
+    mock_provider.embed_documents = AsyncMock(
+        return_value=[[0.1] * 384, [0.2] * 384]
+    )
+    mock_provider.initialize_async = AsyncMock()
+    return mock_provider
+
+
+@pytest.fixture
+def mock_sparse_provider() -> AsyncMock:
+    """Provide a mock sparse embedding provider."""
+    mock_provider = AsyncMock()
+    mock_provider.model_name = "mock-sparse-model"
+    mock_provider.provider_name = "mock-sparse-provider"
+    mock_provider.embed_query = AsyncMock(
+        return_value=[{"indices": [1, 2, 3], "values": [0.1, 0.2, 0.3]}]
+    )
+    mock_provider.embed_documents = AsyncMock(
+        return_value=[
+            {"indices": [1, 2, 3], "values": [0.1, 0.2, 0.3]},
+            {"indices": [4, 5, 6], "values": [0.4, 0.5, 0.6]},
+        ]
+    )
+    mock_provider.initialize_async = AsyncMock()
+    return mock_provider
+
+
+@pytest.fixture
+def mock_vector_store() -> AsyncMock:
+    """Provide a mock vector store provider."""
+    mock_store = AsyncMock()
+    mock_store.collection = "mock_collection"
+    mock_store.client = MagicMock()
+    mock_store.client.retrieve = AsyncMock(return_value=[])
+    mock_store.client.scroll = AsyncMock(return_value=([], None))
+    mock_store.client.update_vectors = AsyncMock()
+    mock_store.initialize = AsyncMock()
+    mock_store._initialize = AsyncMock()
+    mock_store.upsert = AsyncMock()
+    mock_store.search = AsyncMock(return_value=[])
+    mock_store.delete_by_file = AsyncMock()
+    return mock_store
+
+
+@pytest.fixture
+def mock_reranking_provider() -> AsyncMock:
+    """Provide a mock reranking provider."""
+    mock_provider = AsyncMock()
+    mock_provider.rerank = AsyncMock(return_value=[])
+    return mock_provider
+
+
+@pytest.fixture
+def di_overrides(
+    clean_container,
+    mock_embedding_provider,
+    mock_sparse_provider,
+    mock_vector_store,
+    mock_reranking_provider,
+):
+    """Apply standard mock overrides to the DI container.
+
+    This fixture applies mock providers to the DI container, ensuring that
+    components resolved via DI use these mocks instead of real providers.
+    """
+    from codeweaver.providers.embedding.providers.base import (
+        EmbeddingProvider,
+        SparseEmbeddingProvider,
+    )
+    from codeweaver.providers.reranking.providers.base import RerankingProvider
+    from codeweaver.providers.vector_stores.base import VectorStoreProvider
+
+    clean_container.override(EmbeddingProvider, mock_embedding_provider)
+    clean_container.override(SparseEmbeddingProvider, mock_sparse_provider)
+    clean_container.override(VectorStoreProvider, mock_vector_store)
+    clean_container.override(RerankingProvider, mock_reranking_provider)
+
+    return clean_container
 
 
 # ===========================================================================

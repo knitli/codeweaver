@@ -305,16 +305,22 @@ async def actual_vector_store() -> MemoryVectorStoreProvider:
             config={"collection_name": "codeweaver-test-collection"}, _provider=Provider.MEMORY
         )
 
-        # Ensure it's initialized
+    # ALWAYS ensure it's initialized and collection exists
+    # This handles cases where collection was deleted in previous test cleanup
+    # Bypass the guard by calling the private _initialize if needed or ensuring collection
+    if _shared_memory_vector_store._client is None:
         await _shared_memory_vector_store._initialize()
+    else:
+        # Collection might have been deleted, re-ensure it
+        await _shared_memory_vector_store._ensure_collection("codeweaver-test-collection")
 
-        # CRITICAL: Register this instance in the global registry singleton cache
-        registry = get_provider_registry()
-        instance_cache = registry._get_instance_cache_for_kind(ProviderKind.VECTOR_STORE)
-        instance_cache[Provider.MEMORY] = _shared_memory_vector_store
+    # CRITICAL: Register this instance in the global registry singleton cache
+    registry = get_provider_registry()
+    instance_cache = registry._get_instance_cache_for_kind(ProviderKind.VECTOR_STORE)
+    instance_cache[Provider.MEMORY] = _shared_memory_vector_store
 
-        # ALSO register in DI container
-        get_container().override(VectorStoreProvider, _shared_memory_vector_store)
+    # ALSO register in DI container
+    get_container().override(VectorStoreProvider, _shared_memory_vector_store)
 
     import sys
 
@@ -1046,7 +1052,70 @@ async def initialized_cw_state(tmp_path: Path, actual_vector_store, clean_contai
     with clean_container.use_overrides(overrides):
         # Resolve state via container (this will trigger resolution of all deps)
         state = await clean_container.resolve(CodeWeaverState)
+        
+        # CRITICAL: Set the global state so get_state() works during tests
+        from codeweaver.server import server
+        server._state = state
+        
         yield state
+
+    # Cleanup: Reset global state
+    from codeweaver.server import server
+    server._state = None
+
+
+@pytest.fixture
+async def indexed_test_project(known_test_codebase, clean_container):
+    """Create pre-indexed test project with configured settings.
+
+    This fixture:
+    1. Configures CodeWeaverSettings with project path
+    2. Resolves and initializes the Indexer via DI
+    3. Indexes the test codebase
+    4. Ensures global state is correctly initialized
+    5. Yields the project path for tests
+    """
+    from codeweaver.config.settings import CodeWeaverSettings, get_settings
+    from codeweaver.engine.indexer.indexer import Indexer
+    from codeweaver.server.server import CodeWeaverState
+
+    # Ensure known_test_codebase is absolute
+    project_path = known_test_codebase.resolve()
+
+    # Define a factory that returns settings with the test project path
+    async def get_test_settings() -> CodeWeaverSettings:
+        # codeweaver.test.toml is already loaded via CODEWEAVER_TEST_MODE="true"
+        settings = get_settings()
+        settings.project_path = project_path
+        settings.project_name = f"test_real_{project_path.name}"
+        return settings
+
+    # Apply overrides to container
+    clean_container.override(CodeWeaverSettings, get_test_settings)
+
+    # Resolve state via container to ensure it's initialized with correct settings
+    state = await clean_container.resolve(CodeWeaverState)
+    
+    # CRITICAL: Set the global state so get_state() works during tests
+    from codeweaver.server import server
+    server._state = state
+
+    # Patch time for deterministic behavior if needed
+    call_count = [0]
+    def mock_time() -> float:
+        call_count[0] += 1
+        return 1000000.0 + call_count[0] * 0.001
+
+    with patch("codeweaver.agent_api.find_code.time.time", side_effect=mock_time):
+        # Resolve indexer from container
+        indexer = await clean_container.resolve(Indexer)
+        
+        # Ensure it's using the correct project path
+        indexer._project_path = project_path
+        
+        await indexer.prime_index(force_reindex=True)
+
+        yield project_path
 
     # Cleanup: Reset global state
     from codeweaver.server import server

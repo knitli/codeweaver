@@ -20,52 +20,28 @@ pytestmark = [pytest.mark.unit]
 
 
 @pytest.fixture
-async def mock_indexer(tmp_path: Path, clean_container):
+async def mock_indexer(tmp_path: Path, di_overrides, mock_vector_store):
     """Create an indexer with mocked dependencies using DI."""
-    from codeweaver.engine.chunking_service import ChunkingService
-    from codeweaver.providers.vector_stores.base import VectorStoreProvider
+    from codeweaver.engine.indexer.indexer import Indexer
 
-    # Mock vector store
-    mock_vs = AsyncMock(spec=VectorStoreProvider)
-    mock_vs.delete_by_file = AsyncMock()
-    mock_vs.upsert = AsyncMock()
-    mock_vs.collection = "test_collection"
-    mock_vs.client = MagicMock()
-    mock_vs.client.retrieve = AsyncMock()
-    mock_vs.client.scroll = AsyncMock(return_value=([], None))
-    mock_vs.initialize = AsyncMock()
-    mock_vs._initialize = AsyncMock()
+    # Resolve indexer from container with standard overrides already applied
+    indexer = await di_overrides.resolve(Indexer)
 
-    # Mock chunking service
-    mock_cs = MagicMock(spec=ChunkingService)
-    mock_cs.chunk_file = MagicMock(return_value=[])
-    mock_cs.initialize = AsyncMock()
+    # Ensure project path matches tmp_path
+    indexer._project_path = tmp_path
+    if indexer._checkpoint_manager:
+        indexer._checkpoint_manager.project_path = tmp_path
+    if indexer._manifest_manager:
+        indexer._manifest_manager.project_path = tmp_path
 
-    # Apply overrides using context manager
-    overrides = {
-        VectorStoreProvider: lambda: mock_vs,
-        ChunkingService: lambda: mock_cs,
-    }
+    # Set up manifest
+    indexer._file_manifest = IndexFileManifest(project_path=tmp_path)
 
-    with clean_container.use_overrides(overrides):
-        indexer = await clean_container.resolve(Indexer)
+    # Manually set providers to avoid initialization overhead
+    indexer._vector_store = mock_vector_store
+    indexer._providers_initialized = True
 
-        # Ensure project path matches tmp_path
-        indexer._project_path = tmp_path
-        if indexer._checkpoint_manager:
-            indexer._checkpoint_manager.project_path = tmp_path
-        if indexer._manifest_manager:
-            indexer._manifest_manager.project_path = tmp_path
-
-        # Set up manifest
-        indexer._file_manifest = IndexFileManifest(project_path=tmp_path)
-
-        # Manually set providers to avoid initialization overhead
-        indexer._vector_store = mock_vs
-        indexer._chunking_service = mock_cs
-        indexer._providers_initialized = True
-
-        yield indexer
+    yield indexer
 
 
 class TestStalePointRemovalInIndexFile:

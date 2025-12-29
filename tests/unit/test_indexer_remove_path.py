@@ -25,14 +25,11 @@ class TestRemovePathWithDeletedFiles:
     """Test that _remove_path correctly handles deleted files."""
 
     @pytest.fixture
-    async def mock_indexer(self, tmp_path: Path):
+    async def mock_indexer(self, tmp_path: Path, di_overrides):
         """Create an indexer with mocked dependencies using DI."""
-        from codeweaver.di import get_container
+        from codeweaver.engine.indexer.indexer import Indexer
 
-        container = get_container()
-        container.clear_overrides()
-
-        indexer = await container.resolve(Indexer)
+        indexer = await di_overrides.resolve(Indexer)
         indexer._project_path = tmp_path
         indexer._file_manifest = IndexFileManifest(project_path=tmp_path)
 

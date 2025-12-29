@@ -27,53 +27,6 @@ import pytest
 
 
 # =============================================================================
-# Fixtures
-# =============================================================================
-
-
-@pytest.fixture
-async def indexed_test_project(known_test_codebase):
-    """Create pre-indexed test project with configured settings.
-
-    This fixture:
-    1. Configures CodeWeaverSettings with project path
-    2. Patches the provider registry with real providers
-    3. Creates and initializes the Indexer
-    4. Indexes the test codebase
-    5. Yields the project path for tests
-
-    Tests using this fixture can call find_code() without worrying about
-    indexing - the project is already indexed and settings are configured.
-    """
-    from codeweaver.config.settings import get_settings
-    from codeweaver.engine.indexer.indexer import Indexer
-
-    # Use global test settings (auto-loaded from codeweaver.test.local.toml)
-    # Don't create new settings - that would override the test config
-    settings = get_settings()
-    settings_dict = settings.model_dump()
-
-    # Patch provider registry and settings
-    call_count = [0]
-
-    def mock_time() -> float:
-        call_count[0] += 1
-        return 1000000.0 + call_count[0] * 0.001
-
-    # Trust the config system - codeweaver.test.toml loaded via CODEWEAVER_TEST_MODE="true"
-    # Only patch get_project_path to ensure test codebase collection name coordination
-    with (
-        patch("codeweaver.agent_api.find_code.time.time", side_effect=mock_time),
-        patch("codeweaver.core.get_project_path", return_value=known_test_codebase),
-    ):
-        # Create and initialize indexer
-        indexer = await Indexer.from_settings_async(settings_dict)
-        await indexer.prime_index()
-
-        yield known_test_codebase
-
-
-# =============================================================================
 # Search Quality Validation Tests
 # =============================================================================
 
@@ -336,43 +289,42 @@ async def test_search_handles_no_matches_gracefully(indexed_test_project):
 @pytest.mark.integration
 @pytest.mark.real_providers
 @pytest.mark.asyncio
-async def test_search_handles_empty_codebase(tmp_path, real_provider_registry):
+async def test_search_handles_empty_codebase(tmp_path, clean_container):
     """Validate that search handles empty codebase without crashing.
 
     **What this validates:**
     - Indexing handles empty directories
     - Search doesn't crash with no indexed content
     - Error messages are clear
-
-    **Production failure modes this catches:**
-    - Crash on empty repository
-    - Unclear error messages for users
-    - Indexing assumes content exists
     """
     from codeweaver.agent_api.find_code import find_code
     from codeweaver.agent_api.find_code.intent import IntentType
-    from codeweaver.config.settings import CodeWeaverSettings
+    from codeweaver.config.settings import CodeWeaverSettings, get_settings
     from codeweaver.engine.indexer.indexer import Indexer
 
     empty_dir = tmp_path / "empty_codebase"
     empty_dir.mkdir()
     (empty_dir / ".git").mkdir()  # Git marker
 
-    # Index and search with patched provider registry
-    call_count = [0]
+    # Define a factory that returns settings with the empty project path
+    async def get_test_settings() -> CodeWeaverSettings:
+        settings = get_settings()
+        settings.project_path = empty_dir
+        settings.project_name = f"test_empty_{empty_dir.name}"
+        return settings
 
+    # Apply overrides to container
+    clean_container.override(CodeWeaverSettings, get_test_settings)
+
+    # Index and search
+    call_count = [0]
     def mock_time() -> float:
         call_count[0] += 1
         return 1000000.0 + call_count[0] * 0.001
 
-    with (
-        patch(
-            "codeweaver.common.registry.get_provider_registry", return_value=real_provider_registry
-        ),
-        patch("codeweaver.agent_api.find_code.time.time", side_effect=mock_time),
-    ):
-        settings = CodeWeaverSettings(project_path=empty_dir)
-        indexer = await Indexer.from_settings_async(settings.model_dump())
+    with patch("codeweaver.agent_api.find_code.time.time", side_effect=mock_time):
+        # Resolve indexer from container
+        indexer = await clean_container.resolve(Indexer)
         await indexer.prime_index()
 
         response = await find_code(query="any query", intent=IntentType.UNDERSTAND)
