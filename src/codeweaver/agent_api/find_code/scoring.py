@@ -18,13 +18,13 @@ import logging
 from typing import TYPE_CHECKING
 
 from codeweaver.agent_api.find_code.intent import IntentType
-from codeweaver.core.chunks import CodeChunk
-from codeweaver.semantic.classifications import AgentTask
+from codeweaver.core import CodeChunk
+from codeweaver.semantic import AgentTask
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.types.search import SearchResult
-    from codeweaver.providers.reranking.providers.base import RerankingResult
+    from codeweaver.core import SearchResult
+    from codeweaver.providers import RerankingResult
 
 
 logger = logging.getLogger(__name__)

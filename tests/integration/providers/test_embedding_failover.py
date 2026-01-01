@@ -22,9 +22,8 @@ from pathlib import Path
 
 import pytest
 
-from codeweaver.core.chunks import CodeChunk
-from codeweaver.core.spans import Span
-from codeweaver.providers.embedding.registry import get_embedding_registry
+from codeweaver.core import CodeChunk, Span
+from codeweaver.providers import get_embedding_registry
 
 
 @pytest.fixture(autouse=True)
@@ -37,9 +36,7 @@ def cleanup_registry():
     Also clears the hash stores from the embedding providers to prevent
     deduplication across tests.
     """
-    from codeweaver.providers.embedding.providers.sentence_transformers import (
-        SentenceTransformersEmbeddingProvider,
-    )
+    from codeweaver.providers import SentenceTransformersEmbeddingProvider
 
     registry = get_embedding_registry()
     registry.clear()
@@ -79,14 +76,12 @@ async def primary_embedding_provider():
 
     from sentence_transformers import SentenceTransformer
 
-    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
-    from codeweaver.providers.embedding.capabilities.ibm_granite import (
+    from codeweaver.providers import (
         GRANITE_EMBEDDING_SMALL_ENGLISH_R2_CAPABILITIES,
-    )
-    from codeweaver.providers.embedding.providers.sentence_transformers import (
+        EmbeddingModelCapabilities,
+        Provider,
         SentenceTransformersEmbeddingProvider,
     )
-    from codeweaver.providers.provider import Provider
 
     # Use a small model for fast testing (384 dimensions)
     model = SentenceTransformer("ibm-granite/granite-embedding-small-english-r2")
@@ -111,14 +106,12 @@ async def backup_embedding_provider():
 
     from sentence_transformers import SentenceTransformer
 
-    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
-    from codeweaver.providers.embedding.capabilities.ibm_granite import (
+    from codeweaver.providers import (
         GRANITE_EMBEDDING_ENGLISH_R2_CAPABILITIES,  # 768 dimensions
-    )
-    from codeweaver.providers.embedding.providers.sentence_transformers import (
+        EmbeddingModelCapabilities,
+        Provider,
         SentenceTransformersEmbeddingProvider,
     )
-    from codeweaver.providers.provider import Provider
 
     # Use larger Granite model (768 dimensions - different from primary's 384!)
     model = SentenceTransformer("ibm-granite/granite-embedding-english-r2")
@@ -208,7 +201,7 @@ async def test_deduplication_prevents_reembedding(sample_chunk, primary_embeddin
     assert len(embeddings_first) > 0, "First embedding should succeed"
 
     # Verify hash is stored
-    from codeweaver.core.stores import get_blake_hash
+    from codeweaver.core import get_blake_hash
 
     content_hash = get_blake_hash(sample_chunk.content.encode("utf-8"))
 

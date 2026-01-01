@@ -14,18 +14,16 @@ import time
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Literal, NoReturn, cast
 
-from codeweaver.common.registry import ProviderRegistry
-from codeweaver.common.statistics import SessionStatistics
+from codeweaver.common import ProviderRegistry, SessionStatistics
 from codeweaver.core import ConfigurationError
-from codeweaver.di import INJECTED
-from codeweaver.di.providers import (
+from codeweaver.di import (
+    INJECTED,
     FailoverManagerDep,
     IndexerDep,
     ProviderRegistryDep,
     StatisticsDep,
 )
-from codeweaver.engine.failover import VectorStoreFailoverManager
-from codeweaver.engine.indexer.indexer import Indexer
+from codeweaver.engine import Indexer, VectorStoreFailoverManager
 from codeweaver.server.health.models import (
     EmbeddingProviderServiceInfo,
     FailoverInfo,
@@ -42,7 +40,7 @@ from codeweaver.server.health.models import (
 
 
 if TYPE_CHECKING:
-    from codeweaver.common.statistics import FileStatistics
+    from codeweaver.common import FileStatistics
 
 
 logger = logging.getLogger(__name__)
@@ -91,11 +89,9 @@ class HealthService:
 
     async def _resolve_dependencies(self) -> None:
         """Resolve dependencies if they were provided as Depends objects."""
-        from codeweaver.common.registry import ProviderRegistry
-        from codeweaver.common.statistics import SessionStatistics
+        from codeweaver.common import ProviderRegistry, SessionStatistics
         from codeweaver.di import get_container, is_depends_marker
-        from codeweaver.engine.failover import VectorStoreFailoverManager
-        from codeweaver.engine.indexer import Indexer
+        from codeweaver.engine import Indexer, VectorStoreFailoverManager
 
         container = get_container()
         logger.debug(
@@ -106,12 +102,12 @@ class HealthService:
             try:
                 self._provider_registry = await container.resolve(ProviderRegistry)
             except Exception:
-                from codeweaver.common.registry import get_provider_registry
+                from codeweaver.common import get_provider_registry
 
                 self._provider_registry = get_provider_registry()
 
         if is_depends_marker(self._statistics):
-            from codeweaver.common.statistics import SessionStatistics
+            from codeweaver.common import SessionStatistics
 
             try:
                 # Use container to ensure overrides are respected
@@ -119,7 +115,7 @@ class HealthService:
                 logger.debug("Resolved statistics from container: %s", type(self._statistics))
             except Exception as e:
                 logger.debug("Failed to resolve statistics from container: %s", e)
-                from codeweaver.common.statistics import get_session_statistics
+                from codeweaver.common import get_session_statistics
 
                 self._statistics = get_session_statistics()
                 logger.debug("Fallback to get_session_statistics: %s", type(self._statistics))
@@ -256,7 +252,7 @@ class HealthService:
 
     async def _check_vector_store_health(self) -> VectorStoreServiceInfo:
         """Check vector store health with latency measurement."""
-        from codeweaver.core.types.provider import ProviderKind
+        from codeweaver.core import ProviderKind
 
         def raise_error() -> NoReturn:
             """Helper to raise error for missing provider."""

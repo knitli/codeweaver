@@ -24,12 +24,10 @@ import pytest_asyncio
 
 from pydantic_core import to_json
 
-from codeweaver.agent_api.find_code.types import FindCodeResponseSummary
-from codeweaver.common.registry import ProviderRegistry
-from codeweaver.common.statistics import FailoverStats, get_session_statistics
-from codeweaver.engine.failover import VectorStoreFailoverManager
-from codeweaver.server.health.health_service import HealthService
-from codeweaver.server.health.models import FailoverInfo
+from codeweaver.agent_api import FindCodeResponseSummary
+from codeweaver.common import FailoverStats, ProviderRegistry, get_session_statistics
+from codeweaver.engine import VectorStoreFailoverManager
+from codeweaver.server import FailoverInfo, HealthService
 
 
 @pytest.fixture
@@ -47,7 +45,7 @@ def mock_context() -> Mock:
 @pytest.fixture
 def mock_primary_store() -> Mock:
     """Create a mock primary vector store."""
-    from codeweaver.providers.vector_stores.base import CircuitBreakerState
+    from codeweaver.providers import CircuitBreakerState
 
     store = Mock()
     store.close = AsyncMock()
@@ -272,8 +270,8 @@ class TestPhase4StatusFlow:
     ) -> None:
         """Test that find_code responses can include failover metadata."""
         # Create a mock FindCodeResponseSummary
-        from codeweaver.agent_api.find_code.intent import IntentType
-        from codeweaver.core.types.search import SearchStrategy
+        from codeweaver.agent_api import IntentType
+        from codeweaver.core import SearchStrategy
 
         response = FindCodeResponseSummary(
             matches=[],
@@ -404,7 +402,7 @@ class TestPhase4CLIStatus:
 
     def test_status_command_imports(self) -> None:
         """Test that status command module imports correctly."""
-        from codeweaver.cli.commands import status
+        from codeweaver.cli import status
 
         # Verify main components exist
         assert hasattr(status, "app")
@@ -421,7 +419,7 @@ class TestPhase4CLIStatus:
 
     def test_format_duration_utility(self) -> None:
         """Test duration formatting utility function."""
-        from codeweaver.cli.commands.status import _format_duration
+        from codeweaver.cli import _format_duration
 
         # Test seconds
         assert _format_duration(30) == "30s"
@@ -437,7 +435,7 @@ class TestPhase4CLIStatus:
 
     def test_status_command_registered(self) -> None:
         """Test that status command is registered in CLI."""
-        from codeweaver.cli.__main__ import app
+        from codeweaver.cli import app
 
         # The command should be registered
         # We can verify this by checking the app's command registry

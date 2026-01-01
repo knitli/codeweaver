@@ -10,7 +10,7 @@ from __future__ import annotations
 from types import MappingProxyType
 from typing import ClassVar, Literal
 
-from codeweaver.core.types.provider import Provider
+from codeweaver.core import Provider
 from codeweaver.providers.embedding.capabilities.base import (
     EmbeddingModelCapabilities,
     EmbeddingModelSpec,

@@ -48,7 +48,7 @@ class TestStartCommandBehavior:
         # Check the function signature has foreground parameter
         import inspect
 
-        from codeweaver.cli.commands.start import start
+        from codeweaver.cli import start
 
         sig = inspect.signature(start)
         assert "foreground" in sig.parameters
@@ -59,7 +59,7 @@ class TestStartCommandBehavior:
         """Test that start defaults to background mode (foreground=False)."""
         import inspect
 
-        from codeweaver.cli.commands.start import start
+        from codeweaver.cli import start
 
         sig = inspect.signature(start)
         # foreground should default to False
@@ -70,7 +70,7 @@ class TestStartCommandBehavior:
         self, temp_project: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
         """Test that start detects when services are already running."""
-        from codeweaver.cli.commands.start import are_services_running
+        from codeweaver.cli import are_services_running
 
         # Mock httpx at the httpx module level (it's lazily imported inside the function)
         mock_client = AsyncMock()
@@ -89,7 +89,7 @@ class TestStartCommandBehavior:
     @pytest.mark.asyncio
     async def test_start_detects_not_running(self, temp_project: Path) -> None:
         """Test that start detects when services are not running."""
-        from codeweaver.cli.commands.start import are_services_running
+        from codeweaver.cli import are_services_running
 
         # Mock httpx to simulate no daemon running (connection error)
         mock_client = AsyncMock()
@@ -111,8 +111,7 @@ class TestStartDaemonBackground:
 
     def test_start_daemon_background_finds_executable(self, temp_project: Path) -> None:
         """Test that _start_daemon_background finds the codeweaver executable."""
-        from codeweaver.cli.commands.start import _start_daemon_background
-        from codeweaver.cli.ui import StatusDisplay
+        from codeweaver.cli import StatusDisplay, _start_daemon_background
 
         display = StatusDisplay()
 
@@ -144,8 +143,7 @@ class TestStartDaemonBackground:
 
     def test_start_daemon_background_uses_python_fallback(self, temp_project: Path) -> None:
         """Test fallback to python when cw/codeweaver executable not found."""
-        from codeweaver.cli.commands.start import _start_daemon_background
-        from codeweaver.cli.ui import StatusDisplay
+        from codeweaver.cli import StatusDisplay, _start_daemon_background
 
         display = StatusDisplay()
 
@@ -176,8 +174,7 @@ class TestStartDaemonBackground:
 
     def test_start_daemon_background_passes_options(self, temp_project: Path) -> None:
         """Test that custom options are passed to the spawned daemon."""
-        from codeweaver.cli.commands.start import _start_daemon_background
-        from codeweaver.cli.ui import StatusDisplay
+        from codeweaver.cli import StatusDisplay, _start_daemon_background
 
         display = StatusDisplay()
 
@@ -214,7 +211,7 @@ class TestInitServiceCommand:
 
     def test_init_service_command_exists(self) -> None:
         """Test that init service command is registered."""
-        from codeweaver.cli.commands.init import app as init_app
+        from codeweaver.cli import app as init_app
 
         # Check that 'service' is a registered command
         # cyclopts stores commands differently, check the app has the command
@@ -224,7 +221,7 @@ class TestInitServiceCommand:
         """Test that service command has --enable flag."""
         import inspect
 
-        from codeweaver.cli.commands.init import service
+        from codeweaver.cli import service
 
         sig = inspect.signature(service)
         assert "enable" in sig.parameters
@@ -235,7 +232,7 @@ class TestInitServiceCommand:
         """Test that service command has --uninstall flag."""
         import inspect
 
-        from codeweaver.cli.commands.init import service
+        from codeweaver.cli import service
 
         sig = inspect.signature(service)
         assert "uninstall" in sig.parameters
@@ -250,7 +247,7 @@ class TestSystemdServiceGeneration:
 
     def test_systemd_unit_content_valid(self) -> None:
         """Test that generated systemd unit file has valid structure."""
-        from codeweaver.cli.commands.init import _get_systemd_unit
+        from codeweaver.cli import _get_systemd_unit
 
         unit_content = _get_systemd_unit(
             cw_cmd="/usr/local/bin/cw", working_dir=Path("/home/user/project")
@@ -272,7 +269,7 @@ class TestSystemdServiceGeneration:
 
     def test_systemd_unit_includes_documentation(self) -> None:
         """Test that systemd unit includes documentation link."""
-        from codeweaver.cli.commands.init import _get_systemd_unit
+        from codeweaver.cli import _get_systemd_unit
 
         unit_content = _get_systemd_unit(
             cw_cmd="/usr/local/bin/cw", working_dir=Path("/home/user/project")
@@ -289,7 +286,7 @@ class TestLaunchdServiceGeneration:
 
     def test_launchd_plist_content_valid(self) -> None:
         """Test that generated launchd plist has valid XML structure."""
-        from codeweaver.cli.commands.init import _get_launchd_plist
+        from codeweaver.cli import _get_launchd_plist
 
         plist_content = _get_launchd_plist(
             cw_cmd="/usr/local/bin/cw", working_dir=Path("/Users/user/project")
@@ -308,7 +305,7 @@ class TestLaunchdServiceGeneration:
 
     def test_launchd_plist_runs_foreground(self) -> None:
         """Test that launchd plist runs daemon in foreground mode."""
-        from codeweaver.cli.commands.init import _get_launchd_plist
+        from codeweaver.cli import _get_launchd_plist
 
         plist_content = _get_launchd_plist(
             cw_cmd="/usr/local/bin/cw", working_dir=Path("/Users/user/project")
@@ -321,7 +318,7 @@ class TestLaunchdServiceGeneration:
 
     def test_launchd_plist_sets_log_paths(self) -> None:
         """Test that launchd plist configures log file paths."""
-        from codeweaver.cli.commands.init import _get_launchd_plist
+        from codeweaver.cli import _get_launchd_plist
 
         plist_content = _get_launchd_plist(
             cw_cmd="/usr/local/bin/cw", working_dir=Path("/Users/user/project")
@@ -340,7 +337,7 @@ class TestStartPersistAlias:
 
     def test_persist_command_exists(self) -> None:
         """Test that start persist command is registered."""
-        from codeweaver.cli.commands.start import app as start_app
+        from codeweaver.cli import app as start_app
 
         # Check that 'persist' is a registered command
         assert hasattr(start_app, "command")
@@ -349,7 +346,7 @@ class TestStartPersistAlias:
         """Test that persist command has same options as init service."""
         import inspect
 
-        from codeweaver.cli.commands.start import persist
+        from codeweaver.cli import persist
 
         persist_sig = inspect.signature(persist)
 
@@ -360,10 +357,10 @@ class TestStartPersistAlias:
 
     def test_persist_delegates_to_init_service(self) -> None:
         """Test that persist command delegates to init service."""
-        from codeweaver.cli.commands.start import persist
+        from codeweaver.cli import persist
 
         # Patch the init_service function that persist should delegate to
-        with patch("codeweaver.cli.commands.init.service") as mock_init_service:
+        with patch("codeweaver.cli") as mock_init_service:
             # Call persist with some test arguments
             from tempfile import TemporaryDirectory
 
@@ -383,8 +380,7 @@ class TestServiceInstallationBehavior:
         """Test that systemd installation creates service file in correct location."""
         import subprocess as subprocess_module
 
-        from codeweaver.cli.commands.init import _install_systemd_service
-        from codeweaver.cli.ui import StatusDisplay
+        from codeweaver.cli import StatusDisplay, _install_systemd_service
 
         display = StatusDisplay()
 
@@ -414,12 +410,11 @@ class TestServiceInstallationBehavior:
     @pytest.mark.skipif(sys.platform != "darwin", reason="macOS-specific test")
     def test_launchd_install_creates_plist_file(self, temp_home: Path) -> None:
         """Test that launchd installation creates plist file in correct location."""
-        from codeweaver.cli.commands.init import _install_launchd_service
-        from codeweaver.cli.ui import StatusDisplay
+        from codeweaver.cli import StatusDisplay, _install_launchd_service
 
         display = StatusDisplay()
 
-        with patch("codeweaver.cli.commands.init.subprocess.run") as mock_run:
+        with patch("codeweaver.cli") as mock_run:
             mock_run.return_value = MagicMock(returncode=0)
 
             result = _install_launchd_service(
@@ -443,8 +438,7 @@ class TestWindowsServiceInstructions:
 
     def test_windows_instructions_shown(self, capsys: pytest.CaptureFixture[str]) -> None:
         """Test that Windows instructions are displayed correctly."""
-        from codeweaver.cli.commands.init import _show_windows_instructions
-        from codeweaver.cli.ui import StatusDisplay
+        from codeweaver.cli import StatusDisplay, _show_windows_instructions
 
         display = StatusDisplay()
 
@@ -471,8 +465,7 @@ class TestHealthCheckBehavior:
         """Test waiting for daemon to become healthy."""
         import httpx as httpx_module
 
-        from codeweaver.cli.commands.start import _wait_for_daemon_healthy
-        from codeweaver.cli.ui import StatusDisplay
+        from codeweaver.cli import StatusDisplay, _wait_for_daemon_healthy
 
         display = StatusDisplay()
 
@@ -495,8 +488,7 @@ class TestHealthCheckBehavior:
         """Test timeout when daemon doesn't become healthy."""
         import httpx as httpx_module
 
-        from codeweaver.cli.commands.start import _wait_for_daemon_healthy
-        from codeweaver.cli.ui import StatusDisplay
+        from codeweaver.cli import StatusDisplay, _wait_for_daemon_healthy
 
         display = StatusDisplay()
 

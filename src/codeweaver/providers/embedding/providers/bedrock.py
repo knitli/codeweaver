@@ -36,16 +36,14 @@ from pydantic import (
 from pydantic.alias_generators import to_camel, to_snake
 from types_boto3_bedrock_runtime.client import BedrockRuntimeClient
 
-from codeweaver.core import ConfigurationError, ProviderError
+from codeweaver.core import BasedModel, ConfigurationError, Provider, ProviderError
 from codeweaver.core import ValidationError as CodeWeaverValidationError
-from codeweaver.core.types.models import BasedModel
-from codeweaver.core.types.provider import Provider
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.providers.base import EmbeddingProvider
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.chunks import CodeChunk
+    from codeweaver.core import CodeChunk
 
 logger = logging.getLogger(__name__)
 
@@ -472,7 +470,7 @@ class BedrockEmbeddingProvider(EmbeddingProvider[BedrockRuntimeClient]):
         if not client:
             client = boto3_client("bedrock-runtime", **kwargs)
         if not caps:
-            from codeweaver.common.registry.models import get_model_registry
+            from codeweaver.common import get_model_registry
 
             registry = get_model_registry()
             caps = registry.configured_models_for_kind("embedding")  # ty: ignore[invalid-assignment]
@@ -523,7 +521,7 @@ class BedrockEmbeddingProvider(EmbeddingProvider[BedrockRuntimeClient]):
         self, response: BedrockInvokeEmbeddingResponse, doc: CodeChunk | None = None
     ) -> list[float] | list[int]:
         """Handle the response from Titan for embedding requests."""
-        from codeweaver.core.chunks import CodeChunk
+        from codeweaver.core import CodeChunk
 
         if (
             isinstance(response.body, TitanEmbeddingV2Response)
@@ -613,7 +611,7 @@ class BedrockEmbeddingProvider(EmbeddingProvider[BedrockRuntimeClient]):
         **kwargs: Any,
     ) -> list[InvokeRequestDict]:
         """Create the Titan embedding request."""
-        from codeweaver.core.chunks import CodeChunk
+        from codeweaver.core import CodeChunk
 
         body_kwargs = (
             {

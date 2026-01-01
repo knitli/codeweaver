@@ -5,7 +5,7 @@
 
 """# Implementation of the find_code tool.
 
-CodeWeaver differentiates between *internal* and *external* tools. External tools -- and there is only one, this one, the **`find_code`** tool -- are exposed to the user and user's AI agents. `find_code` is intentionally very simple. This module contains the back-end, execution-side, of the `find_code` tool. The entry-point exposed to users and agents is in `codeweaver.mcp.user_agent`.
+CodeWeaver differentiates between *internal* and *external* tools. External tools -- and there is only one, this one, the **`find_code`** tool -- are exposed to the user and user's AI agents. `find_code` is intentionally very simple. This module contains the back-end, execution-side, of the `find_code` tool. The entry-point exposed to users and agents is in `codeweaver.mcp`.
 
 ## How it Works
 
@@ -69,21 +69,16 @@ from codeweaver.agent_api.find_code.scoring import (
     process_unranked_results,
 )
 from codeweaver.agent_api.find_code.types import CodeMatch, FindCodeResponseSummary
-from codeweaver.common._logging import log_to_client_or_fallback
-from codeweaver.common.telemetry.events import capture_search_event
-from codeweaver.core.spans import Span
-from codeweaver.core.types.search import SearchStrategy
-from codeweaver.di import INJECTED
-from codeweaver.di.providers import EmbeddingDep, RerankingDep, SparseEmbeddingDep, VectorStoreDep
-from codeweaver.providers.embedding.providers.base import EmbeddingProvider
-from codeweaver.providers.reranking.providers.base import RerankingProvider
-from codeweaver.providers.vector_stores.base import VectorStoreProvider
-from codeweaver.semantic.classifications import AgentTask
+from codeweaver.common import capture_search_event, log_to_client_or_fallback
+from codeweaver.core import SearchStrategy, Span
+from codeweaver.di import INJECTED, EmbeddingDep, RerankingDep, SparseEmbeddingDep, VectorStoreDep
+from codeweaver.providers import EmbeddingProvider, RerankingProvider, VectorStoreProvider
+from codeweaver.semantic import AgentTask
 
 
 if TYPE_CHECKING:
-    from codeweaver.config.types import CodeWeaverSettingsDict
-    from codeweaver.core.types.dictview import DictView
+    from codeweaver.config import CodeWeaverSettingsDict
+    from codeweaver.core import DictView
 
 
 logger = logging.getLogger(__name__)
@@ -114,7 +109,7 @@ def get_max_results() -> int:
 
 def _get_settings() -> DictView[CodeWeaverSettingsDict]:
     """Get settings view from codeweaver settings."""
-    from codeweaver.config.settings import get_settings_map
+    from codeweaver.config import get_settings_map
 
     return get_settings_map()
 
@@ -138,7 +133,7 @@ async def _check_index_status(
     if vector_store is None or isinstance(vector_store, (Depends, DependsPlaceholder)):
         try:
             from codeweaver.di import get_container
-            from codeweaver.providers.vector_stores.base import VectorStoreProvider
+            from codeweaver.providers import VectorStoreProvider
 
             vector_store = await get_container().resolve(VectorStoreProvider)
         except Exception:
@@ -245,8 +240,7 @@ async def find_code(
 
     # Manually resolve providers if not injected (DI fallback)
     from codeweaver.di import Depends, DependsPlaceholder, get_container
-    from codeweaver.providers.embedding.providers.base import EmbeddingProvider
-    from codeweaver.providers.vector_stores.base import VectorStoreProvider
+    from codeweaver.providers import EmbeddingProvider, VectorStoreProvider
 
     container = get_container()
 
@@ -256,9 +250,7 @@ async def find_code(
         except Exception:
             vector_store = None
 
-    if embedding_provider is None or isinstance(
-        embedding_provider, (Depends, DependsPlaceholder)
-    ):
+    if embedding_provider is None or isinstance(embedding_provider, (Depends, DependsPlaceholder)):
         try:
             embedding_provider = await container.resolve(EmbeddingProvider)
         except Exception:
@@ -266,17 +258,15 @@ async def find_code(
 
     if sparse_provider is None or isinstance(sparse_provider, (Depends, DependsPlaceholder)):
         try:
-            from codeweaver.providers.embedding.providers.base import SparseEmbeddingProvider
+            from codeweaver.providers import SparseEmbeddingProvider
 
             sparse_provider = await container.resolve(SparseEmbeddingProvider)
         except Exception:
             sparse_provider = None
 
-    if reranking_provider is None or isinstance(
-        reranking_provider, (Depends, DependsPlaceholder)
-    ):
+    if reranking_provider is None or isinstance(reranking_provider, (Depends, DependsPlaceholder)):
         try:
-            from codeweaver.providers.reranking.providers.base import RerankingProvider
+            from codeweaver.providers import RerankingProvider
 
             reranking_provider = await container.resolve(RerankingProvider)
         except Exception:
@@ -386,7 +376,7 @@ async def find_code(
         settings = _get_settings()
         tools_over_privacy = settings["telemetry"]["tools_over_privacy"]
         try:
-            from codeweaver.common.telemetry import get_telemetry_client
+            from codeweaver.common import get_telemetry_client
 
             client = get_telemetry_client()
             feature_flags = {

@@ -42,13 +42,15 @@ except ImportError:
     # Fallback if httpcore or qdrant_client not available
     RETRYABLE_EXCEPTIONS = (ConnectionError, TimeoutError, OSError, httpx.TimeoutException)
 
-from codeweaver.config.providers import EmbeddingModelSettings, SparseEmbeddingModelSettings
-from codeweaver.core import ProviderError
-from codeweaver.core.chunks import CodeChunk
-from codeweaver.core.types.enum import BaseEnum
-from codeweaver.core.types.models import BasedModel
-from codeweaver.core.types.provider import Provider
-from codeweaver.core.types.search import StrategizedQuery
+from codeweaver.config import EmbeddingModelSettings, SparseEmbeddingModelSettings
+from codeweaver.core import (
+    BasedModel,
+    BaseEnum,
+    CodeChunk,
+    Provider,
+    ProviderError,
+    StrategizedQuery,
+)
 from codeweaver.providers.embedding.capabilities.base import (
     EmbeddingModelCapabilities,
     SparseEmbeddingModelCapabilities,
@@ -57,7 +59,7 @@ from codeweaver.providers.vector_stores.search import Filter
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.types.search import SearchResult
+    from codeweaver.core import SearchResult
 
 
 logger = logging.getLogger(__name__)
@@ -116,12 +118,12 @@ def _get_caps(
     Returns:
         Embedding capabilities or None.
     """
-    from codeweaver.common.registry import get_model_registry
-    from codeweaver.core.types import Unset
+    from codeweaver.common import get_model_registry
+    from codeweaver.core import Unset
 
     registry = get_model_registry()
     if backup:
-        from codeweaver.config.profiles import get_profile
+        from codeweaver.config import get_profile
 
         profile = get_profile("backup", "local")
         if not profile:
@@ -174,8 +176,8 @@ def _get_embedding_settings() -> EmbeddingSettingsDict:
     Returns:
         Embedding model settings dictionary.
     """
-    from codeweaver.common.registry.provider import get_provider_registry
-    from codeweaver.config.profiles import get_profile
+    from codeweaver.common import get_provider_registry
+    from codeweaver.config import get_profile
 
     profile = get_profile("backup", "local")
     registry = get_provider_registry()
@@ -487,7 +489,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
         context: Any = None,
     ) -> list[SearchResult]:
         """Wrapper around search with retry logic and circuit breaker."""
-        from codeweaver.common._logging import log_to_client_or_fallback
+        from codeweaver.common import log_to_client_or_fallback
 
         _ = self._check_circuit_breaker
 
@@ -586,7 +588,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
         self, chunks: list[CodeChunk], context: Any = None, *, for_backup: bool = False
     ) -> None:
         """Wrapper around upsert with retry logic and circuit breaker."""
-        from codeweaver.common._logging import log_to_client_or_fallback
+        from codeweaver.common import log_to_client_or_fallback
 
         _ = self._check_circuit_breaker
 

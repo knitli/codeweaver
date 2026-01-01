@@ -21,9 +21,7 @@ from pathlib import Path
 
 import pytest
 
-from codeweaver.engine.chunker.base import ChunkGovernor
-from codeweaver.engine.chunker.delimiter import DelimiterChunker
-from codeweaver.engine.chunker.delimiters.kind import DelimiterKind
+from codeweaver.engine import ChunkGovernor, DelimiterChunker, DelimiterKind
 
 
 pytestmark = [pytest.mark.unit]
@@ -93,7 +91,7 @@ function createDataProcessor(config) {
         test_file.write_text(js_code)
 
         # Create DiscoveredFile and chunk the code
-        from codeweaver.core.discovery import DiscoveredFile
+        from codeweaver.core import DiscoveredFile
 
         discovered_file = DiscoveredFile.from_path(test_file)
         chunks = delimiter_chunker.chunk(js_code, file=discovered_file)
@@ -170,7 +168,7 @@ class DataProcessor:
         test_file.write_text(py_code)
 
         # Create DiscoveredFile and chunk the code
-        from codeweaver.core.discovery import DiscoveredFile
+        from codeweaver.core import DiscoveredFile
 
         discovered_file = DiscoveredFile.from_path(test_file)
         chunks = delimiter_chunker.chunk(py_code, file=discovered_file)
@@ -266,7 +264,7 @@ def validate_config(config: dict) -> bool:
         _ = test_file.write_text(py_code)
 
         # Create DiscoveredFile and chunk the code
-        from codeweaver.core.discovery import DiscoveredFile
+        from codeweaver.core import DiscoveredFile
 
         discovered_file = DiscoveredFile.from_path(test_file)
         chunks = delimiter_chunker.chunk(py_code, file=discovered_file)
@@ -350,7 +348,7 @@ function processData(items) {
         test_file.write_text(code)
 
         # Create DiscoveredFile and chunk the code
-        from codeweaver.core.discovery import DiscoveredFile
+        from codeweaver.core import DiscoveredFile
 
         discovered_file = DiscoveredFile.from_path(test_file)
         chunks = delimiter_chunker.chunk(code, file=discovered_file)
@@ -390,7 +388,7 @@ def another_function():
         _ = test_file.write_text(code)
 
         # Create DiscoveredFile and chunk the code
-        from codeweaver.core.discovery import DiscoveredFile
+        from codeweaver.core import DiscoveredFile
 
         discovered_file = DiscoveredFile.from_path(test_file)
         chunks = delimiter_chunker.chunk(code, file=discovered_file)

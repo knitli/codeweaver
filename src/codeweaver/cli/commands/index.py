@@ -18,14 +18,13 @@ from cyclopts import App
 from pydantic import FilePath
 
 from codeweaver.cli.ui import CLIErrorHandler, IndexingProgress, StatusDisplay, get_display
-from codeweaver.config.types import CodeWeaverSettingsDict
-from codeweaver.core import CodeWeaverError, get_project_path, get_user_config_dir
-from codeweaver.core.types.dictview import DictView
+from codeweaver.config import CodeWeaverSettingsDict
+from codeweaver.core import CodeWeaverError, DictView, get_project_path, get_user_config_dir
 
 
 if TYPE_CHECKING:
-    from codeweaver.config.settings import CodeWeaverSettings
-    from codeweaver.engine.indexer.checkpoint import CheckpointManager
+    from codeweaver.config import CodeWeaverSettings
+    from codeweaver.engine import CheckpointManager
 
 _display: StatusDisplay = get_display()
 
@@ -75,7 +74,7 @@ def _load_and_configure_settings(
     Returns:
         Tuple of (CodeWeaverSettings, resolved project path)
     """
-    from codeweaver.config.settings import get_settings, update_settings
+    from codeweaver.config import get_settings, update_settings
 
     settings = get_settings(config_file=config_file)
 
@@ -108,7 +107,7 @@ def _derive_collection_name(
     Returns:
         Derived collection name string
     """
-    from codeweaver.config.providers import ProviderSettings
+    from codeweaver.config import ProviderSettings
     from codeweaver.core import generate_collection_name
 
     # Default collection name
@@ -145,10 +144,9 @@ async def _perform_clear_operation(
     Raises:
         CodeWeaverError: If operation fails
     """
-    from codeweaver.common.registry.provider import get_provider_registry
-    from codeweaver.config.indexer import IndexerSettings
-    from codeweaver.engine.indexer.checkpoint import CheckpointManager
-    from codeweaver.engine.indexer.manifest import FileManifestManager
+    from codeweaver.common import get_provider_registry
+    from codeweaver.config import IndexerSettings
+    from codeweaver.engine import CheckpointManager, FileManifestManager
 
     if not yes:
         display.print_warning("⚠ Warning: Destructive Operation")
@@ -186,8 +184,8 @@ async def _perform_clear_operation(
     collection_name = _derive_collection_name(settings, project_path, checkpoint_mgr)
 
     # Clear vector store
-    from codeweaver.config.providers import ProviderSettings
-    from codeweaver.core.types import Unset
+    from codeweaver.config import ProviderSettings
+    from codeweaver.core import Unset
 
     registry = get_provider_registry()
     provider = registry.get_provider_enum_for("vector_store")
@@ -263,7 +261,7 @@ async def _handle_server_status(*, standalone: bool, display: StatusDisplay) -> 
 
 
 def _get_url():
-    from codeweaver.config.settings import get_settings_map
+    from codeweaver.config import get_settings_map
 
     settings_map = get_settings_map()
     host = settings_map.get("management_host", "localhost")
@@ -317,7 +315,7 @@ async def _run_standalone_indexing(
     """
     from typing import Any
 
-    from codeweaver.engine.indexer import Indexer
+    from codeweaver.engine import Indexer
 
     display.print_info("Initializing indexer...")
     indexer = await Indexer.from_settings_async(

@@ -14,8 +14,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from codeweaver.engine.failover import VectorStoreFailoverManager
-from codeweaver.providers.vector_stores.base import CircuitBreakerState
+from codeweaver.engine import VectorStoreFailoverManager
+from codeweaver.providers import CircuitBreakerState
 
 
 pytestmark = [pytest.mark.unit]
@@ -449,11 +449,9 @@ class TestFailoverWithValidation:
         primary = MockVectorStoreProvider(circuit_state=CircuitBreakerState.OPEN)
         manager = VectorStoreFailoverManager(backup_enabled=True)
 
-        with patch(
-            "codeweaver.engine.failover.estimate_backup_memory_requirements"
-        ) as mock_estimate:
+        with patch("codeweaver.engine") as mock_estimate:
             # Create proper MemoryEstimate with numeric values
-            from codeweaver.engine.resource_estimation import MemoryEstimate
+            from codeweaver.engine import MemoryEstimate
 
             mock_estimate.return_value = MemoryEstimate(
                 estimated_bytes=500_000_000,  # 500MB
@@ -494,11 +492,9 @@ class TestFailoverWithValidation:
         primary = MockVectorStoreProvider(circuit_state=CircuitBreakerState.OPEN)
         manager = VectorStoreFailoverManager(backup_enabled=True)
 
-        with patch(
-            "codeweaver.engine.failover.estimate_backup_memory_requirements"
-        ) as mock_estimate:
+        with patch("codeweaver.engine") as mock_estimate:
             # Create proper MemoryEstimate with numeric values
-            from codeweaver.engine.resource_estimation import MemoryEstimate
+            from codeweaver.engine import MemoryEstimate
 
             mock_estimate.return_value = MemoryEstimate(
                 estimated_bytes=500_000_000,  # 500MB
@@ -603,7 +599,7 @@ class TestSyncBackToPrimary:
         from pathlib import Path as PathlibPath
 
         from codeweaver.core import CodeChunk, Metadata, Span, uuid7
-        from codeweaver.providers.vector_stores.metadata import HybridVectorPayload
+        from codeweaver.providers import HybridVectorPayload
 
         chunk = CodeChunk(
             content="test content",
@@ -754,7 +750,7 @@ class TestBackupSyncCoordination:
     @pytest.mark.asyncio
     async def test_should_sync_false_when_no_changes(self, tmp_path: Path):
         """Test should_sync_backup returns False with no pending changes."""
-        from codeweaver.engine.failover_tracker import FileChangeTracker
+        from codeweaver.engine import FileChangeTracker
 
         manager = VectorStoreFailoverManager()
         manager._change_tracker = FileChangeTracker(project_path=tmp_path)
@@ -764,7 +760,7 @@ class TestBackupSyncCoordination:
     @pytest.mark.asyncio
     async def test_should_sync_true_on_volume_threshold(self, tmp_path: Path):
         """Test should_sync_backup returns True when volume threshold exceeded."""
-        from codeweaver.engine.failover_tracker import FileChangeTracker
+        from codeweaver.engine import FileChangeTracker
 
         manager = VectorStoreFailoverManager()
         tracker = FileChangeTracker(project_path=tmp_path)
@@ -779,7 +775,7 @@ class TestBackupSyncCoordination:
         """Test should_sync_backup returns True when time threshold exceeded."""
         from datetime import UTC, datetime, timedelta
 
-        from codeweaver.engine.failover_tracker import FileChangeTracker
+        from codeweaver.engine import FileChangeTracker
 
         manager = VectorStoreFailoverManager()
         tracker = FileChangeTracker(project_path=tmp_path)
@@ -793,7 +789,7 @@ class TestBackupSyncCoordination:
     @pytest.mark.asyncio
     async def test_should_sync_true_when_never_synced(self, tmp_path: Path):
         """Test should_sync_backup returns True when never synced."""
-        from codeweaver.engine.failover_tracker import FileChangeTracker
+        from codeweaver.engine import FileChangeTracker
 
         manager = VectorStoreFailoverManager()
         tracker = FileChangeTracker(project_path=tmp_path)
@@ -815,7 +811,7 @@ class TestBackupSyncCoordination:
     @pytest.mark.asyncio
     async def test_sync_pending_returns_zero_without_indexer(self, tmp_path: Path):
         """Test sync_pending_to_backup returns 0 without backup indexer."""
-        from codeweaver.engine.failover_tracker import FileChangeTracker
+        from codeweaver.engine import FileChangeTracker
 
         manager = VectorStoreFailoverManager()
         manager._change_tracker = FileChangeTracker(project_path=tmp_path)
@@ -827,7 +823,7 @@ class TestBackupSyncCoordination:
     @pytest.mark.asyncio
     async def test_sync_pending_returns_zero_with_no_changes(self, tmp_path: Path):
         """Test sync_pending_to_backup returns 0 with no pending changes."""
-        from codeweaver.engine.failover_tracker import FileChangeTracker
+        from codeweaver.engine import FileChangeTracker
 
         manager = VectorStoreFailoverManager()
         manager._change_tracker = FileChangeTracker(project_path=tmp_path)
@@ -873,7 +869,7 @@ class TestPrimaryRecovery:
     @pytest.mark.asyncio
     async def test_sync_failover_returns_zero_without_indexer(self, tmp_path: Path):
         """Test sync_failover_to_primary returns 0 without primary indexer."""
-        from codeweaver.engine.failover_tracker import FileChangeTracker
+        from codeweaver.engine import FileChangeTracker
 
         manager = VectorStoreFailoverManager()
         manager._change_tracker = FileChangeTracker(project_path=tmp_path)
@@ -885,7 +881,7 @@ class TestPrimaryRecovery:
     @pytest.mark.asyncio
     async def test_sync_failover_returns_zero_with_no_failover_files(self, tmp_path: Path):
         """Test sync_failover_to_primary returns 0 with no failover files."""
-        from codeweaver.engine.failover_tracker import FileChangeTracker
+        from codeweaver.engine import FileChangeTracker
 
         manager = VectorStoreFailoverManager()
         manager._change_tracker = FileChangeTracker(project_path=tmp_path)
@@ -898,7 +894,7 @@ class TestPrimaryRecovery:
     @pytest.mark.asyncio
     async def test_status_includes_change_tracker_info(self, tmp_path: Path):
         """Test that status includes change tracker information."""
-        from codeweaver.engine.failover_tracker import FileChangeTracker
+        from codeweaver.engine import FileChangeTracker
 
         manager = VectorStoreFailoverManager()
         tracker = FileChangeTracker(project_path=tmp_path)

@@ -1,14 +1,14 @@
-"""Unit tests for codeweaver.core.utils.text module."""
+"""Unit tests for codeweaver.core module."""
 
 import logging
 import re
 
 import pytest
 
-from codeweaver.core import ConfigurationError
-from codeweaver.core.utils.text import (
+from codeweaver.core import (
     _NESTED_QUANTIFIER_RE,
     MAX_REGEX_PATTERN_LENGTH,
+    ConfigurationError,
     _walk_pattern,
     validate_regex_pattern,
 )

@@ -13,7 +13,7 @@ import logging
 from functools import partial
 from typing import TYPE_CHECKING, Any
 
-from codeweaver.cli.ui.status_display import IndexingProgress, StatusDisplay
+from codeweaver.cli import IndexingProgress, StatusDisplay
 from codeweaver.core import elapsed_time_to_human_readable
 
 
@@ -121,7 +121,7 @@ async def start_watcher(
 ) -> asyncio.Task[None | int]:
     """Start the file watcher as an asynchronous task."""
     from codeweaver.di import get_container
-    from codeweaver.engine.watcher.watcher import FileWatcher
+    from codeweaver.engine import FileWatcher
 
     # Use DI container to resolve FileWatcher with all its dependencies
     watcher = await get_container().resolve(FileWatcher)

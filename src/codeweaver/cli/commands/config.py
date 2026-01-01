@@ -33,7 +33,7 @@ class ConfigProfile(StrEnum):
 
 if TYPE_CHECKING:
     from codeweaver.config import CodeWeaverSettingsDict, ProviderSettingsDict
-    from codeweaver.core.types.dictview import DictView
+    from codeweaver.core import DictView
 
 display: StatusDisplay = get_display()
 app = App("config", help="Manage and view your CodeWeaver config.", console=display.console)
@@ -59,7 +59,7 @@ def config(
     ] = False,
 ) -> None:
     """Manage CodeWeaver configuration."""
-    from codeweaver.config.settings import get_settings_map
+    from codeweaver.config import get_settings_map
     from codeweaver.core import CodeWeaverError
 
     error_handler = CLIErrorHandler(display, verbose=verbose, debug=debug)
@@ -67,7 +67,7 @@ def config(
     try:
         settings = get_settings_map()
         if project_path or (config_file and not is_codeweaver_config_path(config_file)):
-            from codeweaver.config.settings import update_settings
+            from codeweaver.config import update_settings
 
             if config_file:
                 display.print_info(f"Updating settings from config file: {config_file}")
@@ -89,7 +89,7 @@ def config(
 
 def _show_config(settings: DictView[CodeWeaverSettingsDict]) -> None:
     """Display current configuration."""
-    from codeweaver.core.types.sentinel import Unset
+    from codeweaver.core import Unset
 
     display.print_command_header("CodeWeaver Configuration")
 
@@ -123,7 +123,7 @@ def _show_config(settings: DictView[CodeWeaverSettingsDict]) -> None:
 
 def _show_provider_config(provider_settings: ProviderSettingsDict) -> None:
     """Display provider configuration details."""
-    from codeweaver.core.types.sentinel import Unset
+    from codeweaver.core import Unset
 
     display.print_section("Provider Configuration")
 

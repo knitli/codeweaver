@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from importlib.util import find_spec
 
     if find_spec("codeweaver.config") is not None:
-        from codeweaver.config.types import CodeWeaverSettingsDict
+        from codeweaver.config import CodeWeaverSettingsDict
     else:
         CodeWeaverSettingsDict = dict[str, object]
 
@@ -92,7 +92,7 @@ def rpartial[**P, R](func: Callable[P, R], *args: object, **kwargs: object) -> C
 def _try_for_settings() -> DictView[CodeWeaverSettingsDict] | None:
     """Try to import and return the settings map if available."""
     with contextlib.suppress(Exception):
-        from codeweaver.config.settings import get_settings_map
+        from codeweaver.config import get_settings_map
 
         if (settings_map := get_settings_map()) is not None:
             from codeweaver.core.types.sentinel import Unset

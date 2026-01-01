@@ -17,13 +17,7 @@ from __future__ import annotations
 
 import pytest
 
-from codeweaver.engine.chunker.delimiters.families import (
-    LanguageFamily,
-    detect_family_characteristics,
-    detect_language_family,
-)
-from codeweaver.engine.chunker.delimiters.kind import DelimiterKind
-from codeweaver.engine.chunker.delimiters.patterns import (
+from codeweaver.engine import (
     ALL_PATTERNS,
     CONDITIONAL_PATTERN,
     FUNCTION_PATTERN,
@@ -31,7 +25,11 @@ from codeweaver.engine.chunker.delimiters.patterns import (
     PARAGRAPH_PATTERN,
     STRING_QUOTE_PATTERN,
     DelimiterDict,
+    DelimiterKind,
     DelimiterPattern,
+    LanguageFamily,
+    detect_family_characteristics,
+    detect_language_family,
     expand_pattern,
     matches_pattern,
 )
@@ -475,7 +473,7 @@ class TestIntegration:
 
     def test_family_pattern_expansion(self) -> None:
         """Test expanding all patterns for a language family."""
-        from codeweaver.engine.chunker.delimiters.families import get_family_patterns
+        from codeweaver.engine import get_family_patterns
 
         c_patterns = get_family_patterns(LanguageFamily.C_STYLE)
 
@@ -503,7 +501,7 @@ class TestIntegration:
 
     def test_unknown_language_fallback(self) -> None:
         """Test unknown language gets generic delimiters."""
-        from codeweaver.engine.chunker.delimiters.families import get_family_patterns
+        from codeweaver.engine import get_family_patterns
 
         unknown_patterns = get_family_patterns(LanguageFamily.UNKNOWN)
 

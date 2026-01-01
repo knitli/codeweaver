@@ -27,17 +27,13 @@ from typing import TYPE_CHECKING, Annotated, Any, cast
 from pydantic import ConfigDict, Field, PositiveInt, PrivateAttr, computed_field
 
 # Import ChunkerSettings at runtime for model rebuild to work
-from codeweaver.config.chunker import ChunkerSettings
-from codeweaver.config.providers import ProviderSettingsDict
-from codeweaver.core import InitializationError
-from codeweaver.core.chunks import CodeChunk
-from codeweaver.core.types.models import BasedModel
-from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
-from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
+from codeweaver.config import ChunkerSettings, ProviderSettingsDict
+from codeweaver.core import BasedModel, CodeChunk, InitializationError
+from codeweaver.providers import EmbeddingModelCapabilities, RerankingModelCapabilities
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.discovery import DiscoveredFile
+    from codeweaver.core import DiscoveredFile
 
 
 logger = logging.getLogger(__name__)
@@ -45,7 +41,7 @@ logger = logging.getLogger(__name__)
 
 def _get_chunker_settings() -> ChunkerSettings:
     """Retrieve the chunker settings."""
-    from codeweaver.config.settings import get_settings
+    from codeweaver.config import get_settings
 
     cw_settings = get_settings()
     return (
@@ -61,8 +57,8 @@ def _get_capabilities() -> (
     | tuple[EmbeddingModelCapabilities, RerankingModelCapabilities]
 ):
     """Retrieve the capabilities."""
-    from codeweaver.common.registry.models import get_model_registry
-    from codeweaver.core.types.provider import ProviderKind
+    from codeweaver.common import get_model_registry
+    from codeweaver.core import ProviderKind
 
     registry = get_model_registry()
     embedding_caps = registry.configured_models_for_kind(ProviderKind.EMBEDDING)
@@ -168,7 +164,7 @@ class ChunkGovernor(BasedModel):
         Returns:
             A ChunkGovernor instance.
         """
-        from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
+        from codeweaver.providers import RerankingModelCapabilities
 
         capabilities = _get_capabilities()
         if len(capabilities) == 2:
@@ -205,12 +201,8 @@ class ChunkGovernor(BasedModel):
         Returns:
             A ChunkGovernor instance configured for backup model constraints.
         """
-        from codeweaver.providers.embedding.capabilities import (
-            load_default_capabilities as load_embedding_caps,
-        )
-        from codeweaver.providers.reranking.capabilities import (
-            load_default_capabilities as load_reranking_caps,
-        )
+        from codeweaver.providers import load_default_capabilities as load_embedding_caps
+        from codeweaver.providers import load_default_capabilities as load_reranking_caps
 
         embedding_caps: EmbeddingModelCapabilities | None = None
         reranking_caps: RerankingModelCapabilities | None = None
@@ -344,7 +336,7 @@ def _rebuild_models() -> None:
         if not ChunkGovernor.__pydantic_complete__:
             # Import ChunkerSettings to ensure it's available for rebuild
             # The import is safe here because ChunkerSettings imports are already resolved
-            from codeweaver.config.chunker import ChunkerSettings as _ChunkerSettings
+            from codeweaver.config import ChunkerSettings as _ChunkerSettings
             from codeweaver.engine.chunker.delimiters.families import LanguageFamily
             from codeweaver.engine.chunker.delimiters.patterns import DelimiterPattern
 

@@ -16,8 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from codeweaver.engine.chunker.base import ChunkGovernor
-from codeweaver.engine.chunker.delimiter import DelimiterChunker
+from codeweaver.engine import ChunkGovernor, DelimiterChunker
 
 
 pytestmark = [pytest.mark.unit]
@@ -63,7 +62,7 @@ for multiple chunks if the generic patterns work correctly.
         file_path.write_text(content)
 
         # Create DiscoveredFile and execute chunking
-        from codeweaver.core.discovery import DiscoveredFile
+        from codeweaver.core import DiscoveredFile
 
         discovered_file = DiscoveredFile.from_path(file_path)
         chunks = delimiter_chunker.chunk(content, file=discovered_file)
@@ -116,7 +115,7 @@ def function_three():
         file_path.write_text(content)
 
         # Create DiscoveredFile and test with default configuration
-        from codeweaver.core.discovery import DiscoveredFile
+        from codeweaver.core import DiscoveredFile
 
         discovered_file = DiscoveredFile.from_path(file_path)
         chunks = delimiter_chunker.chunk(content, file=discovered_file)
@@ -165,7 +164,7 @@ a, b, c = 1, 2, 3; total = a + b + c  # Another multi-statement line
         file_path.write_text(content)
 
         # Create DiscoveredFile and chunk with default configuration
-        from codeweaver.core.discovery import DiscoveredFile
+        from codeweaver.core import DiscoveredFile
 
         discovered_file = DiscoveredFile.from_path(file_path)
         chunks = delimiter_chunker.chunk(content, file=discovered_file)
@@ -232,7 +231,7 @@ function outer() {
         file_path.write_text(content)
 
         # Create DiscoveredFile and chunk
-        from codeweaver.core.discovery import DiscoveredFile
+        from codeweaver.core import DiscoveredFile
 
         discovered_file = DiscoveredFile.from_path(file_path)
         chunks = delimiter_chunker.chunk(content, file=discovered_file)
@@ -269,7 +268,7 @@ class MyClass:
         file_path.write_text(content)
 
         # Create DiscoveredFile and chunk
-        from codeweaver.core.discovery import DiscoveredFile
+        from codeweaver.core import DiscoveredFile
 
         discovered_file = DiscoveredFile.from_path(file_path)
         chunks = delimiter_chunker.chunk(content, file=discovered_file)
@@ -312,7 +311,7 @@ function alsoEmpty() {
         file_path.write_text(content)
 
         # Create DiscoveredFile and chunk
-        from codeweaver.core.discovery import DiscoveredFile
+        from codeweaver.core import DiscoveredFile
 
         discovered_file = DiscoveredFile.from_path(file_path)
         chunks = delimiter_chunker.chunk(content, file=discovered_file)
@@ -343,7 +342,7 @@ function another() {
         file_path.write_text(content)
 
         # Create DiscoveredFile - should not crash, should produce some chunks
-        from codeweaver.core.discovery import DiscoveredFile
+        from codeweaver.core import DiscoveredFile
 
         discovered_file = DiscoveredFile.from_path(file_path)
         chunks = delimiter_chunker.chunk(content, file=discovered_file)

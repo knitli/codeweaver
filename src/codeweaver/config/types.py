@@ -41,17 +41,15 @@ from codeweaver.config._logging import LoggingConfigDict
 from codeweaver.config.chunker import ChunkerSettingsDict
 from codeweaver.config.indexer import IndexerSettingsDict
 from codeweaver.config.telemetry import TelemetrySettingsDict
-from codeweaver.core.types.enum import AnonymityConversion
-from codeweaver.core.types.models import BASEDMODEL_CONFIG, BasedModel
-from codeweaver.core.types.sentinel import Unset
-from codeweaver.mcp.middleware import McpMiddleware
+from codeweaver.core import BASEDMODEL_CONFIG, AnonymityConversion, BasedModel, Unset
+from codeweaver.mcp import McpMiddleware
 
 
 if TYPE_CHECKING:
     from codeweaver.config._logging import LoggingSettings
     from codeweaver.config.middleware import MiddlewareOptions
     from codeweaver.config.providers import ProviderSettingsDict
-    from codeweaver.core.types import AnonymityConversion, FilteredKeyT
+    from codeweaver.core import AnonymityConversion, FilteredKeyT
 
 
 # ===========================================================================
@@ -269,7 +267,7 @@ class UvicornServerSettings(BasedModel):
     h11_max_incomplete_event_size: int | None = None
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
-        from codeweaver.core.types import AnonymityConversion, FilteredKey
+        from codeweaver.core import AnonymityConversion, FilteredKey
 
         return {
             FilteredKey("host"): AnonymityConversion.BOOLEAN,

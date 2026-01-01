@@ -18,12 +18,12 @@ from typing import Any, TypedDict
 from pydantic import AnyUrl, BaseModel, ConfigDict, Field, RootModel
 
 from codeweaver import __version__
-from codeweaver.config.envs import environment_variables
-from codeweaver.core.file_extensions import ALL_LANGUAGES
-from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
-from codeweaver.core.types.models import EnvFormat
-from codeweaver.providers.capabilities import PROVIDER_CAPABILITIES
-from codeweaver.providers.provider import (
+from codeweaver.config import environment_variables
+from codeweaver.core import ALL_LANGUAGES
+from codeweaver.core import ConfigLanguage, SemanticSearchLanguage
+from codeweaver.core import EnvFormat
+from codeweaver.core import PROVIDER_CAPABILITIES
+from codeweaver.core import (
     Provider,
     ProviderEnvVarInfo,
     ProviderEnvVars,
@@ -94,7 +94,7 @@ def set_version(version: str, *, for_docker: bool = False) -> str:
 
 
 def _providers_for_kind(kind: ProviderKind) -> set[Provider]:
-    return {prov for prov in Provider if prov in PROVIDER_CAPABILITIES and kind in PROVIDER_CAPABILITIES[prov]}
+    return {prov for prov in Provider if prov != Provider.NOT_SET and prov in PROVIDER_CAPABILITIES and kind in PROVIDER_CAPABILITIES[prov]}
 
 
 def _shared_env_vars() -> dict[str, tuple[ProviderEnvVarInfo, list[Provider]]]:

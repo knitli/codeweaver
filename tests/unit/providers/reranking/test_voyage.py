@@ -11,14 +11,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from codeweaver.core import uuid7
-from codeweaver.core.chunks import CodeChunk
-from codeweaver.core.language import SemanticSearchLanguage
-from codeweaver.core.metadata import ChunkKind, ExtKind
-from codeweaver.core.spans import Span
-from codeweaver.providers.provider import Provider
-from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
-from codeweaver.providers.reranking.providers.voyage import VoyageRerankingProvider
+from codeweaver.core import ChunkKind, CodeChunk, ExtKind, SemanticSearchLanguage, Span, uuid7
+from codeweaver.providers import Provider, RerankingModelCapabilities, VoyageRerankingProvider
 
 
 pytestmark = [pytest.mark.unit]
@@ -178,10 +172,7 @@ class TestVoyageRerankingProviderReranking:
         )
         from pathlib import Path
 
-        from codeweaver.core import uuid7
-        from codeweaver.core.language import SemanticSearchLanguage
-        from codeweaver.core.metadata import ChunkKind, ExtKind
-        from codeweaver.core.spans import Span
+        from codeweaver.core import ChunkKind, ExtKind, SemanticSearchLanguage, Span, uuid7
 
         # Create test chunks
         chunks = [

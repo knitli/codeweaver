@@ -12,8 +12,7 @@ from typing import TYPE_CHECKING, Any, Literal
 
 
 if TYPE_CHECKING:
-    from codeweaver.core import ConfigurationError
-    from codeweaver.core.types.provider import Provider
+    from codeweaver.core import ConfigurationError, Provider
     from codeweaver.providers.reranking.capabilities import (
         dependency_map,
         get_alibaba_reranking_capabilities,
@@ -68,7 +67,7 @@ type KnownRerankModelName = Literal[
 
 def get_rerank_model_provider(provider: Provider) -> type[RerankingProvider[Any]]:
     """Get rerank model provider."""
-    from codeweaver.core.types.provider import Provider
+    from codeweaver.core import Provider
 
     if provider in {Provider.VOYAGE}:
         from codeweaver.providers.reranking.providers.voyage import VoyageRerankingProvider

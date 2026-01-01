@@ -18,15 +18,15 @@ from pydantic import ConfigDict
 from rich.console import Console
 
 from codeweaver.common.registry.types import LiteralModelKinds
-from codeweaver.core.types.aliases import LiteralStringT, ModelName
-from codeweaver.core.types.models import BasedModel
-from codeweaver.core.types.provider import Provider
-from codeweaver.providers.agent import AgentModel, AgentProfile, AgentProfileSpec
-from codeweaver.providers.embedding.capabilities.base import (
+from codeweaver.core import BasedModel, LiteralStringT, ModelName, Provider
+from codeweaver.providers import (
+    AgentModel,
+    AgentProfile,
+    AgentProfileSpec,
     EmbeddingModelCapabilities,
+    RerankingModelCapabilities,
     SparseEmbeddingModelCapabilities,
 )
-from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 
 
 console = Console(markup=True, emoji=True)
@@ -96,10 +96,7 @@ class ModelRegistry(BasedModel):
 
     def _register_builtin_embedding_models(self) -> None:
         """Register built-in embedding models."""
-        from codeweaver.providers.embedding.capabilities import (
-            load_default_capabilities,
-            load_sparse_capabilities,
-        )
+        from codeweaver.providers import load_default_capabilities, load_sparse_capabilities
 
         for cap in load_default_capabilities():
             self.register_embedding_capabilities(cap, replace=False)
@@ -107,7 +104,7 @@ class ModelRegistry(BasedModel):
             self.register_sparse_embedding_capabilities(cap, replace=False)
 
     def _register_builtin_reranking_models(self) -> None:
-        from codeweaver.providers.reranking.capabilities import load_default_capabilities
+        from codeweaver.providers import load_default_capabilities
 
         for cap in load_default_capabilities():
             self.register_reranking_capabilities(cap, replace=False)
@@ -276,7 +273,7 @@ class ModelRegistry(BasedModel):
 
     def _register_builtin_agent_profiles(self) -> None:
         """Register built-in agent profiles."""
-        from codeweaver.providers.agent import KnownAgentModelName, infer_model
+        from codeweaver.providers import KnownAgentModelName, infer_model
 
         model_names = KnownAgentModelName.__value__.__dict__["__args__"][:-1]
         for model_name in model_names:
@@ -338,7 +335,7 @@ class ModelRegistry(BasedModel):
     ):
         """Get all configured models for a specific kind."""
         from codeweaver.common.registry.provider import get_provider_config_for
-        from codeweaver.core.types.provider import ProviderKind
+        from codeweaver.core import ProviderKind
 
         kind = kind if isinstance(kind, ProviderKind) else ProviderKind.from_string(kind)
         if settings := get_provider_config_for(kind):

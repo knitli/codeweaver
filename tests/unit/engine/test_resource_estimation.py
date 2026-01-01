@@ -12,10 +12,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from codeweaver.engine.resource_estimation import (
-    MemoryEstimate,
-    estimate_backup_memory_requirements,
-)
+from codeweaver.engine import MemoryEstimate, estimate_backup_memory_requirements
 
 
 pytestmark = [pytest.mark.unit]

@@ -15,7 +15,7 @@ from pydantic import NonNegativeInt
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.chunks import CodeChunk
+    from codeweaver.core import CodeChunk
     from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
     from codeweaver.providers.reranking.capabilities.types import PartialRerankingCapabilitiesDict
 
@@ -46,7 +46,7 @@ def _get_common_capabilities() -> PartialRerankingCapabilitiesDict:
 
 def get_cohere_reranking_capabilities() -> tuple[RerankingModelCapabilities, ...]:
     """Get the capabilities of the Cohere reranking model."""
-    from codeweaver.core.types.provider import Provider
+    from codeweaver.core import Provider
     from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 
     base_capabilities = _get_common_capabilities()

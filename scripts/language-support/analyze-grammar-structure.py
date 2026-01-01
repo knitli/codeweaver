@@ -22,7 +22,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from codeweaver.core.language import SemanticSearchLanguage
+from codeweaver.core import SemanticSearchLanguage
 
 
 @dataclass

@@ -21,10 +21,9 @@ from typing import TYPE_CHECKING, Any, Protocol, Self
 
 
 if TYPE_CHECKING:
-    from codeweaver.agent_api.find_code.intent import IntentType
-    from codeweaver.agent_api.find_code.types import FindCodeResponseSummary
+    from codeweaver.agent_api import FindCodeResponseSummary, IntentType
     from codeweaver.common.statistics import SessionStatistics
-    from codeweaver.core.types.search import SearchStrategy
+    from codeweaver.core import SearchStrategy
 
 
 class TelemetryEvent(Protocol):

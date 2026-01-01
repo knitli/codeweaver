@@ -52,19 +52,18 @@ from codeweaver.core import (
     make_uuid_store,
     uuid7,
 )
-from codeweaver.di.depends import DependsPlaceholder
 from codeweaver.engine.chunker.base import BaseChunker
 from codeweaver.engine.chunker.exceptions import ASTDepthExceededError, BinaryFileError, ParseError
 from codeweaver.engine.chunker.governance import ResourceGovernor
-from codeweaver.semantic.types import SemanticMetadata
+from codeweaver.semantic import SemanticMetadata
 
 
 if TYPE_CHECKING:
     from ast_grep_py import SgRoot
 
-    from codeweaver.core.discovery import DiscoveredFile
+    from codeweaver.core import DiscoveredFile
     from codeweaver.engine.chunker.base import ChunkGovernor
-    from codeweaver.semantic.ast_grep import AstThing, FileThing
+    from codeweaver.semantic import AstThing, FileThing
 
 
 logger = logging.getLogger(__name__)
@@ -144,17 +143,15 @@ class SemanticChunker(BaseChunker):
         """
         super().__init__(governor)
         self.language = language
-        
+
         # Handle tokenizer injection
-        from codeweaver_tokenizers.base import Tokenizer
         from codeweaver.di import is_depends_marker
-        
+
         if tokenizer is None or is_depends_marker(tokenizer):
             try:
                 # Try to resolve from container if not provided
-                from codeweaver.di import get_container
                 from codeweaver_tokenizers import get_tokenizer
-                
+
                 # Default to tokenizers/gpt-4 if nothing else available
                 self.tokenizer = get_tokenizer("tokenizers", "gpt-4")
             except Exception:
@@ -196,7 +193,7 @@ class SemanticChunker(BaseChunker):
             ChunkLimitExceededError: If chunk count exceeds configured maximum
             ASTDepthExceededError: If AST nesting exceeds safe depth limit
         """
-        from codeweaver.common.statistics import get_session_statistics
+        from codeweaver.common import get_session_statistics
 
         statistics = get_session_statistics()
         start_time = time.perf_counter()
@@ -257,7 +254,7 @@ class SemanticChunker(BaseChunker):
         Returns:
             Tuple of (file_path, source_id)
         """
-        from codeweaver.core.types.aliases import UUID7Hex
+        from codeweaver.core import UUID7Hex
 
         file_path = file.path if file else None
         if file_path:
@@ -275,7 +272,7 @@ class SemanticChunker(BaseChunker):
         if self.governor.settings is not None:
             return self.governor.settings.performance
 
-        from codeweaver.config.chunker import PerformanceSettings
+        from codeweaver.config import PerformanceSettings
 
         return PerformanceSettings()
 
@@ -545,7 +542,7 @@ class SemanticChunker(BaseChunker):
         try:
             from ast_grep_py import SgRoot
 
-            from codeweaver.semantic.ast_grep import FileThing
+            from codeweaver.semantic import FileThing
 
             root: SgRoot = SgRoot(content, self.language.variable)
 
@@ -861,7 +858,7 @@ class SemanticChunker(BaseChunker):
 
         # Chunk the node text using delimiter patterns
         # Create a pseudo-file for the node text with proper source tracking
-        from codeweaver.core.discovery import DiscoveredFile as _DiscoveredFile
+        from codeweaver.core import DiscoveredFile as _DiscoveredFile
 
         temp_file = _DiscoveredFile.from_path(file_path) if file_path else None
 
@@ -963,7 +960,7 @@ class SemanticChunker(BaseChunker):
         Returns:
             List of unique chunks
         """
-        from codeweaver.core.chunks import BatchKeys
+        from codeweaver.core import BatchKeys
 
         deduplicated: list[CodeChunk] = []
 

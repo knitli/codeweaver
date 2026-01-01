@@ -16,12 +16,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from codeweaver.agent_api.find_code.types import CodeMatch, CodeMatchType
-from codeweaver.core.discovery import DiscoveredFile
-from codeweaver.core.spans import Span
+from codeweaver.core import DiscoveredFile, Span
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.types.search import SearchResult
+    from codeweaver.core import SearchResult
 
 
 def convert_search_result_to_code_match(result: SearchResult) -> CodeMatch:
@@ -46,7 +45,7 @@ def convert_search_result_to_code_match(result: SearchResult) -> CodeMatch:
     # Ensure we always have a DiscoveredFile (CodeMatch requires non-None)
     if file is None:
         # Create fallback DiscoveredFile with unknown path
-        from codeweaver.core.metadata import ExtKind
+        from codeweaver.core import ExtKind
 
         unknown_path = Path("unknown")
         ext_kind = ExtKind.from_language("text", "other")

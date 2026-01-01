@@ -13,11 +13,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from codeweaver.core.chunks import CodeChunk
+from codeweaver.core import CodeChunk
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.types.search import SearchResult
+    from codeweaver.core import SearchResult
 
 
 def filter_test_files(candidates: list[SearchResult]) -> list[SearchResult]:

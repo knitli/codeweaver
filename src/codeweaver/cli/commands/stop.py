@@ -16,8 +16,8 @@ from cyclopts import App, Parameter
 from pydantic import PositiveInt
 
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
-from codeweaver.config.settings import get_settings_map
-from codeweaver.core.types.sentinel import Unset
+from codeweaver.config import get_settings_map
+from codeweaver.core import Unset
 
 
 _display: StatusDisplay = get_display()

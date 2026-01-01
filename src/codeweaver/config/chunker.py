@@ -14,15 +14,18 @@ from typing import TYPE_CHECKING, Annotated, Any, Literal, NotRequired, Self, Ty
 
 from pydantic import ConfigDict, Field, NonNegativeFloat, PositiveInt, model_validator
 
-from codeweaver.core.file_extensions import ALL_LANGUAGES
-from codeweaver.core.metadata import ExtLangPair
-from codeweaver.core.secondary_languages import SecondarySupportedLanguage
-from codeweaver.core.types.aliases import LanguageNameT
-from codeweaver.core.types.models import FROZEN_BASEDMODEL_CONFIG, BasedModel
+from codeweaver.core import (
+    ALL_LANGUAGES,
+    FROZEN_BASEDMODEL_CONFIG,
+    BasedModel,
+    ExtLangPair,
+    LanguageNameT,
+    SecondarySupportedLanguage,
+)
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.types.delimiter import DelimiterPattern, LanguageFamily
+    from codeweaver.core import DelimiterPattern, LanguageFamily
 
 
 logger = logging.getLogger(__name__)
@@ -82,7 +85,7 @@ class CustomLanguage(BasedModel):
         list[ExtLangPair],
         Field(
             min_length=1,
-            description="""List of file extensions and their associated languages to apply this custom language to. An ExtLangPair is a tuple of `ext: FileExt, language: LanguageName | SemanticSearchLanguage | ConfigLanguage`. **If the language and extensions are already defined in `codeweaver.core.file_extensions` or `codeweaver.core.language`, then this is not required.**""",
+            description="""List of file extensions and their associated languages to apply this custom language to. An ExtLangPair is a tuple of `ext: FileExt, language: LanguageName | SemanticSearchLanguage | ConfigLanguage`. **If the language and extensions are already defined in `codeweaver.core` or `codeweaver.core`, then this is not required.**""",
         ),
     ]
     language_family: Annotated[
@@ -113,7 +116,7 @@ class CustomDelimiter(BasedModel):
     extensions: Annotated[
         list[ExtLangPair] | None,
         Field(
-            description="""List of file extensions and their associated languages to apply this delimiter to. If you are defining delimiters for a language that does not currently have support see `codeweaver.core.file_extensions.CODE_FILES_EXTENSIONS`, `codeweaver.core.file_extensions.DATA_FILES_EXTENSIONS`, and `codeweaver.core.file_extensions.DOC_FILES_EXTENSIONS`. An ExtLangPair is a tuple of `ext: FileExt, language: LanguageName` (str NewTypes for FileExt and LanguageName) or `ConfigLanguage` or `SemanticSearchLanguage` enums. If the language and extensions are already defined in `codeweaver.core.file_extensions` then you don't need to provide these, but you DO need to provide a language."""
+            description="""List of file extensions and their associated languages to apply this delimiter to. If you are defining delimiters for a language that does not currently have support see `codeweaver.coreCODE_FILES_EXTENSIONS`, `codeweaver.coreDATA_FILES_EXTENSIONS`, and `codeweaver.coreDOC_FILES_EXTENSIONS`. An ExtLangPair is a tuple of `ext: FileExt, language: LanguageName` (str NewTypes for FileExt and LanguageName) or `ConfigLanguage` or `SemanticSearchLanguage` enums. If the language and extensions are already defined in `codeweaver.core` then you don't need to provide these, but you DO need to provide a language."""
         ),
     ] = None
 
@@ -122,7 +125,7 @@ class CustomDelimiter(BasedModel):
         Field(
             min_length=1,
             max_length=30,
-            description="""The programming language this delimiter applies to. Must be one of the languages defined in `codeweaver.core.file_extensions`. If you want to define delimiters for a new language and/or file extensions, leave this field as `None` and provide the `extensions` field.""",
+            description="""The programming language this delimiter applies to. Must be one of the languages defined in `codeweaver.core`. If you want to define delimiters for a new language and/or file extensions, leave this field as `None` and provide the `extensions` field.""",
         ),
     ] = None
 
@@ -134,7 +137,7 @@ class CustomDelimiter(BasedModel):
         """Validate the instance after initialization."""
         if self.language not in ALL_LANGUAGES and not self.extensions:
             raise ValueError(
-                f"If you are defining a delimiter for a language that does not currently have support see `codeweaver.core.file_extensions.CODE_FILES_EXTENSIONS`, `codeweaver.core.file_extensions.DATA_FILES_EXTENSIONS`, and `codeweaver.core.file_extensions.DOC_FILES_EXTENSIONS`. You must provide the `extensions` field if the language '{self.language}' is not supported."
+                f"If you are defining a delimiter for a language that does not currently have support see `codeweaver.coreCODE_FILES_EXTENSIONS`, `codeweaver.coreDATA_FILES_EXTENSIONS`, and `codeweaver.coreDOC_FILES_EXTENSIONS`. You must provide the `extensions` field if the language '{self.language}' is not supported."
             )
         if not self.delimiters:
             raise ValueError("You must provide at least one delimiter.")
@@ -205,7 +208,7 @@ class ChunkerSettings(BasedModel):
 
     You can use these settings to customize how CodeWeaver chunks files for indexing, and to add support for custom languages or delimiters.
 
-    Note: If you're adding support for another language, we'd love you to open a pull request to add it to our built-in language definitions! See `codeweaver.core.file_extensions` and `codeweaver.engine.chunker.delimiters` for more details.
+    Note: If you're adding support for another language, we'd love you to open a pull request to add it to our built-in language definitions! See `codeweaver.core` and `codeweaver.engine` for more details.
     """
 
     model_config = BasedModel.model_config | ConfigDict(validate_assignment=True)
@@ -257,7 +260,7 @@ class ChunkerSettings(BasedModel):
         used in CustomLanguage and CustomDelimiter models.
         """
         # Import the actual types now from core
-        from codeweaver.core.types.delimiter import DelimiterPattern, LanguageFamily
+        from codeweaver.core import DelimiterPattern, LanguageFamily
 
         # Pass the types to model_rebuild so Pydantic can resolve string annotations
         namespace = {"DelimiterPattern": DelimiterPattern, "LanguageFamily": LanguageFamily}

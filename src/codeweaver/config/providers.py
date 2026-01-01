@@ -71,7 +71,7 @@ from codeweaver.core import (
 
 
 if TYPE_CHECKING:
-    from codeweaver.common.registry.types import LiteralKinds
+    from codeweaver.common import LiteralKinds
 
 
 logger = logging.getLogger(__name__)
@@ -333,7 +333,7 @@ class QdrantClientOptions(ClientOptions):
         if self.location:
             self.url = (
                 self.url or None
-                if self.location in {"localhost", "127.0.0.1", "0.0.0.0"}
+                if self.location in {"localhost", "127.0.0.1", "0.0.0.0"}  # noqa: S104
                 else AnyUrl(self.location)
             )
             self.host = self.host or None if self.url else self.location
@@ -1365,7 +1365,7 @@ class ProviderSettings(BasedModel):
         Args:
             setting_name: The name of the setting or ProviderKind to check.
         """
-        from codeweaver.core.types.provider import ProviderKind
+        from codeweaver.core import ProviderKind
 
         setting = (
             setting_name
@@ -1471,7 +1471,7 @@ class ProviderSettings(BasedModel):
         Args:
             kind: The kind of provider or ProviderKind to get settings for.
         """
-        from codeweaver.core.types.provider import ProviderKind
+        from codeweaver.core import ProviderKind
 
         setting_field = (
             kind

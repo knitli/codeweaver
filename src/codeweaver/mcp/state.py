@@ -23,30 +23,34 @@ from pydantic import (
 )
 from pydantic.dataclasses import dataclass
 
-from codeweaver.config.server_defaults import DefaultFastMcpHttpRunArgs
-from codeweaver.config.types import (
+from codeweaver.config import (
     CodeWeaverSettingsDict,
+    DefaultFastMcpHttpRunArgs,
     FastMcpHttpRunArgs,
     FastMcpServerSettingsDict,
 )
-from codeweaver.core import elapsed_time_to_human_readable, lazy_import
-from codeweaver.core.types.dataclasses import DATACLASS_CONFIG, DataclassSerializationMixin
-from codeweaver.core.types.dictview import DictView
-from codeweaver.core.types.sentinel import Unset
+from codeweaver.core import (
+    DATACLASS_CONFIG,
+    DataclassSerializationMixin,
+    DictView,
+    Unset,
+    elapsed_time_to_human_readable,
+    lazy_import,
+)
 from codeweaver.mcp.middleware import McpMiddleware
 
 
 if TYPE_CHECKING:
     from fastmcp import FastMCP
 
-get_settings_map = lazy_import("codeweaver.config.settings", "get_settings_map")
+get_settings_map = lazy_import("codeweaver.config", "get_settings_map")
 
 logger = logging.getLogger(__name__)
 
 
 def _get_fastmcp_settings_map(*, http: bool = False) -> DictView[FastMcpServerSettingsDict]:
     """Get the current FastMCP server settings."""
-    from codeweaver.config.settings import (
+    from codeweaver.config import (
         FastMcpHttpServerSettings,
         FastMcpStdioServerSettings,
         get_settings_map,

@@ -27,7 +27,7 @@ from fastmcp.server.middleware.caching import (
 from fastmcp.server.middleware.middleware import MiddlewareContext as McpMiddlewareContext
 from pydantic import Field, PositiveInt
 
-from codeweaver.mcp.middleware import (
+from codeweaver.mcp import (
     DetailedTimingMiddleware,
     ErrorHandlingMiddleware,
     LoggingMiddleware,

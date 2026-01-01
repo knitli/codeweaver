@@ -27,7 +27,7 @@ def mock_confirm(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     mock.ask.return_value = True
 
     # Patch the module-level import in init.py (imported at line 27)
-    monkeypatch.setattr("codeweaver.cli.commands.init.Confirm", mock)
+    monkeypatch.setattr("codeweaver.cliConfirm", mock)
     # Also patch the base location to catch any other imports
     monkeypatch.setattr("rich.prompt.Confirm", mock)
 

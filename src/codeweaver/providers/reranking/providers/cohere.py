@@ -15,14 +15,13 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import SkipValidation
 
-from codeweaver.core import rpartial
-from codeweaver.core.types.provider import Provider
+from codeweaver.core import Provider, rpartial
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 from codeweaver.providers.reranking.providers.base import RerankingProvider, RerankingResult
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.chunks import CodeChunk
+    from codeweaver.core import CodeChunk
 
 
 try:

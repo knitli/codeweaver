@@ -30,7 +30,7 @@ from codeweaver.core import AnonymityConversion, BasedModel, is_tty, validate_re
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.types import AnonymityConversion, FilteredKeyT
+    from codeweaver.core import AnonymityConversion, FilteredKeyT
 
 
 # ===========================================================================
@@ -120,7 +120,7 @@ class SerializableLoggingFilter(BasedModel, logging.Filter):
     ] = None
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
-        from codeweaver.core.types import AnonymityConversion, FilteredKey
+        from codeweaver.core import AnonymityConversion, FilteredKey
 
         return {FilteredKey("simple_filter"): AnonymityConversion.BOOLEAN}
 

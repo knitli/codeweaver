@@ -12,9 +12,9 @@ from pathlib import Path
 
 import pytest
 
+from codeweaver.core import SemanticSearchLanguage as Language
 from codeweaver.core import uuid7
-from codeweaver.core.language import SemanticSearchLanguage as Language
-from codeweaver.providers.vector_stores.qdrant import QdrantVectorStoreProvider
+from codeweaver.providers import QdrantVectorStoreProvider
 from tests.conftest import create_test_chunk_with_embeddings
 
 
@@ -28,7 +28,7 @@ async def test_partial_embeddings(qdrant_test_manager):
     Edge Case: Partial embedding failure
     Then: Store chunk with sparse-only and mark as 'incomplete'
     """
-    from codeweaver.config.providers import QdrantConfig
+    from codeweaver.config import QdrantConfig
 
     # Create unique collection
     collection_name = qdrant_test_manager.create_collection_name("partial")
@@ -61,8 +61,8 @@ async def test_partial_embeddings(qdrant_test_manager):
     await provider.upsert([chunk])
 
     # Verify chunk is searchable with sparse vector
-    from codeweaver.core.types.search import SearchStrategy, StrategizedQuery
-    from codeweaver.providers.embedding.types import SparseEmbedding
+    from codeweaver.core import SearchStrategy, StrategizedQuery
+    from codeweaver.providers import SparseEmbedding
 
     # Use same sparse embedding for search to ensure we find the chunk
     results = await provider.search(

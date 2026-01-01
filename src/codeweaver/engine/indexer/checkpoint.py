@@ -25,9 +25,9 @@ from uuid import UUID
 from pydantic import UUID7, DirectoryPath, Field, NonNegativeInt
 from pydantic_core import from_json, to_json
 
-from codeweaver.config.indexer import IndexerSettings
-from codeweaver.config.providers import (
+from codeweaver.config import (
     EmbeddingProviderSettings,
+    IndexerSettings,
     RerankingProviderSettings,
     SparseEmbeddingProviderSettings,
     VectorStoreProviderSettings,
@@ -47,9 +47,8 @@ from codeweaver.core import (
 
 
 if TYPE_CHECKING:
-    from codeweaver.config.types import CodeWeaverSettingsDict
-    from codeweaver.core.types.aliases import FilteredKeyT
-    from codeweaver.core.types.enum import AnonymityConversion
+    from codeweaver.config import CodeWeaverSettingsDict
+    from codeweaver.core import AnonymityConversion, FilteredKeyT
 
 logger = logging.getLogger(__name__)
 
@@ -81,19 +80,19 @@ def _get_settings_map() -> DictView[CheckpointSettingsFingerprint]:
 
     We don't want to cache this -- we want the latest settings each time. DictView always reflects changes, but we're creating a new instance here.
     """
-    from codeweaver.config.indexer import DefaultIndexerSettings
-    from codeweaver.config.providers import (
+    from codeweaver.config import (
         DefaultEmbeddingProviderSettings,
+        DefaultIndexerSettings,
         DefaultRerankingProviderSettings,
         DefaultSparseEmbeddingProviderSettings,
         DefaultVectorStoreProviderSettings,
+        get_settings,
     )
-    from codeweaver.config.settings import get_settings
     from codeweaver.core import get_project_path
 
     settings = get_settings()
     if isinstance(settings.provider, Unset) or settings.provider is None:
-        from codeweaver.config.providers import AllDefaultProviderSettings, ProviderSettings
+        from codeweaver.config import AllDefaultProviderSettings, ProviderSettings
 
         settings.provider = ProviderSettings.model_validate(AllDefaultProviderSettings)
     settings.indexer = (
@@ -240,7 +239,7 @@ class IndexingCheckpoint(BasedModel):
 
     def _telemetry_handler(self, _serialized_self: dict[str, Any]) -> dict[str, Any]:
         if errors := self.errors:
-            from codeweaver.core.types.enum import AnonymityConversion
+            from codeweaver.core import AnonymityConversion
 
             converted = AnonymityConversion.DISTRIBUTION.filtered([
                 EXCEPTION_PATTERN.findall(val)
@@ -261,8 +260,7 @@ class IndexingCheckpoint(BasedModel):
         return get_blake_hash(to_json(_get_settings_map()))
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
-        from codeweaver.core.types.aliases import FilteredKey
-        from codeweaver.core.types.enum import AnonymityConversion
+        from codeweaver.core import AnonymityConversion, FilteredKey
 
         return {
             FilteredKey("project_path"): AnonymityConversion.HASH,
@@ -309,7 +307,7 @@ class CheckpointManager:
             checkpoint_dir: Directory for checkpoint files (default: .codeweaver/)
         """
         settings: DictView[CodeWeaverSettingsDict] = lazy_import(
-            "codeweaver.config.settings", "get_settings_map"
+            "codeweaver.config", "get_settings_map"
         )._resolve()()
 
         self.project_path: Path = (

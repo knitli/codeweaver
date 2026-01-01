@@ -19,8 +19,8 @@ from pydantic_core import from_json
 from rich.table import Table
 
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
-from codeweaver.config.server_defaults import DefaultFastMcpHttpRunArgs
-from codeweaver.core.types.sentinel import Unset
+from codeweaver.config import DefaultFastMcpHttpRunArgs
+from codeweaver.core import Unset
 
 
 _display: StatusDisplay = get_display()
@@ -29,7 +29,7 @@ app = App("status", help="Show CodeWeaver runtime status.")
 
 def get_url() -> str:
     """Get the MCP server URL from settings (http transport)."""
-    from codeweaver.config.settings import get_settings_map
+    from codeweaver.config import get_settings_map
 
     settings_map = get_settings_map()
     mcp_server_settings = settings_map["mcp_server"]
@@ -45,7 +45,7 @@ def get_url() -> str:
 
 def get_management_url() -> str:
     """Get the management server URL from settings."""
-    from codeweaver.config.settings import get_settings_map
+    from codeweaver.config import get_settings_map
 
     settings_map = get_settings_map()
     mgmt_host = (

@@ -125,7 +125,7 @@ Validates complete index → search workflows:
 @pytest.mark.asyncio
 async def test_my_search_behavior(real_providers, known_test_codebase):
     """Test actual search behavior with real embeddings."""
-    from codeweaver.agent_api.find_code import find_code
+    from codeweaver.agent_api import find_code
 
     # This uses REAL embeddings, REAL vector store, REAL search
     response = await find_code(

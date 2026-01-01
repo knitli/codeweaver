@@ -6,7 +6,7 @@
 """
 Indexing configuration settings for CodeWeaver.
 
-Settings for `codeweaver.engine.indexer.indexer.Indexer`, `codeweaver.engine.watcher.watcher.FileWatcher`, and related components.
+Settings for `codeweaver.engineIndexer`, `codeweaver.engineFileWatcher`, and related components.
 """
 
 from __future__ import annotations
@@ -33,23 +33,24 @@ from typing import (
 from fastmcp import Context as FastMCPContext
 from pydantic import DirectoryPath, Field, FilePath, PrivateAttr, computed_field
 
-from codeweaver.core.file_extensions import DEFAULT_EXCLUDED_DIRS, DEFAULT_EXCLUDED_EXTENSIONS
-from codeweaver.core.types.aliases import (
+from codeweaver.core import (
+    DEFAULT_EXCLUDED_DIRS,
+    DEFAULT_EXCLUDED_EXTENSIONS,
+    UNSET,
+    BasedModel,
     DirectoryNameT,
     FileExtensionT,
     FileGlob,
     FileGlobT,
     FilteredKeyT,
+    Unset,
 )
-from codeweaver.core.types.models import BasedModel
-from codeweaver.core.types.sentinel import UNSET, Unset
 
 
 if TYPE_CHECKING:
     from codeweaver.config.settings import CodeWeaverSettings
     from codeweaver.config.types import CodeWeaverSettingsDict
-    from codeweaver.core.types import DictView
-    from codeweaver.core.types.enum import AnonymityConversion
+    from codeweaver.core import AnonymityConversion, DictView
 
 logger = logging.getLogger(__name__)
 
@@ -173,8 +174,7 @@ def _resolve_globs(path_string: str, repo_root: Path) -> set[Path]:
 @cache
 def _get_known_extensions() -> set[str]:
     """Get a set of known file extensions for the watcher."""
-    from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
-    from codeweaver.core.metadata import get_ext_lang_pairs
+    from codeweaver.core import ConfigLanguage, SemanticSearchLanguage, get_ext_lang_pairs
 
     return (
         {ext.ext.lower() for ext in get_ext_lang_pairs()}
@@ -354,10 +354,7 @@ class IndexerSettings(BasedModel):
         if self.include_github_dir:
             self.forced_includes |= {"**/.github/**", "**/.circleci/**"}
         if self.include_tooling_dirs:
-            from codeweaver.core.file_extensions import (
-                COMMON_LLM_TOOLING_PATHS,
-                COMMON_TOOLING_PATHS,
-            )
+            from codeweaver.core import COMMON_LLM_TOOLING_PATHS, COMMON_TOOLING_PATHS
 
             file_endings = {
                 ".json",
@@ -424,7 +421,7 @@ class IndexerSettings(BasedModel):
         return self.cache_dir / "indexing_checkpoint.json"
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
-        from codeweaver.core.types.aliases import FilteredKey
+        from codeweaver.core import FilteredKey
 
         return {
             FilteredKey("_index_cache_dir"): AnonymityConversion.HASH,
@@ -515,7 +512,7 @@ class IndexerSettings(BasedModel):
     @cached_property
     def hidden_tool_paths(self) -> set[str]:
         """Get common hidden tooling paths to consider for forced-includes."""
-        from codeweaver.core.file_extensions import COMMON_LLM_TOOLING_PATHS, COMMON_TOOLING_PATHS
+        from codeweaver.core import COMMON_LLM_TOOLING_PATHS, COMMON_TOOLING_PATHS
 
         result: set[str] = set()
         for tool in COMMON_TOOLING_PATHS:

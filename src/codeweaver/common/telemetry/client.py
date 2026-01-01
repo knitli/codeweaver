@@ -28,14 +28,12 @@ from typing import TYPE_CHECKING, Any, Self
 from pydantic import HttpUrl
 from pydantic.types import SecretStr
 
-from codeweaver.config._project import CODEWEAVER_POSTHOG_PROJECT_KEY
-from codeweaver.core import uuid7
-from codeweaver.core.types.aliases import UUID7HexT
-from codeweaver.core.types.sentinel import Unset
+from codeweaver.config import CODEWEAVER_POSTHOG_PROJECT_KEY
+from codeweaver.core import Unset, UUID7HexT, uuid7
 
 
 if TYPE_CHECKING:
-    from codeweaver.config.settings import CodeWeaverSettings
+    from codeweaver.config import CodeWeaverSettings
 
 
 NO_HOG = find_spec("posthog") is None
@@ -173,12 +171,11 @@ class PostHogClient:
         Returns:
             Configured PostHog client instance
         """
-        from codeweaver.config.settings import get_settings
-        from codeweaver.config.telemetry import TelemetrySettings
+        from codeweaver.config import TelemetrySettings, get_settings
 
         settings = get_settings().telemetry  # ty:ignore[invalid-assignment]
         if not isinstance(settings, TelemetrySettings):
-            from codeweaver.config.telemetry import DefaultTelemetrySettings
+            from codeweaver.config import DefaultTelemetrySettings
 
             settings = TelemetrySettings.model_validate(DefaultTelemetrySettings)
         if (

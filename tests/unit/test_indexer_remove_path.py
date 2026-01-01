@@ -12,8 +12,7 @@ from unittest.mock import patch
 import pytest
 
 from codeweaver.core import DiscoveredFile, Missing, uuid7
-from codeweaver.engine.indexer.indexer import Indexer
-from codeweaver.engine.indexer.manifest import IndexFileManifest
+from codeweaver.engine import Indexer, IndexFileManifest
 
 
 pytestmark = [pytest.mark.unit]
@@ -27,7 +26,7 @@ class TestRemovePathWithDeletedFiles:
     @pytest.fixture
     async def mock_indexer(self, tmp_path: Path, di_overrides):
         """Create an indexer with mocked dependencies using DI."""
-        from codeweaver.engine.indexer.indexer import Indexer
+        from codeweaver.engine import Indexer
 
         indexer = await di_overrides.resolve(Indexer)
         indexer._project_path = tmp_path
@@ -78,12 +77,12 @@ class TestRemovePathWithDeletedFiles:
         result.write_text("def example(): pass")
         with (
             patch(
-                "codeweaver.core.discovery.set_relative_path",
+                "codeweaver.core",
                 side_effect=lambda p, **kwargs: (
                     Path(p).relative_to(tmp_path) if Path(p).is_absolute() else p
                 ),
             ),
-            patch("codeweaver.core.discovery.get_git_branch", return_value="main"),
+            patch("codeweaver.core", return_value="main"),
         ):
             discovered = DiscoveredFile.from_path(result)
             assert discovered is not None
@@ -106,12 +105,12 @@ class TestRemovePathWithDeletedFiles:
         file3.write_text("def file3(): pass")
         with (
             patch(
-                "codeweaver.core.discovery.set_relative_path",
+                "codeweaver.core",
                 side_effect=lambda p, **kwargs: (
                     Path(p).relative_to(tmp_path) if Path(p).is_absolute() else p
                 ),
             ),
-            patch("codeweaver.core.discovery.get_git_branch", return_value="main"),
+            patch("codeweaver.core", return_value="main"),
         ):
             assert mock_indexer._store is not None
             for f in [file1, file2, file3]:
@@ -127,7 +126,7 @@ class TestRemovePathWithDeletedFiles:
                     git_branch=resolved_branch,
                     source_id=unique_id,
                 )
-                from codeweaver.core.stores import BlakeKey
+                from codeweaver.core import BlakeKey
 
                 mock_indexer._store[cast(BlakeKey, unique_id)] = discovered
         self._test_malformed_entry_removal_gracefully(mock_indexer, file2)
@@ -152,12 +151,12 @@ class TestRemovePathWithDeletedFiles:
         # Add valid entry and another file to store with unique IDs
         with (
             patch(
-                "codeweaver.core.discovery.set_relative_path",
+                "codeweaver.core",
                 side_effect=lambda p, **kwargs: (
                     Path(p).relative_to(tmp_path) if Path(p).is_absolute() else p
                 ),
             ),
-            patch("codeweaver.core.discovery.get_git_branch", return_value="main"),
+            patch("codeweaver.core", return_value="main"),
         ):
             self._test_removal_of_malformed_entries(valid_file, another_file, mock_indexer)
         self._test_malformed_entry_removal_gracefully(mock_indexer, another_file)

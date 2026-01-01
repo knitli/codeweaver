@@ -20,9 +20,7 @@ import pytest
 from pydantic.types import UUID7
 from qdrant_client import AsyncQdrantClient
 
-from codeweaver.core.chunks import CodeChunk
-from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
-from codeweaver.core.metadata import ChunkKind, ExtKind
+from codeweaver.core import ChunkKind, CodeChunk, ConfigLanguage, ExtKind, SemanticSearchLanguage
 
 from .qdrant_test_manager import QdrantTestManager
 
@@ -104,12 +102,8 @@ def mock_embedding_provider() -> AsyncMock:
     mock_provider = AsyncMock()
     mock_provider.model_name = "mock-dense-model"
     mock_provider.provider_name = "mock-provider"
-    mock_provider.embed_query = AsyncMock(
-        return_value=[[0.1] * 384]
-    )
-    mock_provider.embed_documents = AsyncMock(
-        return_value=[[0.1] * 384, [0.2] * 384]
-    )
+    mock_provider.embed_query = AsyncMock(return_value=[[0.1] * 384])
+    mock_provider.embed_documents = AsyncMock(return_value=[[0.1] * 384, [0.2] * 384])
     mock_provider.initialize_async = AsyncMock()
     return mock_provider
 
@@ -171,12 +165,12 @@ def di_overrides(
     This fixture applies mock providers to the DI container, ensuring that
     components resolved via DI use these mocks instead of real providers.
     """
-    from codeweaver.providers.embedding.providers.base import (
+    from codeweaver.providers import (
         EmbeddingProvider,
+        RerankingProvider,
         SparseEmbeddingProvider,
+        VectorStoreProvider,
     )
-    from codeweaver.providers.reranking.providers.base import RerankingProvider
-    from codeweaver.providers.vector_stores.base import VectorStoreProvider
 
     clean_container.override(EmbeddingProvider, mock_embedding_provider)
     clean_container.override(SparseEmbeddingProvider, mock_sparse_provider)
@@ -208,9 +202,9 @@ def mock_tokenizer_for_unit_tests(
         # Patch get_tokenizer to return our mock in all modules that use it
         modules_to_patch = [
             "codeweaver_tokenizers.get_tokenizer",
-            "codeweaver.providers.embedding.providers.base.get_tokenizer",
-            "codeweaver.providers.reranking.providers.base.get_tokenizer",
-            "codeweaver.providers.reranking.capabilities.base.get_tokenizer",
+            "codeweaver.providers",
+            "codeweaver.providers",
+            "codeweaver.providers",
         ]
         for module_path in modules_to_patch:
             try:
@@ -228,7 +222,7 @@ def initialize_test_settings() -> GeneratorType:
     with minimal required configuration for tests. It resets settings after
     the test to avoid cross-test contamination.
     """
-    from codeweaver.config.settings import get_settings, reset_settings
+    from codeweaver.config import get_settings, reset_settings
 
     # Reset any existing settings
     reset_settings()
@@ -282,11 +276,8 @@ def clear_all_deduplication_stores() -> GeneratorType:
     marked as duplicates in subsequent tests.
     """
     from codeweaver.core import generate_collection_name
-    from codeweaver.engine.chunker.semantic import SemanticChunker
-    from codeweaver.providers.embedding.providers.base import (
-        EmbeddingProvider,
-        SparseEmbeddingProvider,
-    )
+    from codeweaver.engine import SemanticChunker
+    from codeweaver.providers import EmbeddingProvider, SparseEmbeddingProvider
 
     generate_collection_name.cache_clear()
     SemanticChunker.clear_deduplication_stores()
@@ -447,11 +438,8 @@ def create_test_chunk_with_embeddings(
         CodeChunk with embeddings registered in the global registry
     """
 
-    from codeweaver.core import uuid7
-    from codeweaver.core.chunks import BatchKeys, CodeChunk
-    from codeweaver.core.spans import Span
-    from codeweaver.providers.embedding.registry import get_embedding_registry
-    from codeweaver.providers.embedding.types import ChunkEmbeddings, EmbeddingBatchInfo
+    from codeweaver.core import BatchKeys, CodeChunk, Span, uuid7
+    from codeweaver.providers import ChunkEmbeddings, EmbeddingBatchInfo, get_embedding_registry
 
     # Create the base chunk
     chunk = CodeChunk(
@@ -489,7 +477,7 @@ def create_test_chunk_with_embeddings(
 
     if sparse_embedding:
         # Convert sparse dict format to SparseEmbedding object
-        from codeweaver.providers.embedding.types import SparseEmbedding
+        from codeweaver.providers import SparseEmbedding
 
         sparse_emb = SparseEmbedding(
             indices=sparse_embedding.get("indices", []), values=sparse_embedding.get("values", [])
@@ -587,7 +575,7 @@ def cli_api_keys(monkeypatch: pytest.MonkeyPatch) -> dict[str, str]:
 @pytest.fixture(autouse=True)
 def reset_cli_settings_cache() -> GeneratorType:
     """Reset settings cache between CLI tests."""
-    from codeweaver.config.settings import reset_settings
+    from codeweaver.config import reset_settings
 
     reset_settings()
     yield
@@ -597,7 +585,7 @@ def reset_cli_settings_cache() -> GeneratorType:
 @pytest.fixture(autouse=True)
 def reset_di_container() -> GeneratorType:
     """Reset DI container between tests to ensure isolation."""
-    from codeweaver.di.container import reset_container
+    from codeweaver.di import reset_container
 
     reset_container()
     yield
@@ -613,6 +601,7 @@ def clean_container():
             clean_container.override(...)
     """
     from codeweaver.di import get_container
+
     container = get_container()
     container.clear_overrides()
     yield container

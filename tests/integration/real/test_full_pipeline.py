@@ -18,10 +18,7 @@ Performance: ~5-15s per test due to full indexing + search.
 
 from __future__ import annotations
 
-import os
-
 from pathlib import Path
-from typing import AsyncGenerator
 
 import pytest
 
@@ -40,17 +37,18 @@ import pytest
 @pytest.mark.real_providers
 @pytest.mark.asyncio
 @pytest.mark.timeout(600)  # 10 minutes for real embedding generation + indexing
-async def test_full_pipeline_index_then_search(indexed_test_project, actual_vector_store, clean_container):
+async def test_full_pipeline_index_then_search(
+    indexed_test_project, actual_vector_store, clean_container
+):
     """Validate complete workflow: index fresh codebase, then search it."""
-    from codeweaver.agent_api.find_code import find_code
-    from codeweaver.agent_api.find_code.intent import IntentType
-    from codeweaver.config.settings import CodeWeaverSettings, get_settings
-    from codeweaver.providers.vector_stores.base import VectorStoreProvider
+    from codeweaver.agent_api import IntentType, find_code
+    from codeweaver.config import CodeWeaverSettings, get_settings
+    from codeweaver.providers import VectorStoreProvider
 
     # Override settings and vector store in container
     settings = get_settings()
     settings.project_path = indexed_test_project
-    
+
     overrides = {
         CodeWeaverSettings: lambda: settings,
         VectorStoreProvider: lambda: actual_vector_store,
@@ -59,8 +57,7 @@ async def test_full_pipeline_index_then_search(indexed_test_project, actual_vect
     with clean_container.use_overrides(overrides):
         # Search for specific functionality in the indexed codebase
         search_response = await find_code(
-            query="authentication user login",
-            intent=IntentType.UNDERSTAND,
+            query="authentication user login", intent=IntentType.UNDERSTAND
         )
 
     # Validate search found the code we indexed
@@ -79,11 +76,10 @@ async def test_incremental_indexing_updates_search_results(
     indexed_test_project, actual_vector_store, clean_container
 ):
     """Validate that adding new files updates search results."""
-    from codeweaver.agent_api.find_code import find_code
-    from codeweaver.agent_api.find_code.intent import IntentType
-    from codeweaver.config.settings import CodeWeaverSettings, get_settings
-    from codeweaver.engine.indexer.indexer import Indexer
-    from codeweaver.providers.vector_stores.base import VectorStoreProvider
+    from codeweaver.agent_api import IntentType, find_code
+    from codeweaver.config import CodeWeaverSettings, get_settings
+    from codeweaver.engine import Indexer
+    from codeweaver.providers import VectorStoreProvider
 
     # Add a new file with distinct content
     new_file = Path(indexed_test_project) / "payments.py"
@@ -101,7 +97,7 @@ def process_payment(amount: float, card_token: str) -> str:
     # Configure settings
     settings = get_settings()
     settings.project_path = indexed_test_project
-    
+
     overrides = {
         CodeWeaverSettings: lambda: settings,
         VectorStoreProvider: lambda: actual_vector_store,
@@ -114,8 +110,7 @@ def process_payment(amount: float, card_token: str) -> str:
 
         # Search for new file's content
         response = await find_code(
-            query="payment processing credit card Stripe",
-            intent=IntentType.UNDERSTAND,
+            query="payment processing credit card Stripe", intent=IntentType.UNDERSTAND
         )
 
     # Validate new file appears in results
@@ -127,17 +122,14 @@ def process_payment(amount: float, card_token: str) -> str:
 @pytest.mark.real_providers
 @pytest.mark.asyncio
 @pytest.mark.timeout(900)  # 15 minutes for 20 files with real embeddings
-async def test_pipeline_handles_large_codebase(
-    tmp_path, actual_vector_store, clean_container
-):
+async def test_pipeline_handles_large_codebase(tmp_path, actual_vector_store, clean_container):
     """Validate pipeline handles larger codebase (~20 files) efficiently."""
     import time
 
-    from codeweaver.agent_api.find_code import find_code
-    from codeweaver.agent_api.find_code.intent import IntentType
-    from codeweaver.config.settings import CodeWeaverSettings, get_settings
-    from codeweaver.engine.indexer.indexer import Indexer
-    from codeweaver.providers.vector_stores.base import VectorStoreProvider
+    from codeweaver.agent_api import IntentType, find_code
+    from codeweaver.config import CodeWeaverSettings, get_settings
+    from codeweaver.engine import Indexer
+    from codeweaver.providers import VectorStoreProvider
 
     # Create a larger test codebase
     large_codebase = tmp_path / "large_codebase"
@@ -152,7 +144,7 @@ async def test_pipeline_handles_large_codebase(
     # Configure settings
     settings = get_settings()
     settings.project_path = large_codebase
-    
+
     overrides = {
         CodeWeaverSettings: lambda: settings,
         VectorStoreProvider: lambda: actual_vector_store,
@@ -165,10 +157,7 @@ async def test_pipeline_handles_large_codebase(
         indexing_time = time.time() - start_time
 
         # Search
-        response = await find_code(
-            query="module function",
-            intent=IntentType.UNDERSTAND,
-        )
+        response = await find_code(query="module function", intent=IntentType.UNDERSTAND)
 
     assert response is not None
     assert indexing_time < 30.0
@@ -183,11 +172,10 @@ async def test_pipeline_handles_file_updates(
     indexed_test_project, actual_vector_store, clean_container
 ):
     """Validate that modifying files updates their embeddings."""
-    from codeweaver.agent_api.find_code import find_code
-    from codeweaver.agent_api.find_code.intent import IntentType
-    from codeweaver.config.settings import CodeWeaverSettings, get_settings
-    from codeweaver.engine.indexer.indexer import Indexer
-    from codeweaver.providers.vector_stores.base import VectorStoreProvider
+    from codeweaver.agent_api import IntentType, find_code
+    from codeweaver.config import CodeWeaverSettings, get_settings
+    from codeweaver.engine import Indexer
+    from codeweaver.providers import VectorStoreProvider
 
     # Modify auth.py significantly
     auth_file = Path(indexed_test_project) / "auth.py"
@@ -196,7 +184,7 @@ async def test_pipeline_handles_file_updates(
     # Configure settings
     settings = get_settings()
     settings.project_path = indexed_test_project
-    
+
     overrides = {
         CodeWeaverSettings: lambda: settings,
         VectorStoreProvider: lambda: actual_vector_store,
@@ -207,10 +195,7 @@ async def test_pipeline_handles_file_updates(
         await indexer.prime_index(force_reindex=True)
 
         # Search should now find OAuth content
-        response_after = await find_code(
-            query="OAuth2 JWT token",
-            intent=IntentType.UNDERSTAND,
-        )
+        response_after = await find_code(query="OAuth2 JWT token", intent=IntentType.UNDERSTAND)
 
     # Validate updated content is found
     result_files = [r.file_path.name for r in response_after.matches[:3]]
@@ -221,15 +206,12 @@ async def test_pipeline_handles_file_updates(
 @pytest.mark.real_providers
 @pytest.mark.asyncio
 @pytest.mark.timeout(600)  # 10 minutes for real embedding generation + indexing
-async def test_pipeline_coordination_with_errors(
-    tmp_path, actual_vector_store, clean_container
-):
+async def test_pipeline_coordination_with_errors(tmp_path, actual_vector_store, clean_container):
     """Validate pipeline handles partial failures gracefully."""
-    from codeweaver.agent_api.find_code import find_code
-    from codeweaver.agent_api.find_code.intent import IntentType
-    from codeweaver.config.settings import CodeWeaverSettings, get_settings
-    from codeweaver.engine.indexer.indexer import Indexer
-    from codeweaver.providers.vector_stores.base import VectorStoreProvider
+    from codeweaver.agent_api import IntentType, find_code
+    from codeweaver.config import CodeWeaverSettings, get_settings
+    from codeweaver.engine import Indexer
+    from codeweaver.providers import VectorStoreProvider
 
     # Create codebase with mix of good and problematic files
     mixed_codebase = tmp_path / "mixed_codebase"
@@ -242,7 +224,7 @@ async def test_pipeline_coordination_with_errors(
     # Configure settings
     settings = get_settings()
     settings.project_path = mixed_codebase
-    
+
     overrides = {
         CodeWeaverSettings: lambda: settings,
         VectorStoreProvider: lambda: actual_vector_store,
@@ -252,9 +234,7 @@ async def test_pipeline_coordination_with_errors(
         indexer = await clean_container.resolve(Indexer)
         await indexer.prime_index(force_reindex=True)
 
-        response = await find_code(
-            query="function", intent=IntentType.UNDERSTAND
-        )
+        response = await find_code(query="function", intent=IntentType.UNDERSTAND)
 
     assert response is not None
 
@@ -269,19 +249,20 @@ async def test_pipeline_coordination_with_errors(
 @pytest.mark.benchmark
 @pytest.mark.asyncio
 @pytest.mark.timeout(600)  # 10 minutes including fixture setup
-async def test_search_performance_with_real_providers(indexed_test_project, actual_vector_store, clean_container):
+async def test_search_performance_with_real_providers(
+    indexed_test_project, actual_vector_store, clean_container
+):
     """Validate search performance meets requirements with real providers."""
     import time
 
-    from codeweaver.agent_api.find_code import find_code
-    from codeweaver.agent_api.find_code.intent import IntentType
-    from codeweaver.config.settings import CodeWeaverSettings, get_settings
-    from codeweaver.providers.vector_stores.base import VectorStoreProvider
+    from codeweaver.agent_api import IntentType, find_code
+    from codeweaver.config import CodeWeaverSettings, get_settings
+    from codeweaver.providers import VectorStoreProvider
 
     # Configure settings
     settings = get_settings()
     settings.project_path = indexed_test_project
-    
+
     overrides = {
         CodeWeaverSettings: lambda: settings,
         VectorStoreProvider: lambda: actual_vector_store,
@@ -290,8 +271,7 @@ async def test_search_performance_with_real_providers(indexed_test_project, actu
     with clean_container.use_overrides(overrides):
         start_time = time.time()
         response = await find_code(
-            query="authentication database API configuration",
-            intent=IntentType.UNDERSTAND,
+            query="authentication database API configuration", intent=IntentType.UNDERSTAND
         )
         search_time = time.time() - start_time
 
@@ -311,11 +291,10 @@ async def test_indexing_performance_with_real_providers(
     """Validate indexing performance is acceptable for real-world usage."""
     import time
 
-    from codeweaver.agent_api.find_code import find_code
-    from codeweaver.agent_api.find_code.intent import IntentType
-    from codeweaver.config.settings import CodeWeaverSettings, get_settings
-    from codeweaver.engine.indexer.indexer import Indexer
-    from codeweaver.providers.vector_stores.base import VectorStoreProvider
+    from codeweaver.agent_api import IntentType, find_code
+    from codeweaver.config import CodeWeaverSettings, get_settings
+    from codeweaver.engine import Indexer
+    from codeweaver.providers import VectorStoreProvider
 
     # Create 50-file codebase
     perf_codebase = tmp_path / "perf_codebase"
@@ -328,7 +307,7 @@ async def test_indexing_performance_with_real_providers(
     # Configure settings
     settings = get_settings()
     settings.project_path = perf_codebase
-    
+
     overrides = {
         CodeWeaverSettings: lambda: settings,
         VectorStoreProvider: lambda: actual_vector_store,
@@ -340,9 +319,7 @@ async def test_indexing_performance_with_real_providers(
         await indexer.prime_index(force_reindex=True)
         indexing_time = time.time() - start_time
 
-        response = await find_code(
-            query="function", intent=IntentType.UNDERSTAND
-        )
+        response = await find_code(query="function", intent=IntentType.UNDERSTAND)
 
     assert response is not None
     assert indexing_time < 60.0

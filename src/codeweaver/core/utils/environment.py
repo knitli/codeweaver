@@ -29,9 +29,8 @@ else:
     type Console = object
 
 if TYPE_CHECKING:
-    if find_spec("codeweaver.config.settings") is not None:
-        from codeweaver.config.settings import CodeWeaverSettings
-        from codeweaver.config.types import CodeWeaverSettingsDict
+    if find_spec("codeweaver.config") is not None:
+        from codeweaver.config import CodeWeaverSettings, CodeWeaverSettingsDict
     else:
         type CodeWeaverSettings = object
         type CodeWeaverSettingsDict = Mapping[str, object]
@@ -85,7 +84,7 @@ def get_possible_env_vars() -> tuple[tuple[str, str], ...] | None:
 
 def resolve_project_root() -> Path:
     """Resolve the project root directory."""
-    from codeweaver.config.settings import get_settings_map
+    from codeweaver.config import get_settings_map
 
     settings_map = get_settings_map()
     if isinstance(settings_map.get("project_path"), Path):
@@ -128,7 +127,7 @@ def format_file_link(file_path: str | Path, line: NonNegativeInt | None = None) 
 
 def get_codeweaver_config_paths() -> tuple[Path, ...]:
     """Get all possible CodeWeaver configuration file paths."""
-    from codeweaver.config.settings import get_settings_map
+    from codeweaver.config import get_settings_map
     from codeweaver.core import get_user_config_dir
 
     settings_map = get_settings_map()
@@ -182,17 +181,16 @@ def is_codeweaver_config_path(path: Path) -> bool:
 
 def _set_settings_for_config(config_file: Path) -> CodeWeaverSettings:
     """Set the global settings based on the given config file."""
-    from codeweaver.config.settings import get_settings
+    from codeweaver.config import get_settings
 
     return get_settings(config_file=config_file)
 
 
 def _set_project_path(project_path: Path) -> DictView[CodeWeaverSettingsDict]:
     """Set the global project path."""
-    if find_spec("codeweaver.config.settings") is None:
-        raise ImportError("codeweaver.config.settings module is not available.")
-    from codeweaver.config.settings import get_settings_map, update_settings
-    from codeweaver.config.types import CodeWeaverSettingsDict
+    if find_spec("codeweaver.config") is None:
+        raise ImportError("codeweaver.config module is not available.")
+    from codeweaver.config import CodeWeaverSettingsDict, get_settings_map, update_settings
 
     return cast(
         DictView[CodeWeaverSettingsDict],
@@ -208,7 +206,7 @@ def get_settings_map_for(
         return _set_settings_for_config(config_file).view  # ty:ignore[unresolved-attribute]
     if project_path is not None:
         return _set_project_path(project_path)
-    from codeweaver.config.settings import get_settings_map
+    from codeweaver.config import get_settings_map
 
     return get_settings_map()  # ty:ignore[invalid-return-type]
 

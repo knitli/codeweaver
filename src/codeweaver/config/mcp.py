@@ -64,14 +64,12 @@ from fastmcp.mcp_config import update_config_file as update_mcp_config_file
 from pydantic import Field
 from pydantic_core import from_json
 
-from codeweaver.core import MissingValueError
-from codeweaver.core.types.models import BasedModel
+from codeweaver.core import BasedModel, MissingValueError
 
 
 if TYPE_CHECKING:
     from codeweaver.config.types import CodeWeaverMCPConfigDict, StdioCodeWeaverConfigDict
-    from codeweaver.core.types.aliases import FilteredKeyT
-    from codeweaver.core.types.enum import AnonymityConversion
+    from codeweaver.core import AnonymityConversion, FilteredKeyT
 
 CODEWEAVER_DESCRIPTION = "CodeWeaver advanced code search and understanding server."
 
@@ -112,8 +110,7 @@ class CodeWeaverMCPConfig(BasedModel, FastMCPRemoteMCPServer):
         Returns:
             A dictionary of telemetry keys.
         """
-        from codeweaver.core.types.aliases import FilteredKey
-        from codeweaver.core.types.enum import AnonymityConversion
+        from codeweaver.core import AnonymityConversion, FilteredKey
 
         return {
             FilteredKey("auth"): AnonymityConversion.BOOLEAN,
@@ -156,8 +153,7 @@ class StdioCodeWeaverConfig(BasedModel, FastMCPStdioMCPServer):
         Returns:
             A dictionary of telemetry keys.
         """
-        from codeweaver.core.types.aliases import FilteredKey
-        from codeweaver.core.types.enum import AnonymityConversion
+        from codeweaver.core import AnonymityConversion, FilteredKey
 
         return {
             FilteredKey("args"): AnonymityConversion.COUNT,

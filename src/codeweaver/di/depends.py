@@ -10,8 +10,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any, TypeVar, cast
 
-from codeweaver.core.types.aliases import SentinelName
-from codeweaver.core.types.sentinel import Sentinel
+from codeweaver.core import Sentinel, SentinelName
 
 
 T = TypeVar("T")

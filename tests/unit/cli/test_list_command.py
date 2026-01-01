@@ -15,9 +15,9 @@ from __future__ import annotations
 
 import pytest
 
-from codeweaver.cli.commands.list import app as list_app
-from codeweaver.common.registry import get_provider_registry
-from codeweaver.providers.provider import ProviderKind
+from codeweaver.cli import app as list_app
+from codeweaver.common import get_provider_registry
+from codeweaver.providers import ProviderKind
 
 
 @pytest.mark.unit

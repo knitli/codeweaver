@@ -16,8 +16,8 @@ from typing import Any
 
 from fastmcp import Context
 
-from codeweaver.common._logging import log_to_client_or_fallback, setup_logger
-from codeweaver.config._logging import SerializableLoggingFilter
+from codeweaver.common import log_to_client_or_fallback, setup_logger
+from codeweaver.config import SerializableLoggingFilter
 from codeweaver.core import validate_regex_pattern
 
 

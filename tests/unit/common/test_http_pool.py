@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock
 import httpx
 import pytest
 
-from codeweaver.common.http_pool import (
+from codeweaver.common import (
     HttpClientPool,
     PoolLimits,
     PoolTimeouts,
@@ -370,8 +370,8 @@ class TestProviderRegistryPooling:
 
     def test_get_pooled_client_voyage(self):
         """Test getting pooled client for Voyage provider."""
-        from codeweaver.common.registry.provider import ProviderRegistry
-        from codeweaver.providers.provider import Provider, ProviderKind
+        from codeweaver.common import ProviderRegistry
+        from codeweaver.providers import Provider, ProviderKind
 
         registry = ProviderRegistry()
         client = registry._get_pooled_httpx_client(Provider.VOYAGE, ProviderKind.EMBEDDING)
@@ -383,8 +383,8 @@ class TestProviderRegistryPooling:
 
     def test_get_pooled_client_cohere(self):
         """Test getting pooled client for Cohere provider."""
-        from codeweaver.common.registry.provider import ProviderRegistry
-        from codeweaver.providers.provider import Provider, ProviderKind
+        from codeweaver.common import ProviderRegistry
+        from codeweaver.providers import Provider, ProviderKind
 
         registry = ProviderRegistry()
         client = registry._get_pooled_httpx_client(Provider.COHERE, ProviderKind.EMBEDDING)
@@ -396,8 +396,8 @@ class TestProviderRegistryPooling:
 
     def test_get_pooled_client_openai(self):
         """Test getting pooled client for OpenAI provider."""
-        from codeweaver.common.registry.provider import ProviderRegistry
-        from codeweaver.providers.provider import Provider, ProviderKind
+        from codeweaver.common import ProviderRegistry
+        from codeweaver.providers import Provider, ProviderKind
 
         registry = ProviderRegistry()
         client = registry._get_pooled_httpx_client(Provider.OPENAI, ProviderKind.EMBEDDING)
@@ -409,8 +409,8 @@ class TestProviderRegistryPooling:
 
     def test_get_pooled_client_mistral(self):
         """Test getting pooled client for Mistral provider."""
-        from codeweaver.common.registry.provider import ProviderRegistry
-        from codeweaver.providers.provider import Provider, ProviderKind
+        from codeweaver.common import ProviderRegistry
+        from codeweaver.providers import Provider, ProviderKind
 
         registry = ProviderRegistry()
         client = registry._get_pooled_httpx_client(Provider.MISTRAL, ProviderKind.EMBEDDING)
@@ -421,8 +421,8 @@ class TestProviderRegistryPooling:
 
     def test_get_pooled_client_different_kinds_create_different_clients(self):
         """Test that different provider kinds get different clients."""
-        from codeweaver.common.registry.provider import ProviderRegistry
-        from codeweaver.providers.provider import Provider, ProviderKind
+        from codeweaver.common import ProviderRegistry
+        from codeweaver.providers import Provider, ProviderKind
 
         registry = ProviderRegistry()
         embedding_client = registry._get_pooled_httpx_client(
@@ -437,8 +437,8 @@ class TestProviderRegistryPooling:
 
     def test_get_pooled_client_same_provider_reuses_client(self):
         """Test that same provider/kind combination reuses the same client."""
-        from codeweaver.common.registry.provider import ProviderRegistry
-        from codeweaver.providers.provider import Provider, ProviderKind
+        from codeweaver.common import ProviderRegistry
+        from codeweaver.providers import Provider, ProviderKind
 
         registry = ProviderRegistry()
         client1 = registry._get_pooled_httpx_client(Provider.VOYAGE, ProviderKind.EMBEDDING)
@@ -448,8 +448,8 @@ class TestProviderRegistryPooling:
 
     def test_pooled_http_providers_mapping(self):
         """Test that _POOLED_HTTP_PROVIDERS includes expected providers with correct param names."""
-        from codeweaver.common.registry.provider import ProviderRegistry
-        from codeweaver.providers.provider import Provider
+        from codeweaver.common import ProviderRegistry
+        from codeweaver.providers import Provider
 
         pooled = ProviderRegistry._POOLED_HTTP_PROVIDERS
 
@@ -475,8 +475,8 @@ class TestProviderRegistryPooling:
 
     def test_non_pooled_provider_not_in_mapping(self):
         """Test that providers without pooling support are not in the mapping."""
-        from codeweaver.common.registry.provider import ProviderRegistry
-        from codeweaver.providers.provider import Provider
+        from codeweaver.common import ProviderRegistry
+        from codeweaver.providers import Provider
 
         pooled = ProviderRegistry._POOLED_HTTP_PROVIDERS
 

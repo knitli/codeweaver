@@ -18,8 +18,8 @@ from typing import TYPE_CHECKING
 
 from codeweaver_tokenizers.base import Tokenizer
 
-from codeweaver.config.settings import CodeWeaverSettings
-from codeweaver.core.chunks import CodeChunk
+from codeweaver.config import CodeWeaverSettings
+from codeweaver.core import CodeChunk
 from codeweaver.di import INJECTED, GovernorDep, SettingsDep, TokenizerDep
 from codeweaver.engine.chunker import ChunkerSelector, chunk_files_parallel
 from codeweaver.engine.chunker.base import ChunkGovernor
@@ -30,7 +30,7 @@ from codeweaver.engine.chunker.exceptions import ChunkingError
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-    from codeweaver.core.discovery import DiscoveredFile
+    from codeweaver.core import DiscoveredFile
 
 
 logger = logging.getLogger(__name__)
@@ -45,9 +45,7 @@ class ChunkingService:
     Examples:
         Basic usage with parallel processing:
 
-        >>> from codeweaver.providers.embedding.capabilities.base import (
-        ...     EmbeddingModelCapabilities,
-        ... )
+        >>> from codeweaver.providers import EmbeddingModelCapabilities
         >>> capabilities = EmbeddingModelCapabilities(context_window=8192)
         >>> governor = ChunkGovernor(capabilities=(capabilities,))
         >>> service = ChunkingService(governor)
@@ -58,7 +56,7 @@ class ChunkingService:
 
         Using settings for configuration:
 
-        >>> from codeweaver.config.chunker import ChunkerSettings, ConcurrencySettings
+        >>> from codeweaver.config import ChunkerSettings, ConcurrencySettings
         >>> settings = ChunkerSettings(
         ...     concurrency=ConcurrencySettings(max_parallel_files=8, executor="thread")
         ... )
@@ -151,12 +149,11 @@ class ChunkingService:
         Yields:
             Tuples of (file_path, chunks) for successfully chunked files
         """
-        from codeweaver.core import get_project_path
-        from codeweaver.core.types.sentinel import Unset
+        from codeweaver.core import Unset, get_project_path
         from codeweaver.di import Depends, DependsPlaceholder
 
         if isinstance(self.settings, (Depends, DependsPlaceholder)):
-            from codeweaver.config.settings import get_settings
+            from codeweaver.config import get_settings
 
             self.settings = get_settings()
 
@@ -237,7 +234,7 @@ class ChunkingService:
         from codeweaver.di import Depends, DependsPlaceholder
 
         if isinstance(self.settings, (Depends, DependsPlaceholder)):
-            from codeweaver.config.settings import get_settings
+            from codeweaver.config import get_settings
 
             self.settings = get_settings()
 

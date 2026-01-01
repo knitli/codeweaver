@@ -16,15 +16,13 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, cast
 
-from codeweaver.config.providers import MemoryConfig
-from codeweaver.core import PersistenceError, ProviderError, get_user_config_dir
-from codeweaver.core.types.provider import Provider
+from codeweaver.config import MemoryConfig
+from codeweaver.core import PersistenceError, Provider, ProviderError, get_user_config_dir
 from codeweaver.providers.vector_stores.qdrant_base import QdrantBaseProvider
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.chunks import CodeChunk
-    from codeweaver.core.types.search import SearchResult, StrategizedQuery
+    from codeweaver.core import CodeChunk, SearchResult, StrategizedQuery
     from codeweaver.providers.vector_stores.base import MixedQueryInput
     from codeweaver.providers.vector_stores.search import Filter
 
@@ -44,7 +42,7 @@ def _get_project_name() -> str:
     Returns:
         The project name as a string.
     """
-    from codeweaver.config.settings import get_settings_map
+    from codeweaver.config import get_settings_map
 
     settings = get_settings_map()
     return settings.get("project_name") or (
@@ -55,8 +53,8 @@ def _get_project_name() -> str:
 
 
 def _get_memory_config() -> MemoryConfig:
-    from codeweaver.config.settings import get_settings_map
-    from codeweaver.core.types.sentinel import Unset
+    from codeweaver.config import get_settings_map
+    from codeweaver.core import Unset
 
     settings_map = get_settings_map()
     if (

@@ -19,18 +19,17 @@ from urllib.parse import urlparse
 
 import pytest
 
-from codeweaver.cli.commands.doctor import app as doctor_app
-from codeweaver.config.settings import CodeWeaverSettings
-from codeweaver.core.types.aliases import SentinelName
-from codeweaver.core.types.sentinel import Unset
-from codeweaver.providers.provider import Provider
+from codeweaver.cli import app as doctor_app
+from codeweaver.config import CodeWeaverSettings
+from codeweaver.core import SentinelName, Unset
+from codeweaver.providers import Provider
 
 
 @pytest.fixture
 def temp_project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Create temporary project directory."""
     # Reset global settings to avoid state pollution between tests
-    from codeweaver.config.settings import reset_settings
+    from codeweaver.config import reset_settings
 
     reset_settings()
 
@@ -92,7 +91,7 @@ class TestDoctorUnsetHandling:
     def test_unset_check_pattern_correct(self) -> None:
         # sourcery skip: remove-assert-true, remove-redundant-if
         """Test correct pattern for checking Unset values."""
-        from codeweaver.core.types.sentinel import Unset
+        from codeweaver.core import Unset
 
         unset_value = Unset(name="UNSET", module_name=__name__)
 
@@ -163,8 +162,8 @@ class TestDoctorProviderEnvVars:
 
     def test_all_cloud_providers_have_env_vars(self) -> None:
         """Test all cloud providers have other_env_vars defined."""
-        from codeweaver.common.registry import get_provider_registry
-        from codeweaver.providers.provider import ProviderKind
+        from codeweaver.common import get_provider_registry
+        from codeweaver.providers import ProviderKind
 
         registry = get_provider_registry()
         embedding_providers = registry.list_providers(ProviderKind.EMBEDDING)
@@ -311,7 +310,7 @@ class TestDoctorConfigAssumptions:
         self, temp_project: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Test init args can configure settings."""
-        from codeweaver.config.settings import CodeWeaverSettings
+        from codeweaver.config import CodeWeaverSettings
 
         # Test that explicit init args work for basic settings
         custom_path = temp_project / "custom_location"

@@ -26,15 +26,18 @@ from pydantic import FilePath, ValidationError
 from rich.table import Table
 
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
-from codeweaver.core import get_codeweaver_config_paths, get_project_path, is_git_dir
-from codeweaver.core.types.provider import ProviderKind
-from codeweaver.core.types.sentinel import Unset
+from codeweaver.core import (
+    ProviderKind,
+    Unset,
+    get_codeweaver_config_paths,
+    get_project_path,
+    is_git_dir,
+)
 
 
 if TYPE_CHECKING:
-    from codeweaver.config.providers import ProviderSettings
-    from codeweaver.config.settings import CodeWeaverSettings
-    from codeweaver.core.types.provider import Provider
+    from codeweaver.config import CodeWeaverSettings, ProviderSettings
+    from codeweaver.core import Provider
 
 
 # Module-level display for check functions
@@ -268,7 +271,7 @@ def check_configuration_file(settings: CodeWeaverSettings | None = None) -> Doct
 
     try:
         if settings is None:
-            from codeweaver.config.settings import get_settings
+            from codeweaver.config import get_settings
 
             settings = get_settings()
 
@@ -356,7 +359,7 @@ type DeploymentType = Literal["local docker", "cloud", "local", "remote", "in-me
 
 async def check_vector_store_config(settings: ProviderSettings) -> DoctorCheck:
     """Check vector store configuration with Docker/Cloud detection."""
-    from codeweaver.core.types.provider import Provider
+    from codeweaver.core import Provider
 
     check = DoctorCheck("Vector Store Configuration")
 
@@ -522,7 +525,7 @@ def _set_warning_status(check: DoctorCheck, message: str, suggestion: str) -> No
 
 def check_indexer_config(settings: CodeWeaverSettings) -> DoctorCheck:
     """Check if the indexer is properly configured and cache directory is writable."""
-    from codeweaver.config.indexer import IndexerSettings
+    from codeweaver.config import IndexerSettings
 
     check = DoctorCheck("Indexer Configuration")
 
@@ -588,7 +591,7 @@ def check_provider_availability(settings: ProviderSettings) -> list[DoctorCheck]
     check = DoctorCheck("Provider Availability")
 
     try:
-        from codeweaver.common.registry import get_provider_registry
+        from codeweaver.common import get_provider_registry
 
         registry = get_provider_registry()
         tested_providers: list[DoctorCheck] = []
@@ -602,7 +605,7 @@ def check_provider_availability(settings: ProviderSettings) -> list[DoctorCheck]
                     ["Configure providers in your codeweaver configuration."],
                 )
             ]
-        from codeweaver.core.types.provider import ProviderKind
+        from codeweaver.core import ProviderKind
 
         for kind, provider_configs in configs.items():
             if not provider_configs:
@@ -685,7 +688,7 @@ def check_provider_availability(settings: ProviderSettings) -> list[DoctorCheck]
 
 
 def _get_health_endpoint():
-    from codeweaver.config.settings import get_settings_map
+    from codeweaver.config import get_settings_map
 
     settings_map = get_settings_map()
     host = settings_map.get("management_host", "localhost")
@@ -765,7 +768,7 @@ async def process_checks(display: StatusDisplay) -> list[DoctorCheck]:
     # Configuration checks
     config_failed = False
     try:
-        from codeweaver.config.settings import get_settings
+        from codeweaver.config import get_settings
 
         settings = get_settings()
         checks.append(check_configuration_file(settings))
@@ -864,7 +867,7 @@ async def doctor(
 
     # Update settings if config_file or project_path provided
     if config_file or project_path:
-        from codeweaver.config.settings import update_settings
+        from codeweaver.config import update_settings
 
         _ = update_settings(config_file=config_file, project_path=project_path)  # type: ignore
 

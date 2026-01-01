@@ -17,14 +17,13 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from codeweaver.core import ConfigurationError
-from codeweaver.core.types.provider import Provider
+from codeweaver.core import ConfigurationError, Provider
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.providers.base import EmbeddingProvider
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.chunks import CodeChunk
+    from codeweaver.core import CodeChunk
 
 
 logger = logging.getLogger(__name__)
@@ -33,7 +32,7 @@ logger = logging.getLogger(__name__)
 def huggingface_hub_input_transformer(chunks: Sequence[CodeChunk]) -> Iterator[str]:
     """Input transformer for Hugging Face Hub models."""
     # The hub client only takes a single string at a time, so we'll just use a generator here
-    from codeweaver.core.chunks import CodeChunk
+    from codeweaver.core import CodeChunk
 
     return CodeChunk.dechunkify(chunks)
 

@@ -25,21 +25,18 @@ from fastmcp import Context
 from pydantic import Field, PrivateAttr
 from qdrant_client.http.models.models import CollectionInfo
 
-from codeweaver.common._logging import log_to_client_or_fallback
-from codeweaver.config.profiles import _backup_profile, get_profile
-from codeweaver.config.providers import ProviderSettingsDict
-from codeweaver.core.types.models import BasedModel
+from codeweaver.common import log_to_client_or_fallback
+from codeweaver.config import ProviderSettingsDict, _backup_profile, get_profile
+from codeweaver.core import BasedModel
 from codeweaver.engine.resource_estimation import estimate_backup_memory_requirements
-from codeweaver.providers.vector_stores.base import CircuitBreakerState
-from codeweaver.providers.vector_stores.qdrant_base import QdrantBaseProvider
+from codeweaver.providers import CircuitBreakerState, QdrantBaseProvider
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.types import AnonymityConversion, FilteredKeyT
+    from codeweaver.core import AnonymityConversion, FilteredKeyT
     from codeweaver.engine.failover_tracker import FileChangeTracker
     from codeweaver.engine.indexer.indexer import Indexer
-    from codeweaver.providers.vector_stores.base import VectorStoreProvider
-    from codeweaver.providers.vector_stores.inmemory import MemoryVectorStoreProvider
+    from codeweaver.providers import MemoryVectorStoreProvider, VectorStoreProvider
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +57,7 @@ def _get_collection_name(*, secondary: bool) -> str:
             settings = vector_store[0] if isinstance(vector_store, tuple) else vector_store
             return settings.get("provider_settings", {}).get("collection_name", "codeweaver-backup")  # type: ignore[union-attr]
         return "codeweaver-backup"
-    from codeweaver.common.registry.provider import get_provider_config_for
+    from codeweaver.common import get_provider_config_for
 
     if (config := get_provider_config_for("vector_store")) and (
         collection_name := config.get("provider_settings", {}).get("collection_name")
@@ -127,8 +124,7 @@ class VectorStoreFailoverManager(BasedModel):
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         """Keys to process for telemetry privacy."""
-        from codeweaver.core.types.aliases import FilteredKey
-        from codeweaver.core.types.enum import AnonymityConversion
+        from codeweaver.core import AnonymityConversion, FilteredKey
 
         return {
             FilteredKey("primary_collection"): AnonymityConversion.BOOLEAN,
@@ -180,7 +176,7 @@ class VectorStoreFailoverManager(BasedModel):
             indexer: Optional indexer reference for stats
         """
         from codeweaver.engine.failover_tracker import FileChangeTracker
-        from codeweaver.providers.vector_stores.qdrant_base import QdrantBaseProvider
+        from codeweaver.providers import QdrantBaseProvider
 
         self._primary_store = primary_store
         self._active_store = primary_store
@@ -441,7 +437,7 @@ class VectorStoreFailoverManager(BasedModel):
                     continue
 
                 # Check if primary is healthy
-                from codeweaver.providers.vector_stores.base import CircuitBreakerState
+                from codeweaver.providers import CircuitBreakerState
 
                 if self._primary_store.circuit_breaker_state != CircuitBreakerState.CLOSED:
                     logger.debug(
@@ -622,7 +618,7 @@ class VectorStoreFailoverManager(BasedModel):
         self._failover_time = datetime.now(UTC)
 
         # Update global statistics
-        from codeweaver.common.statistics import get_session_statistics
+        from codeweaver.common import get_session_statistics
 
         stats = get_session_statistics()
         stats.update_failover_stats(
@@ -717,7 +713,7 @@ class VectorStoreFailoverManager(BasedModel):
             self._failover_chunks.clear()
 
             # Update global statistics
-            from codeweaver.common.statistics import get_session_statistics
+            from codeweaver.common import get_session_statistics
 
             stats = get_session_statistics()
             stats.update_failover_stats(failover_active=False, active_store_type="primary")
@@ -850,7 +846,7 @@ class VectorStoreFailoverManager(BasedModel):
         """
         if not self._backup_store or not self._indexer or not self._primary_store:
             return
-        from codeweaver.providers.vector_stores.metadata import HybridVectorPayload
+        from codeweaver.providers import HybridVectorPayload
 
         try:
             # Get chunk from backup (need payload for re-embedding)
@@ -942,7 +938,7 @@ class VectorStoreFailoverManager(BasedModel):
                 logger.debug("Primary health check: no collections found")
 
             # Check 2: Circuit breaker is closed
-            from codeweaver.providers.vector_stores.base import CircuitBreakerState
+            from codeweaver.providers import CircuitBreakerState
 
             if (
                 self._primary_store.circuit_breaker_state != CircuitBreakerState.CLOSED
@@ -977,7 +973,7 @@ class VectorStoreFailoverManager(BasedModel):
         Raises:
             Exception: If backup store creation fails
         """
-        from codeweaver.providers.vector_stores.inmemory import MemoryVectorStoreProvider
+        from codeweaver.providers import MemoryVectorStoreProvider
 
         # Get backup configuration
         backup_config = _backup_profile()
@@ -1013,9 +1009,8 @@ class VectorStoreFailoverManager(BasedModel):
         Raises:
             Exception: If backup indexer creation fails
         """
-        from codeweaver.common.registry import get_provider_registry
-        from codeweaver.core.discovery import DiscoveredFile
-        from codeweaver.core.stores import make_blake_store
+        from codeweaver.common import get_provider_registry
+        from codeweaver.core import DiscoveredFile, make_blake_store
         from codeweaver.engine.chunker.base import ChunkGovernor
         from codeweaver.engine.chunking_service import ChunkingService
         from codeweaver.engine.indexer.indexer import Indexer
@@ -1511,7 +1506,7 @@ class VectorStoreFailoverManager(BasedModel):
 
     async def delete_and_clear(self) -> None:
         """Delete all data from both primary and backup vector stores."""
-        from codeweaver.providers.vector_stores.qdrant_base import QdrantBaseProvider
+        from codeweaver.providers import QdrantBaseProvider
 
         try:
             if self._primary_store:

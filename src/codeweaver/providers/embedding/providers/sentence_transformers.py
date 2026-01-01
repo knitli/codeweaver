@@ -16,8 +16,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 import numpy as np
 
-from codeweaver.core import ConfigurationError, rpartial
-from codeweaver.core.types.provider import Provider
+from codeweaver.core import ConfigurationError, Provider, rpartial
 from codeweaver.providers.embedding.capabilities.base import (
     EmbeddingModelCapabilities,
     SparseEmbeddingModelCapabilities,
@@ -26,7 +25,7 @@ from codeweaver.providers.embedding.providers.base import EmbeddingProvider, Spa
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.chunks import CodeChunk
+    from codeweaver.core import CodeChunk
     from codeweaver.providers.embedding.types import SparseEmbedding
 
 logger = logging.getLogger(__name__)

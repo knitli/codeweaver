@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from codeweaver.engine.failover_tracker import FileChangeTracker
+from codeweaver.engine import FileChangeTracker
 
 
 pytestmark = [pytest.mark.unit]
@@ -132,7 +132,7 @@ class TestRecordFileIndexed:
         mock_file = MagicMock()
         mock_file.path = tmp_path / "src" / "test.py"
         mock_file.file_hash = file_hash
-        with patch("codeweaver.engine.failover_tracker.set_relative_path") as mock_rel:
+        with patch("codeweaver.engine") as mock_rel:
             mock_rel.return_value = Path("src/test.py")
             tracker.record_file_indexed(mock_file)
 
@@ -148,7 +148,7 @@ class TestRecordFileDeleted:
         tracker.file_hashes["src/test.py"] = "hash123"
         tracker.pending_changes.add("src/test.py")
 
-        with patch("codeweaver.engine.failover_tracker.set_relative_path") as mock_rel:
+        with patch("codeweaver.engine") as mock_rel:
             mock_rel.return_value = Path("src/test.py")
             tracker.record_file_deleted(tmp_path / "src" / "test.py")
 
@@ -167,7 +167,7 @@ class TestRecordFailoverIndexed:
         """Test recording a file indexed during failover."""
         tracker = FileChangeTracker(project_path=tmp_path)
 
-        with patch("codeweaver.engine.failover_tracker.set_relative_path") as mock_rel:
+        with patch("codeweaver.engine") as mock_rel:
             mock_rel.return_value = Path("src/test.py")
             tracker.record_file_indexed_during_failover(tmp_path / "src" / "test.py")
 

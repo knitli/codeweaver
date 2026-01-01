@@ -28,15 +28,17 @@ import pytest
 from qdrant_client import models
 from qdrant_client.async_qdrant_client import AsyncQdrantClient
 
-from codeweaver.config.providers import MemoryConfig, QdrantConfig
-from codeweaver.core.chunks import CodeChunk
-from codeweaver.core.language import SemanticSearchLanguage
-from codeweaver.core.metadata import ChunkKind, ExtKind
-from codeweaver.core.spans import Span
-from codeweaver.core.types.search import SearchStrategy, StrategizedQuery
-from codeweaver.providers.provider import Provider
-from codeweaver.providers.vector_stores.inmemory import MemoryVectorStoreProvider
-from codeweaver.providers.vector_stores.qdrant import QdrantVectorStoreProvider
+from codeweaver.config import MemoryConfig, QdrantConfig
+from codeweaver.core import (
+    ChunkKind,
+    CodeChunk,
+    ExtKind,
+    SearchStrategy,
+    SemanticSearchLanguage,
+    Span,
+    StrategizedQuery,
+)
+from codeweaver.providers import MemoryVectorStoreProvider, Provider, QdrantVectorStoreProvider
 
 
 pytestmark = [pytest.mark.async_test, pytest.mark.performance, pytest.mark.slow]

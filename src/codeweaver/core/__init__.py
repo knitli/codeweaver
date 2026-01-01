@@ -229,7 +229,7 @@ if TYPE_CHECKING:
         we_are_in_jetbrains,
         we_are_in_vscode,
     )
-    from codeweaver.semantic.types import SemanticMetadata
+    from codeweaver.semantic import SemanticMetadata
 
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({

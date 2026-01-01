@@ -17,7 +17,7 @@ from qdrant_client.http.models import Distance, VectorParams
 from qdrant_client.http.models.models import SparseVectorParams
 
 from codeweaver.core import ModelSwitchError
-from codeweaver.providers.vector_stores.metadata import CollectionMetadata
+from codeweaver.providers import CollectionMetadata
 
 
 pytestmark = [pytest.mark.integration]

@@ -15,12 +15,9 @@ from uuid import uuid4
 
 import pytest
 
-from codeweaver.core.chunks import CodeChunk
-from codeweaver.core.language import SemanticSearchLanguage as Language
-from codeweaver.core.spans import Span
-from codeweaver.core.types.search import SearchStrategy, StrategizedQuery
-from codeweaver.providers.provider import Provider
-from codeweaver.providers.vector_stores.inmemory import MemoryVectorStoreProvider
+from codeweaver.core import CodeChunk, SearchStrategy, Span, StrategizedQuery
+from codeweaver.core import SemanticSearchLanguage as Language
+from codeweaver.providers import MemoryVectorStoreProvider, Provider
 
 
 pytestmark = [pytest.mark.validation]
@@ -50,7 +47,7 @@ async def memory_config(temp_persist_path):
 @pytest.fixture
 async def test_embedding_caps():
     """Provide test embedding capabilities with 768 dimensions."""
-    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+    from codeweaver.providers import EmbeddingModelCapabilities
 
     dense_caps = EmbeddingModelCapabilities(
         name="test-dense-model",
@@ -65,7 +62,7 @@ async def test_embedding_caps():
 @pytest.fixture
 async def memory_provider(memory_config, test_embedding_caps):
     """Create a MemoryVectorStoreProvider instance for testing."""
-    from codeweaver.providers.provider import Provider
+    from codeweaver.providers import Provider
 
     provider = MemoryVectorStoreProvider(
         _provider=Provider.MEMORY, config=memory_config, embedding_caps=test_embedding_caps
@@ -78,11 +75,8 @@ async def memory_provider(memory_config, test_embedding_caps):
 @pytest.fixture
 def sample_chunk():
     """Create a sample CodeChunk for testing."""
-    from codeweaver.core import uuid7
-    from codeweaver.core.chunks import BatchKeys
-    from codeweaver.core.metadata import ChunkKind, ExtKind
-    from codeweaver.providers.embedding.registry import get_embedding_registry
-    from codeweaver.providers.embedding.types import ChunkEmbeddings, EmbeddingBatchInfo
+    from codeweaver.core import BatchKeys, ChunkKind, ExtKind, uuid7
+    from codeweaver.providers import ChunkEmbeddings, EmbeddingBatchInfo, get_embedding_registry
 
     chunk_id = uuid7()
 
@@ -127,7 +121,7 @@ class TestMemoryProviderContract:
 
     async def test_implements_vector_store_provider(self):
         """Verify MemoryVectorStoreProvider implements VectorStoreProvider interface."""
-        from codeweaver.providers.vector_stores.base import VectorStoreProvider
+        from codeweaver.providers import VectorStoreProvider
 
         assert issubclass(MemoryVectorStoreProvider, VectorStoreProvider)
 
@@ -198,7 +192,7 @@ class TestMemoryProviderContract:
         self, memory_config, sample_chunk, temp_persist_path, test_embedding_caps
     ):
         """Test _restore_from_disk loads data from JSON."""
-        from codeweaver.providers.provider import Provider
+        from codeweaver.providers import Provider
 
         # Create and persist data
         provider1 = MemoryVectorStoreProvider(

@@ -111,7 +111,7 @@ class DelimiterChunker(BaseChunker):
         """
         import time
 
-        from codeweaver.core.types.aliases import UUID7Hex
+        from codeweaver.core import UUID7Hex
         from codeweaver.engine.chunker.governance import ResourceGovernor
 
         # Edge case: empty content
@@ -196,7 +196,7 @@ class DelimiterChunker(BaseChunker):
         ):
             return performance_settings
 
-        from codeweaver.config.chunker import PerformanceSettings
+        from codeweaver.config import PerformanceSettings
 
         return PerformanceSettings()
 
@@ -1126,7 +1126,7 @@ class DelimiterChunker(BaseChunker):
         Returns:
             List of CodeChunk objects
         """
-        from codeweaver.core.metadata import ExtKind
+        from codeweaver.core import ExtKind
 
         chunks: list[CodeChunk] = []
         lines = content.splitlines(keepends=True)

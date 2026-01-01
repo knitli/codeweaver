@@ -261,20 +261,23 @@ from pydantic import (
 )
 from pydantic.dataclasses import dataclass
 
-from codeweaver.core import LazyImport, lazy_import
-from codeweaver.core.language import SemanticSearchLanguage
-from codeweaver.core.types.aliases import (
+from codeweaver.core import (
+    DATACLASS_CONFIG,
+    FROZEN_BASEDMODEL_CONFIG,
+    BasedModel,
     CategoryName,
     CategoryNameT,
+    DataclassSerializationMixin,
+    LazyImport,
     LiteralStringT,
     Role,
     RoleT,
+    SemanticSearchLanguage,
     ThingName,
     ThingNameT,
     ThingOrCategoryNameT,
+    lazy_import,
 )
-from codeweaver.core.types.dataclasses import DATACLASS_CONFIG, DataclassSerializationMixin
-from codeweaver.core.types.models import FROZEN_BASEDMODEL_CONFIG, BasedModel
 from codeweaver.semantic.classifications import ThingClass
 from codeweaver.semantic.types import (
     ConnectionClass,

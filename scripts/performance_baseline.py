@@ -8,15 +8,15 @@ import logging
 import time
 
 from codeweaver.di import get_container
-from codeweaver.engine.indexer import Indexer
-from codeweaver.providers.embedding.providers.base import EmbeddingProvider
+from codeweaver.engine import Indexer
+from codeweaver.providers import EmbeddingProvider
 
 
 # Suppress logging for cleaner output
 logging.getLogger("codeweaver").setLevel(logging.ERROR)
 
 
-async def benchmark_initialization():
+async def benchmark_initialization() -> None:
     print("--- Performance Baseline: Initialization ---")
 
     start = time.perf_counter()
@@ -31,7 +31,7 @@ async def benchmark_initialization():
     print(f"Container.resolve(Indexer):   {(end - start) * 1000:.2f}ms")
 
 
-async def benchmark_embedding():
+async def benchmark_embedding() -> None:
     print("\n--- Performance Baseline: Embedding (Local/Mock) ---")
     container = get_container()
     try:
@@ -45,7 +45,7 @@ async def benchmark_embedding():
         print(f"Embedding benchmark skipped: {e}")
 
 
-async def main():
+async def main() -> None:
     await benchmark_initialization()
     # Embedding might require API keys or local models, skip if not available
     # await benchmark_embedding()

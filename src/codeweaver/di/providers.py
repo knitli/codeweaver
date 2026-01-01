@@ -8,22 +8,23 @@
 from typing import TYPE_CHECKING, Annotated, Any
 
 # Top-level imports for DI keys where safe (no circularity)
-from codeweaver.config.settings import CodeWeaverSettings
-from codeweaver.core.types.sentinel import Unset
+from codeweaver.config import CodeWeaverSettings
+from codeweaver.core import Unset
 from codeweaver.di.container import Container, get_container
 from codeweaver.di.depends import Depends
-from codeweaver.engine.chunker.base import ChunkGovernor
-from codeweaver.providers.embedding.providers.base import EmbeddingProvider
-from codeweaver.providers.reranking.providers.base import RerankingProvider
-from codeweaver.providers.vector_stores.base import VectorStoreProvider
+from codeweaver.engine import ChunkGovernor
+from codeweaver.providers import EmbeddingProvider, RerankingProvider, VectorStoreProvider
 
 
 if TYPE_CHECKING:
-    from codeweaver.common.registry import ModelRegistry, ProviderRegistry, ServicesRegistry
-    from codeweaver.common.statistics import SessionStatistics
-    from codeweaver.common.telemetry.client import PostHogClient
-    from codeweaver.engine.failover import VectorStoreFailoverManager
-    from codeweaver.engine.indexer.indexer import Indexer
+    from codeweaver.common import (
+        ModelRegistry,
+        PostHogClient,
+        ProviderRegistry,
+        ServicesRegistry,
+        SessionStatistics,
+    )
+    from codeweaver.engine import Indexer, VectorStoreFailoverManager
 
 # Type aliases for cleaner injection - defined early for use in function signatures
 # without 'from __future__ import annotations'
@@ -83,7 +84,7 @@ async def get_embedding_provider() -> Any:
 
     This factory bridges the old registry system with the new DI system.
     """
-    from codeweaver.common.registry import get_provider_registry
+    from codeweaver.common import get_provider_registry
 
     registry = get_provider_registry()
     provider_enum = registry.get_provider_enum_for("embedding")
@@ -97,7 +98,7 @@ async def get_embedding_provider() -> Any:
 
 async def get_sparse_embedding_provider() -> Any:
     """Resolve the configured sparse embedding provider from the registry."""
-    from codeweaver.common.registry import get_provider_registry
+    from codeweaver.common import get_provider_registry
 
     registry = get_provider_registry()
     if provider_enum := registry.get_provider_enum_for("sparse_embedding"):
@@ -107,7 +108,7 @@ async def get_sparse_embedding_provider() -> Any:
 
 async def get_vector_store() -> Any:
     """Resolve the configured vector store provider from the registry."""
-    from codeweaver.common.registry import get_provider_registry
+    from codeweaver.common import get_provider_registry
 
     registry = get_provider_registry()
     provider_enum = registry.get_provider_enum_for("vector_store")
@@ -121,11 +122,10 @@ async def get_vector_store() -> Any:
 
 async def get_chunk_governor(settings: SettingsDep) -> Any:
     """Resolve the chunk governor."""
-    from codeweaver.common.registry import get_model_registry
-    from codeweaver.config.chunker import ChunkerSettings
-    from codeweaver.config.settings import Unset
-    from codeweaver.core.types.provider import ProviderKind
-    from codeweaver.engine.chunker import ChunkGovernor
+    from codeweaver.common import get_model_registry
+    from codeweaver.config import ChunkerSettings, Unset
+    from codeweaver.core import ProviderKind
+    from codeweaver.engine import ChunkGovernor
 
     chunk_settings_raw = settings.chunker
     chunk_settings = (
@@ -142,7 +142,7 @@ async def get_chunk_governor(settings: SettingsDep) -> Any:
 
 async def get_chunking_service() -> Any:
     """Resolve the chunking service."""
-    from codeweaver.engine.chunking_service import ChunkingService
+    from codeweaver.engine import ChunkingService
 
     # ChunkingService will have its own dependencies resolved by the container
     return await get_container().resolve(ChunkingService)
@@ -150,7 +150,7 @@ async def get_chunking_service() -> Any:
 
 async def get_reranking_provider() -> Any:
     """Resolve the configured reranking provider from the registry."""
-    from codeweaver.common.registry import get_provider_registry
+    from codeweaver.common import get_provider_registry
 
     registry = get_provider_registry()
     if provider_enum := registry.get_provider_enum_for("reranking"):
@@ -160,7 +160,7 @@ async def get_reranking_provider() -> Any:
 
 async def get_settings() -> CodeWeaverSettings:
     """Resolve the global settings."""
-    from codeweaver.config.settings import get_settings
+    from codeweaver.config import get_settings
 
     settings = get_settings()
     if settings.project_path is Unset:
@@ -178,7 +178,7 @@ async def get_indexer(
     vector_store: VectorStoreDep,
 ) -> Any:
     """Resolve the indexer service."""
-    from codeweaver.engine.indexer.indexer import Indexer
+    from codeweaver.engine import Indexer
 
     # project_path is needed for manifest and checkpoint managers
     return Indexer(
@@ -193,7 +193,7 @@ async def get_indexer(
 
 async def get_ignore_filter(settings: SettingsDep) -> Any:
     """Resolve the ignore filter."""
-    from codeweaver.engine.watcher.watch_filters import IgnoreFilter
+    from codeweaver.engine import IgnoreFilter
 
     return await IgnoreFilter.from_settings_async(settings=settings.view)
 
@@ -212,35 +212,35 @@ async def get_tokenizer(embedding_provider: EmbeddingDep) -> Any:
 
 async def get_provider_registry() -> Any:
     """Resolve the provider registry."""
-    from codeweaver.common.registry import get_provider_registry
+    from codeweaver.common import get_provider_registry
 
     return get_provider_registry()
 
 
 async def get_services_registry() -> Any:
     """Resolve the services registry."""
-    from codeweaver.common.registry import get_services_registry
+    from codeweaver.common import get_services_registry
 
     return get_services_registry()
 
 
 async def get_model_registry() -> Any:
     """Resolve the model registry."""
-    from codeweaver.common.registry import get_model_registry
+    from codeweaver.common import get_model_registry
 
     return get_model_registry()
 
 
 async def get_statistics() -> Any:
     """Resolve the session statistics."""
-    from codeweaver.common.statistics import get_session_statistics
+    from codeweaver.common import get_session_statistics
 
     return get_session_statistics()
 
 
 async def get_failover_manager() -> Any:
     """Resolve the failover manager."""
-    from codeweaver.engine.failover import VectorStoreFailoverManager
+    from codeweaver.engine import VectorStoreFailoverManager
 
     return VectorStoreFailoverManager()
 
@@ -254,7 +254,7 @@ async def get_health_service(
     """Resolve the health service."""
     import time
 
-    from codeweaver.server.health.health_service import HealthService
+    from codeweaver.server import HealthService
 
     return HealthService(
         provider_registry=provider_registry,
@@ -269,9 +269,8 @@ async def get_file_watcher(
     indexer: IndexerDep, ignore_filter: IgnoreFilterDep, settings: SettingsDep
 ) -> Any:
     """Resolve the file watcher."""
-    from codeweaver.core import get_project_path
-    from codeweaver.core.types.sentinel import Unset
-    from codeweaver.engine.watcher.watcher import FileWatcher
+    from codeweaver.core import Unset, get_project_path
+    from codeweaver.engine import FileWatcher
 
     project_path = (
         get_project_path() if isinstance(settings.project_path, Unset) else settings.project_path
@@ -282,7 +281,7 @@ async def get_file_watcher(
 
 async def get_telemetry(settings: SettingsDep) -> Any:
     """Resolve the telemetry client."""
-    from codeweaver.common.telemetry.client import PostHogClient
+    from codeweaver.common import PostHogClient
 
     return PostHogClient.from_settings(settings)
 
@@ -298,8 +297,8 @@ async def get_state(
     telemetry: Annotated["PostHogClient", Depends(get_telemetry)],
 ) -> Any:
     """Resolve the application state."""
-    from codeweaver.config.settings import Unset
-    from codeweaver.server.server import CodeWeaverState
+    from codeweaver.config import Unset
+    from codeweaver.server import CodeWeaverState
 
     return CodeWeaverState(
         initialized=True,
@@ -322,22 +321,27 @@ def setup_default_container(container: Container) -> None:
     Args:
         container: The container to configure.
     """
-    from codeweaver.common.registry import ModelRegistry, ProviderRegistry, ServicesRegistry
-    from codeweaver.common.statistics import SessionStatistics
-    from codeweaver.common.telemetry.client import PostHogClient
-    from codeweaver.config.settings import CodeWeaverSettings
-    from codeweaver.engine.chunker import ChunkGovernor
-    from codeweaver.engine.chunking_service import ChunkingService
-    from codeweaver.engine.failover import VectorStoreFailoverManager
-    from codeweaver.engine.indexer.indexer import Indexer
-    from codeweaver.providers.embedding.providers.base import (
-        EmbeddingProvider,
-        SparseEmbeddingProvider,
+    from codeweaver.common import (
+        ModelRegistry,
+        PostHogClient,
+        ProviderRegistry,
+        ServicesRegistry,
+        SessionStatistics,
     )
-    from codeweaver.providers.reranking.providers.base import RerankingProvider
-    from codeweaver.providers.vector_stores.base import VectorStoreProvider
-    from codeweaver.server.health.health_service import HealthService
-    from codeweaver.server.server import CodeWeaverState
+    from codeweaver.config import CodeWeaverSettings
+    from codeweaver.engine import (
+        ChunkGovernor,
+        ChunkingService,
+        Indexer,
+        VectorStoreFailoverManager,
+    )
+    from codeweaver.providers import (
+        EmbeddingProvider,
+        RerankingProvider,
+        SparseEmbeddingProvider,
+        VectorStoreProvider,
+    )
+    from codeweaver.server import CodeWeaverState, HealthService
 
     # Register by class
     container.register(ProviderRegistry, get_provider_registry)

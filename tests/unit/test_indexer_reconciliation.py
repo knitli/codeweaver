@@ -6,14 +6,13 @@
 """Tests for automatic embedding reconciliation in the indexer."""
 
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
 
-from codeweaver.core.stores import get_blake_hash
-from codeweaver.engine.indexer.indexer import Indexer
-from codeweaver.engine.indexer.manifest import IndexFileManifest
+from codeweaver.core import get_blake_hash
+from codeweaver.engine import Indexer, IndexFileManifest
 
 
 pytestmark = [pytest.mark.unit]
@@ -33,9 +32,16 @@ class TestAddMissingEmbeddings:
     """Test the add_missing_embeddings_to_existing_chunks method."""
 
     @pytest.fixture
-    async def mock_indexer(self, tmp_path: Path, di_overrides, mock_embedding_provider, mock_sparse_provider, mock_vector_store):
+    async def mock_indexer(
+        self,
+        tmp_path: Path,
+        di_overrides,
+        mock_embedding_provider,
+        mock_sparse_provider,
+        mock_vector_store,
+    ):
         """Create an indexer with mocked dependencies for reconciliation testing."""
-        from codeweaver.engine.indexer.indexer import Indexer
+        from codeweaver.engine import Indexer
 
         # Use the standard mocks from fixtures
         mock_ep = mock_embedding_provider
@@ -62,12 +68,12 @@ class TestAddMissingEmbeddings:
             indexer._manifest_manager.project_path = tmp_path
 
         # Set up manifest
-        from codeweaver.engine.indexer.manifest import IndexFileManifest
+
         indexer._file_manifest = IndexFileManifest(project_path=tmp_path)
 
         # Mark as initialized to avoid actual network/provider calls
         indexer._providers_initialized = True
-        
+
         # Ensure internal fields are set
         indexer._vector_store = mock_vs
         indexer._embedding_provider = mock_ep
@@ -78,7 +84,7 @@ class TestAddMissingEmbeddings:
         indexer._manifest_lock.__aenter__ = AsyncMock()
         indexer._manifest_lock.__aexit__ = AsyncMock()
 
-        yield indexer
+        return indexer
 
     @pytest.mark.asyncio
     async def test_only_adds_sparse_when_dense_exists(

@@ -13,21 +13,24 @@ from typing import TYPE_CHECKING, Annotated, Any, Literal
 from pydantic import ConfigDict, Field, NonNegativeFloat, NonNegativeInt, model_validator
 
 from codeweaver.agent_api.find_code.intent import IntentType
-from codeweaver.core import ValidationError
-from codeweaver.core.chunks import CodeChunk
-from codeweaver.core.discovery import DiscoveredFile
-from codeweaver.core.language import SemanticSearchLanguage
-from codeweaver.core.spans import Span
-from codeweaver.core.types import LanguageName
-from codeweaver.core.types.enum import BaseEnum
-from codeweaver.core.types.models import BASEDMODEL_CONFIG, BasedModel
-from codeweaver.core.types.search import SearchStrategy
+from codeweaver.core import (
+    BASEDMODEL_CONFIG,
+    BasedModel,
+    BaseEnum,
+    CodeChunk,
+    DiscoveredFile,
+    LanguageName,
+    SearchStrategy,
+    SemanticSearchLanguage,
+    Span,
+    ValidationError,
+)
 
 
 if TYPE_CHECKING:
     from rich.table import Table
 
-    from codeweaver.core.types import AnonymityConversion, FilteredKeyT
+    from codeweaver.core import AnonymityConversion, FilteredKeyT
 
 
 class CodeMatchType(BaseEnum):
@@ -84,7 +87,7 @@ class CodeMatch(BasedModel):
     ]
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
-        from codeweaver.core.types import AnonymityConversion, FilteredKey
+        from codeweaver.core import AnonymityConversion, FilteredKey
 
         return {FilteredKey("related_symbols"): AnonymityConversion.COUNT}
 
@@ -230,7 +233,7 @@ class FindCodeResponseSummary(BasedModel):
     languages_found: Annotated[
         tuple[SemanticSearchLanguage | LanguageName, ...],
         Field(
-            description="""Programming languages in the results. If the language is supported for semantic search, it will be a `SemanticSearchLanguage`, otherwise a `LanguageName` NewType (str) from languages in `codeweaver.core.file_extensions.py`""",
+            description="""Programming languages in the results. If the language is supported for semantic search, it will be a `SemanticSearchLanguage`, otherwise a `LanguageName` NewType (str) from languages in `codeweaver.core`""",
             default_factory=tuple,
         ),
     ]
@@ -262,7 +265,7 @@ class FindCodeResponseSummary(BasedModel):
         return self
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
-        from codeweaver.core.types import AnonymityConversion, FilteredKey
+        from codeweaver.core import AnonymityConversion, FilteredKey
 
         return {FilteredKey("summary"): AnonymityConversion.TEXT_COUNT}
 

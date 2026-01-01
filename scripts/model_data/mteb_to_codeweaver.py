@@ -49,8 +49,8 @@ from typing_extensions import TypeIs
 # make sure codeweaver is importable
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from codeweaver.providers.embedding.capabilities.types import PartialCapabilities
-from codeweaver.providers.provider import Provider
+from codeweaver.core import Provider
+from codeweaver.providers import PartialCapabilities
 
 
 # TODO: Finish refactor to use these inline constants and eliminate the hf-models.json

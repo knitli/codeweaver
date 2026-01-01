@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 def _get_shared_capabilities() -> PartialRerankingCapabilitiesDict:
     """Returns shared_capabilities across all Qwen reranking models."""
-    from codeweaver.core.types.provider import Provider
+    from codeweaver.core import Provider
 
     return {  # ty: ignore[invalid-return-type]
         "name": "Qwen/Qwen3-Reranking-",

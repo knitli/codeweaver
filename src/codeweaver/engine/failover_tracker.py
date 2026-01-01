@@ -26,14 +26,11 @@ from typing import TYPE_CHECKING, Annotated, Any
 
 from pydantic import Field, PrivateAttr
 
-from codeweaver.core import set_relative_path
-from codeweaver.core.stores import BlakeHashKey
-from codeweaver.core.types.models import BasedModel
+from codeweaver.core import BasedModel, BlakeHashKey, set_relative_path
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.discovery import DiscoveredFile
-    from codeweaver.core.types import AnonymityConversion, FilteredKeyT
+    from codeweaver.core import AnonymityConversion, DiscoveredFile, FilteredKeyT
 
 logger = logging.getLogger(__name__)
 
@@ -111,8 +108,7 @@ class FileChangeTracker(BasedModel):
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         """Keys to process for telemetry privacy."""
-        from codeweaver.core.types.aliases import FilteredKey
-        from codeweaver.core.types.enum import AnonymityConversion
+        from codeweaver.core import AnonymityConversion, FilteredKey
 
         return {
             FilteredKey("file_hashes"): AnonymityConversion.COUNT,

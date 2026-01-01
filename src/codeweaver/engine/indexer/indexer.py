@@ -31,10 +31,8 @@ from pydantic import PrivateAttr
 from pydantic.types import DirectoryPath, NonNegativeFloat, NonNegativeInt
 from watchfiles import Change
 
-from codeweaver.common._logging import log_to_client_or_fallback
-from codeweaver.common.statistics import SessionStatistics, get_session_statistics
-from codeweaver.config.chunker import ChunkerSettings
-from codeweaver.config.settings import CodeWeaverSettings
+from codeweaver.common import SessionStatistics, get_session_statistics, log_to_client_or_fallback
+from codeweaver.config import ChunkerSettings, CodeWeaverSettings
 from codeweaver.core import (
     BasedModel,
     BlakeStore,
@@ -67,8 +65,7 @@ from codeweaver.engine.indexer.checkpoint import CheckpointManager, IndexingChec
 from codeweaver.engine.indexer.manifest import FileManifestManager, IndexFileManifest
 from codeweaver.engine.indexer.progress import IndexingStats
 from codeweaver.engine.watcher.types import FileChange
-from codeweaver.providers.embedding.providers.base import EmbeddingProvider
-from codeweaver.providers.vector_stores.base import VectorStoreProvider
+from codeweaver.providers import EmbeddingProvider, VectorStoreProvider
 
 
 logger = logging.getLogger(__name__)
@@ -76,14 +73,14 @@ logger = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from typing import Any
 
-    from codeweaver.config.providers import (
+    from codeweaver.config import (
+        CodeWeaverSettingsDict,
         EmbeddingProviderSettings,
         SparseEmbeddingProviderSettings,
         VectorStoreProviderSettings,
     )
-    from codeweaver.config.types import CodeWeaverSettingsDict
-    from codeweaver.core.chunks import CodeChunk
-    from codeweaver.providers.embedding.providers.base import EmbeddingProvider
+    from codeweaver.core import CodeChunk
+    from codeweaver.providers import EmbeddingProvider
 
 
 class ProgressCallback(Protocol):
@@ -118,8 +115,8 @@ _user_config: None | UserProviderSelectionDict = None
 
 
 def _get_user_provider_config() -> UserProviderSelectionDict:
-    from codeweaver.common.registry.provider import get_provider_config_for
-    from codeweaver.core.types.provider import ProviderKind
+    from codeweaver.common import get_provider_config_for
+    from codeweaver.core import ProviderKind
 
     global _user_config
     if _user_config is None:
@@ -133,7 +130,7 @@ def _get_user_provider_config() -> UserProviderSelectionDict:
 
 def _get_embedding_instance(*, sparse: bool = False) -> EmbeddingProvider[Any] | None:
     """Get embedding provider instance using new registry API."""
-    from codeweaver.common.registry import get_provider_registry
+    from codeweaver.common import get_provider_registry
 
     kind = "sparse_embedding" if sparse else "embedding"
     registry = get_provider_registry()
@@ -145,7 +142,7 @@ def _get_embedding_instance(*, sparse: bool = False) -> EmbeddingProvider[Any] |
 
 def _get_vector_store_instance() -> Any | None:
     """Get vector store provider instance using registry API."""
-    from codeweaver.common.registry import get_provider_registry
+    from codeweaver.common import get_provider_registry
 
     registry = get_provider_registry()
     if provider_enum := registry.get_provider_enum_for("vector_store"):
@@ -155,7 +152,7 @@ def _get_vector_store_instance() -> Any | None:
 
 def _get_chunking_service() -> ChunkingService:
     """Stub function to get chunking service instance."""
-    from codeweaver.config.settings import get_settings
+    from codeweaver.config import get_settings
     from codeweaver.engine.chunking_service import ChunkingService
 
     chunk_settings = get_settings().chunker
@@ -239,13 +236,13 @@ class Indexer(BasedModel):
         else:
             self._walker_settings = None
 
-        from codeweaver.core.discovery import DiscoveredFile
+        from codeweaver.core import DiscoveredFile
 
         self._store = store or make_blake_store(value_type=DiscoveredFile)
         self._chunking_service = chunking_service
         self._settings = settings
         self._stats = IndexingStats()
-        from codeweaver.common.statistics import get_session_statistics
+        from codeweaver.common import get_session_statistics
 
         self._session_statistics = get_session_statistics()
         # Pipeline provider Fields (initialized lazily on first use)
@@ -416,13 +413,13 @@ class Indexer(BasedModel):
                 self._chunking_service = _get_chunking_service()
 
         if self._settings is None or is_depends_marker(self._settings):
-            from codeweaver.config.settings import CodeWeaverSettings
+            from codeweaver.config import CodeWeaverSettings
 
             try:
                 # Resolve via container to support registration, singletons, and overrides
                 self._settings = await get_container().resolve(CodeWeaverSettings)
             except Exception:
-                from codeweaver.config.settings import get_settings
+                from codeweaver.config import get_settings
 
                 self._settings = get_settings()
 
@@ -682,7 +679,7 @@ class Indexer(BasedModel):
                 )
 
             # 4. Retrieve updated chunks from registry (single source of truth!)
-            from codeweaver.providers.embedding.registry import get_embedding_registry
+            from codeweaver.providers import get_embedding_registry
 
             registry = get_embedding_registry()
             updated_chunks = [
@@ -821,7 +818,7 @@ class Indexer(BasedModel):
             return
 
         # Get embedding registry to check which chunks already have embeddings
-        from codeweaver.providers.embedding.registry import get_embedding_registry
+        from codeweaver.providers import get_embedding_registry
 
         registry = get_embedding_registry()
 
@@ -1483,8 +1480,7 @@ class Indexer(BasedModel):
         Returns:
             Configured Indexer instance (may need async initialization via prime_index)
         """
-        from codeweaver.config.indexer import DefaultIndexerSettings, IndexerSettings
-        from codeweaver.config.settings import get_settings_map
+        from codeweaver.config import DefaultIndexerSettings, IndexerSettings, get_settings_map
 
         settings_map = settings or get_settings_map()
         indexer_data = settings_map["indexer"]
@@ -1533,8 +1529,7 @@ class Indexer(BasedModel):
         Returns:
             Fully initialized Indexer instance
         """
-        from codeweaver.config.indexer import DefaultIndexerSettings, IndexerSettings
-        from codeweaver.config.settings import get_settings_map
+        from codeweaver.config import DefaultIndexerSettings, IndexerSettings, get_settings_map
         from codeweaver.core import get_project_path
 
         settings_map = settings or get_settings_map()
@@ -1650,7 +1645,7 @@ class Indexer(BasedModel):
             progress_callback: Optional callback for progress updates
         """
         from codeweaver.core import low_priority
-        from codeweaver.providers.embedding.registry import get_embedding_registry
+        from codeweaver.providers import get_embedding_registry
 
         total_chunks = len(chunks)
         registry = get_embedding_registry()
@@ -1755,7 +1750,7 @@ class Indexer(BasedModel):
         Returns:
             Updated chunks from registry, or original chunks if none found
         """
-        from codeweaver.providers.embedding.registry import get_embedding_registry
+        from codeweaver.providers import get_embedding_registry
 
         registry = get_embedding_registry()
         updated_chunks = [
@@ -1846,7 +1841,7 @@ class Indexer(BasedModel):
         await self._embed_chunks_in_batches(all_chunks, progress_callback=progress_callback)
 
         # Get registry to check actual embeddings created
-        from codeweaver.providers.embedding.registry import get_embedding_registry
+        from codeweaver.providers import get_embedding_registry
 
         registry = get_embedding_registry()
         embedded_count = len(registry)

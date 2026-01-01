@@ -8,6 +8,7 @@ import ast
 import os
 
 from collections import defaultdict
+from pathlib import Path
 from typing import NamedTuple
 
 
@@ -15,6 +16,8 @@ from typing import NamedTuple
 
 
 class PackageRule(NamedTuple):
+    """Mapping rule for file paths and imports to logical packages."""
+
     pattern: str
     package: str
 
@@ -55,18 +58,18 @@ PATH_RULES = [
 IMPORT_RULES = [
     ("codeweaver_daemon", "codeweaver-daemon"),
     ("codeweaver_tokenizers", "codeweaver-tokenizers"),
-    ("codeweaver.common.telemetry", "codeweaver-telemetry"),
-    ("codeweaver.common.registry", "codeweaver-engine"),
+    ("codeweaver.common", "codeweaver-telemetry"),
+    ("codeweaver.common", "codeweaver-engine"),
     ("codeweaver.config", "codeweaver-engine"),
     ("codeweaver.engine", "codeweaver-engine"),
     ("codeweaver.semantic", "codeweaver-semantic"),
     ("codeweaver.providers", "codeweaver-providers"),
     ("codeweaver.core", "codeweaver-core"),
     ("codeweaver.core", "codeweaver-core"),
-    ("codeweaver.common.types", "codeweaver-core"),
-    ("codeweaver.common._logging", "codeweaver-core"),
-    ("codeweaver.common.statistics", "codeweaver-core"),
-    ("codeweaver.common.http_pool", "codeweaver-core"),
+    ("codeweaver.common", "codeweaver-core"),
+    ("codeweaver.common", "codeweaver-core"),
+    ("codeweaver.common", "codeweaver-core"),
+    ("codeweaver.common", "codeweaver-core"),
     ("codeweaver.common", "codeweaver-core"),
     ("codeweaver.di", "codeweaver-core"),
     ("codeweaver._version", "codeweaver-core"),
@@ -115,26 +118,31 @@ def get_package_for_file(file_path: str) -> str | None:
 
 def get_package_for_import(import_name: str) -> str | None:
     """Determine the logical package for a given import string."""
-    for pattern, package in IMPORT_RULES:
-        if import_name == pattern or import_name.startswith(pattern + "."):
-            return package
-
-    # Fallback for unmapped codeweaver imports
-    if import_name.startswith("codeweaver.") or import_name == "codeweaver":
-        return "codeweaver-unknown"
-
-    return None
+    return next(
+        (
+            package
+            for pattern, package in IMPORT_RULES
+            if import_name == pattern or import_name.startswith(pattern + ".")
+        ),
+        (
+            "codeweaver-unknown"
+            if import_name.startswith("codeweaver.") or import_name == "codeweaver"
+            else None
+        ),
+    )
 
 
 class ImportVisitor(ast.NodeVisitor):
-    def __init__(self):
+    def __init__(self) -> None:
         self.imports = set()
 
-    def visit_Import(self, node):
+    def visit_Import(self, node: ast.Import) -> None:
+        """Visit import statements and collect module names."""
         for alias in node.names:
             self.imports.add(alias.name)
 
-    def visit_ImportFrom(self, node):
+    def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
+        """Visit from-import statements and collect module names."""
         if node.module:
             self.imports.add(node.module)
 
@@ -190,10 +198,10 @@ def main():
                 if not file.endswith(".py"):
                     continue
 
-                file_path = os.path.join(root, file)
+                file_path = Path(root) / file
 
                 # Exclude specific legacy/root files from analysis
-                if file_path == "src/codeweaver/__init__.py":
+                if file_path == Path("src/codeweaver/__init__.py"):
                     continue
 
                 source_package = get_package_for_file(file_path)

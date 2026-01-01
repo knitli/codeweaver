@@ -16,12 +16,11 @@ from typing import TYPE_CHECKING, Any, Literal, TypedDict, get_args
 
 from pydantic import AnyUrl, SecretStr
 
-from codeweaver.core.types.dictview import DictView
-from codeweaver.core.types.env import EnvFormat, EnvVarInfo
+from codeweaver.core import DictView, EnvFormat, EnvVarInfo
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.types.provider import Provider
+    from codeweaver.core import Provider
 
 
 class SettingsEnvVars(TypedDict):
@@ -112,8 +111,8 @@ class SettingsEnvVars(TypedDict):
 def _providers_for_kind(
     kind: Literal["embedding", "reranking", "sparse_embedding", "agent", "data", "vector_store"],
 ) -> set[str]:
-    from codeweaver.core.types.provider import ProviderKind
-    from codeweaver.providers.capabilities import PROVIDER_CAPABILITIES
+    from codeweaver.core import ProviderKind
+    from codeweaver.providers import PROVIDER_CAPABILITIES
 
     kind = ProviderKind.from_string(kind)
     return {provider.variable for provider, caps in PROVIDER_CAPABILITIES.items() if kind in caps}
@@ -122,8 +121,8 @@ def _providers_for_kind(
 def _providers_for_kind_requiring_auth(
     kind: Literal["embedding", "reranking", "sparse_embedding", "agent", "data", "vector_store"],
 ) -> set[str]:
-    from codeweaver.core.types.provider import ProviderKind
-    from codeweaver.providers.capabilities import PROVIDER_CAPABILITIES
+    from codeweaver.core import ProviderKind
+    from codeweaver.providers import PROVIDER_CAPABILITIES
 
     kind = ProviderKind.from_string(kind)
     return {
@@ -149,8 +148,8 @@ def _auth_list_for_kind(
 def _maybe_requiring_auth(
     kind: Literal["embedding", "reranking", "sparse_embedding", "agent", "data", "vector_store"],
 ) -> set[str]:
-    from codeweaver.core.types.provider import ProviderKind
-    from codeweaver.providers.capabilities import PROVIDER_CAPABILITIES
+    from codeweaver.core import ProviderKind
+    from codeweaver.providers import PROVIDER_CAPABILITIES
 
     kind = ProviderKind.from_string(kind)
     return {
@@ -460,7 +459,7 @@ def get_provider_vars() -> MappingProxyType[ProviderField, SetProviderEnvVarsDic
             if "API_KEY" in env_var:
                 env_map[kind]["api_key"] = SecretStr(value)
             elif env_var.endswith("PROVIDER"):
-                from codeweaver.core.types.provider import Provider
+                from codeweaver.core import Provider
 
                 env_map[kind]["provider"] = Provider.from_string(value)
             elif "PORT" in env_var:

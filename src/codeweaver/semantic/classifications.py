@@ -27,14 +27,14 @@ from pydantic import (
 from pydantic.dataclasses import dataclass
 from pydantic_core import ArgsKwargs, core_schema
 
-from codeweaver.core.language import SemanticSearchLanguage
-from codeweaver.core.types import (
+from codeweaver.core import (
     DATACLASS_CONFIG,
     BaseDataclassEnum,
     BasedModel,
     BaseEnum,
     BaseEnumData,
     DataclassSerializationMixin,
+    SemanticSearchLanguage,
 )
 
 

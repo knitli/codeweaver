@@ -19,7 +19,7 @@ def get_alibaba_reranking_capabilities() -> Sequence[RerankingModelCapabilities]
     """
     Get the reranking capabilities for Alibaba NLP models.
     """
-    from codeweaver.core.types.provider import Provider
+    from codeweaver.core import Provider
     from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 
     return [

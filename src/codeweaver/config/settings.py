@@ -170,7 +170,7 @@ def ensure_set_fields(obj: BaseSettings | BasedModel) -> BaseSettings | BasedMod
 
 
 DEFAULT_BASE_MIDDLEWARE = [
-    f"codeweaver.mcp.middleware.{mw}"
+    f"codeweaver.mcp.{mw}"
     for mw in (
         "ResponseCachingMiddleware",
         "ErrorHandlingMiddleware",
@@ -181,9 +181,9 @@ DEFAULT_BASE_MIDDLEWARE = [
 
 DEFAULT_HTTP_MIDDLEWARE = [
     *DEFAULT_BASE_MIDDLEWARE[:-1],
-    "codeweaver.mcp.middleware.RateLimitingMiddleware",
-    "codeweaver.mcp.middleware.RetryMiddleware",
-    "codeweaver.mcp.middleware.StructuredLoggingMiddleware",
+    "codeweaver.mcpRateLimitingMiddleware",
+    "codeweaver.mcpRetryMiddleware",
+    "codeweaver.mcpStructuredLoggingMiddleware",
 ]
 _sort_order = (
     "ResponseCachingMiddleware",
@@ -636,7 +636,7 @@ class CodeWeaverSettings(BaseSettings):
             globals()["_mapped_settings"] = self._map
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
-        from codeweaver.core.types import AnonymityConversion, FilteredKey
+        from codeweaver.core import AnonymityConversion, FilteredKey
 
         return {
             FilteredKey("project_path"): AnonymityConversion.HASH,

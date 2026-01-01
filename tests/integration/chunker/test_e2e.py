@@ -12,7 +12,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from codeweaver.engine.chunker.selector import ChunkerSelector
+from codeweaver.engine import ChunkerSelector
 
 
 pytestmark = [pytest.mark.integration]
@@ -52,7 +52,7 @@ def mock_discovered_file():
         # but may need to mock stat for files that don't exist yet
 
         # Create mock ExtKind
-        from codeweaver.core.language import SemanticSearchLanguage
+        from codeweaver.core import SemanticSearchLanguage
 
         mock_ext_kind = Mock()
         if path.suffix == ".py":
@@ -113,7 +113,7 @@ def test_e2e_degradation_chain(mock_governor, mock_discovered_file):
 @pytest.fixture
 def sample_files():
     """Create list of real test fixture files for parallel processing."""
-    from codeweaver.core.discovery import DiscoveredFile
+    from codeweaver.core import DiscoveredFile
 
     fixture_dir = Path("tests/fixtures")
     files = []
@@ -144,10 +144,9 @@ def test_e2e_multiple_files_parallel_process(sample_files):
     1. Converting positional_connections from generator to tuple
     2. Adding __getstate__/__setstate__ to SemanticMetadata to exclude AST nodes
     """
-    from codeweaver.config.chunker import ChunkerSettings, PerformanceSettings
-    from codeweaver.engine.chunker.base import ChunkGovernor
-    from codeweaver.engine.chunker.parallel import chunk_files_parallel
-    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+    from codeweaver.config import ChunkerSettings, PerformanceSettings
+    from codeweaver.engine import ChunkGovernor, chunk_files_parallel
+    from codeweaver.providers import EmbeddingModelCapabilities
 
     # Skip if no files available
     if not sample_files:
@@ -188,10 +187,9 @@ def test_e2e_multiple_files_parallel_process(sample_files):
 @pytest.mark.slow
 def test_e2e_multiple_files_parallel_thread(sample_files):
     """Integration test: Process multiple files in parallel with ThreadPoolExecutor."""
-    from codeweaver.config.chunker import ChunkerSettings, PerformanceSettings
-    from codeweaver.engine.chunker.base import ChunkGovernor
-    from codeweaver.engine.chunker.parallel import chunk_files_parallel
-    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+    from codeweaver.config import ChunkerSettings, PerformanceSettings
+    from codeweaver.engine import ChunkGovernor, chunk_files_parallel
+    from codeweaver.providers import EmbeddingModelCapabilities
 
     # Skip if no files available
     if not sample_files:
@@ -223,11 +221,10 @@ def test_e2e_multiple_files_parallel_thread(sample_files):
 
 def test_e2e_parallel_error_handling(tmp_path):
     """Verify parallel processing continues when individual files fail."""
-    from codeweaver.config.chunker import ChunkerSettings
-    from codeweaver.core.discovery import DiscoveredFile
-    from codeweaver.engine.chunker.base import ChunkGovernor
-    from codeweaver.engine.chunker.parallel import chunk_files_parallel
-    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+    from codeweaver.config import ChunkerSettings
+    from codeweaver.core import DiscoveredFile
+    from codeweaver.engine import ChunkGovernor, chunk_files_parallel
+    from codeweaver.providers import EmbeddingModelCapabilities
 
     # Create mix of valid and invalid files
     good_file = tmp_path / "good.py"
@@ -275,9 +272,8 @@ def test_e2e_parallel_error_handling(tmp_path):
 
 def test_e2e_parallel_empty_file_list():
     """Verify parallel processing handles empty file list gracefully."""
-    from codeweaver.engine.chunker.base import ChunkGovernor
-    from codeweaver.engine.chunker.parallel import chunk_files_parallel
-    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+    from codeweaver.engine import ChunkGovernor, chunk_files_parallel
+    from codeweaver.providers import EmbeddingModelCapabilities
 
     capabilities = EmbeddingModelCapabilities(context_window=8192, default_dimension=1536)
     governor = ChunkGovernor(capabilities=(capabilities,))
@@ -291,11 +287,10 @@ def test_e2e_parallel_empty_file_list():
 
 def test_e2e_parallel_dict_convenience():
     """Test parallel_dict convenience wrapper."""
-    from codeweaver.config.chunker import ChunkerSettings
-    from codeweaver.core.discovery import DiscoveredFile
-    from codeweaver.engine.chunker.base import ChunkGovernor
-    from codeweaver.engine.chunker.parallel import chunk_files_parallel_dict
-    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+    from codeweaver.config import ChunkerSettings
+    from codeweaver.core import DiscoveredFile
+    from codeweaver.engine import ChunkGovernor, chunk_files_parallel_dict
+    from codeweaver.providers import EmbeddingModelCapabilities
 
     # Get sample files
     fixture_dir = Path("tests/fixtures")

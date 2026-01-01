@@ -15,11 +15,11 @@ from itertools import chain
 from types import MappingProxyType
 from typing import TYPE_CHECKING, cast
 
-from codeweaver.core.language import SemanticSearchLanguage
-from codeweaver.core.types.aliases import (
+from codeweaver.core import (
     CategoryNameT,
     Role,
     RoleT,
+    SemanticSearchLanguage,
     ThingNameT,
     ThingOrCategoryNameT,
 )

@@ -542,7 +542,7 @@ class TestLazyImportIntrospection:
         from inspect import signature
 
         # Create a lazy import to a function
-        get_settings_lazy = lazy_import("codeweaver.config.settings", "get_settings")
+        get_settings_lazy = lazy_import("codeweaver.config", "get_settings")
 
         # This should not raise AttributeError
         sig = signature(get_settings_lazy)
@@ -560,7 +560,7 @@ class TestLazyImportIntrospection:
         from pydantic.dataclasses import dataclass
 
         # This is the pattern used in CodeWeaverState
-        get_settings_lazy = lazy_import("codeweaver.config.settings", "get_settings")
+        get_settings_lazy = lazy_import("codeweaver.config", "get_settings")
 
         @dataclass
         @pytest.mark.benchmark
@@ -574,9 +574,9 @@ class TestLazyImportIntrospection:
 
     def test_introspection_attributes_resolve(self):
         """Test that accessing introspection attributes resolves the object."""
-        from codeweaver.config.settings import get_settings
+        from codeweaver.config import get_settings
 
-        get_settings_lazy = lazy_import("codeweaver.config.settings", "get_settings")
+        get_settings_lazy = lazy_import("codeweaver.config", "get_settings")
 
         # Should not be resolved yet
         assert not get_settings_lazy.is_resolved()

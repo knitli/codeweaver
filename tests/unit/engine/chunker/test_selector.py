@@ -9,10 +9,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from codeweaver.engine.chunker.base import ChunkGovernor
-from codeweaver.engine.chunker.delimiter import DelimiterChunker
-from codeweaver.engine.chunker.selector import ChunkerSelector
-from codeweaver.engine.chunker.semantic import SemanticChunker
+from codeweaver.engine import ChunkerSelector, ChunkGovernor, DelimiterChunker, SemanticChunker
 
 
 pytestmark = [pytest.mark.unit]
@@ -37,7 +34,7 @@ def _create_mock_file(file_path: Path) -> Mock:
     mock_path.__str__ = Mock(return_value=str(file_path))
 
     # Create mock ExtKind
-    from codeweaver.core.language import SemanticSearchLanguage
+    from codeweaver.core import SemanticSearchLanguage
 
     mock_ext_kind = Mock()
     if file_path.suffix == ".py":
@@ -56,7 +53,7 @@ def _create_mock_file(file_path: Path) -> Mock:
 
 def test_selector_chooses_semantic_for_python(chunk_governor: ChunkGovernor) -> None:
     """Verify selector picks semantic for supported language."""
-    from codeweaver.engine.chunker.selector import GracefulChunker
+    from codeweaver.engine import GracefulChunker
 
     selector = ChunkerSelector(chunk_governor)
 
@@ -74,7 +71,7 @@ def test_selector_chooses_semantic_for_python(chunk_governor: ChunkGovernor) -> 
     )
 
     # Verify fallback language matches the primary semantic language
-    from codeweaver.core.language import SemanticSearchLanguage
+    from codeweaver.core import SemanticSearchLanguage
 
     assert chunker.fallback._language == SemanticSearchLanguage.PYTHON, (
         "Fallback language should match semantic language for .py files"

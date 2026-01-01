@@ -14,14 +14,11 @@ from typing import TYPE_CHECKING, Annotated, Any, Literal
 from pydantic import Field
 from qdrant_client.http.models import SparseVectorParams, VectorParams
 
-from codeweaver.core import DimensionMismatchError, ModelSwitchError
-from codeweaver.core.chunks import CodeChunk
-from codeweaver.core.types.models import BasedModel
+from codeweaver.core import BasedModel, CodeChunk, DimensionMismatchError, ModelSwitchError
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.types.aliases import FilteredKeyT
-    from codeweaver.core.types.enum import AnonymityConversion
+    from codeweaver.core import AnonymityConversion, FilteredKeyT
 
 logger = logging.getLogger(__name__)
 
@@ -62,8 +59,7 @@ class HybridVectorPayload(BasedModel):
     ] = False
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
-        from codeweaver.core.types.aliases import FilteredKey
-        from codeweaver.core.types.enum import AnonymityConversion
+        from codeweaver.core import AnonymityConversion, FilteredKey
 
         return {FilteredKey("file_path"): AnonymityConversion.HASH}
 
@@ -217,8 +213,7 @@ class CollectionMetadata(BasedModel):
             )
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
-        from codeweaver.core.types.aliases import FilteredKey
-        from codeweaver.core.types.enum import AnonymityConversion
+        from codeweaver.core import AnonymityConversion, FilteredKey
 
         return {FilteredKey("project_name"): AnonymityConversion.HASH}
 

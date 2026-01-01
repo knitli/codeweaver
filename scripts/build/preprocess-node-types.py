@@ -25,7 +25,7 @@ def main() -> int:
     if src_path not in sys.path:
         sys.path.insert(0, str(src_path))
 
-    from codeweaver.semantic.node_type_parser import NodeTypeParser
+    from codeweaver.semantic import NodeTypeParser
 
     print("Preprocessing node-types JSON files...")
 

@@ -29,8 +29,8 @@ from codeweaver.core import get_settings_map_for, lazy_import
 
 
 if TYPE_CHECKING:
-    from codeweaver.config.types import CodeWeaverSettingsDict
-    from codeweaver.core.types.dictview import DictView
+    from codeweaver.config import CodeWeaverSettingsDict
+    from codeweaver.core import DictView
 
 _display: StatusDisplay = get_display()
 app = App("start", help="Start CodeWeaver background services.")
@@ -47,7 +47,7 @@ class NetworkConfig(NamedTuple):
 
 def _get_settings_map() -> DictView[CodeWeaverSettingsDict]:
     """Get the current settings map."""
-    from codeweaver.config.settings import get_settings_map
+    from codeweaver.config import get_settings_map
 
     return get_settings_map()
 
@@ -148,15 +148,14 @@ async def start_cw_services(
     By default, starts both the management server (port 9329) and MCP HTTP server
     (port 9328) to support stdio proxy connections.
     """
-    from codeweaver.common.statistics import get_session_statistics
-    from codeweaver.server.lifespan import background_services_lifespan
-    from codeweaver.server.management import ManagementServer
+    from codeweaver.common import get_session_statistics
+    from codeweaver.server import ManagementServer, background_services_lifespan
 
     statistics = get_session_statistics()
 
     # Use background_services_lifespan (the new Phase 1 implementation)
     async with background_services_lifespan(
-        settings=lazy_import("codeweaver.config.settings", "get_settings")._resolve()(),
+        settings=lazy_import("codeweaver.config", "get_settings")._resolve()(),
         statistics=statistics,
         status_display=display,
         verbose=verbose,
@@ -173,7 +172,7 @@ async def start_cw_services(
         # Start MCP HTTP server if requested (needed for stdio proxy)
         mcp_server_task = None
         if start_mcp_http_server:
-            from codeweaver.mcp.server import create_http_server
+            from codeweaver.mcp import create_http_server
 
             mcp_state = await create_http_server(
                 host=mcp_host, port=mcp_port, verbose=verbose, debug=debug
@@ -190,7 +189,7 @@ async def start_cw_services(
                 # Create a task that monitors the shutdown event
                 async def wait_for_shutdown() -> None:
                     """Wait for shutdown signal from management API."""
-                    from codeweaver.server.management import ManagementServer as MgmtServer
+                    from codeweaver.server import ManagementServer as MgmtServer
 
                     # Wait on the event instead of busy-waiting with sleep
                     if MgmtServer._shutdown_event is not None:
@@ -226,7 +225,7 @@ async def start_cw_services(
 
 def get_network_settings() -> NetworkConfig:
     """Get network configuration from settings."""
-    from codeweaver.core.types.sentinel import Unset
+    from codeweaver.core import Unset
 
     settings_map = _get_settings_map()
 
@@ -354,7 +353,7 @@ async def start(
         display.print_error("Invalid host or port provided. Please check your inputs.")
         return
     get_project_path = lazy_import("codeweaver.core", "get_project_path")
-    from codeweaver.core.types.sentinel import Unset
+    from codeweaver.core import Unset
 
     project = (
         project or project_path

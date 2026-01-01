@@ -25,13 +25,12 @@ from typing import TYPE_CHECKING, Any, Literal, cast
 
 from google.genai.types import HttpOptions
 
-from codeweaver.core import ConfigurationError
-from codeweaver.core.types.enum import BaseEnum
+from codeweaver.core import BaseEnum, ConfigurationError
 from codeweaver.providers.embedding.providers.base import EmbeddingProvider
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.chunks import CodeChunk
+    from codeweaver.core import CodeChunk
 
 logger = logging.getLogger(__name__)
 

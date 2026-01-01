@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Literal, overload
 
 
 if TYPE_CHECKING:
-    from codeweaver.config.providers import (
+    from codeweaver.config import (
         AgentProviderSettings,
         DataProviderSettings,
         EmbeddingProviderSettings,
@@ -20,8 +20,7 @@ if TYPE_CHECKING:
         SparseEmbeddingProviderSettings,
         VectorStoreProviderSettings,
     )
-    from codeweaver.core.types.dictview import DictView
-    from codeweaver.core.types.provider import ProviderKind
+    from codeweaver.core import DictView, ProviderKind
 
 
 _provider_settings: DictView[ProviderSettingsDict] | None = None
@@ -31,8 +30,8 @@ def get_provider_settings() -> DictView[ProviderSettingsDict]:
     """Get the provider settings."""
     global _provider_settings
     if not _provider_settings:
-        from codeweaver.config.settings import get_settings_map
-        from codeweaver.core.types.dictview import DictView
+        from codeweaver.config import get_settings_map
+        from codeweaver.core import DictView
 
         _provider_settings = DictView(get_settings_map()["provider"])
     if not _provider_settings:
@@ -56,7 +55,7 @@ def _get_sparse_config(
     | None,
 ) -> DictView[SparseEmbeddingProviderSettings] | None:
     """Get the config for sparse config, if any."""
-    from codeweaver.core.types.dictview import DictView
+    from codeweaver.core import DictView
 
     normalized = _normalize_to_tuple(embedding_settings)  # ty:ignore[invalid-argument-type]
     return next(
@@ -73,7 +72,7 @@ def _get_embedding_config(
     embedding_settings: tuple[EmbeddingProviderSettings, ...] | EmbeddingProviderSettings | None,
 ) -> DictView[EmbeddingProviderSettings] | None:
     """Get the embedding model config."""
-    from codeweaver.core.types.dictview import DictView
+    from codeweaver.core import DictView
 
     normalized = _normalize_to_tuple(embedding_settings)  # ty:ignore[invalid-argument-type]
     return next(
@@ -85,7 +84,7 @@ def _get_reranking_config(
     reranking_settings: tuple[RerankingProviderSettings, ...] | RerankingProviderSettings | None,
 ) -> DictView[RerankingProviderSettings] | None:
     """Get the reranking model config."""
-    from codeweaver.core.types.dictview import DictView
+    from codeweaver.core import DictView
 
     normalized = _normalize_to_tuple(reranking_settings)  # ty:ignore[invalid-argument-type]
     return next(
@@ -102,7 +101,7 @@ def _get_agent_config(
     agent_settings: tuple[AgentProviderSettings, ...] | AgentProviderSettings | None,
 ) -> DictView[AgentProviderSettings] | None:
     """Get the agent model config."""
-    from codeweaver.core.types.dictview import DictView
+    from codeweaver.core import DictView
 
     normalized = _normalize_to_tuple(agent_settings)  # ty:ignore[invalid-argument-type]
     return next(
@@ -151,7 +150,7 @@ def get_model_config(
     | None
 ):
     """Get the model settings for a specific provider kind."""
-    from codeweaver.core.types.provider import ProviderKind
+    from codeweaver.core import ProviderKind
 
     provider_settings = get_provider_settings()
     kind = ProviderKind.from_string(kind) if isinstance(kind, str) else kind  # type: ignore
@@ -189,7 +188,7 @@ def get_model_config(
 
 def get_vector_store_config() -> DictView[VectorStoreProviderSettings] | None:
     """Get the vector store config, if any."""
-    from codeweaver.core.types.dictview import DictView
+    from codeweaver.core import DictView
 
     provider_settings = get_provider_settings()
     normalized = _normalize_to_tuple(provider_settings.get("vector_store"))
@@ -199,7 +198,7 @@ def get_vector_store_config() -> DictView[VectorStoreProviderSettings] | None:
 def get_data_configs() -> tuple[DictView[DataProviderSettings], ...]:
     """Get all enabled data provider configs."""
     provider_settings = get_provider_settings()
-    from codeweaver.core.types.dictview import DictView
+    from codeweaver.core import DictView
 
     return tuple(
         DictView(setting) for setting in provider_settings["data"] if setting.get("enabled")

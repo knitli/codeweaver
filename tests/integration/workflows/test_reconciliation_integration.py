@@ -59,11 +59,11 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from codeweaver.config.providers import QdrantConfig
+from codeweaver.config import QdrantConfig
+from codeweaver.core import SemanticSearchLanguage as Language
 from codeweaver.core import uuid7
-from codeweaver.core.language import SemanticSearchLanguage as Language
-from codeweaver.engine.indexer.indexer import Indexer
-from codeweaver.providers.vector_stores.qdrant import QdrantVectorStoreProvider
+from codeweaver.engine import Indexer
+from codeweaver.providers import QdrantVectorStoreProvider
 
 # sourcery skip: dont-import-test-modules
 from tests.conftest import create_test_chunk_with_embeddings
@@ -148,11 +148,7 @@ async def test_prime_index_reconciliation_without_force_reindex(
     )
     mock_sparse_provider.initialize_async = AsyncMock()
 
-    from codeweaver.providers.embedding.providers.base import (
-        EmbeddingProvider,
-        SparseEmbeddingProvider,
-    )
-    from codeweaver.providers.vector_stores.base import VectorStoreProvider
+    from codeweaver.providers import EmbeddingProvider, SparseEmbeddingProvider, VectorStoreProvider
 
     # Apply overrides to container
     clean_container.override(EmbeddingProvider, mock_dense_provider)
@@ -170,7 +166,7 @@ async def test_prime_index_reconciliation_without_force_reindex(
     object.__setattr__(indexer, "_initialize_providers_async", mock_init_providers_async)
 
     # Initialize manifest manager
-    from codeweaver.engine.indexer.manifest import FileManifestManager
+    from codeweaver.engine import FileManifestManager
 
     indexer._manifest_manager = FileManifestManager(project_path=project_path)
     indexer._file_manifest = indexer._manifest_manager.create_new()
@@ -276,11 +272,7 @@ async def test_reconciliation_with_add_dense_flag(
     mock_dense_provider.get_async_embeddings = AsyncMock(return_value=[[0.5] * 768])
     mock_dense_provider.initialize_async = AsyncMock()
 
-    from codeweaver.providers.embedding.providers.base import (
-        EmbeddingProvider,
-        SparseEmbeddingProvider,
-    )
-    from codeweaver.providers.vector_stores.base import VectorStoreProvider
+    from codeweaver.providers import EmbeddingProvider, SparseEmbeddingProvider, VectorStoreProvider
 
     # Apply overrides to container
     clean_container.override(EmbeddingProvider, mock_dense_provider)
@@ -298,7 +290,7 @@ async def test_reconciliation_with_add_dense_flag(
     object.__setattr__(indexer, "_initialize_providers_async", mock_init_providers_async)
 
     # Initialize manifest manager
-    from codeweaver.engine.indexer.manifest import FileManifestManager
+    from codeweaver.engine import FileManifestManager
 
     indexer._manifest_manager = FileManifestManager(project_path=project_path)
     indexer._file_manifest = indexer._manifest_manager.create_new()
@@ -371,11 +363,7 @@ async def test_reconciliation_with_add_sparse_flag(
     )
     mock_sparse_provider.initialize_async = AsyncMock()
 
-    from codeweaver.providers.embedding.providers.base import (
-        EmbeddingProvider,
-        SparseEmbeddingProvider,
-    )
-    from codeweaver.providers.vector_stores.base import VectorStoreProvider
+    from codeweaver.providers import EmbeddingProvider, SparseEmbeddingProvider, VectorStoreProvider
 
     # Apply overrides to container
     clean_container.override(EmbeddingProvider, None)
@@ -393,7 +381,7 @@ async def test_reconciliation_with_add_sparse_flag(
     object.__setattr__(indexer, "_initialize_providers_async", mock_init_providers_async)
 
     # Initialize manifest manager
-    from codeweaver.engine.indexer.manifest import FileManifestManager
+    from codeweaver.engine import FileManifestManager
 
     indexer._manifest_manager = FileManifestManager(project_path=project_path)
     indexer._file_manifest = indexer._manifest_manager.create_new()
@@ -466,11 +454,7 @@ async def test_reconciliation_skipped_when_no_files_need_embeddings(
     mock_sparse_provider.provider_name = "test-sparse-provider"
     mock_sparse_provider.initialize_async = AsyncMock()
 
-    from codeweaver.providers.embedding.providers.base import (
-        EmbeddingProvider,
-        SparseEmbeddingProvider,
-    )
-    from codeweaver.providers.vector_stores.base import VectorStoreProvider
+    from codeweaver.providers import EmbeddingProvider, SparseEmbeddingProvider, VectorStoreProvider
 
     # Apply overrides to container
     clean_container.override(EmbeddingProvider, mock_dense_provider)
@@ -488,7 +472,7 @@ async def test_reconciliation_skipped_when_no_files_need_embeddings(
     object.__setattr__(indexer, "_initialize_providers_async", mock_init_providers_async)
 
     # Initialize manifest manager
-    from codeweaver.engine.indexer.manifest import FileManifestManager
+    from codeweaver.engine import FileManifestManager
 
     indexer._manifest_manager = FileManifestManager(project_path=project_path)
     indexer._file_manifest = indexer._manifest_manager.create_new()
@@ -577,11 +561,7 @@ async def test_reconciliation_handles_provider_error_gracefully(
         side_effect=ProviderError("Simulated provider failure")
     )
 
-    from codeweaver.providers.embedding.providers.base import (
-        EmbeddingProvider,
-        SparseEmbeddingProvider,
-    )
-    from codeweaver.providers.vector_stores.base import VectorStoreProvider
+    from codeweaver.providers import EmbeddingProvider, SparseEmbeddingProvider, VectorStoreProvider
 
     # Apply overrides to container
     clean_container.override(EmbeddingProvider, mock_dense_provider)
@@ -610,7 +590,7 @@ async def test_reconciliation_handles_provider_error_gracefully(
     )
 
     # Initialize manifest
-    from codeweaver.engine.indexer.manifest import FileManifestManager
+    from codeweaver.engine import FileManifestManager
 
     indexer._manifest_manager = FileManifestManager(project_path=project_path)
     indexer._file_manifest = indexer._manifest_manager.create_new()
@@ -632,7 +612,7 @@ async def test_reconciliation_handles_provider_error_gracefully(
     object.__setattr__(indexer, "_load_file_manifest", lambda: True)
 
     # This should NOT crash despite ProviderError during reconciliation
-    result = await indexer.prime_index(force_reindex=False)
+    await indexer.prime_index(force_reindex=False)
 
     print("✅ PASSED: ProviderError handling verified")
 
@@ -700,11 +680,7 @@ async def test_reconciliation_handles_indexing_error_gracefully(
         return_value=[{"indices": [1, 2], "values": [0.9, 0.8]}]
     )
 
-    from codeweaver.providers.embedding.providers.base import (
-        EmbeddingProvider,
-        SparseEmbeddingProvider,
-    )
-    from codeweaver.providers.vector_stores.base import VectorStoreProvider
+    from codeweaver.providers import EmbeddingProvider, SparseEmbeddingProvider, VectorStoreProvider
 
     # Apply overrides to container
     clean_container.override(EmbeddingProvider, mock_dense_provider)
@@ -733,7 +709,7 @@ async def test_reconciliation_handles_indexing_error_gracefully(
     )
 
     # Initialize manifest
-    from codeweaver.engine.indexer.manifest import FileManifestManager
+    from codeweaver.engine import FileManifestManager
 
     indexer._manifest_manager = FileManifestManager(project_path=project_path)
     indexer._file_manifest = indexer._manifest_manager.create_new()
@@ -815,11 +791,7 @@ async def test_reconciliation_handles_connection_error_gracefully(
     mock_dense_provider.provider_name = "test-provider"
     mock_dense_provider.initialize_async = AsyncMock()
 
-    from codeweaver.providers.embedding.providers.base import (
-        EmbeddingProvider,
-        SparseEmbeddingProvider,
-    )
-    from codeweaver.providers.vector_stores.base import VectorStoreProvider
+    from codeweaver.providers import EmbeddingProvider, SparseEmbeddingProvider, VectorStoreProvider
 
     # Apply overrides to container
     clean_container.override(EmbeddingProvider, mock_dense_provider)
@@ -837,7 +809,7 @@ async def test_reconciliation_handles_connection_error_gracefully(
     object.__setattr__(indexer, "_initialize_providers_async", mock_init_providers_async)
 
     # Initialize manifest manager
-    from codeweaver.engine.indexer.manifest import FileManifestManager
+    from codeweaver.engine import FileManifestManager
 
     indexer._manifest_manager = FileManifestManager(project_path=project_path)
     indexer._file_manifest = indexer._manifest_manager.create_new()
@@ -918,11 +890,7 @@ async def test_reconciliation_not_called_when_force_reindex_true(
     mock_dense_provider.provider_name = "test-provider"
     mock_dense_provider.initialize_async = AsyncMock()
 
-    from codeweaver.providers.embedding.providers.base import (
-        EmbeddingProvider,
-        SparseEmbeddingProvider,
-    )
-    from codeweaver.providers.vector_stores.base import VectorStoreProvider
+    from codeweaver.providers import EmbeddingProvider, SparseEmbeddingProvider, VectorStoreProvider
 
     # Apply overrides to container
     clean_container.override(EmbeddingProvider, mock_dense_provider)
@@ -950,7 +918,7 @@ async def test_reconciliation_not_called_when_force_reindex_true(
     )
 
     # Initialize manifest manager (normally done in prime_index)
-    from codeweaver.engine.indexer.manifest import FileManifestManager
+    from codeweaver.engine import FileManifestManager
 
     indexer._manifest_manager = FileManifestManager(project_path=project_path)
     indexer._file_manifest = indexer._manifest_manager.create_new()
@@ -1004,11 +972,7 @@ async def test_reconciliation_not_called_when_no_vector_store(
     mock_dense_provider.provider_name = "test-provider"
     mock_dense_provider.initialize_async = AsyncMock()
 
-    from codeweaver.providers.embedding.providers.base import (
-        EmbeddingProvider,
-        SparseEmbeddingProvider,
-    )
-    from codeweaver.providers.vector_stores.base import VectorStoreProvider
+    from codeweaver.providers import EmbeddingProvider, SparseEmbeddingProvider, VectorStoreProvider
 
     # Apply overrides to container
     clean_container.override(EmbeddingProvider, mock_dense_provider)
@@ -1036,7 +1000,7 @@ async def test_reconciliation_not_called_when_no_vector_store(
     )
 
     # Initialize manifest manager (normally done in prime_index)
-    from codeweaver.engine.indexer.manifest import FileManifestManager
+    from codeweaver.engine import FileManifestManager
 
     indexer._manifest_manager = FileManifestManager(project_path=project_path)
     indexer._file_manifest = indexer._manifest_manager.create_new()
@@ -1083,11 +1047,7 @@ async def test_reconciliation_not_called_when_no_providers(
     file1 = project_path / "module.py"
     file1.write_text("def func():\n    pass\n")
 
-    from codeweaver.providers.embedding.providers.base import (
-        EmbeddingProvider,
-        SparseEmbeddingProvider,
-    )
-    from codeweaver.providers.vector_stores.base import VectorStoreProvider
+    from codeweaver.providers import EmbeddingProvider, SparseEmbeddingProvider, VectorStoreProvider
 
     # Apply overrides to container
     clean_container.override(EmbeddingProvider, None)
@@ -1115,7 +1075,7 @@ async def test_reconciliation_not_called_when_no_providers(
     )
 
     # Initialize manifest manager (normally done in prime_index)
-    from codeweaver.engine.indexer.manifest import FileManifestManager
+    from codeweaver.engine import FileManifestManager
 
     indexer._manifest_manager = FileManifestManager(project_path=project_path)
     indexer._file_manifest = indexer._manifest_manager.create_new()

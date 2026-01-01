@@ -21,8 +21,7 @@ from pydantic import ConfigDict, SecretStr
 from textcase import pascal
 from typing_extensions import TypeIs
 
-from codeweaver.config.providers import SparseEmbeddingProviderSettings
-from codeweaver.config.types import CodeWeaverSettingsDict
+from codeweaver.config import CodeWeaverSettingsDict, SparseEmbeddingProviderSettings
 from codeweaver.core import (
     BasedModel,
     ConfigurationError,
@@ -36,11 +35,14 @@ from codeweaver.core import (
 # NOTE: Re-export Provider and ProviderKind for easier access -- anyone importing the registry likely needs these too
 from codeweaver.core import Provider as Provider
 from codeweaver.core import ProviderKind as ProviderKind
-from codeweaver.providers.agent.agent_providers import AgentProvider
-from codeweaver.providers.embedding.capabilities.base import SparseEmbeddingModelCapabilities
-from codeweaver.providers.embedding.providers.base import EmbeddingProvider, SparseEmbeddingProvider
-from codeweaver.providers.reranking.providers.base import RerankingProvider
-from codeweaver.providers.vector_stores.base import VectorStoreProvider
+from codeweaver.providers import (
+    AgentProvider,
+    EmbeddingProvider,
+    RerankingProvider,
+    SparseEmbeddingModelCapabilities,
+    SparseEmbeddingProvider,
+    VectorStoreProvider,
+)
 
 
 if TYPE_CHECKING:
@@ -51,15 +53,18 @@ if TYPE_CHECKING:
         LiteralKinds,
         LiteralVectorStoreKinds,
     )
-    from codeweaver.config.providers import (
+    from codeweaver.config import (
         AgentProviderSettings,
         DataProviderSettings,
         EmbeddingProviderSettings,
         RerankingProviderSettings,
         VectorStoreProviderSettings,
     )
-    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
-    from codeweaver.providers.types import LiteralProvider, LiteralProviderKind
+    from codeweaver.providers import (
+        EmbeddingModelCapabilities,
+        LiteralProvider,
+        LiteralProviderKind,
+    )
 
 
 logger = logging.getLogger(__name__)
@@ -72,11 +77,11 @@ class ProviderRegistry(BasedModel):
 
     _instance: ProviderRegistry | None = None
     _settings: DictView[CodeWeaverSettingsDict] | None = None
-    _embedding_prefix: ClassVar[LiteralStringT] = "codeweaver.providers.embedding.providers."
-    _sparse_prefix: ClassVar[LiteralStringT] = "codeweaver.providers.embedding.providers."
-    _rerank_prefix: ClassVar[LiteralStringT] = "codeweaver.providers.reranking.providers."
-    _agent_prefix: ClassVar[LiteralStringT] = "codeweaver.providers.agent."
-    _vector_store_prefix: ClassVar[LiteralStringT] = "codeweaver.providers.vector_stores."
+    _embedding_prefix: ClassVar[LiteralStringT] = "codeweaver.providers."
+    _sparse_prefix: ClassVar[LiteralStringT] = "codeweaver.providers."
+    _rerank_prefix: ClassVar[LiteralStringT] = "codeweaver.providers."
+    _agent_prefix: ClassVar[LiteralStringT] = "codeweaver.providers."
+    _vector_store_prefix: ClassVar[LiteralStringT] = "codeweaver.providers."
     _provider_map: ClassVar[
         MappingProxyType[LiteralProviderKind, Mapping[LiteralProvider, partial[LazyImport[Any]]]]
     ] = cast(
@@ -147,8 +152,8 @@ class ProviderRegistry(BasedModel):
                 Provider.MEMORY: partial(lazy_import, f"{_vector_store_prefix}inmemory"),
             },
             ProviderKind.DATA: {
-                Provider.DUCKDUCKGO: partial(lazy_import, "codeweaver.providers.tools"),
-                Provider.TAVILY: partial(lazy_import, "codeweaver.providers.tools"),
+                Provider.DUCKDUCKGO: partial(lazy_import, "codeweaver.providers"),
+                Provider.TAVILY: partial(lazy_import, "codeweaver.providers"),
             },
         }),
     )
@@ -361,7 +366,7 @@ class ProviderRegistry(BasedModel):
                         None,
                     ):
                         self.register(provider, ProviderKind.AGENT, provider_class)
-        data_module = importlib.import_module("codeweaver.providers.data")
+        data_module = importlib.import_module("codeweaver.providers")
         if tools_func := getattr(data_module, "load_default_data_providers", None):
             for tool in tools_func():
                 provider = (
@@ -436,7 +441,7 @@ class ProviderRegistry(BasedModel):
         if hasattr(module_name, "_module_name"):
             module_name = module_name._module_name
 
-        if module_name == "codeweaver.providers.embedding.providers.openai_factory":
+        if module_name == "codeweaver.providers":
             return "OpenAIEmbeddingBase"
         return f"{pascal(str(provider))}EmbeddingProvider"
 
@@ -492,7 +497,7 @@ class ProviderRegistry(BasedModel):
         Returns:
             EmbeddingModelCapabilities instance for the provider
         """
-        from codeweaver.providers.embedding.capabilities import load_default_capabilities
+        from codeweaver.providers import load_default_capabilities
 
         # Get all capabilities for this provider type
         all_caps = load_default_capabilities()
@@ -533,16 +538,12 @@ class ProviderRegistry(BasedModel):
             Base URL string or None
         """
         url_map: dict[Provider, LazyImport[Callable[[Mapping[str, Any]], str]] | str] = {
-            Provider.AZURE: lazy_import(
-                "codeweaver.providers.embedding.providers.openai_factory", "try_for_azure_endpoint"
-            ),
+            Provider.AZURE: lazy_import("codeweaver.providers", "try_for_azure_endpoint"),
             Provider.CEREBRAS: "https://api.cerebras.ai/v1",
             Provider.FIREWORKS: "https://api.fireworks.ai/inference/v1",
             Provider.GITHUB: "https://models.inference.ai.azure.com",
             Provider.GROQ: "https://api.groq.com/openai/v1",
-            Provider.HEROKU: lazy_import(
-                "codeweaver.providers.embedding.providers.openai_factory", "try_for_heroku_endpoint"
-            ),
+            Provider.HEROKU: lazy_import("codeweaver.providers", "try_for_heroku_endpoint"),
             Provider.OLLAMA: "http://localhost:11434/v1",
             Provider.OPENAI: "https://api.openai.com/v1",
             Provider.VERCEL: "https://ai-gateway.vercel.sh/v1",
@@ -621,7 +622,7 @@ class ProviderRegistry(BasedModel):
         """
         import os
 
-        from codeweaver.providers.provider import ProviderEnvVarInfo, ProviderEnvVars
+        from codeweaver.providers import ProviderEnvVarInfo, ProviderEnvVars
 
         env_vars: tuple[ProviderEnvVars, ...] | None = provider.other_env_vars
         if env_vars is None:
@@ -686,7 +687,7 @@ class ProviderRegistry(BasedModel):
                 or invalid configuration.
         """
         from codeweaver.core import ConfigurationError
-        from codeweaver.providers.capabilities import CLIENT_MAP, get_client_map
+        from codeweaver.providers import CLIENT_MAP, get_client_map
 
         # Normalize provider_kind to ProviderKind enum if string
         if isinstance(provider_kind, str):
@@ -863,7 +864,7 @@ class ProviderRegistry(BasedModel):
                     client_options = {"lazy_load": True, **(client_options or {})}
 
                 if provider_kind == ProviderKind.EMBEDDING:
-                    # The client_class for embeddings is returned by `get_text_embedder()` in `codeweaver.providers.embedding.fastembed_extensions`
+                    # The client_class for embeddings is returned by `get_text_embedder()` in `codeweaver.providers`
                     # We need to call it first.
                     client_class = client_class()
 
@@ -996,7 +997,7 @@ class ProviderRegistry(BasedModel):
 
         # Get client if provided
         client: AsyncOpenAI | None = kwargs.get("client")
-        from codeweaver.providers.embedding.providers.openai_factory import OpenAIEmbeddingBase
+        from codeweaver.providers import OpenAIEmbeddingBase
 
         # Call the factory method to construct the provider class
         return cast(OpenAIEmbeddingBase, factory_class).get_provider_class(
@@ -1579,9 +1580,7 @@ class ProviderRegistry(BasedModel):
                 else ProviderKind.from_string(provider_kind)
             )
             if provider_kind_enum == ProviderKind.SPARSE_EMBEDDING:
-                from codeweaver.providers.embedding.capabilities.base import (
-                    SparseEmbeddingModelCapabilities,
-                )
+                from codeweaver.providers import SparseEmbeddingModelCapabilities
 
                 kwargs["caps"] = SparseEmbeddingModelCapabilities(
                     name=model_name,  # ty:ignore[invalid-argument-type]
@@ -1589,17 +1588,13 @@ class ProviderRegistry(BasedModel):
                     other={},  # ty:ignore[invalid-argument-type]
                 )
             elif provider_kind_enum == ProviderKind.RERANKING:
-                from codeweaver.providers.reranking.capabilities.base import (
-                    RerankingModelCapabilities,
-                )
+                from codeweaver.providers import RerankingModelCapabilities
 
                 kwargs["caps"] = RerankingModelCapabilities(
                     name=model_name, provider=config["provider"]
                 )
             else:
-                from codeweaver.providers.embedding.capabilities.base import (
-                    EmbeddingModelCapabilities,
-                )
+                from codeweaver.providers import EmbeddingModelCapabilities
 
                 # Create minimal dense embedding capability
                 kwargs["caps"] = EmbeddingModelCapabilities(
@@ -1750,7 +1745,7 @@ class ProviderRegistry(BasedModel):
         Returns:
             EmbeddingModelCapabilities if found, None otherwise (which is OK!)
         """
-        from codeweaver.providers.embedding.capabilities import load_default_capabilities
+        from codeweaver.providers import load_default_capabilities
 
         # Try exact match first
         for cap in load_default_capabilities():
@@ -1759,7 +1754,7 @@ class ProviderRegistry(BasedModel):
 
         # Try sparse capabilities for SENTENCE_TRANSFORMERS/FASTEMBED
         if provider.name in ("SENTENCE_TRANSFORMERS", "FASTEMBED"):
-            from codeweaver.providers.embedding.capabilities.base import get_sparse_caps
+            from codeweaver.providers import get_sparse_caps
 
             sparse_caps = get_sparse_caps()
             for cap in sparse_caps:
@@ -1783,7 +1778,7 @@ class ProviderRegistry(BasedModel):
                 return cap
 
         if provider.name in ("SENTENCE_TRANSFORMERS", "FASTEMBED"):
-            from codeweaver.providers.embedding.capabilities.base import get_sparse_caps
+            from codeweaver.providers import get_sparse_caps
 
             sparse_caps = get_sparse_caps()
             for cap in sparse_caps:

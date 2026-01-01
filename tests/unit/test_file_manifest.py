@@ -11,8 +11,8 @@ from pathlib import Path
 
 import pytest
 
-from codeweaver.core.stores import get_blake_hash
-from codeweaver.engine.indexer.manifest import FileManifestManager, IndexFileManifest
+from codeweaver.core import get_blake_hash
+from codeweaver.engine import FileManifestManager, IndexFileManifest
 
 
 pytestmark = [pytest.mark.unit]

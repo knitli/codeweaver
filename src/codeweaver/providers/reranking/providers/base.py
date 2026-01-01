@@ -40,19 +40,20 @@ from tenacity import (
     wait_exponential,
 )
 
-from codeweaver.core import RerankingProviderError, ValidationError
-from codeweaver.core.types.enum import BaseEnum
-from codeweaver.core.types.models import BasedModel
-from codeweaver.core.types.provider import Provider
-from codeweaver.core.types.utils import generate_field_title
+from codeweaver.core import (
+    BasedModel,
+    BaseEnum,
+    Provider,
+    RerankingProviderError,
+    ValidationError,
+    generate_field_title,
+)
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 
 
 if TYPE_CHECKING:
-    from codeweaver.common.statistics import SessionStatistics
-    from codeweaver.core.chunks import CodeChunk, StructuredDataInput
-    from codeweaver.core.types.aliases import FilteredKeyT
-    from codeweaver.core.types.enum import AnonymityConversion
+    from codeweaver.common import SessionStatistics
+    from codeweaver.core import AnonymityConversion, CodeChunk, FilteredKeyT, StructuredDataInput
 
 logger = logging.getLogger(__name__)
 
@@ -120,7 +121,7 @@ class RerankingResult(NamedTuple):
 
 def _get_statistics() -> SessionStatistics:
     """Get the statistics source for the reranking provider."""
-    statistics_module = importlib.import_module("codeweaver.common.statistics")
+    statistics_module = importlib.import_module("codeweaver.common")
     # we need SessionStatistics in this namespace at runtime for pydantic to find it
     SessionStatistics = statistics_module.SessionStatistics  # type: ignore # noqa: F841, N806
     return statistics_module.get_session_statistics()
@@ -128,7 +129,7 @@ def _get_statistics() -> SessionStatistics:
 
 def default_reranking_input_transformer(documents: StructuredDataInput) -> Iterator[str]:
     """Default input transformer that converts documents to strings."""
-    from codeweaver.core.chunks import CodeChunk
+    from codeweaver.core import CodeChunk
 
     try:
         yield from CodeChunk.dechunkify(documents, for_embedding=True)
@@ -378,7 +379,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         self, query: str, documents: StructuredDataInput, **kwargs: Any
     ) -> Sequence[RerankingResult]:
         """Rerank the given documents based on the query."""
-        from codeweaver.core.chunks import CodeChunk
+        from codeweaver.core import CodeChunk
 
         processed_kwargs = self._set_kwargs(**kwargs)
         transformed_docs = CodeChunk.chunkify(documents)
@@ -502,7 +503,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
             loop = asyncio.get_running_loop()
             _ = loop.run_in_executor(None, lambda: self._update_token_stats(from_docs=raw_docs))
 
-        from codeweaver.core.chunks import CodeChunk
+        from codeweaver.core import CodeChunk
 
         chunks = self._chunk_store or CodeChunk.chunkify(raw_docs)
         return type(self)._output_transformer(results, iter(chunks))
@@ -510,7 +511,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
     @staticmethod
     def to_code_chunk(text: StructuredDataInput) -> Sequence[CodeChunk]:
         """Convenience wrapper around `CodeChunk.chunkify`."""
-        from codeweaver.core.chunks import CodeChunk
+        from codeweaver.core import CodeChunk
 
         return tuple(CodeChunk.chunkify(text))
 
@@ -567,7 +568,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
 
         Defines which fields should be filtered/anonymized when sending telemetry data.
         """
-        from codeweaver.core.types import AnonymityConversion, FilteredKey
+        from codeweaver.core import AnonymityConversion, FilteredKey
 
         return {
             FilteredKey("_client"): AnonymityConversion.FORBIDDEN,

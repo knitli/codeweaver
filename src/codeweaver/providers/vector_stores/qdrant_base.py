@@ -37,12 +37,16 @@ from qdrant_client.http.models.models import (
 )
 from typing_extensions import TypeIs
 
-from codeweaver.config.providers import VectorStoreProviderSettings
-from codeweaver.core import ProviderError
-from codeweaver.core.chunks import CodeChunk
-from codeweaver.core.types import DictView
-from codeweaver.core.types.provider import Provider
-from codeweaver.core.types.search import SearchResult, SearchStrategy, StrategizedQuery
+from codeweaver.config import VectorStoreProviderSettings
+from codeweaver.core import (
+    CodeChunk,
+    DictView,
+    Provider,
+    ProviderError,
+    SearchResult,
+    SearchStrategy,
+    StrategizedQuery,
+)
 from codeweaver.providers.embedding.types import SparseEmbedding as CodeWeaverSparseEmbedding
 from codeweaver.providers.vector_stores.base import MixedQueryInput, VectorStoreProvider
 from codeweaver.providers.vector_stores.metadata import CollectionMetadata, HybridVectorPayload
@@ -75,7 +79,7 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         return None
 
     def _fetch_config(self) -> DictView[VectorStoreProviderSettings]:
-        from codeweaver.common.registry.provider import get_provider_config_for
+        from codeweaver.common import get_provider_config_for
 
         return get_provider_config_for("vector_store")
 
@@ -115,7 +119,7 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         Returns:
             CollectionMetadata configured according to provider settings.
         """
-        from codeweaver.config.settings import get_settings_map
+        from codeweaver.config import get_settings_map
         from codeweaver.core import get_project_path
 
         settings_map = get_settings_map()
@@ -533,7 +537,7 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         Raises:
             ProviderError: Invalid vector input format.
         """
-        from codeweaver.core.types.search import StrategizedQuery
+        from codeweaver.core import StrategizedQuery
         from codeweaver.providers.embedding.types import SparseEmbedding
 
         if isinstance(vector, StrategizedQuery):
@@ -584,7 +588,7 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         Returns:
             List of SearchResult objects.
         """
-        from codeweaver.core.types.search import SearchResult
+        from codeweaver.core import SearchResult
 
         # Handle both query_points (QueryResponse) and search (list) results
         points = results.points if isinstance(results, QueryResponse) else results

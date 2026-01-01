@@ -16,7 +16,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from codeweaver.core.file_extensions import METADATA_PATH
+from codeweaver.core import METADATA_PATH
 from codeweaver.providers.vector_stores.search.condition import (
     FieldCondition,
     Filter,

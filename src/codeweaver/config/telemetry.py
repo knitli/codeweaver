@@ -35,9 +35,7 @@ from typing import Annotated, Any, NotRequired, TypedDict
 from pydantic import Field, HttpUrl, PositiveInt, PrivateAttr, SecretStr
 
 from codeweaver.config._project import CODEWEAVER_POSTHOG_PROJECT_KEY
-from codeweaver.core.types.aliases import LiteralStringT
-from codeweaver.core.types.models import BasedModel
-from codeweaver.core.types.sentinel import UNSET, Unset
+from codeweaver.core import UNSET, BasedModel, LiteralStringT, Unset
 
 
 def _set_bool_env_var(env_var: str) -> bool | Unset:

@@ -24,7 +24,7 @@ from __future__ import annotations
 from itertools import product
 from typing import overload
 
-from codeweaver.core.types.delimiter import DelimiterDict, DelimiterKind, DelimiterPattern
+from codeweaver.core import DelimiterDict, DelimiterKind, DelimiterPattern
 
 
 PARAGRAPH_BREAK = ["\n\n", "\r\n\r\n", "\r\r"]  # Cross-platform paragraph breaks

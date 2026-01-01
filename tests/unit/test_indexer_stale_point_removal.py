@@ -6,14 +6,13 @@
 """Tests for indexer stale point removal and orphan detection."""
 
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 from uuid import uuid4
 
 import pytest
 
-from codeweaver.core.stores import get_blake_hash
-from codeweaver.engine.indexer.indexer import Indexer
-from codeweaver.engine.indexer.manifest import IndexFileManifest
+from codeweaver.core import get_blake_hash
+from codeweaver.engine import Indexer, IndexFileManifest
 
 
 pytestmark = [pytest.mark.unit]
@@ -22,7 +21,7 @@ pytestmark = [pytest.mark.unit]
 @pytest.fixture
 async def mock_indexer(tmp_path: Path, di_overrides, mock_vector_store):
     """Create an indexer with mocked dependencies using DI."""
-    from codeweaver.engine.indexer.indexer import Indexer
+    from codeweaver.engine import Indexer
 
     # Resolve indexer from container with standard overrides already applied
     indexer = await di_overrides.resolve(Indexer)
@@ -41,7 +40,7 @@ async def mock_indexer(tmp_path: Path, di_overrides, mock_vector_store):
     indexer._vector_store = mock_vector_store
     indexer._providers_initialized = True
 
-    yield indexer
+    return indexer
 
 
 class TestStalePointRemovalInIndexFile:

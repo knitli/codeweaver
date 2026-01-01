@@ -13,14 +13,13 @@ from typing import TYPE_CHECKING, Any, cast
 
 from pydantic import SkipValidation
 
-from codeweaver.core import ConfigurationError
-from codeweaver.core.types.provider import Provider
+from codeweaver.core import ConfigurationError, Provider
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.providers.base import EmbeddingProvider
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.chunks import CodeChunk
+    from codeweaver.core import CodeChunk
 
 
 def try_for_heroku_endpoint(kwargs: Any) -> str:

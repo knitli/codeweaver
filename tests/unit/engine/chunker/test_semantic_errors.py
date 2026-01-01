@@ -21,7 +21,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from codeweaver.engine.chunker.exceptions import (
+from codeweaver.engine import (
     ASTDepthExceededError,
     ChunkingTimeoutError,
     ChunkLimitExceededError,
@@ -64,8 +64,8 @@ class TestParseErrors:
         Expected: ParseError raised with descriptive message
         Verifies: Exception contains file path and error details
         """
-        from codeweaver.core.language import SemanticSearchLanguage
-        from codeweaver.engine.chunker.semantic import SemanticChunker
+        from codeweaver.core import SemanticSearchLanguage
+        from codeweaver.engine import SemanticChunker
 
         # Arrange: Load malformed Python file
         malformed_file = FIXTURES_DIR / "malformed.py"
@@ -76,7 +76,7 @@ class TestParseErrors:
         chunker = SemanticChunker(governor=mock_governor, language=SemanticSearchLanguage.PYTHON)
 
         # Create DiscoveredFile and verify ParseError raised
-        from codeweaver.core.discovery import DiscoveredFile
+        from codeweaver.core import DiscoveredFile
 
         discovered_file = DiscoveredFile.from_path(malformed_file)
         with pytest.raises(ParseError) as exc_info:
@@ -95,15 +95,15 @@ class TestParseErrors:
 
         Confirms that parse errors provide helpful guidance for resolution.
         """
-        from codeweaver.core.language import SemanticSearchLanguage
-        from codeweaver.engine.chunker.semantic import SemanticChunker
+        from codeweaver.core import SemanticSearchLanguage
+        from codeweaver.engine import SemanticChunker
 
         malformed_file = FIXTURES_DIR / "malformed.py"
         content = malformed_file.read_text()
 
         chunker = SemanticChunker(governor=mock_governor, language=SemanticSearchLanguage.PYTHON)
 
-        from codeweaver.core.discovery import DiscoveredFile
+        from codeweaver.core import DiscoveredFile
 
         discovered_file = DiscoveredFile.from_path(malformed_file)
         with pytest.raises(ParseError) as exc_info:
@@ -129,8 +129,8 @@ class TestASTDepthErrors:
         Expected: ASTDepthExceededError raised with depth metrics
         Verifies: Exception contains actual depth and configured limit
         """
-        from codeweaver.core.language import SemanticSearchLanguage
-        from codeweaver.engine.chunker.semantic import SemanticChunker
+        from codeweaver.core import SemanticSearchLanguage
+        from codeweaver.engine import SemanticChunker
 
         # Arrange: Load deeply nested Python file
         deep_file = FIXTURES_DIR / "deep_nesting.py"
@@ -141,7 +141,7 @@ class TestASTDepthErrors:
         chunker = SemanticChunker(governor=mock_governor, language=SemanticSearchLanguage.PYTHON)
 
         # Act & Assert: Verify ASTDepthExceededError raised
-        from codeweaver.core.discovery import DiscoveredFile
+        from codeweaver.core import DiscoveredFile
 
         discovered_file = DiscoveredFile.from_path(deep_file)
         with pytest.raises(ASTDepthExceededError) as exc_info:
@@ -160,15 +160,15 @@ class TestASTDepthErrors:
 
         Confirms that depth errors provide helpful diagnostics and suggestions.
         """
-        from codeweaver.core.language import SemanticSearchLanguage
-        from codeweaver.engine.chunker.semantic import SemanticChunker
+        from codeweaver.core import SemanticSearchLanguage
+        from codeweaver.engine import SemanticChunker
 
         deep_file = FIXTURES_DIR / "deep_nesting.py"
         content = deep_file.read_text()
         mock_governor.performance_settings.max_ast_depth = 200
         chunker = SemanticChunker(governor=mock_governor, language=SemanticSearchLanguage.PYTHON)
 
-        from codeweaver.core.discovery import DiscoveredFile
+        from codeweaver.core import DiscoveredFile
 
         discovered_file = DiscoveredFile.from_path(deep_file)
         with pytest.raises(ASTDepthExceededError) as exc_info:
@@ -203,8 +203,8 @@ class TestTimeoutErrors:
         """
         import time
 
-        from codeweaver.core.language import SemanticSearchLanguage
-        from codeweaver.engine.chunker.semantic import SemanticChunker
+        from codeweaver.core import SemanticSearchLanguage
+        from codeweaver.engine import SemanticChunker
 
         # Arrange: Create chunker with very short timeout (10ms)
         mock_governor.settings.performance.chunk_timeout_seconds = 0.01
@@ -271,8 +271,8 @@ class TestChunkLimitErrors:
         Expected: ChunkLimitExceededError raised with count metrics
         Verifies: Exception contains chunk count and configured limit
         """
-        from codeweaver.core.language import SemanticSearchLanguage
-        from codeweaver.engine.chunker.semantic import SemanticChunker
+        from codeweaver.core import SemanticSearchLanguage
+        from codeweaver.engine import SemanticChunker
 
         # Arrange: Create chunker with very low chunk limit
         mock_governor.settings.performance.max_chunks_per_file = 10  # Very low limit for testing

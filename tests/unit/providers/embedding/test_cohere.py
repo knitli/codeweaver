@@ -14,18 +14,16 @@ import pytest
 # Skip this entire module if the cohere package is not installed
 pytest.importorskip("cohere", reason="cohere package is required for these tests")
 
-from codeweaver.core.chunks import CodeChunk
-from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
-from codeweaver.providers.embedding.providers.base import EmbeddingErrorInfo
-from codeweaver.providers.provider import Provider
+from codeweaver.core import CodeChunk
+from codeweaver.providers import EmbeddingErrorInfo, EmbeddingModelCapabilities, Provider
 
 
 @pytest.fixture(autouse=True)
 def reset_embedding_registry():
     """Reset the global embedding registry and hash stores between tests to avoid state pollution."""
-    import codeweaver.providers.embedding.registry as registry_module
+    import codeweaver.providers as registry_module
 
-    from codeweaver.providers.embedding.providers.base import EmbeddingProvider
+    from codeweaver.providers import EmbeddingProvider
 
     # Reset the global singleton registry
     registry_module._embedding_registry = None
@@ -83,7 +81,7 @@ class TestCohereEmbeddingProviderInitialization:
     @patch.dict("os.environ", {"COHERE_API_KEY": "test-api-key"})
     def test_provider_initialization_with_env_api_key(self, cohere_capabilities):
         """Test that provider initializes with API key from environment."""
-        from codeweaver.providers.embedding.providers.cohere import CohereEmbeddingProvider
+        from codeweaver.providers import CohereEmbeddingProvider
 
         provider = CohereEmbeddingProvider(caps=cohere_capabilities)
 
@@ -95,7 +93,7 @@ class TestCohereEmbeddingProviderInitialization:
     def test_provider_initialization_without_api_key_raises_error(self, cohere_capabilities):
         """Test that provider raises error without API key."""
         from codeweaver.core import ConfigurationError
-        from codeweaver.providers.embedding.providers.cohere import CohereEmbeddingProvider
+        from codeweaver.providers import CohereEmbeddingProvider
 
         with pytest.raises(ConfigurationError) as exc_info:
             CohereEmbeddingProvider(caps=cohere_capabilities)
@@ -104,7 +102,7 @@ class TestCohereEmbeddingProviderInitialization:
 
     def test_provider_initialization_with_client(self, mock_cohere_client, cohere_capabilities):
         """Test that provider initializes correctly with a provided client."""
-        from codeweaver.providers.embedding.providers.cohere import CohereEmbeddingProvider
+        from codeweaver.providers import CohereEmbeddingProvider
 
         provider = CohereEmbeddingProvider(caps=cohere_capabilities, _client=mock_cohere_client)
 
@@ -114,7 +112,7 @@ class TestCohereEmbeddingProviderInitialization:
     @patch.dict("os.environ", {"COHERE_API_KEY": "test-api-key"})
     def test_provider_initialization_with_custom_kwargs(self, cohere_capabilities):
         """Test that custom kwargs are stored correctly."""
-        from codeweaver.providers.embedding.providers.cohere import CohereEmbeddingProvider
+        from codeweaver.providers import CohereEmbeddingProvider
 
         provider = CohereEmbeddingProvider(caps=cohere_capabilities, custom_param="value")
 
@@ -124,7 +122,7 @@ class TestCohereEmbeddingProviderInitialization:
     @patch.dict("os.environ", {"COHERE_API_KEY": "test-api-key"})
     def test_provider_base_url_cohere(self, cohere_capabilities):
         """Test that base_url property returns correct value for Cohere."""
-        from codeweaver.providers.embedding.providers.cohere import CohereEmbeddingProvider
+        from codeweaver.providers import CohereEmbeddingProvider
 
         provider = CohereEmbeddingProvider(caps=cohere_capabilities)
 
@@ -133,7 +131,7 @@ class TestCohereEmbeddingProviderInitialization:
     @patch.dict("os.environ", {"AZURE_COHERE_API_KEY": "test-api-key"})
     def test_provider_initialization_azure_provider(self):
         """Test that Azure provider is supported."""
-        from codeweaver.providers.embedding.providers.cohere import CohereEmbeddingProvider
+        from codeweaver.providers import CohereEmbeddingProvider
 
         caps = EmbeddingModelCapabilities(
             name="embed-english-v3.0",
@@ -159,7 +157,7 @@ class TestCohereEmbeddingProviderEmbedding:
     @pytest.mark.asyncio
     async def test_embed_documents_success(self, mock_cohere_client, cohere_capabilities):
         """Test successful document embedding."""
-        from codeweaver.providers.embedding.providers.cohere import CohereEmbeddingProvider
+        from codeweaver.providers import CohereEmbeddingProvider
 
         # Setup mock response with correct dimension (1024)
         mock_embeddings = MagicMock()
@@ -178,10 +176,7 @@ class TestCohereEmbeddingProviderEmbedding:
         mock_cohere_client.embed.return_value = mock_response
 
         provider = CohereEmbeddingProvider(caps=cohere_capabilities, _client=mock_cohere_client)
-        from codeweaver.core import uuid7
-        from codeweaver.core.language import SemanticSearchLanguage
-        from codeweaver.core.metadata import ChunkKind, ExtKind
-        from codeweaver.core.spans import Span
+        from codeweaver.core import ChunkKind, ExtKind, SemanticSearchLanguage, Span, uuid7
 
         # Create test chunks with explicit chunk_ids
         chunks = [
@@ -220,7 +215,7 @@ class TestCohereEmbeddingProviderEmbedding:
     @pytest.mark.asyncio
     async def test_embed_query_success(self, mock_cohere_client, cohere_capabilities):
         """Test successful query embedding."""
-        from codeweaver.providers.embedding.providers.cohere import CohereEmbeddingProvider
+        from codeweaver.providers import CohereEmbeddingProvider
 
         # Setup mock response
         mock_embeddings = MagicMock()
@@ -250,7 +245,7 @@ class TestCohereEmbeddingProviderEmbedding:
     @pytest.mark.asyncio
     async def test_embed_documents_v4_model(self, mock_cohere_client, cohere_4_capabilities):
         """Test embedding with v4.0 model uses correct embedding_types."""
-        from codeweaver.providers.embedding.providers.cohere import CohereEmbeddingProvider
+        from codeweaver.providers import CohereEmbeddingProvider
 
         # Setup mock response - use capabilities dimension for consistency
         expected_dimension = cohere_4_capabilities.default_dimension
@@ -267,10 +262,7 @@ class TestCohereEmbeddingProviderEmbedding:
 
         from pathlib import Path
 
-        from codeweaver.core import uuid7
-        from codeweaver.core.language import SemanticSearchLanguage
-        from codeweaver.core.metadata import ChunkKind, ExtKind
-        from codeweaver.core.spans import Span
+        from codeweaver.core import ChunkKind, ExtKind, SemanticSearchLanguage, Span, uuid7
 
         chunks = [
             CodeChunk(
@@ -308,17 +300,14 @@ class TestCohereEmbeddingProviderErrorHandling:
         self, mock_cohere_client, cohere_capabilities
     ):
         """Test that connection errors are handled with retry logic."""
-        from codeweaver.providers.embedding.providers.cohere import CohereEmbeddingProvider
+        from codeweaver.providers import CohereEmbeddingProvider
 
         mock_cohere_client.embed.side_effect = ConnectionError("Connection failed")
 
         provider = CohereEmbeddingProvider(caps=cohere_capabilities, _client=mock_cohere_client)
         from pathlib import Path
 
-        from codeweaver.core import uuid7
-        from codeweaver.core.language import SemanticSearchLanguage
-        from codeweaver.core.metadata import ChunkKind, ExtKind
-        from codeweaver.core.spans import Span
+        from codeweaver.core import ChunkKind, ExtKind, SemanticSearchLanguage, Span, uuid7
 
         chunks = [
             CodeChunk(

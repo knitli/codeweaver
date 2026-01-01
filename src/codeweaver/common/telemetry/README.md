@@ -123,8 +123,8 @@ client.end_session()
 
 ```python
 from codeweaver.common.telemetry.events import capture_search_event
-from codeweaver.agent_api.find_code.intent import IntentType
-from codeweaver.agent_api.find_code.types import SearchStrategy
+from codeweaver.agent_api import IntentType
+from codeweaver.agent_api import SearchStrategy
 
 # Capture a search event (convenience function)
 capture_search_event(
@@ -154,7 +154,7 @@ with get_telemetry_client() as client:
 Privacy filtering is now handled automatically via the `serialize_for_telemetry()` method on BasedModel and DataclassSerializationMixin objects. Each model defines its sensitive fields via the `_telemetry_keys()` method:
 
 ```python
-from codeweaver.core.types import BasedModel, AnonymityConversion, FilteredKey
+from codeweaver.core import BasedModel, AnonymityConversion, FilteredKey
 
 class MyModel(BasedModel):
     public_data: str = "safe"

@@ -24,8 +24,7 @@ import numpy as np
 
 from pydantic import SkipValidation
 
-from codeweaver.core import ConfigurationError, rpartial
-from codeweaver.core.types.provider import Provider
+from codeweaver.core import ConfigurationError, Provider, rpartial
 from codeweaver.providers.embedding.capabilities.base import (
     EmbeddingModelCapabilities,
     SparseEmbeddingModelCapabilities,
@@ -35,7 +34,7 @@ from codeweaver.providers.embedding.providers.base import SparseEmbeddingProvide
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.chunks import CodeChunk
+    from codeweaver.core import CodeChunk
     from codeweaver.providers.embedding.types import SparseEmbedding
 
 try:

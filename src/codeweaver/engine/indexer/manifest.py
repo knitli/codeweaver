@@ -23,15 +23,11 @@ from typing import TYPE_CHECKING, Annotated, Any, NotRequired, Required, TypedDi
 from pydantic import Field, NonNegativeInt, computed_field
 from pydantic_core import from_json
 
-from codeweaver.core import get_user_config_dir
-from codeweaver.core.stores import BlakeHashKey
-from codeweaver.core.types.enum import AnonymityConversion
-from codeweaver.core.types.models import BasedModel
+from codeweaver.core import AnonymityConversion, BasedModel, BlakeHashKey, get_user_config_dir
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.types.aliases import FilteredKeyT
-    from codeweaver.core.types.enum import AnonymityConversion
+    from codeweaver.core import AnonymityConversion, FilteredKeyT
 
 
 logger = logging.getLogger(__name__)
@@ -480,8 +476,7 @@ class IndexFileManifest(BasedModel):
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         """Telemetry keys for the manifest (none needed)."""
-        from codeweaver.core.types.aliases import FilteredKey
-        from codeweaver.core.types.enum import AnonymityConversion
+        from codeweaver.core import AnonymityConversion, FilteredKey
 
         return {FilteredKey("project_path"): AnonymityConversion.HASH}
 
@@ -496,7 +491,7 @@ class FileManifestManager:
             project_path: Path to indexed codebase
             manifest_dir: Directory for manifest files (default: .codeweaver/)
         """
-        from codeweaver.core.stores import get_blake_hash
+        from codeweaver.core import get_blake_hash
 
         # Ensure consistent path normalization: absolute -> resolve -> real path
         # This prevents different representations of the same path from generating different hashes

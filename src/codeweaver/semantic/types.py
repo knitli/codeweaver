@@ -18,12 +18,14 @@ from typing import Annotated, Any, Literal, NamedTuple, TypedDict, cast
 
 from pydantic import ConfigDict, Field, PrivateAttr, computed_field
 
-from codeweaver.core.language import SemanticSearchLanguage
-from codeweaver.core.types.aliases import LiteralStringT
-from codeweaver.core.types.enum import BaseEnum
-from codeweaver.core.types.models import BasedModel
-from codeweaver.core.types.utils import generate_field_title
-from codeweaver.core.utils import uuid7
+from codeweaver.core import (
+    BasedModel,
+    BaseEnum,
+    LiteralStringT,
+    SemanticSearchLanguage,
+    generate_field_title,
+    uuid7,
+)
 
 
 class SimpleNodeTypeDTO(TypedDict):
@@ -231,7 +233,12 @@ class NodeTypeDTO(BasedModel):
 
 def _set_symbol(data: Any) -> str | None:
     """Helper function to set the symbol field based on the primary_thing."""
-    if (thing := data.get("thing")) is not None and (symbol := getattr(thing, "symbol", None)) and isinstance(symbol, str) and (0 < len(symbol.strip()) < 20):
+    if (
+        (thing := data.get("thing")) is not None
+        and (symbol := getattr(thing, "symbol", None))
+        and isinstance(symbol, str)
+        and (0 < len(symbol.strip()) < 20)
+    ):
         return symbol
     return None
 
@@ -296,7 +303,7 @@ class SemanticMetadata(BasedModel):
         cls, child: Any, parent_meta: SemanticMetadata, **overrides: Any
     ) -> SemanticMetadata:
         """Create a SemanticMetadata instance from a parent SemanticMetadata instance."""
-        from codeweaver.core.utils import uuid7
+        from codeweaver.core import uuid7
 
         return cls(
             language=parent_meta.language,
@@ -312,7 +319,7 @@ class SemanticMetadata(BasedModel):
         """Create a SemanticMetadata instance from an AST node."""
         from ast_grep_py import SgNode
 
-        from codeweaver.core.utils import uuid7
+        from codeweaver.core import uuid7
 
         if isinstance(thing, SgNode):
             from codeweaver.semantic.ast_grep import AstThing

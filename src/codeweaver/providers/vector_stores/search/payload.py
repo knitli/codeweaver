@@ -17,7 +17,7 @@ from typing import Annotated, Any
 
 from pydantic import BaseModel, Field
 
-from codeweaver.core.types.enum import BaseEnum
+from codeweaver.core import BaseEnum
 
 
 PayloadMetadata = dict[str, Any]

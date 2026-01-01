@@ -15,13 +15,11 @@ All tests must pass before deploying telemetry to production.
 
 from __future__ import annotations
 
-from typing import override
+from typing import Any, override
 
 import pytest
 
-from codeweaver.core.types.aliases import FilteredKey, FilteredKeyT
-from codeweaver.core.types.enum import AnonymityConversion
-from codeweaver.core.types.models import BasedModel
+from codeweaver.core import AnonymityConversion, BasedModel, FilteredKey, FilteredKeyT
 
 
 class MockSensitiveModel(BasedModel):
@@ -55,17 +53,12 @@ class MockOverrideModel(BasedModel):
 
     @override
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion] | None:
-        return {
-            FilteredKey("data"): AnonymityConversion.HASH,
-        }
+        return {FilteredKey("data"): AnonymityConversion.HASH}
 
     @override
     def _telemetry_handler(self, serialized_self: dict[str, Any], /) -> dict[str, Any]:
         """Override specific fields."""
-        return {
-            "special_value": "REDACTED",
-            "extra_field": "injected",
-        }
+        return {"special_value": "REDACTED", "extra_field": "injected"}
 
 
 class TestTelemetryPrivacy:

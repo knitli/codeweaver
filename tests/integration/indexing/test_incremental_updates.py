@@ -12,10 +12,10 @@ from pathlib import Path
 
 import pytest
 
-from codeweaver.config.providers import QdrantConfig
+from codeweaver.config import QdrantConfig
+from codeweaver.core import SemanticSearchLanguage as Language
 from codeweaver.core import uuid7
-from codeweaver.core.language import SemanticSearchLanguage as Language
-from codeweaver.providers.vector_stores.qdrant import QdrantVectorStoreProvider
+from codeweaver.providers import QdrantVectorStoreProvider
 
 # sourcery skip: dont-import-test-modules
 from tests.conftest import create_test_chunk_with_embeddings
@@ -75,7 +75,7 @@ async def test_incremental_updates(qdrant_test_manager):
     await provider.upsert([chunk_v2])
 
     # Verify: Old chunk gone, new chunk present
-    from codeweaver.core.types.search import SearchStrategy, StrategizedQuery
+    from codeweaver.core import SearchStrategy, StrategizedQuery
 
     results = await provider.search(
         StrategizedQuery(

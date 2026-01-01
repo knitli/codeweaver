@@ -22,7 +22,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 ## Basic Usage
 
 ```python
-from codeweaver.common.utils.lazy_importer import lazy_import
+from codeweaver.common import lazy_import
 
 # Module import
 os_lazy = lazy_import("os")

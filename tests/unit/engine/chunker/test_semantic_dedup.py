@@ -15,8 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from codeweaver.engine.chunker.base import ChunkGovernor
-from codeweaver.engine.chunker.semantic import SemanticChunker
+from codeweaver.engine import ChunkGovernor, SemanticChunker
 
 
 pytestmark = [pytest.mark.unit]
@@ -28,7 +27,7 @@ def chunk_governor() -> ChunkGovernor:
 
     Uses mock capabilities to provide chunk limits.
     """
-    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+    from codeweaver.providers import EmbeddingModelCapabilities
 
     # Create mock capability with test limits
     capabilities = (EmbeddingModelCapabilities(name="test-model", context_window=8192),)
@@ -38,7 +37,7 @@ def chunk_governor() -> ChunkGovernor:
 @pytest.fixture(autouse=True)
 def clear_semantic_chunker_stores():
     """Clear SemanticChunker class-level stores before each test for test isolation."""
-    from codeweaver.engine.chunker.semantic import SemanticChunker
+    from codeweaver.engine import SemanticChunker
 
     # Clear the internal store dictionaries directly to avoid weak reference issues
     SemanticChunker._store.store.clear()
@@ -52,7 +51,7 @@ def clear_semantic_chunker_stores():
 @pytest.fixture
 def semantic_chunker(chunk_governor: ChunkGovernor) -> SemanticChunker:
     """Create a SemanticChunker instance for testing."""
-    from codeweaver.core.language import SemanticSearchLanguage
+    from codeweaver.core import SemanticSearchLanguage
 
     return SemanticChunker(governor=chunk_governor, language=SemanticSearchLanguage.PYTHON)
 
@@ -149,7 +148,7 @@ def test_duplicate_functions_deduplicated(
     content = python_file_with_duplicates.read_text()
 
     # Create DiscoveredFile and chunk the file containing duplicates
-    from codeweaver.core.discovery import DiscoveredFile
+    from codeweaver.core import DiscoveredFile
 
     discovered_file = DiscoveredFile.from_path(python_file_with_duplicates)
     chunks = semantic_chunker.chunk(content, file=discovered_file)
@@ -194,7 +193,8 @@ def test_duplicate_functions_deduplicated(
     # Verify deduplication is working by checking for duplicate identifiers
     # We have 3 identical 'add' methods, so 'add', 'self', 'a', 'b' should appear once
     identifier_chunks = [
-        chunk for chunk in chunks
+        chunk
+        for chunk in chunks
         if chunk.metadata
         and "semantic_meta" in chunk.metadata
         and hasattr(chunk.metadata["semantic_meta"], "thing")
@@ -233,7 +233,7 @@ def test_unique_chunks_preserved(
     content = python_file_with_unique_functions.read_text()
 
     # Create DiscoveredFile and chunk the file with all unique functions
-    from codeweaver.core.discovery import DiscoveredFile
+    from codeweaver.core import DiscoveredFile
 
     discovered_file = DiscoveredFile.from_path(python_file_with_unique_functions)
     chunks = semantic_chunker.chunk(content, file=discovered_file)
@@ -254,7 +254,8 @@ def test_unique_chunks_preserved(
 
     # Find all function_definition chunks
     function_chunks = [
-        chunk for chunk in chunks
+        chunk
+        for chunk in chunks
         if chunk.metadata
         and "semantic_meta" in chunk.metadata
         and hasattr(chunk.metadata["semantic_meta"], "thing")
@@ -303,7 +304,7 @@ def test_batch_id_tracking(
     content = python_file_with_unique_functions.read_text()
 
     # Create DiscoveredFile and chunk the file
-    from codeweaver.core.discovery import DiscoveredFile
+    from codeweaver.core import DiscoveredFile
 
     discovered_file = DiscoveredFile.from_path(python_file_with_unique_functions)
     chunks = semantic_chunker.chunk(content, file=discovered_file)

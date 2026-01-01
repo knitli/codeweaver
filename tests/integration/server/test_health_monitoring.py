@@ -33,11 +33,11 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from codeweaver.common.statistics import FailoverStats, Identifier, SessionStatistics
-from codeweaver.engine.indexer import Indexer, IndexingStats
-from codeweaver.server.health.health_service import HealthService
-from codeweaver.server.health.models import (
+from codeweaver.common import FailoverStats, Identifier, SessionStatistics
+from codeweaver.engine import Indexer, IndexingStats
+from codeweaver.server import (
     HealthResponse,
+    HealthService,
     IndexingInfo,
     ServicesInfo,
     StatisticsInfo,
@@ -174,7 +174,7 @@ def mock_provider_registry(mocker) -> MagicMock:
 @pytest.fixture
 def session_statistics() -> SessionStatistics:
     """Create session statistics instance."""
-    from codeweaver.common.statistics import FileStatistics, TokenCounter
+    from codeweaver.common import FileStatistics, TokenCounter
 
     return SessionStatistics(
         index_statistics=FileStatistics(),
@@ -338,7 +338,7 @@ async def test_health_status_healthy(health_service: HealthService, mocker):
     Then: Status is 'healthy'
     """
     # Mock resource collection to return healthy values
-    from codeweaver.server.health.models import ResourceInfo
+    from codeweaver.server import ResourceInfo
 
     async def mock_resource_info():
         return ResourceInfo(

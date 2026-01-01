@@ -23,11 +23,15 @@ from ast_grep_py import SgNode
 from pydantic import Field, NonNegativeFloat, NonNegativeInt, computed_field
 from typing_extensions import TypeIs
 
-from codeweaver.core import rpartial
-from codeweaver.core.language import SemanticSearchLanguage
-from codeweaver.core.types.aliases import CategoryName, CategoryNameT, ThingNameT
-from codeweaver.core.types.enum import BaseEnum
-from codeweaver.core.types.utils import generate_field_title
+from codeweaver.core import (
+    BaseEnum,
+    CategoryName,
+    CategoryNameT,
+    SemanticSearchLanguage,
+    ThingNameT,
+    generate_field_title,
+    rpartial,
+)
 from codeweaver.semantic.classifications import ImportanceRank, SemanticClass
 
 
@@ -681,18 +685,22 @@ class GrammarBasedClassifier:
         """
         thing_name = str(thing.name)
         return {
-            SemanticSearchLanguage.RUBY: lambda: self._classify_ruby_primary(thing_name)
-            # ty seems to think this is not ok -- it's explicitly defined on `Thing` as `__contains__`
-            if CategoryName("primary") in thing  # ty: ignore[unsupported-operator]
-            else None,
-            SemanticSearchLanguage.RUST: lambda: self._classify_rust_declaration_statement(
-                thing_name
-            )
-            if CategoryName("declaration_statement") in thing  # ty: ignore[unsupported-operator]
-            else None,
-            SemanticSearchLanguage.SCALA: lambda: self._classify_scala_definition(thing_name)
-            if CategoryName("definition") in thing  # ty: ignore[unsupported-operator]
-            else None,
+            SemanticSearchLanguage.RUBY: lambda: (
+                self._classify_ruby_primary(thing_name)
+                # ty seems to think this is not ok -- it's explicitly defined on `Thing` as `__contains__`
+                if CategoryName("primary") in thing  # ty: ignore[unsupported-operator]
+                else None
+            ),
+            SemanticSearchLanguage.RUST: lambda: (
+                self._classify_rust_declaration_statement(thing_name)
+                if CategoryName("declaration_statement") in thing  # ty: ignore[unsupported-operator]
+                else None
+            ),
+            SemanticSearchLanguage.SCALA: lambda: (
+                self._classify_scala_definition(thing_name)
+                if CategoryName("definition") in thing  # ty: ignore[unsupported-operator]
+                else None
+            ),
         }.get(language, lambda: None)()
 
     def _classify_by_cross_language_lookup(

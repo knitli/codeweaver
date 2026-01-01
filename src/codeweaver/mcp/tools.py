@@ -16,7 +16,7 @@ from fastmcp.client.transports import FastMCPTransport
 from fastmcp.tools import Tool
 from mcp.types import ToolAnnotations
 
-from codeweaver.agent_api.find_code.types import FindCodeResponseSummary
+from codeweaver.agent_api import FindCodeResponseSummary
 from codeweaver.core import DictView, lazy_import
 from codeweaver.mcp.types import ToolRegistrationDict
 from codeweaver.mcp.user_agent import find_code_tool

@@ -14,7 +14,7 @@ from typing import ClassVar, cast
 from pydantic import ConfigDict, PrivateAttr
 
 from codeweaver.common.registry.types import Feature, ServiceCard, ServiceCardDict, ServiceName
-from codeweaver.core.types.models import BasedModel
+from codeweaver.core import BasedModel
 
 
 class ServicesRegistry(BasedModel):

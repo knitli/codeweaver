@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 def get_baai_reranking_capabilities() -> Sequence[RerankingModelCapabilities]:
     """Get the BAAI reranking model capabilities."""
-    from codeweaver.core.types.provider import Provider
+    from codeweaver.core import Provider
     from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
     from codeweaver.providers.reranking.capabilities.types import PartialRerankingCapabilitiesDict
 

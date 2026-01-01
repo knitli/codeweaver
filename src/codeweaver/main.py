@@ -19,7 +19,7 @@ from typing import Any, Literal, cast
 from fastmcp import FastMCP
 from pydantic import FilePath
 
-from codeweaver.config.types import CodeWeaverSettingsDict
+from codeweaver.config import CodeWeaverSettingsDict
 from codeweaver.core import InitializationError, lazy_import
 from codeweaver.core import Provider as Provider
 
@@ -103,15 +103,12 @@ async def _run_http_server(
         verbose: Enable verbose logging
         debug: Enable debug logging
     """
-    from codeweaver.cli.ui import StatusDisplay
-    from codeweaver.common.statistics import get_session_statistics
-    from codeweaver.config.settings import get_settings
-    from codeweaver.core import get_project_path
-    from codeweaver.core.types.sentinel import Unset
-    from codeweaver.mcp.server import create_http_server
-    from codeweaver.mcp.state import CwMcpHttpState
-    from codeweaver.server.lifespan import http_lifespan
-    from codeweaver.server.management import ManagementServer
+    from codeweaver.cli import StatusDisplay
+    from codeweaver.common import get_session_statistics
+    from codeweaver.config import get_settings
+    from codeweaver.core import Unset, get_project_path
+    from codeweaver.mcp import CwMcpHttpState, create_http_server
+    from codeweaver.server import ManagementServer, http_lifespan
 
     # Load settings
     settings = get_settings()
@@ -124,8 +121,8 @@ async def _run_http_server(
 
     # Setup logging
     if verbose or debug:
-        from codeweaver.config.settings import get_settings_map
-        from codeweaver.server._logging import setup_logger
+        from codeweaver.config import get_settings_map
+        from codeweaver.server import setup_logger
 
         setup_logger(get_settings_map())
 
@@ -148,7 +145,7 @@ async def _run_http_server(
     original_sigint_handler = _setup_signal_handler()
 
     # Initialize provider registry
-    registry = lazy_import("codeweaver.common.registry.provider", "get_provider_registry")  # type: ignore
+    registry = lazy_import("codeweaver.common", "get_provider_registry")  # type: ignore
     _ = registry._resolve()()  # type: ignore
 
     # Suppress uvicorn loggers if not in verbose/debug mode
@@ -269,11 +266,11 @@ async def get_stdio_server(
         Configured FastMCP stdio server instance (not yet running).
 
     """
-    from codeweaver.mcp.server import create_stdio_server
+    from codeweaver.mcp import create_stdio_server
 
     if config_file or project_path:
         # We normally want to use the global settings instance, but here because a proxied stdio client could be used in isolation and outside a typical configuration, we create a unique settings instance.
-        from codeweaver.config.settings import CodeWeaverSettings, get_settings
+        from codeweaver.config import CodeWeaverSettings, get_settings
 
         global_settings = get_settings()
         if config_file and isinstance(config_file, Path) and config_file.exists():

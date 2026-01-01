@@ -23,11 +23,15 @@ from pydantic.dataclasses import dataclass
 from starlette.middleware import Middleware as ASGIMiddleware
 
 from codeweaver import __version__ as version
-from codeweaver.common.http_pool import HttpClientPool
-from codeweaver.common.registry import ModelRegistry, ProviderRegistry, ServicesRegistry
-from codeweaver.common.statistics import SessionStatistics
-from codeweaver.common.telemetry.client import PostHogClient
-from codeweaver.config.settings import CodeWeaverSettings
+from codeweaver.common import (
+    HttpClientPool,
+    ModelRegistry,
+    PostHogClient,
+    ProviderRegistry,
+    ServicesRegistry,
+    SessionStatistics,
+)
+from codeweaver.config import CodeWeaverSettings
 from codeweaver.core import (
     DATACLASS_CONFIG,
     AnonymityConversion,
@@ -40,32 +44,30 @@ from codeweaver.core import (
 )
 from codeweaver.core import Provider as Provider
 from codeweaver.di import get_container
-from codeweaver.engine.failover import VectorStoreFailoverManager
-from codeweaver.engine.indexer import Indexer
-from codeweaver.mcp.state import CwMcpHttpState
+from codeweaver.engine import Indexer, VectorStoreFailoverManager
+from codeweaver.mcp import CwMcpHttpState
 from codeweaver.server.health.health_service import HealthService
 from codeweaver.server.management import ManagementServer
 
 
 if TYPE_CHECKING:
-    from codeweaver.core import LazyImport
-    from codeweaver.core.types import AnonymityConversion, FilteredKeyT
+    from codeweaver.core import AnonymityConversion, FilteredKeyT, LazyImport
 
 # lazy imports for default factory functions
 get_provider_registry: LazyImport[Callable[[], ProviderRegistry]] = lazy_import(
-    "codeweaver.common.registry.provider", "get_provider_registry"
+    "codeweaver.common", "get_provider_registry"
 )
 get_services_registry: LazyImport[Callable[[], ServicesRegistry]] = lazy_import(
-    "codeweaver.common.registry.services", "get_services_registry"
+    "codeweaver.common", "get_services_registry"
 )
 get_model_registry: LazyImport[Callable[[], ModelRegistry]] = lazy_import(
-    "codeweaver.common.registry.models", "get_model_registry"
+    "codeweaver.common", "get_model_registry"
 )
 get_session_statistics: LazyImport[Callable[[], SessionStatistics]] = lazy_import(
-    "codeweaver.common.statistics", "get_session_statistics"
+    "codeweaver.common", "get_session_statistics"
 )
 get_settings: LazyImport[Callable[[], CodeWeaverSettings]] = lazy_import(
-    "codeweaver.config.settings", "get_settings"
+    "codeweaver.config", "get_settings"
 )
 
 _logger = logging.getLogger(__name__)
@@ -181,7 +183,7 @@ class CodeWeaverState(DataclassSerializationMixin):
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         # Each of the values that are BasedModel or DataclassSerializationMixin have their own filters
-        from codeweaver.core.types import AnonymityConversion, FilteredKey
+        from codeweaver.core import AnonymityConversion, FilteredKey
 
         return {
             # We'd need to make broader use of the Unset sentinel for that to work well
@@ -278,7 +280,7 @@ async def _cleanup_state(
     # Capture session telemetry event before shutdown
     if state.telemetry and state.telemetry.enabled:
         try:
-            from codeweaver.common.telemetry.events import capture_session_event
+            from codeweaver.common import capture_session_event
 
             # Calculate session duration
             duration_seconds = time.time() - state.startup_time
@@ -335,7 +337,7 @@ async def lifespan(
         verbose: Enable verbose logging
         debug: Enable debug logging
     """
-    from codeweaver.cli.ui import StatusDisplay
+    from codeweaver.cli import StatusDisplay
 
     # Create StatusDisplay for clean user-facing output
     status_display = StatusDisplay()
@@ -450,7 +452,7 @@ async def _initialize_cw_state(
 
     # Ensure telemetry is initialized
     if not state.telemetry:
-        from codeweaver.common.telemetry.client import PostHogClient
+        from codeweaver.common import PostHogClient
 
         state.telemetry = PostHogClient.from_settings(state.settings)
 

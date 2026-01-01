@@ -14,7 +14,7 @@ from pydantic import NonNegativeInt
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.chunks import CodeChunk
+    from codeweaver.core import CodeChunk
     from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
     from codeweaver.providers.reranking.capabilities.types import PartialRerankingCapabilitiesDict
 
@@ -82,7 +82,7 @@ def _voyage_max_limit(chunks: list[CodeChunk], query: str) -> tuple[bool, NonNeg
 
 def _get_voyage_capabilities() -> PartialRerankingCapabilitiesDict:
     """Get the common capabilities for Voyage models."""
-    from codeweaver.core.types.provider import Provider
+    from codeweaver.core import Provider
 
     return {
         "name": "rerank-2.5",

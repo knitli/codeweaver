@@ -15,8 +15,8 @@ such as `embedding`, `sparse_embedding`, `reranking`, `vector_store`, `agent`, a
 The `Provider` enum also includes methods for retrieving some provider-specific information, such as environment variables used by the provider's client that are not part of CodeWeaver's settings.
 """
 
-from codeweaver.core.types.env import EnvVarInfo as ProviderEnvVarInfo
-from codeweaver.core.types.provider import Provider, ProviderEnvVars, ProviderKind
+from codeweaver.core import EnvVarInfo as ProviderEnvVarInfo
+from codeweaver.core import Provider, ProviderEnvVars, ProviderKind
 
 
 __all__ = ("Provider", "ProviderEnvVarInfo", "ProviderEnvVars", "ProviderKind")

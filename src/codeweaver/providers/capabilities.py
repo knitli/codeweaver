@@ -408,4 +408,4 @@ def get_client_map(provider: LiteralProvider) -> tuple[Client, ...]:
     return CLIENT_MAP.get(provider, ())
 
 
-__all__ = ("CLIENT_MAP")
+__all__ = "CLIENT_MAP"

@@ -25,16 +25,15 @@ import pytest
 
 from pydantic import ValidationError
 
-from codeweaver.agent_api.find_code import find_code
-from codeweaver.agent_api.find_code.intent import IntentType
-from codeweaver.agent_api.find_code.types import (
+from codeweaver.agent_api import (
     CodeMatch,
     CodeMatchType,
     FindCodeResponseSummary,
+    IntentType,
     SearchStrategy,
+    find_code,
 )
-from codeweaver.core.language import SemanticSearchLanguage
-from codeweaver.core.metadata import ChunkKind
+from codeweaver.core import ChunkKind, SemanticSearchLanguage
 
 
 pytestmark = [pytest.mark.validation]
@@ -273,11 +272,7 @@ class TestCodeMatchSchema:
         """Verify span tuple validation (2 elements, start <= end, >= 1)."""
         from pathlib import Path
 
-        from codeweaver.core import uuid7
-        from codeweaver.core.chunks import CodeChunk
-        from codeweaver.core.discovery import DiscoveredFile
-        from codeweaver.core.metadata import ExtKind
-        from codeweaver.core.spans import Span
+        from codeweaver.core import CodeChunk, DiscoveredFile, ExtKind, Span, uuid7
 
         # Create minimal test data
         test_file = DiscoveredFile(path=Path("test.py"))
@@ -399,11 +394,7 @@ class TestContractExamples:
         """Verify response can represent the simple search example from contract."""
         from pathlib import Path
 
-        from codeweaver.core import uuid7
-        from codeweaver.core.chunks import CodeChunk
-        from codeweaver.core.discovery import DiscoveredFile
-        from codeweaver.core.metadata import ExtKind
-        from codeweaver.core.spans import Span
+        from codeweaver.core import CodeChunk, DiscoveredFile, ExtKind, Span, uuid7
 
         # Recreate example from contract
         example_file = DiscoveredFile(path=Path("src/auth/middleware.py"))

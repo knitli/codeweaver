@@ -16,10 +16,12 @@ import pytest
 from qdrant_client import AsyncQdrantClient
 from voyageai.client_async import AsyncClient
 
-from codeweaver.config.providers import QdrantConfig
-from codeweaver.providers.embedding.capabilities.voyage import get_voyage_embedding_capabilities
-from codeweaver.providers.embedding.providers.voyage import VoyageEmbeddingProvider
-from codeweaver.providers.vector_stores.qdrant import QdrantVectorStoreProvider
+from codeweaver.config import QdrantConfig
+from codeweaver.providers import (
+    QdrantVectorStoreProvider,
+    VoyageEmbeddingProvider,
+    get_voyage_embedding_capabilities,
+)
 
 
 embedding_caps = next(

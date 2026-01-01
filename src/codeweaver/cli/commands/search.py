@@ -20,18 +20,15 @@ from cyclopts import App
 from pydantic import FilePath
 from rich.table import Table
 
-from codeweaver.agent_api.find_code import find_code
-from codeweaver.agent_api.find_code.intent import IntentType
-from codeweaver.agent_api.find_code.types import CodeMatch, FindCodeResponseSummary
+from codeweaver.agent_api import CodeMatch, FindCodeResponseSummary, IntentType, find_code
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
-from codeweaver.config.settings import get_settings_map
+from codeweaver.config import get_settings_map
 from codeweaver.core import CodeWeaverError, resolve_project_root
 
 
 if TYPE_CHECKING:
-    from codeweaver.config.settings import CodeWeaverSettings
-    from codeweaver.config.types import CodeWeaverSettingsDict
-    from codeweaver.core.types.dictview import DictView
+    from codeweaver.config import CodeWeaverSettings, CodeWeaverSettingsDict
+    from codeweaver.core import DictView
 
 _display: StatusDisplay = get_display()
 logger = logging.getLogger(__name__)
@@ -48,7 +45,7 @@ async def _index_exists(settings: DictView[CodeWeaverSettingsDict]) -> bool:
         True if a valid index exists with indexed files
     """
     try:
-        from codeweaver.engine.indexer.manifest import FileManifestManager
+        from codeweaver.engine import FileManifestManager
 
         project_path = (
             settings.get("project_path")
@@ -81,8 +78,8 @@ async def _run_search_indexing(
     Raises:
         Exception: On indexing failure
     """
-    from codeweaver.core.types.dictview import DictView
-    from codeweaver.engine.indexer import Indexer, IndexingProgressTracker
+    from codeweaver.core import DictView
+    from codeweaver.engine import Indexer, IndexingProgressTracker
 
     display = _display
     display.print_warning("No index found. Indexing project...")
@@ -144,13 +141,13 @@ async def search(
     try:
         settings = get_settings_map()
         if project_path or config_file:
-            from codeweaver.config.settings import update_settings
+            from codeweaver.config import update_settings
 
             settings = update_settings(project_path=project_path, config_file=config_file)  # type: ignore
 
         # Check if index exists, auto-index if needed
         if not await _index_exists(settings):
-            from codeweaver.config.settings import get_settings
+            from codeweaver.config import get_settings
 
             settings_obj = get_settings()
             await _run_search_indexing(settings_obj)

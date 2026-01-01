@@ -53,7 +53,7 @@ if TYPE_CHECKING:
         FileWatcher,
         IgnoreFilter,
     )
-    from codeweaver.providers.vector_stores.search import (
+    from codeweaver.providers import (
         AnyVariants,
         ArbitraryFilter,
         Condition,

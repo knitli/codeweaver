@@ -14,7 +14,7 @@ from functools import lru_cache
 from types import MappingProxyType
 from typing import TYPE_CHECKING, TypedDict
 
-from codeweaver.core.language import SemanticSearchLanguage
+from codeweaver.core import SemanticSearchLanguage
 
 
 logger = logging.getLogger(__name__)

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from codeweaver.core.types.search import SearchResult
+from codeweaver.core import SearchResult
 
 
 if TYPE_CHECKING:

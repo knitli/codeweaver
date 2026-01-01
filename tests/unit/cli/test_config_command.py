@@ -23,8 +23,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from codeweaver.cli.commands.config import app as config_app
-from codeweaver.cli.commands.init import app as init_app  # For setup in integration tests
+from codeweaver.cli import app as config_app
+from codeweaver.cli import app as init_app  # For setup in integration tests
 
 
 @pytest.fixture
@@ -103,7 +103,7 @@ model = "test-model"
 """
         config_path.write_text(config_content)
 
-        from codeweaver.config.settings import CodeWeaverSettings
+        from codeweaver.config import CodeWeaverSettings
         from codeweaver.core import CodeWeaverError
 
         with pytest.raises((CodeWeaverError, ValueError)):

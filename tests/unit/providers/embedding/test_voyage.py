@@ -9,12 +9,13 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from codeweaver.core.chunks import CodeChunk
-from codeweaver.core.language import SemanticSearchLanguage
-from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
-from codeweaver.providers.embedding.providers.base import EmbeddingErrorInfo
-from codeweaver.providers.embedding.providers.voyage import VoyageEmbeddingProvider
-from codeweaver.providers.provider import Provider
+from codeweaver.core import CodeChunk, SemanticSearchLanguage
+from codeweaver.providers import (
+    EmbeddingErrorInfo,
+    EmbeddingModelCapabilities,
+    Provider,
+    VoyageEmbeddingProvider,
+)
 
 
 pytestmark = [pytest.mark.unit]
@@ -23,9 +24,9 @@ pytestmark = [pytest.mark.unit]
 @pytest.fixture(autouse=True)
 def reset_embedding_registry():
     """Reset the global embedding registry and hash stores between tests to avoid state pollution."""
-    import codeweaver.providers.embedding.registry as registry_module
+    import codeweaver.providers as registry_module
 
-    from codeweaver.providers.embedding.providers.base import EmbeddingProvider
+    from codeweaver.providers import EmbeddingProvider
 
     # Reset the global singleton registry
     registry_module._embedding_registry = None
@@ -157,9 +158,7 @@ class TestVoyageEmbeddingProviderEmbedding:
         )
         from pathlib import Path
 
-        from codeweaver.core import uuid7
-        from codeweaver.core.metadata import ChunkKind, ExtKind
-        from codeweaver.core.spans import Span
+        from codeweaver.core import ChunkKind, ExtKind, Span, uuid7
 
         # Create test chunks
         chunks = [
@@ -271,7 +270,7 @@ class TestVoyageEmbeddingProviderEmbedding:
             return [[0.1] * 1024, [0.2] * 1024]
 
         # Monkey-patch the transformer for this test
-        import codeweaver.providers.embedding.providers.voyage as voyage_module
+        import codeweaver.providers as voyage_module
 
         original_transformer = voyage_module.voyage_context_output_transformer
         voyage_module.voyage_context_output_transformer = mock_transformer  # ty: ignore[invalid-assignment]
@@ -283,9 +282,7 @@ class TestVoyageEmbeddingProviderEmbedding:
 
             from pathlib import Path
 
-            from codeweaver.core import uuid7
-            from codeweaver.core.metadata import ChunkKind, ExtKind
-            from codeweaver.core.spans import Span
+            from codeweaver.core import ChunkKind, ExtKind, Span, uuid7
 
             # Create test chunks
             chunks = [
@@ -341,9 +338,7 @@ class TestVoyageEmbeddingProviderErrorHandling:
 
         from pathlib import Path
 
-        from codeweaver.core import uuid7
-        from codeweaver.core.metadata import ChunkKind, ExtKind
-        from codeweaver.core.spans import Span
+        from codeweaver.core import ChunkKind, ExtKind, Span, uuid7
 
         # Create test chunks
         chunks = [

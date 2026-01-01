@@ -15,13 +15,13 @@ from pathlib import Path
 import pytest
 
 from codeweaver.core import uuid7
-from codeweaver.core.language import SemanticSearchLanguage as Language
-from codeweaver.providers.vector_stores.inmemory import MemoryVectorStoreProvider
-from codeweaver.config.providers import MemoryConfig
+from codeweaver.core import SemanticSearchLanguage as Language
+from codeweaver.providers import MemoryVectorStoreProvider
+from codeweaver.config import MemoryConfig
 
 # sourcery skip: dont-import-test-modules
 from tests.conftest import create_test_chunk_with_embeddings
-from codeweaver.providers.provider import Provider
+from codeweaver.providers import Provider
 
 pytestmark = [pytest.mark.integration]
 
@@ -76,7 +76,7 @@ async def test_inmemory_persistence():
         await provider2._initialize()
 
         # Verify: Chunk restored from disk
-        from codeweaver.core.types.search import SearchStrategy, StrategizedQuery
+        from codeweaver.core import SearchStrategy, StrategizedQuery
 
         # Use the same dimension as we used for upserting
         dense_caps2 = provider2._embedding_caps.get("dense")

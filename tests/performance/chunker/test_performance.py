@@ -28,10 +28,9 @@ from pathlib import Path
 
 import pytest
 
-from codeweaver.core.discovery import DiscoveredFile
-from codeweaver.engine.chunker.base import ChunkGovernor
-from codeweaver.engine.chunker.selector import ChunkerSelector
-from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+from codeweaver.core import DiscoveredFile
+from codeweaver.engine import ChunkerSelector, ChunkGovernor
+from codeweaver.providers import EmbeddingModelCapabilities
 
 
 pytestmark = [pytest.mark.benchmark, pytest.mark.performance, pytest.mark.slow]
@@ -355,9 +354,8 @@ class TestChunkerPerformance:
         Current measured: Semantic ~2.16s, Delimiter faster
         Regression threshold: < 3.0s per file for semantic chunker (measured + 40% margin)
         """
-        from codeweaver.core.language import SemanticSearchLanguage
-        from codeweaver.engine.chunker.delimiter import DelimiterChunker
-        from codeweaver.engine.chunker.semantic import SemanticChunker
+        from codeweaver.core import SemanticSearchLanguage
+        from codeweaver.engine import DelimiterChunker, SemanticChunker
 
         content = generate_python_file(500)
         file_path = Path("comparison.py")

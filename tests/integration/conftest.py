@@ -20,36 +20,28 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from codeweaver.common.registry.provider import ProviderRegistry
-from codeweaver.providers.embedding.providers.fastembed import FastEmbedEmbeddingProvider
-from codeweaver.providers.vector_stores.inmemory import MemoryVectorStoreProvider
+from codeweaver.common import ProviderRegistry
+from codeweaver.providers import FastEmbedEmbeddingProvider, MemoryVectorStoreProvider
 
 
 if TYPE_CHECKING:
-    from codeweaver.config.providers import (
+    from codeweaver.config import (
+        CodeWeaverSettingsDict,
         EmbeddingProviderSettings,
         RerankingProviderSettings,
         SparseEmbeddingProviderSettings,
     )
-    from codeweaver.config.types import CodeWeaverSettingsDict
-    from codeweaver.core.chunks import CodeChunk
-    from codeweaver.core.types.dictview import DictView
-    from codeweaver.providers.embedding.capabilities.base import (
+    from codeweaver.core import CodeChunk, DictView
+    from codeweaver.providers import (
         EmbeddingModelCapabilities,
-        SparseEmbeddingModelCapabilities,
-    )
-    from codeweaver.providers.embedding.providers.fastembed import (
         FastEmbedEmbeddingProvider,
+        FastEmbedRerankingProvider,
         FastEmbedSparseProvider,
-    )
-    from codeweaver.providers.embedding.providers.sentence_transformers import (
+        RerankingModelCapabilities,
         SentenceTransformersEmbeddingProvider,
-        SentenceTransformersSparseProvider,
-    )
-    from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
-    from codeweaver.providers.reranking.providers.fastembed import FastEmbedRerankingProvider
-    from codeweaver.providers.reranking.providers.sentence_transformers import (
         SentenceTransformersRerankingProvider,
+        SentenceTransformersSparseProvider,
+        SparseEmbeddingModelCapabilities,
     )
 
 logger = logging.getLogger(__name__)
@@ -87,7 +79,7 @@ def _set_settings() -> DictView[CodeWeaverSettingsDict]:
 
     No manual loading needed - the config system handles it automatically.
     """
-    from codeweaver.config.settings import get_settings_map
+    from codeweaver.config import get_settings_map
 
     # Just return the settings map - config system already loaded codeweaver.test.toml
     # because CODEWEAVER_TEST_MODE="true" (set at top of this file)
@@ -104,7 +96,7 @@ def _get_configs(
     *, sparse: bool = False, rerank: bool = False
 ) -> EmbeddingProviderSettings | SparseEmbeddingProviderSettings | RerankingProviderSettings:
     """Get the model name for testing based on available libraries."""
-    from codeweaver.config.profiles import get_profile
+    from codeweaver.config import get_profile
 
     profile = get_profile("backup", vector_deployment="local")
     if rerank:
@@ -129,7 +121,7 @@ def mock_confirm(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     mock.ask.return_value = True
 
     # Patch the module-level import in init.py (imported at line 27)
-    monkeypatch.setattr("codeweaver.cli.commands.init.Confirm", mock)
+    monkeypatch.setattr("codeweaver.cliConfirm", mock)
     # Also patch the base location to catch any other imports
     monkeypatch.setattr("rich.prompt.Confirm", mock)
 
@@ -161,7 +153,7 @@ def mock_embedding_provider() -> AsyncMock:
 def _get_caps() -> tuple[
     EmbeddingModelCapabilities, SparseEmbeddingModelCapabilities, RerankingModelCapabilities
 ]:
-    from codeweaver.common.registry.models import get_model_registry
+    from codeweaver.common import get_model_registry
 
     model_registry = get_model_registry()
     settings = (_get_configs(), _get_configs(sparse=True), _get_configs(rerank=True))
@@ -184,7 +176,7 @@ async def actual_dense_embedding_provider() -> (
 ):
     """Provide an actual dense embedding provider using SentenceTransformers."""
     caps, _, _ = _get_caps()
-    from codeweaver.common.registry.provider import get_provider_registry
+    from codeweaver.common import get_provider_registry
 
     registry = get_provider_registry()
     # Registry will get capabilities from the configured "testing" profile settings
@@ -217,7 +209,7 @@ async def actual_sparse_embedding_provider() -> (
 ):
     """Provide an actual sparse embedding provider using SentenceTransformers."""
     _, caps, _ = _get_caps()
-    from codeweaver.common.registry.provider import get_provider_registry
+    from codeweaver.common import get_provider_registry
 
     registry = get_provider_registry()
     # Pass caps explicitly so registry doesn't need to look them up from global settings
@@ -232,12 +224,15 @@ async def actual_sparse_embedding_provider() -> (
 @pytest.fixture
 def mock_vector_store() -> AsyncMock:
     """Provide a mock vector store that returns search results."""
-    from codeweaver.core import uuid7
-    from codeweaver.core.chunks import CodeChunk
-    from codeweaver.core.language import SemanticSearchLanguage
-    from codeweaver.core.metadata import ChunkKind, ExtKind
-    from codeweaver.core.spans import Span
-    from codeweaver.core.types.search import SearchResult
+    from codeweaver.core import (
+        ChunkKind,
+        CodeChunk,
+        ExtKind,
+        SearchResult,
+        SemanticSearchLanguage,
+        Span,
+        uuid7,
+    )
 
     mock_store = AsyncMock()
 
@@ -292,11 +287,14 @@ async def actual_vector_store() -> MemoryVectorStoreProvider:
     Uses a singleton instance and a FIXED collection name to ensure that
     different components (e.g., Indexer and Search) share the same in-memory data.
     """
-    from codeweaver.common.registry import get_provider_registry
+    from codeweaver.common import get_provider_registry
     from codeweaver.di import get_container
-    from codeweaver.providers.provider import Provider, ProviderKind
-    from codeweaver.providers.vector_stores.base import VectorStoreProvider
-    from codeweaver.providers.vector_stores.inmemory import MemoryVectorStoreProvider
+    from codeweaver.providers import (
+        MemoryVectorStoreProvider,
+        Provider,
+        ProviderKind,
+        VectorStoreProvider,
+    )
 
     global _shared_memory_vector_store
     if _shared_memory_vector_store is None:
@@ -381,7 +379,7 @@ async def actual_reranking_provider() -> (
 ):
     """Provide an actual reranking provider using SentenceTransformers."""
     _, _, caps = _get_caps()
-    from codeweaver.common.registry.provider import get_provider_registry
+    from codeweaver.common import get_provider_registry
 
     registry = get_provider_registry()
     # Pass caps explicitly so registry doesn't need to look them up from global settings
@@ -453,9 +451,7 @@ def configured_providers(
     """Fixture that patches the provider registry with mock providers."""
     # Patch both the provider registry and time.time to ensure monotonic timing
     from codeweaver.di import get_container
-    from codeweaver.providers.embedding.providers.base import EmbeddingProvider
-    from codeweaver.providers.reranking.providers.base import RerankingProvider
-    from codeweaver.providers.vector_stores.base import VectorStoreProvider
+    from codeweaver.providers import EmbeddingProvider, RerankingProvider, VectorStoreProvider
 
     container = get_container()
     container.override(EmbeddingProvider, mock_embedding_provider)
@@ -470,10 +466,8 @@ def configured_providers(
         return 1000000.0 + call_count[0] * 0.001
 
     with (
-        patch(
-            "codeweaver.common.registry.get_provider_registry", return_value=mock_provider_registry
-        ),
-        patch("codeweaver.agent_api.find_code.time.time", side_effect=mock_time),
+        patch("codeweaver.common", return_value=mock_provider_registry),
+        patch("codeweaver.agent_api", side_effect=mock_time),
     ):
         yield mock_provider_registry
         container.clear_overrides()
@@ -487,7 +481,7 @@ def configured_providers(
 @pytest.fixture
 def mock_settings_with_providers() -> MagicMock:
     """Provide mock settings with provider configuration."""
-    from codeweaver.config.settings import CodeWeaverSettings as Settings
+    from codeweaver.config import CodeWeaverSettings as Settings
 
     mock_settings = MagicMock(spec=Settings)
     mock_settings.providers = {
@@ -1006,10 +1000,8 @@ def real_providers(real_provider_registry: MagicMock) -> Generator[ProviderRegis
         return 1000000.0 + call_count[0] * 0.001
 
     with (
-        patch(
-            "codeweaver.common.registry.get_provider_registry", return_value=real_provider_registry
-        ),
-        patch("codeweaver.agent_api.find_code.time.time", side_effect=mock_time),
+        patch("codeweaver.common", return_value=real_provider_registry),
+        patch("codeweaver.agent_api", side_effect=mock_time),
     ):
         yield real_provider_registry
 
@@ -1020,22 +1012,25 @@ def real_providers(real_provider_registry: MagicMock) -> Generator[ProviderRegis
 
 
 @pytest.fixture
-async def initialized_cw_state(tmp_path: Path, actual_vector_store, clean_container) -> AsyncGenerator[Any, None]:
+async def initialized_cw_state(
+    tmp_path: Path, actual_vector_store, clean_container
+) -> AsyncGenerator[Any, None]:
     """Initialize CodeWeaverState for integration tests using DI.
 
     This fixture ensures CodeWeaverState is properly initialized via the DI
     container, allowing for consistent dependency resolution and overrides.
     """
-    from codeweaver.config.settings import CodeWeaverSettings, reset_settings
-    from codeweaver.providers.vector_stores.base import VectorStoreProvider
-    from codeweaver.server.server import CodeWeaverState
+    from codeweaver.config import CodeWeaverSettings, reset_settings
+    from codeweaver.providers import VectorStoreProvider
+    from codeweaver.server import CodeWeaverState
 
     # Reset state to ensure isolation
     reset_settings()
 
     # Factory for test settings
     async def get_test_settings() -> CodeWeaverSettings:
-        from codeweaver.config.settings import get_settings
+        from codeweaver.config import get_settings
+
         # This properly initializes the singleton with defaults from codeweaver.test.toml
         # including the "providers" dict
         settings = get_settings()
@@ -1052,15 +1047,17 @@ async def initialized_cw_state(tmp_path: Path, actual_vector_store, clean_contai
     with clean_container.use_overrides(overrides):
         # Resolve state via container (this will trigger resolution of all deps)
         state = await clean_container.resolve(CodeWeaverState)
-        
+
         # CRITICAL: Set the global state so get_state() works during tests
         from codeweaver.server import server
+
         server._state = state
-        
+
         yield state
 
     # Cleanup: Reset global state
     from codeweaver.server import server
+
     server._state = None
 
 
@@ -1075,9 +1072,9 @@ async def indexed_test_project(known_test_codebase, clean_container):
     4. Ensures global state is correctly initialized
     5. Yields the project path for tests
     """
-    from codeweaver.config.settings import CodeWeaverSettings, get_settings
-    from codeweaver.engine.indexer.indexer import Indexer
-    from codeweaver.server.server import CodeWeaverState
+    from codeweaver.config import CodeWeaverSettings, get_settings
+    from codeweaver.engine import Indexer
+    from codeweaver.server import CodeWeaverState
 
     # Ensure known_test_codebase is absolute
     project_path = known_test_codebase.resolve()
@@ -1095,28 +1092,31 @@ async def indexed_test_project(known_test_codebase, clean_container):
 
     # Resolve state via container to ensure it's initialized with correct settings
     state = await clean_container.resolve(CodeWeaverState)
-    
+
     # CRITICAL: Set the global state so get_state() works during tests
     from codeweaver.server import server
+
     server._state = state
 
     # Patch time for deterministic behavior if needed
     call_count = [0]
+
     def mock_time() -> float:
         call_count[0] += 1
         return 1000000.0 + call_count[0] * 0.001
 
-    with patch("codeweaver.agent_api.find_code.time.time", side_effect=mock_time):
+    with patch("codeweaver.agent_api", side_effect=mock_time):
         # Resolve indexer from container
         indexer = await clean_container.resolve(Indexer)
-        
+
         # Ensure it's using the correct project path
         indexer._project_path = project_path
-        
+
         await indexer.prime_index(force_reindex=True)
 
         yield project_path
 
     # Cleanup: Reset global state
     from codeweaver.server import server
+
     server._state = None

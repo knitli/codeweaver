@@ -11,13 +11,13 @@ import logging
 
 from typing import TYPE_CHECKING
 
-from codeweaver.config._logging import DefaultLoggingSettings, LoggingSettings
-from codeweaver.core.types.sentinel import Unset
+from codeweaver.config import DefaultLoggingSettings, LoggingSettings
+from codeweaver.core import Unset
 
 
 if TYPE_CHECKING:
-    from codeweaver.config.types import CodeWeaverSettingsDict
-    from codeweaver.core.types import DictView
+    from codeweaver.config import CodeWeaverSettingsDict
+    from codeweaver.core import DictView
 
 
 def _set_log_levels():
@@ -81,7 +81,7 @@ def setup_logger(settings: DictView[CodeWeaverSettingsDict]) -> logging.Logger:
     rich = app_logger_settings.get("use_rich", True)
     rich_options = app_logger_settings.get("rich_options", {})
     logging_kwargs = app_logger_settings.get("dict_config", None)
-    from codeweaver.common._logging import setup_logger as setup_global_logging
+    from codeweaver.common import setup_logger as setup_global_logging
 
     app_logger = setup_global_logging(
         name="codeweaver",

@@ -56,8 +56,7 @@ if TYPE_CHECKING:
 
     from codeweaver.core.discovery import DiscoveredFile
     from codeweaver.core.types import AnonymityConversion
-    from codeweaver.providers.embedding.registry import EmbeddingRegistry
-    from codeweaver.providers.embedding.types import EmbeddingBatchInfo
+    from codeweaver.providers import EmbeddingBatchInfo, EmbeddingRegistry
 
 # ---------------------------------------------------------------------------
 # *                    Code Search and Chunks
@@ -79,7 +78,7 @@ type StructuredDataInput = (
 
 
 def _get_registry() -> EmbeddingRegistry:
-    from codeweaver.providers.embedding.registry import get_embedding_registry
+    from codeweaver.providers import get_embedding_registry
 
     return get_embedding_registry()
 

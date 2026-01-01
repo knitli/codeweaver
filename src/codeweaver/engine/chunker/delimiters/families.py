@@ -25,11 +25,11 @@ from typing import TYPE_CHECKING
 
 from pydantic import NonNegativeFloat, NonNegativeInt
 
-from codeweaver.core.types.delimiter import _LANGUAGE_TO_FAMILY, LanguageFamily
+from codeweaver.core import _LANGUAGE_TO_FAMILY, LanguageFamily
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.types.delimiter import DelimiterKind, LanguageFamily
+    from codeweaver.core import DelimiterKind, LanguageFamily
     from codeweaver.engine.chunker.delimiters.patterns import DelimiterPattern
 
 

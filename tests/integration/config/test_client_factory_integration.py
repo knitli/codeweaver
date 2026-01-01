@@ -11,7 +11,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from codeweaver.providers.provider import Provider, ProviderKind
+from codeweaver.providers import Provider, ProviderKind
 
 
 pytestmark = [pytest.mark.integration]
@@ -28,7 +28,7 @@ class TestProviderInstantiationWithClientFactory:
         """Create a ProviderRegistry for testing."""
         from unittest.mock import Mock
 
-        from codeweaver.common.registry.provider import ProviderRegistry
+        from codeweaver.common import ProviderRegistry
 
         # Create mock settings to avoid Unset type annotation issues
         mock_settings = Mock()
@@ -56,7 +56,7 @@ class TestProviderInstantiationWithClientFactory:
         # Mock the CLIENT_MAP and client class
         from inspect import Parameter, Signature
 
-        from codeweaver.providers.capabilities import Client
+        from codeweaver.providers import Client
 
         mock_client_instance = Mock()
         mock_client_class = Mock(return_value=mock_client_instance)
@@ -90,7 +90,7 @@ class TestProviderInstantiationWithClientFactory:
             )
         }
 
-        with patch("codeweaver.providers.capabilities.CLIENT_MAP", mock_client_map):
+        with patch("codeweaver.providersCLIENT_MAP", mock_client_map):
             with patch.dict("os.environ", {"VOYAGE_API_KEY": "test_key"}):
                 # Register the provider
                 registry.register(Provider.VOYAGE, ProviderKind.EMBEDDING, mock_provider_lazy)
@@ -110,7 +110,7 @@ class TestProviderInstantiationWithClientFactory:
 
     def test_create_provider_skips_client_if_provided(self, registry):
         """Test that existing client in kwargs is not overridden."""
-        from codeweaver.providers.capabilities import Client
+        from codeweaver.providers import Client
 
         mock_existing_client = Mock()
         mock_client_class = Mock()
@@ -136,7 +136,7 @@ class TestProviderInstantiationWithClientFactory:
             )
         }
 
-        with patch("codeweaver.providers.capabilities.CLIENT_MAP", mock_client_map):
+        with patch("codeweaver.providersCLIENT_MAP", mock_client_map):
             registry.register(Provider.VOYAGE, ProviderKind.EMBEDDING, mock_provider_lazy)
 
             # Pass explicit client
@@ -155,7 +155,7 @@ class TestProviderInstantiationWithClientFactory:
 
     def test_create_provider_handles_client_creation_failure(self, registry):
         """Test graceful degradation when client creation fails."""
-        from codeweaver.providers.capabilities import Client
+        from codeweaver.providers import Client
 
         mock_client_class = Mock(side_effect=Exception("Connection failed"))
         mock_lazy_import = Mock()
@@ -180,7 +180,7 @@ class TestProviderInstantiationWithClientFactory:
             )
         }
 
-        with patch("codeweaver.providers.capabilities.CLIENT_MAP", mock_client_map):
+        with patch("codeweaver.providersCLIENT_MAP", mock_client_map):
             with patch.dict("os.environ", {"VOYAGE_API_KEY": "test_key"}):
                 registry.register(Provider.VOYAGE, ProviderKind.EMBEDDING, mock_provider_lazy)
 
@@ -205,7 +205,7 @@ class TestVectorStoreProviderWithClientFactory:
         """Create a ProviderRegistry for testing."""
         from unittest.mock import Mock
 
-        from codeweaver.common.registry.provider import ProviderRegistry
+        from codeweaver.common import ProviderRegistry
 
         # Create mock settings to avoid Unset type annotation issues
         mock_settings = Mock()
@@ -230,7 +230,7 @@ class TestVectorStoreProviderWithClientFactory:
 
     def test_qdrant_provider_with_memory_mode(self, registry):
         """Test Qdrant provider creation in memory mode."""
-        from codeweaver.providers.capabilities import Client
+        from codeweaver.providers import Client
 
         mock_client_instance = Mock()
         mock_client_instance.location = ":memory:"
@@ -255,7 +255,7 @@ class TestVectorStoreProviderWithClientFactory:
             )
         }
 
-        with patch("codeweaver.providers.capabilities.CLIENT_MAP", mock_client_map):
+        with patch("codeweaver.providersCLIENT_MAP", mock_client_map):
             registry.register(Provider.QDRANT, ProviderKind.VECTOR_STORE, mock_provider_lazy)
 
             # Create provider without settings (should use memory mode)
@@ -274,7 +274,7 @@ class TestVectorStoreProviderWithClientFactory:
 
     def test_qdrant_provider_with_url_mode(self, registry):
         """Test Qdrant provider creation with URL."""
-        from codeweaver.providers.capabilities import Client
+        from codeweaver.providers import Client
 
         mock_client_instance = Mock()
         mock_client_class = Mock(return_value=mock_client_instance)
@@ -308,7 +308,7 @@ class TestVectorStoreProviderWithClientFactory:
             return original_getenv(key, default)
 
         with patch("os.getenv", side_effect=mock_getenv):
-            with patch("codeweaver.providers.capabilities.CLIENT_MAP", mock_client_map):
+            with patch("codeweaver.providersCLIENT_MAP", mock_client_map):
                 registry.register(Provider.QDRANT, ProviderKind.VECTOR_STORE, mock_provider_lazy)
 
                 # Create provider with URL
@@ -336,7 +336,7 @@ class TestProviderKindStringHandling:
         """Create a ProviderRegistry for testing."""
         from unittest.mock import Mock
 
-        from codeweaver.common.registry.provider import ProviderRegistry
+        from codeweaver.common import ProviderRegistry
 
         # Create mock settings to avoid Unset type annotation issues
         mock_settings = Mock()
@@ -363,7 +363,7 @@ class TestProviderKindStringHandling:
         """Test create_provider works with string provider_kind."""
         from inspect import Parameter, Signature
 
-        from codeweaver.providers.capabilities import Client
+        from codeweaver.providers import Client
 
         mock_client_instance = Mock()
         mock_client_class = Mock(return_value=mock_client_instance)
@@ -393,7 +393,7 @@ class TestProviderKindStringHandling:
             )
         }
 
-        with patch("codeweaver.providers.capabilities.CLIENT_MAP", mock_client_map):
+        with patch("codeweaver.providersCLIENT_MAP", mock_client_map):
             with patch.dict("os.environ", {"VOYAGE_API_KEY": "test_key"}):
                 registry.register(Provider.VOYAGE, ProviderKind.EMBEDDING, mock_provider_lazy)
 
@@ -420,7 +420,7 @@ class TestGlobalRegistryIntegration:
         """Test that global registry has client factory methods."""
         from unittest.mock import Mock
 
-        from codeweaver.common.registry.provider import ProviderRegistry
+        from codeweaver.common import ProviderRegistry
 
         # Create mock registry instance
         mock_settings = Mock()

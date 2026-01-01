@@ -13,13 +13,12 @@ from typing import TYPE_CHECKING, Annotated, Any, Literal, cast
 from codeweaver_tokenizers.base import Tokenizer
 from pydantic import ConfigDict, Field, NonNegativeInt, PositiveInt
 
+from codeweaver.core import BasedModel, Provider
 from codeweaver.core import ValidationError as CodeWeaverValidationError
-from codeweaver.core.types.models import BasedModel
-from codeweaver.core.types.provider import Provider
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.chunks import CodeChunk
+    from codeweaver.core import CodeChunk
 
 
 class RerankingModelCapabilities(BasedModel):

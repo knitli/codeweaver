@@ -117,8 +117,7 @@ from codeweaver.semantic.grammar import Category, CompositeThing, Token
 
 # type-only imports
 if TYPE_CHECKING:
-    from codeweaver.core.types.aliases import FilteredKey
-    from codeweaver.core.types.enum import AnonymityConversion
+    from codeweaver.core import AnonymityConversion, FilteredKey
     from codeweaver.semantic.classifications import AgentTask, ImportanceScores, ThingClass
 
 logger = logging.getLogger(__name__)
@@ -253,8 +252,7 @@ class FileThing[SgRoot: (AstGrepRoot)](BasedModel):
     _file_path: Path | None = PrivateAttr(default=None)
 
     def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
-        from codeweaver.core.types.aliases import FilteredKey
-        from codeweaver.core.types.enum import AnonymityConversion
+        from codeweaver.core import AnonymityConversion, FilteredKey
 
         return {
             FilteredKey("_root"): AnonymityConversion.HASH,
@@ -309,7 +307,7 @@ class FileThing[SgRoot: (AstGrepRoot)](BasedModel):
     @classmethod
     def from_file(cls, file_path: Path) -> FileThing[SgRoot]:
         """Create a FileThing from a file."""
-        from codeweaver.core.language import SemanticSearchLanguage
+        from codeweaver.core import SemanticSearchLanguage
 
         content = file_path.read_text()
         language = SemanticSearchLanguage.from_extension(
@@ -364,8 +362,7 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
         return f"{self.language.variable} node: {self.name}"
 
     def _telemetry_keys(self) -> dict[FilteredKey, AnonymityConversion]:
-        from codeweaver.core.types.aliases import FilteredKey
-        from codeweaver.core.types.enum import AnonymityConversion
+        from codeweaver.core import AnonymityConversion, FilteredKey
 
         return {
             FilteredKey("_node"): AnonymityConversion.HASH,
@@ -811,7 +808,7 @@ __all__ = (
 
 # Rebuild models to resolve forward references
 with contextlib.suppress(Exception):
-    from codeweaver.core.chunks import CodeChunk
+    from codeweaver.core import CodeChunk
     from codeweaver.semantic.types import SemanticMetadata
 
     for model in (FileThing, AstThing, SemanticMetadata, CodeChunk):

@@ -12,13 +12,11 @@ from weakref import WeakValueDictionary
 
 from pydantic import UUID7
 
-from codeweaver.core.discovery import DiscoveredFile
-from codeweaver.core.stores import UUIDStore
-from codeweaver.core.types.aliases import UUID7Hex, UUID7HexT
+from codeweaver.core import DiscoveredFile, UUID7Hex, UUID7HexT, UUIDStore
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.types import AnonymityConversion, FilteredKeyT
+    from codeweaver.core import AnonymityConversion, FilteredKeyT
 
 
 class SourceIdRegistry(UUIDStore[DiscoveredFile]):
@@ -41,7 +39,7 @@ class SourceIdRegistry(UUIDStore[DiscoveredFile]):
         self._size_limit = 1024 * 1024 * 5  # 5MB
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
-        from codeweaver.core.types import AnonymityConversion, FilteredKey
+        from codeweaver.core import AnonymityConversion, FilteredKey
 
         return {
             FilteredKey("store"): AnonymityConversion.COUNT,
@@ -120,7 +118,7 @@ def for_file_path(file_path: str | Path) -> UUID7HexT:
     Returns:
         Hex string representation of the UUID7 source ID
     """
-    from codeweaver.core.discovery import DiscoveredFile
+    from codeweaver.core import DiscoveredFile
 
     if discovered_file := DiscoveredFile.from_path(
         file_path if isinstance(file_path, Path) else Path(file_path)

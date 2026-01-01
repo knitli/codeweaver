@@ -20,18 +20,16 @@ from typing import TYPE_CHECKING, Annotated, Any, Literal, Self, cast
 from pydantic import AliasGenerator, ConfigDict, Field, JsonValue, PositiveInt, model_validator
 from pydantic.alias_generators import to_camel, to_snake
 
-from codeweaver.config.providers import BedrockProviderSettings
-from codeweaver.core import ConfigurationError
+from codeweaver.config import BedrockProviderSettings
+from codeweaver.core import BasedModel, ConfigurationError, Provider
 from codeweaver.core import ValidationError as CodeWeaverValidationError
-from codeweaver.core.types.models import BasedModel
-from codeweaver.core.types.provider import Provider
 from codeweaver.providers.reranking.capabilities.amazon import get_amazon_reranking_capabilities
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 from codeweaver.providers.reranking.providers.base import RerankingProvider, RerankingResult
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.chunks import CodeChunk, StructuredDataInput
+    from codeweaver.core import CodeChunk, StructuredDataInput
 
 
 class BaseBedrockModel(BasedModel):
@@ -245,7 +243,7 @@ def bedrock_reranking_input_transformer(
     We can't actually produce the full objects we need here with just the documents. We need the query and model config to construct the full object.
     We're going to handle that in the rerank method, and break type override law. 👮
     """
-    from codeweaver.core.chunks import CodeChunk
+    from codeweaver.core import CodeChunk
 
     # Transform the input documents into the format expected by the Bedrock API
     if isinstance(documents, list | tuple | set):
@@ -282,7 +280,7 @@ def bedrock_reranking_output_transformer(
     response: BedrockRerankingResult, original_chunks: tuple[CodeChunk, ...] | Iterator[CodeChunk]
 ) -> list[RerankingResult]:
     """Transform the Bedrock API response into the format expected by the reranking provider."""
-    from codeweaver.core.chunks import CodeChunk
+    from codeweaver.core import CodeChunk
 
     parsed_response = BedrockRerankingResult.model_validate_json(cast(bytes, response))
     results: list[RerankingResult] = []

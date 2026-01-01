@@ -17,14 +17,13 @@ from warnings import filterwarnings
 
 from pydantic import ConfigDict, SecretStr, SkipValidation
 
-from codeweaver.core import ProviderError, rpartial
-from codeweaver.core.types.provider import Provider
+from codeweaver.core import Provider, ProviderError, rpartial
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 from codeweaver.providers.reranking.providers.base import RerankingProvider, RerankingResult
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.chunks import CodeChunk
+    from codeweaver.core import CodeChunk
 
 logger = logging.getLogger(__name__)
 
@@ -96,7 +95,7 @@ class VoyageRerankingProvider(RerankingProvider[AsyncClient]):
     ) -> None:
         """Initialize the reranking provider."""
         if caps is None:
-            from codeweaver.common.registry.models import get_model_registry
+            from codeweaver.common import get_model_registry
 
             registry = get_model_registry()
             caps = registry.configured_models_for_kind("reranking")  # ty: ignore[invalid-assignment]

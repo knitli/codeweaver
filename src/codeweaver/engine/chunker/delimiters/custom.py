@@ -21,7 +21,7 @@ from types import MappingProxyType
 
 import textcase
 
-from codeweaver.core.types.sentinel import Unset
+from codeweaver.core import Unset
 from codeweaver.engine.chunker.delimiters.kind import DelimiterKind
 from codeweaver.engine.chunker.delimiters.patterns import (
     EMPTY_PATTERN,
@@ -679,8 +679,8 @@ def get_custom_patterns(language: str) -> list[DelimiterPattern]:
         >>> len(patterns)
         6
     """
-    from codeweaver.config.settings import get_settings
-    from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
+    from codeweaver.config import get_settings
+    from codeweaver.core import ConfigLanguage, SemanticSearchLanguage
 
     language = textcase.snake(language)
     delimiters: list[DelimiterPattern] = []

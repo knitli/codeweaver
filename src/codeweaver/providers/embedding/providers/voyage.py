@@ -12,9 +12,7 @@ from typing import Annotated, Any, ClassVar, cast
 from pydantic import PrivateAttr, SkipValidation
 from voyageai.object.embeddings import EmbeddingsObject
 
-from codeweaver.core import ConfigurationError
-from codeweaver.core.chunks import CodeChunk
-from codeweaver.core.types.provider import Provider
+from codeweaver.core import CodeChunk, ConfigurationError, Provider
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.providers import EmbeddingProvider
 

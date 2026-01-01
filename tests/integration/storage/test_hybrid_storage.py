@@ -13,12 +13,10 @@ from typing import Any
 
 import pytest
 
-from codeweaver.config.providers import QdrantConfig
-from codeweaver.core import uuid7
-from codeweaver.core.language import SemanticSearchLanguage as Language
-from codeweaver.core.types.search import SearchStrategy, StrategizedQuery
-from codeweaver.providers.embedding.types import SparseEmbedding
-from codeweaver.providers.vector_stores.qdrant import QdrantVectorStoreProvider
+from codeweaver.config import QdrantConfig
+from codeweaver.core import SearchStrategy, StrategizedQuery, uuid7
+from codeweaver.core import SemanticSearchLanguage as Language
+from codeweaver.providers import QdrantVectorStoreProvider, SparseEmbedding
 
 # sourcery skip: dont-import-test-modules
 from tests.conftest import create_test_chunk_with_embeddings

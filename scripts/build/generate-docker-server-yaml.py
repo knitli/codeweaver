@@ -27,10 +27,10 @@ from pathlib import Path
 import yaml
 
 from codeweaver import __version__
-from codeweaver.config.envs import environment_variables
-from codeweaver.core.file_extensions import ALL_LANGUAGES
-from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
-from codeweaver.providers.provider import Provider
+from codeweaver.config import environment_variables
+from codeweaver.core import ALL_LANGUAGES
+from codeweaver.core import ConfigLanguage, SemanticSearchLanguage
+from codeweaver.core import Provider
 
 
 def _languages() -> list[str]:

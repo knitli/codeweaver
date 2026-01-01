@@ -23,10 +23,10 @@ from codeweaver.server.server import CodeWeaverState
 
 
 if TYPE_CHECKING:
-    from codeweaver.cli.ui import StatusDisplay
-    from codeweaver.common.statistics import SessionStatistics
-    from codeweaver.config.settings import CodeWeaverSettings
-    from codeweaver.mcp.state import CwMcpHttpState
+    from codeweaver.cli import StatusDisplay
+    from codeweaver.common import SessionStatistics
+    from codeweaver.config import CodeWeaverSettings
+    from codeweaver.mcp import CwMcpHttpState
 
 logger = logging.getLogger(__name__)
 
@@ -62,8 +62,8 @@ async def background_services_lifespan(
     Yields:
         CodeWeaverState instance for background services
     """
-    from codeweaver.cli.ui import StatusDisplay
-    from codeweaver.config.settings import get_settings
+    from codeweaver.cli import StatusDisplay
+    from codeweaver.config import get_settings
     from codeweaver.core import Unset, get_project_path
 
     # Create StatusDisplay if not provided
@@ -178,7 +178,7 @@ async def http_lifespan(
     Yields:
         CodeWeaverState instance for background services
     """
-    from codeweaver.cli.ui import StatusDisplay
+    from codeweaver.cli import StatusDisplay
 
     # Create StatusDisplay if not provided
     if status_display is None:

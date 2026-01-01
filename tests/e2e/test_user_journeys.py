@@ -17,9 +17,9 @@ from pathlib import Path
 import pytest
 import tomli
 
-from codeweaver.cli.commands.config import app as config_app
-from codeweaver.cli.commands.init import app as init_app
-from codeweaver.cli.commands.list import app as list_app
+from codeweaver.cli import app as config_app
+from codeweaver.cli import app as init_app
+from codeweaver.cli import app as list_app
 
 
 @pytest.fixture
@@ -276,7 +276,7 @@ class TestCompleteUserJourneys:
         self, user_environment: dict[str, Path], monkeypatch: pytest.MonkeyPatch, mock_confirm
     ) -> None:
         """Test: First-time user from install to working setup."""
-        from codeweaver.cli.commands.init import _get_client_config_path
+        from codeweaver.cli import _get_client_config_path
 
         project = user_environment["project"]
         user_environment["home"]

@@ -22,10 +22,8 @@ from uuid import UUID
 
 import pytest
 
-from codeweaver.core.chunks import CodeChunk
-from codeweaver.core.spans import Span
-from codeweaver.core.types.search import SearchStrategy, StrategizedQuery
-from codeweaver.providers.vector_stores.qdrant import QdrantVectorStoreProvider
+from codeweaver.core import CodeChunk, SearchStrategy, Span, StrategizedQuery
+from codeweaver.providers import QdrantVectorStoreProvider
 
 
 pytestmark = [pytest.mark.integration, pytest.mark.external_api]
@@ -34,7 +32,7 @@ pytestmark = [pytest.mark.integration, pytest.mark.external_api]
 @pytest.fixture
 async def qdrant_provider(qdrant_test_manager):
     """Create a QdrantVectorStoreProvider instance using test manager."""
-    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+    from codeweaver.providers import EmbeddingModelCapabilities
 
     # Create test collection with both dense and sparse vectors
     collection_name = qdrant_test_manager.create_collection_name("codeweaver-test-contract")
@@ -78,8 +76,7 @@ async def qdrant_provider(qdrant_test_manager):
 def _register_chunk_embeddings(chunk, dense=None, sparse=None):
     """Helper to register embeddings for a test chunk in the global registry."""
     from codeweaver.core import uuid7
-    from codeweaver.providers.embedding.registry import get_embedding_registry
-    from codeweaver.providers.embedding.types import ChunkEmbeddings, EmbeddingBatchInfo
+    from codeweaver.providers import ChunkEmbeddings, EmbeddingBatchInfo, get_embedding_registry
 
     registry = get_embedding_registry()
 
@@ -102,7 +99,7 @@ def _register_chunk_embeddings(chunk, dense=None, sparse=None):
 
     sparse_info = None
     if sparse is not None:
-        from codeweaver.providers.embedding.types import SparseEmbedding
+        from codeweaver.providers import SparseEmbedding
 
         sparse_emb = SparseEmbedding(indices=sparse["indices"], values=sparse["values"])
         sparse_info = EmbeddingBatchInfo.create_sparse(
@@ -117,7 +114,7 @@ def _register_chunk_embeddings(chunk, dense=None, sparse=None):
     registry[chunk.chunk_id] = ChunkEmbeddings(sparse=sparse_info, dense=dense_info, chunk=chunk)
 
     # Update chunk with batch keys - need to add both dense and sparse keys
-    from codeweaver.core.chunks import BatchKeys
+    from codeweaver.core import BatchKeys
 
     # Start with the chunk
     result_chunk = chunk
@@ -160,7 +157,7 @@ class TestQdrantProviderContract:
 
     async def test_implements_vector_store_provider(self):
         """Verify QdrantVectorStoreProvider implements VectorStoreProvider interface."""
-        from codeweaver.providers.vector_stores.base import VectorStoreProvider
+        from codeweaver.providers import VectorStoreProvider
 
         assert issubclass(QdrantVectorStoreProvider, VectorStoreProvider)
 
@@ -253,8 +250,7 @@ class TestQdrantProviderContract:
         """Test upserting a batch of chunks and verify they can be retrieved via search."""
         from pathlib import Path
 
-        from codeweaver.core import uuid7
-        from codeweaver.core.chunks import CodeChunk, Span
+        from codeweaver.core import CodeChunk, Span, uuid7
 
         chunks = []
         for i in range(10):

@@ -25,7 +25,7 @@ A marker used in function signatures or `Annotated` type hints to declare a depe
 from typing import Annotated
 from codeweaver.di import Depends, INJECTED
 from codeweaver.di.providers import get_embedding_provider, EmbeddingDep
-from codeweaver.providers.embedding.providers.base import EmbeddingProvider
+from codeweaver.providers import EmbeddingProvider
 
 # Recommended: Type-safe INJECTED with subscript syntax
 async def search(embedding: EmbeddingDep = INJECTED[EmbeddingProvider]):
@@ -52,7 +52,7 @@ To make a service injectable, declare its dependencies in the `__init__` method 
 ```python
 from codeweaver.di import INJECTED
 from codeweaver.di.providers import IndexerDep
-from codeweaver.engine.indexer.indexer import Indexer
+from codeweaver.engine import Indexer
 
 class MyService:
     def __init__(self, indexer: IndexerDep = INJECTED[Indexer]):

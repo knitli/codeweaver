@@ -20,7 +20,7 @@ from pathlib import Path
 
 import pytest
 
-from codeweaver.cli.commands.init import app as init_app
+from codeweaver.cli import app as init_app
 
 
 @pytest.fixture
@@ -190,7 +190,7 @@ class TestInitIntegration:
         capsys,
     ) -> None:
         """Test init followed by config show."""
-        from codeweaver.cli.commands.config import app as config_app
+        from codeweaver.cli import app as config_app
 
         test_environment["project"]
 
@@ -218,7 +218,7 @@ class TestInitIntegration:
         self, test_environment: dict[str, Path], monkeypatch: pytest.MonkeyPatch, mock_confirm
     ) -> None:
         """Test init followed by doctor check."""
-        from codeweaver.cli.commands.doctor import app as doctor_app
+        from codeweaver.cli import app as doctor_app
 
         test_environment["project"]
 

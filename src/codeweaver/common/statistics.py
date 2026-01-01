@@ -48,18 +48,27 @@ from codeweaver.common.types import (
     TimingStatisticsDict,
     ToolOrPromptName,
 )
-from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
-from codeweaver.core.metadata import ChunkKind, ExtKind
-from codeweaver.core.types.aliases import FilteredKey, FilteredKeyT, LanguageName, LanguageNameT
-from codeweaver.core.types.dataclasses import DATACLASS_CONFIG, DataclassSerializationMixin
-from codeweaver.core.types.enum import AnonymityConversion, BaseEnum
-from codeweaver.core.types.utils import generate_field_title
-from codeweaver.core.utils import uuid7, uuid7_as_timestamp
+from codeweaver.core import (
+    DATACLASS_CONFIG,
+    AnonymityConversion,
+    BaseEnum,
+    ChunkKind,
+    ConfigLanguage,
+    DataclassSerializationMixin,
+    ExtKind,
+    FilteredKey,
+    FilteredKeyT,
+    LanguageName,
+    LanguageNameT,
+    SemanticSearchLanguage,
+    generate_field_title,
+    uuid7,
+    uuid7_as_timestamp,
+)
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.chunks import CodeChunk
-    from codeweaver.core.discovery import DiscoveredFile
+    from codeweaver.core import CodeChunk, DiscoveredFile
 
 
 @dataclass(config=DATACLASS_CONFIG | ConfigDict(extra="forbid", defer_build=True))
@@ -407,7 +416,7 @@ class _LanguageStatistics(DataclassSerializationMixin):
             chunk: The CodeChunk to track
             operation: The operation type (usually "processed" for chunk creation)
         """
-        from codeweaver.core.metadata import ChunkSource
+        from codeweaver.core import ChunkSource
 
         # Track overall chunk count
         self.chunks_created += 1

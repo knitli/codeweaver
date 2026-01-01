@@ -20,16 +20,20 @@ from fastmcp.client.transports import StreamableHttpTransport
 from fastmcp.server.proxy import FastMCPProxy, ProxyClient
 from fastmcp.tools import Tool
 
-from codeweaver.config.middleware import MiddlewareOptions, default_for_transport
-from codeweaver.config.settings import FastMcpHttpServerSettings, FastMcpStdioServerSettings
-from codeweaver.config.types import FastMcpHttpRunArgs, FastMcpServerSettingsDict
-from codeweaver.core import lazy_import
-from codeweaver.core.types import DictView, Unset
+from codeweaver.config import (
+    FastMcpHttpRunArgs,
+    FastMcpHttpServerSettings,
+    FastMcpServerSettingsDict,
+    FastMcpStdioServerSettings,
+    MiddlewareOptions,
+    default_for_transport,
+)
+from codeweaver.core import DictView, Unset, lazy_import
 from codeweaver.mcp.middleware import McpMiddleware
 
 
 if TYPE_CHECKING:
-    from codeweaver.config.types import CodeWeaverSettingsDict, FastMcpServerSettingsDict
+    from codeweaver.config import CodeWeaverSettingsDict, FastMcpServerSettingsDict
     from codeweaver.mcp.middleware import StatisticsMiddleware
     from codeweaver.mcp.state import CwMcpHttpState
 
@@ -41,7 +45,7 @@ type StdioClientLifespan = AsyncIterator[Any]
 
 def _get_fastmcp_settings_map(*, http: bool = False) -> DictView[FastMcpServerSettingsDict]:
     """Get the current settings."""
-    from codeweaver.config.settings import get_settings_map
+    from codeweaver.config import get_settings_map
 
     settings_map = get_settings_map()
     if http:
@@ -59,7 +63,7 @@ def _get_fastmcp_settings_map(*, http: bool = False) -> DictView[FastMcpServerSe
 
 def _get_middleware_settings() -> DictView[MiddlewareOptions] | None:
     """Get the current middleware settings."""
-    from codeweaver.config.settings import get_settings_map
+    from codeweaver.config import get_settings_map
 
     settings_map = get_settings_map()
     return (
@@ -82,7 +86,7 @@ def get_statistics_middleware(
     settings: MiddlewareOptions | DictView[MiddlewareOptions],
 ) -> StatisticsMiddleware:
     """Get the statistics middleware instance."""
-    from codeweaver.common.statistics import get_session_statistics
+    from codeweaver.common import get_session_statistics
     from codeweaver.mcp.middleware.statistics import StatisticsMiddleware
 
     return StatisticsMiddleware(
@@ -292,10 +296,7 @@ def _setup_server[TransportT: Literal["stdio", "streamable-http"]](
         run_args = setup_runargs(run_args, host, port, verbose=verbose, debug=debug)
     app = FastMCP(
         "CodeWeaver",
-        **(
-            mutable_args
-            | {"icons": [lazy_import("codeweaver.server._assets", "CODEWEAVER_SVG_ICON")]}
-        ),  # ty: ignore[invalid-argument-type]
+        **(mutable_args | {"icons": [lazy_import("codeweaver.server", "CODEWEAVER_SVG_ICON")]}),  # ty: ignore[invalid-argument-type]
     )
     app = register_tools(app)
     app = register_middleware(app, cast(list[type[McpMiddleware]], middleware), middleware_opts)

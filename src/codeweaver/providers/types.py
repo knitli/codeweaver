@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from codeweaver.core.types.provider import Provider, ProviderKind
+from codeweaver.core import Provider, ProviderKind
 
 
 type LiteralProviderKind = Literal[

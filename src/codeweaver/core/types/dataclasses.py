@@ -199,7 +199,7 @@ class BaseEnumData(DataclassSerializationMixin):
 
     `BaseEnumData` is intended to be used in conjunction with `BaseDataclassEnum` to create enums with rich metadata. See `codeweaver.core.types.enum.BaseDataclassEnum` for more details.
 
-    For an implementation example, see `codeweaver.semantic.classifications.BaseAgentTask` (the type) and `codeweaver.semantic.classifications.AgentTask` (the enum).
+    For an implementation example, see `codeweaver.semanticBaseAgentTask` (the type) and `codeweaver.semanticAgentTask` (the enum).
     """
 
     aliases: tuple[str, ...] = Field(

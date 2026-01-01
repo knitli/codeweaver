@@ -18,14 +18,13 @@ import logging
 from contextvars import ContextVar
 from typing import TYPE_CHECKING, Any, NoReturn
 
-from codeweaver.core import ConfigurationError, QueryError
-from codeweaver.core.types.search import SearchStrategy, StrategizedQuery
-from codeweaver.di.providers import EmbeddingDep, RerankingDep, SparseEmbeddingDep, VectorStoreDep
-from codeweaver.providers.embedding.types import QueryResult, RawEmbeddingVectors, SparseEmbedding
+from codeweaver.core import ConfigurationError, QueryError, SearchStrategy, StrategizedQuery
+from codeweaver.di import EmbeddingDep, RerankingDep, SparseEmbeddingDep, VectorStoreDep
+from codeweaver.providers import QueryResult, RawEmbeddingVectors, SparseEmbedding
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.types.search import SearchResult
+    from codeweaver.core import SearchResult
 
 
 logger = logging.getLogger(__name__)
@@ -51,8 +50,7 @@ async def _embed_dense(
     query: str, dense_provider_enum: Any, context: Any
 ) -> RawEmbeddingVectors | None:
     """Attempt dense embedding, return None on failure."""
-    from codeweaver.common._logging import log_to_client_or_fallback
-    from codeweaver.common.registry import get_provider_registry
+    from codeweaver.common import get_provider_registry, log_to_client_or_fallback
 
     registry = get_provider_registry()
     try:
@@ -115,8 +113,7 @@ async def _embed_sparse(
     query: str, sparse_provider_enum: Any, context: Any
 ) -> SparseEmbedding | None:
     """Attempt sparse embedding, return None on failure."""
-    from codeweaver.common._logging import log_to_client_or_fallback
-    from codeweaver.common.registry import get_provider_registry
+    from codeweaver.common import get_provider_registry, log_to_client_or_fallback
 
     registry = get_provider_registry()
     try:
@@ -206,14 +203,14 @@ async def embed_query(
     Raises:
         ValueError: If no embedding providers configured or both fail
     """
-    from codeweaver.common._logging import log_to_client_or_fallback
-    from codeweaver.providers.embedding.types import QueryResult
+    from codeweaver.common import log_to_client_or_fallback
+    from codeweaver.providers import QueryResult
 
     _query_cv.set(query.strip())
 
     # Manually resolve providers if not injected (DI fallback)
     from codeweaver.di import get_container
-    from codeweaver.providers.embedding.providers.base import EmbeddingProvider
+    from codeweaver.providers import EmbeddingProvider
 
     container = get_container()
 
@@ -228,7 +225,7 @@ async def embed_query(
 
     if sparse_provider is None or hasattr(sparse_provider, "__pydantic_serializer__"):
         try:
-            from codeweaver.providers.embedding.providers.base import SparseEmbeddingProvider
+            from codeweaver.providers import SparseEmbeddingProvider
 
             sparse_provider = await container.resolve(SparseEmbeddingProvider)
         except Exception:
@@ -282,7 +279,7 @@ async def embed_query(
             result = await sparse_provider.embed_query(query)
 
             # Standardize sparse embedding format
-            from codeweaver.core.types.embeddings import SparseEmbedding
+            from codeweaver.core import SparseEmbedding
 
             if isinstance(result, SparseEmbedding):
                 sparse_query_embedding = result
@@ -382,7 +379,7 @@ async def execute_vector_search(
     Raises:
         ValueError: If no vector store provider configured
     """
-    from codeweaver.common._logging import log_to_client_or_fallback
+    from codeweaver.common import log_to_client_or_fallback
 
     await log_to_client_or_fallback(
         context,
@@ -439,13 +436,13 @@ async def rerank_results(
         - reranked_results is None if reranking unavailable or fails
         - strategy is SEMANTIC_RERANK if successful, None otherwise
     """
-    from codeweaver.common._logging import log_to_client_or_fallback
+    from codeweaver.common import log_to_client_or_fallback
 
     # Manually resolve provider if not injected (DI fallback)
     if reranking is None or hasattr(reranking, "__pydantic_serializer__"):
         try:
             from codeweaver.di import get_container
-            from codeweaver.providers.reranking.providers.base import RerankingProvider
+            from codeweaver.providers import RerankingProvider
 
             reranking = await get_container().resolve(RerankingProvider)
         except Exception:
@@ -488,7 +485,7 @@ async def rerank_results(
         reranked_results = await reranking.rerank(query, chunks_for_reranking)
 
         # Enrich reranked results with preserved search metadata
-        from codeweaver.providers.reranking.providers.base import RerankingResult
+        from codeweaver.providers import RerankingResult
 
         enriched_results = [
             RerankingResult(

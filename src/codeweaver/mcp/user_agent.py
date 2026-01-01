@@ -18,11 +18,8 @@ from mcp.server.session import ServerSession
 from mcp.shared.context import RequestContext
 from starlette.requests import Request
 
-from codeweaver.agent_api.find_code import find_code
-from codeweaver.agent_api.find_code.intent import IntentType
-from codeweaver.agent_api.find_code.types import FindCodeResponseSummary
-from codeweaver.core import lazy_import
-from codeweaver.core.language import SemanticSearchLanguage
+from codeweaver.agent_api import FindCodeResponseSummary, IntentType, find_code
+from codeweaver.core import SemanticSearchLanguage, lazy_import
 
 
 _logger = logging.getLogger(__name__)
@@ -31,7 +28,7 @@ _logger = logging.getLogger(__name__)
 # -------------------------
 # * `find_code` tool definition
 #
-# * This is the function that gets called when an MCP agent invokes the `find_code` tool. The mcp Tool definition is in `codeweaver.mcp.tools`. This find_code_tool wraps the actual `find_code`, which is defined in `codeweaver.agent_api.find_code`.
+# * This is the function that gets called when an MCP agent invokes the `find_code` tool. The mcp Tool definition is in `codeweaver.mcp.tools`. This find_code_tool wraps the actual `find_code`, which is defined in `codeweaver.agent_api`.
 # -------------------------
 async def find_code_tool(
     query: str,
@@ -69,10 +66,10 @@ async def find_code_tool(
             if focus_languages
             else None
         )
-        statistics = lazy_import("codeweaver.common.statistics", "get_session_statistics")
+        statistics = lazy_import("codeweaver.common", "get_session_statistics")
 
         # Set context on failover manager for notifications
-        from codeweaver.server.server import get_state
+        from codeweaver.server import get_state
 
         state = get_state()
         if state.failover_manager and context:

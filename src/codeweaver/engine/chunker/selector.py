@@ -19,7 +19,7 @@ import logging
 
 from typing import TYPE_CHECKING, Any
 
-from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
+from codeweaver.core import ConfigLanguage, SemanticSearchLanguage
 from codeweaver.engine.chunker.base import BaseChunker
 from codeweaver.engine.chunker.delimiter import DelimiterChunker
 from codeweaver.engine.chunker.exceptions import ParseError
@@ -27,8 +27,7 @@ from codeweaver.engine.chunker.semantic import SemanticChunker
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.chunks import CodeChunk
-    from codeweaver.core.discovery import DiscoveredFile
+    from codeweaver.core import CodeChunk, DiscoveredFile
     from codeweaver.engine.chunker.base import ChunkGovernor
 
 
@@ -50,7 +49,7 @@ class ChunkerSelector:
         Basic usage with file discovery:
 
         >>> from codeweaver.engine.chunker.base import ChunkGovernor
-        >>> from codeweaver.core.discovery import DiscoveredFile
+        >>> from codeweaver.core import DiscoveredFile
         >>> from pathlib import Path
         >>>
         >>> governor = ChunkGovernor(capabilities=(...))
@@ -103,7 +102,7 @@ class ChunkerSelector:
         """
         from pathlib import Path
 
-        from codeweaver.core.discovery import DiscoveredFile
+        from codeweaver.core import DiscoveredFile
 
         file_path = file_path if isinstance(file_path, Path) else Path(file_path)
         if discovered_file := DiscoveredFile.from_path(file_path):
@@ -134,7 +133,7 @@ class ChunkerSelector:
 
         Examples:
             >>> from pathlib import Path
-            >>> from codeweaver.core.discovery import DiscoveredFile
+            >>> from codeweaver.core import DiscoveredFile
             >>>
             >>> file = DiscoveredFile.from_path(Path("example.py"))
             >>> chunker1 = selector.select_for_file(file)

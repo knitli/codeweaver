@@ -49,8 +49,7 @@ from codeweaver.engine.chunker.selector import ChunkerSelector
 if TYPE_CHECKING:
     from concurrent.futures import Future
 
-    from codeweaver.core.chunks import CodeChunk
-    from codeweaver.core.discovery import DiscoveredFile
+    from codeweaver.core import CodeChunk, DiscoveredFile
     from codeweaver.engine.chunker.base import ChunkGovernor
 logger = logging.getLogger(__name__)
 
@@ -168,7 +167,7 @@ def chunk_files_parallel(
         Basic usage with defaults:
 
         >>> from codeweaver.engine.chunker.base import ChunkGovernor
-        >>> from codeweaver.core.discovery import DiscoveredFile
+        >>> from codeweaver.core import DiscoveredFile
         >>> from pathlib import Path
         >>>
         >>> files = [DiscoveredFile.from_path(p) for p in Path("src").rglob("*.py")]

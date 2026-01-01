@@ -30,14 +30,11 @@ from rich.progress import (
 )
 from rich.table import Table
 
-from codeweaver.core import elapsed_time_to_human_readable
-from codeweaver.core.types.dataclasses import DataclassSerializationMixin
-from codeweaver.core.types.enum import BaseEnum
+from codeweaver.core import BaseEnum, DataclassSerializationMixin, elapsed_time_to_human_readable
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.types.aliases import FilteredKeyT
-    from codeweaver.core.types.enum import AnonymityConversion
+    from codeweaver.core import AnonymityConversion, FilteredKeyT
 
 
 class IndexingErrorDict(TypedDict):
@@ -87,8 +84,7 @@ class IndexingStats(DataclassSerializationMixin):
         return self.files_discovered
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
-        from codeweaver.core.types.aliases import FilteredKey
-        from codeweaver.core.types.enum import AnonymityConversion
+        from codeweaver.core import AnonymityConversion, FilteredKey
 
         return {
             FilteredKey("files_with_errors"): AnonymityConversion.COUNT,

@@ -41,7 +41,7 @@ from tenacity import (
     wait_exponential,
 )
 
-from codeweaver.config.providers import EmbeddingModelSettings, SparseEmbeddingModelSettings
+from codeweaver.config import EmbeddingModelSettings, SparseEmbeddingModelSettings
 from codeweaver.core import (
     AnonymityConversion,
     BasedModel,
@@ -62,16 +62,21 @@ from codeweaver.providers.embedding.registry import EmbeddingRegistry
 from codeweaver.providers.embedding.types import SparseEmbedding
 
 
-statistics_module: LazyImport[ModuleType] = lazy_import("codeweaver.common.statistics")
+statistics_module: LazyImport[ModuleType] = lazy_import("codeweaver.common")
 
 if TYPE_CHECKING:
-    from codeweaver.common.statistics import SessionStatistics
-    from codeweaver.core.chunks import CodeChunk, SerializedStrOnlyCodeChunk, StructuredDataInput
-    from codeweaver.core.types import AnonymityConversion, FilteredKeyT
+    from codeweaver.common import SessionStatistics
+    from codeweaver.core import (
+        AnonymityConversion,
+        CodeChunk,
+        FilteredKeyT,
+        SerializedStrOnlyCodeChunk,
+        StructuredDataInput,
+    )
 
 
 _get_statistics: LazyImport[SessionStatistics] = lazy_import(
-    "codeweaver.common.statistics", "get_session_statistics"
+    "codeweaver.common", "get_session_statistics"
 )
 
 logger = logging.getLogger(__name__)
@@ -110,7 +115,7 @@ class EmbeddingErrorInfo(TypedDict):
 
 def default_input_transformer(chunks: StructuredDataInput) -> Iterator[CodeChunk]:
     """Default input transformer that serializes CodeChunks to strings."""
-    from codeweaver.core.chunks import CodeChunk
+    from codeweaver.core import CodeChunk
 
     return CodeChunk.chunkify(chunks)
 
@@ -156,7 +161,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
     The primary example of this one-to-many relationship is the OpenAI provider, which supports any OpenAI-compatible provider (Azure, Ollama, Fireworks, Heroku, Together, Github).
     """
 
-    from codeweaver.core.chunks import StructuredDataInput
+    from codeweaver.core import StructuredDataInput
 
     model_config = BasedModel.model_config | ConfigDict(extra="allow", arbitrary_types_allowed=True)
 
@@ -496,7 +501,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
 
         Optionally takes a `batch_id` parameter to reprocess a specific batch of documents.
         """
-        from codeweaver.common._logging import log_to_client_or_fallback
+        from codeweaver.common import log_to_client_or_fallback
 
         is_old_batch = False
         if (batch_id and self._store and batch_id in self._store and not for_backup) or (
@@ -822,7 +827,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
     def _get_model_settings(
         self, *, sparse: bool = False
     ) -> EmbeddingModelSettings | SparseEmbeddingModelSettings | None:
-        from codeweaver.common.registry.provider import get_provider_config_for
+        from codeweaver.common import get_provider_config_for
 
         settings = get_provider_config_for("sparse_embedding" if sparse else "embedding")
         return settings.get("model_settings")
@@ -848,7 +853,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         if sparse:
             return 0
         if backup:
-            from codeweaver.config.profiles import get_profile
+            from codeweaver.config import get_profile
 
             profile = get_profile("backup", "local")
             if isinstance(profile["embedding"], dict):
@@ -933,7 +938,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         for_backup: bool = False,
     ) -> None:  # sourcery skip: low-code-quality
         """Register chunks in the embedding registry."""
-        from codeweaver.core.types.aliases import LiteralStringT, ModelName
+        from codeweaver.core import LiteralStringT, ModelName
         from codeweaver.providers.embedding.types import (
             ChunkEmbeddings,
             EmbeddingBatchInfo,
@@ -1072,7 +1077,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         processed_chunks = default_input_transformer(input_data)
         if is_old_batch:
             return processed_chunks, None
-        from codeweaver.core.chunks import BatchKeys
+        from codeweaver.core import BatchKeys
 
         key = uuid7()
         # Convert iterator to list to avoid exhaustion when used multiple times
@@ -1080,7 +1085,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         final_chunks: list[CodeChunk] = []
 
         # FIXED: Compute hashes first WITHOUT adding to store
-        from codeweaver.core.stores import get_blake_hash
+        from codeweaver.core import get_blake_hash
 
         hashes = [get_blake_hash(chunk.content.encode("utf-8")) for chunk in chunk_list]
 
@@ -1146,7 +1151,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         _ = loop.run_in_executor(None, task)
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
-        from codeweaver.core.types import AnonymityConversion, FilteredKey
+        from codeweaver.core import AnonymityConversion, FilteredKey
 
         return {
             FilteredKey("_store"): AnonymityConversion.COUNT,
@@ -1221,8 +1226,7 @@ class SparseEmbeddingProvider[SparseClient](EmbeddingProvider[SparseClient], ABC
         This ensures chunks get their sparse_batch_key set correctly, which is
         required for sparse embeddings to be stored in the vector store.
         """
-        from codeweaver.core.chunks import BatchKeys
-        from codeweaver.core.stores import get_blake_hash
+        from codeweaver.core import BatchKeys, get_blake_hash
 
         key = uuid7()
         final_chunks: list[CodeChunk] = []

@@ -14,7 +14,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from codeweaver.providers.provider import Provider, ProviderKind
+from codeweaver.providers import Provider, ProviderKind
 
 
 pytestmark = [pytest.mark.unit]
@@ -31,7 +31,7 @@ class TestClientMapLookup:
         """Create a ProviderRegistry for testing."""
         from unittest.mock import Mock
 
-        from codeweaver.common.registry.provider import ProviderRegistry
+        from codeweaver.common import ProviderRegistry
 
         # Create mock settings to avoid Unset type annotation issues
         mock_settings = Mock()
@@ -57,7 +57,7 @@ class TestClientMapLookup:
     def test_unknown_provider_returns_none(self, registry):
         """Test that unknown provider returns None."""
         # Use a provider enum that doesn't exist in CLIENT_MAP
-        with patch("codeweaver.providers.capabilities.CLIENT_MAP", {}):
+        with patch("codeweaver.providersCLIENT_MAP", {}):
             _result = registry._create_client_from_map(
                 Provider.OPENAI, ProviderKind.EMBEDDING, None, None
             )
@@ -65,7 +65,7 @@ class TestClientMapLookup:
 
     def test_provider_without_matching_kind_returns_none(self, registry):
         """Test that provider without matching kind returns None."""
-        from codeweaver.providers.capabilities import Client
+        from codeweaver.providers import Client
 
         mock_client_map = {
             Provider.VOYAGE: (
@@ -73,7 +73,7 @@ class TestClientMapLookup:
             )
         }
 
-        with patch("codeweaver.providers.capabilities.CLIENT_MAP", mock_client_map):
+        with patch("codeweaver.providersCLIENT_MAP", mock_client_map):
             # Request RERANKING but only EMBEDDING exists
             _result = registry._create_client_from_map(
                 Provider.VOYAGE, ProviderKind.RERANKING, None, None
@@ -82,7 +82,7 @@ class TestClientMapLookup:
 
     def test_pydantic_ai_provider_returns_none(self, registry):
         """Test that pydantic-ai origin providers return None."""
-        from codeweaver.providers.capabilities import Client
+        from codeweaver.providers import Client
 
         mock_client_map = {
             Provider.ANTHROPIC: (
@@ -90,7 +90,7 @@ class TestClientMapLookup:
             )
         }
 
-        with patch("codeweaver.providers.capabilities.CLIENT_MAP", mock_client_map):
+        with patch("codeweaver.providersCLIENT_MAP", mock_client_map):
             _result = registry._create_client_from_map(
                 Provider.ANTHROPIC, ProviderKind.AGENT, None, None
             )
@@ -98,7 +98,7 @@ class TestClientMapLookup:
 
     def test_provider_without_client_returns_none(self, registry):
         """Test that provider without client class returns None."""
-        from codeweaver.providers.capabilities import Client
+        from codeweaver.providers import Client
 
         mock_client_map = {
             Provider.VOYAGE: (
@@ -110,7 +110,7 @@ class TestClientMapLookup:
             )
         }
 
-        with patch("codeweaver.providers.capabilities.CLIENT_MAP", mock_client_map):
+        with patch("codeweaver.providersCLIENT_MAP", mock_client_map):
             _result = registry._create_client_from_map(
                 Provider.VOYAGE, ProviderKind.EMBEDDING, None, None
             )
@@ -118,7 +118,7 @@ class TestClientMapLookup:
 
     def test_lazy_import_resolution_error_raises(self, registry):
         """Test that LazyImport resolution errors are caught and raised."""
-        from codeweaver.providers.capabilities import Client
+        from codeweaver.providers import Client
 
         mock_lazy_import = Mock()
         mock_lazy_import._resolve.side_effect = ImportError("Module not found")
@@ -133,7 +133,7 @@ class TestClientMapLookup:
 
         from codeweaver.core import ConfigurationError
 
-        with patch("codeweaver.providers.capabilities.CLIENT_MAP", mock_client_map):
+        with patch("codeweaver.providersCLIENT_MAP", mock_client_map):
             with pytest.raises(ConfigurationError, match="client import failed"):
                 registry._create_client_from_map(
                     Provider.VOYAGE, ProviderKind.EMBEDDING, None, None
@@ -151,7 +151,7 @@ class TestInstantiateClient:
         """Create a ProviderRegistry for testing."""
         from unittest.mock import Mock
 
-        from codeweaver.common.registry.provider import ProviderRegistry
+        from codeweaver.common import ProviderRegistry
 
         # Create mock settings to avoid Unset type annotation issues
         mock_settings = Mock()
@@ -338,8 +338,7 @@ class TestInstantiateClient:
 
         # Use patch on the class method instead of instance
         with patch(
-            "codeweaver.common.registry.provider.ProviderRegistry.get_configured_provider_settings",
-            return_value=None,
+            "codeweaver.commonProviderRegistry.get_configured_provider_settings", return_value=None
         ):
             _result = registry._instantiate_client(
                 Provider.FASTEMBED,
@@ -464,7 +463,7 @@ class TestClientOptionsHandling:
         """Create a ProviderRegistry for testing."""
         from unittest.mock import Mock
 
-        from codeweaver.common.registry.provider import ProviderRegistry
+        from codeweaver.common import ProviderRegistry
 
         # Create mock settings to avoid Unset type annotation issues
         mock_settings = Mock()
@@ -547,7 +546,7 @@ class TestProviderKindNormalization:
         """Create a ProviderRegistry for testing."""
         from unittest.mock import Mock
 
-        from codeweaver.common.registry.provider import ProviderRegistry
+        from codeweaver.common import ProviderRegistry
 
         # Create mock settings to avoid Unset type annotation issues
         mock_settings = Mock()
@@ -572,7 +571,7 @@ class TestProviderKindNormalization:
 
     def test_string_provider_kind_normalized(self, registry):
         """Test string provider_kind is converted to enum."""
-        from codeweaver.providers.capabilities import Client
+        from codeweaver.providers import Client
 
         # Create a real class for the client to avoid Mock inspection issues
         class MockClient:
@@ -590,18 +589,17 @@ class TestProviderKindNormalization:
             )
         }
 
-        with patch("codeweaver.providers.capabilities.CLIENT_MAP", mock_client_map):
+        with patch("codeweaver.providersCLIENT_MAP", mock_client_map):
             with patch.dict("os.environ", {"VOYAGE_API_KEY": "test_key"}):
                 with patch(
-                    "codeweaver.common.registry.provider.ProviderRegistry.get_configured_provider_settings",
+                    "codeweaver.commonProviderRegistry.get_configured_provider_settings",
                     return_value=None,
                 ):
                     with patch(
-                        "codeweaver.common.registry.provider.ProviderRegistry.collect_env_vars",
-                        return_value={},
+                        "codeweaver.commonProviderRegistry.collect_env_vars", return_value={}
                     ):
                         with patch(
-                            "codeweaver.common.registry.provider.ProviderRegistry._get_base_url_for_provider",
+                            "codeweaver.commonProviderRegistry._get_base_url_for_provider",
                             return_value=None,
                         ):
                             # Pass string instead of enum
