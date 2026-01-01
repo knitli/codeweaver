@@ -1067,7 +1067,7 @@ async def get_embedding_provider() -> EmbeddingProvider:
     """Factory for embedding provider with full complexity."""
     from codeweaver.common.registry import get_provider_registry
     from codeweaver.common.registry.utils import get_model_config
-    from codeweaver.exceptions import ConfigurationError
+    from codeweaver.core import ConfigurationError
     
     # Get settings
     config = get_model_config("embedding")

@@ -49,14 +49,14 @@ from codeweaver.core import (
     BlakeStore,
     LazyImport,
     Provider,
+    ProviderError,
     UUIDStore,
     lazy_import,
     make_blake_store,
     make_uuid_store,
     uuid7,
 )
-from codeweaver.exceptions import ProviderError
-from codeweaver.exceptions import ValidationError as CodeWeaverValidationError
+from codeweaver.core import ValidationError as CodeWeaverValidationError
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.registry import EmbeddingRegistry
 from codeweaver.providers.embedding.types import SparseEmbedding

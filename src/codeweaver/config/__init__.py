@@ -47,9 +47,9 @@ if TYPE_CHECKING:
     from codeweaver.config.providers import (
         AgentModelSettings,
         AgentProviderSettings,
-        AWSProviderSettings,
         AzureCohereProviderSettings,
         AzureOpenAIProviderSettings,
+        BedrockProviderSettings,
         ConnectionConfiguration,
         ConnectionRateLimitConfig,
         DataProviderSettings,
@@ -88,7 +88,7 @@ if TYPE_CHECKING:
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "AVAILABLE_MIDDLEWARE": (__spec__.parent, "middleware"),
-    "AWSProviderSettings": (__spec__.parent, "providers"),
+    "BedrockProviderSettings": (__spec__.parent, "providers"),
     "AgentModelSettings": (__spec__.parent, "providers"),
     "AgentProviderSettings": (__spec__.parent, "providers"),
     "AzureCohereProviderSettings": (__spec__.parent, "providers"),
@@ -160,11 +160,11 @@ __getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
 
 __all__ = (
     "AVAILABLE_MIDDLEWARE",
-    "AWSProviderSettings",
     "AgentModelSettings",
     "AgentProviderSettings",
     "AzureCohereProviderSettings",
     "AzureOpenAIProviderSettings",
+    "BedrockProviderSettings",
     "ChunkerSettings",
     "ChunkerSettingsDict",
     "CodeWeaverMCPConfig",

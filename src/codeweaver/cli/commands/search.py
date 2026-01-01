@@ -25,8 +25,7 @@ from codeweaver.agent_api.find_code.intent import IntentType
 from codeweaver.agent_api.find_code.types import CodeMatch, FindCodeResponseSummary
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
 from codeweaver.config.settings import get_settings_map
-from codeweaver.core import resolve_project_root
-from codeweaver.exceptions import CodeWeaverError
+from codeweaver.core import CodeWeaverError, resolve_project_root
 
 
 if TYPE_CHECKING:
@@ -137,7 +136,7 @@ async def search(
     output_format: Literal["json", "table", "markdown"] = "table",
 ) -> None:
     """Search your codebase from the command line with plain language."""
-    from codeweaver.exceptions import ConfigurationError
+    from codeweaver.core import ConfigurationError
 
     display = _display
     error_handler = CLIErrorHandler(display, verbose=False, debug=False)

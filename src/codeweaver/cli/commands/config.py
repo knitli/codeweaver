@@ -60,7 +60,7 @@ def config(
 ) -> None:
     """Manage CodeWeaver configuration."""
     from codeweaver.config.settings import get_settings_map
-    from codeweaver.exceptions import CodeWeaverError
+    from codeweaver.core import CodeWeaverError
 
     error_handler = CLIErrorHandler(display, verbose=verbose, debug=debug)
 

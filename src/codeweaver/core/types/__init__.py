@@ -58,9 +58,9 @@ if TYPE_CHECKING:
     from codeweaver.core.types.config import (
         BridgedKwargsDict,
         BridgedSettings,
-        BridgedSource,
         ConfigSourceType,
         ConfigTargetType,
+        FunctionKind,
         SettingBridge,
     )
     from codeweaver.core.types.dataclasses import (
@@ -97,6 +97,7 @@ if TYPE_CHECKING:
         Provider,
         ProviderEnvVars,
         ProviderKind,
+        ProviderLiteral,
         get_provider_kinds,
     )
     from codeweaver.core.types.search import SearchResult, SearchStrategy, StrategizedQuery
@@ -117,7 +118,6 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "BasedModel": (__spec__.parent, "models"),
     "BlakeHashKey": (__spec__.parent, "aliases"),
     "BlakeKey": (__spec__.parent, "aliases"),
-    "BridgedSource": (__spec__.parent, "config"),
     "BridgedKwargsDict": (__spec__.parent, "config"),
     "BridgedSettings": (__spec__.parent, "config"),
     "CategoryName": (__spec__.parent, "aliases"),
@@ -153,6 +153,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "FilePathT": (__spec__.parent, "aliases"),
     "FilteredKey": (__spec__.parent, "aliases"),
     "FilteredKeyT": (__spec__.parent, "aliases"),
+    "FunctionKind": (__spec__.parent, "config"),
     "LanguageFamily": (__spec__.parent, "delimiter"),
     "LanguageName": (__spec__.parent, "aliases"),
     "LanguageNameT": (__spec__.parent, "aliases"),
@@ -167,6 +168,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "Provider": (__spec__.parent, "provider"),
     "ProviderEnvVars": (__spec__.parent, "provider"),
     "ProviderKind": (__spec__.parent, "provider"),
+    "ProviderLiteral": (__spec__.parent, "provider"),
     "QueryResult": (__spec__.parent, "embeddings"),
     "RawEmbeddingVectors": (__spec__.parent, "embeddings"),
     "RerankingModelName": (__spec__.parent, "aliases"),
@@ -215,7 +217,6 @@ __all__ = (
     "BlakeKey",
     "BridgedKwargsDict",
     "BridgedSettings",
-    "BridgedSource",
     "CategoryName",
     "CategoryNameT",
     "ConfigSourceType",
@@ -247,6 +248,7 @@ __all__ = (
     "FilePathT",
     "FilteredKey",
     "FilteredKeyT",
+    "FunctionKind",
     "LanguageFamily",
     "LanguageName",
     "LanguageNameT",
@@ -260,6 +262,7 @@ __all__ = (
     "Provider",
     "ProviderEnvVars",
     "ProviderKind",
+    "ProviderLiteral",
     "QueryResult",
     "RawEmbeddingVectors",
     "RerankingModelName",

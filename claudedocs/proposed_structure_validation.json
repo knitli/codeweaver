@@ -150,7 +150,7 @@
   "violations": {
     "codeweaver-core": [
       {
-        "file": "codeweaver.exceptions",
+        "file": "codeweaver.core",
         "imports_from": "codeweaver",
         "import": "codeweaver.cli.utils",
         "allowed": []
@@ -254,7 +254,7 @@
       {
         "file": "codeweaver.main",
         "imports_from": "codeweaver-core",
-        "import": "codeweaver.exceptions",
+        "import": "codeweaver.core",
         "allowed": [
           "codeweaver-engine",
           "codeweaver-providers",
@@ -334,7 +334,7 @@
       {
         "file": "codeweaver.mcp.user_agent",
         "imports_from": "codeweaver-core",
-        "import": "codeweaver.exceptions",
+        "import": "codeweaver.core",
         "allowed": [
           "codeweaver-engine",
           "codeweaver-providers",
@@ -554,7 +554,7 @@
       {
         "file": "codeweaver.server.server",
         "imports_from": "codeweaver-core",
-        "import": "codeweaver.exceptions",
+        "import": "codeweaver.core",
         "allowed": [
           "codeweaver-engine",
           "codeweaver-providers",
@@ -654,7 +654,7 @@
       {
         "file": "codeweaver.cli.ui.error_handler",
         "imports_from": "codeweaver-core",
-        "import": "codeweaver.exceptions",
+        "import": "codeweaver.core",
         "allowed": [
           "codeweaver-engine",
           "codeweaver-providers",
@@ -684,7 +684,7 @@
       {
         "file": "codeweaver.cli.commands.doctor",
         "imports_from": "codeweaver-core",
-        "import": "codeweaver.exceptions",
+        "import": "codeweaver.core",
         "allowed": [
           "codeweaver-engine",
           "codeweaver-providers",
@@ -724,7 +724,7 @@
       {
         "file": "codeweaver.cli.commands.config",
         "imports_from": "codeweaver-core",
-        "import": "codeweaver.exceptions",
+        "import": "codeweaver.core",
         "allowed": [
           "codeweaver-engine",
           "codeweaver-providers",
@@ -784,7 +784,7 @@
       {
         "file": "codeweaver.cli.commands.list",
         "imports_from": "codeweaver-core",
-        "import": "codeweaver.exceptions",
+        "import": "codeweaver.core",
         "allowed": [
           "codeweaver-engine",
           "codeweaver-providers",
@@ -824,7 +824,7 @@
       {
         "file": "codeweaver.cli.commands.index",
         "imports_from": "codeweaver-core",
-        "import": "codeweaver.exceptions",
+        "import": "codeweaver.core",
         "allowed": [
           "codeweaver-engine",
           "codeweaver-providers",
@@ -864,7 +864,7 @@
       {
         "file": "codeweaver.cli.commands.init",
         "imports_from": "codeweaver-core",
-        "import": "codeweaver.exceptions",
+        "import": "codeweaver.core",
         "allowed": [
           "codeweaver-engine",
           "codeweaver-providers",
@@ -874,7 +874,7 @@
       {
         "file": "codeweaver.cli.commands.server",
         "imports_from": "codeweaver-core",
-        "import": "codeweaver.exceptions",
+        "import": "codeweaver.core",
         "allowed": [
           "codeweaver-engine",
           "codeweaver-providers",
@@ -894,7 +894,7 @@
       {
         "file": "codeweaver.cli.commands.search",
         "imports_from": "codeweaver-core",
-        "import": "codeweaver.exceptions",
+        "import": "codeweaver.core",
         "allowed": [
           "codeweaver-engine",
           "codeweaver-providers",
@@ -944,7 +944,7 @@
       {
         "file": "codeweaver.server.health.health_service",
         "imports_from": "codeweaver-core",
-        "import": "codeweaver.exceptions",
+        "import": "codeweaver.core",
         "allowed": [
           "codeweaver-engine",
           "codeweaver-providers",
@@ -984,7 +984,7 @@
       {
         "file": "codeweaver.agent_api.find_code.pipeline",
         "imports_from": "codeweaver-core",
-        "import": "codeweaver.exceptions",
+        "import": "codeweaver.core",
         "allowed": [
           "codeweaver-engine",
           "codeweaver-providers",
@@ -1234,7 +1234,7 @@
       {
         "file": "codeweaver.agent_api.find_code.types",
         "imports_from": "codeweaver-core",
-        "import": "codeweaver.exceptions",
+        "import": "codeweaver.core",
         "allowed": [
           "codeweaver-engine",
           "codeweaver-providers",
@@ -1254,7 +1254,7 @@
       {
         "file": "codeweaver.mcp.middleware.statistics",
         "imports_from": "codeweaver-core",
-        "import": "codeweaver.exceptions",
+        "import": "codeweaver.core",
         "allowed": [
           "codeweaver-engine",
           "codeweaver-providers",

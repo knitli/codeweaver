@@ -8,7 +8,7 @@
       "codeweaver.common",
       "codeweaver.cli",
       "codeweaver.mcp",
-      "codeweaver.exceptions"
+      "codeweaver.core"
     ],
     "codeweaver.mcp": [
       "codeweaver.core",
@@ -16,7 +16,7 @@
       "codeweaver.server",
       "codeweaver.common",
       "codeweaver.agent_api",
-      "codeweaver.exceptions"
+      "codeweaver.core"
     ],
     "codeweaver.engine": [
       "codeweaver.core",
@@ -26,14 +26,14 @@
       "codeweaver.cli",
       "codeweaver.semantic",
       "codeweaver.di",
-      "codeweaver.exceptions"
+      "codeweaver.core"
     ],
     "codeweaver.common": [
       "codeweaver.config",
       "codeweaver.core",
       "codeweaver.providers",
       "codeweaver.cli",
-      "codeweaver.exceptions"
+      "codeweaver.core"
     ],
     "codeweaver.agent_api": [
       "codeweaver.core",
@@ -44,7 +44,7 @@
       "codeweaver.server",
       "codeweaver.semantic",
       "codeweaver.di",
-      "codeweaver.exceptions"
+      "codeweaver.core"
     ],
     "codeweaver.server": [
       "codeweaver.config",
@@ -54,7 +54,7 @@
       "codeweaver.cli",
       "codeweaver.di",
       "codeweaver.mcp",
-      "codeweaver.exceptions"
+      "codeweaver.core"
     ],
     "codeweaver.cli": [
       "codeweaver.core",
@@ -66,7 +66,7 @@
       "codeweaver.main",
       "codeweaver.agent_api",
       "codeweaver.mcp",
-      "codeweaver.exceptions"
+      "codeweaver.core"
     ],
     "codeweaver.di": [
       "codeweaver.core",
@@ -75,11 +75,11 @@
       "codeweaver.providers",
       "codeweaver.common",
       "codeweaver.server",
-      "codeweaver.exceptions"
+      "codeweaver.core"
     ],
     "codeweaver.core": [
       "codeweaver.providers",
-      "codeweaver.exceptions"
+      "codeweaver.core"
     ],
     "codeweaver.semantic": [
       "codeweaver.core",
@@ -90,13 +90,13 @@
       "codeweaver.providers",
       "codeweaver.common",
       "codeweaver.mcp",
-      "codeweaver.exceptions"
+      "codeweaver.core"
     ],
     "codeweaver.providers": [
       "codeweaver.core",
       "codeweaver.config",
       "codeweaver.common",
-      "codeweaver.exceptions"
+      "codeweaver.core"
     ]
   },
   "metrics": {
@@ -184,7 +184,7 @@
       "instability": 0.6,
       "total_coupling": 10
     },
-    "codeweaver.exceptions": {
+    "codeweaver.core": {
       "afferent": 11,
       "efferent": 0,
       "instability": 0.0,

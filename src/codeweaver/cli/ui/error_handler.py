@@ -11,7 +11,7 @@ import sys
 from typing import TYPE_CHECKING
 
 from codeweaver.common import CODEWEAVER_PREFIX
-from codeweaver.exceptions import CodeWeaverError
+from codeweaver.core import CodeWeaverError
 
 
 if TYPE_CHECKING:

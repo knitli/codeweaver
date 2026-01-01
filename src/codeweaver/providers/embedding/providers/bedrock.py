@@ -36,10 +36,10 @@ from pydantic import (
 from pydantic.alias_generators import to_camel, to_snake
 from types_boto3_bedrock_runtime.client import BedrockRuntimeClient
 
+from codeweaver.core import ConfigurationError, ProviderError
+from codeweaver.core import ValidationError as CodeWeaverValidationError
 from codeweaver.core.types.models import BasedModel
 from codeweaver.core.types.provider import Provider
-from codeweaver.exceptions import ConfigurationError, ProviderError
-from codeweaver.exceptions import ValidationError as CodeWeaverValidationError
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.providers.base import EmbeddingProvider
 
@@ -114,6 +114,20 @@ def is_one_of_valid_types(
     if isinstance(data, dict):
         return all(isinstance(key, str) for key in data if key)
     return isinstance(data, str | bytes | bytearray | BytesIO)
+
+
+class CohereRequestHandler:
+    """Handler for Cohere embedding requests."""
+
+    def __init__(
+        self,
+        inputs: Sequence[CodeChunk] | Sequence[str],
+        kind: Literal["documents", "query"],
+        **kwargs: Any,
+    ) -> None:
+        self.inputs = inputs
+        self.kind = kind
+        self.kwargs = kwargs
 
 
 class CohereEmbeddingRequestBody(BaseBedrockModel):

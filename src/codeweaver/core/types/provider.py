@@ -10,7 +10,7 @@ from __future__ import annotations
 import contextlib
 import os
 
-from typing import TYPE_CHECKING, NotRequired, TypedDict, cast
+from typing import TYPE_CHECKING, Literal, NotRequired, TypedDict, cast
 
 from codeweaver.core.types.enum import BaseEnum
 
@@ -98,7 +98,7 @@ class Provider(BaseEnum):
     @classmethod
     def validate(cls, value: str) -> BaseEnum:
         """Validate provider-specific settings."""
-        from codeweaver.exceptions import ConfigurationError
+        from codeweaver.core import ConfigurationError
 
         with contextlib.suppress(AttributeError, KeyError, ValueError):
             if value_in_self := cls.from_string(value.strip()):
@@ -596,6 +596,12 @@ PROVIDER_CAPABILITIES: MappingProxyType[Provider, tuple[ProviderKind, ...]] = Ma
     Provider.VERCEL: (ProviderKind.AGENT, ProviderKind.EMBEDDING),
     Provider.VOYAGE: (ProviderKind.EMBEDDING, ProviderKind.RERANKING),
 })
+"""Mapping of providers to their capabilities (the kind of provider).
+
+One of the big questions you might have is "why don't certain providers have reranking models available?" For example, Hugging Face Inference has some models that can do reranking, but we don't list it here. The biggest reason is the SDK support, not model availability. Most notably, the SDK we use for many providers is the OpenAI SDK, which has no reranking endpoint because OpenAI itself has no reranking models.
+
+Eventually, we may be able to enable broader support from these providers, but for now, we only list providers that have first-class support for these capabilities in their SDKs.
+"""
 
 
 def get_provider_kinds(provider: Provider) -> tuple[ProviderKind, ...]:
@@ -603,4 +609,37 @@ def get_provider_kinds(provider: Provider) -> tuple[ProviderKind, ...]:
     return PROVIDER_CAPABILITIES.get(provider, (ProviderKind.DATA,))
 
 
-__all__ = ("Provider", "ProviderKind", "get_provider_kinds")
+type ProviderLiteral = Literal[
+    "anthropic",
+    "azure",
+    "bedrock",
+    "cerebras",
+    "cohere",
+    "deepseek",
+    "duckduckgo",
+    "fastembed",
+    "fireworks",
+    "github",
+    "google",
+    "groq",
+    "heroku",
+    "hf_inference",
+    "litellm",
+    "mistral",
+    "memory",
+    "moonshot",
+    "ollama",
+    "openai",
+    "openrouter",
+    "perplexity",
+    "qdrant",
+    "sentence_transformers",
+    "tavily",
+    "together",
+    "vercel",
+    "voyage",
+    "x_ai",
+]
+
+
+__all__ = ("Provider", "ProviderKind", "ProviderLiteral", "get_provider_kinds")

@@ -11,9 +11,9 @@ It only stores the last `max_size` bytes, and moves old batches to a weakref sto
 
 from __future__ import annotations
 
+from codeweaver.core import ValidationError as CodeWeaverValidationError
 from codeweaver.core.stores import UUIDStore
 from codeweaver.core.types.aliases import ModelNameT
-from codeweaver.exceptions import ValidationError as CodeWeaverValidationError
 from codeweaver.providers.embedding.types import (
     ChunkEmbeddings,
     EmbeddingKind,

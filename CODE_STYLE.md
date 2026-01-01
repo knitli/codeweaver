@@ -109,7 +109,7 @@ class MyModel(BasedModel):
 - **Use `raise from`**: Maintain exception context
 - **Use `contextlib.suppress`**: For intentional exception suppression (not try-except-pass/continue)
 
-- If raising an exception, raise to a specific codeweaver exception (`codeweaver.exceptions`)
+- If raising an exception, raise to a specific codeweaver exception (`codeweaver.core`)
 
 ### Functions
 

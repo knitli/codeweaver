@@ -13,9 +13,9 @@ from typing import TYPE_CHECKING, Annotated, Any, Literal, cast
 from codeweaver_tokenizers.base import Tokenizer
 from pydantic import ConfigDict, Field, NonNegativeInt, PositiveInt
 
+from codeweaver.core import ValidationError as CodeWeaverValidationError
 from codeweaver.core.types.models import BasedModel
 from codeweaver.core.types.provider import Provider
-from codeweaver.exceptions import ValidationError as CodeWeaverValidationError
 
 
 if TYPE_CHECKING:

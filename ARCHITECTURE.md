@@ -662,7 +662,7 @@ async def test_find_code_authentication_query():
 - Specify exception types (no bare `except:`)
 - Use `raise from` to maintain exception context
 - Use `contextlib.suppress` for intentional suppression
-- Raise to specific CodeWeaver exceptions (`codeweaver.exceptions`)
+- Raise to specific CodeWeaver exceptions (`codeweaver.core`)
 
 **Functions**:
 - Type all parameters and returns (including `-> None`)

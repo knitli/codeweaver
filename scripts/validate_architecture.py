@@ -62,7 +62,7 @@ IMPORT_RULES = [
     ("codeweaver.semantic", "codeweaver-semantic"),
     ("codeweaver.providers", "codeweaver-providers"),
     ("codeweaver.core", "codeweaver-core"),
-    ("codeweaver.exceptions", "codeweaver-core"),
+    ("codeweaver.core", "codeweaver-core"),
     ("codeweaver.common.types", "codeweaver-core"),
     ("codeweaver.common._logging", "codeweaver-core"),
     ("codeweaver.common.statistics", "codeweaver-core"),

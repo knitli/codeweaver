@@ -32,6 +32,7 @@ from codeweaver.core import (
     DATACLASS_CONFIG,
     AnonymityConversion,
     DataclassSerializationMixin,
+    InitializationError,
     Unset,
     elapsed_time_to_human_readable,
     get_project_path,
@@ -41,7 +42,6 @@ from codeweaver.core import Provider as Provider
 from codeweaver.di import get_container
 from codeweaver.engine.failover import VectorStoreFailoverManager
 from codeweaver.engine.indexer import Indexer
-from codeweaver.exceptions import InitializationError
 from codeweaver.mcp.state import CwMcpHttpState
 from codeweaver.server.health.health_service import HealthService
 from codeweaver.server.management import ManagementServer

@@ -55,7 +55,7 @@ import asyncio
 import logging
 
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -524,7 +524,7 @@ async def test_reconciliation_handles_provider_error_gracefully(
     qdrant_test_manager, tmp_path, initialized_cw_state, clean_container, caplog
 ):
     """Verify prime_index continues when reconciliation fails with ProviderError."""
-    from codeweaver.exceptions import ProviderError
+    from codeweaver.core import ProviderError
 
     # Set caplog to capture logs
     caplog.set_level(logging.WARNING, logger="codeweaver")
@@ -590,20 +590,24 @@ async def test_reconciliation_handles_provider_error_gracefully(
 
     # Resolve indexer
     indexer = await clean_container.resolve(Indexer)
-    
+
     # Ensure vector store and providers are set
     object.__setattr__(indexer, "_project_path", project_path)
     object.__setattr__(indexer, "_vector_store", provider)
     object.__setattr__(indexer, "_embedding_provider", mock_dense_provider)
     object.__setattr__(indexer, "_sparse_provider", mock_sparse_provider)
-    
+
     # Patch _get_current_embedding_models
-    object.__setattr__(indexer, "_get_current_embedding_models", lambda: {
-        "dense_provider": "test-provider",
-        "dense_model": "test-dense-model",
-        "sparse_provider": "test-sparse-provider",
-        "sparse_model": "test-sparse-model",
-    })
+    object.__setattr__(
+        indexer,
+        "_get_current_embedding_models",
+        lambda: {
+            "dense_provider": "test-provider",
+            "dense_model": "test-dense-model",
+            "sparse_provider": "test-sparse-provider",
+            "sparse_model": "test-sparse-model",
+        },
+    )
 
     # Initialize manifest
     from codeweaver.engine.indexer.manifest import FileManifestManager
@@ -639,7 +643,7 @@ async def test_reconciliation_handles_indexing_error_gracefully(
     qdrant_test_manager, tmp_path, initialized_cw_state, clean_container, caplog
 ):
     """Verify prime_index continues when reconciliation fails with IndexingError."""
-    from codeweaver.exceptions import IndexingError
+    from codeweaver.core import IndexingError
 
     # Create unique collection
     collection_name = qdrant_test_manager.create_collection_name("error_indexing")
@@ -673,13 +677,14 @@ async def test_reconciliation_handles_indexing_error_gracefully(
 
     # Make vector store client fail with IndexingError during update
     from qdrant_client.models import Record
+
     mock_record = Record(
-        id=str(chunk.chunk_id),
-        payload={"text": "def func():\n    pass\n"},
-        vector={},
+        id=str(chunk.chunk_id), payload={"text": "def func():\n    pass\n"}, vector={}
     )
     provider.client.retrieve = AsyncMock(return_value=[mock_record])
-    provider.client.update_vectors = AsyncMock(side_effect=IndexingError("Simulated indexing failure"))
+    provider.client.update_vectors = AsyncMock(
+        side_effect=IndexingError("Simulated indexing failure")
+    )
 
     # Create mocked providers
     mock_dense_provider = AsyncMock()
@@ -708,7 +713,7 @@ async def test_reconciliation_handles_indexing_error_gracefully(
 
     # Resolve indexer
     indexer = await clean_container.resolve(Indexer)
-    
+
     # Ensure vector store and providers are set
     object.__setattr__(indexer, "_project_path", project_path)
     object.__setattr__(indexer, "_vector_store", provider)
@@ -716,12 +721,16 @@ async def test_reconciliation_handles_indexing_error_gracefully(
     object.__setattr__(indexer, "_sparse_provider", mock_sparse_provider)
 
     # Patch _get_current_embedding_models
-    object.__setattr__(indexer, "_get_current_embedding_models", lambda: {
-        "dense_provider": "test-provider",
-        "dense_model": "test-dense-model",
-        "sparse_provider": "test-sparse-provider",
-        "sparse_model": "test-sparse-model",
-    })
+    object.__setattr__(
+        indexer,
+        "_get_current_embedding_models",
+        lambda: {
+            "dense_provider": "test-provider",
+            "dense_model": "test-dense-model",
+            "sparse_provider": "test-sparse-provider",
+            "sparse_model": "test-sparse-model",
+        },
+    )
 
     # Initialize manifest
     from codeweaver.engine.indexer.manifest import FileManifestManager
@@ -760,9 +769,6 @@ async def test_reconciliation_handles_connection_error_gracefully(
     qdrant_test_manager, tmp_path, initialized_cw_state, clean_container, caplog
 ):
     """Verify prime_index continues when reconciliation fails with ConnectionError."""
-    import logging
-
-    from codeweaver.exceptions import IndexingError
 
     collection_name = qdrant_test_manager.create_collection_name("error_connection")
     await qdrant_test_manager.create_collection(
@@ -868,8 +874,9 @@ async def test_reconciliation_handles_connection_error_gracefully(
     if isinstance(result, dict):
         assert result["files_processed"] == 0
         assert result.get("errors"), "Expected errors in reconciliation result"
-        assert any("Simulated connection failure" in str(e) for e in result["errors"]), \
+        assert any("Simulated connection failure" in str(e) for e in result["errors"]), (
             "Expected 'Simulated connection failure' in errors"
+        )
     else:
         pytest.fail(f"Expected dict result with errors, got {result}")
 
@@ -924,19 +931,23 @@ async def test_reconciliation_not_called_when_force_reindex_true(
 
     # Resolve indexer
     indexer = await clean_container.resolve(Indexer)
-    
+
     # Ensure vector store and providers are set
     object.__setattr__(indexer, "_vector_store", None)
     object.__setattr__(indexer, "_embedding_provider", mock_dense_provider)
     object.__setattr__(indexer, "_sparse_provider", mock_sparse_provider)
-    
+
     # Patch _get_current_embedding_models to be consistent with manifest
-    object.__setattr__(indexer, "_get_current_embedding_models", lambda: {
-        "dense_provider": "test",
-        "dense_model": "test-dense-model",
-        "sparse_provider": "test-sparse",
-        "sparse_model": "test-sparse-model",
-    })
+    object.__setattr__(
+        indexer,
+        "_get_current_embedding_models",
+        lambda: {
+            "dense_provider": "test",
+            "dense_model": "test-dense-model",
+            "sparse_provider": "test-sparse",
+            "sparse_model": "test-sparse-model",
+        },
+    )
 
     # Initialize manifest manager (normally done in prime_index)
     from codeweaver.engine.indexer.manifest import FileManifestManager
@@ -972,7 +983,9 @@ async def test_reconciliation_not_called_when_force_reindex_true(
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_reconciliation_not_called_when_no_vector_store(tmp_path, initialized_cw_state, clean_container):
+async def test_reconciliation_not_called_when_no_vector_store(
+    tmp_path, initialized_cw_state, clean_container
+):
     """Verify reconciliation is skipped when no vector store is configured."""
     project_path = tmp_path / "test_no_vs"
     project_path.mkdir()
@@ -1004,19 +1017,23 @@ async def test_reconciliation_not_called_when_no_vector_store(tmp_path, initiali
 
     # Resolve indexer
     indexer = await clean_container.resolve(Indexer)
-    
+
     # Ensure vector store and providers are set
     object.__setattr__(indexer, "_vector_store", None)
     object.__setattr__(indexer, "_embedding_provider", mock_dense_provider)
     object.__setattr__(indexer, "_sparse_provider", mock_sparse_provider)
-    
+
     # Patch _get_current_embedding_models to be consistent with manifest
-    object.__setattr__(indexer, "_get_current_embedding_models", lambda: {
-        "dense_provider": "test",
-        "dense_model": "test-dense-model",
-        "sparse_provider": "test-sparse",
-        "sparse_model": "test-sparse-model",
-    })
+    object.__setattr__(
+        indexer,
+        "_get_current_embedding_models",
+        lambda: {
+            "dense_provider": "test",
+            "dense_model": "test-dense-model",
+            "sparse_provider": "test-sparse",
+            "sparse_model": "test-sparse-model",
+        },
+    )
 
     # Initialize manifest manager (normally done in prime_index)
     from codeweaver.engine.indexer.manifest import FileManifestManager
@@ -1079,19 +1096,23 @@ async def test_reconciliation_not_called_when_no_providers(
 
     # Resolve indexer
     indexer = await clean_container.resolve(Indexer)
-    
+
     # Ensure vector store and providers are set
     object.__setattr__(indexer, "_vector_store", None)
     object.__setattr__(indexer, "_embedding_provider", None)
     object.__setattr__(indexer, "_sparse_provider", None)
-    
+
     # Patch _get_current_embedding_models to be consistent with manifest
-    object.__setattr__(indexer, "_get_current_embedding_models", lambda: {
-        "dense_provider": "test",
-        "dense_model": "test-dense-model",
-        "sparse_provider": "test-sparse",
-        "sparse_model": "test-sparse-model",
-    })
+    object.__setattr__(
+        indexer,
+        "_get_current_embedding_models",
+        lambda: {
+            "dense_provider": "test",
+            "dense_model": "test-dense-model",
+            "sparse_provider": "test-sparse",
+            "sparse_model": "test-sparse-model",
+        },
+    )
 
     # Initialize manifest manager (normally done in prime_index)
     from codeweaver.engine.indexer.manifest import FileManifestManager

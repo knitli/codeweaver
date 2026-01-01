@@ -757,7 +757,7 @@ async def process_checks(display: StatusDisplay) -> list[DoctorCheck]:
     Returns:
         List of DoctorCheck results
     """
-    from codeweaver.exceptions import CodeWeaverError
+    from codeweaver.core import CodeWeaverError
 
     settings: CodeWeaverSettings | None = None
 

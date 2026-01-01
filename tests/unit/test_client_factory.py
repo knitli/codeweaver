@@ -131,7 +131,7 @@ class TestClientMapLookup:
             )
         }
 
-        from codeweaver.exceptions import ConfigurationError
+        from codeweaver.core import ConfigurationError
 
         with patch("codeweaver.providers.capabilities.CLIENT_MAP", mock_client_map):
             with pytest.raises(ConfigurationError, match="client import failed"):
@@ -406,7 +406,7 @@ class TestInstantiateClient:
 
     def test_missing_required_api_key_raises(self, registry):
         """Test missing API key for required provider raises error."""
-        from codeweaver.exceptions import ConfigurationError
+        from codeweaver.core import ConfigurationError
 
         # Create a mock class that requires api_key
         class MockClient:

@@ -149,5 +149,32 @@ class BasedModel(BaseModel):
             for key, value in data.items()
         }
 
+    # Because we switched from TypedDict to BasedModel for provider settings, we need to implement some dict-like behavior, at least until we're confident we have refactored all usages.
+    def __getitem__(self, key: str) -> Any:
+        """Get an item by key."""
+        return getattr(self, key)
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        """Set an item by key."""
+        setattr(self, key, value)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        """Get an item by key with a default value."""
+        return getattr(self, key, default)
+
+    def items(self) -> Generator[tuple[str, Any], None, None]:
+        """Get items as (key, value) pairs."""
+        for field in type(self).model_fields:
+            yield field, getattr(self, field)
+
+    def keys(self) -> Generator[str, None, None]:
+        """Get keys of the model."""
+        yield from type(self).model_fields
+
+    def values(self) -> Generator[Any, None, None]:
+        """Get values of the model."""
+        for field in type(self).model_fields:
+            yield getattr(self, field)
+
 
 __all__ = ("BASEDMODEL_CONFIG", "FROZEN_BASEDMODEL_CONFIG", "BasedModel", "RootedRoot")

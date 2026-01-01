@@ -18,9 +18,9 @@ import logging
 from contextvars import ContextVar
 from typing import TYPE_CHECKING, Any, NoReturn
 
+from codeweaver.core import ConfigurationError, QueryError
 from codeweaver.core.types.search import SearchStrategy, StrategizedQuery
 from codeweaver.di.providers import EmbeddingDep, RerankingDep, SparseEmbeddingDep, VectorStoreDep
-from codeweaver.exceptions import ConfigurationError, QueryError
 from codeweaver.providers.embedding.types import QueryResult, RawEmbeddingVectors, SparseEmbedding
 
 
@@ -280,10 +280,10 @@ async def embed_query(
     if sparse_provider:
         try:
             result = await sparse_provider.embed_query(query)
-            
+
             # Standardize sparse embedding format
             from codeweaver.core.types.embeddings import SparseEmbedding
-            
+
             if isinstance(result, SparseEmbedding):
                 sparse_query_embedding = result
             elif isinstance(result, list) and len(result) > 0:
@@ -299,7 +299,7 @@ async def embed_query(
                 sparse_query_embedding = SparseEmbedding(**result)
             else:
                 logger.warning("Unexpected sparse embedding format: %s", type(result))
-                
+
         except Exception as e:
             await log_to_client_or_fallback(
                 context,

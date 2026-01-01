@@ -38,11 +38,11 @@ from qdrant_client.http.models.models import (
 from typing_extensions import TypeIs
 
 from codeweaver.config.providers import VectorStoreProviderSettings
+from codeweaver.core import ProviderError
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.types import DictView
 from codeweaver.core.types.provider import Provider
 from codeweaver.core.types.search import SearchResult, SearchStrategy, StrategizedQuery
-from codeweaver.exceptions import ProviderError
 from codeweaver.providers.embedding.types import SparseEmbedding as CodeWeaverSparseEmbedding
 from codeweaver.providers.vector_stores.base import MixedQueryInput, VectorStoreProvider
 from codeweaver.providers.vector_stores.metadata import CollectionMetadata, HybridVectorPayload
@@ -359,7 +359,7 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         """
 
         def _raise_dimension_error() -> NoReturn:
-            from codeweaver.exceptions import DimensionMismatchError
+            from codeweaver.core import DimensionMismatchError
 
             raise DimensionMismatchError(
                 dedent(f"""\

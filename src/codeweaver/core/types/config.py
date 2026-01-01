@@ -8,11 +8,13 @@ Any concrete types are in the configuration modules.
 
 from __future__ import annotations
 
+import contextlib
+import importlib
 import logging
 
 from collections import defaultdict
-from collections.abc import Callable
-from typing import Any, Literal, LiteralString, NamedTuple, TypedDict, TypeVar, cast
+from collections.abc import Callable, Mapping, Sequence
+from typing import Any, Literal, NamedTuple, TypedDict, TypeVar, cast
 
 from codeweaver.core.types.enum import BaseEnum
 
@@ -26,27 +28,24 @@ U = TypeVar("U")
 class ConfigSourceType(BaseEnum):
     """An enumeration of possible configuration sources."""
 
-    MODEL_SETTINGS = "model_settings"
+    MODEL = "model_settings"
     """Configuration sourced from a model's settings (like `EmbeddingModelSettings`)."""
 
-    PROVIDER_SETTINGS = "provider_settings"
+    PROVIDER = "provider_settings"
     """Configuration sourced from a provider's settings (like `EmbeddingProviderSettings`)."""
-
-    PROVIDER_SPECIFIC_SETTINGS = "provider_specific_settings"
-    """Some providers have unique settings objects for their specific configurations; this is for those. For example, `AWSBedrockProviderSettings`."""
 
     CAPABILITIES = "capabilities"
     """Setting is from a model's capabilities object (for static capabilities that can't be set, like context window size)."""
 
 
 class ConfigTargetType(BaseEnum):
-    """An enumeration of possible configuration targets."""
+    """An enumeration of possible configuration targets.
+
+    NOTE: We don't need a `CLIENT` source type because each client has a `ClientOptions` object, which defines its
+    """
 
     PROVIDER = "provider_settings"
     """Setting provided to a provider class's constructor."""
-
-    CLIENT = "client_settings"
-    """Setting provided to a provider client's constructor (like a Boto3 client)."""
 
     MODEL = "model_settings"
     """For providers with model objects, like SentenceTransformers models, settings provided to the model's constructor."""
@@ -104,12 +103,15 @@ class SettingBridge(NamedTuple):
     Anything can provide a `SettingBridge`, and they are used to translate settings from one place to another. Typically, these are defined as either a ClassVar or as an attribute for an implementing class.
     """
 
-    source: LiteralString
-    """The source setting name for the origin (i.e. a CodeWeaver setting name)."""
+    source: str | list[str]
+    """The source setting name for the origin (i.e. a CodeWeaver setting name). If a list, the values are names of nested keys to reach the source setting from the setting source's top level.
+
+    For example: `api_key` is defined in `BaseProviderSettings`, so the source would just be `"api_key"`. But `host` is nested under the `connection
+    """
     source_type: ConfigSourceType
     """The type of source for the setting (i.e. whether it's from model settings, provider settings, etc)."""
 
-    target: LiteralString | list[LiteralString] | None
+    target: str | list[str] | None
     """The target setting name for the destination (i.e. a provider's client setting name). If a list, the values are names of nested keys to reach the target setting.
 
     If `None`, there is no corresponding target setting, and the bridge is only for informational purposes.
@@ -117,6 +119,9 @@ class SettingBridge(NamedTuple):
 
     target_type: ConfigTargetType | None
     """The type of target for the setting (i.e. whether it's for a provider, client, model, or function)."""
+
+    target_class: type | str | None = None
+    """For provider/client/model settings, the specific class to use for the target (like `OpenAIClientOptions`, or some providers have pydantic models to validate settings). Can be a type or an import string to one."""
 
     function_kind: FunctionKind | None = None
     """The kind of function this setting applies to (like text embedding, reranking, etc). If `None`, applies to all function kinds. Only relevant if target_type is `ConfigTargetType.FUNCTION`."""
@@ -134,7 +139,7 @@ class SettingBridge(NamedTuple):
     """
 
     is_required: bool = False
-    """Whether this bridge is required to have a value when used. If `True` and no value is provided, an error should be raised."""
+    """Whether this bridge is required to have a value when used. Raise an error if not found."""
 
     @property
     def has_target(self) -> bool:
@@ -168,6 +173,31 @@ class SettingBridge(NamedTuple):
             return self._build_nested_dict_from_kwargs(value)
         return {cast(str, self.target): value}
 
+    def get_target(self) -> type[Any] | None:
+        """Attempt to get the target class type, resolving from string if necessary.
+
+        Returns:
+            The target class type, or None if not defined.
+        """
+        # return if target_class or is already a type.
+        # We need to be careful because most BaseEnum are str subclasses.
+        # We don't currently have settings that are BaseEnum, but we may in the future.
+        if self.target_class is None or (
+            self.target_class is object
+            and self.target_class is not str
+            and not issubclass(self.target_class, str)
+        ):
+            return self.target_class
+        with contextlib.suppress(ImportError, AttributeError):
+            if isinstance(self.target_class, str):
+                components = self.target_class.split(".")
+                module_path = ".".join(components[:-1])
+                class_name = components[-1]
+                module = importlib.import_module(module_path)
+                return getattr(module, class_name)
+        # I don't think this is reachable, but I'm probably missing something.
+        return self.target_class
+
     def _build_nested_dict_from_kwargs(self, value: str | Any) -> dict[str, Any]:
         """Build a nested dictionary from the target list of keys."""
         # Build nested dictionary
@@ -179,38 +209,6 @@ class SettingBridge(NamedTuple):
             current = current[part]
         current[target_parts[-1]] = value
         return nested_kwargs
-
-
-class BridgeSource(NamedTuple):
-    """A NamedTuple representing the source of a bridged setting."""
-
-    bridges: list[SettingBridge]
-    """A list of SettingBridges for the source."""
-
-    source: Any
-    """The source object to read values from."""
-
-    use_keys: bool = False
-    """Whether to use keys from the source (if it's a dict-like object), or to use property access."""
-
-    def extract_values(self) -> dict[str, Any]:
-        """Extract values from the source object for all bridges.
-
-        Returns:
-            A dictionary mapping source names to their values.
-        """
-        values: dict[str, Any] = {}
-        for bridge in self.bridges:
-            try:
-                if self.use_keys:
-                    value = self.source.get(bridge.source)
-                else:
-                    value = getattr(self.source, bridge.source, None)
-                if value is not None:
-                    values[bridge.source] = value
-            except (KeyError, AttributeError, TypeError):
-                continue
-        return values
 
 
 class BridgedKwargsDict(TypedDict):
@@ -250,38 +248,37 @@ class BridgedSettings(NamedTuple):
 
     @classmethod
     def sort_bridges(
-        cls, sources: list[BridgeSource]
+        cls, bridges: list[SettingBridge]
     ) -> dict[ConfigTargetType, list[SettingBridge] | None]:
-        """Sort bridges from a list of BridgeSources into a dictionary keyed by ConfigTargetType.
+        """Sort bridges from a list of SettingBridge into a dictionary keyed by ConfigTargetType.
 
         Args:
-            sources: A list of BridgeSource objects containing bridges to sort.
+            bridges: A list of SettingBridge objects containing bridges to sort.
 
         Returns:
             A dictionary mapping each ConfigTargetType to its list of bridges.
             Types with no bridges will have `None` as their value.
         """
         sorted_bridges: dict[ConfigTargetType, list[SettingBridge]] = defaultdict(list)
-        for source in sources:
-            for bridge in source.bridges:
-                if bridge.target_type is not None:
-                    sorted_bridges[bridge.target_type].append(bridge)
+        for bridge in bridges:
+            if bridge.target_type is not None:
+                sorted_bridges[bridge.target_type].append(bridge)
         # Return dict with None for any target types that have no bridges
         return {k: sorted_bridges.get(k) for k in ConfigTargetType}
 
     @classmethod
-    def from_sources(cls, sources: list[BridgeSource] | None = None) -> BridgedSettings:
-        """Create a BridgedSettings object from a list of BridgeSources.
+    def from_sources(cls, bridges: Sequence[SettingBridge] | None = None) -> BridgedSettings:
+        """Create a BridgedSettings object from a list of SettingBridge.
 
         Args:
-            sources: A list of BridgeSource objects. If None, returns empty BridgedSettings.
+            bridges: A list of SettingBridge objects. If None, returns empty BridgedSettings.
 
         Returns:
             A BridgedSettings instance with bridges sorted by target type.
         """
-        if sources is None:
+        if bridges is None:
             return cls()
-        sorted_bridges = cls.sort_bridges(sources)
+        sorted_bridges = cls.sort_bridges(bridges)
         return cls(**{k.value: v for k, v in sorted_bridges.items()})
 
     def to_setting(
@@ -317,7 +314,7 @@ class BridgedSettings(NamedTuple):
                 deep_merge(result, kwarg)
         return result
 
-    def to_kwargs_dict(self, values: dict[str, Any]) -> BridgedKwargsDict:
+    def to_kwargs_dict(self, values: Mapping[str, Any]) -> BridgedKwargsDict:
         """Convert the bridged settings to a BridgedKwargsDict.
 
         Args:
@@ -327,16 +324,21 @@ class BridgedSettings(NamedTuple):
         Returns:
             A BridgedKwargsDict with settings organized by target type.
         """
+        if not isinstance(values, dict):
+            values = dict(values)
         return BridgedKwargsDict(
-            provider_settings=self.to_setting(ConfigTargetType.PROVIDER, values),
-            client_settings=self.to_setting(ConfigTargetType.CLIENT, values),
-            model_settings=self.to_setting(ConfigTargetType.MODEL, values),
-            function_settings=self.to_setting(ConfigTargetType.FUNCTION, values),
+            provider_settings=self.to_setting(
+                ConfigTargetType.PROVIDER, cast(dict[str, Any], values)
+            ),
+            client_settings=self.to_setting(ConfigTargetType.CLIENT, cast(dict[str, Any], values)),
+            model_settings=self.to_setting(ConfigTargetType.MODEL, cast(dict[str, Any], values)),
+            function_settings=self.to_setting(
+                ConfigTargetType.FUNCTION, cast(dict[str, Any], values)
+            ),
         )
 
 
 __all__ = (
-    "BridgeSource",
     "BridgedKwargsDict",
     "BridgedSettings",
     "ConfigSourceType",

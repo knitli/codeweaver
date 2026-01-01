@@ -6,11 +6,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, Annotated, Any, Literal, Self
 
 from pydantic import ConfigDict, Field, PositiveFloat, PositiveInt
 
-from codeweaver.core import BASEDMODEL_CONFIG, BasedModel, BridgeSource, Provider
+from codeweaver.core import BASEDMODEL_CONFIG, BasedModel, Provider, SettingBridge
 
 
 if TYPE_CHECKING:
@@ -320,8 +321,8 @@ class EmbeddingModelSpec(BasedModel):
         Field(description="The capabilities associated with this model spec."),
     ]
 
-    bridge_source: Annotated[
-        BridgeSource, Field(description="The source of the setting bridge for this model spec.")
+    bridges: Annotated[
+        Sequence[SettingBridge], Field(description="The setting bridges for this spec.")
     ]
 
     def _telemetry_keys(self) -> None:

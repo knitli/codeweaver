@@ -25,8 +25,8 @@ from typing import TYPE_CHECKING, Any, Literal, cast
 
 from google.genai.types import HttpOptions
 
+from codeweaver.core import ConfigurationError
 from codeweaver.core.types.enum import BaseEnum
-from codeweaver.exceptions import ConfigurationError
 from codeweaver.providers.embedding.providers.base import EmbeddingProvider
 
 

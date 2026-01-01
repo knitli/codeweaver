@@ -9,7 +9,7 @@ from typing import cast
 
 from pydantic import PositiveInt
 
-from codeweaver.exceptions import ConfigurationError
+from codeweaver.core import ConfigurationError
 
 
 def resolve_dimensions() -> PositiveInt:

@@ -417,7 +417,7 @@ async def test_remote_connection():
 
 **Test Scenario**:
 ```python
-from codeweaver.exceptions import ProviderSwitchError
+from codeweaver.core import ProviderSwitchError
 
 async def test_provider_switch_detection():
     collection_name = "test_provider_switch"

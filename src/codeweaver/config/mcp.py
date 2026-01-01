@@ -64,8 +64,8 @@ from fastmcp.mcp_config import update_config_file as update_mcp_config_file
 from pydantic import Field
 from pydantic_core import from_json
 
+from codeweaver.core import MissingValueError
 from codeweaver.core.types.models import BasedModel
-from codeweaver.exceptions import MissingValueError
 
 
 if TYPE_CHECKING:

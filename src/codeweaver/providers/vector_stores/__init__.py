@@ -10,7 +10,7 @@ from importlib import import_module
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any
 
-from codeweaver.exceptions import ConfigurationError
+from codeweaver.core import ConfigurationError
 
 
 if TYPE_CHECKING:

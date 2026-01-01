@@ -137,7 +137,7 @@ def analyze_proposed_structure():
             path_to_package[normalized] = pkg_name
 
     # Special handling for exceptions (it's a file, not a package)
-    path_to_package["codeweaver.exceptions"] = "codeweaver-core"
+    path_to_package["codeweaver.core"] = "codeweaver-core"
 
     # Analyze actual dependencies
     file_dependencies = {}

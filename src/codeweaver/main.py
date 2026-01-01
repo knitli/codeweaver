@@ -20,9 +20,8 @@ from fastmcp import FastMCP
 from pydantic import FilePath
 
 from codeweaver.config.types import CodeWeaverSettingsDict
+from codeweaver.core import InitializationError, lazy_import
 from codeweaver.core import Provider as Provider
-from codeweaver.core import lazy_import
-from codeweaver.exceptions import InitializationError
 
 
 class UvicornAccessLogFilter(logging.Filter):

@@ -15,7 +15,7 @@ from cyclopts import App
 from pydantic import FilePath
 
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
-from codeweaver.exceptions import CodeWeaverError
+from codeweaver.core import CodeWeaverError
 
 
 _display: StatusDisplay = get_display()

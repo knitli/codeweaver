@@ -3,16 +3,24 @@
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
 
-"""TypedDict classes for provider settings.
+"""
+Models and TypedDict classes for provider and AI (embedding, sparse embedding, reranking, agent) model settings.
 
-Provides configuration settings for all supported providers, including embedding models, reranking models, and agent models.
+The overall pattern:
+    - Each potential provider client (the actual client class, e.g., OpenAIClient) has a corresponding ClientOptions class (e.g., OpenAIClientOptions).
+    - There is a baseline provider settings model, `BaseProviderSettings`. Each provider type (embedding, data, vector store, etc.) has a corresponding settings model that extends `BaseProviderSettings` (e.g., `EmbeddingProviderSettings`). These are mostly almost identical, but the class distinctions make identification easier and improves clarity.
+    - Certain providers with unique settings requirements can define a mixin class that provides the additional required settings. Note that these should not overlap with the client options for the provider.
+    - A series of discriminators help with identifying the correct client options and provider settings classes based on the provider and other settings.
 """
 
 from __future__ import annotations
 
-import importlib.util as util
+import importlib
 import logging
+import ssl
 
+from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -22,20 +30,44 @@ from typing import (
     NamedTuple,
     NotRequired,
     Required,
+    Self,
     TypedDict,
     cast,
     is_typeddict,
 )
 
-from pydantic import Field, PositiveFloat, PositiveInt, SecretStr, computed_field, model_validator
+import httpx
+
+from pydantic import (
+    AnyUrl,
+    ConfigDict,
+    Discriminator,
+    Field,
+    NonNegativeInt,
+    PositiveFloat,
+    PositiveInt,
+    SecretStr,
+    Tag,
+    computed_field,
+    model_validator,
+)
 from pydantic_ai.settings import ModelSettings as AgentModelSettings
 from pydantic_ai.settings import merge_model_settings
+from qdrant_client.http.models.models import SparseVectorParams, VectorParams
 
-from codeweaver.core import get_user_config_dir
-from codeweaver.core.types import DictView
-from codeweaver.core.types.models import BasedModel
-from codeweaver.core.types.provider import Provider
-from codeweaver.core.types.sentinel import Unset
+from codeweaver.core import (
+    BASEDMODEL_CONFIG,
+    AnonymityConversion,
+    BasedModel,
+    ConfigurationError,
+    DictView,
+    FilteredKey,
+    FilteredKeyT,
+    Provider,
+    ProviderLiteral,
+    Unset,
+    get_user_config_dir,
+)
 
 
 if TYPE_CHECKING:
@@ -44,6 +76,505 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# ===========================================================================
+# *                           Client Options
+# ===========================================================================
+
+
+class HttpxClientParams(TypedDict, total=False):
+    """Parameters for configuring an httpx client."""
+
+    auth: NotRequired[httpx._types.AuthTypes]
+    params: NotRequired[httpx._types.QueryParamTypes]
+    headers: NotRequired[httpx._types.HeaderTypes]
+    cookies: NotRequired[httpx._types.CookieTypes]
+    verify: NotRequired[bool | ssl.SSLContext | str]
+    cert: NotRequired[httpx._types.CertTypes]
+    http1: NotRequired[bool]
+    http2: NotRequired[bool]
+    proxy: NotRequired[httpx._types.ProxyTypes]
+    mounts: NotRequired[Mapping[str, httpx._transports.AsyncBaseTransport]]
+    timeout: NotRequired[httpx._types.TimeoutTypes]
+    follow_redirects: NotRequired[bool]
+    limits: NotRequired[httpx.Limits]
+    max_redirects: NotRequired[NonNegativeInt]
+    event_hooks: NotRequired[Mapping[str, list[Callable[..., Any]]]]
+    base_url: NotRequired[httpx.URL | str]
+    transport: NotRequired[httpx._transports.AsyncBaseTransport]
+    trust_env: NotRequired[bool]
+    default_encoding: NotRequired[
+        Literal["utf-8", "utf-16", "utf-32"]
+        | Callable[[bytes], Literal["utf-8", "utf-16", "utf-32"]]
+    ]
+
+
+class GrpcParams(TypedDict, total=False):
+    """Parameters for configuring a grpc channel."""
+
+    root_certificates: NotRequired[bytes]
+    """PEM encoded root certificates as bytes."""
+    private_key: NotRequired[bytes]
+    """PEM encoded private key as bytes."""
+    certificate_chain: NotRequired[bytes]
+    """PEM encoded certificate chain as bytes."""
+    metadata: NotRequired[Sequence[tuple[str, str]]]
+    """Metadata to be sent with each request."""
+    options: NotRequired[dict[str, Any]]
+    """A mapping of channel options. See grpc documentation for details. Note: max_send_message_length and max_receive_message_length can't be set here because qdrant_client will override them (always -1)."""
+
+
+if importlib.util.find_spec("fastembed") is not None:
+    from fastembed.common.types import OnnxProvider
+else:
+    OnnxProvider = object
+
+if importlib.util.find_spec("torch") is not None:
+    from torch.nn import Module
+else:
+    Module = object
+if importlib.util.find_spec("sentence-transformers") is not None:
+    from sentence_transformers.model_card import SentenceTransformerModelCardData
+else:
+    SentenceTransformerModelCardData = object
+
+
+class ClientOptions(BasedModel):
+    """A base class for provider client options.
+
+    Client options are specific to the underlying SDK client that's used. They are not
+    necessarily the same as the *provider*. The provider is who you pay, while the client
+    if what you use to connect. For the most part, this is intuitive but there are some
+    exceptions. The biggest exception is Azure, which does not have its own provider class,
+    because it instead uses either Cohere or OpenAI providers. You're connecting to and paying Azure,
+    but using the correct provider class for what you're trying to do.
+
+    The standard way to pass client options to a provider is with the `as_settings()` method, which provides a kwargs dictionary.
+    """
+
+    model_config = BASEDMODEL_CONFIG | ConfigDict(frozen=True, from_attributes=True)
+    _core_provider: Annotated[
+        Provider,
+        Field(
+            exclude=True,
+            init=False,
+            description="The provider most associated with this options class. For example, OpenAI for OpenAIClientOptions, or Cohere for CohereClientOptions, even though both can be used with multiple providers. This value should be a provider that the client is *always* used with.",
+        ),
+    ]
+    _providers: Annotated[
+        tuple[Provider, ...],
+        Field(
+            exclude=True,
+            init=False,
+            description="Providers this client options class can apply to.",
+        ),
+    ]
+
+    @staticmethod
+    def _filter_values(value: Any) -> Any:
+        if isinstance(value, SecretStr):
+            return value.get_secret_value()
+        return str(value) if isinstance(value, AnyUrl) else value
+
+    def as_settings(self) -> dict[str, Any]:
+        """Return the client options as a dictionary suitable for passing as settings to the client constructor."""
+        settings = self.model_dump(exclude={"_core_provider", "_providers"})
+        return {k: self._filter_values(v) for k, v in settings.items()}
+
+    @property
+    def core_provider(self) -> Provider:
+        return self._core_provider
+
+    @property
+    def providers(self) -> tuple[Provider, ...]:
+        return self._providers
+
+
+class CohereClientOptions(ClientOptions):
+    """Client options for Cohere (rerank and embeddings)."""
+
+    _core_provider: Provider = Provider.COHERE
+    _providers: tuple[Provider, ...] = (Provider.COHERE, Provider.AZURE, Provider.HEROKU)
+
+    api_key: (
+        Annotated[
+            SecretStr | Callable[[], str],
+            Field(description="Cohere API key.", default_factory=SecretStr),
+        ]
+        | None
+    ) = None
+    base_url: Annotated[AnyUrl, Field(description="Base URL for the Cohere API.")] | None = None
+    environment: Literal["production", "staging", "development"] = "production"
+    client_name: str | None = "codeweaver_cohere_client"
+    timeout: PositiveFloat | None = None
+    httpx_client: httpx.Client | None = None
+    thread_pool_executor: ThreadPoolExecutor | None = None
+    log_experimental: bool = True  # disables warnings about experimental features
+
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
+        return {
+            FilteredKey("api_key"): AnonymityConversion.BOOLEAN,
+            FilteredKey("base_url"): AnonymityConversion.BOOLEAN,
+            FilteredKey("client_name"): AnonymityConversion.HASH,
+            FilteredKey("httpx_client"): AnonymityConversion.BOOLEAN,
+        }
+
+
+class QdrantClientOptions(ClientOptions):
+    """Client options for Qdrant vector store provider.
+
+    Note: `kwargs` are passed directly to the underlying httpx or grpc client.
+
+    The instantiated client's `_client` attribute will be either an `httpx.AsyncClient` for rest.based connections, or a `grpc.aio.Channel` for grpc-based connections, which may be useful for providing custom httpx or grpc clients.
+    """
+
+    # we need to manipulate values on this one, so we'll leave it mutable
+    model_config = ClientOptions.model_config | ConfigDict(frozen=False)
+
+    _core_provider: Provider = Provider.QDRANT
+    _providers: tuple[Provider, ...] = (Provider.QDRANT, Provider.MEMORY)
+
+    location: Literal[":memory:"] | AnyUrl | None = None
+    url: AnyUrl | Literal[":memory:"] | None = None
+    port: PositiveInt | None = 6333
+    grpc_port: PositiveInt | None = 6334
+    https: bool | None = None
+    api_key: str | None = None
+    prefer_grpc: bool = False
+    prefix: str | None = None
+    timeout: PositiveFloat | None = None
+    host: AnyUrl | str | None = None
+    path: str | None = None
+    force_disable_check_same_thread: bool = False
+    grpc_options: dict[str, Any] | None = None
+    auth_token_provider: (
+        Callable[[], SecretStr | str] | Callable[[], Awaitable[SecretStr | str]] | None
+    ) = None
+    cloud_inference: bool = False
+    local_inference_batch_size: PositiveInt | None = None
+    check_compatibility: bool = True
+    pool_size: PositiveInt | None = None  # (httpx pool size, default 100)
+    kwargs: HttpxClientParams | GrpcParams | None = None
+
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
+        # Location isn't sensitive because after `finalize_settings` it will only be `:memory:` or None
+        return {
+            FilteredKey(name): AnonymityConversion.BOOLEAN
+            for name in ("api_key", "auth_token_provider")
+        } | {FilteredKey(name): AnonymityConversion.HASH for name in ("url", "host", "path")}
+
+    def _handle_cloud_inference(self) -> None:
+        """Adjust settings for cloud inference if enabled."""
+        if not self.cloud_inference:
+            return
+        if not self.url or (
+            (self.url and not self.url.host.endswith(".cloud.qdrant.io"))
+            or (self.host and not self.host.host.endswith(".cloud.qdrant.io"))
+        ):
+            logger.warning(
+                "Cloud inference can only be enabled for Qdrant cloud endpoints. Disabling cloud_inference."
+            )
+            self.cloud_inference = False
+            return
+        logger.warning(
+            "We haven't tested CodeWeaver with Qdrant Cloud inference yet. It may not work as expected. If you proceed, please report any issues you encounter to help us improve support."
+        )
+
+    def _handle_cloud(self) -> None:
+        pass
+
+    def _to_nones(self, attrs: Sequence[str]) -> None:
+        for attr in attrs:
+            setattr(self, attr, False if attr == "https" else None)
+
+    @staticmethod
+    def _is_local_url(url: str | AnyUrl) -> bool:
+        """Determine if a URL is local."""
+        host = url.host if isinstance(url, AnyUrl) else url
+        return any(local in host for local in ("localhost", "127.0.0.1", "0.0.0.0"))  # noqa: S104
+
+    def _resolve_host_and_url(self) -> None:
+        """Resolve host and url settings to avoid conflicts."""
+        if not self.host or not self.url:
+            return
+        if self.url.host == (self.host if isinstance(self.host, str) else self.host.host) or (
+            self._is_local_url(self.url) and self._is_local_url(self.host)
+        ):
+            self.host = None
+            return
+        if not self._is_local_url(self.url):
+            self.host = None
+            return
+        if not self._is_local_url(self.host):
+            self.url = None
+            return
+        # at this point, we can raise:
+        raise ConfigurationError(
+            "Conflicting Qdrant client options: both `host` and `url` are set, and they aren't the same.",
+            suggestions=["Set only one of `host` or `url` to avoid conflicts."],
+        )
+
+    def _normalize_settings(self) -> None:
+        """Normalize settings for Qdrant client options.
+
+        The goal here is to ensure that only one of `location`, `url`, `host`, or `path` is set, as required by the Qdrant client.
+        """
+        if not (url_like_settings := (self.url, self.host, self.location, self.path)):
+            self.url = AnyUrl(url="http://127.0.0.1")
+            self.https = False
+            return
+        if ":memory:" in url_like_settings:
+            self.location = ":memory:"
+            self._to_nones(["url", "host", "https", "path"])
+            return
+        if self.path:
+            self._to_nones(["location", "url", "host", "https"])
+            return
+        # we've already handled `:memory`
+        if self.location:
+            self.url = (
+                self.url or None
+                if self.location in {"localhost", "127.0.0.1", "0.0.0.0"}
+                else AnyUrl(self.location)
+            )
+            self.host = self.host or None if self.url else self.location
+            self._to_nones(["location", "path"])
+        self._resolve_host_and_url()
+
+    @model_validator(mode="after")
+    def finalize_settings(self) -> Self:
+        """Validate that either location or url is provided.
+
+        This is actually less of a true validator and more of a guard against common foot-guns with the `qdrant_client`.
+
+        Quick version: `qdrant_client` offers `location`, `path`, `url`, and `host` settings but resolves them in a way that's not super intuitive. It errors if more than one is set, but doesn't provide any overrides to help you avoid that situation -- despite the fact that it will ignore other settings of path or location is set...
+
+        I'll give them the benefit of the doubt on the missing overrides and assume there're no overrides or better handling because of limitations imposed by their minimum python version. Clearly though, I should probably take a stab at a PR to improve this in qdrant-client itself when I get a few extra cycles. I understand that maintaining backward compatibility is important, and I know folks like to keep things explicit, but I think there's room for improvement here.
+
+        Instead, we assume you're trying to provide reasonable parameters, and like many people, might set both `location` and `url`, or `location` and `host`/`port`, etc. The overall strategy is to look for non-default options first. If multiple are found, we prioritize them in this order: `location`, `path`, `url`, `host` (well, the last two get some nuanced handling). The others are nulled out.
+        """
+        self._normalize_settings()
+        self._handle_cloud_inference()
+        self._handle_cloud()
+        if (
+            (self.url or self.host)
+            and self.prefer_grpc
+            and not self._is_local_url(self.url or self.host)
+        ):
+            # GRPC over http requires http2
+            self.kwargs = (self.kwargs or {}) | {"http2": True, "http1": False}
+        if self.url and not self._is_local_url(self.url) and self.https is None:
+            self.https = True
+            if self.url.scheme == "http":
+                self.url = AnyUrl(url=str(self.url).replace("http://", "https://", 1))
+        return self
+
+
+class OpenAIClientOptions(ClientOptions):
+    """Client options for OpenAI-based embedding providers."""
+
+    _core_provider: Provider = Provider.OPENAI
+    _providers: tuple[Provider, ...] = tuple(
+        provider for provider in Provider if provider.uses_openai_api
+    )
+
+    api_key: (
+        SecretStr | Callable[[], str | SecretStr] | Callable[[], Awaitable[str | SecretStr]] | None
+    ) = None
+    organization: str | None = None
+    project: str | None = None
+    webhook_secret: SecretStr | None = None
+    base_url: AnyUrl | None = None
+    websocket_base_url: AnyUrl | None = None
+    timeout: PositiveFloat | None = None
+    max_retries: PositiveInt | None = None
+    default_headers: Mapping[str, str] | None = None
+    default_query: Mapping[str, object] | None = None
+    http_client: httpx.Client | None = None
+    _strict_response_validation: bool = False
+
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
+        return {
+            FilteredKey(name): AnonymityConversion.BOOLEAN
+            for name in (
+                "api_key",
+                "webhook_secret",
+                "http_client",
+                "default_headers",
+                "default_query",
+            )
+        } | {
+            FilteredKey(name): AnonymityConversion.HASH
+            for name in ("organization", "project", "base_url", "websocket_base_url")
+        }
+
+
+class Boto3ClientOptions(ClientOptions):
+    """Client options for Boto3-based providers like Bedrock. Most of these are required but can be configured in other ways, such as environment variables or AWS config files."""
+
+    _core_provider: Provider = Provider.BEDROCK
+    _providers: tuple[Provider, ...] = (Provider.BEDROCK,)
+
+    aws_access_key_id: str | None = None
+    aws_secret_access_key: SecretStr | None = None
+    aws_session_token: SecretStr | None = None
+    region_name: str | None = None
+    profile_name: str | None = None
+    aws_account_id: str | None = None
+    botocore_session: Any | None = None
+
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
+        return {FilteredKey("aws_secret_access_key"): AnonymityConversion.BOOLEAN} | {
+            FilteredKey(name): AnonymityConversion.HASH
+            for name in (
+                "aws_access_key_id",
+                "aws_session_token",
+                "region_name",
+                "profile_name",
+                "aws_account_id",
+            )
+        }
+
+
+class GoogleClientOptions(ClientOptions):
+    """Client options for the GenAI Google provider."""
+
+    _core_provider: Provider = Provider.GOOGLE
+    _providers: tuple[Provider, ...] = (Provider.GOOGLE,)
+
+    api_key: SecretStr | None = None
+    vertex_ai: bool = False
+    credentials: Any | None = None
+    project: str | None = None
+    location: str | None = None
+    debug_config: dict[str, Any] | None = None
+    http_options: dict[str, Any] | None = None
+
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
+        return {
+            FilteredKey(name): AnonymityConversion.BOOLEAN
+            for name in ("api_key", "location", "http_options", "credentials")
+        } | {FilteredKey("project"): AnonymityConversion.HASH}
+
+
+class FastEmbedClientOptions(ClientOptions):
+    """Client options for FastEmbed-based embedding providers."""
+
+    _core_provider: Provider = Provider.FASTEMBED
+    _providers: tuple[Provider, ...] = (Provider.FASTEMBED,)
+
+    model_name: str
+    cache_dir: str | None = None
+    threads: int | None = None
+    providers: Sequence[OnnxProvider] | None = None
+    cuda: bool = False
+    device_ids: list[int] | None = None
+    lazy_load: bool = True
+
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
+        return {FilteredKey("cache_dir"): AnonymityConversion.HASH}
+
+
+class SentenceTransformersClientOptions(ClientOptions):
+    """Client options for SentenceTransformers-based embedding providers."""
+
+    _core_provider: Provider = Provider.SENTENCE_TRANSFORMERS
+    _providers: tuple[Provider, ...] = (Provider.SENTENCE_TRANSFORMERS,)
+
+    model_name_or_path: str | None = None
+    modules: Iterable[Module] | None = None
+    device: str | None = None
+    prompts: dict[str, str] | None = None
+    default_prompt_name: str | None = None
+    similarity_fn_name: Literal["cosine", "dot", "euclidean", "manhattan"] | None = None
+    cache_folder: str | None = None
+    trust_remote_code: bool = False
+    revision: str | None = None
+    local_files_only: bool = False
+    token: bool | SecretStr | None = None
+    use_auth_token: bool | SecretStr | None = None
+    truncate_dim: int | None = None
+    model_kwargs: dict[str, Any] | None = None
+    tokenizer_kwargs: dict[str, Any] | None = None
+    config_kwargs: dict[str, Any] | None = None
+    model_card_data: SentenceTransformerModelCardData | None = None
+    backend: Literal["torch", "onnx", "openvino"] = "torch"
+
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
+        return {
+            FilteredKey("cache_folder"): AnonymityConversion.HASH,
+            FilteredKey("model_name_or_path"): AnonymityConversion.HASH,
+        }
+
+
+class HFInferenceClientOptions(ClientOptions):
+    """Client options for HuggingFace Inference API-based embedding providers."""
+
+    _core_provider: Provider = Provider.HUGGINGFACE_INFERENCE
+    _providers: tuple[Provider, ...] = (Provider.HUGGINGFACE_INFERENCE,)
+
+    model: str | None = None
+    provider: str | None = None
+    token: SecretStr | None = None
+    timeout: PositiveFloat | None = None
+    headers: dict[str, str] | None = None
+    cookies: dict[str, str] | None = None
+    trust_env: bool = False
+    proxies: Any | None = None
+    bill_to: str | None = None
+    base_url: AnyUrl | None = None
+    api_key: SecretStr | None = None
+
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
+        return {
+            FilteredKey(name): AnonymityConversion.BOOLEAN
+            for name in ("token", "api_key", "headers", "cookies", "proxies")
+        } | {
+            FilteredKey("base_url"): AnonymityConversion.HASH,
+            FilteredKey("bill_to"): AnonymityConversion.HASH,
+        }
+
+
+class MistralClientOptions(ClientOptions):
+    """Client options for Mistral-based embedding providers."""
+
+    _core_provider: Provider = Provider.MISTRAL
+    _providers: tuple[Provider, ...] = (Provider.MISTRAL,)
+
+    api_key: (
+        SecretStr | Callable[[], str | SecretStr] | Callable[[], Awaitable[str | SecretStr]] | None
+    ) = None
+    server: str | None = None
+    server_url: AnyUrl | None = None
+    url_params: dict[str, str] | None = None
+    async_client: httpx.AsyncClient | None = None
+    retry_config: Any | None = None
+    timeout_ms: PositiveInt | None = None
+    debug_logger: Any | None = None
+
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
+        return {
+            FilteredKey("api_key"): AnonymityConversion.BOOLEAN,
+            FilteredKey("server"): AnonymityConversion.HASH,
+            FilteredKey("server_url"): AnonymityConversion.HASH,
+            FilteredKey("url_params"): AnonymityConversion.HASH,
+            FilteredKey("async_client"): AnonymityConversion.BOOLEAN,
+        }
+
+
+class VoyageClientOptions(ClientOptions):
+    """Client options for Voyage AI-based embedding and reranking providers."""
+
+    _core_provider: Provider = Provider.VOYAGE
+    _providers: tuple[Provider, ...] = (Provider.VOYAGE,)
+
+    api_key: SecretStr | None = None
+    max_retries: PositiveInt = 0
+    timeout: PositiveFloat | None = None
+
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
+        return {FilteredKey("api_key"): AnonymityConversion.BOOLEAN}
+
+
 # We chose TypedDicts originally for speed. They can be substantially faster than Pydantic models (according to Pydantic: https://docs.pydantic.dev/2.12/concepts/performance/#use-typeddict-over-nested-models) But we lose a lot of benefits of Pydantic models.
 
 # ===========================================================================
@@ -51,7 +582,7 @@ logger = logging.getLogger(__name__)
 # ===========================================================================
 
 
-class ConnectionRateLimitConfig(TypedDict, total=False):
+class ConnectionRateLimitConfig(BasedModel):
     """Settings for connection rate limiting."""
 
     max_requests_per_second: PositiveInt | None
@@ -60,26 +591,96 @@ class ConnectionRateLimitConfig(TypedDict, total=False):
     max_retries: PositiveInt | None
 
 
-class ConnectionConfiguration(TypedDict, total=False):
-    """Settings for connection configuration. Only required for non-default transports."""
+class ConnectionConfiguration(BasedModel):
+    """Settings for connection configuration. You probably don't need to set these unless you're doing something special."""
 
-    host: str | None
-    port: PositiveInt | None
-    headers: NotRequired[dict[str, str] | None]
-    rate_limits: NotRequired[ConnectionRateLimitConfig | None]
+    headers: Annotated[
+        dict[str, str] | None, Field(description="HTTP headers to include in requests.")
+    ] = None
+    rate_limits: Annotated[
+        ConnectionRateLimitConfig | None,
+        Field(description="Rate limit configuration for the connection."),
+    ] = None
+    httpx_config: Annotated[
+        HttpxClientParams | None,
+        Field(
+            description="You may optionally provide custom client parameters for the httpx client. CodeWeaver will use your parameters when it constructs its http client pool. You probably don't need this unless you need to handle unique auth or similar requirements."
+        ),
+    ] = None
+
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
+        return {
+            FilteredKey("headers"): AnonymityConversion.BOOLEAN,
+            FilteredKey("httpx_config"): AnonymityConversion.BOOLEAN,
+        }
+
+
+class BaseProviderSettings(BasedModel):
+    """Base settings for all providers."""
+
+    provider: Provider
+    connection: ConnectionConfiguration | None = None
+    tag: ProviderLiteral = Field(
+        default_factory=lambda data: (
+            data.get("provider").variable if isinstance(data, dict) else data.provider.variable
+        ),
+        exclude=True,
+        init=False,
+        description="Discriminator tag for the provider.",
+    )
+
+    def _telemetry_keys(self) -> None:
+        return None
 
 
 class BaseProviderSettingsDict(TypedDict, total=False):
-    """Base settings for all providers."""
+    """Base settings for all providers. Represents `BaseProviderSettings` in a TypedDict form."""
 
     provider: Required[Provider]
-    enabled: NotRequired[bool]
-    api_key: NotRequired[SecretStr | None]
     connection: NotRequired[ConnectionConfiguration | None]
-    client_options: NotRequired[dict[str, Any] | None]
-    """Options to pass to the provider's client (like to `qdrant_client` for qdrant) as keyword arguments. You should refer to the provider's documentation for what options are available."""
-    other: NotRequired[dict[str, Any] | None]
-    """Other provider-specific settings. This is primarily for user-defined providers to pass custom options."""
+
+
+# ===========================================================================
+# *                    Client Discriminators
+# ===========================================================================
+
+type GeneralRerankingClientOptionsType = Annotated[
+    Annotated[SentenceTransformersClientOptions, Tag(Provider.SENTENCE_TRANSFORMERS.variable)]
+    | Annotated[CohereClientOptions, Tag(Provider.COHERE.variable)]
+    | Annotated[VoyageClientOptions, Tag(Provider.VOYAGE.variable)],
+    Field(description="Reranking client options type.", discriminator="tag"),
+]
+
+
+def _discriminate_embedding_clients(v: Any) -> str:
+    """Identify the provider-specific settings type for discriminator field."""
+    return v["tag"] if isinstance(v, dict) else v.tag
+
+
+def _discriminate_azure_embedding_client_options(v: Any) -> str:
+    """Identify the Azure embedding provider settings type for discriminator field."""
+    model_settings = v["model_settings"] if isinstance(v, dict) else v.model_settings
+    model = (
+        model_settings.get("model") if isinstance(model_settings, dict) else model_settings.model
+    )
+    if model in ("text-embedding-3-small", "text-embedding-3-large"):
+        return "openai"
+    return "cohere"
+
+
+type GeneralEmbeddingClientOptionsType = Annotated[
+    Annotated[SentenceTransformersClientOptions, Tag(Provider.SENTENCE_TRANSFORMERS.variable)]
+    | Annotated[CohereClientOptions, Tag(Provider.COHERE.variable)]
+    | Annotated[OpenAIClientOptions, Tag(Provider.OPENAI.variable)]
+    | Annotated[GoogleClientOptions, Tag(Provider.GOOGLE.variable)]
+    | Annotated[HFInferenceClientOptions, Tag(Provider.HUGGINGFACE_INFERENCE.variable)]
+    | Annotated[MistralClientOptions, Tag(Provider.MISTRAL.variable)]
+    | Annotated[VoyageClientOptions, Tag(Provider.VOYAGE.variable)],
+    Field(
+        description="Embedding client options type.",
+        discriminator=Discriminator(_discriminate_embedding_clients),
+    ),
+]
 
 
 # ===========================================================================
@@ -87,8 +688,12 @@ class BaseProviderSettingsDict(TypedDict, total=False):
 # ===========================================================================
 
 
-class DataProviderSettings(BaseProviderSettingsDict):
+class DataProviderSettings(BaseProviderSettings):
     """Settings for data providers."""
+
+    other: Annotated[
+        dict[str, Any] | None, Field(description="Other provider-specific settings.")
+    ] = None
 
 
 class EmbeddingModelSettings(TypedDict, total=False):
@@ -121,77 +726,91 @@ class RerankingModelSettings(TypedDict, total=False):
 
     model: Required[str]
     custom_prompt: NotRequired[str | None]
-    rerank_options: NotRequired[dict[str, Any] | None]
-    """Keyword arguments to pass to the *provider* **client's** (like `voyageai.async_client.AsyncClient`) `rerank` method."""
-    client_options: NotRequired[dict[str, Any] | None]
-    """Keyword arguments to pass to the *provider* **client's** (like `voyageai.async_client.AsyncClient`) constructor."""
-    model_options: NotRequired[dict[str, Any] | None]
-    """Keyword arguments to pass to the model's constructor."""
 
 
-class AWSProviderSettings(TypedDict, total=False):
-    """Settings for AWS provider.
+class BedrockProviderMixin:
+    """Settings for AWS provider."""
 
-    You need to provide these settings if you are using Bedrock, and you need to provide them for each Bedrock model you use. It might be repetitive, but a lot of people have different credentials for different models/services, and certainly different regions. Reranking models, in particular, are only available in a few regions right now.
-    """
+    model_arn: str
+    """The ARN of the Bedrock model you want to use."""
+    client_options: (
+        Annotated[
+            Boto3ClientOptions | None,
+            Field(
+                description="Client options for the Bedrock client. Note: You need to provide most of the client settings, but may do so through environment variables, AWS config files, or IAM roles if not supplied here."
+            ),
+        ]
+        | None
+    ) = None
 
-    region_name: Required[str]
-    model_arn: Required[str]
-    aws_access_key_id: NotRequired[SecretStr | None]
-    """Optional AWS access key ID. If not provided, we'll assume you have your AWS credentials configured in another way, such as environment variables, AWS config files, or IAM roles."""
-    aws_secret_access_key: NotRequired[SecretStr | None]
-    """Optional AWS secret access key. If not provided, we'll assume you have your AWS credentials configured in another way, such as environment variables, AWS config files, or IAM roles."""
-    aws_session_token: NotRequired[SecretStr | None]
-    """Optional AWS session token. If not provided, we'll assume you have your AWS credentials configured in another way, such as environment variables, AWS config files, or IAM roles."""
-
-
-class AzureCohereProviderSettings(TypedDict, total=False):
-    """Provider settings for Azure Cohere.
-
-    You need to provide these settings if you are using Azure Cohere, and you need to provide them for each Azure Cohere model you use.
-    They're **all required**. They're marked `NotRequired` in the TypedDict because you can also provide them by environment variables, but you must provide them one way or another.
-    """
-
-    model_deployment: NotRequired[str]
-    """The deployment name of the model you want to use. Important: While the OpenAI API uses the model name to identify the model, you must separately provide a codeweaver-compatible name for the model, as well as your Azure resource name here. We're open to PRs if you want to add a parser for model names that can extract the deployment name from them."""
-    api_key: NotRequired[SecretStr | None]
-    """Your Azure API key. If not provided, we'll assume you have your Azure credentials configured in another way, such as environment variables."""
-    azure_resource_name: NotRequired[str]
-    """The name of your Azure resource. This is used to identify your resource in Azure."""
-    azure_endpoint: NotRequired[str]
-    """The endpoint for your Azure resource. This is used to send requests to your resource. Only provide the endpoint, not the full URL. For example, if your endpoint is `https://your-cool-resource.<region_name>.inference.ai.azure.com/v1`, you would only provide "your-cool-resource" here."""
-    region_name: NotRequired[str]
-    """The Azure region where your resource is located. This is used to route requests to the correct regional endpoint."""
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
+        return {FilteredKey("model_arn"): AnonymityConversion.HASH}
 
 
-class AzureOpenAIProviderSettings(TypedDict, total=False):
-    """Provider settings for Azure OpenAI.
+class AzureProviderMixin:
+    """Provider settings for Azure.
 
-    You need to provide these settings if you are using Azure OpenAI, and you need to provide them for each Azure OpenAI model you use.
+    You need to provide these settings if you are using Azure for either Cohere *embedding or reranking models* or OpenAI *embedding* models. You need to provide these for agentic models too, but not with this class (well, we'll probably try to make it work if you do, but no garauntees).
 
-    **For embedding models:**
+    **For OpenAI embedding models:**
     **We only support the "**next-generation** Azure OpenAI API." Currently, you need to opt into this API in your Azure settings. We didn't want to start supporting the old API knowing it's going away.
 
+    Note that we don't currently support using Azure's SDKs directly for embedding or reranking models. Instead, we use the OpenAI or Cohere clients configured to use Azure endpoints.
+
     For agent models:
-    We support both APIs for agentic models because our support comes from `pydantic_ai`, which supports both.
+    We support both OpenAI APIs for agentic models because our support comes from `pydantic_ai`, which supports both, it also implements the Azure SDK for agents.
     """
 
-    azure_resource_name: NotRequired[str]
-    """The name of your Azure resource. This is used to identify your resource in Azure."""
-    model_deployment: NotRequired[str]
-    """The deployment name of the model you want to use. Important: While the OpenAI API uses the model name to identify the model, you must separately provide a codeweaver-compatible name for the model, as well as your Azure resource name here. We're open to PRs if you want to add a parser for model names that can extract the deployment name from them."""
-    endpoint: NotRequired[str | None]
-    """The endpoint for your Azure resource. This is used to send requests to your resource. Only provide the endpoint, not the full URL. For example, if your endpoint is `https://your-cool-resource.<region_name>.inference.ai.azure.com/v1`, you would only provide "your-cool-resource" here."""
-    region_name: NotRequired[str]
-    """The Azure region where your resource is located. This is used to route requests to the correct regional endpoint."""
-    api_key: NotRequired[SecretStr | None]
-    """Your Azure API key. If not provided, we'll assume you have your Azure credentials configured in another way, such as environment variables."""
+    azure_resource_name: Annotated[
+        str,
+        Field(
+            description="The name of your Azure resource. This is used to identify your resource in Azure."
+        ),
+    ]
+
+    model_deployment: Annotated[
+        str,
+        Field(
+            description="The deployment name of the model you want to use. This is *different* from the model name in `model_settings`, which is the name of the model itself (`text-embedding-3-small`). You need to create a deployment in your Azure OpenAI resource for each model you want to use, and provide the deployment name here."
+        ),
+    ]
+
+    endpoint: Annotated[
+        str | None,
+        Field(
+            description='The endpoint for your Azure resource. This is used to send requests to your resource. Only provide the endpoint, not the full URL. For example, if your endpoint is `https://your-cool-resource.<region_name>.inference.ai.azure.com/v1`, you would only provide "your-cool-resource" here.'
+        ),
+    ] = None
+
+    region_name: Annotated[
+        str | None,
+        Field(
+            description="The region name for your Azure resource. This is used to identify the region your resource is in. For example, `eastus` or `westus2`."
+        ),
+    ] = None
+
+    api_key: Annotated[
+        SecretStr | None,
+        Field(
+            description="Your Azure API key. If not provided, we'll assume you have your Azure credentials configured in another way, such as environment variables."
+        ),
+    ] = None
+
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
+        return {
+            FilteredKey("azure_resource_name"): AnonymityConversion.HASH,
+            FilteredKey("model_deployment"): AnonymityConversion.HASH,
+            FilteredKey("endpoint"): AnonymityConversion.HASH,
+            FilteredKey("region_name"): AnonymityConversion.HASH,
+            FilteredKey("api_key"): AnonymityConversion.BOOLEAN,
+        }
 
 
-class FastembedGPUProviderSettings(TypedDict, total=False):
+class FastembedProviderMixin:
     """Special settings for Fastembed-GPU provider.
 
-    These settings only apply if you are using a Fastembed provider, installed the `codeweaver[fastembed-gpu]` or `codeweaver[full-gpu]` extra, have a CUDA-capable GPU, and have properly installed and configured the ONNX GPU runtime.
+    These settings only apply if you are using a Fastembed provider, installed the `codeweaver[fastembed-gpu]` or `codeweaver[full-gpu]` extra, have a CUDA-capable GPU, and have properly installed and configured the ONNX GPU runtime (see ONNX docs).
+
     You can provide these settings with your CodeWeaver embedding provider settings, or rerank provider settings. If you're using fastembed-gpu for both, we'll assume you are using the same settings for both if we find one of them.
 
     Important: You cannot have both `fastembed` and `fastembed-gpu` installed at the same time. They conflict with each other. Make sure to uninstall `fastembed` if you want to use `fastembed-gpu`.
@@ -199,7 +818,7 @@ class FastembedGPUProviderSettings(TypedDict, total=False):
 
     cuda: NotRequired[bool | None]
     """Whether to use CUDA (if available). If `None`, will auto-detect. We'll generally assume you want to use CUDA if it's available unless you provide a `False` value here."""
-    provider_settings: NotRequired[list[int] | None]
+    device_ids: NotRequired[list[int] | None]
     """List of GPU device IDs to use. If `None`, we will try to detect available GPUs using `nvidia-smi` if we can find it. We recommend specifying them because our checks aren't perfect."""
 
 
@@ -208,23 +827,24 @@ class FastembedGPUProviderSettings(TypedDict, total=False):
 # ===========================================================================
 
 
-class QdrantConfig(TypedDict, total=False):
-    """Configuration for Qdrant vector store provider."""
+class VectorConfig(TypedDict, total=False):
+    """Configuration for individual vector types in a collection."""
 
-    url: NotRequired[str | None]
-    """Qdrant server URL. Defaults to http://localhost:6333 if not specified."""
-    api_key: NotRequired[SecretStr | None]
-    """API key for authentication (required for remote instances unless you have custom authentication for a private instance)."""
+    dense: VectorParams | None
+    sparse: SparseVectorParams | None
+
+
+class CollectionConfig(TypedDict, total=False):
+    """Common collection configuration for vector store providers."""
+
     collection_name: NotRequired[str | None]
-    """Collection name override. Defaults to project name if not specified."""
-    prefer_grpc: NotRequired[bool]
-    """Use gRPC instead of HTTP. Defaults to False."""
-    batch_size: NotRequired[PositiveInt]
-    """Batch size for bulk upsert operations. Defaults to 64."""
+    """Collection name override. Defaults to a unique name based on the project name."""
     dense_vector_name: NotRequired[str]
     """Named vector for dense embeddings. Defaults to 'dense'."""
     sparse_vector_name: NotRequired[str]
     """Named vector for sparse embeddings. Defaults to 'sparse'."""
+    vector_config: NotRequired[VectorConfig | None]
+    """Configuration for individual vector types in the collection."""
 
 
 class MemoryConfig(TypedDict, total=False):
@@ -236,49 +856,153 @@ class MemoryConfig(TypedDict, total=False):
     """Automatically save after operations. Defaults to True."""
     persist_interval: NotRequired[PositiveInt | None]
     """Periodic persist interval in seconds. Defaults to 300 (5 minutes). Set to None to disable periodic persistence."""
-    collection_name: NotRequired[str]
-    """Collection name override. Defaults to project name if not specified."""
 
 
-type ProviderSpecificSettings = (
-    FastembedGPUProviderSettings
-    | AWSProviderSettings
-    | AzureOpenAIProviderSettings
-    | AzureCohereProviderSettings
-)
+class QdrantProviderMixin:
+    collection: CollectionConfig | None = None
+    in_memory_config: MemoryConfig | None = None
+
+    def _telemetry_handler(self, _serialized_self: dict[str, Any], /) -> dict[str, Any]:
+        """Custom telemetry handler to avoid logging sensitive collection names or paths."""
+        if (collection := _serialized_self.get("collection")) and (
+            collection_name := collection.get("collection_name")
+        ):
+            return {
+                "collection": {
+                    "collection_name": AnonymityConversion.HASH.filtered(collection_name)
+                }
+            }
+        return {}
 
 
-class EmbeddingProviderSettings(BaseProviderSettingsDict):
-    """Settings for (dense) embedding models. It validates that the model and provider settings are compatible and complete, reconciling environment variables and config file settings as needed."""
-
-    model_settings: Required[EmbeddingModelSettings]
-    """Settings for the embedding model(s)."""
-    provider_settings: NotRequired[ProviderSpecificSettings | None]
-    """Settings for specific providers, if any. Some providers have special settings that are required for them to work properly, but you may provide them by environment variables as well as in your config, or both."""
-
-
-class SparseEmbeddingProviderSettings(BaseProviderSettingsDict):
-    """Settings for sparse embedding models."""
-
-    model_settings: Required[SparseEmbeddingModelSettings]
-    """Settings for the sparse embedding model(s)."""
-    provider_settings: NotRequired[ProviderSpecificSettings | None]
-
-
-class RerankingProviderSettings(BaseProviderSettingsDict):
-    """Settings for re-ranking models."""
-
-    model_settings: Required[RerankingModelSettings]
-    """Settings for the re-ranking model(s)."""
-    provider_settings: NotRequired[ProviderSpecificSettings | None]
-    top_n: NotRequired[PositiveInt | None]
-
-
-class VectorStoreProviderSettings(BaseProviderSettingsDict, total=False):
+class VectorStoreProviderSettings(BaseProviderSettings):
     """Settings for vector store provider selection and configuration."""
 
-    """Vector store provider: Provider.QDRANT or Provider.MEMORY. Defaults to Provider.QDRANT."""
-    provider_settings: Required[QdrantConfig | MemoryConfig]
+    batch_size: Annotated[
+        PositiveInt | None,
+        Field(description="Batch size for bulk upsert operations. Defaults to 64."),
+    ] = 64
+
+
+# we don't need to add client_options here because it's easy to resolve
+class QdrantVectorStoreProviderSettings(QdrantProviderMixin, VectorStoreProviderSettings):
+    """Qdrant-specific settings for the Qdrant and Memory providers. Qdrant is the only currently supported vector store, but others may be added in the future."""
+
+    client_options: Annotated[
+        QdrantClientOptions | None, Field(description="Client options for the provider's client.")
+    ] = None
+
+    @model_validator(mode="after")
+    def _ensure_consistent_config(self) -> Self:
+        """Ensure consistent config for Qdrant and Memory providers."""
+        if not self._client_options:
+            self.client_options = QdrantClientOptions(
+                location=":memory:" if self.provider == Provider.MEMORY else None,
+                host="localhost" if self.provider == Provider.QDRANT else None,
+            )
+        if self.provider == Provider.MEMORY:
+            # we'll resolve the project name later if the user didn't provide a path
+            self.in_memory_config = MemoryConfig(auto_persist=True, persist_interval=300) | (
+                self.in_memory_config or {}
+            )
+        # we'll handle collection config later too -- when models are getting instantiated it's much less painful to wait until the dust settles for inter-model dependencies
+        return self
+
+
+class EmbeddingProviderSettings(BaseProviderSettings):
+    """Settings for (dense) embedding models. It validates that the model and provider settings are compatible and complete, reconciling environment variables and config file settings as needed."""
+
+    model_settings: EmbeddingModelSettings
+    """Settings for the embedding model(s)."""
+    client_options: Annotated[
+        GeneralEmbeddingClientOptionsType | None,
+        Field(description="Client options for the provider's client.", discriminator="tag"),
+    ] = None
+
+
+class AzureEmbeddingProviderSettings(AzureProviderMixin, EmbeddingProviderSettings):
+    """Provider settings for Azure embedding models (Cohere or OpenAI)."""
+
+    client_options: Annotated[
+        Annotated[CohereClientOptions, Tag(Provider.COHERE.variable)]
+        | Annotated[OpenAIClientOptions, Tag(Provider.OPENAI.variable)]
+        | None,
+        Field(
+            description="Client options for the provider's client.",
+            discriminator=Discriminator(_discriminate_azure_embedding_client_options),
+        ),
+    ] = None
+
+
+class BedrockEmbeddingProviderSettings(BedrockProviderMixin, EmbeddingProviderSettings):
+    """Provider settings for Bedrock embedding models."""
+
+    client_options: Annotated[
+        Boto3ClientOptions | None, Field(description="Client options for the provider's client.")
+    ] = None
+
+
+class FastembedEmbeddingProviderSettings(FastembedProviderMixin, EmbeddingProviderSettings):
+    """Provider settings for Fastembed embedding models."""
+
+    client_options: Annotated[
+        FastEmbedClientOptions | None,
+        Field(description="Client options for the provider's client."),
+    ] = None
+
+
+class SparseEmbeddingProviderSettings(BaseProviderSettings):
+    """Settings for sparse embedding models."""
+
+    model_settings: SparseEmbeddingModelSettings
+    """Settings for the sparse embedding model."""
+    client_options: Annotated[
+        SentenceTransformersClientOptions | None,
+        Field(description="Client options for the provider's client."),
+    ] = None
+
+
+class FastembedSparseEmbeddingProviderSettings(
+    FastembedProviderMixin, SparseEmbeddingProviderSettings
+):
+    """Provider settings for Fastembed sparse embedding models."""
+
+    client_options: Annotated[
+        FastEmbedClientOptions | None,
+        Field(description="Client options for the provider's client."),
+    ] = None
+
+
+class RerankingProviderSettings(BaseProviderSettings):
+    """Settings for re-ranking models."""
+
+    model_settings: RerankingModelSettings
+    """Settings for the re-ranking model(s)."""
+    top_n: PositiveInt | None = None
+    client_options: (
+        Annotated[
+            GeneralRerankingClientOptionsType,
+            Field(description="Client options for the provider's client."),
+        ]
+        | None
+    ) = None
+
+
+class FastembedRerankingProviderSettings(FastembedProviderMixin, RerankingProviderSettings):
+    """Provider settings for Fastembed reranking models."""
+
+    client_options: Annotated[
+        FastEmbedClientOptions | None,
+        Field(description="Client options for the provider's client."),
+    ] = None
+
+
+class BedrockRerankingProviderSettings(BedrockProviderMixin, RerankingProviderSettings):
+    """Provider settings for Bedrock reranking models."""
+
+    client_options: Annotated[
+        Boto3ClientOptions | None, Field(description="Client options for the provider's client.")
+    ] = None
 
 
 # Agent model settings are imported/defined from `pydantic_ai`
@@ -291,13 +1015,76 @@ type ModelString = Annotated[
 ]
 
 
-class AgentProviderSettings(BaseProviderSettingsDict):
+# we also don't need to add it here because pydantic-ai handles the client
+class AgentProviderSettings(BaseProviderSettings):
     """Settings for agent models."""
 
-    model: Required[ModelString | None]
+    model: Required[ModelString]
     model_settings: Required[AgentModelSettings | None]
     """Settings for the agent model(s)."""
 
+
+# ===========================================================================
+# *                    Settings Discriminators
+# ===========================================================================
+
+type SpecialEmbeddingProviderSettingsType = Annotated[
+    Annotated[AzureEmbeddingProviderSettings, Tag(Provider.AZURE.variable)],
+    Annotated(BedrockEmbeddingProviderSettings, Tag(Provider.BEDROCK.variable)),
+    Annotated(FastembedEmbeddingProviderSettings, Tag(Provider.FASTEMBED.variable)),
+    Field(description="Special embedding provider settings type.", discriminator="tag"),
+]
+
+
+def _discriminate_embedding_provider(v: Any) -> str:
+    """Identify the embedding provider settings type for discriminator field."""
+    return (
+        tag
+        if (tag := (v["tag"] if isinstance(v, dict) else v.tag))
+        in {Provider.AZURE.variable, Provider.BEDROCK.variable, Provider.FASTEMBED.variable}
+        else "none"
+    )
+
+
+type EmbeddingProviderSettingsType = Annotated[
+    Annotated[EmbeddingProviderSettings, Tag("none")] | SpecialEmbeddingProviderSettingsType,
+    Field(
+        description="Embedding provider settings type.",
+        discriminator=Discriminator(_discriminate_embedding_provider),
+    ),
+]
+
+
+type SparseEmbeddingProviderSettingsType = Annotated[
+    Annotated[SparseEmbeddingProviderSettings, Tag(Provider.SENTENCE_TRANSFORMERS.variable)]
+    | Annotated[FastembedSparseEmbeddingProviderSettings, Tag(Provider.FASTEMBED.variable)],
+    Field(description="Sparse embedding provider settings type.", discriminator="tag"),
+]
+
+
+def _discriminate_reranking_provider(v: Any) -> str:
+    """Identify the reranking provider settings type for discriminator field."""
+    return (
+        tag
+        if (tag := (v["tag"] if isinstance(v, dict) else v.tag))
+        in {Provider.FASTEMBED.variable, Provider.BEDROCK.variable}
+        else "none"
+    )
+
+
+type SpecialRerankingProviderSettingsType = Annotated[
+    Annotated[FastembedRerankingProviderSettings, Tag(Provider.FASTEMBED.variable)]
+    | Annotated[BedrockRerankingProviderSettings, Tag(Provider.BEDROCK.variable)],
+    Field(description="Special reranking provider settings type.", discriminator="tag"),
+]
+
+type RerankingProviderSettingsType = Annotated[
+    Annotated[RerankingProviderSettings, Tag("none")] | SpecialRerankingProviderSettingsType,
+    Field(
+        description="Reranking provider settings type.",
+        discriminator=Discriminator(_discriminate_reranking_provider),
+    ),
+]
 
 # ===========================================================================
 # *                    More TypedDict versions of Models
@@ -310,12 +1097,17 @@ class ProviderSettingsDict(TypedDict, total=False):
     data: NotRequired[tuple[DataProviderSettings, ...] | None]
     # we currently only support one each of embedding, reranking and vector store providers
     # but we use tuples to allow for future expansion for some less common use cases
-    embedding: NotRequired[tuple[EmbeddingProviderSettings, ...] | EmbeddingProviderSettings | None]
+    embedding: NotRequired[
+        tuple[EmbeddingProviderSettingsType, ...] | EmbeddingProviderSettingsType | None
+    ]
     # rerank is probably the priority for multiple providers in the future, because they're vector agnostic, so you could have fallback providers, or use different ones for different tasks
     sparse_embedding: NotRequired[
-        tuple[SparseEmbeddingProviderSettings, ...] | SparseEmbeddingProviderSettings | None
+        tuple[SparseEmbeddingProviderSettingsType, ...] | SparseEmbeddingProviderSettingsType | None
     ]
-    reranking: NotRequired[tuple[RerankingProviderSettings, ...] | RerankingProviderSettings | None]
+    reranking: NotRequired[
+        tuple[RerankingProviderSettingsType, ...] | RerankingProviderSettingsType | None
+    ]
+
     vector_store: NotRequired[
         tuple[VectorStoreProviderSettings, ...] | VectorStoreProviderSettings | None
     ]
@@ -357,7 +1149,7 @@ def _get_default_embedding_settings() -> DeterminedDefaults:
         "fastembed",
         "sentence_transformers",
     ):
-        if util.find_spec(lib) is not None:
+        if importlib.util.find_spec(lib) is not None:
             # all three of the top defaults are extremely capable
             if lib == "voyageai":
                 return DeterminedDefaults(
@@ -400,7 +1192,7 @@ DefaultEmbeddingProviderSettings = EmbeddingProviderSettings(
 def _get_default_sparse_embedding_settings() -> DeterminedDefaults:
     """Determine the default sparse embedding provider, model, and enabled status based on available libraries."""
     for lib in ("sentence_transformers", "fastembed_gpu", "fastembed"):
-        if util.find_spec(lib) is not None:
+        if importlib.util.find_spec(lib) is not None:
             if lib == "sentence_transformers":
                 return DeterminedDefaults(
                     provider=Provider.SENTENCE_TRANSFORMERS,
@@ -412,7 +1204,7 @@ def _get_default_sparse_embedding_settings() -> DeterminedDefaults:
                     provider=Provider.FASTEMBED, model="prithivida/Splade_PP_en_v1", enabled=True
                 )
     # qdrant_client has built-in BM25 support
-    # if FastEmbed isn't available, it will use that automatically
+    # if FastEmbed isn't available, we will use that automatically
     return DeterminedDefaults(provider=Provider.FASTEMBED, model="qdrant/bm25", enabled=True)
 
 
@@ -428,7 +1220,7 @@ DefaultSparseEmbeddingProviderSettings = SparseEmbeddingProviderSettings(
 def _get_default_reranking_settings() -> DeterminedDefaults:
     """Determine the default reranking provider, model, and enabled status based on available libraries."""
     for lib in ("voyageai", "fastembed_gpu", "fastembed", "sentence_transformers"):
-        if util.find_spec(lib) is not None:
+        if importlib.util.find_spec(lib) is not None:
             if lib == "voyageai":
                 return DeterminedDefaults(
                     provider=Provider.VOYAGE, model="voyage:rerank-2.5", enabled=True
@@ -460,7 +1252,9 @@ DefaultRerankingProviderSettings = RerankingProviderSettings(
     model_settings=RerankingModelSettings(model=_reranking_defaults.model),
 )
 
-HAS_ANTHROPIC = util.find_spec("anthropic") is not None
+HAS_ANTHROPIC = (
+    importlib.util.find_spec("anthropic") or importlib.util.find_spec("code_agent_sdk")
+) is not None
 DefaultAgentProviderSettings = AgentProviderSettings(
     provider=Provider.ANTHROPIC,
     enabled=HAS_ANTHROPIC,
@@ -537,77 +1331,6 @@ class ProviderSettings(BasedModel):
         Field(description="""Agent provider configuration"""),
     ] = DefaultAgentProviderSettings
 
-    def _validate_qdrant(
-        self, settings: VectorStoreProviderSettings
-    ) -> VectorStoreProviderSettings:
-        """Setup Qdrant vector store settings with defaults."""
-        provider_settings = settings.get("provider_settings", {})
-        new_settings = {}
-        if (qdrant_config := provider_settings.get("qdrant", {})) and sum(
-            bool(qdrant_config.get(key)) for key in ("location", "url", "host", "path")
-        ) > 1:
-            from codeweaver.exceptions import ConfigurationError
-
-            raise ConfigurationError(
-                "Qdrant provider_settings cannot have more than one of `location`, `url`, `host`, or `path` set.",
-                details={"provider_settings": qdrant_config},
-                suggestions=[
-                    "Remove all but one of `location`, `url`, `host`, or `path` from your Qdrant provider_settings.",
-                    "Local instances: use `path` if your instance is at a file path. Use `host=localhost` for local network instances (docker). Provide a port if not default (6333 for http, 6334 for grpc).",
-                    "Remote instances: use `url`. Provide a port if not standard (usually not necessary).",
-                ],
-            )
-        if connection := settings.get("connection"):
-            if (
-                host := connection.get("host")
-                and not provider_settings.get("host")
-                and not provider_settings.get("url")
-            ):
-                new_settings["provider_settings"] = {"host": host}
-            if (port := connection.get("port")) and not provider_settings.get("port"):
-                if "provider_settings" not in new_settings:
-                    new_settings["provider_settings"] = {}
-                new_settings["provider_settings"]["port"] = port
-        if headers := settings.get("connection", {}).get("headers"):
-            new_settings["client_options"] = (settings.get("client_options") or {}) | {
-                "metadata": headers
-            }
-        if api_key := settings.get("api_key"):
-            if "provider_settings" not in new_settings:
-                new_settings["provider_settings"] = {}
-            new_settings["provider_settings"]["api_key"] = api_key
-        return VectorStoreProviderSettings(**(settings.copy() | new_settings))  # ty: ignore[missing-typed-dict-key]
-
-    def _validate_vector_stores(self) -> tuple[VectorStoreProviderSettings, ...]:
-        """Validate vector store settings."""
-        if self.vector_store is Unset or (
-            isinstance(self.vector_store, dict)
-            and self.vector_store.get("provider") == Provider.NOT_SET
-        ):
-            from codeweaver.exceptions import ConfigurationError
-
-            raise ConfigurationError(
-                "CodeWeaver requires a vector store provider.",
-                details={"vector_store": self.vector_store},
-                suggestions=[
-                    "Configure a vector store in your CodeWeaver settings.",
-                    "If you got this error and *don't have blank settings in your config* (meaning they're provided and literally blank or None), please open an issue at https://github.com/knitli/codeweaver/issues/new",
-                ],
-            )
-        vectors = (
-            self.vector_store if isinstance(self.vector_store, tuple) else (self.vector_store,)
-        )
-        new_vector_store: list[VectorStoreProviderSettings] = []
-        for vector in vectors:
-            if isinstance(vector, Unset):
-                continue
-            if vector["provider"] == Provider.MEMORY:
-                new_vector = vector.copy() | {"client_options": {}}
-            else:
-                new_vector = self._validate_qdrant(vector)
-            new_vector_store.append(new_vector)  # type: ignore[missing-typed-dict-key]
-        return tuple(new_vector_store)
-
     def _reconcile_env_vars(self) -> ProviderSettings:
         """Reconcile provider settings with environment variables, if any."""
         from codeweaver.config.profiles import get_skeleton_provider_settings
@@ -627,7 +1350,6 @@ class ProviderSettings(BasedModel):
     @model_validator(mode="after")
     def validate_and_normalize_providers(self) -> ProviderSettings:
         """Validate and normalize provider settings after initialization."""
-        self.vector_store = self._validate_vector_stores()
         for key in "vector_store", "embedding", "sparse_embedding", "reranking", "agent":
             value = getattr(self, key)
             if value is not Unset and not isinstance(value, tuple):
@@ -653,22 +1375,6 @@ class ProviderSettings(BasedModel):
         )
         return getattr(self, setting) is not Unset  # type: ignore
 
-    def multiple_embedding_providers(self) -> bool:
-        """Check if multiple embedding providers are configured."""
-        return isinstance(self.embedding, tuple) and len(self.embedding) > 1
-
-    def multiple_reranking_providers(self) -> bool:
-        """Check if multiple reranking providers are configured."""
-        return isinstance(self.reranking, tuple) and len(self.reranking) > 1
-
-    def multiple_vector_store_providers(self) -> bool:
-        """Check if multiple vector store providers are configured."""
-        return isinstance(self.vector_store, tuple) and len(self.vector_store) > 1
-
-    def multiple_agent_providers(self) -> bool:
-        """Check if multiple agent providers are configured."""
-        return isinstance(self.agent, tuple) and len(self.agent) > 1
-
     @computed_field
     @property
     def providers(self) -> frozenset[Provider]:
@@ -686,9 +1392,9 @@ class ProviderSettings(BasedModel):
         return ("data", "embedding", "sparse_embedding", "reranking", "vector_store", "agent")
 
     @property
-    def provider_configs(self) -> dict[ProviderField, tuple[BaseProviderSettingsDict, ...] | None]:
+    def provider_configs(self) -> dict[ProviderField, tuple[BaseProviderSettings, ...] | None]:
         """Get a summary of configured provider settings by kind."""
-        configs: dict[ProviderField, tuple[BaseProviderSettingsDict, ...] | None] = {}
+        configs: dict[ProviderField, tuple[BaseProviderSettings, ...] | None] = {}
         for field in self._field_names:
             setting = self.settings_for_kind(field)
             if setting is None or setting is Unset:
@@ -702,7 +1408,7 @@ class ProviderSettings(BasedModel):
         """Get a summary of configured providers by kind."""
         provider_data: dict[ProviderField, Provider | tuple[Provider, ...] | None] = {
             field_name: (
-                tuple(s["provider"] for s in setting if setting and is_typeddict(s))  # type: ignore
+                tuple(s.provider for s in setting if setting and is_typeddict(s))  # type: ignore
                 if isinstance(setting, tuple)
                 else (setting["provider"] if setting else None)
             )
@@ -713,7 +1419,7 @@ class ProviderSettings(BasedModel):
 
     def get_provider_settings(
         self, provider: Provider
-    ) -> BaseProviderSettingsDict | tuple[BaseProviderSettingsDict, ...] | None:
+    ) -> BaseProviderSettings | tuple[BaseProviderSettings, ...] | None:
         """Get the settings for a specific provider."""
         if provider == Provider.NOT_SET:
             return None
@@ -731,7 +1437,7 @@ class ProviderSettings(BasedModel):
             return None
 
         # Retrieve and flatten settings for matching fields
-        all_settings: list[BaseProviderSettingsDict] = []
+        all_settings: list[BaseProviderSettings] = []
         for field in matching_fields:
             if setting := self.settings_for_kind(field):
                 if isinstance(setting, tuple):
@@ -759,7 +1465,7 @@ class ProviderSettings(BasedModel):
 
     def settings_for_kind(
         self, kind: ProviderField | LiteralKinds
-    ) -> BaseProviderSettingsDict | tuple[BaseProviderSettingsDict, ...] | None:
+    ) -> BaseProviderSettings | tuple[BaseProviderSettings, ...] | None:
         """Get the settings for a specific provider kind.
 
         Args:
@@ -787,27 +1493,20 @@ AllDefaultProviderSettings = ProviderSettingsDict(
 
 
 __all__ = (
-    "AWSProviderSettings",
     "AgentProviderSettings",
     "AllDefaultProviderSettings",
-    "AzureCohereProviderSettings",
-    "AzureOpenAIProviderSettings",
     "ConnectionConfiguration",
     "ConnectionRateLimitConfig",
     "DataProviderSettings",
     "EmbeddingModelSettings",
     "EmbeddingProviderSettings",
-    "FastembedGPUProviderSettings",
     "MemoryConfig",
     "ModelString",
     "ProviderSettings",
     "ProviderSettingsDict",
     "ProviderSettingsDict",
     "ProviderSettingsView",
-    "ProviderSpecificSettings",
-    "QdrantConfig",
     "RerankingModelSettings",
     "RerankingProviderSettings",
     "SparseEmbeddingModelSettings",
-    "VectorStoreProviderSettings",
 )

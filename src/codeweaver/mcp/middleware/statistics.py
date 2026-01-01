@@ -45,7 +45,7 @@ from codeweaver.common.statistics import (
     get_session_statistics,
 )
 from codeweaver.common.types import TimingStatisticsDict
-from codeweaver.exceptions import ProviderError
+from codeweaver.core import ProviderError
 
 
 class StatisticsMiddleware(McpMiddleware):

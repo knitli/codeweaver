@@ -16,7 +16,7 @@ import pytest
 from qdrant_client.http.models import Distance, VectorParams
 from qdrant_client.http.models.models import SparseVectorParams
 
-from codeweaver.exceptions import ModelSwitchError
+from codeweaver.core import ModelSwitchError
 from codeweaver.providers.vector_stores.metadata import CollectionMetadata
 
 
@@ -133,7 +133,7 @@ def test_dimension_mismatch_detection():
     When: User tries to use 768-dimensional embeddings
     Then: System raises DimensionMismatchError
     """
-    from codeweaver.exceptions import DimensionMismatchError
+    from codeweaver.core import DimensionMismatchError
 
     metadata_original = CollectionMetadata(
         provider="qdrant",

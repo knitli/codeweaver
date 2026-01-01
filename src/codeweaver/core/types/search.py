@@ -89,7 +89,7 @@ class StrategizedQuery(NamedTuple):
         """Convert to a FusionQuery for hybrid search."""
         from qdrant_client.http.models import Prefetch, Rrf, RrfQuery, SparseVector
 
-        from codeweaver.exceptions import QueryError
+        from codeweaver.core import QueryError
 
         if not self.is_hybrid():
             raise QueryError(
@@ -152,7 +152,7 @@ class StrategizedQuery(NamedTuple):
 
     def to_query(self, kwargs: dict[str, Any]) -> dict[str, FusionQuery | list[Prefetch] | Any]:
         """Convert to a query dict based on available embeddings."""
-        from codeweaver.exceptions import QueryError
+        from codeweaver.core import QueryError
 
         if self.is_empty():
             raise QueryError(

@@ -17,9 +17,8 @@ from warnings import filterwarnings
 
 from pydantic import ConfigDict, SecretStr, SkipValidation
 
-from codeweaver.core import rpartial
+from codeweaver.core import ProviderError, rpartial
 from codeweaver.core.types.provider import Provider
-from codeweaver.exceptions import ProviderError
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 from codeweaver.providers.reranking.providers.base import RerankingProvider, RerankingResult
 
@@ -35,7 +34,7 @@ try:
     from voyageai.object.reranking import RerankingResult as VoyageRerankingResult
 
 except ImportError as e:
-    from codeweaver.exceptions import ConfigurationError
+    from codeweaver.core import ConfigurationError
 
     raise ConfigurationError(
         r"Voyage AI SDK is not installed. Please install it with `pip install code-weaver\[voyage]`."

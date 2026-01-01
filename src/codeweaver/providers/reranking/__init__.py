@@ -12,8 +12,8 @@ from typing import TYPE_CHECKING, Any, Literal
 
 
 if TYPE_CHECKING:
+    from codeweaver.core import ConfigurationError
     from codeweaver.core.types.provider import Provider
-    from codeweaver.exceptions import ConfigurationError
     from codeweaver.providers.reranking.capabilities import (
         dependency_map,
         get_alibaba_reranking_capabilities,

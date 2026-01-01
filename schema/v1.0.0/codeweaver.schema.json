@@ -172,7 +172,7 @@
       "title": "AuthSettings",
       "type": "object"
     },
-    "AWSProviderSettings": {
+    "BedrockProviderSettings": {
       "description": "Settings for AWS provider. You need to provide these settings if you are using Bedrock, and you need to provide them for each Bedrock model you use. It might be repetitive, but a lot of people have different credentials for different models/services.",
       "properties": {
         "aws_access_key_id": {
@@ -230,7 +230,7 @@
         "region_name",
         "model_arn"
       ],
-      "title": "AWSProviderSettings",
+      "title": "BedrockProviderSettings",
       "type": "object"
     },
     "AzureCohereProviderSettings": {
@@ -1794,7 +1794,7 @@
           "$ref": "#/$defs/FastembedGPUProviderSettings"
         },
         {
-          "$ref": "#/$defs/AWSProviderSettings"
+          "$ref": "#/$defs/BedrockProviderSettings"
         },
         {
           "$ref": "#/$defs/AzureOpenAIProviderSettings"

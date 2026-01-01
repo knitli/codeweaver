@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any, Literal, NoReturn, cast
 
 from codeweaver.common.registry import ProviderRegistry
 from codeweaver.common.statistics import SessionStatistics
+from codeweaver.core import ConfigurationError
 from codeweaver.di import INJECTED
 from codeweaver.di.providers import (
     FailoverManagerDep,
@@ -25,7 +26,6 @@ from codeweaver.di.providers import (
 )
 from codeweaver.engine.failover import VectorStoreFailoverManager
 from codeweaver.engine.indexer.indexer import Indexer
-from codeweaver.exceptions import ConfigurationError
 from codeweaver.server.health.models import (
     EmbeddingProviderServiceInfo,
     FailoverInfo,
@@ -98,7 +98,9 @@ class HealthService:
         from codeweaver.engine.indexer import Indexer
 
         container = get_container()
-        logger.debug("HealthService resolving dependencies. Statistics type: %s", type(self._statistics))
+        logger.debug(
+            "HealthService resolving dependencies. Statistics type: %s", type(self._statistics)
+        )
 
         if is_depends_marker(self._provider_registry):
             try:
@@ -110,6 +112,7 @@ class HealthService:
 
         if is_depends_marker(self._statistics):
             from codeweaver.common.statistics import SessionStatistics
+
             try:
                 # Use container to ensure overrides are respected
                 self._statistics = await container.resolve(SessionStatistics)

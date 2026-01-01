@@ -19,10 +19,10 @@ from typing import Any, Self, cast
 
 from pydantic import AnyHttpUrl, create_model
 
+from codeweaver.core import ConfigurationError, ProviderError
+from codeweaver.core import ValidationError as CodeWeaverValidationError
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.types.provider import Provider
-from codeweaver.exceptions import ConfigurationError, ProviderError
-from codeweaver.exceptions import ValidationError as CodeWeaverValidationError
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.providers.base import EmbeddingProvider
 

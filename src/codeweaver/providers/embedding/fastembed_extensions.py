@@ -19,7 +19,7 @@ try:
     from fastembed.text import TextEmbedding
 
 except ImportError as e:
-    from codeweaver.exceptions import ConfigurationError
+    from codeweaver.core import ConfigurationError
 
     raise ConfigurationError(
         "fastembed is not installed. Please install it with `pip install code-weaver[fastembed]` or `codeweaver[fastembed-gpu]`."

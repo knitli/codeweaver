@@ -5,13 +5,13 @@ import re
 
 import pytest
 
+from codeweaver.core import ConfigurationError
 from codeweaver.core.utils.text import (
     _NESTED_QUANTIFIER_RE,
     MAX_REGEX_PATTERN_LENGTH,
     _walk_pattern,
     validate_regex_pattern,
 )
-from codeweaver.exceptions import ConfigurationError
 
 
 @pytest.mark.unit

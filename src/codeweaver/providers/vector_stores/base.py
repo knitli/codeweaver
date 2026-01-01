@@ -43,12 +43,12 @@ except ImportError:
     RETRYABLE_EXCEPTIONS = (ConnectionError, TimeoutError, OSError, httpx.TimeoutException)
 
 from codeweaver.config.providers import EmbeddingModelSettings, SparseEmbeddingModelSettings
+from codeweaver.core import ProviderError
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.types.enum import BaseEnum
 from codeweaver.core.types.models import BasedModel
 from codeweaver.core.types.provider import Provider
 from codeweaver.core.types.search import StrategizedQuery
-from codeweaver.exceptions import ProviderError
 from codeweaver.providers.embedding.capabilities.base import (
     EmbeddingModelCapabilities,
     SparseEmbeddingModelCapabilities,

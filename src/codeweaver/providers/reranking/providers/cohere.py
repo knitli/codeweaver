@@ -30,7 +30,7 @@ try:
     from cohere.v2.types.v2rerank_response import V2RerankResponse
     from cohere.v2.types.v2rerank_response_results_item import V2RerankResponseResultsItem
 except ImportError as e:
-    from codeweaver.exceptions import ConfigurationError
+    from codeweaver.core import ConfigurationError
 
     raise ConfigurationError(
         r'Please install the `cohere` package to use the Cohere provider, \nyou can use the `cohere` optional group -- `pip install "code-weaver\[cohere]"`'
@@ -103,7 +103,7 @@ class CohereRerankingProvider(RerankingProvider[CohereClient]):
                     client_options["api_key"] = kwargs.get("api_key") or os.getenv("COHERE_API_KEY")
 
                 if not client_options.get("api_key"):
-                    from codeweaver.exceptions import ConfigurationError
+                    from codeweaver.core import ConfigurationError
 
                     raise ConfigurationError(
                         f"API key not found for {provider.as_title} provider. Please set the API key in the client kwargs or as an environment variable."

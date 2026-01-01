@@ -29,7 +29,7 @@ from pydantic_ai.toolsets import (
     WrapperToolset,
 )
 
-from codeweaver.exceptions import ConfigurationError
+from codeweaver.core import ConfigurationError
 
 
 if TYPE_CHECKING:

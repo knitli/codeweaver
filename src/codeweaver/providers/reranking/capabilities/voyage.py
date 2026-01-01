@@ -40,7 +40,7 @@ def _voyage_max_limit(chunks: list[CodeChunk], query: str) -> tuple[bool, NonNeg
         from codeweaver_tokenizers import get_tokenizer
 
     except ImportError as e:
-        from codeweaver.exceptions import ConfigurationError
+        from codeweaver.core import ConfigurationError
 
         raise ConfigurationError(
             "The `tokenizers` package is required for Voyage capabilities. Please install it with `pip install code-weaver[voyage]` or `pip install tokenizers`."

@@ -122,7 +122,7 @@ async def find_code_tool(
         _logger.exception("find_code failed")
 
         # Import here to avoid circular dependency
-        from codeweaver.exceptions import QueryError
+        from codeweaver.core import QueryError
 
         raise QueryError(
             f"Unexpected error in find_code: {e!s}",

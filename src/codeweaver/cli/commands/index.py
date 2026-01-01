@@ -19,9 +19,8 @@ from pydantic import FilePath
 
 from codeweaver.cli.ui import CLIErrorHandler, IndexingProgress, StatusDisplay, get_display
 from codeweaver.config.types import CodeWeaverSettingsDict
-from codeweaver.core import get_project_path, get_user_config_dir
+from codeweaver.core import CodeWeaverError, get_project_path, get_user_config_dir
 from codeweaver.core.types.dictview import DictView
-from codeweaver.exceptions import CodeWeaverError
 
 
 if TYPE_CHECKING:

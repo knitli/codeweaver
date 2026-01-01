@@ -40,11 +40,11 @@ from tenacity import (
     wait_exponential,
 )
 
+from codeweaver.core import RerankingProviderError, ValidationError
 from codeweaver.core.types.enum import BaseEnum
 from codeweaver.core.types.models import BasedModel
 from codeweaver.core.types.provider import Provider
 from codeweaver.core.types.utils import generate_field_title
-from codeweaver.exceptions import RerankingProviderError, ValidationError
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 
 
@@ -415,7 +415,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
             r.original_index
             for r in sorted(
                 processed_results,
-                key=lambda r: (r.batch_rank if r.batch_rank != -1 else float("inf")),
+                key=lambda r: r.batch_rank if r.batch_rank != -1 else float("inf"),
             )
         ]
         included_set = set(included_indices)

@@ -276,7 +276,7 @@ class TestVoyageRerankingProviderErrorHandling:
         self, mock_voyage_rerank_client, voyage_rerank_capabilities
     ):
         """Test that provider errors are wrapped correctly."""
-        from codeweaver.exceptions import ProviderError
+        from codeweaver.core import ProviderError
 
         mock_voyage_rerank_client.rerank.side_effect = Exception("API error")
 

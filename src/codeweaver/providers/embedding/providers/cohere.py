@@ -13,8 +13,8 @@ from typing import TYPE_CHECKING, Any, cast
 
 from pydantic import SkipValidation
 
+from codeweaver.core import ConfigurationError
 from codeweaver.core.types.provider import Provider
-from codeweaver.exceptions import ConfigurationError
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.providers.base import EmbeddingProvider
 

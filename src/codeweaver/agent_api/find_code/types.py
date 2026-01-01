@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Annotated, Any, Literal
 from pydantic import ConfigDict, Field, NonNegativeFloat, NonNegativeInt, model_validator
 
 from codeweaver.agent_api.find_code.intent import IntentType
+from codeweaver.core import ValidationError
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.discovery import DiscoveredFile
 from codeweaver.core.language import SemanticSearchLanguage
@@ -21,7 +22,6 @@ from codeweaver.core.types import LanguageName
 from codeweaver.core.types.enum import BaseEnum
 from codeweaver.core.types.models import BASEDMODEL_CONFIG, BasedModel
 from codeweaver.core.types.search import SearchStrategy
-from codeweaver.exceptions import ValidationError
 
 
 if TYPE_CHECKING:

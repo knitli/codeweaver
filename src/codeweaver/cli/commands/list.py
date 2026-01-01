@@ -196,7 +196,7 @@ def models(
             else Provider.from_string(provider_name)
         )
     except (AttributeError, KeyError, ValueError):
-        from codeweaver.exceptions import CodeWeaverError
+        from codeweaver.core import CodeWeaverError
 
         error_handler = CLIErrorHandler(display)
         error = CodeWeaverError(
@@ -206,7 +206,7 @@ def models(
         error_handler.handle_error(error, "List models", exit_code=1)
 
     if provider == Provider.NOT_SET:
-        from codeweaver.exceptions import CodeWeaverError
+        from codeweaver.core import CodeWeaverError
 
         error_handler = CLIErrorHandler(display)
         error = CodeWeaverError(

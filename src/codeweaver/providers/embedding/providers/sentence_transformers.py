@@ -16,9 +16,8 @@ from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 import numpy as np
 
-from codeweaver.core import rpartial
+from codeweaver.core import ConfigurationError, rpartial
 from codeweaver.core.types.provider import Provider
-from codeweaver.exceptions import ConfigurationError
 from codeweaver.providers.embedding.capabilities.base import (
     EmbeddingModelCapabilities,
     SparseEmbeddingModelCapabilities,

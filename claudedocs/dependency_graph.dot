@@ -58,7 +58,7 @@ digraph CodeWeaverDependencies {
         color=white;
 
         common [label="codeweaver.common\n(21 files)\nInstability: 0.44", fillcolor=pink];
-        exceptions [label="codeweaver.exceptions\n(1 file)\nInstability: 0.00", fillcolor=lightgreen];
+        exceptions [label="codeweaver.core\n(1 file)\nInstability: 0.00", fillcolor=lightgreen];
         tokenizers [label="codeweaver.tokenizers\n(3 files)\nInstability: 0.00", fillcolor=lightgreen];
         daemon [label="codeweaver.daemon\n(0 files)\nInstability: 0.00", fillcolor=lightgreen];
     }

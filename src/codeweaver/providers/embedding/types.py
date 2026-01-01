@@ -11,6 +11,7 @@ from typing import Annotated, Literal, NamedTuple, cast
 
 from pydantic import UUID7, Field, NonNegativeInt, PositiveInt
 
+from codeweaver.core import ConfigurationError
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.types.aliases import LiteralStringT, ModelName, ModelNameT
 from codeweaver.core.types.embeddings import (
@@ -21,7 +22,6 @@ from codeweaver.core.types.embeddings import (
     StoredEmbeddingVectors,
 )
 from codeweaver.core.types.utils import generate_field_title
-from codeweaver.exceptions import ConfigurationError
 
 
 class InvalidEmbeddingModelError(ConfigurationError):

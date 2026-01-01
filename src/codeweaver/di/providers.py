@@ -88,7 +88,7 @@ async def get_embedding_provider() -> Any:
     registry = get_provider_registry()
     provider_enum = registry.get_provider_enum_for("embedding")
     if not provider_enum:
-        from codeweaver.exceptions import ConfigurationError
+        from codeweaver.core import ConfigurationError
 
         raise ConfigurationError("No embedding provider configured.")
 
@@ -112,7 +112,7 @@ async def get_vector_store() -> Any:
     registry = get_provider_registry()
     provider_enum = registry.get_provider_enum_for("vector_store")
     if not provider_enum:
-        from codeweaver.exceptions import ConfigurationError
+        from codeweaver.core import ConfigurationError
 
         raise ConfigurationError("No vector store provider configured.")
 
@@ -330,7 +330,10 @@ def setup_default_container(container: Container) -> None:
     from codeweaver.engine.chunking_service import ChunkingService
     from codeweaver.engine.failover import VectorStoreFailoverManager
     from codeweaver.engine.indexer.indexer import Indexer
-    from codeweaver.providers.embedding.providers.base import EmbeddingProvider, SparseEmbeddingProvider
+    from codeweaver.providers.embedding.providers.base import (
+        EmbeddingProvider,
+        SparseEmbeddingProvider,
+    )
     from codeweaver.providers.reranking.providers.base import RerankingProvider
     from codeweaver.providers.vector_stores.base import VectorStoreProvider
     from codeweaver.server.health.health_service import HealthService

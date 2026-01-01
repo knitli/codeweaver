@@ -94,7 +94,7 @@ class TestCohereEmbeddingProviderInitialization:
     @patch.dict("os.environ", {}, clear=True)
     def test_provider_initialization_without_api_key_raises_error(self, cohere_capabilities):
         """Test that provider raises error without API key."""
-        from codeweaver.exceptions import ConfigurationError
+        from codeweaver.core import ConfigurationError
         from codeweaver.providers.embedding.providers.cohere import CohereEmbeddingProvider
 
         with pytest.raises(ConfigurationError) as exc_info:

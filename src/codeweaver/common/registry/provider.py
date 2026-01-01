@@ -25,6 +25,7 @@ from codeweaver.config.providers import SparseEmbeddingProviderSettings
 from codeweaver.config.types import CodeWeaverSettingsDict
 from codeweaver.core import (
     BasedModel,
+    ConfigurationError,
     DictView,
     LazyImport,
     LiteralStringT,
@@ -35,7 +36,6 @@ from codeweaver.core import (
 # NOTE: Re-export Provider and ProviderKind for easier access -- anyone importing the registry likely needs these too
 from codeweaver.core import Provider as Provider
 from codeweaver.core import ProviderKind as ProviderKind
-from codeweaver.exceptions import ConfigurationError
 from codeweaver.providers.agent.agent_providers import AgentProvider
 from codeweaver.providers.embedding.capabilities.base import SparseEmbeddingModelCapabilities
 from codeweaver.providers.embedding.providers.base import EmbeddingProvider, SparseEmbeddingProvider
@@ -685,7 +685,7 @@ class ProviderRegistry(BasedModel):
             ConfigurationError: If client creation fails due to missing dependencies
                 or invalid configuration.
         """
-        from codeweaver.exceptions import ConfigurationError
+        from codeweaver.core import ConfigurationError
         from codeweaver.providers.capabilities import CLIENT_MAP, get_client_map
 
         # Normalize provider_kind to ProviderKind enum if string

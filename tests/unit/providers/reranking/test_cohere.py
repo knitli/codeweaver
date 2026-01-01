@@ -70,7 +70,7 @@ class TestCohereRerankingProviderInitialization:
     @patch.dict("os.environ", {}, clear=True)
     def test_provider_initialization_without_api_key_raises_error(self, cohere_rerank_capabilities):
         """Test that provider raises error without API key."""
-        from codeweaver.exceptions import ConfigurationError
+        from codeweaver.core import ConfigurationError
         from codeweaver.providers.reranking.providers.cohere import CohereRerankingProvider
 
         with pytest.raises(ConfigurationError) as exc_info:

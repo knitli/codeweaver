@@ -42,6 +42,9 @@ from codeweaver.core import (
     ConfigLanguage,
     DictView,
     DiscoveredFile,
+    IndexingError,
+    InitializationError,
+    ProviderError,
     SemanticSearchLanguage,
     Unset,
     get_blake_hash,
@@ -64,7 +67,6 @@ from codeweaver.engine.indexer.checkpoint import CheckpointManager, IndexingChec
 from codeweaver.engine.indexer.manifest import FileManifestManager, IndexFileManifest
 from codeweaver.engine.indexer.progress import IndexingStats
 from codeweaver.engine.watcher.types import FileChange
-from codeweaver.exceptions import IndexingError, InitializationError, ProviderError
 from codeweaver.providers.embedding.providers.base import EmbeddingProvider
 from codeweaver.providers.vector_stores.base import VectorStoreProvider
 

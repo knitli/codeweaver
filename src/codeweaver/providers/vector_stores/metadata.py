@@ -14,9 +14,9 @@ from typing import TYPE_CHECKING, Annotated, Any, Literal
 from pydantic import Field
 from qdrant_client.http.models import SparseVectorParams, VectorParams
 
+from codeweaver.core import DimensionMismatchError, ModelSwitchError
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.types.models import BasedModel
-from codeweaver.exceptions import DimensionMismatchError, ModelSwitchError
 
 
 if TYPE_CHECKING:
@@ -190,8 +190,8 @@ class CollectionMetadata(BasedModel):
             raise DimensionMismatchError(
                 f"Embedding dimension mismatch: collection expects {other_dense_dim}, but current embedder produces {dense_dim}.",
                 suggestions=[
-                    "Option 1: Use an embedding model with matching dimensions",
-                    "Option 2: Re-index with the current embedding model",
+                    "Option 1: Use an embedding model with matching dimensions (the same model as before)",
+                    "Option 2: Re-index with the current embedding model and dimensions",
                     "Option 3: Check your embedding provider configuration",
                 ],
                 details={
