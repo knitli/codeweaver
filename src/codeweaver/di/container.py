@@ -14,7 +14,11 @@ import sys
 
 from collections.abc import AsyncIterator, Callable, Generator
 from contextlib import asynccontextmanager, contextmanager, suppress
-from typing import Annotated, Any, cast, get_args, get_origin, get_type_hints
+from typing import Annotated, Any, cast, get_args, get_origin
+
+# Pydantic internal utilities for robust type resolution
+from pydantic._internal._core_utils import get_type_ref
+from pydantic._internal._typing_extra import annotated_type, get_function_type_hints
 
 from codeweaver.di.depends import Depends, DependsPlaceholder, _InjectedProxy
 
@@ -45,15 +49,17 @@ class Container[T]:
     def _unwrap_annotated(annotation: Any) -> Any:
         """Unwrap Annotated type hints to get the underlying type.
 
+        Uses pydantic's annotated_type() for robust handling of Annotated types.
+
         Args:
             annotation: The type annotation, possibly Annotated.
 
         Returns:
             The unwrapped type, or the original annotation if not Annotated.
         """
-        if get_origin(annotation) is Annotated:
-            return get_args(annotation)[0]
-        return annotation
+        # Use pydantic's annotated_type() which handles edge cases better
+        unwrapped = annotated_type(annotation)
+        return unwrapped if unwrapped is not None else annotation
 
     def _resolve_string_type(
         self, type_str: str, globalns: dict[str, Any] | None = None
@@ -152,20 +158,48 @@ class Container[T]:
         self._startup_hooks.clear()
         self._shutdown_hooks.clear()
 
-    async def resolve(self, interface: type[T]) -> T:
-        """Resolve a dependency.
+    async def resolve(
+        self,
+        interface: type[T],
+        _resolution_stack: list[str] | None = None,
+    ) -> T:
+        """Resolve a dependency with circular dependency detection.
 
         Args:
             interface: The type to resolve.
+            _resolution_stack: Internal parameter for tracking resolution chain.
+                DO NOT pass this manually - it's managed automatically.
 
         Returns:
             The resolved instance.
+
+        Raises:
+            CircularDependencyError: If a circular dependency is detected.
         """
+        from codeweaver.core.exceptions import CircularDependencyError
+
+        # Initialize resolution stack on first call
+        if _resolution_stack is None:
+            _resolution_stack = []
+
+        # Create stable cache key using pydantic's get_type_ref
+        cache_key = self._create_cache_key(interface)
+
+        # Detect circular dependency
+        if cache_key in _resolution_stack:
+            cycle = " -> ".join([*_resolution_stack, cache_key])
+            raise CircularDependencyError(cycle=cycle)
+
         # 1. Check overrides first
         if interface in self._overrides:
             override = self._overrides[interface]
             if callable(override) and not isinstance(override, type):
-                return await self._call_with_injection(override)
+                # Add to resolution stack before resolving override
+                _resolution_stack.append(cache_key)
+                try:
+                    return await self._call_with_injection(override, _resolution_stack)
+                finally:
+                    _resolution_stack.pop()
             return cast(T, override)
 
         # 2. Check singleton cache
@@ -175,8 +209,12 @@ class Container[T]:
         # 3. Find factory
         factory = self._factories.get(interface, interface)
 
-        # 4. Create instance
-        instance = await self._call_with_injection(factory)
+        # 4. Create instance with circular dependency tracking
+        _resolution_stack.append(cache_key)
+        try:
+            instance = await self._call_with_injection(factory, _resolution_stack)
+        finally:
+            _resolution_stack.pop()
 
         # 5. Cache if singleton
         if self._is_singleton.get(interface, True):
@@ -197,10 +235,28 @@ class Container[T]:
             return sys.modules[obj.__module__].__dict__
         return getattr(obj, "__globals__", {})
 
+    @staticmethod
+    def _create_cache_key(type_: type[Any]) -> str:
+        """Create a stable cache key for a type.
+
+        Uses pydantic's get_type_ref() which handles generics, type aliases,
+        and edge cases better than using id() or __name__.
+
+        Args:
+            type_: The type to create a cache key for.
+
+        Returns:
+            A stable string key that uniquely identifies the type.
+        """
+        return get_type_ref(type_)
+
     def _get_signature_and_hints(
         self, obj: Callable[..., Any], globalns: dict[str, Any]
     ) -> tuple[inspect.Signature, dict[str, Any]]:
         """Get signature and type hints for an object.
+
+        Uses pydantic's get_function_type_hints() for robust type resolution,
+        which handles PEP 563 string annotations, forward refs, and Python 3.13+ changes.
 
         Args:
             obj: The callable or class to inspect.
@@ -214,9 +270,15 @@ class Container[T]:
         """
         try:
             signature = inspect.signature(obj)
-            # Resolve type hints to handle string annotations from 'from __future__ import annotations'
-            # include_extras=True is required to see Annotated metadata
-            type_hints = get_type_hints(obj, globalns=globalns, include_extras=True)
+            # Use pydantic's function type hint getter which handles:
+            # - PEP 563 string annotations (from __future__ import annotations)
+            # - Forward references in TYPE_CHECKING blocks
+            # - Python 3.13+ annotation changes
+            # - functools.partial unwrapping
+            type_hints = get_function_type_hints(
+                obj,
+                globalns=globalns,
+            )
         except NameError:
             # NameError happens if a type hint cannot be resolved (e.g. forward ref in TYPE_CHECKING)
             # Fallback to signature annotations which might be strings
@@ -233,6 +295,7 @@ class Container[T]:
         real_type: Any,
         globalns: dict[str, Any],
         obj: Callable[..., Any],
+        _resolution_stack: list[str] | None = None,
     ) -> Any:
         """Resolve a parameter with INJECTED sentinel.
 
@@ -243,6 +306,7 @@ class Container[T]:
             real_type: Unwrapped annotation.
             globalns: Global namespace.
             obj: The callable being injected.
+            _resolution_stack: Internal parameter for circular dependency tracking.
 
         Returns:
             The resolved dependency value.
@@ -252,13 +316,17 @@ class Container[T]:
         """
         # Try to resolve by annotation
         if marker := self._create_depends_from_type(param, annotation, globalns):
-            return await self._resolve_dependency(name, param, marker, annotation, globalns)
+            return await self._resolve_dependency(
+                name, param, marker, annotation, globalns, _resolution_stack
+            )
 
         # Try to resolve by unwrapped real_type
         if real_type != annotation and (
             marker := self._create_depends_from_type(param, real_type, globalns)
         ):
-            return await self._resolve_dependency(name, param, marker, real_type, globalns)
+            return await self._resolve_dependency(
+                name, param, marker, real_type, globalns, _resolution_stack
+            )
 
         # Special case: if the annotation is still a string, try to resolve it
         if (
@@ -266,7 +334,9 @@ class Container[T]:
             and (resolved_type := self._resolve_string_type(annotation, globalns))
             and (marker := self._create_depends_from_type(param, resolved_type, globalns))
         ):
-            return await self._resolve_dependency(name, param, marker, resolved_type, globalns)
+            return await self._resolve_dependency(
+                name, param, marker, resolved_type, globalns, _resolution_stack
+            )
 
         raise TypeError(
             f"Parameter '{name}' in {obj.__name__} has INJECTED sentinel "  # ty:ignore[unresolved-attribute]
@@ -281,6 +351,7 @@ class Container[T]:
         annotation: Any,
         real_type: Any,
         globalns: dict[str, Any],
+        _resolution_stack: list[str] | None = None,
     ) -> Any | None:
         """Try to auto-resolve a required parameter by type hint.
 
@@ -290,27 +361,43 @@ class Container[T]:
             annotation: Raw annotation.
             real_type: Unwrapped annotation.
             globalns: Global namespace.
+            _resolution_stack: Internal parameter for circular dependency tracking.
 
         Returns:
             The resolved dependency value, or None if it can't be resolved.
         """
         # Try to resolve by annotation
         if marker := self._create_depends_from_type(param, annotation, globalns):
-            return await self._resolve_dependency(name, param, marker, annotation, globalns)
+            return await self._resolve_dependency(
+                name, param, marker, annotation, globalns, _resolution_stack
+            )
 
         # Try to resolve by unwrapped real_type
         if real_type != annotation and (
             marker := self._create_depends_from_type(param, real_type, globalns)
         ):
-            return await self._resolve_dependency(name, param, marker, real_type, globalns)
+            return await self._resolve_dependency(
+                name, param, marker, real_type, globalns, _resolution_stack
+            )
 
         # Not a dependency, might be provided by caller
         return None
 
-    async def _call_with_injection(self, obj: Callable[..., Any]) -> Any:
+    async def _call_with_injection(
+        self,
+        obj: Callable[..., Any],
+        _resolution_stack: list[str] | None = None,
+    ) -> Any:
         """Call a function or instantiate a class, injecting its dependencies.
 
         Looks for Depends() markers in the signature or Annotated type hints.
+
+        Args:
+            obj: The callable or class to inject dependencies into.
+            _resolution_stack: Internal parameter for circular dependency tracking.
+
+        Returns:
+            The result of calling obj with injected dependencies.
         """
         globalns = self._get_globalns(obj)
 
@@ -330,15 +417,15 @@ class Container[T]:
             # Check if the default is the INJECTED sentinel OR if it's a Depends marker
             if marker := self._find_depends_marker(param, annotation, globalns):
                 kwargs[name] = await self._resolve_dependency(
-                    name, param, marker, annotation, globalns
+                    name, param, marker, annotation, globalns, _resolution_stack
                 )
             elif isinstance(param.default, (DependsPlaceholder, _InjectedProxy)):
                 kwargs[name] = await self._resolve_injected_parameter(
-                    name, param, annotation, real_type, globalns, obj
+                    name, param, annotation, real_type, globalns, obj, _resolution_stack
                 )
             elif param.default is inspect.Parameter.empty:
                 resolved = await self._try_resolve_required_parameter(
-                    name, param, annotation, real_type, globalns
+                    name, param, annotation, real_type, globalns, _resolution_stack
                 )
                 if resolved is not None:
                     kwargs[name] = resolved
@@ -420,12 +507,25 @@ class Container[T]:
         marker: Depends,
         annotation: Any = None,
         globalns: dict[str, Any] | None = None,
+        _resolution_stack: list[str] | None = None,
     ) -> Any:
-        """Resolve a dependency from a Depends marker."""
+        """Resolve a dependency from a Depends marker.
+
+        Args:
+            name: Parameter name.
+            param: Parameter object.
+            marker: The Depends marker.
+            annotation: Raw annotation.
+            globalns: Global namespace.
+            _resolution_stack: Internal parameter for circular dependency tracking.
+
+        Returns:
+            The resolved dependency value.
+        """
         if marker.dependency:
             # Resolve via container to support registration, singletons, and overrides
             # If it's a factory function, the container will resolve it
-            return await self.resolve(marker.dependency)
+            return await self.resolve(marker.dependency, _resolution_stack)
 
         target_type = annotation or param.annotation
 
@@ -441,7 +541,7 @@ class Container[T]:
         if target_type is inspect.Parameter.empty:
             raise ValueError(f"Parameter {name} has Depends() but no type hint.")
 
-        return await self.resolve(target_type)
+        return await self.resolve(target_type, _resolution_stack)
 
     @asynccontextmanager
     async def lifespan(self) -> AsyncIterator[Container]:

@@ -317,11 +317,168 @@ class DependencyNotAvailableError(CodeWeaverError):
         self.required_package = required_package
 
 
+# =============================
+# Dependency Injection Errors
+# =============================
+
+
+class DependencyInjectionError(CodeWeaverError):
+    """Base exception for dependency injection system errors.
+
+    Raised when there are issues with dependency resolution, registration,
+    or lifecycle management in the DI container.
+    """
+
+
+class CircularDependencyError(DependencyInjectionError):
+    """Circular dependency detected error.
+
+    Raised when a circular dependency is detected during dependency resolution.
+    For example: ServiceA depends on ServiceB which depends on ServiceA.
+    """
+
+    def __init__(
+        self,
+        cycle: str,
+        details: dict[str, Any] | None = None,
+        suggestions: list[str] | None = None,
+    ) -> None:
+        """Initialize CircularDependencyError.
+
+        Args:
+            cycle: String representation of the dependency cycle
+            details: Additional context about the error
+            suggestions: Actionable suggestions for resolving the error
+        """
+        super().__init__(
+            message=f"Circular dependency detected: {cycle}",
+            details=details,
+            suggestions=suggestions
+            or [
+                "Review dependency chain and break the cycle by:",
+                "  1. Using property injection instead of constructor injection",
+                "  2. Introducing an interface/abstraction to break the cycle",
+                "  3. Restructuring components to remove the circular reference",
+            ],
+        )
+        self.cycle = cycle
+
+
+class UnresolvableDependencyError(DependencyInjectionError):
+    """Unresolvable dependency error.
+
+    Raised when a dependency cannot be resolved because it's not registered
+    or doesn't have a valid factory.
+    """
+
+    def __init__(
+        self,
+        interface: type[Any],
+        reason: str,
+        details: dict[str, Any] | None = None,
+        suggestions: list[str] | None = None,
+    ) -> None:
+        """Initialize UnresolvableDependencyError.
+
+        Args:
+            interface: The type that could not be resolved
+            reason: Explanation of why resolution failed
+            details: Additional context about the error
+            suggestions: Actionable suggestions for resolving the error
+        """
+        super().__init__(
+            message=f"Cannot resolve dependency {interface.__name__}: {reason}",
+            details=details,
+            suggestions=suggestions
+            or [
+                f"Ensure {interface.__name__} is registered with the DI container:",
+                f"  container.register({interface.__name__}, factory_function)",
+                "Or use the @provider decorator:",
+                f"  @provider({interface.__name__})",
+                f"  def get_{interface.__name__.lower()}(): ...",
+            ],
+        )
+        self.interface = interface
+        self.reason = reason
+
+
+class ScopeViolationError(DependencyInjectionError):
+    """Dependency scope violation error.
+
+    Raised when a dependency violates scope rules, such as a request-scoped
+    dependency depending on a function-scoped dependency.
+    """
+
+    def __init__(
+        self,
+        dependent: str,
+        dependency: str,
+        reason: str,
+        details: dict[str, Any] | None = None,
+        suggestions: list[str] | None = None,
+    ) -> None:
+        """Initialize ScopeViolationError.
+
+        Args:
+            dependent: Name of the dependent component
+            dependency: Name of the dependency
+            reason: Explanation of the scope violation
+            details: Additional context about the error
+            suggestions: Actionable suggestions for resolving the error
+        """
+        super().__init__(
+            message=f"Scope violation: {dependent} cannot depend on {dependency}: {reason}",
+            details=details,
+            suggestions=suggestions
+            or [
+                "Ensure scope hierarchy is correct:",
+                "  singleton > request > function",
+                "A dependency can only depend on scopes of equal or longer lifetime.",
+            ],
+        )
+        self.dependent = dependent
+        self.dependency = dependency
+        self.reason = reason
+
+
+class DependencyResolutionError(DependencyInjectionError):
+    """Aggregate multiple dependency resolution errors.
+
+    Raised when multiple dependency resolution errors occur and need to be
+    reported together instead of failing fast on the first error.
+    """
+
+    def __init__(
+        self,
+        errors: list[DependencyInjectionError],
+        details: dict[str, Any] | None = None,
+    ) -> None:
+        """Initialize DependencyResolutionErrors.
+
+        Args:
+            errors: List of dependency injection errors
+            details: Additional context about the errors
+        """
+        error_messages = "\n".join(f"  - {e.message}" for e in errors)
+        super().__init__(
+            message=f"Multiple dependency resolution errors:\n{error_messages}",
+            details=details,
+            suggestions=[
+                "Fix each error listed above.",
+                "Errors are listed in the order they were encountered.",
+            ],
+        )
+        self.errors = errors
+
+
 __all__ = (
+    "CircularDependencyError",
     "CodeWeaverError",
     "CollectionNotFoundError",
     "ConfigurationError",
+    "DependencyInjectionError",
     "DependencyNotAvailableError",
+    "DependencyResolutionError",
     "DimensionMismatchError",
     "IndexingError",
     "InitializationError",
@@ -331,5 +488,7 @@ __all__ = (
     "ProviderSwitchError",
     "QueryError",
     "RerankingProviderError",
+    "ScopeViolationError",
+    "UnresolvableDependencyError",
     "ValidationError",
 )
