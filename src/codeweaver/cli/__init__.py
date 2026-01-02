@@ -14,11 +14,12 @@ if TYPE_CHECKING:
     # Import everything for IDE and type checker support
     # These imports are never executed at runtime, only during type checking
     from codeweaver.cli.__main__ import app, console, main
-    from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
+    from codeweaver.cli.ui import CLIErrorHandler, IndexingProgress, StatusDisplay, get_display
 
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "CLIErrorHandler": (__spec__.parent, "ui"),
+    "IndexingProgress": (__spec__.parent, "ui"),
     "StatusDisplay": (__spec__.parent, "ui"),
     "app": (__spec__.parent, "__main__"),
     "console": (__spec__.parent, "__main__"),
@@ -30,7 +31,15 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
 __getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
 
 
-__all__ = ("CLIErrorHandler", "StatusDisplay", "app", "console", "get_display", "main")
+__all__ = (
+    "CLIErrorHandler",
+    "IndexingProgress",
+    "StatusDisplay",
+    "app",
+    "console",
+    "get_display",
+    "main",
+)
 
 
 def __dir__() -> list[str]:

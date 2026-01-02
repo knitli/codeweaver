@@ -25,7 +25,8 @@ from typing import Literal, overload
 
 from pydantic import AnyHttpUrl
 
-from codeweaver.config.providers import (
+from codeweaver.core import get_blake_hash, get_project_path, get_user_config_dir
+from codeweaver.providers.config import (
     AgentModelSettings,
     AgentProviderSettings,
     DataProviderSettings,
@@ -40,7 +41,6 @@ from codeweaver.config.providers import (
     SparseEmbeddingProviderSettings,
     VectorStoreProviderSettings,
 )
-from codeweaver.core import get_blake_hash, get_project_path, get_user_config_dir
 
 
 def _default_local_vector_config() -> QdrantConfig:

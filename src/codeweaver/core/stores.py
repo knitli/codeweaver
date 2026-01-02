@@ -28,6 +28,7 @@ from typing import (
     cast,
     get_args,
     get_origin,
+    override,
 )
 from weakref import WeakValueDictionary
 
@@ -77,6 +78,8 @@ class StoreDict(TypedDict, total=False):
 class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
     """A key-value store with precise typing for keys and values.
 
+    It started simple, but then got complicated...
+
     - KeyT is either UUID7 or BlakeHashKey, determined by the concrete subclass.
     - T is the value type for all items in the store.
 
@@ -88,7 +91,7 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
         1. Entirely serializable. You can save and load it as JSON. Weakrefs are *not serialized*.
         2. Supports complex data types. You can store any picklable Python object, including nested structures.
         3. API that mimics a standard Python dictionary, making it easy to use.
-        4. Type-safe: Enforces that all values are of the specified type T.
+        4. Type-safe: Enforces that all values are of the specified type T. I really wanted to make this work strictly for subtypes too, but it quickly became unsustainably complex. So for now, it only enforces the top-level type.
 
     Example:
     ```python
@@ -242,13 +245,15 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
             return lambda item: type(item)(iter(item))  # type: ignore
         return lambda item: item  # no-op copy
 
-    def get(self, key: KeyT, default: Any = None) -> T | None:
+    @override
+    def get(self, key: KeyT, default: Any = None) -> T | None:  # ty:ignore[invalid-method-override]
         """Get a value from the store."""
         if item := self.store.get(key):
             return self._get_copy_strategy(item) if self._get_copy_strategy else item
         # Try to recover from trash first, then return default
         return self.store.get(key, default) if self.recover(key) else default
 
+    @override
     def __iter__(self) -> Iterator[KeyT]:  # ty:ignore[invalid-method-override]
         """Return an iterator over the keys in the store."""
         return iter(self.store)
@@ -259,7 +264,8 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
             self.delete(key)
         raise KeyError(key)
 
-    def __getitem__(self, key: KeyT) -> T:
+    @override
+    def __getitem__(self, key: KeyT) -> T:  # ty:ignore[invalid-method-override]
         """Get an item from the store by key."""
         if key in self:
             return cast(T, self.get(key))
@@ -272,7 +278,8 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
     def __len__(self) -> int:
         return len(self.store)
 
-    def __setitem__(self, key: KeyT, value: Any) -> None:
+    @override
+    def __setitem__(self, key: KeyT, value: Any) -> None:  # ty:ignore[invalid-method-override]
         """Set an item in the store by key."""
         self.set(key, value)
 
@@ -313,15 +320,18 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
             value = rand
         return cast(KeyT, self._keygen(value))
 
-    def keys(self) -> KeysView[KeyT]:
+    @override
+    def keys(self) -> KeysView[KeyT]:  # ty:ignore[invalid-method-override]
         """Return the keys in the store."""
         return self.store.keys()
 
-    def values(self) -> ValuesView[T]:
+    @override
+    def values(self) -> ValuesView[T]:  # ty:ignore[invalid-method-override]
         """Return the values in the store."""
         return self.store.values()
 
-    def items(self) -> ItemsView[KeyT, T]:
+    @override
+    def items(self) -> ItemsView[KeyT, T]:  # ty:ignore[invalid-method-override]
         """Return the items in the store."""
         return self.store.items()
 

@@ -19,10 +19,10 @@ from codeweaver.providers import EmbeddingProvider, RerankingProvider, VectorSto
 if TYPE_CHECKING:
     from codeweaver.common import (
         ModelRegistry,
-        PostHogClient,
         ProviderRegistry,
         ServicesRegistry,
         SessionStatistics,
+        TelemetryService,
     )
     from codeweaver.engine import Indexer, VectorStoreFailoverManager
 
@@ -281,9 +281,9 @@ async def get_file_watcher(
 
 async def get_telemetry(settings: SettingsDep) -> Any:
     """Resolve the telemetry client."""
-    from codeweaver.common import PostHogClient
+    from codeweaver.common import TelemetryService
 
-    return PostHogClient.from_settings(settings)
+    return TelemetryService.from_settings(settings)
 
 
 async def get_state(
@@ -294,7 +294,7 @@ async def get_state(
     model_registry: Annotated["ModelRegistry", Depends(get_model_registry)],
     indexer: Annotated["Indexer", Depends(get_indexer)],
     failover_manager: Annotated["VectorStoreFailoverManager", Depends(get_failover_manager)],
-    telemetry: Annotated["PostHogClient", Depends(get_telemetry)],
+    telemetry: Annotated["TelemetryService", Depends(get_telemetry)],
 ) -> Any:
     """Resolve the application state."""
     from codeweaver.config import Unset
@@ -323,10 +323,10 @@ def setup_default_container(container: Container) -> None:
     """
     from codeweaver.common import (
         ModelRegistry,
-        PostHogClient,
         ProviderRegistry,
         ServicesRegistry,
         SessionStatistics,
+        TelemetryService,
     )
     from codeweaver.config import CodeWeaverSettings
     from codeweaver.engine import (
@@ -358,7 +358,7 @@ def setup_default_container(container: Container) -> None:
     container.register(VectorStoreFailoverManager, get_failover_manager)
     container.register(HealthService, get_health_service)
     container.register(CodeWeaverState, get_state)
-    container.register(PostHogClient, get_telemetry)
+    container.register(TelemetryService, get_telemetry)
     container.register(ChunkingService, get_chunking_service)
 
     # ALSO register the factory functions themselves so Depends(get_...) works

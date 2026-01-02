@@ -42,7 +42,12 @@ from codeweaver.core import create_lazy_getattr
 if TYPE_CHECKING:
     # Import everything for IDE and type checker support
     # These imports are never executed at runtime, only during type checking
-    from codeweaver.common.telemetry.client import SESSION_ID, PostHogClient, get_telemetry_client
+    from codeweaver.common.telemetry.client import (
+        SESSION_ID,
+        TelemetryService,
+        get_telemetry_client,
+    )
+    from codeweaver.common.telemetry.config import TelemetrySettings, get_telemetry_settings
     from codeweaver.common.telemetry.events import (
         SearchEvent,
         SessionEvent,
@@ -51,16 +56,17 @@ if TYPE_CHECKING:
         capture_session_event,
     )
 
-
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
-    "PostHogClient": (__spec__.parent, "client"),
+    "TelemetryService": (__spec__.parent, "client"),
     "SESSION_ID": (__spec__.parent, "client"),
     "SearchEvent": (__spec__.parent, "events"),
     "SessionEvent": (__spec__.parent, "events"),
     "TelemetryEvent": (__spec__.parent, "events"),
+    "TelemetrySettings": (__spec__.parent, "config"),
     "capture_search_event": (__spec__.parent, "events"),
     "capture_session_event": (__spec__.parent, "events"),
     "get_telemetry_client": (__spec__.parent, "client"),
+    "get_telemetry_settings": (__spec__.parent, "config"),
 })
 
 
@@ -68,13 +74,15 @@ __getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
 
 __all__ = (
     "SESSION_ID",
-    "PostHogClient",
     "SearchEvent",
     "SessionEvent",
     "TelemetryEvent",
+    "TelemetryService",
+    "TelemetrySettings",
     "capture_search_event",
     "capture_session_event",
     "get_telemetry_client",
+    "get_telemetry_settings",
 )
 
 

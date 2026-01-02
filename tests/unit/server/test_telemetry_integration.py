@@ -23,7 +23,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from codeweaver.common import PostHogClient
+from codeweaver.common import TelemetryService
 from codeweaver.config import CodeWeaverSettings, TelemetrySettings
 
 
@@ -94,10 +94,10 @@ class TestTelemetryIntegration:
     """Test telemetry integration in server initialization."""
 
     def test_posthog_client_handles_import_error(self) -> None:
-        """Test that PostHogClient gracefully handles missing posthog package."""
+        """Test that TelemetryService gracefully handles missing posthog package."""
         # Temporarily hide posthog module
         with patch.dict(sys.modules, {"posthog": None}):
-            client = PostHogClient(enabled=True)
+            client = TelemetryService(enabled=True)
 
             # Client should be disabled and not raise an error
             assert client.enabled is False
@@ -107,8 +107,8 @@ class TestTelemetryIntegration:
             client.capture("test_event", {"key": "value"})
 
     def test_posthog_client_respects_disabled_setting(self) -> None:
-        """Test that PostHogClient respects enabled=False setting."""
-        client = PostHogClient(enabled=False)
+        """Test that TelemetryService respects enabled=False setting."""
+        client = TelemetryService(enabled=False)
 
         assert client.enabled is False
         assert client._client is None
@@ -126,7 +126,7 @@ class TestTelemetryIntegration:
         mock_settings.telemetry = mock_telemetry
 
         with patch("codeweaver.config", return_value=mock_settings):
-            client = PostHogClient.from_settings()
+            client = TelemetryService.from_settings()
 
             assert client.enabled is False
             assert client._client is None
@@ -142,21 +142,21 @@ class TestTelemetryIntegration:
         mock_settings.telemetry = mock_telemetry
 
         with patch("codeweaver.config", return_value=mock_settings):
-            client = PostHogClient.from_settings()
+            client = TelemetryService.from_settings()
 
             assert client.enabled is False
             assert client._client is None
 
     def test_shutdown_with_no_client(self) -> None:
         """Test that shutdown handles case when client is None."""
-        client = PostHogClient(enabled=False)
+        client = TelemetryService(enabled=False)
 
         # Should not raise an error
         client.shutdown()
 
     def test_shutdown_with_client_error(self) -> None:
         """Test that shutdown handles errors from posthog client."""
-        client = PostHogClient(enabled=False)
+        client = TelemetryService(enabled=False)
         client._client = MagicMock()
         client._client.flush.side_effect = Exception("Test error")
 
@@ -165,7 +165,7 @@ class TestTelemetryIntegration:
 
     def test_capture_never_raises(self) -> None:
         """Test that capture method never raises exceptions."""
-        client = PostHogClient(enabled=False)
+        client = TelemetryService(enabled=False)
         client._client = MagicMock()
         client._client.capture.side_effect = Exception("Test error")
         client.enabled = True  # Force it to try to capture
@@ -183,7 +183,7 @@ class TestTelemetryIntegration:
             def _telemetry_keys(self):
                 return None
 
-        client = PostHogClient(enabled=False)
+        client = TelemetryService(enabled=False)
         obj = TestModel()
 
         # Should not raise an error even when disabled
@@ -206,7 +206,7 @@ class TestTelemetryIntegration:
             duration_seconds=300.0,
         )
 
-        client = PostHogClient(enabled=False)
+        client = TelemetryService(enabled=False)
 
         # Should not raise an error even when disabled
         client.capture_from_event(event)
@@ -394,7 +394,7 @@ class TestContextManagement:
 
     def test_start_session(self) -> None:
         """Test start_session initializes context."""
-        client = PostHogClient(enabled=False)
+        client = TelemetryService(enabled=False)
 
         # Should not raise even when disabled
         client.start_session({"version": "0.5.0"})
@@ -404,14 +404,14 @@ class TestContextManagement:
 
     def test_end_session(self) -> None:
         """Test end_session cleans up context."""
-        client = PostHogClient(enabled=False)
+        client = TelemetryService(enabled=False)
 
         # Should not raise even when disabled
         client.end_session()
 
     def test_context_manager(self) -> None:
-        """Test PostHogClient works as context manager."""
-        with PostHogClient(enabled=False) as client:
+        """Test TelemetryService works as context manager."""
+        with TelemetryService(enabled=False) as client:
             assert client.enabled is False
             client.capture("test_event", {"key": "value"})
 
@@ -419,7 +419,7 @@ class TestContextManagement:
 
     def test_feature_flag_returns_none_when_disabled(self) -> None:
         """Test feature flag returns None when client is disabled."""
-        client = PostHogClient(enabled=False)
+        client = TelemetryService(enabled=False)
 
         result = client.get_feature_flag("test-flag")
 
@@ -427,7 +427,7 @@ class TestContextManagement:
 
     def test_get_all_feature_flags_returns_empty_when_disabled(self) -> None:
         """Test get_all_feature_flags returns empty dict when disabled."""
-        client = PostHogClient(enabled=False)
+        client = TelemetryService(enabled=False)
 
         result = client.get_all_feature_flags()
 

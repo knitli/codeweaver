@@ -3,7 +3,7 @@
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
 
-"""Types for CodeWeaver infrastructure package."""
+"""Types for CodeWeaver's statistics."""
 
 from __future__ import annotations
 

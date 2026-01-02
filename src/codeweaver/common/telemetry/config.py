@@ -34,7 +34,7 @@ from typing import Annotated, Any, NotRequired, TypedDict
 
 from pydantic import Field, HttpUrl, PositiveInt, PrivateAttr, SecretStr
 
-from codeweaver.config._project import CODEWEAVER_POSTHOG_PROJECT_KEY
+from codeweaver.common.telemetry._project import CODEWEAVER_POSTHOG_PROJECT_KEY
 from codeweaver.core import UNSET, BasedModel, LiteralStringT, Unset
 
 

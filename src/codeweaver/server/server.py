@@ -26,10 +26,10 @@ from codeweaver import __version__ as version
 from codeweaver.common import (
     HttpClientPool,
     ModelRegistry,
-    PostHogClient,
     ProviderRegistry,
     ServicesRegistry,
     SessionStatistics,
+    TelemetryService,
 )
 from codeweaver.config import CodeWeaverSettings
 from codeweaver.core import (
@@ -160,7 +160,7 @@ class CodeWeaverState(DataclassSerializationMixin):
         description="Optional HTTP middleware stack to CodeWeaver's management and http mcp servers.",
     )
 
-    telemetry: Annotated[PostHogClient | None, PrivateAttr(default=None)]
+    telemetry: Annotated[TelemetryService | None, PrivateAttr(default=None)]
 
     http_pool: Annotated[
         HttpClientPool | None,
@@ -452,9 +452,9 @@ async def _initialize_cw_state(
 
     # Ensure telemetry is initialized
     if not state.telemetry:
-        from codeweaver.common import PostHogClient
+        from codeweaver.common import TelemetryService
 
-        state.telemetry = PostHogClient.from_settings(state.settings)
+        state.telemetry = TelemetryService.from_settings(state.settings)
 
     # Start telemetry session with metadata
     if state.telemetry and state.telemetry.enabled:

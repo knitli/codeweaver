@@ -8,45 +8,63 @@
 from __future__ import annotations
 
 import contextlib
+import importlib
 import os
 
-from typing import TYPE_CHECKING, Literal, NotRequired, TypedDict, cast
+from types import MappingProxyType
+from typing import TYPE_CHECKING, Literal, cast
+
+from beartype.typing import Any, TypedDict
 
 from codeweaver.core.types.enum import BaseEnum
+from codeweaver.core.utils.lazy_import import LazyImport, lazy_import
 
 
 if TYPE_CHECKING:
     from codeweaver.core.types.env import EnvVarInfo as ProviderEnvVarInfo
+    from codeweaver.core.types.env import ProviderEnvVars, VariableInfo
+
+if TYPE_CHECKING and importlib.util.find_spec("sentence-transformers") is not None:
+    from sentence_transformers import CrossEncoder, SentenceTransformer, SparseEncoder
+else:
+    SentenceTransformer = Any
+    CrossEncoder = Any
+    SparseEncoder = Any
+
+if TYPE_CHECKING and (
+    importlib.util.find_spec("fastembed") is not None
+    or importlib.util.find_spec("fastembed-gpu") is not None
+):
+    from fastembed.rerank.cross_encoder import TextCrossEncoder
+    from fastembed.sparse import SparseTextEmbedding
+    from fastembed.text import TextEmbedding
+else:
+    TextEmbedding = Any
+    TextCrossEncoder = Any
+    SparseTextEmbedding = Any
 
 
-class ProviderEnvVars(TypedDict, total=False):
-    """Provides information about environment variables used by a provider's client that are not part of CodeWeaver's settings.
+class LazyImportDict(TypedDict):
+    """A typed dict for lazy imports when a client provider has multiple possible clients.
 
-    You can optionally use these to configure the provider's client, or you can use the equivalent CodeWeaver environment variables or settings.
-
-    Each setting is a tuple of the form `(env_var_name, description)`, where `env_var_name` is the name of the environment variable and `description` is a brief description of what it does or the expected format.
+    This class specifically is kind of an abstract base class for such dicts.
     """
 
-    note: NotRequired[str]
-    api_key: NotRequired[ProviderEnvVarInfo]
-    host: NotRequired[ProviderEnvVarInfo]
-    """URL or hostname of the provider's API endpoint."""
-    endpoint: NotRequired[ProviderEnvVarInfo]
-    """A customer-specific endpoint hostname for the provider's API."""
-    log_level: NotRequired[ProviderEnvVarInfo]
-    tls_cert_path: NotRequired[ProviderEnvVarInfo]
-    tls_key_path: NotRequired[ProviderEnvVarInfo]
-    tls_on_off: NotRequired[ProviderEnvVarInfo]
-    tls_version: NotRequired[ProviderEnvVarInfo]
-    config_path: NotRequired[ProviderEnvVarInfo]
-    region: NotRequired[ProviderEnvVarInfo]
-    account_id: NotRequired[ProviderEnvVarInfo]
 
-    port: NotRequired[ProviderEnvVarInfo]
-    path: NotRequired[ProviderEnvVarInfo]
-    oauth: NotRequired[ProviderEnvVarInfo]
+class FastembedClientLazyImportDict(LazyImportDict):
+    """A typed dict for lazy imports for Fastembed client providers."""
 
-    other: NotRequired[dict[str, ProviderEnvVarInfo]]
+    embed: LazyImport[TextEmbedding]
+    sparse: LazyImport[SparseTextEmbedding]
+    reranking: LazyImport[TextCrossEncoder]
+
+
+class SentenceTransformersLazyImportDict(LazyImportDict):
+    """A typed dict for lazy imports for Sentence Transformers client providers."""
+
+    embed: LazyImport[SentenceTransformer]
+    sparse: LazyImport[SparseEncoder]
+    reranking: LazyImport[CrossEncoder]
 
 
 class ProviderKind(BaseEnum):
@@ -60,40 +78,94 @@ class ProviderKind(BaseEnum):
     AGENT = "agent"
     UNSET = "unset"
 
+class SDKClient(BaseEnum):
+    """Enumeration of available SDK clients.
+
+    There's not a 1-to-1 match of Provider to SDKClient, because some providers
+    use the same SDK client (like OpenAI, which has 10+ providers using their SDK, at least for agents).
+    """
+
+    BEDROCK = "bedrock"
+    COHERE = "cohere"
+    FASTEMBED = "fastembed"
+    GOOGLE = "google"
+    HUGGINGFACE_INFERENCE = "hf_inference"
+    MISTRAL = "mistral"
+    OPENAI = "openai"
+    QDRANT = "qdrant"
+    SENTENCE_TRANSFORMERS = "sentence-transformers"
+
+    @property
+    def client(  # noqa: C901
+        self,
+    ) -> LazyImport[Any] | FastembedClientLazyImportDict | SentenceTransformersLazyImportDict:
+        """Get a lazy import for the SDK client (not the provider class)."""
+        match self:
+            case SDKClient.BEDROCK:
+                return lazy_import("boto3", "client")
+            case SDKClient.COHERE:
+                return lazy_import("cohere", "AsyncClientV2")
+            case SDKClient.FASTEMBED:
+                return FastembedClientLazyImportDict(
+                    embed=lazy_import("fastembed.text", "TextEmbedding"),
+                    sparse=lazy_import("fastembed.sparse", "SparseTextEmbedding"),
+                    reranking=lazy_import("fastembed.rerank.cross_encoder", "TextCrossEncoder"),
+                )
+            case SDKClient.GOOGLE:
+                return lazy_import("google.genai", "Client")
+            case SDKClient.HUGGINGFACE_INFERENCE:
+                return lazy_import("huggingface_hub", "AsyncInferenceClient")
+            case SDKClient.MISTRAL:
+                return lazy_import("mistralai", "Mistral")
+            case SDKClient.OPENAI:
+                return lazy_import("openai", "AsyncOpenAI")
+            case SDKClient.QDRANT:
+                return lazy_import("qdrant_client", "AsyncQdrantClient")
+            case SDKClient.SENTENCE_TRANSFORMERS:
+                return SentenceTransformersLazyImportDict(
+                    embed=lazy_import("sentence_transformers", "SentenceTransformer"),
+                    sparse=lazy_import("sentence_transformers", "SparseEncoder"),
+                    reranking=lazy_import("sentence_transformers", "CrossEncoder"),
+                )
+            case SDKClient.VOYAGE:
+                return lazy_import("voyageai.client_async", "AsyncClient")
+            case _:
+                raise ValueError(f"Unsupported SDK client: {self.value}")
+
 
 class Provider(BaseEnum):
     """Enumeration of available providers."""
 
-    VOYAGE = "voyage"
-    FASTEMBED = "fastembed"
-    QDRANT = "qdrant"
-    MEMORY = "memory"
     ANTHROPIC = "anthropic"
-    BEDROCK = "bedrock"
-    COHERE = "cohere"
-    GOOGLE = "google"
-    X_AI = "x-ai"
-    HUGGINGFACE_INFERENCE = "hf-inference"
-    SENTENCE_TRANSFORMERS = "sentence-transformers"
-    MISTRAL = "mistral"
-    OPENAI = "openai"
     AZURE = "azure"
+    BEDROCK = "bedrock"
     CEREBRAS = "cerebras"
+    COHERE = "cohere"
     DEEPSEEK = "deepseek"
+    DUCKDUCKGO = "duckduckgo"
+    FASTEMBED = "fastembed"
     FIREWORKS = "fireworks"
     GITHUB = "github"
+    GOOGLE = "google"
     GROQ = "groq"
     HEROKU = "heroku"
+    HUGGINGFACE_INFERENCE = "hf-inference"
     LITELLM = "litellm"
+    MEMORY = "memory"
+    MISTRAL = "mistral"
     MOONSHOT = "moonshot"
+    NOT_SET = "not_set"
     OLLAMA = "ollama"
+    OPENAI = "openai"
     OPENROUTER = "openrouter"
     PERPLEXITY = "perplexity"
+    QDRANT = "qdrant"
+    SENTENCE_TRANSFORMERS = "sentence-transformers"
+    TAVILY = "tavily"
     TOGETHER = "together"
     VERCEL = "vercel"
-    DUCKDUCKGO = "duckduckgo"
-    TAVILY = "tavily"
-    NOT_SET = "not_set"
+    VOYAGE = "voyage"
+    X_AI = "x-ai"
 
     @classmethod
     def validate(cls, value: str) -> BaseEnum:
@@ -115,10 +187,15 @@ class Provider(BaseEnum):
 
         httpx_env_vars = {
             "http_proxy": ProviderEnvVarInfo(
-                env="HTTPS_PROXY", description="HTTP proxy for requests"
+                env="HTTPS_PROXY",
+                description="HTTP proxy for requests",
+                variables=(VariableInfo(variable="proxy", dest="httpx"),),
             ),
             "ssl_cert_file": ProviderEnvVarInfo(
-                env="SSL_CERT_FILE", description="Path to the SSL certificate file for requests"
+                env="SSL_CERT_FILE",
+                description="Path to the SSL certificate file for requests",
+                fmt=EnvFormat.FILEPATH,
+                variables=(VariableInfo(variable="verify", dest="httpx"),),
             ),
         }
         match self:
@@ -126,6 +203,7 @@ class Provider(BaseEnum):
                 return (
                     ProviderEnvVars(
                         note="Qdrant supports setting **all** configuration options using environment variables. Like with CodeWeaver, nested variables are separated by double underscores (`__`). For all options, see [the Qdrant documentation](https://qdrant.tech/documentation/guides/configuration/)",
+                        client=("qdrant",),
                         log_level=ProviderEnvVarInfo(
                             env="QDRANT__LOG_LEVEL",
                             description="Log level for Qdrant service",
@@ -135,35 +213,46 @@ class Provider(BaseEnum):
                             env="QDRANT__SERVICE__API_KEY",
                             is_secret=True,
                             description="API key for Qdrant service",
+                            variable_name="api_key",
                         ),
                         tls_on_off=ProviderEnvVarInfo(
                             env="QDRANT__SERVICE__ENABLE_TLS",
                             description="Enable TLS for Qdrant service, expects truthy or false value (e.g. 1 for on, 0 for off).",
                             fmt=EnvFormat.BOOLEAN,
                             choices={"true", "false"},
+                            variable_name="https",
                         ),
                         tls_cert_path=ProviderEnvVarInfo(
                             env="QDRANT__TLS__CERT",
                             description="Path to the TLS certificate file for Qdrant service. Only needed if using a self-signed certificate. If you're using qdrant-cloud, you don't need this.",
                             fmt=EnvFormat.FILEPATH,
+                            variable_name="kwargs",
+                            variables=(
+                                VariableInfo(variable="verify", dest="client"),
+                                VariableInfo(variable="verify", dest="httpx"),
+                            ),
                         ),
                         host=ProviderEnvVarInfo(
                             env="QDRANT__SERVICE__HOST",
                             description="Hostname of the Qdrant service; do not use for URLs with schemes (e.g. 'http://')",
+                            variable_name="host",
                         ),
                         port=ProviderEnvVarInfo(
                             env="QDRANT__SERVICE__HTTP_PORT",
                             description="Port number for the Qdrant service",
+                            variable_name="port",
                         ),
                     ),
                 )
             case Provider.VOYAGE:
                 return (
                     ProviderEnvVars(
+                        client=("voyage",),
                         api_key=ProviderEnvVarInfo(
                             env="VOYAGE_API_KEY",
                             is_secret=True,
                             description="API key for Voyage service",
+                            variable_name="api_key",
                         ),
                         **httpx_env_vars,
                     ),
@@ -173,34 +262,49 @@ class Provider(BaseEnum):
                 return (
                     ProviderEnvVars(
                         note="These variables are for the Azure OpenAI service. (OpenAI models on Azure)",
+                        client=("openai",),
                         api_key=ProviderEnvVarInfo(
                             env="AZURE_OPENAI_API_KEY",
                             is_secret=True,
                             description="API key for Azure OpenAI service (OpenAI models on Azure)",
+                            variables=(
+                                VariableInfo(variable="api_key", dest="client"),
+                                VariableInfo(variable="api_key", dest="provider_settings"),
+                            ),
                         ),
                         endpoint=ProviderEnvVarInfo(
                             env="AZURE_OPENAI_ENDPOINT",
                             description="Endpoint for Azure OpenAI service (OpenAI models on Azure)",
+                            variables=(
+                                VariableInfo(variable="base_url", dest="client"),
+                                VariableInfo(variable="endpoint", dest="provider_settings"),
+                            ),
                         ),
                         region=ProviderEnvVarInfo(
                             env="AZURE_OPENAI_REGION",
                             description="Region for Azure OpenAI service (OpenAI models on Azure)",
+                            variables=(VariableInfo(variable="region_name", dest="provider"),),
                         ),
                         **httpx_env_vars,
                     ),
                     ProviderEnvVars(
                         note="These variables are for the Azure Cohere service.",
+                        client=("cohere",),
                         api_key=ProviderEnvVarInfo(
                             env="AZURE_COHERE_API_KEY",
                             is_secret=True,
                             description="API key for Azure Cohere service (cohere models on Azure)",
+                            variable_name="api_key",
                         ),
                         endpoint=ProviderEnvVarInfo(
                             env="AZURE_COHERE_ENDPOINT",
                             description="Endpoint for Azure Cohere service (cohere models on Azure)",
+                            variable_name="base_url",
                         ),
                         region=ProviderEnvVarInfo(
-                            env="AZURE_COHERE_REGION", description="Region for Azure Cohere service"
+                            env="AZURE_COHERE_REGION",
+                            description="Region for Azure Cohere service",
+                            variable_name="region_name",
                         ),
                         **httpx_env_vars,
                     ),
@@ -210,30 +314,36 @@ class Provider(BaseEnum):
                 return (
                     ProviderEnvVars(
                         note="You may also use the OpenAI-compatible environment variables with Vercel, since it uses the OpenAI client.",
+                        client=("openai",),
                         api_key=ProviderEnvVarInfo(
                             env="AI_GATEWAY_API_KEY",
                             is_secret=True,
                             description="API key for Vercel service",
+                            variable_name="api_key",
                         ),
                         other=httpx_env_vars,
                     ),
                     ProviderEnvVars(
+                        client=("openai",),
                         api_key=ProviderEnvVarInfo(
                             env="VERCEL_OIDC_TOKEN",
                             is_secret=True,
                             description="OIDC token for Vercel service",
-                        )
+                            variable_name="api_key",
+                        ),
                     ),
                     cast(ProviderEnvVars, *type(self).OPENAI.other_env_vars),
                 )
             case Provider.TOGETHER:
                 return (
                     ProviderEnvVars(
+                        client=("openai",),
                         note="These variables are for the Together service.",
                         api_key=ProviderEnvVarInfo(
                             env="TOGETHER_API_KEY",
                             is_secret=True,
                             description="API key for Together service",
+                            variable_name="api_key",
                         ),
                         other=httpx_env_vars,
                     ),
@@ -242,32 +352,41 @@ class Provider(BaseEnum):
             case Provider.HEROKU:
                 return (
                     ProviderEnvVars(
+                        client=("openai", "cohere"),
                         note="These variables are for the Heroku service.",
                         api_key=ProviderEnvVarInfo(
                             env="INFERENCE_KEY",
                             is_secret=True,
                             description="API key for Heroku service",
+                            variable_name="api_key",
                         ),
                         host=ProviderEnvVarInfo(
-                            env="INFERENCE_URL", description="Host URL for Heroku service"
+                            env="INFERENCE_URL",
+                            description="Host URL for Heroku service",
+                            variable_name="base_url",
                         ),
                         other={
                             "model_id": ProviderEnvVarInfo(
-                                env="INFERENCE_MODEL_ID", description="Model ID for Heroku service"
+                                env="INFERENCE_MODEL_ID",
+                                description="Model ID for Heroku service",
+                                variables=(VariableInfo(variable="model", dest="embed"),),
                             ),
                             **httpx_env_vars,
                         },
                     ),
                     cast(ProviderEnvVars, *type(self).OPENAI.other_env_vars),
+                    cast(ProviderEnvVars, *type(self).COHERE.other_env_vars),
                 )
             case Provider.DEEPSEEK:
                 return (
                     ProviderEnvVars(
                         note="These variables are for the DeepSeek service.",
+                        client=("openai",),
                         api_key=ProviderEnvVarInfo(
                             env="DEEPSEEK_API_KEY",
                             is_secret=True,
                             description="API key for DeepSeek service",
+                            variable_name="api_key",
                         ),
                         other=httpx_env_vars,
                     ),
@@ -287,11 +406,13 @@ class Provider(BaseEnum):
             ):
                 return (
                     ProviderEnvVars(
+                        client=("openai",),
                         note="These variables are for any OpenAI-compatible service, including OpenAI itself, Azure OpenAI, and others -- any provider that we use the OpenAI client to connect to.",
                         api_key=ProviderEnvVarInfo(
                             env="OPENAI_API_KEY",
                             description="API key for OpenAI-compatible services (not necessarily an API key *for* OpenAI). The OpenAI client also requires an API key, even if you don't actually need one for your provider (like local Ollama). So provide a dummy key if needed.",
                             is_secret=True,
+                            variable_name="api_key",
                         ),
                         log_level=ProviderEnvVarInfo(
                             env="OPENAI_LOG",
@@ -301,15 +422,20 @@ class Provider(BaseEnum):
                         other=httpx_env_vars
                         | {
                             "organization": ProviderEnvVarInfo(
-                                env="OPENAI_ORG_ID", description="Organization ID for OpenAI."
+                                env="OPENAI_ORG_ID",
+                                description="Organization ID for OpenAI.",
+                                variable_name="organization",
                             ),
                             "project": ProviderEnvVarInfo(
                                 env="OPENAI_PROJECT_ID",
                                 description="An openai project id for tracking usage.",
+                                variable_name="project",
                             ),
                             "webhook_secret": ProviderEnvVarInfo(
                                 env="OPENAI_WEBHOOK_SECRET",
                                 description="Webhook secret for verifying incoming webhooks from OpenAI.",
+                                is_secret=True,
+                                variable_name="webhook_secret",
                             ),
                         },
                     ),
@@ -317,9 +443,13 @@ class Provider(BaseEnum):
             case Provider.HUGGINGFACE_INFERENCE:
                 return (
                     ProviderEnvVars(
+                        client=("hf_inference",),
                         note="Hugging Face allows for setting many configuration options by environment variable. See [the Hugging Face documentation](https://huggingface.co/docs/huggingface_hub/package_reference/environment_variables) for more details.",
                         api_key=ProviderEnvVarInfo(
-                            env="HF_TOKEN", description="API key/token for Hugging Face service"
+                            env="HF_TOKEN",
+                            description="API key/token for Hugging Face service",
+                            variable_name="token",
+                            is_secret=True,
                         ),
                         log_level=ProviderEnvVarInfo(
                             env="HF_HUB_VERBOSITY",
@@ -333,11 +463,12 @@ class Provider(BaseEnum):
                 return (
                     (
                         ProviderEnvVars(
+                            client=("bedrock",),
                             note="AWS allows for setting many configuration options by environment variable. See [the AWS documentation](https://boto3.amazonaws.com/v1/documentation/api/latest/guide/configuration.html#using-environment-variables) for more details. Because AWS has multiple authentication methods, and ways to configure settings, we don't provide them here. We'd just confuse people. Unlike other providers, we also don't check for AWS's environment variables, we just assume you're authorized to do what you need to do.",
                             region=ProviderEnvVarInfo(
                                 env="AWS_REGION",
                                 description="AWS region for Bedrock service",
-                                variable_name="region",
+                                variable_name="region_name",
                             ),
                             account_id=ProviderEnvVarInfo(
                                 env="AWS_ACCOUNT_ID",
@@ -364,11 +495,17 @@ class Provider(BaseEnum):
             case Provider.COHERE:
                 return (
                     ProviderEnvVars(
+                        client=("cohere",),
                         api_key=ProviderEnvVarInfo(
-                            env="COHERE_API_KEY", description="Your Cohere API Key"
+                            env="COHERE_API_KEY",
+                            description="Your Cohere API Key",
+                            is_secret=True,
+                            variable_name="api_key",
                         ),
                         host=ProviderEnvVarInfo(
-                            env="CO_API_URL", description="Host URL for Cohere service"
+                            env="CO_API_URL",
+                            description="Host URL for Cohere service",
+                            variable_name="base_url",
                         ),
                         other=httpx_env_vars,
                     ),
@@ -376,8 +513,12 @@ class Provider(BaseEnum):
             case Provider.TAVILY:
                 return (
                     ProviderEnvVars(
+                        client=("tavily",),
                         api_key=ProviderEnvVarInfo(
-                            env="TAVILY_API_KEY", description="Your Tavily API Key"
+                            env="TAVILY_API_KEY",
+                            description="Your Tavily API Key",
+                            is_secret=True,
+                            variable_name="api_key",
                         ),
                         other=httpx_env_vars,
                     ),
@@ -385,22 +526,34 @@ class Provider(BaseEnum):
             case Provider.GOOGLE:
                 return (
                     ProviderEnvVars(
+                        client=("google",),
                         api_key=ProviderEnvVarInfo(
-                            env="GEMINI_API_KEY", description="Your Google Gemini API Key"
+                            env="GEMINI_API_KEY",
+                            description="Your Google Gemini API Key",
+                            is_secret=True,
+                            variable_name="api_key",
                         ),
                         other=httpx_env_vars,
                     ),
                     ProviderEnvVars(
+                        client=("google",),
                         api_key=ProviderEnvVarInfo(
-                            env="GOOGLE_API_KEY", description="Your Google API Key"
-                        )
+                            env="GOOGLE_API_KEY",
+                            description="Your Google API Key",
+                            is_secret=True,
+                            variable_name="api_key",
+                        ),
                     ),
                 )
             case Provider.MISTRAL:
                 return (
                     ProviderEnvVars(
+                        client=("mistral",),
                         api_key=ProviderEnvVarInfo(
-                            env="MISTRAL_API_KEY", description="Your Mistral API Key"
+                            env="MISTRAL_API_KEY",
+                            description="Your Mistral API Key",
+                            is_secret=True,
+                            variable_name="api_key",
                         ),
                         other=httpx_env_vars,
                     ),
@@ -514,6 +667,28 @@ class Provider(BaseEnum):
                     found_vars.extend((p, var_info) for var_info in cls._flatten_envvars(v))
         return tuple(found_vars)
 
+    def all_envs_for_client(
+        self,
+        client: Literal[
+            "bedrock",
+            "cohere",
+            "fastembed",
+            "google",
+            "hf_inference",
+            "mistral",
+            "openai",
+            "qdrant",
+            "sentence-transformers",
+        ],
+    ) -> tuple[ProviderEnvVarInfo, ...]:
+        """Get all environment variables used by this provider for a specific client."""
+        found_vars: list[ProviderEnvVarInfo] = []
+        if envs := self.other_env_vars:
+            for env_vars_dict in envs:
+                if "client" in env_vars_dict and client in env_vars_dict["client"]:
+                    found_vars.extend(self._flatten_envvars(env_vars_dict))
+        return tuple(found_vars)
+
     def is_embedding_provider(self) -> bool:
         """Check if the provider is an embedding provider."""
         return any(kind == ProviderKind.EMBEDDING for kind in get_provider_kinds(self))
@@ -554,8 +729,49 @@ class Provider(BaseEnum):
         return False
 
 
-from types import MappingProxyType
-
+SDK_MAP: MappingProxyType[tuple[Provider, ProviderKind], SDKClient | tuple[SDKClient, ...]] = MappingProxyType(
+    {(provider, ProviderKind.EMBEDDING): SDKClient.OPENAI for provider in (
+        Provider.FIREWORKS,
+        Provider.GITHUB,
+        Provider.GROQ,
+        Provider.LITELLM,
+        Provider.OLLAMA,
+        Provider.OPENAI,
+        Provider.OPENROUTER,
+        Provider.TOGETHER,
+        Provider.VERCEL,
+    )} |
+    {
+        (Provider.AZURE, ProviderKind.EMBEDDING): (SDKClient.OPENAI, SDKClient.COHERE),
+        (Provider.HEROKU, ProviderKind.EMBEDDING): (SDKClient.OPENAI, SDKClient.COHERE),
+    }
+    | {
+        (provider, ProviderKind.EMBEDDING): SDKClient.from_string(provider.variable)
+        for provider in (Provider.MISTRAL, Provider.HUGGINGFACE_INFERENCE, Provider.GOOGLE)
+    }
+    | {
+        (provider, kind): SDKClient.from_string(provider.variable)
+        for provider, kind in (
+            (prov, knd)
+            for prov in (Provider.BEDROCK, Provider.COHERE, Provider.VOYAGE)
+            for knd in (ProviderKind.EMBEDDING, ProviderKind.RERANKING)
+        )
+    }
+    | {
+        (provider, kind): SDKClient.from_string(provider.variable)
+        for provider in (Provider.FASTEMBED, Provider.SENTENCE_TRANSFORMERS)
+        for kind in (
+            ProviderKind.EMBEDDING,
+            ProviderKind.SPARSE_EMBEDDING,
+            ProviderKind.RERANKING,
+        )
+    }
+    | {
+        (Provider.QDRANT, ProviderKind.VECTOR_STORE): SDKClient.QDRANT,
+    }
+    | {(Provider.MEMORY, ProviderKind.VECTOR_STORE): SDKClient.QDRANT},
+)
+"""Mapping of providers and their kinds to SDK clients. Currently only handles embedding/sparse_embedding/reranking/vector_store kinds."""
 
 PROVIDER_CAPABILITIES: MappingProxyType[Provider, tuple[ProviderKind, ...]] = MappingProxyType({
     Provider.ANTHROPIC: (ProviderKind.AGENT,),
@@ -609,6 +825,49 @@ def get_provider_kinds(provider: Provider) -> tuple[ProviderKind, ...]:
     return PROVIDER_CAPABILITIES.get(provider, (ProviderKind.DATA,))
 
 
+type LiteralProviderKind = Literal[
+    ProviderKind.AGENT,
+    ProviderKind.DATA,
+    ProviderKind.EMBEDDING,
+    ProviderKind.RERANKING,
+    ProviderKind.SPARSE_EMBEDDING,
+    ProviderKind.VECTOR_STORE,
+]
+type LiteralProvider = Literal[
+    Provider.ANTHROPIC,
+    Provider.AZURE,
+    Provider.BEDROCK,
+    Provider.CEREBRAS,
+    Provider.COHERE,
+    Provider.DEEPSEEK,
+    Provider.DUCKDUCKGO,
+    Provider.FASTEMBED,
+    Provider.FIREWORKS,
+    Provider.GITHUB,
+    Provider.GOOGLE,
+    Provider.GROQ,
+    Provider.HEROKU,
+    Provider.HUGGINGFACE_INFERENCE,
+    Provider.LITELLM,
+    Provider.MISTRAL,
+    Provider.MOONSHOT,
+    Provider.OLLAMA,
+    Provider.OPENAI,
+    Provider.OPENROUTER,
+    Provider.PERPLEXITY,
+    Provider.QDRANT,
+    Provider.SENTENCE_TRANSFORMERS,
+    Provider.TAVILY,
+    Provider.TOGETHER,
+    Provider.VERCEL,
+    Provider.VOYAGE,
+    Provider.X_AI,
+]
+
+type ProviderKindLiteral = Literal[
+    "agent", "data", "embedding", "reranking", "sparse_embedding", "vector_store"
+]
+
 type ProviderLiteral = Literal[
     "anthropic",
     "azure",
@@ -641,5 +900,18 @@ type ProviderLiteral = Literal[
     "x_ai",
 ]
 
+type LiteralProviderKindType = ProviderKindLiteral | LiteralProviderKind
+type LiteralProviderType = ProviderLiteral | LiteralProvider
 
-__all__ = ("Provider", "ProviderKind", "ProviderLiteral", "get_provider_kinds")
+
+__all__ = (
+    "LiteralProvider",
+    "LiteralProviderKind",
+    "LiteralProviderKindType",
+    "LiteralProviderType",
+    "Provider",
+    "ProviderKind",
+    "ProviderKindLiteral",
+    "ProviderLiteral",
+    "get_provider_kinds",
+)

@@ -12,7 +12,6 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     # Import everything for IDE and type checker support
     # These imports are never executed at runtime, only during type checking
-    from codeweaver.common._logging import log_to_client_or_fallback, setup_logger
     from codeweaver.common.http_pool import (
         HttpClientPool,
         PoolLimits,

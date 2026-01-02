@@ -89,7 +89,7 @@ def _set_settings() -> DictView[CodeWeaverSettingsDict]:
 _settings: DictView[CodeWeaverSettingsDict] = _set_settings()
 
 HAS_SENTENCE_TRANSFORMERS = find_spec("sentence_transformers") is not None
-HAS_FASTEMBED = find_spec("fastembed") is not None
+HAS_FASTEMBED = find_spec("fastembed") is not None or find_spec("fastembed-gpu") is not None
 
 
 def _get_configs(

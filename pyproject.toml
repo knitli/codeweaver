@@ -101,46 +101,82 @@ classifiers = [
   "Topic :: Utilities",
   "Typing :: Typed",
 ]
+# Some notes:
+#   - Starting with Alpha 6, we pin client versions to ensure our `ClientOptions` subclasses work correctly.
+#   - We like to stay toward the edge, so we'll update these regularly but ensure they work first.
+#   -
+# tombi: format.rules.array-values-order.disabled = true
 dependencies = [
-  # Core functionality
+  # * ================ Core Dependencies ==================*
+  # aenum used for adding enum members dynamically
+  # Code-Weaver uses enums extensively
   "aenum>=3.1.16",
-  "ast-grep-py>=0.40.1",
   "blake3>=1.0.8",
-  "code-weaver-daemon",
-  "code-weaver-tokenizers",
-  # CLI framework and output
-  "cyclopts>=4.3.0",
-  # onnxruntime currently does not support python 3.14
-  "fastembed>=0.7.4; python_version < '3.14'",
-  # MCP server framework
-  "fastmcp>=2.13.3",
-  "mcp>=1.19.0",
-  # Numerical and ML
-  "numpy>=2.3.5",
-  # Infrastructure and utilities
-  "posthog>=7.0.1",
-  "psutil>=7.1.3",
-  # Core data models and validation
-  "py-cpuinfo>=9.0.0",
   "pydantic>=2.12.5",
-  "pydantic-ai-slim>=1.30.1",
-  "pydantic-graph>=1.30.1",
-  "pydantic-settings[toml,yaml]>=2.12.0",  # Pulls: tomli>=2.0.1, pyyaml>=6.0.1
-  "qdrant-client>=1.16.1",
-  "rich>=14.2.0",
-  "rignore>=0.7.6",
-  # until onnxruntime supports python 3.14, we'll substitute fastembed with sentence-transformers for 3.14 to keep equivalent functionality
-  # this is less than desirable because sentence-transformers is a *very heavy* dependency compared to fastembed
-  "sentence-transformers>=5.1.2; python_version <= '3.14'",
-  "tenacity>=9.1.2",
+  # psutil used for resource governance/limiting by engine
+  "psutil>=7.2.1",
   "textcase>=0.4.5",
-  "tomli-w>=1.2.0",
   "typing_extensions>=4.15.0",
   "uuid7>=0.1.0; python_version < '3.14'",
-  "uvicorn[standard]>=0.38.0",
   "uvloop>=0.22.1; python_implementation == 'CPython' and platform_system != 'Windows'",
-  "voyageai>=0.3.5",
+  # * ================ Core Provider Dependencies ==================*
+  # tokenizers used by stats, telemetry, and all embed/rerank providers (for stats)
+  # no easy way to currently separate out stats-only usage from embedding/rerank usage
+  "code-weaver-tokenizers",
+  # numpy needed for all embedding providers
+  "numpy>=2.4.0",
+  # retries
+  "tenacity>=9.1.2",
+  # for local providers (sentence-transformers, fastembed) to detect CPU/GPU features
+  "py-cpuinfo>=9.0.0",
+  # * ================ CLI Dependencies ==================*
+  "cyclopts>=4.4.3",
+  "rich>=14.2.0",
+  # * ================ Provider Clients ==================*
+  # we must pin these to specific versions to ensure compatibility with our ClientOptions subclasses
+  "types-boto3-custom",
+  "boto3==1.42.19",
+  "cohere==5.20.1",
+  "fastembed==0.7.4; python_version < '3.14'",
+  "google-genai==1.56.0",
+  "huggingface-hub==0.36.0",
+  "mistralai==1.10.0",
+  "openai==2.14.0",
+  "qdrant-client==1.16.2",
+  "pydantic-ai-slim>=1.39.0",
+  "sentence-transformers==5.2.0; python_version <= '3.14'",
+  "voyageai==0.3.7",
+  # * ================ Indexing and Engine ==================*
+  # Also known as: the land of python rust extensions
+  # the core code-weaver-daemon package that keeps indexing continuously updated
+  "code-weaver-daemon",
+  # performant rust-based file walker with .gitignore support (pyO3 extensions for `ignore` crate)
+  "rignore>=0.7.6",
+  # performant rust-based file watcher
   "watchfiles>=1.1.1",
+  # for semantic indexing, but also required for the Semantic package, unsurprisingly
+  # also rust-based.
+  "ast-grep-py>=0.40.3",
+  # * ================ Server and MCP Server Framework ==================*
+  # fastmcp is the core MCP server framework
+  "fastmcp>=2.14.0",
+  # just used for types but we need them at runtime for Pydantic models
+  "mcp>=1.19.0",
+  # Runs the core admin/management server
+  "uvicorn[standard]>=0.40.0",
+  # * ================ Configuration and Settings ==================*
+  # pydantic-settings with toml and yaml support for config files
+  "pydantic-settings[toml,yaml]>=2.12.0",  # Pulls: tomli>=2.0.1, pyyaml>=6.0.1
+  # For writing toml config files
+  "tomli-w>=1.2.0",
+  # * ================ Telemetry and Observability ==================*
+  # It's telemetry. Our implementation is lightweight and privacy-focused.
+  "posthog>=7.4.2",
+
+  #! Not yet used, but planned for future releases
+  # * ================ Future Dependencies ==================*
+  # for advanced pipeline management and orchestration
+  # "pydantic-graph>=1.39.0",
 ]
 dynamic = ["version"]
 
@@ -196,7 +232,7 @@ full = [
   "pydantic-ai-slim[openai,cohere,google,anthropic,groq,mistral,bedrock,huggingface,duckduckgo,tavily,retries]",
   "pydantic-settings[yaml,toml,aws-secrets-manager,azure-key-vault,gcp-secret-manager]",
   "permit-fastmcp",
-  "sentence-transformers>=5.1.2",
+  "sentence-transformers",
   "types-boto3-custom",
 ]
 full-gpu = [
@@ -272,11 +308,10 @@ voyageai = ["voyageai"]
 dev = [
   # black is used to format generated code
   "black>=25.12.0",
-  "ruff>=0.14.8",
+  "ruff>=0.14.10",
   "serena>=0.9.1",
-  "ty>=0.0.1a31",
-  "types-boto3-custom",
-  "uv>=0.9.17",
+  "ty>=0.0.8",
+  "uv>=0.9.21",
 ]
 build = ["hatchling>=1.27.0", "twine>=6.2.0", "uv-dynamic-versioning>=0.11.2"]
 dev-helpers = [
@@ -307,7 +342,7 @@ test = [
 requires = [
   "hatchling>=1.28.0",
   "twine>=6.2.0",
-  "uv-dynamic-versioning>=0.11.2"
+  "uv-dynamic-versioning>=0.12.0"
 ]
 build-backend = "hatchling.build"
 
@@ -315,7 +350,16 @@ build-backend = "hatchling.build"
 #  - readme: https://github.com/hynek/hatch-fancy-pypi-readme
 
 [tool.coverage.run]
-omit = ["scripts/*", "mise-tasks/*", "typings/*", ".venv/*"]
+omit = [
+  "scripts/*",
+  "mise-tasks/*",
+  "typings/*",
+  ".venv/*",
+  "tests/*",
+  "vendored/*",
+  "src/codeweaver/__init__.py",
+  "src/codeweaver/**/__init__.py"
+]
 
 [tool.hatch.build.hooks.version]
 additionalProperties = true
@@ -363,10 +407,12 @@ include = [
   "SECURITY.md",
   "context7.json",
   "context7.json.license",
+  "packages/**",
   "pyproject.toml",
   "sbom.spdx",
   "schema/**",
   "src/**",
+  "tests/**",
   "typings/**",
   "uv.lock",
   "uv.lock.license",
@@ -482,7 +528,7 @@ timeout_func_only = true  # Only apply timeout to test functions, not setup/tear
 
 [tool.ty.environment]
 python-version = "3.12"
-root = ["./src", "./tests", "./scripts", "./mise-tasks"]
+root = ["./src", "./tests", "./scripts", "./mise-tasks", "./packages"]
 python = "./.venv"
 extra-paths = ["./typings"]
 
@@ -507,9 +553,9 @@ redundant-cast = "ignore"  # Informational only, not bugs
 unresolved-import = "warn"  # Downgrade to warn for optional dependencies
 
 [tool.ty.src]
-include = ["./src", "./tests", "./scripts", "./mise-tasks"]
+include = ["./src", "./tests", "./scripts", "./mise-tasks", "./packages"]
 # Exclude vendored code, typings, and intentionally malformed test fixtures
-exclude = ["./typings", "./tests/fixtures/malformed.py"]
+exclude = ["./typings", "./tests/**/malformed.py", "./vendored"]
 
 # === Per-Directory Overrides ===
 # Apply different strictness levels: strict for src/, lenient for scripts/mise-tasks/tests
@@ -548,7 +594,7 @@ unresolved-import = "ignore"  # pytest and other test dependencies may not be in
 unknown-argument = "ignore"  # pytest fixtures inject arguments dynamically
 unresolved-reference = "ignore"  # test fixtures and dynamic test patterns
 unresolved-attribute = "ignore"  # mocks and fixtures have dynamic attributes
-non-subscriptable = "warn"  # Often false positive after pytest assertions
+not-subscriptable = "warn"  # Often false positive after pytest assertions
 unsupported-operator = "warn"  # Type narrowing after assertions not always understood
 missing-argument = "warn"  # Dynamic test patterns and fixtures
 too-many-positional-arguments = "warn"  # Dynamic function calls in tests
@@ -610,10 +656,21 @@ include = ["src/codeweaver/core/types/aliases.py"]
 invalid-newtype = "ignore"
 
 [tool.uv]
+cache-keys = [
+  { file = "uv.lock" },
+  { file = "pyproject.toml" },
+  { dir = "src/codeweaver" },
+  { dir = "tests" },
+  { dir = "packages" },
+]
 conflicts = [
   [{ extra = "full-gpu" }, { extra = "full" }],
-  [{ extra = "fastembed" }, { extra = "fastembed-gpu" }]
+  [{ extra = "full-gpu" }, { package = "fastembed" }],
+  [{ extra = "full" }, { package = "fastembed-gpu" }],
+  [{ extra = "gpu-support" }, { package = "fastembed" }],
+  [{ package = "fastembed" }, { package = "fastembed-gpu" }],
 ]
+preview = true
 
 [tool.uv.workspace]
 members = ["packages/*"]

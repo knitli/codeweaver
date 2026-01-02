@@ -146,7 +146,7 @@ class EmbeddingModelCapabilities(BasedModel):
 from importlib.util import find_spec
 
 
-HAS_FASTEMBED = find_spec("fastembed") is not None
+HAS_FASTEMBED = find_spec("fastembed") is not None or find_spec("fastembed-gpu") is not None
 HAS_ST = find_spec("sentence_transformers") is not None
 
 

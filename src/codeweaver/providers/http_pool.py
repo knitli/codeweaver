@@ -32,6 +32,7 @@ Thread Safety:
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import threading
 
@@ -184,10 +185,8 @@ class HttpClientPool:
         # Fast path: return existing client without lock
         # Use try-except to handle race condition where client could be removed
         # between check and return
-        try:
+        with contextlib.suppress(KeyError):
             return self._clients[name]
-        except KeyError:
-            pass  # Continue to locked creation
 
         # Lazily create asyncio.Lock on first use to avoid event loop binding issues.
         # asyncio.Lock must be created in the same event loop where it will be used.
@@ -261,10 +260,8 @@ class HttpClientPool:
         # Fast path: client already exists
         # Use try-except to handle race condition where client could be removed
         # between check and return
-        try:
+        with contextlib.suppress(KeyError):
             return self._clients[name]
-        except KeyError:
-            pass  # Continue to locked creation
 
         # Slow path: acquire lock and double-check
         with self._sync_lock:

@@ -286,6 +286,11 @@ def validate_regex_pattern(value: re.Pattern[str] | str | None) -> re.Pattern[st
         raise ConfigurationError(f"Invalid regex pattern: {e.args[0]}") from e
 
 
+def variable_to_env_var(var: str) -> str:
+    """Convert a variable name to an environment variable name."""
+    return textcase.screaming_snake(var)
+
+
 __all__ = (
     "elapsed_time_to_human_readable",
     "format_descriptor",
@@ -298,4 +303,5 @@ __all__ = (
     "to_tokens",
     "truncate_text",
     "validate_regex_pattern",
+    "variable_to_env_var",
 )

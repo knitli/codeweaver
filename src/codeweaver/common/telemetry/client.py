@@ -28,12 +28,12 @@ from typing import TYPE_CHECKING, Any, Self
 from pydantic import HttpUrl
 from pydantic.types import SecretStr
 
-from codeweaver.config import CODEWEAVER_POSTHOG_PROJECT_KEY
+from codeweaver.common.telemetry import CODEWEAVER_POSTHOG_PROJECT_KEY
 from codeweaver.core import Unset, UUID7HexT, uuid7
 
 
 if TYPE_CHECKING:
-    from codeweaver.config import CodeWeaverSettings
+    pass
 
 
 NO_HOG = find_spec("posthog") is None
@@ -81,7 +81,7 @@ else:
 logger = logging.getLogger(__name__)
 
 
-class PostHogClient:
+class TelemetryService:
     """
     Privacy-aware PostHog client wrapper with context API support.
 
@@ -91,7 +91,7 @@ class PostHogClient:
     DataclassSerializationMixin objects before passing to capture().
 
     Example:
-        >>> client = PostHogClient.from_settings()
+        >>> client = TelemetryService.from_settings()
         >>> client.start_session({"version": "0.5.0"})
         >>> if client.enabled:
         ...     client.capture("codeweaver_search", {"intent": "UNDERSTAND"})
@@ -164,7 +164,7 @@ class PostHogClient:
             self.logger.info("Telemetry disabled by configuration")
 
     @classmethod
-    def from_settings(cls, settings: CodeWeaverSettings | None = None) -> PostHogClient:
+    def from_settings(cls, settings: TelemetrySettingsDep) -> TelemetryService:
         """
         Create PostHog client from telemetry settings.
 
@@ -175,7 +175,7 @@ class PostHogClient:
 
         settings = get_settings().telemetry  # ty:ignore[invalid-assignment]
         if not isinstance(settings, TelemetrySettings):
-            from codeweaver.config import DefaultTelemetrySettings
+            from codeweaver.common.telemetry.config import DefaultTelemetrySettings
 
             settings = TelemetrySettings.model_validate(DefaultTelemetrySettings)
         if (
@@ -407,14 +407,14 @@ class PostHogClient:
 
 
 @cache
-def get_telemetry_client() -> PostHogClient:
+def get_telemetry_client() -> TelemetryService:
     """
     Get singleton telemetry client instance.
 
     Returns:
         Cached PostHog client configured from settings
     """
-    return PostHogClient.from_settings()
+    return TelemetryService.from_settings()
 
 
-__all__ = ("SESSION_ID", "PostHogClient", "get_telemetry_client")
+__all__ = ("SESSION_ID", "TelemetryService", "get_telemetry_client")

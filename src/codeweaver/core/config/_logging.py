@@ -26,7 +26,8 @@ from typing import (
 
 from pydantic import BeforeValidator, Field, FieldSerializationInfo, PrivateAttr, field_serializer
 
-from codeweaver.core import AnonymityConversion, BasedModel, is_tty, validate_regex_pattern
+from codeweaver.core.types import AnonymityConversion, BasedModel
+from codeweaver.core.utils import is_tty, validate_regex_pattern
 
 
 if TYPE_CHECKING:
@@ -93,7 +94,7 @@ class SerializableLoggingFilter(BasedModel, logging.Filter):
     If you provide a `simple_filter`, any patterns will only be applied to records that pass the simple filter.
     """
 
-    simple_filter: LoggerName | None = Field(
+    simple_filter: LoggerName | logging.Filter | None = Field(
         default_factory=logging.Filter,
         description="""A simple name filter that matches the `name` attribute of a `logging.Logger`. This is equivalent to using `logging.Filter(name)`.""",
     )
@@ -264,6 +265,7 @@ DefaultLoggingSettings: LoggingSettings = {
 
 
 __all__ = (
+    "DefaultLoggingSettings",
     "FilterID",
     "FiltersDict",
     "FormatterID",

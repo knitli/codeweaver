@@ -18,8 +18,8 @@ from codeweaver.core import LazyImport, Provider, ProviderKind, lazy_import
 
 
 if TYPE_CHECKING:
+    from codeweaver.core.types import LiteralProvider, LiteralProviderKind
     from codeweaver.providers.embedding.providers.openai_factory import OpenAIEmbeddingBase
-    from codeweaver.providers.types import LiteralProvider, LiteralProviderKind
 
 
 FACTORY_IMPORT: LazyImport[OpenAIEmbeddingBase] = lazy_import(

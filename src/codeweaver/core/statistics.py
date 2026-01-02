@@ -38,7 +38,17 @@ from pydantic import (
 from pydantic.dataclasses import dataclass
 from starlette.responses import PlainTextResponse
 
-from codeweaver.common.types import (
+from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
+from codeweaver.core.metadata import ChunkKind, ExtKind
+from codeweaver.core.types import (
+    DATACLASS_CONFIG,
+    AnonymityConversion,
+    BaseEnum,
+    DataclassSerializationMixin,
+    FilteredKey,
+    FilteredKeyT,
+    LanguageName,
+    LanguageNameT,
     McpComponentRequests,
     McpOperationRequests,
     McpTimingDict,
@@ -47,24 +57,9 @@ from codeweaver.common.types import (
     SummaryKey,
     TimingStatisticsDict,
     ToolOrPromptName,
-)
-from codeweaver.core import (
-    DATACLASS_CONFIG,
-    AnonymityConversion,
-    BaseEnum,
-    ChunkKind,
-    ConfigLanguage,
-    DataclassSerializationMixin,
-    ExtKind,
-    FilteredKey,
-    FilteredKeyT,
-    LanguageName,
-    LanguageNameT,
-    SemanticSearchLanguage,
     generate_field_title,
-    uuid7,
-    uuid7_as_timestamp,
 )
+from codeweaver.core.utils import uuid7, uuid7_as_timestamp
 
 
 if TYPE_CHECKING:
@@ -1533,7 +1528,6 @@ __all__ = (
     "FileStatistics",
     "Identifier",
     "LanguageSummary",
-    "McpComponentRequests",
     "SessionStatistics",
     "TimingStatistics",
     "TokenCategory",
