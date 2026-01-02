@@ -15,16 +15,33 @@ import types
 
 from collections.abc import AsyncIterator, Callable, Generator
 from contextlib import asynccontextmanager, contextmanager, suppress
+from dataclasses import dataclass
 from typing import Annotated, Any, Union, cast, get_args, get_origin
 
 # Pydantic internal utilities for robust type resolution
 from pydantic._internal._core_utils import get_type_ref
 from pydantic._internal._typing_extra import annotated_type, get_function_type_hints
 
+from codeweaver.core.exceptions import DependencyInjectionError
 from codeweaver.di.depends import Depends, DependsPlaceholder, _InjectedProxy
 
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class ResolutionResult:
+    """Result of dependency resolution with error tracking.
+
+    Used when collect_errors=True to aggregate multiple dependency
+    resolution errors instead of failing fast on the first error.
+
+    Attributes:
+        values: Successfully resolved parameter values by name
+        errors: List of dependency injection errors encountered
+    """
+    values: dict[str, Any]
+    errors: list[DependencyInjectionError]
 
 
 class Container[T]:
@@ -268,7 +285,8 @@ class Container[T]:
                 # Add to resolution stack before resolving override
                 _resolution_stack.append(cache_key)
                 try:
-                    return await self._call_with_injection(override, _resolution_stack)
+                    # collect_errors=False by default, so this won't return ResolutionResult
+                    return cast(T, await self._call_with_injection(override, _resolution_stack))
                 finally:
                     _resolution_stack.pop()
             return cast(T, override)
@@ -283,6 +301,7 @@ class Container[T]:
         # 4. Create instance with circular dependency tracking
         _resolution_stack.append(cache_key)
         try:
+            # collect_errors=False by default, so this won't return ResolutionResult
             instance = await self._call_with_injection(factory, _resolution_stack)
         finally:
             _resolution_stack.pop()
@@ -454,11 +473,13 @@ class Container[T]:
         # Not a dependency, might be provided by caller
         return None
 
-    async def _call_with_injection(
+    async def _call_with_injection(  # noqa: C901
         self,
         obj: Callable[..., Any],
         _resolution_stack: list[str] | None = None,
-    ) -> Any:
+        *,
+        collect_errors: bool = False,
+    ) -> Any | ResolutionResult:
         """Call a function or instantiate a class, injecting its dependencies.
 
         Looks for Depends() markers in the signature or Annotated type hints.
@@ -466,9 +487,12 @@ class Container[T]:
         Args:
             obj: The callable or class to inject dependencies into.
             _resolution_stack: Internal parameter for circular dependency tracking.
+            collect_errors: If True, collect all dependency errors instead of failing fast.
+                           Returns ResolutionResult with both values and errors.
 
         Returns:
-            The result of calling obj with injected dependencies.
+            The result of calling obj with injected dependencies, or ResolutionResult
+            if collect_errors=True and errors were encountered.
         """
         globalns = self._get_globalns(obj)
 
@@ -479,28 +503,43 @@ class Container[T]:
             return obj() if callable(obj) else obj
 
         kwargs = {}
+        errors: list[DependencyInjectionError] = []
+
         for name, param in signature.parameters.items():
             # Get resolved annotation from type hints if available
             # THIS IS CRITICAL: type_hints contains the EVALUATED types (not strings)
             annotation = type_hints.get(name, param.annotation)
             real_type = self._unwrap_annotated(annotation)
 
-            # Check if the default is the INJECTED sentinel OR if it's a Depends marker
-            if marker := self._find_depends_marker(param, annotation, globalns):
-                kwargs[name] = await self._resolve_dependency(
-                    name, param, marker, annotation, globalns, _resolution_stack
-                )
-            elif isinstance(param.default, (DependsPlaceholder, _InjectedProxy)):
-                kwargs[name] = await self._resolve_injected_parameter(
-                    name, param, annotation, real_type, globalns, obj, _resolution_stack
-                )
-            elif param.default is inspect.Parameter.empty:
-                resolved = await self._try_resolve_required_parameter(
-                    name, param, annotation, real_type, globalns, _resolution_stack
-                )
-                if resolved is not None:
-                    kwargs[name] = resolved
+            try:
+                # Check if the default is the INJECTED sentinel OR if it's a Depends marker
+                if marker := self._find_depends_marker(param, annotation, globalns):
+                    kwargs[name] = await self._resolve_dependency(
+                        name, param, marker, annotation, globalns, _resolution_stack
+                    )
+                elif isinstance(param.default, (DependsPlaceholder, _InjectedProxy)):
+                    kwargs[name] = await self._resolve_injected_parameter(
+                        name, param, annotation, real_type, globalns, obj, _resolution_stack
+                    )
+                elif param.default is inspect.Parameter.empty:
+                    resolved = await self._try_resolve_required_parameter(
+                        name, param, annotation, real_type, globalns, _resolution_stack
+                    )
+                    if resolved is not None:
+                        kwargs[name] = resolved
+            except DependencyInjectionError as e:
+                if collect_errors:
+                    # Collect error and continue to next parameter
+                    errors.append(e)
+                    continue
+                # Fail fast (existing behavior)
+                raise
 
+        # If we collected errors, return ResolutionResult
+        if collect_errors and errors:
+            return ResolutionResult(values=kwargs, errors=errors)
+
+        # Normal execution path
         if inspect.iscoroutinefunction(obj):
             return await obj(**kwargs)
 
