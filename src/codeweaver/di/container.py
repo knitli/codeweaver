@@ -14,7 +14,7 @@ import sys
 import types
 
 from collections.abc import AsyncIterator, Callable, Generator
-from contextlib import asynccontextmanager, contextmanager, suppress
+from contextlib import AsyncExitStack, asynccontextmanager, contextmanager, suppress
 from dataclasses import dataclass
 from typing import Annotated, Any, Union, cast, get_args, get_origin
 
@@ -62,6 +62,8 @@ class Container[T]:
         self._is_singleton: dict[type[Any], bool] = {}
         self._startup_hooks: list[Callable[..., Any]] = []
         self._shutdown_hooks: list[Callable[..., Any]] = []
+        self._cleanup_stack: AsyncExitStack | None = None
+        self._request_cache: dict[Any, Any] = {}  # Keys can be types or callables
 
     @staticmethod
     def _unwrap_annotated(annotation: Any) -> Any:
@@ -175,6 +177,15 @@ class Container[T]:
         self._is_singleton.clear()
         self._startup_hooks.clear()
         self._shutdown_hooks.clear()
+        self._cleanup_stack = None
+        self._request_cache.clear()
+
+    def clear_request_cache(self) -> None:
+        """Clear the request-scoped dependency cache.
+
+        Should be called at the end of each request to clean up request-scoped instances.
+        """
+        self._request_cache.clear()
 
     @staticmethod
     def _is_union_type(annotation: Any) -> bool:
@@ -539,6 +550,48 @@ class Container[T]:
         if collect_errors and errors:
             return ResolutionResult(values=kwargs, errors=errors)
 
+        # Check if this is a generator function
+        if inspect.isasyncgenfunction(obj):
+            # Wrap async generator in context manager
+            @asynccontextmanager
+            async def async_gen_cm():
+                async_gen = obj(**kwargs)
+                try:
+                    # Get the first yielded value
+                    value = await async_gen.__anext__()
+                    yield value
+                finally:
+                    # Cleanup - exhaust the generator
+                    with suppress(StopAsyncIteration):
+                        await async_gen.__anext__()
+
+            if self._cleanup_stack:
+                return await self._cleanup_stack.enter_async_context(async_gen_cm())
+            # No cleanup stack - use directly within context
+            async with async_gen_cm() as value:
+                return value
+
+        if inspect.isgeneratorfunction(obj):
+            # Wrap sync generator in async context manager for compatibility
+            @asynccontextmanager
+            async def async_sync_gen_cm():
+                gen = obj(**kwargs)
+                try:
+                    # Get the first yielded value
+                    value = next(gen)
+                    yield value
+                finally:
+                    # Cleanup - exhaust the generator
+                    with suppress(StopIteration):
+                        next(gen)
+
+            if self._cleanup_stack:
+                # Enter async-wrapped sync context manager into async stack
+                return await self._cleanup_stack.enter_async_context(async_sync_gen_cm())
+            # No cleanup stack - use directly within context
+            async with async_sync_gen_cm() as value:
+                return value
+
         # Normal execution path
         if inspect.iscoroutinefunction(obj):
             return await obj(**kwargs)
@@ -619,7 +672,7 @@ class Container[T]:
         globalns: dict[str, Any] | None = None,
         _resolution_stack: list[str] | None = None,
     ) -> Any:
-        """Resolve a dependency from a Depends marker.
+        """Resolve a dependency from a Depends marker with scope support.
 
         Args:
             name: Parameter name.
@@ -632,73 +685,83 @@ class Container[T]:
         Returns:
             The resolved dependency value.
         """
-        # Check if caching is disabled for this dependency
-        if not marker.use_cache:
-            # Bypass all caching - always create new instance
-            if marker.dependency:
-                # Use the explicit factory directly (no cache lookup)
-                return await self._call_with_injection(marker.dependency, _resolution_stack)
+        # Determine scope (default to singleton if use_cache=True)
+        scope = marker.scope or ("singleton" if marker.use_cache else "function")
 
-            # If no explicit dependency, resolve from annotation without caching
-            target_type = annotation or param.annotation
-
-            # If it's a string, try to resolve it
-            if isinstance(target_type, str):
-                resolved = self._resolve_string_type(target_type, globalns)
-                if resolved is not None:
-                    target_type = resolved
-
-            # Unwrap Annotated if present
-            target_type = self._unwrap_annotated(target_type)
-
-            if target_type is inspect.Parameter.empty:
-                raise ValueError(f"Parameter {name} has Depends() but no type hint.")
-
-            # Get factory and create instance without caching
-            factory = self._factories.get(target_type, target_type)
-            return await self._call_with_injection(factory, _resolution_stack)
-
-        # Normal cached resolution path
-        if marker.dependency:
-            # Resolve via container to support registration, singletons, and overrides
-            # If it's a factory function, the container will resolve it
-            return await self.resolve(marker.dependency, _resolution_stack)
-
+        # Get target type for caching
         target_type = annotation or param.annotation
-
-        # If it's a string, try to resolve it
         if isinstance(target_type, str):
             resolved = self._resolve_string_type(target_type, globalns)
             if resolved is not None:
                 target_type = resolved
-
-        # Unwrap Annotated if present
         target_type = self._unwrap_annotated(target_type)
 
-        if target_type is inspect.Parameter.empty:
+        if target_type is inspect.Parameter.empty and not marker.dependency:
             raise ValueError(f"Parameter {name} has Depends() but no type hint.")
+
+        # Use marker.dependency if provided, otherwise use target_type
+        cache_key = marker.dependency or target_type
+
+        # Function scope - always create new instance
+        if scope == "function" or not marker.use_cache:
+            # Bypass all caching - always create new instance
+            if marker.dependency:
+                return await self._call_with_injection(marker.dependency, _resolution_stack)
+            # Resolve from annotation without caching
+            factory = self._factories.get(target_type, target_type)
+            return await self._call_with_injection(factory, _resolution_stack)
+
+        # Request scope - check request cache
+        if scope == "request":
+            if cache_key in self._request_cache:
+                return self._request_cache[cache_key]
+
+            # Create and cache in request scope
+            if marker.dependency:
+                instance = await self.resolve(marker.dependency, _resolution_stack)
+            else:
+                instance = await self.resolve(target_type, _resolution_stack)
+
+            self._request_cache[cache_key] = instance
+            return instance
+
+        # Singleton scope - use normal container resolution (default behavior)
+        if marker.dependency:
+            # Resolve via container to support registration, singletons, and overrides
+            return await self.resolve(marker.dependency, _resolution_stack)
 
         return await self.resolve(target_type, _resolution_stack)
 
     @asynccontextmanager
     async def lifespan(self) -> AsyncIterator[Container]:
-        """Async context manager for managing container lifecycle hooks."""
-        # Startup
-        for hook in self._startup_hooks:
-            if asyncio.iscoroutinefunction(hook):
-                await hook()
-            else:
-                hook()
+        """Context manager for container lifecycle with cleanup support.
 
-        try:
-            yield self
-        finally:
-            # Shutdown
-            for hook in self._shutdown_hooks:
-                if asyncio.iscoroutinefunction(hook):
-                    await hook()
-                else:
-                    hook()
+        Usage:
+            async with container.lifespan():
+                # Container ready with cleanup tracking
+                instance = await container.resolve(SomeType)
+            # All generators cleaned up
+        """
+        async with AsyncExitStack() as stack:
+            self._cleanup_stack = stack
+            try:
+                # Run startup hooks
+                for hook in self._startup_hooks:
+                    if asyncio.iscoroutinefunction(hook):
+                        await hook()
+                    else:
+                        hook()
+
+                yield self
+            finally:
+                # Run shutdown hooks
+                for hook in self._shutdown_hooks:
+                    if asyncio.iscoroutinefunction(hook):
+                        await hook()
+                    else:
+                        hook()
+
+                self._cleanup_stack = None
 
     def __getitem__(self, interface: type[T]) -> T:
         """Synchronous access to resolved singletons.
