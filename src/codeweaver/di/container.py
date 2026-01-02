@@ -11,10 +11,11 @@ import asyncio
 import inspect
 import logging
 import sys
+import types
 
 from collections.abc import AsyncIterator, Callable, Generator
 from contextlib import asynccontextmanager, contextmanager, suppress
-from typing import Annotated, Any, cast, get_args, get_origin
+from typing import Annotated, Any, Union, cast, get_args, get_origin
 
 # Pydantic internal utilities for robust type resolution
 from pydantic._internal._core_utils import get_type_ref
@@ -158,6 +159,67 @@ class Container[T]:
         self._startup_hooks.clear()
         self._shutdown_hooks.clear()
 
+    @staticmethod
+    def _is_union_type(annotation: Any) -> bool:
+        """Check if an annotation is a Union type (Union[...] or X | Y syntax).
+
+        Handles both typing.Union and types.UnionType (Python 3.10+ | syntax).
+
+        Args:
+            annotation: The type annotation to check.
+
+        Returns:
+            True if the annotation is a union type, False otherwise.
+        """
+        origin = get_origin(annotation)
+        return origin is Union or origin is types.UnionType
+
+    async def _resolve_union_dependency(
+        self,
+        annotation: Any,
+        _resolution_stack: list[str] | None = None,
+    ) -> Any:
+        """Try to resolve from union types in order.
+
+        Attempts to resolve each type in the union, skipping None types.
+        Returns the first successfully resolved type.
+
+        Args:
+            annotation: The Union type annotation to resolve.
+            _resolution_stack: Internal parameter for circular dependency tracking.
+
+        Returns:
+            The first successfully resolved instance from the union.
+
+        Raises:
+            ValueError: If the annotation is not a union type or if no type can be resolved.
+        """
+        if not self._is_union_type(annotation):
+            raise ValueError(f"Not a union type: {annotation}")
+
+        union_args = get_args(annotation)
+
+        # Try each type in the union, skipping None
+        for arg_type in union_args:
+            # Skip None type
+            if arg_type is type(None):
+                continue
+
+            # Check if registered in container
+            if arg_type in self._factories or arg_type in self._overrides:
+                return await self.resolve(arg_type, _resolution_stack)
+
+        # Try to instantiate first non-None type
+        for arg_type in union_args:
+            if arg_type is not type(None):
+                try:
+                    return await self.resolve(arg_type, _resolution_stack)
+                except Exception:  # noqa: S112
+                    # Intentionally continue to try next union type
+                    continue
+
+        raise ValueError(f"Could not resolve any type from union: {union_args}")
+
     async def resolve(
         self,
         interface: type[T],
@@ -189,6 +251,15 @@ class Container[T]:
         if cache_key in _resolution_stack:
             cycle = " -> ".join([*_resolution_stack, cache_key])
             raise CircularDependencyError(cycle=cycle)
+
+        # Handle Union types - try to resolve from union members
+        if self._is_union_type(interface):
+            _resolution_stack.append(cache_key)
+            try:
+                instance = await self._resolve_union_dependency(interface, _resolution_stack)
+            finally:
+                _resolution_stack.pop()
+            return instance  # type: ignore
 
         # 1. Check overrides first
         if interface in self._overrides:
@@ -522,6 +593,33 @@ class Container[T]:
         Returns:
             The resolved dependency value.
         """
+        # Check if caching is disabled for this dependency
+        if not marker.use_cache:
+            # Bypass all caching - always create new instance
+            if marker.dependency:
+                # Use the explicit factory directly (no cache lookup)
+                return await self._call_with_injection(marker.dependency, _resolution_stack)
+
+            # If no explicit dependency, resolve from annotation without caching
+            target_type = annotation or param.annotation
+
+            # If it's a string, try to resolve it
+            if isinstance(target_type, str):
+                resolved = self._resolve_string_type(target_type, globalns)
+                if resolved is not None:
+                    target_type = resolved
+
+            # Unwrap Annotated if present
+            target_type = self._unwrap_annotated(target_type)
+
+            if target_type is inspect.Parameter.empty:
+                raise ValueError(f"Parameter {name} has Depends() but no type hint.")
+
+            # Get factory and create instance without caching
+            factory = self._factories.get(target_type, target_type)
+            return await self._call_with_injection(factory, _resolution_stack)
+
+        # Normal cached resolution path
         if marker.dependency:
             # Resolve via container to support registration, singletons, and overrides
             # If it's a factory function, the container will resolve it
