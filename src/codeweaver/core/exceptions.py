@@ -178,6 +178,10 @@ class ConfigurationError(CodeWeaverError):
     """
 
 
+class InvalidEmbeddingModelError(ConfigurationError):
+    """Exception raised when an invalid embedding model is encountered."""
+
+
 class ProviderError(CodeWeaverError):
     """Provider integration errors.
 

@@ -41,17 +41,6 @@ if TYPE_CHECKING:
         SparseEmbeddingProvider,
     )
     from codeweaver.providers.embedding.registry import EmbeddingRegistry, get_embedding_registry
-    from codeweaver.providers.embedding.types import (
-        ChunkEmbeddings,
-        EmbeddingBatchInfo,
-        EmbeddingKind,
-        InvalidEmbeddingModelError,
-        QueryResult,
-        RawEmbeddingVectors,
-        SparseEmbedding,
-        StoredEmbeddingVectors,
-    )
-
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "EmbeddingModelCapabilities": (__spec__.parent, "capabilities.base"),
@@ -73,14 +62,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "get_text_embedder": (__spec__.parent, "fastembed_extensions"),
     "EmbeddingRegistry": (__spec__.parent, "registry"),
     "get_embedding_registry": (__spec__.parent, "registry"),
-    "InvalidEmbeddingModelError": (__spec__.parent, "types"),
-    "SparseEmbedding": (__spec__.parent, "types"),
-    "RawEmbeddingVectors": (__spec__.parent, "types"),
-    "StoredEmbeddingVectors": (__spec__.parent, "types"),
-    "EmbeddingKind": (__spec__.parent, "types"),
-    "QueryResult": (__spec__.parent, "types"),
-    "EmbeddingBatchInfo": (__spec__.parent, "types"),
-    "ChunkEmbeddings": (__spec__.parent, "types"),
+
 })
 
 
@@ -99,10 +81,7 @@ def __getattr__(name: str) -> object:
 
 __all__ = (
     "BedrockEmbeddingProvider",
-    "ChunkEmbeddings",
     "CohereEmbeddingProvider",
-    "EmbeddingBatchInfo",
-    "EmbeddingKind",
     "EmbeddingModelCapabilities",
     "EmbeddingProvider",
     "EmbeddingRegistry",
@@ -113,14 +92,10 @@ __all__ = (
     "InvalidEmbeddingModelError",
     "MistralEmbeddingProvider",
     "OpenAIEmbeddingBase",
-    "QueryResult",
-    "RawEmbeddingVectors",
     "SentenceTransformersEmbeddingProvider",
     "SentenceTransformersSparseProvider",
-    "SparseEmbedding",
     "SparseEmbeddingModelCapabilities",
     "SparseEmbeddingProvider",
-    "StoredEmbeddingVectors",
     "VoyageEmbeddingProvider",
     "get_embedding_registry",
     "get_sparse_embedder",

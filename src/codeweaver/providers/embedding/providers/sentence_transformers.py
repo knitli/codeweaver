@@ -25,8 +25,7 @@ from codeweaver.providers.embedding.providers.base import EmbeddingProvider, Spa
 
 
 if TYPE_CHECKING:
-    from codeweaver.core import CodeChunk
-    from codeweaver.providers.embedding.types import SparseEmbedding
+    from codeweaver.core import CodeChunk, SparseEmbedding
 
 logger = logging.getLogger(__name__)
 

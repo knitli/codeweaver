@@ -111,7 +111,7 @@ def get_embedding_registry() -> EmbeddingRegistry:
     global _embedding_registry, _model_rebuilt
 
     # Rebuild model on first access to resolve forward references
-    if not _model_rebuilt:
+    if not _model_rebuilt and not EmbeddingRegistry.__pydantic_complete__:
         # Import CodeChunk here to make it available for model rebuild without circular import
         from codeweaver.core import CodeChunk as CodeChunk
 
