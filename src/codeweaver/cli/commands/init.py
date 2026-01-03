@@ -32,7 +32,7 @@ from codeweaver.core import CodeWeaverError, get_user_config_dir, resolve_projec
 
 if TYPE_CHECKING:
     from codeweaver.cli.ui import StatusDisplay
-    from codeweaver.config import CodeWeaverMCPConfig, StdioCodeWeaverConfig
+    from codeweaver.server import CodeWeaverMCPConfig, StdioCodeWeaverConfig
 
 type MCPClient = Literal[
     "claude_code", "claude_desktop", "cursor", "gemini_cli", "vscode", "mcpjson"
@@ -124,14 +124,14 @@ def _create_codeweaver_config(
     display = _display
 
     config_path.parent.mkdir(parents=True, exist_ok=True)
-    from codeweaver.config import get_profile
+    from codeweaver.providers.config import get_profile
 
     deployment_profile = (
         get_profile("backup" if profile == "test" else profile, vector_deployment, url=vector_url)  # ty: ignore[no-matching-overload]
         if profile
         else None
     )  # ty: ignore[no-matching-overload]
-    from codeweaver.config import get_settings, update_settings
+    from codeweaver.server import get_settings, update_settings
 
     settings = get_settings()
     # Don't pass config_file when creating a new config - the file doesn't exist yet
@@ -364,7 +364,7 @@ def _create_stdio_config(
     Returns:
         StdioCodeWeaverConfig instance
     """
-    from codeweaver.config import StdioCodeWeaverConfig
+    from codeweaver.server import StdioCodeWeaverConfig
 
     # Build the command - CodeWeaver doesn't need uv environment
     # Explicitly specify stdio transport to make configuration unambiguous
@@ -407,7 +407,7 @@ def _create_remote_config(
     Returns:
         CodeWeaverMCPConfig instance
     """
-    from codeweaver.config import CodeWeaverMCPConfig
+    from codeweaver.server import CodeWeaverMCPConfig
 
     # For HTTP transport, we just need the URL
     # No command execution needed - client connects directly to running server
@@ -444,7 +444,7 @@ def _handle_write_output(
     Raises:
         ValueError: If configuration is invalid or client doesn't support the config level
     """
-    from codeweaver.config import MCPConfig
+    from codeweaver.server import MCPConfig
 
     display = _display
     error_handler = CLIErrorHandler(display)
@@ -991,7 +991,8 @@ WantedBy=default.target
 def _escape_xml(text: str) -> str:
     """Escape special characters for XML content."""
     return (
-        text.replace("&", "&amp;")
+        text
+        .replace("&", "&amp;")
         .replace("<", "&lt;")
         .replace(">", "&gt;")
         .replace('"', "&quot;")

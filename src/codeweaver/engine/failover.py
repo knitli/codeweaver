@@ -25,11 +25,15 @@ from fastmcp import Context
 from pydantic import Field, PrivateAttr
 from qdrant_client.http.models.models import CollectionInfo
 
-from codeweaver.common import log_to_client_or_fallback
-from codeweaver.config import ProviderSettingsDict, _backup_profile, get_profile
-from codeweaver.core import BasedModel
+from codeweaver.core import BasedModel, log_to_client_or_fallback
 from codeweaver.engine.resource_estimation import estimate_backup_memory_requirements
-from codeweaver.providers import CircuitBreakerState, QdrantBaseProvider
+from codeweaver.providers import (
+    CircuitBreakerState,
+    ProviderSettingsDict,
+    QdrantBaseProvider,
+    _backup_profile,
+    get_profile,
+)
 
 
 if TYPE_CHECKING:
@@ -57,7 +61,7 @@ def _get_collection_name(*, secondary: bool) -> str:
             settings = vector_store[0] if isinstance(vector_store, tuple) else vector_store
             return settings.get("provider_settings", {}).get("collection_name", "codeweaver-backup")  # type: ignore[union-attr]
         return "codeweaver-backup"
-    from codeweaver.common import get_provider_config_for
+    from codeweaver.core import get_provider_config_for
 
     if (config := get_provider_config_for("vector_store")) and (
         collection_name := config.get("provider_settings", {}).get("collection_name")
@@ -618,7 +622,7 @@ class VectorStoreFailoverManager(BasedModel):
         self._failover_time = datetime.now(UTC)
 
         # Update global statistics
-        from codeweaver.common import get_session_statistics
+        from codeweaver.core import get_session_statistics
 
         stats = get_session_statistics()
         stats.update_failover_stats(
@@ -713,7 +717,7 @@ class VectorStoreFailoverManager(BasedModel):
             self._failover_chunks.clear()
 
             # Update global statistics
-            from codeweaver.common import get_session_statistics
+            from codeweaver.core import get_session_statistics
 
             stats = get_session_statistics()
             stats.update_failover_stats(failover_active=False, active_store_type="primary")
@@ -1009,8 +1013,7 @@ class VectorStoreFailoverManager(BasedModel):
         Raises:
             Exception: If backup indexer creation fails
         """
-        from codeweaver.common import get_provider_registry
-        from codeweaver.core import DiscoveredFile, make_blake_store
+        from codeweaver.core import DiscoveredFile, get_provider_registry, make_blake_store
         from codeweaver.engine.chunker.base import ChunkGovernor
         from codeweaver.engine.chunking_service import ChunkingService
         from codeweaver.engine.indexer.indexer import Indexer

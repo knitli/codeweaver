@@ -12,10 +12,9 @@ from typing import Annotated, Any, ClassVar, NamedTuple, Self, TypeGuard, cast
 
 from pydantic import UUID7, Field, NonNegativeInt, PositiveInt, computed_field, model_validator
 from pydantic.dataclasses import dataclass
-from typing_extensions import TypeIs
 
 from codeweaver.core.types.dataclasses import DATACLASS_CONFIG, DataclassSerializationMixin
-from codeweaver.core.utils import uuid7
+from codeweaver.core.utils import TypeIs, uuid7
 
 
 # ===========================================================================

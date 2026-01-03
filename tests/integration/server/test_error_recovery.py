@@ -139,6 +139,7 @@ async def test_sparse_only_fallback(initialize_test_settings, clean_container):
     Then: Falls back to sparse-only search, warns user
     """
     from codeweaver.agent_api import find_code
+
     from codeweaver.core import SearchStrategy
     from codeweaver.providers import (
         EmbeddingProvider,
@@ -305,12 +306,12 @@ async def test_indexing_continues_on_file_errors(
     When: Indexing runs
     Then: Successfully discovers and processes the 2 Python files
     """
-    from codeweaver.config import CodeWeaverSettings
     from codeweaver.engine import Indexer
+    from codeweaver.server import CodeWeaverSettings
 
     # Configure settings for this test
     async def get_test_settings() -> CodeWeaverSettings:
-        from codeweaver.config import get_settings
+        from codeweaver.server import get_settings
 
         settings = get_settings()
         settings.project_path = test_project_path
@@ -357,8 +358,8 @@ async def test_warning_at_25_errors(initialize_test_settings, tmp_path: Path, cl
     When: Indexing encounters ≥25 errors
     Then: Warning displayed to stderr
     """
-    from codeweaver.config import CodeWeaverSettings
     from codeweaver.engine import Indexer
+    from codeweaver.server import CodeWeaverSettings
 
     # Create project with many corrupted files
     project_root = tmp_path / "error_project"
@@ -374,7 +375,7 @@ async def test_warning_at_25_errors(initialize_test_settings, tmp_path: Path, cl
 
     # Configure settings for this test
     async def get_test_settings() -> CodeWeaverSettings:
-        from codeweaver.config import get_settings
+        from codeweaver.server import get_settings
 
         settings = get_settings()
         settings.project_path = project_root
@@ -418,7 +419,7 @@ async def test_health_shows_degraded_status(initialize_test_settings, clean_cont
     When: Query /health/ endpoint
     Then: Status = degraded, circuit_breaker_state = open
     """
-    from codeweaver.common import ProviderRegistry, SessionStatistics
+    from codeweaver.core import ProviderRegistry, SessionStatistics
     from codeweaver.server import HealthService
 
     # Mock provider registry with degraded state
@@ -454,7 +455,7 @@ async def test_health_shows_degraded_status(initialize_test_settings, clean_cont
     mock_stats.get_timing_statistics.return_value = mock_timing
 
     # Apply overrides
-    from codeweaver.di import get_statistics
+    from codeweaver.core import get_statistics
 
     overrides = {
         ProviderRegistry: lambda: mock_reg,
@@ -541,8 +542,8 @@ async def test_graceful_shutdown_with_checkpoint(initialize_test_settings, clean
     # Create test project
     import tempfile
 
-    from codeweaver.config import CodeWeaverSettings
     from codeweaver.engine import CheckpointManager, Indexer
+    from codeweaver.server import CodeWeaverSettings
 
     with tempfile.TemporaryDirectory() as tmpdir:
         project_root = Path(tmpdir)
@@ -550,7 +551,7 @@ async def test_graceful_shutdown_with_checkpoint(initialize_test_settings, clean
 
         # Configure settings for this test
         async def get_test_settings() -> CodeWeaverSettings:
-            from codeweaver.config import get_settings
+            from codeweaver.server import get_settings
 
             settings = get_settings()
             settings.project_path = project_root
@@ -629,8 +630,8 @@ async def test_error_logging_structured(clean_container):
         # Create temporary directory with a file that will cause processing errors
         import tempfile
 
-        from codeweaver.config import CodeWeaverSettings
         from codeweaver.engine import Indexer
+        from codeweaver.server import CodeWeaverSettings
 
         with tempfile.TemporaryDirectory() as tmpdir:
             test_path = Path(tmpdir)
@@ -640,7 +641,7 @@ async def test_error_logging_structured(clean_container):
 
             # Configure settings for this test
             async def get_test_settings() -> CodeWeaverSettings:
-                from codeweaver.config import get_settings
+                from codeweaver.server import get_settings
 
                 settings = get_settings()
                 settings.project_path = test_path

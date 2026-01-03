@@ -52,8 +52,13 @@ from codeweaver.providers.reranking.capabilities.base import RerankingModelCapab
 
 
 if TYPE_CHECKING:
-    from codeweaver.common import SessionStatistics
-    from codeweaver.core import AnonymityConversion, CodeChunk, FilteredKeyT, StructuredDataInput
+    from codeweaver.core import (
+        AnonymityConversion,
+        CodeChunk,
+        FilteredKeyT,
+        SessionStatistics,
+        StructuredDataInput,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -121,7 +126,7 @@ class RerankingResult(NamedTuple):
 
 def _get_statistics() -> SessionStatistics:
     """Get the statistics source for the reranking provider."""
-    statistics_module = importlib.import_module("codeweaver.common")
+    statistics_module = importlib.import_module("codeweaver.core")
     # we need SessionStatistics in this namespace at runtime for pydantic to find it
     SessionStatistics = statistics_module.SessionStatistics  # type: ignore # noqa: F841, N806
     return statistics_module.get_session_statistics()

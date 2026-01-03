@@ -23,29 +23,26 @@ from pydantic.dataclasses import dataclass
 from starlette.middleware import Middleware as ASGIMiddleware
 
 from codeweaver import __version__ as version
-from codeweaver.common import (
-    HttpClientPool,
-    ModelRegistry,
-    ProviderRegistry,
-    ServicesRegistry,
-    SessionStatistics,
-    TelemetryService,
-)
-from codeweaver.config import CodeWeaverSettings
 from codeweaver.core import (
     DATACLASS_CONFIG,
     AnonymityConversion,
     DataclassSerializationMixin,
     InitializationError,
+    ModelRegistry,
+    ProviderRegistry,
+    ServicesRegistry,
+    SessionStatistics,
     Unset,
     elapsed_time_to_human_readable,
+    get_container,
     get_project_path,
     lazy_import,
 )
 from codeweaver.core import Provider as Provider
-from codeweaver.di import get_container
 from codeweaver.engine import Indexer, VectorStoreFailoverManager
 from codeweaver.mcp import CwMcpHttpState
+from codeweaver.providers import HttpClientPool
+from codeweaver.server.config import CodeWeaverSettings
 from codeweaver.server.health.health_service import HealthService
 from codeweaver.server.management import ManagementServer
 
@@ -55,19 +52,19 @@ if TYPE_CHECKING:
 
 # lazy imports for default factory functions
 get_provider_registry: LazyImport[Callable[[], ProviderRegistry]] = lazy_import(
-    "codeweaver.common", "get_provider_registry"
+    "codeweaver.core", "get_provider_registry"
 )
 get_services_registry: LazyImport[Callable[[], ServicesRegistry]] = lazy_import(
-    "codeweaver.common", "get_services_registry"
+    "codeweaver.core", "get_services_registry"
 )
 get_model_registry: LazyImport[Callable[[], ModelRegistry]] = lazy_import(
-    "codeweaver.common", "get_model_registry"
+    "codeweaver.core", "get_model_registry"
 )
 get_session_statistics: LazyImport[Callable[[], SessionStatistics]] = lazy_import(
-    "codeweaver.common", "get_session_statistics"
+    "codeweaver.core", "get_session_statistics"
 )
 get_settings: LazyImport[Callable[[], CodeWeaverSettings]] = lazy_import(
-    "codeweaver.config", "get_settings"
+    "codeweaver.server.config", "get_settings"
 )
 
 _logger = logging.getLogger(__name__)
@@ -280,7 +277,7 @@ async def _cleanup_state(
     # Capture session telemetry event before shutdown
     if state.telemetry and state.telemetry.enabled:
         try:
-            from codeweaver.common import capture_session_event
+            from codeweaver.core import capture_session_event
 
             # Calculate session duration
             duration_seconds = time.time() - state.startup_time
@@ -430,7 +427,7 @@ async def _initialize_cw_state(
     settings: CodeWeaverSettings | None = None, statistics: SessionStatistics | None = None
 ) -> CodeWeaverState:
     """Initialize application state if not already present."""
-    from codeweaver.di import get_container
+    from codeweaver.core import get_container
 
     container = get_container()
 
@@ -452,7 +449,7 @@ async def _initialize_cw_state(
 
     # Ensure telemetry is initialized
     if not state.telemetry:
-        from codeweaver.common import TelemetryService
+        from codeweaver.core import TelemetryService
 
         state.telemetry = TelemetryService.from_settings(state.settings)
 

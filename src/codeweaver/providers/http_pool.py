@@ -10,7 +10,7 @@ reduces overhead from repeated TCP handshakes and TLS negotiations, improving
 performance and reliability during high-load operations like indexing.
 
 Usage:
-    from codeweaver.common.http_pool import HttpClientPool, get_http_pool
+    from codeweaver.core.http_pool import HttpClientPool, get_http_pool
 
     # Get singleton instance
     pool = get_http_pool()

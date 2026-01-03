@@ -469,10 +469,7 @@ class BedrockEmbeddingProvider(EmbeddingProvider[BedrockRuntimeClient]):
         """Initialize the Bedrock embedding provider."""
         if not client:
             client = boto3_client("bedrock-runtime", **kwargs)
-        if not caps:
-            from codeweaver.common import get_model_registry
 
-            registry = get_model_registry()
             caps = registry.configured_models_for_kind("embedding")  # ty: ignore[invalid-assignment]
             if isinstance(caps, tuple) and len(caps) > 0:
                 caps = caps[0]

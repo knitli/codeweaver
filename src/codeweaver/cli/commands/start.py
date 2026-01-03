@@ -22,15 +22,14 @@ from typing import TYPE_CHECKING, Annotated, Any, NamedTuple
 from codeweaver_daemon import check_daemon_health, spawn_daemon_process
 from cyclopts import App, Parameter
 from pydantic import FilePath, PositiveInt
-from typing_extensions import TypeIs
 
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
-from codeweaver.core import get_settings_map_for, lazy_import
+from codeweaver.core import TypeIs, get_settings_map_for, lazy_import
 
 
 if TYPE_CHECKING:
-    from codeweaver.config import CodeWeaverSettingsDict
     from codeweaver.core import DictView
+    from codeweaver.server import CodeWeaverSettingsDict
 
 _display: StatusDisplay = get_display()
 app = App("start", help="Start CodeWeaver background services.")
@@ -47,7 +46,7 @@ class NetworkConfig(NamedTuple):
 
 def _get_settings_map() -> DictView[CodeWeaverSettingsDict]:
     """Get the current settings map."""
-    from codeweaver.config import get_settings_map
+    from codeweaver.server import get_settings_map
 
     return get_settings_map()
 
@@ -148,14 +147,14 @@ async def start_cw_services(
     By default, starts both the management server (port 9329) and MCP HTTP server
     (port 9328) to support stdio proxy connections.
     """
-    from codeweaver.common import get_session_statistics
+    from codeweaver.core import get_session_statistics
     from codeweaver.server import ManagementServer, background_services_lifespan
 
     statistics = get_session_statistics()
 
     # Use background_services_lifespan (the new Phase 1 implementation)
     async with background_services_lifespan(
-        settings=lazy_import("codeweaver.config", "get_settings")._resolve()(),
+        settings=lazy_import("codeweaver.server", "get_settings")._resolve()(),
         statistics=statistics,
         status_display=display,
         verbose=verbose,

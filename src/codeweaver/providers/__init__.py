@@ -55,6 +55,7 @@ if TYPE_CHECKING:
         SentenceTransformersSparseProvider,
         SparseEmbeddingModelCapabilities,
         VoyageEmbeddingProvider,
+        get_embedding_registry,
     )
     from codeweaver.providers.optimize import (
         AvailableOptimizations,
@@ -133,6 +134,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "download_item": (__spec__.parent, "agent"),
     "get_agent_model_provider": (__spec__.parent, "agent"),
     "get_data_provider": (__spec__.parent, "data"),
+    "get_embedding_registry": (__spec__.parent, "embedding"),
     "get_optimizations": (__spec__.parent, "optimize"),
     "infer_agent_provider_class": (__spec__.parent, "agent"),
     "infer_model": (__spec__.parent, "agent"),
@@ -208,6 +210,7 @@ __all__ = (
     "download_item",
     "get_agent_model_provider",
     "get_data_provider",
+    "get_embedding_registry",
     "get_optimizations",
     "infer_agent_provider_class",
     "infer_model",

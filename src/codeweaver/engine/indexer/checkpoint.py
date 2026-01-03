@@ -25,13 +25,6 @@ from uuid import UUID
 from pydantic import UUID7, DirectoryPath, Field, NonNegativeInt
 from pydantic_core import from_json, to_json
 
-from codeweaver.config import (
-    EmbeddingProviderSettings,
-    IndexerSettings,
-    RerankingProviderSettings,
-    SparseEmbeddingProviderSettings,
-    VectorStoreProviderSettings,
-)
 from codeweaver.core import (
     BasedModel,
     BlakeHashKey,
@@ -44,11 +37,18 @@ from codeweaver.core import (
     lazy_import,
     uuid7,
 )
+from codeweaver.engine.config import IndexerSettings
+from codeweaver.providers import (
+    EmbeddingProviderSettings,
+    RerankingProviderSettings,
+    SparseEmbeddingProviderSettings,
+    VectorStoreProviderSettings,
+)
 
 
 if TYPE_CHECKING:
-    from codeweaver.config import CodeWeaverSettingsDict
     from codeweaver.core import AnonymityConversion, FilteredKeyT
+    from codeweaver.server import CodeWeaverSettingsDict
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +80,8 @@ def _get_settings_map() -> DictView[CheckpointSettingsFingerprint]:
 
     We don't want to cache this -- we want the latest settings each time. DictView always reflects changes, but we're creating a new instance here.
     """
-    from codeweaver.config import (
+    from codeweaver.core import get_project_path
+    from codeweaver.server import (
         DefaultEmbeddingProviderSettings,
         DefaultIndexerSettings,
         DefaultRerankingProviderSettings,
@@ -88,11 +89,10 @@ def _get_settings_map() -> DictView[CheckpointSettingsFingerprint]:
         DefaultVectorStoreProviderSettings,
         get_settings,
     )
-    from codeweaver.core import get_project_path
 
     settings = get_settings()
     if isinstance(settings.provider, Unset) or settings.provider is None:
-        from codeweaver.config import AllDefaultProviderSettings, ProviderSettings
+        from codeweaver.providers import AllDefaultProviderSettings, ProviderSettings
 
         settings.provider = ProviderSettings.model_validate(AllDefaultProviderSettings)
     settings.indexer = (
@@ -307,7 +307,7 @@ class CheckpointManager:
             checkpoint_dir: Directory for checkpoint files (default: .codeweaver/)
         """
         settings: DictView[CodeWeaverSettingsDict] = lazy_import(
-            "codeweaver.config", "get_settings_map"
+            "codeweaver.server", "get_settings_map"
         )._resolve()()
 
         self.project_path: Path = (

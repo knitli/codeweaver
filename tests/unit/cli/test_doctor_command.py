@@ -20,16 +20,16 @@ from urllib.parse import urlparse
 import pytest
 
 from codeweaver.cli import app as doctor_app
-from codeweaver.config import CodeWeaverSettings
 from codeweaver.core import SentinelName, Unset
 from codeweaver.providers import Provider
+from codeweaver.server import CodeWeaverSettings
 
 
 @pytest.fixture
 def temp_project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Create temporary project directory."""
     # Reset global settings to avoid state pollution between tests
-    from codeweaver.config import reset_settings
+    from codeweaver.server import reset_settings
 
     reset_settings()
 
@@ -162,7 +162,7 @@ class TestDoctorProviderEnvVars:
 
     def test_all_cloud_providers_have_env_vars(self) -> None:
         """Test all cloud providers have other_env_vars defined."""
-        from codeweaver.common import get_provider_registry
+        from codeweaver.core import get_provider_registry
         from codeweaver.providers import ProviderKind
 
         registry = get_provider_registry()
@@ -310,7 +310,7 @@ class TestDoctorConfigAssumptions:
         self, temp_project: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Test init args can configure settings."""
-        from codeweaver.config import CodeWeaverSettings
+        from codeweaver.server import CodeWeaverSettings
 
         # Test that explicit init args work for basic settings
         custom_path = temp_project / "custom_location"

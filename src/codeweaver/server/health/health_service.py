@@ -14,13 +14,14 @@ import time
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Literal, NoReturn, cast
 
-from codeweaver.common import ProviderRegistry, SessionStatistics
-from codeweaver.core import ConfigurationError
-from codeweaver.di import (
+from codeweaver.core import (
     INJECTED,
+    ConfigurationError,
     FailoverManagerDep,
     IndexerDep,
+    ProviderRegistry,
     ProviderRegistryDep,
+    SessionStatistics,
     StatisticsDep,
 )
 from codeweaver.engine import Indexer, VectorStoreFailoverManager
@@ -40,7 +41,7 @@ from codeweaver.server.health.models import (
 
 
 if TYPE_CHECKING:
-    from codeweaver.common import FileStatistics
+    from codeweaver.core import FileStatistics
 
 
 logger = logging.getLogger(__name__)
@@ -89,8 +90,12 @@ class HealthService:
 
     async def _resolve_dependencies(self) -> None:
         """Resolve dependencies if they were provided as Depends objects."""
-        from codeweaver.common import ProviderRegistry, SessionStatistics
-        from codeweaver.di import get_container, is_depends_marker
+        from codeweaver.core import (
+            ProviderRegistry,
+            SessionStatistics,
+            get_container,
+            is_depends_marker,
+        )
         from codeweaver.engine import Indexer, VectorStoreFailoverManager
 
         container = get_container()
@@ -102,12 +107,12 @@ class HealthService:
             try:
                 self._provider_registry = await container.resolve(ProviderRegistry)
             except Exception:
-                from codeweaver.common import get_provider_registry
+                from codeweaver.core import get_provider_registry
 
                 self._provider_registry = get_provider_registry()
 
         if is_depends_marker(self._statistics):
-            from codeweaver.common import SessionStatistics
+            from codeweaver.core import SessionStatistics
 
             try:
                 # Use container to ensure overrides are respected
@@ -115,7 +120,7 @@ class HealthService:
                 logger.debug("Resolved statistics from container: %s", type(self._statistics))
             except Exception as e:
                 logger.debug("Failed to resolve statistics from container: %s", e)
-                from codeweaver.common import get_session_statistics
+                from codeweaver.core import get_session_statistics
 
                 self._statistics = get_session_statistics()
                 logger.debug("Fallback to get_session_statistics: %s", type(self._statistics))

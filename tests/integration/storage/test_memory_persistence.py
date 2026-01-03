@@ -17,7 +17,7 @@ import pytest
 from codeweaver.core import uuid7
 from codeweaver.core import SemanticSearchLanguage as Language
 from codeweaver.providers import MemoryVectorStoreProvider
-from codeweaver.config import MemoryConfig
+from codeweaver.server import MemoryConfig
 
 # sourcery skip: dont-import-test-modules
 from tests.conftest import create_test_chunk_with_embeddings

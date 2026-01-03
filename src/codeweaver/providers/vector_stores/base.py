@@ -18,7 +18,8 @@ import httpx
 
 from pydantic import UUID7, ConfigDict, PrivateAttr
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
-from typing_extensions import TypeIs
+
+from codeweaver.core import TypeIs
 
 
 # Common retryable exceptions for vector store operations
@@ -42,7 +43,6 @@ except ImportError:
     # Fallback if httpcore or qdrant_client not available
     RETRYABLE_EXCEPTIONS = (ConnectionError, TimeoutError, OSError, httpx.TimeoutException)
 
-from codeweaver.config import EmbeddingModelSettings, SparseEmbeddingModelSettings
 from codeweaver.core import (
     BasedModel,
     BaseEnum,
@@ -51,6 +51,7 @@ from codeweaver.core import (
     ProviderError,
     StrategizedQuery,
 )
+from codeweaver.providers.config import EmbeddingModelSettings, SparseEmbeddingModelSettings
 from codeweaver.providers.embedding.capabilities.base import (
     EmbeddingModelCapabilities,
     SparseEmbeddingModelCapabilities,
@@ -118,12 +119,11 @@ def _get_caps(
     Returns:
         Embedding capabilities or None.
     """
-    from codeweaver.common import get_model_registry
-    from codeweaver.core import Unset
+    from codeweaver.core import Unset, get_model_registry
 
     registry = get_model_registry()
     if backup:
-        from codeweaver.config import get_profile
+        from codeweaver.providers.config import get_profile
 
         profile = get_profile("backup", "local")
         if not profile:
@@ -176,8 +176,8 @@ def _get_embedding_settings() -> EmbeddingSettingsDict:
     Returns:
         Embedding model settings dictionary.
     """
-    from codeweaver.common import get_provider_registry
-    from codeweaver.config import get_profile
+    from codeweaver.core import get_provider_registry
+    from codeweaver.providers.config import get_profile
 
     profile = get_profile("backup", "local")
     registry = get_provider_registry()
@@ -489,7 +489,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
         context: Any = None,
     ) -> list[SearchResult]:
         """Wrapper around search with retry logic and circuit breaker."""
-        from codeweaver.common import log_to_client_or_fallback
+        from codeweaver.core import log_to_client_or_fallback
 
         _ = self._check_circuit_breaker
 
@@ -588,7 +588,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
         self, chunks: list[CodeChunk], context: Any = None, *, for_backup: bool = False
     ) -> None:
         """Wrapper around upsert with retry logic and circuit breaker."""
-        from codeweaver.common import log_to_client_or_fallback
+        from codeweaver.core import log_to_client_or_fallback
 
         _ = self._check_circuit_breaker
 

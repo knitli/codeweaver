@@ -12,16 +12,50 @@ import logging
 import os
 import platform
 import sys
+import urllib
 
 from importlib import metadata, util
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, TypeAdapter
-from typing_extensions import TypeIs
+import httpx
+
+from pydantic import AnyUrl, BaseModel, TypeAdapter
 
 
 logger = logging.getLogger(__name__)
+
+python_version = sys.version_info
+
+if sys.version_info >= (3, 13):
+    from typing import TypeIs as TypeIs
+else:
+    from typing_extensions import TypeIs as TypeIs
+
+LOCALHOST_INDICATORS = {
+    "localhost",
+    "127.0.0.1",
+    "0.0.0.0",  # noqa: S104
+    "::1",
+    "0:0:0:0:0:0:0:1",
+    "::",  # I guess ruff is ok if we bind to all interfaces in ipv6
+    # save the more expensive check for second
+    # this checks if the ip range is in private ranges
+}
+
+
+def is_local_host(host: str | AnyUrl | httpx.URL | urllib.parse.ParseResult) -> bool:
+    """Check if a host is a localhost address."""
+    if isinstance(host, (AnyUrl, httpx.URL)):
+        filtered_host = host.host
+    elif isinstance(host, urllib.parse.ParseResult):
+        filtered_host = host.hostname or ""
+    else:
+        filtered_host = str(host)
+        if any(c in filtered_host for c in ("/", ":", "\\")):
+            # likely a url, parse it
+            parsed = urllib.parse.urlparse(filtered_host)
+            filtered_host = parsed.hostname or ""
 
 
 def is_pydantic_basemodel(model: Any) -> TypeIs[type[BaseModel] | BaseModel]:
@@ -142,6 +176,7 @@ def is_wsl_vscode() -> bool:
 
 
 __all__ = (
+    "TypeIs",
     "file_is_binary",
     "has_package",
     "is_ci",

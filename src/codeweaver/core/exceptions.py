@@ -449,9 +449,7 @@ class DependencyResolutionError(DependencyInjectionError):
     """
 
     def __init__(
-        self,
-        errors: list[DependencyInjectionError],
-        details: dict[str, Any] | None = None,
+        self, errors: list[DependencyInjectionError], details: dict[str, Any] | None = None
     ) -> None:
         """Initialize DependencyResolutionErrors.
 

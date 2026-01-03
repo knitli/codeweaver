@@ -28,7 +28,7 @@ async def test_partial_embeddings(qdrant_test_manager):
     Edge Case: Partial embedding failure
     Then: Store chunk with sparse-only and mark as 'incomplete'
     """
-    from codeweaver.config import QdrantConfig
+    from codeweaver.server import QdrantConfig
 
     # Create unique collection
     collection_name = qdrant_test_manager.create_collection_name("partial")

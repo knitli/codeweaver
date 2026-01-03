@@ -14,6 +14,25 @@ from typing import Any, cast
 # ===========================================================================
 # *                            Lazy Import Utilities
 # ===========================================================================
+INTROSPECTION_ATTRS: frozenset[str] = frozenset({
+    "__annotations__",
+    "__class__",
+    "__closure__",
+    "__code__",
+    "__defaults__",
+    "__dict__",
+    "__doc__",
+    "__func__",
+    "__globals__",
+    "__kwdefaults__",
+    "__module__",
+    "__name__",
+    "__qualname__",
+    "__self__",
+    "__signature__",
+    "__text_signature__",
+    "__wrapped__",
+})
 
 
 class LazyImport[Import: Any]:
@@ -28,25 +47,7 @@ class LazyImport[Import: Any]:
     __slots__ = ("_attrs", "_lock", "_module_name", "_parent", "_resolved")  # type: ignore
 
     # Introspection attributes that should resolve the object immediately
-    _INTROSPECTION_ATTRS = frozenset({
-        "__annotations__",
-        "__class__",
-        "__closure__",
-        "__code__",
-        "__defaults__",
-        "__dict__",
-        "__doc__",
-        "__func__",
-        "__globals__",
-        "__kwdefaults__",
-        "__module__",
-        "__name__",
-        "__qualname__",
-        "__self__",
-        "__signature__",
-        "__text_signature__",
-        "__wrapped__",
-    })
+
     """Attributes that trigger immediate resolution when accessed.
 
     These attributes are commonly used for introspection and should not
@@ -113,7 +114,7 @@ class LazyImport[Import: Any]:
 
     def __getattr__(self, name: str) -> LazyImport[Import]:
         """Get attribute from the resolved object, or create a new LazyImport for it."""
-        if name in self._INTROSPECTION_ATTRS:
+        if name in INTROSPECTION_ATTRS:
             try:
                 resolved = self._resolve()
                 return getattr(resolved, name)
@@ -186,4 +187,4 @@ def create_lazy_getattr(
     return __getattr__
 
 
-__all__ = ("LazyImport", "create_lazy_getattr", "lazy_import")
+__all__ = ("INTROSPECTION_ATTRS", "LazyImport", "create_lazy_getattr", "lazy_import")

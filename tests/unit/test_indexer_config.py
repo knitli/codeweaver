@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from codeweaver.config import FilteredPaths, IndexerSettings
+from codeweaver.engine import FilteredPaths, IndexerSettings
 
 
 pytestmark = [pytest.mark.unit]

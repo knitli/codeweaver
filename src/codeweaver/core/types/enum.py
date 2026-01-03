@@ -455,9 +455,11 @@ class AnonymityConversion(BaseEnum):
         functions: MappingProxyType[AnonymityConversion, FilteredCallable] = MappingProxyType({
             AnonymityConversion.BOOLEAN: lambda v: bool(v),
             AnonymityConversion.COUNT: lambda v: len(v) if isinstance(v, list) else 1,
-            AnonymityConversion.DISTRIBUTION: lambda v: {item: v.count(item) for item in set(v)}  # type: ignore
-            if (isinstance(v, Sequence) and not isinstance(v, str))
-            else {v: 1},  # type: ignore
+            AnonymityConversion.DISTRIBUTION: lambda v: (
+                {item: v.count(item) for item in set(v)}  # type: ignore
+                if (isinstance(v, Sequence) and not isinstance(v, str))
+                else {v: 1}
+            ),  # type: ignore
             AnonymityConversion.AGGREGATE: lambda v: sum(v) if isinstance(v, list) else v,  # type: ignore
             AnonymityConversion.HASH: lambda v: _hash_it(v),
             AnonymityConversion.TEXT_COUNT: lambda v: len(v) if isinstance(v, str) else 0,

@@ -95,7 +95,7 @@ class VoyageRerankingProvider(RerankingProvider[AsyncClient]):
     ) -> None:
         """Initialize the reranking provider."""
         if caps is None:
-            from codeweaver.common import get_model_registry
+            from codeweaver.core import get_model_registry
 
             registry = get_model_registry()
             caps = registry.configured_models_for_kind("reranking")  # ty: ignore[invalid-assignment]

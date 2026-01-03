@@ -45,7 +45,7 @@ def _check_api_key(provider: Provider, kind: ProviderKind) -> bool:
         return True
 
     if provider.is_local_provider:
-        from codeweaver.common import get_provider_registry
+        from codeweaver.core import get_provider_registry
 
         registry = get_provider_registry()
         return registry.is_provider_available(provider, kind)
@@ -96,7 +96,7 @@ def providers(
 
     Shows provider name, capabilities, and status (ready or needs configuration).
     """
-    from codeweaver.common import get_provider_registry
+    from codeweaver.core import get_provider_registry
 
     display = _display
     registry = get_provider_registry()
@@ -215,7 +215,7 @@ def models(
         error_handler.handle_error(error, "List models", exit_code=1)
 
     # Get provider capabilities to determine what kind of models it supports
-    from codeweaver.common import get_model_registry
+    from codeweaver.core import get_model_registry
 
     registry = get_model_registry()
     capabilities = registry.models_for_provider(provider)

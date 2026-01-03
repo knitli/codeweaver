@@ -16,8 +16,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, cast
 
-from codeweaver.config import MemoryConfig
 from codeweaver.core import PersistenceError, Provider, ProviderError, get_user_config_dir
+from codeweaver.providers.config import MemoryConfig
 from codeweaver.providers.vector_stores.qdrant_base import QdrantBaseProvider
 
 
@@ -42,7 +42,7 @@ def _get_project_name() -> str:
     Returns:
         The project name as a string.
     """
-    from codeweaver.config import get_settings_map
+    from codeweaver.providers.config import get_settings_map
 
     settings = get_settings_map()
     return settings.get("project_name") or (
@@ -53,8 +53,8 @@ def _get_project_name() -> str:
 
 
 def _get_memory_config() -> MemoryConfig:
-    from codeweaver.config import get_settings_map
     from codeweaver.core import Unset
+    from codeweaver.providers.config import get_settings_map
 
     settings_map = get_settings_map()
     if (

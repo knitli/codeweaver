@@ -62,7 +62,6 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "get_text_embedder": (__spec__.parent, "fastembed_extensions"),
     "EmbeddingRegistry": (__spec__.parent, "registry"),
     "get_embedding_registry": (__spec__.parent, "registry"),
-
 })
 
 

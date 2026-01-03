@@ -42,11 +42,10 @@ from pydantic import (
     Tag,
     computed_field,
 )
-from typing_extensions import TypeIs
 
 from codeweaver.core.types.aliases import BlakeHashKey, BlakeKey
 from codeweaver.core.types.models import BasedModel
-from codeweaver.core.utils import get_blake_hash, get_blake_hash_generic, uuid7
+from codeweaver.core.utils import TypeIs, get_blake_hash, get_blake_hash_generic, uuid7
 
 
 if TYPE_CHECKING:

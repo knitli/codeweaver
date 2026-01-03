@@ -29,8 +29,7 @@ import watchfiles
 
 from fastmcp import Context
 
-from codeweaver.core import is_ci, is_tty
-from codeweaver.di import INJECTED, IgnoreFilterDep, IndexerDep
+from codeweaver.core import INJECTED, IgnoreFilterDep, IndexerDep, is_ci, is_tty
 from codeweaver.engine.indexer.indexer import Indexer
 from codeweaver.engine.watcher._logging import WatchfilesLogManager
 from codeweaver.engine.watcher.types import FileChange

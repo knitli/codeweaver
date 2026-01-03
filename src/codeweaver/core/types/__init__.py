@@ -106,6 +106,7 @@ if TYPE_CHECKING:
         ProviderKind,
         ProviderKindLiteral,
         ProviderLiteral,
+        SDKClient,
         get_provider_kinds,
     )
     from codeweaver.core.types.search import SearchResult, SearchStrategy, StrategizedQuery
@@ -217,6 +218,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "Role": (__spec__.parent, "aliases"),
     "RoleT": (__spec__.parent, "aliases"),
     "RootedRoot": (__spec__.parent, "models"),
+    "SDKClient": (__spec__.parent, "provider"),
     "SearchResult": (__spec__.parent, "search"),
     "SearchStrategy": (__spec__.parent, "search"),
     "Sentinel": (__spec__.parent, "sentinel"),
@@ -332,6 +334,7 @@ __all__ = (
     "Role",
     "RoleT",
     "RootedRoot",
+    "SDKClient",
     "SearchResult",
     "SearchStrategy",
     "Sentinel",

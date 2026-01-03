@@ -344,7 +344,7 @@ logger = logging.getLogger()
 #
 # * Static at runtime
 #
-# In practice, CodeWeaver generates this data at build time and saves it as a pickle cache (python object) in `codeweaver.data`. This avoids the need for runtime parsing and speeds up startup.
+# In practice, CodeWeaver generates this data at build time and saves it as a pickle cache (python object) in `codeweaver.semantic.data`. This avoids the need for runtime parsing and speeds up startup.
 # We keep this capability within the code, vice in build generation, because we plan to use it dynamically in the future for new languages at runtime.
 # ===========================================================================
 
@@ -360,7 +360,7 @@ def _get_types_files_in_directory(directory: DirectoryPath | None = None) -> lis
     """
     if directory is None:
         # Use importlib.resources to access package data
-        data_dir = files("codeweaver.data") / "node_types"
+        data_dir = files("codeweaver.semantic.data") / "node_types"
         if not data_dir.is_dir():
             return []
         return [
@@ -461,7 +461,7 @@ class NodeTypeFileLoader:
 
         # If using package resources, load directly
         if self.directory is None:
-            data_dir = files("codeweaver.data") / "node_types"
+            data_dir = files("codeweaver.semantic.data") / "node_types"
             filename = f"{language.variable}-node-types.json"
             resource = data_dir / filename
             return from_json(resource.read_bytes()) if resource.is_file() else None
@@ -591,7 +591,7 @@ class NodeTypeParser:
         """
         try:
             # Try to load cache from package resources
-            cache_resource = files("codeweaver.data") / "node_types_cache.pkl"
+            cache_resource = files("codeweaver.semantic.data") / "node_types_cache.pkl"
             if not cache_resource.is_file():
                 logger.debug("Node types cache not found, will parse from JSON files")
                 return False

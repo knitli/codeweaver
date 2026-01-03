@@ -103,8 +103,8 @@ model = "test-model"
 """
         config_path.write_text(config_content)
 
-        from codeweaver.config import CodeWeaverSettings
         from codeweaver.core import CodeWeaverError
+        from codeweaver.server import CodeWeaverSettings
 
         with pytest.raises((CodeWeaverError, ValueError)):
             CodeWeaverSettings(config_file=config_path)

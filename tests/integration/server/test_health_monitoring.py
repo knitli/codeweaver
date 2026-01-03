@@ -33,7 +33,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from codeweaver.common import FailoverStats, Identifier, SessionStatistics
+from codeweaver.core import FailoverStats, Identifier, SessionStatistics
 from codeweaver.engine import Indexer, IndexingStats
 from codeweaver.server import (
     HealthResponse,
@@ -174,7 +174,7 @@ def mock_provider_registry(mocker) -> MagicMock:
 @pytest.fixture
 def session_statistics() -> SessionStatistics:
     """Create session statistics instance."""
-    from codeweaver.common import FileStatistics, TokenCounter
+    from codeweaver.core import FileStatistics, TokenCounter
 
     return SessionStatistics(
         index_statistics=FileStatistics(),

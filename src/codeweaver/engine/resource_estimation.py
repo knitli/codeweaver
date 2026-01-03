@@ -73,8 +73,8 @@ class MemoryEstimate(NamedTuple):
 
 def get_walker() -> rignore.Walker:
     """Get a rignore.Walker instance. Walkers are generators, so we create a new one each time."""
-    from codeweaver.config import DefaultIndexerSettings, get_settings
     from codeweaver.core import Unset
+    from codeweaver.engine import DefaultIndexerSettings
 
     settings = get_settings()
     index_settings = (
@@ -85,7 +85,7 @@ def get_walker() -> rignore.Walker:
     return rignore.Walker(**index_settings.to_settings())
 
 
-def estimate_file_count(project_path: Path | None = None) -> NonNegativeInt:
+def estimate_file_count(project_path: ProjectPathDep = INJECTED[Path], max_depth: int = 5) -> NonNegativeInt:
     """Quickly estimate the number of indexable files in a project.
 
     OPTIMIZATION: Caches results to avoid repeated file system scans.
@@ -98,17 +98,15 @@ def estimate_file_count(project_path: Path | None = None) -> NonNegativeInt:
         Estimated file count
     """
     if project_path is None:
-        from codeweaver.config import get_settings
         from codeweaver.core import Unset, get_project_path
 
-        settings = get_settings()
         project_path = (
             get_project_path()
             if isinstance(settings.project_path, Unset)
             else settings.project_path
         )
 
-    from codeweaver.common import get_session_statistics
+    from codeweaver.core import get_session_statistics
 
     if (
         (statistics := get_session_statistics())
@@ -157,7 +155,7 @@ def estimate_file_count(project_path: Path | None = None) -> NonNegativeInt:
 
 def _get_backup_profile():
     """Get the backup configuration profile."""
-    from codeweaver.config import get_profile
+    from codeweaver.providers import get_profile
 
     return get_profile("backup", "local")
 
@@ -258,8 +256,8 @@ def _estimate_memory_fallback():
     """Fallback memory estimation when psutil is not available."""
     logger.warning("psutil not available, cannot estimate memory")
     # we'll estimate by file count
-    from codeweaver.config import DefaultIndexerSettings, get_settings
     from codeweaver.core import Unset
+    from codeweaver.engine.config import DefaultIndexerSettings
 
     settings = get_settings()
     index_settings = (

@@ -19,7 +19,6 @@ import watchfiles
 
 from watchfiles import Change, DefaultFilter
 
-from codeweaver.config import CodeWeaverSettingsDict, RignoreSettings
 from codeweaver.core import (
     CODE_FILES_EXTENSIONS,
     CONFIG_FILE_LANGUAGES,
@@ -30,6 +29,7 @@ from codeweaver.core import (
     SemanticSearchLanguage,
     Unset,
 )
+from codeweaver.server import CodeWeaverSettingsDict, RignoreSettings
 
 
 logger = logging.getLogger(__name__)
@@ -247,8 +247,12 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
         Returns:
             Configured IgnoreFilter instance (may need async initialization)
         """
-        from codeweaver.config import DefaultIndexerSettings, IndexerSettings, get_settings_map
         from codeweaver.core import get_project_path
+        from codeweaver.engine.config import (
+            DefaultIndexerSettings,
+            IndexerSettings,
+            get_settings_map,
+        )
 
         settings = settings or get_settings_map()
         index_settings = (
@@ -291,8 +295,12 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
         Returns:
             Fully initialized IgnoreFilter instance
         """
-        from codeweaver.config import DefaultIndexerSettings, IndexerSettings, get_settings_map
         from codeweaver.core import get_project_path
+        from codeweaver.engine.config import (
+            DefaultIndexerSettings,
+            IndexerSettings,
+            get_settings_map,
+        )
 
         settings = settings or get_settings_map()
         index_settings = (

@@ -35,9 +35,7 @@ from qdrant_client.http.models.models import (
     SparseVectorParams,
     VectorParams,
 )
-from typing_extensions import TypeIs
 
-from codeweaver.config import VectorStoreProviderSettings
 from codeweaver.core import (
     CodeChunk,
     DictView,
@@ -46,8 +44,10 @@ from codeweaver.core import (
     SearchResult,
     SearchStrategy,
     StrategizedQuery,
+    TypeIs,
 )
-from codeweaver.providers.embedding.types import SparseEmbedding as CodeWeaverSparseEmbedding
+from codeweaver.core import SparseEmbedding as CodeWeaverSparseEmbedding
+from codeweaver.providers.config import VectorStoreProviderSettings
 from codeweaver.providers.vector_stores.base import MixedQueryInput, VectorStoreProvider
 from codeweaver.providers.vector_stores.metadata import CollectionMetadata, HybridVectorPayload
 from codeweaver.providers.vector_stores.search import Filter
@@ -79,7 +79,7 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         return None
 
     def _fetch_config(self) -> DictView[VectorStoreProviderSettings]:
-        from codeweaver.common import get_provider_config_for
+        from codeweaver.core import get_provider_config_for
 
         return get_provider_config_for("vector_store")
 
@@ -119,8 +119,8 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         Returns:
             CollectionMetadata configured according to provider settings.
         """
-        from codeweaver.config import get_settings_map
         from codeweaver.core import get_project_path
+        from codeweaver.providers.config import get_settings_map
 
         settings_map = get_settings_map()
         project_name = (

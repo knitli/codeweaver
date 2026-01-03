@@ -112,7 +112,9 @@ dependencies = [
   # Code-Weaver uses enums extensively
   "aenum>=3.1.16",
   "blake3>=1.0.8",
-  "pydantic>=2.12.5",
+  # We use some pydantic internal/private utilities in dependency resolution
+  # So we pin it to make sure we don't break on minor releases
+  "pydantic==2.12.5",
   # psutil used for resource governance/limiting by engine
   "psutil>=7.2.1",
   "textcase>=0.4.5",

@@ -31,36 +31,36 @@ from pydantic import PrivateAttr
 from pydantic.types import DirectoryPath, NonNegativeFloat, NonNegativeInt
 from watchfiles import Change
 
-from codeweaver.common import SessionStatistics, get_session_statistics, log_to_client_or_fallback
-from codeweaver.config import ChunkerSettings, CodeWeaverSettings
 from codeweaver.core import (
+    INJECTED,
     BasedModel,
     BlakeStore,
+    ChunkingServiceDep,
     CodeChunk,
     ConfigLanguage,
     DictView,
     DiscoveredFile,
+    EmbeddingDep,
     IndexingError,
     InitializationError,
     ProviderError,
     SemanticSearchLanguage,
+    SessionStatistics,
+    SettingsDep,
+    SparseEmbeddingDep,
     Unset,
+    VectorStoreDep,
     get_blake_hash,
+    get_container,
+    get_session_statistics,
+    is_depends_marker,
+    log_to_client_or_fallback,
     make_blake_store,
     set_relative_path,
 )
-from codeweaver.di import (
-    INJECTED,
-    ChunkingServiceDep,
-    EmbeddingDep,
-    SettingsDep,
-    SparseEmbeddingDep,
-    VectorStoreDep,
-    get_container,
-    is_depends_marker,
-)
 from codeweaver.engine.chunker import ChunkGovernor
 from codeweaver.engine.chunking_service import ChunkingService
+from codeweaver.engine.config import ChunkerSettings, CodeWeaverSettings
 from codeweaver.engine.indexer.checkpoint import CheckpointManager, IndexingCheckpoint
 from codeweaver.engine.indexer.manifest import FileManifestManager, IndexFileManifest
 from codeweaver.engine.indexer.progress import IndexingStats
@@ -73,14 +73,14 @@ logger = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from typing import Any
 
-    from codeweaver.config import (
-        CodeWeaverSettingsDict,
+    from codeweaver.core import CodeChunk
+    from codeweaver.providers import (
+        EmbeddingProvider,
         EmbeddingProviderSettings,
         SparseEmbeddingProviderSettings,
         VectorStoreProviderSettings,
     )
-    from codeweaver.core import CodeChunk
-    from codeweaver.providers import EmbeddingProvider
+    from codeweaver.server import CodeWeaverSettingsDict
 
 
 class ProgressCallback(Protocol):
@@ -115,8 +115,7 @@ _user_config: None | UserProviderSelectionDict = None
 
 
 def _get_user_provider_config() -> UserProviderSelectionDict:
-    from codeweaver.common import get_provider_config_for
-    from codeweaver.core import ProviderKind
+    from codeweaver.core import ProviderKind, get_provider_config_for
 
     global _user_config
     if _user_config is None:
@@ -130,7 +129,7 @@ def _get_user_provider_config() -> UserProviderSelectionDict:
 
 def _get_embedding_instance(*, sparse: bool = False) -> EmbeddingProvider[Any] | None:
     """Get embedding provider instance using new registry API."""
-    from codeweaver.common import get_provider_registry
+    from codeweaver.core import get_provider_registry
 
     kind = "sparse_embedding" if sparse else "embedding"
     registry = get_provider_registry()
@@ -142,7 +141,7 @@ def _get_embedding_instance(*, sparse: bool = False) -> EmbeddingProvider[Any] |
 
 def _get_vector_store_instance() -> Any | None:
     """Get vector store provider instance using registry API."""
-    from codeweaver.common import get_provider_registry
+    from codeweaver.core import get_provider_registry
 
     registry = get_provider_registry()
     if provider_enum := registry.get_provider_enum_for("vector_store"):
@@ -152,8 +151,8 @@ def _get_vector_store_instance() -> Any | None:
 
 def _get_chunking_service() -> ChunkingService:
     """Stub function to get chunking service instance."""
-    from codeweaver.config import get_settings
     from codeweaver.engine.chunking_service import ChunkingService
+    from codeweaver.server import get_settings
 
     chunk_settings = get_settings().chunker
     governor = ChunkGovernor.from_settings(
@@ -242,7 +241,7 @@ class Indexer(BasedModel):
         self._chunking_service = chunking_service
         self._settings = settings
         self._stats = IndexingStats()
-        from codeweaver.common import get_session_statistics
+        from codeweaver.core import get_session_statistics
 
         self._session_statistics = get_session_statistics()
         # Pipeline provider Fields (initialized lazily on first use)
@@ -413,13 +412,13 @@ class Indexer(BasedModel):
                 self._chunking_service = _get_chunking_service()
 
         if self._settings is None or is_depends_marker(self._settings):
-            from codeweaver.config import CodeWeaverSettings
+            from codeweaver.server import CodeWeaverSettings
 
             try:
                 # Resolve via container to support registration, singletons, and overrides
                 self._settings = await get_container().resolve(CodeWeaverSettings)
             except Exception:
-                from codeweaver.config import get_settings
+                from codeweaver.server import get_settings
 
                 self._settings = get_settings()
 
@@ -1480,7 +1479,11 @@ class Indexer(BasedModel):
         Returns:
             Configured Indexer instance (may need async initialization via prime_index)
         """
-        from codeweaver.config import DefaultIndexerSettings, IndexerSettings, get_settings_map
+        from codeweaver.engine.config import (
+            DefaultIndexerSettings,
+            IndexerSettings,
+            get_settings_map,
+        )
 
         settings_map = settings or get_settings_map()
         indexer_data = settings_map["indexer"]
@@ -1529,8 +1532,12 @@ class Indexer(BasedModel):
         Returns:
             Fully initialized Indexer instance
         """
-        from codeweaver.config import DefaultIndexerSettings, IndexerSettings, get_settings_map
         from codeweaver.core import get_project_path
+        from codeweaver.engine.config import (
+            DefaultIndexerSettings,
+            IndexerSettings,
+            get_settings_map,
+        )
 
         settings_map = settings or get_settings_map()
         indexer_data = settings_map["indexer"]

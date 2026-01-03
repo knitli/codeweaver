@@ -196,7 +196,7 @@ class DelimiterChunker(BaseChunker):
         ):
             return performance_settings
 
-        from codeweaver.config import PerformanceSettings
+        from codeweaver.server import PerformanceSettings
 
         return PerformanceSettings()
 

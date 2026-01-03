@@ -34,4 +34,4 @@ def test_tokenizer_estimate() -> None:
 def test_invalid_tokenizer_type() -> None:
     """Test that an invalid tokenizer type raises a ValueError."""
     with pytest.raises(ValueError, match="Unsupported tokenizer type"):
-        get_tokenizer("invalid", "model")
+        get_tokenizer("invalid", "model")  # ty:ignore[invalid-argument-type]

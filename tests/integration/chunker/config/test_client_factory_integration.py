@@ -11,7 +11,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from codeweaver.providers import Provider, ProviderKind
+from codeweaver.core import Provider, ProviderKind
 
 
 pytestmark = [pytest.mark.integration]
@@ -28,7 +28,7 @@ class TestProviderInstantiationWithClientFactory:
         """Create a ProviderRegistry for testing."""
         from unittest.mock import Mock
 
-        from codeweaver.common import ProviderRegistry
+        from codeweaver.core import ProviderRegistry
 
         # Create mock settings to avoid Unset type annotation issues
         mock_settings = Mock()
@@ -205,7 +205,7 @@ class TestVectorStoreProviderWithClientFactory:
         """Create a ProviderRegistry for testing."""
         from unittest.mock import Mock
 
-        from codeweaver.common import ProviderRegistry
+        from codeweaver.core import ProviderRegistry
 
         # Create mock settings to avoid Unset type annotation issues
         mock_settings = Mock()
@@ -336,7 +336,7 @@ class TestProviderKindStringHandling:
         """Create a ProviderRegistry for testing."""
         from unittest.mock import Mock
 
-        from codeweaver.common import ProviderRegistry
+        from codeweaver.core import ProviderRegistry
 
         # Create mock settings to avoid Unset type annotation issues
         mock_settings = Mock()
@@ -420,7 +420,7 @@ class TestGlobalRegistryIntegration:
         """Test that global registry has client factory methods."""
         from unittest.mock import Mock
 
-        from codeweaver.common import ProviderRegistry
+        from codeweaver.core import ProviderRegistry
 
         # Create mock registry instance
         mock_settings = Mock()

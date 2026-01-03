@@ -41,15 +41,16 @@ from tenacity import (
     wait_exponential,
 )
 
-from codeweaver.config import EmbeddingModelSettings, SparseEmbeddingModelSettings
 from codeweaver.core import (
     AnonymityConversion,
     BasedModel,
     BaseEnum,
     BlakeStore,
     LazyImport,
+    LiteralProviderType,
     Provider,
     ProviderError,
+    SparseEmbedding,
     UUIDStore,
     lazy_import,
     make_blake_store,
@@ -57,26 +58,26 @@ from codeweaver.core import (
     uuid7,
 )
 from codeweaver.core import ValidationError as CodeWeaverValidationError
+from codeweaver.providers.config import EmbeddingModelSettings, SparseEmbeddingModelSettings
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.registry import EmbeddingRegistry
-from codeweaver.providers.embedding.types import SparseEmbedding
 
 
-statistics_module: LazyImport[ModuleType] = lazy_import("codeweaver.common")
+statistics_module: LazyImport[ModuleType] = lazy_import("codeweaver.core")
 
 if TYPE_CHECKING:
-    from codeweaver.common import SessionStatistics
     from codeweaver.core import (
         AnonymityConversion,
         CodeChunk,
         FilteredKeyT,
         SerializedStrOnlyCodeChunk,
+        SessionStatistics,
         StructuredDataInput,
     )
 
 
 _get_statistics: LazyImport[SessionStatistics] = lazy_import(
-    "codeweaver.common", "get_session_statistics"
+    "codeweaver.core", "get_session_statistics"
 )
 
 logger = logging.getLogger(__name__)
@@ -177,7 +178,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         EmbeddingModelCapabilities,
         Field(description="The capabilities of the embedding model.", validation_alias="_caps"),
     ]
-    _provider: ClassVar[Provider] = Provider.NOT_SET
+    _provider: ClassVar[LiteralProviderType] = cast(LiteralProviderType, Provider.NOT_SET)
     _input_transformer: ClassVar[Callable[[StructuredDataInput], Any]] = default_input_transformer
     _output_transformer: ClassVar[Callable[[Any], list[list[float]] | list[list[int]]]] = (
         default_output_transformer
@@ -185,25 +186,23 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
     _doc_kwargs: ClassVar[dict[str, Any]] = {}
     _query_kwargs: ClassVar[dict[str, Any]] = {}
 
-    # Typing note: we can't type this properly because: 1) Pyright wants us to define the subtype for `list` and 2) pydantic does not support parameterized subtypes for generics.
-    _store: ClassVar[UUIDStore[list]] = make_uuid_store(  # type: ignore
+    # Typing note: we can't type this properly because: 1) Ty wants us to define the subtype for `list` and 2) pydantic does not support parameterized subtypes for generics.
+    _store: UUIDStore[list] = make_uuid_store(  # type: ignore
         value_type=list, size_limit=1024 * 1024 * 3
     )
     """The store for embedding documents, keyed by batch ID (UUID7) and stored as a batch of CodeChunks."""
 
-    _backup_store: ClassVar[UUIDStore[list]] = make_uuid_store(
-        value_type=list, size_limit=1024 * 1024
-    )
+    _backup_store: UUIDStore[list] = make_uuid_store(value_type=list, size_limit=1024 * 1024)
     """A smaller backup store for mapping batch IDs *for codeweaver's failsafe mechanism* to the batch ID of code chunks."""
 
-    _hash_store: ClassVar[BlakeStore[UUID7]] = make_blake_store(
+    _hash_store: BlakeStore[UUID7] = make_blake_store(
         value_type=UUID, size_limit=1024 * 256
     )  # 256kb limit -- we're just storing hashes
     """A store for deduplicating CodeChunks based on their content hash. The keys are each CodeChunk's content hash, the values are their batch IDs.
 
     Note that we're only storing the hash keys and batch ID values, not the full CodeChunk objects. This keeps the store size small. We can lookup by batch ID in the main `_store` if needed, or if it has been ejected, in the `_store`'s `_trash_heap`. `SimpleTypedStore`, the parent class, handles that for us with a simple "get" method.
     """
-    _backup_hash_store: ClassVar[BlakeStore[UUID7]] = make_blake_store(
+    _backup_hash_store: BlakeStore[UUID7] = make_blake_store(
         value_type=UUID, size_limit=1024 * 128
     )  # 128kb limit -- we're just storing hashes
     """A backup store for deduplicating CodeChunks based on their content hash. The keys are each CodeChunk's content hash, the values are their backup batch IDs.
@@ -216,11 +215,22 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
 
     def __init__(
         self,
+        client: ClientDep[SDKClient] = INJECTED[SDKClient],
+        settings: EmbeddingProviderDep[EmbeddingProviderSettingsType] = INJECTED[
+            EmbeddingProviderSettingsType
+        ],
+        **kwargs: Any,
+    ) -> None:
+        defaults = getattr(type(self), "_defaults", {})
+        object.__setattr__(self, "_model_dump_json", super().model_dump_json)
+
+    """
+    def __init__(
+        self,
         client: EmbeddingClient,
         caps: EmbeddingModelCapabilities,
         kwargs: dict[str, Any] | None,
     ) -> None:
-        """Initialize the embedding provider."""
         # Determine provider - check if subclass has it set
         getattr(type(self), "_provider", None) or caps.provider
 
@@ -246,6 +256,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
 
         # Call _initialize after super().__init__() so Pydantic private attributes are set up
         self._initialize(caps)
+    """
 
     def _add_kwargs(self, kwargs: dict[str, Any]) -> None:
         """Add keyword arguments to the embedding provider."""
@@ -501,7 +512,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
 
         Optionally takes a `batch_id` parameter to reprocess a specific batch of documents.
         """
-        from codeweaver.common import log_to_client_or_fallback
+        from codeweaver.core import log_to_client_or_fallback
 
         is_old_batch = False
         if (batch_id and self._store and batch_id in self._store and not for_backup) or (
@@ -827,7 +838,6 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
     def _get_model_settings(
         self, *, sparse: bool = False
     ) -> EmbeddingModelSettings | SparseEmbeddingModelSettings | None:
-        from codeweaver.common import get_provider_config_for
 
         settings = get_provider_config_for("sparse_embedding" if sparse else "embedding")
         return settings.get("model_settings")
@@ -853,7 +863,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         if sparse:
             return 0
         if backup:
-            from codeweaver.config import get_profile
+            from codeweaver.providers.config import get_profile
 
             profile = get_profile("backup", "local")
             if isinstance(profile["embedding"], dict):

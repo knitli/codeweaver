@@ -679,8 +679,8 @@ def get_custom_patterns(language: str) -> list[DelimiterPattern]:
         >>> len(patterns)
         6
     """
-    from codeweaver.config import get_settings
     from codeweaver.core import ConfigLanguage, SemanticSearchLanguage
+    from codeweaver.server import get_settings
 
     language = textcase.snake(language)
     delimiters: list[DelimiterPattern] = []

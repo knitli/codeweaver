@@ -296,7 +296,7 @@ def get_skeleton_provider_settings() -> dict[str, object]:
         A skeleton dict populated from environment variables that can be merged with
         provider settings.
     """
-    from codeweaver.config.envs import get_skeleton_provider_dict
+    from codeweaver.core import get_skeleton_provider_dict
 
     return get_skeleton_provider_dict()
 

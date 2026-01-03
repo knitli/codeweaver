@@ -44,6 +44,57 @@ def get_function_annotations(func: Callable[..., Any]) -> dict[str, Any]:
     return func.__annotations__
 
 
+def get_caller(depth: int = 1) -> inspect.FrameInfo | None:
+    """Retrieve the caller's frame information.
+
+    Args:
+        depth (int): The depth of the caller to retrieve. Default is 1 (immediate caller).
+
+    Returns:
+        inspect.FrameInfo | None: The frame information of the caller, or None if not found.
+    """
+    stack = inspect.stack()
+    return stack[depth] if len(stack) > depth else None
+
+
+def get_caller_module(depth: int = 1) -> Any | None:
+    """Retrieve the caller's module.
+
+    Args:
+        depth (int): The depth of the caller to retrieve. Default is 1 (immediate caller).
+
+    Returns:
+        Any | None: The module of the caller, or None if not found.
+    """
+    caller_frame = get_caller(depth + 1)
+    return inspect.getmodule(caller_frame.frame) if caller_frame else None
+
+
+def get_caller_modulename(depth: int = 1) -> str | None:
+    """Retrieve the caller's module name.
+
+    Args:
+        depth (int): The depth of the caller to retrieve. Default is 1 (immediate caller).
+
+    Returns:
+        str | None: The module name of the caller, or None if not found.
+    """
+    caller_frame = get_caller(depth + 1)
+    return inspect.getmodulename(caller_frame.filename) if caller_frame else None
+
+
+def get_generic_params_for_type(tp: type[Any]) -> tuple[Any, ...]:
+    """Retrieve the generic parameters for a given type.
+
+    Args:
+        tp (type): The type to introspect.
+
+    Returns:
+        tuple[Any, ...]: The generic parameters of the type.
+    """
+    return getattr(tp, "__args__", ())
+
+
 def get_function_parameters(func: Callable[..., Any]) -> MappingProxyType[str, Parameter]:
     """Retrieve the parameters of a given function.
 

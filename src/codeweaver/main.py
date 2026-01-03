@@ -19,9 +19,9 @@ from typing import Any, Literal, cast
 from fastmcp import FastMCP
 from pydantic import FilePath
 
-from codeweaver.config import CodeWeaverSettingsDict
 from codeweaver.core import InitializationError, lazy_import
 from codeweaver.core import Provider as Provider
+from codeweaver.server import CodeWeaverSettingsDict
 
 
 class UvicornAccessLogFilter(logging.Filter):
@@ -104,11 +104,9 @@ async def _run_http_server(
         debug: Enable debug logging
     """
     from codeweaver.cli import StatusDisplay
-    from codeweaver.common import get_session_statistics
-    from codeweaver.config import get_settings
-    from codeweaver.core import Unset, get_project_path
+    from codeweaver.core import Unset, get_project_path, get_session_statistics
     from codeweaver.mcp import CwMcpHttpState, create_http_server
-    from codeweaver.server import ManagementServer, http_lifespan
+    from codeweaver.server import ManagementServer, get_settings, http_lifespan
 
     # Load settings
     settings = get_settings()
@@ -121,8 +119,7 @@ async def _run_http_server(
 
     # Setup logging
     if verbose or debug:
-        from codeweaver.config import get_settings_map
-        from codeweaver.server import setup_logger
+        from codeweaver.server import get_settings_map, setup_logger
 
         setup_logger(get_settings_map())
 
@@ -145,7 +142,7 @@ async def _run_http_server(
     original_sigint_handler = _setup_signal_handler()
 
     # Initialize provider registry
-    registry = lazy_import("codeweaver.common", "get_provider_registry")  # type: ignore
+    registry = lazy_import("codeweaver.core", "get_provider_registry")  # type: ignore
     _ = registry._resolve()()  # type: ignore
 
     # Suppress uvicorn loggers if not in verbose/debug mode
@@ -270,7 +267,7 @@ async def get_stdio_server(
 
     if config_file or project_path:
         # We normally want to use the global settings instance, but here because a proxied stdio client could be used in isolation and outside a typical configuration, we create a unique settings instance.
-        from codeweaver.config import CodeWeaverSettings, get_settings
+        from codeweaver.server import CodeWeaverSettings, get_settings
 
         global_settings = get_settings()
         if config_file and isinstance(config_file, Path) and config_file.exists():

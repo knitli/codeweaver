@@ -145,7 +145,7 @@ class SemanticChunker(BaseChunker):
         self.language = language
 
         # Handle tokenizer injection
-        from codeweaver.di import is_depends_marker
+        from codeweaver.core import is_depends_marker
 
         if tokenizer is None or is_depends_marker(tokenizer):
             try:
@@ -193,7 +193,7 @@ class SemanticChunker(BaseChunker):
             ChunkLimitExceededError: If chunk count exceeds configured maximum
             ASTDepthExceededError: If AST nesting exceeds safe depth limit
         """
-        from codeweaver.common import get_session_statistics
+        from codeweaver.core import get_session_statistics
 
         statistics = get_session_statistics()
         start_time = time.perf_counter()
@@ -272,7 +272,7 @@ class SemanticChunker(BaseChunker):
         if self.governor.settings is not None:
             return self.governor.settings.performance
 
-        from codeweaver.config import PerformanceSettings
+        from codeweaver.server import PerformanceSettings
 
         return PerformanceSettings()
 

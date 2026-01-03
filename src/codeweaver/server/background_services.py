@@ -120,7 +120,7 @@ async def start_watcher(
     state: CodeWeaverState, status_display: StatusDisplay
 ) -> asyncio.Task[None | int]:
     """Start the file watcher as an asynchronous task."""
-    from codeweaver.di import get_container
+    from codeweaver.core import get_container
     from codeweaver.engine import FileWatcher
 
     # Use DI container to resolve FileWatcher with all its dependencies

@@ -18,13 +18,12 @@ from typing import TYPE_CHECKING
 
 from codeweaver_tokenizers.base import Tokenizer
 
-from codeweaver.config import CodeWeaverSettings
-from codeweaver.core import CodeChunk
-from codeweaver.di import INJECTED, GovernorDep, SettingsDep, TokenizerDep
+from codeweaver.core import INJECTED, CodeChunk, GovernorDep, SettingsDep, TokenizerDep
 from codeweaver.engine.chunker import ChunkerSelector, chunk_files_parallel
 from codeweaver.engine.chunker.base import ChunkGovernor
 from codeweaver.engine.chunker.delimiter import DelimiterChunker
 from codeweaver.engine.chunker.exceptions import ChunkingError
+from codeweaver.server import CodeWeaverSettings
 
 
 if TYPE_CHECKING:
@@ -56,7 +55,7 @@ class ChunkingService:
 
         Using settings for configuration:
 
-        >>> from codeweaver.config import ChunkerSettings, ConcurrencySettings
+        >>> from codeweaver.engine.config import ChunkerSettings, ConcurrencySettings
         >>> settings = ChunkerSettings(
         ...     concurrency=ConcurrencySettings(max_parallel_files=8, executor="thread")
         ... )
@@ -149,11 +148,10 @@ class ChunkingService:
         Yields:
             Tuples of (file_path, chunks) for successfully chunked files
         """
-        from codeweaver.core import Unset, get_project_path
-        from codeweaver.di import Depends, DependsPlaceholder
+        from codeweaver.core import Depends, DependsPlaceholder, Unset, get_project_path
 
         if isinstance(self.settings, (Depends, DependsPlaceholder)):
-            from codeweaver.config import get_settings
+            from codeweaver.server import get_settings
 
             self.settings = get_settings()
 
@@ -231,10 +229,10 @@ class ChunkingService:
         Raises:
             Exception: If chunking fails (after fallback attempts)
         """
-        from codeweaver.di import Depends, DependsPlaceholder
+        from codeweaver.core import Depends, DependsPlaceholder
 
         if isinstance(self.settings, (Depends, DependsPlaceholder)):
-            from codeweaver.config import get_settings
+            from codeweaver.server import get_settings
 
             self.settings = get_settings()
 

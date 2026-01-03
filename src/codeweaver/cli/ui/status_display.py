@@ -37,6 +37,8 @@ if TYPE_CHECKING:
     from rich.console import RenderableType
     from rich.progress import Task
 
+CODEWEAVER_PREFIX = "[bold dark_orange][CodeWeaver][/bold dark_orange]"
+
 
 class AtomicAwareBarColumn(BarColumn):
     """BarColumn that skips rendering for atomic tasks."""
@@ -697,8 +699,6 @@ class StatusDisplay:
             command: Command name (e.g., "index", "search")
             description: Optional command description
         """
-        from codeweaver.common import CODEWEAVER_PREFIX
-
         self.console.print(f"{CODEWEAVER_PREFIX} {command}", style="bold")
         if description:
             self.console.print(f"  {description}")

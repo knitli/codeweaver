@@ -10,8 +10,7 @@ import sys
 
 from typing import TYPE_CHECKING
 
-from codeweaver.common import CODEWEAVER_PREFIX
-from codeweaver.core import CodeWeaverError
+from codeweaver.core import CODEWEAVER_PREFIX, CodeWeaverError
 
 
 if TYPE_CHECKING:

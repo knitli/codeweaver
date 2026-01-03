@@ -25,6 +25,13 @@ if TYPE_CHECKING:
         LoggingSettings,
         SerializableLoggingFilter,
     )
+    from codeweaver.core.config.envs import (
+        SettingsEnvVars,
+        environment_variables,
+        get_provider_vars,
+        get_skeleton_provider_dict,
+    )
+    from codeweaver.core.config.telemetry import TelemetrySettings, get_telemetry_settings
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "DefaultLoggingSettings": (__spec__.parent, "_logging"),
@@ -39,6 +46,12 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "LoggingConfigDict": (__spec__.parent, "_logging"),
     "LoggingSettings": (__spec__.parent, "_logging"),
     "SerializableLoggingFilter": (__spec__.parent, "_logging"),
+    "SettingsEnvVars": (__spec__.parent, "envs"),
+    "TelemetrySettings": (__spec__.parent, "telemetry"),
+    "environment_variables": (__spec__.parent, "envs"),
+    "get_provider_vars": (__spec__.parent, "envs"),
+    "get_skeleton_provider_dict": (__spec__.parent, "envs"),
+    "get_telemetry_settings": (__spec__.parent, "telemetry"),
 })
 
 __getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
@@ -56,6 +69,12 @@ __all__ = (
     "LoggingConfigDict",
     "LoggingSettings",
     "SerializableLoggingFilter",
+    "SettingsEnvVars",
+    "TelemetrySettings",
+    "environment_variables",
+    "get_provider_vars",
+    "get_skeleton_provider_dict",
+    "get_telemetry_settings",
 )
 
 

@@ -8,7 +8,7 @@ from typing import Annotated
 
 import pytest
 
-from codeweaver.di import INJECTED, Container, Depends
+from codeweaver.core import INJECTED, Container, Depends
 
 
 class MockService:

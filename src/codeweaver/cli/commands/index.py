@@ -18,13 +18,13 @@ from cyclopts import App
 from pydantic import FilePath
 
 from codeweaver.cli.ui import CLIErrorHandler, IndexingProgress, StatusDisplay, get_display
-from codeweaver.config import CodeWeaverSettingsDict
 from codeweaver.core import CodeWeaverError, DictView, get_project_path, get_user_config_dir
+from codeweaver.server import CodeWeaverSettingsDict
 
 
 if TYPE_CHECKING:
-    from codeweaver.config import CodeWeaverSettings
     from codeweaver.engine import CheckpointManager
+    from codeweaver.server import CodeWeaverSettings
 
 _display: StatusDisplay = get_display()
 
@@ -74,7 +74,7 @@ def _load_and_configure_settings(
     Returns:
         Tuple of (CodeWeaverSettings, resolved project path)
     """
-    from codeweaver.config import get_settings, update_settings
+    from codeweaver.server import get_settings, update_settings
 
     settings = get_settings(config_file=config_file)
 
@@ -107,8 +107,8 @@ def _derive_collection_name(
     Returns:
         Derived collection name string
     """
-    from codeweaver.config import ProviderSettings
     from codeweaver.core import generate_collection_name
+    from codeweaver.providers import ProviderSettings
 
     # Default collection name
     collection_name = generate_collection_name()
@@ -144,9 +144,8 @@ async def _perform_clear_operation(
     Raises:
         CodeWeaverError: If operation fails
     """
-    from codeweaver.common import get_provider_registry
-    from codeweaver.config import IndexerSettings
-    from codeweaver.engine import CheckpointManager, FileManifestManager
+    from codeweaver.core import get_provider_registry
+    from codeweaver.engine import CheckpointManager, FileManifestManager, IndexerSettings
 
     if not yes:
         display.print_warning("⚠ Warning: Destructive Operation")
@@ -184,8 +183,8 @@ async def _perform_clear_operation(
     collection_name = _derive_collection_name(settings, project_path, checkpoint_mgr)
 
     # Clear vector store
-    from codeweaver.config import ProviderSettings
     from codeweaver.core import Unset
+    from codeweaver.server import ProviderSettings
 
     registry = get_provider_registry()
     provider = registry.get_provider_enum_for("vector_store")
@@ -261,7 +260,7 @@ async def _handle_server_status(*, standalone: bool, display: StatusDisplay) -> 
 
 
 def _get_url():
-    from codeweaver.config import get_settings_map
+    from codeweaver.server import get_settings_map
 
     settings_map = get_settings_map()
     host = settings_map.get("management_host", "localhost")

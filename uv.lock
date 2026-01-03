@@ -900,7 +900,7 @@ requires-dist = [
     { name = "py-cpuinfo", marker = "extra == 'recommended'" },
     { name = "py-cpuinfo", marker = "extra == 'recommended-local-only'" },
     { name = "py-cpuinfo", marker = "extra == 'sentence-transformers'" },
-    { name = "pydantic", specifier = ">=2.12.5" },
+    { name = "pydantic", specifier = "==2.12.5" },
     { name = "pydantic-ai-slim", specifier = ">=1.39.0" },
     { name = "pydantic-ai-slim", extras = ["anthropic"], marker = "extra == 'anthropic'" },
     { name = "pydantic-ai-slim", extras = ["anthropic", "bedrock", "cohere", "duckduckgo", "google", "groq", "huggingface", "mistral", "openai", "retries", "tavily"], marker = "extra == 'full'" },

@@ -23,8 +23,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from codeweaver.common import TelemetryService
-from codeweaver.config import CodeWeaverSettings, TelemetrySettings
+from codeweaver.core import TelemetryService
+from codeweaver.server import CodeWeaverSettings, TelemetrySettings
 
 
 pytestmark = [pytest.mark.unit, pytest.mark.server]
@@ -32,7 +32,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.server]
 
 def create_session_statistics():
     """Create a SessionStatistics instance with all required fields."""
-    from codeweaver.common import (
+    from codeweaver.core import (
         FailoverStats,
         FileStatistics,
         SessionStatistics,
@@ -67,6 +67,7 @@ def create_find_code_response(
 ):
     """Create a FindCodeResponseSummary with all required fields."""
     from codeweaver.agent_api import FindCodeResponseSummary, IntentType
+
     from codeweaver.core import SearchStrategy
 
     return FindCodeResponseSummary(
@@ -125,7 +126,7 @@ class TestTelemetryIntegration:
         mock_telemetry.disable_telemetry = True
         mock_settings.telemetry = mock_telemetry
 
-        with patch("codeweaver.config", return_value=mock_settings):
+        with patch("codeweaver.server", return_value=mock_settings):
             client = TelemetryService.from_settings()
 
             assert client.enabled is False
@@ -141,7 +142,7 @@ class TestTelemetryIntegration:
         mock_telemetry.posthog_host = "https://us.i.posthog.com"
         mock_settings.telemetry = mock_telemetry
 
-        with patch("codeweaver.config", return_value=mock_settings):
+        with patch("codeweaver.server", return_value=mock_settings):
             client = TelemetryService.from_settings()
 
             assert client.enabled is False
@@ -191,7 +192,7 @@ class TestTelemetryIntegration:
 
     def test_capture_from_event(self) -> None:
         """Test capture_from_event with a telemetry event object."""
-        from codeweaver.common import SessionEvent
+        from codeweaver.core import SessionEvent
 
         # Create SessionStatistics with all required fields
         stats = create_session_statistics()
@@ -219,7 +220,7 @@ class TestSessionEvent:
 
     def test_session_event_creation(self) -> None:
         """Test SessionEvent can be created from statistics."""
-        from codeweaver.common import SessionEvent
+        from codeweaver.core import SessionEvent
 
         stats = create_session_statistics()
         event = SessionEvent.from_statistics(
@@ -237,7 +238,7 @@ class TestSessionEvent:
 
     def test_session_event_to_posthog_event(self) -> None:
         """Test SessionEvent converts to PostHog event format."""
-        from codeweaver.common import SessionEvent
+        from codeweaver.core import SessionEvent
 
         stats = create_session_statistics()
         event = SessionEvent.from_statistics(
@@ -263,7 +264,7 @@ class TestSessionEvent:
 
     def test_session_event_empty_stats(self) -> None:
         """Test SessionEvent handles empty statistics."""
-        from codeweaver.common import SessionEvent
+        from codeweaver.core import SessionEvent
 
         event = SessionEvent()
         event_name, properties = event.to_posthog_event()
@@ -280,8 +281,8 @@ class TestSearchEvent:
     def test_search_event_creation(self) -> None:
         """Test SearchEvent can be created."""
         from codeweaver.agent_api import IntentType
-        from codeweaver.common import SearchEvent
-        from codeweaver.core import SearchStrategy
+
+        from codeweaver.core import SearchEvent, SearchStrategy
 
         response = create_find_code_response()
 
@@ -301,8 +302,8 @@ class TestSearchEvent:
     def test_search_event_to_posthog_event(self) -> None:
         """Test SearchEvent converts to PostHog event format."""
         from codeweaver.agent_api import IntentType
-        from codeweaver.common import SearchEvent
-        from codeweaver.core import SearchStrategy
+
+        from codeweaver.core import SearchEvent, SearchStrategy
 
         response = create_find_code_response(
             total_matches=10,
@@ -338,8 +339,8 @@ class TestSearchEvent:
     def test_search_event_with_tools_over_privacy(self) -> None:
         """Test SearchEvent includes query details when tools_over_privacy=True."""
         from codeweaver.agent_api import IntentType
-        from codeweaver.common import SearchEvent
-        from codeweaver.core import SearchStrategy
+
+        from codeweaver.core import SearchEvent, SearchStrategy
 
         response = create_find_code_response()
 
@@ -366,8 +367,8 @@ class TestSearchEvent:
     def test_search_event_without_tools_over_privacy(self) -> None:
         """Test SearchEvent excludes query details when tools_over_privacy=False."""
         from codeweaver.agent_api import IntentType
-        from codeweaver.common import SearchEvent
-        from codeweaver.core import SearchStrategy
+
+        from codeweaver.core import SearchEvent, SearchStrategy
 
         response = create_find_code_response()
 
@@ -441,9 +442,9 @@ class TestConvenienceFunctions:
 
     def test_capture_session_event_respects_opt_out(self) -> None:
         """Test capture_session_event doesn't capture when disabled."""
-        from codeweaver.common import capture_session_event
+        from codeweaver.core import capture_session_event
 
-        with patch("codeweaver.common") as mock_get_client:
+        with patch("codeweaver.core") as mock_get_client:
             mock_client = MagicMock()
             mock_client.enabled = False
             mock_get_client.return_value = mock_client
@@ -457,10 +458,10 @@ class TestConvenienceFunctions:
     def test_capture_search_event_respects_opt_out(self) -> None:
         """Test capture_search_event doesn't capture when disabled."""
         from codeweaver.agent_api import IntentType
-        from codeweaver.common import capture_search_event
-        from codeweaver.core import SearchStrategy
 
-        with patch("codeweaver.common") as mock_get_client:
+        from codeweaver.core import SearchStrategy, capture_search_event
+
+        with patch("codeweaver.core") as mock_get_client:
             mock_client = MagicMock()
             mock_client.enabled = False
             mock_get_client.return_value = mock_client

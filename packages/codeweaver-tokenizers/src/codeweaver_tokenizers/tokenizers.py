@@ -9,14 +9,16 @@ Tokenizer for the Tokenizers library.
 from __future__ import annotations
 
 import logging
-
+import sys
 from collections.abc import Sequence
 from typing import Any, Literal
 
-from typing_extensions import TypeIs
+if sys.version_info >= (3, 13):
+    from typing import TypeIs
+else:
+    from typing_extensions import TypeIs
 
 from codeweaver_tokenizers.base import Tokenizer
-
 
 logger = logging.getLogger(__name__)
 

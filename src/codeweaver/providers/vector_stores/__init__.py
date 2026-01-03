@@ -14,7 +14,7 @@ from codeweaver.core import ConfigurationError
 
 
 if TYPE_CHECKING:
-    from codeweaver.config import VectorStoreProviderSettings
+    from codeweaver.providers.config import VectorStoreProviderSettings
     from codeweaver.providers.vector_stores.base import VectorStoreProvider
     from codeweaver.providers.vector_stores.inmemory import MemoryVectorStoreProvider
     from codeweaver.providers.vector_stores.metadata import CollectionMetadata, HybridVectorPayload
@@ -38,7 +38,7 @@ def get_vector_store_provider(settings: VectorStoreProviderSettings) -> VectorSt
         ImportError: If required dependencies for selected provider are not installed.
 
     Examples:
-        >>> from codeweaver.config import VectorStoreProviderSettings
+        >>> from codeweaver.providers.config import VectorStoreProviderSettings
         >>> settings = VectorStoreProviderSettings(provider=Provider.MEMORY)
         >>> provider = get_vector_store_provider(settings)
         >>> isinstance(provider, MemoryVectorStoreProvider)

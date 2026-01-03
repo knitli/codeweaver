@@ -78,6 +78,7 @@ class ProviderKind(BaseEnum):
     AGENT = "agent"
     UNSET = "unset"
 
+
 class SDKClient(BaseEnum):
     """Enumeration of available SDK clients.
 
@@ -94,6 +95,7 @@ class SDKClient(BaseEnum):
     OPENAI = "openai"
     QDRANT = "qdrant"
     SENTENCE_TRANSFORMERS = "sentence-transformers"
+    VOYAGE = "voyage"
 
     @property
     def client(  # noqa: C901
@@ -689,6 +691,10 @@ class Provider(BaseEnum):
                     found_vars.extend(self._flatten_envvars(env_vars_dict))
         return tuple(found_vars)
 
+    def has_capability(self, kind: LiteralProviderKindType) -> bool:
+        """Check if the provider has a specific capability."""
+        return kind in get_provider_kinds(cast(LiteralProviderType, self))
+
     def is_embedding_provider(self) -> bool:
         """Check if the provider is an embedding provider."""
         return any(kind == ProviderKind.EMBEDDING for kind in get_provider_kinds(self))
@@ -729,47 +735,50 @@ class Provider(BaseEnum):
         return False
 
 
-SDK_MAP: MappingProxyType[tuple[Provider, ProviderKind], SDKClient | tuple[SDKClient, ...]] = MappingProxyType(
-    {(provider, ProviderKind.EMBEDDING): SDKClient.OPENAI for provider in (
-        Provider.FIREWORKS,
-        Provider.GITHUB,
-        Provider.GROQ,
-        Provider.LITELLM,
-        Provider.OLLAMA,
-        Provider.OPENAI,
-        Provider.OPENROUTER,
-        Provider.TOGETHER,
-        Provider.VERCEL,
-    )} |
-    {
-        (Provider.AZURE, ProviderKind.EMBEDDING): (SDKClient.OPENAI, SDKClient.COHERE),
-        (Provider.HEROKU, ProviderKind.EMBEDDING): (SDKClient.OPENAI, SDKClient.COHERE),
-    }
-    | {
-        (provider, ProviderKind.EMBEDDING): SDKClient.from_string(provider.variable)
-        for provider in (Provider.MISTRAL, Provider.HUGGINGFACE_INFERENCE, Provider.GOOGLE)
-    }
-    | {
-        (provider, kind): SDKClient.from_string(provider.variable)
-        for provider, kind in (
-            (prov, knd)
-            for prov in (Provider.BEDROCK, Provider.COHERE, Provider.VOYAGE)
-            for knd in (ProviderKind.EMBEDDING, ProviderKind.RERANKING)
-        )
-    }
-    | {
-        (provider, kind): SDKClient.from_string(provider.variable)
-        for provider in (Provider.FASTEMBED, Provider.SENTENCE_TRANSFORMERS)
-        for kind in (
-            ProviderKind.EMBEDDING,
-            ProviderKind.SPARSE_EMBEDDING,
-            ProviderKind.RERANKING,
-        )
-    }
-    | {
-        (Provider.QDRANT, ProviderKind.VECTOR_STORE): SDKClient.QDRANT,
-    }
-    | {(Provider.MEMORY, ProviderKind.VECTOR_STORE): SDKClient.QDRANT},
+SDK_MAP: MappingProxyType[tuple[Provider, ProviderKind], SDKClient | tuple[SDKClient, ...]] = (
+    MappingProxyType(
+        {
+            (provider, ProviderKind.EMBEDDING): SDKClient.OPENAI
+            for provider in (
+                Provider.FIREWORKS,
+                Provider.GITHUB,
+                Provider.GROQ,
+                Provider.LITELLM,
+                Provider.OLLAMA,
+                Provider.OPENAI,
+                Provider.OPENROUTER,
+                Provider.TOGETHER,
+                Provider.VERCEL,
+            )
+        }
+        | {
+            (Provider.AZURE, ProviderKind.EMBEDDING): (SDKClient.OPENAI, SDKClient.COHERE),
+            (Provider.HEROKU, ProviderKind.EMBEDDING): (SDKClient.OPENAI, SDKClient.COHERE),
+        }
+        | {
+            (provider, ProviderKind.EMBEDDING): SDKClient.from_string(provider.variable)
+            for provider in (Provider.MISTRAL, Provider.HUGGINGFACE_INFERENCE, Provider.GOOGLE)
+        }
+        | {
+            (provider, kind): SDKClient.from_string(provider.variable)
+            for provider, kind in (
+                (prov, knd)
+                for prov in (Provider.BEDROCK, Provider.COHERE, Provider.VOYAGE)
+                for knd in (ProviderKind.EMBEDDING, ProviderKind.RERANKING)
+            )
+        }
+        | {
+            (provider, kind): SDKClient.from_string(provider.variable)
+            for provider in (Provider.FASTEMBED, Provider.SENTENCE_TRANSFORMERS)
+            for kind in (
+                ProviderKind.EMBEDDING,
+                ProviderKind.SPARSE_EMBEDDING,
+                ProviderKind.RERANKING,
+            )
+        }
+        | {(Provider.QDRANT, ProviderKind.VECTOR_STORE): SDKClient.QDRANT}
+        | {(Provider.MEMORY, ProviderKind.VECTOR_STORE): SDKClient.QDRANT}
+    )
 )
 """Mapping of providers and their kinds to SDK clients. Currently only handles embedding/sparse_embedding/reranking/vector_store kinds."""
 
@@ -820,9 +829,13 @@ Eventually, we may be able to enable broader support from these providers, but f
 """
 
 
-def get_provider_kinds(provider: Provider) -> tuple[ProviderKind, ...]:
+def get_provider_kinds(provider: LiteralProviderType) -> tuple[ProviderKind, ...]:
     """Get capabilities for a provider."""
-    return PROVIDER_CAPABILITIES.get(provider, (ProviderKind.DATA,))
+    provider = cast(
+        LiteralProviderType,
+        provider if isinstance(provider, Provider) else Provider.from_string(provider),
+    )
+    return PROVIDER_CAPABILITIES.get(provider, (ProviderKind.DATA,))  # ty:ignore[no-matching-overload]
 
 
 type LiteralProviderKind = Literal[
@@ -913,5 +926,6 @@ __all__ = (
     "ProviderKind",
     "ProviderKindLiteral",
     "ProviderLiteral",
+    "SDKClient",
     "get_provider_kinds",
 )

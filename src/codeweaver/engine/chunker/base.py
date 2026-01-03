@@ -26,9 +26,10 @@ from typing import TYPE_CHECKING, Annotated, Any, cast
 
 from pydantic import ConfigDict, Field, PositiveInt, PrivateAttr, computed_field
 
-# Import ChunkerSettings at runtime for model rebuild to work
-from codeweaver.config import ChunkerSettings, ProviderSettingsDict
 from codeweaver.core import BasedModel, CodeChunk, InitializationError
+
+# Import ChunkerSettings at runtime for model rebuild to work
+from codeweaver.engine.config import ChunkerSettings, ProviderSettingsDict
 from codeweaver.providers import EmbeddingModelCapabilities, RerankingModelCapabilities
 
 
@@ -41,7 +42,7 @@ logger = logging.getLogger(__name__)
 
 def _get_chunker_settings() -> ChunkerSettings:
     """Retrieve the chunker settings."""
-    from codeweaver.config import get_settings
+    from codeweaver.server import get_settings
 
     cw_settings = get_settings()
     return (
@@ -57,8 +58,7 @@ def _get_capabilities() -> (
     | tuple[EmbeddingModelCapabilities, RerankingModelCapabilities]
 ):
     """Retrieve the capabilities."""
-    from codeweaver.common import get_model_registry
-    from codeweaver.core import ProviderKind
+    from codeweaver.core import ProviderKind, get_model_registry
 
     registry = get_model_registry()
     embedding_caps = registry.configured_models_for_kind(ProviderKind.EMBEDDING)
@@ -336,9 +336,9 @@ def _rebuild_models() -> None:
         if not ChunkGovernor.__pydantic_complete__:
             # Import ChunkerSettings to ensure it's available for rebuild
             # The import is safe here because ChunkerSettings imports are already resolved
-            from codeweaver.config import ChunkerSettings as _ChunkerSettings
             from codeweaver.engine.chunker.delimiters.families import LanguageFamily
             from codeweaver.engine.chunker.delimiters.patterns import DelimiterPattern
+            from codeweaver.engine.config import ChunkerSettings as _ChunkerSettings
 
             # Build namespace for model rebuild with all required types
             # ChunkGovernor needs ChunkerSettings, and BaseChunker methods use CodeChunk

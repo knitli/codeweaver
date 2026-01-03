@@ -6,9 +6,10 @@
 
 from __future__ import annotations
 
-from importlib import import_module
 from types import MappingProxyType
 from typing import TYPE_CHECKING
+
+from codeweaver.core import create_lazy_getattr
 
 
 if TYPE_CHECKING:
@@ -44,6 +45,27 @@ if TYPE_CHECKING:
         source_id_for,
     )
     from codeweaver.engine.chunking_service import ChunkingService
+    from codeweaver.engine.config import (
+        ChunkerSettings,
+        ChunkerSettingsDict,
+        CustomDelimiter,
+        CustomLanguage,
+        IndexerSettings,
+        IndexerSettingsDict,
+        RignoreSettings,
+    )
+    from codeweaver.engine.indexer import (
+        CheckpointManager,
+        CheckpointSettingsFingerprint,
+        FileManifestEntry,
+        FileManifestManager,
+        Indexer,
+        IndexFileManifest,
+        IndexingCheckpoint,
+        IndexingPhase,
+        IndexingProgressTracker,
+        IndexingStats,
+    )
     from codeweaver.engine.watcher import (
         CodeFilter,
         ConfigFilter,
@@ -52,43 +74,6 @@ if TYPE_CHECKING:
         ExtensionFilter,
         FileWatcher,
         IgnoreFilter,
-    )
-    from codeweaver.providers import (
-        AnyVariants,
-        ArbitraryFilter,
-        Condition,
-        DatetimeRange,
-        Entry,
-        ExtendedPointId,
-        FieldCondition,
-        Filter,
-        FilterableField,
-        GeoBoundingBox,
-        GeoLineString,
-        GeoPoint,
-        GeoPolygon,
-        GeoRadius,
-        HasIdCondition,
-        HasVectorCondition,
-        IsEmptyCondition,
-        IsNullCondition,
-        Match,
-        MatchAny,
-        MatchExcept,
-        MatchPhrase,
-        MatchText,
-        MatchValue,
-        MinShould,
-        Nested,
-        NestedCondition,
-        PayloadField,
-        PayloadMetadata,
-        PayloadSchemaType,
-        Range,
-        ValuesCount,
-        ValueVariants,
-        make_partial_function,
-        wrap_filters,
     )
 
 parent = __spec__.parent or "codeweaver.engine"
@@ -99,28 +84,36 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "ArbitraryFilter": (f"{parent}", "search"),
     "BinaryFileError": (f"{parent}.chunker", "exceptions"),
     "Boundary": (f"{parent}.chunker", "delimiter_model"),
+    "CheckpointManager": (f"{parent}.indexer", "indexer"),
+    "CheckpointSettingsFingerprint": (f"{parent}.indexer", "indexer"),
     "ChunkGovernor": (f"{parent}.chunker", "base"),
     "ChunkLimitExceededError": (f"{parent}.chunker", "exceptions"),
     "ChunkerSelector": (f"{parent}.chunker", "selector"),
+    "ChunkerSettings": (__spec__.parent, "chunker"),
+    "ChunkerSettingsDict": (__spec__.parent, "chunker"),
     "ChunkingError": (f"{parent}.chunker", "exceptions"),
     "ChunkingService": (parent, "chunking_service"),
     "ChunkingTimeoutError": (f"{parent}.chunker", "exceptions"),
     "CodeFilter": (parent, "watcher"),
     "Condition": (parent, "search"),
     "ConfigFilter": (parent, "watcher"),
+    "CustomDelimiter": (__spec__.parent, "chunker"),
+    "CustomLanguage": (__spec__.parent, "chunker"),
     "DatetimeRange": (parent, "search"),
     "DefaultFilter": (parent, "watcher"),
     "Delimiter": (f"{parent}.chunker", "delimiter_model"),
     "DelimiterChunker": (f"{parent}.chunker", "delimiter"),
+    "DelimiterDict": (f"{parent}.chunker.delimiters", "patterns"),
     "DelimiterKind": (f"{parent}.chunker.delimiters", "kind"),
     "DelimiterMatch": (f"{parent}.chunker", "delimiter_model"),
     "DelimiterPattern": (f"{parent}.chunker.delimiters", "patterns"),
-    "DelimiterDict": (f"{parent}.chunker.delimiters", "patterns"),
     "DocsFilter": (parent, "watcher"),
     "Entry": (parent, "search"),
     "ExtendedPointId": (parent, "search"),
     "ExtensionFilter": (parent, "watcher"),
     "FieldCondition": (parent, "search"),
+    "FileManifestEntry": (f"{parent}.indexer", "manifest"),
+    "FileManifestManager": (f"{parent}.indexer", "manifest"),
     "FileWatcher": (parent, "watcher"),
     "Filter": (parent, "search"),
     "FilterableField": (parent, "search"),
@@ -133,7 +126,14 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "HasIdCondition": (parent, "search"),
     "HasVectorCondition": (parent, "search"),
     "IgnoreFilter": (parent, "watcher"),
-    "Indexer": (parent, "indexer"),
+    "IndexFileManifest": (f"{parent}.indexer", "manifest"),
+    "Indexer": (f"{parent}.indexer", "indexer"),
+    "IndexerSettings": (__spec__.parent, "indexer"),
+    "IndexerSettingsDict": (__spec__.parent, "indexer"),
+    "IndexingCheckpoint": (f"{parent}.indexer", "indexer"),
+    "IndexingPhase": (f"{parent}.indexer", "progress"),
+    "IndexingProgressTracker": (f"{parent}.indexer", "progress"),
+    "IndexingStats": (f"{parent}.indexer", "progress"),
     "IsEmptyCondition": (parent, "search"),
     "IsNullCondition": (parent, "search"),
     "LanguageFamily": (f"{parent}.chunker.delimiters", "families"),
@@ -154,6 +154,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "PayloadSchemaType": (parent, "search"),
     "Range": (parent, "search"),
     "ResourceGovernor": (f"{parent}.chunker", "governance"),
+    "RignoreSettings": (__spec__.parent, "indexer"),
     "SemanticChunker": (f"{parent}.chunker", "semantic"),
     "SourceIdRegistry": (f"{parent}.chunker", "registry"),
     "ValueVariants": (parent, "search"),
@@ -170,17 +171,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
 })
 
 
-def __getattr__(name: str) -> object:
-    """Dynamically import submodules and classes for the engine package."""
-    if name in _dynamic_imports:
-        module_name, submodule_name = _dynamic_imports[name]
-        module = import_module(f"{module_name}.{submodule_name}")
-        result = getattr(module, name)
-        globals()[name] = result  # Cache in globals for future access
-        return result
-    if globals().get(name) is not None:
-        return globals()[name]
-    raise AttributeError(f"module {__name__} has no attribute {name}")
+__getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
 
 
 __all__ = (
@@ -189,15 +180,21 @@ __all__ = (
     "ArbitraryFilter",
     "BinaryFileError",
     "Boundary",
+    "CheckpointManager",
+    "CheckpointSettingsFingerprint",
     "ChunkGovernor",
     "ChunkLimitExceededError",
     "ChunkerSelector",
+    "ChunkerSettings",
+    "ChunkerSettingsDict",
     "ChunkingError",
     "ChunkingService",
     "ChunkingTimeoutError",
     "CodeFilter",
     "Condition",
     "ConfigFilter",
+    "CustomDelimiter",
+    "CustomLanguage",
     "DatetimeRange",
     "DefaultFilter",
     "Delimiter",
@@ -211,6 +208,8 @@ __all__ = (
     "ExtendedPointId",
     "ExtensionFilter",
     "FieldCondition",
+    "FileManifestEntry",
+    "FileManifestManager",
     "FileWatcher",
     "Filter",
     "FilterableField",
@@ -223,7 +222,14 @@ __all__ = (
     "HasIdCondition",
     "HasVectorCondition",
     "IgnoreFilter",
+    "IndexFileManifest",
     "Indexer",
+    "IndexerSettings",
+    "IndexerSettingsDict",
+    "IndexingCheckpoint",
+    "IndexingPhase",
+    "IndexingProgressTracker",
+    "IndexingStats",
     "IsEmptyCondition",
     "IsNullCondition",
     "LanguageFamily",
@@ -244,6 +250,7 @@ __all__ = (
     "PayloadSchemaType",
     "Range",
     "ResourceGovernor",
+    "RignoreSettings",
     "SemanticChunker",
     "SourceIdRegistry",
     "ValueVariants",

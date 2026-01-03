@@ -71,7 +71,7 @@ IMPORT_RULES = [
     ("codeweaver.common", "codeweaver-core"),
     ("codeweaver.common", "codeweaver-core"),
     ("codeweaver.common", "codeweaver-core"),
-    ("codeweaver.di", "codeweaver-core"),
+    ("codeweaver.core", "codeweaver-core"),
     ("codeweaver._version", "codeweaver-core"),
     ("codeweaver.data", "codeweaver-core"),
     ("codeweaver.agent_api", "codeweaver"),

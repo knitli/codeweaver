@@ -10,7 +10,6 @@ from unittest.mock import Mock
 
 import pytest
 
-from codeweaver.config import ChunkerSettings, PerformanceSettings
 from codeweaver.core import CodeChunk
 
 # Rebuild models to resolve forward references
@@ -21,6 +20,7 @@ from codeweaver.providers import (
     EmbeddingBatchInfo,  # noqa: F401
     EmbeddingModelCapabilities,
 )
+from codeweaver.server import ChunkerSettings, PerformanceSettings
 
 
 # Build namespace for Pydantic to resolve string annotations

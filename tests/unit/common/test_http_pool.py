@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock
 import httpx
 import pytest
 
-from codeweaver.common import (
+from codeweaver.core import (
     HttpClientPool,
     PoolLimits,
     PoolTimeouts,
@@ -370,7 +370,7 @@ class TestProviderRegistryPooling:
 
     def test_get_pooled_client_voyage(self):
         """Test getting pooled client for Voyage provider."""
-        from codeweaver.common import ProviderRegistry
+        from codeweaver.core import ProviderRegistry
         from codeweaver.providers import Provider, ProviderKind
 
         registry = ProviderRegistry()
@@ -383,7 +383,7 @@ class TestProviderRegistryPooling:
 
     def test_get_pooled_client_cohere(self):
         """Test getting pooled client for Cohere provider."""
-        from codeweaver.common import ProviderRegistry
+        from codeweaver.core import ProviderRegistry
         from codeweaver.providers import Provider, ProviderKind
 
         registry = ProviderRegistry()
@@ -396,7 +396,7 @@ class TestProviderRegistryPooling:
 
     def test_get_pooled_client_openai(self):
         """Test getting pooled client for OpenAI provider."""
-        from codeweaver.common import ProviderRegistry
+        from codeweaver.core import ProviderRegistry
         from codeweaver.providers import Provider, ProviderKind
 
         registry = ProviderRegistry()
@@ -409,7 +409,7 @@ class TestProviderRegistryPooling:
 
     def test_get_pooled_client_mistral(self):
         """Test getting pooled client for Mistral provider."""
-        from codeweaver.common import ProviderRegistry
+        from codeweaver.core import ProviderRegistry
         from codeweaver.providers import Provider, ProviderKind
 
         registry = ProviderRegistry()
@@ -421,7 +421,7 @@ class TestProviderRegistryPooling:
 
     def test_get_pooled_client_different_kinds_create_different_clients(self):
         """Test that different provider kinds get different clients."""
-        from codeweaver.common import ProviderRegistry
+        from codeweaver.core import ProviderRegistry
         from codeweaver.providers import Provider, ProviderKind
 
         registry = ProviderRegistry()
@@ -437,7 +437,7 @@ class TestProviderRegistryPooling:
 
     def test_get_pooled_client_same_provider_reuses_client(self):
         """Test that same provider/kind combination reuses the same client."""
-        from codeweaver.common import ProviderRegistry
+        from codeweaver.core import ProviderRegistry
         from codeweaver.providers import Provider, ProviderKind
 
         registry = ProviderRegistry()
@@ -448,7 +448,7 @@ class TestProviderRegistryPooling:
 
     def test_pooled_http_providers_mapping(self):
         """Test that _POOLED_HTTP_PROVIDERS includes expected providers with correct param names."""
-        from codeweaver.common import ProviderRegistry
+        from codeweaver.core import ProviderRegistry
         from codeweaver.providers import Provider
 
         pooled = ProviderRegistry._POOLED_HTTP_PROVIDERS
@@ -475,7 +475,7 @@ class TestProviderRegistryPooling:
 
     def test_non_pooled_provider_not_in_mapping(self):
         """Test that providers without pooling support are not in the mapping."""
-        from codeweaver.common import ProviderRegistry
+        from codeweaver.core import ProviderRegistry
         from codeweaver.providers import Provider
 
         pooled = ProviderRegistry._POOLED_HTTP_PROVIDERS

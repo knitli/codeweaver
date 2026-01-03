@@ -31,7 +31,7 @@ class TestClientMapLookup:
         """Create a ProviderRegistry for testing."""
         from unittest.mock import Mock
 
-        from codeweaver.common import ProviderRegistry
+        from codeweaver.core import ProviderRegistry
 
         # Create mock settings to avoid Unset type annotation issues
         mock_settings = Mock()
@@ -151,7 +151,7 @@ class TestInstantiateClient:
         """Create a ProviderRegistry for testing."""
         from unittest.mock import Mock
 
-        from codeweaver.common import ProviderRegistry
+        from codeweaver.core import ProviderRegistry
 
         # Create mock settings to avoid Unset type annotation issues
         mock_settings = Mock()
@@ -338,7 +338,7 @@ class TestInstantiateClient:
 
         # Use patch on the class method instead of instance
         with patch(
-            "codeweaver.commonProviderRegistry.get_configured_provider_settings", return_value=None
+            "codeweaver.coreProviderRegistry.get_configured_provider_settings", return_value=None
         ):
             _result = registry._instantiate_client(
                 Provider.FASTEMBED,
@@ -463,7 +463,7 @@ class TestClientOptionsHandling:
         """Create a ProviderRegistry for testing."""
         from unittest.mock import Mock
 
-        from codeweaver.common import ProviderRegistry
+        from codeweaver.core import ProviderRegistry
 
         # Create mock settings to avoid Unset type annotation issues
         mock_settings = Mock()
@@ -546,7 +546,7 @@ class TestProviderKindNormalization:
         """Create a ProviderRegistry for testing."""
         from unittest.mock import Mock
 
-        from codeweaver.common import ProviderRegistry
+        from codeweaver.core import ProviderRegistry
 
         # Create mock settings to avoid Unset type annotation issues
         mock_settings = Mock()
@@ -592,14 +592,12 @@ class TestProviderKindNormalization:
         with patch("codeweaver.providersCLIENT_MAP", mock_client_map):
             with patch.dict("os.environ", {"VOYAGE_API_KEY": "test_key"}):
                 with patch(
-                    "codeweaver.commonProviderRegistry.get_configured_provider_settings",
+                    "codeweaver.coreProviderRegistry.get_configured_provider_settings",
                     return_value=None,
                 ):
-                    with patch(
-                        "codeweaver.commonProviderRegistry.collect_env_vars", return_value={}
-                    ):
+                    with patch("codeweaver.coreProviderRegistry.collect_env_vars", return_value={}):
                         with patch(
-                            "codeweaver.commonProviderRegistry._get_base_url_for_provider",
+                            "codeweaver.coreProviderRegistry._get_base_url_for_provider",
                             return_value=None,
                         ):
                             # Pass string instead of enum

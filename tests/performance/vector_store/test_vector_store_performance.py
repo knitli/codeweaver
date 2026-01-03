@@ -28,7 +28,6 @@ import pytest
 from qdrant_client import models
 from qdrant_client.async_qdrant_client import AsyncQdrantClient
 
-from codeweaver.config import MemoryConfig, QdrantConfig
 from codeweaver.core import (
     ChunkKind,
     CodeChunk,
@@ -38,7 +37,13 @@ from codeweaver.core import (
     Span,
     StrategizedQuery,
 )
-from codeweaver.providers import MemoryVectorStoreProvider, Provider, QdrantVectorStoreProvider
+from codeweaver.providers import (
+    MemoryConfig,
+    MemoryVectorStoreProvider,
+    Provider,
+    QdrantConfig,
+    QdrantVectorStoreProvider,
+)
 
 
 pytestmark = [pytest.mark.async_test, pytest.mark.performance, pytest.mark.slow]

@@ -10,11 +10,17 @@ from __future__ import annotations
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
-from codeweaver.core.utils.lazy_import import LazyImport, create_lazy_getattr, lazy_import
+from codeweaver.core.utils.lazy_import import (
+    INTROSPECTION_ATTRS,
+    LazyImport,
+    create_lazy_getattr,
+    lazy_import,
+)
 
 
 if TYPE_CHECKING:
     from codeweaver.core.utils.checks import (
+        TypeIs,
         file_is_binary,
         has_package,
         is_ci,
@@ -119,6 +125,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "COMMON_TOOLING_PATHS": (__spec__.parent, "filesystem"),
     "DictInputTypesT": (__spec__.parent, "general"),
     "DictOutputTypesT": (__spec__.parent, "general"),
+    "TypeIs": (__spec__.parent, "checks"),
     "asyncio_or_uvloop": (__spec__.parent, "procs"),
     "backup_file_path": (__spec__.parent, "filesystem"),
     "clean_args": (__spec__.parent, "introspect"),
@@ -207,9 +214,11 @@ __getattr__ = create_lazy_getattr(
 __all__ = (
     "COMMON_LLM_TOOLING_PATHS",
     "COMMON_TOOLING_PATHS",
+    "INTROSPECTION_ATTRS",
     "DictInputTypesT",
     "DictOutputTypesT",
     "LazyImport",
+    "TypeIs",
     "asyncio_or_uvloop",
     "backup_file_path",
     "clean_args",

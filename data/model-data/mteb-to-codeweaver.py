@@ -33,13 +33,12 @@ from pydantic import (
 )
 from pydantic_core import from_json
 from rich.console import Console
-from typing_extensions import TypeIs
 
 
 # make sure codeweaver is importable
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from codeweaver.core import PartialCapabilities, Provider
+from codeweaver.core import PartialCapabilities, Provider, TypeIs
 
 
 VERSION_PATTERNS = (  # some special cases first
@@ -562,7 +561,8 @@ def generate_capabilities_file(models: list[SimplifiedModelMeta], model_maker: M
     page = f"{code}\n\n\n{func_def}\n"
     # black seems to think single tuples are just the value in parentheses, so we replace them after formatting
     return (
-        black.format_str(
+        black
+        .format_str(
             page,
             mode=black.FileMode(
                 target_versions={black.TargetVersion.PY312, black.TargetVersion.PY313}

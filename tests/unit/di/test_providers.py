@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from codeweaver.di import (
+from codeweaver.core import (
     get_embedding_provider,
     get_reranking_provider,
     get_sparse_embedding_provider,
@@ -22,7 +22,7 @@ async def test_get_embedding_provider():
     mock_instance = MagicMock()
     mock_registry.get_provider_instance.return_value = mock_instance
 
-    with patch("codeweaver.common", return_value=mock_registry):
+    with patch("codeweaver.core", return_value=mock_registry):
         result = await get_embedding_provider()
         assert result is mock_instance
         mock_registry.get_provider_enum_for.assert_called_with("embedding")
@@ -35,7 +35,7 @@ async def test_get_sparse_embedding_provider():
     mock_instance = MagicMock()
     mock_registry.get_provider_instance.return_value = mock_instance
 
-    with patch("codeweaver.common", return_value=mock_registry):
+    with patch("codeweaver.core", return_value=mock_registry):
         result = await get_sparse_embedding_provider()
         assert result is mock_instance
         mock_registry.get_provider_enum_for.assert_called_with("sparse_embedding")
@@ -48,7 +48,7 @@ async def test_get_vector_store():
     mock_instance = MagicMock()
     mock_registry.get_provider_instance.return_value = mock_instance
 
-    with patch("codeweaver.common", return_value=mock_registry):
+    with patch("codeweaver.core", return_value=mock_registry):
         result = await get_vector_store()
         assert result is mock_instance
         mock_registry.get_provider_enum_for.assert_called_with("vector_store")
@@ -61,7 +61,7 @@ async def test_get_reranking_provider():
     mock_instance = MagicMock()
     mock_registry.get_provider_instance.return_value = mock_instance
 
-    with patch("codeweaver.common", return_value=mock_registry):
+    with patch("codeweaver.core", return_value=mock_registry):
         result = await get_reranking_provider()
         assert result is mock_instance
         mock_registry.get_provider_enum_for.assert_called_with("reranking")

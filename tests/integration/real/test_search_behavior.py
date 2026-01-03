@@ -291,8 +291,9 @@ async def test_search_handles_empty_codebase(tmp_path, clean_container):
     - Error messages are clear
     """
     from codeweaver.agent_api import IntentType, find_code
-    from codeweaver.config import CodeWeaverSettings, get_settings
+
     from codeweaver.engine import Indexer
+    from codeweaver.server import CodeWeaverSettings, get_settings
 
     empty_dir = tmp_path / "empty_codebase"
     empty_dir.mkdir()

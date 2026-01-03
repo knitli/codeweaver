@@ -32,8 +32,9 @@ class ConfigProfile(StrEnum):
 
 
 if TYPE_CHECKING:
-    from codeweaver.config import CodeWeaverSettingsDict, ProviderSettingsDict
     from codeweaver.core import DictView
+    from codeweaver.providers import ProviderSettingsDict
+    from codeweaver.server import CodeWeaverSettingsDict
 
 display: StatusDisplay = get_display()
 app = App("config", help="Manage and view your CodeWeaver config.", console=display.console)
@@ -59,15 +60,15 @@ def config(
     ] = False,
 ) -> None:
     """Manage CodeWeaver configuration."""
-    from codeweaver.config import get_settings_map
     from codeweaver.core import CodeWeaverError
+    from codeweaver.server import get_settings_map
 
     error_handler = CLIErrorHandler(display, verbose=verbose, debug=debug)
 
     try:
         settings = get_settings_map()
         if project_path or (config_file and not is_codeweaver_config_path(config_file)):
-            from codeweaver.config import update_settings
+            from codeweaver.server import update_settings
 
             if config_file:
                 display.print_info(f"Updating settings from config file: {config_file}")

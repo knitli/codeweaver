@@ -7,7 +7,7 @@ import asyncio
 import logging
 import time
 
-from codeweaver.di import get_container
+from codeweaver.core import get_container
 from codeweaver.engine import Indexer
 from codeweaver.providers import EmbeddingProvider
 

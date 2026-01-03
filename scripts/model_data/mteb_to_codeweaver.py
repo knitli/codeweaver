@@ -693,7 +693,8 @@ def generate_capabilities_file(models: list[SimplifiedModelMeta], model_maker: M
     page = f"{code}\n\n\n{func_def}\n"
     # black seems to think single tuples are just the value in parentheses, so we replace them after formatting
     return (
-        black.format_str(
+        black
+        .format_str(
             page,
             mode=black.FileMode(
                 target_versions={

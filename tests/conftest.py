@@ -159,7 +159,7 @@ def di_overrides(
     mock_sparse_provider,
     mock_vector_store,
     mock_reranking_provider,
-):
+) -> Any:
     """Apply standard mock overrides to the DI container.
 
     This fixture applies mock providers to the DI container, ensuring that
@@ -207,11 +207,8 @@ def mock_tokenizer_for_unit_tests(
             "codeweaver.providers",
         ]
         for module_path in modules_to_patch:
-            try:
+            with contextlib.suppress(AttributeError):
                 monkeypatch.setattr(module_path, _mock_get_tokenizer)
-            except AttributeError:
-                # Module or attribute not loaded yet, skip
-                pass
 
 
 @pytest.fixture
@@ -222,7 +219,7 @@ def initialize_test_settings() -> GeneratorType:
     with minimal required configuration for tests. It resets settings after
     the test to avoid cross-test contamination.
     """
-    from codeweaver.config import get_settings, reset_settings
+    from codeweaver.server import get_settings, reset_settings
 
     # Reset any existing settings
     reset_settings()
@@ -575,7 +572,7 @@ def cli_api_keys(monkeypatch: pytest.MonkeyPatch) -> dict[str, str]:
 @pytest.fixture(autouse=True)
 def reset_cli_settings_cache() -> GeneratorType:
     """Reset settings cache between CLI tests."""
-    from codeweaver.config import reset_settings
+    from codeweaver.server import reset_settings
 
     reset_settings()
     yield
@@ -585,7 +582,7 @@ def reset_cli_settings_cache() -> GeneratorType:
 @pytest.fixture(autouse=True)
 def reset_di_container() -> GeneratorType:
     """Reset DI container between tests to ensure isolation."""
-    from codeweaver.di import reset_container
+    from codeweaver.core import reset_container
 
     reset_container()
     yield
@@ -600,7 +597,7 @@ def clean_container():
         def test_something(clean_container):
             clean_container.override(...)
     """
-    from codeweaver.di import get_container
+    from codeweaver.core import get_container
 
     container = get_container()
     container.clear_overrides()

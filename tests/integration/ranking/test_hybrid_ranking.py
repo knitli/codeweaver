@@ -12,10 +12,10 @@ from pathlib import Path
 
 import pytest
 
-from codeweaver.config import QdrantConfig
 from codeweaver.core import SearchStrategy, StrategizedQuery, uuid7
 from codeweaver.core import SemanticSearchLanguage as Language
 from codeweaver.providers import QdrantVectorStoreProvider
+from codeweaver.server import QdrantConfig
 
 # sourcery skip: dont-import-test-modules
 from tests.conftest import create_test_chunk_with_embeddings

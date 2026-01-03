@@ -29,7 +29,7 @@ from cyclopts import App, Parameter
 
 from codeweaver import __version__
 from codeweaver.cli.ui import get_display
-from codeweaver.common import CODEWEAVER_PREFIX
+from codeweaver.core import CODEWEAVER_PREFIX
 
 
 if TYPE_CHECKING:

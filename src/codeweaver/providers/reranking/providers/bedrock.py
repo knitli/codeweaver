@@ -20,9 +20,9 @@ from typing import TYPE_CHECKING, Annotated, Any, Literal, Self, cast
 from pydantic import AliasGenerator, ConfigDict, Field, JsonValue, PositiveInt, model_validator
 from pydantic.alias_generators import to_camel, to_snake
 
-from codeweaver.config import BedrockProviderSettings
 from codeweaver.core import BasedModel, ConfigurationError, Provider
 from codeweaver.core import ValidationError as CodeWeaverValidationError
+from codeweaver.providers.config import BedrockProviderSettings
 from codeweaver.providers.reranking.capabilities.amazon import get_amazon_reranking_capabilities
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 from codeweaver.providers.reranking.providers.base import RerankingProvider, RerankingResult

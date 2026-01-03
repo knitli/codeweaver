@@ -124,7 +124,7 @@ logger = logging.getLogger(__name__)
 
 registry_module: LazyImport[ModuleType] = lazy_import("codeweaver.semantic.registry")
 
-_resolving_ast_thing: ContextVar[set[int]] = ContextVar("_resolving_ast_thing", default=set())
+_resolving_ast_thing: ContextVar[set[int] | None] = ContextVar("_resolving_ast_thing", default=None)
 
 # re-export Ast Grep's rules and config types:
 AstGrepSearchTypes = (
@@ -602,7 +602,8 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
         """Calculate the importance score for this node for a specific context."""
         return self.importance_for_task(task).as_dict()[context]
 
-    def __getitem__(self, meta_var: str) -> AstThing[SgNode]:
+    @override
+    def __getitem__(self, meta_var: str) -> AstThing[SgNode]:  # ty:ignore[invalid-method-override]
         """Get the child node for the given meta variable."""
         return type(self).from_sg_node(cast(SgNode, self._node[meta_var]), self.language)
 

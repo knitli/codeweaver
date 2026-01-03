@@ -23,9 +23,9 @@ import pytest
 
 from watchfiles.main import Change
 
-from codeweaver.config import CodeWeaverSettings, reset_settings
-from codeweaver.di import get_container
+from codeweaver.core import get_container
 from codeweaver.engine import Indexer
+from codeweaver.server import CodeWeaverSettings, reset_settings
 
 
 # Test fixture: Small Python project
@@ -131,7 +131,7 @@ def test_project_path(tmp_path: Path) -> Path:
 @pytest.fixture
 async def indexer(test_project_path: Path, clean_container) -> Indexer:
     """Create indexer instance for test project using DI container."""
-    from codeweaver.config import get_settings
+    from codeweaver.server import get_settings
 
     # Define a factory that returns settings with the test project path
     async def get_test_settings() -> CodeWeaverSettings:
@@ -271,7 +271,7 @@ async def test_indexing_error_recovery(test_project_path: Path):
     corrupted_file.write_bytes(b"\x00\x01\x02\xff\xfe\xfd")
 
     # Resolve indexer from container with overridden settings
-    from codeweaver.config import get_settings
+    from codeweaver.server import get_settings
 
     reset_settings()
     container = get_container()

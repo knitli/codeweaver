@@ -144,8 +144,12 @@ def test_e2e_multiple_files_parallel_process(sample_files):
     1. Converting positional_connections from generator to tuple
     2. Adding __getstate__/__setstate__ to SemanticMetadata to exclude AST nodes
     """
-    from codeweaver.config import ChunkerSettings, PerformanceSettings
-    from codeweaver.engine import ChunkGovernor, chunk_files_parallel
+    from codeweaver.engine import (
+        ChunkerSettings,
+        ChunkGovernor,
+        PerformanceSettings,
+        chunk_files_parallel,
+    )
     from codeweaver.providers import EmbeddingModelCapabilities
 
     # Skip if no files available
@@ -187,8 +191,12 @@ def test_e2e_multiple_files_parallel_process(sample_files):
 @pytest.mark.slow
 def test_e2e_multiple_files_parallel_thread(sample_files):
     """Integration test: Process multiple files in parallel with ThreadPoolExecutor."""
-    from codeweaver.config import ChunkerSettings, PerformanceSettings
-    from codeweaver.engine import ChunkGovernor, chunk_files_parallel
+    from codeweaver.engine import (
+        ChunkerSettings,
+        ChunkGovernor,
+        PerformanceSettings,
+        chunk_files_parallel,
+    )
     from codeweaver.providers import EmbeddingModelCapabilities
 
     # Skip if no files available
@@ -221,9 +229,8 @@ def test_e2e_multiple_files_parallel_thread(sample_files):
 
 def test_e2e_parallel_error_handling(tmp_path):
     """Verify parallel processing continues when individual files fail."""
-    from codeweaver.config import ChunkerSettings
     from codeweaver.core import DiscoveredFile
-    from codeweaver.engine import ChunkGovernor, chunk_files_parallel
+    from codeweaver.engine import ChunkerSettings, ChunkGovernor, chunk_files_parallel
     from codeweaver.providers import EmbeddingModelCapabilities
 
     # Create mix of valid and invalid files
@@ -287,9 +294,8 @@ def test_e2e_parallel_empty_file_list():
 
 def test_e2e_parallel_dict_convenience():
     """Test parallel_dict convenience wrapper."""
-    from codeweaver.config import ChunkerSettings
     from codeweaver.core import DiscoveredFile
-    from codeweaver.engine import ChunkGovernor, chunk_files_parallel_dict
+    from codeweaver.engine import ChunkerSettings, ChunkGovernor, chunk_files_parallel_dict
     from codeweaver.providers import EmbeddingModelCapabilities
 
     # Get sample files

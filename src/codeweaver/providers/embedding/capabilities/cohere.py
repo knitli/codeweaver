@@ -11,10 +11,7 @@ from types import MappingProxyType
 from typing import ClassVar, Literal
 
 from codeweaver.core import Provider
-from codeweaver.providers.embedding.capabilities.base import (
-    EmbeddingModelCapabilities,
-    EmbeddingModelSpec,
-)
+from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.capabilities.types import PartialCapabilities
 
 

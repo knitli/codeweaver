@@ -21,7 +21,6 @@ from typing import TYPE_CHECKING, Annotated, NamedTuple, cast
 
 from ast_grep_py import SgNode
 from pydantic import Field, NonNegativeFloat, NonNegativeInt, computed_field
-from typing_extensions import TypeIs
 
 from codeweaver.core import (
     BaseEnum,
@@ -29,6 +28,7 @@ from codeweaver.core import (
     CategoryNameT,
     SemanticSearchLanguage,
     ThingNameT,
+    TypeIs,
     generate_field_title,
     rpartial,
 )
@@ -473,8 +473,8 @@ class GrammarBasedClassifier:
         if is_token(thing) and (str(thing.name) in registry.composite_things[language]):
             # a rare number of Things are *both* Tokens and CompositeThings in some languages
             return result_func(
-                classification=SemanticClass.from_token_purpose(thing.purpose, thing.name)  # type: ignore
-            )
+                classification=SemanticClass.from_token_purpose(thing.purpose, thing.name)
+            )  # ty:ignore[missing-argument]
         if (
             is_composite_thing(thing)
             and thing.name in registry.tokens[language]
@@ -482,7 +482,7 @@ class GrammarBasedClassifier:
         ):
             return result_func(
                 classification=SemanticClass.from_token_purpose(token.purpose, token.name)  # type: ignore
-            )
+            )  # ty:ignore[missing-argument]
         if is_composite_thing(thing):
             return self._classify_from_composite_checks(thing, language)
         return None

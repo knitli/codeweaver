@@ -6,12 +6,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 from typing import TYPE_CHECKING, Annotated, Any, Literal, Self
 
 from pydantic import ConfigDict, Field, PositiveFloat, PositiveInt
 
-from codeweaver.core import BASEDMODEL_CONFIG, BasedModel, Provider, SettingBridge
+from codeweaver.core import BASEDMODEL_CONFIG, BasedModel, Provider
 
 
 if TYPE_CHECKING:
@@ -298,45 +297,4 @@ def get_sparse_caps() -> tuple[SparseEmbeddingModelCapabilities, ...]:
     return fastembed_caps + st_caps
 
 
-class EmbeddingModelSpec(BasedModel):
-    """Base class for embedding model specifications. Also used for Sparse embedding model specs.
-
-    A spec describes the configuration for a model with a specific provider.
-    """
-
-    model_config = BASEDMODEL_CONFIG | ConfigDict(extra="allow")
-
-    model_maker: Annotated[
-        str,
-        Field(
-            description="The model maker or family of the embedding model.",
-            examples=["openai", "mistral", "sentence_transformers", "jinaai"],
-        ),
-    ]
-
-    provider: Annotated[Provider, Field(description="The provider the spec applies to.")]
-
-    capabilities: Annotated[
-        tuple[EmbeddingModelCapabilities, ...],
-        Field(description="The capabilities associated with this model spec."),
-    ]
-
-    bridges: Annotated[
-        Sequence[SettingBridge], Field(description="The setting bridges for this spec.")
-    ]
-
-    def _telemetry_keys(self) -> None:
-        return None
-
-    @property
-    def models(self) -> tuple[str, ...]:
-        """Get the names of all models associated with this spec."""
-        return tuple(cap.name for cap in self.capabilities)
-
-
-__all__ = (
-    "EmbeddingModelCapabilities",
-    "EmbeddingModelSpec",
-    "SparseEmbeddingModelCapabilities",
-    "get_sparse_caps",
-)
+__all__ = ("EmbeddingModelCapabilities", "SparseEmbeddingModelCapabilities", "get_sparse_caps")

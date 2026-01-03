@@ -26,9 +26,8 @@ from starlette.requests import Request
 from starlette.responses import PlainTextResponse, Response
 from starlette.routing import Route
 
-from codeweaver.common import SessionStatistics, get_session_statistics, timed_http
-from codeweaver.config import CodeWeaverSettingsDict, get_settings_map
-from codeweaver.core import DictView
+from codeweaver.core import DictView, SessionStatistics, get_session_statistics, timed_http
+from codeweaver.server.config import CodeWeaverSettingsDict, get_settings_map
 
 
 if TYPE_CHECKING:
@@ -412,7 +411,7 @@ class ManagementServer:
 
         IMPORTANT: Reuses existing handlers from app_bindings.py.
         """
-        from codeweaver.config import get_settings_map
+        from codeweaver.server.config import get_settings_map
 
         settings_map = get_settings_map()
         endpoint_settings = settings_map.get("endpoints", {})

@@ -46,7 +46,7 @@ def isolated_test_environment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 
     Applied automatically to all unit tests.
     """
-    from codeweaver.config import reset_settings
+    from codeweaver.server import reset_settings
 
     # Create isolated HOME directory
     fake_home = tmp_path / "home"

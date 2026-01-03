@@ -14,8 +14,8 @@ from codeweaver.core import ConfigurationError
 
 def resolve_dimensions() -> PositiveInt:
     """Resolves embedding dimensions based on model capabilities and model settings. **Only applies to dense embeddings.**."""
-    from codeweaver.common import get_model_registry
-    from codeweaver.config import get_settings_map
+    from codeweaver.core import get_model_registry
+    from codeweaver.providers.config import get_settings_map
     from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 
     registry = get_model_registry()
