@@ -4320,7 +4320,7 @@ LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
-FileName: ./src/codeweaver/mcp/__init__.py
+FileName: ./src/codeweaver.server.mcp/__init__.py
 SPDXID: SPDXRef-fbe8ac1ba2241598f4b1f73c94882928
 FileChecksum: SHA1: 0d6e8cb9b0aaf309c6100b7487157c984db8b5e6
 LicenseConcluded: Apache-2.0 OR MIT
@@ -4328,7 +4328,7 @@ LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
-FileName: ./src/codeweaver/mcp/middleware/__init__.py
+FileName: ./src/codeweaver.server.mcp/middleware/__init__.py
 SPDXID: SPDXRef-42a64789f7d539124c681323fb419706
 FileChecksum: SHA1: 3254a281e386494286411e66f17a18ff0b558172
 LicenseConcluded: Apache-2.0 OR MIT
@@ -4336,7 +4336,7 @@ LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
-FileName: ./src/codeweaver/mcp/middleware/statistics.py
+FileName: ./src/codeweaver.server.mcp/middleware/statistics.py
 SPDXID: SPDXRef-e44e7c6789f76b25c0b0bfeae21cedac
 FileChecksum: SHA1: 842b9db040ce1b2516138819d7f6c7c91d304ad9
 LicenseConcluded: Apache-2.0 OR MIT
@@ -4344,7 +4344,7 @@ LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
-FileName: ./src/codeweaver/mcp/server.py
+FileName: ./src/codeweaver.server.mcp/server.py
 SPDXID: SPDXRef-5fe0fa225a1473079398e32b07e4f0b7
 FileChecksum: SHA1: 101ea46d750d1c1135ad946106a1073413550b55
 LicenseConcluded: Apache-2.0 OR MIT
@@ -4352,7 +4352,7 @@ LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
-FileName: ./src/codeweaver/mcp/state.py
+FileName: ./src/codeweaver.server.mcp/state.py
 SPDXID: SPDXRef-aaa50f3846c8410269bbadaf8211e214
 FileChecksum: SHA1: ebea46081886f68506540b1ff2f2cf44461786ef
 LicenseConcluded: Apache-2.0 OR MIT
@@ -4360,7 +4360,7 @@ LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
-FileName: ./src/codeweaver/mcp/tools.py
+FileName: ./src/codeweaver.server.mcp/tools.py
 SPDXID: SPDXRef-13e0126f58ec2cf1388eca018df21030
 FileChecksum: SHA1: 6d3ecdc3ff3c9d9d28bf8d00ee1877826bcde5ae
 LicenseConcluded: Apache-2.0 OR MIT
@@ -4368,7 +4368,7 @@ LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
-FileName: ./src/codeweaver/mcp/types.py
+FileName: ./src/codeweaver.server.mcp/types.py
 SPDXID: SPDXRef-bbd8b602be7de25f9b575b44267c89a5
 FileChecksum: SHA1: 4b1d51862609cdcbd35a71746955bddf66248b0d
 LicenseConcluded: Apache-2.0 OR MIT
@@ -4376,7 +4376,7 @@ LicenseInfoInFile: Apache-2.0
 LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Knitli Inc.</text>
 
-FileName: ./src/codeweaver/mcp/user_agent.py
+FileName: ./src/codeweaver.server.mcp/user_agent.py
 SPDXID: SPDXRef-d8f780e1167309f2860150a8306b7334
 FileChecksum: SHA1: d2cf1d8008f85a67bc793dbaf908404e78b7a35b
 LicenseConcluded: Apache-2.0 OR MIT

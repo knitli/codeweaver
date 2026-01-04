@@ -25,17 +25,14 @@ import numpy as np
 from pydantic import SkipValidation
 
 from codeweaver.core import ConfigurationError, Provider, rpartial
-from codeweaver.providers.embedding.capabilities.base import (
-    EmbeddingModelCapabilities,
-    SparseEmbeddingModelCapabilities,
-)
+from codeweaver.core import SparseEmbedding as CodeWeaverSparseEmbedding
+from codeweaver.providers.embedding.capabilities.base import SparseEmbeddingModelCapabilities
 from codeweaver.providers.embedding.providers import EmbeddingProvider
 from codeweaver.providers.embedding.providers.base import SparseEmbeddingProvider
 
 
 if TYPE_CHECKING:
     from codeweaver.core import CodeChunk
-    from codeweaver.providers.embedding.types import SparseEmbedding
 
 try:
     from fastembed.sparse import SparseTextEmbedding
@@ -92,27 +89,25 @@ def fastembed_output_transformer(output: list[np.ndarray]) -> list[list[float]] 
 
 
 def fastembed_sparse_output_transformer(
-    output: list[np.ndarray] | list[SparseEmbedding],
-) -> list[SparseEmbedding]:
+    output: list[np.ndarray] | list[CodeWeaverSparseEmbedding],
+) -> list[CodeWeaverSparseEmbedding]:
     """Transform the sparse output of FastEmbed into indices and values format.
 
     FastEmbed's SparseTextEmbedding returns SparseEmbedding objects with
     indices and values attributes. We transform them into CodeWeaver SparseEmbedding objects.
     """
-    from codeweaver.providers.embedding.types import SparseEmbedding
-
     if not output:
-        return [SparseEmbedding(indices=[], values=[])]
+        return [CodeWeaverSparseEmbedding(indices=[], values=[])]
 
-    if isinstance(output[0], SparseEmbedding):
-        return cast(list[SparseEmbedding], output)
+    if isinstance(output[0], CodeWeaverSparseEmbedding):
+        return cast(list[CodeWeaverSparseEmbedding], output)
 
     return [
-        SparseEmbedding(
+        CodeWeaverSparseEmbedding(
             cast(np.ndarray, emb.indices).tolist(), cast(np.ndarray, emb.values).tolist()
         )
         if isinstance(emb, np.ndarray)
-        else SparseEmbedding(emb.indices, emb.values)
+        else CodeWeaverSparseEmbedding(emb.indices, emb.values)
         for emb in output
     ]
 
@@ -126,31 +121,10 @@ class FastEmbedEmbeddingProvider(EmbeddingProvider[TextEmbedding]):
 
     client: SkipValidation[TextEmbedding]
     _provider: Provider = Provider.FASTEMBED
-    caps: EmbeddingModelCapabilities
 
-    _doc_kwargs: ClassVar[dict[str, Any]] = fastembed_all_kwargs()
-    _query_kwargs: ClassVar[dict[str, Any]] = fastembed_all_kwargs()
     _output_transformer: ClassVar[Callable[[Any], list[list[float]] | list[list[int]]]] = (
         fastembed_output_transformer
     )
-
-    def _initialize(self, caps: EmbeddingModelCapabilities) -> None:
-        """Initialize the FastEmbed client."""
-        # 1. Set caps from parameter
-        self.caps = caps
-
-        # 2. Configure model name in kwargs if not already set
-        if "model_name" not in type(self)._doc_kwargs:
-            model = caps.name  # Use caps parameter, not self.caps
-            self.doc_kwargs["model_name"] = model
-            # Note: model_name should NOT be in query_kwargs - it's only for client init
-
-        # 3. Initialize the client
-        self.client = _TextEmbedding(**self.doc_kwargs)
-
-        # 4. Remove model_name from runtime kwargs - it was only needed for initialization
-        self.doc_kwargs.pop("model_name", None)
-        self.query_kwargs.pop("model_name", None)
 
     @property
     def base_url(self) -> str | None:
@@ -174,9 +148,7 @@ class FastEmbedEmbeddingProvider(EmbeddingProvider[TextEmbedding]):
         loop = asyncio.get_running_loop()
         embeddings = await loop.run_in_executor(
             None,
-            lambda: list(
-                self.client.passage_embed(texts=cast(Iterable[str], ready_documents), **kwargs)
-            ),
+            lambda: list(self.client.embed(texts=cast(Iterable[str], ready_documents), **kwargs)),
         )
         partial_tokens = rpartial(self._update_token_stats, from_docs=ready_documents)
         self._fire_and_forget(partial_tokens)
@@ -206,7 +178,7 @@ class FastEmbedSparseProvider(SparseEmbeddingProvider[SparseTextEmbedding]):
 
     client: type[SparseTextEmbedding] | SparseTextEmbedding = _SparseTextEmbedding  # type: ignore
     caps: SparseEmbeddingModelCapabilities
-    _output_transformer: ClassVar[Callable[[Any], list[SparseEmbedding]]] = (  # type: ignore
+    _output_transformer: ClassVar[Callable[[Any], list[CodeWeaverSparseEmbedding]]] = (  # type: ignore
         fastembed_sparse_output_transformer
     )  # type: ignore
 

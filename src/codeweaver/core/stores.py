@@ -14,6 +14,7 @@ import sys
 from collections.abc import Callable, ItemsView, Iterator, KeysView, ValuesView
 from functools import cached_property
 from pathlib import Path
+from threading import Lock
 from types import MappingProxyType
 from typing import (
     TYPE_CHECKING,
@@ -132,6 +133,10 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
     _trash_heap: WeakValueDictionary[KeyT, T] = PrivateAttr(
         default_factory=lambda: WeakValueDictionary[KeyT, T]()
     )
+
+    _lock: Lock = PrivateAttr(default_factory=Lock)
+
+    _trash_lock: Lock = PrivateAttr(default_factory=Lock)
 
     _id: Annotated[
         UUID7,
@@ -260,7 +265,9 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
     def __delitem__(self, key: KeyT) -> None:
         """Delete a value from the store."""
         if key in self:
-            self.delete(key)
+            with self._lock:
+                self.delete(key)
+            return
         raise KeyError(key)
 
     @override
@@ -342,14 +349,16 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
         """Check the value type and set the sub-value type if needed."""
         if key in self.store:
             return key
-        self.set(key, value)
+        with self._lock:
+            self.store[key] = value
         return key
 
     def update(self, values: dict[KeyT, T]) -> Iterator[KeyT]:
         """Update multiple items in the store."""
         if values and type(next(iter(values.keys()))) is type(next(iter(self.store.keys()))):
-            for key, value in values.items():
-                self[key] = value
+            with self._lock:
+                for key, value in values.items():
+                    self[key] = value
             yield from values.keys()
         else:
             yield from (self.add(value) for value in values.values())
@@ -409,8 +418,10 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
             and key in self._trash_heap
             and self._trash_heap[key] is not None
         ):
-            del self._trash_heap[key]
-        self.store[key] = value
+            with self._trash_lock:
+                del self._trash_heap[key]
+        with self._lock:
+            self.store[key] = value
 
     def has_room(self, additional_size: int = 0) -> bool:
         """Check if the store has room for additional data."""
@@ -419,24 +430,28 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
     def delete(self, key: KeyT) -> None:
         """Delete a value from the store."""
         if key in self.store:
-            del self.store[key]
+            with self._lock:
+                del self.store[key]
         if self._trash_heap is not None and key in self._trash_heap:  # type: ignore
-            del self._trash_heap[key]
+            with self._trash_lock:
+                del self._trash_heap[key]
 
     def clear(self) -> None:
         """Clear the store."""
         if self._trash_heap is not None:  # type: ignore
             # Try to move items to trash heap, but if value type doesn't support weak refs
             # (e.g., NamedTuple), just skip the trash heap
-            with contextlib.suppress(TypeError):
+            with contextlib.suppress(TypeError) and self._trash_lock:
                 # Value type doesn't support weak references (e.g., NamedTuple)
                 self._trash_heap.update(self.store)
-        self.store.clear()
+        with self._lock:
+            self.store.clear()
 
     def clear_trash(self) -> None:
         """Clear the trash heap."""
         if self._trash_heap is not None:  # type: ignore
-            self._trash_heap.clear()
+            with self._trash_lock:
+                self._trash_heap.clear()
 
     def recover(self, key: KeyT) -> bool:
         """Recover a value from the trash heap."""

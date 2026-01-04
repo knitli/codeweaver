@@ -16,7 +16,9 @@ the `codeweaver.core.di` module:
 from codeweaver.core.di import provider
 
 
-@provider
+dependency_provider
+
+
 def service_factory() -> ServiceProvider:
     return ServiceProvider()
 ```
@@ -100,12 +102,12 @@ if TYPE_CHECKING:
     )
     from codeweaver.core.di.utils import (
         ProviderMetadata,
+        dependency_provider,
         get_all_provider_metadata,
         get_all_providers,
         get_provider,
         get_provider_metadata,
         is_provider_registered,
-        provider,
     )
 
 
@@ -124,7 +126,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "get_provider": (__spec__.parent, "utils"),
     "get_provider_metadata": (__spec__.parent, "utils"),
     "is_provider_registered": (__spec__.parent, "utils"),
-    "provider": (__spec__.parent, "utils"),
+    "dependency_provider": (__spec__.parent, "utils"),
 })
 
 __getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
@@ -136,6 +138,7 @@ __all__ = (
     "Depends",
     "DependsPlaceholder",
     "ProviderMetadata",
+    "dependency_provider",
     "depends",
     "get_all_provider_metadata",
     "get_all_providers",
@@ -144,7 +147,6 @@ __all__ = (
     "get_provider_metadata",
     "is_depends_marker",
     "is_provider_registered",
-    "provider",
     "reset_container",
 )
 

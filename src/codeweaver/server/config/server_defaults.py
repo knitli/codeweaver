@@ -38,7 +38,7 @@ DefaultEndpointSettings = EndpointSettingsDict(
 
 DefaultUvicornSettings = UvicornServerSettings.codeweaver_management_defaults()
 
-DefaultUvicornSettingsForMcp = UvicornServerSettings.codeweaver_mcp_defaults()
+DefaultUvicornSettingsForMcp = UvicornServerSettings.codeweaver.server.mcp()
 
 DefaultFastMcpHttpRunArgs = FastMcpHttpRunArgs(
     transport="streamable-http",

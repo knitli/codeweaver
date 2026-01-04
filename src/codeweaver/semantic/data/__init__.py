@@ -2,38 +2,10 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
-"""MCP tools for CodeWeaver."""
+"""Data package for CodeWeaver containing node types and cached grammar data.
 
-from __future__ import annotations
+This package is primarily generated during the build process and should not be
+edited directly. Its main member is `node_types_cache.pkl`, which is the cached compiled grammar data used by CodeWeaver's semantic processing components. The raw node type definitions are also included as a backup in the `node_types/` directory.
+"""
 
-import contextlib
-
-from codeweaver.core import Provider
-
-
-def get_data_provider(provider: Provider) -> type | None:
-    """Get available tools."""
-    if provider == Provider.DUCKDUCKGO:
-        with contextlib.suppress(ImportError):
-            from pydantic_ai.common_tools.duckduckgo import DuckDuckGoSearchTool
-
-            return DuckDuckGoSearchTool
-    if provider == Provider.TAVILY:
-        with contextlib.suppress(ImportError):
-            from pydantic_ai.common_tools.tavily import TavilySearchTool
-
-            return TavilySearchTool
-    return None
-
-
-def load_default_data_providers() -> tuple[type, ...]:
-    """Load all available data providers."""
-    providers: list[type] = []
-    for provider in (Provider.DUCKDUCKGO, Provider.TAVILY):
-        data_provider = get_data_provider(provider)
-        if data_provider is not None:
-            providers.append(data_provider)
-    return tuple(providers)
-
-
-__all__ = ("get_data_provider", "load_default_data_providers")
+__all__ = ()

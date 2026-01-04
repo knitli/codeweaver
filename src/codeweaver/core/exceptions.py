@@ -317,6 +317,10 @@ class DependencyNotAvailableError(CodeWeaverError):
         self.required_package = required_package
 
 
+class InvalidEmbeddingModelError(ConfigurationError):
+    """Exception raised when an embedding model does not match the expected configuration."""
+
+
 # =============================
 # Dependency Injection Errors
 # =============================
@@ -393,8 +397,8 @@ class UnresolvableDependencyError(DependencyInjectionError):
             or [
                 f"Ensure {interface.__name__} is registered with the DI container:",
                 f"  container.register({interface.__name__}, factory_function)",
-                "Or use the @provider decorator:",
-                f"  @provider({interface.__name__})",
+                "Or use the dependency_provider decorator:",
+                f"  dependency_provider({interface.__name__})",
                 f"  def get_{interface.__name__.lower()}(): ...",
             ],
         )
@@ -480,6 +484,7 @@ __all__ = (
     "DimensionMismatchError",
     "IndexingError",
     "InitializationError",
+    "InvalidEmbeddingModelError",
     "MissingValueError",
     "PersistenceError",
     "ProviderError",

@@ -11,13 +11,14 @@ It only stores the last `max_size` bytes, and moves old batches to a weakref sto
 
 from __future__ import annotations
 
-from codeweaver.core import ModelNameT, UUIDStore
-from codeweaver.core import ValidationError as CodeWeaverValidationError
-from codeweaver.providers.embedding.types import (
+from codeweaver.core import (
     ChunkEmbeddings,
     EmbeddingKind,
     InvalidEmbeddingModelError,
+    ModelNameT,
+    UUIDStore,
 )
+from codeweaver.core import ValidationError as CodeWeaverValidationError
 
 
 class EmbeddingRegistry(UUIDStore[ChunkEmbeddings]):
@@ -97,7 +98,7 @@ class EmbeddingRegistry(UUIDStore[ChunkEmbeddings]):
             _ = self.sparse_model
         except ValueError as e:
             raise InvalidEmbeddingModelError(
-                "Embeddings can't be created with multiple models for the same data. You can only have one model per embedding kind (sparse and dense).",
+                "Embeddings can't be created with multiple models for the same data. You can only have one model per embedding kind (sparse and dense). (...for now)",
                 details={k.hex: v for k, v in self.items()},
             ) from e
 

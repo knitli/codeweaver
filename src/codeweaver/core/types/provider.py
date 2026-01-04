@@ -11,6 +11,7 @@ import contextlib
 import importlib
 import os
 
+from functools import cached_property
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Literal, cast
 
@@ -563,7 +564,7 @@ class Provider(BaseEnum):
             case _:
                 return None
 
-    @property
+    @cached_property
     def api_key_env_vars(self) -> tuple[str, ...] | None:
         """Get the environment variable names used for API keys by the provider's client that are not part of CodeWeaver's settings."""
         if envs := self.other_env_vars:
@@ -697,23 +698,26 @@ class Provider(BaseEnum):
 
     def is_embedding_provider(self) -> bool:
         """Check if the provider is an embedding provider."""
-        return any(kind == ProviderKind.EMBEDDING for kind in get_provider_kinds(self))
+        return any(
+            kind == ProviderKind.EMBEDDING
+            for kind in get_provider_kinds(cast(LiteralProviderType, self))
+        )
 
     def is_sparse_provider(self) -> bool:
         """Check if the provider is a sparse embedding provider."""
-        return ProviderKind.SPARSE_EMBEDDING in get_provider_kinds(self)
+        return ProviderKind.SPARSE_EMBEDDING in get_provider_kinds(cast(LiteralProviderType, self))
 
     def is_reranking_provider(self) -> bool:
         """Check if the provider is a reranking provider."""
-        return ProviderKind.RERANKING in get_provider_kinds(self)
+        return ProviderKind.RERANKING in get_provider_kinds(cast(LiteralProviderType, self))
 
     def is_agent_provider(self) -> bool:
         """Check if the provider is an agent model provider."""
-        return ProviderKind.AGENT in get_provider_kinds(self)
+        return ProviderKind.AGENT in get_provider_kinds(cast(LiteralProviderType, self))
 
     def is_data_provider(self) -> bool:
         """Check if the provider is a data provider."""
-        return ProviderKind.DATA in get_provider_kinds(self)
+        return ProviderKind.DATA in get_provider_kinds(cast(LiteralProviderType, self))
 
     def get_env_api_key(self) -> str | None:
         """Get the API key from environment variables, if set."""
@@ -723,7 +727,7 @@ class Provider(BaseEnum):
                     return api_key
         return None
 
-    @property
+    @cached_property
     def has_env_auth(self) -> bool:
         """Check if API key or TLS certs are set for the provider."""
         if self.other_env_vars:
@@ -733,6 +737,27 @@ class Provider(BaseEnum):
                     if (env_var := env_info.get(var)) and (env := env_var.env) and os.getenv(env):
                         return True
         return False
+
+    @cached_property
+    def never_uses_own_client(self) -> bool:
+        """Check if the provider never uses its own SDK client."""
+        return self in {Provider.AZURE, Provider.MEMORY} | {
+            provider
+            for provider in type(self)
+            if (provider.uses_openai_api and provider != Provider.OPENAI)
+        }
+
+    @cached_property
+    def only_uses_own_client(self) -> bool:
+        """Check if the provider only uses its own SDK client. Importantly, this does not consider a provider's **models**. Cohere, for example, which makes models -- you can use Cohere models with many SDKs, but in CodeWeaver, Cohere, as a provider (someone you pay for a service), is only ever used with the Cohere SDK client."""
+        return self not in (
+            {Provider.AZURE, Provider.HEROKU, Provider.MEMORY}
+            | {
+                provider
+                for provider in type(self)
+                if (provider.uses_openai_api and provider != Provider.OPENAI)
+            }
+        )
 
 
 SDK_MAP: MappingProxyType[tuple[Provider, ProviderKind], SDKClient | tuple[SDKClient, ...]] = (

@@ -5,9 +5,8 @@ from typing import Literal, LiteralString, NotRequired, Required, TypedDict
 from codeweaver.core import BasedModel
 
 
-BEDROCK_DEFAULTS = {
-    "cohere*": {}
-}
+BEDROCK_DEFAULTS = {"cohere*": {}}
+
 
 class BedrockEmbeddingRequestParams(TypedDict, total=False):
     """Parameters for Bedrock embedding requests."""
@@ -48,14 +47,26 @@ class BedrockEmbeddingConfigDict(BasedModel):
             "amazon.titan-embed-text-v2:0",
             "cohere.embed-english-v3.0",
             "cohere.embed-multilingual-v3.0",
-        ] | LiteralString
+        ]
+        | LiteralString
     ]
     """The Bedrock embedding model to use. Can be one of the predefined models or a custom model identifier. Note that this isn't the AWS `model_id` (usually its ARN) - that's specified in the embedding request params."""
 
-    model: NotRequired[
-        BedrockTitanV2ConfigDict | BedrockCohereConfigDict
-    ]
+    model: NotRequired[BedrockTitanV2ConfigDict | BedrockCohereConfigDict]
     """Model-specific embedding configuration options."""
 
     embedding: NotRequired[BedrockEmbeddingRequestParams]
     """Parameters for the embedding request to Bedrock."""
+
+
+class FastembedEmbeddingConfigDict(BasedModel):
+    """Configuration options for Fastembed embedding models."""
+
+    model_name: Required[str]
+    """The Fastembed model name to use for embeddings."""
+
+    model_version: NotRequired[str]
+    """The version of the Fastembed model to use. Defaults to the latest version available."""
+
+    additional_options: NotRequired[dict[str, str]]
+    """Additional model-specific options for Fastembed embeddings."""

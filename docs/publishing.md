@@ -209,8 +209,8 @@ python -m readme_renderer README.md
 ## Build Artifacts
 
 Each build creates:
-- **Wheel**: `codeweaver_mcp-{version}-py3-none-any.whl` (pure Python)
-- **Sdist**: `codeweaver_mcp-{version}.tar.gz` (source distribution)
+- **Wheel**: `codeweaver.server.mcp-{version}-py3-none-any.whl` (pure Python)
+- **Sdist**: `codeweaver.server.mcp-{version}.tar.gz` (source distribution)
 
 Both artifacts are:
 - Validated with `twine check` before publish

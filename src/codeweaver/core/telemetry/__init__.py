@@ -58,7 +58,6 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "capture_search_event": (__spec__.parent, "events"),
     "capture_session_event": (__spec__.parent, "events"),
     "get_telemetry_client": (__spec__.parent, "client"),
-    "get_telemetry_settings": (__spec__.parent, "config"),
 })
 
 
@@ -74,7 +73,6 @@ __all__ = (
     "capture_search_event",
     "capture_session_event",
     "get_telemetry_client",
-    "get_telemetry_settings",
 )
 
 

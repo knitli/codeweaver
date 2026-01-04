@@ -25,8 +25,8 @@ from codeweaver.server.server import CodeWeaverState
 if TYPE_CHECKING:
     from codeweaver.cli import StatusDisplay
     from codeweaver.core import SessionStatistics
-    from codeweaver.mcp import CwMcpHttpState
     from codeweaver.server.config import CodeWeaverSettings
+    from codeweaver.server.mcp import CwMcpHttpState
 
 logger = logging.getLogger(__name__)
 

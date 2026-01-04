@@ -176,7 +176,7 @@ def ensure_set_fields(obj: BaseSettings | BasedModel) -> BaseSettings | BasedMod
 
 
 DEFAULT_BASE_MIDDLEWARE = [
-    f"codeweaver.mcp.{mw}"
+    f"codeweaver.server.mcp{mw}"
     for mw in (
         "ResponseCachingMiddleware",
         "ErrorHandlingMiddleware",
@@ -187,9 +187,9 @@ DEFAULT_BASE_MIDDLEWARE = [
 
 DEFAULT_HTTP_MIDDLEWARE = [
     *DEFAULT_BASE_MIDDLEWARE[:-1],
-    "codeweaver.mcpRateLimitingMiddleware",
-    "codeweaver.mcpRetryMiddleware",
-    "codeweaver.mcpStructuredLoggingMiddleware",
+    "codeweaver.server.mcpRateLimitingMiddleware",
+    "codeweaver.server.mcpRetryMiddleware",
+    "codeweaver.server.mcpStructuredLoggingMiddleware",
 ]
 _sort_order = (
     "ResponseCachingMiddleware",

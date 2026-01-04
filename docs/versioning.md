@@ -72,7 +72,7 @@ Building with uncommitted changes appends `.dirty` suffix.
 ### Development Workflow
 1. Work on features on feature branches
 2. Each commit gets unique pre-release version
-3. Build creates: `codeweaver_mcp-0.1.0rc298+g2080710-py3-none-any.whl`
+3. Build creates: `codeweaver.server.mcp-0.1.0rc298+g2080710-py3-none-any.whl`
 
 ### Alpha Release Workflow
 1. Commit and push changes to your branch
@@ -138,7 +138,7 @@ To see what version will be built from current git state:
 uv build
 ls dist/
 
-# Output: codeweaver_mcp-{version}-py3-none-any.whl
+# Output: codeweaver.server.mcp-{version}-py3-none-any.whl
 ```
 
 The version in the filename is what will be used for PyPI.

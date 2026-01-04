@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 
 """
-Models and TypedDict classes for provider and AI (embedding, sparse embedding, reranking, agent) model settings.
+Models and TypedDict classes for providers by kind (embedding, sparse embedding, reranking, agent, vector store, data).
 
 The overall pattern:
     - Each potential provider client (the actual client class, e.g., OpenAIClient) has a corresponding ClientOptions class (e.g., OpenAIClientOptions).
@@ -15,10 +15,12 @@ The overall pattern:
 
 from __future__ import annotations
 
+import contextlib
 import logging
 
+from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Annotated, Any, Literal, NotRequired, Required, Self, TypedDict
+from typing import Annotated, Any, Literal, NotRequired, Required, Self, TypedDict, cast
 
 from pydantic import (
     Discriminator,
@@ -27,6 +29,7 @@ from pydantic import (
     PositiveInt,
     SecretStr,
     Tag,
+    computed_field,
     model_validator,
 )
 from pydantic_ai.settings import ModelSettings as AgentModelSettings
@@ -39,6 +42,7 @@ from codeweaver.core import (
     FilteredKeyT,
     Provider,
     ProviderLiteral,
+    SDKClient,
     get_user_config_dir,
 )
 from codeweaver.providers.config.clients import (
@@ -56,6 +60,15 @@ from codeweaver.providers.config.clients import (
 
 
 logger = logging.getLogger(__name__)
+
+type LiteralSDKClient = Literal[
+    SDKClient.BEDROCK,
+    SDKClient.COHERE,
+    SDKClient.FASTEMBED,
+    SDKClient.OPENAI,
+    SDKClient.SENTENCE_TRANSFORMERS,
+    SDKClient.QDRANT,
+]
 
 
 # ===========================================================================
@@ -96,7 +109,7 @@ class ConnectionConfiguration(BasedModel):
         }
 
 
-class BaseProviderSettings(BasedModel):
+class BaseProviderSettings(BasedModel, ABC):
     """Base settings for all providers."""
 
     provider: Provider
@@ -113,52 +126,23 @@ class BaseProviderSettings(BasedModel):
     def _telemetry_keys(self) -> None:
         return None
 
+    @abstractmethod
+    @computed_field
+    def client(self) -> LiteralSDKClient:
+        """Return an SDKClient enum member corresponding to this provider settings instance.  Often this is the same as `self.provider`, but not always, and sometimes must be computed (e.g., Azure embedding models)."""
+
 
 class BaseProviderSettingsDict(TypedDict, total=False):
     """Base settings for all providers. Represents `BaseProviderSettings` in a TypedDict form."""
 
     provider: Required[Provider]
     connection: NotRequired[ConnectionConfiguration | None]
+    tag: NotRequired[ProviderLiteral]
 
 
 # ===========================================================================
 # *            Model Settings classes
 # ===========================================================================
-
-
-# =================== Model Settings ===================
-
-
-class EmbeddingModelSettings(TypedDict, total=False):
-    """Embedding model settings. Use this class for dense (vector) models."""
-
-    model: Required[str]
-    dimension: NotRequired[PositiveInt | None]
-    data_type: NotRequired[str | None]
-    custom_prompt: NotRequired[str | None]
-    """A custom prompt to use for the embedding model, if supported. Most models do not support custom prompts for embedding."""
-    embed_options: NotRequired[dict[str, Any] | None]
-    """Keyword arguments to pass to the *provider* **client's** (like `voyageai.async_client.AsyncClient`) `embed` method. These are different from `model_options`, which are passed to the model constructor itself."""
-    model_options: NotRequired[dict[str, Any] | None]
-    """Keyword arguments to pass to the model's constructor."""
-
-
-class SparseEmbeddingModelSettings(TypedDict, total=False):
-    """Sparse embedding model settings. Use this class for sparse (e.g. bag-of-words) models."""
-
-    model: Required[str]
-    embed_options: NotRequired[dict[str, Any] | None]
-    """Keyword arguments to pass to the *provider* **client's** (like `sentence_transformers.SparseEncoder`) `embed` method. These are different from `model_options`, which are passed to the model constructor itself."""
-    model_options: NotRequired[dict[str, Any] | None]
-    """Keyword arguments to pass to the model's constructor."""
-    data_type: NotRequired[Literal["float32", "float16", "int8", "binary"] | None]
-
-
-class RerankingModelSettings(TypedDict, total=False):
-    """Rerank model settings."""
-
-    model: Required[str]
-    custom_prompt: NotRequired[str | None]
 
 
 # =================== Provider-Specific Mixins ===================
@@ -197,7 +181,7 @@ class AzureProviderMixin:
     model_deployment: Annotated[
         str,
         Field(
-            description="The deployment name of the model you want to use. This is *different* from the model name in `model_settings`, which is the name of the model itself (`text-embedding-3-small`). You need to create a deployment in your Azure OpenAI resource for each model you want to use, and provide the deployment name here."
+            description="The deployment name of the model you want to use. This is *different* from the model name in `model_options`, which is the name of the model itself (`text-embedding-3-small`). You need to create a deployment in your Azure OpenAI resource for each model you want to use, and provide the deployment name here."
         ),
     ]
 
@@ -312,7 +296,6 @@ class VectorStoreProviderSettings(BaseProviderSettings):
     ] = 64
 
 
-# we don't need to add client_options here because it's easy to resolve
 class QdrantVectorStoreProviderSettings(QdrantProviderMixin, VectorStoreProviderSettings):
     """Qdrant-specific settings for the Qdrant and Memory providers. Qdrant is the only currently supported vector store, but others may be added in the future."""
 
@@ -336,21 +319,70 @@ class QdrantVectorStoreProviderSettings(QdrantProviderMixin, VectorStoreProvider
         # we'll handle collection config later too -- when models are getting instantiated it's much less painful to wait until the dust settles for inter-model dependencies
         return self
 
+    @computed_field
+    def client(self) -> Literal[SDKClient.QDRANT]:
+        """Return the Qdrant SDKClient enum member."""
+        return SDKClient.QDRANT
+
 
 # ===========================================================================
 # *                       Embedding Provider Settings
 # ===========================================================================
 
 
-class EmbeddingProviderSettings(BaseProviderSettings):
+class BaseEmbeddingProviderSettings(BaseProviderSettings, ABC):
     """Settings for (dense) embedding models. It validates that the model and provider settings are compatible and complete, reconciling environment variables and config file settings as needed."""
 
-    model_settings: EmbeddingModelSettings
-    """Settings for the embedding model(s)."""
+    @abstractmethod
+    def get_embed_kwargs(self) -> dict[str, Any]:
+        """Get keyword arguments for embedding requests based on the provider settings."""
+        raise NotImplementedError("get_embed_kwargs must be implemented by subclasses.")
+
+    @abstractmethod
+    def get_query_embed_kwargs(self) -> dict[str, Any]:
+        """Get keyword arguments for query embedding requests based on the provider settings."""
+        raise NotImplementedError("get_query_embed_kwargs must be implemented by subclasses.")
+
+
+class EmbeddingProviderSettings(BaseEmbeddingProviderSettings):
+    """Settings for dense embedding models."""
+
+    model_name: Annotated[
+        str,
+        Field(
+            description="The name of the embedding model to use. This should correspond to a model supported by the selected provider and formatted as the provider expects. For builtin models, this is the name as listed with `codeweaver list models`."
+        ),
+    ]
     client_options: Annotated[
         GeneralEmbeddingClientOptionsType | None,
         Field(description="Client options for the provider's client.", discriminator="tag"),
     ] = None
+
+    @computed_field
+    @property
+    def client(self) -> LiteralSDKClient:
+        """Return the embedding SDKClient enum member."""
+        is_sdkclient_member = False
+        if self.provider == Provider.MEMORY:
+            return SDKClient.QDRANT
+        if self.provider.uses_openai_api and self.provider not in {Provider.COHERE, Provider.AZURE}:
+            return SDKClient.OPENAI
+        with contextlib.suppress(AttributeError, KeyError, ValueError):
+            is_sdkclient_member = SDKClient.from_string(self.provider.variable) is not None
+        if self.provider.only_uses_own_client and is_sdkclient_member:
+            return cast(LiteralSDKClient, SDKClient.from_string(self.provider.variable))
+        # Now we have azure and heroku left to consider
+        if self.model_name.startswith("cohere") or self.model_name.startswith("embed"):
+            return SDKClient.COHERE
+        return SDKClient.OPENAI
+
+    def get_embed_kwargs(self) -> dict[str, Any]:
+        """Get keyword arguments for embedding requests based on the provider settings."""
+        return {}
+
+    def get_query_embed_kwargs(self) -> dict[str, Any]:
+        """Get keyword arguments for query embedding requests based on the provider settings."""
+        return {}
 
 
 class AzureEmbeddingProviderSettings(AzureProviderMixin, EmbeddingProviderSettings):
@@ -392,12 +424,19 @@ class FastembedEmbeddingProviderSettings(FastembedProviderMixin, EmbeddingProvid
 class SparseEmbeddingProviderSettings(BaseProviderSettings):
     """Settings for sparse embedding models."""
 
-    model_settings: SparseEmbeddingModelSettings
+    model_name: Annotated[str, Field(description="The name of the sparse embedding model to use.")]
+    model_options: SparseEmbeddingModelSettings
     """Settings for the sparse embedding model."""
     client_options: Annotated[
         SentenceTransformersClientOptions | None,
         Field(description="Client options for the provider's client."),
     ] = None
+
+    @computed_field
+    @property
+    def client(self) -> Literal[SDKClient.SENTENCE_TRANSFORMERS]:
+        """Return the sparse embedding SDKClient enum member."""
+        return SDKClient.SENTENCE_TRANSFORMERS
 
 
 class FastembedSparseEmbeddingProviderSettings(
@@ -410,6 +449,12 @@ class FastembedSparseEmbeddingProviderSettings(
         Field(description="Client options for the provider's client."),
     ] = None
 
+    @computed_field
+    @property
+    def client(self) -> Literal[SDKClient.FASTEMBED]:
+        """Return the sparse embedding SDKClient enum member."""
+        return SDKClient.FASTEMBED
+
 
 # ===========================================================================
 # *                       Reranking Provider Settings
@@ -419,7 +464,8 @@ class FastembedSparseEmbeddingProviderSettings(
 class RerankingProviderSettings(BaseProviderSettings):
     """Settings for re-ranking models."""
 
-    model_settings: RerankingModelSettings
+    model_name: Annotated[str, Field(description="The name of the re-ranking model to use.")]
+    model_options: RerankingModelSettings
     """Settings for the re-ranking model(s)."""
     top_n: PositiveInt | None = None
     client_options: (
@@ -429,6 +475,13 @@ class RerankingProviderSettings(BaseProviderSettings):
         ]
         | None
     ) = None
+
+    @computed_field
+    @property
+    def client(self) -> LiteralSDKClient:
+        """Return the reranking SDKClient enum member."""
+        # currently all reranking providers only use their own clients
+        return cast(LiteralSDKClient, SDKClient.from_string(self.provider.variable))
 
 
 class FastembedRerankingProviderSettings(FastembedProviderMixin, RerankingProviderSettings):
@@ -462,6 +515,12 @@ class DataProviderSettings(BaseProviderSettings):
         dict[str, Any] | None, Field(description="Other provider-specific settings.")
     ] = None
 
+    @computed_field
+    @property
+    def client(self) -> LiteralSDKClient:
+        """Return the data SDKClient enum member."""
+        raise NotImplementedError("Data provider client resolution is not yet implemented.")
+
 
 # ===========================================================================
 # *                       Agent Provider Settings
@@ -482,8 +541,14 @@ class AgentProviderSettings(BaseProviderSettings):
     """Settings for agent models."""
 
     model: Required[ModelString]
-    model_settings: Required[AgentModelSettings | None]
+    model_options: Required[AgentModelSettings | None]
     """Settings for the agent model(s)."""
+
+    @computed_field
+    @property
+    def client(self) -> LiteralSDKClient:
+        """Return the agent SDKClient enum member."""
+        raise NotImplementedError("Agent provider client resolution is not yet implemented.")
 
 
 __all__ = (

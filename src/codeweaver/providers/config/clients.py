@@ -151,6 +151,14 @@ class ClientOptions(BasedModel):
         ),
     ]
 
+    def __init__(self, **data: Any) -> None:
+        """Initialize the client options and apply environment variables."""
+        for key, value in data.items():
+            if key in type(self).model_fields and value:
+                object.__setattr__(self, key, value)
+        self.apply_env_vars()
+        super().__init__(**data)
+
     @staticmethod
     def _filter_values(value: Any) -> Any:
         if isinstance(value, SecretStr):
@@ -217,7 +225,7 @@ class ClientOptions(BasedModel):
                 var_name in type(self).model_fields
                 and not (existing_value := getattr(self, var_name, None))
             ) or (existing_value and existing_value == value):
-                setattr(self, var_name, value)
+                object.__setattr__(self, var_name, value)
                 return
             if var_name in type(self).model_fields and existing_value:
                 if (
@@ -237,14 +245,14 @@ class ClientOptions(BasedModel):
         existing_value = getattr(self, var_name, None) or {}
         env_vars = {k: os.getenv(v) for k, v in env_var_names.items() if os.getenv(v) is not None}
         if not existing_value and env_vars:
-            setattr(self, var_name, env_vars)
+            object.__setattr__(self, var_name, env_vars)
             return
         if isinstance(existing_value, dict):
-            setattr(self, var_name, existing_value | env_vars)
+            object.__setattr__(self, var_name, existing_value | env_vars)
             return
         if isinstance(existing_value, BaseModel | tuple):
             with contextlib.suppress(AttributeError, ValueError, TypeError):
-                setattr(
+                object.__setattr__(
                     self,
                     var_name,
                     existing_value.model_dump() | env_vars
@@ -652,6 +660,18 @@ class VoyageClientOptions(ClientOptions):
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         return {FilteredKey("api_key"): AnonymityConversion.BOOLEAN}
+
+
+class FastEmbedClientOptions(ClientOptions):
+    """Client options for FastEmbed-based embedding providers."""
+
+    _core_provider: Provider = Provider.FASTEMBED
+    _providers: tuple[Provider, ...] = (Provider.FASTEMBED,)
+
+    model_name: str
+    cache_dir: str | None = None
+    cuda: bool = False
+    device_ids: list[int] | None = None
 
 
 # We chose TypedDicts originally for speed. They can be substantially faster than Pydantic models (according to Pydantic: https://docs.pydantic.dev/2.12/concepts/performance/#use-typeddict-over-nested-models) But we lose a lot of benefits of Pydantic models.

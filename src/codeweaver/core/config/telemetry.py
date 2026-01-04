@@ -199,12 +199,4 @@ DefaultTelemetrySettings = TelemetrySettingsDict(
 )  # type: ignore
 
 
-def get_telemetry_settings() -> TelemetrySettings:
-    """Get cached telemetry settings instance."""
-    global _telemetry_settings
-    if _telemetry_settings is None:
-        _telemetry_settings = TelemetrySettings()
-    return _telemetry_settings
-
-
-__all__ = ("TelemetrySettings", "TelemetrySettingsDict", "get_telemetry_settings")
+__all__ = ("TelemetrySettings", "TelemetrySettingsDict")

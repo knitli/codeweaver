@@ -44,9 +44,30 @@ class ProviderMetadata:
     is_async_generator: bool
     module: str | None
 
+    @classmethod
+    def from_provider(
+        cls,
+        scope: Literal["singleton", "request", "function"],
+        factory: Callable[..., Any],
+        module: str | None = None,
+    ) -> ProviderMetadata:
+        """Create ProviderMetadata from a factory function.
+
+        Args:
+            scope: The lifecycle scope.
+            factory: The provider function or class.
+            module: Optional module name.
+
+        Returns:
+            An instance of ProviderMetadata.
+        """
+        is_async_gen = inspect.isasyncgenfunction(factory)
+        is_gen = inspect.isgeneratorfunction(factory)
+        return cls(scope=scope, is_generator=is_gen, is_async_generator=is_async_gen, module=module)
+
 
 @overload
-def provider[T](
+def dependency_provider[T](
     cls: type[T],
     *,
     scope: Literal["singleton", "request", "function"] = "singleton",
@@ -55,7 +76,7 @@ def provider[T](
 
 
 @overload
-def provider[T](
+def dependency_provider[T](
     cls: None = None,
     *,
     scope: Literal["singleton", "request", "function"] = "singleton",
@@ -63,7 +84,7 @@ def provider[T](
 ) -> Callable[[type[T]], type[T]]: ...
 
 
-def provider[T](
+def dependency_provider[T](
     cls: type[T] | None = None,
     *,
     scope: Literal["singleton", "request", "function"] = "singleton",
@@ -79,7 +100,9 @@ def provider[T](
 
     1. Function registration (explicit type):
         ```python
-        @provider(MyService, scope="singleton")
+        dependency_provider(MyService, scope="singleton")
+
+
         async def create_my_service() -> MyService:
             return MyService()
         ```
@@ -87,7 +110,9 @@ def provider[T](
     2. Class registration (self-registration):
         Note: In this case, the class *must* implement __call__.
         ```python
-        @provider(scope="request")
+        dependency_provider(scope="request")
+
+
         class MyService:
             def __init__(self, config: Config):
                 self.config = config
@@ -100,31 +125,39 @@ def provider[T](
         module: Optional module name for scoped registration.
 
     Returns:
-        When used as `@provider(SomeType)`: Returns a decorator function.
-        When used as `@provider` on a class: Returns the class unchanged.
+        When used as `dependency_provider(SomeType)`: Returns a decorator function.
+        When used as `dependency_provider` on a class: Returns the class unchanged.
 
     Example:
         ```python
         # Singleton factory function
-        @provider(DatabaseConnection, scope="singleton")
+        dependency_provider(DatabaseConnection, scope="singleton")
+
+
         async def get_db() -> DatabaseConnection:
             return DatabaseConnection()
 
 
         # Request-scoped service
-        @provider(RequestContext, scope="request")
+        dependency_provider(RequestContext, scope="request")
+
+
         async def get_context() -> RequestContext:
             return RequestContext()
 
 
         # Function-scoped (no caching)
-        @provider(TempFile, scope="function")
+        dependency_provider(TempFile, scope="function")
+
+
         async def create_temp() -> TempFile:
             return TempFile()
 
 
         # Generator with cleanup
-        @provider(ResourcePool, scope="singleton")
+        dependency_provider(ResourcePool, scope="singleton")
+
+
         async def get_pool() -> AsyncIterator[ResourcePool]:
             pool = ResourcePool()
             await pool.connect()
@@ -133,14 +166,16 @@ def provider[T](
 
 
         # Class self-registration (no cls argument)
-        @provider(scope="singleton")
+        dependency_provider(scope="singleton")
+
+
         class SimpleService:
             def __init__(self):
                 self.value = 42
         ```
     """
     # Case 1: Used without cls argument (for class self-registration)
-    # @provider(scope="request")
+    # dependency_provider(scope="request")
     # class MyClass: ...
     if cls is None:
 
@@ -151,10 +186,10 @@ def provider[T](
         return class_decorator
 
     # Case 2: Used with explicit type - return decorator function
-    # @provider(SomeType, scope="singleton")
+    # dependency_provider(SomeType, scope="singleton")
     # def factory() -> SomeType: ...
     # OR
-    # @provider(SomeType, scope="singleton")
+    # dependency_provider(SomeType, scope="singleton")
     # class SomeType: ...  # Self-registration with explicit type
     def decorator(fn_or_cls: Callable[..., T] | type[T]) -> Callable[..., T] | type[T]:
         _register_provider(
@@ -263,10 +298,10 @@ def get_all_provider_metadata() -> dict[type, ProviderMetadata]:
 
 __all__ = (
     "ProviderMetadata",
+    "dependency_provider",
     "get_all_provider_metadata",
     "get_all_providers",
     "get_provider",
     "get_provider_metadata",
     "is_provider_registered",
-    "provider",
 )

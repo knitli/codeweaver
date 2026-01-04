@@ -171,7 +171,7 @@ async def start_cw_services(
         # Start MCP HTTP server if requested (needed for stdio proxy)
         mcp_server_task = None
         if start_mcp_http_server:
-            from codeweaver.mcp import create_http_server
+            from codeweaver.server import create_http_server
 
             mcp_state = await create_http_server(
                 host=mcp_host, port=mcp_port, verbose=verbose, debug=debug

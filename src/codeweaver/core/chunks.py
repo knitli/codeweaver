@@ -570,6 +570,8 @@ class CodeChunk(BasedModel):
 
 
 __all__ = (
+    "BatchKeyIndex",
+    "BatchKeys",
     "ChunkSequence",
     "CodeChunk",
     "CodeChunkDict",

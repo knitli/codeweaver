@@ -12,7 +12,7 @@ import logging
 import re
 import time
 
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any
@@ -28,44 +28,24 @@ from codeweaver.core import (
     AnonymityConversion,
     DataclassSerializationMixin,
     InitializationError,
-    ModelRegistry,
-    ProviderRegistry,
-    ServicesRegistry,
     SessionStatistics,
     Unset,
     elapsed_time_to_human_readable,
     get_container,
     get_project_path,
-    lazy_import,
 )
 from codeweaver.core import Provider as Provider
 from codeweaver.engine import Indexer, VectorStoreFailoverManager
-from codeweaver.mcp import CwMcpHttpState
 from codeweaver.providers import HttpClientPool
 from codeweaver.server.config import CodeWeaverSettings
 from codeweaver.server.health.health_service import HealthService
 from codeweaver.server.management import ManagementServer
+from codeweaver.server.mcp import CwMcpHttpState
 
 
 if TYPE_CHECKING:
-    from codeweaver.core import AnonymityConversion, FilteredKeyT, LazyImport
+    from codeweaver.core import AnonymityConversion, FilteredKeyT
 
-# lazy imports for default factory functions
-get_provider_registry: LazyImport[Callable[[], ProviderRegistry]] = lazy_import(
-    "codeweaver.core", "get_provider_registry"
-)
-get_services_registry: LazyImport[Callable[[], ServicesRegistry]] = lazy_import(
-    "codeweaver.core", "get_services_registry"
-)
-get_model_registry: LazyImport[Callable[[], ModelRegistry]] = lazy_import(
-    "codeweaver.core", "get_model_registry"
-)
-get_session_statistics: LazyImport[Callable[[], SessionStatistics]] = lazy_import(
-    "codeweaver.core", "get_session_statistics"
-)
-get_settings: LazyImport[Callable[[], CodeWeaverSettings]] = lazy_import(
-    "codeweaver.server.config", "get_settings"
-)
 
 _logger = logging.getLogger(__name__)
 BRACKET_PATTERN: re.Pattern[str] = re.compile("\\[.+\\]")
@@ -103,27 +83,6 @@ class CodeWeaverState(DataclassSerializationMixin):
     project_path: Annotated[
         DirectoryPath,
         Field(default_factory=get_project_path, description="Path to the project root"),
-    ]
-    provider_registry: Annotated[
-        ProviderRegistry,
-        Field(
-            default_factory=get_provider_registry,
-            description="Provider registry for dynamic provider management",
-        ),
-    ]
-    services_registry: Annotated[
-        ServicesRegistry,
-        Field(
-            default_factory=get_services_registry,
-            description="Service registry for managing available services",
-        ),
-    ]
-    model_registry: Annotated[
-        ModelRegistry,
-        Field(
-            default_factory=get_model_registry,
-            description="Model registry for managing AI and embedding/reranking models",
-        ),
     ]
     statistics: Annotated[
         SessionStatistics,
@@ -234,7 +193,6 @@ def _get_health_service() -> HealthService:
     state = get_state()
 
     return HealthService(
-        provider_registry=state.provider_registry,
         statistics=state.statistics,
         indexer=state.indexer,
         startup_stopwatch=state.startup_stopwatch,

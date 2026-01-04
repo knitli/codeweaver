@@ -117,7 +117,7 @@ async def test_cli_search_returns_results(
     When: CLI search command executed via find_code_tool
     Then: Returns valid FindCodeResponseSummary structure
     """
-    from codeweaver.mcp import find_code_tool
+    from codeweaver.server import find_code_tool
 
     # Execute search via find_code_tool (CLI uses this internally)
     response = await find_code_tool(
@@ -165,7 +165,7 @@ async def test_cli_search_output_formats(
     When: Output format specified (json, table, markdown)
     Then: Results render correctly in each format
     """
-    from codeweaver.mcp import find_code_tool
+    from codeweaver.server import find_code_tool
 
     # Get search results
     response = await find_code_tool(
@@ -214,7 +214,8 @@ async def test_mcp_find_code_tool(test_project_path: Path, initialized_cw_state,
     Reference: specs/003-our-aim-to/contracts/find_code_mcp_tool.json
     """
     from codeweaver.agent_api import CodeMatchType, IntentType
-    from codeweaver.mcp import find_code_tool
+
+    from codeweaver.server import find_code_tool
 
     # Invoke MCP tool
     response = await find_code_tool(
@@ -273,7 +274,7 @@ async def test_mcp_find_code_required_parameters(
     When: Parameters provided (including edge cases)
     Then: Appropriate handling occurs
     """
-    from codeweaver.mcp import find_code_tool
+    from codeweaver.server import find_code_tool
 
     # Test with empty query
     response = await find_code_tool(
@@ -312,7 +313,8 @@ async def test_search_with_intent_parameter(initialized_cw_state, di_overrides):
     Then: Intent reflected in response
     """
     from codeweaver.agent_api import IntentType
-    from codeweaver.mcp import find_code_tool
+
+    from codeweaver.server import find_code_tool
 
     intents_to_test = [
         IntentType.UNDERSTAND,
@@ -359,7 +361,7 @@ async def test_search_filters_work(initialized_cw_state, di_overrides):
     When: Filters applied (include_tests=True/False)
     Then: Both return valid responses
     """
-    from codeweaver.mcp import find_code_tool
+    from codeweaver.server import find_code_tool
 
     # Test include_tests filter (parameter removed from API)
     response_with_tests = await find_code_tool(
@@ -394,7 +396,7 @@ async def test_search_token_limit(initialized_cw_state, di_overrides):
     When: token_limit parameter provided
     Then: Response respects limit
     """
-    from codeweaver.mcp import find_code_tool
+    from codeweaver.server import find_code_tool
 
     response = await find_code_tool(
         query="authentication",
@@ -422,7 +424,7 @@ async def test_empty_query_handling(initialized_cw_state, di_overrides):
     When: Search executed
     Then: Returns graceful response
     """
-    from codeweaver.mcp import find_code_tool
+    from codeweaver.server import find_code_tool
 
     # Test empty query
     response = await find_code_tool(
@@ -444,7 +446,7 @@ async def test_no_results_scenario(initialized_cw_state, di_overrides):
     When: Search executed
     Then: Returns empty results with clear summary
     """
-    from codeweaver.mcp import find_code_tool
+    from codeweaver.server import find_code_tool
 
     response = await find_code_tool(
         query="xyzabc123nonexistentquerythatmatchesnothing",
@@ -510,7 +512,7 @@ async def test_search_response_time_tracking(initialized_cw_state, di_overrides)
     When: Response returned
     Then: execution_time_ms tracked (even for stub)
     """
-    from codeweaver.mcp import find_code_tool
+    from codeweaver.server import find_code_tool
 
     start_time = time.time()
 
@@ -543,6 +545,7 @@ async def test_search_strategy_reporting(test_project_path: Path, initialized_cw
     Then: search_strategy reports HYBRID_SEARCH and SEMANTIC_RERANK
     """
     from codeweaver.agent_api import IntentType, find_code
+
     from codeweaver.core import SearchStrategy
 
     response = await find_code(
@@ -569,7 +572,7 @@ async def test_search_languages_found(test_project_path: Path, initialized_cw_st
     When: Results returned
     Then: languages_found has correct structure
     """
-    from codeweaver.mcp import find_code_tool
+    from codeweaver.server import find_code_tool
 
     response = await find_code_tool(
         query="authentication database",

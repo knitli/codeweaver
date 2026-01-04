@@ -53,7 +53,7 @@ class Container[T]:
     - Recursive dependency resolution via Depends markers
     - Testing overrides
     - Async startup/shutdown hooks
-    - Auto-discovery of providers via @provider decorator
+    - Auto-discovery of providers via dependency_provider decorator
     """
 
     def __init__(self) -> None:
@@ -123,7 +123,7 @@ class Container[T]:
         """Load providers from the global registry on first access.
 
         This method is called lazily on first `resolve()` call to ensure all
-        @provider decorators have been processed during module imports.
+        dependency_provider decorators have been processed during module imports.
 
         Thread-safe via the _providers_loaded flag - only runs once.
         """
@@ -822,8 +822,7 @@ def get_container() -> Container:
 
     On first call, this will:
     1. Create a new Container instance
-    2. Load providers from @provider decorator registry (lazy, on first resolve)
-    3. Call setup_default_container for any additional legacy registrations
+    2. Load providers from dependency_provider decorator registry (lazy, on first resolve)
 
     Returns:
         The global container instance.
@@ -831,13 +830,6 @@ def get_container() -> Container:
     global _default_container
     if _default_container is None:
         _default_container = Container()
-        # Note: Providers are loaded lazily on first resolve() call via _load_providers()
-        # This ensures all @provider decorators have been processed during module imports
-
-        # Legacy setup for backward compatibility
-        from codeweaver.core.di.providers import setup_default_container
-
-        setup_default_container(_default_container)
     return _default_container
 
 

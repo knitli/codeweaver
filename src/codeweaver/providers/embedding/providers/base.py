@@ -42,17 +42,25 @@ from tenacity import (
 )
 
 from codeweaver.core import (
+    INJECTED,
     AnonymityConversion,
     BasedModel,
     BaseEnum,
+    BatchKeys,
     BlakeStore,
+    ChunkEmbeddings,
+    EmbeddingBatchInfo,
     LazyImport,
-    LiteralProviderType,
+    LiteralProvider,
+    LiteralStringT,
+    ModelName,
     Provider,
     ProviderError,
     SparseEmbedding,
     UUIDStore,
+    depends,
     lazy_import,
+    log_to_client_or_fallback,
     make_blake_store,
     make_uuid_store,
     uuid7,
@@ -62,6 +70,29 @@ from codeweaver.providers.config import EmbeddingModelSettings, SparseEmbeddingM
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.registry import EmbeddingRegistry
 
+
+type EmbeddingImplementationDeps = Annotated[Any, depends(lambda: None)]
+"Implementation-specific dependencies for the provider. To use this type, implement a dependency provider callable and register it with the DI system using this type as the key."
+
+type EmbeddingCustomDeps = Annotated[Any, depends(lambda: None)]
+"""Custom dependencies for the provider. To use this type, implement a dependency provider callable. You can register it simply by importing it. Here's how to declare it:
+
+```python
+from typing import Annotated
+from codeweaver.core import dependency_provider
+
+class LiterallyAnything:
+    # this doesn't have to be a class, it could be anything.
+    pass
+
+type EmbeddingCustomDeps = Annotated[LiterallyAnything, depends(my_custom_deps)]
+
+@dependency_provider(EmbeddingCustomDeps)
+def my_custom_deps() -> LiterallyAnything:
+    return LiterallyAnything()
+
+```
+"""
 
 statistics_module: LazyImport[ModuleType] = lazy_import("codeweaver.core")
 
@@ -116,8 +147,6 @@ class EmbeddingErrorInfo(TypedDict):
 
 def default_input_transformer(chunks: StructuredDataInput) -> Iterator[CodeChunk]:
     """Default input transformer that serializes CodeChunks to strings."""
-    from codeweaver.core import CodeChunk
-
     return CodeChunk.chunkify(chunks)
 
 
@@ -150,19 +179,10 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
     """
     Abstract class for an embedding provider. You must pass in a client and capabilities.
 
-    This class mirrors `pydantic_ai.providers.Provider` class to make it simple to use
-    existing implementations of `pydantic_ai.providers.Provider` as embedding providers.
-
-    We chose to separate this from the `pydantic_ai.providers.Provider` class for clarity. That class is re-exported in `codeweaver.providers.agent` package as `AgentProvider`, which is used for agent operations.
-    We didn't want folks accidentally conflating agent operations with embedding operations. That's kind of a 'dogs and cats living together' 🐕🐈 situation.
-
-    We don't think many or possibly any of the pydantic-ai providers can be used directly as embedding providers -- the endpoints and request/response formats are often different.
     Each provider only supports a specific interface, but an interface can be used by multiple providers.
 
-    The primary example of this one-to-many relationship is the OpenAI provider, which supports any OpenAI-compatible provider (Azure, Ollama, Fireworks, Heroku, Together, Github).
+    The primary example of this one-to-many relationship is the OpenAI provider, which supports any OpenAI-compatible provider (Azure, Ollama, Fireworks, Heroku, Together, Github, and more).
     """
-
-    from codeweaver.core import StructuredDataInput
 
     model_config = BasedModel.model_config | ConfigDict(extra="allow", arbitrary_types_allowed=True)
 
@@ -174,17 +194,24 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             validation_alias="_client",
         ),
     ]
+
     caps: Annotated[
-        EmbeddingModelCapabilities,
-        Field(description="The capabilities of the embedding model.", validation_alias="_caps"),
+        EmbeddingModelCapabilities, Field(description="The capabilities of the embedding model.")
     ]
-    _provider: ClassVar[LiteralProviderType] = cast(LiteralProviderType, Provider.NOT_SET)
+
+    embed_options: Mapping[str, Any] = Field(
+        description="Options for embedding requests.", default_factory=dict
+    )
+
+    query_options: Mapping[str, Any] = Field(
+        description="Options for query requests.", default_factory=dict
+    )
+
+    _provider: ClassVar[LiteralProvider] = cast(LiteralProvider, Provider.NOT_SET)
     _input_transformer: ClassVar[Callable[[StructuredDataInput], Any]] = default_input_transformer
     _output_transformer: ClassVar[Callable[[Any], list[list[float]] | list[list[int]]]] = (
         default_output_transformer
     )
-    _doc_kwargs: ClassVar[dict[str, Any]] = {}
-    _query_kwargs: ClassVar[dict[str, Any]] = {}
 
     # Typing note: we can't type this properly because: 1) Ty wants us to define the subtype for `list` and 2) pydantic does not support parameterized subtypes for generics.
     _store: UUIDStore[list] = make_uuid_store(  # type: ignore
@@ -215,80 +242,69 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
 
     def __init__(
         self,
-        client: ClientDep[SDKClient] = INJECTED[SDKClient],
-        settings: EmbeddingProviderDep[EmbeddingProviderSettingsType] = INJECTED[
-            EmbeddingProviderSettingsType
-        ],
+        client: ClientDep[EmbeddingClient] = INJECTED,
+        caps: ModelCapabilitiesDep[EmbeddingModelCapabilities] = INJECTED,
+        embed_options: Mapping[str, Any] | None = None,
+        query_options: Mapping[str, Any] | None = None,
+        impl_deps: Any = None,
+        custom_deps: Any = None,
         **kwargs: Any,
     ) -> None:
         defaults = getattr(type(self), "_defaults", {})
         object.__setattr__(self, "_model_dump_json", super().model_dump_json)
-
-    """
-    def __init__(
-        self,
-        client: EmbeddingClient,
-        caps: EmbeddingModelCapabilities,
-        kwargs: dict[str, Any] | None,
-    ) -> None:
-        # Determine provider - check if subclass has it set
-        getattr(type(self), "_provider", None) or caps.provider
-
-        # Store values we'll need after super().__init__()
-        _doc_kwargs = type(self)._doc_kwargs.copy() or {}
-        _query_kwargs = type(self)._query_kwargs.copy() or {}
-        _user_kwargs = kwargs or {}
-
-        # Use object.__setattr__ to bypass Pydantic's validation for pre-super() initialization
-        object.__setattr__(self, "_model_dump_json", super().model_dump_json)
-
-        # Initialize circuit breaker state using object.__setattr__
         object.__setattr__(self, "_circuit_state", CircuitBreakerState.CLOSED)
-        object.__setattr__(self, "_failure_count", 0)
-        object.__setattr__(self, "_last_failure_time", None)
-
-        # Initialize pydantic model BEFORE calling _initialize since _initialize may set PrivateAttr fields
-        super().__init__(client=client, caps=caps)
-
-        # Now that Pydantic is initialized, set kwargs as normal attributes (will go to __pydantic_extra__)
-        self.doc_kwargs = {**_doc_kwargs, **_user_kwargs}
-        self.query_kwargs = {**_query_kwargs, **_user_kwargs}
-
-        # Call _initialize after super().__init__() so Pydantic private attributes are set up
-        self._initialize(caps)
-    """
-
-    def _add_kwargs(self, kwargs: dict[str, Any]) -> None:
-        """Add keyword arguments to the embedding provider."""
-        if not kwargs:
-            return
-        # Access attributes directly from __dict__ to avoid Pydantic validation during initialization
-        doc_kwargs = self.__dict__.get("doc_kwargs", {})
-        query_kwargs = self.__dict__.get("query_kwargs", {})
-        object.__setattr__(self, "doc_kwargs", {**doc_kwargs, **kwargs})
-        object.__setattr__(self, "query_kwargs", {**query_kwargs, **kwargs})
+        object.__setattr__(self, "_failure_count", kwargs.get("failure_count", 0))
+        object.__setattr__(self, "_last_failure_time", kwargs.get("last_failure_time"))
+        object.__setattr__(
+            self, "_circuit_open_duration", kwargs.get("circuit_open_duration", 30.0)
+        )
+        object.__setattr__(self, "client", client)
+        object.__setattr__(self, "embed_options", embed_options)
+        object.__setattr__(self, "query_options", query_options)
+        store_kwargs = kwargs.get(
+            "store_kwargs", {"value_type": list, "size_limit": 1024 * 1024 * 3}
+        )
+        object.__setattr__(self, "_store", make_uuid_store(**store_kwargs))
+        backup_store_kwargs = kwargs.get(
+            "backup_store_kwargs", {"value_type": list, "size_limit": 1024 * 1024}
+        )
+        object.__setattr__(self, "_backup_store", make_uuid_store(**backup_store_kwargs))
+        hash_store_kwargs = kwargs.get(
+            "hash_store_kwargs", {"value_type": UUID, "size_limit": 1024 * 256}
+        )
+        object.__setattr__(self, "_hash_store", make_blake_store(**hash_store_kwargs))
+        backup_hash_store_kwargs = kwargs.get(
+            "backup_hash_store_kwargs", {"value_type": UUID, "size_limit": 1024 * 128}
+        )
+        object.__setattr__(self, "_backup_hash_store", make_blake_store(**backup_hash_store_kwargs))
+        self._initialize(impl_deps, custom_deps)
+        object.__setattr__(self, "caps", caps)
+        super().__init__(client=client, **defaults)
 
     @abstractmethod
-    def _initialize(self, caps: EmbeddingModelCapabilities) -> None:
+    def _initialize(
+        self, impl_deps: EmbeddingImplementationDeps = None, custom_deps: EmbeddingCustomDeps = None
+    ) -> None:
         """Initialize the embedding provider.
 
-        This method is called at the end of __init__ to allow for any additional setup.
-        It should minimally set up `doc_kwargs` and `query_kwargs` if they are not already set.
+        This method is called at the end of __init__ and before pydantic validation to allow for any additional setup.
+        It offers a flexible opportunity to insert implementation-specific or custom dependencies needed for the provider,
+        which can be either directly passed or dependency injected.
 
         Args:
-            caps: The embedding model capabilities (passed since pydantic may not have set _caps yet).
+            impl_deps: Any implementation-specific dependencies or parameters for initialization.
+            custom_deps: Any custom dependencies or parameters for initialization.
         """
 
-    @classmethod
-    def clear_deduplication_stores(cls) -> None:
+    def clear_deduplication_stores(self) -> None:
         """Clear class-level deduplication stores.
 
         This is primarily useful for testing to ensure clean state between test runs.
         """
-        cls._store = make_uuid_store(value_type=list, size_limit=1024 * 1024 * 3)
-        cls._backup_store = make_uuid_store(value_type=list, size_limit=1024 * 1024)
-        cls._hash_store = make_blake_store(value_type=UUID, size_limit=1024 * 256)
-        cls._backup_hash_store = make_blake_store(value_type=UUID, size_limit=1024 * 128)
+        self._store = make_uuid_store(value_type=list, size_limit=1024 * 1024 * 3)
+        self._backup_store = make_uuid_store(value_type=list, size_limit=1024 * 1024)
+        self._hash_store = make_blake_store(value_type=UUID, size_limit=1024 * 256)
+        self._backup_hash_store = make_blake_store(value_type=UUID, size_limit=1024 * 128)
 
     async def initialize_async(self) -> None:
         """Perform asynchronous initialization of the provider.
@@ -325,19 +341,12 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         if not chunks:
             return []
 
-        max_tokens = max_tokens or self.caps.max_batch_tokens
+        max_tokens = max_tokens or 120_000
         # Apply 85% safety margin to account for tokenizer estimation variance
         # This prevents edge cases where our token estimate slightly underestimates
         # the provider's actual token count, which would cause API errors
         effective_limit = int(max_tokens * 0.85)
         tokenizer = self.tokenizer
-
-        if effective_limit != max_tokens:
-            logger.debug(
-                "Using conservative token limit %d (85%% of %d) to prevent estimation errors",
-                effective_limit,
-                max_tokens,
-            )
 
         batches: list[list[CodeChunk]] = []
         current_batch: list[CodeChunk] = []
@@ -512,8 +521,6 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
 
         Optionally takes a `batch_id` parameter to reprocess a specific batch of documents.
         """
-        from codeweaver.core import log_to_client_or_fallback
-
         is_old_batch = False
         if (batch_id and self._store and batch_id in self._store and not for_backup) or (
             batch_id and for_backup and self._backup_store and batch_id in self._backup_store
@@ -646,8 +653,6 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         else:
             if isinstance(results, dict):
                 # Sparse embedding format
-                from codeweaver.providers.embedding.types import SparseEmbedding
-
                 results = [  # ty: ignore[invalid-assignment]
                     SparseEmbedding(
                         indices=result["indices"],  # type: ignore
@@ -718,7 +723,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         self, query: str | Sequence[str], **kwargs: Any
     ) -> list[list[float]] | list[list[int]] | list[SparseEmbedding] | EmbeddingErrorInfo:
         """Embed a query into a vector."""
-        processed_kwargs: Any = self._set_kwargs(self.query_kwargs, kwargs or {})
+        processed_kwargs: Any = self._set_kwargs(self.query_options, kwargs or {})
         queries: Sequence[str] = [query] if isinstance(query, str) else list(query)
         try:
             # Use retry wrapper instead of calling _embed_query directly
@@ -735,9 +740,6 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             return self._handle_embedding_error(e, batch_id=None, documents=None, queries=queries)
         else:
             if isinstance(results, dict):
-                # Sparse embedding format
-                from codeweaver.providers.embedding.types import SparseEmbedding
-
                 results = [
                     SparseEmbedding(
                         indices=result["indices"],  # type: ignore
@@ -948,13 +950,6 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         for_backup: bool = False,
     ) -> None:  # sourcery skip: low-code-quality
         """Register chunks in the embedding registry."""
-        from codeweaver.core import LiteralStringT, ModelName
-        from codeweaver.providers.embedding.types import (
-            ChunkEmbeddings,
-            EmbeddingBatchInfo,
-            SparseEmbedding,
-        )
-
         registry = _get_registry()
         is_sparse = (
             type(self).__name__.lower().startswith("sparse")
@@ -1087,15 +1082,11 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         processed_chunks = default_input_transformer(input_data)
         if is_old_batch:
             return processed_chunks, None
-        from codeweaver.core import BatchKeys
 
         key = uuid7()
         # Convert iterator to list to avoid exhaustion when used multiple times
         chunk_list = list(processed_chunks)
         final_chunks: list[CodeChunk] = []
-
-        # FIXED: Compute hashes first WITHOUT adding to store
-        from codeweaver.core import get_blake_hash
 
         hashes = [get_blake_hash(chunk.content.encode("utf-8")) for chunk in chunk_list]
 
@@ -1236,8 +1227,6 @@ class SparseEmbeddingProvider[SparseClient](EmbeddingProvider[SparseClient], ABC
         This ensures chunks get their sparse_batch_key set correctly, which is
         required for sparse embeddings to be stored in the vector store.
         """
-        from codeweaver.core import BatchKeys, get_blake_hash
-
         key = uuid7()
         final_chunks: list[CodeChunk] = []
 

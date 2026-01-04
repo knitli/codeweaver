@@ -97,7 +97,9 @@ class Depends:
     from codeweaver.core.di import provider
 
 
-    @provider
+    dependency_provider
+
+
     def service_factory() -> ServiceProvider:
         return ServiceProvider()
     ```

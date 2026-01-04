@@ -253,8 +253,8 @@ queries:
       - src/codeweaver/server/health/endpoint.py
       - src/codeweaver/server/server.py
       - src/codeweaver/config/types.py
-      - src/codeweaver/mcp/server.py
-      - src/codeweaver/mcp/user_agent.py
+      - src/codeweaver/server/mcp/server.py
+      - src/codeweaver/server/mcp/user_agent.py
       - src/codeweaver/agent_api/find_code/__init__.py
     description: Documenting server interface
   - query: document MCP configuration options
@@ -264,6 +264,6 @@ queries:
       - src/codeweaver/config/mcp.py
       - src/codeweaver/config/types.py
       - src/codeweaver/cli/commands/init.py
-      - src/codeweaver/mcp/middleware/__init__.py
+      - src/codeweaver/server/mcp/middleware/__init__.py
       - src/codeweaver/config/middleware.py
     description: Documenting MCP config settings

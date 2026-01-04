@@ -16,10 +16,11 @@ import sys
 from pathlib import Path
 from typing import Any, Literal, cast
 
+from codeweaver_daemon import start_daemon_if_needed
 from fastmcp import FastMCP
 from pydantic import FilePath
 
-from codeweaver.core import InitializationError, lazy_import
+from codeweaver.core import InitializationError
 from codeweaver.core import Provider as Provider
 from codeweaver.server import CodeWeaverSettingsDict
 
@@ -84,7 +85,8 @@ async def _run_http_server(
     config_file: FilePath | None = None,
     project_path: Path | None = None,
     host: str = "127.0.0.1",
-    port: int = 9328,
+    mcp_port: int = 9328,
+    port: int = 9329,
     verbose: bool = False,
     debug: bool = False,
 ) -> None:
@@ -105,8 +107,13 @@ async def _run_http_server(
     """
     from codeweaver.cli import StatusDisplay
     from codeweaver.core import Unset, get_project_path, get_session_statistics
-    from codeweaver.mcp import CwMcpHttpState, create_http_server
-    from codeweaver.server import ManagementServer, get_settings, http_lifespan
+    from codeweaver.server import (
+        CwMcpHttpState,
+        ManagementServer,
+        create_http_server,
+        get_settings,
+        http_lifespan,
+    )
 
     # Load settings
     settings = get_settings()
@@ -119,7 +126,8 @@ async def _run_http_server(
 
     # Setup logging
     if verbose or debug:
-        from codeweaver.server import get_settings_map, setup_logger
+        from codeweaver.core import setup_logger
+        from codeweaver.server import get_settings_map
 
         setup_logger(get_settings_map())
 
@@ -140,10 +148,6 @@ async def _run_http_server(
 
     # Setup signal handler for force shutdowns
     original_sigint_handler = _setup_signal_handler()
-
-    # Initialize provider registry
-    registry = lazy_import("codeweaver.core", "get_provider_registry")  # type: ignore
-    _ = registry._resolve()()  # type: ignore
 
     # Suppress uvicorn loggers if not in verbose/debug mode
     if not (verbose or debug):
@@ -184,10 +188,6 @@ async def _run_http_server(
                 signal.signal(signal.SIGINT, original_sigint_handler)
 
 
-# Re-export from shared daemon module for backward compatibility
-from codeweaver_daemon import start_daemon_if_needed as _start_daemon_if_needed
-
-
 async def _run_stdio_server(
     *,
     config_file: FilePath | None = None,
@@ -212,7 +212,7 @@ async def _run_stdio_server(
     """
     # Ensure daemon is running (auto-start if needed)
     # The daemon includes both management server (9329) and MCP HTTP server (9328)
-    daemon_ready = await _start_daemon_if_needed(
+    daemon_ready = await start_daemon_if_needed(
         management_host=host,
         management_port=9329,  # Management server port
         max_wait_seconds=30.0,
@@ -263,7 +263,7 @@ async def get_stdio_server(
         Configured FastMCP stdio server instance (not yet running).
 
     """
-    from codeweaver.mcp import create_stdio_server
+    from codeweaver.server import create_stdio_server
 
     if config_file or project_path:
         # We normally want to use the global settings instance, but here because a proxied stdio client could be used in isolation and outside a typical configuration, we create a unique settings instance.

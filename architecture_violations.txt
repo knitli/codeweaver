@@ -104,13 +104,13 @@ Package: codeweaver-engine
     -> Imports: codeweaver.cli.utils (codeweaver)
     (Not in allowed dependencies: {'codeweaver-core', 'codeweaver-semantic', 'codeweaver-providers'})
   FAILED: src/codeweaver/config/settings.py
-    -> Imports: codeweaver.mcp.middleware (codeweaver)
+    -> Imports: codeweaver.server.mcp (codeweaver)
     (Not in allowed dependencies: {'codeweaver-core', 'codeweaver-semantic', 'codeweaver-providers'})
   FAILED: src/codeweaver/config/types.py
-    -> Imports: codeweaver.mcp.middleware (codeweaver)
+    -> Imports: codeweaver.server.mcp (codeweaver)
     (Not in allowed dependencies: {'codeweaver-core', 'codeweaver-semantic', 'codeweaver-providers'})
   FAILED: src/codeweaver/config/middleware.py
-    -> Imports: codeweaver.mcp.middleware (codeweaver)
+    -> Imports: codeweaver.server.mcp (codeweaver)
     (Not in allowed dependencies: {'codeweaver-core', 'codeweaver-semantic', 'codeweaver-providers'})
 
 Package: codeweaver-providers
