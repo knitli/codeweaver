@@ -23,8 +23,6 @@ with contextlib.suppress(Exception):
 from collections.abc import Iterable, Sequence
 from typing import TYPE_CHECKING, Any, Literal, cast
 
-from google.genai.types import HttpOptions
-
 from codeweaver.core import BaseEnum, ConfigurationError
 from codeweaver.providers.embedding.providers.base import EmbeddingProvider
 
@@ -33,16 +31,6 @@ if TYPE_CHECKING:
     from codeweaver.core import CodeChunk
 
 logger = logging.getLogger(__name__)
-
-
-def get_shared_kwargs() -> dict[str, dict[str, HttpOptions] | int]:
-    """Get the default kwargs for the Google embedding provider."""
-    from google.genai.types import HttpOptions
-
-    return {
-        "config": {"http_options": HttpOptions(api_version="v1alpha")},
-        "output_dimensionality": 768,
-    }
 
 
 class GoogleEmbeddingTasks(BaseEnum):
@@ -94,12 +82,11 @@ class GoogleEmbeddingProvider(EmbeddingProvider[genai.Client]):
 
     async def _report_stats(self, documents: Iterable[genai_types.Part]) -> None:
         """Report token usage statistics."""
-        http_kwargs = self.doc_kwargs.get("config", {}).get("http_options", {})
         try:
             response = await self.client.aio.models.count_tokens(
                 model=self.caps.name,
                 contents=list(documents),
-                config=genai_types.CountTokensConfig(http_options=http_kwargs),
+                config=genai_types.CountTokensConfig(),
             )
             if response and response.total_tokens is not None and response.total_tokens > 0:
                 _ = self._fire_and_forget(
@@ -122,8 +109,8 @@ class GoogleEmbeddingProvider(EmbeddingProvider[genai.Client]):
         """
         Embed the documents using the Google embedding provider.
         """
+        config_kwargs = dict(self.embed_options) | (kwargs or {})
         readied_docs = self.chunks_to_strings(documents)
-        config_kwargs = self.doc_kwargs.get("config", {})
         content = (genai_types.Part.from_text(text=cast(str, doc)) for doc in readied_docs)
         response = await self.client.aio.models.embed_content(
             model=self.caps.name,
@@ -131,7 +118,6 @@ class GoogleEmbeddingProvider(EmbeddingProvider[genai.Client]):
             config=genai_types.EmbedContentConfig(
                 task_type=str(GoogleEmbeddingTasks.RETRIEVAL_DOCUMENT), **config_kwargs
             ),
-            **kwargs,
         )
         embeddings = [
             item.values
@@ -145,7 +131,7 @@ class GoogleEmbeddingProvider(EmbeddingProvider[genai.Client]):
         """
         Embed the query using the Google embedding provider.
         """
-        config_kwargs = self.query_kwargs.get("config", {})
+        config_kwargs = dict(self.query_options) | (kwargs or {})
         content = [genai_types.Part.from_text(text=q) for q in query]
         response = await self.client.aio.models.embed_content(
             model=self.caps.name,
@@ -153,12 +139,22 @@ class GoogleEmbeddingProvider(EmbeddingProvider[genai.Client]):
             config=genai_types.EmbedContentConfig(
                 task_type=str(GoogleEmbeddingTasks.CODE_RETRIEVAL_QUERY), **config_kwargs
             ),
-            **kwargs,
         )
-        embeddings = [
-            item.values
-            for item in cast(list[genai_types.ContentEmbedding], response.embeddings)
-            if response.embeddings is not None and item
-        ] or [[]]
+        if (
+            self.caps
+            and self.caps.default_dimension
+            and self.dimension != self.caps.default_dimension
+        ):
+            embeddings = [
+                self.normalize(item.values)
+                for item in cast(list[genai_types.ContentEmbedding], response.embeddings)
+                if response.embeddings is not None and item
+            ] or [[]]
+        else:
+            embeddings = [
+                item.values
+                for item in cast(list[genai_types.ContentEmbedding], response.embeddings)
+                if response.embeddings is not None and item
+            ] or [[]]
         _ = await self._report_stats(content)
         return embeddings  # ty: ignore[invalid-return-type]

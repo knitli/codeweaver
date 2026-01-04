@@ -29,6 +29,8 @@ from typing import (
 )
 from uuid import UUID
 
+import numpy as np
+
 from codeweaver_tokenizers import Tokenizer, get_tokenizer
 from pydantic import UUID7, ConfigDict, Field, SkipValidation
 from pydantic.main import IncEx
@@ -69,6 +71,10 @@ from codeweaver.core import ValidationError as CodeWeaverValidationError
 from codeweaver.providers.config import EmbeddingModelSettings, SparseEmbeddingModelSettings
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.registry import EmbeddingRegistry
+
+
+ONE_KB = 1024
+ONE_MB = ONE_KB * 1024  # I guess it could be ONE_KB** but that'd be confusing
 
 
 type EmbeddingImplementationDeps = Annotated[Any, depends(lambda: None)]
@@ -207,6 +213,10 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         description="Options for query requests.", default_factory=dict
     )
 
+    is_backup_provider: Annotated[
+        bool, Field(description="Whether this provider is used as a backup.")
+    ] = False
+
     _provider: ClassVar[LiteralProvider] = cast(LiteralProvider, Provider.NOT_SET)
     _input_transformer: ClassVar[Callable[[StructuredDataInput], Any]] = default_input_transformer
     _output_transformer: ClassVar[Callable[[Any], list[list[float]] | list[list[int]]]] = (
@@ -215,24 +225,16 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
 
     # Typing note: we can't type this properly because: 1) Ty wants us to define the subtype for `list` and 2) pydantic does not support parameterized subtypes for generics.
     _store: UUIDStore[list] = make_uuid_store(  # type: ignore
-        value_type=list, size_limit=1024 * 1024 * 3
+        value_type=list, size_limit=ONE_MB * 3
     )
     """The store for embedding documents, keyed by batch ID (UUID7) and stored as a batch of CodeChunks."""
 
-    _backup_store: UUIDStore[list] = make_uuid_store(value_type=list, size_limit=1024 * 1024)
-    """A smaller backup store for mapping batch IDs *for codeweaver's failsafe mechanism* to the batch ID of code chunks."""
-
     _hash_store: BlakeStore[UUID7] = make_blake_store(
-        value_type=UUID, size_limit=1024 * 256
+        value_type=UUID, size_limit=ONE_KB * 256
     )  # 256kb limit -- we're just storing hashes
     """A store for deduplicating CodeChunks based on their content hash. The keys are each CodeChunk's content hash, the values are their batch IDs.
 
     Note that we're only storing the hash keys and batch ID values, not the full CodeChunk objects. This keeps the store size small. We can lookup by batch ID in the main `_store` if needed, or if it has been ejected, in the `_store`'s `_trash_heap`. `SimpleTypedStore`, the parent class, handles that for us with a simple "get" method.
-    """
-    _backup_hash_store: BlakeStore[UUID7] = make_blake_store(
-        value_type=UUID, size_limit=1024 * 128
-    )  # 128kb limit -- we're just storing hashes
-    """A backup store for deduplicating CodeChunks based on their content hash. The keys are each CodeChunk's content hash, the values are their backup batch IDs.
     """
     # Circuit breaker state tracking
     _circuit_state: CircuitBreakerState = CircuitBreakerState.CLOSED
@@ -248,6 +250,8 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         query_options: Mapping[str, Any] | None = None,
         impl_deps: Any = None,
         custom_deps: Any = None,
+        *,
+        is_backup_provider: bool = False,
         **kwargs: Any,
     ) -> None:
         defaults = getattr(type(self), "_defaults", {})
@@ -265,18 +269,11 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             "store_kwargs", {"value_type": list, "size_limit": 1024 * 1024 * 3}
         )
         object.__setattr__(self, "_store", make_uuid_store(**store_kwargs))
-        backup_store_kwargs = kwargs.get(
-            "backup_store_kwargs", {"value_type": list, "size_limit": 1024 * 1024}
-        )
-        object.__setattr__(self, "_backup_store", make_uuid_store(**backup_store_kwargs))
         hash_store_kwargs = kwargs.get(
-            "hash_store_kwargs", {"value_type": UUID, "size_limit": 1024 * 256}
+            "hash_store_kwargs", {"value_type": UUID, "size_limit": ONE_KB * 256}
         )
         object.__setattr__(self, "_hash_store", make_blake_store(**hash_store_kwargs))
-        backup_hash_store_kwargs = kwargs.get(
-            "backup_hash_store_kwargs", {"value_type": UUID, "size_limit": 1024 * 128}
-        )
-        object.__setattr__(self, "_backup_hash_store", make_blake_store(**backup_hash_store_kwargs))
+        object.__setattr__(self, "is_backup_provider", is_backup_provider)
         self._initialize(impl_deps, custom_deps)
         object.__setattr__(self, "caps", caps)
         super().__init__(client=client, **defaults)
@@ -301,10 +298,8 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
 
         This is primarily useful for testing to ensure clean state between test runs.
         """
-        self._store = make_uuid_store(value_type=list, size_limit=1024 * 1024 * 3)
-        self._backup_store = make_uuid_store(value_type=list, size_limit=1024 * 1024)
-        self._hash_store = make_blake_store(value_type=UUID, size_limit=1024 * 256)
-        self._backup_hash_store = make_blake_store(value_type=UUID, size_limit=1024 * 128)
+        self._store = make_uuid_store(value_type=list, size_limit=ONE_MB * 3)
+        self._hash_store = make_blake_store(value_type=UUID, size_limit=ONE_KB * 256)
 
     async def initialize_async(self) -> None:
         """Perform asynchronous initialization of the provider.
@@ -883,15 +878,17 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         return default_dim
 
     @staticmethod
-    def normalize(embedding: Sequence[float] | Sequence[int]) -> list[float]:
+    def normalize(embedding: Sequence[float] | Sequence[int] | np.ndarray) -> list[float]:
         """Normalize an embedding vector to unit L2 length.
 
         Returns the input as floats if the vector is empty or has zero norm.
         Raises ValueError if the input contains non-finite values.
         """
-        import numpy as np
-
-        arr = np.asarray(embedding, dtype=np.float32)
+        arr = (
+            embedding
+            if isinstance(embedding, np.ndarray)
+            else np.asarray(embedding, dtype=np.float32)
+        )
         if arr.size == 0:
             return arr.tolist()
         if not np.all(np.isfinite(arr)):
@@ -909,7 +906,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                 ],
             )
         denom = float(np.linalg.norm(arr))
-        return arr.tolist() if denom == 0.0 else (arr / denom).tolist()
+        return arr.tolist() if denom == 0.0 else (arr / np.asarray(denom, dtype=arr.dtype)).tolist()
 
     @staticmethod
     def is_normalized(embedding: Sequence[float] | Sequence[int], *, tol: float = 1e-6) -> bool:

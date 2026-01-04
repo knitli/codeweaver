@@ -51,7 +51,7 @@ from codeweaver.server.mcp import McpMiddleware
 
 if TYPE_CHECKING:
     from codeweaver.core import AnonymityConversion, FilteredKeyT
-    from codeweaver.core._logging import LoggingSettings
+    from codeweaver.core._logging import LoggingSettingsDict
     from codeweaver.providers import ProviderSettingsDict
     from codeweaver.server.config.middleware import MiddlewareOptions
 
@@ -132,7 +132,7 @@ class CodeWeaverSettingsDict(TypedDict, total=False):
     # Mcp HTTP Server Settings
     mcp_server: NotRequired[FastMcpServerSettingsDict | Unset]
     stdio_server: NotRequired[FastMcpServerSettingsDict | Unset]
-    logging: NotRequired[LoggingSettings | Unset]
+    logging: NotRequired[LoggingSettingsDict | Unset]
     middleware: NotRequired[MiddlewareOptions | Unset]
     chunker: NotRequired[ChunkerSettingsDict | Unset]
     uvicorn: NotRequired[UvicornServerSettingsDict | Unset]

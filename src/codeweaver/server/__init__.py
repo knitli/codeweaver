@@ -101,7 +101,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "IntentType": (__spec__.parent, "agent_api"),
     "LoggingMiddleware": (__spec__.parent, "mcp"),
     "LoggingMiddlewareSettings": (__spec__.parent, "middleware"),
-    "LoggingSettings": (__spec__.parent, "_logging"),
+    "LoggingSettingsDict": (__spec__.parent, "_logging"),
     "MCPConfig": (__spec__.parent, "mcp"),
     "MCPConfigDict": (__spec__.parent, "types"),
     "ManagementServer": (__spec__.parent, "management"),

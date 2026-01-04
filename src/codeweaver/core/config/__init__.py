@@ -22,7 +22,7 @@ if TYPE_CHECKING:
         LoggerName,
         LoggersDict,
         LoggingConfigDict,
-        LoggingSettings,
+        LoggingSettingsDict,
         SerializableLoggingFilter,
     )
     from codeweaver.core.config.envs import (
@@ -44,7 +44,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "LoggerName": (__spec__.parent, "_logging"),
     "LoggersDict": (__spec__.parent, "_logging"),
     "LoggingConfigDict": (__spec__.parent, "_logging"),
-    "LoggingSettings": (__spec__.parent, "_logging"),
+    "LoggingSettingsDict": (__spec__.parent, "_logging"),
     "SerializableLoggingFilter": (__spec__.parent, "_logging"),
     "SettingsEnvVars": (__spec__.parent, "envs"),
     "TelemetrySettings": (__spec__.parent, "telemetry"),
@@ -66,7 +66,7 @@ __all__ = (
     "LoggerName",
     "LoggersDict",
     "LoggingConfigDict",
-    "LoggingSettings",
+    "LoggingSettingsDict",
     "SerializableLoggingFilter",
     "SettingsEnvVars",
     "TelemetrySettings",

@@ -13,7 +13,6 @@ from collections.abc import Generator, Iterator, Sequence
 from typing import Any, cast, override
 
 from pydantic import BaseModel, ConfigDict, RootModel
-from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from codeweaver.core.types.aliases import FilteredKey, FilteredKeyT, LiteralStringT
 from codeweaver.core.types.enum import AnonymityConversion
@@ -176,37 +175,6 @@ class BasedModel(BaseModel):
         """Get values of the model."""
         for field in type(self).model_fields:
             yield getattr(self, field)
-
-
-DEFAULT_BASE_SETTINGS_CONFIG = SettingsConfigDict(
-    case_sensitive=False,
-    cli_kebab_case=True,
-    extra="allow",  # Allow extra fields in the configuration for plugins/extensions
-    field_title_generator=generate_field_title,
-    model_title_generator=generate_title,
-    serialize_by_alias=True,
-    validate_by_alias=True,
-    validate_by_name=True,
-    json_schema_extra=clean_sentinel_from_schema,
-    nested_model_default_partial_update=True,
-    from_attributes=True,
-    env_ignore_empty=True,
-    env_nested_delimiter="__",
-    env_nested_max_split=-1,
-    env_prefix="CODEWEAVER_",  # environment variables will be prefixed with CODEWEAVER_
-    # keep secrets in user config dir
-    str_strip_whitespace=True,
-    title="CodeWeaver Settings",
-    use_attribute_docstrings=True,
-    use_enum_values=True,
-    validate_assignment=True,
-    populate_by_name=True,
-    # spellchecker:off
-)
-
-
-class BaseCodeWeaverSettings(BaseSettings):
-    model_config: SettingsConfigDict = DEFAULT_BASE_SETTINGS_CONFIG
 
 
 __all__ = ("BASEDMODEL_CONFIG", "FROZEN_BASEDMODEL_CONFIG", "BasedModel", "RootedRoot")

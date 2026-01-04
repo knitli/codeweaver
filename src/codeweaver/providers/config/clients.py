@@ -662,18 +662,6 @@ class VoyageClientOptions(ClientOptions):
         return {FilteredKey("api_key"): AnonymityConversion.BOOLEAN}
 
 
-class FastEmbedClientOptions(ClientOptions):
-    """Client options for FastEmbed-based embedding providers."""
-
-    _core_provider: Provider = Provider.FASTEMBED
-    _providers: tuple[Provider, ...] = (Provider.FASTEMBED,)
-
-    model_name: str
-    cache_dir: str | None = None
-    cuda: bool = False
-    device_ids: list[int] | None = None
-
-
 # We chose TypedDicts originally for speed. They can be substantially faster than Pydantic models (according to Pydantic: https://docs.pydantic.dev/2.12/concepts/performance/#use-typeddict-over-nested-models) But we lose a lot of benefits of Pydantic models.
 
 # ===========================================================================

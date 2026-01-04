@@ -59,7 +59,7 @@ from codeweaver.core import (
     DefaultTelemetrySettings,
     DictView,
     FilteredKeyT,
-    LoggingSettings,
+    LoggingSettingsDict,
     TelemetrySettings,
     Unset,
     clean_sentinel_from_schema,
@@ -440,7 +440,7 @@ class CodeWeaverSettings(BaseSettings):
     ] = UNSET
 
     logging: Annotated[
-        LoggingSettings | Unset,
+        LoggingSettingsDict | Unset,
         Field(description="""Logging configuration""", validate_default=False),
     ] = UNSET
 
@@ -531,7 +531,7 @@ class CodeWeaverSettings(BaseSettings):
             pattern=r"\d{1,2}\.\d{1,3}\.\d{1,3}",
             alias="schema_version",
         ),
-    ] = "1.1.1"
+    ] = "1.2.0"
 
     schema_: HttpUrl = Field(
         description="URL to the CodeWeaver settings schema",
@@ -812,8 +812,8 @@ class CodeWeaverSettings(BaseSettings):
                 - `ChunkerSettings` (`CODEWEAVER__CHUNKER__SEMANTIC_IMPORTANCE_THRESHOLD`, etc)
                 - `TelemetrySettings` (`CODEWEAVER__TELEMETRY__TOOLS_OVER_PRIVACY`, etc)
                 - UvicornServerSettings (`CODEWEAVER__UVICORN__LOG_LEVEL`, etc)
-            - It does NOT apply to `LoggingSettings`, `MiddlewareOptions`, `MCPServerConfig`, or any other fields using TypedDict, including those in the above models.
-            - It *does* apply to nested models in those models, currently only `CustomDelimiter`, `PerformanceSettings`, and `ConcurrencySettings`, which are fields in `ChunkerSettings`. You could set: `CODEWEAVER__CHUNKER__PERFORMANCE__MAX_PARALLEL_FILES=4`
+            - It does NOT apply to `LoggingSettingsDict`, `MiddlewareOptions`, `MCPServerConfig`, or any other fields using TypedDict, including those in the above models.
+            - It *does* apply to nested models in those models, like `CustomDelimiter`, `PerformanceSettings`, and `ConcurrencySettings`, which are fields in `ChunkerSettings`. You could set: `CODEWEAVER__CHUNKER__PERFORMANCE__MAX_PARALLEL_FILES=4`
         3. dotenv_settings - .env files:
             - .local.env,
             - .env

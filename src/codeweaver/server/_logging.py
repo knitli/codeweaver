@@ -11,7 +11,7 @@ import logging
 
 from typing import TYPE_CHECKING
 
-from codeweaver.core import DefaultLoggingSettings, LoggingSettings, Unset
+from codeweaver.core import DefaultLoggingSettings, LoggingSettingsDict, Unset
 
 
 if TYPE_CHECKING:
@@ -71,7 +71,7 @@ def setup_logger(settings: DictView[CodeWeaverSettingsDict]) -> logging.Logger:
     Returns:
         Configured logger instance
     """
-    app_logger_settings: LoggingSettings = (
+    app_logger_settings: LoggingSettingsDict = (
         DefaultLoggingSettings
         if isinstance(settings.get("logging", {}), Unset)
         else settings.get("logging", {})

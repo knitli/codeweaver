@@ -55,14 +55,6 @@ if TYPE_CHECKING:
         UUID7Hex,
         UUID7HexT,
     )
-    from codeweaver.core.types.config import (
-        BridgedKwargsDict,
-        BridgedSettings,
-        ConfigSourceType,
-        ConfigTargetType,
-        FunctionKind,
-        SettingBridge,
-    )
     from codeweaver.core.types.dataclasses import (
         DATACLASS_CONFIG,
         BaseEnumData,
@@ -111,6 +103,12 @@ if TYPE_CHECKING:
     )
     from codeweaver.core.types.search import SearchResult, SearchStrategy, StrategizedQuery
     from codeweaver.core.types.sentinel import MISSING, UNSET, Missing, Sentinel, Unset
+    from codeweaver.core.types.settings_model import (
+        DEFAULT_BASE_SETTINGS_CONFIG,
+        BaseCodeWeaverSettings,
+        get_config_locations,
+        get_dotenv_locations,
+    )
     from codeweaver.core.types.statistics import (
         CallHookTimingDict,
         CategoryKey,
@@ -135,6 +133,7 @@ if TYPE_CHECKING:
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "AnonymityConversion": (__spec__.parent, "enum"),
     "BASEDMODEL_CONFIG": (__spec__.parent, "models"),
+    "BaseCodeWeaverSettings": (__spec__.parent, "settings_model"),
     "BaseDataclassEnum": (__spec__.parent, "enum"),
     "BaseEnum": (__spec__.parent, "enum"),
     "BaseEnumData": (__spec__.parent, "dataclasses"),
@@ -142,15 +141,13 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "BlakeHashKey": (__spec__.parent, "aliases"),
     "BlakeKey": (__spec__.parent, "aliases"),
     "BridgedKwargsDict": (__spec__.parent, "config"),
-    "BridgedSettings": (__spec__.parent, "config"),
     "CallHookTimingDict": (__spec__.parent, "statistics"),
     "CategoryKey": (__spec__.parent, "statistics"),
     "CategoryName": (__spec__.parent, "aliases"),
     "CategoryNameT": (__spec__.parent, "aliases"),
     "ChunkEmbeddings": (__spec__.parent, "embeddings"),
-    "ConfigSourceType": (__spec__.parent, "config"),
-    "ConfigTargetType": (__spec__.parent, "config"),
     "DATACLASS_CONFIG": (__spec__.parent, "dataclasses"),
+    "DEFAULT_BASE_SETTINGS_CONFIG": (__spec__.parent, "settings_model"),
     "DataType": (__spec__.parent, "embeddings"),
     "DataclassSerializationMixin": (__spec__.parent, "dataclasses"),
     "DelimiterDict": (__spec__.parent, "delimiter"),
@@ -182,7 +179,6 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "FilePathT": (__spec__.parent, "aliases"),
     "FilteredKey": (__spec__.parent, "aliases"),
     "FilteredKeyT": (__spec__.parent, "aliases"),
-    "FunctionKind": (__spec__.parent, "config"),
     "HttpRequestsDict": (__spec__.parent, "statistics"),
     "LanguageFamily": (__spec__.parent, "delimiter"),
     "LanguageName": (__spec__.parent, "aliases"),
@@ -225,7 +221,6 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "SentinelName": (__spec__.parent, "aliases"),
     "SentinelNameT": (__spec__.parent, "aliases"),
     "SerializationKwargs": (__spec__.parent, "dataclasses"),
-    "SettingBridge": (__spec__.parent, "config"),
     "SparseEmbedding": (__spec__.parent, "embeddings"),
     "StoredEmbeddingVectors": (__spec__.parent, "embeddings"),
     "StrategizedQuery": (__spec__.parent, "search"),
@@ -241,6 +236,8 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "clean_sentinel_from_schema": (__spec__.parent, "utils"),
     "generate_field_title": (__spec__.parent, "utils"),
     "generate_title": (__spec__.parent, "utils"),
+    "get_config_locations": (__spec__.parent, "settings_model"),
+    "get_dotenv_locations": (__spec__.parent, "settings_model"),
     "get_provider_kinds": (__spec__.parent, "provider"),
 })
 
@@ -250,25 +247,23 @@ __getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
 __all__ = (
     "BASEDMODEL_CONFIG",
     "DATACLASS_CONFIG",
+    "DEFAULT_BASE_SETTINGS_CONFIG",
     "FROZEN_BASEDMODEL_CONFIG",
     "MISSING",
     "UNSET",
     "AnonymityConversion",
+    "BaseCodeWeaverSettings",
     "BaseDataclassEnum",
     "BaseEnum",
     "BaseEnumData",
     "BasedModel",
     "BlakeHashKey",
     "BlakeKey",
-    "BridgedKwargsDict",
-    "BridgedSettings",
     "CallHookTimingDict",
     "CategoryKey",
     "CategoryName",
     "CategoryNameT",
     "ChunkEmbeddings",
-    "ConfigSourceType",
-    "ConfigTargetType",
     "DataType",
     "DataclassSerializationMixin",
     "DelimiterDict",
@@ -299,7 +294,6 @@ __all__ = (
     "FilePathT",
     "FilteredKey",
     "FilteredKeyT",
-    "FunctionKind",
     "HttpRequestsDict",
     "LanguageFamily",
     "LanguageName",
@@ -341,7 +335,6 @@ __all__ = (
     "SentinelName",
     "SentinelNameT",
     "SerializationKwargs",
-    "SettingBridge",
     "SparseEmbedding",
     "StoredEmbeddingVectors",
     "StrategizedQuery",
@@ -357,6 +350,8 @@ __all__ = (
     "clean_sentinel_from_schema",
     "generate_field_title",
     "generate_title",
+    "get_config_locations",
+    "get_dotenv_locations",
     "get_provider_kinds",
 )
 

@@ -225,7 +225,7 @@ def _from_env_log_level() -> Literal[0, 10, 20, 30, 40, 50]:
     return logging.WARNING
 
 
-class LoggingSettings(TypedDict, total=False):
+class LoggingSettingsDict(TypedDict, total=False):
     """Global logging settings."""
 
     name: NotRequired[str]
@@ -249,7 +249,7 @@ class LoggingSettings(TypedDict, total=False):
     ]
 
 
-DefaultLoggingSettings: LoggingSettings = {
+DefaultLoggingSettings = LoggingSettingsDict({
     "name": "codeweaver",
     "level": cast(Literal[0, 10, 20, 30, 40, 50], _from_env_log_level()),
     "use_rich": is_tty(),
@@ -261,7 +261,7 @@ DefaultLoggingSettings: LoggingSettings = {
     }
     if is_tty()
     else {},
-}
+})
 
 
 __all__ = (
@@ -275,6 +275,6 @@ __all__ = (
     "LoggerName",
     "LoggersDict",
     "LoggingConfigDict",
-    "LoggingSettings",
+    "LoggingSettingsDict",
     "SerializableLoggingFilter",
 )

@@ -202,7 +202,6 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
         # Filter out client initialization params - only pass encode-time params
         # Client init params: model_name_or_path, trust_remote_code, model_kwargs, etc.
         # Encode params: normalize_embeddings, convert_to_numpy, batch_size, show_progress_bar, etc.
-        client_options = self.doc_kwargs.get("client_options", {})
         encode_kwargs = {
             k: v
             for k, v in client_options.items()

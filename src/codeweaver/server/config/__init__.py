@@ -58,7 +58,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "FastMcpStdioServerSettings": (__spec__.parent, "settings"),
     "FastembedGPUProviderSettings": (__spec__.parent, "providers"),
     "LoggingMiddlewareSettings": (__spec__.parent, "middleware"),
-    "LoggingSettings": (__spec__.parent, "_logging"),
+    "LoggingSettingsDict": (__spec__.parent, "_logging"),
     "MCPConfig": (__spec__.parent, "mcp"),
     "MCPConfigDict": (__spec__.parent, "types"),
     "MiddlewareOptions": (__spec__.parent, "middleware"),

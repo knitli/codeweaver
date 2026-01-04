@@ -11,6 +11,12 @@ It only stores the last `max_size` bytes, and moves old batches to a weakref sto
 
 from __future__ import annotations
 
+import logging
+
+from typing import Literal, cast, overload
+
+from pydantic import UUID7
+
 from codeweaver.core import (
     ChunkEmbeddings,
     EmbeddingKind,
@@ -19,6 +25,11 @@ from codeweaver.core import (
     UUIDStore,
 )
 from codeweaver.core import ValidationError as CodeWeaverValidationError
+
+
+logger = logging.getLogger(__name__)
+
+ONE_MB = 1024 * 1024
 
 
 class EmbeddingRegistry(UUIDStore[ChunkEmbeddings]):
@@ -31,13 +42,16 @@ class EmbeddingRegistry(UUIDStore[ChunkEmbeddings]):
 
     """
 
-    def __init__(self, *, size_limit: int = 100 * 1024 * 1024) -> None:
+    is_backup_provider: bool = False
+    """Indicates whether this registry is for a backup embedding provider."""
+
+    def __init__(self, *, size_limit: int = 100 * ONE_MB, is_backup_provider: bool = False) -> None:
         """Initialize the EmbeddingRegistry with a size limit.
 
         Args:
             size_limit (int): The maximum size of the store in bytes. Defaults to 100 MB.
         """
-        super().__init__(value_type=tuple, max_size=size_limit)
+        self.is_backup_provider = is_backup_provider
 
     @property
     def complete(self) -> bool:
@@ -79,6 +93,7 @@ class EmbeddingRegistry(UUIDStore[ChunkEmbeddings]):
                     "Check configuration to ensure consistent model selection",
                 ],
             )
+        # UUIDStores always returns a copy, so we can safely pop here
         return models.pop() if models else None
 
     @property
@@ -90,6 +105,22 @@ class EmbeddingRegistry(UUIDStore[ChunkEmbeddings]):
     def dense_model(self) -> ModelNameT | None:
         """Get the model name used for primary dense embeddings, if any."""
         return self._fetch_model_by_kind(EmbeddingKind.DENSE)
+
+    def get_item_ages(self) -> dict[UUID7, int]:
+        """Get the ages of all items in the store, where age is defined as the number of insertions since the item was added."""
+        from codeweaver.core import uuid7_as_timestamp
+
+        if mapping := {key: uuid7_as_timestamp(key) for key in self}:
+            return cast(dict[UUID7, int], mapping)
+        logger.warning(
+            "No items found in EmbeddingRegistry store when attempting to get item ages."
+        )
+        return {}
+
+    def oldest_item(self) -> UUID7 | None:
+        """Get the oldest item in the store based on insertion time."""
+        item_ages = sorted(iter(self.get_item_ages().items()), key=lambda x: x[1])
+        return min(item[0] for item in item_ages) if item_ages else None
 
     def validate_models(self) -> None:
         """Validate that all embeddings use the same model and return the set of models used."""
@@ -103,25 +134,35 @@ class EmbeddingRegistry(UUIDStore[ChunkEmbeddings]):
             ) from e
 
 
-_embedding_registry: EmbeddingRegistry | None = None
-_model_rebuilt = False
+class BackupEmbeddingRegistry(EmbeddingRegistry):
+    """
+    A backup embedding registry for use with backup embedding providers.
+
+    This class is identical to `EmbeddingRegistry` but is used to differentiate between primary and backup embedding stores.
+    """
 
 
-def get_embedding_registry() -> EmbeddingRegistry:
-    """Get the global EmbeddingRegistry instance, creating it if it doesn't exist."""
-    global _embedding_registry, _model_rebuilt
-
-    # Rebuild model on first access to resolve forward references
-    if not _model_rebuilt and not EmbeddingRegistry.__pydantic_complete__:
-        # Import CodeChunk here to make it available for model rebuild without circular import
+def _rebuild_store(store: type[EmbeddingRegistry | BackupEmbeddingRegistry]) -> None:
+    """Rebuild the given UUIDStore to ensure proper initialization after model changes."""
+    if not store.__pydantic_complete__:
+        # We need CodeChunk in the namespace for the rebuild
         from codeweaver.core import CodeChunk as CodeChunk
 
-        _ = EmbeddingRegistry.model_rebuild()
-        _model_rebuilt = True
+        store.model_rebuild()
 
-    if _embedding_registry is None:
-        _embedding_registry = EmbeddingRegistry()
-    return _embedding_registry
+
+@overload
+def get_embedding_registry(*, backup: bool = False) -> EmbeddingRegistry: ...
+
+
+@overload
+def get_embedding_registry(*, backup: Literal[True]) -> BackupEmbeddingRegistry: ...
+
+
+def get_embedding_registry(*, backup: bool = False) -> EmbeddingRegistry | BackupEmbeddingRegistry:
+    """Get the global EmbeddingRegistry instance, creating it if it doesn't exist."""
+    _rebuild_store(BackupEmbeddingRegistry if backup else EmbeddingRegistry)
+    return BackupEmbeddingRegistry(store={}, _value_type=list) if backup else EmbeddingRegistry()
 
 
 __all__ = ("EmbeddingRegistry", "get_embedding_registry")
