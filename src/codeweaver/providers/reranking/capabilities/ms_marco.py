@@ -7,20 +7,26 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 from typing import TYPE_CHECKING
+
+from codeweaver.core import dependency_provider
+from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 
 
 if TYPE_CHECKING:
-    from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
+    pass
 
 
-def get_marco_reranking_capabilities() -> Sequence[RerankingModelCapabilities]:
+class MsMarcoRerankingCapabilities(RerankingModelCapabilities):
+    """Capabilities for MS MARCO reranking models."""
+
+
+@dependency_provider(MsMarcoRerankingCapabilities, scope="singleton", collection=True)
+def get_marco_reranking_capabilities() -> tuple[MsMarcoRerankingCapabilities, ...]:
     """
     Get the MS-Marco MiniLM reranking capabilities.
     """
     from codeweaver.core import Provider
-    from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
     from codeweaver.providers.reranking.capabilities.types import PartialRerankingCapabilitiesDict
 
     # FastEmbed uses Xenova namespace, SentenceTransformers uses cross-encoder namespace
@@ -57,11 +63,11 @@ def get_marco_reranking_capabilities() -> Sequence[RerankingModelCapabilities]:
         "supports_custom_prompt": False,
     }
 
-    assembled_capabilities: list[RerankingModelCapabilities] = []
+    assembled_capabilities: list[MsMarcoRerankingCapabilities] = []
 
     # Add FastEmbed models (Xenova namespace)
     assembled_capabilities.extend(
-        RerankingModelCapabilities.model_validate({
+        MsMarcoRerankingCapabilities.model_validate({
             **fastembed_shared,
             "name": f"{fastembed_shared['name']}{model}",
             "tokenizer_model": f"Xenova/ms-marco-MiniLM-{model}",
@@ -71,15 +77,15 @@ def get_marco_reranking_capabilities() -> Sequence[RerankingModelCapabilities]:
 
     # Add SentenceTransformers models (cross-encoder namespace)
     assembled_capabilities.extend(
-        RerankingModelCapabilities.model_validate({
+        MsMarcoRerankingCapabilities.model_validate({
             **sentence_transformers_shared,
             "name": f"{sentence_transformers_shared['name']}{model}",
             "tokenizer_model": f"cross-encoder/ms-marco-MiniLM-{model}",
         })
         for model in sentence_transformers_models
     )
-    assembled_capabilities.append(RerankingModelCapabilities.model_validate(ultra_light))
-    return assembled_capabilities
+    assembled_capabilities.append(MsMarcoRerankingCapabilities.model_validate(ultra_light))
+    return tuple(assembled_capabilities)
 
 
-__all__ = ("get_marco_reranking_capabilities",)
+__all__ = ("get_marco_reranking_capabilities", "MsMarcoRerankingCapabilities")

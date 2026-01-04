@@ -7,18 +7,18 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-from typing import TYPE_CHECKING
+from codeweaver.core import dependency_provider
+from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 
 
-if TYPE_CHECKING:
-    from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
+class BaaiRerankingCapabilities(RerankingModelCapabilities):
+    """Capabilities for BAAI reranking models."""
 
 
-def get_baai_reranking_capabilities() -> Sequence[RerankingModelCapabilities]:
+@dependency_provider(BaaiRerankingCapabilities, scope="singleton", collection=True)
+def get_baai_reranking_capabilities() -> tuple[BaaiRerankingCapabilities, ...]:
     """Get the BAAI reranking model capabilities."""
     from codeweaver.core import Provider
-    from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
     from codeweaver.providers.reranking.capabilities.types import PartialRerankingCapabilitiesDict
 
     shared_capabilities: PartialRerankingCapabilitiesDict = {
@@ -27,8 +27,8 @@ def get_baai_reranking_capabilities() -> Sequence[RerankingModelCapabilities]:
         "supports_custom_prompt": False,
     }
     models = ("base", "large", "v2-m3")
-    return [
-        RerankingModelCapabilities.model_validate({
+    return tuple(
+        BaaiRerankingCapabilities.model_validate({
             **shared_capabilities,
             "name": f"{shared_capabilities['name']}{model}",
             "max_input": 8192 if model == "v2-m3" else 512,
@@ -37,7 +37,7 @@ def get_baai_reranking_capabilities() -> Sequence[RerankingModelCapabilities]:
             "provider": Provider.FASTEMBED if model == "base" else Provider.SENTENCE_TRANSFORMERS,
         })
         for model in models
-    ]
+    )
 
 
 __all__ = ("get_baai_reranking_capabilities",)

@@ -8,9 +8,8 @@
 from __future__ import annotations
 
 from types import MappingProxyType
-from typing import ClassVar, Literal
 
-from codeweaver.core import Provider
+from codeweaver.core import Provider, dependency_provider
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.capabilities.types import PartialCapabilities
 
@@ -46,10 +45,13 @@ def _get_shared_cohere_embedding_capabilities() -> PartialCapabilities:
     }
 
 
-def get_cohere_embedding_capabilities() -> tuple[EmbeddingModelCapabilities, ...]:
-    """Get the capabilities for cohere embedding models."""
-    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+class CohereEmbeddingCapabilities(EmbeddingModelCapabilities):
+    """Capabilities for Cohere embedding models."""
 
+
+@dependency_provider(CohereEmbeddingCapabilities, scope="singleton", collection=True)
+def get_cohere_embedding_capabilities() -> tuple[CohereEmbeddingCapabilities, ...]:
+    """Get the capabilities for cohere embedding models."""
     shared_caps = _get_shared_cohere_embedding_capabilities()
     base_capabilities: dict[str, PartialCapabilities] = {
         "embed-english-v3.0": {
@@ -81,7 +83,7 @@ def get_cohere_embedding_capabilities() -> tuple[EmbeddingModelCapabilities, ...
             "context_window": 128_000,
         },
     }
-    output_models: list[EmbeddingModelCapabilities] = []
+    output_models: list[CohereEmbeddingCapabilities] = []
     for model, caps in base_capabilities.items():
         for provider, models in MODEL_MAP.items():
             if provider == Provider.GITHUB and model in (
@@ -93,43 +95,13 @@ def get_cohere_embedding_capabilities() -> tuple[EmbeddingModelCapabilities, ...
                 model = models[0]
             if model in models:
                 output_models.append(
-                    EmbeddingModelCapabilities.model_validate({
+                    CohereEmbeddingCapabilities.model_validate({
                         **caps,
                         "name": model,
                         "provider": provider,
                     })
                 )
-    return tuple(EmbeddingModelCapabilities.model_validate(m) for m in output_models)
-
-
-class BaseCohereEmbeddingSpec(EmbeddingModelSpec):
-    """Base spec for Cohere embedding models."""
-
-    model_map: ClassVar[MappingProxyType[Provider, tuple[str, ...]]] = MODEL_MAP
-
-    model_maker: ClassVar[Literal["cohere"]] = "cohere"
-
-    mapped_names: MappingProxyType[str, str]
-    """Map from Cohere model names to provider-specific model names."""
-
-    @classmethod
-    def models(cls) -> tuple[str, ...]:
-        """Get the models available for this provider."""
-        return cls.model_map[cls.provider]
-
-
-class CohereAzureEmbeddingSpec(BaseCohereEmbeddingSpec):
-    """Spec for Cohere embedding models on Azure."""
-
-    provider: ClassVar[Provider] = Provider.AZURE
-
-    mapped_names: MappingProxyType[str, str] = MappingProxyType(
-        zip(MODEL_MAP[Provider.AZURE], MODEL_MAP[Provider.AZURE], strict=True)
-    )
-
-    capabilities: tuple[EmbeddingModelCapabilities, ...] = tuple(
-        cap for cap in get_cohere_embedding_capabilities() if cap.provider == Provider.AZURE
-    )
+    return tuple(output_models)
 
 
 __all__ = ("get_cohere_embedding_capabilities",)

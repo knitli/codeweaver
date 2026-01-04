@@ -8,7 +8,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Literal
 
-from codeweaver.core import Provider
+from codeweaver.core import Provider, dependency_provider
+from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.capabilities.types import (
     EmbeddingCapabilitiesDict,
     PartialCapabilities,
@@ -16,7 +17,7 @@ from codeweaver.providers.embedding.capabilities.types import (
 
 
 if TYPE_CHECKING:
-    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+    pass
 
 type SentenceTransformersProvider = Literal[
     Provider.FASTEMBED, Provider.HUGGINGFACE_INFERENCE, Provider.SENTENCE_TRANSFORMERS
@@ -280,17 +281,24 @@ ALL_CAPABILITIES: tuple[PartialCapabilities, ...] = (
 )
 
 
-def get_sentence_transformers_embedding_capabilities() -> tuple[EmbeddingModelCapabilities, ...]:
-    """Get the capabilities for sentence-transformers embedding models."""
-    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+class SentenceTransformersEmbeddingCapabilities(EmbeddingModelCapabilities):
+    """Capabilities for sentence-transformers embedding models."""
 
+
+@dependency_provider(SentenceTransformersEmbeddingCapabilities, scope="singleton", collection=True)
+def get_sentence_transformers_embedding_capabilities() -> tuple[
+    SentenceTransformersEmbeddingCapabilities, ...
+]:
+    """Get the capabilities for sentence-transformers embedding models."""
     capabilities: list[EmbeddingCapabilitiesDict] = []
     for cap in ALL_CAPABILITIES:
         capabilities.extend([
             EmbeddingCapabilitiesDict({**cap, "provider": provider})  # type: ignore[missing-typeddict-key]
             for provider in CAP_MAP[cap["name"]]  # ty: ignore[invalid-argument-type]
         ])
-    return tuple(EmbeddingModelCapabilities.model_validate(cap) for cap in capabilities)
+    return tuple(
+        SentenceTransformersEmbeddingCapabilities.model_validate(cap) for cap in capabilities
+    )
 
 
 __all__ = ("get_sentence_transformers_embedding_capabilities",)

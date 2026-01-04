@@ -19,6 +19,10 @@ if TYPE_CHECKING:
         EmbeddingModelCapabilities,
         SparseEmbeddingModelCapabilities,
     )
+    from codeweaver.providers.embedding.capabilities.dependencies import (
+        EmbeddingCapabilityResolver,
+        EmbeddingCapabilityResolverDep,
+    )
     from codeweaver.providers.embedding.fastembed_extensions import (
         get_sparse_embedder,
         get_text_embedder,
@@ -43,12 +47,13 @@ if TYPE_CHECKING:
     from codeweaver.providers.embedding.registry import EmbeddingRegistry, get_embedding_registry
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
-    "EmbeddingModelCapabilities": (__spec__.parent, "capabilities.base"),
-    "SparseEmbeddingModelCapabilities": (__spec__.parent, "capabilities.base"),
-    "EmbeddingProvider": (__spec__.parent, "providers.base"),
-    "SparseEmbeddingProvider": (__spec__.parent, "providers.base"),
     "BedrockEmbeddingProvider": (__spec__.parent, "providers.bedrock"),
     "CohereEmbeddingProvider": (__spec__.parent, "providers.cohere"),
+    "EmbeddingCapabilityResolver": (__spec__.parent, "capabilities.dependencies"),
+    "EmbeddingCapabilityResolverDep": (__spec__.parent, "capabilities.dependencies"),
+    "EmbeddingModelCapabilities": (__spec__.parent, "capabilities.base"),
+    "EmbeddingProvider": (__spec__.parent, "providers.base"),
+    "EmbeddingRegistry": (__spec__.parent, "registry"),
     "FastEmbedEmbeddingProvider": (__spec__.parent, "providers.fastembed"),
     "FastEmbedSparseProvider": (__spec__.parent, "providers.fastembed"),
     "GoogleEmbeddingProvider": (__spec__.parent, "providers.google"),
@@ -57,11 +62,12 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "OpenAIEmbeddingBase": (__spec__.parent, "providers.openai_factory"),
     "SentenceTransformersEmbeddingProvider": (__spec__.parent, "providers.sentence_transformers"),
     "SentenceTransformersSparseProvider": (__spec__.parent, "providers.sentence_transformers"),
+    "SparseEmbeddingModelCapabilities": (__spec__.parent, "capabilities.base"),
+    "SparseEmbeddingProvider": (__spec__.parent, "providers.base"),
     "VoyageEmbeddingProvider": (__spec__.parent, "providers.voyage"),
+    "get_embedding_registry": (__spec__.parent, "registry"),
     "get_sparse_embedder": (__spec__.parent, "fastembed_extensions"),
     "get_text_embedder": (__spec__.parent, "fastembed_extensions"),
-    "EmbeddingRegistry": (__spec__.parent, "registry"),
-    "get_embedding_registry": (__spec__.parent, "registry"),
 })
 
 
@@ -81,6 +87,8 @@ def __getattr__(name: str) -> object:
 __all__ = (
     "BedrockEmbeddingProvider",
     "CohereEmbeddingProvider",
+    "EmbeddingCapabilityResolver",
+    "EmbeddingCapabilityResolverDep",
     "EmbeddingModelCapabilities",
     "EmbeddingProvider",
     "EmbeddingRegistry",

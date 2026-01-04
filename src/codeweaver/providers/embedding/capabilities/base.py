@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Annotated, Any, Literal, Self
 
 from pydantic import ConfigDict, Field, PositiveFloat, PositiveInt
 
-from codeweaver.core import BASEDMODEL_CONFIG, BasedModel, Provider
+from codeweaver.core import BASEDMODEL_CONFIG, BasedModel, Provider, dependency_provider
 
 
 if TYPE_CHECKING:
@@ -218,7 +218,12 @@ class SparseEmbeddingModelCapabilities(BasedModel):
         return None
 
 
-def get_sparse_caps() -> tuple[SparseEmbeddingModelCapabilities, ...]:
+class SparseCapabilities(SparseEmbeddingModelCapabilities):
+    """Sparse embedding model capabilities for dependency injection."""
+
+
+@dependency_provider(SparseCapabilities, scope="singleton", collection=True)
+def get_sparse_caps() -> tuple[SparseCapabilities, ...]:
     """Get sparse embedding model capabilities."""
     caps = {  # type: ignore
         # Qdrant's bm25 model has no tokenizer because it isn't actually a learned model
@@ -275,7 +280,7 @@ def get_sparse_caps() -> tuple[SparseEmbeddingModelCapabilities, ...]:
         },
     }
     fastembed_caps = tuple(
-        SparseEmbeddingModelCapabilities.model_validate(
+        SparseCapabilities.model_validate(
             cap
             | {
                 "provider": Provider.FASTEMBED,
@@ -285,7 +290,7 @@ def get_sparse_caps() -> tuple[SparseEmbeddingModelCapabilities, ...]:
         for cap in list(caps.values())[:3]  # type: ignore
     )
     st_caps = tuple(
-        SparseEmbeddingModelCapabilities.model_validate(
+        SparseCapabilities.model_validate(
             cap
             | {
                 "provider": Provider.SENTENCE_TRANSFORMERS,
@@ -297,4 +302,9 @@ def get_sparse_caps() -> tuple[SparseEmbeddingModelCapabilities, ...]:
     return fastembed_caps + st_caps
 
 
-__all__ = ("EmbeddingModelCapabilities", "SparseEmbeddingModelCapabilities", "get_sparse_caps")
+__all__ = (
+    "EmbeddingModelCapabilities",
+    "SparseCapabilities",
+    "SparseEmbeddingModelCapabilities",
+    "get_sparse_caps",
+)

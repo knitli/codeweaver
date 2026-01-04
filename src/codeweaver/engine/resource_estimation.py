@@ -85,7 +85,9 @@ def get_walker() -> rignore.Walker:
     return rignore.Walker(**index_settings.to_settings())
 
 
-def estimate_file_count(project_path: ProjectPathDep = INJECTED[Path], max_depth: int = 5) -> NonNegativeInt:
+def estimate_file_count(
+    project_path: ProjectPathDep = INJECTED[Path], max_depth: int = 5
+) -> NonNegativeInt:
     """Quickly estimate the number of indexable files in a project.
 
     OPTIMIZATION: Caches results to avoid repeated file system scans.

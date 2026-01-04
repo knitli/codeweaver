@@ -7,24 +7,22 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-from codeweaver.core import Provider
+from codeweaver.core import Provider, dependency_provider
+from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.capabilities.types import PartialCapabilities
 
 
-if TYPE_CHECKING:
-    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+class MistralEmbeddingCapabilities(EmbeddingModelCapabilities):
+    """Capabilities for Mistral embedding models."""
 
 
-def get_mistral_embedding_capabilities() -> tuple[EmbeddingModelCapabilities, ...]:
+@dependency_provider(MistralEmbeddingCapabilities, scope="singleton", collection=True)
+def get_mistral_embedding_capabilities() -> tuple[MistralEmbeddingCapabilities, ...]:
     """Get Mistral embedding capabilities.
 
     NOTE: Like with the `voyage-code-3` model, we set the default dtype to `int8` for `codestral-embed`. Mistral's default, of course, is `float`.
     Like with voyage's model, codestral gets virtually no loss of retrieval quality when quantizing to int8, while getting a 4x reduction in storage and memory bandwidth.
     """
-    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
-
     shared: PartialCapabilities = {
         "provider": Provider.MISTRAL,
         "preferred_metrics": ("dot", "cosine", "euclidean"),
@@ -57,7 +55,7 @@ def get_mistral_embedding_capabilities() -> tuple[EmbeddingModelCapabilities, ..
         "default_dtype": "float",
     }
     return tuple(
-        EmbeddingModelCapabilities.model_validate({**shared, **d})
+        MistralEmbeddingCapabilities.model_validate({**shared, **d})
         for d in (base_mistral, codestral_caps)
     )
 

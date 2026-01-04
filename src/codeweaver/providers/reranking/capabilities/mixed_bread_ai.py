@@ -8,23 +8,25 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import TYPE_CHECKING
+
+from codeweaver.core import dependency_provider
+from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 
 
-if TYPE_CHECKING:
-    from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
+class MixedBreadAiRerankingCapabilities(RerankingModelCapabilities):
+    """Capabilities for MixedBread AI reranking models."""
 
 
-def get_mixed_bread_reranking_capabilities() -> Sequence[RerankingModelCapabilities]:
+@dependency_provider(MixedBreadAiRerankingCapabilities, scope="singleton", collection=True)
+def get_mixed_bread_reranking_capabilities() -> Sequence[MixedBreadAiRerankingCapabilities]:
     """
     Get the reranking capabilities for Mixed Bread AI models.
     """
     from codeweaver.core import Provider
-    from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 
     models = ("large-v2", "base-v2", "xsmall-v1", "base-v1")
     return [
-        RerankingModelCapabilities.model_validate({
+        MixedBreadAiRerankingCapabilities.model_validate({
             "name": "mixedbread-ai/mxbai-rerank-",
             "tokenizer": "tokenizers",
             "supports_custom_prompt": False,
@@ -37,4 +39,4 @@ def get_mixed_bread_reranking_capabilities() -> Sequence[RerankingModelCapabilit
     ]
 
 
-__all__ = ("get_mixed_bread_reranking_capabilities",)
+__all__ = ("MixedBreadAiRerankingCapabilities", "get_mixed_bread_reranking_capabilities")

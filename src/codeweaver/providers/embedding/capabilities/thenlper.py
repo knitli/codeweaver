@@ -6,17 +6,14 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal
+from typing import Literal
 
-from codeweaver.core import Provider
+from codeweaver.core import Provider, dependency_provider
+from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.capabilities.types import (
     EmbeddingCapabilitiesDict,
     PartialCapabilities,
 )
-
-
-if TYPE_CHECKING:
-    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 
 
 type ThenlperProvider = Literal[Provider.FASTEMBED, Provider.FIREWORKS]
@@ -92,17 +89,20 @@ ALL_CAPABILITIES: tuple[PartialCapabilities, ...] = (
 )
 
 
-def get_thenlper_embedding_capabilities() -> tuple[EmbeddingModelCapabilities, ...]:
-    """Get the capabilities for thenlper embedding models."""
-    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+class ThenlperEmbeddingCapabilities(EmbeddingModelCapabilities):
+    """Capabilities for thenlper embedding models."""
 
+
+@dependency_provider(ThenlperEmbeddingCapabilities, scope="singleton", collection=True)
+def get_thenlper_embedding_capabilities() -> tuple[ThenlperEmbeddingCapabilities, ...]:
+    """Get the capabilities for thenlper embedding models."""
     capabilities: list[EmbeddingCapabilitiesDict] = []
     for cap in ALL_CAPABILITIES:
         capabilities.extend([
             EmbeddingCapabilitiesDict({**cap, "provider": provider})  # type: ignore[missing-typeddict-key]
             for provider in CAP_MAP[cap["name"]]  # ty: ignore[invalid-argument-type]
         ])
-    return tuple(EmbeddingModelCapabilities.model_validate(cap) for cap in capabilities)
+    return tuple(ThenlperEmbeddingCapabilities.model_validate(cap) for cap in capabilities)
 
 
 __all__ = ("get_thenlper_embedding_capabilities",)

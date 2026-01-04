@@ -8,7 +8,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Literal
 
-from codeweaver.core import Provider
+from codeweaver.core import Provider, dependency_provider
+from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.capabilities.types import (
     EmbeddingCapabilitiesDict,
     PartialCapabilities,
@@ -16,7 +17,7 @@ from codeweaver.providers.embedding.capabilities.types import (
 
 
 if TYPE_CHECKING:
-    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+    pass
 
 
 type QwenProvider = Literal[Provider.SENTENCE_TRANSFORMERS]
@@ -127,10 +128,13 @@ ALL_CAPABILITIES: tuple[PartialCapabilities, ...] = (
 )
 
 
-def get_qwen_embedding_capabilities() -> tuple[EmbeddingModelCapabilities, ...]:
-    """Get the capabilities for Qwen embedding models."""
-    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+class QwenEmbeddingCapabilities(EmbeddingModelCapabilities):
+    """Capabilities for Qwen embedding models."""
 
+
+@dependency_provider(QwenEmbeddingCapabilities, scope="singleton", collection=True)
+def get_qwen_embedding_capabilities() -> tuple[QwenEmbeddingCapabilities, ...]:
+    """Get the capabilities for Qwen embedding models."""
     capabilities: list[EmbeddingCapabilitiesDict] = []
     for cap in ALL_CAPABILITIES:
         capabilities.extend([
@@ -138,7 +142,7 @@ def get_qwen_embedding_capabilities() -> tuple[EmbeddingModelCapabilities, ...]:
             for provider in CAP_MAP[cap["name"]]  # ty: ignore[invalid-argument-type]
         ])
     return tuple(
-        EmbeddingModelCapabilities.model_validate(
+        QwenEmbeddingCapabilities.model_validate(
             cap
             | {
                 "other": {

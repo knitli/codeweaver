@@ -9,12 +9,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Literal
 
-from codeweaver.core import Provider
+from codeweaver.core import Provider, dependency_provider
+from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.capabilities.types import PartialCapabilities
 
 
 if TYPE_CHECKING:
-    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+    pass
 
 
 def _get_openai_models(
@@ -50,13 +51,16 @@ def _get_shared_openai_embedding_capabilities() -> PartialCapabilities:
     }
 
 
-def get_openai_embedding_capabilities() -> tuple[EmbeddingModelCapabilities, ...]:
-    """Get the capabilities for OpenAI embedding models."""
-    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+class OpenaiEmbeddingCapabilities(EmbeddingModelCapabilities):
+    """Capabilities for OpenAI embedding models."""
 
+
+@dependency_provider(OpenaiEmbeddingCapabilities, scope="singleton", collection=True)
+def get_openai_embedding_capabilities() -> tuple[OpenaiEmbeddingCapabilities, ...]:
+    """Get the capabilities for OpenAI embedding models."""
     dimensions = (3072, 2560, 2048, 1536, 1024, 512, 256)
     return tuple(
-        EmbeddingModelCapabilities.model_validate({
+        OpenaiEmbeddingCapabilities.model_validate({
             **_get_shared_openai_embedding_capabilities(),
             "name": model_name,
             "provider": provider,

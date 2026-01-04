@@ -8,17 +8,19 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import TYPE_CHECKING
+
+from codeweaver.core import dependency_provider
+from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 
 
-if TYPE_CHECKING:
-    from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
+class JinaaiRerankingCapabilities(RerankingModelCapabilities):
+    """Capabilities for JinaAI reranking models."""
 
 
-def get_jinaai_reranking_capabilities() -> Sequence[RerankingModelCapabilities]:
+@dependency_provider(JinaaiRerankingCapabilities, scope="singleton", collection=True)
+def get_jinaai_reranking_capabilities() -> Sequence[JinaaiRerankingCapabilities]:
     """Get the JinaAI reranking model capabilities."""
     from codeweaver.core import Provider
-    from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 
     capabilities = {
         "jinaai/jina-reranking-v2-base-multilingual": {
@@ -40,9 +42,9 @@ def get_jinaai_reranking_capabilities() -> Sequence[RerankingModelCapabilities]:
         },
     }
     return [
-        RerankingModelCapabilities.model_validate({**cap, "name": name})
+        JinaaiRerankingCapabilities.model_validate({**cap, "name": name})
         for name, cap in capabilities.items()
     ]
 
 
-__all__ = ("get_jinaai_reranking_capabilities",)
+__all__ = ("JinaaiRerankingCapabilities", "get_jinaai_reranking_capabilities")

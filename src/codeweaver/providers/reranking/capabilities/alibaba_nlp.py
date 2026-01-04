@@ -7,23 +7,23 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-from typing import TYPE_CHECKING
+from codeweaver.core import dependency_provider
+from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 
 
-if TYPE_CHECKING:
-    from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
+class AlibabaNlpRerankingCapabilities(RerankingModelCapabilities):
+    """Capabilities for Alibaba-NLP reranking models."""
 
 
-def get_alibaba_reranking_capabilities() -> Sequence[RerankingModelCapabilities]:
+@dependency_provider(AlibabaNlpRerankingCapabilities, scope="singleton", collection=True)
+def get_alibaba_reranking_capabilities() -> tuple[AlibabaNlpRerankingCapabilities, ...]:
     """
     Get the reranking capabilities for Alibaba NLP models.
     """
     from codeweaver.core import Provider
-    from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 
-    return [
-        RerankingModelCapabilities.model_validate({
+    return (
+        AlibabaNlpRerankingCapabilities.model_validate({
             "name": "Alibaba-NLP/gte-multilingual-reranking-base",
             "tokenizer": "tokenizers",
             "tokenizer_model": "Alibaba-NLP/gte-multilingual-reranking-base",
@@ -31,8 +31,8 @@ def get_alibaba_reranking_capabilities() -> Sequence[RerankingModelCapabilities]
             "max_input": 8192,
             "context_window": 8192,
             "provider": Provider.SENTENCE_TRANSFORMERS,
-        })
-    ]
+        }),
+    )
 
 
 __all__ = ("get_alibaba_reranking_capabilities",)

@@ -30,7 +30,6 @@ from codeweaver.providers.config import (
     AgentModelSettings,
     AgentProviderSettings,
     DataProviderSettings,
-    EmbeddingModelSettings,
     EmbeddingProviderSettings,
     MemoryConfig,
     ProviderSettingsDict,

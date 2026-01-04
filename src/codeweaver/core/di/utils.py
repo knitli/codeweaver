@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import inspect
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from threading import Lock
 from typing import Any, Literal, TypeVar, cast, overload
@@ -72,6 +72,17 @@ def dependency_provider[T](
     *,
     scope: Literal["singleton", "request", "function"] = "singleton",
     module: str | None = None,
+    collection: Literal[True],
+) -> Callable[[Callable[..., Sequence[T]]], Callable[..., Sequence[T]]]: ...
+
+
+@overload
+def dependency_provider[T](
+    cls: type[T],
+    *,
+    scope: Literal["singleton", "request", "function"] = "singleton",
+    module: str | None = None,
+    collection: Literal[False] = False,
 ) -> Callable[[Callable[..., T]], Callable[..., T]]: ...
 
 
@@ -81,6 +92,7 @@ def dependency_provider[T](
     *,
     scope: Literal["singleton", "request", "function"] = "singleton",
     module: str | None = None,
+    collection: Literal[False] = False,
 ) -> Callable[[type[T]], type[T]]: ...
 
 
@@ -89,14 +101,20 @@ def dependency_provider[T](
     *,
     scope: Literal["singleton", "request", "function"] = "singleton",
     module: str | None = None,
-) -> Callable[[Callable[..., T]], Callable[..., T]] | Callable[[type[T]], type[T]] | type[T]:
+    collection: bool = False,
+) -> (
+    Callable[[Callable[..., T]], Callable[..., T]]
+    | Callable[[Callable[..., Sequence[T]]], Callable[..., Sequence[T]]]
+    | Callable[[type[T]], type[T]]
+    | type[T]
+):
     """Decorator that registers a function or class as the provider for a specific type.
 
     This decorator binds a factory function (or class) to the type it produces.
     When the DI system needs an instance of `cls`, it will use the decorated
     function or class to create it.
 
-    Supports two usage patterns:
+    Supports three usage patterns:
 
     1. Function registration (explicit type):
         ```python
@@ -118,11 +136,22 @@ def dependency_provider[T](
                 self.config = config
         ```
 
+    3. Collection registration (returns multiple instances):
+        ```python
+        dependency_provider(MyCapability, scope="singleton", collection=True)
+
+
+        def get_capabilities() -> Sequence[MyCapability]:
+            return (MyCapability(...), MyCapability(...))
+        ```
+
     Args:
         cls: The type (class) that the decorated function provides.
         scope: The lifecycle scope - "singleton" (app lifetime, default),
                "request" (per request), or "function" (per call, no caching).
         module: Optional module name for scoped registration.
+        collection: If True, the factory returns a Sequence[T] instead of T.
+                   Use this when registering a provider that returns multiple instances.
 
     Returns:
         When used as `dependency_provider(SomeType)`: Returns a decorator function.
@@ -172,6 +201,18 @@ def dependency_provider[T](
         class SimpleService:
             def __init__(self):
                 self.value = 42
+
+
+        # Collection provider (returns multiple instances)
+        dependency_provider(Capability, scope="singleton", collection=True)
+
+
+        def get_all_capabilities() -> Sequence[Capability]:
+            return (
+                Capability(name="feature1"),
+                Capability(name="feature2"),
+                Capability(name="feature3"),
+            )
         ```
     """
     # Case 1: Used without cls argument (for class self-registration)

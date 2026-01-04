@@ -77,7 +77,7 @@ if TYPE_CHECKING:
     from someplace import ServiceProvider
 
 
-def my_function(service: ServiceDep = INJECTED[ServiceProvider]) -> None:
+def my_function(service: ServiceDep = INJECTED) -> None:
     # service will be injected by the DI container
     ...
 ```

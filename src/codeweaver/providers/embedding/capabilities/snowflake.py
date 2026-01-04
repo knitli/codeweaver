@@ -8,7 +8,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Literal
 
-from codeweaver.core import Provider
+from codeweaver.core import Provider, dependency_provider
+from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.capabilities.types import (
     EmbeddingCapabilitiesDict,
     PartialCapabilities,
@@ -16,7 +17,7 @@ from codeweaver.providers.embedding.capabilities.types import (
 
 
 if TYPE_CHECKING:
-    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+    pass
 
 
 type SnowflakeProvider = Literal[
@@ -338,17 +339,20 @@ ALL_CAPABILITIES: tuple[PartialCapabilities, ...] = (
 )
 
 
-def get_snowflake_embedding_capabilities() -> tuple[EmbeddingModelCapabilities, ...]:
-    """Get the capabilities for Snowflake embedding models."""
-    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+class SnowflakeEmbeddingCapabilities(EmbeddingModelCapabilities):
+    """Capabilities for Snowflake embedding models."""
 
+
+@dependency_provider(SnowflakeEmbeddingCapabilities, scope="singleton", collection=True)
+def get_snowflake_embedding_capabilities() -> tuple[SnowflakeEmbeddingCapabilities, ...]:
+    """Get the capabilities for Snowflake embedding models."""
     capabilities: list[EmbeddingCapabilitiesDict] = []
     for cap in ALL_CAPABILITIES:
         capabilities.extend([
             EmbeddingCapabilitiesDict({**cap, "provider": provider})  # type: ignore[missing-typeddict-key]
             for provider in CAP_MAP[cap["name"]]  # ty: ignore[invalid-argument-type]
         ])
-    return tuple(EmbeddingModelCapabilities.model_validate(cap) for cap in capabilities)
+    return tuple(SnowflakeEmbeddingCapabilities.model_validate(cap) for cap in capabilities)
 
 
 __all__ = ("get_snowflake_embedding_capabilities",)

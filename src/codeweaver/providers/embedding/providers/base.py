@@ -61,6 +61,7 @@ from codeweaver.core import (
     SparseEmbedding,
     UUIDStore,
     depends,
+    get_blake_hash,
     lazy_import,
     log_to_client_or_fallback,
     make_blake_store,
@@ -69,6 +70,7 @@ from codeweaver.core import (
 )
 from codeweaver.core import ValidationError as CodeWeaverValidationError
 from codeweaver.providers.config import EmbeddingModelSettings, SparseEmbeddingModelSettings
+from codeweaver.providers.embedding import EmbeddingCapabilityResolverDep
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.registry import EmbeddingRegistry
 
@@ -213,9 +215,9 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         description="Options for query requests.", default_factory=dict
     )
 
-    is_backup_provider: Annotated[
-        bool, Field(description="Whether this provider is used as a backup.")
-    ] = False
+    model_options: Mapping[str, Any] = Field(
+        description="Options for model configuration.", default_factory=dict
+    )
 
     _provider: ClassVar[LiteralProvider] = cast(LiteralProvider, Provider.NOT_SET)
     _input_transformer: ClassVar[Callable[[StructuredDataInput], Any]] = default_input_transformer
@@ -245,13 +247,12 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
     def __init__(
         self,
         client: ClientDep[EmbeddingClient] = INJECTED,
-        caps: ModelCapabilitiesDep[EmbeddingModelCapabilities] = INJECTED,
+        caps: EmbeddingCapabilityResolverDep = INJECTED,
         embed_options: Mapping[str, Any] | None = None,
         query_options: Mapping[str, Any] | None = None,
+        model_options: Mapping[str, Any] | None = None,
         impl_deps: Any = None,
         custom_deps: Any = None,
-        *,
-        is_backup_provider: bool = False,
         **kwargs: Any,
     ) -> None:
         defaults = getattr(type(self), "_defaults", {})
@@ -265,6 +266,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         object.__setattr__(self, "client", client)
         object.__setattr__(self, "embed_options", embed_options)
         object.__setattr__(self, "query_options", query_options)
+        object.__setattr__(self, "model_options", model_options)
         store_kwargs = kwargs.get(
             "store_kwargs", {"value_type": list, "size_limit": 1024 * 1024 * 3}
         )
@@ -273,7 +275,6 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             "hash_store_kwargs", {"value_type": UUID, "size_limit": ONE_KB * 256}
         )
         object.__setattr__(self, "_hash_store", make_blake_store(**hash_store_kwargs))
-        object.__setattr__(self, "is_backup_provider", is_backup_provider)
         self._initialize(impl_deps, custom_deps)
         object.__setattr__(self, "caps", caps)
         super().__init__(client=client, **defaults)
@@ -450,7 +451,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         reraise=True,
     )
     async def _embed_documents_with_retry(
-        self, documents: Sequence[CodeChunk], *, for_backup: bool = False, **kwargs: Any
+        self, documents: Sequence[CodeChunk], **kwargs: Any
     ) -> Sequence[Sequence[float]] | Sequence[Sequence[int]] | dict[str, list[int] | list[float]]:
         """Wrapper around _embed_documents with retry logic and circuit breaker.
 
@@ -507,7 +508,6 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         documents: Sequence[CodeChunk],  # type: ignore # intentionally obscurred
         *,
         batch_id: UUID7 | None = None,
-        for_backup: bool = False,
         skip_deduplication: bool = False,
         context: Any = None,
         **kwargs: Any,
@@ -517,18 +517,11 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         Optionally takes a `batch_id` parameter to reprocess a specific batch of documents.
         """
         is_old_batch = False
-        if (batch_id and self._store and batch_id in self._store and not for_backup) or (
-            batch_id and for_backup and self._backup_store and batch_id in self._backup_store
-        ):
-            documents: Sequence[CodeChunk] = (
-                self._backup_store[batch_id] if for_backup else self._store[batch_id]
-            )  # type: ignore
+        if batch_id and self._store and batch_id in self._store:
+            documents: Sequence[CodeChunk] = self._store[batch_id]  # type: ignore
             is_old_batch = True
         chunks_iter, cache_key = self._process_input(
-            documents,
-            is_old_batch=is_old_batch,
-            for_backup=for_backup,
-            skip_deduplication=skip_deduplication,
+            documents, is_old_batch=is_old_batch, skip_deduplication=skip_deduplication
         )  # type: ignore
 
         # Convert iterator to tuple once to avoid exhaustion issues
@@ -591,9 +584,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                     Sequence[Sequence[float]]
                     | Sequence[Sequence[int]]
                     | Sequence[dict[str, list[int] | list[float]]]
-                ) = await self._embed_documents_with_retry(
-                    token_batch, for_backup=for_backup, **kwargs
-                )
+                ) = await self._embed_documents_with_retry(token_batch, **kwargs)
                 all_results.extend(batch_results)
 
                 # Yield between token batches to keep server responsive
@@ -660,7 +651,6 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                     chunks=chunks,  # Already a tuple, no need to convert again
                     batch_id=cast(UUID7, batch_id or cache_key),
                     embeddings=results,  # ty: ignore[invalid-argument-type]
-                    for_backup=for_backup,
                 )
 
             await log_to_client_or_fallback(
@@ -840,11 +830,9 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         return settings.get("model_settings")
 
     def get_datatype(
-        self, *, sparse: bool = False, backup: bool = False
+        self, *, sparse: bool = False
     ) -> Literal["float32", "float16", "int8", "binary"]:
         """Get the datatype of the embedding vectors based on capabilities."""
-        if backup:
-            return "int8"
         default_dtype = self.caps.default_dtype
         if default_dtype and default_dtype not in ("float32", "float16", "int8", "binary"):
             default_dtype = "float16" if "float" in default_dtype else "int8"
@@ -853,24 +841,10 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             return model_settings["data_type"]
         return cast(Literal["float32", "float16", "int8", "binary"], default_dtype)
 
-    def get_dimension(
-        self, *, sparse: bool = False, backup: bool = False
-    ) -> PositiveInt | Literal[0]:
+    def get_dimension(self, *, sparse: bool = False) -> PositiveInt | Literal[0]:
         """Get the dimension of the embedding vectors based on capabilities."""
         if sparse:
             return 0
-        if backup:
-            from codeweaver.providers.config import get_profile
-
-            profile = get_profile("backup", "local")
-            if isinstance(profile["embedding"], dict):
-                # Use .get() to safely access dimension, fall back to default_dimension if not present
-                backup_dim = profile["embedding"]["model_settings"].get("dimension")
-            else:
-                backup_dim = cast(tuple, profile["embedding"])[0]["model_settings"].get("dimension")
-            if backup_dim:
-                return backup_dim
-                # If dimension not in backup profile, fall through to use default_dimension
         default_dim = self.caps.default_dimension
         model_settings = self._get_model_settings(sparse=sparse)
         if model_settings and model_settings.get("dimension"):
@@ -943,8 +917,6 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         chunks: Sequence[CodeChunk],
         batch_id: UUID7,
         embeddings: Sequence[Sequence[float]] | Sequence[Sequence[int]] | Sequence[SparseEmbedding],
-        *,
-        for_backup: bool = False,
     ) -> None:  # sourcery skip: low-code-quality
         """Register chunks in the embedding registry."""
         registry = _get_registry()
@@ -957,18 +929,17 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
 
         # Validate embedding dimensions for dense embeddings
         if not is_sparse and embeddings:
-            expected_dim = self.get_dimension(sparse=False, backup=for_backup)
+            expected_dim = self.get_dimension(sparse=False)
             first_embedding = embeddings[0]
             if not isinstance(first_embedding, SparseEmbedding):
                 actual_dim = len(first_embedding)
                 if actual_dim != expected_dim:
                     # Debug logging
                     logger.debug(
-                        "Dimension mismatch DEBUG: model_name=%s, caps.name=%s, caps.default_dimension=%s, for_backup=%s, expected=%s, actual=%s",
+                        "Dimension mismatch DEBUG: model_name=%s, caps.name=%s, caps.default_dimension=%s, expected=%s, actual=%s",
                         self.model_name,
                         self.caps.name,
                         self.caps.default_dimension,
-                        for_backup,
                         expected_dim,
                         actual_dim,
                     )
@@ -981,7 +952,6 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                             "provider": type(self)._provider.variable
                             if hasattr(type(self), "_provider")
                             else "unknown",
-                            "for_backup": for_backup,
                         },
                         suggestions=[
                             f"Check that your embedding model '{self.model_name}' is configured with dimension={actual_dim}",
@@ -1005,8 +975,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                     chunk_id=chunk.chunk_id,
                     model=ModelName(cast(LiteralStringT, self.model_name)),
                     embeddings=sparse_emb,
-                    dtype=self.get_datatype(sparse=True, backup=for_backup),
-                    backup=for_backup,
+                    dtype=self.get_datatype(sparse=True),
                 )
             else:
                 # For dense embeddings or old format
@@ -1016,9 +985,8 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                     chunk_id=chunk.chunk_id,
                     model=ModelName(cast(LiteralStringT, self.model_name)),
                     embeddings=embedding,
-                    dimension=self.get_dimension(sparse=is_sparse, backup=for_backup),
-                    dtype=self.get_datatype(sparse=is_sparse, backup=for_backup),
-                    backup=for_backup,
+                    dimension=self.get_dimension(sparse=is_sparse),
+                    dtype=self.get_datatype(sparse=is_sparse),
                 )
             chunk_infos.append(chunk_info)
 
@@ -1026,26 +994,13 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             if (registered := registry.get(info.chunk_id)) is not None:
                 # Check if we already have this type of embedding
                 has_existing = (
-                    (
-                        info.kind.variable == "dense"
-                        and not info.backup
-                        and registered.dense is not None
-                    )
-                    or (
-                        info.kind.variable == "sparse"
-                        and not info.backup
-                        and registered.sparse is not None
-                    )
-                    or (
-                        info.kind.variable == "dense"
-                        and info.backup
-                        and registered.backup_dense is not None
-                    )
-                    or (
-                        info.kind.variable == "sparse"
-                        and info.backup
-                        and registered.backup_sparse is not None
-                    )
+                    info.kind.variable == "dense"
+                    and not info.backup
+                    and registered.dense is not None
+                ) or (
+                    info.kind.variable == "sparse"
+                    and not info.backup
+                    and registered.sparse is not None
                 )
 
                 if has_existing:
@@ -1060,11 +1015,9 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                     registry[info.chunk_id] = registry[info.chunk_id]._replace(chunk=chunks[i])
             else:
                 registry[info.chunk_id] = ChunkEmbeddings(
-                    dense=info if attr == "dense" and not for_backup else None,
-                    sparse=info if attr == "sparse" and not for_backup else None,
+                    dense=info if attr == "dense" else None,
+                    sparse=info if attr == "sparse" else None,
                     chunk=chunks[i],
-                    backup_dense=info if attr == "dense" and for_backup else None,
-                    backup_sparse=info if attr == "sparse" and for_backup else None,
                 )
 
     def _process_input(
@@ -1072,7 +1025,6 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         input_data: StructuredDataInput,
         *,
         is_old_batch: bool = False,
-        for_backup: bool = False,
         skip_deduplication: bool = False,
     ) -> tuple[Iterator[CodeChunk], UUID7 | None]:
         """Process input data for embedding."""
@@ -1092,19 +1044,11 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         if skip_deduplication:
             starter_chunks = chunk_list
         else:
-            starter_chunks = (
-                [
-                    chunk
-                    for i, chunk in enumerate(chunk_list)
-                    if chunk and hashes[i] not in type(self)._backup_hash_store
-                ]
-                if for_backup
-                else [
-                    chunk
-                    for i, chunk in enumerate(chunk_list)
-                    if chunk and hashes[i] not in type(self)._hash_store
-                ]
-            )
+            starter_chunks = [
+                chunk
+                for i, chunk in enumerate(chunk_list)
+                if chunk and hashes[i] not in type(self)._hash_store
+            ]
 
         # Detect if this is a sparse embedding provider using type checking
         # SparseEmbeddingProvider is defined in this same module after EmbeddingProvider
@@ -1115,20 +1059,12 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             # Find the original index in chunk_list to get correct hash
             original_idx = chunk_list.index(chunk)
             batch_keys = BatchKeys(id=key, idx=i, sparse=is_sparse_provider)
-            final_chunks.append(chunk.set_batch_keys(batch_keys, secondary=for_backup))
+            final_chunks.append(chunk.set_batch_keys(batch_keys))
             # Now add the hash to store, mapping it to this batch key
-            if for_backup:
-                type(self)._backup_hash_store[hashes[original_idx]] = key
-                if not type(self)._backup_store:
-                    type(self)._backup_store = make_uuid_store(
-                        value_type=list, size_limit=1024 * 1024
-                    )  # type: ignore
-                type(self)._backup_store[key] = final_chunks  # type: ignore
-            else:
-                type(self)._hash_store[hashes[original_idx]] = key
-                if not type(self)._store:
-                    type(self)._store = make_uuid_store(value_type=list, size_limit=1024 * 1024 * 3)  # type: ignore
-                type(self)._store[key] = final_chunks  # type: ignore
+            type(self)._hash_store[hashes[original_idx]] = key
+            if not type(self)._store:
+                type(self)._store = make_uuid_store(value_type=list, size_limit=1024 * 1024 * 3)  # type: ignore
+            type(self)._store[key] = final_chunks  # type: ignore
 
         return iter(final_chunks), key
 
@@ -1154,11 +1090,11 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         return {
             FilteredKey("_store"): AnonymityConversion.COUNT,
             FilteredKey("_hash_store"): AnonymityConversion.COUNT,
-            FilteredKey("_client"): AnonymityConversion.FORBIDDEN,
+            FilteredKey("client"): AnonymityConversion.FORBIDDEN,
             FilteredKey("_input_transformer"): AnonymityConversion.FORBIDDEN,
             FilteredKey("_output_transformer"): AnonymityConversion.FORBIDDEN,
-            FilteredKey("_doc_kwargs"): AnonymityConversion.COUNT,
-            FilteredKey("_query_kwargs"): AnonymityConversion.COUNT,
+            FilteredKey("embed_options"): AnonymityConversion.COUNT,
+            FilteredKey("query_options"): AnonymityConversion.COUNT,
         }
 
     @override
@@ -1182,7 +1118,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         return self._model_dump_json(  # ty: ignore[unresolved-attribute]
             indent=indent,
             include=include,
-            exclude={"_client", "_input_transformer", "_output_transformer"},
+            exclude={"client", "_input_transformer", "_output_transformer"},
             context=context,
             by_alias=by_alias,
             exclude_unset=exclude_unset,
@@ -1204,20 +1140,16 @@ class SparseEmbeddingProvider[SparseClient](EmbeddingProvider[SparseClient], ABC
 
     # Override parent class hash stores with separate stores for sparse embeddings
     _hash_store: ClassVar[BlakeStore[UUID7]] = make_blake_store(
-        value_type=UUID, size_limit=1024 * 256
+        value_type=UUID, size_limit=ONE_KB * 256
     )  # 256kb limit -- separate from dense embeddings
-    _backup_hash_store: ClassVar[BlakeStore[UUID7]] = make_blake_store(
-        value_type=UUID, size_limit=1024 * 128
-    )  # 128kb limit -- separate from dense embeddings
 
     @classmethod
     def clear_deduplication_stores(cls) -> None:
         """Clear class-level deduplication stores for sparse embeddings."""
-        cls._hash_store = make_blake_store(value_type=UUID, size_limit=1024 * 256)
-        cls._backup_hash_store = make_blake_store(value_type=UUID, size_limit=1024 * 128)
+        cls._hash_store = make_blake_store(value_type=UUID, size_limit=ONE_KB * 256)
 
     def _batch_and_key(
-        self, chunk_list: Sequence[CodeChunk], *, for_backup: bool, skip_deduplication: bool
+        self, chunk_list: Sequence[CodeChunk], *, skip_deduplication: bool
     ) -> tuple[Iterator[CodeChunk], UUID7]:
         """Override to create batch keys with sparse=True.
 
@@ -1234,19 +1166,11 @@ class SparseEmbeddingProvider[SparseClient](EmbeddingProvider[SparseClient], ABC
         if skip_deduplication:
             starter_chunks = chunk_list
         else:
-            starter_chunks = (
-                [
-                    chunk
-                    for i, chunk in enumerate(chunk_list)
-                    if chunk and hashes[i] not in type(self)._backup_hash_store
-                ]
-                if for_backup
-                else [
-                    chunk
-                    for i, chunk in enumerate(chunk_list)
-                    if chunk and hashes[i] not in type(self)._hash_store
-                ]
-            )
+            starter_chunks = [
+                chunk
+                for i, chunk in enumerate(chunk_list)
+                if chunk and hashes[i] not in type(self)._hash_store
+            ]
 
         # Add NEW chunks with batch keys (sparse=True for sparse providers) and add their hashes to store
         for i, chunk in enumerate(starter_chunks):
@@ -1254,20 +1178,12 @@ class SparseEmbeddingProvider[SparseClient](EmbeddingProvider[SparseClient], ABC
             original_idx = chunk_list.index(chunk)
             # *** FIX: Create batch keys with sparse=True for sparse embedding providers ***
             batch_keys = BatchKeys(id=key, idx=i, sparse=True)
-            final_chunks.append(chunk.set_batch_keys(batch_keys, secondary=for_backup))
+            final_chunks.append(chunk.set_batch_keys(batch_keys))
             # Now add the hash to store, mapping it to this batch key
-            if for_backup:
-                type(self)._backup_hash_store[hashes[original_idx]] = key
-                if not type(self)._backup_store:
-                    type(self)._backup_store = make_uuid_store(
-                        value_type=list, size_limit=1024 * 1024
-                    )  # type: ignore
-                type(self)._backup_store[key] = final_chunks  # type: ignore
-            else:
-                type(self)._hash_store[hashes[original_idx]] = key
-                if not type(self)._store:
-                    type(self)._store = make_uuid_store(value_type=list, size_limit=1024 * 1024 * 3)  # type: ignore
-                type(self)._store[key] = final_chunks  # type: ignore
+            type(self)._hash_store[hashes[original_idx]] = key
+            if not type(self)._store:
+                type(self)._store = make_uuid_store(value_type=list, size_limit=ONE_MB * 3)  # type: ignore
+            type(self)._store[key] = final_chunks  # type: ignore
 
         return iter(final_chunks), key
 

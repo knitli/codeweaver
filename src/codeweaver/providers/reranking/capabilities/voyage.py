@@ -12,11 +12,17 @@ from typing import TYPE_CHECKING
 
 from pydantic import NonNegativeInt
 
+from codeweaver.core import dependency_provider
+from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
+
 
 if TYPE_CHECKING:
     from codeweaver.core import CodeChunk
-    from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
     from codeweaver.providers.reranking.capabilities.types import PartialRerankingCapabilitiesDict
+
+
+class VoyageRerankingCapabilities(RerankingModelCapabilities):
+    """Capabilities for Voyage reranking models."""
 
 
 def _handle_too_big(token_list: Sequence[int]) -> Sequence[tuple[int, int]]:
@@ -96,18 +102,17 @@ def _get_voyage_capabilities() -> PartialRerankingCapabilitiesDict:
     }
 
 
+@dependency_provider(VoyageRerankingCapabilities, scope="singleton", collection=True)
 def get_voyage_reranking_capabilities() -> tuple[
-    RerankingModelCapabilities, RerankingModelCapabilities
+    VoyageRerankingCapabilities, VoyageRerankingCapabilities
 ]:
     """Get the capabilities of the Voyage reranking model."""
-    from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
-
     base_capabilities = _get_voyage_capabilities()
     lite_capabilities = base_capabilities.copy()
     lite_capabilities["name"] = "voyage-rerank-2.5-lite"
-    return RerankingModelCapabilities.model_validate(
+    return VoyageRerankingCapabilities.model_validate(
         base_capabilities
-    ), RerankingModelCapabilities.model_validate(lite_capabilities)
+    ), VoyageRerankingCapabilities.model_validate(lite_capabilities)
 
 
-__all__ = ("get_voyage_reranking_capabilities",)
+__all__ = ("get_voyage_reranking_capabilities", "VoyageRerankingCapabilities")

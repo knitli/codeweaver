@@ -6,17 +6,15 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal
+from typing import Literal
 
-from codeweaver.core import Provider
+from codeweaver.core import Provider, dependency_provider
+from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.capabilities.types import (
     EmbeddingCapabilitiesDict,
     PartialCapabilities,
 )
 
-
-if TYPE_CHECKING:
-    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 
 type MinishlabProvider = Literal[Provider.SENTENCE_TRANSFORMERS]
 
@@ -273,17 +271,23 @@ ALL_CAPABILITIES: tuple[PartialCapabilities, ...] = (
 )
 
 
-def get_minishlab_embedding_capabilities() -> tuple[EmbeddingModelCapabilities, ...]:
-    """Get the capabilities for minishlab/model2vec embedding models."""
-    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+class MinishlabEmbeddingCapabilities(EmbeddingModelCapabilities):
+    """Capabilities for minishlab/model2vec embedding models."""
 
+
+@dependency_provider(MinishlabEmbeddingCapabilities, scope="singleton", collection=True)
+def get_minishlab_embedding_capabilities() -> tuple[MinishlabEmbeddingCapabilities, ...]:
+    """Get the capabilities for minishlab/model2vec embedding models."""
     capabilities: list[EmbeddingCapabilitiesDict] = []
     for cap in ALL_CAPABILITIES:
+        model_name = cap["name"]
+        assert isinstance(model_name, str)  # noqa: S101
+        assert model_name in CAP_MAP, f"Invalid model name: {model_name}"  # noqa: S101
         capabilities.extend([
             EmbeddingCapabilitiesDict({**cap, "provider": provider})  # type: ignore[missing-typeddict-key]
-            for provider in CAP_MAP[cap["name"]]  # type: ignore[invalid-argument-type]
+            for provider in CAP_MAP[model_name]  # ty: ignore[invalid-argument-type]
         ])
-    return tuple(EmbeddingModelCapabilities.model_validate(cap) for cap in capabilities)
+    return tuple(MinishlabEmbeddingCapabilities.model_validate(cap) for cap in capabilities)
 
 
 __all__ = ("get_minishlab_embedding_capabilities",)

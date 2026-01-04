@@ -201,8 +201,15 @@ class ChunkGovernor(BasedModel):
         Returns:
             A ChunkGovernor instance configured for backup model constraints.
         """
-        from codeweaver.providers import load_default_capabilities as load_embedding_caps
-        from codeweaver.providers import load_default_capabilities as load_reranking_caps
+        from codeweaver.providers.embedding.capabilities.dependencies import (
+            EmbeddingCapabilityResolver,
+        )
+        from codeweaver.providers.reranking.capabilities.dependencies import (
+            RerankingCapabilityResolver,
+        )
+
+        embedding_resolver = EmbeddingCapabilityResolver()
+        reranking_resolver = RerankingCapabilityResolver()
 
         embedding_caps: EmbeddingModelCapabilities | None = None
         reranking_caps: RerankingModelCapabilities | None = None
@@ -217,11 +224,8 @@ class ChunkGovernor(BasedModel):
             if (model_settings := getattr(first_setting, "model_settings", None)) and (
                 model_name := getattr(model_settings, "model", None)
             ):
-                # Find matching capability
-                for cap in load_embedding_caps():
-                    if cap.name == model_name:
-                        embedding_caps = cap
-                        break
+                # Resolve capability by model name (returns None if not found)
+                embedding_caps = embedding_resolver.resolve(model_name)
 
         # Extract reranking model name from profile
         if (
@@ -233,11 +237,8 @@ class ChunkGovernor(BasedModel):
             if (model_settings := getattr(first_setting, "model_settings", None)) and (
                 model_name := getattr(model_settings, "model", None)
             ):
-                # Find matching capability
-                for cap in load_reranking_caps():
-                    if cap.name == model_name:
-                        reranking_caps = cap
-                        break
+                # Resolve capability by model name (returns None if not found)
+                reranking_caps = reranking_resolver.resolve(model_name)
 
         # Build capabilities tuple
         if embedding_caps and reranking_caps:

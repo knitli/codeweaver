@@ -7,20 +7,21 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from codeweaver.core import dependency_provider
+from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 
 
-if TYPE_CHECKING:
-    from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
+class AmazonRerankingCapabilities(RerankingModelCapabilities):
+    """Capabilities for Amazon reranking models."""
 
 
-def get_amazon_reranking_capabilities() -> tuple[RerankingModelCapabilities, ...]:
+@dependency_provider(AmazonRerankingCapabilities, scope="singleton", collection=True)
+def get_amazon_reranking_capabilities() -> tuple[AmazonRerankingCapabilities, ...]:
     """Get the capabilities of the Amazon reranking model."""
     from codeweaver.core import Provider
-    from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 
     return (
-        RerankingModelCapabilities.model_validate({
+        AmazonRerankingCapabilities.model_validate({
             "name": "amazon.rerank-v1:0",
             "provider": Provider.BEDROCK,
             "max_input": 4096,  # we actually have no idea, Amazon doesn't provide any info on model capabilities and limits

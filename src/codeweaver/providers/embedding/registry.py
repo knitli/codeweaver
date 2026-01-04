@@ -161,8 +161,14 @@ def get_embedding_registry(*, backup: Literal[True]) -> BackupEmbeddingRegistry:
 
 def get_embedding_registry(*, backup: bool = False) -> EmbeddingRegistry | BackupEmbeddingRegistry:
     """Get the global EmbeddingRegistry instance, creating it if it doesn't exist."""
+    from codeweaver.core import ChunkEmbeddings
+
     _rebuild_store(BackupEmbeddingRegistry if backup else EmbeddingRegistry)
-    return BackupEmbeddingRegistry(store={}, _value_type=list) if backup else EmbeddingRegistry()
+    return (
+        BackupEmbeddingRegistry(store={}, _value_type=ChunkEmbeddings)
+        if backup
+        else EmbeddingRegistry()
+    )
 
 
 __all__ = ("EmbeddingRegistry", "get_embedding_registry")

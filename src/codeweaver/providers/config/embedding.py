@@ -1,0 +1,620 @@
+"""Provider-specific embedding configuration models and utilities."""
+
+from __future__ import annotations
+
+from abc import abstractmethod
+from typing import Annotated, Any, Literal, LiteralString, NotRequired, Required, TypedDict, cast
+
+from pydantic import Discriminator, Field, Tag
+
+from codeweaver.core import BasedModel, LiteralProvider
+
+
+DATATYPE_FIELDS = {"encoding_format", "output_dtype", "embedding_types", "precision"}
+
+
+def adjust_collection_config_for_datatype(datatype: Literal["float16", "uint8"]) -> None:
+    """Adjust the collection configuration based on the specified datatype.
+
+    Qdrant currently expects to receive floats, but can quantize to float16 or uint8 on ingest. So we need to adjust the collection config accordingly. (it can also handle binary vectors, but setting them up is more complex and we don't support that yet)
+
+    Args:
+        datatype (Literal["float16", "uint8"]): The datatype for the embeddings.
+
+    Raises:
+        ValueError: If an unsupported datatype is provided.
+    """
+    raise NotImplementedError("This function is a placeholder, this needs to be implemented later.")
+
+
+def adjust_collection_config_for_dimensionality(dimensions: int) -> None:
+    """Adjust the collection configuration based on the specified dimensionality.
+
+    If we are dealing with non-default dimensionality embeddings, we need to update the collection config accordingly.
+
+    Args:
+        dimensions (int): The dimensionality of the embeddings.
+    """
+    raise NotImplementedError("This function is a placeholder, this needs to be implemented later.")
+
+
+class SerializedEmbeddingOptionsDict(TypedDict, total=False):
+    """A dictionary representing serialized embedding options for different providers."""
+
+    model_name: Required[LiteralString]
+    """The name of the embedding model in the format used by the provider."""
+
+    embedding: NotRequired[dict[str, Any]]
+
+    model: NotRequired[dict[str, Any]]
+
+    query: NotRequired[dict[str, Any]]
+
+
+class BaseEmbeddingConfig(BasedModel):
+    """Base configuration for embedding models."""
+
+    _tag: LiteralProvider = Field(
+        ...,
+        description="The provider tag for the embedding model. Used for discriminated unions.",
+        exclude=True,
+    )
+
+    model_name: LiteralString
+    """The name of the embedding model."""
+
+    embedding: Annotated[
+        dict[str, Any] | None, Field(description="Parameters for document embedding requests.")
+    ] = None
+
+    query: Annotated[
+        dict[str, Any] | None,
+        Field(description="Parameters for query embedding requests (if different from document)."),
+    ] = None
+
+    def __init__(self, **data: Any) -> None:
+        """Initialize the embedding configuration."""
+        if (
+            ((embedding := data.get("embedding")) and not (query := data.get("query")))
+            or (query and not embedding)
+        ) and self._query_and_embedding_same_type():
+            # if only one of embedding or query is provided, and they are the same type, copy it over, with caveats
+            no_copy_keys = {"prompt", "prompt_name", "task"}
+            if embedding and not query:
+                data["query"] = {k: v for k, v in embedding.copy().items() if k not in no_copy_keys}
+            elif query and not embedding:
+                data["embedding"] = {k: v for k, v in query.copy().items() if k not in no_copy_keys}
+        if not embedding:
+            data["embedding"] = {}
+        if not query:
+            data["query"] = {}
+        super().__init__(**data)
+
+    @staticmethod
+    def _clean_dtypes(
+        kwargs: dict[Literal["embedding", "query", "model"], Any],
+    ) -> dict[Literal["embedding", "query", "model"], Any]:
+        """Clean up datatype fields from embedding and query configurations."""
+        if found_field := next(
+            (
+                f
+                for f in DATATYPE_FIELDS
+                if f in kwargs.get("embedding", {}) or f in kwargs.get("query", {})
+            ),
+            None,
+        ):
+            kwargs["embedding"].pop(found_field, None)
+            kwargs["query"].pop(found_field, None)
+        if "embedding" in kwargs or "query" in kwargs:
+            kwargs["embedding"] = BaseEmbeddingConfig._clean_dtypes(kwargs.get("embedding", {}))
+            kwargs["query"] = BaseEmbeddingConfig._clean_dtypes(kwargs.get("query", {}))
+        return kwargs
+
+    def _adjust_for_datatypes(self) -> None:
+        """Adjust collection configuration based on embedding datatypes."""
+        if (
+            field_name := next(
+                (f for f in DATATYPE_FIELDS if f in (self.embedding or (self.query or {}))), None
+            )
+        ) and (
+            datatype := (self.embedding or {}).get(field_name) or (self.query or {}).get(field_name)
+        ):
+            # we always go to float16 because there's basically no downside
+            adjust_collection_config_for_datatype(
+                "float16" if datatype.startswith("float") else "uint8"
+            )
+        if (field_name and not datatype) or (
+            (
+                field_name := next(
+                    (
+                        f
+                        for f in DATATYPE_FIELDS
+                        if f
+                        in (
+                            self._defaults.get("embedding", {})
+                            | (self._defaults.get("query", {}) or {})
+                        )
+                    ),
+                    None,
+                )
+            )
+            and (
+                datatype := (self._defaults.get("embedding", {}) or {}).get(field_name)
+                or (self._defaults.get("query", {}) or {}).get(field_name)
+            )
+        ):
+            # we always go to float16 because there's basically no downside
+            adjust_collection_config_for_datatype(
+                "float16" if datatype.startswith("float") else "uint8"
+            )
+
+    @classmethod
+    def _query_and_embedding_same_type(cls) -> bool:
+        """Check if both query and embedding configurations are of the same type."""
+        query_field_info = cls.model_fields.get("query")
+        embedding_field_info = cls.model_fields.get("embedding")
+        return query_field_info.annotation == embedding_field_info.annotation
+
+    def _telemetry_keys(self) -> None:
+        """Get the telemetry keys for the model."""
+
+    @abstractmethod
+    def _as_options(self) -> SerializedEmbeddingOptionsDict:
+        """Return the configuration as a dictionary of options. Subclasses must implement this method and should leave the as_options method alone."""
+        raise NotImplementedError("Subclasses must implement as_options method.")
+
+    def as_options(self) -> SerializedEmbeddingOptionsDict:
+        """Return the configuration as a dictionary of options."""
+        self._adjust_for_datatypes()
+        serialized = self._as_options()
+        return SerializedEmbeddingOptionsDict(
+            **type(self)._clean_dtypes(self._defaults | serialized)
+        )  # ty:ignore[missing-typed-dict-key, invalid-argument-type, unsupported-operator]
+
+    @property
+    def _defaults(self) -> dict[Literal["embedding", "query", "model"], Any]:
+        """Return default values for the configuration."""
+        return {}
+
+
+class BedrockEmbeddingRequestParams(TypedDict, total=False):
+    """Parameters for Bedrock embedding requests."""
+
+    model_id: Required[str]
+    """The model ID to use for generating embeddings. The value for this depends on the model, your account, and other factors. [See the Bedrock docs](https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/bedrock-runtime/client/invoke_model.html) for more information. tl;dr **use the model ARN if you aren't sure.**"""
+    trace: NotRequired[Literal["ENABLED", "DISABLED", "ENABLED_FULL"]]
+    """Whether to enable tracing for the requests made to Bedrock. Defaults to "DISABLED"."""
+    guardrail_identifier: NotRequired[str]
+    """The guardrail identifier to use for the request. This is used to enforce safety and compliance policies. We'll default to null/None. If you need this, you'll know."""
+    guardrail_version: NotRequired[str]
+    """The guardrail version to use for the request, if using guardrails."""
+    performance_config_latency: NotRequired[Literal["standard", "optimized"]]
+    """The performance configuration for latency. Can be "standard" or "optimized". Defaults to "standard"."""
+
+
+class BedrockTitanV2ConfigDict(TypedDict, total=False):
+    """Configuration options specific to the Bedrock Titan V2 embedding model."""
+
+    dimensions: NotRequired[Literal[256, 512, 1024]]
+    """Number of dimensions for the embeddings. Can be 256, 512, or 1024. Defaults to 1024."""
+    embedding_types: NotRequired[Literal["float", "binary"]]
+
+
+class BedrockCohereConfigDict(TypedDict, total=False):
+    """Configuration options specific to Bedrock Cohere embedding models."""
+
+    truncate: NotRequired[Literal["NONE", "START", "END"]]
+    """Truncation strategy for inputs that exceed the model's maximum context length. Can be "NONE", "START", or "END". Defaults to "NONE"."""
+    embedding_types: NotRequired[Literal["float", "int8", "uint8", "binary", "ubinary"]]
+
+
+def _set_bedrock_model_config_discriminator(v: Any) -> Literal["cohere", "titan"]:
+    """Set the discriminator for Bedrock model configuration based on the model name."""
+    model_name = v.get("model_name") if isinstance(v, dict) else v.model_name
+    return "cohere" if model_name.startswith("cohere") else "titan"
+
+
+type BedrockModelConfig = Annotated[
+    Annotated[BedrockCohereConfigDict, Tag("cohere")]
+    | Annotated[BedrockTitanV2ConfigDict, Tag("titan")],
+    Discriminator(_set_bedrock_model_config_discriminator),
+]
+
+
+class BedrockEmbeddingConfig(BaseEmbeddingConfig):
+    """Configuration options for Bedrock embedding models."""
+
+    _tag: Literal["bedrock"] = "bedrock"
+
+    model_name: (
+        Literal[
+            "amazon.titan-embed-text-v2:0",
+            "cohere.embed-english-v3.0",
+            "cohere.embed-multilingual-v3.0",
+        ]
+        | LiteralString
+    )
+    """The Bedrock embedding model to use. Can be one of the predefined models or a custom model identifier. Note that this isn't the AWS `model_id` (usually its ARN) - that's specified in the embedding request params."""
+
+    model: Annotated[
+        BedrockModelConfig, Field(description="Model-specific embedding configuration options.")
+    ]
+    """Model-specific embedding configuration options."""
+
+    embedding: BedrockEmbeddingRequestParams | None
+    """Parameters for the embedding request to Bedrock."""
+
+    def _as_options(self) -> SerializedEmbeddingOptionsDict:
+        """Convert the Bedrock embedding configuration to a dictionary of options."""
+        model = self.model.copy()
+        if dimensions := model.get("dimensions"):
+            adjust_collection_config_for_dimensionality(dimensions)
+        return SerializedEmbeddingOptionsDict(
+            model_name=self.model_name,
+            model=model,  # ty:ignore[invalid-argument-type]
+            embedding=self.embedding or {},  # ty:ignore[invalid-argument-type]
+            query=self.embedding or {},  # ty:ignore[invalid-argument-type]
+        )
+
+    @property
+    def _defaults(self) -> dict[str, Any]:
+        """Return default values for the configuration."""
+        if self.model_name.startswith("cohere"):
+            return {"model": {"embedding_types": "float", "truncate": "NONE"}}
+        if self.model_name.startswith(
+            "amazon.titan-embed-text-v2"
+        ):  # be specific because models change and dimensions might too
+            return {"model": {"dimensions": 1024, "embedding_types": "float"}}
+        return {}
+
+
+class FastembedEmbeddingConfigDict(BaseEmbeddingConfig):
+    """Configuration options for Fastembed embedding models."""
+
+    _tag: Literal["fastembed"] = "fastembed"
+
+    def _as_options(self) -> SerializedEmbeddingOptionsDict:
+        """Convert the Fastembed embedding configuration to a dictionary of options."""
+        return SerializedEmbeddingOptionsDict(
+            model_name=self.model_name, embedding={}, query={}, model={}
+        )
+
+
+class GoogleEmbeddingRequestParams(TypedDict, total=False):
+    """Parameters for Google embedding requests."""
+
+    output_dimensionality: NotRequired[int]
+    """The desired output dimensionality for the embeddings. Defaults to 768. `gemini-test-embedding-001` supports 3072, 1536, or 768 dimensions. We default to 768 because the retrieval performance hit is tiny (~1%) and the size savings are significant (4x smaller), and you get faster inference too."""
+
+
+class GoogleEmbeddingConfig(BaseEmbeddingConfig):
+    """Configuration options for Google embedding models."""
+
+    _tag: Literal["google"] = "google"
+
+    model_name: Literal["gemini-embedding-001"] | LiteralString
+    """The Google embedding model to use."""
+    embedding: GoogleEmbeddingRequestParams | None
+    """Parameters for the embedding request to Google."""
+
+    def _as_options(self) -> SerializedEmbeddingOptionsDict:
+        """Convert the Google embedding configuration to a dictionary of options."""
+        if (
+            output_dimensionality := self.embedding.get("output_dimensionality")
+            if self.embedding
+            else None
+        ):
+            adjust_collection_config_for_dimensionality(output_dimensionality)
+        embedding_options = {"model": self.model_name} | (self.embedding or {})
+        return SerializedEmbeddingOptionsDict(
+            model_name=self.model_name,
+            embedding=embedding_options,
+            query=embedding_options,
+            model={},
+        )
+
+    @property
+    def _defaults(self) -> dict[str, Any]:
+        """Return default values for the configuration."""
+        return (
+            {"embedding": {"output_dimensionality": 768}}
+            if self.model_name == "gemini-embedding-001"
+            else {}
+        )
+
+
+class HuggingFaceEmbeddingConfig(BaseEmbeddingConfig):
+    """Configuration options for HuggingFace embedding models."""
+
+    _tag: Literal["huggingface"] = "huggingface"
+
+    def _as_options(self) -> SerializedEmbeddingOptionsDict:
+        """Convert the HuggingFace embedding configuration to a dictionary of options."""
+        return SerializedEmbeddingOptionsDict(
+            model_name=self.model_name,
+            embedding={"model": self.model_name},
+            query={"model": self.model_name},
+            model={},
+        )
+
+    @property
+    def _defaults(self) -> dict[str, Any]:
+        """Return default values for the configuration."""
+        return {
+            "embedding": {
+                "normalize": True,
+                "prompt_name": "passage",
+                "truncate": True,
+                "truncation_direction": "right",
+            },
+            "query": {
+                "normalize": True,
+                "prompt_name": "query",
+                "truncate": True,
+                "truncation_direction": "left",
+            },
+        }
+
+
+class MistralEmbeddingOptionsDict(TypedDict, total=False):
+    """Embedding request options for Mistral AI embedding API.
+
+    These parameters are passed to the embeddings.create() method.
+    """
+
+    output_dimension: NotRequired[int]
+    """Target embedding dimension (max 3072 for codestral-embed). First n dimensions ordered by relevance."""
+
+    output_dtype: NotRequired[Literal["float", "int8", "uint8", "binary", "ubinary"]]
+    """Embedding precision/format. Default is 'float' (32-bit single-precision)."""
+
+
+class MistralEmbeddingConfig(BaseEmbeddingConfig):
+    """Configuration options for Mistral AI embedding models."""
+
+    _tag: Literal["mistral"] = "mistral"
+
+    model_name: Literal["mistral-embed", "codestral-embed"] | LiteralString
+    """The Mistral AI embedding model to use."""
+
+    embedding: MistralEmbeddingOptionsDict | None = None
+    """Parameters for document embedding requests."""
+
+    query: MistralEmbeddingOptionsDict | None = None
+    """Parameters for query embedding requests (same as embedding for Mistral)."""
+
+    def _as_options(self) -> SerializedEmbeddingOptionsDict:
+        """Convert the Mistral embedding configuration to a dictionary of options."""
+        if (output_dimension := (self.embedding or {}).get("output_dimension")) or (
+            output_dtype := (self.embedding or {}).get("output_dtype")
+        ):
+            if output_dimension:
+                adjust_collection_config_for_dimensionality(output_dimension)
+            if output_dtype and output_dtype in ("int8", "uint8", "binary", "ubinary"):
+                adjust_collection_config_for_datatype("uint8")
+
+        return SerializedEmbeddingOptionsDict(
+            model_name=self.model_name,
+            embedding=cast(dict[str, Any], self.embedding or {}),
+            query=cast(dict[str, Any], self.query or {}),
+            model={},
+        )
+
+
+class OpenAIEmbeddingRequestParams(TypedDict, total=False):
+    """Parameters for OpenAI-compatible embedding requests.
+
+    These parameters work across all OpenAI-compatible providers including
+    Azure OpenAI, Ollama, Fireworks, Together AI, GitHub Models, and Groq.
+    """
+
+    dimensions: NotRequired[int]
+    """Output dimensionality for the embeddings. Only supported by text-embedding-3-* models."""
+
+    user: NotRequired[str]
+    """End-user identifier for abuse monitoring and tracking."""
+
+    timeout: NotRequired[float]
+    """Request timeout in seconds."""
+
+    extra_headers: NotRequired[dict[str, str]]
+    """Additional HTTP headers for the request."""
+
+    extra_query: NotRequired[dict[str, Any]]
+    """Additional query parameters for the request."""
+
+    extra_body: NotRequired[dict[str, Any]]
+    """Additional request body parameters."""
+
+
+class OpenAIEmbeddingConfig(BaseEmbeddingConfig):
+    """Configuration options for OpenAI and OpenAI-compatible embedding models.
+
+    Supports OpenAI, Azure OpenAI, Ollama, Fireworks, Together AI, GitHub Models, Groq, and other OpenAI-compatible providers.
+    """
+
+    model_name: LiteralString
+    """The OpenAI-compatible embedding model to use."""
+
+    embedding: OpenAIEmbeddingRequestParams | None = None
+    """Parameters for document embedding requests."""
+
+    query: OpenAIEmbeddingRequestParams | None = None
+    """Parameters for query embedding requests (same as embedding for OpenAI)."""
+
+    def _as_options(self) -> SerializedEmbeddingOptionsDict:
+        """Convert the OpenAI embedding configuration to a dictionary of options."""
+        if dimensions := (self.embedding or {}).get("dimensions"):
+            adjust_collection_config_for_dimensionality(dimensions)
+
+        return SerializedEmbeddingOptionsDict(
+            model_name=self.model_name,
+            embedding=cast(dict[str, Any], self.embedding or {}),
+            query=cast(dict[str, Any], self.query or {}),
+            model={},
+        )
+
+    @property
+    def _defaults(self) -> dict[str, Any]:
+        """Return default values for the configuration."""
+        return {
+            "embedding": {"encoding_format": "float", "timeout": 30.0},
+            "query": {"encoding_format": "float", "timeout": 30.0},
+        }
+
+    def _telemetry_handler(self, _serialized_self: dict[str, Any], /) -> dict[str, Any]:
+        """Custom telemetry filtering for OpenAI embedding config."""
+        # the class init will copy over the embedding/query dicts if only one is provided, so we just check one
+        if self.embedding:
+            filtered_embedding: dict[str, Any] = self.embedding.copy()  # ty:ignore[invalid-assignment]
+            if "extra_headers" in filtered_embedding:
+                filtered_embedding["extra_headers"] = True
+            if "extra_query" in filtered_embedding:
+                filtered_embedding["extra_query"] = True
+            if "extra_body" in filtered_embedding:
+                filtered_embedding["extra_body"] = True
+            if "user" in filtered_embedding:
+                from codeweaver.core import get_blake_hash
+
+                filtered_embedding["user"] = get_blake_hash(filtered_embedding["user"])
+        return {"embedding": filtered_embedding, "query": filtered_embedding.copy()}
+
+
+class SentenceTransformersEncodeDict(TypedDict, total=False):
+    """Parameters for the SentenceTransformer encode() method."""
+
+    prompt_name: NotRequired[str]
+    """Name of prompt from model's prompts dictionary."""
+
+    prompt: NotRequired[str]
+    """Custom prompt text prepended to sentences."""
+
+    batch_size: NotRequired[int]
+    """Batch size for encoding. Default is 32."""
+
+    show_progress_bar: NotRequired[bool]
+    """Display progress bar during encoding."""
+
+    output_value: NotRequired[Literal["sentence_embedding", "token_embeddings"]]
+    """Return type for embeddings. Default is 'sentence_embedding'."""
+
+    precision: NotRequired[Literal["float32", "int8", "uint8", "binary", "ubinary"]]
+    """Quantization level for embeddings. Default is 'float32'."""
+
+    device: NotRequired[str | list[str]]
+    """Computation device(s). E.g., 'cuda:0', 'cpu', or list for multi-process."""
+
+    truncate_dim: NotRequired[int]
+    """Dimension reduction for Matryoshka models."""
+
+    pool: NotRequired[dict[str, Any]]
+    """Multi-process pool configuration."""
+
+    chunk_size: NotRequired[int]
+    """Chunk size for multi-process encoding."""
+
+    task: NotRequired[str]
+    """Task identifier for Router models (e.g., 'query', 'document')."""
+
+    max_active_dims: NotRequired[int]
+    """Maximum active dimensions for SparseAutoEncoder models."""
+
+
+class SentenceTransformersEmbeddingConfig(BaseEmbeddingConfig):
+    """Configuration options for Sentence Transformers embedding models.
+
+    Note: Sentence Transformers receives model kwargs through its client constructor. Provide model options to the `model_kwargs` field in `SentenceTransformersClientOptions`.
+    """
+
+    model_name: LiteralString
+    """The Sentence Transformers model to use."""
+
+    embedding: SentenceTransformersEncodeDict | None = None
+    """Parameters for document/corpus encoding."""
+
+    query: SentenceTransformersEncodeDict | None = None
+    """Parameters for query encoding (if different from document)."""
+
+    def _as_options(self) -> SerializedEmbeddingOptionsDict:
+        """Convert the Sentence Transformers configuration to a dictionary of options."""
+        return SerializedEmbeddingOptionsDict(
+            model_name=self.model_name,
+            embedding=cast(dict[str, Any], self.embedding or {}),
+            query=cast(dict[str, Any], self.query or {}),
+            model={},
+        )
+
+    @property
+    def _defaults(self) -> dict[str, Any]:
+        """Return default values for the configuration."""
+        return {
+            "embedding": {
+                "normalize_embeddings": True,
+                "convert_to_numpy": True,
+                "batch_size": 64,
+                "show_progress_bar": False,
+            },
+            "query": {
+                "normalize_embeddings": True,
+                "convert_to_numpy": True,
+                "batch_size": 64,
+                "show_progress_bar": False,
+            },
+        }
+
+
+class VoyageEmbeddingOptionsDict(TypedDict, total=False):
+    """Parameters for Voyage AI embedding requests."""
+
+    truncation: NotRequired[bool]
+    """Whether to truncate inputs exceeding context length. Default is True."""
+
+    output_dimension: NotRequired[int]
+    """Desired output dimensionality (model-dependent)."""
+
+    output_dtype: NotRequired[Literal["float", "int8", "uint8", "binary", "ubinary"]]
+    """Data type for embeddings. Default is 'float'."""
+
+
+class VoyageEmbeddingConfig(BaseEmbeddingConfig):
+    """Configuration options for Voyage AI embedding models."""
+
+    model_name: LiteralString
+    """The Voyage AI embedding model to use."""
+
+    embedding: VoyageEmbeddingOptionsDict | None = None
+    """Parameters for document embedding requests."""
+
+    query: VoyageEmbeddingOptionsDict | None = None
+    """Parameters for query embedding requests."""
+
+    def _as_options(self) -> SerializedEmbeddingOptionsDict:
+        """Convert the Voyage embedding configuration to a dictionary of options."""
+        if output_dimension := (self.embedding or {}).get("output_dimension") or (
+            self._defaults["query"] | (self.query or {})
+        ).get("output_dimension"):
+            adjust_collection_config_for_dimensionality(output_dimension)
+        if (
+            (
+                dtype_set := (self.embedding or {}).get("output_dtype")
+                or (self.query or {}).get("output_dtype")
+            )
+            and not dtype_set.startswith("float")
+        ) or (not dtype_set):
+            adjust_collection_config_for_datatype("uint8")
+            (self.embedding or {}).pop("output_dtype", None)
+            (self.query or {}).pop("output_dtype", None)
+        return SerializedEmbeddingOptionsDict(
+            model_name=self.model_name,
+            embedding=cast(dict[str, Any], (self.embedding or {}) | {"input_type": "document"}),
+            query=cast(dict[str, Any], (self.query or {}) | {"input_type": "query"}),
+            model={},
+        )
+
+    @property
+    def _defaults(self) -> dict[str, Any]:
+        """Return default values for the configuration."""
+        return {
+            "embedding": {"input_type": "document", "truncation": True, "output_dtype": "float"},
+            "query": {"input_type": "query", "truncation": True, "output_dtype": "float"},
+        }

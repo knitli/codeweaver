@@ -14,16 +14,9 @@ from typing import TYPE_CHECKING, Any, Literal
 if TYPE_CHECKING:
     from codeweaver.core import ConfigurationError, Provider
     from codeweaver.providers.reranking.capabilities import (
-        dependency_map,
-        get_alibaba_reranking_capabilities,
-        get_amazon_reranking_capabilities,
-        get_baai_reranking_capabilities,
-        get_cohere_reranking_capabilities,
-        get_jinaai_reranking_capabilities,
-        get_marco_reranking_capabilities,
-        get_qwen_reranking_capabilities,
-        get_voyage_reranking_capabilities,
-        load_default_capabilities,
+        RerankingCapabilityResolver,
+        RerankingCapabilityResolverDep,
+        RerankingModelCapabilities,
     )
     from codeweaver.providers.reranking.providers import (
         BedrockRerankingProvider,
@@ -120,24 +113,17 @@ def get_rerank_model_provider(provider: Provider) -> type[RerankingProvider[Any]
 
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
-    "RerankingProvider": (__spec__.parent, "providers"),
-    "VoyageRerankingProvider": (__spec__.parent, "providers"),
-    "CohereRerankingProvider": (__spec__.parent, "providers"),
     "BedrockRerankingProvider": (__spec__.parent, "providers"),
+    "CohereRerankingProvider": (__spec__.parent, "providers"),
     "FastEmbedRerankingProvider": (__spec__.parent, "providers"),
-    "SentenceTransformersRerankingProvider": (__spec__.parent, "providers"),
     "QueryType": (__spec__.parent, "providers"),
+    "RerankingCapabilityResolver": (__spec__.parent, "capabilities"),
+    "RerankingCapabilityResolverDep": (__spec__.parent, "capabilities"),
+    "RerankingModelCapabilities": (__spec__.parent, "capabilities"),
+    "RerankingProvider": (__spec__.parent, "providers"),
     "RerankingResult": (__spec__.parent, "providers"),
-    "dependency_map": (__spec__.parent, "capabilities"),
-    "load_default_capabilities": (__spec__.parent, "capabilities"),
-    "get_alibaba_reranking_capabilities": (__spec__.parent, "capabilities"),
-    "get_amazon_reranking_capabilities": (__spec__.parent, "capabilities"),
-    "get_baai_reranking_capabilities": (__spec__.parent, "capabilities"),
-    "get_cohere_reranking_capabilities": (__spec__.parent, "capabilities"),
-    "get_jinaai_reranking_capabilities": (__spec__.parent, "capabilities"),
-    "get_marco_reranking_capabilities": (__spec__.parent, "capabilities"),
-    "get_qwen_reranking_capabilities": (__spec__.parent, "capabilities"),
-    "get_voyage_reranking_capabilities": (__spec__.parent, "capabilities"),
+    "SentenceTransformersRerankingProvider": (__spec__.parent, "providers"),
+    "VoyageRerankingProvider": (__spec__.parent, "providers"),
 })
 
 
@@ -160,21 +146,14 @@ __all__ = (
     "FastEmbedRerankingProvider",
     "KnownRerankModelName",
     "QueryType",
+    "RerankingCapabilityResolver",
+    "RerankingCapabilityResolverDep",
+    "RerankingModelCapabilities",
     "RerankingProvider",
     "RerankingResult",
     "SentenceTransformersRerankingProvider",
     "VoyageRerankingProvider",
-    "dependency_map",
-    "get_alibaba_reranking_capabilities",
-    "get_amazon_reranking_capabilities",
-    "get_baai_reranking_capabilities",
-    "get_cohere_reranking_capabilities",
-    "get_jinaai_reranking_capabilities",
-    "get_marco_reranking_capabilities",
-    "get_qwen_reranking_capabilities",
     "get_rerank_model_provider",
-    "get_voyage_reranking_capabilities",
-    "load_default_capabilities",
 )
 
 

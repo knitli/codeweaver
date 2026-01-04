@@ -574,7 +574,7 @@ class SentenceTransformersClientOptions(ClientOptions):
     default_prompt_name: str | None = None
     similarity_fn_name: Literal["cosine", "dot", "euclidean", "manhattan"] | None = None
     cache_folder: str | None = None
-    trust_remote_code: bool = False
+    trust_remote_code: bool = True
     revision: str | None = None
     local_files_only: bool = False
     token: bool | SecretStr | None = None

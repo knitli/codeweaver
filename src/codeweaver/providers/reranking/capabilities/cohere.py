@@ -13,11 +13,17 @@ from typing import TYPE_CHECKING, cast
 from codeweaver_tokenizers import get_tokenizer
 from pydantic import NonNegativeInt
 
+from codeweaver.core import dependency_provider
+from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
+
 
 if TYPE_CHECKING:
     from codeweaver.core import CodeChunk
-    from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
     from codeweaver.providers.reranking.capabilities.types import PartialRerankingCapabilitiesDict
+
+
+class CohereRerankingCapabilities(RerankingModelCapabilities):
+    """Capabilities for Cohere reranking models."""
 
 
 def cohere_max_input(chunks: Sequence[CodeChunk], query: str) -> tuple[bool, NonNegativeInt]:
@@ -44,14 +50,14 @@ def _get_common_capabilities() -> PartialRerankingCapabilitiesDict:
     }
 
 
-def get_cohere_reranking_capabilities() -> tuple[RerankingModelCapabilities, ...]:
+@dependency_provider(CohereRerankingCapabilities, scope="singleton", collection=True)
+def get_cohere_reranking_capabilities() -> tuple[CohereRerankingCapabilities, ...]:
     """Get the capabilities of the Cohere reranking model."""
     from codeweaver.core import Provider
-    from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 
     base_capabilities = _get_common_capabilities()
-    capabilities: list[RerankingModelCapabilities] = [
-        RerankingModelCapabilities.model_validate({
+    capabilities: list[CohereRerankingCapabilities] = [
+        CohereRerankingCapabilities.model_validate({
             **base_capabilities,
             "name": model,
             "provider": Provider.COHERE,
@@ -61,7 +67,7 @@ def get_cohere_reranking_capabilities() -> tuple[RerankingModelCapabilities, ...
     ]
     return (
         *capabilities,
-        RerankingModelCapabilities.model_validate({
+        CohereRerankingCapabilities.model_validate({
             **base_capabilities,
             "name": "rerank-v3-5:0",
             "provider": Provider.BEDROCK,
@@ -70,4 +76,4 @@ def get_cohere_reranking_capabilities() -> tuple[RerankingModelCapabilities, ...
     )
 
 
-__all__ = ("get_cohere_reranking_capabilities",)
+__all__ = ("CohereRerankingCapabilities", "get_cohere_reranking_capabilities")
