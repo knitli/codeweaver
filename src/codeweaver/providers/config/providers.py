@@ -18,7 +18,17 @@ from __future__ import annotations
 import importlib
 import logging
 
-from typing import Annotated, Any, Literal, NamedTuple, NotRequired, TypedDict, cast, is_typeddict
+from typing import (
+    Annotated,
+    Any,
+    Literal,
+    LiteralString,
+    NamedTuple,
+    NotRequired,
+    TypedDict,
+    cast,
+    is_typeddict,
+)
 
 from pydantic import Discriminator, Field, SecretStr, Tag, computed_field, model_validator
 from pydantic_ai.settings import ModelSettings as AgentModelSettings
@@ -26,6 +36,17 @@ from pydantic_ai.settings import merge_model_settings
 
 from codeweaver.core import BasedModel, DictView, LiteralProviderKindType, Provider, Unset
 from codeweaver.providers.config.clients import QdrantClientOptions
+from codeweaver.providers.config.embedding import (
+    EmbeddingConfigT,
+    FastembedEmbeddingConfigDict,
+    FastEmbedSparseEmbeddingConfig,
+    GoogleEmbeddingConfig,
+    MistralEmbeddingConfig,
+    SentenceTransformersEmbeddingConfig,
+    SentenceTransformersSparseEmbeddingConfig,
+    SparseEmbeddingConfigT,
+    VoyageEmbeddingConfig,
+)
 from codeweaver.providers.config.kinds import (
     AgentProviderSettings,
     AzureEmbeddingProviderSettings,
@@ -33,16 +54,19 @@ from codeweaver.providers.config.kinds import (
     BedrockEmbeddingProviderSettings,
     BedrockRerankingProviderSettings,
     DataProviderSettings,
-    EmbeddingModelSettings,
     EmbeddingProviderSettings,
     FastembedEmbeddingProviderSettings,
     FastembedRerankingProviderSettings,
     FastembedSparseEmbeddingProviderSettings,
     QdrantVectorStoreProviderSettings,
-    RerankingModelSettings,
     RerankingProviderSettings,
-    SparseEmbeddingModelSettings,
     SparseEmbeddingProviderSettings,
+)
+from codeweaver.providers.config.reranking import (
+    FastEmbedRerankingConfig,
+    RerankingConfigT,
+    SentenceTransformersRerankingConfig,
+    VoyageRerankingConfig,
 )
 
 
@@ -183,7 +207,7 @@ class DeterminedDefaults(NamedTuple):
     """Tuple for determined default embedding settings."""
 
     provider: Provider
-    model: str
+    model: LiteralString
     enabled: bool
 
 
@@ -231,9 +255,32 @@ def _get_default_embedding_settings() -> DeterminedDefaults:
 
 _embedding_defaults = _get_default_embedding_settings()
 
-DefaultEmbeddingProviderSettings = EmbeddingProviderSettings(
-    provider=_embedding_defaults.provider,
-    model_settings=EmbeddingModelSettings(model=_embedding_defaults.model),
+
+def _create_embedding_config(provider: Provider, model: LiteralString) -> EmbeddingConfigT:
+    """Create provider-specific embedding config based on provider type."""
+    if provider == Provider.VOYAGE:
+        return VoyageEmbeddingConfig(model_name=model)
+    if provider == Provider.MISTRAL:
+        return MistralEmbeddingConfig(model_name=model)
+    if provider == Provider.GOOGLE:
+        return GoogleEmbeddingConfig(model_name=model)
+    if provider == Provider.FASTEMBED:
+        return FastembedEmbeddingConfigDict(model_name=model)
+    if provider == Provider.SENTENCE_TRANSFORMERS:
+        return SentenceTransformersEmbeddingConfig(model_name=model)
+    raise ValueError(f"Unknown embedding provider: {provider}")
+
+
+DefaultEmbeddingProviderSettings = (
+    EmbeddingProviderSettings(
+        provider=_embedding_defaults.provider,
+        model_name=_embedding_defaults.model,
+        embedding_config=_create_embedding_config(
+            _embedding_defaults.provider, _embedding_defaults.model
+        ),
+    )
+    if _embedding_defaults.provider != Provider.NOT_SET
+    else None  # type: ignore[assignment]
 )
 
 
@@ -258,9 +305,24 @@ def _get_default_sparse_embedding_settings() -> DeterminedDefaults:
 
 _sparse_embedding_defaults = _get_default_sparse_embedding_settings()
 
+
+def _create_sparse_embedding_config(
+    provider: Provider, model: LiteralString
+) -> SparseEmbeddingConfigT:
+    """Create provider-specific sparse embedding config based on provider type."""
+    if provider == Provider.SENTENCE_TRANSFORMERS:
+        return SentenceTransformersSparseEmbeddingConfig(model_name=model)
+    if provider == Provider.FASTEMBED:
+        return FastEmbedSparseEmbeddingConfig(model_name=model)
+    raise ValueError(f"Unknown sparse embedding provider: {provider}")
+
+
 DefaultSparseEmbeddingProviderSettings = SparseEmbeddingProviderSettings(
     provider=_sparse_embedding_defaults.provider,
-    model_settings=SparseEmbeddingModelSettings(model=_sparse_embedding_defaults.model),
+    model_name=_sparse_embedding_defaults.model,
+    sparse_embedding_config=_create_sparse_embedding_config(
+        _sparse_embedding_defaults.provider, _sparse_embedding_defaults.model
+    ),
 )
 
 
@@ -285,26 +347,51 @@ def _get_default_reranking_settings() -> DeterminedDefaults:
                     model="sentence-transformers:BAAI/bge-reranking-v2-m3",
                     enabled=True,
                 )
+    possible_libs = [
+        importlib.util.find_spec(lib)
+        for lib in ("boto3", "cohere")
+        if importlib.util.find_spec(lib) is not None
+    ]
     logger.warning(
-        "No default reranking provider libraries found. Reranking functionality will be disabled unless explicitly set in your config or environment variables."
+        "No default reranking provider libraries found. Reranking functionality will be disabled unless explicitly set in your config or environment variables. %s",
+        f"It looks like you have {'these' if len(possible_libs) > 1 else 'this'} libraries installed that support reranking: {', '.join(lib.name for lib in possible_libs)}."
+        if possible_libs
+        else "You have no known reranking libraries installed.",
     )
     return DeterminedDefaults(provider=Provider.NOT_SET, model="NONE", enabled=False)
 
 
 _reranking_defaults = _get_default_reranking_settings()
 
-DefaultRerankingProviderSettings = RerankingProviderSettings(
-    provider=_reranking_defaults.provider,
-    model_settings=RerankingModelSettings(model=_reranking_defaults.model),
+
+def _create_reranking_config(provider: Provider, model: LiteralString) -> RerankingConfigT:
+    """Create provider-specific reranking config based on provider type."""
+    if provider == Provider.VOYAGE:
+        return VoyageRerankingConfig(model_name=model)
+    if provider == Provider.FASTEMBED:
+        return FastEmbedRerankingConfig(model_name=model)
+    if provider == Provider.SENTENCE_TRANSFORMERS:
+        return SentenceTransformersRerankingConfig(model_name=model)
+    raise ValueError(f"Unknown reranking provider: {provider}")
+
+
+DefaultRerankingProviderSettings = (
+    RerankingProviderSettings(
+        provider=_reranking_defaults.provider,
+        model_name=_reranking_defaults.model,
+        reranking_config=_create_reranking_config(
+            _reranking_defaults.provider, _reranking_defaults.model
+        ),
+    )
+    if _reranking_defaults.provider != Provider.NOT_SET
+    else None  # type: ignore[assignment]
 )
 
 HAS_ANTHROPIC = (
     importlib.util.find_spec("anthropic") or importlib.util.find_spec("claude-agent-sdk")
 ) is not None
 DefaultAgentProviderSettings = AgentProviderSettings(
-    provider=Provider.ANTHROPIC,
-    model="claude-haiku-4.5-latest",
-    model_settings=AgentModelSettings(),
+    provider=Provider.ANTHROPIC, model="claude-haiku-4.5-latest", model_options=AgentModelSettings()
 )
 
 

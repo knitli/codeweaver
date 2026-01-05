@@ -9,18 +9,15 @@ Provides lazy loading and resolution of reranking model capabilities by model na
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Annotated
+from types import MappingProxyType
+from typing import Annotated
 
 from codeweaver.core import Depends, dependency_provider
-from codeweaver.providers.types import CapabilityResolver
-
-
-if TYPE_CHECKING:
-    pass
+from codeweaver.providers.types import CapabilityResolver, RerankingCapabilityType
 
 
 @dependency_provider(scope="singleton")
-class RerankingCapabilityResolver(CapabilityResolver["RerankingModelCapabilities"]):
+class RerankingCapabilityResolver(CapabilityResolver[RerankingCapabilityType]):
     """Resolves reranking model capabilities by model name.
 
     Lazily loads all capability modules on first access to minimize startup overhead.
@@ -57,6 +54,7 @@ class RerankingCapabilityResolver(CapabilityResolver["RerankingModelCapabilities
             get_voyage_reranking_capabilities,
         )
 
+        temp_capabilities: dict[str, RerankingCapabilityType] = {}
         # Call each getter to retrieve capabilities and build the lookup index
         for getter in [
             get_alibaba_reranking_capabilities,
@@ -70,8 +68,9 @@ class RerankingCapabilityResolver(CapabilityResolver["RerankingModelCapabilities
             get_voyage_reranking_capabilities,
         ]:
             for cap in getter():
-                self._capabilities_by_name[cap.name] = cap
+                temp_capabilities[cap.name] = cap
 
+        self._capabilities_by_name = MappingProxyType(temp_capabilities)
         self._loaded = True
 
 

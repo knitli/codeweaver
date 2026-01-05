@@ -1,64 +1,22 @@
-# SPDX-FileCopyrightText: 2025 Knitli Inc.
-# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
-#
-# SPDX-License-Identifier: MIT OR Apache-2.0
 """Health service for collecting and aggregating system health information."""
-
 from __future__ import annotations
-
 import asyncio
 import contextlib
 import logging
 import time
-
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Literal, NoReturn, cast
-
-from codeweaver.core import (
-    INJECTED,
-    ConfigurationError,
-    FailoverManagerDep,
-    IndexerDep,
-    ProviderRegistry,
-    ProviderRegistryDep,
-    SessionStatistics,
-    StatisticsDep,
-)
+from codeweaver.core import INJECTED, ConfigurationError, FailoverManagerDep, IndexerDep, ProviderRegistry, ProviderRegistryDep, SessionStatistics, StatisticsDep
 from codeweaver.engine import Indexer, VectorStoreFailoverManager
-from codeweaver.server.health.models import (
-    EmbeddingProviderServiceInfo,
-    FailoverInfo,
-    HealthResponse,
-    IndexingInfo,
-    IndexingProgressInfo,
-    RerankingServiceInfo,
-    ResourceInfo,
-    ServicesInfo,
-    SparseEmbeddingServiceInfo,
-    StatisticsInfo,
-    VectorStoreServiceInfo,
-)
-
-
+from codeweaver.server.health.models import EmbeddingProviderServiceInfo, FailoverInfo, HealthResponse, IndexingInfo, IndexingProgressInfo, RerankingServiceInfo, ResourceInfo, ServicesInfo, SparseEmbeddingServiceInfo, StatisticsInfo, VectorStoreServiceInfo
 if TYPE_CHECKING:
     from codeweaver.core import FileStatistics
-
-
 logger = logging.getLogger(__name__)
-
 
 class HealthService:
     """Service for collecting and aggregating health information from all components."""
 
-    def __init__(
-        self,
-        *,
-        provider_registry: ProviderRegistryDep = INJECTED[ProviderRegistry],
-        statistics: StatisticsDep = INJECTED[SessionStatistics],
-        indexer: IndexerDep = INJECTED[Indexer],
-        failover_manager: FailoverManagerDep = INJECTED[VectorStoreFailoverManager],
-        startup_stopwatch: float | None = None,
-    ) -> None:
+    def __init__(self, *, provider_registry: ProviderRegistryDep=INJECTED[ProviderRegistry], statistics: StatisticsDep=INJECTED[SessionStatistics], indexer: IndexerDep=INJECTED[Indexer], failover_manager: FailoverManagerDep=INJECTED[VectorStoreFailoverManager], startup_stopwatch: float | None=None) -> None:
         """Initialize health service.
 
         Args:
@@ -90,47 +48,31 @@ class HealthService:
 
     async def _resolve_dependencies(self) -> None:
         """Resolve dependencies if they were provided as Depends objects."""
-        from codeweaver.core import (
-            ProviderRegistry,
-            SessionStatistics,
-            get_container,
-            is_depends_marker,
-        )
+        from codeweaver.core import ProviderRegistry, SessionStatistics, get_container, is_depends_marker
         from codeweaver.engine import Indexer, VectorStoreFailoverManager
-
         container = get_container()
-        logger.debug(
-            "HealthService resolving dependencies. Statistics type: %s", type(self._statistics)
-        )
-
+        logger.debug('HealthService resolving dependencies. Statistics type: %s', type(self._statistics))
         if is_depends_marker(self._provider_registry):
             try:
                 self._provider_registry = await container.resolve(ProviderRegistry)
             except Exception:
                 from codeweaver.core import get_provider_registry
-
                 self._provider_registry = get_provider_registry()
-
         if is_depends_marker(self._statistics):
             from codeweaver.core import SessionStatistics
-
             try:
-                # Use container to ensure overrides are respected
                 self._statistics = await container.resolve(SessionStatistics)
-                logger.debug("Resolved statistics from container: %s", type(self._statistics))
+                logger.debug('Resolved statistics from container: %s', type(self._statistics))
             except Exception as e:
-                logger.debug("Failed to resolve statistics from container: %s", e)
+                logger.debug('Failed to resolve statistics from container: %s', e)
                 from codeweaver.core import get_session_statistics
-
                 self._statistics = get_session_statistics()
-                logger.debug("Fallback to get_session_statistics: %s", type(self._statistics))
-
+                logger.debug('Fallback to get_session_statistics: %s', type(self._statistics))
         if is_depends_marker(self._indexer):
             try:
                 self._indexer = await container.resolve(Indexer)
             except Exception:
                 self._indexer = None
-
         if is_depends_marker(self._failover_manager):
             try:
                 self._failover_manager = await container.resolve(VectorStoreFailoverManager)
@@ -144,116 +86,45 @@ class HealthService:
             HealthResponse with current system health
         """
         await self._resolve_dependencies()
-
-        # Collect component health in parallel
         indexing_info_task = asyncio.create_task(self._get_indexing_info())
         services_info_task = asyncio.create_task(self._get_services_info())
         statistics_info_task = asyncio.create_task(self._get_statistics_info())
         failover_info_task = asyncio.create_task(self._get_failover_info())
         resources_info_task = asyncio.create_task(self._collect_resource_info())
-
-        (
-            indexing_info,
-            services_info,
-            statistics_info,
-            failover_info,
-            resources_info,
-        ) = await asyncio.gather(
-            indexing_info_task,
-            services_info_task,
-            statistics_info_task,
-            failover_info_task,
-            resources_info_task,
-        )
-
-        # Determine overall status (including resource checks)
+        indexing_info, services_info, statistics_info, failover_info, resources_info = await asyncio.gather(indexing_info_task, services_info_task, statistics_info_task, failover_info_task, resources_info_task)
         status = self._determine_status(indexing_info, services_info, resources_info)
-
-        # Calculate uptime using monotonic time to prevent clock drift/skew issues
         uptime_seconds = int(time.monotonic() - self._startup_stopwatch)
-
-        return HealthResponse.create_with_current_timestamp(
-            status=cast(Literal["healthy", "degraded", "unhealthy"], status),
-            uptime_seconds=uptime_seconds,
-            indexing=indexing_info,
-            services=services_info,
-            statistics=statistics_info,
-            failover=failover_info,
-            resources=resources_info,
-        )
+        return HealthResponse.create_with_current_timestamp(status=cast(Literal['healthy', 'degraded', 'unhealthy'], status), uptime_seconds=uptime_seconds, indexing=indexing_info, services=services_info, statistics=statistics_info, failover=failover_info, resources=resources_info)
 
     async def _get_indexing_info(self) -> IndexingInfo:
         """Get indexing state and progress information."""
         if self._indexer is None:
-            # No indexer configured - return idle state with zeros
-            return IndexingInfo(
-                state="idle",
-                progress=IndexingProgressInfo(
-                    files_discovered=0,
-                    files_processed=0,
-                    chunks_created=0,
-                    errors=0,
-                    current_file=None,
-                    start_time=None,
-                    estimated_completion=None,
-                ),
-                last_indexed=self._last_indexed,
-            )
-
+            return IndexingInfo(state='idle', progress=IndexingProgressInfo(files_discovered=0, files_processed=0, chunks_created=0, errors=0, current_file=None, start_time=None, estimated_completion=None), last_indexed=self._last_indexed)
         stats = self._indexer.stats
         error_count = len(stats.files_with_errors) if stats.files_with_errors else 0
-
-        # Determine indexing state
         if error_count >= 50:
-            state = "error"
+            state = 'error'
         elif stats.files_processed < stats.files_discovered:
-            state = "indexing"
+            state = 'indexing'
         else:
-            state = "idle"
-
-        # Calculate estimated completion
+            state = 'idle'
         estimated_completion = None
-        if state == "indexing" and stats.processing_rate() > 0:
+        if state == 'indexing' and stats.processing_rate() > 0:
             remaining_files = stats.files_discovered - stats.files_processed
             eta_seconds = remaining_files / stats.processing_rate()
             estimated_timestamp = time.time() + eta_seconds
             estimated_completion = datetime.fromtimestamp(estimated_timestamp, tz=UTC).isoformat()
-
-        # Get start time
         start_time_iso = datetime.fromtimestamp(stats.start_time, tz=UTC).isoformat()
-
-        return IndexingInfo(
-            state=state,
-            progress=IndexingProgressInfo(
-                files_discovered=stats.files_discovered,
-                files_processed=stats.files_processed,
-                chunks_created=stats.chunks_created,
-                errors=error_count,
-                current_file=None,
-                start_time=start_time_iso,
-                estimated_completion=estimated_completion,
-            ),
-            last_indexed=self._last_indexed,
-        )
+        return IndexingInfo(state=state, progress=IndexingProgressInfo(files_discovered=stats.files_discovered, files_processed=stats.files_processed, chunks_created=stats.chunks_created, errors=error_count, current_file=None, start_time=start_time_iso, estimated_completion=estimated_completion), last_indexed=self._last_indexed)
 
     async def _get_services_info(self) -> ServicesInfo:
         """Get health information for all services."""
-        # Collect service health checks in parallel
         vector_store_task = asyncio.create_task(self._check_vector_store_health())
         embedding_task = asyncio.create_task(self._check_embedding_provider_health())
         sparse_task = asyncio.create_task(self._check_sparse_embedding_health())
         reranking_task = asyncio.create_task(self._check_reranking_health())
-
-        vector_store, embedding, sparse, reranking = await asyncio.gather(
-            vector_store_task, embedding_task, sparse_task, reranking_task
-        )
-
-        return ServicesInfo(
-            vector_store=vector_store,
-            embedding_provider=embedding,
-            sparse_embedding=sparse,
-            reranking=reranking,
-        )
+        vector_store, embedding, sparse, reranking = await asyncio.gather(vector_store_task, embedding_task, sparse_task, reranking_task)
+        return ServicesInfo(vector_store=vector_store, embedding_provider=embedding, sparse_embedding=sparse, reranking=reranking)
 
     async def _check_vector_store_health(self) -> VectorStoreServiceInfo:
         """Check vector store health with latency measurement."""
@@ -261,48 +132,23 @@ class HealthService:
 
         def raise_error() -> NoReturn:
             """Helper to raise error for missing provider."""
-            logger.error("No vector store provider configured")
-            raise ConfigurationError(
-                "No vector store provider configured. Either you don't have a vector store configured, your settings are misconfigured, or the provider is not available.",
-                details={
-                    "vector_provider_settings": self._provider_registry.get_configured_provider_settings(
-                        provider_kind=ProviderKind.VECTOR_STORE
-                    )
-                },
-                suggestions=[
-                    "Ensure a vector store provider is configured in your settings.",
-                    "Check that the provider settings are correct and the provider is reachable.",
-                    "If the issue persists, please submit an issue: https://github.com/knitli/codeweaver/issues/new",
-                ],
-            )
-
+            logger.error('No vector store provider configured')
+            raise ConfigurationError("No vector store provider configured. Either you don't have a vector store configured, your settings are misconfigured, or the provider is not available.", details={'vector_provider_settings': self._provider_registry.get_configured_provider_settings(provider_kind=ProviderKind.VECTOR_STORE)}, suggestions=['Ensure a vector store provider is configured in your settings.', 'Check that the provider settings are correct and the provider is reachable.', 'If the issue persists, please submit an issue: https://github.com/knitli/codeweaver/issues/new'])
         try:
-            vector_provider = self._provider_registry.get_configured_provider_settings(
-                provider_kind=ProviderKind.VECTOR_STORE
-            )
-            provider = (
-                vector_provider["provider"]
-                if isinstance(vector_provider, dict)
-                else vector_provider["provider"]
-                if vector_provider
-                else None
-            )
+            vector_provider = self._provider_registry.get_configured_provider_settings(provider_kind=ProviderKind.VECTOR_STORE)
+            provider = vector_provider['provider'] if isinstance(vector_provider, dict) else vector_provider['provider'] if vector_provider else None
             if not provider:
                 raise_error()
-
-            # Get vector store instance using new unified API
-            vector_store_enum = self._provider_registry.get_provider_enum_for("vector_store")
+            vector_store_enum = self._provider_registry.get_provider_enum_for('vector_store')
             if vector_store_enum:
-                _ = self._provider_registry.get_provider_instance(
-                    vector_store_enum, "vector_store", singleton=True
-                )
+                _ = self._provider_registry.get_provider_instance(vector_store_enum, 'vector_store', singleton=True)
             start = time.time()
-            # For now, assume healthy if we can get the instance
             latency_ms = (time.time() - start) * 1000
-            return VectorStoreServiceInfo(status="up", latency_ms=latency_ms)
         except Exception as e:
-            logger.warning("Vector store health check failed: %s", e)
-            return VectorStoreServiceInfo(status="down", latency_ms=0)
+            logger.warning('Vector store health check failed: %s', e)
+            return VectorStoreServiceInfo(status='down', latency_ms=0)
+        else:
+            return VectorStoreServiceInfo(status='up', latency_ms=latency_ms)
 
     def _extract_circuit_breaker_state(self, circuit_state_raw: Any) -> str:
         """Extract circuit breaker state string from raw value.
@@ -315,97 +161,59 @@ class HealthService:
         Returns:
             Circuit breaker state as string ("closed", "open", or "half_open")
         """
-        if hasattr(circuit_state_raw, "variable"):
+        if hasattr(circuit_state_raw, 'variable'):
             return circuit_state_raw.variable
-        return str(circuit_state_raw) if circuit_state_raw else "closed"
+        return str(circuit_state_raw) if circuit_state_raw else 'closed'
 
     async def _check_embedding_provider_health(self) -> EmbeddingProviderServiceInfo:
         """Check embedding provider health with circuit breaker state."""
 
         def raise_error() -> NoReturn:
             """Helper to raise error for missing provider."""
-            logger.error("No embedding provider configured")
-            raise RuntimeError("No embedding provider configured")
-
+            logger.error('No embedding provider configured')
+            raise RuntimeError('No embedding provider configured')
         try:
-            # Get embedding provider using new unified API
-            if embedding_provider_enum := self._provider_registry.get_provider_enum_for(
-                "embedding"
-            ):
-                embedding_provider_instance = self._provider_registry.get_provider_instance(
-                    embedding_provider_enum, "embedding", singleton=True
-                )
-                circuit_state = self._extract_circuit_breaker_state(
-                    embedding_provider_instance.circuit_breaker_state
-                )
-                model_name = getattr(embedding_provider_instance, "model_name", "unknown")
-
-                # Check if circuit breaker is open -> service is down
-                status = "down" if circuit_state == "open" else "up"
-
-                # Estimate latency from recent operations
-                latency_ms = 200.0 if status == "up" else 0.0
-
-                return EmbeddingProviderServiceInfo(
-                    status=status,
-                    model=model_name,
-                    latency_ms=latency_ms,
-                    circuit_breaker_state=circuit_state,  # type: ignore
-                )
+            if (embedding_provider_enum := self._provider_registry.get_provider_enum_for('embedding')):
+                embedding_provider_instance = self._provider_registry.get_provider_instance(embedding_provider_enum, 'embedding', singleton=True)
+                circuit_state = self._extract_circuit_breaker_state(embedding_provider_instance.circuit_breaker_state)
+                model_name = getattr(embedding_provider_instance, 'model_name', 'unknown')
+                status = 'down' if circuit_state == 'open' else 'up'
+                latency_ms = 200.0 if status == 'up' else 0.0
+                return EmbeddingProviderServiceInfo(status=status, model=model_name, latency_ms=latency_ms, circuit_breaker_state=circuit_state)
             raise_error()
         except Exception as e:
-            logger.warning("Embedding provider health check failed: %s", e)
-            return EmbeddingProviderServiceInfo(
-                status="down", model="unknown", latency_ms=0, circuit_breaker_state="open"
-            )
+            logger.warning('Embedding provider health check failed: %s', e)
+            return EmbeddingProviderServiceInfo(status='down', model='unknown', latency_ms=0, circuit_breaker_state='open')
 
     async def _check_sparse_embedding_health(self) -> SparseEmbeddingServiceInfo:
         """Check sparse embedding provider health."""
         try:
-            # Get sparse embedding provider using new unified API
-            if sparse_provider_enum := self._provider_registry.get_provider_enum_for(
-                "sparse_embedding"
-            ):
-                _ = self._provider_registry.get_provider_instance(
-                    sparse_provider_enum, "sparse_embedding", singleton=True
-                )
-                # Sparse embedding is local, so typically always available
-                return SparseEmbeddingServiceInfo(
-                    status="up", provider=sparse_provider_enum.as_title
-                )
-            logger.info("No sparse embedding provider configured")
-            return SparseEmbeddingServiceInfo(status="down", provider="none")
+            if (sparse_provider_enum := self._provider_registry.get_provider_enum_for('sparse_embedding')):
+                _ = self._provider_registry.get_provider_instance(sparse_provider_enum, 'sparse_embedding', singleton=True)
+                return SparseEmbeddingServiceInfo(status='up', provider=sparse_provider_enum.as_title)
+            logger.info('No sparse embedding provider configured')
         except Exception as e:
-            logger.warning("Sparse embedding health check failed: %s", e)
-            return SparseEmbeddingServiceInfo(status="down", provider="unknown")
+            logger.warning('Sparse embedding health check failed: %s', e)
+            return SparseEmbeddingServiceInfo(status='down', provider='unknown')
+        else:
+            return SparseEmbeddingServiceInfo(status='down', provider='none')
 
     async def _check_reranking_health(self) -> RerankingServiceInfo:
         """Check reranking service health."""
         try:
-            # Get reranking provider using new unified API
-            if reranking_provider_enum := self._provider_registry.get_provider_enum_for(
-                "reranking"
-            ):
-                reranking_instance = self._provider_registry.get_provider_instance(
-                    reranking_provider_enum, "reranking", singleton=True
-                )
-                circuit_state = self._extract_circuit_breaker_state(
-                    reranking_instance.circuit_breaker_state
-                )
-                model_name = getattr(reranking_instance, "model_name", "unknown")
-                status = "down" if circuit_state == "open" else "up"
-
-                # Estimate latency
-                latency_ms = 180.0 if status == "up" else 0.0
+            if (reranking_provider_enum := self._provider_registry.get_provider_enum_for('reranking')):
+                reranking_instance = self._provider_registry.get_provider_instance(reranking_provider_enum, 'reranking', singleton=True)
+                circuit_state = self._extract_circuit_breaker_state(reranking_instance.circuit_breaker_state)
+                model_name = getattr(reranking_instance, 'model_name', 'unknown')
+                status = 'down' if circuit_state == 'open' else 'up'
+                latency_ms = 180.0 if status == 'up' else 0.0
                 return RerankingServiceInfo(status=status, model=model_name, latency_ms=latency_ms)
         except Exception as e:
-            logger.warning("Reranking health check failed: %s", e)
-            return RerankingServiceInfo(status="down", model="unknown", latency_ms=0)
-        return RerankingServiceInfo(status="down", model="unknown", latency_ms=0)
+            logger.warning('Reranking health check failed: %s', e)
+            return RerankingServiceInfo(status='down', model='unknown', latency_ms=0)
+        return RerankingServiceInfo(status='down', model='unknown', latency_ms=0)
 
-    def _aggregate_chunk_statistics(
-        self, index_statistics: FileStatistics
-    ) -> tuple[int, int, int, int, float]:
+    def _aggregate_chunk_statistics(self, index_statistics: FileStatistics) -> tuple[int, int, int, int, float]:
         """Aggregate chunk statistics from index statistics.
 
         Returns:
@@ -415,22 +223,18 @@ class HealthService:
         delimiter_chunks = 0
         file_chunks = 0
         all_chunk_sizes = []
-
         for category_stats in index_statistics.categories.values():
             for lang_stats in category_stats.languages.values():
                 semantic_chunks += lang_stats.semantic_chunks
                 delimiter_chunks += lang_stats.delimiter_chunks
                 file_chunks += lang_stats.file_chunks
                 all_chunk_sizes.extend(lang_stats.chunk_sizes)
-
         total_chunks = semantic_chunks + delimiter_chunks + file_chunks
         avg_chunk_size = 0.0
         if all_chunk_sizes:
             import statistics as stats_module
-
             avg_chunk_size = stats_module.mean(all_chunk_sizes)
-
-        return total_chunks, semantic_chunks, delimiter_chunks, file_chunks, avg_chunk_size
+        return (total_chunks, semantic_chunks, delimiter_chunks, file_chunks, avg_chunk_size)
 
     def _extract_indexed_languages(self, index_statistics: Any) -> list[str]:
         """Extract and normalize language names from index statistics.
@@ -444,9 +248,7 @@ class HealthService:
                 if isinstance(lang, str):
                     languages.append(lang)
                 else:
-                    languages.append(
-                        lang.as_variable if hasattr(lang, "as_variable") else str(lang)
-                    )
+                    languages.append(lang.as_variable if hasattr(lang, 'as_variable') else str(lang))
         return sorted(set(languages))
 
     def _calculate_avg_query_latency(self, stats: Any) -> float:
@@ -456,18 +258,15 @@ class HealthService:
             Average latency in milliseconds
         """
         timing_stats = stats.get_timing_statistics()
-        if not timing_stats or "queries" not in timing_stats:
+        if not timing_stats or 'queries' not in timing_stats:
             return 0.0
-
-        if query_timings := timing_stats["queries"]:
-            return sum(query_timings) / len(query_timings) * 1000  # Convert to ms
+        if (query_timings := timing_stats['queries']):
+            return sum(query_timings) / len(query_timings) * 1000
         return 0.0
 
     async def _get_statistics_info(self) -> StatisticsInfo:
         """Get statistics and metrics information."""
         stats = self._statistics
-
-        # Initialize default values
         total_chunks = 0
         total_files = 0
         semantic_chunks = 0
@@ -475,45 +274,21 @@ class HealthService:
         file_chunks = 0
         avg_chunk_size = 0.0
         languages: list[str] = []
-
-        # Collect indexer statistics if available
         if self._indexer:
             session_stats = self._indexer.session_statistics
-
             if session_stats.index_statistics:
-                # Get detailed statistics from session stats
                 index_stats = session_stats.index_statistics
                 total_files = index_stats.total_unique_files
-
-                total_chunks, semantic_chunks, delimiter_chunks, file_chunks, avg_chunk_size = (
-                    self._aggregate_chunk_statistics(index_stats)
-                )
+                total_chunks, semantic_chunks, delimiter_chunks, file_chunks, avg_chunk_size = self._aggregate_chunk_statistics(index_stats)
                 languages = self._extract_indexed_languages(index_stats)
             else:
-                # Fallback to basic indexer stats
                 indexer_stats = self._indexer.stats
                 total_chunks = indexer_stats.chunks_indexed
                 total_files = indexer_stats.files_processed
-
-        # Calculate query metrics
         avg_latency = self._calculate_avg_query_latency(stats)
         total_queries = stats.total_requests
-
-        # Estimate index size (rough estimate: ~1KB per chunk)
-        index_size_mb = int((total_chunks * 1024) / (1024 * 1024))
-
-        return StatisticsInfo(
-            total_chunks_indexed=total_chunks,
-            total_files_indexed=total_files,
-            languages_indexed=languages,
-            index_size_mb=index_size_mb,
-            queries_processed=total_queries,
-            avg_query_latency_ms=avg_latency,
-            semantic_chunks=semantic_chunks,
-            delimiter_chunks=delimiter_chunks,
-            file_chunks=file_chunks,
-            avg_chunk_size=avg_chunk_size,
-        )
+        index_size_mb = int(total_chunks * 1024 / (1024 * 1024))
+        return StatisticsInfo(total_chunks_indexed=total_chunks, total_files_indexed=total_files, languages_indexed=languages, index_size_mb=index_size_mb, queries_processed=total_queries, avg_query_latency_ms=avg_latency, semantic_chunks=semantic_chunks, delimiter_chunks=delimiter_chunks, file_chunks=file_chunks, avg_chunk_size=avg_chunk_size)
 
     async def _get_failover_info(self) -> FailoverInfo | None:
         """Get failover status information.
@@ -523,40 +298,14 @@ class HealthService:
         """
         if self._failover_manager is None:
             return None
-
-        # Get failover statistics from session statistics
         failover_stats = self._statistics.failover_statistics
         if not failover_stats:
-            return FailoverInfo(
-                failover_enabled=True,
-                failover_active=False,
-                failover_count=0,
-                total_failover_time_seconds=0.0,
-                backup_syncs_completed=0,
-                chunks_in_failover=0,
-            )
-
-        # Get active store type from failover manager
-        active_store = "backup" if self._failover_manager._failover_active else "primary"
-
-        # Get circuit breaker state
+            return FailoverInfo(failover_enabled=True, failover_active=False, failover_count=0, total_failover_time_seconds=0.0, backup_syncs_completed=0, chunks_in_failover=0)
+        active_store = 'backup' if self._failover_manager._failover_active else 'primary'
         circuit_state = None
-        if self._failover_manager._primary_store and hasattr(
-            self._failover_manager._primary_store, "circuit_breaker_state"
-        ):
+        if self._failover_manager._primary_store and hasattr(self._failover_manager._primary_store, 'circuit_breaker_state'):
             circuit_state = str(self._failover_manager._primary_store.circuit_breaker_state)
-
-        return FailoverInfo(
-            failover_enabled=True,
-            failover_active=failover_stats.failover_active,
-            active_store_type=active_store,
-            failover_count=failover_stats.failover_count,
-            total_failover_time_seconds=failover_stats.total_failover_time_seconds,
-            last_failover_time=failover_stats.last_failover_time,
-            primary_circuit_breaker_state=circuit_state,
-            backup_syncs_completed=failover_stats.backup_syncs_completed,
-            chunks_in_failover=failover_stats.chunks_in_failover,
-        )
+        return FailoverInfo(failover_enabled=True, failover_active=failover_stats.failover_active, active_store_type=active_store, failover_count=failover_stats.failover_count, total_failover_time_seconds=failover_stats.total_failover_time_seconds, last_failover_time=failover_stats.last_failover_time, primary_circuit_breaker_state=circuit_state, backup_syncs_completed=failover_stats.backup_syncs_completed, chunks_in_failover=failover_stats.chunks_in_failover)
 
     async def _collect_resource_info(self) -> ResourceInfo | None:
         """Collect system resource usage.
@@ -566,25 +315,15 @@ class HealthService:
         """
         try:
             import os
-
             from pathlib import Path
-
             import psutil
-
             process = psutil.Process(os.getpid())
-
-            # Memory usage (RSS = Resident Set Size)
             memory_info = process.memory_info()
             memory_mb = memory_info.rss // (1024 * 1024)
-
-            # CPU usage (over short interval)
             cpu_percent = process.cpu_percent(interval=0.1)
-
-            # Disk usage
             from codeweaver.core import get_user_config_dir
-
             config_dir = Path(get_user_config_dir())
-            index_dir = config_dir / ".indexes"
+            index_dir = config_dir / '.indexes'
             cache_dir = config_dir
 
             def get_dir_size(path: Path) -> int:
@@ -592,47 +331,31 @@ class HealthService:
                 if not path.exists():
                     return 0
                 try:
-                    total = sum(f.stat().st_size for f in path.rglob("*") if f.is_file())
-                    return total // (1024 * 1024)
+                    total = sum((f.stat().st_size for f in path.rglob('*') if f.is_file()))
                 except OSError:
-                    # Gracefully handle permission errors
                     return 0
-
+                else:
+                    return total // (1024 * 1024)
             disk_index_mb = get_dir_size(index_dir)
             disk_cache_mb = get_dir_size(cache_dir)
-            disk_total_mb = disk_cache_mb  # Cache includes index
-
-            # File descriptors (Unix only)
+            disk_total_mb = disk_cache_mb
             file_descriptors = None
             file_descriptors_limit = None
             with contextlib.suppress(AttributeError, ImportError):
-                file_descriptors = process.num_fds()  # Unix only
-                # Get system limit
+                file_descriptors = process.num_fds()
                 import resource
-
                 soft_limit, _ = resource.getrlimit(resource.RLIMIT_NOFILE)
                 file_descriptors_limit = soft_limit
-            return ResourceInfo(
-                memory_mb=memory_mb,
-                cpu_percent=cpu_percent,
-                disk_total_mb=disk_total_mb,
-                disk_index_mb=disk_index_mb,
-                disk_cache_mb=disk_cache_mb,
-                file_descriptors=file_descriptors,
-                file_descriptors_limit=file_descriptors_limit,
-            )
         except ImportError:
-            # psutil not available - graceful degradation
-            logger.debug("psutil not available, skipping resource collection")
+            logger.debug('psutil not available, skipping resource collection')
             return None
         except Exception as e:
-            # Gracefully handle any other errors
-            logger.warning("Failed to collect resource information: %s", e)
+            logger.warning('Failed to collect resource information: %s', e)
             return None
+        else:
+            return ResourceInfo(memory_mb=memory_mb, cpu_percent=cpu_percent, disk_total_mb=disk_total_mb, disk_index_mb=disk_index_mb, disk_cache_mb=disk_cache_mb, file_descriptors=file_descriptors, file_descriptors_limit=file_descriptors_limit)
 
-    def _determine_status(
-        self, indexing: IndexingInfo, services: ServicesInfo, resources: ResourceInfo | None = None
-    ) -> str:  # Literal["healthy", "degraded", "unhealthy"]:
+    def _determine_status(self, indexing: IndexingInfo, services: ServicesInfo, resources: ResourceInfo | None=None) -> str:
         """Determine overall system health status based on component states.
 
         Status rules (from FR-010-Enhanced contract):
@@ -648,45 +371,23 @@ class HealthService:
         Returns:
             Overall health status
         """
-        # Unhealthy: Vector store down OR indexing in error state
-        if services.vector_store.status == "down" or indexing.state == "error":
-            return "unhealthy"
-
-        # Degraded: Embedding provider down (but sparse works) OR high error count
-        if (
-            services.embedding_provider.status == "down"
-            and services.sparse_embedding.status == "up"
-        ):
-            return "degraded"
-
-        # Check resource usage (warnings, not critical)
+        if services.vector_store.status == 'down' or indexing.state == 'error':
+            return 'unhealthy'
+        if services.embedding_provider.status == 'down' and services.sparse_embedding.status == 'up':
+            return 'degraded'
         if resources:
-            # Memory warning at 1.5GB, critical at 2GB
             if resources.memory_mb > 2048:
-                logger.warning("High memory usage: %d MB", resources.memory_mb)
-                return "degraded"
-
-            # CPU sustained high usage (>80%)
+                logger.warning('High memory usage: %d MB', resources.memory_mb)
+                return 'degraded'
             if resources.cpu_percent > 80:
-                logger.warning("High CPU usage: %.1f%%", resources.cpu_percent)
-                return "degraded"
-
-            # File descriptor warning at 80% of limit
-            if (
-                resources.file_descriptors is not None
-                and resources.file_descriptors_limit is not None
-            ):
-                fd_percent = (resources.file_descriptors / resources.file_descriptors_limit) * 100
+                logger.warning('High CPU usage: %.1f%%', resources.cpu_percent)
+                return 'degraded'
+            if resources.file_descriptors is not None and resources.file_descriptors_limit is not None:
+                fd_percent = resources.file_descriptors / resources.file_descriptors_limit * 100
                 if fd_percent > 80:
-                    logger.warning(
-                        "High file descriptor usage: %d/%d (%.1f%%)",
-                        resources.file_descriptors,
-                        resources.file_descriptors_limit,
-                        fd_percent,
-                    )
-                    return "degraded"
-
-        return "degraded" if indexing.progress.errors >= 25 else "healthy"
+                    logger.warning('High file descriptor usage: %d/%d (%.1f%%)', resources.file_descriptors, resources.file_descriptors_limit, fd_percent)
+                    return 'degraded'
+        return 'degraded' if indexing.progress.errors >= 25 else 'healthy'
 
     def to_dict(self) -> dict[str, Any]:
         """Convert HealthService to dictionary for serialization.
@@ -696,10 +397,6 @@ class HealthService:
         Warning: This method uses asyncio.run() and CANNOT be called from async context.
         If you need to get health information from async code, use get_health_response() instead.
         """
-        # Get health response synchronously using asyncio.run()
-        # This will raise RuntimeError if called from async context
         health_response = asyncio.run(self.get_health_response())
         return health_response.model_dump(round_trip=True)
-
-
-__all__ = ("HealthService",)
+__all__ = ('HealthService',)

@@ -544,6 +544,8 @@ class CodeWeaverSettings(BaseSettings):
 
     _unset_fields: Annotated[set[str], PrivateAttr(default_factory=set)] = set()
 
+    _resolution_complete: bool = PrivateAttr(default=False)
+
     def __init__(self, **kwargs: Any) -> None:
         """Initialize CodeWeaverSettings, loading from config file if provided."""
         type(self)._ensure_settings_dirs()
@@ -997,6 +999,31 @@ class CodeWeaverSettings(BaseSettings):
             *other_sources,
         )
 
+    async def finalize(self) -> Self:
+        """Finalize settings with config resolution.
+
+        This should be called after all configs are loaded but before
+        the application starts. It resolves all interdependencies.
+
+        Returns:
+            Self for chaining
+        """
+        if self._resolution_complete:
+            return self
+
+        try:
+            from codeweaver.core.config.resolver import resolve_all_configs
+
+            # Trigger config resolution across all registered components
+            await resolve_all_configs()
+
+            self._resolution_complete = True
+        except Exception:
+            # Silently fail if config resolution not available (monorepo compatibility)
+            logger.debug("Config resolution not available, skipping finalization")
+
+        return self
+
     def _update_settings(self, **kwargs: Unpack[CodeWeaverSettingsDict]) -> Self:
         """Update settings, validating a new CodeWeaverSettings instance and updating the global instance."""
         try:
@@ -1010,6 +1037,8 @@ class CodeWeaverSettings(BaseSettings):
         # But we do need to update the global _mapped_settings because it's a copy
         # And other modules are using references to that copy
         globals()["_mapped_settings"] = self.view  # this recreates self._map as well
+        # Reset resolution flag when settings are updated
+        self._resolution_complete = False
         return self
 
     @classmethod

@@ -20,24 +20,27 @@ import logging
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Annotated, Any, Literal, NotRequired, Required, Self, TypedDict, cast
+from typing import Annotated, Any, Literal, NotRequired, Required, Self, TypedDict, cast, overload
 
+from awscrt.mqtt5 import ClientOptions
 from pydantic import (
     Discriminator,
     Field,
     PositiveFloat,
     PositiveInt,
+    PrivateAttr,
     SecretStr,
     Tag,
     computed_field,
     model_validator,
 )
 from pydantic_ai.settings import ModelSettings as AgentModelSettings
-from qdrant_client.http.models.models import SparseVectorParams, VectorParams
+from qdrant_client.http.models.models import Distance, SparseVectorParams, VectorParams
 
 from codeweaver.core import (
     AnonymityConversion,
     BasedModel,
+    ConfigurationError,
     FilteredKey,
     FilteredKeyT,
     Provider,
@@ -57,6 +60,8 @@ from codeweaver.providers.config.clients import (
     SentenceTransformersClientOptions,
     discriminate_azure_embedding_client_options,
 )
+from codeweaver.providers.config.embedding import EmbeddingConfigT, SparseEmbeddingConfigT
+from codeweaver.providers.config.reranking import RerankingConfigT
 
 
 logger = logging.getLogger(__name__)
@@ -123,6 +128,29 @@ class BaseProviderSettings(BasedModel, ABC):
         description="Discriminator tag for the provider.",
     )
 
+    client_options: Annotated[
+        ClientOptions | None, Field(description="Client options for the provider's client.")
+    ] = None
+
+    def __model_post_init__(self) -> None:
+        """Post-initialization to register in DI container and config registry."""
+        # Register self in DI container as singleton
+        try:
+            from codeweaver.core.di import get_container
+
+            container = get_container()
+            container.register(type(self), lambda: self, singleton=True)
+        except Exception as e:
+            # Log if DI not available (monorepo compatibility)
+            logger.debug(
+                "Failed to register %s in DI container (monorepo mode): %s", type(self).__name__, e
+            )
+
+        self._register_configurables()
+
+    def _register_configurables(self) -> None:
+        """Register self for config resolution. Classes may optionally implement this class method to register themselves for config resolution."""
+
     def _telemetry_keys(self) -> None:
         return None
 
@@ -130,6 +158,14 @@ class BaseProviderSettings(BasedModel, ABC):
     @computed_field
     def client(self) -> LiteralSDKClient:
         """Return an SDKClient enum member corresponding to this provider settings instance.  Often this is the same as `self.provider`, but not always, and sometimes must be computed (e.g., Azure embedding models)."""
+        raise NotImplementedError("client must be implemented by subclasses.")
+
+    def get_client(self) -> Any:
+        """Construct and return the client instance based on the provider settings."""
+        options = self.client_options or {}
+        client_import = cast(SDKClient, self.client).client
+        if not isinstance(client_import, dict):
+            return client_import._resolve()(**options)
 
 
 class BaseProviderSettingsDict(TypedDict, total=False):
@@ -303,6 +339,54 @@ class QdrantVectorStoreProviderSettings(QdrantProviderMixin, VectorStoreProvider
         QdrantClientOptions | None, Field(description="Client options for the provider's client.")
     ] = None
 
+    @overload
+    def __init__(
+        self,
+        provider: Literal[Provider.MEMORY],
+        client_options: QdrantClientOptions | None = None,
+        collection: CollectionConfig | None = None,
+        in_memory_config: MemoryConfig | None = None,
+        batch_size: PositiveInt | None = 64,
+    ) -> None: ...
+    @overload
+    def __init__(
+        self,
+        provider: Literal[Provider.QDRANT],
+        client_options: QdrantClientOptions | None = None,
+        collection: CollectionConfig | None = None,
+        in_memory_config: None = None,
+        batch_size: PositiveInt | None = 64,
+    ) -> None: ...
+    def __init__(
+        self,
+        provider: Literal[Provider.QDRANT, Provider.MEMORY] = Provider.QDRANT,
+        connection: ConnectionConfiguration | None = None,
+        client_options: QdrantClientOptions | None = None,
+        collection: CollectionConfig | None = None,
+        in_memory_config: MemoryConfig | None = None,
+        batch_size: PositiveInt | None = 64,
+    ) -> None:
+        """Initialize Qdrant vector store provider settings.
+
+        Args:
+            provider: The vector store provider (Qdrant or Memory).
+            connection: Connection configuration for the vector store.
+            client_options: Client options for the provider's client.
+            collection: Collection configuration for the vector store.
+            in_memory_config: In-memory configuration for the Memory provider.
+            batch_size: Batch size for bulk upsert operations.
+        """
+        if provider == Provider.QDRANT and in_memory_config is not None:
+            raise ConfigurationError("in_memory_config can only be set when provider is MEMORY.")
+        object.__setattr__(self, "client_options", client_options)
+        object.__setattr__(self, "collection", collection)
+        object.__setattr__(self, "in_memory_config", in_memory_config)
+        super().__init__(provider=provider, connection=connection, batch_size=batch_size)
+
+    # Track resolved values
+    _resolved_dimension: int | None = PrivateAttr(default=None)
+    _resolved_datatype: str | None = PrivateAttr(default=None)
+
     @model_validator(mode="after")
     def _ensure_consistent_config(self) -> Self:
         """Ensure consistent config for Qdrant and Memory providers."""
@@ -317,7 +401,110 @@ class QdrantVectorStoreProviderSettings(QdrantProviderMixin, VectorStoreProvider
                 self.in_memory_config or {}
             )
         # we'll handle collection config later too -- when models are getting instantiated it's much less painful to wait until the dust settles for inter-model dependencies
+
+        # Register self in DI container as singleton
+        try:
+            from codeweaver.core.di import get_container
+
+            container = get_container()
+            container.register(type(self), lambda: self, singleton=True)
+        except Exception as e:
+            # Log if DI not available (monorepo compatibility)
+            logger.debug(
+                "Failed to register %s in DI container (monorepo mode): %s", type(self).__name__, e
+            )
+
         return self
+
+    def _register_configurables(self) -> None:
+        """Register self for config resolution."""
+        try:
+            from codeweaver.core.config.registry import register_configurable
+
+            register_configurable(self)
+        except Exception as e:
+            # Log if config system not available (monorepo compatibility)
+            logger.debug(
+                "Failed to register %s for config resolution (monorepo mode): %s",
+                type(self).__name__,
+                e,
+            )
+
+    def config_dependencies(self) -> dict[str, type]:
+        """Vector store needs embedding config for dimension/datatype."""
+        # Import here to avoid circular dependencies
+        from codeweaver.providers.config.embedding import BaseEmbeddingConfig
+
+        return {"embedding": BaseEmbeddingConfig}
+
+    async def apply_resolved_config(self, **resolved: Any) -> None:
+        """Apply dimension and datatype from embedding config.
+
+        Args:
+            **resolved: Should contain "embedding" key with embedding config instance
+        """
+        if not (embedding_config := resolved.get("embedding")):
+            return
+
+        # Get dimension and datatype from embedding config
+        dimension = await embedding_config.get_dimension()
+        datatype = await embedding_config.get_datatype()
+
+        # Apply if we got values
+        if dimension:
+            self._resolved_dimension = dimension
+            self._configure_for_dimension(dimension)
+
+        if datatype:
+            self._resolved_datatype = datatype
+            self._configure_for_datatype(datatype)
+
+    def _configure_for_dimension(self, dimension: int) -> None:
+        """Configure collection for specific dimension.
+
+        Args:
+            dimension: Embedding dimension to configure for
+        """
+        if not self.collection:
+            self.collection = {}
+
+        # Type cast for type checker - we just ensured collection is a dict
+        collection = cast(dict[str, Any], self.collection)
+
+        # Update vector configuration
+        if "vector_config" not in collection:
+            collection["vector_config"] = {}
+
+        vector_config: dict[str, Any] = collection["vector_config"]
+        if "dense" not in vector_config:
+            vector_config["dense"] = VectorParams(size=dimension, distance=Distance.COSINE)
+        else:
+            # Update existing config
+            dense_config = vector_config["dense"]
+            dense_config.size = dimension
+            if not hasattr(dense_config, "distance"):
+                dense_config.distance = Distance.COSINE
+
+    def _configure_for_datatype(self, datatype: str) -> None:
+        """Configure collection quantization based on datatype.
+
+        Args:
+            datatype: Embedding datatype (float16, uint8, etc.)
+        """
+        if not self.collection:
+            self.collection = {}
+
+        # Type cast for type checker - we just ensured collection is a dict
+        collection = cast(dict[str, Any], self.collection)
+
+        # Configure quantization for reduced precision types
+        if datatype in {"float16", "uint8", "int8"}:
+            quantization_config: dict[str, Any] = {"scalar": {"type": datatype, "always_ram": True}}
+            # Add quantile for integer types
+            if "int" in datatype:
+                quantization_config["scalar"]["quantile"] = 0.99
+
+            collection["quantization_config"] = quantization_config
 
     @computed_field
     def client(self) -> Literal[SDKClient.QDRANT]:
@@ -353,6 +540,9 @@ class EmbeddingProviderSettings(BaseEmbeddingProviderSettings):
             description="The name of the embedding model to use. This should correspond to a model supported by the selected provider and formatted as the provider expects. For builtin models, this is the name as listed with `codeweaver list models`."
         ),
     ]
+    embedding_config: Annotated[
+        EmbeddingConfigT, Field(description="Model configuration for embedding operations.")
+    ]
     client_options: Annotated[
         GeneralEmbeddingClientOptionsType | None,
         Field(description="Client options for the provider's client.", discriminator="tag"),
@@ -372,6 +562,10 @@ class EmbeddingProviderSettings(BaseEmbeddingProviderSettings):
         if self.provider.only_uses_own_client and is_sdkclient_member:
             return cast(LiteralSDKClient, SDKClient.from_string(self.provider.variable))
         # Now we have azure and heroku left to consider
+        if self.provider not in (Provider.AZURE, Provider.HEROKU):
+            raise ValueError(
+                f"Cannot resolve embedding client for provider {self.provider.variable}."
+            )
         if self.model_name.startswith("cohere") or self.model_name.startswith("embed"):
             return SDKClient.COHERE
         return SDKClient.OPENAI
@@ -425,8 +619,10 @@ class SparseEmbeddingProviderSettings(BaseProviderSettings):
     """Settings for sparse embedding models."""
 
     model_name: Annotated[str, Field(description="The name of the sparse embedding model to use.")]
-    model_options: SparseEmbeddingModelSettings
-    """Settings for the sparse embedding model."""
+    sparse_embedding_config: Annotated[
+        SparseEmbeddingConfigT,
+        Field(description="Model configuration for sparse embedding operations."),
+    ]
     client_options: Annotated[
         SentenceTransformersClientOptions | None,
         Field(description="Client options for the provider's client."),
@@ -465,8 +661,9 @@ class RerankingProviderSettings(BaseProviderSettings):
     """Settings for re-ranking models."""
 
     model_name: Annotated[str, Field(description="The name of the re-ranking model to use.")]
-    model_options: RerankingModelSettings
-    """Settings for the re-ranking model(s)."""
+    reranking_config: Annotated[
+        RerankingConfigT, Field(description="Model configuration for reranking operations.")
+    ]
     top_n: PositiveInt | None = None
     client_options: (
         Annotated[

@@ -273,6 +273,9 @@ class BaseCodeWeaverSettings(BaseSettings):
     _unset_fields: set[str] = PrivateAttr(default_factory=set)
     """Fields that were left unset during initialization."""
 
+    _resolution_complete: bool = PrivateAttr(default=False)
+    """Whether config resolution has been completed."""
+
     _env_prefix: ClassVar[str] = "CODEWEAVER_"
 
     def __init__(
@@ -349,6 +352,38 @@ class BaseCodeWeaverSettings(BaseSettings):
             )
             for key, value in data.items()
         } | {"unset_fields": list(self._unset_fields)}
+
+    async def finalize(self) -> Self:
+        """Finalize settings with config resolution.
+
+        This should be called after all configs are loaded but before
+        the application starts. It resolves all interdependencies between
+        configuration objects.
+
+        Returns:
+            Self for chaining
+
+        Note:
+            This method is idempotent - calling it multiple times is safe.
+            It will only perform resolution once.
+        """
+        if self._resolution_complete:
+            return self
+
+        try:
+            from codeweaver.core.config.resolver import resolve_all_configs
+
+            # Trigger config resolution across all registered components
+            await resolve_all_configs()
+
+            self._resolution_complete = True
+        except ImportError:
+            # Config resolution not available (minimal core install)
+            logger.debug("Config resolution module not available - skipping")
+        except Exception as e:
+            logger.warning(f"Config resolution failed: {e}")
+
+        return self
 
     @classmethod
     def from_config(cls, path: FilePath, project_path: Path | None = None, **kwargs: Any) -> Self:

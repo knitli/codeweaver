@@ -12,7 +12,7 @@ import logging
 import time
 
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from types import ModuleType
 from typing import (
     TYPE_CHECKING,
@@ -69,7 +69,7 @@ from codeweaver.core import (
     uuid7,
 )
 from codeweaver.core import ValidationError as CodeWeaverValidationError
-from codeweaver.providers.config import EmbeddingModelSettings, SparseEmbeddingModelSettings
+from codeweaver.providers.config.embedding import EmbeddingConfigT
 from codeweaver.providers.embedding import EmbeddingCapabilityResolverDep
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.registry import EmbeddingRegistry
@@ -204,20 +204,16 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
     ]
 
     caps: Annotated[
-        EmbeddingModelCapabilities, Field(description="The capabilities of the embedding model.")
+        EmbeddingModelCapabilities | None,
+        Field(
+            description="The capabilities of the embedding model. Can be None if capabilities are not available."
+        ),
+    ] = None
+
+    config: Annotated[
+        EmbeddingConfigT,
+        Field(description="Configuration for the embedding model, including all request options."),
     ]
-
-    embed_options: Mapping[str, Any] = Field(
-        description="Options for embedding requests.", default_factory=dict
-    )
-
-    query_options: Mapping[str, Any] = Field(
-        description="Options for query requests.", default_factory=dict
-    )
-
-    model_options: Mapping[str, Any] = Field(
-        description="Options for model configuration.", default_factory=dict
-    )
 
     _provider: ClassVar[LiteralProvider] = cast(LiteralProvider, Provider.NOT_SET)
     _input_transformer: ClassVar[Callable[[StructuredDataInput], Any]] = default_input_transformer
@@ -247,10 +243,8 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
     def __init__(
         self,
         client: ClientDep[EmbeddingClient] = INJECTED,
-        caps: EmbeddingCapabilityResolverDep = INJECTED,
-        embed_options: Mapping[str, Any] | None = None,
-        query_options: Mapping[str, Any] | None = None,
-        model_options: Mapping[str, Any] | None = None,
+        config: EmbeddingConfigT | None = None,
+        caps: EmbeddingCapabilityResolverDep | None = INJECTED,
         impl_deps: Any = None,
         custom_deps: Any = None,
         **kwargs: Any,
@@ -264,9 +258,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             self, "_circuit_open_duration", kwargs.get("circuit_open_duration", 30.0)
         )
         object.__setattr__(self, "client", client)
-        object.__setattr__(self, "embed_options", embed_options)
-        object.__setattr__(self, "query_options", query_options)
-        object.__setattr__(self, "model_options", model_options)
+        object.__setattr__(self, "config", config)
         store_kwargs = kwargs.get(
             "store_kwargs", {"value_type": list, "size_limit": 1024 * 1024 * 3}
         )
@@ -277,7 +269,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         object.__setattr__(self, "_hash_store", make_blake_store(**hash_store_kwargs))
         self._initialize(impl_deps, custom_deps)
         object.__setattr__(self, "caps", caps)
-        super().__init__(client=client, **defaults)
+        super().__init__(client=client, config=config, caps=caps, **defaults)
 
     @abstractmethod
     def _initialize(
@@ -708,13 +700,13 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         self, query: str | Sequence[str], **kwargs: Any
     ) -> list[list[float]] | list[list[int]] | list[SparseEmbedding] | EmbeddingErrorInfo:
         """Embed a query into a vector."""
-        processed_kwargs: Any = self._set_kwargs(self.query_options, kwargs or {})
+        # Config structure delivers query options directly, no need to merge kwargs
         queries: Sequence[str] = [query] if isinstance(query, str) else list(query)
         try:
             # Use retry wrapper instead of calling _embed_query directly
             results: (
                 Sequence[Sequence[float]] | Sequence[Sequence[int]] | Sequence[SparseEmbedding]
-            ) = await self._embed_query_with_retry(queries, **processed_kwargs)
+            ) = await self._embed_query_with_retry(queries, **kwargs)
         except CircuitBreakerOpenError as e:
             logger.warning("Circuit breaker open for query embedding")
             return self._handle_embedding_error(e, batch_id=None, documents=None, queries=queries)
@@ -737,16 +729,23 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
     @property
     def model_name(self) -> str:
         """Get the model name for the embedding provider."""
-        return self.caps.name
+        if self.caps:
+            return self.caps.name
+        return self.config.model_name if self.config else "unknown"
 
     @property
     def model_capabilities(self) -> EmbeddingModelCapabilities | None:
         """Get the model capabilities for the embedding provider."""
         return self.caps
 
+    @property
+    def is_provider_backup(self) -> bool:
+        """Return True if this is a backup embedding provider."""
+        return False
+
     def _tokenizer(self) -> Tokenizer[Any]:
         """Get the tokenizer for the embedding provider."""
-        if defined_tokenizer := self.caps.tokenizer:
+        if self.caps and (defined_tokenizer := self.caps.tokenizer):
             return get_tokenizer(defined_tokenizer, self.caps.tokenizer_model or self.caps.name)
         return get_tokenizer("tiktoken", "cl100k_base")
 
@@ -814,42 +813,26 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                 ],
             )
 
-    @overload
-    def _get_model_settings(
-        self, *, sparse: Literal[False] = False
-    ) -> EmbeddingModelSettings | None: ...
-    @overload
-    def _get_model_settings(
-        self, *, sparse: Literal[True] = True
-    ) -> SparseEmbeddingModelSettings | None: ...
-    def _get_model_settings(
-        self, *, sparse: bool = False
-    ) -> EmbeddingModelSettings | SparseEmbeddingModelSettings | None:
-
-        settings = get_provider_config_for("sparse_embedding" if sparse else "embedding")
-        return settings.get("model_settings")
-
     def get_datatype(
         self, *, sparse: bool = False
     ) -> Literal["float32", "float16", "int8", "binary"]:
-        """Get the datatype of the embedding vectors based on capabilities."""
-        default_dtype = self.caps.default_dtype
-        if default_dtype and default_dtype not in ("float32", "float16", "int8", "binary"):
-            default_dtype = "float16" if "float" in default_dtype else "int8"
-        model_settings = self._get_model_settings(sparse=sparse)
-        if model_settings and model_settings.get("data_type"):
-            return model_settings["data_type"]
-        return cast(Literal["float32", "float16", "int8", "binary"], default_dtype)
+        """Get the datatype of the embedding vectors based on capabilities and config."""
+        # First try to get from capabilities
+        if self.caps:
+            default_dtype = self.caps.default_dtype
+            if default_dtype and default_dtype not in ("float32", "float16", "int8", "binary"):
+                default_dtype = "float16" if "float" in default_dtype else "int8"
+            return cast(Literal["float32", "float16", "int8", "binary"], default_dtype)
+        # Fallback to float32 if no capabilities
+        return "float32"
 
     def get_dimension(self, *, sparse: bool = False) -> PositiveInt | Literal[0]:
         """Get the dimension of the embedding vectors based on capabilities."""
         if sparse:
             return 0
-        default_dim = self.caps.default_dimension
-        model_settings = self._get_model_settings(sparse=sparse)
-        if model_settings and model_settings.get("dimension"):
-            return model_settings["dimension"]
-        return default_dim
+        if self.caps:
+            return self.caps.default_dimension
+        return self.caps.default_dimension if self.caps else 0
 
     @staticmethod
     def normalize(embedding: Sequence[float] | Sequence[int] | np.ndarray) -> list[float]:
@@ -905,12 +888,6 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             for chunk in chunks
             if chunk
         ]
-
-    @staticmethod
-    def _set_kwargs(instance_kwargs: Any, passed_kwargs: Any) -> Mapping[str, Any]:
-        """Set keyword arguments for the embedding provider."""
-        passed_kwargs = passed_kwargs or {}
-        return cast(dict[str, Any], instance_kwargs) | cast(dict[str, Any], passed_kwargs)
 
     def _register_chunks(
         self,
@@ -993,14 +970,8 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         for i, info in enumerate(chunk_infos):
             if (registered := registry.get(info.chunk_id)) is not None:
                 # Check if we already have this type of embedding
-                has_existing = (
-                    info.kind.variable == "dense"
-                    and not info.backup
-                    and registered.dense is not None
-                ) or (
-                    info.kind.variable == "sparse"
-                    and not info.backup
-                    and registered.sparse is not None
+                has_existing = (info.kind.variable == "dense" and registered.dense is not None) or (
+                    info.kind.variable == "sparse" and registered.sparse is not None
                 )
 
                 if has_existing:
@@ -1093,8 +1064,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             FilteredKey("client"): AnonymityConversion.FORBIDDEN,
             FilteredKey("_input_transformer"): AnonymityConversion.FORBIDDEN,
             FilteredKey("_output_transformer"): AnonymityConversion.FORBIDDEN,
-            FilteredKey("embed_options"): AnonymityConversion.COUNT,
-            FilteredKey("query_options"): AnonymityConversion.COUNT,
+            FilteredKey("config"): AnonymityConversion.AGGREGATE,
         }
 
     @override
@@ -1131,17 +1101,26 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         )
 
 
+class BackupEmbeddingProvider[EmbeddingClient](EmbeddingProvider[EmbeddingClient], ABC):
+    """Abstract class for backup embedding providers.
+
+    Backup providers are used as fallbacks when primary providers are unavailable.
+    They have the is_provider_backup property set to True.
+    """
+
+    @property
+    @override
+    def is_provider_backup(self) -> bool:
+        """Return True for backup embedding providers."""
+        return True
+
+
 class SparseEmbeddingProvider[SparseClient](EmbeddingProvider[SparseClient], ABC):
     """Abstract class for sparse embedding providers.
 
     Overrides hash stores to prevent collision with dense embedding deduplication.
     Dense and sparse embeddings should deduplicate independently.
     """
-
-    # Override parent class hash stores with separate stores for sparse embeddings
-    _hash_store: ClassVar[BlakeStore[UUID7]] = make_blake_store(
-        value_type=UUID, size_limit=ONE_KB * 256
-    )  # 256kb limit -- separate from dense embeddings
 
     @classmethod
     def clear_deduplication_stores(cls) -> None:
@@ -1151,11 +1130,7 @@ class SparseEmbeddingProvider[SparseClient](EmbeddingProvider[SparseClient], ABC
     def _batch_and_key(
         self, chunk_list: Sequence[CodeChunk], *, skip_deduplication: bool
     ) -> tuple[Iterator[CodeChunk], UUID7]:
-        """Override to create batch keys with sparse=True.
-
-        This ensures chunks get their sparse_batch_key set correctly, which is
-        required for sparse embeddings to be stored in the vector store.
-        """
+        """Override to create batch keys with sparse=True."""
         key = uuid7()
         final_chunks: list[CodeChunk] = []
 
@@ -1176,7 +1151,6 @@ class SparseEmbeddingProvider[SparseClient](EmbeddingProvider[SparseClient], ABC
         for i, chunk in enumerate(starter_chunks):
             # Find the original index in chunk_list to get correct hash
             original_idx = chunk_list.index(chunk)
-            # *** FIX: Create batch keys with sparse=True for sparse embedding providers ***
             batch_keys = BatchKeys(id=key, idx=i, sparse=True)
             final_chunks.append(chunk.set_batch_keys(batch_keys))
             # Now add the hash to store, mapping it to this batch key
@@ -1200,4 +1174,16 @@ class SparseEmbeddingProvider[SparseClient](EmbeddingProvider[SparseClient], ABC
         """Abstract method to implement query embedding logic for sparse embeddings."""
 
 
-__all__ = ("EmbeddingErrorInfo", "EmbeddingProvider", "SparseEmbeddingProvider")
+class BackupSparseEmbeddingProvider[SparseClient](
+    SparseEmbeddingProvider[SparseClient], BackupEmbeddingProvider[SparseClient], ABC
+):
+    """Abstract class for backup sparse embedding providers."""
+
+
+__all__ = (
+    "BackupEmbeddingProvider",
+    "BackupSparseEmbeddingProvider",
+    "EmbeddingErrorInfo",
+    "EmbeddingProvider",
+    "SparseEmbeddingProvider",
+)

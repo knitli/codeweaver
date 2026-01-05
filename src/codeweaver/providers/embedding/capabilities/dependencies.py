@@ -10,10 +10,11 @@ Provides lazy loading and resolution of embedding model capabilities by model na
 from __future__ import annotations
 
 from collections.abc import Sequence
+from types import MappingProxyType
 from typing import TYPE_CHECKING, Annotated
 
-from codeweaver.core import Depends, dependency_provider
-from codeweaver.providers.types import CapabilityResolver
+from codeweaver.core import dependency_provider, depends
+from codeweaver.providers.types import CapabilityResolver, EmbeddingCapabilityType
 
 
 if TYPE_CHECKING:
@@ -21,7 +22,7 @@ if TYPE_CHECKING:
 
 
 @dependency_provider(scope="singleton")
-class EmbeddingCapabilityResolver(CapabilityResolver["EmbeddingModelCapabilities"]):
+class EmbeddingCapabilityResolver(CapabilityResolver[EmbeddingCapabilityType]):
     """Resolves embedding model capabilities by model name.
 
     Lazily loads all capability modules on first access to minimize startup overhead.
@@ -31,7 +32,9 @@ class EmbeddingCapabilityResolver(CapabilityResolver["EmbeddingModelCapabilities
     def __init__(self) -> None:
         """Initialize the capability resolver with empty cache."""
         super().__init__()
-        self._sparse_capabilities_by_name: dict[str, SparseEmbeddingModelCapabilities] = {}
+        self._sparse_capabilities_by_name: MappingProxyType[
+            str, SparseEmbeddingModelCapabilities
+        ] = MappingProxyType({})
 
     def _ensure_loaded(self) -> None:
         """Lazily import all capability modules and build the index."""
@@ -97,6 +100,9 @@ class EmbeddingCapabilityResolver(CapabilityResolver["EmbeddingModelCapabilities
         )
 
         # Call each getter to retrieve capabilities and build the lookup index
+        temp_capabilities: dict[str, EmbeddingCapabilityType] = {}
+        temp_sparse_capabilities: dict[str, SparseEmbeddingModelCapabilities] = {}
+
         for getter in [
             get_alibaba_nlp_embedding_capabilities,
             get_amazon_embedding_capabilities,
@@ -119,12 +125,13 @@ class EmbeddingCapabilityResolver(CapabilityResolver["EmbeddingModelCapabilities
             get_whereisai_embedding_capabilities,
         ]:
             for cap in getter():
-                self._capabilities_by_name[cap.name] = cap
+                temp_capabilities[cap.name] = cap
 
         # Index sparse capabilities
         for sparse_cap in get_sparse_caps():
-            self._sparse_capabilities_by_name[sparse_cap.name] = sparse_cap
-
+            temp_sparse_capabilities[sparse_cap.name] = sparse_cap
+        self._sparse_capabilities_by_name = MappingProxyType(temp_sparse_capabilities)
+        self._capabilities_by_name = MappingProxyType(temp_capabilities)
         self._loaded = True
 
     def resolve_sparse(self, model_name: str) -> SparseEmbeddingModelCapabilities | None:
@@ -136,7 +143,8 @@ class EmbeddingCapabilityResolver(CapabilityResolver["EmbeddingModelCapabilities
         Returns:
             The sparse capabilities for the specified model, or None if not found.
         """
-        self._ensure_loaded()
+        with self._lock:
+            self._ensure_loaded()
         return self._sparse_capabilities_by_name.get(model_name)
 
     def all_sparse_capabilities(self) -> Sequence[SparseEmbeddingModelCapabilities]:
@@ -145,7 +153,8 @@ class EmbeddingCapabilityResolver(CapabilityResolver["EmbeddingModelCapabilities
         Returns:
             A sequence of all registered sparse capabilities.
         """
-        self._ensure_loaded()
+        with self._lock:
+            self._ensure_loaded()
         return tuple(self._sparse_capabilities_by_name.values())
 
     def all_sparse_model_names(self) -> Sequence[str]:
@@ -154,13 +163,14 @@ class EmbeddingCapabilityResolver(CapabilityResolver["EmbeddingModelCapabilities
         Returns:
             A sequence of all registered sparse model names.
         """
-        self._ensure_loaded()
+        with self._lock:
+            self._ensure_loaded()
         return tuple(self._sparse_capabilities_by_name.keys())
 
 
 # Type alias for dependency injection
 type EmbeddingCapabilityResolverDep = Annotated[
-    EmbeddingCapabilityResolver, Depends(EmbeddingCapabilityResolver)
+    EmbeddingCapabilityResolver, depends(EmbeddingCapabilityResolver)
 ]
 
 

@@ -18,11 +18,13 @@ if TYPE_CHECKING:
         IndexerSettingsDict,
         RignoreSettings,
     )
+    from codeweaver.engine.config.root_settings import CodeWeaverEngineSettings
 
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "ChunkerSettings": (__spec__.parent, "chunker"),
     "ChunkerSettingsDict": (__spec__.parent, "chunker"),
+    "CodeWeaverEngineSettings": (__spec__.parent, "root_settings"),
     "CustomDelimiter": (__spec__.parent, "chunker"),
     "CustomLanguage": (__spec__.parent, "chunker"),
     "IndexerSettings": (__spec__.parent, "indexer"),
@@ -37,6 +39,7 @@ __getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
 __all__ = (
     "ChunkerSettings",
     "ChunkerSettingsDict",
+    "CodeWeaverEngineSettings",
     "CustomDelimiter",
     "CustomLanguage",
     "IndexerSettings",

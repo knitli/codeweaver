@@ -2,15 +2,64 @@
 
 from __future__ import annotations
 
+import logging
+
 from abc import abstractmethod
-from typing import Annotated, Any, Literal, LiteralString, NotRequired, Required, TypedDict, cast
+from typing import (
+    TYPE_CHECKING,
+    Annotated,
+    Any,
+    Literal,
+    LiteralString,
+    NotRequired,
+    Required,
+    TypedDict,
+    cast,
+)
 
-from pydantic import Discriminator, Field, Tag
+from pydantic import Discriminator, Field, Tag, computed_field
 
-from codeweaver.core import BasedModel, LiteralProvider
+from codeweaver.core import BasedModel, LiteralProvider, Provider
+from codeweaver.providers.embedding.capabilities.dependencies import EmbeddingCapabilityResolverDep
 
+
+logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from codeweaver.providers.embedding.capabilities.base import (
+        EmbeddingModelCapabilities,
+        SparseEmbeddingModelCapabilities,
+    )
 
 DATATYPE_FIELDS = {"encoding_format", "output_dtype", "embedding_types", "precision"}
+"""Fields that specify the datatype of embeddings in provider configs."""
+
+INCOMPATIBLE_FIELDS = {"prompt_name", "prompt", "task"}
+"""Fields that cannot be shared between query and embedding configs even if the types are the same."""
+
+DIMENSION_FIELDS = {
+    "dimension",
+    "dimensions",
+    "output_dimension",
+    "output_dimensions",
+    "output_dimensionality",
+    "truncate_dim",
+}
+
+
+def get_embedding_capability(
+    cap: EmbeddingCapabilityResolverDep, model_name: str
+) -> EmbeddingModelCapabilities | SparseEmbeddingModelCapabilities | None:
+    """Get the embedding capabilities for a specific model name.
+
+    Args:
+        cap (EmbeddingCapabilityResolverDep): The embedding capability resolver dependency.
+        model_name (str): The name of the embedding model.
+
+    Returns:
+        EmbeddingModelCapabilities | SparseEmbeddingModelCapabilities | None: The capabilities for the specified model, or None if not found.
+    """
+    return cap.resolve(model_name)
 
 
 def adjust_collection_config_for_datatype(datatype: Literal["float16", "uint8"]) -> None:
@@ -23,8 +72,13 @@ def adjust_collection_config_for_datatype(datatype: Literal["float16", "uint8"])
 
     Raises:
         ValueError: If an unsupported datatype is provided.
+
+    Note:
+        This function is deprecated. Vector store configuration now happens automatically
+        through the config resolution system. See BaseEmbeddingConfig.get_datatype() and
+        QdrantVectorStoreProviderSettings.apply_resolved_config().
     """
-    raise NotImplementedError("This function is a placeholder, this needs to be implemented later.")
+    # This function is now a no-op - config resolution handles this automatically
 
 
 def adjust_collection_config_for_dimensionality(dimensions: int) -> None:
@@ -34,8 +88,13 @@ def adjust_collection_config_for_dimensionality(dimensions: int) -> None:
 
     Args:
         dimensions (int): The dimensionality of the embeddings.
+
+    Note:
+        This function is deprecated. Vector store configuration now happens automatically
+        through the config resolution system. See BaseEmbeddingConfig.get_dimension() and
+        QdrantVectorStoreProviderSettings.apply_resolved_config().
     """
-    raise NotImplementedError("This function is a placeholder, this needs to be implemented later.")
+    # This function is now a no-op - config resolution handles this automatically
 
 
 class SerializedEmbeddingOptionsDict(TypedDict, total=False):
@@ -60,6 +119,11 @@ class BaseEmbeddingConfig(BasedModel):
         exclude=True,
     )
 
+    provider: Provider = Field(
+        ...,
+        description="The provider for this embedding configuration. Used for discriminated unions.",
+    )
+
     model_name: LiteralString
     """The name of the embedding model."""
 
@@ -69,7 +133,9 @@ class BaseEmbeddingConfig(BasedModel):
 
     query: Annotated[
         dict[str, Any] | None,
-        Field(description="Parameters for query embedding requests (if different from document)."),
+        Field(
+            description="Parameters for query embedding requests (often the same as embedding; if the types for each are the same, we'll copy the values so you only need to provide one)."
+        ),
     ] = None
 
     def __init__(self, **data: Any) -> None:
@@ -89,6 +155,130 @@ class BaseEmbeddingConfig(BasedModel):
         if not query:
             data["query"] = {}
         super().__init__(**data)
+
+        # Register self in DI container as singleton
+        try:
+            from codeweaver.core.di import get_container
+            container = get_container()
+            # Use type(self) so each concrete class registers separately
+            container.register(type(self), lambda: self, singleton=True)
+        except Exception as e:
+            # Log if DI not available (monorepo compatibility)
+            logger.debug(
+                "Failed to register %s in DI container (monorepo mode): %s",
+                type(self).__name__, e
+            )
+
+        # Register for config resolution
+        try:
+            from codeweaver.core.config.registry import register_configurable
+            register_configurable(self)
+        except Exception as e:
+            # Log if config system not available (monorepo compatibility)
+            logger.debug(
+                "Failed to register %s for config resolution (monorepo mode): %s",
+                type(self).__name__, e
+            )
+
+    def config_dependencies(self) -> dict[str, type]:
+        """Embedding configs don't depend on others - they provide values."""
+        return {}
+
+    async def apply_resolved_config(self, **resolved: Any) -> None:
+        """Nothing to apply - we're a provider, not a consumer."""
+
+    async def get_dimension(self) -> int | None:
+        """Get resolved dimension through fallback chain.
+
+        Resolution order:
+        1. Explicit config (self.embedding/self.query fields)
+        2. Model capabilities (from capability resolver)
+        3. User-registered defaults
+        4. Hardcoded fallback
+
+        Returns:
+            Resolved dimension or None
+        """
+        # 1. Explicit config
+        for field in ("embedding", "query"):
+            if (
+                (config := getattr(self, field, None))
+                and (found_field := next((f for f in DIMENSION_FIELDS if f in config), None))
+                and isinstance(config[found_field], int)
+            ):
+                return config[found_field]
+
+        # 2. Model capabilities
+        try:
+            from codeweaver.core.di import get_container
+            from codeweaver.providers.embedding.capabilities.dependencies import (
+                EmbeddingCapabilityResolverDep,
+            )
+
+            container = get_container()
+            cap_resolver = await container.resolve(EmbeddingCapabilityResolverDep)  # ty: ignore[invalid-argument-type]
+            if caps := cap_resolver.resolve(self.model_name):
+                if dim := getattr(caps, 'default_dimension', None):
+                    return dim
+        except Exception:
+            pass
+
+        # 3. User-registered defaults
+        try:
+            from codeweaver.core.config.defaults import get_default
+            if user_default := get_default("embedding.dimension"):
+                return user_default
+        except Exception:
+            pass
+
+        # 4. Final fallback (could be None)
+        return None
+
+    async def get_datatype(self) -> str | None:
+        """Get resolved datatype through fallback chain.
+
+        Resolution order:
+        1. Explicit config
+        2. Model capabilities
+        3. User-registered defaults
+        4. Provider-specific defaults
+
+        Returns:
+            Resolved datatype or None
+        """
+        # 1. Explicit config
+        for field in ("embedding", "query"):
+            if (
+                (config := getattr(self, field, None))
+                and (found_field := next((f for f in DATATYPE_FIELDS if f in config), None))
+            ):
+                return config[found_field]
+
+        # 2. Model capabilities
+        try:
+            from codeweaver.core.di import get_container
+            from codeweaver.providers.embedding.capabilities.dependencies import (
+                EmbeddingCapabilityResolverDep,
+            )
+
+            container = get_container()
+            cap_resolver = await container.resolve(EmbeddingCapabilityResolverDep)  # ty: ignore[invalid-argument-type]
+            if caps := cap_resolver.resolve(self.model_name):
+                if dtype := getattr(caps, 'default_datatype', None):
+                    return dtype
+        except Exception:
+            pass
+
+        # 3. User-registered defaults
+        try:
+            from codeweaver.core.config.defaults import get_default
+            if user_default := get_default("embedding.datatype"):
+                return user_default
+        except Exception:
+            pass
+
+        # 4. Provider-specific defaults
+        return self._defaults.get("embedding", {}).get("output_dtype")
 
     @staticmethod
     def _clean_dtypes(
@@ -167,14 +357,32 @@ class BaseEmbeddingConfig(BasedModel):
         """Return the configuration as a dictionary of options."""
         self._adjust_for_datatypes()
         serialized = self._as_options()
-        return SerializedEmbeddingOptionsDict(
-            **type(self)._clean_dtypes(self._defaults | serialized)
-        )  # ty:ignore[missing-typed-dict-key, invalid-argument-type, unsupported-operator]
+        return SerializedEmbeddingOptionsDict(  # type: ignore
+            **type(self)._clean_dtypes(self._defaults | serialized)  # type: ignore
+        )
 
     @property
     def _defaults(self) -> dict[Literal["embedding", "query", "model"], Any]:
         """Return default values for the configuration."""
         return {}
+
+    @computed_field
+    @property
+    def dimension(self) -> int | None:
+        """Get the embedding dimension (computed field for backward compatibility).
+
+        Note: This is synchronous but get_dimension() is async. For full
+        resolution, use get_dimension() directly. This property returns
+        only explicitly configured values or None.
+        """
+        for field in ("embedding", "query"):
+            if (
+                (config := getattr(self, field, None))
+                and (found_field := next((f for f in DIMENSION_FIELDS if f in config), None))
+                and isinstance(config[found_field], int)
+            ):
+                return config[found_field]
+        return None
 
 
 class BedrockEmbeddingRequestParams(TypedDict, total=False):
@@ -225,6 +433,7 @@ class BedrockEmbeddingConfig(BaseEmbeddingConfig):
     """Configuration options for Bedrock embedding models."""
 
     _tag: Literal["bedrock"] = "bedrock"
+    provider: Literal[Provider.BEDROCK] = Provider.BEDROCK
 
     model_name: (
         Literal[
@@ -272,6 +481,7 @@ class FastembedEmbeddingConfigDict(BaseEmbeddingConfig):
     """Configuration options for Fastembed embedding models."""
 
     _tag: Literal["fastembed"] = "fastembed"
+    provider: Literal[Provider.FASTEMBED] = Provider.FASTEMBED
 
     def _as_options(self) -> SerializedEmbeddingOptionsDict:
         """Convert the Fastembed embedding configuration to a dictionary of options."""
@@ -291,10 +501,11 @@ class GoogleEmbeddingConfig(BaseEmbeddingConfig):
     """Configuration options for Google embedding models."""
 
     _tag: Literal["google"] = "google"
+    provider: Literal[Provider.GOOGLE] = Provider.GOOGLE
 
     model_name: Literal["gemini-embedding-001"] | LiteralString
     """The Google embedding model to use."""
-    embedding: GoogleEmbeddingRequestParams | None
+    embedding: GoogleEmbeddingRequestParams | None = None
     """Parameters for the embedding request to Google."""
 
     def _as_options(self) -> SerializedEmbeddingOptionsDict:
@@ -327,6 +538,7 @@ class HuggingFaceEmbeddingConfig(BaseEmbeddingConfig):
     """Configuration options for HuggingFace embedding models."""
 
     _tag: Literal["huggingface"] = "huggingface"
+    provider: Literal[Provider.HUGGINGFACE_INFERENCE] = Provider.HUGGINGFACE_INFERENCE
 
     def _as_options(self) -> SerializedEmbeddingOptionsDict:
         """Convert the HuggingFace embedding configuration to a dictionary of options."""
@@ -373,6 +585,7 @@ class MistralEmbeddingConfig(BaseEmbeddingConfig):
     """Configuration options for Mistral AI embedding models."""
 
     _tag: Literal["mistral"] = "mistral"
+    provider: Literal[Provider.MISTRAL] = Provider.MISTRAL
 
     model_name: Literal["mistral-embed", "codestral-embed"] | LiteralString
     """The Mistral AI embedding model to use."""
@@ -390,8 +603,16 @@ class MistralEmbeddingConfig(BaseEmbeddingConfig):
         ):
             if output_dimension:
                 adjust_collection_config_for_dimensionality(output_dimension)
-            if output_dtype and output_dtype in ("int8", "uint8", "binary", "ubinary"):
+            elif self.model_name == "codestral-embed":
+                # we default to 1536 (not 3072, the actual default) because there's no meaningful performance benefit (<1%) and the size savings are significant (2x smaller)
+                adjust_collection_config_for_dimensionality(1536)
+            if (output_dtype and output_dtype in ("int8", "uint8", "binary", "ubinary")) or (
+                not output_dtype and self.model_name == "codestral-embed"
+            ):
                 adjust_collection_config_for_datatype("uint8")
+        elif self.model_name == "codestral-embed":
+            adjust_collection_config_for_dimensionality(1536)
+            adjust_collection_config_for_datatype("uint8")
 
         return SerializedEmbeddingOptionsDict(
             model_name=self.model_name,
@@ -432,6 +653,9 @@ class OpenAIEmbeddingConfig(BaseEmbeddingConfig):
 
     Supports OpenAI, Azure OpenAI, Ollama, Fireworks, Together AI, GitHub Models, Groq, and other OpenAI-compatible providers.
     """
+
+    _tag: Literal["openai"] = "openai"
+    provider: Literal[Provider.OPENAI] = Provider.OPENAI
 
     model_name: LiteralString
     """The OpenAI-compatible embedding model to use."""
@@ -526,6 +750,9 @@ class SentenceTransformersEmbeddingConfig(BaseEmbeddingConfig):
     Note: Sentence Transformers receives model kwargs through its client constructor. Provide model options to the `model_kwargs` field in `SentenceTransformersClientOptions`.
     """
 
+    _tag: Literal["sentence_transformers"] = "sentence_transformers"
+    provider: Literal[Provider.SENTENCE_TRANSFORMERS] = Provider.SENTENCE_TRANSFORMERS
+
     model_name: LiteralString
     """The Sentence Transformers model to use."""
 
@@ -579,6 +806,9 @@ class VoyageEmbeddingOptionsDict(TypedDict, total=False):
 class VoyageEmbeddingConfig(BaseEmbeddingConfig):
     """Configuration options for Voyage AI embedding models."""
 
+    _tag: Literal["voyage"] = "voyage"
+    provider: Literal[Provider.VOYAGE] = Provider.VOYAGE
+
     model_name: LiteralString
     """The Voyage AI embedding model to use."""
 
@@ -618,3 +848,46 @@ class VoyageEmbeddingConfig(BaseEmbeddingConfig):
             "embedding": {"input_type": "document", "truncation": True, "output_dtype": "float"},
             "query": {"input_type": "query", "truncation": True, "output_dtype": "float"},
         }
+
+
+# ============================================================================
+# Sparse Embedding Configs (Reuse dense configs with renamed classes)
+# ============================================================================
+
+
+class SentenceTransformersSparseEmbeddingConfig(SentenceTransformersEmbeddingConfig):
+    """Configuration options for Sentence Transformers sparse embedding models.
+
+    Inherits all configuration from SentenceTransformersEmbeddingConfig.
+    """
+
+
+class FastEmbedSparseEmbeddingConfig(FastembedEmbeddingConfigDict):
+    """Configuration options for FastEmbed sparse embedding models.
+
+    Inherits all configuration from FastembedEmbeddingConfigDict.
+    """
+
+
+# ============================================================================
+# Discriminator Type Unions
+# ============================================================================
+
+EmbeddingConfigT = Annotated[
+    BedrockEmbeddingConfig
+    | FastembedEmbeddingConfigDict
+    | GoogleEmbeddingConfig
+    | HuggingFaceEmbeddingConfig
+    | MistralEmbeddingConfig
+    | OpenAIEmbeddingConfig
+    | SentenceTransformersEmbeddingConfig
+    | VoyageEmbeddingConfig,
+    Field(discriminator="provider"),
+]
+"""Discriminated union type for all embedding configuration classes."""
+
+SparseEmbeddingConfigT = Annotated[
+    SentenceTransformersSparseEmbeddingConfig | FastEmbedSparseEmbeddingConfig,
+    Field(discriminator="provider"),
+]
+"""Discriminated union type for all sparse embedding configuration classes."""

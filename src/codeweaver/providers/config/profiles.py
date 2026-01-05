@@ -24,37 +24,47 @@ from importlib import util
 from typing import Literal, overload
 
 from pydantic import AnyHttpUrl
+from pydantic_ai.settings import ModelSettings as AgentModelSettings
 
 from codeweaver.core import get_blake_hash, get_project_path, get_user_config_dir
-from codeweaver.providers.config import (
-    AgentModelSettings,
+from codeweaver.providers.config.clients import QdrantClientOptions
+from codeweaver.providers.config.embedding import (
+    FastembedEmbeddingConfigDict,
+    FastEmbedSparseEmbeddingConfig,
+    SentenceTransformersEmbeddingConfig,
+    SentenceTransformersSparseEmbeddingConfig,
+    VoyageEmbeddingConfig,
+)
+from codeweaver.providers.config.kinds import (
     AgentProviderSettings,
     DataProviderSettings,
     EmbeddingProviderSettings,
-    MemoryConfig,
-    ProviderSettingsDict,
-    QdrantConfig,
-    RerankingModelSettings,
+    QdrantVectorStoreProviderSettings,
     RerankingProviderSettings,
-    SparseEmbeddingModelSettings,
     SparseEmbeddingProviderSettings,
     VectorStoreProviderSettings,
 )
+from codeweaver.providers.config.providers import ProviderSettingsDict
+from codeweaver.providers.config.reranking import (
+    FastEmbedRerankingConfig,
+    SentenceTransformersRerankingConfig,
+    VoyageRerankingConfig,
+)
 
 
-def _default_local_vector_config() -> QdrantConfig:
+def _default_local_vector_config() -> QdrantClientOptions:
     """Default local vector store configuration for Qdrant."""
-    return QdrantConfig(prefer_grpc=False, url="http://localhost:6333")
+    return QdrantClientOptions(prefer_grpc=False, host="localhost", port=6333)
 
 
-def _default_remote_vector_config(url: AnyHttpUrl) -> QdrantConfig:
+def _default_remote_vector_config(url: AnyHttpUrl) -> QdrantClientOptions:
     """Default remote vector store configuration for Qdrant."""
-    return QdrantConfig(prefer_grpc=False, url=str(url))
+    return QdrantClientOptions(prefer_grpc=False, url=url)
 
 
 def _get_vector_config(
     vector_deployment: Literal["cloud", "local"], *, url: AnyHttpUrl | None = None
-) -> QdrantConfig:
+) -> QdrantClientOptions:
     if vector_deployment != "cloud":
         return _default_local_vector_config()
     if url is None:
@@ -128,45 +138,44 @@ def _recommended_default(
     return ProviderSettingsDict(
         embedding=(
             EmbeddingProviderSettings(
-                model_settings=EmbeddingModelSettings(model="voyage-code-3"),
+                model_name="voyage-code-3",
+                embedding_config=VoyageEmbeddingConfig(model_name="voyage-code-3"),
                 provider=Provider.VOYAGE,
-                enabled=True,
             ),
         ),
         sparse_embedding=(
             SparseEmbeddingProviderSettings(
                 provider=Provider.FASTEMBED,
-                enabled=True,
                 # Splade is a strong sparse embedding model that works well for code search
                 # Splade models are slow to generate embeddings, but lightning fast at inference time
                 # This version comes without license complications associated with `naver`'s versions
                 # There is a v2 available, but not yet supported by FastEmbed
-                model_settings=SparseEmbeddingModelSettings(model="prithivida/Splade_PP_en_v1"),
+                model_name="prithivida/Splade_PP_en_v1",
+                sparse_embedding_config=FastEmbedSparseEmbeddingConfig(
+                    model_name="prithivida/Splade_PP_en_v1"
+                ),
             ),
         ),
         reranking=(
             RerankingProviderSettings(
                 provider=Provider.VOYAGE,
-                enabled=True,
-                model_settings=RerankingModelSettings(model="voyage-rerank-2.5"),
+                model_name="voyage-rerank-2.5",
+                reranking_config=VoyageRerankingConfig(model_name="voyage-rerank-2.5"),
             ),
         ),
         agent=(
             AgentProviderSettings(
                 provider=Provider.ANTHROPIC,
-                enabled=True,
                 model="claude-haiku-4.5",
-                model_settings=AgentModelSettings(),
+                model_options=AgentModelSettings(),
             ),
         ),
         data=(
-            DataProviderSettings(provider=Provider.TAVILY, enabled=True),
-            DataProviderSettings(provider=Provider.DUCKDUCKGO, enabled=True),
+            DataProviderSettings(provider=Provider.TAVILY),
+            DataProviderSettings(provider=Provider.DUCKDUCKGO),
         ),
-        vector_store=VectorStoreProviderSettings(
-            provider=Provider.QDRANT,
-            enabled=True,
-            provider_settings=_get_vector_config(vector_deployment, url=url),
+        vector_store=QdrantVectorStoreProviderSettings(
+            provider=Provider.QDRANT, client_options=_get_vector_config(vector_deployment, url=url)
         ),
     )
 
@@ -180,55 +189,65 @@ def _quickstart_default(
     """
     from codeweaver.core import Provider
 
+    embedding_model = (
+        "ibm-granite/granite-embedding-small-english-r2" if HAS_ST else "BAAI/bge-small-en-v1.5"
+    )
+    sparse_model = (
+        "opensearch/opensearch-neural-sparse-encoding-doc-v3-gte"
+        if HAS_ST
+        else "prithivida/Splade_PP_en_v1"
+    )
+    reranking_model = (
+        "BAAI/bge-reranking-v2-m3" if HAS_ST else "jinaai/jina-reranking-v2-base-multilingual"
+    )
+
     return ProviderSettingsDict(
         embedding=(
             EmbeddingProviderSettings(
-                model_settings=EmbeddingModelSettings(
-                    model="ibm-granite/granite-embedding-small-english-r2"
+                model_name=embedding_model,
+                embedding_config=(
+                    SentenceTransformersEmbeddingConfig(model_name=embedding_model)
                     if HAS_ST
-                    else "BAAI/bge-small-en-v1.5"
+                    else FastembedEmbeddingConfigDict(model_name=embedding_model)
                 ),
                 provider=Provider.SENTENCE_TRANSFORMERS if HAS_ST else Provider.FASTEMBED,
-                enabled=True,
             ),
         ),
         sparse_embedding=(
             SparseEmbeddingProviderSettings(
                 provider=Provider.SENTENCE_TRANSFORMERS if HAS_ST else Provider.FASTEMBED,
-                enabled=True,
-                model_settings=SparseEmbeddingModelSettings(
-                    model="opensearch/openensearch-neural-sparse-encoding-doc-v3-gte"
+                model_name=sparse_model,
+                sparse_embedding_config=(
+                    SentenceTransformersSparseEmbeddingConfig(model_name=sparse_model)
                     if HAS_ST
-                    else "prithivida/Splade_PP_en_v1"
+                    else FastEmbedSparseEmbeddingConfig(model_name=sparse_model)
                 ),
             ),
         ),
         reranking=(
             RerankingProviderSettings(
                 provider=Provider.SENTENCE_TRANSFORMERS if HAS_ST else Provider.FASTEMBED,
-                enabled=True,
-                model_settings=RerankingModelSettings(
-                    model="BAAI/bge-reranking-v2-m3"
+                model_name=reranking_model,
+                reranking_config=(
+                    SentenceTransformersRerankingConfig(model_name=reranking_model)
                     if HAS_ST
-                    else "jinaai/jina-reranking-v2-base-multilingual"
+                    else FastEmbedRerankingConfig(model_name=reranking_model)
                 ),
             ),
         ),
         agent=(
             AgentProviderSettings(
                 provider=Provider.ANTHROPIC,
-                enabled=True,
                 model="claude-haiku-4.5",
-                model_settings=AgentModelSettings(),
+                model_options=AgentModelSettings(),
             ),
         ),
         data=(
-            DataProviderSettings(provider=Provider.TAVILY, enabled=True),
-            DataProviderSettings(provider=Provider.DUCKDUCKGO, enabled=True),
+            DataProviderSettings(provider=Provider.TAVILY),
+            DataProviderSettings(provider=Provider.DUCKDUCKGO),
         ),
         vector_store=VectorStoreProviderSettings(
             provider=Provider.QDRANT,
-            enabled=True,
             provider_settings=_get_vector_config(vector_deployment, url=url),
         ),
     )
@@ -245,18 +264,26 @@ def _backup_profile() -> ProviderSettingsDict:
 
     # NOTE: qdrant/bm25 doesn't require FASTEMBED -- Fastembed can generate with it, but so can the qdrant_client itself
     # We lose true sparse embeddings with bm25, but it's a good lightweight backup option
+    embedding_model = "minishlab/potion-base-8M" if HAS_ST else "BAAI/bge-small-en-v1.5"
+    reranking_model = (
+        "cross-encoder/ms-marco-TinyBERT-L2-v2" if HAS_ST else "jinaai/jina-reranker-v1-tiny-en"
+    )
+
     backup_settings = _quickstart_default("local") | {
         "sparse_embedding": SparseEmbeddingProviderSettings(
             provider=Provider.FASTEMBED,
-            enabled=True,
-            model_settings=SparseEmbeddingModelSettings(model="qdrant/bm25"),
+            model_name="qdrant/bm25",
+            sparse_embedding_config=FastEmbedSparseEmbeddingConfig(model_name="qdrant/bm25"),
         ),
         # For the dense embeddings, we essentially choose the lightest available model
         # potion-base-8M is a static embedding model, which again loses some quality, but is extremely light weight and virtually instant
         "embedding": EmbeddingProviderSettings(
             provider=Provider.SENTENCE_TRANSFORMERS if HAS_ST else Provider.FASTEMBED,
-            model_settings=EmbeddingModelSettings(
-                model="minishlab/potion-base-8M" if HAS_ST else "BAAI/bge-small-en-v1.5"
+            model_name=embedding_model,
+            embedding_config=(
+                SentenceTransformersEmbeddingConfig(model_name=embedding_model)
+                if HAS_ST
+                else FastembedEmbeddingConfigDict(model_name=embedding_model)
             ),
         ),
     }
@@ -264,18 +291,17 @@ def _backup_profile() -> ProviderSettingsDict:
     backup_settings["reranking"] = (
         RerankingProviderSettings(
             provider=Provider.SENTENCE_TRANSFORMERS if HAS_ST else Provider.FASTEMBED,
-            enabled=True,
-            model_settings=RerankingModelSettings(
-                model="cross-encoder/ms-marco-TinyBERT-L2-v2"
+            model_name=reranking_model,
+            reranking_config=(
+                SentenceTransformersRerankingConfig(model_name=reranking_model)
                 if HAS_ST
-                else "jinaai/jina-reranker-v1-tiny-en"
+                else FastEmbedRerankingConfig(model_name=reranking_model)
             ),
         ),
     )
 
     backup_settings["vector_store"] = VectorStoreProviderSettings(
         provider=Provider.MEMORY,
-        enabled=True,
         provider_settings=MemoryConfig(
             persist_path=get_user_config_dir() / "vectors/backup",
             collection_name=f"{get_project_path().name}-{get_blake_hash(str(get_project_path()).encode('utf-8'))[:8]}-backup",
