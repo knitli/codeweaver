@@ -21,15 +21,16 @@ from __future__ import annotations
 import contextlib
 
 from importlib import util
+from pathlib import Path
 from typing import Literal, overload
 
 from pydantic import AnyHttpUrl
 from pydantic_ai.settings import ModelSettings as AgentModelSettings
 
-from codeweaver.core import get_blake_hash, get_project_path, get_user_config_dir
+from codeweaver.core.utils.filesystem import get_user_data_dir
 from codeweaver.providers.config.clients import QdrantClientOptions
 from codeweaver.providers.config.embedding import (
-    FastembedEmbeddingConfigDict,
+    FastEmbedEmbeddingConfig,
     FastEmbedSparseEmbeddingConfig,
     SentenceTransformersEmbeddingConfig,
     SentenceTransformersSparseEmbeddingConfig,
@@ -39,10 +40,10 @@ from codeweaver.providers.config.kinds import (
     AgentProviderSettings,
     DataProviderSettings,
     EmbeddingProviderSettings,
+    MemoryConfig,
     QdrantVectorStoreProviderSettings,
     RerankingProviderSettings,
     SparseEmbeddingProviderSettings,
-    VectorStoreProviderSettings,
 )
 from codeweaver.providers.config.providers import ProviderSettingsDict
 from codeweaver.providers.config.reranking import (
@@ -52,24 +53,24 @@ from codeweaver.providers.config.reranking import (
 )
 
 
-def _default_local_vector_config() -> QdrantClientOptions:
+def _default_local_vector_client_options() -> QdrantClientOptions:
     """Default local vector store configuration for Qdrant."""
     return QdrantClientOptions(prefer_grpc=False, host="localhost", port=6333)
 
 
-def _default_remote_vector_config(url: AnyHttpUrl) -> QdrantClientOptions:
+def _default_remote_vector_client_options(url: AnyHttpUrl) -> QdrantClientOptions:
     """Default remote vector store configuration for Qdrant."""
     return QdrantClientOptions(prefer_grpc=False, url=url)
 
 
-def _get_vector_config(
+def _get_vector_client_options(
     vector_deployment: Literal["cloud", "local"], *, url: AnyHttpUrl | None = None
 ) -> QdrantClientOptions:
     if vector_deployment != "cloud":
-        return _default_local_vector_config()
+        return _default_local_vector_client_options()
     if url is None:
         raise ValueError("You must provide a URL for cloud vector store deployment.")
-    return _default_remote_vector_config(url)
+    return _default_remote_vector_client_options(url)
 
 
 @overload
@@ -175,7 +176,7 @@ def _recommended_default(
             DataProviderSettings(provider=Provider.DUCKDUCKGO),
         ),
         vector_store=QdrantVectorStoreProviderSettings(
-            provider=Provider.QDRANT, client_options=_get_vector_config(vector_deployment, url=url)
+            provider=Provider.QDRANT, client_options=_get_vector_client_options(vector_deployment, url=url)
         ),
     )
 
@@ -208,7 +209,7 @@ def _quickstart_default(
                 embedding_config=(
                     SentenceTransformersEmbeddingConfig(model_name=embedding_model)
                     if HAS_ST
-                    else FastembedEmbeddingConfigDict(model_name=embedding_model)
+                    else FastEmbedEmbeddingConfig(model_name=embedding_model)
                 ),
                 provider=Provider.SENTENCE_TRANSFORMERS if HAS_ST else Provider.FASTEMBED,
             ),
@@ -246,9 +247,9 @@ def _quickstart_default(
             DataProviderSettings(provider=Provider.TAVILY),
             DataProviderSettings(provider=Provider.DUCKDUCKGO),
         ),
-        vector_store=VectorStoreProviderSettings(
+        vector_store=QdrantVectorStoreProviderSettings(
             provider=Provider.QDRANT,
-            provider_settings=_get_vector_config(vector_deployment, url=url),
+            client_options=_get_vector_client_options(vector_deployment, url=url)
         ),
     )
 
@@ -262,7 +263,7 @@ def _backup_profile() -> ProviderSettingsDict:
     """
     from codeweaver.core import Provider
 
-    # NOTE: qdrant/bm25 doesn't require FASTEMBED -- Fastembed can generate with it, but so can the qdrant_client itself
+    # NOTE: qdrant/bm25 doesn't require FASTEMBED -- FastEmbed can generate with it, but so can the qdrant_client itself
     # We lose true sparse embeddings with bm25, but it's a good lightweight backup option
     embedding_model = "minishlab/potion-base-8M" if HAS_ST else "BAAI/bge-small-en-v1.5"
     reranking_model = (
@@ -283,7 +284,7 @@ def _backup_profile() -> ProviderSettingsDict:
             embedding_config=(
                 SentenceTransformersEmbeddingConfig(model_name=embedding_model)
                 if HAS_ST
-                else FastembedEmbeddingConfigDict(model_name=embedding_model)
+                else FastEmbedEmbeddingConfig(model_name=embedding_model)
             ),
         ),
     }
@@ -300,30 +301,14 @@ def _backup_profile() -> ProviderSettingsDict:
         ),
     )
 
-    backup_settings["vector_store"] = VectorStoreProviderSettings(
+    backup_settings["vector_store"] = QdrantVectorStoreProviderSettings(
         provider=Provider.MEMORY,
-        provider_settings=MemoryConfig(
-            persist_path=get_user_config_dir() / "vectors/backup",
-            collection_name=f"{get_project_path().name}-{get_blake_hash(str(get_project_path()).encode('utf-8'))[:8]}-backup",
-        ),
+        in_memory_config=MemoryConfig(
+            persist_path=Path(f"{get_user_data_dir()}/vectors/backup"), auto_persist=True),
+        client_options=_default_local_vector_client_options(),
     )
 
     return ProviderSettingsDict(**backup_settings)
 
 
-def get_skeleton_provider_settings() -> dict[str, object]:
-    """Get a skeleton provider settings structure for reconciling environment variables.
-
-    Returns a minimal provider settings dict structure that can be used as a base
-    for merging with environment variables in ProviderSettings._reconcile_env_vars().
-
-    Returns:
-        A skeleton dict populated from environment variables that can be merged with
-        provider settings.
-    """
-    from codeweaver.core import get_skeleton_provider_dict
-
-    return get_skeleton_provider_dict()
-
-
-__all__ = ("get_profile", "get_skeleton_provider_settings")
+__all__ = ("get_profile",)

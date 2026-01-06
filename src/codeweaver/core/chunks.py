@@ -55,8 +55,8 @@ if TYPE_CHECKING:
     from codeweaver_tokenizers.base import Tokenizer
 
     from codeweaver.core.discovery import DiscoveredFile
-    from codeweaver.core.types import AnonymityConversion
-    from codeweaver.providers import EmbeddingBatchInfo, EmbeddingRegistry
+    from codeweaver.core.types import AnonymityConversion, EmbeddingBatchInfo
+    from codeweaver.providers import EmbeddingRegistry
 
 # ---------------------------------------------------------------------------
 # *                    Code Search and Chunks
@@ -370,12 +370,12 @@ class CodeChunk(BasedModel):
         }
 
         # Include select metadata if available
-        if self.metadata:
-            metadata = {
+        if self.metadata and (
+            metadata := {
                 k: v for k, v in self.metadata.items() if k in ("name", "tags", "semantic_meta")
             }
-            if metadata:
-                data["metadata"] = metadata
+        ):
+            data["metadata"] = metadata
 
         # Use pydantic_core.to_json for fast, reliable serialization
         return to_json({k: v for k, v in data.items() if v is not None}).decode("utf-8")

@@ -26,11 +26,15 @@ from typing import TYPE_CHECKING, Annotated, Any, cast
 
 from pydantic import ConfigDict, Field, PositiveInt, PrivateAttr, computed_field
 
-from codeweaver.core import BasedModel, CodeChunk, InitializationError
+from codeweaver.core import BasedModel, CodeChunk
 
 # Import ChunkerSettings at runtime for model rebuild to work
-from codeweaver.engine.config import ChunkerSettings, ProviderSettingsDict
-from codeweaver.providers import EmbeddingModelCapabilities, RerankingModelCapabilities
+from codeweaver.engine.config import ChunkerSettings
+from codeweaver.providers import (
+    EmbeddingModelCapabilities,
+    ProviderSettingsDict,
+    RerankingModelCapabilities,
+)
 
 
 if TYPE_CHECKING:
@@ -38,42 +42,6 @@ if TYPE_CHECKING:
 
 
 logger = logging.getLogger(__name__)
-
-
-def _get_chunker_settings() -> ChunkerSettings:
-    """Retrieve the chunker settings."""
-    from codeweaver.server import get_settings
-
-    cw_settings = get_settings()
-    return (
-        cw_settings.chunker
-        if isinstance(cw_settings.chunker, ChunkerSettings)
-        else ChunkerSettings()
-    )
-
-
-def _get_capabilities() -> (
-    tuple[()]
-    | tuple[EmbeddingModelCapabilities]
-    | tuple[EmbeddingModelCapabilities, RerankingModelCapabilities]
-):
-    """Retrieve the capabilities."""
-    from codeweaver.core import ProviderKind, get_model_registry
-
-    registry = get_model_registry()
-    embedding_caps = registry.configured_models_for_kind(ProviderKind.EMBEDDING)
-    reranking_caps = registry.configured_models_for_kind(ProviderKind.RERANKING)
-    if embedding_caps and reranking_caps:
-        return (embedding_caps[0], reranking_caps[0])
-    if embedding_caps:
-        return (embedding_caps[0],)
-    raise InitializationError(
-        "Could not determine capabilities for embedding.",
-        details={"embedding_caps": embedding_caps, "reranking_caps": reranking_caps},
-        suggestions=[
-            "If you have providers configured, submit an issue. It's probably a bug -- this is an alpha release :)"
-        ],
-    )
 
 
 SAFETY_MARGIN = 0.1
@@ -225,7 +193,9 @@ class ChunkGovernor(BasedModel):
                 model_name := getattr(model_settings, "model", None)
             ):
                 # Resolve capability by model name (returns None if not found)
-                embedding_caps = embedding_resolver.resolve(model_name)
+                embedding_caps = cast(
+                    EmbeddingModelCapabilities, embedding_resolver.resolve(model_name)
+                )
 
         # Extract reranking model name from profile
         if (

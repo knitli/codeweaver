@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from collections.abc import Sequence
-from typing import Annotated, Any, Literal, LiteralString, NotRequired, Required, TypedDict
+from typing import Annotated, Any, Literal, LiteralString, NotRequired, Required, TypedDict, cast
 
 from pydantic import Field
 
@@ -17,7 +17,7 @@ class SerializedRerankingOptionsDict(TypedDict, total=False):
     model_name: Required[LiteralString]
     """The name of the reranking model in the format used by the provider."""
 
-    reranking: NotRequired[dict[str, Any]]
+    rerank: NotRequired[dict[str, Any]]
     """Parameters for reranking requests."""
 
     model: NotRequired[dict[str, Any]]
@@ -117,7 +117,7 @@ class BaseRerankingConfig(BasedModel):
     model_name: LiteralString
     """The name of the reranking model."""
 
-    reranking: Annotated[
+    rerank: Annotated[
         dict[str, Any] | None, Field(description="Parameters for reranking requests.")
     ] = None
 
@@ -148,15 +148,13 @@ class VoyageRerankingConfig(BaseRerankingConfig):
     model_name: LiteralString
     """The Voyage AI reranking model to use (e.g., 'rerank-2.5', 'rerank-2.5-lite')."""
 
-    reranking: VoyageRerankingOptionsDict | None = None
+    rerank: VoyageRerankingOptionsDict | None = None
     """Parameters for Voyage reranking requests."""
 
     def _as_options(self) -> SerializedRerankingOptionsDict:
         """Convert the Voyage reranking configuration to a dictionary of options."""
         return SerializedRerankingOptionsDict(
-            model_name=self.model_name,
-            reranking=self.reranking or {},
-            model={},
+            model_name=self.model_name, rerank=cast(dict[str, Any], self.rerank or {}), model={}
         )
 
 
@@ -169,15 +167,13 @@ class CohereRerankingConfig(BaseRerankingConfig):
     model_name: LiteralString
     """The Cohere reranking model to use (e.g., 'rerank-v4.0-pro', 'rerank-v3.5')."""
 
-    reranking: CohereRerankingOptionsDict | None = None
+    rerank: CohereRerankingOptionsDict | None = None
     """Parameters for Cohere reranking requests."""
 
     def _as_options(self) -> SerializedRerankingOptionsDict:
         """Convert the Cohere reranking configuration to a dictionary of options."""
         return SerializedRerankingOptionsDict(
-            model_name=self.model_name,
-            reranking=self.reranking or {},
-            model={},
+            model_name=self.model_name, rerank=cast(dict[str, Any], self.rerank or {}), model={}
         )
 
 
@@ -196,15 +192,15 @@ class BedrockRerankingConfig(BaseRerankingConfig):
     model: BedrockRerankingModelConfig
     """Model configuration including ARN and additional fields."""
 
-    reranking: BedrockRerankingOptionsDict | None = None
+    rerank: BedrockRerankingOptionsDict | None = None
     """Parameters for Bedrock reranking requests."""
 
     def _as_options(self) -> SerializedRerankingOptionsDict:
         """Convert the Bedrock reranking configuration to a dictionary of options."""
         return SerializedRerankingOptionsDict(
             model_name=self.model_name,
-            reranking=self.reranking or {},
-            model=self.model,
+            rerank=cast(dict[str, Any], self.rerank or {}),
+            model=cast(dict[str, Any], self.model),
         )
 
 
@@ -217,15 +213,13 @@ class FastEmbedRerankingConfig(BaseRerankingConfig):
     model_name: LiteralString
     """The FastEmbed reranking model to use (e.g., 'Xenova/ms-marco-MiniLM-L-6-v2')."""
 
-    reranking: FastEmbedRerankingOptionsDict | None = None
+    rerank: FastEmbedRerankingOptionsDict | None = None
     """Parameters for FastEmbed reranking requests."""
 
     def _as_options(self) -> SerializedRerankingOptionsDict:
         """Convert the FastEmbed reranking configuration to a dictionary of options."""
         return SerializedRerankingOptionsDict(
-            model_name=self.model_name,
-            reranking=self.reranking or {},
-            model={},
+            model_name=self.model_name, rerank=cast(dict[str, Any], self.rerank or {}), model={}
         )
 
 
@@ -241,15 +235,13 @@ class SentenceTransformersRerankingConfig(BaseRerankingConfig):
     model_name: LiteralString
     """The Sentence Transformers cross-encoder model to use (e.g., 'cross-encoder/ms-marco-MiniLM-L6-v2')."""
 
-    reranking: SentenceTransformersRerankingOptionsDict | None = None
+    rerank: SentenceTransformersRerankingOptionsDict | None = None
     """Parameters for Sentence Transformers reranking requests."""
 
     def _as_options(self) -> SerializedRerankingOptionsDict:
         """Convert the Sentence Transformers reranking configuration to a dictionary of options."""
         return SerializedRerankingOptionsDict(
-            model_name=self.model_name,
-            reranking=self.reranking or {},
-            model={},
+            model_name=self.model_name, rerank=cast(dict[str, Any], self.rerank or {}), model={}
         )
 
 
@@ -266,3 +258,15 @@ RerankingConfigT = Annotated[
     Field(discriminator="provider"),
 ]
 """Discriminated union type for all reranking configuration classes."""
+
+
+__all__ = (
+    "BaseRerankingConfig",
+    "BedrockRerankingConfig",
+    "CohereRerankingConfig",
+    "FastEmbedRerankingConfig",
+    "RerankingConfigT",
+    "SentenceTransformersRerankingConfig",
+    "SerializedRerankingOptionsDict",
+    "VoyageRerankingConfig",
+)

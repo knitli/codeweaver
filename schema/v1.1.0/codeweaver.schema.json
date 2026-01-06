@@ -851,8 +851,8 @@
       "title": "EndpointSettingsDict",
       "type": "object"
     },
-    "FastembedGPUProviderSettings": {
-      "description": "Special settings for Fastembed-GPU provider.\n\nThese settings only apply if you are using a Fastembed provider, installed the `codeweaver[fastembed-gpu]` or `codeweaver[full-gpu]` extra, have a CUDA-capable GPU, and have properly installed and configured the ONNX GPU runtime.\nYou can provide these settings with your CodeWeaver embedding provider settings, or rerank provider settings. If you're using fastembed-gpu for both, we'll assume you are using the same settings for both if we find one of them.\n\nImportant: You cannot have both `fastembed` and `fastembed-gpu` installed at the same time. They conflict with each other. Make sure to uninstall `fastembed` if you want to use `fastembed-gpu`.",
+    "FastEmbedGPUProviderSettings": {
+      "description": "Special settings for FastEmbed-GPU provider.\n\nThese settings only apply if you are using a FastEmbed provider, installed the `codeweaver[fastembed-gpu]` or `codeweaver[full-gpu]` extra, have a CUDA-capable GPU, and have properly installed and configured the ONNX GPU runtime.\nYou can provide these settings with your CodeWeaver embedding provider settings, or rerank provider settings. If you're using fastembed-gpu for both, we'll assume you are using the same settings for both if we find one of them.\n\nImportant: You cannot have both `fastembed` and `fastembed-gpu` installed at the same time. They conflict with each other. Make sure to uninstall `fastembed` if you want to use `fastembed-gpu`.",
       "properties": {
         "cuda": {
           "anyOf": [
@@ -882,7 +882,7 @@
           "title": "Provider settings"
         }
       },
-      "title": "FastembedGPUProviderSettings",
+      "title": "FastEmbedGPUProviderSettings",
       "type": "object"
     },
     "FastMcpStdioServerSettings": {
@@ -1714,7 +1714,7 @@
     "ProviderSpecificSettings": {
       "anyOf": [
         {
-          "$ref": "#/$defs/FastembedGPUProviderSettings"
+          "$ref": "#/$defs/FastEmbedGPUProviderSettings"
         },
         {
           "$ref": "#/$defs/BedrockProviderSettings"

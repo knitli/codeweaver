@@ -248,6 +248,17 @@ class BaseCodeWeaverSettings(BaseSettings):
             description="Path to the project root directory",
             init=False,
             exclude=CODEWEAVER_SETTINGS_AVAILABLE,
+            repr=True,
+        ),
+    ]
+
+    project_name: Annotated[
+        str,
+        Field(
+            description="Name of the project. Derived from the project directory name if not provided.",
+            init=False,
+            exclude=CODEWEAVER_SETTINGS_AVAILABLE,
+            repr=True,
         ),
     ]
 
@@ -257,6 +268,7 @@ class BaseCodeWeaverSettings(BaseSettings):
             description="Path to the configuration file used to load settings",
             exclude=True,
             init=False,
+            repr=True,
         ),
     ]
 
@@ -265,6 +277,16 @@ class BaseCodeWeaverSettings(BaseSettings):
         Field(
             description="Path to the user configuration directory",
             default_factory=get_user_config_dir,
+            exclude=CODEWEAVER_SETTINGS_AVAILABLE,
+            init=False,
+        ),
+    ]
+
+    user_data_dir: Annotated[
+        DirectoryPath,
+        Field(
+            description="Path to the user data directory",
+            default_factory=get_user_data_dir,
             exclude=CODEWEAVER_SETTINGS_AVAILABLE,
             init=False,
         ),
@@ -281,7 +303,10 @@ class BaseCodeWeaverSettings(BaseSettings):
     def __init__(
         self,
         project_path: DirectoryPath | Unset = UNSET,
+        project_name: str | Unset = UNSET,
         config_file: FilePath | Unset = UNSET,
+        user_config_dir: DirectoryPath | Unset = UNSET,
+        user_data_dir: DirectoryPath | Unset = UNSET,
         **data: Any,
     ) -> None:
         """Initialize the BaseCodeWeaverSettings instance."""

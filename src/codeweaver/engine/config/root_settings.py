@@ -7,25 +7,30 @@ and chunking functionality without the full CodeWeaver server.
 
 from __future__ import annotations
 
-from typing import Annotated, Any
+from typing import Annotated
 
 from pydantic import Field
+from pydantic_settings import SettingsConfigDict
 
 from codeweaver.core.config._logging import LoggingSettingsDict
 from codeweaver.core.config.telemetry import TelemetrySettings
-from codeweaver.core.types.aliases import FilteredKey, FilteredKeyT
-from codeweaver.core.types.enum import AnonymityConversion
-from codeweaver.core.types.sentinel import UNSET, Unset
-from codeweaver.core.types.settings_model import BaseCodeWeaverSettings
-from codeweaver.engine.config.chunker import ChunkerSettings
-from codeweaver.engine.config.indexer import IndexerSettings
+from codeweaver.core.types import (
+    UNSET,
+    AnonymityConversion,
+    BaseCodeWeaverSettings,
+    FilteredKey,
+    FilteredKeyT,
+    Unset,
+)
+from codeweaver.engine import ChunkerSettings, IndexerSettings
+from codeweaver.providers.config import ProviderSettings
 
 
 class CodeWeaverEngineSettings(BaseCodeWeaverSettings):
     """Root settings wrapper for engine-only installation.
 
     When only the engine package is installed (with core and providers),
-    this provides configuration for indexing and chunking operations.
+    this provides configuration for indexing and chunking operations. The config structure is identical to CodeWeaverSettings, but without server-specific settings.
 
     Configuration structure:
         ```toml
@@ -37,11 +42,12 @@ class CodeWeaverEngineSettings(BaseCodeWeaverSettings):
         max_chunk_size = 1000
         overlap = 200
 
+        [provider]
+        embedding.provider = "voyage"
+        embedding.model_name = "voyage-code-3"
+
         [logging]
         level = "INFO"
-
-        [telemetry]
-        enabled = true
         ```
 
     Note:
@@ -51,21 +57,33 @@ class CodeWeaverEngineSettings(BaseCodeWeaverSettings):
         ChunkerSettings under their respective fields.
     """
 
+    model_config = model_config = BaseCodeWeaverSettings.model_config | SettingsConfigDict(
+        title="CodeWeaver Engine Settings"
+    )
+
     indexer: Annotated[
-        IndexerSettings,
+        IndexerSettings | Unset,
         Field(
             default_factory=IndexerSettings,
             description="Indexing configuration for code discovery and processing",
         ),
-    ]
+    ] = UNSET
 
     chunker: Annotated[
-        ChunkerSettings,
+        ChunkerSettings | Unset,
         Field(
             default_factory=ChunkerSettings,
             description="Chunking configuration for code segmentation",
         ),
-    ]
+    ] = UNSET
+
+    provider: Annotated[
+        ProviderSettings | Unset,
+        Field(
+            default_factory=ProviderSettings,
+            description="Provider configuration for embedding, vector store, reranking, etc.",
+        ),
+    ] = UNSET
 
     logging: Annotated[
         LoggingSettingsDict | Unset,
@@ -87,7 +105,6 @@ class CodeWeaverEngineSettings(BaseCodeWeaverSettings):
 
     def _initialize(self) -> None:
         """Initialize engine settings - nothing special needed."""
-        pass
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion] | None:
         """Define telemetry filtering for engine settings."""

@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import logging
 import os
@@ -15,6 +16,7 @@ import sys
 from contextlib import contextmanager
 from functools import cache
 from importlib.util import find_spec
+from types import ModuleType
 from typing import TYPE_CHECKING
 
 from pydantic import PositiveInt
@@ -85,7 +87,7 @@ def _wsl_count(count: PositiveInt) -> PositiveInt:
 
 
 @cache
-def asyncio_or_uvloop() -> object:
+def asyncio_or_uvloop() -> ModuleType:
     """Set uvloop as the event loop policy if available and appropriate."""
     if (
         sys.platform not in {"win32", "cygwin", "wasi", "ios"}
@@ -95,7 +97,6 @@ def asyncio_or_uvloop() -> object:
         import uvloop
 
         return uvloop
-    import asyncio
 
     return asyncio
 

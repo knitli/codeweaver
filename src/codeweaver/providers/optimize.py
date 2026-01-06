@@ -3,7 +3,7 @@
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
 
-"""Optimization decision logic for Fastembed and SentenceTransformers providers."""
+"""Optimization decision logic for FastEmbed and SentenceTransformers providers."""
 
 from __future__ import annotations
 
@@ -22,13 +22,13 @@ from codeweaver.core import LazyImport, has_package, lazy_import
 
 
 # ===========================================================================
-# *               Fastembed GPU/CPU Decision Logic                     *
+# *               FastEmbed GPU/CPU Decision Logic                     *
 # ===========================================================================
-"""This section conducts a series of checks to determine if Fastembed-GPU can be used.
+"""This section conducts a series of checks to determine if FastEmbed-GPU can be used.
 
-It is only called if the user requests a Fastembed provider.
+It is only called if the user requests a FastEmbed provider.
 
-There is also a separate set of optimizations that can be used with Fastembed and SentenceTransformers. These aren't yet fully implemented.
+There is also a separate set of optimizations that can be used with FastEmbed and SentenceTransformers. These aren't yet fully implemented.
 """
 
 logger = logging.getLogger(__name__)
@@ -127,7 +127,7 @@ def decide_fastembed_runtime(
             from warnings import warn
 
             warn(
-                f"It looks like you requested GPU usage for Fastembed, but cuda is not available. Make sure to provide your device_ids in your CodeWeaver settings if you have GPUs available, installed the `codeweaver[fastembed-gpu]` extra, and followed Fastembed's [gpu setup instructions](https://qdrant.github.io/fastembed/examples/FastEmbed_GPU/). Our checks returned this message: {decision[2]}",
+                f"It looks like you requested GPU usage for FastEmbed, but cuda is not available. Make sure to provide your device_ids in your CodeWeaver settings if you have GPUs available, installed the `codeweaver[fastembed-gpu]` extra, and followed FastEmbed's [gpu setup instructions](https://qdrant.github.io/fastembed/examples/FastEmbed_GPU/). Our checks returned this message: {decision[2]}",
                 stacklevel=2,
             )
             return "cpu"
@@ -140,7 +140,7 @@ def decide_fastembed_runtime(
 # These optimizations aren't yet tied into the provider executions
 # We need to:
 #    - integrate and combine them with user settings/choices
-#    - ensure they are integrated with `Fastembed` and `SentenceTransformers` (Fastembed will always use onnx, however)
+#    - ensure they are integrated with `FastEmbed` and `SentenceTransformers` (FastEmbed will always use onnx, however)
 #    - account for any potential conflicts or limitations in the chosen execution environment
 # ===========================================================================
 

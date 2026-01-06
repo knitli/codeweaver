@@ -13,6 +13,18 @@ if TYPE_CHECKING:
     from codeweaver.core.config.registry import ConfigurableComponent
 
 
+class ConfigurationSupplier(Protocol):
+    """Protocol for supplying configuration instances."""
+
+    async def get_configuration(self) -> Any:
+        """Get the configuration instance.
+
+        Returns:
+            Configuration instance.
+        """
+        ...
+
+
 class ConfigurableComponent(Protocol):
     """Protocol for components participating in config resolution.
 

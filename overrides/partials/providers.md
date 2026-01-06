@@ -9,7 +9,7 @@ SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 - Azure
 - Bedrock
 - Cohere
-- Fastembed
+- FastEmbed
 - Fireworks
 - Github
 - Google
@@ -25,13 +25,13 @@ SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 - Voyage
 
 ## Sparse embedding Providers
-- Fastembed
+- FastEmbed
 - Sentence Transformers
 
 ## Reranking Providers
 - Bedrock
 - Cohere
-- Fastembed
+- FastEmbed
 - Sentence Transformers
 - Voyage
 

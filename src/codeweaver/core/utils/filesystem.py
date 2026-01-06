@@ -17,6 +17,8 @@ from functools import cache
 from pathlib import Path
 from typing import cast
 
+import platformdirs
+
 from codeweaver.core.types.aliases import DevToolName, DevToolNameT, LlmToolName, LlmToolNameT
 from codeweaver.core.types.sentinel import MISSING, Missing
 
@@ -24,15 +26,25 @@ from codeweaver.core.types.sentinel import MISSING, Missing
 @cache
 def get_user_config_dir(*, base_only: bool = False) -> Path:
     """Get the user configuration directory based on the operating system."""
-    import platform
+    if base_only:
+        return Path(platformdirs.user_config_dir())
+    return Path(platformdirs.user_config_dir("codeweaver"))
 
-    if (system := platform.system()) == "Windows":
-        config_dir = Path(os.getenv("APPDATA", Path("~\\AppData\\Roaming").expanduser()))
-    elif system == "Darwin":
-        config_dir = Path.home() / "Library" / "Application Support"
-    else:
-        config_dir = Path(os.getenv("XDG_CONFIG_HOME", Path.home() / ".config"))
-    return config_dir if base_only else config_dir / "codeweaver"
+
+@cache
+def get_user_data_dir(*, base_only: bool = False) -> Path:
+    """Get the user data directory based on the operating system."""
+    if base_only:
+        return Path(platformdirs.user_data_dir())
+    return Path(platformdirs.user_data_dir("codeweaver"))
+
+
+@cache
+def get_user_cache_dir(*, base_only: bool = False) -> Path:
+    """Get the user cache directory based on the operating system."""
+    if base_only:
+        return Path(platformdirs.user_cache_dir())
+    return Path(platformdirs.user_cache_dir("codeweaver"))
 
 
 def try_git_rev_parse() -> Path | None:
@@ -409,8 +421,8 @@ def backup_file_path(*, project_name: str | None = None, project_path: Path | No
     from codeweaver.core.utils.general import generate_collection_name
 
     return (
-        get_user_config_dir()
-        / ".vectors"
+        get_user_data_dir()
+        / "vectors"
         / "backup"
         / f"{generate_collection_name(is_backup=True, project_name=project_name, project_path=project_path)}.json"
     )
@@ -424,7 +436,9 @@ __all__ = (
     "get_git_revision",
     "get_project_path",
     "get_tooling_dirs",
+    "get_user_cache_dir",
     "get_user_config_dir",
+    "get_user_data_dir",
     "has_git",
     "in_codeweaver_clone",
     "is_git_dir",

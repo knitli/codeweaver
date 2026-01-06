@@ -56,6 +56,7 @@ def is_local_host(host: str | AnyUrl | httpx.URL | urllib.parse.ParseResult) -> 
             # likely a url, parse it
             parsed = urllib.parse.urlparse(filtered_host)
             filtered_host = parsed.hostname or ""
+    return filtered_host in LOCALHOST_INDICATORS if filtered_host else False
 
 
 def is_pydantic_basemodel(model: Any) -> TypeIs[type[BaseModel] | BaseModel]:

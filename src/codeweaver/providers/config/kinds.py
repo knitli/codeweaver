@@ -22,7 +22,6 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Annotated, Any, Literal, NotRequired, Required, Self, TypedDict, cast, overload
 
-from awscrt.mqtt5 import ClientOptions
 from pydantic import (
     Discriminator,
     Field,
@@ -50,6 +49,7 @@ from codeweaver.core import (
 )
 from codeweaver.providers.config.clients import (
     BedrockClientOptions,
+    ClientOptions,
     CohereClientOptions,
     FastEmbedClientOptions,
     GeneralEmbeddingClientOptionsType,
@@ -162,10 +162,20 @@ class BaseProviderSettings(BasedModel, ABC):
 
     def get_client(self) -> Any:
         """Construct and return the client instance based on the provider settings."""
-        options = self.client_options or {}
+        options = (
+            self.client_options.as_settings()
+            if isinstance(self.client_options, ClientOptions)
+            else {}
+        )
         client_import = cast(SDKClient, self.client).client
         if not isinstance(client_import, dict):
             return client_import._resolve()(**options)
+        kind = next(
+            name for name in {"sparse", "embed", "rerank"} if name in type(self).__name__.lower()
+        )
+        client_class = client_import.get(kind)._resolve()
+
+        return client_class(**options)
 
 
 class BaseProviderSettingsDict(TypedDict, total=False):
@@ -252,10 +262,10 @@ class AzureProviderMixin:
         }
 
 
-class FastembedProviderMixin:
-    """Special settings for Fastembed-GPU provider.
+class FastEmbedProviderMixin:
+    """Special settings for FastEmbed-GPU provider.
 
-    These settings only apply if you are using a Fastembed provider, installed the `codeweaver[fastembed-gpu]` or `codeweaver[full-gpu]` extra, have a CUDA-capable GPU, and have properly installed and configured the ONNX GPU runtime (see ONNX docs).
+    These settings only apply if you are using a FastEmbed provider, installed the `codeweaver[fastembed-gpu]` or `codeweaver[full-gpu]` extra, have a CUDA-capable GPU, and have properly installed and configured the ONNX GPU runtime (see ONNX docs).
 
     You can provide these settings with your CodeWeaver embedding provider settings, or rerank provider settings. If you're using fastembed-gpu for both, we'll assume you are using the same settings for both if we find one of them.
 
@@ -572,11 +582,13 @@ class EmbeddingProviderSettings(BaseEmbeddingProviderSettings):
 
     def get_embed_kwargs(self) -> dict[str, Any]:
         """Get keyword arguments for embedding requests based on the provider settings."""
-        return {}
+        embedding_config = self.embedding_config.as_options()
+        return embedding_config.get("embedding", {})
 
     def get_query_embed_kwargs(self) -> dict[str, Any]:
         """Get keyword arguments for query embedding requests based on the provider settings."""
-        return {}
+        embedding_config = self.embedding_config.as_options()
+        return embedding_config.get("query", {})
 
 
 class AzureEmbeddingProviderSettings(AzureProviderMixin, EmbeddingProviderSettings):
@@ -601,8 +613,8 @@ class BedrockEmbeddingProviderSettings(BedrockProviderMixin, EmbeddingProviderSe
     ] = None
 
 
-class FastembedEmbeddingProviderSettings(FastembedProviderMixin, EmbeddingProviderSettings):
-    """Provider settings for Fastembed embedding models."""
+class FastEmbedEmbeddingProviderSettings(FastEmbedProviderMixin, EmbeddingProviderSettings):
+    """Provider settings for FastEmbed embedding models."""
 
     client_options: Annotated[
         FastEmbedClientOptions | None,
@@ -635,10 +647,10 @@ class SparseEmbeddingProviderSettings(BaseProviderSettings):
         return SDKClient.SENTENCE_TRANSFORMERS
 
 
-class FastembedSparseEmbeddingProviderSettings(
-    FastembedProviderMixin, SparseEmbeddingProviderSettings
+class FastEmbedSparseEmbeddingProviderSettings(
+    FastEmbedProviderMixin, SparseEmbeddingProviderSettings
 ):
-    """Provider settings for Fastembed sparse embedding models."""
+    """Provider settings for FastEmbed sparse embedding models."""
 
     client_options: Annotated[
         FastEmbedClientOptions | None,
@@ -681,8 +693,8 @@ class RerankingProviderSettings(BaseProviderSettings):
         return cast(LiteralSDKClient, SDKClient.from_string(self.provider.variable))
 
 
-class FastembedRerankingProviderSettings(FastembedProviderMixin, RerankingProviderSettings):
-    """Provider settings for Fastembed reranking models."""
+class FastEmbedRerankingProviderSettings(FastEmbedProviderMixin, RerankingProviderSettings):
+    """Provider settings for FastEmbed reranking models."""
 
     client_options: Annotated[
         FastEmbedClientOptions | None,
@@ -761,13 +773,15 @@ __all__ = (
     "ConnectionRateLimitConfig",
     "DataProviderSettings",
     "EmbeddingProviderSettings",
-    "FastembedEmbeddingProviderSettings",
-    "FastembedProviderMixin",
-    "FastembedRerankingProviderSettings",
-    "FastembedSparseEmbeddingProviderSettings",
+    "FastEmbedEmbeddingProviderSettings",
+    "FastEmbedProviderMixin",
+    "FastEmbedRerankingProviderSettings",
+    "FastEmbedSparseEmbeddingProviderSettings",
     "MemoryConfig",
+    "ModelString",
     "QdrantVectorStoreProviderSettings",
     "RerankingProviderSettings",
     "SparseEmbeddingProviderSettings",
     "VectorConfig",
+    "VectorStoreProviderSettings",
 )

@@ -16,7 +16,6 @@ import inspect
 import logging
 import os
 
-from collections.abc import Callable
 from importlib import util
 from pathlib import Path
 from typing import Annotated, Any, Literal, Self, Unpack, cast, get_origin, overload
@@ -33,7 +32,7 @@ from pydantic import (
     ValidationError,
     computed_field,
 )
-from pydantic.fields import ComputedFieldInfo, FieldInfo
+from pydantic.fields import FieldInfo
 from pydantic.networks import HttpUrl
 from pydantic_core import from_json, to_json
 from pydantic_settings import (
@@ -46,7 +45,6 @@ from pydantic_settings import (
     JsonConfigSettingsSource,
     PydanticBaseSettingsSource,
     SecretsSettingsSource,
-    SettingsConfigDict,
     TomlConfigSettingsSource,
     YamlConfigSettingsSource,
 )
@@ -54,6 +52,7 @@ from pydantic_settings import (
 from codeweaver.core import (
     UNSET,
     AnonymityConversion,
+    BaseCodeWeaverSettings,
     BasedModel,
     DefaultLoggingSettings,
     DefaultTelemetrySettings,
@@ -62,7 +61,6 @@ from codeweaver.core import (
     LoggingSettingsDict,
     TelemetrySettings,
     Unset,
-    clean_sentinel_from_schema,
     get_user_config_dir,
     is_test_environment,
     lazy_import,
@@ -341,7 +339,7 @@ def _resolve_env_settings_path(*, directory: bool = False) -> FilePath | Directo
     return UNSET
 
 
-class CodeWeaverSettings(BaseSettings):
+class CodeWeaverSettings(BaseCodeWeaverSettings):
     """Main configuration model following pydantic-settings patterns.
 
     Configuration precedence (highest to lowest):
@@ -353,33 +351,6 @@ class CodeWeaverSettings(BaseSettings):
 
     NOTE: You should add local configs to the .gitignore, either at the project .gitignore, or if it's not your repo, in .git/info/exclude (like with: `echo "codeweaver.local.toml" >> .git/info/exclude`). You should tell projects you work on to add a *.local.* pattern to their .gitiginore if they haven't already because this is a common pattern for local config files.
     """
-
-    model_config = SettingsConfigDict(
-        case_sensitive=False,
-        cli_kebab_case=True,
-        extra="allow",  # Allow extra fields in the configuration for plugins/extensions
-        field_title_generator=cast(
-            Callable[[str, FieldInfo | ComputedFieldInfo], str],
-            BasedModel.model_config["field_title_generator"],  # type: ignore
-        ),
-        json_schema_extra=clean_sentinel_from_schema,
-        nested_model_default_partial_update=True,
-        from_attributes=True,
-        env_ignore_empty=True,
-        env_nested_delimiter="__",
-        env_nested_max_split=-1,
-        env_prefix="CODEWEAVER_",  # environment variables will be prefixed with CODEWEAVER_
-        # keep secrets in user config dir
-        str_strip_whitespace=True,
-        title="CodeWeaver Settings",
-        use_attribute_docstrings=True,
-        use_enum_values=True,
-        validate_assignment=True,
-        populate_by_name=True,
-        # spellchecker:off
-        # NOTE: Config sources are set in `settings_customise_sources` method below
-        # spellchecker:on
-    )
 
     # Core settings
     project_path: Annotated[

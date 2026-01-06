@@ -1,5 +1,6 @@
 """Defines a base class for the Qdrant and In Memory Qdrant vector stores to reduce code duplication."""
 from __future__ import annotations
+from codeweaver.providers import QdrantVectorStoreProvider, QdrantVectorStoreProviderSettings
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
@@ -40,9 +41,8 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
     def _telemetry_keys(self) -> None:
         return None
 
-    def _fetch_config(self) -> DictView[VectorStoreProviderSettings]:
-        from codeweaver.core import get_provider_config_for
-        return get_provider_config_for('vector_store')
+    def _fetch_config(self) -> DictView[QdrantVectorStoreProviderSettings]:
+
 
     async def _metadata(self) -> CollectionMetadata | None:
         """Get the collection metadata."""
@@ -74,8 +74,6 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
             CollectionMetadata configured according to provider settings.
         """
         from codeweaver.core import get_project_path
-        from codeweaver.providers.config import get_settings_map
-        settings_map = get_settings_map()
         project_name = settings_map.get('project_name') if isinstance(settings_map.get('project_name'), str) else get_project_path().name
         distance = Distance.COSINE if self.distance_metric == 'cosine' else Distance.DOT if self.distance_metric == 'dot' else Distance.EUCLID
         datatype = Datatype.FLOAT32 if self.dense_dtype == 'float32' else Datatype.FLOAT16 if self.dense_dtype == 'float16' else Datatype.UINT8

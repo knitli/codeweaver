@@ -100,7 +100,7 @@ def get_sparse_embedder() -> type[SparseTextEmbedding]:
     """
     Get the sparse embedder with added custom models.
 
-    TODO: Temporarily disabled until we can work out the bugs on added sparse models in Fastembed.
+    TODO: Temporarily disabled until we can work out the bugs on added sparse models in FastEmbed.
     """
     # splade_pp.supported_splade_models.append(SPARSE_MODELS[0])
     return SparseTextEmbedding
@@ -128,7 +128,7 @@ def get_text_embedder() -> type[TextEmbedding]:
     }
     """
     """
-    TODO: Temporarily disabled until we can work out the bugs on added dense models in Fastembed.
+    TODO: Temporarily disabled until we can work out the bugs on added dense models in FastEmbed.
     # Get existing model names from native FastEmbed registry
     existing_model_names = {model.get("model") for model in embedder.list_supported_models()}
 

@@ -34,11 +34,19 @@ from pydantic import Discriminator, Field, SecretStr, Tag, computed_field, model
 from pydantic_ai.settings import ModelSettings as AgentModelSettings
 from pydantic_ai.settings import merge_model_settings
 
-from codeweaver.core import BasedModel, DictView, LiteralProviderKindType, Provider, Unset
+from codeweaver.core import (
+    UNSET,
+    BasedModel,
+    DictView,
+    LiteralProviderKindType,
+    Provider,
+    ProviderKind,
+    Unset,
+)
 from codeweaver.providers.config.clients import QdrantClientOptions
 from codeweaver.providers.config.embedding import (
     EmbeddingConfigT,
-    FastembedEmbeddingConfigDict,
+    FastEmbedEmbeddingConfig,
     FastEmbedSparseEmbeddingConfig,
     GoogleEmbeddingConfig,
     MistralEmbeddingConfig,
@@ -55,9 +63,9 @@ from codeweaver.providers.config.kinds import (
     BedrockRerankingProviderSettings,
     DataProviderSettings,
     EmbeddingProviderSettings,
-    FastembedEmbeddingProviderSettings,
-    FastembedRerankingProviderSettings,
-    FastembedSparseEmbeddingProviderSettings,
+    FastEmbedEmbeddingProviderSettings,
+    FastEmbedRerankingProviderSettings,
+    FastEmbedSparseEmbeddingProviderSettings,
     QdrantVectorStoreProviderSettings,
     RerankingProviderSettings,
     SparseEmbeddingProviderSettings,
@@ -90,7 +98,7 @@ type VectorStoreProviderSettingsType = Annotated[
 type SpecialEmbeddingProviderSettingsType = Annotated[
     Annotated[AzureEmbeddingProviderSettings, Tag(Provider.AZURE.variable)]
     | Annotated[BedrockEmbeddingProviderSettings, Tag(Provider.BEDROCK.variable)]
-    | Annotated[FastembedEmbeddingProviderSettings, Tag(Provider.FASTEMBED.variable)],
+    | Annotated[FastEmbedEmbeddingProviderSettings, Tag(Provider.FASTEMBED.variable)],
     Field(description="Special embedding provider settings type.", discriminator="tag"),
 ]
 
@@ -117,7 +125,7 @@ type EmbeddingProviderSettingsType = Annotated[
 
 type SparseEmbeddingProviderSettingsType = Annotated[
     Annotated[SparseEmbeddingProviderSettings, Tag(Provider.SENTENCE_TRANSFORMERS.variable)]
-    | Annotated[FastembedSparseEmbeddingProviderSettings, Tag(Provider.FASTEMBED.variable)],
+    | Annotated[FastEmbedSparseEmbeddingProviderSettings, Tag(Provider.FASTEMBED.variable)],
     Field(description="Sparse embedding provider settings type.", discriminator="tag"),
 ]
 
@@ -135,7 +143,7 @@ def _discriminate_reranking_provider(v: Any) -> str:
 
 
 type SpecialRerankingProviderSettingsType = Annotated[
-    Annotated[FastembedRerankingProviderSettings, Tag(Provider.FASTEMBED.variable)]
+    Annotated[FastEmbedRerankingProviderSettings, Tag(Provider.FASTEMBED.variable)]
     | Annotated[BedrockRerankingProviderSettings, Tag(Provider.BEDROCK.variable)],
     Field(description="Special reranking provider settings type.", discriminator="tag"),
 ]
@@ -265,7 +273,7 @@ def _create_embedding_config(provider: Provider, model: LiteralString) -> Embedd
     if provider == Provider.GOOGLE:
         return GoogleEmbeddingConfig(model_name=model)
     if provider == Provider.FASTEMBED:
-        return FastembedEmbeddingConfigDict(model_name=model)
+        return FastEmbedEmbeddingConfig(model_name=model)
     if provider == Provider.SENTENCE_TRANSFORMERS:
         return SentenceTransformersEmbeddingConfig(model_name=model)
     raise ValueError(f"Unknown embedding provider: {provider}")
@@ -431,7 +439,7 @@ class ProviderSettings(BasedModel):
             We will only use the first provider you configure here. We may add support for multiple embedding providers in the future.
             """
         ),
-    ] = DefaultEmbeddingProviderSettings
+    ] = DefaultEmbeddingProviderSettings or UNSET
 
     sparse_embedding: Annotated[
         tuple[SparseEmbeddingProviderSettingsType, ...]
@@ -451,7 +459,7 @@ class ProviderSettings(BasedModel):
 
             We will only use the first provider you configure here. We may add support for multiple reranking providers in the future."""
         ),
-    ] = DefaultRerankingProviderSettings
+    ] = DefaultRerankingProviderSettings or UNSET
 
     vector_store: Annotated[
         tuple[VectorStoreProviderSettingsType, ...] | VectorStoreProviderSettingsType | Unset,
@@ -465,22 +473,6 @@ class ProviderSettings(BasedModel):
         Field(description="""Agent provider configuration"""),
     ] = DefaultAgentProviderSettings
 
-    def _reconcile_env_vars(self) -> ProviderSettings:
-        """Reconcile provider settings with environment variables, if any."""
-        from codeweaver.providers.config.profiles import get_skeleton_provider_settings
-
-        serialized_self = self.model_dump()
-        skeleton = get_skeleton_provider_settings()
-        for key, value in serialized_self.items():
-            if skeleton_value := skeleton.get(key):
-                if value is Unset:
-                    serialized_self[key] = (skeleton_value,)
-                else:
-                    value = value[0] if isinstance(value, tuple) else value
-                    new_value = value.copy() | skeleton_value
-                    serialized_self[key] = (new_value,)
-        return self.model_copy(update=serialized_self)
-
     @model_validator(mode="after")
     def validate_and_normalize_providers(self) -> ProviderSettings:
         """Validate and normalize provider settings after initialization."""
@@ -488,7 +480,7 @@ class ProviderSettings(BasedModel):
             value = getattr(self, key)
             if value is not Unset and not isinstance(value, tuple):
                 setattr(self, key, (value,))
-        return self._reconcile_env_vars()
+        return self
 
     def _telemetry_keys(self) -> None:
         return None
@@ -605,8 +597,6 @@ class ProviderSettings(BasedModel):
         Args:
             kind: The kind of provider or ProviderKind to get settings for.
         """
-        from codeweaver.core import ProviderKind
-
         setting_field = (
             kind
             if kind
@@ -626,4 +616,12 @@ AllDefaultProviderSettings = ProviderSettingsDict(
 )
 
 
-__all__ = ()
+__all__ = (
+    "AgentProviderSettingsType",
+    "AllDefaultProviderSettings",
+    "DataProviderSettingsType",
+    "EmbeddingProviderSettingsType",
+    "ProviderSettingsView",
+    "RerankingProviderSettingsType",
+    "VectorStoreProviderSettingsType",
+)

@@ -12,7 +12,7 @@ import time
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar, Literal, TypedDict, cast, overload
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, cast
 
 import httpx
 
@@ -51,11 +51,6 @@ from codeweaver.core import (
     ProviderError,
     StrategizedQuery,
 )
-from codeweaver.providers.config import EmbeddingModelSettings, SparseEmbeddingModelSettings
-from codeweaver.providers.embedding.capabilities.base import (
-    EmbeddingModelCapabilities,
-    SparseEmbeddingModelCapabilities,
-)
 from codeweaver.providers.vector_stores.search import Filter
 
 
@@ -68,20 +63,6 @@ logger = logging.getLogger(__name__)
 type MixedQueryInput = (
     list[float] | list[int] | dict[Literal["dense", "sparse"], list[float] | list[int] | Any]
 )
-
-
-class EmbeddingCapsDict(TypedDict):
-    dense: EmbeddingModelCapabilities | None
-    sparse: SparseEmbeddingModelCapabilities | None
-    backup_dense: EmbeddingModelCapabilities | None
-    backup_sparse: SparseEmbeddingModelCapabilities | None
-
-
-class EmbeddingSettingsDict(TypedDict):
-    dense: EmbeddingModelSettings | None
-    sparse: SparseEmbeddingModelSettings | None
-    backup_dense: EmbeddingModelSettings | None
-    backup_sparse: SparseEmbeddingModelSettings | None
 
 
 # Lock for thread-safe initialization of class-level embedding capabilities
@@ -98,117 +79,6 @@ class CircuitBreakerState(BaseEnum):
 
 class CircuitBreakerOpenError(Exception):
     """Raised when circuit breaker is open and rejecting requests."""
-
-
-@overload
-def _get_caps(
-    *, sparse: Literal[False] = False, backup: bool = False
-) -> EmbeddingModelCapabilities | None: ...
-@overload
-def _get_caps(
-    *, sparse: Literal[True], backup: bool = False
-) -> SparseEmbeddingModelCapabilities | None: ...
-def _get_caps(
-    *, sparse: bool = False, backup: bool = False
-) -> EmbeddingModelCapabilities | SparseEmbeddingModelCapabilities | None:
-    """Get embedding capabilities for in-memory provider.
-
-    Args:
-        sparse: Whether to get sparse embedding capabilities.
-
-    Returns:
-        Embedding capabilities or None.
-    """
-    from codeweaver.core import Unset, get_model_registry
-
-    registry = get_model_registry()
-    if backup:
-        from codeweaver.providers.config import get_profile
-
-        profile = get_profile("backup", "local")
-        if not profile:
-            return None
-        if (
-            sparse
-            and (sparse_profile := profile["sparse_embedding"])
-            and (
-                sparse_settings := sparse_profile[0]
-                if isinstance(sparse_profile, tuple) and len(sparse_profile) > 0
-                else None
-                if isinstance(sparse_profile, Unset)
-                else sparse_profile
-            )
-            and (
-                sparse_model := registry.get_embedding_capabilities(
-                    provider=sparse_settings["provider"],
-                    name=sparse_settings["model_settings"]["model"],
-                )
-            )
-        ):  # type: ignore
-            return sparse_model  # type: ignore
-        if (
-            (dense_profile := profile["embedding"])
-            and (
-                dense_settings := dense_profile[0]
-                if isinstance(dense_profile, tuple) and len(dense_profile) > 0
-                else None
-                if isinstance(dense_profile, Unset)
-                else dense_profile
-            )
-            and (
-                dense_model := registry.get_embedding_capabilities(
-                    provider=dense_settings["provider"],
-                    name=dense_settings["model_settings"]["model"],
-                )
-            )
-        ):  # type: ignore
-            return dense_model  # type: ignore
-    if sparse and (sparse_settings := registry.configured_models_for_kind(kind="sparse_embedding")):
-        return sparse_settings[0] if isinstance(sparse_settings, tuple) else sparse_settings  # type: ignore
-    if not sparse and (dense_settings := registry.configured_models_for_kind(kind="embedding")):
-        return dense_settings[0] if isinstance(dense_settings, tuple) else dense_settings  # type: ignore
-    return None
-
-
-def _get_embedding_settings() -> EmbeddingSettingsDict:
-    """Get embedding model settings for in-memory provider.
-
-    Returns:
-        Embedding model settings dictionary.
-    """
-    from codeweaver.core import get_provider_registry
-    from codeweaver.providers.config import get_profile
-
-    profile = get_profile("backup", "local")
-    registry = get_provider_registry()
-    dense = registry.get_configured_provider_settings("embedding")
-    sparse = registry.get_configured_provider_settings("sparse_embedding")
-    return EmbeddingSettingsDict(
-        dense=dense.get("model_settings") if dense else None,
-        sparse=sparse.get("model_settings") if sparse else None,
-        backup_dense=profile["embedding"][0]["model_settings"]
-        if profile
-        and profile["embedding"]
-        and isinstance(profile["embedding"], tuple)
-        and len(profile["embedding"]) > 0
-        else None,
-        backup_sparse=profile["sparse_embedding"][0]["model_settings"]
-        if profile
-        and profile["sparse_embedding"]
-        and isinstance(profile["sparse_embedding"], tuple)
-        and len(profile["sparse_embedding"]) > 0
-        else None,
-    )
-
-
-def _default_embedding_caps() -> EmbeddingCapsDict:
-    """Default factory for embedding capabilities. Evaluated lazily at instance creation."""
-    return EmbeddingCapsDict(
-        dense=_get_caps(),
-        sparse=_get_caps(sparse=True),
-        backup_dense=_get_caps(backup=True),
-        backup_sparse=_get_caps(sparse=True, backup=True),
-    )
 
 
 class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):

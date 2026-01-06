@@ -396,9 +396,7 @@ def get_skeleton_provider_dict() -> dict[str, Any]:
     The return type is a sparse version of `ProviderSettingsDict` where only keys with both environment variables and values are set.
     """
     env_map = get_provider_vars()
-    skeleton = defaultdict(
-        lambda: {"provider_settings": {}, "model_settings": {}, "connection": {}}
-    )
+    skeleton = defaultdict(lambda: {"connection": {}, "client_options": {}, "": {}})
     for kind, vars_dict in env_map.items():
         if vars_dict:
             for key, value in vars_dict.items():

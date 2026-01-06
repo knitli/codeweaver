@@ -244,11 +244,12 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         self,
         client: ClientDep[EmbeddingClient] = INJECTED,
         config: EmbeddingConfigT | None = None,
-        caps: EmbeddingCapabilityResolverDep | None = INJECTED,
-        impl_deps: Any = None,
-        custom_deps: Any = None,
+        caps: EmbeddingCapabilityResolverDep | NoneDep = INJECTED,
+        impl_deps: EmbeddingImplementationDeps = None,
+        custom_deps: EmbeddingCustomDeps = None,
         **kwargs: Any,
     ) -> None:
+        """Initialize the embedding provider."""
         defaults = getattr(type(self), "_defaults", {})
         object.__setattr__(self, "_model_dump_json", super().model_dump_json)
         object.__setattr__(self, "_circuit_state", CircuitBreakerState.CLOSED)
@@ -1183,7 +1184,9 @@ class BackupSparseEmbeddingProvider[SparseClient](
 __all__ = (
     "BackupEmbeddingProvider",
     "BackupSparseEmbeddingProvider",
+    "EmbeddingCustomDeps",
     "EmbeddingErrorInfo",
+    "EmbeddingImplementationDeps",
     "EmbeddingProvider",
     "SparseEmbeddingProvider",
 )

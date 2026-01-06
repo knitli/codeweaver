@@ -38,6 +38,7 @@ from types_boto3_bedrock_runtime.client import BedrockRuntimeClient
 
 from codeweaver.core import BasedModel, ConfigurationError, Provider, ProviderError
 from codeweaver.core import ValidationError as CodeWeaverValidationError
+from codeweaver.providers import BedrockEmbeddingConfig
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.providers.base import EmbeddingProvider
 
@@ -453,9 +454,10 @@ except ImportError as e:
 class BedrockEmbeddingProvider(EmbeddingProvider[BedrockRuntimeClient]):
     """Bedrock embedding provider."""
 
-    client: BedrockRuntimeClient
-    _provider: Provider = Provider.BEDROCK
-    caps: EmbeddingModelCapabilities
+    _provider: ClassVar[Provider] = Provider.BEDROCK
+
+    client: ClientDep[BedrockRuntimeClient]
+    config: BedrockEmbeddingConfig
 
     _doc_kwargs: ClassVar[dict[str, Any]] = {}
     _query_kwargs: ClassVar[dict[str, Any]] = {}
@@ -482,7 +484,9 @@ class BedrockEmbeddingProvider(EmbeddingProvider[BedrockRuntimeClient]):
         self.query_kwargs = type(self)._query_kwargs | kwargs
         super().__init__(client=client, caps=caps, **kwargs)
 
-    def _initialize(self, caps: EmbeddingModelCapabilities) -> None:
+    def _initialize(
+        self, impl_deps: EmbeddingImplementationDeps = None, custom_deps: EmbeddingCustomDeps = None
+    ) -> None:
         self._preprocessor = super()._input_transformer
         self._postprocessor = self._handle_response
 

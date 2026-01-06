@@ -1,11 +1,10 @@
-"""Annotated getters for dependency injection of core dependencies."""
+"""Core dependency types and factories."""
 
-from codeweaver.core.types import LiteralProviderKind, SDKClient
+from typing import Annotated
+
+from codeweaver.core.di import depends
 
 
-dependency_provider(SDKClient)
+type NoneDep = Annotated[None, depends(lambda: None)]
 
-
-def get_sdk_client(kind: LiteralProviderKind) -> SDKClient:
-    """Get the SDK client dependency."""
-    return get_client()
+__all__ = ("NoneDep",)

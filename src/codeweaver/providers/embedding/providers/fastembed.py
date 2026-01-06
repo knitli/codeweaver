@@ -54,7 +54,7 @@ _SparseTextEmbedding = get_sparse_embedder()
 logger = logging.getLogger(__name__)
 
 
-def fastembed_all_kwargs(**kwargs: Any) -> dict[str, Any]:
+def fastembed_all_kwargs() -> dict[str, Any]:
     """Get all possible kwargs for FastEmbed embedding methods."""
     default_kwargs: dict[str, Any] = {"threads": multiprocessing.cpu_count(), "lazy_load": True}
     if kwargs:

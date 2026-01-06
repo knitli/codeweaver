@@ -15,11 +15,14 @@ from typing import (
     Required,
     TypedDict,
     cast,
+    overload,
 )
 
+from beartype.typing import ClassVar
 from pydantic import Discriminator, Field, Tag, computed_field
 
-from codeweaver.core import BasedModel, LiteralProvider, Provider
+from codeweaver.core import INJECTED, BasedModel, ConfigurationError, LiteralProvider, Provider
+from codeweaver.providers import EmbeddingCapabilityResolver
 from codeweaver.providers.embedding.capabilities.dependencies import EmbeddingCapabilityResolverDep
 
 
@@ -47,54 +50,35 @@ DIMENSION_FIELDS = {
 }
 
 
-def get_embedding_capability(
-    cap: EmbeddingCapabilityResolverDep, model_name: str
+def _get_embedding_capabilities_resolver(
+    cap: EmbeddingCapabilityResolverDep = INJECTED,  # ty:ignore[invalid-parameter-default]
+) -> EmbeddingCapabilityResolver:
+    """Get the embedding capabilities resolver."""
+    return cap
+
+
+@overload
+def _get_embedding_capabilities_for_model(
+    model_name: LiteralString, *, sparse: Literal[True]
+) -> SparseEmbeddingModelCapabilities | None: ...
+@overload
+def _get_embedding_capabilities_for_model(
+    model_name: LiteralString, *, sparse: Literal[False] = False
+) -> EmbeddingModelCapabilities | None: ...
+def _get_embedding_capabilities_for_model(
+    model_name: LiteralString, *, sparse: bool = False
 ) -> EmbeddingModelCapabilities | SparseEmbeddingModelCapabilities | None:
-    """Get the embedding capabilities for a specific model name.
+    """Get the embedding model capabilities for a given model name.
 
     Args:
-        cap (EmbeddingCapabilityResolverDep): The embedding capability resolver dependency.
-        model_name (str): The name of the embedding model.
+        model_name: The name of the embedding model.
+        sparse: Whether to get sparse embedding capabilities.
 
     Returns:
-        EmbeddingModelCapabilities | SparseEmbeddingModelCapabilities | None: The capabilities for the specified model, or None if not found.
+        The embedding model capabilities or None if not found.
     """
-    return cap.resolve(model_name)
-
-
-def adjust_collection_config_for_datatype(datatype: Literal["float16", "uint8"]) -> None:
-    """Adjust the collection configuration based on the specified datatype.
-
-    Qdrant currently expects to receive floats, but can quantize to float16 or uint8 on ingest. So we need to adjust the collection config accordingly. (it can also handle binary vectors, but setting them up is more complex and we don't support that yet)
-
-    Args:
-        datatype (Literal["float16", "uint8"]): The datatype for the embeddings.
-
-    Raises:
-        ValueError: If an unsupported datatype is provided.
-
-    Note:
-        This function is deprecated. Vector store configuration now happens automatically
-        through the config resolution system. See BaseEmbeddingConfig.get_datatype() and
-        QdrantVectorStoreProviderSettings.apply_resolved_config().
-    """
-    # This function is now a no-op - config resolution handles this automatically
-
-
-def adjust_collection_config_for_dimensionality(dimensions: int) -> None:
-    """Adjust the collection configuration based on the specified dimensionality.
-
-    If we are dealing with non-default dimensionality embeddings, we need to update the collection config accordingly.
-
-    Args:
-        dimensions (int): The dimensionality of the embeddings.
-
-    Note:
-        This function is deprecated. Vector store configuration now happens automatically
-        through the config resolution system. See BaseEmbeddingConfig.get_dimension() and
-        QdrantVectorStoreProviderSettings.apply_resolved_config().
-    """
-    # This function is now a no-op - config resolution handles this automatically
+    resolver = _get_embedding_capabilities_resolver()
+    return resolver.resolve_sparse(model_name) if sparse else resolver.resolve(model_name)
 
 
 class SerializedEmbeddingOptionsDict(TypedDict, total=False):
@@ -112,6 +96,8 @@ class SerializedEmbeddingOptionsDict(TypedDict, total=False):
 
 class BaseEmbeddingConfig(BasedModel):
     """Base configuration for embedding models."""
+
+    _is_sparse: ClassVar[bool] = False
 
     _tag: LiteralProvider = Field(
         ...,
@@ -159,25 +145,27 @@ class BaseEmbeddingConfig(BasedModel):
         # Register self in DI container as singleton
         try:
             from codeweaver.core.di import get_container
+
             container = get_container()
             # Use type(self) so each concrete class registers separately
             container.register(type(self), lambda: self, singleton=True)
         except Exception as e:
             # Log if DI not available (monorepo compatibility)
             logger.debug(
-                "Failed to register %s in DI container (monorepo mode): %s",
-                type(self).__name__, e
+                "Failed to register %s in DI container (monorepo mode): %s", type(self).__name__, e
             )
 
         # Register for config resolution
         try:
             from codeweaver.core.config.registry import register_configurable
+
             register_configurable(self)
         except Exception as e:
             # Log if config system not available (monorepo compatibility)
             logger.debug(
                 "Failed to register %s for config resolution (monorepo mode): %s",
-                type(self).__name__, e
+                type(self).__name__,
+                e,
             )
 
     def config_dependencies(self) -> dict[str, type]:
@@ -187,7 +175,7 @@ class BaseEmbeddingConfig(BasedModel):
     async def apply_resolved_config(self, **resolved: Any) -> None:
         """Nothing to apply - we're a provider, not a consumer."""
 
-    async def get_dimension(self) -> int | None:
+    async def get_dimension(self) -> int | Literal[0]:
         """Get resolved dimension through fallback chain.
 
         Resolution order:
@@ -197,8 +185,10 @@ class BaseEmbeddingConfig(BasedModel):
         4. Hardcoded fallback
 
         Returns:
-            Resolved dimension or None
+            Resolved dimension or 0 if sparse embeddings
         """
+        if type(self)._is_sparse:
+            return 0
         # 1. Explicit config
         for field in ("embedding", "query"):
             if (
@@ -209,30 +199,18 @@ class BaseEmbeddingConfig(BasedModel):
                 return config[found_field]
 
         # 2. Model capabilities
-        try:
-            from codeweaver.core.di import get_container
-            from codeweaver.providers.embedding.capabilities.dependencies import (
-                EmbeddingCapabilityResolverDep,
-            )
-
-            container = get_container()
-            cap_resolver = await container.resolve(EmbeddingCapabilityResolverDep)  # ty: ignore[invalid-argument-type]
-            if caps := cap_resolver.resolve(self.model_name):
-                if dim := getattr(caps, 'default_dimension', None):
-                    return dim
-        except Exception:
-            pass
+        if (caps := self.capabilities) and (dim := getattr(caps, "default_dimension", None)):
+            return dim
 
         # 3. User-registered defaults
-        try:
-            from codeweaver.core.config.defaults import get_default
-            if user_default := get_default("embedding.dimension"):
-                return user_default
-        except Exception:
-            pass
+        from codeweaver.core.config.defaults import get_default
 
-        # 4. Final fallback (could be None)
-        return None
+        if user_default := get_default("embedding.dimension"):
+            return user_default
+
+        raise ConfigurationError(
+            "Could not resolve embedding dimension from config, capabilities, or registered defaults. You need to specify it explicitly, for best results, register an `EmbeddingModelCapabilities` subclass with the capability resolver."
+        )
 
     async def get_datatype(self) -> str | None:
         """Get resolved datatype through fallback chain.
@@ -247,38 +225,27 @@ class BaseEmbeddingConfig(BasedModel):
             Resolved datatype or None
         """
         # 1. Explicit config
-        for field in ("embedding", "query"):
-            if (
-                (config := getattr(self, field, None))
-                and (found_field := next((f for f in DATATYPE_FIELDS if f in config), None))
+        for field in ("embedding", "query", "model"):
+            if (config := getattr(self, field, None)) and (
+                found_field := next((f for f in DATATYPE_FIELDS if f in config), None)
             ):
                 return config[found_field]
 
         # 2. Model capabilities
-        try:
-            from codeweaver.core.di import get_container
-            from codeweaver.providers.embedding.capabilities.dependencies import (
-                EmbeddingCapabilityResolverDep,
-            )
-
-            container = get_container()
-            cap_resolver = await container.resolve(EmbeddingCapabilityResolverDep)  # ty: ignore[invalid-argument-type]
-            if caps := cap_resolver.resolve(self.model_name):
-                if dtype := getattr(caps, 'default_datatype', None):
-                    return dtype
-        except Exception:
-            pass
+        if (caps := self.capabilities) and (dtype := getattr(caps, "default_datatype", None)):
+            return dtype
 
         # 3. User-registered defaults
-        try:
-            from codeweaver.core.config.defaults import get_default
-            if user_default := get_default("embedding.datatype"):
-                return user_default
-        except Exception:
-            pass
+        from codeweaver.core.config.defaults import get_default
 
+        if user_default := get_default("embedding.datatype"):
+            return user_default
         # 4. Provider-specific defaults
-        return self._defaults.get("embedding", {}).get("output_dtype")
+        if output_default := next(
+            (f for f in DATATYPE_FIELDS if f in self._defaults.get("embedding", {})), None
+        ):
+            return self._defaults.get("embedding", {}).get(output_default)
+        return "float16"
 
     @staticmethod
     def _clean_dtypes(
@@ -289,54 +256,30 @@ class BaseEmbeddingConfig(BasedModel):
             (
                 f
                 for f in DATATYPE_FIELDS
-                if f in kwargs.get("embedding", {}) or f in kwargs.get("query", {})
+                if f in kwargs.get("embedding", {})
+                or f in kwargs.get("query", {})
+                or f in kwargs.get("model", {})
             ),
             None,
         ):
-            kwargs["embedding"].pop(found_field, None)
-            kwargs["query"].pop(found_field, None)
-        if "embedding" in kwargs or "query" in kwargs:
+            if "embedding" in kwargs:
+                kwargs["embedding"].pop(found_field, None)
+            if "query" in kwargs:
+                kwargs["query"].pop(found_field, None)
+            if "model" in kwargs:
+                kwargs["model"].pop(found_field, None)
+        if "embedding" in kwargs:
             kwargs["embedding"] = BaseEmbeddingConfig._clean_dtypes(kwargs.get("embedding", {}))
+        if "query" in kwargs:
             kwargs["query"] = BaseEmbeddingConfig._clean_dtypes(kwargs.get("query", {}))
+        if "model" in kwargs:
+            kwargs["model"] = BaseEmbeddingConfig._clean_dtypes(kwargs.get("model", {}))
         return kwargs
 
-    def _adjust_for_datatypes(self) -> None:
-        """Adjust collection configuration based on embedding datatypes."""
-        if (
-            field_name := next(
-                (f for f in DATATYPE_FIELDS if f in (self.embedding or (self.query or {}))), None
-            )
-        ) and (
-            datatype := (self.embedding or {}).get(field_name) or (self.query or {}).get(field_name)
-        ):
-            # we always go to float16 because there's basically no downside
-            adjust_collection_config_for_datatype(
-                "float16" if datatype.startswith("float") else "uint8"
-            )
-        if (field_name and not datatype) or (
-            (
-                field_name := next(
-                    (
-                        f
-                        for f in DATATYPE_FIELDS
-                        if f
-                        in (
-                            self._defaults.get("embedding", {})
-                            | (self._defaults.get("query", {}) or {})
-                        )
-                    ),
-                    None,
-                )
-            )
-            and (
-                datatype := (self._defaults.get("embedding", {}) or {}).get(field_name)
-                or (self._defaults.get("query", {}) or {}).get(field_name)
-            )
-        ):
-            # we always go to float16 because there's basically no downside
-            adjust_collection_config_for_datatype(
-                "float16" if datatype.startswith("float") else "uint8"
-            )
+    @property
+    def capabilities(self) -> EmbeddingModelCapabilities | SparseEmbeddingModelCapabilities | None:
+        """Get the embedding model capabilities for this configuration."""
+        return _get_embedding_capabilities_for_model(self.model_name, sparse=type(self)._is_sparse)
 
     @classmethod
     def _query_and_embedding_same_type(cls) -> bool:
@@ -355,7 +298,6 @@ class BaseEmbeddingConfig(BasedModel):
 
     def as_options(self) -> SerializedEmbeddingOptionsDict:
         """Return the configuration as a dictionary of options."""
-        self._adjust_for_datatypes()
         serialized = self._as_options()
         return SerializedEmbeddingOptionsDict(  # type: ignore
             **type(self)._clean_dtypes(self._defaults | serialized)  # type: ignore
@@ -456,8 +398,6 @@ class BedrockEmbeddingConfig(BaseEmbeddingConfig):
     def _as_options(self) -> SerializedEmbeddingOptionsDict:
         """Convert the Bedrock embedding configuration to a dictionary of options."""
         model = self.model.copy()
-        if dimensions := model.get("dimensions"):
-            adjust_collection_config_for_dimensionality(dimensions)
         return SerializedEmbeddingOptionsDict(
             model_name=self.model_name,
             model=model,  # ty:ignore[invalid-argument-type]
@@ -477,14 +417,14 @@ class BedrockEmbeddingConfig(BaseEmbeddingConfig):
         return {}
 
 
-class FastembedEmbeddingConfigDict(BaseEmbeddingConfig):
-    """Configuration options for Fastembed embedding models."""
+class FastEmbedEmbeddingConfig(BaseEmbeddingConfig):
+    """Configuration options for FastEmbed embedding models."""
 
     _tag: Literal["fastembed"] = "fastembed"
     provider: Literal[Provider.FASTEMBED] = Provider.FASTEMBED
 
     def _as_options(self) -> SerializedEmbeddingOptionsDict:
-        """Convert the Fastembed embedding configuration to a dictionary of options."""
+        """Convert the FastEmbed embedding configuration to a dictionary of options."""
         return SerializedEmbeddingOptionsDict(
             model_name=self.model_name, embedding={}, query={}, model={}
         )
@@ -510,12 +450,6 @@ class GoogleEmbeddingConfig(BaseEmbeddingConfig):
 
     def _as_options(self) -> SerializedEmbeddingOptionsDict:
         """Convert the Google embedding configuration to a dictionary of options."""
-        if (
-            output_dimensionality := self.embedding.get("output_dimensionality")
-            if self.embedding
-            else None
-        ):
-            adjust_collection_config_for_dimensionality(output_dimensionality)
         embedding_options = {"model": self.model_name} | (self.embedding or {})
         return SerializedEmbeddingOptionsDict(
             model_name=self.model_name,
@@ -598,22 +532,6 @@ class MistralEmbeddingConfig(BaseEmbeddingConfig):
 
     def _as_options(self) -> SerializedEmbeddingOptionsDict:
         """Convert the Mistral embedding configuration to a dictionary of options."""
-        if (output_dimension := (self.embedding or {}).get("output_dimension")) or (
-            output_dtype := (self.embedding or {}).get("output_dtype")
-        ):
-            if output_dimension:
-                adjust_collection_config_for_dimensionality(output_dimension)
-            elif self.model_name == "codestral-embed":
-                # we default to 1536 (not 3072, the actual default) because there's no meaningful performance benefit (<1%) and the size savings are significant (2x smaller)
-                adjust_collection_config_for_dimensionality(1536)
-            if (output_dtype and output_dtype in ("int8", "uint8", "binary", "ubinary")) or (
-                not output_dtype and self.model_name == "codestral-embed"
-            ):
-                adjust_collection_config_for_datatype("uint8")
-        elif self.model_name == "codestral-embed":
-            adjust_collection_config_for_dimensionality(1536)
-            adjust_collection_config_for_datatype("uint8")
-
         return SerializedEmbeddingOptionsDict(
             model_name=self.model_name,
             embedding=cast(dict[str, Any], self.embedding or {}),
@@ -668,9 +586,6 @@ class OpenAIEmbeddingConfig(BaseEmbeddingConfig):
 
     def _as_options(self) -> SerializedEmbeddingOptionsDict:
         """Convert the OpenAI embedding configuration to a dictionary of options."""
-        if dimensions := (self.embedding or {}).get("dimensions"):
-            adjust_collection_config_for_dimensionality(dimensions)
-
         return SerializedEmbeddingOptionsDict(
             model_name=self.model_name,
             embedding=cast(dict[str, Any], self.embedding or {}),
@@ -820,20 +735,6 @@ class VoyageEmbeddingConfig(BaseEmbeddingConfig):
 
     def _as_options(self) -> SerializedEmbeddingOptionsDict:
         """Convert the Voyage embedding configuration to a dictionary of options."""
-        if output_dimension := (self.embedding or {}).get("output_dimension") or (
-            self._defaults["query"] | (self.query or {})
-        ).get("output_dimension"):
-            adjust_collection_config_for_dimensionality(output_dimension)
-        if (
-            (
-                dtype_set := (self.embedding or {}).get("output_dtype")
-                or (self.query or {}).get("output_dtype")
-            )
-            and not dtype_set.startswith("float")
-        ) or (not dtype_set):
-            adjust_collection_config_for_datatype("uint8")
-            (self.embedding or {}).pop("output_dtype", None)
-            (self.query or {}).pop("output_dtype", None)
         return SerializedEmbeddingOptionsDict(
             model_name=self.model_name,
             embedding=cast(dict[str, Any], (self.embedding or {}) | {"input_type": "document"}),
@@ -861,12 +762,16 @@ class SentenceTransformersSparseEmbeddingConfig(SentenceTransformersEmbeddingCon
     Inherits all configuration from SentenceTransformersEmbeddingConfig.
     """
 
+    _is_sparse: ClassVar[bool] = True
 
-class FastEmbedSparseEmbeddingConfig(FastembedEmbeddingConfigDict):
+
+class FastEmbedSparseEmbeddingConfig(FastEmbedEmbeddingConfig):
     """Configuration options for FastEmbed sparse embedding models.
 
-    Inherits all configuration from FastembedEmbeddingConfigDict.
+    Inherits all configuration from FastEmbedEmbeddingConfig.
     """
+
+    _is_sparse: ClassVar[bool] = True
 
 
 # ============================================================================
@@ -875,7 +780,7 @@ class FastEmbedSparseEmbeddingConfig(FastembedEmbeddingConfigDict):
 
 EmbeddingConfigT = Annotated[
     BedrockEmbeddingConfig
-    | FastembedEmbeddingConfigDict
+    | FastEmbedEmbeddingConfig
     | GoogleEmbeddingConfig
     | HuggingFaceEmbeddingConfig
     | MistralEmbeddingConfig
@@ -891,3 +796,30 @@ SparseEmbeddingConfigT = Annotated[
     Field(discriminator="provider"),
 ]
 """Discriminated union type for all sparse embedding configuration classes."""
+
+
+__all__ = (
+    "DATATYPE_FIELDS",
+    "DIMENSION_FIELDS",
+    "BaseEmbeddingConfig",
+    "BedrockCohereConfigDict",
+    "BedrockEmbeddingConfig",
+    "BedrockEmbeddingRequestParams",
+    "BedrockTitanV2ConfigDict",
+    "EmbeddingConfigT",
+    "FastEmbedEmbeddingConfig",
+    "FastEmbedSparseEmbeddingConfig",
+    "GoogleEmbeddingConfig",
+    "HuggingFaceEmbeddingConfig",
+    "MistralEmbeddingConfig",
+    "MistralEmbeddingOptionsDict",
+    "OpenAIEmbeddingConfig",
+    "OpenAIEmbeddingRequestParams",
+    "SentenceTransformersEmbeddingConfig",
+    "SentenceTransformersEncodeDict",
+    "SentenceTransformersSparseEmbeddingConfig",
+    "SerializedEmbeddingOptionsDict",
+    "SparseEmbeddingConfigT",
+    "VoyageEmbeddingConfig",
+    "VoyageEmbeddingOptionsDict",
+)

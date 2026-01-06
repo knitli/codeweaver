@@ -7,9 +7,10 @@ and reranking providers without the full CodeWeaver server.
 
 from __future__ import annotations
 
-from typing import Annotated, Any
+from typing import Annotated
 
 from pydantic import Field
+from pydantic_settings import SettingsConfigDict
 
 from codeweaver.core.config._logging import LoggingSettingsDict
 from codeweaver.core.config.telemetry import TelemetrySettings
@@ -34,13 +35,10 @@ class CodeWeaverProviderSettings(BaseCodeWeaverSettings):
         embedding.model_name = "voyage-code-3"
 
         vector_store.provider = "qdrant"
-        vector_store.location = "http://localhost:6333"
+        vector_store.url = "http://localhost:6333"
 
         [logging]
         level = "INFO"
-
-        [telemetry]
-        enabled = true
         ```
 
     Note:
@@ -50,13 +48,17 @@ class CodeWeaverProviderSettings(BaseCodeWeaverSettings):
         provider field.
     """
 
+    model_config = model_config = BaseCodeWeaverSettings.model_config | SettingsConfigDict(
+        title="CodeWeaver Provider Settings"
+    )
+
     provider: Annotated[
-        ProviderSettings,
+        ProviderSettings | Unset,
         Field(
             default_factory=ProviderSettings,
             description="Provider configuration for embedding, vector store, reranking, etc.",
         ),
-    ]
+    ] = UNSET
 
     logging: Annotated[
         LoggingSettingsDict | Unset,
@@ -78,7 +80,6 @@ class CodeWeaverProviderSettings(BaseCodeWeaverSettings):
 
     def _initialize(self) -> None:
         """Initialize provider settings - nothing special needed."""
-        pass
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion] | None:
         """Define telemetry filtering for provider settings."""

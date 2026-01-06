@@ -52,8 +52,8 @@ class LazyImportDict(TypedDict):
     """
 
 
-class FastembedClientLazyImportDict(LazyImportDict):
-    """A typed dict for lazy imports for Fastembed client providers."""
+class FastEmbedClientLazyImportDict(LazyImportDict):
+    """A typed dict for lazy imports for FastEmbed client providers."""
 
     embed: LazyImport[TextEmbedding]
     sparse: LazyImport[SparseTextEmbedding]
@@ -101,7 +101,7 @@ class SDKClient(BaseEnum):
     @property
     def client(  # noqa: C901
         self,
-    ) -> LazyImport[Any] | FastembedClientLazyImportDict | SentenceTransformersLazyImportDict:
+    ) -> LazyImport[Any] | FastEmbedClientLazyImportDict | SentenceTransformersLazyImportDict:
         """Get a lazy import for the SDK client (not the provider class)."""
         match self:
             case SDKClient.BEDROCK:
@@ -109,7 +109,7 @@ class SDKClient(BaseEnum):
             case SDKClient.COHERE:
                 return lazy_import("cohere", "AsyncClientV2")
             case SDKClient.FASTEMBED:
-                return FastembedClientLazyImportDict(
+                return FastEmbedClientLazyImportDict(
                     embed=lazy_import("fastembed.text", "TextEmbedding"),
                     sparse=lazy_import("fastembed.sparse", "SparseTextEmbedding"),
                     reranking=lazy_import("fastembed.rerank.cross_encoder", "TextCrossEncoder"),
