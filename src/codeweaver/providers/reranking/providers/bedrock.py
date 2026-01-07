@@ -320,7 +320,6 @@ class BedrockRerankingProvider(RerankingProvider[AgentsforBedrockRuntimeClient])
         caps: RerankingModelCapabilities | None = None,
         client: AgentsforBedrockRuntimeClient | None = None,
         top_n: PositiveInt = 40,
-        prompt: str | None = None,
         **kwargs: Any,
     ) -> None:
         """Override base init to set up Bedrock-specific client and configuration."""
@@ -350,7 +349,7 @@ class BedrockRerankingProvider(RerankingProvider[AgentsforBedrockRuntimeClient])
             raise ValueError("Either a Bedrock client or provider settings must be provided.")
 
         # Call super().__init__() FIRST which handles all Pydantic initialization
-        super().__init__(client=client, caps=final_caps, top_n=top_n, prompt=prompt, **kwargs)
+        super().__init__(client=client, caps=final_caps, top_n=top_n, **kwargs)
 
         # Set instance attributes AFTER Pydantic initialization
         self._bedrock_provider_settings = bedrock_settings

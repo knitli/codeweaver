@@ -13,7 +13,6 @@ import time
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterator, Sequence
-from types import ModuleType
 from typing import (
     TYPE_CHECKING,
     Annotated,
@@ -52,7 +51,6 @@ from codeweaver.core import (
     BlakeStore,
     ChunkEmbeddings,
     EmbeddingBatchInfo,
-    LazyImport,
     LiteralProvider,
     LiteralStringT,
     ModelName,
@@ -62,7 +60,6 @@ from codeweaver.core import (
     UUIDStore,
     depends,
     get_blake_hash,
-    lazy_import,
     log_to_client_or_fallback,
     make_blake_store,
     make_uuid_store,
@@ -98,11 +95,8 @@ type EmbeddingCustomDeps = Annotated[LiterallyAnything, depends(my_custom_deps)]
 @dependency_provider(EmbeddingCustomDeps)
 def my_custom_deps() -> LiterallyAnything:
     return LiterallyAnything()
-
 ```
 """
-
-statistics_module: LazyImport[ModuleType] = lazy_import("codeweaver.core")
 
 if TYPE_CHECKING:
     from codeweaver.core import (
@@ -114,10 +108,6 @@ if TYPE_CHECKING:
         StructuredDataInput,
     )
 
-
-_get_statistics: LazyImport[SessionStatistics] = lazy_import(
-    "codeweaver.core", "get_session_statistics"
-)
 
 logger = logging.getLogger(__name__)
 
@@ -156,7 +146,6 @@ class EmbeddingErrorInfo(TypedDict):
 def default_input_transformer(chunks: StructuredDataInput) -> Iterator[CodeChunk]:
     """Default input transformer that serializes CodeChunks to strings."""
     return CodeChunk.chunkify(chunks)
-
 
 def default_output_transformer(output: Any) -> list[list[float]] | list[list[int]]:
     """Default output transformer that ensures the output is in the correct format."""
@@ -216,8 +205,8 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
     ]
 
     _provider: ClassVar[LiteralProvider] = cast(LiteralProvider, Provider.NOT_SET)
-    _input_transformer: ClassVar[Callable[[StructuredDataInput], Any]] = default_input_transformer
-    _output_transformer: ClassVar[Callable[[Any], list[list[float]] | list[list[int]]]] = (
+    _input_transformer: Callable[[StructuredDataInput], Any] = default_input_transformer
+    _output_transformer: Callable[[Any], list[list[float]] | list[list[int]]] = (
         default_output_transformer
     )
 
@@ -250,7 +239,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         **kwargs: Any,
     ) -> None:
         """Initialize the embedding provider."""
-        defaults = getattr(type(self), "_defaults", {})
+        defaults = getattr(self, "_defaults", {})
         object.__setattr__(self, "_model_dump_json", super().model_dump_json)
         object.__setattr__(self, "_circuit_state", CircuitBreakerState.CLOSED)
         object.__setattr__(self, "_failure_count", kwargs.get("failure_count", 0))
@@ -260,6 +249,11 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         )
         object.__setattr__(self, "client", client)
         object.__setattr__(self, "config", config)
+        object.__setattr__(self, "query_options", config.query if config and config.query else {})
+        object.__setattr__(
+            self, "embed_options", config.embedding if config and config.embedding else {}
+        )
+        object.__setattr__(self, "model_options", config.model if config and config.model else {})
         store_kwargs = kwargs.get(
             "store_kwargs", {"value_type": list, "size_limit": 1024 * 1024 * 3}
         )
@@ -705,6 +699,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         queries: Sequence[str] = [query] if isinstance(query, str) else list(query)
         try:
             # Use retry wrapper instead of calling _embed_query directly
+            kwargs = (self.query_options or {}) | kwargs
             results: (
                 Sequence[Sequence[float]] | Sequence[Sequence[int]] | Sequence[SparseEmbedding]
             ) = await self._embed_query_with_retry(queries, **kwargs)
@@ -783,9 +778,9 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         token_count: int | None = None,
         from_docs: Sequence[str] | Sequence[Sequence[str]] | None = None,
         sparse: bool = False,
+        statistics: StatisticsDep[SessionStatistics] = INJECTED,
     ) -> None:
         """Update token statistics for the embedding provider."""
-        statistics: SessionStatistics = _get_statistics()
         if token_count is not None:
             statistics.add_token_usage(embedding_generated=token_count)
         elif from_docs and all(isinstance(doc, str) for doc in from_docs):
@@ -895,14 +890,10 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         chunks: Sequence[CodeChunk],
         batch_id: UUID7,
         embeddings: Sequence[Sequence[float]] | Sequence[Sequence[int]] | Sequence[SparseEmbedding],
+        registry: RegistryDep[EmbeddingRegistry] = INJECTED,
     ) -> None:  # sourcery skip: low-code-quality
         """Register chunks in the embedding registry."""
-        registry = _get_registry()
-        is_sparse = (
-            type(self).__name__.lower().startswith("sparse")
-            or "sparse" in type(self).__name__.lower()
-            or isinstance(embeddings[0], SparseEmbedding)
-        )
+        is_sparse = self._is_sparse
         attr = "sparse" if is_sparse else "dense"
 
         # Validate embedding dimensions for dense embeddings
@@ -1019,7 +1010,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             starter_chunks = [
                 chunk
                 for i, chunk in enumerate(chunk_list)
-                if chunk and hashes[i] not in type(self)._hash_store
+                if chunk and hashes[i] not in self._hash_store
             ]
 
         # Detect if this is a sparse embedding provider using type checking
@@ -1033,16 +1024,16 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             batch_keys = BatchKeys(id=key, idx=i, sparse=is_sparse_provider)
             final_chunks.append(chunk.set_batch_keys(batch_keys))
             # Now add the hash to store, mapping it to this batch key
-            type(self)._hash_store[hashes[original_idx]] = key
-            if not type(self)._store:
-                type(self)._store = make_uuid_store(value_type=list, size_limit=1024 * 1024 * 3)  # type: ignore
-            type(self)._store[key] = final_chunks  # type: ignore
+            self._hash_store[hashes[original_idx]] = key
+            if not self._store:
+                self._store = make_uuid_store(value_type=list, size_limit=1024 * 1024 * 3)  # type: ignore
+            self._store[key] = final_chunks  # type: ignore
 
         return iter(final_chunks), key
 
     def _process_output(self, output_data: Any) -> list[list[float]] | list[list[int]]:
         """Handle output data from embedding."""
-        return type(self)._output_transformer(output_data)
+        return self._output_transformer(output_data)
 
     def _fire_and_forget(self, task: Callable[..., Any]) -> None:
         """Execute a fire-and-forget task in a thread pool executor.
@@ -1145,7 +1136,7 @@ class SparseEmbeddingProvider[SparseClient](EmbeddingProvider[SparseClient], ABC
             starter_chunks = [
                 chunk
                 for i, chunk in enumerate(chunk_list)
-                if chunk and hashes[i] not in type(self)._hash_store
+                if chunk and hashes[i] not in self._hash_store
             ]
 
         # Add NEW chunks with batch keys (sparse=True for sparse providers) and add their hashes to store
@@ -1155,10 +1146,10 @@ class SparseEmbeddingProvider[SparseClient](EmbeddingProvider[SparseClient], ABC
             batch_keys = BatchKeys(id=key, idx=i, sparse=True)
             final_chunks.append(chunk.set_batch_keys(batch_keys))
             # Now add the hash to store, mapping it to this batch key
-            type(self)._hash_store[hashes[original_idx]] = key
-            if not type(self)._store:
-                type(self)._store = make_uuid_store(value_type=list, size_limit=ONE_MB * 3)  # type: ignore
-            type(self)._store[key] = final_chunks  # type: ignore
+            self._hash_store[hashes[original_idx]] = key
+            if not self._store:
+                self._store = make_uuid_store(value_type=list, size_limit=ONE_MB * 3)  # type: ignore
+            self._store[key] = final_chunks  # type: ignore
 
         return iter(final_chunks), key
 

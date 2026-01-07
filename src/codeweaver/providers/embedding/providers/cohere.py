@@ -39,50 +39,6 @@ def try_for_heroku_endpoint(kwargs: Any) -> str:
     return ""
 
 
-def parse_endpoint(endpoint: str, region: str | None = None) -> str:
-    """Parse the Azure endpoint URL."""
-    if endpoint.startswith("http"):
-        if endpoint.rstrip("/").endswith(("com", "com")):
-            return endpoint
-        endpoint = endpoint.split("//", 1)[1].split(".")[0]
-        region = region or endpoint.split(".")[1]
-        return f"https://{endpoint}.{region}.inference.ai.azure.com"
-    endpoint = endpoint.split(".")[0]
-    region = region or endpoint.split(".")[1]
-    return f"https://{endpoint}.{region}.inference.ai.azure.com"
-
-
-def try_for_azure_endpoint(kwargs: Any) -> str:
-    """Try to identify the Azure endpoint.
-
-    Azure uses this format: `https://<endpoint>.<region_name>.inference.ai.azure.com`,
-    But because people often conflate `endpoint` and `url`, we try to be flexible.
-    """
-    endpoint, region = kwargs.get("endpoint"), kwargs.get("region_name")
-    if endpoint and region:
-        if not endpoint.startswith("http") or "azure" not in endpoint:
-            # URL looks right
-            return f"{endpoint}.{region}.inference.ai.azure.com/v1"
-        return parse_endpoint(endpoint, region)
-    if endpoint and (region := os.getenv("AZURE_OPENAI_REGION")):
-        return f"https://{endpoint}.{region}.inference.ai.azure.com/v1"
-    if region and (endpoint := os.getenv("AZURE_OPENAI_ENDPOINT")):
-        return parse_endpoint(endpoint, region)
-    if kwargs.get("base_url"):
-        return kwargs["base_url"]
-    if kwargs.get("api_base"):
-        return kwargs["api_base"]
-    if (
-        env_set := os.getenv("AZURE_COHERE_ENDPOINT")
-        or os.getenv("AZURE_API_BASE")
-        or os.getenv("AZURE_BASE_URL")
-    ):
-        return parse_endpoint(
-            env_set, region or os.getenv("AZURE_COHERE_REGION") or os.getenv("AZURE_REGION")
-        )
-    return ""
-
-
 try:
     from cohere import AsyncClientV2 as CohereClient
 
@@ -177,18 +133,6 @@ class CohereEmbeddingProvider(EmbeddingProvider[CohereClient]):
         # Now set client_options after super().__init__()
         self.client_options = client_opts_to_store
 
-    def _initialize(self, caps: EmbeddingModelCapabilities) -> None:
-        """Initialize the Cohere embedding provider.
-
-        Sets up provider-specific configuration after Pydantic initialization.
-        """
-        # Set _caps at the start
-        self.caps = caps
-        type(self)._provider = caps.provider or type(self)._provider
-
-        # Client options were already configured in __init__
-        # Base class already copied _doc_kwargs and _query_kwargs class variables
-
     @property
     def base_url(self) -> str:
         """Get the base URL for the current provider."""
@@ -240,8 +184,8 @@ class CohereEmbeddingProvider(EmbeddingProvider[CohereClient]):
     ) -> list[list[float]] | list[list[int]]:
         """Embed a list of documents."""
         kwargs = (
-            self.doc_kwargs.get("client_options", {})
-            | self.doc_kwargs.get("model_kwargs", {})
+            self.embed_options.get("client_options", {})  # ty:ignore[unresolved-attribute]
+            | self.embed_options.get("model_kwargs", {})  # ty:ignore[unresolved-attribute]
             | kwargs
         )
         readied_texts = self.chunks_to_strings(documents)
@@ -254,8 +198,8 @@ class CohereEmbeddingProvider(EmbeddingProvider[CohereClient]):
     ) -> list[list[float]] | list[list[int]]:
         """Embed a query or list of queries."""
         kwargs = (
-            self.query_kwargs.get("client_options", {})
-            | self.query_kwargs.get("model_kwargs", {})
+            self.query_options.get("client_options", {})  # ty:ignore[unresolved-attribute]
+            | self.query_options.get("model_kwargs", {})  # ty:ignore[unresolved-attribute]
             | kwargs
         )
         return await self._fetch_embeddings(cast(list[str], query), is_query=True, **kwargs)

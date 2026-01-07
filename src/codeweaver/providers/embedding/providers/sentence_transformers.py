@@ -111,8 +111,8 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
     _provider: Provider = Provider.SENTENCE_TRANSFORMERS
     caps: EmbeddingModelCapabilities
 
-    _doc_kwargs: ClassVar[dict[str, Any]] = {"client_options": {"trust_remote_code": True}}
-    _query_kwargs: ClassVar[dict[str, Any]] = {"client_options": {"trust_remote_code": True}}
+    embed_options: ClassVar[dict[str, Any]] = {"client_options": {"trust_remote_code": True}}
+    query_options: ClassVar[dict[str, Any]] = {"client_options": {"trust_remote_code": True}}
 
     def __init__(
         self,
@@ -137,9 +137,9 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
             return
 
         def _load_model() -> SentenceTransformer:
-            doc_kwargs = {**type(self)._doc_kwargs, **(self.doc_kwargs or {})}
+            embed_options = {**type(self).embed_options, **(self.embed_options or {})}
             return SentenceTransformer(
-                model_name_or_path=self.caps.name, **doc_kwargs.get("client_options", {})
+                model_name_or_path=self.caps.name, **embed_options.get("client_options", {})
             )
 
         # Load model in a thread pool to avoid blocking the event loop
@@ -156,7 +156,7 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
         # Set _caps for later use
         self.caps = caps
 
-        for keyword_args in (self.doc_kwargs, self.query_kwargs):
+        for keyword_args in (self.embed_options, self.query_options):
             keyword_args.setdefault("client_options", {})
             if "normalize_embeddings" not in keyword_args["client_options"]:
                 keyword_args["client_options"]["normalize_embeddings"] = True
@@ -170,12 +170,12 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
 
         # Extract model name for potential use
         name = (
-            self.doc_kwargs.pop("model_name", None)
-            or self.doc_kwargs.pop("model_name_or_path", None)
+            self.embed_options.pop("model_name", None)
+            or self.embed_options.pop("model_name_or_path", None)
             or caps.name
         )
-        self.query_kwargs.pop("model_name", None)
-        self.query_kwargs.pop("model_name_or_path", None)
+        self.query_options.pop("model_name", None)
+        self.query_options.pop("model_name_or_path", None)
 
         if (
             (other := caps.other)
@@ -241,7 +241,7 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
             preprocessed = [f"search_query: {query}" for query in preprocessed]
 
         # Filter out client initialization params - only pass encode-time params
-        client_options = self.query_kwargs.get("client_options", {})
+        client_options = self.query_options.get("client_options", {})
         encode_kwargs = {
             k: v
             for k, v in client_options.items()
@@ -290,8 +290,8 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
     def _setup_qwen3(self) -> None:
         """Sets up Qwen3 specific parameters."""
         if "Qwen3" not in (
-            self.doc_kwargs.get("model_name", ""),
-            self.doc_kwargs.get("model_name_or_path", ""),
+            self.embed_options.get("model_name", ""),
+            self.embed_options.get("model_name_or_path", ""),
         ):
             return
         from importlib import metadata
@@ -301,7 +301,7 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
         except Exception:
             has_flash_attention = None
         if has_flash_attention:
-            self.doc_kwargs["client_options"]["model_kwargs"]["attention_implementation"] = (
+            self.embed_options["client_options"]["model_kwargs"]["attention_implementation"] = (
                 "flash_attention_2"
             )
 
@@ -325,8 +325,8 @@ class SentenceTransformersSparseProvider(SparseEmbeddingProvider[_SparseEncoderT
     _provider: Provider = Provider.SENTENCE_TRANSFORMERS
     caps: SparseEmbeddingModelCapabilities
 
-    _doc_kwargs: ClassVar[dict[str, Any]] = {"client_options": {"trust_remote_code": True}}
-    _query_kwargs: ClassVar[dict[str, Any]] = {"client_options": {"trust_remote_code": True}}
+    embed_options: ClassVar[dict[str, Any]] = {"client_options": {"trust_remote_code": True}}
+    query_options: ClassVar[dict[str, Any]] = {"client_options": {"trust_remote_code": True}}
 
     def __init__(
         self,
@@ -357,9 +357,9 @@ class SentenceTransformersSparseProvider(SparseEmbeddingProvider[_SparseEncoderT
             return
 
         def _load_model() -> _SparseEncoderType:  # type: ignore
-            doc_kwargs = {**type(self)._doc_kwargs, **(self.doc_kwargs or {})}
+            embed_options = {**type(self).embed_options, **(self.embed_options or {})}
             return _SparseEncoderType(  # type: ignore
-                model_name_or_path=self.caps.name, **doc_kwargs.get("client_options", {})
+                model_name_or_path=self.caps.name, **embed_options.get("client_options", {})
             )
 
         # Load model in a thread pool to avoid blocking the event loop
@@ -376,7 +376,7 @@ class SentenceTransformersSparseProvider(SparseEmbeddingProvider[_SparseEncoderT
         # Set _caps for later use
         self.caps = caps  # type: ignore
 
-        for keyword_args in (self.doc_kwargs, self.query_kwargs):
+        for keyword_args in (self.embed_options, self.query_options):
             keyword_args.setdefault("client_options", {})
             if "trust_remote_code" not in keyword_args["client_options"]:
                 keyword_args["client_options"]["trust_remote_code"] = True
@@ -385,9 +385,11 @@ class SentenceTransformersSparseProvider(SparseEmbeddingProvider[_SparseEncoderT
                 and "model_name_or_path" not in keyword_args["client_options"]
             ):
                 keyword_args["client_options"]["model_name_or_path"] = caps.name
-        self.doc_kwargs.pop("model_name", None) or self.doc_kwargs.pop("model_name_or_path", None)
-        self.query_kwargs.pop("model_name", None)
-        self.query_kwargs.pop("model_name_or_path", None)
+        self.embed_options.pop("model_name", None) or self.embed_options.pop(
+            "model_name_or_path", None
+        )
+        self.query_options.pop("model_name", None)
+        self.query_options.pop("model_name_or_path", None)
 
     def _to_sparse_format(self, embedding: Any) -> SparseEmbedding:
         """Convert embedding to sparse format with indices and values."""
@@ -411,8 +413,8 @@ class SentenceTransformersSparseProvider(SparseEmbeddingProvider[_SparseEncoderT
         embed_partial = rpartial(  # type: ignore
             self.client.encode,  # type: ignore
             **(
-                self.doc_kwargs.get("client_options", {})
-                | {"model_kwargs": self.doc_kwargs.get("model_kwargs", {})}
+                self.embed_options.get("client_options", {})
+                | {"model_kwargs": self.embed_options.get("model_kwargs", {})}
                 | kwargs
             ),
         )
@@ -434,8 +436,8 @@ class SentenceTransformersSparseProvider(SparseEmbeddingProvider[_SparseEncoderT
         embed_partial = rpartial(  # type: ignore
             self.client.encode,  # type: ignore
             **(
-                self.query_kwargs.get("client_options", {})
-                | {"model_kwargs": self.query_kwargs.get("model_kwargs", {})}
+                self.query_options.get("client_options", {})
+                | {"model_kwargs": self.query_options.get("model_kwargs", {})}
                 | kwargs
             ),
         )

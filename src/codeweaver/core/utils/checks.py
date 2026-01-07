@@ -93,10 +93,18 @@ def is_debug() -> bool:
     env = os.getenv("CODEWEAVER_DEBUG")
 
     explicit_true = (env in ("1", "true", "True", "TRUE")) if env is not None else False
-    explicit_false = os.getenv("CODEWEAVER_DEBUG", "1") in ("false", "0", "", "False", "FALSE")
+    explicit_false = os.getenv("CODEWEAVER_DEBUG", "1") in (
+        "false",
+        "0",
+        "",
+        "False",
+        "FALSE",
+    )
 
     has_debugger = (
-        hasattr(sys, "gettrace") and callable(sys.gettrace) and (sys.gettrace() is not None)
+        hasattr(sys, "gettrace")
+        and callable(sys.gettrace)
+        and (sys.gettrace() is not None)
     )
     repo_heuristic = in_codeweaver_clone(Path.cwd()) and not explicit_false
 
@@ -129,12 +137,16 @@ def file_is_binary(file_path: Path) -> bool:
             initial_bytes = f.read(1024)
             if b"\0" in initial_bytes:
                 return True
-            text_characters = bytearray({7, 8, 9, 10, 12, 13, 27} | set(range(0x20, 0x100)))
+            text_characters = bytearray(
+                {7, 8, 9, 10, 12, 13, 27} | set(range(0x20, 0x100))
+            )
             non_text = initial_bytes.translate(None, text_characters)
             if len(non_text) / len(initial_bytes) > 0.30:
                 return True
     except Exception as e:
-        logger.warning("Could not read file %s to determine if binary: %s", file_path, e)
+        logger.warning(
+            "Could not read file %s to determine if binary: %s", file_path, e
+        )
         return False
     return False
 
@@ -142,7 +154,12 @@ def file_is_binary(file_path: Path) -> bool:
 def is_test_environment() -> bool:
     """Check if the code is running in a test environment."""
     # Check if CODEWEAVER_TEST_MODE is explicitly enabled
-    test_mode_enabled = os.environ.get("CODEWEAVER_TEST_MODE", "0") in {"1", "true", "True", "TRUE"}
+    test_mode_enabled = os.environ.get("CODEWEAVER_TEST_MODE", "0") in {
+        "1",
+        "true",
+        "True",
+        "TRUE",
+    }
     if test_mode_enabled:
         return True
 
@@ -163,7 +180,12 @@ def is_wsl() -> bool:
         or "WSL" in platform.uname().version
         or any(
             v
-            for v in ("WSL_INTEROP", "WSL_DISTRO_NAME", "WSLENV", "WSL2_GUI_APPS_ENABLED")
+            for v in (
+                "WSL_INTEROP",
+                "WSL_DISTRO_NAME",
+                "WSLENV",
+                "WSL2_GUI_APPS_ENABLED",
+            )
             if v in os.environ
         )
     )
@@ -171,18 +193,20 @@ def is_wsl() -> bool:
 
 def is_wsl_vscode() -> bool:
     """Check if the code is running inside WSL with VSCode integration."""
-    from codeweaver.core import we_are_in_vscode
+    from codeweaver.core.utils.environment import we_are_in_vscode
 
     return is_wsl() and we_are_in_vscode()
 
 
 __all__ = (
+    "LOCALHOST_INDICATORS",
     "TypeIs",
     "file_is_binary",
     "has_package",
     "is_ci",
     "is_class",
     "is_debug",
+    "is_local_host",
     "is_pydantic_basemodel",
     "is_test_environment",
     "is_typeadapter",

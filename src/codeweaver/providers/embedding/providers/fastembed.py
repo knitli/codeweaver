@@ -189,20 +189,20 @@ class FastEmbedSparseProvider(SparseEmbeddingProvider[SparseTextEmbedding]):
         self.caps = caps
 
         # 2. Configure model name in kwargs if not already set
-        if "model_name" not in self.doc_kwargs:
+        if "model_name" not in self.embed_options:
             model = caps.name  # Use caps parameter, not self.caps
-            self.doc_kwargs["model_name"] = model
-            # Note: model_name should NOT be in query_kwargs - it's only for client init
+            self.embed_options["model_name"] = model
+            # Note: model_name should NOT be in query_options - it's only for client init
 
         # 3. Initialize client if it's still a class (not an instance)
         # The _client class variable is set to the class type, so we need to instantiate it
         if isinstance(self.client, type):
-            client_options = self.doc_kwargs.get("client_options") or self.doc_kwargs
+            client_options = self.embed_options.get("client_options") or self.embed_options
             self.client = self.client(**client_options)
 
         # 4. Remove model_name from runtime kwargs - it was only needed for initialization
-        self.doc_kwargs.pop("model_name", None)
-        self.query_kwargs.pop("model_name", None)
+        self.embed_options.pop("model_name", None)
+        self.query_options.pop("model_name", None)
 
     def base_url(self) -> str | None:
         """FastEmbed does not use a base URL."""

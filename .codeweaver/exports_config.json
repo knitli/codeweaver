@@ -1,0 +1,34 @@
+{
+  "exclusions": {},
+  "module_exclusions": {
+    "codeweaver.providers.config.embedding": [
+      "INCOMPATIBLE_FIELDS"
+    ],
+    "codeweaver.providers.config.providers": [
+      "DeterminedDefaults",
+      "HAS_ANTHROPIC",
+      "ProviderNameMap"
+    ],
+    "codeweaver.core.di.depends": [
+      "T"
+    ],
+    "codeweaver.core.di.utils": [
+      "T"
+    ],
+    "codeweaver.core.utils.text": [
+      "BOUNDARY",
+      "CONTROL_CHARS",
+      "INJECT_PATTERN",
+      "INVISIBLE_CHARS",
+      "INVISIBLE_PATTERN",
+      "LOWLY_WORDS",
+      "MAX_REGEX_PATTERN_LENGTH",
+      "NORMALIZE_FORM",
+      "POSSIBLE_PROMPT_INJECTS",
+      "REMOVE_ID"
+    ],
+    "codeweaver.providers.config.profiles": [
+      "HAS_ST"
+    ]
+  }
+}

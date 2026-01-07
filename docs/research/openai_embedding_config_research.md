@@ -453,7 +453,7 @@ Based on the pattern from other providers:
 The current `openai_factory.py` implementation (lines 201-220) already:
 - ✅ Validates against `valid_client_kwargs`
 - ✅ Merges `_shared_kwargs` with request-specific kwargs
-- ✅ Separates `doc_kwargs` and `query_kwargs` (though they're identical for OpenAI)
+- ✅ Separates `embed_options` and `query_options` (though they're identical for OpenAI)
 - ✅ Filters kwargs to only valid parameters
 
 This config structure will integrate seamlessly.

@@ -362,9 +362,11 @@ def _get_default_reranking_settings() -> DeterminedDefaults:
     ]
     logger.warning(
         "No default reranking provider libraries found. Reranking functionality will be disabled unless explicitly set in your config or environment variables. %s",
-        f"It looks like you have {'these' if len(possible_libs) > 1 else 'this'} libraries installed that support reranking: {', '.join(lib.name for lib in possible_libs)}."
-        if possible_libs
-        else "You have no known reranking libraries installed.",
+        (
+            f"It looks like you have {'these' if len(possible_libs) > 1 else 'this'} libraries installed that support reranking: {', '.join(lib.name for lib in possible_libs)}."
+            if possible_libs
+            else "You have no known reranking libraries installed."
+        ),
     )
     return DeterminedDefaults(provider=Provider.NOT_SET, model="NONE", enabled=False)
 
@@ -476,7 +478,7 @@ class ProviderSettings(BasedModel):
     @model_validator(mode="after")
     def validate_and_normalize_providers(self) -> ProviderSettings:
         """Validate and normalize provider settings after initialization."""
-        for key in "vector_store", "embedding", "sparse_embedding", "reranking", "agent":
+        for key in ("vector_store", "embedding", "sparse_embedding", "reranking", "agent"):
             value = getattr(self, key)
             if value is not Unset and not isinstance(value, tuple):
                 setattr(self, key, (value,))
@@ -621,7 +623,10 @@ __all__ = (
     "AllDefaultProviderSettings",
     "DataProviderSettingsType",
     "EmbeddingProviderSettingsType",
+    "ProviderSettings",
+    "ProviderSettingsDict",
     "ProviderSettingsView",
     "RerankingProviderSettingsType",
     "VectorStoreProviderSettingsType",
+    "merge_agent_model_settings",
 )

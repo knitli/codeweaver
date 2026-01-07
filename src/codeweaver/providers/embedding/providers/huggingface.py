@@ -44,18 +44,6 @@ def huggingface_hub_output_transformer(
     return [out.tolist() for out in output]
 
 
-def huggingface_hub_embed_kwargs(**kwargs: Any) -> dict[str, Any]:
-    """Keyword arguments for Hugging Face Hub models."""
-    kwargs = kwargs or {}
-    return {"normalize": True, "prompt_name": "passage", **kwargs}
-
-
-def huggingface_hub_query_kwargs(**kwargs: Any) -> dict[str, Any]:
-    """Keyword arguments for the query embedding method."""
-    kwargs = kwargs or {}
-    return {"normalize": True, "prompt_name": "query", **kwargs}
-
-
 try:
     from huggingface_hub import AsyncInferenceClient
 
@@ -74,19 +62,6 @@ class HuggingFaceEmbeddingProvider(EmbeddingProvider[AsyncInferenceClient]):
     caps: EmbeddingModelCapabilities
 
     _output_transformer = staticmethod(huggingface_hub_output_transformer)
-
-    def _initialize(self, caps: EmbeddingModelCapabilities) -> None:
-        """We don't need to do anything here."""
-        self.doc_kwargs |= {
-            "model": self.caps.name,
-            **huggingface_hub_embed_kwargs(),
-            "prompt_name": "passage",
-        }
-        self.query_kwargs |= {
-            "model": self.caps.name,
-            **huggingface_hub_query_kwargs(),
-            "prompt_name": "query",
-        }
 
     @property
     def base_url(self) -> str | None:

@@ -116,8 +116,8 @@ class TestCohereEmbeddingProviderInitialization:
 
         provider = CohereEmbeddingProvider(caps=cohere_capabilities, custom_param="value")
 
-        assert "custom_param" in provider.doc_kwargs
-        assert provider.doc_kwargs["custom_param"] == "value"
+        assert "custom_param" in provider.embed_options
+        assert provider.embed_options["custom_param"] == "value"
 
     @patch.dict("os.environ", {"COHERE_API_KEY": "test-api-key"})
     def test_provider_base_url_cohere(self, cohere_capabilities):

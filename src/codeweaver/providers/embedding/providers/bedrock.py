@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from io import BytesIO
 from typing import (
     TYPE_CHECKING,
@@ -39,8 +39,11 @@ from types_boto3_bedrock_runtime.client import BedrockRuntimeClient
 from codeweaver.core import BasedModel, ConfigurationError, Provider, ProviderError
 from codeweaver.core import ValidationError as CodeWeaverValidationError
 from codeweaver.providers import BedrockEmbeddingConfig
-from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
-from codeweaver.providers.embedding.providers.base import EmbeddingProvider
+from codeweaver.providers.embedding.providers.base import (
+    EmbeddingCustomDeps,
+    EmbeddingImplementationDeps,
+    EmbeddingProvider,
+)
 
 
 if TYPE_CHECKING:
@@ -457,38 +460,16 @@ class BedrockEmbeddingProvider(EmbeddingProvider[BedrockRuntimeClient]):
     _provider: ClassVar[Provider] = Provider.BEDROCK
 
     client: ClientDep[BedrockRuntimeClient]
-    config: BedrockEmbeddingConfig
-
-    _doc_kwargs: ClassVar[dict[str, Any]] = {}
-    _query_kwargs: ClassVar[dict[str, Any]] = {}
-
-    def __init__(
-        self,
-        client: BedrockRuntimeClient | None = None,
-        caps: EmbeddingModelCapabilities | None = None,
-        **kwargs: Any,
-    ) -> None:
-        """Initialize the Bedrock embedding provider."""
-        if not client:
-            client = boto3_client("bedrock-runtime", **kwargs)
-
-            caps = registry.configured_models_for_kind("embedding")  # ty: ignore[invalid-assignment]
-            if isinstance(caps, tuple) and len(caps) > 0:
-                caps = caps[0]
-        if not caps:
-            raise ConfigurationError(
-                "No embedding model capabilities provided and no default model found in registry for Bedrock embedding provider."
-            )
-        self.bedrock_client = client
-        self.doc_kwargs = type(self)._doc_kwargs | kwargs
-        self.query_kwargs = type(self)._query_kwargs | kwargs
-        super().__init__(client=client, caps=caps, **kwargs)
+    config: EmbeddingConfigDep[BedrockEmbeddingConfig]
 
     def _initialize(
         self, impl_deps: EmbeddingImplementationDeps = None, custom_deps: EmbeddingCustomDeps = None
     ) -> None:
-        self._preprocessor = super()._input_transformer
-        self._postprocessor = self._handle_response
+
+        self._output_transformer: Callable[
+            [BedrockInvokeEmbeddingResponse, CodeChunk | None],
+            list[float] | list[int] | list[list[float]] | list[list[int]],
+        ] = self._handle_response  # ty:ignore[invalid-assignment]
 
     @property
     def base_url(self) -> str | None:
@@ -498,13 +479,8 @@ class BedrockEmbeddingProvider(EmbeddingProvider[BedrockRuntimeClient]):
     @property
     def dimension(self) -> int:
         """Get the dimension of the embeddings."""
-        if "titan" in self.model_name.lower() and (
-            "dimensions" in self.doc_kwargs or "dimensions" in self.doc_kwargs.get("body", {})
-        ):
-            return self.doc_kwargs.get("dimensions") or self.doc_kwargs.get("body", {}).get(
-                "dimensions"
-            )
-        return self.caps.default_dimension
+        # TODO: Hook up config resolver to get authoritative dimensionality
+        return self.embed_options.get("dimensions") or self.caps.default_dimension  # ty:ignore[unresolved-attribute]
 
     def _handle_response(
         self, response: dict[str, Any], doc: CodeChunk | None = None
@@ -635,7 +611,7 @@ class BedrockEmbeddingProvider(EmbeddingProvider[BedrockRuntimeClient]):
                     "Input text exceeds Titan Embedding V2 maximum length",
                     details={
                         "provider": "bedrock",
-                        "model": "titan-embed-v2",
+                        "model": f"{self.config.model_name}",
                         "max_length": 50_000,
                         "actual_length": len(doc),
                         "excess_chars": len(doc) - 50_000,
@@ -648,7 +624,7 @@ class BedrockEmbeddingProvider(EmbeddingProvider[BedrockRuntimeClient]):
                 )
             body = TitanEmbeddingV2RequestBody.model_validate({
                 "input_text": doc,
-                "dimensions": 1024,
+                "dimensions": self.dimension,
                 "normalize": True,
                 "embedding_types": ["float"],
                 **body_kwargs,
@@ -656,7 +632,7 @@ class BedrockEmbeddingProvider(EmbeddingProvider[BedrockRuntimeClient]):
             requests.extend([
                 BedrockInvokeEmbeddingRequest.model_validate({
                     "body": body,
-                    "model_id": self.caps.name,
+                    "model_id": self.config.model_name,
                 })
             ])
         return [InvokeRequestDict(**dict(req.model_dump(by_alias=True))) for req in requests]  # ty: ignore[missing-typed-dict-key]
@@ -668,7 +644,7 @@ class BedrockEmbeddingProvider(EmbeddingProvider[BedrockRuntimeClient]):
         **kwargs: Any,
     ) -> list[InvokeRequestDict] | InvokeRequestDict:
         """Create the Bedrock embedding request."""
-        if "cohere" in self.caps.name.lower():
+        if "cohere" in self.config.model_name.lower():
             return self._create_cohere_request(inputs, kind, **kwargs)
         return self._create_titan_request(inputs, kind, **kwargs)
 
@@ -689,10 +665,10 @@ class BedrockEmbeddingProvider(EmbeddingProvider[BedrockRuntimeClient]):
         kwargs = kwargs or {}
         requests = self._create_request(documents, kind="documents", **kwargs)  # type: ignore
         responses = await self._get_vectors(requests if isinstance(requests, list) else [requests])
-        if "cohere" in self.model_name.lower():
-            return self._postprocessor(responses[0], documents)  # type: ignore
+        if "cohere" in self.config.model_name.lower():
+            return self._output_transformer(responses[0], documents)  # type: ignore
         return [
-            self._postprocessor(response, doc)  # type: ignore
+            self._output_transformer(response, doc)  # type: ignore
             for (response, doc) in zip(responses, documents, strict=True)
         ]  # ty: ignore[invalid-return-type]
 
@@ -706,7 +682,7 @@ class BedrockEmbeddingProvider(EmbeddingProvider[BedrockRuntimeClient]):
             requests if isinstance(requests, list) else [requests]
         )
         return [
-            self._postprocessor(response, doc)
+            self._output_transformer(response, doc)  # ty:ignore[too-many-positional-arguments]
             for (response, doc) in zip(responses, query, strict=True)
         ]  # ty: ignore[invalid-return-type]
 

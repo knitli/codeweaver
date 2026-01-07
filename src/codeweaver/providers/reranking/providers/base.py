@@ -206,10 +206,6 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         RerankingModelCapabilities,
         Field(description="The capabilities of the reranking model.", validation_alias="_caps"),
     ]
-    prompt: Annotated[
-        str | None,
-        Field(description="The prompt for the reranking provider.", validation_alias="_prompt"),
-    ]
 
     _rerank_kwargs: ClassVar[MappingProxyType[str, Any]]
     # transforms the input documents into a format suitable for the provider
@@ -238,7 +234,6 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         self,
         client: RerankingClient,
         caps: RerankingModelCapabilities,
-        prompt: str | None = None,
         top_n: PositiveInt = 40,
         **kwargs: Any,
     ) -> None:
@@ -265,7 +260,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         object.__setattr__(self, "_last_failure_time", None)
 
         # Initialize pydantic model with the proper fields BEFORE _initialize
-        super().__init__(client=client, caps=caps, prompt=prompt)
+        super().__init__(client=client, caps=caps)
 
         # Now that Pydantic is initialized, set kwargs as normal attributes
         self.kwargs = _rerank_kwargs

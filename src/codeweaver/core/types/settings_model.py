@@ -36,7 +36,7 @@ from codeweaver.core.types.utils import (
     generate_field_title,
     generate_title,
 )
-from codeweaver.core.utils import get_user_config_dir, is_test_environment
+from codeweaver.core.utils import get_user_config_dir, get_user_data_dir, is_test_environment
 
 
 SUPPORTED_CONFIG_FILE_EXTENSIONS = MappingProxyType({
@@ -406,7 +406,7 @@ class BaseCodeWeaverSettings(BaseSettings):
             # Config resolution not available (minimal core install)
             logger.debug("Config resolution module not available - skipping")
         except Exception as e:
-            logger.warning(f"Config resolution failed: {e}")
+            logger.warning("Config resolution failed: %s", e)
 
         return self
 

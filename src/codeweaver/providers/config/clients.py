@@ -15,11 +15,9 @@ The overall pattern:
 
 from __future__ import annotations
 
-import contextlib
 import importlib
 import logging
 import os
-import ssl
 
 from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
@@ -29,11 +27,9 @@ import httpx
 
 from pydantic import (
     AnyUrl,
-    BaseModel,
     ConfigDict,
     Discriminator,
     Field,
-    NonNegativeInt,
     PositiveFloat,
     PositiveInt,
     SecretStr,
@@ -48,9 +44,11 @@ from codeweaver.core import (
     ConfigurationError,
     FilteredKey,
     FilteredKeyT,
+    LiteralProviderType,
     Provider,
     ProviderLiteral,
 )
+from codeweaver.providers.config.types import HttpxClientParams
 
 
 logger = logging.getLogger(__name__)
@@ -58,33 +56,6 @@ logger = logging.getLogger(__name__)
 # ===========================================================================
 # *                           Client Options
 # ===========================================================================
-
-
-class HttpxClientParams(TypedDict, total=False):
-    """Parameters for configuring an httpx client."""
-
-    auth: NotRequired[httpx._types.AuthTypes]
-    params: NotRequired[httpx._types.QueryParamTypes]
-    headers: NotRequired[httpx._types.HeaderTypes]
-    cookies: NotRequired[httpx._types.CookieTypes]
-    verify: NotRequired[bool | ssl.SSLContext | str]
-    cert: NotRequired[httpx._types.CertTypes]
-    http1: NotRequired[bool]
-    http2: NotRequired[bool]
-    proxy: NotRequired[httpx._types.ProxyTypes]
-    mounts: NotRequired[Mapping[str, httpx._transports.AsyncBaseTransport]]
-    timeout: NotRequired[httpx._types.TimeoutTypes]
-    follow_redirects: NotRequired[bool]
-    limits: NotRequired[httpx.Limits]
-    max_redirects: NotRequired[NonNegativeInt]
-    event_hooks: NotRequired[Mapping[str, list[Callable[..., Any]]]]
-    base_url: NotRequired[httpx.URL | str]
-    transport: NotRequired[httpx._transports.AsyncBaseTransport]
-    trust_env: NotRequired[bool]
-    default_encoding: NotRequired[
-        Literal["utf-8", "utf-16", "utf-32"]
-        | Callable[[bytes], Literal["utf-8", "utf-16", "utf-32"]]
-    ]
 
 
 class GrpcParams(TypedDict, total=False):
@@ -151,13 +122,14 @@ class ClientOptions(BasedModel):
         ),
     ]
 
-    def __init__(self, **data: Any) -> None:
-        """Initialize the client options and apply environment variables."""
-        for key, value in data.items():
-            if key in type(self).model_fields and value:
-                object.__setattr__(self, key, value)
-        self.apply_env_vars()
-        super().__init__(**data)
+    @model_validator(mode="before")
+    @classmethod
+    def _handle_env_vars(cls, values: dict[str, Any]) -> dict[str, Any]:
+        """Handle environment variables before initialization."""
+        env_vars = cls.assemble_env_vars()
+        if values and not isinstance(values, dict):
+            values = values.model_dump()
+        return env_vars | values
 
     @staticmethod
     def _filter_values(value: Any) -> Any:
@@ -180,11 +152,12 @@ class ClientOptions(BasedModel):
         """Return the providers this client options class can apply to."""
         return self._providers
 
-    def client_env_vars(self) -> dict[str, tuple[str, ...] | dict[str, Any]]:
+    @classmethod
+    def _client_env_vars(cls) -> dict[str, tuple[str, ...] | dict[str, Any]]:
         """Return a dictionary of environment variables for the client options, mapping client variable names to the environment variable name."""
-        env_vars = self._core_provider.all_envs_for_client(self._core_provider.variable)  # ty:ignore[invalid-argument-type]
+        env_vars = cls._core_provider.all_envs_for_client(cls._core_provider.variable)  # ty:ignore[invalid-argument-type]
         mapped_vars = {}
-        fields = tuple(type(self).model_fields)
+        fields = tuple(cls.model_fields)
         for env_var in env_vars:
             variables = env_var.variables if "variables" in env_var._asdict() else ()
             if (
@@ -217,61 +190,39 @@ class ClientOptions(BasedModel):
                         )
         return mapped_vars
 
-    def _handle_env_tuple(self, var_name: str, env_var_names: tuple[str, ...]) -> None:
+    @classmethod
+    def _handle_env_tuple(cls, var_name: str, env_var_names: tuple[str, ...]) -> dict[str, Any]:
+        if var_name not in cls.model_fields:
+            return {}
         if value := next(
-            (os.getenv(env_name) for env_name in env_var_names if os.getenv(env_name)), None
+            (os.getenv(env_var) for env_var in env_var_names if os.getenv(env_var)), None
         ):
-            if (
-                var_name in type(self).model_fields
-                and not (existing_value := getattr(self, var_name, None))
-            ) or (existing_value and existing_value == value):
-                object.__setattr__(self, var_name, value)
-                return
-            if var_name in type(self).model_fields and existing_value:
-                if (
-                    isinstance(existing_value, SecretStr)
-                    and existing_value.get_secret_value() == value
-                ):
-                    return
-                logger.warning(
-                    "Environment variable %s is set but client option %s already has a different value; skipping environment variable.",
-                    env_var_names,
-                    var_name,
-                )
+            return {var_name: value}
+        return {}
 
-    def _handle_env_dict(self, var_name: str, env_var_names: dict[str, Any]) -> None:
-        if var_name not in type(self).model_fields:
-            return
-        existing_value = getattr(self, var_name, None) or {}
-        env_vars = {k: os.getenv(v) for k, v in env_var_names.items() if os.getenv(v) is not None}
-        if not existing_value and env_vars:
-            object.__setattr__(self, var_name, env_vars)
-            return
-        if isinstance(existing_value, dict):
-            object.__setattr__(self, var_name, existing_value | env_vars)
-            return
-        if isinstance(existing_value, BaseModel | tuple):
-            with contextlib.suppress(AttributeError, ValueError, TypeError):
-                object.__setattr__(
-                    self,
-                    var_name,
-                    existing_value.model_dump() | env_vars
-                    if isinstance(existing_value, BaseModel)
-                    else existing_value._asdict() | env_vars,
-                )
-                return
+    @classmethod
+    def _handle_env_dict(cls, var_name: str, env_var_names: dict[str, Any]) -> dict[str, Any]:
+        if var_name not in cls.model_fields:
+            return {}
+        for client_var, env_var in env_var_names.items():
+            if (value := os.getenv(env_var)) and client_var == var_name:
+                return {var_name: value}
+        return {}
 
-    def apply_env_vars(self) -> None:
+    @classmethod
+    def assemble_env_vars(cls) -> dict[str, Any]:
         """Apply environment variables to the client options."""
-        env_vars = self.client_env_vars()
+        env_vars = cls._client_env_vars()
+        response_map: dict[str, Any] = {}
         for var_name, env_var_names in env_vars.items():
-            if var_name not in type(self).model_fields:
+            if var_name not in cls.model_fields:
                 continue
             if isinstance(env_var_names, tuple):
-                self._handle_env_tuple(var_name, env_var_names)
+                response_map |= cls._handle_env_tuple(var_name, env_var_names)
                 continue
             # it's a dictionary
-            self._handle_env_dict(var_name, env_var_names)
+            response_map |= cls._handle_env_dict(var_name, env_var_names)
+        return response_map if response_map and response_map.values() else {}
 
 
 class CohereClientOptions(ClientOptions):
@@ -281,11 +232,7 @@ class CohereClientOptions(ClientOptions):
     _providers: tuple[Provider, ...] = (Provider.COHERE, Provider.AZURE, Provider.HEROKU)
 
     api_key: (
-        Annotated[
-            SecretStr | Callable[[], str],
-            Field(description="Cohere API key.", default_factory=SecretStr),
-        ]
-        | None
+        Annotated[SecretStr | Callable[[], str], Field(description="Cohere API key.")] | None
     ) = None
     base_url: Annotated[AnyUrl, Field(description="Base URL for the Cohere API.")] | None = None
     environment: Literal["production", "staging", "development"] = "production"
@@ -364,9 +311,6 @@ class QdrantClientOptions(ClientOptions):
             "We haven't tested CodeWeaver with Qdrant Cloud inference yet. It may not work as expected. If you proceed, please report any issues you encounter to help us improve support."
         )
 
-    def _handle_cloud(self) -> None:
-        pass
-
     def _to_nones(self, attrs: Sequence[str]) -> None:
         for attr in attrs:
             setattr(self, attr, False if attr == "https" else None)
@@ -439,7 +383,6 @@ class QdrantClientOptions(ClientOptions):
         """
         self._normalize_settings()
         self._handle_cloud_inference()
-        self._handle_cloud()
         if (
             (self.url or self.host)
             and self.prefer_grpc
@@ -478,6 +421,17 @@ class OpenAIClientOptions(ClientOptions):
     default_query: Mapping[str, object] | None = None
     http_client: httpx.Client | None = None
     _strict_response_validation: bool = False
+
+    def default_base_url(self, provider: LiteralProviderType) -> str | None:
+        """Return the default base URL for the OpenAI client based on the provider."""
+        provider = provider if isinstance(provider, Provider) else Provider.from_string(provider)  # ty:ignore[invalid-assignment]
+        return {
+            Provider.OPENAI: "https://api.openai.com/v1",
+            Provider.AZURE: None,
+            Provider.GROQ: "https://api.groq.com/openai/v1",
+            Provider.OLLAMA: "http://localhost:11434/v1",
+            Provider.TOGETHER: "https://api.together.xyz/v1",
+        }.get(provider)
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         return {
@@ -591,6 +545,33 @@ class SentenceTransformersClientOptions(ClientOptions):
             FilteredKey("cache_folder"): AnonymityConversion.HASH,
             FilteredKey("model_name_or_path"): AnonymityConversion.HASH,
         }
+
+    def __model_post_init__(self) -> None:
+        """Post-initialization adjustments for specific models."""
+        if (
+            model_name_or_path := self.model_name_or_path
+        ) and "qwen3" in model_name_or_path.lower():
+            object.__setattr__(
+                self,
+                "model_kwargs",
+                (self.model_kwargs or {})
+                | {
+                    "torch_dtype": "float16"
+                    if "torch_dtype" not in (self.model_kwargs or {})
+                    else self.model_kwargs.get("torch_dtype")
+                },
+            )
+            if importlib.util.find_spec("flash_attention_2") is not None:
+                object.__setattr__(
+                    self,
+                    "model_kwargs",
+                    (self.model_kwargs or {})
+                    | {
+                        "attention_implementation": "flash_attention_2"
+                        if "attention_implementation" not in (self.model_kwargs or {})
+                        else self.model_kwargs.get("attention_implementation")
+                    },
+                )
 
 
 class HFInferenceClientOptions(ClientOptions):

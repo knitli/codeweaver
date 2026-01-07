@@ -10,7 +10,7 @@ from __future__ import annotations
 import os
 
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, cast
 
 from codeweaver.core import ConfigurationError, Provider
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
@@ -33,7 +33,7 @@ class MistralEmbeddingProvider(EmbeddingProvider[Mistral]):
     """Mistral embedding provider."""
 
     client: Mistral
-    _provider = Provider.MISTRAL
+    _provider: ClassVar[Literal[Provider.MISTRAL]] = Provider.MISTRAL
     caps: EmbeddingModelCapabilities
 
     def __init__(
@@ -60,18 +60,6 @@ class MistralEmbeddingProvider(EmbeddingProvider[Mistral]):
         # Set model attribute after Pydantic initialization completes
         self.model = caps.name
 
-    def _initialize(self, caps: EmbeddingModelCapabilities) -> None:
-        """Initialize the Mistral embedding provider.
-
-        Sets up caps and configures default kwargs for document and query embedding.
-        """
-        # Set caps at start
-        self.caps = caps
-
-        # Configure default kwargs if needed
-        # Mistral uses same parameters for both documents and queries
-        # Base class handles merging with user-provided kwargs
-
     @property
     def base_url(self) -> str | None:
         """Get the base URL of the Mistral API."""
@@ -88,7 +76,7 @@ class MistralEmbeddingProvider(EmbeddingProvider[Mistral]):
                 results = await mistral.embeddings.create_async(
                     model=self.model,
                     inputs=inputs,
-                    output_dtype=cast("EmbeddingDtype", self.caps.default_dtype),
+                    output_dtype=cast(EmbeddingDtype, self.caps.default_dtype),
                     **kwargs,
                 )
                 embeddings = [cast("list[float]", item.embedding) for item in results.data]
@@ -109,13 +97,13 @@ class MistralEmbeddingProvider(EmbeddingProvider[Mistral]):
         self, documents: Sequence[CodeChunk], **kwargs: Any
     ) -> list[list[float]] | list[list[int]]:
         readied_documents = self.chunks_to_strings(documents)
-        kwargs = (kwargs or {}) | self.doc_kwargs.get("client_options", {})
+        kwargs = (kwargs or {}) | self.embed_options.get("client_options", {})
         return await self._fetch_embeddings(cast("list[str]", readied_documents), **kwargs)
 
     async def _embed_query(
         self, query: Sequence[str], **kwargs: Any
     ) -> list[list[float]] | list[list[int]]:
-        kwargs = (kwargs or {}) | self.query_kwargs.get("client_options", {})
+        kwargs = (kwargs or {}) | self.query_options.get("client_options", {})
         return await self._fetch_embeddings(cast("list[str]", query), **kwargs)
 
 

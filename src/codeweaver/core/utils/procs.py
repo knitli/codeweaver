@@ -139,7 +139,9 @@ def low_priority() -> Generator[None, None, None]:
             # Range is -20 (highest) to 19 (lowest)
             new_nice = min(original_nice + 10, 19)
             process.nice(new_nice)
-            logger.debug("Set process nice value to %d (was %d)", new_nice, original_nice)
+            logger.debug(
+                "Set process nice value to %d (was %d)", new_nice, original_nice
+            )
 
     except ImportError:
         logger.debug("psutil not available, running at normal priority")
@@ -237,4 +239,12 @@ def get_optimal_workers(task_type: str = "cpu") -> int:
     return min(cpu_count * 2, 16) if task_type == "io" else max(cpu_count - 1, 1)
 
 
-__all__ = ("asyncio_or_uvloop", "get_optimal_workers", "low_priority", "very_low_priority")
+__all__ = (
+    "asyncio_or_uvloop",
+    "effective_cpu_count",
+    "get_cpu_count",
+    "get_optimal_workers",
+    "low_priority",
+    "python_version",
+    "very_low_priority",
+)

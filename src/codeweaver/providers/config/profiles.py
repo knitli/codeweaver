@@ -176,7 +176,8 @@ def _recommended_default(
             DataProviderSettings(provider=Provider.DUCKDUCKGO),
         ),
         vector_store=QdrantVectorStoreProviderSettings(
-            provider=Provider.QDRANT, client_options=_get_vector_client_options(vector_deployment, url=url)
+            provider=Provider.QDRANT,
+            client_options=_get_vector_client_options(vector_deployment, url=url),
         ),
     )
 
@@ -191,7 +192,9 @@ def _quickstart_default(
     from codeweaver.core import Provider
 
     embedding_model = (
-        "ibm-granite/granite-embedding-small-english-r2" if HAS_ST else "BAAI/bge-small-en-v1.5"
+        "ibm-granite/granite-embedding-small-english-r2"
+        if HAS_ST
+        else "BAAI/bge-small-en-v1.5"
     )
     sparse_model = (
         "opensearch/opensearch-neural-sparse-encoding-doc-v3-gte"
@@ -199,7 +202,9 @@ def _quickstart_default(
         else "prithivida/Splade_PP_en_v1"
     )
     reranking_model = (
-        "BAAI/bge-reranking-v2-m3" if HAS_ST else "jinaai/jina-reranking-v2-base-multilingual"
+        "BAAI/bge-reranking-v2-m3"
+        if HAS_ST
+        else "jinaai/jina-reranking-v2-base-multilingual"
     )
 
     return ProviderSettingsDict(
@@ -211,12 +216,16 @@ def _quickstart_default(
                     if HAS_ST
                     else FastEmbedEmbeddingConfig(model_name=embedding_model)
                 ),
-                provider=Provider.SENTENCE_TRANSFORMERS if HAS_ST else Provider.FASTEMBED,
+                provider=(
+                    Provider.SENTENCE_TRANSFORMERS if HAS_ST else Provider.FASTEMBED
+                ),
             ),
         ),
         sparse_embedding=(
             SparseEmbeddingProviderSettings(
-                provider=Provider.SENTENCE_TRANSFORMERS if HAS_ST else Provider.FASTEMBED,
+                provider=(
+                    Provider.SENTENCE_TRANSFORMERS if HAS_ST else Provider.FASTEMBED
+                ),
                 model_name=sparse_model,
                 sparse_embedding_config=(
                     SentenceTransformersSparseEmbeddingConfig(model_name=sparse_model)
@@ -227,7 +236,9 @@ def _quickstart_default(
         ),
         reranking=(
             RerankingProviderSettings(
-                provider=Provider.SENTENCE_TRANSFORMERS if HAS_ST else Provider.FASTEMBED,
+                provider=(
+                    Provider.SENTENCE_TRANSFORMERS if HAS_ST else Provider.FASTEMBED
+                ),
                 model_name=reranking_model,
                 reranking_config=(
                     SentenceTransformersRerankingConfig(model_name=reranking_model)
@@ -249,7 +260,7 @@ def _quickstart_default(
         ),
         vector_store=QdrantVectorStoreProviderSettings(
             provider=Provider.QDRANT,
-            client_options=_get_vector_client_options(vector_deployment, url=url)
+            client_options=_get_vector_client_options(vector_deployment, url=url),
         ),
     )
 
@@ -267,14 +278,18 @@ def _backup_profile() -> ProviderSettingsDict:
     # We lose true sparse embeddings with bm25, but it's a good lightweight backup option
     embedding_model = "minishlab/potion-base-8M" if HAS_ST else "BAAI/bge-small-en-v1.5"
     reranking_model = (
-        "cross-encoder/ms-marco-TinyBERT-L2-v2" if HAS_ST else "jinaai/jina-reranker-v1-tiny-en"
+        "cross-encoder/ms-marco-TinyBERT-L2-v2"
+        if HAS_ST
+        else "jinaai/jina-reranker-v1-tiny-en"
     )
 
     backup_settings = _quickstart_default("local") | {
         "sparse_embedding": SparseEmbeddingProviderSettings(
             provider=Provider.FASTEMBED,
             model_name="qdrant/bm25",
-            sparse_embedding_config=FastEmbedSparseEmbeddingConfig(model_name="qdrant/bm25"),
+            sparse_embedding_config=FastEmbedSparseEmbeddingConfig(
+                model_name="qdrant/bm25"
+            ),
         ),
         # For the dense embeddings, we essentially choose the lightest available model
         # potion-base-8M is a static embedding model, which again loses some quality, but is extremely light weight and virtually instant
@@ -304,11 +319,13 @@ def _backup_profile() -> ProviderSettingsDict:
     backup_settings["vector_store"] = QdrantVectorStoreProviderSettings(
         provider=Provider.MEMORY,
         in_memory_config=MemoryConfig(
-            persist_path=Path(f"{get_user_data_dir()}/vectors/backup"), auto_persist=True),
+            persist_path=Path(f"{get_user_data_dir()}/vectors/backup"),
+            auto_persist=True,
+        ),
         client_options=_default_local_vector_client_options(),
     )
 
     return ProviderSettingsDict(**backup_settings)
 
 
-__all__ = ("get_profile",)
+__all__ = "get_profile"

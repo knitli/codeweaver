@@ -63,7 +63,12 @@ class ProviderMetadata:
         """
         is_async_gen = inspect.isasyncgenfunction(factory)
         is_gen = inspect.isgeneratorfunction(factory)
-        return cls(scope=scope, is_generator=is_gen, is_async_generator=is_async_gen, module=module)
+        return cls(
+            scope=scope,
+            is_generator=is_gen,
+            is_async_generator=is_async_gen,
+            module=module,
+        )
 
 
 @overload
@@ -221,7 +226,9 @@ def dependency_provider[T](
     if cls is None:
 
         def class_decorator(target_cls: type[T]) -> type[T]:
-            _register_provider(interface=target_cls, factory=target_cls, scope=scope, module=module)
+            _register_provider(
+                interface=target_cls, factory=target_cls, scope=scope, module=module
+            )
             return target_cls
 
         return class_decorator

@@ -42,9 +42,6 @@ class CohereRerankingOptionsDict(TypedDict, total=False):
     top_n: NotRequired[int]
     """Number of most relevant results to return. Defaults to length of documents."""
 
-    return_documents: NotRequired[bool]
-    """If False: returns {index, relevance_score}. If True: returns {index, text, relevance_score}. Defaults to False."""
-
     max_chunks_per_doc: NotRequired[int]
     """Maximum chunks to produce internally from a document. Constraint: num_documents * max_chunks_per_doc ≤ 10,000."""
 
@@ -145,7 +142,7 @@ class VoyageRerankingConfig(BaseRerankingConfig):
     _tag: Literal["voyage"] = "voyage"
     provider: Literal[Provider.VOYAGE] = Provider.VOYAGE
 
-    model_name: LiteralString
+    model_name: Literal["rerank-2.5", "rerank-2.5-lite"] | LiteralString
     """The Voyage AI reranking model to use (e.g., 'rerank-2.5', 'rerank-2.5-lite')."""
 
     rerank: VoyageRerankingOptionsDict | None = None
@@ -164,8 +161,17 @@ class CohereRerankingConfig(BaseRerankingConfig):
     _tag: Literal["cohere"] = "cohere"
     provider: Literal[Provider.COHERE] = Provider.COHERE
 
-    model_name: LiteralString
-    """The Cohere reranking model to use (e.g., 'rerank-v4.0-pro', 'rerank-v3.5')."""
+    model_name: (
+        Literal[
+            "rerank-v4.0-pro",
+            "rerank-v4.0-fast",
+            "rerank-v3.5",
+            "rerank-english-v3.0",
+            "rerank-multilingual-v3.0",
+        ]
+        | LiteralString
+    )
+    """The Cohere reranking model to use."""
 
     rerank: CohereRerankingOptionsDict | None = None
     """Parameters for Cohere reranking requests."""
@@ -173,7 +179,9 @@ class CohereRerankingConfig(BaseRerankingConfig):
     def _as_options(self) -> SerializedRerankingOptionsDict:
         """Convert the Cohere reranking configuration to a dictionary of options."""
         return SerializedRerankingOptionsDict(
-            model_name=self.model_name, rerank=cast(dict[str, Any], self.rerank or {}), model={}
+            model_name=self.model_name,
+            rerank=cast(dict[str, Any], self.rerank or {}) | {"model": self.model_name},
+            model={},
         )
 
 
@@ -186,7 +194,7 @@ class BedrockRerankingConfig(BaseRerankingConfig):
     _tag: Literal["bedrock"] = "bedrock"
     provider: Literal[Provider.BEDROCK] = Provider.BEDROCK
 
-    model_name: LiteralString
+    model_name: Literal["amazon.rerank-v1:0", "cohere.rerank-v3-5:0"] | LiteralString
     """The Bedrock reranking model to use (e.g., 'amazon.rerank-v1:0', 'cohere.rerank-v3-5:0')."""
 
     model: BedrockRerankingModelConfig
@@ -263,10 +271,16 @@ RerankingConfigT = Annotated[
 __all__ = (
     "BaseRerankingConfig",
     "BedrockRerankingConfig",
+    "BedrockRerankingModelConfig",
+    "BedrockRerankingOptionsDict",
     "CohereRerankingConfig",
+    "CohereRerankingOptionsDict",
     "FastEmbedRerankingConfig",
+    "FastEmbedRerankingOptionsDict",
     "RerankingConfigT",
     "SentenceTransformersRerankingConfig",
+    "SentenceTransformersRerankingOptionsDict",
     "SerializedRerankingOptionsDict",
     "VoyageRerankingConfig",
+    "VoyageRerankingOptionsDict",
 )

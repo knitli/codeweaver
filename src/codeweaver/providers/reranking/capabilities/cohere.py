@@ -50,6 +50,14 @@ def _get_common_capabilities() -> PartialRerankingCapabilitiesDict:
     }
 
 
+def _get_v4_capabilities() -> PartialRerankingCapabilitiesDict:
+    """
+    Get the capabilities for Cohere v4 models.
+    """
+    base_caps = _get_common_capabilities()
+    return {**base_caps, "context_window": 32_764}
+
+
 @dependency_provider(CohereRerankingCapabilities, scope="singleton", collection=True)
 def get_cohere_reranking_capabilities() -> tuple[CohereRerankingCapabilities, ...]:
     """Get the capabilities of the Cohere reranking model."""
@@ -65,6 +73,7 @@ def get_cohere_reranking_capabilities() -> tuple[CohereRerankingCapabilities, ..
         })
         for model in ("rerank-v3.5", "rerank-english-v3.0", "rerank-multilingual-v3.0")
     ]
+    capabilities.extend([])
     return (
         *capabilities,
         CohereRerankingCapabilities.model_validate({

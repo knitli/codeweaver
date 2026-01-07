@@ -270,7 +270,7 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         qdrant_filter = None
         args = {'limit': 100, 'with_payload': True, 'query_filter': qdrant_filter or None, 'with_vectors': False}
         if vector.is_hybrid():
-            query_params = vector.to_hybrid_query(query_kwargs=args, kwargs={'collection_name': collection_name})
+            query_params = vector.to_hybrid_query(query_options=args, kwargs={'collection_name': collection_name})
             import logging
             logger = logging.getLogger(__name__)
             logger.info('Hybrid query dict keys: %s', query_params.keys())

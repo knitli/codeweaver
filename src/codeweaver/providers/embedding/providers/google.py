@@ -109,7 +109,9 @@ class GoogleEmbeddingProvider(EmbeddingProvider[genai.Client]):
         """
         Embed the documents using the Google embedding provider.
         """
-        config_kwargs = dict(self.embed_options) | (kwargs or {})
+        config_kwargs = (self.embed_options.as_settings() if self.embed_options else {}) | (
+            kwargs or {}
+        )
         readied_docs = self.chunks_to_strings(documents)
         content = (genai_types.Part.from_text(text=cast(str, doc)) for doc in readied_docs)
         response = await self.client.aio.models.embed_content(
@@ -131,7 +133,7 @@ class GoogleEmbeddingProvider(EmbeddingProvider[genai.Client]):
         """
         Embed the query using the Google embedding provider.
         """
-        config_kwargs = dict(self.query_options) | (kwargs or {})
+        config_kwargs = (self.query_options or {}) | (kwargs or {})
         content = [genai_types.Part.from_text(text=q) for q in query]
         response = await self.client.aio.models.embed_content(
             model=self.caps.name,
@@ -158,3 +160,6 @@ class GoogleEmbeddingProvider(EmbeddingProvider[genai.Client]):
             ] or [[]]
         _ = await self._report_stats(content)
         return embeddings  # ty: ignore[invalid-return-type]
+
+
+__all__ = ("GoogleEmbeddingProvider",)

@@ -23,6 +23,8 @@ from pathlib import Path
 from typing import Annotated, Any, Literal, NotRequired, Required, Self, TypedDict, cast, overload
 
 from pydantic import (
+    AnyUrl,
+    ConfigDict,
     Discriminator,
     Field,
     PositiveFloat,
@@ -62,6 +64,11 @@ from codeweaver.providers.config.clients import (
 )
 from codeweaver.providers.config.embedding import EmbeddingConfigT, SparseEmbeddingConfigT
 from codeweaver.providers.config.reranking import RerankingConfigT
+from codeweaver.providers.config.utils import (
+    AzureOptions,
+    ensure_endpoint_version,
+    try_for_azure_endpoint,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -147,6 +154,29 @@ class BaseProviderSettings(BasedModel, ABC):
             )
 
         self._register_configurables()
+
+    @model_validator(mode="after")
+    def _ensure_endpoint_version(self) -> Self:
+        """Ensure that any endpoints in client_options have the correct version suffix."""
+        if not self.client_options:
+            return self
+        if (
+            self.client_options
+            and self.client_options._core_provider in {Provider.COHERE, Provider.OPENAI}
+            and (endpoint := getattr(self.client_options, "base_url", None))
+        ):
+            object.__setattr__(
+                self,
+                "client_options",
+                self.client_options.model_copy(
+                    update={
+                        "base_url": ensure_endpoint_version(
+                            endpoint, cohere=(self.client_options._core_provider == Provider.COHERE)
+                        )
+                    }
+                ),
+            )
+        return self
 
     def _register_configurables(self) -> None:
         """Register self for config resolution. Classes may optionally implement this class method to register themselves for config resolution."""
@@ -260,6 +290,15 @@ class AzureProviderMixin:
             FilteredKey("region_name"): AnonymityConversion.HASH,
             FilteredKey("api_key"): AnonymityConversion.BOOLEAN,
         }
+
+    def as_azure_options(self) -> AzureOptions:
+        """Return the settings as an AzureOptions TypedDict."""
+        return AzureOptions(
+            model_deployment=self.model_deployment,
+            endpoint=self.endpoint,
+            region_name=self.region_name,
+            api_key=self.api_key,
+        )
 
 
 class FastEmbedProviderMixin:
@@ -594,6 +633,8 @@ class EmbeddingProviderSettings(BaseEmbeddingProviderSettings):
 class AzureEmbeddingProviderSettings(AzureProviderMixin, EmbeddingProviderSettings):
     """Provider settings for Azure embedding models (Cohere or OpenAI)."""
 
+    model_config = EmbeddingProviderSettings.model_config | ConfigDict(frozen=False)
+
     client_options: Annotated[
         Annotated[CohereClientOptions, Tag(Provider.COHERE.variable)]
         | Annotated[OpenAIClientOptions, Tag(Provider.OPENAI.variable)]
@@ -603,6 +644,54 @@ class AzureEmbeddingProviderSettings(AzureProviderMixin, EmbeddingProviderSettin
             discriminator=Discriminator(discriminate_azure_embedding_client_options),
         ),
     ] = None
+
+    @model_validator(mode="after")
+    def _validate_client_options(self) -> Self:
+        """Validate and adjust client options for Azure embedding providers."""
+        if (
+            self.client_options
+            and self.client_options.base_url
+            and (self.api_key or self.client_options.api_key)
+        ):
+            return self
+        if not self.client_options:
+            client_options = (
+                CohereClientOptions() if self.client == SDKClient.COHERE else OpenAIClientOptions()
+            )
+        else:
+            client_options = self.client_options
+        api_key = self.api_key or self.client_options.api_key or Provider.AZURE.get_env_api_key()
+        options = self.as_azure_options() | client_options.model_dump() | {"api_key": api_key}
+        is_cohere = (
+            isinstance(client_options, CohereClientOptions) or self.client == SDKClient.COHERE
+        )
+        if not options.get("base_url") and (
+            endpoint := try_for_azure_endpoint(options, cohere=is_cohere)
+        ):
+            options["base_url"] = AnyUrl(endpoint)
+        final_client_options = {
+            k: v
+            for k, v in options.items()
+            if v is not None and k not in {"model_deployment", "endpoint", "region_name"}
+        }
+        client = (
+            CohereClientOptions(**final_client_options)
+            if is_cohere
+            else OpenAIClientOptions(**final_client_options)
+        )
+        object.__setattr__(self, "client_options", client)
+        for k, v in {
+            key: value
+            for key, value in options.items()
+            if key in {"model_deployment", "endpoint", "region_name", "api_key"}
+        }.items():
+            if v and (
+                (not hasattr(self, k))
+                or ((value := getattr(self, k, None)) is None)
+                or (value and value != v)
+            ):
+                setattr(self, k, v)
+        return self
 
 
 class BedrockEmbeddingProviderSettings(BedrockProviderMixin, EmbeddingProviderSettings):
@@ -764,7 +853,9 @@ __all__ = (
     "AgentProviderSettings",
     "AzureEmbeddingProviderSettings",
     "AzureProviderMixin",
+    "BaseEmbeddingProviderSettings",
     "BaseProviderSettings",
+    "BaseProviderSettingsDict",
     "BedrockEmbeddingProviderSettings",
     "BedrockProviderMixin",
     "BedrockRerankingProviderSettings",
@@ -779,6 +870,7 @@ __all__ = (
     "FastEmbedSparseEmbeddingProviderSettings",
     "MemoryConfig",
     "ModelString",
+    "QdrantProviderMixin",
     "QdrantVectorStoreProviderSettings",
     "RerankingProviderSettings",
     "SparseEmbeddingProviderSettings",

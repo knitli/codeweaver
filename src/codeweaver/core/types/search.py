@@ -84,7 +84,7 @@ class StrategizedQuery(NamedTuple):
         return self.has_dense() and self.has_sparse()
 
     def to_hybrid_query(
-        self, query_kwargs: dict[str, Any], kwargs: dict[str, Any]
+        self, query_options: dict[str, Any], kwargs: dict[str, Any]
     ) -> dict[str, FusionQuery | list[Prefetch] | Any]:
         """Convert to a FusionQuery for hybrid search."""
         from qdrant_client.http.models import Prefetch, Rrf, RrfQuery, SparseVector
@@ -115,14 +115,14 @@ class StrategizedQuery(NamedTuple):
         # Extract Prefetch-specific parameters (limit, score_threshold, filter, params)
         prefetch_params = {
             k: v
-            for k, v in query_kwargs.items()
+            for k, v in query_options.items()
             if k in ("limit", "score_threshold", "filter", "params")
         }
 
         # Extract top-level query_points parameters
         top_level_params = {
             k: v
-            for k, v in query_kwargs.items()
+            for k, v in query_options.items()
             if k
             in (
                 "with_payload",

@@ -9,6 +9,7 @@ from typing import (
     TYPE_CHECKING,
     Annotated,
     Any,
+    ClassVar,
     Literal,
     LiteralString,
     NotRequired,
@@ -18,11 +19,12 @@ from typing import (
     overload,
 )
 
-from beartype.typing import ClassVar
+from cyclopts.types import PositiveInt
 from pydantic import Discriminator, Field, Tag, computed_field
 
 from codeweaver.core import INJECTED, BasedModel, ConfigurationError, LiteralProvider, Provider
 from codeweaver.providers import EmbeddingCapabilityResolver
+from codeweaver.providers.config.types import CohereRequestOptionsDict
 from codeweaver.providers.embedding.capabilities.dependencies import EmbeddingCapabilityResolverDep
 
 
@@ -417,6 +419,57 @@ class BedrockEmbeddingConfig(BaseEmbeddingConfig):
         return {}
 
 
+class CohereEmbeddingOptionsDict(TypedDict, total=False):
+    """Embedding request options for Cohere embedding API.
+
+    These parameters are passed to the embed() method.
+    """
+
+    model: Required[LiteralString]
+    """The Cohere embedding model to use."""
+
+    max_tokens: NotRequired[PositiveInt]
+    """The maximum number of tokens to process. Will truncate inputs longer than this using the truncation strategy."""
+
+    output_dimension: NotRequired[Literal[256, 512, 1024, 1536]]
+    """The desired output dimensionality for the embeddings. Default is 1536."""
+
+    embedding_types: NotRequired[Literal["float", "int8", "uint8", "binary", "ubinary"]]
+
+    truncate: NotRequired[Literal["NONE", "START", "END"]]
+    """Truncation strategy for inputs that exceed the model's maximum context length. Can be "NONE", "START", or "END". Defaults to "NONE"."""
+
+    request_options: CohereRequestOptionsDict | None
+    """Additional request options for the Cohere API."""
+
+
+class CohereEmbeddingConfig(BaseEmbeddingConfig):
+    """Configuration options for Cohere embedding models."""
+
+    _tag: Literal["cohere"] = "cohere"
+    provider: Literal[Provider.COHERE] = Provider.COHERE
+
+    model_name: (
+        Literal[
+            "embed-v4.0",
+            "embed-english-v3.0",
+            "embed-english-light-v3.0",
+            "embed-multilingual-v3.0",
+            "embed-multilingual-light-v3.0",
+        ]
+        | LiteralString
+    )
+    """The Cohere embedding model to use."""
+
+    def _as_options(self) -> SerializedEmbeddingOptionsDict:
+        """Convert the Cohere embedding configuration to a dictionary of options."""
+        embedding_options = {"model": self.model_name} | (self.embedding or {})
+        query_options = {"model": self.model_name} | (self.query or {})
+        return SerializedEmbeddingOptionsDict(
+            model_name=self.model_name, embedding=embedding_options, query=query_options, model={}
+        )
+
+
 class FastEmbedEmbeddingConfig(BaseEmbeddingConfig):
     """Configuration options for FastEmbed embedding models."""
 
@@ -575,7 +628,7 @@ class OpenAIEmbeddingConfig(BaseEmbeddingConfig):
     _tag: Literal["openai"] = "openai"
     provider: Literal[Provider.OPENAI] = Provider.OPENAI
 
-    model_name: LiteralString
+    model_name: Literal["text-embedding-3-large", "text-embedding-3-small"] | LiteralString
     """The OpenAI-compatible embedding model to use."""
 
     embedding: OpenAIEmbeddingRequestParams | None = None
@@ -724,7 +777,12 @@ class VoyageEmbeddingConfig(BaseEmbeddingConfig):
     _tag: Literal["voyage"] = "voyage"
     provider: Literal[Provider.VOYAGE] = Provider.VOYAGE
 
-    model_name: LiteralString
+    model_name: (
+        Literal[
+            "voyage-code-3", "voyage-3.5", "voyage-3.5-lite", "voyage-3-large", "voyage-context-3"
+        ]
+        | LiteralString
+    )
     """The Voyage AI embedding model to use."""
 
     embedding: VoyageEmbeddingOptionsDict | None = None
@@ -810,6 +868,7 @@ __all__ = (
     "FastEmbedEmbeddingConfig",
     "FastEmbedSparseEmbeddingConfig",
     "GoogleEmbeddingConfig",
+    "GoogleEmbeddingRequestParams",
     "HuggingFaceEmbeddingConfig",
     "MistralEmbeddingConfig",
     "MistralEmbeddingOptionsDict",

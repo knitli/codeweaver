@@ -100,22 +100,22 @@ class TestVoyageEmbeddingProviderInitialization:
         assert provider._is_context_model
         assert "context" in provider.caps.name
 
-    def test_provider_sets_doc_and_query_kwargs(self, mock_voyage_client, voyage_capabilities):
-        """Test that doc_kwargs and query_kwargs are set correctly."""
+    def test_provider_sets_doc_andquery_options(self, mock_voyage_client, voyage_capabilities):
+        """Test that embed_options and query_options are set correctly."""
         provider = VoyageEmbeddingProvider(
             client=mock_voyage_client, caps=voyage_capabilities, kwargs=None
         )
 
         # Check that model name and output params are set
-        assert provider.doc_kwargs["model"] == "voyage-3"
-        assert provider.doc_kwargs["input_type"] == "document"
-        assert provider.doc_kwargs["output_dimension"] == 1024
-        assert provider.doc_kwargs["output_dtype"] == "float"
+        assert provider.embed_options["model"] == "voyage-3"
+        assert provider.embed_options["input_type"] == "document"
+        assert provider.embed_options["output_dimension"] == 1024
+        assert provider.embed_options["output_dtype"] == "float"
 
-        assert provider.query_kwargs["model"] == "voyage-3"
-        assert provider.query_kwargs["input_type"] == "query"
-        assert provider.query_kwargs["output_dimension"] == 1024
-        assert provider.query_kwargs["output_dtype"] == "float"
+        assert provider.query_options["model"] == "voyage-3"
+        assert provider.query_options["input_type"] == "query"
+        assert provider.query_options["output_dimension"] == 1024
+        assert provider.query_options["output_dtype"] == "float"
 
     def test_provider_initialization_with_custom_kwargs(
         self, mock_voyage_client, voyage_capabilities
@@ -126,8 +126,8 @@ class TestVoyageEmbeddingProviderInitialization:
             client=mock_voyage_client, caps=voyage_capabilities, kwargs=custom_kwargs
         )
 
-        assert provider.doc_kwargs["custom_param"] == "value"
-        assert provider.query_kwargs["custom_param"] == "value"
+        assert provider.embed_options["custom_param"] == "value"
+        assert provider.query_options["custom_param"] == "value"
 
     def test_provider_base_url(self, mock_voyage_client, voyage_capabilities):
         """Test that base_url property returns correct value."""

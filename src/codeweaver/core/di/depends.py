@@ -64,7 +64,8 @@ class DependsPlaceholder(Sentinel):
 
 
 _injected_sentinel = DependsPlaceholder(
-    name=SentinelName("InjectedDependency"), module_name=Sentinel._get_module_name_generator()()
+    name=SentinelName("InjectedDependency"),
+    module_name=Sentinel._get_module_name_generator()(),
 )  # ty:ignore[invalid-argument-type]
 
 # INJECTED is a proxy that supports subscripting while wrapping the sentinel
