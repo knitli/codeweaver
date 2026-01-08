@@ -9,9 +9,10 @@ We wanted to mirror `pydantic-ai`'s handling of LLM models, but we had to make a
 # sourcery skip: avoid-global-variables
 from __future__ import annotations
 
-from importlib import import_module
 from types import MappingProxyType
 from typing import TYPE_CHECKING
+
+from codeweaver.core import create_lazy_getattr
 
 
 if TYPE_CHECKING:
@@ -19,9 +20,9 @@ if TYPE_CHECKING:
         EmbeddingModelCapabilities,
         SparseEmbeddingModelCapabilities,
     )
-    from codeweaver.providers.embedding.capabilities.dependencies import (
+    from codeweaver.providers.embedding.capabilities.resolver import (
         EmbeddingCapabilityResolver,
-        EmbeddingCapabilityResolverDep,
+        SparseEmbeddingCapabilityResolver,
     )
     from codeweaver.providers.embedding.fastembed_extensions import (
         get_sparse_embedder,
@@ -49,8 +50,8 @@ if TYPE_CHECKING:
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "BedrockEmbeddingProvider": (__spec__.parent, "providers.bedrock"),
     "CohereEmbeddingProvider": (__spec__.parent, "providers.cohere"),
-    "EmbeddingCapabilityResolver": (__spec__.parent, "capabilities.dependencies"),
-    "EmbeddingCapabilityResolverDep": (__spec__.parent, "capabilities.dependencies"),
+    "EmbeddingCapabilityResolver": (__spec__.parent, "capabilities.resolver"),
+    "SparseEmbeddingCapabilityResolver": (__spec__.parent, "capabilities.resolver"),
     "EmbeddingModelCapabilities": (__spec__.parent, "capabilities.base"),
     "EmbeddingProvider": (__spec__.parent, "providers.base"),
     "EmbeddingRegistry": (__spec__.parent, "registry"),
@@ -71,24 +72,13 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
 })
 
 
-def __getattr__(name: str) -> object:
-    """Dynamically import submodules and classes for the embedding package."""
-    if name in _dynamic_imports:
-        module_name, submodule_name = _dynamic_imports[name]
-        module = import_module(f"{module_name}.{submodule_name}")
-        result = getattr(module, name)
-        globals()[name] = result  # Cache in globals for future access
-        return result
-    if globals().get(name) is not None:
-        return globals()[name]
-    raise AttributeError(f"module {__name__} has no attribute {name}")
+__getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
 
 
 __all__ = (
     "BedrockEmbeddingProvider",
     "CohereEmbeddingProvider",
     "EmbeddingCapabilityResolver",
-    "EmbeddingCapabilityResolverDep",
     "EmbeddingModelCapabilities",
     "EmbeddingProvider",
     "EmbeddingRegistry",
@@ -101,6 +91,7 @@ __all__ = (
     "OpenAIEmbeddingBase",
     "SentenceTransformersEmbeddingProvider",
     "SentenceTransformersSparseProvider",
+    "SparseEmbeddingCapabilityResolver",
     "SparseEmbeddingModelCapabilities",
     "SparseEmbeddingProvider",
     "VoyageEmbeddingProvider",

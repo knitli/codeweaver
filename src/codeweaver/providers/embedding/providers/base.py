@@ -76,6 +76,29 @@ ONE_KB = 1024
 ONE_MB = ONE_KB * 1024  # I guess it could be ONE_KB** but that'd be confusing
 
 
+# Generic client dependency type for providers
+# Note: Individual providers should use specific client type aliases from providers.dependencies
+# (e.g., OpenAIClientDep, VoyageClientDep) when possible
+type ClientDep[T] = Annotated[T, depends(lambda: None)]
+"""Generic client dependency type for embedding providers.
+
+For specific provider implementations, prefer using the concrete client type aliases
+from codeweaver.providers.dependencies (OpenAIClientDep, VoyageClientDep, etc.).
+
+This generic type is used in the base class where the client type is parameterized.
+"""
+
+
+# Generic config dependency type for providers
+type EmbeddingConfigDep[T] = Annotated[T, depends(lambda: None)]
+"""Generic config dependency type for embedding providers.
+
+For most use cases, use EmbeddingProviderSettingsDep from codeweaver.providers.dependencies
+which injects the primary embedding config. Use this generic type when you need a
+parameterized config type in the base class.
+"""
+
+
 type EmbeddingImplementationDeps = Annotated[Any, depends(lambda: None)]
 "Implementation-specific dependencies for the provider. To use this type, implement a dependency provider callable and register it with the DI system using this type as the key."
 
@@ -147,6 +170,7 @@ def default_input_transformer(chunks: StructuredDataInput) -> Iterator[CodeChunk
     """Default input transformer that serializes CodeChunks to strings."""
     return CodeChunk.chunkify(chunks)
 
+
 def default_output_transformer(output: Any) -> list[list[float]] | list[list[int]]:
     """Default output transformer that ensures the output is in the correct format."""
     if isinstance(output, list | tuple | set) and (
@@ -195,7 +219,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
     caps: Annotated[
         EmbeddingModelCapabilities | None,
         Field(
-            description="The capabilities of the embedding model. Can be None if capabilities are not available."
+            description="The capabilities of the embedding model. Can be None if capabilities are not available. If you are adding a custom model, you'll get best results if you define an `EmbeddingModelCapabilities` object for it and register it with the DI system (using `@dependency_provider` decorator).",
         ),
     ] = None
 
@@ -205,6 +229,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
     ]
 
     _provider: ClassVar[LiteralProvider] = cast(LiteralProvider, Provider.NOT_SET)
+    _max_tokens: ClassVar[PositiveInt] = 120_000
     _input_transformer: Callable[[StructuredDataInput], Any] = default_input_transformer
     _output_transformer: Callable[[Any], list[list[float]] | list[list[int]]] = (
         default_output_transformer
@@ -232,8 +257,8 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
     def __init__(
         self,
         client: ClientDep[EmbeddingClient] = INJECTED,
-        config: EmbeddingConfigT | None = None,
-        caps: EmbeddingCapabilityResolverDep | NoneDep = INJECTED,
+        config: EmbeddingConfigDep[EmbeddingConfigT] = INJECTED,
+        caps: EmbeddingCapabilityResolverDep = INJECTED,
         impl_deps: EmbeddingImplementationDeps = None,
         custom_deps: EmbeddingCustomDeps = None,
         **kwargs: Any,
@@ -1093,20 +1118,6 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         )
 
 
-class BackupEmbeddingProvider[EmbeddingClient](EmbeddingProvider[EmbeddingClient], ABC):
-    """Abstract class for backup embedding providers.
-
-    Backup providers are used as fallbacks when primary providers are unavailable.
-    They have the is_provider_backup property set to True.
-    """
-
-    @property
-    @override
-    def is_provider_backup(self) -> bool:
-        """Return True for backup embedding providers."""
-        return True
-
-
 class SparseEmbeddingProvider[SparseClient](EmbeddingProvider[SparseClient], ABC):
     """Abstract class for sparse embedding providers.
 
@@ -1166,15 +1177,7 @@ class SparseEmbeddingProvider[SparseClient](EmbeddingProvider[SparseClient], ABC
         """Abstract method to implement query embedding logic for sparse embeddings."""
 
 
-class BackupSparseEmbeddingProvider[SparseClient](
-    SparseEmbeddingProvider[SparseClient], BackupEmbeddingProvider[SparseClient], ABC
-):
-    """Abstract class for backup sparse embedding providers."""
-
-
 __all__ = (
-    "BackupEmbeddingProvider",
-    "BackupSparseEmbeddingProvider",
     "EmbeddingCustomDeps",
     "EmbeddingErrorInfo",
     "EmbeddingImplementationDeps",

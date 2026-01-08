@@ -10,6 +10,7 @@
 """OpenAI embedding provider."""
 
 from __future__ import annotations as _annotations
+from codeweaver.providers.config import EmbeddingConfigT
 
 import asyncio
 import os
@@ -17,13 +18,18 @@ import os
 from collections.abc import Callable, Sequence
 from typing import Any, Self, cast
 
+from typing import ClassVar
 from pydantic import create_model
 
-from codeweaver.core import CodeChunk, ConfigurationError, Provider, ProviderError
+from codeweaver.core import INJECTED, CodeChunk, ConfigurationError, Provider, ProviderError, TypeIs
 from codeweaver.core import ValidationError as CodeWeaverValidationError
 from codeweaver.providers import EmbeddingCapabilityResolverDep
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
-from codeweaver.providers.embedding.providers.base import EmbeddingProvider
+from codeweaver.providers.embedding.providers.base import (
+    EmbeddingCustomDeps,
+    EmbeddingImplementationDeps,
+    EmbeddingProvider,
+)
 
 
 try:
@@ -35,6 +41,12 @@ except ImportError as _import_error:
     ) from _import_error
 
 
+def _is_embedding_model_capabilities(obj: Any) -> TypeIs[EmbeddingModelCapabilities]:
+    """Appease the type checking gods for capability resolution."""
+    return isinstance(obj, EmbeddingModelCapabilities)
+
+def _raise_configuration_error(model_name: str, provider: Provider, resolved_type: Any) -> None:
+
 class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
     """A class for producing embedding provider classes for OpenAI compatible providers."""
 
@@ -43,24 +55,37 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
         cls,
         model_name: str,
         provider: Provider,
-        capabilities: EmbeddingModelCapabilities,
+        capabilities: EmbeddingCapabilityResolverDep = INJECTED,
         *,
-        base_url: str | None = None,
-        provider_kwargs: Any = None,
-        client: AsyncOpenAI | None = None,
+        config: EmbedddingConfigDep[EmbeddingConfigT] = INJECTED,
+        client: ClientDep[AsyncOpenAI] = INJECTED,
     ) -> type[Self]:
         """
         Create a new embedding provider class for the specified model and provider.
         """
         name = f"{str(provider).title()}EmbeddingProvider"
-        caps: EmbeddingModelCapabilities = capabilities
+        caps = capabilities.resolve(model_name=model_name)
+        if not _is_embedding_model_capabilities(caps):
+            raise ConfigurationError(
+                f"Could not resolve embedding model capabilities for model '{model_name}' and provider '{provider}'",
+                details={
+                    "model_name": model_name,
+                    "provider": str(provider),
+                    "resolved_type": type(caps).__name__,
+                },
+                suggestions=[
+                    "Ensure the model name is correct",
+                    "Check that the provider supports the specified model",
+                    "Verify that the capabilities resolver is functioning properly",
+                ],
+            )
 
         def make_init(
             base: type,
             provider: Provider,
             client: ClientDep[AsyncOpenAI] = INJECTED,
             config: EmbedddingConfigDep = INJECTED,
-            caps: EmbeddingCapabilityResolverDep = INJECTED,
+            caps: EmbeddingModelCapabilities = caps,
             impl_deps: EmbeddingImplementationDeps = INJECTED,
             custom_deps: EmbeddingCustomDeps = INJECTED,
         ) -> Callable[..., None]:
@@ -72,18 +97,10 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
                 """
                 Initialize the embedding provider.
                 """
-                cls.__init__(
-                    self,
-                    client=client,
-                    config=config,
-                    caps=caps,
-                    impl_deps=impl_deps,
-                    custom_deps=custom_deps,
-                    kwargs=kwargs,
-                )
+                cls.__init__(self, client=client, config=config, caps=caps, **kwargs)
 
                 # 4. Set provider-specific attributes AFTER parent initialization
-                cls._provider = provider
+                cls.provider = provider
 
             return __init__
 
@@ -91,9 +108,16 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
         # Because this is a BaseModel, we need to set __init__ on the parent class
         # so that it's there *before* pydantic does its thing so it can account for it.
         # there are other ways to do this, but this is the simplest.
-        parent_cls.__init__ = make_init(
-            cls, model_name, provider, base_url, provider_kwargs or {}, client=client
-        )
+        if not _is_embedding_model_capabilities(caps):
+            raise ConfigurationError(
+                "Capabilities must be an instance of EmbeddingModelCapabilities",
+                details={"provided_type": type(caps).__name__},
+                suggestions=[
+                    "Ensure the capabilities resolver returns the correct type",
+                    "Check the implementation of the capabilities resolver",
+                ],
+            )
+        object.__setattr__(parent_cls, "__init__", make_init(cls, provider, client=client, config=config, caps=caps))
 
         # Create the new provider class with proper field definitions
         new_class = create_model(
@@ -102,7 +126,7 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
             __base__=parent_cls,
             __module__="codeweaver.providers.embedding.providers.openai_factory",
             __validators__=None,
-            client=(AsyncOpenAI, ClientDep),
+            client=(AsyncOpenAI, client),
             _provider=(Provider, provider),
             caps=(EmbeddingModelCapabilities, capabilities),
         )
@@ -111,13 +135,13 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
         new_class._default_model_name = model_name
         new_class._default_provider = provider
         new_class._default_base_url = base_url
-        new_class._default_provider_kwargs = provider_kwargs or {}
+        new_class._default_config = config or {}
 
         return new_class
 
-    _client: AsyncOpenAI
-    _provider: Provider
-    _caps: EmbeddingModelCapabilities
+    client: AsyncOpenAI
+    provider: ClassVar[Provider]
+    caps: EmbeddingModelCapabilities
 
     @property
     def base_url(self) -> str:
@@ -155,20 +179,11 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
                 self._update_token_stats(from_docs=texts)
 
     async def _get_vectors(
-        self, texts: Sequence[str], **kwargs: Any
+        self, texts: Sequence[str], *, is_query: bool = False, **kwargs: Any
     ) -> list[list[float]] | list[list[int]]:
         """Get vectors for a sequence of texts."""
-        response = await self.client.embeddings.create(
-            input=cast(list[str], texts),
-            **(  # ty: ignore[invalid-argument-type]
-                self.embed_options  # ty:ignore[unresolved-attribute]
-                | (
-                    {k: v for k, v in kwargs.items() if k in self.valid_client_kwargs}  # ty:ignore[unresolved-attribute]
-                    if kwargs
-                    else {}
-                )
-            ),
-        )
+        kwargs = (self.query_options if is_query else self.embed_options) | kwargs
+        response = await self.client.embeddings.create(input=cast(list[str], texts), **kwargs)
         if not response or not response.data:
             raise ProviderError(
                 "OpenAI embeddings endpoint returned empty response",
@@ -212,7 +227,7 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
     async def _embed_query(
         self, query: Sequence[str], **kwargs: Any
     ) -> list[list[float]] | list[list[int]]:
-        return await self._get_vectors(query, **kwargs)
+        return await self._get_vectors(query, is_query=True, **kwargs)
 
 
 __all__ = ("OpenAIEmbeddingBase",)

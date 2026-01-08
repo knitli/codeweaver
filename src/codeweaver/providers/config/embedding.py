@@ -144,32 +144,6 @@ class BaseEmbeddingConfig(BasedModel):
             data["query"] = {}
         super().__init__(**data)
 
-        # Register self in DI container as singleton
-        try:
-            from codeweaver.core.di import get_container
-
-            container = get_container()
-            # Use type(self) so each concrete class registers separately
-            container.register(type(self), lambda: self, singleton=True)
-        except Exception as e:
-            # Log if DI not available (monorepo compatibility)
-            logger.debug(
-                "Failed to register %s in DI container (monorepo mode): %s", type(self).__name__, e
-            )
-
-        # Register for config resolution
-        try:
-            from codeweaver.core.config.registry import register_configurable
-
-            register_configurable(self)
-        except Exception as e:
-            # Log if config system not available (monorepo compatibility)
-            logger.debug(
-                "Failed to register %s for config resolution (monorepo mode): %s",
-                type(self).__name__,
-                e,
-            )
-
     def config_dependencies(self) -> dict[str, type]:
         """Embedding configs don't depend on others - they provide values."""
         return {}

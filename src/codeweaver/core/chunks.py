@@ -48,7 +48,12 @@ from codeweaver.core.spans import Span, SpanTuple
 from codeweaver.core.stores import BlakeHashKey
 from codeweaver.core.types import BasedModel, FilteredKeyT, LanguageNameT
 from codeweaver.core.types.utils import generate_field_title
-from codeweaver.core.utils import ensure_iterable, set_relative_path, truncate_text, uuid7
+from codeweaver.core.utils import (
+    ensure_iterable,
+    set_relative_path,
+    truncate_text,
+    uuid7,
+)
 
 
 if TYPE_CHECKING:
@@ -198,7 +203,11 @@ class CodeChunk(BasedModel):
     ] = datetime.now(UTC).timestamp()
     chunk_id: Annotated[
         UUID7,
-        Field(kw_only=True, description="""Unique identifier for the code chunk""", frozen=True),
+        Field(
+            kw_only=True,
+            description="""Unique identifier for the code chunk""",
+            frozen=True,
+        ),
     ] = uuid7()
     metadata: Metadata = Field(
         default_factory=lambda data: Metadata(
@@ -211,7 +220,8 @@ class CodeChunk(BasedModel):
         description="Additional metadata for the code chunk; includes ast-derived information under the `semantic` field for supported languages.",
     )
     ext_kind: ExtKind | None = Field(
-        default_factory=determine_ext_kind, description="The file extension and its `ChunkKind`."
+        default_factory=determine_ext_kind,
+        description="The file extension and its `ChunkKind`.",
     )
 
     parent_id: UUID7 | None = Field(
@@ -226,9 +236,9 @@ class CodeChunk(BasedModel):
         ),
     ] = None
 
-    _version: Annotated[str, Field(repr=True, init=False, serialization_alias="chunk_version")] = (
-        "1.0.0"
-    )
+    _version: Annotated[
+        str, Field(repr=True, init=False, serialization_alias="chunk_version")
+    ] = "1.0.0"
     _embedding_index: Annotated[
         BatchKeyIndex | None,
         Field(
@@ -268,10 +278,16 @@ class CodeChunk(BasedModel):
             parts.append(str(self.file_path))
         if self.line_range:
             parts.append(f"lines {self.line_range.start}-{self.line_range.end}")
-        name = self.metadata.get("name") if self.metadata and self.metadata.get("name") else None
+        name = (
+            self.metadata.get("name")
+            if self.metadata and self.metadata.get("name")
+            else None
+        )
         semantic_meta = self.metadata.get("semantic_meta") if self.metadata else None
         semantic = (
-            semantic_meta.symbol if semantic_meta and hasattr(semantic_meta, "symbol") else None
+            semantic_meta.symbol
+            if semantic_meta and hasattr(semantic_meta, "symbol")
+            else None
         )
         if semantic:
             parts.append(semantic)
@@ -372,7 +388,9 @@ class CodeChunk(BasedModel):
         # Include select metadata if available
         if self.metadata and (
             metadata := {
-                k: v for k, v in self.metadata.items() if k in ("name", "tags", "semantic_meta")
+                k: v
+                for k, v in self.metadata.items()
+                if k in ("name", "tags", "semantic_meta")
             }
         ):
             data["metadata"] = metadata
@@ -455,7 +473,9 @@ class CodeChunk(BasedModel):
     def serialize_for_cli(self) -> dict[str, Any]:
         """Serialize the CodeChunk for CLI output."""
         self_map: dict[str, Any] = {
-            k: v for k, v in super().serialize_for_cli().items() if k not in self._base_excludes
+            k: v
+            for k, v in super().serialize_for_cli().items()
+            if k not in self._base_excludes
         }
         if self.metadata:
             self_map["metadata"] = self._serialize_metadata_for_cli()
@@ -464,18 +484,24 @@ class CodeChunk(BasedModel):
         return self_map
 
     @classmethod
-    def from_file(cls, file: DiscoveredFile, line_range: Span, content: str) -> CodeChunk:
+    def from_file(
+        cls, file: DiscoveredFile, line_range: Span, content: str
+    ) -> CodeChunk:
         """Create a CodeChunk from a file. (This creates a chunk that consists of the entire file contents. To create smaller chunks, use a chunker.)."""
-        return cls.model_validate({
-            "file_path": file.path,
-            "line_range": line_range,
-            "content": content,
-            "language": file.ext_kind.language
-            if file.ext_kind
-            else getattr(ExtKind.from_file(file.path), "language", None),
-            "source": ChunkSource.FILE,
-            "parent_id": file.source_id,
-        })
+        return cls.model_validate(
+            {
+                "file_path": file.path,
+                "line_range": line_range,
+                "content": content,
+                "language": (
+                    file.ext_kind.language
+                    if file.ext_kind
+                    else getattr(ExtKind.from_file(file.path), "language", None)
+                ),
+                "source": ChunkSource.FILE,
+                "parent_id": file.source_id,
+            }
+        )
 
     @computed_field
     @cached_property
@@ -490,7 +516,9 @@ class CodeChunk(BasedModel):
             title_parts.append(f"Language: {str(self.language).capitalize()}")
         if self.source:
             title_parts.append(f"Category: {str(self.source).capitalize()}")
-        return "\n".join(textwrap.wrap(" | ".join(title_parts), width=80, subsequent_indent="    "))
+        return "\n".join(
+            textwrap.wrap(" | ".join(title_parts), width=80, subsequent_indent="    ")
+        )
 
     @computed_field
     @cached_property
@@ -540,33 +568,53 @@ class CodeChunk(BasedModel):
         from codeweaver.core.utils import ensure_iterable
 
         yield from (
-            item
-            if isinstance(item, cls)
-            else (
-                cls.model_validate_json(item)
-                if isinstance(item, str | bytes | bytearray)
-                else cls.model_validate(item)
+            (
+                item
+                if isinstance(item, cls)
+                else (
+                    cls.model_validate_json(item)
+                    if isinstance(item, str | bytes | bytearray)
+                    else cls.model_validate(item)
+                )
             )
             for item in ensure_iterable(text)
         )
 
     @staticmethod
-    def dechunkify(chunks: StructuredDataInput, *, for_embedding: bool = False) -> Iterator[str]:
+    def dechunkify(
+        chunks: StructuredDataInput, *, for_embedding: bool = False
+    ) -> Iterator[str]:
         """Convert a sequence of CodeChunks or mixed serialized and deserialized chunks back to json strings."""
         for chunk in ensure_iterable(chunks):
             if isinstance(chunk, str | bytes | bytearray):  # type: ignore
-                yield chunk.decode("utf-8") if isinstance(chunk, bytes | bytearray) else chunk
+                yield (
+                    chunk.decode("utf-8")
+                    if isinstance(chunk, bytes | bytearray)
+                    else chunk
+                )
             elif is_typeddict(chunk):
                 result = (
                     CodeChunk.model_validate(chunk).serialize_for_embedding()
                     if for_embedding
                     else CodeChunk.model_validate(chunk).serialize()
                 )
-                yield result.decode("utf-8") if isinstance(result, bytes | bytearray) else result
+                yield (
+                    result.decode("utf-8")
+                    if isinstance(result, bytes | bytearray)
+                    else result
+                )
             else:
                 chunk = cast(CodeChunk, chunk)
-                result = chunk.serialize_for_embedding() if for_embedding else chunk.serialize()
-                yield result.decode("utf-8") if isinstance(result, bytes | bytearray) else result
+                result = (
+                    chunk.serialize_for_embedding()
+                    if for_embedding
+                    else chunk.serialize()
+                )
+                yield (
+                    result.decode("utf-8")
+                    if isinstance(result, bytes | bytearray)
+                    else result
+                )
 
 
 __all__ = (

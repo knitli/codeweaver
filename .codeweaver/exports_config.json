@@ -1,5 +1,9 @@
 {
-  "exclusions": {},
+  "exclusions": {
+    "codeweaver.core.exceptions": [
+      "LocationInfo"
+    ]
+  },
   "module_exclusions": {
     "codeweaver.providers.config.embedding": [
       "INCOMPATIBLE_FIELDS"
@@ -29,6 +33,28 @@
     ],
     "codeweaver.providers.config.profiles": [
       "HAS_ST"
+    ],
+    "codeweaver.core.metadata": [
+      "BASH_SHEBANG",
+      "EXTENSION_TESTS",
+      "ExtTestDef",
+      "PERL_SHEBANG",
+      "PYTHON_SHEBANG"
+    ],
+    "codeweaver.core.spans": [
+      "ONE_LINE"
+    ],
+    "codeweaver.core.language": [
+      "RepoConventions"
+    ],
+    "codeweaver.core.file_extensions": [
+      "METADATA_PATH"
+    ],
+    "codeweaver.core._logging": [
+      "IS_CI",
+      "IS_TTY",
+      "create_session_file_handler",
+      "get_rich_handler"
     ]
   }
 }

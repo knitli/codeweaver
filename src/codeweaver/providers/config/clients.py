@@ -507,9 +507,41 @@ class FastEmbedClientOptions(ClientOptions):
     cache_dir: str | None = None
     threads: int | None = None
     providers: Sequence[OnnxProvider] | None = None
-    cuda: bool = False
+    cuda: bool | None = None
     device_ids: list[int] | None = None
     lazy_load: bool = True
+
+    @model_validator(mode="after")
+    def _resolve_device_settings(self) -> Self:
+        """Resolve device settings for FastEmbed client options."""
+        from codeweaver.core import effective_cpu_count
+
+        cpu_count = effective_cpu_count()
+        object.__setattr__(self, "threads", self.threads or cpu_count)
+        if self.cuda is False:
+            object.__setattr__(self, "device_ids", [])
+            return self
+        from codeweaver.providers.optimize import decide_fastembed_runtime
+
+        decision = decide_fastembed_runtime(
+            explicit_cuda=self.cuda, explicit_device_ids=self.device_ids
+        )
+        if isinstance(decision, tuple) and len(decision) == 2:
+            cuda = bool(decision[0])
+            device_ids = decision[1]
+        elif decision == "gpu":
+            cuda = True
+            device_ids = [0]
+        else:
+            cuda = False
+            device_ids = []
+        object.__setattr__(self, "cuda", cuda)
+        object.__setattr__(self, "device_ids", device_ids)
+        if cuda and (not self.providers or "CUDAExecutionProvider" not in self.providers):
+            object.__setattr__(
+                self, "providers", ["CUDAExecutionProvider", *(self.providers or [])]
+            )
+        return self
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         return {FilteredKey("cache_dir"): AnonymityConversion.HASH}
@@ -573,6 +605,52 @@ class SentenceTransformersClientOptions(ClientOptions):
                     },
                 )
 
+    def default_kwargs_for_model(self, *, model: str | None = None, query: bool = False) -> dict[str, Any]:
+        """Get default client arguments for a specific model."""
+        model = model or self.model_name_or_path
+        if not model:
+            return {}
+        extra: dict[str, Any] = {}
+        float16 = {"model_kwargs": {"torch_dtype": "torch.float16"}}
+        if "qwen3" in model.lower():
+            extra = {
+                "instruction": "Use provided search results to of codebase data to retrieve relevant Documents that answer the Query.",
+                "tokenizer_kwargs": {"padding_side": "left"},
+                **float16,
+            }
+        if "bge" in model.lower() and "m3" not in model.lower() and query:
+            extra = {
+                "prompt_name": "query",
+                "prompts": {
+                    "query": {"text": "Represent this sentence for searching relevant passages:"}
+                },
+                **float16,
+            }
+        if "snowflake" in model.lower() and "v2.0" in model.lower():
+            extra = {"prompt_name": "query"}  # only for query embeddings
+        if "intfloat" in model.lower() and "instruct" not in model.lower():
+            extra = {"prompt_name": "query"} if query else {"prompt_name": "document"}
+        if "jina" in model.lower() and "v2" not in model.lower():
+            if "v4" in model.lower():
+                extra = (
+                    {"prompt_name": "query", "task": "code"}
+                    if query
+                    else {"task": "code", "prompt_name": "passage"}
+                )
+            else:
+                extra = (
+                    {"task": "retrieval.query", "prompt_name": "query"}
+                    if query
+                    else {"task": "retrieval.passage"}
+                )
+        if "nomic" in model.lower():
+            extra = {"tokenizer_kwargs": {"padding": True}}
+        return {
+            "model_name_or_path": model,
+            "normalize_embeddings": True,
+            "trust_remote_code": True,
+            **extra,
+        }
 
 class HFInferenceClientOptions(ClientOptions):
     """Client options for HuggingFace Inference API-based embedding providers."""

@@ -10,10 +10,20 @@ from __future__ import annotations
 from collections.abc import Iterator, Sequence
 from typing import Annotated, Any, ClassVar, NamedTuple, Self, TypeGuard, cast
 
-from pydantic import UUID7, Field, NonNegativeInt, PositiveInt, computed_field, model_validator
+from pydantic import (
+    UUID7,
+    Field,
+    NonNegativeInt,
+    PositiveInt,
+    computed_field,
+    model_validator,
+)
 from pydantic.dataclasses import dataclass
 
-from codeweaver.core.types.dataclasses import DATACLASS_CONFIG, DataclassSerializationMixin
+from codeweaver.core.types.dataclasses import (
+    DATACLASS_CONFIG,
+    DataclassSerializationMixin,
+)
 from codeweaver.core.utils import TypeIs, uuid7
 
 
@@ -117,7 +127,9 @@ class Span(DataclassSerializationMixin):
         """Return the union of two spans."""
         if self._source_id != other._source_id:
             return self
-        return Span(min(self.start, other.start), max(self.end, other.end), self._source_id)
+        return Span(
+            min(self.start, other.start), max(self.end, other.end), self._source_id
+        )
 
     def __and__(self, other: Span) -> Span | None:  # Intersection
         """Return the intersection between two spans."""
@@ -161,9 +173,13 @@ class Span(DataclassSerializationMixin):
         diff2 = other - self
         result: list[Span] = []
         if diff1:
-            result.extend(diff1 if isinstance(diff1, tuple) else [diff1])  # ty: ignore[invalid-argument-type]
+            result.extend(
+                diff1 if isinstance(diff1, tuple) else [diff1]
+            )  # ty: ignore[invalid-argument-type]
         if diff2:
-            result.extend(diff2 if isinstance(diff2, tuple) else [diff2])  # ty: ignore[invalid-argument-type]
+            result.extend(
+                diff2 if isinstance(diff2, tuple) else [diff2]
+            )  # ty: ignore[invalid-argument-type]
         return tuple(result) if result else None
 
     def __le__(self, other: Span) -> bool:  # Subset
@@ -203,7 +219,9 @@ class Span(DataclassSerializationMixin):
     @staticmethod
     def _is_file_end_tuple(
         span: Span | SpanTuple | int,
-    ) -> TypeGuard[tuple[PositiveInt, PositiveInt] | tuple[PositiveInt, PositiveInt, None]]:
+    ) -> TypeGuard[
+        tuple[PositiveInt, PositiveInt] | tuple[PositiveInt, PositiveInt, None]
+    ]:
         """Check if the given span is a (start, end) tuple."""
         return (
             isinstance(span, tuple)
@@ -228,7 +246,8 @@ class Span(DataclassSerializationMixin):
             return bool(self & Span.from_tuple(span_tuple))
         if self._is_file_end_tuple(span):
             start, end = cast(
-                tuple[PositiveInt, PositiveInt] | tuple[PositiveInt, PositiveInt, None], span
+                tuple[PositiveInt, PositiveInt] | tuple[PositiveInt, PositiveInt, None],
+                span,
             )[:2]
             return self._is_contained(start) or self._is_contained(end)
         return bool(self & span) if isinstance(span, Span) else False
@@ -377,7 +396,9 @@ class SpanGroup(DataclassSerializationMixin):
 
     def _ensure_set(self, spans: Sequence[Any]) -> TypeGuard[set[Span]]:
         """Ensure that spans is a set of Span objects."""
-        return bool(spans and isinstance(spans, set) and all(isinstance(s, Span) for s in spans))
+        return bool(
+            spans and isinstance(spans, set) and all(isinstance(s, Span) for s in spans)
+        )
 
     def _normalize(self) -> None:
         """Merge overlapping/adjacent spans with same source_id."""
@@ -414,7 +435,9 @@ class SpanGroup(DataclassSerializationMixin):
                     new_leftovers: list[Span] = []
                     for lf in leftovers:
                         if diff := lf - s2:
-                            new_leftovers.extend(diff if isinstance(diff, tuple) else [diff])  # ty: ignore[invalid-argument-type]
+                            new_leftovers.extend(
+                                diff if isinstance(diff, tuple) else [diff]
+                            )  # ty: ignore[invalid-argument-type]
                     leftovers = new_leftovers
             result.update(leftovers)
         return SpanGroup({r for r in result if r})

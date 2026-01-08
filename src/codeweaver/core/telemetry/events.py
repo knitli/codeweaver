@@ -18,7 +18,9 @@ import importlib
 import statistics
 
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, Protocol, Self
+from typing import TYPE_CHECKING, Any, Protocol, Self, cast
+
+from codeweaver.core.types import BasedModel
 
 
 if TYPE_CHECKING:
@@ -272,7 +274,7 @@ class SearchEvent:
 
         # Use serialize_for_telemetry() to get properly anonymized base data
         # This applies _telemetry_keys() rules (e.g., summary -> TEXT_COUNT, related_symbols -> COUNT)
-        base_data = response.serialize_for_telemetry()
+        base_data = cast(BasedModel, response).serialize_for_telemetry()
 
         properties: dict[str, Any] = {
             # Core search info
@@ -349,7 +351,7 @@ class SearchEvent:
                 "token_count": len(self._query.split()),
                 "char_count": len(self._query),
                 "query": redact_identifiable_info(self._query),
-                "results": redact_identifiable_info(response.model_dump_json()),
+                "results": redact_identifiable_info(cast(BasedModel, response).model_dump_json()),
             }
 
         return (self.EVENT_NAME, properties)

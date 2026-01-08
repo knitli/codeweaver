@@ -6,6 +6,7 @@
 # SPDX-FileCopyrightText: 2025 (c) 2025 Knitli Inc.
 # SPDX-License-Identifier: MIT OR Apache-2.0
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+# ty:ignore[unresolved-attribute]
 """FastEmbed embedding provider implementation.
 
 FastEmbed is a lightweight and efficient library for generating embeddings locally.
@@ -15,10 +16,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import multiprocessing
 
 from collections.abc import Callable, Iterable, Sequence
-from typing import TYPE_CHECKING, Any, ClassVar, cast, override
+from typing import TYPE_CHECKING, Any, cast, override
 
 import numpy as np
 
@@ -52,35 +52,6 @@ _SparseTextEmbedding = get_sparse_embedder()
 
 
 logger = logging.getLogger(__name__)
-
-
-def fastembed_all_kwargs() -> dict[str, Any]:
-    """Get all possible kwargs for FastEmbed embedding methods."""
-    default_kwargs: dict[str, Any] = {"threads": multiprocessing.cpu_count(), "lazy_load": True}
-    if kwargs:
-        device_ids: list[int] | None = kwargs.get("device_ids")
-        cuda: bool | None = kwargs.get("cuda")
-        if cuda == False:  # user **explicitly** disabled cuda  # noqa: E712
-            return default_kwargs | kwargs
-        cuda = bool(cuda)
-        from codeweaver.providers.optimize import decide_fastembed_runtime
-
-        decision = decide_fastembed_runtime(explicit_cuda=cuda, explicit_device_ids=device_ids)
-        if isinstance(decision, tuple) and len(decision) == 2:
-            cuda = True
-            device_ids = decision[1]
-        elif decision == "gpu":
-            cuda = True
-            device_ids = [0]
-        else:
-            cuda = False
-            device_ids = None
-        if cuda:
-            kwargs["cuda"] = True
-            kwargs["device_ids"] = device_ids
-            kwargs["providers"] = ["CUDAExecutionProvider"]
-        return default_kwargs | kwargs
-    return default_kwargs
 
 
 def fastembed_output_transformer(output: list[np.ndarray]) -> list[list[float]] | list[list[int]]:
@@ -122,7 +93,7 @@ class FastEmbedEmbeddingProvider(EmbeddingProvider[TextEmbedding]):
     client: SkipValidation[TextEmbedding]
     _provider: Provider = Provider.FASTEMBED
 
-    _output_transformer: ClassVar[Callable[[Any], list[list[float]] | list[list[int]]]] = (
+    _output_transformer: Callable[[Any], list[list[float]] | list[list[int]]] = (
         fastembed_output_transformer
     )
 
@@ -178,7 +149,7 @@ class FastEmbedSparseProvider(SparseEmbeddingProvider[SparseTextEmbedding]):
 
     client: type[SparseTextEmbedding] | SparseTextEmbedding = _SparseTextEmbedding  # type: ignore
     caps: SparseEmbeddingModelCapabilities
-    _output_transformer: ClassVar[Callable[[Any], list[CodeWeaverSparseEmbedding]]] = (  # type: ignore
+    _output_transformer: Callable[[Any], list[CodeWeaverSparseEmbedding]] = (  # type: ignore
         fastembed_sparse_output_transformer
     )  # type: ignore
 
@@ -210,7 +181,7 @@ class FastEmbedSparseProvider(SparseEmbeddingProvider[SparseTextEmbedding]):
 
     async def _embed_documents(
         self, documents: Sequence[CodeChunk], **kwargs: Any
-    ) -> list[SparseEmbedding]:  # ty:ignore[invalid-method-override]
+    ) -> list[CodeWeaverSparseEmbedding]:  # ty:ignore[invalid-method-override]
         """Embed a list of documents into sparse vectors."""
         ready_documents = self.chunks_to_strings(documents)
         loop = asyncio.get_running_loop()
@@ -226,7 +197,9 @@ class FastEmbedSparseProvider(SparseEmbeddingProvider[SparseTextEmbedding]):
         self._update_token_stats(token_count=features, sparse=True)
         return await loop.run_in_executor(None, lambda: self._process_output(embeddings))  # type: ignore
 
-    async def _embed_query(self, query: Sequence[str], **kwargs: Any) -> list[SparseEmbedding]:  # ty:ignore[invalid-method-override]
+    async def _embed_query(
+        self, query: Sequence[str], **kwargs: Any
+    ) -> list[CodeWeaverSparseEmbedding]:  # ty:ignore[invalid-method-override]
         """Embed a query into a sparse vector."""
         loop = asyncio.get_running_loop()
         embeddings = await loop.run_in_executor(

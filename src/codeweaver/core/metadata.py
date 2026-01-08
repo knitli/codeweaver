@@ -27,7 +27,11 @@ from typing import (
 
 from pydantic import UUID7, Field, PositiveFloat
 
-from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage, has_semantic_extension
+from codeweaver.core.language import (
+    ConfigLanguage,
+    SemanticSearchLanguage,
+    has_semantic_extension,
+)
 from codeweaver.core.types.aliases import (
     FileExt,
     FileExtensionT,
@@ -74,7 +78,9 @@ class ChunkSource(BaseEnum):
     TEXT_BLOCK = "text_block"
     FILE = "file"  # the whole file is the chunk
     SEMANTIC = "semantic"  # semantic chunking, e.g. from AST nodes
-    EXTERNAL = "external"  # from internet or similar external sources, not from code files
+    EXTERNAL = (
+        "external"  # from internet or similar external sources, not from code files
+    )
 
 
 class Metadata(TypedDict, total=False):
@@ -84,10 +90,14 @@ class Metadata(TypedDict, total=False):
         Annotated[UUID7, Field(description="""Unique identifier for the code chunk""")]
     ]
     created_at: Required[
-        Annotated[PositiveFloat, Field(description="""Timestamp when the chunk was created""")]
+        Annotated[
+            PositiveFloat, Field(description="""Timestamp when the chunk was created""")
+        ]
     ]
     name: NotRequired[
-        Annotated[str | None, Field(description="""Name of the code chunk, if applicable""")]
+        Annotated[
+            str | None, Field(description="""Name of the code chunk, if applicable""")
+        ]
     ]
     kind: NotRequired[
         Annotated[
@@ -99,20 +109,28 @@ class Metadata(TypedDict, total=False):
     ]
     nesting_level: NotRequired[
         Annotated[
-            int | None, Field(description="""Nesting level for delimiter chunks (0 = top level)""")
+            int | None,
+            Field(description="""Nesting level for delimiter chunks (0 = top level)"""),
         ]
     ]
     priority: NotRequired[
-        Annotated[int | None, Field(description="""Priority value for delimiter chunks""")]
+        Annotated[
+            int | None, Field(description="""Priority value for delimiter chunks""")
+        ]
     ]
     line_start: NotRequired[
-        Annotated[int | None, Field(description="""Starting line number for the chunk""")]
+        Annotated[
+            int | None, Field(description="""Starting line number for the chunk""")
+        ]
     ]
     line_end: NotRequired[
         Annotated[int | None, Field(description="""Ending line number for the chunk""")]
     ]
     fallback_to_generic: NotRequired[
-        Annotated[bool | None, Field(description="""Whether generic/fallback chunking was used""")]
+        Annotated[
+            bool | None,
+            Field(description="""Whether generic/fallback chunking was used"""),
+        ]
     ]
     updated_at: NotRequired[
         Annotated[
@@ -128,7 +146,9 @@ class Metadata(TypedDict, total=False):
             Field(description="""Tags associated with the code chunk, if applicable"""),
         ]
     ]
-    semantic_meta: NotRequired[Annotated[Any | None, Field(description="""Semantic metadata""")]]
+    semantic_meta: NotRequired[
+        Annotated[Any | None, Field(description="""Semantic metadata""")]
+    ]
     context: Annotated[
         dict[str, Any] | None,
         Field(
@@ -160,7 +180,8 @@ PYTHON_SHEBANG = re.compile(
     re.IGNORECASE | re.DOTALL,
 )
 PERL_SHEBANG = re.compile(
-    r"^(#(/usr/bin/env (-S )?(/usr/bin/|/usr/local/bin/)?(perl).*))", re.IGNORECASE | re.DOTALL
+    r"^(#(/usr/bin/env (-S )?(/usr/bin/|/usr/local/bin/)?(perl).*))",
+    re.IGNORECASE | re.DOTALL,
 )
 
 
@@ -247,14 +268,18 @@ class ExtLangPair(NamedTuple):
         """Check if the extension is a configuration file."""
         from codeweaver.core.file_extensions import CONFIG_FILE_LANGUAGES
 
-        return self.language in CONFIG_FILE_LANGUAGES or isinstance(self.language, ConfigLanguage)
+        return self.language in CONFIG_FILE_LANGUAGES or isinstance(
+            self.language, ConfigLanguage
+        )
 
     @property
     def is_doc(self) -> bool:
         """Check if the extension is a documentation file."""
         from codeweaver.core.file_extensions import DOC_FILES_EXTENSIONS
 
-        return next((True for doc_ext in DOC_FILES_EXTENSIONS if doc_ext.ext == self.ext), False)
+        return next(
+            (True for doc_ext in DOC_FILES_EXTENSIONS if doc_ext.ext == self.ext), False
+        )
 
     @property
     def is_code(self) -> bool:
@@ -266,13 +291,17 @@ class ExtLangPair(NamedTuple):
         """Check if the extension is a data file."""
         from codeweaver.core.file_extensions import DATA_FILES_EXTENSIONS
 
-        return next((True for data_ext in DATA_FILES_EXTENSIONS if data_ext.ext == self.ext), False)
+        return next(
+            (True for data_ext in DATA_FILES_EXTENSIONS if data_ext.ext == self.ext),
+            False,
+        )
 
     @property
     def as_source(self) -> ChunkSource:
         """Return the chunk source based on the extension type."""
         if isinstance(self.language, SemanticSearchLanguage) or (
-            isinstance(self.language, ConfigLanguage) and self.language.is_semantic_search_language
+            isinstance(self.language, ConfigLanguage)
+            and self.language.is_semantic_search_language
         ):
             return ChunkSource.SEMANTIC
         return ChunkSource.FILE
@@ -309,7 +338,9 @@ class ExtLangPair(NamedTuple):
             return True
         if self.is_file_name and filename == self.ext:
             return True
-        return bool(self.is_weird_extension and filename.lower().endswith(self.ext.lower()))
+        return bool(
+            self.is_weird_extension and filename.lower().endswith(self.ext.lower())
+        )
 
 
 def determine_ext_kind(validated_data: dict[str, Any]) -> ExtKind | None:
@@ -333,9 +364,9 @@ def determine_ext_kind(validated_data: dict[str, Any]) -> ExtKind | None:
     meta = validated_data.get("metadata", validated_data.get("semantic_meta", {}))
     if "semantic_meta" in meta:
         meta = meta["semantic_meta"]
-    if (language := meta.get("language") or validated_data.get("language")) and isinstance(
-        language, SemanticSearchLanguage
-    ):
+    if (
+        language := meta.get("language") or validated_data.get("language")
+    ) and isinstance(language, SemanticSearchLanguage):
         if language == SemanticSearchLanguage.KOTLIN:
             return ExtKind.from_language(language, ChunkKind.CODE_OR_CONFIG)
         return (
@@ -353,7 +384,11 @@ def determine_ext_kind(validated_data: dict[str, Any]) -> ExtKind | None:
         return ExtKind.from_language(
             language.as_semantic_search_language or language, ChunkKind.CONFIG
         )
-    from codeweaver.core.file_extensions import CODE_LANGUAGES, DATA_LANGUAGES, DOCS_LANGUAGES
+    from codeweaver.core.file_extensions import (
+        CODE_LANGUAGES,
+        DATA_LANGUAGES,
+        DOCS_LANGUAGES,
+    )
 
     if language and language in {pair.language for pair in DATA_LANGUAGES}:  # type: ignore
         return ExtKind.from_language(language, ChunkKind.DATA)
@@ -373,7 +408,11 @@ def get_ext_lang_pairs(*, include_data: bool = False) -> Generator[ExtLangPair]:
     )
 
     if include_data:
-        yield from (*CODE_FILES_EXTENSIONS, *DATA_FILES_EXTENSIONS, *DOC_FILES_EXTENSIONS)
+        yield from (
+            *CODE_FILES_EXTENSIONS,
+            *DATA_FILES_EXTENSIONS,
+            *DOC_FILES_EXTENSIONS,
+        )
     else:
         yield from (*CODE_FILES_EXTENSIONS, *DOC_FILES_EXTENSIONS)
 
@@ -387,9 +426,11 @@ def get_semantic_or_config_lang(
     file_path = (
         test_info
         if is_file
-        else Path(str(test_info))
-        if test_info and Path(str(test_info)).exists()
-        else None
+        else (
+            Path(str(test_info))
+            if test_info and Path(str(test_info)).exists()
+            else None
+        )
     )
     language_name = test_info if test_info and not is_file else None
     if language_name is not None:
@@ -405,7 +446,11 @@ def get_semantic_or_config_lang(
                 FileExt(cast(LiteralStringT, file_path.suffix or file_path.name))
             ):
                 if semantic_lang.config_files and next(
-                    (cfg for cfg in semantic_lang.config_files if cfg.path.name == file_path.name),
+                    (
+                        cfg
+                        for cfg in semantic_lang.config_files
+                        if cfg.path.name == file_path.name
+                    ),
                     None,
                 ):
                     return ConfigLanguage.from_string(str(language_name))
@@ -454,11 +499,17 @@ def get_language_from_extension(
     if semantic_ext := has_semantic_extension(extension):
         return semantic_ext
     if config_lang := next(
-        lang for lang in ConfigLanguage if lang.extensions and extension in lang.extensions
+        lang
+        for lang in ConfigLanguage
+        if lang.extensions and extension in lang.extensions
     ):
         return config_lang
     return next(
-        (pair.language for pair in get_ext_lang_pairs() if pair and pair.ext == extension),
+        (
+            pair.language
+            for pair in get_ext_lang_pairs()
+            if pair and pair.ext == extension
+        ),
         hook(extension, path) if hook else None,
     )
 
@@ -505,7 +556,9 @@ class ExtKind(NamedTuple):
     @classmethod
     def from_language(
         cls,
-        language: LanguageName | LiteralStringT | SemanticSearchLanguage | ConfigLanguage,
+        language: (
+            LanguageName | LiteralStringT | SemanticSearchLanguage | ConfigLanguage
+        ),
         kind: str | ChunkKind,
     ) -> ExtKind | None:
         """Create an ExtKind from a string representation."""
@@ -515,25 +568,40 @@ class ExtKind(NamedTuple):
                 return cls(language=language, kind=kind)
             return cls(
                 language=language,
-                kind=ChunkKind.CONFIG if language.is_config_language else ChunkKind.CODE,
+                kind=(
+                    ChunkKind.CONFIG if language.is_config_language else ChunkKind.CODE
+                ),
             )
 
         # Handle ConfigLanguage with special cases
         if isinstance(language, ConfigLanguage):
-            special_config_langs = (ConfigLanguage.BASH, ConfigLanguage.SELF, ConfigLanguage.KOTLIN)
-            target_kind = (
-                ChunkKind.CODE_OR_CONFIG if language in special_config_langs else ChunkKind.CONFIG
+            special_config_langs = (
+                ConfigLanguage.BASH,
+                ConfigLanguage.SELF,
+                ConfigLanguage.KOTLIN,
             )
-            return cls(language=language.as_semantic_search_language or language, kind=target_kind)
+            target_kind = (
+                ChunkKind.CODE_OR_CONFIG
+                if language in special_config_langs
+                else ChunkKind.CONFIG
+            )
+            return cls(
+                language=language.as_semantic_search_language or language,
+                kind=target_kind,
+            )
 
         # Try to convert string to SemanticSearchLanguage
         with contextlib.suppress(KeyError, ValueError, AttributeError):
-            if semantic := SemanticSearchLanguage.from_string(language):  # ty:ignore[invalid-argument-type]
+            if semantic := SemanticSearchLanguage.from_string(
+                language
+            ):  # ty:ignore[invalid-argument-type]
                 return cls.from_language(semantic, kind)
 
         # Resolve as LanguageName and categorize
         lang_name = LanguageName(language)
-        resolved_kind = kind if isinstance(kind, ChunkKind) else ChunkKind.from_string(kind)
+        resolved_kind = (
+            kind if isinstance(kind, ChunkKind) else ChunkKind.from_string(kind)
+        )
 
         if resolved_kind:
             categorized_kind = _categorize_language(lang_name)
@@ -554,7 +622,8 @@ class ExtKind(NamedTuple):
                     ext_test.language,
                     (
                         ChunkKind.CODE
-                        if ext_test.language not in (LanguageName("bash"), LanguageName("matlab"))
+                        if ext_test.language
+                        not in (LanguageName("bash"), LanguageName("matlab"))
                         else ChunkKind.OTHER
                     ),
                 )
@@ -587,7 +656,8 @@ class ExtKind(NamedTuple):
         if language := language_from_path(file):
             if isinstance(language, ConfigLanguage):
                 return cls(
-                    language=language.as_semantic_search_language or language, kind=ChunkKind.CONFIG
+                    language=language.as_semantic_search_language or language,
+                    kind=ChunkKind.CONFIG,
                 )
             if not isinstance(language, SemanticSearchLanguage):
                 return cls(language=language, kind=_categorize_language(language))
@@ -610,8 +680,11 @@ __all__ = (
     "ChunkKind",
     "ChunkSource",
     "ExtKind",
+    "ExtLangPair",
     "Metadata",
     "determine_ext_kind",
     "get_ext_lang_pair_for_file",
+    "get_ext_lang_pairs",
     "get_language_from_extension",
+    "get_semantic_or_config_lang",
 )

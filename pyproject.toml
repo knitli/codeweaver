@@ -115,6 +115,7 @@ dependencies = [
   # We use some pydantic internal/private utilities in dependency resolution
   # So we pin it to make sure we don't break on minor releases
   "pydantic==2.12.5",
+  # for, you know, platform dirs
   "platformdirs>=4.3.6",
   # psutil used for resource governance/limiting by engine
   "psutil>=7.2.1",
@@ -316,7 +317,7 @@ dev = [
   "ty>=0.0.8",
   "uv>=0.9.21",
 ]
-build = ["hatchling>=1.27.0", "twine>=6.2.0", "uv-dynamic-versioning>=0.11.2"]
+build = ["hatchling>=1.28.0", "twine>=6.2.0", "uv-dynamic-versioning>=0.12.0"]
 dev-helpers = [
   "ipython>=9.8.0",
   "jsonlines>=4.0.0",
@@ -382,7 +383,7 @@ __all__ = ("__version__",)
 # REUSE-IgnoreEnd
 
 [tool.hatch.build.targets.wheel]
-artifacts = ["*.so", "src/**", "vendored/**"]
+artifacts = ["*.so", "src/**", "vendored/**", "packages/**"]
 
 [tool.hatch.build.targets.wheel.force-include]
 "LICENSES" = "LICENSES"
@@ -393,6 +394,7 @@ artifacts = ["*.so", "src/**", "vendored/**"]
 "LICENSE-Apache-2.0" = "LICENSE-APACHE-2.0"
 "LICENSE-MIT" = "LICENSE-MIT"
 "src/codeweaver" = "codeweaver"
+"packages" = "packages"
 
 [tool.hatch.build.targets.sdist]
 include = [
@@ -657,6 +659,15 @@ include = ["src/codeweaver/core/types/aliases.py"]
 
 [tool.ty.overrides.rules]
 invalid-newtype = "ignore"
+
+[[tool.ty.overrides]]
+include = [
+  "src/codeweaver/providers/embedding/providers/*.py",
+  "src/codeweaver/providers/reranking/providers/*.py"
+]
+
+[tool.ty.overrides.rules]
+unresolved-attribute = "ignore"
 
 [tool.uv]
 cache-keys = [

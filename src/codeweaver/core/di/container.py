@@ -134,10 +134,7 @@ class Container[T]:
         if self._providers_loaded:
             return
 
-        from codeweaver.core.di.utils import (
-            get_all_provider_metadata,
-            get_all_providers,
-        )
+        from codeweaver.core.di.utils import get_all_provider_metadata, get_all_providers
 
         providers = get_all_providers()
         metadata_map = get_all_provider_metadata()
@@ -153,7 +150,7 @@ class Container[T]:
                 )
                 continue
 
-            # Map scope to singleton flag for backward compatibility
+            # Map scope to singleton flag
             # - "singleton" -> singleton=True (app lifetime cache)
             # - "request" -> singleton=False (request-scoped, managed by Container._request_cache)
             # - "function" -> singleton=False (no caching at all)

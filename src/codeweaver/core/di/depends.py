@@ -64,8 +64,7 @@ class DependsPlaceholder(Sentinel):
 
 
 _injected_sentinel = DependsPlaceholder(
-    name=SentinelName("InjectedDependency"),
-    module_name=Sentinel._get_module_name_generator()(),
+    name=SentinelName("InjectedDependency"), module_name=Sentinel._get_module_name_generator()()
 )  # ty:ignore[invalid-argument-type]
 
 # INJECTED is a proxy that supports subscripting while wrapping the sentinel
@@ -159,7 +158,7 @@ class Depends:
         from someplace import ServiceProvider
 
 
-    def my_function(service: ServiceDep = INJECTED[ServiceProvider]) -> None:
+    def my_function(service: ServiceDep = INJECTED) -> None:
         # service will be injected by the DI container
         ...
     ```

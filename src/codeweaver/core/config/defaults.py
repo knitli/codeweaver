@@ -6,6 +6,17 @@ from typing import Any
 
 _default_providers: dict[str, list[Callable[[], Any | None]]] = {}
 
+_KNOWN_KEYS: frozenset[str] = frozenset({
+    "embedding.dimension",
+    "embedding.datatype",
+    "embedding.model",
+    "embedding.provider",
+})
+"""This is really just here to document known config keys for default providers.
+Users can register defaults for any key, but these are the ones we know about. It's not used
+programmatically anywhere.
+"""
+
 
 def register_default_provider(key: str, provider: Callable[[], Any | None]) -> None:
     """Register a default value provider for a config key.
@@ -19,15 +30,11 @@ def register_default_provider(key: str, provider: Callable[[], Any | None]) -> N
     Example:
         ```python
         # Register a custom default dimension
-        register_default_provider(
-            "embedding.dimension",
-            lambda: 768
-        )
+        register_default_provider("embedding.dimension", lambda: 768)
 
         # Register with conditional logic
         register_default_provider(
-            "embedding.datatype",
-            lambda: "float16" if has_gpu() else "uint8"
+            "embedding.datatype", lambda: "float16" if has_gpu() else "uint8"
         )
         ```
     """

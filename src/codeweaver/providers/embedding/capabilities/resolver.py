@@ -9,12 +9,12 @@ Provides lazy loading and resolution of embedding model capabilities by model na
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING
 
-from codeweaver.core import dependency_provider, depends
-from codeweaver.providers.types import CapabilityResolver, EmbeddingCapabilityType
+from codeweaver.core import dependency_provider
+from codeweaver.providers import EmbeddingModelCapabilities
+from codeweaver.providers.types import BaseCapabilityResolver, EmbeddingCapabilityType
 
 
 if TYPE_CHECKING:
@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
 
 @dependency_provider(scope="singleton")
-class EmbeddingCapabilityResolver(CapabilityResolver[EmbeddingCapabilityType]):
+class EmbeddingCapabilityResolver(BaseCapabilityResolver[EmbeddingModelCapabilities]):
     """Resolves embedding model capabilities by model name.
 
     Lazily loads all capability modules on first access to minimize startup overhead.
@@ -49,9 +49,6 @@ class EmbeddingCapabilityResolver(CapabilityResolver[EmbeddingCapabilityType]):
             get_amazon_embedding_capabilities,
         )
         from codeweaver.providers.embedding.capabilities.baai import get_baai_embedding_capabilities
-
-        # Import sparse capabilities
-        from codeweaver.providers.embedding.capabilities.base import get_sparse_caps
         from codeweaver.providers.embedding.capabilities.cohere import (
             get_cohere_embedding_capabilities,
         )
@@ -101,7 +98,6 @@ class EmbeddingCapabilityResolver(CapabilityResolver[EmbeddingCapabilityType]):
 
         # Call each getter to retrieve capabilities and build the lookup index
         temp_capabilities: dict[str, EmbeddingCapabilityType] = {}
-        temp_sparse_capabilities: dict[str, SparseEmbeddingModelCapabilities] = {}
 
         for getter in [
             get_alibaba_nlp_embedding_capabilities,
@@ -127,51 +123,33 @@ class EmbeddingCapabilityResolver(CapabilityResolver[EmbeddingCapabilityType]):
             for cap in getter():
                 temp_capabilities[cap.name] = cap
 
-        # Index sparse capabilities
-        for sparse_cap in get_sparse_caps():
-            temp_sparse_capabilities[sparse_cap.name] = sparse_cap
-        self._sparse_capabilities_by_name = MappingProxyType(temp_sparse_capabilities)
         self._capabilities_by_name = MappingProxyType(temp_capabilities)
         self._loaded = True
 
-    def resolve_sparse(self, model_name: str) -> SparseEmbeddingModelCapabilities | None:
-        """Get sparse capabilities for a specific model name.
 
-        Args:
-            model_name: The name of the sparse embedding model.
+@dependency_provider(scope="singleton")
+class SparseEmbeddingCapabilityResolver(BaseCapabilityResolver[SparseEmbeddingModelCapabilities]):
+    """A capability resolver for sparse embedding models."""
 
-        Returns:
-            The sparse capabilities for the specified model, or None if not found.
-        """
-        with self._lock:
-            self._ensure_loaded()
-        return self._sparse_capabilities_by_name.get(model_name)
+    def __init__(self) -> None:
+        """Initialize the capability resolver with empty cache."""
+        super().__init__()
+        self._capabilities_by_name: MappingProxyType[str, SparseEmbeddingModelCapabilities] = (
+            MappingProxyType({})
+        )
 
-    def all_sparse_capabilities(self) -> Sequence[SparseEmbeddingModelCapabilities]:
-        """Get all registered sparse embedding model capabilities.
+    def _ensure_loaded(self) -> None:
+        """Lazily import all capability modules and build the index."""
+        if self._loaded:
+            return
 
-        Returns:
-            A sequence of all registered sparse capabilities.
-        """
-        with self._lock:
-            self._ensure_loaded()
-        return tuple(self._sparse_capabilities_by_name.values())
+        # Import sparse capabilities
+        from codeweaver.providers.embedding.capabilities.base import get_sparse_caps
 
-    def all_sparse_model_names(self) -> Sequence[str]:
-        """Get all registered sparse embedding model names.
-
-        Returns:
-            A sequence of all registered sparse model names.
-        """
-        with self._lock:
-            self._ensure_loaded()
-        return tuple(self._sparse_capabilities_by_name.keys())
+        self._capabilities_by_name = MappingProxyType({
+            sparse_cap.name: sparse_cap for sparse_cap in get_sparse_caps()
+        })
+        self._loaded = True
 
 
-# Type alias for dependency injection
-type EmbeddingCapabilityResolverDep = Annotated[
-    EmbeddingCapabilityResolver, depends(EmbeddingCapabilityResolver)
-]
-
-
-__all__ = ("EmbeddingCapabilityResolver", "EmbeddingCapabilityResolverDep")
+__all__ = ("EmbeddingCapabilityResolver", "SparseEmbeddingCapabilityResolver")

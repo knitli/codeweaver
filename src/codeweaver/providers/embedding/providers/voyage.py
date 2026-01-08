@@ -9,7 +9,6 @@ from pydantic import PrivateAttr, SkipValidation
 from voyageai.object.embeddings import EmbeddingsObject
 
 from codeweaver.core import CodeChunk, ConfigurationError, Provider
-from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.providers import EmbeddingProvider
 
 
@@ -25,18 +24,22 @@ except ImportError as _import_error:
 
 def voyage_context_output_transformer(
     result: ContextualizedEmbeddingsObject,
-) -> list[list[float]] | list[list[int]]:
+) -> list[list[int | float]] | list[list[int]]:
     """Transform the output of the Voyage AI context chunk embedding model."""
     results = result.results
     embeddings = [res.embeddings for res in results if res and res.embeddings]
     if embeddings and isinstance(embeddings[0][0][0], list):
-        embeddings = cast(list[list[float]], [emb for sublist in embeddings for emb in sublist])
-    return embeddings
+        embeddings = cast(
+            list[list[int | float]], [emb for sublist in embeddings for emb in sublist]
+        )
+    return cast(list[list[int | float]] | list[list[int]], embeddings)
 
 
-def voyage_output_transformer(result: EmbeddingsObject) -> list[list[float]] | list[list[int]]:
+def voyage_output_transformer(
+    result: EmbeddingsObject,
+) -> list[list[int | float]] | list[list[int]]:
     """Transform the output of the Voyage AI model."""
-    return result.embeddings
+    return cast(list[list[int | float]] | list[list[int]], result.embeddings)
 
 
 class VoyageEmbeddingProvider(EmbeddingProvider[AsyncClient]):
@@ -44,24 +47,10 @@ class VoyageEmbeddingProvider(EmbeddingProvider[AsyncClient]):
 
     client: SkipValidation[AsyncClient]
     _provider: ClassVar[Provider] = Provider.VOYAGE
-    caps: EmbeddingModelCapabilities
-    embed_options: ClassVar[dict[str, Any]] = {"input_type": "document"}
-    query_options: ClassVar[dict[str, Any]] = {"input_type": "query"}
-    _output_transformer: ClassVar[Callable[[Any], list[list[float]] | list[list[int]]]] = (
+    _output_transformer: Callable[[Any], list[list[float]] | list[list[int]]] = (
         voyage_output_transformer
     )
     _is_context_model: Annotated[bool, PrivateAttr()] = False
-
-    def _initialize(self, caps: EmbeddingModelCapabilities) -> None:
-        self._is_context_model = "context" in caps.name
-        configured_dimension = self.get_dimension()
-        shared_kwargs = {
-            "model": caps.name,
-            "output_dimension": configured_dimension,
-            "output_dtype": "float",
-        }
-        self.embed_options |= shared_kwargs
-        self.query_options |= shared_kwargs
 
     def _process_output(self, output_data: Any) -> list[list[float]] | list[list[int]]:
         """Process output data using the appropriate transformer."""
@@ -84,7 +73,7 @@ class VoyageEmbeddingProvider(EmbeddingProvider[AsyncClient]):
 
     async def _embed_documents(
         self, documents: Sequence[CodeChunk], **kwargs: Any
-    ) -> list[list[float]] | list[list[int]]:
+    ) -> list[list[int | float]] | list[list[int]]:
         """Embed a list of documents into vectors."""
         import logging
 
@@ -110,14 +99,16 @@ class VoyageEmbeddingProvider(EmbeddingProvider[AsyncClient]):
                 mid = len(documents) // 2
                 first_half = await self._embed_documents(documents[:mid], **kwargs)
                 second_half = await self._embed_documents(documents[mid:], **kwargs)
-                return first_half + second_half
+                return cast(
+                    list[list[int | float]] | list[list[int]], first_half + second_half
+                )
             raise
         else:
             return self._process_output(results)
 
     async def _embed_query(
         self, query: Sequence[str], **kwargs: Any
-    ) -> list[list[float]] | list[list[int]]:
+    ) -> list[list[int | float]] | list[list[int]]:
         """Embed a query or group of queries into vectors."""
         results: EmbeddingsObject = await self.client.embed(
             texts=list(query), **kwargs | self.query_options

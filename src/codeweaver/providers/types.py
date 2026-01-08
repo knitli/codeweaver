@@ -22,7 +22,7 @@ type EmbeddingCapabilityType = EmbeddingModelCapabilities | SparseEmbeddingModel
 type RerankingCapabilityType = RerankingModelCapabilities
 
 
-class CapabilityResolver[Capability: (EmbeddingCapabilityType | RerankingCapabilityType)](ABC):
+class BaseCapabilityResolver[Capability: (EmbeddingCapabilityType | RerankingCapabilityType)](ABC):
     """Base class for capability resolvers.
 
     Provides a generic pattern for lazy-loading and resolving model capabilities
@@ -85,4 +85,23 @@ class CapabilityResolver[Capability: (EmbeddingCapabilityType | RerankingCapabil
         return tuple(self._capabilities_by_name.keys())
 
 
-__all__ = ("CapabilityResolver",)
+class BaseRerankingCapabilityResolver(BaseCapabilityResolver[RerankingCapabilityType]):
+    """A capability resolver for reranking models."""
+
+
+class BaseEmbeddingCapabilityResolver(BaseCapabilityResolver[EmbeddingModelCapabilities]):
+    """A capability resolver for embedding models."""
+
+
+class BaseSparseEmbeddingCapabilityResolver(
+    BaseCapabilityResolver[SparseEmbeddingModelCapabilities]
+):
+    """A capability resolver for sparse embedding models."""
+
+
+__all__ = (
+    "BaseEmbeddingCapabilityResolver",
+    "BaseRerankingCapabilityResolver",
+    "BaseSparseEmbeddingCapabilityResolver",
+    "CapabilityResolver",
+)

@@ -957,9 +957,9 @@ provides-extras = ["anthropic", "auth-eunomia", "auth-permitio", "aws-secrets-ma
 
 [package.metadata.requires-dev]
 build = [
-    { name = "hatchling", specifier = ">=1.27.0" },
+    { name = "hatchling", specifier = ">=1.28.0" },
     { name = "twine", specifier = ">=6.2.0" },
-    { name = "uv-dynamic-versioning", specifier = ">=0.11.2" },
+    { name = "uv-dynamic-versioning", specifier = ">=0.12.0" },
 ]
 dev = [
     { name = "black", specifier = ">=25.12.0" },
@@ -1914,7 +1914,7 @@ wheels = [
 
 [[package]]
 name = "hatchling"
-version = "1.27.0"
+version = "1.28.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "packaging" },
@@ -1922,9 +1922,9 @@ dependencies = [
     { name = "pluggy" },
     { name = "trove-classifiers" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/8f/8a/cc1debe3514da292094f1c3a700e4ca25442489731ef7c0814358816bb03/hatchling-1.27.0.tar.gz", hash = "sha256:971c296d9819abb3811112fc52c7a9751c8d381898f36533bb16f9791e941fd6", size = 54983, upload-time = "2024-12-15T17:08:11.894Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/0b/8e/e480359492affde4119a131da729dd26da742c2c9b604dff74836e47eef9/hatchling-1.28.0.tar.gz", hash = "sha256:4d50b02aece6892b8cd0b3ce6c82cb218594d3ec5836dbde75bf41a21ab004c8", size = 55365, upload-time = "2025-11-27T00:31:13.766Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/08/e7/ae38d7a6dfba0533684e0b2136817d667588ae3ec984c1a4e5df5eb88482/hatchling-1.27.0-py3-none-any.whl", hash = "sha256:d3a2f3567c4f926ea39849cdf924c7e99e6686c9c8e288ae1037c8fa2a5d937b", size = 75794, upload-time = "2024-12-15T17:08:10.364Z" },
+    { url = "https://files.pythonhosted.org/packages/0d/a5/48cb7efb8b4718b1a4c0c331e3364a3a33f614ff0d6afd2b93ee883d3c47/hatchling-1.28.0-py3-none-any.whl", hash = "sha256:dc48722b68b3f4bbfa3ff618ca07cdea6750e7d03481289ffa8be1521d18a961", size = 76075, upload-time = "2025-11-27T00:31:12.544Z" },
 ]
 
 [[package]]
@@ -5674,7 +5674,7 @@ wheels = [
 
 [[package]]
 name = "uv-dynamic-versioning"
-version = "0.11.2"
+version = "0.12.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "dunamai" },
@@ -5682,9 +5682,9 @@ dependencies = [
     { name = "jinja2" },
     { name = "tomlkit" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/9b/22/c92035270279904bc94680f4715a02a8d40f90633bc624a6082209655a15/uv_dynamic_versioning-0.11.2.tar.gz", hash = "sha256:4c785ea02e00b93896d015fd3613c451735af1715a7f5f52e8e4e1d76e6ec3c5", size = 40402, upload-time = "2025-09-28T04:24:02.249Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ac/ae/66c95eca70db2a0d01212f05c6cb589e0668532daad10bbbf434f82ccfe7/uv_dynamic_versioning-0.12.0.tar.gz", hash = "sha256:e853e0c5b2425a68005580325d4975a8c37b66015589ca45ef96e660fe0f8f16", size = 41499, upload-time = "2025-12-14T00:47:40.774Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b7/22/276099d5a4b2cc7a4310a0160f4f8a7ed0c2a67adaeefec3862bd55df303/uv_dynamic_versioning-0.11.2-py3-none-any.whl", hash = "sha256:563ab4b7a93904eb8fb8fd9f2959dad853d62baa71f3cdb0233acf8a749d512f", size = 11093, upload-time = "2025-09-28T04:24:00.869Z" },
+    { url = "https://files.pythonhosted.org/packages/b4/8b/1dace94e7786f40e5cbcebb3a43365832798e497bbbb7281557cef72cb4c/uv_dynamic_versioning-0.12.0-py3-none-any.whl", hash = "sha256:2d2f1fb806c2e351d0d0a3840aaf7b3c6ce73757080b1ada4ac5dc44f7dd4c9e", size = 11477, upload-time = "2025-12-14T00:47:39.305Z" },
 ]
 
 [[package]]

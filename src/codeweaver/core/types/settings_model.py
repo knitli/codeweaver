@@ -8,9 +8,8 @@ import os
 from collections.abc import Iterator
 from pathlib import Path
 from types import MappingProxyType
-from typing import Annotated, Any, Literal, Self, cast
+from typing import Annotated, Any, ClassVar, Literal, Self, cast
 
-from beartype.typing import ClassVar
 from pydantic import DirectoryPath, Field, FilePath, PrivateAttr, computed_field
 from pydantic_settings import (
     AWSSecretsManagerSettingsSource,

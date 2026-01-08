@@ -13,9 +13,7 @@ import os
 
 from functools import cached_property
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Literal, cast
-
-from beartype.typing import Any, TypedDict
+from typing import TYPE_CHECKING, Any, Literal, TypedDict, cast
 
 from codeweaver.core.types.enum import BaseEnum
 from codeweaver.core.utils.lazy_import import LazyImport, lazy_import

@@ -10,14 +10,13 @@ Provides lazy loading and resolution of reranking model capabilities by model na
 from __future__ import annotations
 
 from types import MappingProxyType
-from typing import Annotated
 
-from codeweaver.core import Depends, dependency_provider
-from codeweaver.providers.types import CapabilityResolver, RerankingCapabilityType
+from codeweaver.core import dependency_provider
+from codeweaver.providers.types import BaseCapabilityResolver, RerankingCapabilityType
 
 
 @dependency_provider(scope="singleton")
-class RerankingCapabilityResolver(CapabilityResolver[RerankingCapabilityType]):
+class RerankingCapabilityResolver(BaseCapabilityResolver[RerankingCapabilityType]):
     """Resolves reranking model capabilities by model name.
 
     Lazily loads all capability modules on first access to minimize startup overhead.
@@ -74,10 +73,4 @@ class RerankingCapabilityResolver(CapabilityResolver[RerankingCapabilityType]):
         self._loaded = True
 
 
-# Type alias for dependency injection
-type RerankingCapabilityResolverDep = Annotated[
-    RerankingCapabilityResolver, Depends(RerankingCapabilityResolver)
-]
-
-
-__all__ = ("RerankingCapabilityResolver", "RerankingCapabilityResolverDep")
+__all__ = ("RerankingCapabilityResolver",)
