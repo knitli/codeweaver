@@ -6,7 +6,7 @@ is installed (logging and telemetry configuration only).
 
 from __future__ import annotations
 
-from typing import Annotated, Any
+from typing import Annotated
 
 from pydantic import Field
 
@@ -35,6 +35,11 @@ class CodeWeaverCoreSettings(BaseCodeWeaverSettings):
         ```
     """
 
+    model_config = BaseCodeWeaverSettings.model_config | {
+        "title": "CodeWeaver Core Settings",
+        "description": "Core settings for CodeWeaver (logging and telemetry only).",
+    }
+
     logging: Annotated[
         LoggingSettingsDict | Unset,
         Field(
@@ -55,7 +60,6 @@ class CodeWeaverCoreSettings(BaseCodeWeaverSettings):
 
     def _initialize(self) -> None:
         """Initialize core settings - nothing special needed."""
-        pass
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion] | None:
         """Define telemetry filtering for core settings."""

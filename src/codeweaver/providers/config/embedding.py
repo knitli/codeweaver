@@ -22,10 +22,8 @@ from typing import (
 from cyclopts.types import PositiveInt
 from pydantic import Discriminator, Field, Tag, computed_field
 
-from codeweaver.core import INJECTED, BasedModel, ConfigurationError, LiteralProvider, Provider
-from codeweaver.providers import EmbeddingCapabilityResolver
+from codeweaver.core import BasedModel, ConfigurationError, LiteralProvider, Provider
 from codeweaver.providers.config.types import CohereRequestOptionsDict
-from codeweaver.providers.embedding.capabilities.dependencies import EmbeddingCapabilityResolverDep
 
 
 logger = logging.getLogger(__name__)
@@ -52,13 +50,6 @@ DIMENSION_FIELDS = {
 }
 
 
-def _get_embedding_capabilities_resolver(
-    cap: EmbeddingCapabilityResolverDep = INJECTED,  # ty:ignore[invalid-parameter-default]
-) -> EmbeddingCapabilityResolver:
-    """Get the embedding capabilities resolver."""
-    return cap
-
-
 @overload
 def _get_embedding_capabilities_for_model(
     model_name: LiteralString, *, sparse: Literal[True]
@@ -79,8 +70,6 @@ def _get_embedding_capabilities_for_model(
     Returns:
         The embedding model capabilities or None if not found.
     """
-    resolver = _get_embedding_capabilities_resolver()
-    return resolver.resolve_sparse(model_name) if sparse else resolver.resolve(model_name)
 
 
 class SerializedEmbeddingOptionsDict(TypedDict, total=False):
@@ -181,7 +170,7 @@ class BaseEmbeddingConfig(BasedModel):
         # 3. User-registered defaults
         from codeweaver.core.config.defaults import get_default
 
-        if user_default := get_default("embedding.dimension"):
+        if user_default := get_default("primary.embedding.dimension"):
             return user_default
 
         raise ConfigurationError(
@@ -214,7 +203,7 @@ class BaseEmbeddingConfig(BasedModel):
         # 3. User-registered defaults
         from codeweaver.core.config.defaults import get_default
 
-        if user_default := get_default("embedding.datatype"):
+        if user_default := get_default("primary.embedding.datatype"):
             return user_default
         # 4. Provider-specific defaults
         if output_default := next(

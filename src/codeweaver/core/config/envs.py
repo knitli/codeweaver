@@ -10,16 +10,25 @@ from __future__ import annotations
 # sourcery skip:snake-case-variable-declarations
 import os
 
-from collections import defaultdict
 from types import MappingProxyType
-from typing import Any, Literal, TypedDict, get_args
+from typing import Literal, TypedDict, get_args
 
 from pydantic import AnyUrl, SecretStr
+from pydantic.dataclasses import asdict, dataclass
 
-from codeweaver.core.types import DictView, EnvFormat, EnvVarInfo, LiteralProviderKindType, Provider
+from codeweaver.core.config.loader import detect_root_package
+from codeweaver.core.types import (
+    DataclassSerializationMixin,
+    DictView,
+    EnvFormat,
+    EnvVarInfo,
+    LiteralProviderKindType,
+    Provider,
+)
 
 
-class SettingsEnvVars(TypedDict):
+@dataclass
+class SettingsEnvVars(DataclassSerializationMixin):
     """Environment variables for CodeWeaver settings."""
 
     CODEWEAVER_LOG_LEVEL: EnvVarInfo
@@ -101,7 +110,325 @@ class SettingsEnvVars(TypedDict):
     """Environment variable to disable telemetry data collection."""
 
     CODEWEAVER__TELEMETRY__TOOLS_OVER_PRIVACY: EnvVarInfo
-    """Environment variable to opt-in to """
+    """Environment variable to opt-in to providing more detailed search and query data for telemetry. This may include potentially identifying information that we will try to anonymize but can't garauntee complete privacy."""
+
+    def __post_init__(self) -> None:
+        """Post-initialization to validate default values."""
+        self.register_values()
+
+    @classmethod
+    def from_defaults(cls) -> SettingsEnvVars:
+        """Create SettingsEnvVars with built-in defaults."""
+        return cls(
+            CODEWEAVER_LOG_LEVEL=EnvVarInfo(
+                env="CODEWEAVER_LOG_LEVEL",
+                description="Set the log level for CodeWeaver (e.g., DEBUG, INFO, WARNING, ERROR).",
+                is_required=False,
+                is_secret=False,
+                default="WARNING",
+                variable_name="log_level",
+                choices={"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"},
+                resolver_key="logging.level",
+            ),
+            CODEWEAVER_PROJECT_PATH=EnvVarInfo(
+                env="CODEWEAVER_PROJECT_PATH",
+                description="Set the project path for CodeWeaver.",
+                fmt=EnvFormat.FILEPATH,
+                is_required=False,
+                is_secret=False,
+                variable_name="project_path",
+                resolver_key="project_path",
+            ),
+            CODEWEAVER_PROJECT_NAME=EnvVarInfo(
+                env="CODEWEAVER_PROJECT_NAME",
+                description="Set the project name for CodeWeaver.",
+                is_required=False,
+                is_secret=False,
+                variable_name="project_name",
+                resolver_key="project_name",
+            ),
+            CODEWEAVER_HOST=EnvVarInfo(
+                env="CODEWEAVER_HOST",
+                description="Set the server host for CodeWeaver.",
+                is_required=False,
+                is_secret=False,
+                default="localhost",
+                variable_name="management_host",
+                resolver_key="management_host",
+                available_with="server",
+            ),
+            CODEWEAVER_PORT=EnvVarInfo(
+                env="CODEWEAVER_PORT",
+                description="Set the port for the codeweaver management server (information and management endpoints).",
+                is_required=False,
+                is_secret=False,
+                fmt=EnvFormat.NUMBER,
+                default="9329",
+                variable_name="management_port",
+                resolver_key="management_port",
+                available_with="server",
+            ),
+            CODEWEAVER_MCP_PORT=EnvVarInfo(
+                env="CODEWEAVER_MCP_PORT",
+                description="Set the MCP server port for CodeWeaver if using http transport for mcp. Not required if using the default port (9328), or stdio transport.",
+                is_required=False,
+                is_secret=False,
+                fmt=EnvFormat.NUMBER,
+                default="9328",
+                variable_name="mcp_port",
+                resolver_key="server.run_args.port",
+                available_with="server",
+            ),
+            CODEWEAVER_DEBUG=EnvVarInfo(
+                env="CODEWEAVER_DEBUG",
+                description="Enable debug mode for CodeWeaver.",
+                is_required=False,
+                is_secret=False,
+                default="false",
+                fmt=EnvFormat.BOOLEAN,
+                variable_name="debug",
+                choices={"true", "false"},
+                resolver_key="debug",
+            ),
+            CODEWEAVER_PROFILE=EnvVarInfo(
+                env="CODEWEAVER_PROFILE",
+                description="Use a premade provider settings profile for CodeWeaver.",
+                is_required=False,
+                is_secret=False,
+                variable_name="profile",
+                choices={"recommended", "quickstart", "testing"},
+                resolver_key="profile",
+                available_with="providers",
+            ),
+            CODEWEAVER_CONFIG_FILE=EnvVarInfo(
+                env="CODEWEAVER_CONFIG_FILE",
+                description="Specify a custom config file path for CodeWeaver. Only needed if not using the default locations.",
+                fmt=EnvFormat.FILEPATH,
+                is_required=False,
+                is_secret=False,
+                variable_name="config_file",
+                resolver_key="config_file",
+            ),
+            CODEWEAVER_VECTOR_STORE_PROVIDER=EnvVarInfo(
+                env="CODEWEAVER_VECTOR_STORE_PROVIDER",
+                description="Specify the vector store provider to use.",
+                is_required=False,
+                is_secret=False,
+                default="qdrant",
+                variable_name="provider",
+                choices=_providers_for_kind("vector_store"),
+                resolver_key="primary.vector_store.provider",
+                available_with="providers",
+            ),
+            CODEWEAVER_VECTOR_STORE_URL=EnvVarInfo(
+                env="CODEWEAVER_VECTOR_STORE_URL",
+                description="Specify the URL for the vector store.",
+                is_required=False,
+                is_secret=False,
+                default="http://localhost",
+                variable_name="url",
+                resolver_key="primary.vector_store.url",
+                available_with="providers",
+            ),
+            CODEWEAVER_VECTOR_STORE_PORT=EnvVarInfo(
+                env="CODEWEAVER_VECTOR_STORE_PORT",
+                description="Specify the port for the vector store.",
+                is_required=False,
+                is_secret=False,
+                default="6333",
+                variable_name="port",
+                resolver_key="primary.vector_store.port",
+                available_with="providers",
+            ),
+            CODEWEAVER_VECTOR_STORE_API_KEY=EnvVarInfo(
+                env="CODEWEAVER_VECTOR_STORE_API_KEY",
+                description="Specify the API key for the vector store, if required.",
+                is_required=False,
+                is_secret=True,
+                variable_name="api_key",
+                choices=_auth_list_for_kind("vector_store"),
+                resolver_key="primary.vector_store.api_key",
+                available_with="providers",
+            ),
+            CODEWEAVER_SPARSE_EMBEDDING_MODEL=EnvVarInfo(
+                env="CODEWEAVER_SPARSE_EMBEDDING_MODEL",
+                description="Specify the sparse embedding model to use.",
+                is_required=False,
+                is_secret=False,
+                default="prithivida/Splade_pp_en_v1",
+                variable_name="model",
+                resolver_key="primary.sparse_primary.embedding.model_name",
+                available_with="providers",
+            ),
+            CODEWEAVER_SPARSE_EMBEDDING_PROVIDER=EnvVarInfo(
+                env="CODEWEAVER_SPARSE_EMBEDDING_PROVIDER",
+                description="Specify the sparse embedding provider to use.",
+                is_required=False,
+                is_secret=False,
+                default="fastembed",
+                variable_name="provider",
+                choices=_providers_for_kind("sparse_embedding"),
+                resolver_key="primary.sparse_embedding.provider",
+                available_with="providers",
+            ),
+            CODEWEAVER_EMBEDDING_PROVIDER=EnvVarInfo(
+                env="CODEWEAVER_EMBEDDING_PROVIDER",
+                description="Specify the embedding provider to use.",
+                is_required=False,
+                is_secret=False,
+                default="voyage",
+                variable_name="provider",
+                choices=_providers_for_kind("embedding"),
+                resolver_key="primary.embedding.provider",
+                available_with="providers",
+            ),
+            CODEWEAVER_EMBEDDING_MODEL=EnvVarInfo(
+                env="CODEWEAVER_EMBEDDING_MODEL",
+                description="Specify the embedding model to use.",
+                is_required=False,
+                is_secret=False,
+                default="voyage-code-3",
+                variable_name="model",
+                resolver_key="primary.primary.embedding.model_name",
+                available_with="providers",
+            ),
+            CODEWEAVER_EMBEDDING_API_KEY=EnvVarInfo(
+                env="CODEWEAVER_EMBEDDING_API_KEY",
+                description="Specify the API key for the embedding provider, if required. Note: Ollama may require an API key if using their cloud services.",
+                is_required=False,
+                is_secret=True,
+                variable_name="api_key",
+                choices=_auth_list_for_kind("embedding"),
+                resolver_key="primary.embedding.api_key",
+                available_with="providers",
+            ),
+            CODEWEAVER_RERANKING_PROVIDER=EnvVarInfo(
+                env="CODEWEAVER_RERANKING_PROVIDER",
+                description="Specify the reranking provider to use.",
+                is_required=False,
+                is_secret=False,
+                default="voyage",
+                variable_name="provider",
+                choices=_providers_for_kind("reranking"),
+                resolver_key="primary.reranking.provider",
+                available_with="providers",
+            ),
+            CODEWEAVER_RERANKING_MODEL=EnvVarInfo(
+                env="CODEWEAVER_RERANKING_MODEL",
+                description="Specify the reranking model to use.",
+                is_required=False,
+                is_secret=False,
+                default="rerank-2.5",
+                variable_name="model",
+                resolver_key="primary.reranking.model_name",
+                available_with="providers",
+            ),
+            CODEWEAVER_RERANKING_API_KEY=EnvVarInfo(
+                env="CODEWEAVER_RERANKING_API_KEY",
+                description="Specify the API key for the reranking provider, if required.",
+                is_required=False,
+                is_secret=True,
+                variable_name="api_key",
+                choices=_auth_list_for_kind("reranking"),
+                resolver_key="primary.reranking.api_key",
+                available_with="providers",
+            ),
+            CODEWEAVER_AGENT_PROVIDER=EnvVarInfo(
+                env="CODEWEAVER_AGENT_PROVIDER",
+                description="Specify the agent provider to use.",
+                is_required=False,
+                is_secret=False,
+                default="anthropic",
+                variable_name="provider",
+                choices=_providers_for_kind("agent"),
+                resolver_key="primary.agent.provider",
+                available_with="providers",
+            ),
+            CODEWEAVER_AGENT_MODEL=EnvVarInfo(
+                env="CODEWEAVER_AGENT_MODEL",
+                description="Specify the agent model to use. Provide the model name as you would to the provider directly -- check the provider's documentation.",
+                is_required=False,
+                is_secret=False,
+                default="claude-haiku-4.5-latest",
+                variable_name="model",
+                resolver_key="primary.agent.model_name",
+                available_with="providers",
+            ),
+            CODEWEAVER_AGENT_API_KEY=EnvVarInfo(
+                env="CODEWEAVER_AGENT_API_KEY",
+                description="Specify the API key for the agent provider, if required. Note: Ollama uses the `openai` client, which requires an API key. If you're using Ollama locally, you need to set this, but it can be to anything -- like `madeup-key`.",
+                is_required=False,
+                is_secret=True,
+                variable_name="api_key",
+                choices=_auth_list_for_kind("agent"),
+                resolver_key="primary.agent.api_key",
+                available_with="providers",
+            ),
+            CODEWEAVER_DATA_PROVIDERS=EnvVarInfo(
+                env="CODEWEAVER_DATA_PROVIDERS",
+                description="Specify data providers to use, separated by commas. API keys, if required, must be set using the provider's specific environment variable, such as `TAVILY_API_KEY` for the TAVILY provider.",
+                is_required=False,
+                is_secret=False,
+                default="tavily",
+                choices=_providers_for_kind("data"),
+                available_with="providers",
+                resolver_key="data.providers",
+            ),
+            CODEWEAVER__TELEMETRY__DISABLE_TELEMETRY=EnvVarInfo(
+                env="CODEWEAVER__TELEMETRY__DISABLE_TELEMETRY",
+                description="Disable telemetry data collection.",
+                is_required=False,
+                is_secret=False,
+                fmt=EnvFormat.BOOLEAN,
+                default="false",
+                variable_name="disable_telemetry",
+                choices={"true", "false"},
+                resolver_key="telemetry.disable_telemetry",
+            ),
+            CODEWEAVER__TELEMETRY__TOOLS_OVER_PRIVACY=EnvVarInfo(
+                env="CODEWEAVER__TELEMETRY__TOOLS_OVER_PRIVACY",
+                description="Opt-in to potentially identifying collection of query and search result data. This is invaluable for helping us improve CodeWeaver's search capabilities. If privacy is a higher priority, do not enable this setting.",
+                is_required=False,
+                is_secret=False,
+                fmt=EnvFormat.BOOLEAN,
+                default="false",
+                variable_name="tools_over_privacy",
+                choices={"true", "false"},
+                resolver_key="telemetry.tools_over_privacy",
+            ),
+        )
+
+    def resolved_values(self) -> dict[str, str | None]:
+        """Get resolved environment variable values."""
+        mapped_self = {
+            k: v for k, v in asdict(self).items() if detect_root_package() == v.available_with
+        }
+        return {
+            key: resolved_value
+            if (resolved_value := os.getenv(var_info.env)) is not None
+            else var_info.default
+            for key, var_info in mapped_self.items()
+            if var_info.env in os.environ
+        }
+
+    def register_values(self) -> None:
+        """Register the environment variables in the OS environment."""
+        from codeweaver.core.config.registry import (
+            create_configuration_value,
+            register_configurable,
+        )
+
+        if resolved := self.resolved_values():
+            for key, value in resolved.items():
+                info = getattr(self, key)
+                register_configurable(
+                    create_configuration_value(
+                        resolver_key=info.resolver_key,
+                        value=value,
+                        source="env",
+                        tagged=info.resolver_key.startswith("primary."),
+                    )
+                )
 
 
 def _providers_for_kind(kind: LiteralProviderKindType) -> set[str]:
@@ -138,241 +465,9 @@ def _maybe_requiring_auth(kind: LiteralProviderKindType) -> set[str]:
     }
 
 
-def environment_variables() -> DictView[SettingsEnvVars]:
+def environment_variables() -> DictView[SettingsEnvVars]:  # ty:ignore[invalid-type-arguments]
     """Get environment variables for CodeWeaver settings."""
-    return DictView(
-        SettingsEnvVars(
-            CODEWEAVER_LOG_LEVEL=EnvVarInfo(
-                env="CODEWEAVER_LOG_LEVEL",
-                description="Set the log level for CodeWeaver (e.g., DEBUG, INFO, WARNING, ERROR).",
-                is_required=False,
-                is_secret=False,
-                default="WARNING",
-                variable_name="log_level",
-                choices={"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"},
-            ),
-            CODEWEAVER_PROJECT_PATH=EnvVarInfo(
-                env="CODEWEAVER_PROJECT_PATH",
-                description="Set the project path for CodeWeaver.",
-                fmt=EnvFormat.FILEPATH,
-                is_required=False,
-                is_secret=False,
-                variable_name="project_path",
-            ),
-            CODEWEAVER_PROJECT_NAME=EnvVarInfo(
-                env="CODEWEAVER_PROJECT_NAME",
-                description="Set the project name for CodeWeaver.",
-                is_required=False,
-                is_secret=False,
-                variable_name="project_name",
-            ),
-            CODEWEAVER_HOST=EnvVarInfo(
-                env="CODEWEAVER_HOST",
-                description="Set the server host for CodeWeaver.",
-                is_required=False,
-                is_secret=False,
-                default="localhost",
-                variable_name="management_host",
-            ),
-            CODEWEAVER_PORT=EnvVarInfo(
-                env="CODEWEAVER_PORT",
-                description="Set the port for the codeweaver management server (information and management endpoints).",
-                is_required=False,
-                is_secret=False,
-                fmt=EnvFormat.NUMBER,
-                default="9329",
-                variable_name="management_port",
-            ),
-            CODEWEAVER_MCP_PORT=EnvVarInfo(
-                env="CODEWEAVER_MCP_PORT",
-                description="Set the MCP server port for CodeWeaver if using http transport for mcp. Not required if using the default port (9328), or stdio transport.",
-                is_required=False,
-                is_secret=False,
-                fmt=EnvFormat.NUMBER,
-                default="9328",
-                variable_name="mcp_port",
-            ),
-            CODEWEAVER_DEBUG=EnvVarInfo(
-                env="CODEWEAVER_DEBUG",
-                description="Enable debug mode for CodeWeaver.",
-                is_required=False,
-                is_secret=False,
-                default="false",
-                fmt=EnvFormat.BOOLEAN,
-                variable_name="debug",
-                choices={"true", "false"},
-            ),
-            CODEWEAVER_PROFILE=EnvVarInfo(
-                env="CODEWEAVER_PROFILE",
-                description="Use a premade provider settings profile for CodeWeaver.",
-                is_required=False,
-                is_secret=False,
-                variable_name="profile",
-                choices={"recommended", "quickstart", "testing"},
-            ),
-            CODEWEAVER_CONFIG_FILE=EnvVarInfo(
-                env="CODEWEAVER_CONFIG_FILE",
-                description="Specify a custom config file path for CodeWeaver. Only needed if not using the default locations.",
-                fmt=EnvFormat.FILEPATH,
-                is_required=False,
-                is_secret=False,
-                variable_name="config_file",
-            ),
-            CODEWEAVER_VECTOR_STORE_PROVIDER=EnvVarInfo(
-                env="CODEWEAVER_VECTOR_STORE_PROVIDER",
-                description="Specify the vector store provider to use.",
-                is_required=False,
-                is_secret=False,
-                default="qdrant",
-                variable_name="provider",
-                choices=_providers_for_kind("vector_store"),
-            ),
-            CODEWEAVER_VECTOR_STORE_URL=EnvVarInfo(
-                env="CODEWEAVER_VECTOR_STORE_URL",
-                description="Specify the URL for the vector store.",
-                is_required=False,
-                is_secret=False,
-                default="http://localhost",
-                variable_name="url",
-            ),
-            CODEWEAVER_VECTOR_STORE_PORT=EnvVarInfo(
-                env="CODEWEAVER_VECTOR_STORE_PORT",
-                description="Specify the port for the vector store.",
-                is_required=False,
-                is_secret=False,
-                default="6333",
-                variable_name="port",
-            ),
-            CODEWEAVER_VECTOR_STORE_API_KEY=EnvVarInfo(
-                env="CODEWEAVER_VECTOR_STORE_API_KEY",
-                description="Specify the API key for the vector store, if required.",
-                is_required=False,
-                is_secret=True,
-                variable_name="api_key",
-                choices=_auth_list_for_kind("vector_store"),
-            ),
-            CODEWEAVER_SPARSE_EMBEDDING_MODEL=EnvVarInfo(
-                env="CODEWEAVER_SPARSE_EMBEDDING_MODEL",
-                description="Specify the sparse embedding model to use.",
-                is_required=False,
-                is_secret=False,
-                default="prithivida/Splade_pp_en_v1",
-                variable_name="model",
-            ),
-            CODEWEAVER_SPARSE_EMBEDDING_PROVIDER=EnvVarInfo(
-                env="CODEWEAVER_SPARSE_EMBEDDING_PROVIDER",
-                description="Specify the sparse embedding provider to use.",
-                is_required=False,
-                is_secret=False,
-                default="fastembed",
-                variable_name="provider",
-                choices=_providers_for_kind("sparse_embedding"),
-            ),
-            CODEWEAVER_EMBEDDING_PROVIDER=EnvVarInfo(
-                env="CODEWEAVER_EMBEDDING_PROVIDER",
-                description="Specify the embedding provider to use.",
-                is_required=False,
-                is_secret=False,
-                default="voyage",
-                variable_name="provider",
-                choices=_providers_for_kind("embedding"),
-            ),
-            CODEWEAVER_EMBEDDING_MODEL=EnvVarInfo(
-                env="CODEWEAVER_EMBEDDING_MODEL",
-                description="Specify the embedding model to use.",
-                is_required=False,
-                is_secret=False,
-                default="voyage-code-3",
-                variable_name="model",
-            ),
-            CODEWEAVER_EMBEDDING_API_KEY=EnvVarInfo(
-                env="CODEWEAVER_EMBEDDING_API_KEY",
-                description="Specify the API key for the embedding provider, if required. Note: Ollama may require an API key if using their cloud services.",
-                is_required=False,
-                is_secret=True,
-                variable_name="api_key",
-                choices=_auth_list_for_kind("embedding"),
-            ),
-            CODEWEAVER_RERANKING_PROVIDER=EnvVarInfo(
-                env="CODEWEAVER_RERANKING_PROVIDER",
-                description="Specify the reranking provider to use.",
-                is_required=False,
-                is_secret=False,
-                default="voyage",
-                variable_name="provider",
-                choices=_providers_for_kind("reranking"),
-            ),
-            CODEWEAVER_RERANKING_MODEL=EnvVarInfo(
-                env="CODEWEAVER_RERANKING_MODEL",
-                description="Specify the reranking model to use.",
-                is_required=False,
-                is_secret=False,
-                default="rerank-2.5",
-                variable_name="model",
-            ),
-            CODEWEAVER_RERANKING_API_KEY=EnvVarInfo(
-                env="CODEWEAVER_RERANKING_API_KEY",
-                description="Specify the API key for the reranking provider, if required.",
-                is_required=False,
-                is_secret=True,
-                variable_name="api_key",
-                choices=_auth_list_for_kind("reranking"),
-            ),
-            CODEWEAVER_AGENT_PROVIDER=EnvVarInfo(
-                env="CODEWEAVER_AGENT_PROVIDER",
-                description="Specify the agent provider to use.",
-                is_required=False,
-                is_secret=False,
-                default="anthropic",
-                variable_name="provider",
-                choices=_providers_for_kind("agent"),
-            ),
-            CODEWEAVER_AGENT_MODEL=EnvVarInfo(
-                env="CODEWEAVER_AGENT_MODEL",
-                description="Specify the agent model to use. Provide the model name as you would to the provider directly -- check the provider's documentation.",
-                is_required=False,
-                is_secret=False,
-                default="claude-haiku-4.5-latest",
-                variable_name="model",
-            ),
-            CODEWEAVER_AGENT_API_KEY=EnvVarInfo(
-                env="CODEWEAVER_AGENT_API_KEY",
-                description="Specify the API key for the agent provider, if required. Note: Ollama uses the `openai` client, which requires an API key. If you're using Ollama locally, you need to set this, but it can be to anything -- like `madeup-key`.",
-                is_required=False,
-                is_secret=True,
-                variable_name="api_key",
-                choices=_auth_list_for_kind("agent"),
-            ),
-            CODEWEAVER_DATA_PROVIDERS=EnvVarInfo(
-                env="CODEWEAVER_DATA_PROVIDERS",
-                description="Specify data providers to use, separated by commas. API keys, if required, must be set using the provider's specific environment variable, such as `TAVILY_API_KEY` for the TAVILY provider.",
-                is_required=False,
-                is_secret=False,
-                default="tavily",
-                choices=_providers_for_kind("data"),
-            ),
-            CODEWEAVER__TELEMETRY__DISABLE_TELEMETRY=EnvVarInfo(
-                env="CODEWEAVER__TELEMETRY__DISABLE_TELEMETRY",
-                description="Disable telemetry data collection.",
-                is_required=False,
-                is_secret=False,
-                fmt=EnvFormat.BOOLEAN,
-                default="false",
-                variable_name="disable_telemetry",
-                choices={"true", "false"},
-            ),
-            CODEWEAVER__TELEMETRY__TOOLS_OVER_PRIVACY=EnvVarInfo(
-                env="CODEWEAVER__TELEMETRY__TOOLS_OVER_PRIVACY",
-                description="Opt-in to potentially identifying collection of query and search result data. This is invaluable for helping us improve CodeWeaver's search capabilities. If privacy is a higher priority, do not enable this setting.",
-                is_required=False,
-                is_secret=False,
-                fmt=EnvFormat.BOOLEAN,
-                default="false",
-                variable_name="tools_over_privacy",
-                choices={"true", "false"},
-            ),
-        )
-    )
+    return DictView(asdict(SettingsEnvVars))
 
 
 type ProviderField = Literal["embedding", "reranking", "sparse_embedding", "vector_store"]
@@ -388,28 +483,6 @@ class SetProviderEnvVarsDict(TypedDict):
     url: AnyUrl | None
     host: str | None
     port: int | None
-
-
-def get_skeleton_provider_dict() -> dict[str, Any]:
-    """Get a skeleton dictionary of provider settings from environment variables.
-
-    The return type is a sparse version of `ProviderSettingsDict` where only keys with both environment variables and values are set.
-    """
-    env_map = get_provider_vars()
-    skeleton = defaultdict(lambda: {"connection": {}, "client_options": {}, "": {}})
-    for kind, vars_dict in env_map.items():
-        if vars_dict:
-            for key, value in vars_dict.items():
-                if key == "url":
-                    skeleton[kind]["provider_settings"]["url"] = value
-                elif key in {"host", "port"}:
-                    skeleton[kind]["connection"][key] = value
-                elif key != "model":
-                    skeleton[kind][key] = value
-                else:
-                    skeleton[kind]["model_settings"][key] = value
-
-    return skeleton
 
 
 def get_provider_vars() -> MappingProxyType[ProviderField, SetProviderEnvVarsDict]:

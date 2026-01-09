@@ -290,7 +290,7 @@ await settings.finalize()  # Resolves only provider configs
 ```toml
 # codeweaver.toml (no [provider] table!)
 embedding.provider = "voyage"
-embedding.model_name = "voyage-code-3"
+primary.embedding.model_name = "voyage-code-3"
 vector_store.provider = "qdrant"
 ```
 

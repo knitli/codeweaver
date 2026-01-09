@@ -1,4 +1,4 @@
-# sourcery skip: lambdas-should-be-short
+# sourcery skip: lambdas-should-be-short, no-complex-if-expressions
 # SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
@@ -19,14 +19,17 @@ The recommended flag gives you access to:
 from __future__ import annotations
 
 import contextlib
+import os
 
 from importlib import util
 from pathlib import Path
-from typing import Literal, overload
+from typing import Any, Literal, overload
 
 from pydantic import AnyHttpUrl
+from pydantic.dataclasses import as_dict
 from pydantic_ai.settings import ModelSettings as AgentModelSettings
 
+from codeweaver.core import BaseDataclassEnum, Provider
 from codeweaver.core.utils.filesystem import get_user_data_dir
 from codeweaver.providers.config.clients import QdrantClientOptions
 from codeweaver.providers.config.embedding import (
@@ -192,9 +195,7 @@ def _quickstart_default(
     from codeweaver.core import Provider
 
     embedding_model = (
-        "ibm-granite/granite-embedding-small-english-r2"
-        if HAS_ST
-        else "BAAI/bge-small-en-v1.5"
+        "ibm-granite/granite-embedding-small-english-r2" if HAS_ST else "BAAI/bge-small-en-v1.5"
     )
     sparse_model = (
         "opensearch/opensearch-neural-sparse-encoding-doc-v3-gte"
@@ -202,9 +203,7 @@ def _quickstart_default(
         else "prithivida/Splade_PP_en_v1"
     )
     reranking_model = (
-        "BAAI/bge-reranking-v2-m3"
-        if HAS_ST
-        else "jinaai/jina-reranking-v2-base-multilingual"
+        "BAAI/bge-reranking-v2-m3" if HAS_ST else "jinaai/jina-reranking-v2-base-multilingual"
     )
 
     return ProviderSettingsDict(
@@ -216,16 +215,12 @@ def _quickstart_default(
                     if HAS_ST
                     else FastEmbedEmbeddingConfig(model_name=embedding_model)
                 ),
-                provider=(
-                    Provider.SENTENCE_TRANSFORMERS if HAS_ST else Provider.FASTEMBED
-                ),
+                provider=(Provider.SENTENCE_TRANSFORMERS if HAS_ST else Provider.FASTEMBED),
             ),
         ),
         sparse_embedding=(
             SparseEmbeddingProviderSettings(
-                provider=(
-                    Provider.SENTENCE_TRANSFORMERS if HAS_ST else Provider.FASTEMBED
-                ),
+                provider=(Provider.SENTENCE_TRANSFORMERS if HAS_ST else Provider.FASTEMBED),
                 model_name=sparse_model,
                 sparse_embedding_config=(
                     SentenceTransformersSparseEmbeddingConfig(model_name=sparse_model)
@@ -236,9 +231,7 @@ def _quickstart_default(
         ),
         reranking=(
             RerankingProviderSettings(
-                provider=(
-                    Provider.SENTENCE_TRANSFORMERS if HAS_ST else Provider.FASTEMBED
-                ),
+                provider=(Provider.SENTENCE_TRANSFORMERS if HAS_ST else Provider.FASTEMBED),
                 model_name=reranking_model,
                 reranking_config=(
                     SentenceTransformersRerankingConfig(model_name=reranking_model)
@@ -278,18 +271,14 @@ def _backup_profile() -> ProviderSettingsDict:
     # We lose true sparse embeddings with bm25, but it's a good lightweight backup option
     embedding_model = "minishlab/potion-base-8M" if HAS_ST else "BAAI/bge-small-en-v1.5"
     reranking_model = (
-        "cross-encoder/ms-marco-TinyBERT-L2-v2"
-        if HAS_ST
-        else "jinaai/jina-reranker-v1-tiny-en"
+        "cross-encoder/ms-marco-TinyBERT-L2-v2" if HAS_ST else "jinaai/jina-reranker-v1-tiny-en"
     )
 
     backup_settings = _quickstart_default("local") | {
         "sparse_embedding": SparseEmbeddingProviderSettings(
             provider=Provider.FASTEMBED,
             model_name="qdrant/bm25",
-            sparse_embedding_config=FastEmbedSparseEmbeddingConfig(
-                model_name="qdrant/bm25"
-            ),
+            sparse_embedding_config=FastEmbedSparseEmbeddingConfig(model_name="qdrant/bm25"),
         ),
         # For the dense embeddings, we essentially choose the lightest available model
         # potion-base-8M is a static embedding model, which again loses some quality, but is extremely light weight and virtually instant
@@ -319,8 +308,7 @@ def _backup_profile() -> ProviderSettingsDict:
     backup_settings["vector_store"] = QdrantVectorStoreProviderSettings(
         provider=Provider.MEMORY,
         in_memory_config=MemoryConfig(
-            persist_path=Path(f"{get_user_data_dir()}/vectors/backup"),
-            auto_persist=True,
+            persist_path=Path(f"{get_user_data_dir()}/vectors/backup"), auto_persist=True
         ),
         client_options=_default_local_vector_client_options(),
     )
@@ -328,4 +316,82 @@ def _backup_profile() -> ProviderSettingsDict:
     return ProviderSettingsDict(**backup_settings)
 
 
-__all__ = "get_profile"
+class ProviderConfigProfile(BaseDataclassEnum):
+    """Dataclass wrapper for provider settings profiles."""
+
+    _profile: ProviderSettingsDict
+
+    def __init__(self, profile: ProviderSettingsDict, *args: Any, **kwargs: Any):
+        """Initialize the provider config profile."""
+        object.__setattr__(self, "_profile", profile)
+        super().__init__(*args, **kwargs)
+
+    def __and__(self, other: ProviderConfigProfile) -> ProviderConfigProfile:
+        """Combine two provider config profiles."""
+        args = (*(self._aliases or ()), self._description or "")  # ty:ignore[unresolved-attribute]
+        return ProviderConfigProfile(
+            ProviderSettingsDict(
+                vector_store=(
+                    *(self._profile["vector_store"] or ()),
+                    *(other._profile["vector_store"] or ()),
+                ),
+                embedding=(
+                    *(self._profile["embedding"] or ()),
+                    *(other._profile["embedding"] or ()),
+                ),
+                sparse_embedding=(
+                    *(self._profile["sparse_embedding"] or ()),
+                    *(other._profile["sparse_embedding"] or ()),
+                ),
+                reranking=(
+                    *(self._profile["reranking"] or ()),
+                    *(other._profile["reranking"] or ()),
+                ),
+                agent=(*(self._profile["agent"] or ()), *(other._profile["agent"] or ())),
+                data=(*(self._profile["data"] or ()), *(other._profile["data"] or ())),
+            ),
+            *args,
+        )  # ty:ignore[unresolved-attribute]
+
+
+class ProviderProfile(ProviderConfigProfile, BaseDataclassEnum):
+    """Prebuilt provider settings profiles for quick setup."""
+
+    RECOMMENDED = ProviderConfigProfile(
+        get_profile("recommended", vector_deployment="local"),
+        ("recommended",),
+        "Recommended provider settings profile with high-quality providers. Uses Voyage AI for embeddings and rerankings, FastEmbed for sparse (local) embeddings, and local Qdrant for vector storage.",
+    )
+    QUICKSTART = ProviderConfigProfile(
+        get_profile("quickstart", vector_deployment="local"),
+        ("quickstart", "local", "free", "open-source"),
+        "Quickstart provider settings profile. Entirely local and free. Uses open-source models for sparse and dense embeddings and rerankings, and local Qdrant for vector storage.",
+    )
+    TESTING = ProviderConfigProfile(
+        get_profile("backup", vector_deployment="local"),
+        ("testing", "backup", "development", "lightweight", "dev"),
+        "Optimized for testing and local development. Uses the lightest weight local models available, and an in-memory vector store with on-disk persistence. This profile is also used as CodeWeaver's backup when cloud providers are unavailable, ensuring reliable operation regardless of external service status with minimal resource usage.",
+    )
+    TESTING_DB = ProviderConfigProfile(
+        {
+            **get_profile("backup", vector_deployment="local"),
+            "vector_store": QdrantVectorStoreProviderSettings(
+                provider=Provider.QDRANT, client_options=_default_local_vector_client_options()
+            ),
+        },
+        ("testing-db", "backup-db", "development-db", "lightweight-db", "dev-db"),
+        "Testing profile with on-disk vector database. Similar to the testing profile, but uses a normal on-disk Qdrant vector store instead of an in-memory store. This allows for larger datasets and more persistent storage while still using lightweight local models for embeddings and rerankings.",
+    )
+
+    def as_settings_dict(self) -> ProviderSettingsDict:
+        """Get the provider settings as a dictionary."""
+        profile = (
+            self
+            if self in {ProviderProfile.TESTING, ProviderProfile.TESTING_DB}
+            or os.environ.get("CODEWEAVER__BACKUP_DISABLED")
+            else (self._profile | ProviderProfile.TESTING._profile)
+        )
+        return as_dict(profile._profile)
+
+
+__all__ = ("ProviderConfigProfile", "ProviderProfile")

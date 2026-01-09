@@ -44,7 +44,7 @@ class CodeWeaverEngineSettings(BaseCodeWeaverSettings):
 
         [provider]
         embedding.provider = "voyage"
-        embedding.model_name = "voyage-code-3"
+        primary.embedding.model_name = "voyage-code-3"
 
         [logging]
         level = "INFO"

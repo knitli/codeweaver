@@ -49,14 +49,95 @@ logger = logging.getLogger(__name__)
 CODEWEAVER_SETTINGS_AVAILABLE = importlib.util.find_spec("codeweaver.server") is not None
 
 
+def _get_user_config_dir() -> Path:
+    return get_user_config_dir()
+
+
+_BASE_TEST_PATHS = (
+    "codeweaver.test.local",
+    "codeweaver.test",
+    ".codeweaver.test.local",
+    ".codeweaver.test",
+    "codeweaver/codeweaver.test.local",
+    "codeweaver/codeweaver.test",
+    "codeweaver/config.test.local",
+    "codeweaver/config.test",
+    ".codeweaver/codeweaver.test.local",
+    ".codeweaver/codeweaver.test",
+    ".config/codeweaver/test.local",
+    ".config/codeweaver/test",
+    ".config/codeweaver/config.test.local",
+    ".config/codeweaver/config.test",
+    ".config/codeweaver/codeweaver.test.local",
+    ".config/codeweaver/codeweaver.test",
+)
+
+_BASE_PROD_PATHS = (
+    "codeweaver.local",
+    "codeweaver",
+    ".codeweaver.local",
+    ".codeweaver",
+    "codeweaver/codeweaver.local",
+    "codeweaver/config.local",
+    "codeweaver/codeweaver",
+    "codeweaver/config",
+    ".codeweaver/codeweaver.local",
+    ".codeweaver/config.local",
+    ".codeweaver/codeweaver",
+    ".codeweaver/config",
+    ".config/codeweaver/codeweaver.local",
+    ".config/codeweaver/codeweaver",
+    ".config/codeweaver/config.local",
+    ".config/codeweaver/config",
+)
+_USER_PROD_PATHS = (f"{_get_user_config_dir()!s}/codeweaver", f"{_get_user_config_dir()!s}/config")
+
+_DOTENV_PATHS = (
+    ".local.env",
+    ".env",
+    ".codeweaver.local.env",
+    ".codeweaver.env",
+    ".codeweaver/.local.env",
+    ".codeweaver/.env",
+    ".config/codeweaver/.local.env",
+    ".config/codeweaver/.env",
+)
+
+
+def _resolve_project_path() -> Path:
+    from codeweaver.core.utils import get_project_path
+
+    return get_project_path().resolve()
+
+
+def get_possible_config_paths(
+    project_path: Path | None = None, *, for_test: bool = False
+) -> tuple[Path, ...]:
+    """Get possible configuration file paths for CodeWeaverSettings."""
+    if for_test:
+        return (
+            tuple(project_path / path for path in _BASE_TEST_PATHS)
+            if project_path
+            else tuple(_resolve_project_path() / path for path in _BASE_TEST_PATHS)
+        )
+    return (
+        *(
+            (project_path / path for path in _BASE_PROD_PATHS)
+            if project_path
+            else (_resolve_project_path() / path for path in _BASE_PROD_PATHS)
+        ),
+        *(Path(path) for path in _USER_PROD_PATHS),
+    )
+
+
 def get_config_locations(
-    settings_cls: type[BaseSettings], user_config_dir: Path, *, for_test: bool
+    settings_cls: type[BaseSettings], *, for_test: bool = False
 ) -> tuple[PydanticBaseSettingsSource, ...]:
     """Get standard configuration file locations for CodeWeaverSettings.
 
     Also ensures that the user configuration directories exist with correct permissions.
     """
-    user_config_dir = user_config_dir
+    user_config_dir = _get_user_config_dir().resolve()
     secrets_dir = user_config_dir / "secrets"
     user_config_dir.mkdir(parents=True, exist_ok=True)
     user_config_dir.chmod(0o700)
@@ -70,52 +151,10 @@ def get_config_locations(
             else:
                 yield source_cls(settings_cls, f"{config_path}{ext}")
 
-    if for_test:
-        return tuple(
-            pth
-            for path in (
-                "codeweaver.test.local",
-                "codeweaver.test",
-                ".codeweaver.test.local",
-                ".codeweaver.test",
-                "codeweaver/codeweaver.test.local",
-                "codeweaver/codeweaver.test",
-                "codeweaver/config.test.local",
-                "codeweaver/config.test",
-                ".codeweaver/codeweaver.test.local",
-                ".codeweaver/codeweaver.test",
-                ".config/codeweaver/test.local",
-                ".config/codeweaver/test",
-                ".config/codeweaver/config.test.local",
-                ".config/codeweaver/config.test",
-                ".config/codeweaver/codeweaver.test.local",
-                ".config/codeweaver/codeweaver.test",
-            )
-            for pth in to_sources(path)
-        )
     return tuple(
-        pth
-        for path in (
-            "codeweaver.local",
-            "codeweaver",
-            ".codeweaver.local",
-            ".codeweaver",
-            "codeweaver/codeweaver.local",
-            "codeweaver/config.local",
-            "codeweaver/codeweaver",
-            "codeweaver/config",
-            ".codeweaver/codeweaver.local",
-            ".codeweaver/config.local",
-            ".codeweaver/codeweaver",
-            ".codeweaver/config",
-            ".config/codeweaver/codeweaver.local",
-            ".config/codeweaver/codeweaver",
-            ".config/codeweaver/config.local",
-            ".config/codeweaver/config",
-            f"{user_config_dir!s}/codeweaver",
-            f"{user_config_dir!s}/config",
-        )
-        for pth in to_sources(path)
+        source
+        for path in get_possible_config_paths(for_test=for_test)
+        for source in to_sources(str(path))
     )
 
 
@@ -473,10 +512,29 @@ class BaseCodeWeaverSettings(BaseSettings):
         ]
         return tuple(source for source in config_sources if source is not None)
 
+    # spellchecker:off
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        """Customize settings sources for CodeWeaverSettings and subclasses.
+
+        This method defines the configuration source hierarchy for CodeWeaver settings classes. It prioritizes environment variables, dotenv files, multiple configuration file formats in various locations, and secret management services. Subclasses can override this method to modify the source order or add additional sources as needed.
+        """
+        return cls._base_settings_sources(settings_cls)
+
+    # spellchecker:on
+
 
 __all__ = (
     "DEFAULT_BASE_SETTINGS_CONFIG",
     "BaseCodeWeaverSettings",
     "get_config_locations",
     "get_dotenv_locations",
+    "get_possible_config_paths",
 )

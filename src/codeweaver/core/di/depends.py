@@ -8,33 +8,39 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any, Literal, TypeVar, cast
+from typing import Any, Literal, cast
+
+from beartype.typing import TypeVar
 
 from codeweaver.core.types import Sentinel, SentinelName
 from codeweaver.core.utils import TypeIs
 
 
-T = TypeVar("T")
+T = TypeVar("T", bound=Any)
 
 
-class _InjectedProxy:
+class _InjectedProxy[Dep: type[T], S: Sentinel]:
     """Proxy object that provides type-safe subscript syntax for dependency injection.
 
     This class acts as a wrapper that supports `INJECTED[Type]` syntax while
     maintaining compatibility with the DI container's sentinel detection.
     """
 
-    def __init__(self, sentinel: Any) -> None:
+    def __init__(self, sentinel: S) -> None:
         """Initialize with the actual sentinel instance."""
-        self._sentinel = sentinel
+        self._sentinel: S = sentinel
 
-    def __getitem__(self, item: type[T]) -> T:
+    def __getitem__(self, item: type[Dep]) -> Dep:
         """Return the sentinel cast to the requested type.
 
         This allows: `param: SomeType = INJECTED[SomeType]`
         Type checkers see it as type T, runtime gets the sentinel.
         """
-        return cast(T, self._sentinel)
+        return cast(Dep, self._sentinel)
+
+    def __getattr__(self, name: str) -> Any:
+        """Delegate attribute access to the sentinel."""
+        return getattr(self._sentinel, name)
 
     def __repr__(self) -> str:
         """Return a string representation."""
@@ -50,14 +56,14 @@ class DependsPlaceholder(Sentinel):
     Usage:
         # Type-safe with subscript (recommended):
         async def my_function(
-            embedding: Annotated[EmbeddingProvider, Depends(get_embedding)] = INJECTED[EmbeddingProvider]
+            embedding: Annotated[EmbeddingProvider, Depends(get_embedding)] = INJECTED
         ) -> None:
             # embedding will be injected by the container
             ...
 
         # Or with type alias:
         async def my_function(
-            embedding: EmbeddingDep = INJECTED[EmbeddingProvider]
+            embedding: EmbeddingDep = INJECTED
         ) -> None:
             ...
     """
@@ -68,7 +74,7 @@ _injected_sentinel = DependsPlaceholder(
 )  # ty:ignore[invalid-argument-type]
 
 # INJECTED is a proxy that supports subscripting while wrapping the sentinel
-INJECTED = _InjectedProxy(_injected_sentinel)
+INJECTED: _InjectedProxy[T, DependsPlaceholder] = _InjectedProxy(_injected_sentinel)
 
 
 class Depends:
@@ -81,7 +87,7 @@ class Depends:
         from codeweaver.core.di import Depends, INJECTED
         from someplace import ServiceProvider, service_factory
 
-        def my_service(provider: Annotated[ServiceProvider, Depends(service_factory)] = INJECTED[ServiceProvider]) -> None:
+        def my_service(provider: Annotated[ServiceProvider, Depends(service_factory)] = INJECTED) -> None:
             ...
     ```
     This marker indicates that the parameter should be resolved by the DI container
@@ -199,12 +205,12 @@ def depends[T: Any](
     return Depends(dependency, use_cache=use_cache, scope=scope)
 
 
-def _is_injected_proxy(value: Any) -> TypeIs[_InjectedProxy]:
+def _is_injected_proxy[Dep: Any](value: Any) -> TypeIs[_InjectedProxy[Dep, DependsPlaceholder]]:
     """Check if a value is the injected sentinel proxy."""
     return value is _injected_sentinel
 
 
-def is_depends_marker[U: Any](value: U) -> bool:
+def is_depends_marker[Dep: Any](value: Any) -> bool:
     """Check if a value is a DI injection marker or sentinel.
 
     Handles Depends markers, DependsPlaceholder sentinels, and the INJECTED proxy.

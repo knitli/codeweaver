@@ -16,7 +16,6 @@ import inspect
 import logging
 import os
 
-from importlib import util
 from pathlib import Path
 from typing import Annotated, Any, Literal, Self, Unpack, cast, get_origin, overload
 
@@ -35,19 +34,7 @@ from pydantic import (
 from pydantic.fields import FieldInfo
 from pydantic.networks import HttpUrl
 from pydantic_core import from_json, to_json
-from pydantic_settings import (
-    AWSSecretsManagerSettingsSource,
-    AzureKeyVaultSettingsSource,
-    BaseSettings,
-    DotEnvSettingsSource,
-    EnvSettingsSource,
-    GoogleSecretManagerSettingsSource,
-    JsonConfigSettingsSource,
-    PydanticBaseSettingsSource,
-    SecretsSettingsSource,
-    TomlConfigSettingsSource,
-    YamlConfigSettingsSource,
-)
+from pydantic_settings import BaseSettings
 
 from codeweaver.core import (
     UNSET,
@@ -61,8 +48,6 @@ from codeweaver.core import (
     LoggingSettingsDict,
     TelemetrySettings,
     Unset,
-    get_user_config_dir,
-    is_test_environment,
     lazy_import,
 )
 from codeweaver.engine import (
@@ -519,7 +504,6 @@ class CodeWeaverSettings(BaseCodeWeaverSettings):
 
     def __init__(self, **kwargs: Any) -> None:
         """Initialize CodeWeaverSettings, loading from config file if provided."""
-        type(self)._ensure_settings_dirs()
         if (config := kwargs.get("config_file")) and config is not UNSET:
             content = from_json(config.read_bytes())
             if content and content != kwargs:
@@ -734,241 +718,6 @@ class CodeWeaverSettings(BaseCodeWeaverSettings):
         from codeweaver.core import get_project_path
 
         return cls(project_path=get_project_path(), **{**kwargs, "config_file": path})  # type: ignore
-
-    @staticmethod
-    def user_config_dir() -> Path:
-        """Get the user configuration directory, ensuring it exists with correct permissions."""
-        return get_user_config_dir()
-
-    @staticmethod
-    def _ensure_settings_dirs() -> None:
-        """Ensure that necessary configuration directories exist with correct permissions."""
-        # since these are nondestructive, we can just always call them
-        user_config_dir = CodeWeaverSettings.user_config_dir()
-        secrets_dir = user_config_dir / ".secrets"
-        user_config_dir.mkdir(parents=True, exist_ok=True)
-        user_config_dir.chmod(0o700)
-        secrets_dir.mkdir(parents=True, exist_ok=True)
-        secrets_dir.chmod(0o700)
-
-    @computed_field
-    def project_root(self) -> Path:
-        """Get the project root directory. Alias for `project_path`."""
-        if isinstance(self.project_path, Unset):
-            from codeweaver.core import get_project_path
-
-            self.project_path = get_project_path()
-        return self.project_path.resolve()
-
-    @classmethod  # spellchecker:off
-    def settings_customise_sources(  # noqa: C901
-        # spellchecker:on
-        cls,
-        settings_cls: type[BaseSettings],
-        init_settings: PydanticBaseSettingsSource,
-        env_settings: PydanticBaseSettingsSource,
-        dotenv_settings: PydanticBaseSettingsSource,
-        file_secret_settings: PydanticBaseSettingsSource,
-    ) -> tuple[PydanticBaseSettingsSource, ...]:
-        """Customize the sources of settings for a specific settings class.
-
-        Configuration precedence (highest to lowest):
-        1. init_settings - Direct initialization arguments
-        2. env_settings - Environment variables (CODEWEAVER_*)
-            - Nested models are separated by double underscores (__)
-            - Only applies to fields in nested BaseModels
-            - Currently, this includes all fields in:
-                - `CodeWeaverSettings` (`CODEWEAVER__CONFIG_FILE`, etc)
-                - `ProviderSettings` (`CODEWEAVER__PROVIDER__VECTOR_STORE`, etc)
-                - `FastMcpServerSettings` (`CODEWEAVER__SERVER__HOST`, etc)
-                - `IndexerSettings` (`CODEWEAVER__INDEXER__USE_GITIGNORE`, etc)
-                - `ChunkerSettings` (`CODEWEAVER__CHUNKER__SEMANTIC_IMPORTANCE_THRESHOLD`, etc)
-                - `TelemetrySettings` (`CODEWEAVER__TELEMETRY__TOOLS_OVER_PRIVACY`, etc)
-                - UvicornServerSettings (`CODEWEAVER__UVICORN__LOG_LEVEL`, etc)
-            - It does NOT apply to `LoggingSettingsDict`, `MiddlewareOptions`, `MCPServerConfig`, or any other fields using TypedDict, including those in the above models.
-            - It *does* apply to nested models in those models, like `CustomDelimiter`, `PerformanceSettings`, and `ConcurrencySettings`, which are fields in `ChunkerSettings`. You could set: `CODEWEAVER__CHUNKER__PERFORMANCE__MAX_PARALLEL_FILES=4`
-        3. dotenv_settings - .env files:
-            - .local.env,
-            - .env
-            - .codeweaver.local.env
-            - .codeweaver.env
-            - codeweaver/.local.env
-            - codeweaver/.env
-            - .codeweaver/.local.env
-            - .codeweaver/.env
-            - .config/codeweaver/.local.env
-            - .config/codeweaver/.env
-        4. In order of .toml, .yaml/.yml, .json files:
-            - codeweaver.local.{toml,yaml,yml,json}
-            - codeweaver.{toml,yaml,yml,json}
-            - .codeweaver.local.{toml,yaml,yml,json}
-            - .codeweaver.{toml,yaml,yml,json}
-            - codeweaver/{codeweaver,config}.local.{toml,yaml,yml,json}
-            - .codeweaver/{codeweaver,config}.local.{toml,yaml,yml,json}
-            - codeweaver/{codeweaver,config}.{toml,yaml,yml,json}
-            - .codeweaver/codeweaver.{toml,yaml,yml,json}
-            - .config/codeweaver/{codeweaver,config}.local.{toml,yaml,yml,json}
-            - .config/codeweaver/{codeweaver,config}.{toml,yaml,yml,json}
-            - SYSTEM_USER_CONFIG_DIR/codeweaver/{codeweaver,config}.{toml,yaml,yml,json}
-        5. file_secret_settings - Secret files SYSTEM_USER_CONFIG_DIR/codeweaver/.secrets/
-           (see https://docs.pydantic.dev/latest/concepts/pydantic_settings/#secrets for more info)
-        6. If available and configured:
-            - AWS Secrets Manager
-            - Azure Key Vault
-            - Google Secret Manager
-
-        #! IMPORTANT
-        If the environment variable `CODEWEAVER_TEST_MODE` is set to "true", test config paths like codeweaver.test.toml become the *only* config sources. All others get ignored. It's important this get set and unset when testing is over.
-        """
-        config_files: list[PydanticBaseSettingsSource] = []
-        cls._ensure_settings_dirs()
-        # Check if we're in test mode - prioritize test configs
-        is_test_mode = is_test_environment()
-
-        locations: list[str] = []
-        if is_test_mode:
-            # In test mode, look for .test configs first
-            locations.extend([
-                "codeweaver.test.local",
-                "codeweaver.test",
-                ".codeweaver.test.local",
-                ".codeweaver.test",
-                "codeweaver/codeweaver.test.local",
-                "codeweaver/codeweaver.test",
-                "codeweaver/config.test.local",
-                "codeweaver/config.test",
-                ".codeweaver/codeweaver.test.local",
-                ".codeweaver/codeweaver.test",
-                ".config/codeweaver/test.local",
-                ".config/codeweaver/test",
-                ".config/codeweaver/config.test.local",
-                ".config/codeweaver/config.test",
-                ".config/codeweaver/codeweaver.test.local",
-                ".config/codeweaver/codeweaver.test",
-            ])
-        else:
-            # Standard config locations
-            locations.extend([
-                "codeweaver.local",
-                "codeweaver",
-                ".codeweaver.local",
-                ".codeweaver",
-                "codeweaver/codeweaver.local",
-                "codeweaver/config.local",
-                "codeweaver/codeweaver",
-                "codeweaver/config",
-                ".codeweaver/codeweaver.local",
-                ".codeweaver/config.local",
-                ".codeweaver/codeweaver",
-                ".codeweaver/config",
-                ".config/codeweaver/codeweaver.local",
-                ".config/codeweaver/codeweaver",
-                ".config/codeweaver/config.local",
-                ".config/codeweaver/config",
-                f"{cls.user_config_dir()!s}/codeweaver",
-                f"{cls.user_config_dir()!s}/config",
-            ])
-        for _class in (
-            TomlConfigSettingsSource,
-            YamlConfigSettingsSource,
-            JsonConfigSettingsSource,
-        ):
-            for loc in locations:
-                ext = _class.__name__.split("ConfigSettingsSource")[0].lower()
-                config_files.append(_class(settings_cls, Path(f"{loc}.{ext}")))
-                if ext == "yaml":
-                    config_files.append(_class(settings_cls, Path(f"{loc}.yml")))
-        # if we're testing, we want to control and isolate test configs
-        # Still allow init_settings and env vars so tests can programmatically override config
-        if is_test_mode:
-            return (
-                init_settings,
-                EnvSettingsSource(
-                    settings_cls,
-                    env_prefix="CODEWEAVER_",
-                    case_sensitive=False,
-                    env_nested_delimiter="__",
-                    env_parse_enums=True,
-                    env_ignore_empty=True,
-                ),
-                *config_files,
-            )
-        other_sources: list[PydanticBaseSettingsSource] = []
-        if any(env for env in os.environ if env.startswith("AWS_SECRETS_MANAGER")):
-            other_sources.append(
-                AWSSecretsManagerSettingsSource(
-                    settings_cls,
-                    os.environ.get("AWS_SECRETS_MANAGER_SECRET_ID", ""),
-                    os.environ.get("AWS_SECRETS_MANAGER_REGION", ""),
-                    os.environ.get("AWS_SECRETS_MANAGER_ENDPOINT_URL", ""),
-                )
-            )
-        if any(env for env in os.environ if env.startswith("AZURE_KEY_VAULT")) and util.find_spec(
-            "azure.identity"
-        ):
-            try:
-                from azure.identity import DefaultAzureCredential  # type: ignore
-
-            except ImportError:
-                logger.warning("Azure SDK not installed, skipping Azure Key Vault settings.")
-            else:
-                other_sources.append(
-                    AzureKeyVaultSettingsSource(
-                        settings_cls,
-                        os.environ.get("AZURE_KEY_VAULT_URL", ""),
-                        DefaultAzureCredential(),  # type: ignore
-                    )
-                )
-        if any(
-            env for env in os.environ if env.startswith("GOOGLE_SECRET_MANAGER")
-        ) and util.find_spec("google.auth"):
-            try:
-                from google.auth import default  # type: ignore
-
-            except ImportError:
-                logger.warning(
-                    "Google Cloud SDK not installed, skipping Google Secret Manager settings."
-                )
-            else:
-                other_sources.append(
-                    GoogleSecretManagerSettingsSource(
-                        settings_cls,
-                        default()[0],  # type: ignore
-                        os.environ.get("GOOGLE_SECRET_MANAGER_PROJECT_ID", ""),
-                    )
-                )
-        return (
-            init_settings,
-            EnvSettingsSource(
-                settings_cls,
-                env_prefix="CODEWEAVER_",
-                case_sensitive=False,
-                env_nested_delimiter="__",
-                env_parse_enums=True,
-                env_ignore_empty=True,
-            ),
-            DotEnvSettingsSource(
-                settings_cls,
-                env_file=(
-                    ".local.env",
-                    ".env",
-                    ".codeweaver.local.env",
-                    ".codeweaver.env",
-                    ".codeweaver/.local.env",
-                    ".codeweaver/.env",
-                    ".config/codeweaver/.local.env",
-                    ".config/codeweaver/.env",
-                ),
-                env_ignore_empty=True,
-            ),
-            *config_files,
-            SecretsSettingsSource(
-                settings_cls=settings_cls,
-                secrets_dir=f"{cls.user_config_dir()}/secrets",
-                env_ignore_empty=True,
-            ),
-            *other_sources,
-        )
 
     async def finalize(self) -> Self:
         """Finalize settings with config resolution.

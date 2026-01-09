@@ -37,7 +37,56 @@ extend_enum: EnumExtend = extend_enum
 
 @unique
 class BaseDataclassEnum(Enum):
-    """A base enum class for enums with dataclass members. Does not come with its 'type' -- you must define that with `codeweaver.core.types.dataclasses.BaseEnumData` and subclass your implementation, like: `class MyDataclassEnum(MyCustomBaseEnumDataDataclass, BaseDataclassEnum): ...`."""
+    """A base enum class for enums with dataclass members. Does not come with its 'type' -- you must define that with `codeweaver.core.types.dataclasses.BaseEnumData` and subclass your implementation.
+
+    ## Usage
+
+    Building a dataclass enum is a bit more involved than a standard enum. Steps:
+    1. Create a dataclass. It should inherit from `codeweaver.core.types.dataclasses.BaseEnumData`.
+        - Note that `BaseEnumData` already includes `_aliases`, and `_description` fields, so you don't need to redefine those unless you want to customize them. `_name` and `_value` are required by `Enum` members, **you cannot use those names or their non-sunder versions (i.e. 'name')**. `_name` will be the name of the Enum member you assign in the class definition, and `_value` *is your dataclass instance*.
+        - `BaseEnumData` is *already* a dataclass, and it inherits from `pydantic.dataclasses.dataclass`, *and* `codeweaver.core.types.dataclasses.DataclassSerializationMixin`, so you get all that functionality for free. (but that does create some complexity... as we will see)
+        - It is already a dataclass and does not need a `@dataclass` decorator (which will break it).
+        - Suggestion: I find that it's easiest to kind of define a dataclass-within-a-dataclass, where there is only a single top-level field that is either a typed dict, dataclass or named tuple. It makes constructing the dataclass enum members easier to read.
+    2. Create your enum class, inheriting from `BaseDataclassEnum`.
+    3. Define your enum members, assigning each to an instance of your dataclass.
+    4. Use it.
+
+    ## Example
+
+    ```python
+    from codeweaver.core import BaseEnumData, BaseDataclassEnum
+
+    class ColorData(BaseEnumData):
+        hex_code: str
+        rgb: tuple[int, int, int]
+
+        # Because we are making a serializable dataclass with pydantic,
+        # we *must* define __init__ and set values before calling super().__init__()
+        def __init__(self, hex_code: str, rgb: tuple[int, int, int], *args: Any):
+            # use `object.__setattr__` to avoid pydantic/dataclass immutability issues
+            # it's a hack, but it works. We're not abusing it, just working around limitations.
+            object.__setattr__(self, "hex_code", hex_code)
+            object.__setattr__(self, "rgb", rgb)
+            # now call and validate
+            super().__init__(*args)
+
+    class Color(ColorData, BaseDataclassEnum):
+        # Important: _aliases and _description are optional *positional* args after the required fields.
+        RED = ColorData(hex_code="#FF0000", rgb=(255, 0, 0), ("rojo", "rouge"), "A bright red color.")
+        GREEN = ColorData(hex_code="#00FF00", rgb=(0, 255, 0))
+        BLUE = ColorData(hex_code="#0000FF", rgb=(0, 0, 255))
+
+        # define methods/properties if you want
+        @property
+        def brightness(self) -> float:
+            r, g, b = self.value.rgb
+            return (r + g + b) / (3 * 255)
+
+    print(Color.RED.value.hex_code)  # Output: #FF0000
+    print(Color.GREEN.variable)      # Output: green
+    print(Color.BLUE.as_title)       # Output: Blue
+    ```
+    """
 
     @staticmethod
     def _multiply_variations(s: str) -> set[str]:
@@ -142,7 +191,7 @@ class BaseDataclassEnum(Enum):
     def add_member(cls, name: str, value: BaseEnumData) -> Self:
         """Dynamically add a new member to the enum."""
         # The type stub signature is (cls, name, *args, **kwargs), but the function applies a tuple to single args (value -> (value,)). Bottom line: it works fine. This is much more clear.
-        extend_enum(cls, textcase.upper(name), value)  # ty: ignore[too-many-positional-arguments]
+        extend_enum(cls, textcase.upper(name), value)  # ty: ignore[too-many-positional-arguments, invalid-argument-type]
         return cls(value)
 
 

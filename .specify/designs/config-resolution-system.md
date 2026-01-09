@@ -218,20 +218,20 @@ def register_default_provider(key: str, provider: Callable[[], Any | None]) -> N
     Providers are called in registration order. First non-None value wins.
 
     Args:
-        key: Config key like "embedding.dimension"
+        key: Config key like "primary.embedding.dimension"
         provider: Callable that returns the default value or None
 
     Example:
         ```python
         # Register a custom default dimension
         register_default_provider(
-            "embedding.dimension",
+            "primary.embedding.dimension",
             lambda: 768
         )
 
         # Register with conditional logic
         register_default_provider(
-            "embedding.datatype",
+            "primary.embedding.datatype",
             lambda: "float16" if has_gpu() else "uint8"
         )
         ```
@@ -339,7 +339,7 @@ class BaseEmbeddingConfig(BasedModel, ConfigurableComponent):
             pass
 
         # 3. User-registered defaults
-        if user_default := get_default("embedding.dimension"):
+        if user_default := get_default("primary.embedding.dimension"):
             return user_default
 
         # 4. Final fallback (could be None)
@@ -381,7 +381,7 @@ class BaseEmbeddingConfig(BasedModel, ConfigurableComponent):
             pass
 
         # 3. User-registered defaults
-        if user_default := get_default("embedding.datatype"):
+        if user_default := get_default("primary.embedding.datatype"):
             return user_default
 
         # 4. Provider-specific defaults
@@ -582,8 +582,8 @@ assert settings.provider.vector_store[0].collection_config["vectors"]["size"] ==
 from codeweaver.core.config.defaults import register_default_provider
 
 # Register custom defaults
-register_default_provider("embedding.dimension", lambda: 768)
-register_default_provider("embedding.datatype", lambda: "float16")
+register_default_provider("primary.embedding.dimension", lambda: 768)
+register_default_provider("primary.embedding.datatype", lambda: "float16")
 
 # Now when configs resolve, they'll use these as fallback
 settings = CodeWeaverSettings(...)

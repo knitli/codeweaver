@@ -98,7 +98,7 @@ class TestConfigValidation:
 [provider.embedding]
 provider = "invalid_provider_xyz"
 
-[provider.embedding.model_settings]
+[provider.primary.embedding.model_settings]
 model = "test-model"
 """
         config_path.write_text(config_content)

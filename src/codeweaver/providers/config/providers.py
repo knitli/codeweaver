@@ -608,6 +608,14 @@ class ProviderSettings(BasedModel):
         setting = getattr(self, setting_field, None)  # type: ignore
         return None if setting is Unset else setting  # type: ignore
 
+    def apply_profile(self, profile: Literal["recommended", "quickstart", "testing"]) -> None:
+        """Apply a premade provider profile to the settings.
+
+        Args:
+            profile: The profile to apply.
+        """
+        # Implementation of profile application logic goes here
+
 
 AllDefaultProviderSettings = ProviderSettingsDict(
     data=DefaultDataProviderSettings,

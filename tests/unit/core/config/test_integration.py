@@ -1,6 +1,5 @@
 """Integration tests for config resolution system."""
 
-
 import pytest
 
 from codeweaver.core.config.defaults import clear_defaults, register_default_provider
@@ -112,8 +111,8 @@ async def test_full_embedding_to_vector_store_resolution():
 async def test_resolution_with_defaults():
     """Test resolution using default providers."""
     # Register default providers
-    register_default_provider("embedding.dimension", lambda: 768)
-    register_default_provider("embedding.datatype", lambda: "uint8")
+    register_default_provider("primary.embedding.dimension", lambda: 768)
+    register_default_provider("primary.embedding.datatype", lambda: "uint8")
 
     # Create embedding config without explicit values
     # (in real code, it would use the defaults)
@@ -122,11 +121,13 @@ async def test_resolution_with_defaults():
     # Override get_dimension to use defaults
     async def get_dimension_with_default():
         from codeweaver.core.config.defaults import get_default
-        return get_default("embedding.dimension")
+
+        return get_default("primary.embedding.dimension")
 
     async def get_datatype_with_default():
         from codeweaver.core.config.defaults import get_default
-        return get_default("embedding.datatype")
+
+        return get_default("primary.embedding.datatype")
 
     embedding_config.get_dimension = get_dimension_with_default
     embedding_config.get_datatype = get_datatype_with_default

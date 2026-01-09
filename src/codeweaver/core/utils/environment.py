@@ -7,13 +7,14 @@
 
 from __future__ import annotations
 
+import importlib
+import logging
 import os
 import sys
 
 from collections.abc import Mapping
-from importlib.util import find_spec
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Literal, cast
 
 from pydantic import NonNegativeInt
 
@@ -23,13 +24,15 @@ from codeweaver.core.utils.filesystem import get_project_path
 from codeweaver.core.utils.lazy_import import LazyImport, lazy_import
 
 
-if find_spec("rich"):
+logger = logging.getLogger(__name__)
+
+if importlib.util.find_spec("rich") is not None:
     from rich.console import Console
 else:
     type Console = object
 
 if TYPE_CHECKING:
-    if find_spec("codeweaver.server") is not None:
+    if importlib.util.find_spec("codeweaver.server") is not None:
         from codeweaver.server import CodeWeaverSettings, CodeWeaverSettingsDict
     else:
         type CodeWeaverSettings = object
@@ -198,24 +201,39 @@ def _set_project_path(project_path: Path) -> DictView[CodeWeaverSettingsDict]:
     )  # ty:ignore[invalid-return-type]
 
 
-def get_settings_map_for(
-    config_file: Path | None = None, project_path: Path | None = None
-) -> DictView[CodeWeaverSettingsDict]:
-    """Get the settings map for the given config file."""
-    if config_file is not None:
-        return _set_settings_for_config(config_file).view  # ty:ignore[unresolved-attribute]
-    if project_path is not None:
-        return _set_project_path(project_path)
-    from codeweaver.server import get_settings_map
+def detect_root_package() -> Literal["server", "engine", "provider", "core"]:
+    """Detect which package should be root based on what's installed.
 
-    return get_settings_map()  # ty:ignore[invalid-return-type]
+    Priority (highest to lowest):
+    1. code-weaver-server (full installation)
+    2. code-weaver-engine (indexing/chunking only)
+    3. code-weaver-providers (providers only)
+    4. core (minimal - logging/telemetry only)
+
+    Returns:
+        The package type that should serve as root settings
+    """
+    # Check in priority order - highest level package wins
+    if importlib.util.find_spec("codeweaver.server") is not None:
+        logger.debug("Detected server package - using CodeWeaverSettings")
+        return "server"
+
+    if importlib.util.find_spec("codeweaver.engine") is not None:
+        logger.debug("Detected engine package - using CodeWeaverEngineSettings")
+        return "engine"
+
+    if importlib.util.find_spec("codeweaver.providers") is not None:
+        logger.debug("Detected providers package - using CodeWeaverProviderSettings")
+        return "provider"
+
+    logger.debug("Only core package detected - using CodeWeaverCoreSettings")
+    return "core"
 
 
 __all__ = (
     "format_file_link",
     "get_codeweaver_config_paths",
     "get_possible_env_vars",
-    "get_settings_map_for",
     "get_terminal_width",
     "in_ide",
     "is_codeweaver_config_path",

@@ -53,13 +53,18 @@ class EnvVarInfo(NamedTuple):
     """The name of the variable as used by the provider's **client**, if different from `env`."""
     variables: NotRequired[tuple[VariableInfo, ...]] = ()
     """The variables that this environment variable can configure. Use for situations where an env var does not map to the client directly or configures multiple variables."""
+    resolver_key: str | None = None
+    """Optional key for the resolver to deconflict multiple config sources."""
+    available_with: Literal["always", "providers", "engine", "server"] = "always"
+    """Indicates when this environment variable is applicable based on installed packages."""
 
     def as_mcp_info(self) -> dict[str, Any]:
         """Convert to MCP server JSON format."""
         return {
             k: v
             for k, v in self._asdict().items()
-            if k not in {"variable_name", "env"} and v is not None
+            if k not in {"variable_name", "env", "variables", "resolver_key", "available_with"}
+            and v is not None
         } | {"name": self.env}
 
     def as_kwarg(self) -> dict[str, str | None]:

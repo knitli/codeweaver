@@ -14,7 +14,9 @@ from __future__ import annotations
 import contextlib
 import re
 
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, Protocol, runtime_checkable
+
+from pydantic import PositiveInt, computed_field
 
 from codeweaver.core.di import get_container
 
@@ -23,18 +25,28 @@ if TYPE_CHECKING:
     from codeweaver.core.config.registry import ConfigurableComponent
 
 
-class ConfigurationSupplier(Protocol):
-    """Protocol for supplying configuration instances."""
+class ConfigurationValue(NamedTuple):
+    """Some values are not configurable, for example, values from environment variables.
 
-    async def get_configuration(self) -> Any:
-        """Get the configuration instance.
+    This class wraps such values to indicate they should not be modified by the config resolver.
+    """
 
-        Returns:
-            Configuration instance.
+    resolver_key: str
+    value: Any
+    source: Literal["env", "constant", "profile", "coded_default"]
+    tagged: bool = False
+
+    @computed_field
+    @property
+    def priority(self) -> PositiveInt:
+        """Get priority of this value source for conflict resolution.
+
+        Lower number means higher priority.
         """
-        ...
+        return {"env": 1, "constant": 2, "profile": 3, "coded_default": 4}[self.source]
 
 
+@runtime_checkable
 class ConfigurableComponent(Protocol):
     """Protocol for components participating in config resolution.
 
@@ -47,6 +59,8 @@ class ConfigurableComponent(Protocol):
     - "embedding[0]" - primary embedding config (explicit)
     - "embedding[*]" - all embedding configs (primary + backups)
     - "embedding[1]" - first backup config
+
+    note: ConfigurableComponents are primary for provider settings. Each provider setting implicitly starts with "provider." in its config keys, so "embedding" refers to "provider.embedding" settings, and "primary.embedding" refers to "primary.provider.embedding" (the tag must always be first).
     """
 
     def config_dependencies(self) -> dict[str, type]:
@@ -85,11 +99,12 @@ class ConfigurableComponent(Protocol):
         ...
 
 
-def _parse_config_reference(ref: str) -> tuple[str, int | None]:
+def _parse_config_reference(ref: str, *, tagged: bool = False) -> tuple[str, int | None]:
     """Parse a config reference into base name and optional index.
 
     Args:
         ref: Config reference string (e.g., "embedding", "embedding[0]", "embedding[*]")
+        tagged: Whether the reference is tagged (e.g., "primary.embedding")
 
     Returns:
         Tuple of (base_name, index) where:
@@ -104,25 +119,38 @@ def _parse_config_reference(ref: str) -> tuple[str, int | None]:
         >>> _parse_config_reference("embedding[*]")
         ("embedding", -1)
     """
+    if any(
+        item
+        for item in {"vector_store", "sparse_embedding", "reranking", "embedding", "agent", "data"}
+        if item in ref
+    ):
+        split_ref = ref.split(".", 1)
+        idx = (
+            "[0]"
+            if tagged and split_ref[0] == "primary"
+            else "[1]"
+            if tagged and split_ref[0] == "backup"
+            else ""
+        )
+        ref = f"provider.{split_ref[1:]}{idx}" if tagged else f"provider.{ref}"
+
     # Pattern: "name" or "name[index]" where index is a number or "*"
     match = re.match(r"^([a-z_]+)(?:\[(\d+|\*)\])?$", ref)
     if not match:
         return ref, None
 
-    base_name = match.group(1)
-    index_str = match.group(2)
+    base_name = match[1]
+    index_marker = match[2]
 
-    if index_str is None:
+    if index_marker is None:
         return base_name, None
-    if index_str == "*":
+    if index_marker == "*":
         return base_name, -1  # -1 means "all"
-    return base_name, int(index_str)
+    return base_name, int(index_marker)
 
 
 async def _resolve_indexed_config(
-    dep_name: str,
-    dep_type: type,
-    container: Any,
+    dep_name: str, dep_type: type, container: Any, *, tagged: bool = False
 ) -> Any | None:
     """Resolve a config dependency with optional indexing.
 
@@ -130,6 +158,7 @@ async def _resolve_indexed_config(
         dep_name: Dependency name (may include index like "embedding[0]")
         dep_type: Type to resolve from DI container
         container: DI container instance
+        tagged: Whether to treat the config as tagged paths (primary/backup), which provides a simpler way to access indexed configs. Currently only "primary" and "backup" are supported, but we will extend this in future phases.
 
     Returns:
         Resolved config instance(s) or None if resolution fails
@@ -139,8 +168,12 @@ async def _resolve_indexed_config(
         "embedding[0]" → primary config (explicit)
         "embedding[*]" → tuple of all configs
         "embedding[1]" → first backup config
+
+        # tagged=True example:
+        "primary.embedding" → primary config
+        "backup.embedding" → first backup config
     """
-    base_name, index = _parse_config_reference(dep_name)
+    _, index = _parse_config_reference(dep_name, tagged=tagged)
 
     # Try to resolve the config
     with contextlib.suppress(AttributeError, KeyError, TypeError, ValueError, ImportError):
@@ -153,11 +186,7 @@ async def _resolve_indexed_config(
         # All configs requested (embedding[*])
         if index == -1:
             # If resolved is already a collection, return it
-            if isinstance(resolved, tuple | list):
-                return resolved
-            # Otherwise wrap in tuple
-            return (resolved,)
-
+            return resolved if isinstance(resolved, tuple | list) else (resolved,)
         # Specific index requested (embedding[0], embedding[1], etc.)
         # If resolved is a collection, extract the indexed item
         if isinstance(resolved, tuple | list):
@@ -169,12 +198,7 @@ async def _resolve_indexed_config(
 
         # If resolved is not a collection but index is 0, return it
         # (primary config case)
-        if index == 0:
-            return resolved
-
-        # Otherwise we can't index into a non-collection
-        return None
-
+        return resolved if index == 0 else None
     return None
 
 
@@ -222,4 +246,4 @@ async def resolve_all_configs() -> None:
             await configurable.apply_resolved_config(**resolved)
 
 
-__all__ = ("ConfigurableComponent", "resolve_all_configs")
+__all__ = ("ConfigurableComponent", "ConfigurationValue", "resolve_all_configs")

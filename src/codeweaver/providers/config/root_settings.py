@@ -7,13 +7,13 @@ and reranking providers without the full CodeWeaver server.
 
 from __future__ import annotations
 
-from typing import Annotated
+import os
+
+from typing import Annotated, Literal
 
 from pydantic import Field
 from pydantic_settings import SettingsConfigDict
 
-from codeweaver.core.config._logging import LoggingSettingsDict
-from codeweaver.core.config.telemetry import TelemetrySettings
 from codeweaver.core.types.aliases import FilteredKey, FilteredKeyT
 from codeweaver.core.types.enum import AnonymityConversion
 from codeweaver.core.types.sentinel import UNSET, Unset
@@ -32,7 +32,7 @@ class CodeWeaverProviderSettings(BaseCodeWeaverSettings):
         ```toml
         [provider]
         embedding.provider = "voyage"
-        embedding.model_name = "voyage-code-3"
+        primary.embedding.model_name = "voyage-code-3"
 
         vector_store.provider = "qdrant"
         vector_store.url = "http://localhost:6333"
@@ -60,26 +60,23 @@ class CodeWeaverProviderSettings(BaseCodeWeaverSettings):
         ),
     ] = UNSET
 
-    logging: Annotated[
-        LoggingSettingsDict | Unset,
+    profile: Annotated[
+        Literal["recommended", "quickstart", "testing"] | Unset | None,
         Field(
-            default=UNSET,
-            description="Logging configuration for CodeWeaver",
+            description="""Use a premade provider profile.  The recommended profile uses Voyage AI for top-quality embedding and reranking, but requires an API key. The quickstart profile is entirely free and local, and does not require any API key. It sacrifices some search quality and performance compared to the recommended profile. The testing profile is only recommended for testing -- it uses an in-memory vector store and very light weight local models. The testing profile is also CodeWeaver's backup system when a cloud embedding or vector store provider isn't available. Both the quickstart and recommended profiles default to a local qdrant instance for the vector store. If you want to use a cloud or remote instance (which we recommend) you must also provide a URL for it, either with the environment variable CODEWEAVER_VECTOR_STORE_URL or in your codeweaver config in the vector_store settings.""",
             validate_default=False,
         ),
-    ] = UNSET
-
-    telemetry: Annotated[
-        TelemetrySettings | Unset,
-        Field(
-            default=UNSET,
-            description="Telemetry configuration for CodeWeaver",
-            validate_default=False,
-        ),
-    ] = UNSET
+    ] = (
+        profile
+        if (profile := os.environ.get("CODEWEAVER_PROFILE"))
+        and profile.lower() in ("recommended", "quickstart", "testing")
+        else UNSET
+    )  # ty: ignore[invalid-assignment]
 
     def _initialize(self) -> None:
-        """Initialize provider settings - nothing special needed."""
+        """Initialize provider settings."""
+        if self.profile:
+            pass
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion] | None:
         """Define telemetry filtering for provider settings."""

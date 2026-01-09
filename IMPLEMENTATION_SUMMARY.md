@@ -157,8 +157,8 @@ Users can register custom default providers:
 ```python
 from codeweaver.core.config.defaults import register_default_provider
 
-register_default_provider("embedding.dimension", lambda: 768)
-register_default_provider("embedding.datatype", lambda: "float16")
+register_default_provider("primary.embedding.dimension", lambda: 768)
+register_default_provider("primary.embedding.datatype", lambda: "float16")
 ```
 
 ## Usage Example

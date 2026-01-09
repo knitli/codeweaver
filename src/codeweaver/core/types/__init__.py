@@ -108,6 +108,7 @@ if TYPE_CHECKING:
         BaseCodeWeaverSettings,
         get_config_locations,
         get_dotenv_locations,
+        get_possible_config_paths,
     )
     from codeweaver.core.types.statistics import (
         CallHookTimingDict,
@@ -239,6 +240,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "generate_title": (__spec__.parent, "utils"),
     "get_config_locations": (__spec__.parent, "settings_model"),
     "get_dotenv_locations": (__spec__.parent, "settings_model"),
+    "get_possible_config_paths": (__spec__.parent, "settings_model"),
     "get_provider_kinds": (__spec__.parent, "provider"),
 })
 
@@ -353,6 +355,7 @@ __all__ = (
     "generate_title",
     "get_config_locations",
     "get_dotenv_locations",
+    "get_possible_config_paths",
     "get_provider_kinds",
 )
 
