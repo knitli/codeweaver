@@ -1,3 +1,8 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 """Unified exception hierarchy for CodeWeaver.
 
 This module provides a single, unified exception hierarchy to prevent exception

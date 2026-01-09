@@ -1,3 +1,8 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 """Qdrant test instance management for reliable integration testing.
 
 This module provides infrastructure for setting up and managing Qdrant instances

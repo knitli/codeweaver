@@ -1,3 +1,8 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 """
 Clean up trailing punctuation when removing redundant exceptions from logging calls.
 This handles the cases that ast-grep can't handle with complex pattern matching.

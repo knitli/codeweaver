@@ -1,3 +1,8 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 """Defines a base class for the Qdrant and In Memory Qdrant vector stores to reduce code duplication."""
 from __future__ import annotations
 from codeweaver.providers import QdrantVectorStoreProvider, QdrantVectorStoreProviderSettings

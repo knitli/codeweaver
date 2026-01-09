@@ -1,3 +1,10 @@
+<!--
+SPDX-FileCopyrightText: 2025 Knitli Inc.
+SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+
+SPDX-License-Identifier: MIT OR Apache-2.0
+-->
+
 Changes to account for:
 
 1. Moved to creating instances for different configuration vice trying to handle multiple configs within a single instance, this change affects. This means all backup logic will be removed in favor of a `Backup` prefixed subclass:
