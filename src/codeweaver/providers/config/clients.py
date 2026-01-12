@@ -369,6 +369,14 @@ class QdrantClientOptions(ClientOptions):
             self._to_nones(["location", "path"])
         self._resolve_host_and_url()
 
+    def is_local_on_disk(self) -> bool:
+        """Check if the Qdrant client is configured for local on-disk storage."""
+        return bool(
+            self.path is not None
+            or (self.url and self._is_local_url(self.url))
+            or (self.host and self._is_local_url(self.host))
+        )
+
     @model_validator(mode="after")
     def finalize_settings(self) -> Self:
         """Validate that either location or url is provided.
@@ -605,7 +613,9 @@ class SentenceTransformersClientOptions(ClientOptions):
                     },
                 )
 
-    def default_kwargs_for_model(self, *, model: str | None = None, query: bool = False) -> dict[str, Any]:
+    def default_kwargs_for_model(
+        self, *, model: str | None = None, query: bool = False
+    ) -> dict[str, Any]:
         """Get default client arguments for a specific model."""
         model = model or self.model_name_or_path
         if not model:
@@ -651,6 +661,7 @@ class SentenceTransformersClientOptions(ClientOptions):
             "trust_remote_code": True,
             **extra,
         }
+
 
 class HFInferenceClientOptions(ClientOptions):
     """Client options for HuggingFace Inference API-based embedding providers."""

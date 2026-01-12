@@ -42,17 +42,68 @@ This is expected on the feat/di_monorepo branch.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Annotated, Any
 
-from pydantic_settings import BaseSettings
-
-from codeweaver.core import SettingsDep, NoneDep, depends, INJECTED
+from codeweaver.core import (
+    INJECTED,
+    BaseCodeWeaverSettings,
+    ConfigurationError,
+    NoneDep,
+    SettingsDep,
+    TypeIs,
+    depends,
+    rpartial,
+)
+from codeweaver.providers.config import CodeWeaverProviderSettings
 from codeweaver.providers.reranking.capabilities.resolver import RerankingCapabilityResolver
 
 
 if TYPE_CHECKING:
-    from codeweaver.core import BaseCodeWeaverSettings
+    from codeweaver.providers.config import CodeWeaverProviderSettings
 
+
+def _create_backup_func[T: Any](func: Callable[..., T]) -> Callable[..., T]:
+    """Takes a factory function and returns a new function with backup=True.
+
+    This only works for the factories here with no kwargs other than backup (well, it would work for others too, but that's the intended use case).
+
+    Args:
+        func: The original function to partially apply
+
+    Returns:
+        A callable that, when invoked, calls the original function with
+        the bound arguments.
+    """
+    return rpartial(func, {"backup": True})
+
+
+def _definitely_is_provider_settings_or_has_provider_settings_base(
+    value: Any,
+) -> TypeIs[CodeWeaverProviderSettings]:
+    """Check if cls is CodeWeaverProviderSettings or has it as a base class."""
+    return bool(
+        isinstance(value, CodeWeaverProviderSettings)
+        or (
+            issubclass(value, CodeWeaverProviderSettings | BaseCodeWeaverSettings)
+            and hasattr(value, "provider")
+        )
+    )
+
+
+def _get_settings(settings: SettingsDep = INJECTED) -> CodeWeaverProviderSettings:
+    """Helper to get BaseCodeWeaverSettings from SettingsDep."""
+    resolved_settings = settings if hasattr(settings, "provider") else settings.resolve()  # ty:ignore[unresolved-attribute]
+    if not _definitely_is_provider_settings_or_has_provider_settings_base(resolved_settings):
+        raise TypeError(
+            f"Expected CodeWeaverProviderSettings or BaseCodeWeaverSettings with 'provider' attribute (CodeWeaverEngineSettings or CodeWeaverSettings), got {type(resolved_settings)}"
+        )
+    return resolved_settings
+
+
+def _get_provider_settings() -> Any:
+    """Factory for creating root provider settings from configuration."""
+    return _get_settings().provider
 
 
 # ===========================================================================
@@ -74,34 +125,16 @@ if TYPE_CHECKING:
 # at module initialization to ensure it's available when providers are created.
 
 
-
-def _create_provider_settings_dep(settings: SettingsDep = INJECTED) -> Any:
-    ...
-
-
-def _create_embedding_client(settings: SettingsDep = INJECTED) -> Any:  # AsyncOpenAI
+def _create_embedding_client(*, backup: bool = False) -> Any:  # AsyncOpenAI
     """Universal client factory for all embedding providers.
-    
-    This factory creates SDK clients based on the provider type in the config.
-    It supports:
-    - OpenAI-compatible: OpenAI, Azure, Ollama, Fireworks, Together, GitHub, Heroku
-    - Voyage AI
-    - Cohere (including Azure Cohere, Heroku Cohere)
-    - Mistral
-    - Google Generative AI
-    - AWS Bedrock
-    - HuggingFace Inference
-    - FastEmbed
-    - Sentence Transformers
-    
+
     Returns:
         Configured SDK client instance appropriate for the provider type
-        
+
     Raises:
         ConfigurationError: If config is missing, provider unsupported, or SDK not installed
     """
-    settings = settings if issubclass(type(settings), BaseSettings) else settings.
-    
+    embedding_settings = _get_provider_settings().embedding
 
 
 # Universal client dependency type for all embedding providers
@@ -166,62 +199,46 @@ if TYPE_CHECKING:
 
 def _create_embedding_provider_settings_dep():
     """Factory for creating PRIMARY embedding provider config from settings.
-    
+
     Returns the first (primary) embedding config from settings.provider.embedding.
     For all configs (primary + backups), inject Sequence[EmbeddingConfigT] instead.
-    
+
     Note: This factory should be decorated with @dependency_provider at module init.
     """
-    from codeweaver.core.types.settings_model import BaseCodeWeaverSettings
-    from codeweaver.core.di import INJECTED
-    
-    settings: BaseCodeWeaverSettings = INJECTED
-    return settings.provider.embedding[0] if settings.provider.embedding else None
+    return next(
+        iter(
+            embedding_config
+            if (embedding_config := _get_settings().provider.embedding)
+            and "backup" not in embedding_config.__name__.lower()
+            else ()
+        ),
+        None,
+    )
 
 
 def _create_all_embedding_configs():
     """Factory for creating ALL embedding configs (primary + backups) from settings.
-    
+
     Returns a sequence of all configured embedding providers.
     Use this when you need access to backup providers, not just the primary.
-    
+
     Note: This factory should be decorated with @dependency_provider at module init.
     """
-    from codeweaver.core.types.settings_model import BaseCodeWeaverSettings
     from codeweaver.core.di import INJECTED
-    
+
     settings: BaseCodeWeaverSettings = INJECTED
-    return settings.provider.embedding if settings.provider.embedding else tuple()
+    return settings.provider.embedding or ()
 
 
 type EmbeddingProviderSettingsDep = Annotated[
-
-
-# Collection type for all embedding configs (primary + backups)
-if TYPE_CHECKING:
-    from typing import Sequence
-    from codeweaver.providers.config.embedding import EmbeddingConfigT
-
-type AllEmbeddingConfigsDep = Annotated[
-    Sequence["EmbeddingConfigT"],  # type: ignore[name-defined]
-    depends(_create_all_embedding_configs),
-]
-"""Type alias for DI injection of ALL embedding configs (primary + backups).
-
-Use this when you need access to backup providers, not just the primary.
-
-Example:
-    ```python
-    def handle_failover(
-        all_configs: AllEmbeddingConfigsDep = INJECTED
-    ) -> None:
-        primary = all_configs[0]
-        backups = all_configs[1:]
-        # Implement failover logic...
-    ```
-"""
     EmbeddingProviderSettingsType,  # type: ignore[name-defined]
     depends(_create_embedding_provider_settings_dep),
+]
+"""Type alias for DI injection of PRIMARY embedding provider settings."""
+
+type AllEmbeddingConfigsDep = Annotated[
+    Sequence[EmbeddingConfigT],  # type: ignore[name-defined]
+    depends(_create_all_embedding_configs),
 ]
 """Type alias for DI injection of embedding provider settings.
 
@@ -492,7 +509,7 @@ def _get_provider_class_for_config(config: EmbeddingConfigT) -> type:  # type: i
     Raises:
         ConfigurationError: If no provider class found for config type
     """
-    from codeweaver.core import ConfigurationError, Provider
+    from codeweaver.core import Provider
 
     # Import provider classes
     from codeweaver.providers.embedding.providers import (
@@ -584,11 +601,7 @@ def _instantiate_provider(
     """
     # Instantiate provider with dependencies
     # Most providers expect: client, config, caps
-    return provider_cls(
-        client=client,
-        config=config,
-        caps=caps,
-    )
+    return provider_cls(client=client, config=config, caps=caps)
 
 
 async def create_all_embedding_providers() -> tuple[Any, ...]:
@@ -660,8 +673,6 @@ async def get_primary_embedding_provider(
     Raises:
         ConfigurationError: If no providers are configured
     """
-    from codeweaver.core import ConfigurationError
-
     if not all_providers:
         raise ConfigurationError(
             "No embedding providers configured",
@@ -673,9 +684,7 @@ async def get_primary_embedding_provider(
 
 # Type aliases for provider injection
 if TYPE_CHECKING:
-    from typing import Sequence
-
-    from codeweaver.providers.embedding.providers.base import EmbeddingProvider
+    from collections.abc import Sequence
 
 
 type AllEmbeddingProvidersDep = Annotated[
@@ -721,7 +730,4 @@ Example:
 # *                            MODULE EXPORTS
 # ===========================================================================
 
-__all__ = (
-
-    "NoneDep",
-)
+__all__ = ("NoneDep",)

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
+from functools import cache
 from threading import Lock
 from types import MappingProxyType
 
@@ -98,10 +99,38 @@ class BaseSparseEmbeddingCapabilityResolver(
 ):
     """A capability resolver for sparse embedding models."""
 
+@cache
+def get_all_provider_types() -> tuple[type, ...]:
+    """Get all defined provider types.
+
+    Returns:
+        A tuple of all provider type classes.
+    """
+    import textcase
+
+    import codeweaver.providers.config
+
+    cls_names = [
+        cls_name
+        for cls_name in codeweaver.providers.config.__all__
+        if textcase.pascal.match(cls_name)
+        and not cls_name.startswith("Base")
+        and not cls_name.endswith(
+            ("T", "Type"))
+        and any(
+                name
+                for name in ("Client", "Embedding", "Reranking", "Settings", "Qdrant", "VectorStore")
+                if name in cls_name
+            )
+    ]
+    return tuple(
+        getattr(codeweaver.providers.config, cls_name) for cls_name in cls_names
+    )
+
 
 __all__ = (
     "BaseEmbeddingCapabilityResolver",
     "BaseRerankingCapabilityResolver",
     "BaseSparseEmbeddingCapabilityResolver",
-    "CapabilityResolver",
+    "get_all_provider_types",
 )

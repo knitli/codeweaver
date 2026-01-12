@@ -8,7 +8,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any, Literal, cast
+from typing import Any, Literal, cast, overload
 
 from beartype.typing import TypeVar
 
@@ -17,6 +17,7 @@ from codeweaver.core.utils import TypeIs
 
 
 T = TypeVar("T", bound=Any)
+T_co = TypeVar("T_co", bound=Any, covariant=True)
 
 
 class _InjectedProxy[Dep: type[T], S: Sentinel]:
@@ -24,11 +25,19 @@ class _InjectedProxy[Dep: type[T], S: Sentinel]:
 
     This class acts as a wrapper that supports `INJECTED[Type]` syntax while
     maintaining compatibility with the DI container's sentinel detection.
+
+    The proxy allows both subscripted and bare usage:
+    - `INJECTED[SomeType]` returns the sentinel cast to SomeType
+    - `INJECTED` works as a default value, with type checkers inferring the type
+      from the parameter annotation
     """
 
     def __init__(self, sentinel: S) -> None:
         """Initialize with the actual sentinel instance."""
         self._sentinel: S = sentinel
+
+    @overload
+    def __getitem__(self, item: type[T_co]) -> T_co: ...
 
     def __getitem__(self, item: type[Dep]) -> Dep:
         """Return the sentinel cast to the requested type.
@@ -45,6 +54,13 @@ class _InjectedProxy[Dep: type[T], S: Sentinel]:
     def __repr__(self) -> str:
         """Return a string representation."""
         return repr(self._sentinel)
+
+    # NOTE: Support bare INJECTED usage by implementing __bool__ so type checkers
+    # can better understand this as a sentinel value that works as a default.
+    # This allows `def func(param: SomeType = INJECTED)` without subscripting.
+    def __bool__(self) -> bool:
+        """Always return True since the sentinel is always truthy."""
+        return True
 
 
 class DependsPlaceholder(Sentinel):
@@ -69,12 +85,14 @@ class DependsPlaceholder(Sentinel):
     """
 
 
-_injected_sentinel = DependsPlaceholder(
+_injected_sentinel: DependsPlaceholder = DependsPlaceholder(
     name=SentinelName("InjectedDependency"), module_name=Sentinel._get_module_name_generator()()
 )  # ty:ignore[invalid-argument-type]
 
-# INJECTED is a proxy that supports subscripting while wrapping the sentinel
-INJECTED: _InjectedProxy[T, DependsPlaceholder] = _InjectedProxy(_injected_sentinel)
+# INJECTED is a proxy that supports subscripting while wrapping the sentinel.
+# Type annotation uses Any to allow it to work as a default value for any dependency-injected
+# parameter. Type checkers will infer the correct type from the parameter annotation.
+INJECTED: _InjectedProxy[Any, DependsPlaceholder] = _InjectedProxy(_injected_sentinel)  # type: ignore[assignment]
 
 
 class Depends:

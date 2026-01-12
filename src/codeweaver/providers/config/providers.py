@@ -35,7 +35,6 @@ from pydantic_ai.settings import ModelSettings as AgentModelSettings
 from pydantic_ai.settings import merge_model_settings
 
 from codeweaver.core import (
-    UNSET,
     BasedModel,
     DictView,
     LiteralProviderKindType,
@@ -43,6 +42,7 @@ from codeweaver.core import (
     ProviderKind,
     Unset,
 )
+from codeweaver.providers.config import ProviderProfile
 from codeweaver.providers.config.clients import QdrantClientOptions
 from codeweaver.providers.config.embedding import (
     EmbeddingConfigT,
@@ -177,21 +177,15 @@ class ProviderSettingsDict(TypedDict, total=False):
     data: NotRequired[tuple[DataProviderSettingsType, ...] | None]
     # we currently only support one each of embedding, reranking and vector store providers
     # but we use tuples to allow for future expansion for some less common use cases
-    embedding: NotRequired[
-        tuple[EmbeddingProviderSettingsType, ...] | EmbeddingProviderSettingsType | None
-    ]
+    embedding: NotRequired[tuple[EmbeddingProviderSettingsType, ...] | None]
     # rerank is probably the priority for multiple providers in the future, because they're vector agnostic, so you could have fallback providers, or use different ones for different tasks
-    sparse_embedding: NotRequired[
-        tuple[SparseEmbeddingProviderSettingsType, ...] | SparseEmbeddingProviderSettingsType | None
-    ]
-    reranking: NotRequired[
-        tuple[RerankingProviderSettingsType, ...] | RerankingProviderSettingsType | None
-    ]
+    sparse_embedding: NotRequired[tuple[SparseEmbeddingProviderSettingsType, ...] | None]
+    reranking: NotRequired[tuple[RerankingProviderSettingsType, ...] | None]
 
-    vector_store: NotRequired[
-        tuple[VectorStoreProviderSettingsType, ...] | VectorStoreProviderSettingsType | None
-    ]
-    agent: NotRequired[tuple[AgentProviderSettingsType, ...] | AgentProviderSettingsType | None]
+    vector_store: NotRequired[tuple[VectorStoreProviderSettingsType, ...] | None]
+    agent: NotRequired[tuple[AgentProviderSettingsType, ...] | None]
+
+    disable_backup_system: NotRequired[bool]
 
 
 type ProviderSettingsView = DictView[ProviderSettingsDict]
@@ -280,11 +274,13 @@ def _create_embedding_config(provider: Provider, model: LiteralString) -> Embedd
 
 
 DefaultEmbeddingProviderSettings = (
-    EmbeddingProviderSettings(
-        provider=_embedding_defaults.provider,
-        model_name=_embedding_defaults.model,
-        embedding_config=_create_embedding_config(
-            _embedding_defaults.provider, _embedding_defaults.model
+    (
+        EmbeddingProviderSettings(
+            provider=_embedding_defaults.provider,
+            model_name=_embedding_defaults.model,
+            embedding_config=_create_embedding_config(
+                _embedding_defaults.provider, _embedding_defaults.model
+            ),
         ),
     )
     if _embedding_defaults.provider != Provider.NOT_SET
@@ -325,11 +321,13 @@ def _create_sparse_embedding_config(
     raise ValueError(f"Unknown sparse embedding provider: {provider}")
 
 
-DefaultSparseEmbeddingProviderSettings = SparseEmbeddingProviderSettings(
-    provider=_sparse_embedding_defaults.provider,
-    model_name=_sparse_embedding_defaults.model,
-    sparse_embedding_config=_create_sparse_embedding_config(
-        _sparse_embedding_defaults.provider, _sparse_embedding_defaults.model
+DefaultSparseEmbeddingProviderSettings = (
+    SparseEmbeddingProviderSettings(
+        provider=_sparse_embedding_defaults.provider,
+        model_name=_sparse_embedding_defaults.model,
+        sparse_embedding_config=_create_sparse_embedding_config(
+            _sparse_embedding_defaults.provider, _sparse_embedding_defaults.model
+        ),
     ),
 )
 
@@ -386,11 +384,13 @@ def _create_reranking_config(provider: Provider, model: LiteralString) -> Rerank
 
 
 DefaultRerankingProviderSettings = (
-    RerankingProviderSettings(
-        provider=_reranking_defaults.provider,
-        model_name=_reranking_defaults.model,
-        reranking_config=_create_reranking_config(
-            _reranking_defaults.provider, _reranking_defaults.model
+    (
+        RerankingProviderSettings(
+            provider=_reranking_defaults.provider,
+            model_name=_reranking_defaults.model,
+            reranking_config=_create_reranking_config(
+                _reranking_defaults.provider, _reranking_defaults.model
+            ),
         ),
     )
     if _reranking_defaults.provider != Provider.NOT_SET
@@ -400,13 +400,23 @@ DefaultRerankingProviderSettings = (
 HAS_ANTHROPIC = (
     importlib.util.find_spec("anthropic") or importlib.util.find_spec("claude-agent-sdk")
 ) is not None
-DefaultAgentProviderSettings = AgentProviderSettings(
-    provider=Provider.ANTHROPIC, model="claude-haiku-4.5-latest", model_options=AgentModelSettings()
+DefaultAgentProviderSettings = (
+    (
+        AgentProviderSettings(
+            provider=Provider.ANTHROPIC,
+            model="claude-haiku-4.5-latest",
+            model_options=AgentModelSettings(),
+        ),
+    )
+    if HAS_ANTHROPIC
+    else None
 )
 
 
-DefaultVectorStoreProviderSettings = QdrantVectorStoreProviderSettings(
-    provider=Provider.QDRANT, client_options=QdrantClientOptions(host="127.0.0.1")
+DefaultVectorStoreProviderSettings = (
+    QdrantVectorStoreProviderSettings(
+        provider=Provider.QDRANT, client_options=QdrantClientOptions(host="127.0.0.1")
+    ),
 )
 
 type ProviderField = Literal[
@@ -429,24 +439,22 @@ class ProviderSettings(BasedModel):
     """Settings for provider configuration."""
 
     data: Annotated[
-        tuple[DataProviderSettings, ...] | DataProviderSettings | Unset,
+        tuple[DataProviderSettings, ...] | None,
         Field(description="""Data provider configuration"""),
     ] = DefaultDataProviderSettings
 
     embedding: Annotated[
-        tuple[EmbeddingProviderSettingsType, ...] | EmbeddingProviderSettingsType | Unset,
+        tuple[EmbeddingProviderSettingsType, ...] | None,
         Field(
             description="""Embedding provider configuration.
 
             We will only use the first provider you configure here. We may add support for multiple embedding providers in the future.
             """
         ),
-    ] = DefaultEmbeddingProviderSettings or UNSET
+    ] = DefaultEmbeddingProviderSettings
 
     sparse_embedding: Annotated[
-        tuple[SparseEmbeddingProviderSettingsType, ...]
-        | SparseEmbeddingProviderSettingsType
-        | Unset,
+        tuple[SparseEmbeddingProviderSettingsType, ...] | None,
         Field(
             description="""Sparse embedding provider configuration.
 
@@ -455,33 +463,90 @@ class ProviderSettings(BasedModel):
     ] = DefaultSparseEmbeddingProviderSettings
 
     reranking: Annotated[
-        tuple[RerankingProviderSettingsType, ...] | RerankingProviderSettingsType | Unset,
+        tuple[RerankingProviderSettingsType, ...] | None,
         Field(
             description="""Reranking provider configuration.
 
             We will only use the first provider you configure here. We may add support for multiple reranking providers in the future."""
         ),
-    ] = DefaultRerankingProviderSettings or UNSET
+    ] = DefaultRerankingProviderSettings
 
     vector_store: Annotated[
-        tuple[VectorStoreProviderSettingsType, ...] | VectorStoreProviderSettingsType | Unset,
+        tuple[VectorStoreProviderSettingsType, ...] | None,
         Field(
             description="""Vector store provider configuration (Qdrant or in-memory), defaults to a local Qdrant instance."""
         ),
     ] = DefaultVectorStoreProviderSettings
 
     agent: Annotated[
-        tuple[AgentProviderSettings, ...] | AgentProviderSettings | Unset,
+        tuple[AgentProviderSettings, ...] | None,
         Field(description="""Agent provider configuration"""),
     ] = DefaultAgentProviderSettings
+
+    disable_backup_system: Annotated[
+        bool,
+        Field(
+            description="""Disable CodeWeaver's failsafe/backup system.
+
+            CodeWeaver's backup system uses extremely lightweight local models to provide basic functionality when your main provider is unavailable (well, it is still probably better than most alternatives). Specifically, it keeps an alternate local vector store collection and uses the smallest available embedding, sparse embedding, and reranking models to provide basic functionality when the main providers are unreachable. This system keeps a a low-resource, always-available fallback that can be used offline or when cloud providers are unreachable.
+
+            If you use a cloud vector store, the backup will be an in-memory vector store that is loaded and persisted from json. If you use a local vector store, the backup will be a separate collection in that vector store.
+
+            If you set `disable_backup_system` to `True`, don't complain if CodeWeaver stops working when your main providers are unreachable!
+            """
+        ),
+    ] = False
+
+    @property
+    def _backup_profile(
+        self,
+    ) -> Literal[ProviderProfile.TESTING, ProviderProfile.TESTING_DB] | None:
+        if self.disable_backup_system:
+            return None
+        if (
+            (vector_settings := self.get_provider_settings(Provider.QDRANT))
+            and (
+                primary_config := vector_settings
+                if isinstance(vector_settings, QdrantVectorStoreProviderSettings)
+                else vector_settings[0]
+            )
+            and primary_config.is_local_qdrant
+        ):
+            return ProviderProfile.TESTING_DB
+        return ProviderProfile.TESTING
 
     @model_validator(mode="after")
     def validate_and_normalize_providers(self) -> ProviderSettings:
         """Validate and normalize provider settings after initialization."""
         for key in ("vector_store", "embedding", "sparse_embedding", "reranking", "agent"):
             value = getattr(self, key)
-            if value is not Unset and not isinstance(value, tuple):
-                setattr(self, key, (value,))
+            if value is None:
+                continue
+            if value is Unset:
+                default_value = AllDefaultProviderSettings.get(key)
+                setattr(self, key, default_value)
+                value = default_value
+            if not isinstance(value, tuple):
+                value = (value,)
+                setattr(self, key, value)
+            if (backup := next((s for s in value if s.as_backup), None)) and list(value).index(
+                backup
+            ) != len(value) - 1:
+                # Make sure it's last
+                current = list(value)
+                current.remove(backup)
+                current.append(backup)
+                setattr(self, key, tuple(current))
+            elif (
+                not self.disable_backup_system
+                and (backup_settings := self._backup_profile)
+                and (kind_settings := backup_settings[0])
+                and not kind_settings.as_backup
+            ):
+                kind_settings.as_backup = True
+                current = list(value)
+                current.append(kind_settings)
+                setattr(self, key, tuple(current))
         return self
 
     def _telemetry_keys(self) -> None:
@@ -592,12 +657,18 @@ class ProviderSettings(BasedModel):
         )
 
     def settings_for_kind(
-        self, kind: ProviderField | LiteralProviderKindType
+        self,
+        kind: ProviderField | LiteralProviderKindType,
+        *,
+        primary: bool = True,
+        backup: bool = False,
     ) -> BaseProviderSettings | tuple[BaseProviderSettings, ...] | None:
         """Get the settings for a specific provider kind.
 
         Args:
             kind: The kind of provider or ProviderKind to get settings for.
+            primary: Whether to return the primary settings or all settings.
+            backup: Whether to return the backup settings instead of the primary.
         """
         setting_field = (
             kind
@@ -606,15 +677,27 @@ class ProviderSettings(BasedModel):
             else cast(ProviderKind, kind).variable
         )
         setting = getattr(self, setting_field, None)  # type: ignore
-        return None if setting is Unset else setting  # type: ignore
+        if setting is None:
+            return None
+        if setting is Unset:
+            setting = AllDefaultProviderSettings.get(setting_field)  # type: ignore
+            setattr(self, setting_field, setting)  # type: ignore
+        if primary and isinstance(setting, tuple) and len(setting) > 0:
+            return setting[0]
+        if backup:
+            return setting[1] if isinstance(setting, tuple) and len(setting) > 1 else None
+        return setting
 
     def apply_profile(self, profile: Literal["recommended", "quickstart", "testing"]) -> None:
         """Apply a premade provider profile to the settings.
 
+        Profiles are predefined sets of provider configurations that can be applied
+        to quickly set up the environment for different use cases, and can be applied on top
+        of existing settings.
+
         Args:
             profile: The profile to apply.
         """
-        # Implementation of profile application logic goes here
 
 
 AllDefaultProviderSettings = ProviderSettingsDict(

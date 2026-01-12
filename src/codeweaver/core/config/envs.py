@@ -112,6 +112,9 @@ class SettingsEnvVars(DataclassSerializationMixin):
     CODEWEAVER__TELEMETRY__TOOLS_OVER_PRIVACY: EnvVarInfo
     """Environment variable to opt-in to providing more detailed search and query data for telemetry. This may include potentially identifying information that we will try to anonymize but can't garauntee complete privacy."""
 
+    CODEWEAVER_DISABLE_BACKUP_SYSTEM: EnvVarInfo
+    """Environment variable to disable CodeWeaver's failsafe/backup system. Not recommended if you want to ever use CodeWeaver offline or when a cloud provider is unreachable. The backup system uses extremely lightweight local models to provide basic functionality when your main provider is unavailable (well, it is still probably better than most alternatives)."""
+
     def __post_init__(self) -> None:
         """Post-initialization to validate default values."""
         self.register_values()
@@ -395,6 +398,17 @@ class SettingsEnvVars(DataclassSerializationMixin):
                 variable_name="tools_over_privacy",
                 choices={"true", "false"},
                 resolver_key="telemetry.tools_over_privacy",
+            ),
+            CODEWEAVER_DISABLE_BACKUP_SYSTEM=EnvVarInfo(
+                env="CODEWEAVER_DISABLE_BACKUP_SYSTEM",
+                description="Disable CodeWeaver's failsafe/backup system. Not recommended if you want to ever use CodeWeaver offline or when a cloud provider is unreachable. The backup system uses extremely lightweight local models to provide basic functionality when your main provider is unavailable (well, it is still probably better than most alternatives).",
+                is_required=False,
+                is_secret=False,
+                fmt=EnvFormat.BOOLEAN,
+                default="false",
+                variable_name="disable_backup_system",
+                choices={"true", "false"},
+                resolver_key="provider.disable_backup_system",
             ),
         )
 

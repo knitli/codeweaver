@@ -139,6 +139,13 @@ class BaseProviderSettings(BasedModel, ABC):
         ClientOptions | None, Field(description="Client options for the provider's client.")
     ] = None
 
+    as_backup: Annotated[
+        bool,
+        Field(
+            description="Use this provider as a backup/failsafe. Overrides CodeWeaver's defaults for backup providers."
+        ),
+    ] = False
+
     def __model_post_init__(self) -> None:
         """Post-initialization to register in DI container and config registry."""
         # Register self in DI container as singleton
@@ -556,6 +563,13 @@ class QdrantVectorStoreProviderSettings(QdrantProviderMixin, VectorStoreProvider
             collection["quantization_config"] = quantization_config
 
     @computed_field
+    @property
+    def is_local_qdrant(self) -> bool:
+        """Return whether this is a local Qdrant instance (Qdrant database on disk (not memory provider))."""
+        return self.client_options.is_local_on_disk() if self.client_options else False
+
+    @computed_field
+    @property
     def client(self) -> Literal[SDKClient.QDRANT]:
         """Return the Qdrant SDKClient enum member."""
         return SDKClient.QDRANT

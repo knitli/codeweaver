@@ -238,8 +238,6 @@ __all__ = (
     "CohereRerankingOptionsDict",
     "CollectionConfig",
     "ConnectionConfiguration",
-    "ConnectionConfiguration",
-    "ConnectionRateLimitConfig",
     "ConnectionRateLimitConfig",
     "DataProviderSettings",
     "DeterminedDefaults",

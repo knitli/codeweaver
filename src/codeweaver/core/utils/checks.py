@@ -28,11 +28,11 @@ logger = logging.getLogger(__name__)
 python_version = sys.version_info
 
 if sys.version_info >= (3, 13):
-    from typing import TypeIs as TypeIs
+    from typing import TypeIs as _TypeIs
 else:
-    from typing_extensions import TypeIs as TypeIs
+    from typing_extensions import TypeIs as _TypeIs
 
-TypeIs = TypeIs  # type: ignore[assignment]
+TypeIs = _TypeIs  # type: ignore[assignment]
 
 LOCALHOST_INDICATORS = {
     "localhost",
