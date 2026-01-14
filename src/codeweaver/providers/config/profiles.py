@@ -28,9 +28,9 @@ from typing import Any, Literal, overload
 from pydantic import AnyHttpUrl
 from pydantic.dataclasses import as_dict
 from pydantic_ai.settings import ModelSettings as AgentModelSettings
+from qdrant_client.models import SparseVectorParams, VectorParams
 
-from codeweaver.core import BaseDataclassEnum, Provider
-from codeweaver.core.utils.filesystem import get_user_data_dir
+from codeweaver.core import BaseDataclassEnum, Provider, generate_collection_name
 from codeweaver.providers.config.clients import QdrantClientOptions
 from codeweaver.providers.config.embedding import (
     FastEmbedEmbeddingConfig,
@@ -41,9 +41,10 @@ from codeweaver.providers.config.embedding import (
 )
 from codeweaver.providers.config.kinds import (
     AgentProviderSettings,
+    CollectionConfig,
     DataProviderSettings,
     EmbeddingProviderSettings,
-    MemoryConfig,
+    MemoryVectorStoreProviderSettings,
     QdrantVectorStoreProviderSettings,
     RerankingProviderSettings,
     SparseEmbeddingProviderSettings,
@@ -66,6 +67,18 @@ def _default_remote_vector_client_options(url: AnyHttpUrl) -> QdrantClientOption
     return QdrantClientOptions(prefer_grpc=False, url=url)
 
 
+def _default_collection_options(
+    *, as_backup: bool = False, project_path: Path | None = None, project_name: str | None = None
+) -> CollectionConfig:
+    """Default collection configuration for Qdrant."""
+    return CollectionConfig(
+        collection_name=generate_collection_name(
+            is_backup=as_backup, project_name=project_name, project_path=project_path
+        ),
+        vector_config={"dense": VectorParams(), "sparse": SparseVectorParams()},
+    )
+
+
 def _get_vector_client_options(
     vector_deployment: Literal["cloud", "local"], *, url: AnyHttpUrl | None = None
 ) -> QdrantClientOptions:
@@ -82,6 +95,8 @@ def _get_profile(
     vector_deployment: Literal["local"],
     *,
     url: AnyHttpUrl | None = None,
+    project_name: str | None = None,
+    project_path: Path | None = None,
 ) -> ProviderSettingsDict: ...
 @overload
 def _get_profile(
@@ -89,11 +104,15 @@ def _get_profile(
     vector_deployment: Literal["cloud"],
     *,
     url: AnyHttpUrl,
+    project_name: str | None = None,
+    project_path: Path | None = None,
 ) -> ProviderSettingsDict: ...
 def _get_profile(
     profile: Literal["recommended", "quickstart", "testing"],
     vector_deployment: Literal["cloud", "local"],
     *,
+    project_name: str | None = None,
+    project_path: Path | None = None,
     url: AnyHttpUrl | None = None,
 ) -> ProviderSettingsDict:
     """Get the default provider settings profile.
@@ -102,6 +121,8 @@ def _get_profile(
         profile: The profile name, either "recommended" or "quickstart".
         vector_deployment: The vector store deployment type, either "cloud" or "local".
         url: The URL for the vector store if using cloud deployment.
+        project_name: The name of the project, used for generating collection names.
+        project_path: The path to the project, used for generating collection names.
 
     Returns:
         The provider settings dictionary for the specified profile.
@@ -109,9 +130,13 @@ def _get_profile(
     if profile == "testing":
         return _backup_profile()
     if profile == "recommended":
-        return _recommended_default(vector_deployment, url=url)
+        return _recommended_default(
+            vector_deployment, url=url, project_name=project_name, project_path=project_path
+        )
     if profile == "quickstart":
-        return _quickstart_default(vector_deployment, url=url)
+        return _quickstart_default(
+            vector_deployment, url=url, project_name=project_name, project_path=project_path
+        )
     raise ValueError(f"Unknown profile: {profile}")
 
 
@@ -131,7 +156,11 @@ HAS_ST = util.find_spec("sentence_transformers") is not None
 
 
 def _recommended_default(
-    vector_deployment: Literal["cloud", "local"], *, url: AnyHttpUrl | None = None
+    vector_deployment: Literal["cloud", "local"],
+    *,
+    url: AnyHttpUrl | None = None,
+    project_name: str | None = None,
+    project_path: Path | None = None,
 ) -> ProviderSettingsDict:
     """Recommended default settings profile.
 
@@ -182,13 +211,18 @@ def _recommended_default(
             QdrantVectorStoreProviderSettings(
                 provider=Provider.QDRANT,
                 client_options=_get_vector_client_options(vector_deployment, url=url),
+                collection=_default_collection_options(),
             ),
         ),
     )
 
 
 def _quickstart_default(
-    vector_deployment: Literal["local", "cloud"], *, url: AnyHttpUrl | None = None
+    vector_deployment: Literal["local", "cloud"],
+    *,
+    url: AnyHttpUrl | None = None,
+    project_name: str | None = None,
+    project_path: Path | None = None,
 ) -> ProviderSettingsDict:
     """Quickstart default settings profile.
 
@@ -257,20 +291,32 @@ def _quickstart_default(
             QdrantVectorStoreProviderSettings(
                 provider=Provider.QDRANT,
                 client_options=_get_vector_client_options(vector_deployment, url=url),
+                collection=_default_collection_options(),
             ),
         ),
     )
 
 
-def _backup_profile(*, use_local: bool = False) -> ProviderSettingsDict:
+def _backup_profile(
+    *,
+    use_local: bool = False,
+    as_backup: bool = True,
+    project_name: str | None = None,
+    project_path: Path | None = None,
+) -> ProviderSettingsDict:
     """Backup profile for local development with backup vector store.
 
     Exposed through the CLI as the "testing" profile. We choose the lightest models available for either FastEmbed or Sentence Transformers, depending on availability.
 
     Together this set of models can run entirely locally, with very low resource usage, making them ideal for development, testing, and as CodeWeaver's fallback profile.
+
+    Args:
+        use_local: Whether to use a local Qdrant vector store instead of in-memory.
+        as_backup: Whether this profile is being used as a backup profile (or just for local testing).
+        project_name: The name of the project, used for generating collection names.
+        project_path: The path to the project, used for generating collection names.
     """
     from codeweaver.core import Provider
-    from codeweaver.providers.config import CollectionConfig
 
     # NOTE: qdrant/bm25 doesn't require FASTEMBED -- FastEmbed can generate with it, but so can the qdrant_client itself
     # We lose true sparse embeddings with bm25, but it's a good lightweight backup option
@@ -278,12 +324,16 @@ def _backup_profile(*, use_local: bool = False) -> ProviderSettingsDict:
     reranking_model = (
         "cross-encoder/ms-marco-TinyBERT-L2-v2" if HAS_ST else "jinaai/jina-reranker-v1-tiny-en"
     )
+    default_collection = _default_collection_options(
+        as_backup=as_backup, project_name=project_name, project_path=project_path
+    )
 
     backup_settings = _quickstart_default("local") | {
         "sparse_embedding": SparseEmbeddingProviderSettings(
             provider=Provider.FASTEMBED,
             model_name="qdrant/bm25",
             sparse_embedding_config=FastEmbedSparseEmbeddingConfig(model_name="qdrant/bm25"),
+            as_backup=as_backup,
         ),
         # For the dense embeddings, we essentially choose the lightest available model
         # potion-base-8M is a static embedding model, which again loses some quality, but is extremely light weight and virtually instant
@@ -295,6 +345,7 @@ def _backup_profile(*, use_local: bool = False) -> ProviderSettingsDict:
                 if HAS_ST
                 else FastEmbedEmbeddingConfig(model_name=embedding_model)
             ),
+            as_backup=as_backup,
         ),
     }
 
@@ -307,24 +358,26 @@ def _backup_profile(*, use_local: bool = False) -> ProviderSettingsDict:
                 if HAS_ST
                 else FastEmbedRerankingConfig(model_name=reranking_model)
             ),
+            as_backup=as_backup,
         ),
     )
     if use_local:
         backup_settings["vector_store"] = (
             QdrantVectorStoreProviderSettings(
                 provider=Provider.QDRANT,
-                collection=CollectionConfig(),
+                collection=default_collection,
                 client_options=_default_local_vector_client_options(),
+                as_backup=as_backup,
             ),
         )
     else:
-        backup_settings["vector_store"] = (
-            QdrantVectorStoreProviderSettings(
-                provider=Provider.MEMORY,
-                in_memory_config=MemoryConfig(
-                    persist_path=Path(f"{get_user_data_dir()}/vectors/backup"), auto_persist=True
-                ),
-                client_options=QdrantClientOptions(location=":memory:"),
+        backup_settings["vector_store"] = MemoryVectorStoreProviderSettings(
+            provider=Provider.MEMORY,
+            client_options=QdrantClientOptions(location=":memory:"),
+            collection=default_collection,
+            as_backup=as_backup,
+            in_memory_config=MemoryVectorStoreProviderSettings._default_memory_config(
+                project_name=project_name, project_path=project_path
             ),
         )
 
@@ -396,7 +449,9 @@ class ProviderProfile(ProviderConfigProfile, BaseDataclassEnum):
         {
             **_get_profile("testing", vector_deployment="local"),
             "vector_store": QdrantVectorStoreProviderSettings(
-                provider=Provider.QDRANT, client_options=_default_local_vector_client_options()
+                collection=_default_collection_options(),
+                provider=Provider.QDRANT,
+                client_options=_default_local_vector_client_options(),
             ),
         },
         ("testing-db", "backup-db", "development-db", "lightweight-db", "dev-db"),
@@ -466,8 +521,8 @@ class ProviderProfile(ProviderConfigProfile, BaseDataclassEnum):
         profile = (
             self
             if self in {ProviderProfile.TESTING, ProviderProfile.TESTING_DB}
-            or os.environ.get("CODEWEAVER_DISABLE_BACKUP_SYSTEM", "0")
-            in {"1", "true", "True", "TRUE"}
+            or os.environ.get("CODEWEAVER_DISABLE_BACKUP_SYSTEM", "0").lower()
+            in {"1", "true", "yes"}
             else (self._profile | ProviderProfile.TESTING._profile)
         )
         return as_dict(profile._profile)

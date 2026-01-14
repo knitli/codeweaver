@@ -10,6 +10,7 @@ Use EmbeddingCapabilityResolver for capability lookup and management.
 from __future__ import annotations
 
 from types import MappingProxyType
+from typing import TYPE_CHECKING
 
 from codeweaver.core import create_lazy_getattr
 

@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import importlib
 import logging
 
 from abc import abstractmethod
@@ -26,6 +27,17 @@ from typing import (
 
 from cyclopts.types import PositiveInt
 from pydantic import Discriminator, Field, Tag, computed_field
+from qdrant_client.http.api.aliases_api import VectorStorageDatatype
+from qdrant_client.models import (
+    Datatype,
+    Distance,
+    Modifier,
+    ScalarQuantization,
+    ScalarType,
+    SparseIndexParams,
+    SparseVectorParams,
+    VectorParams,
+)
 
 from codeweaver.core import BasedModel, ConfigurationError, LiteralProvider, Provider
 from codeweaver.providers.config.types import CohereRequestOptionsDict
@@ -75,6 +87,14 @@ def _get_embedding_capabilities_for_model(
     Returns:
         The embedding model capabilities or None if not found.
     """
+    resolver_module = importlib.import_module(
+        "codeweaver.providers.embedding.capabilities.resolver"
+    )
+    if sparse:
+        resolver = getattr(resolver_module, "SparseEmbeddingCapabilityResolver", None)
+    else:
+        resolver = getattr(resolver_module, "EmbeddingCapabilityResolver", None)
+    return None if resolver is None else resolver.resolve(model_name)
 
 
 class SerializedEmbeddingOptionsDict(TypedDict, total=False):
@@ -122,6 +142,17 @@ class BaseEmbeddingConfig(BasedModel):
 
     def __init__(self, **data: Any) -> None:
         """Initialize the embedding configuration."""
+        from codeweaver.core.di import get_container
+
+        try:
+            container = get_container()
+            container.register(type(self), lambda: self)
+        except Exception as e:
+            # Log if DI not available (monorepo compatibility)
+            logger.debug(
+                "Dependency injection container not available, skipping registration of EmbeddingConfig: %s",
+                e,
+            )
         if (
             ((embedding := data.get("embedding")) and not (query := data.get("query")))
             or (query and not embedding)
@@ -245,6 +276,37 @@ class BaseEmbeddingConfig(BasedModel):
         if "model" in kwargs:
             kwargs["model"] = BaseEmbeddingConfig._clean_dtypes(kwargs.get("model", {}))
         return kwargs
+
+    async def as_vector_params(self) -> VectorParams:
+        """Get Qdrant VectorParams for this embedding configuration.
+
+        Returns:
+            VectorParams instance with dimension and datatype set.
+        """
+        dimension = await self.get_dimension()
+        datatype = await self.get_datatype()
+        if datatype and datatype not in ("float32", "float16", "uint8"):
+            datatype = "float16" if "float" in datatype else "uint8"
+        distance_metrics = (
+            self.capabilities.preferred_metrics
+            if self.capabilities and self.capabilities.preferred_metrics
+            else []
+        )
+        metric = next(
+            (m for m in distance_metrics if m in ("cosine", "dot", "euclidean", "manhattan")), None
+        )
+        quantization = (
+            None
+            if not datatype or "float" in datatype
+            else ScalarQuantization.model_validate({"scalar": {"type": ScalarType.INT8}})
+        )
+        return VectorParams(
+            size=dimension,
+            distance=Distance(
+                (metric or "cosine").title(), datatype=VectorStorageDatatype(datatype or "float16")
+            ),
+            quantization_config=quantization,
+        )
 
     @property
     def capabilities(self) -> EmbeddingModelCapabilities | SparseEmbeddingModelCapabilities | None:
@@ -780,6 +842,22 @@ class VoyageEmbeddingConfig(BaseEmbeddingConfig):
 # ============================================================================
 # Sparse Embedding Configs (Reuse dense configs with renamed classes)
 # ============================================================================
+async def _to_sparse_vector_params(instance: BaseEmbeddingConfig) -> SparseVectorParams:
+    """Convert a sparse embedding config to SparseVectorParams."""
+    datatype = await instance.get_datatype()
+    resolved_datatype = (
+        datatype
+        if datatype and datatype in ("float32", "float16", "uint8")
+        else "float16"
+        if (not datatype or "float" in datatype)
+        else "uint8"
+    )
+    index_params = SparseIndexParams(datatype=Datatype(resolved_datatype))
+    modifier = Modifier.IDF if ("bm25" in instance.model_name.lower()) else Modifier.NONE
+    return SparseVectorParams(
+        index=index_params,
+        modifier=modifier,
+    )
 
 
 class SentenceTransformersSparseEmbeddingConfig(SentenceTransformersEmbeddingConfig):
@@ -791,6 +869,10 @@ class SentenceTransformersSparseEmbeddingConfig(SentenceTransformersEmbeddingCon
     _is_sparse: ClassVar[bool] = True
 
 
+    async def as_sparse_vector_params(self) -> SparseVectorParams:
+        """Get Qdrant SparseVectorParams for this sparse embedding configuration."""
+        return await _to_sparse_vector_params(self)
+
 class FastEmbedSparseEmbeddingConfig(FastEmbedEmbeddingConfig):
     """Configuration options for FastEmbed sparse embedding models.
 
@@ -799,6 +881,9 @@ class FastEmbedSparseEmbeddingConfig(FastEmbedEmbeddingConfig):
 
     _is_sparse: ClassVar[bool] = True
 
+    async def as_sparse_vector_params(self) -> SparseVectorParams:
+        """Get Qdrant SparseVectorParams for this sparse embedding configuration."""
+        return await _to_sparse_vector_params(self)
 
 # ============================================================================
 # Discriminator Type Unions

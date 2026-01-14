@@ -191,8 +191,8 @@ def _set_settings_for_config(config_file: Path) -> CodeWeaverSettings:
 
 def _set_project_path(project_path: Path) -> DictView[CodeWeaverSettingsDict]:
     """Set the global project path."""
-    if find_spec("codeweaver.server") is None:
-        raise ImportError("codeweaver.server module is not available.")
+    if importlib.util.find_spec("code-weaver-server") is None:
+        raise ImportError("codeweaver_server module is not available.")
     from codeweaver.server import CodeWeaverSettingsDict, get_settings_map, update_settings
 
     return cast(

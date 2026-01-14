@@ -71,11 +71,9 @@ if TYPE_CHECKING:
         FastEmbedRerankingProviderSettings,
         FastEmbedSparseEmbeddingProviderSettings,
         MemoryConfig,
-        QdrantProviderMixin,
         QdrantVectorStoreProviderSettings,
         RerankingProviderSettings,
         SparseEmbeddingProviderSettings,
-        VectorConfig,
         VectorStoreProviderSettings,
     )
     from codeweaver.providers.config.profiles import HAS_ST, ProviderConfigProfile, ProviderProfile

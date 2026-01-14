@@ -34,13 +34,19 @@ _BASE_CLASS_NAMES = (
     "EmbeddingCapabilityResolver",
     "EmbeddingProvider",
     "EmbeddingProviderCapabilities",
+    "EmbeddingProviderSettings",
+    "MemoryVectorStoreProviderSettings",
+    "QdrantVectorStoreProviderSettings",
     "RerankingCapabilityResolver",
     "RerankingProvider",
     "RerankingProviderCapabilities",
+    "RerankingProviderSettings",
     "SparseEmbeddingCapabilityResolver",
     "SparseEmbeddingProvider",
     "SparseEmbeddingProviderCapabilities",
+    "SparseEmbeddingProviderSettings",
     "VectorStoreOptions",
+    "VectorStoreProviderSettings",
 )
 
 logger = logging.getLogger(__name__)

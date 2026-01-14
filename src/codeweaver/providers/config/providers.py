@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import importlib
 import logging
+import os
 
 from typing import (
     Annotated,
@@ -61,6 +62,7 @@ from codeweaver.providers.config.kinds import (
     BaseProviderSettings,
     BedrockEmbeddingProviderSettings,
     BedrockRerankingProviderSettings,
+    CollectionConfig,
     DataProviderSettings,
     EmbeddingProviderSettings,
     FastEmbedEmbeddingProviderSettings,
@@ -415,7 +417,9 @@ DefaultAgentProviderSettings = (
 
 DefaultVectorStoreProviderSettings = (
     QdrantVectorStoreProviderSettings(
-        provider=Provider.QDRANT, client_options=QdrantClientOptions(host="127.0.0.1")
+        provider=Provider.QDRANT,
+        client_options=QdrantClientOptions(host="127.0.0.1"),
+        collection=CollectionConfig(),
     ),
 )
 
@@ -495,7 +499,38 @@ class ProviderSettings(BasedModel):
             If you set `disable_backup_system` to `True`, don't complain if CodeWeaver stops working when your main providers are unreachable!
             """
         ),
-    ] = False
+    ] = os.environ.get("CODEWEAVER_DISABLE_BACKUP_SYSTEM", "false").lower() in ("1", "true", "yes")
+
+    def __init__(self, **data: Any) -> None:
+        """Initialize ProviderSettings and register with DI container if available."""
+        super().__init__(**data)
+        try:
+            from codeweaver.core.di import get_container
+
+            container = get_container()
+            container.register(type(self), lambda: self)
+        except Exception as e:
+            # Log if DI not available
+            logger.debug(
+                "Dependency injection container not available, skipping registration of ProviderSettings: %s",
+                e,
+            )
+        if (
+            not self.disable_backup_system
+            and (backup_settings := self._backup_profile)
+            and not self._has_backup()
+        ):
+            new_fields = {
+                kind: (
+                    kind_settings
+                    if any(s for s in kind_settings if s.as_backup)
+                    else tuple(*kind_settings, *getattr(backup_settings, kind, ()))
+                )
+                for kind, kind_settings in self.provider_configs.items()
+                if kind_settings is not None
+            }
+            self = self.model_copy(update=new_fields, deep=True)
+        super().__init__(**data)
 
     @property
     def _backup_profile(
@@ -504,7 +539,7 @@ class ProviderSettings(BasedModel):
         if self.disable_backup_system:
             return None
         if (
-            (vector_settings := self.get_provider_settings(Provider.QDRANT))
+            (vector_settings := self.settings_for_provider(Provider.QDRANT))
             and (
                 primary_config := vector_settings
                 if isinstance(vector_settings, QdrantVectorStoreProviderSettings)
@@ -518,7 +553,7 @@ class ProviderSettings(BasedModel):
     @model_validator(mode="after")
     def validate_and_normalize_providers(self) -> ProviderSettings:
         """Validate and normalize provider settings after initialization."""
-        for key in ("vector_store", "embedding", "sparse_embedding", "reranking", "agent"):
+        for key in self._field_names:
             value = getattr(self, key)
             if value is None:
                 continue
@@ -585,16 +620,27 @@ class ProviderSettings(BasedModel):
         return ("data", "embedding", "sparse_embedding", "reranking", "vector_store", "agent")
 
     @property
-    def provider_configs(self) -> dict[ProviderField, tuple[BaseProviderSettings, ...] | None]:
+    def _all_configs(self) -> tuple[BaseProviderSettings, ...]:
+        """Get all provider settings as a flat tuple."""
+        return tuple(
+            setting
+            for configs in self.provider_configs.values()
+            if configs
+            for setting in (configs if isinstance(configs, tuple) else (configs,))
+        )
+
+    @property
+    def provider_configs(self) -> dict[ProviderField, tuple[BaseProviderSettings, ...]]:
         """Get a summary of configured provider settings by kind."""
-        configs: dict[ProviderField, tuple[BaseProviderSettings, ...] | None] = {}
-        for field in self._field_names:
-            setting = self.settings_for_kind(field)
-            if setting is None or setting is Unset:
-                continue
-            # Normalize to tuple form
-            configs[field] = setting if isinstance(setting, tuple) else (setting,)  # ty:ignore[invalid-assignment]
-        return configs or None  # type: ignore[return-value]
+        return {
+            field_name: settings
+            if isinstance(settings, tuple)
+            else (settings,)
+            if settings and settings is not Unset
+            else ()
+            for field_name, settings in self.model_dump().items()
+            if field_name in self._field_names
+        }
 
     @property
     def provider_name_map(self) -> ProviderNameMap:
@@ -610,7 +656,7 @@ class ProviderSettings(BasedModel):
 
         return ProviderNameMap(**provider_data)  # type: ignore
 
-    def get_provider_settings(
+    def settings_for_provider(
         self, provider: Provider
     ) -> BaseProviderSettings | tuple[BaseProviderSettings, ...] | None:
         """Get the settings for a specific provider."""
@@ -648,7 +694,7 @@ class ProviderSettings(BasedModel):
 
     def has_auth_configured(self, provider: Provider) -> bool:
         """Check if API key or TLS certs are set for the provider through settings or environment."""
-        if not (settings := self.get_provider_settings(provider)):
+        if not (settings := self.settings_for_provider(provider)):
             return False
         settings = settings if isinstance(settings, tuple) else (settings,)
         return next(
@@ -687,6 +733,22 @@ class ProviderSettings(BasedModel):
         if backup:
             return setting[1] if isinstance(setting, tuple) and len(setting) > 1 else None
         return setting
+
+    def _kind_has_backup(self, kind: ProviderField) -> bool:
+        """Check if a specific provider kind has a backup configured."""
+        return bool(
+            (kind_settings := self.provider_configs.get(kind))
+            and isinstance(kind_settings, tuple)
+            and any(s for s in kind_settings if s.as_backup)
+        )
+
+    def _has_backup(self) -> bool:
+        """Check if there are backup providers configured."""
+        return any(
+            any(s for s in kind_settings if s.as_backup)
+            for kind_settings in self.provider_configs.values()
+            if kind_settings is not None
+        )
 
     def apply_profile(self, profile: Literal["recommended", "quickstart", "testing"]) -> None:
         """Apply a premade provider profile to the settings.

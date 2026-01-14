@@ -8,20 +8,21 @@
 from __future__ import annotations
 
 import contextlib
+import os
 
 from collections.abc import Callable, Iterable
 from functools import cache
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
+from codeweaver.core.types import BaseCodeWeaverSettings
 from codeweaver.core.types.aliases import CategoryName, LiteralStringT
-from codeweaver.core.types.dictview import DictView
 
 
 if TYPE_CHECKING:
     from importlib.util import find_spec
 
-    if find_spec("codeweaver_server") is not None:
+    if find_spec("code-weaver-server") is not None:
         from codeweaver_server import CodeWeaverSettingsDict
     else:
         CodeWeaverSettingsDict = dict[str, object]
@@ -84,21 +85,21 @@ def rpartial[**P, R](func: Callable[P, R], *args: object, **kwargs: object) -> C
         """Return a new partial object which when called will behave like func called with the
         given arguments.
         """
-        return func(*(fargs + args), **dict(fkwargs | kwargs))
+        return func(*(fargs + args), **dict(fkwargs | kwargs))  # ty:ignore[invalid-argument-type]
 
     return partial_right
 
 
-def _try_for_settings() -> DictView[CodeWeaverSettingsDict] | None:
+def _try_for_settings() -> BaseCodeWeaverSettings | None:
     """Try to import and return the settings map if available."""
     with contextlib.suppress(Exception):
-        from codeweaver.server import get_settings_map
+        from codeweaver.core.config import get_settings
 
-        if (settings_map := get_settings_map()) is not None:
+        if (settings := get_settings()) is not None:
             from codeweaver.core.types.sentinel import Unset
 
-            if not isinstance(settings_map, Unset):
-                return settings_map  # ty:ignore[invalid-return-type]
+            if not isinstance(settings, Unset):
+                return settings  # ty:ignore[invalid-return-type]
     return None
 
 
@@ -107,13 +108,16 @@ def _get_project_name() -> str:
     from codeweaver.core.types.sentinel import Unset
     from codeweaver.core.utils.filesystem import get_project_path
 
+    if (env_project_name := os.environ.get("CODEWEAVER_PROJECT_NAME")) is not None:
+        return env_project_name
+
     project_name = None
     if (
-        (settings_map := _try_for_settings()) is not None
-        and (project_name := settings_map.get("project_name"))
+        (settings := _try_for_settings()) is not None
+        and (project_name := settings.project_name) is not None
         and project_name is not Unset
     ):
-        return project_name
+        return cast(str, project_name)
     return get_project_path().name
 
 

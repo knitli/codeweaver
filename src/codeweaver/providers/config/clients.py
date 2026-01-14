@@ -122,6 +122,26 @@ class ClientOptions(BasedModel):
         ),
     ]
 
+    _as_backup: bool = Field(
+        False,
+        exclude=True,
+        init=False,
+        repr=False,
+        compare=True,
+        description="Whether this client options instance is for a backup provider.",
+    )
+
+    def __init__(self, **data: Any) -> None:
+        """Initialize the ClientOptions, setting _as_backup if applicable."""
+        self._as_backup = data.pop("_as_backup", False)
+        if self._as_backup and not hasattr(self, "is_provider_backup"):
+            from codeweaver.providers.config.utils import this_as_backup_cls
+
+            backup_cls = this_as_backup_cls(type(self), namespace=globals())
+            if backup_cls is not None:
+                self.__class__ = backup_cls
+        super().__init__(**data)
+
     @model_validator(mode="before")
     @classmethod
     def _handle_env_vars(cls, values: dict[str, Any]) -> dict[str, Any]:

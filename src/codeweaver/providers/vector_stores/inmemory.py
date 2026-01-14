@@ -9,15 +9,12 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import json
 import logging
 
-from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar, Literal, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Literal
 
-from codeweaver.core import PersistenceError, Provider, ProviderError, get_user_config_dir
-from codeweaver.providers.config import MemoryConfig
+from codeweaver.core import INJECTED, PersistenceError, Provider, ProviderError, get_user_config_dir
 from codeweaver.providers.vector_stores.qdrant_base import QdrantBaseProvider
 
 
@@ -36,45 +33,6 @@ except ImportError as e:
 logger = logging.getLogger(__name__)
 
 
-def _get_project_name() -> str:
-    """Get the project name for the persistence store.
-
-    Returns:
-        The project name as a string.
-    """
-    from codeweaver.providers.config import get_settings_map
-
-    settings = get_settings_map()
-    return settings.get("project_name") or (
-        settings.get("project_path").name
-        if isinstance(settings.get("project_path"), Path)
-        else "default_project"
-    )
-
-
-def _get_memory_config() -> MemoryConfig:
-    from codeweaver.core import Unset
-    from codeweaver.providers.config import get_settings_map
-
-    settings_map = get_settings_map()
-    if (
-        (provider_settings := settings_map.get("providers"))
-        and provider_settings is not Unset
-        and (vector_settings := provider_settings.get("vector_store"))
-        and vector_settings is not Unset
-    ):
-        vector_store_config = (
-            vector_settings[0] if isinstance(vector_settings, tuple) else vector_settings
-        )
-        if (
-            memory_config := vector_store_config["provider_settings"]
-            if vector_store_config["provider"] == Provider.MEMORY
-            else None
-        ):
-            return memory_config
-    return MemoryConfig()
-
-
 class MemoryVectorStoreProvider(QdrantBaseProvider):
     """In-memory vector store with JSON persistence for development/testing.
 
@@ -83,7 +41,7 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
     """
 
     _provider: ClassVar[Literal[Provider.MEMORY]] = Provider.MEMORY
-    config: MemoryConfig = _get_memory_config()
+    config: MemoryDep = INJECTED
     _client: AsyncQdrantClient | None = None
     _shared_client: ClassVar[AsyncQdrantClient | None] = None
 
@@ -91,10 +49,9 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
         """Capture config values before they get overwritten during initialization."""
         # Store persist_path, auto_persist, and persist_interval from original config
         # These will be used in _init_provider after base class overwrites self.config
-        persist_path_config = self.config.get("persist_path", get_user_config_dir())
-        object.__setattr__(self, "_initial_persist_path", persist_path_config)
-        object.__setattr__(self, "_initial_auto_persist", self.config.get("auto_persist"))
-        object.__setattr__(self, "_initial_persist_interval", self.config.get("persist_interval"))
+        for attr in ("persist_path", "auto_persist", "persist_interval"):
+            value = getattr(self.config.in_memory_config, attr, None)
+            object.__setattr__(self, f"_initial_{attr}", value)
         super().model_post_init(__context)
 
     @property
@@ -114,9 +71,14 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
         # Use the values captured in model_post_init before self.config was overwritten
         persist_path_config = getattr(self, "_initial_persist_path", get_user_config_dir())
         persist_path = Path(persist_path_config)
-        # If path doesn't end with .json, treat it as a directory and append default filename
-        if persist_path.suffix != ".json":
-            persist_path = persist_path / f"{_get_project_name()}_vector_store.json"
+
+        # Determine persistence directory
+        if persist_path.suffix == ".json":
+            # If user pointed to a json file, use the path without extension as directory
+            persist_path = persist_path.with_suffix("")
+        elif not persist_path.suffix:
+            # If path is a directory (or intended to be), append default directory name
+            persist_path = persist_path / f"{_get_project_name()}_vector_store"
 
         # Logic for auto_persist:
         # 1. If explicitly provided in config, use that value.
@@ -205,239 +167,69 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
         return AsyncQdrantClient(location=":memory:", **(self.config.get("client_options", {})))
 
     async def _persist_to_disk(self) -> None:
-        """Persist in-memory state to JSON file.
+        """Persist in-memory state to Qdrant storage directory.
 
         Raises:
             PersistenceError: Failed to write persistence file.
         """
-        from qdrant_client.http.models import (
-            Distance,
-            PointStruct,
-            SparseVectorParams,
-            VectorParams,
-        )
-
-        from codeweaver.providers.vector_stores.metadata import CollectionMetadata
-
         if not self._ensure_client(self._client):
             raise ProviderError("Qdrant client not initialized")
+
+        # Atomic persistence via temporary directory
+        temp_path = self._persist_path.with_suffix(".tmp")
+        if temp_path.exists():
+            import shutil
+
+            shutil.rmtree(temp_path)
+
         try:
-            # Get all collections
-            collections_response = await self._client.get_collections()
-            collections_data = {}
+            # Initialize persistent client at temp path
+            # We use AsyncQdrantClient with path to create local storage
+            dest_client = AsyncQdrantClient(path=str(temp_path))
 
-            for col in collections_response.collections:
-                # Get collection info
-                col_info = await self._client.get_collection(collection_name=col.name)
+            # Migrate data
+            await self.migrate_to(dest_client)
 
-                # Scroll all points
-                points: list[PointStruct] = []
-                offset = None
-                while True:
-                    result = await self._client.scroll(
-                        collection_name=col.name,
-                        limit=100,
-                        offset=offset,
-                        with_payload=True,
-                        with_vectors=True,
-                    )
-                    if not result[0]:  # No more points
-                        break
-                    points.extend(result[0])  # ty:ignore[invalid-argument-type]
-                    offset = result[1]  # Next offset
-                    if offset is None:  # Reached end
-                        break
-                # Serialize collection data
-                # Extract dense vector config (vectors is a dict[str, VectorParams])
-                vectors_data = col_info.config.params.vectors  # type: ignore
-                # Try to get dimension from collection first, fall back to model config
-                dense_size = 768  # Default dimension
-                if isinstance(vectors_data, dict) and "dense" in vectors_data:
-                    dense_params = vectors_data["dense"]
-                    if hasattr(dense_params, "size"):
-                        dense_size = dense_params.size
-                    else:
-                        # Only call resolve_dimensions if we can't get size from collection
-                        with contextlib.suppress(ValueError):
-                            from codeweaver.providers.vector_stores.utils import resolve_dimensions
+            # Close dest client to release locks
+            await dest_client.close()
 
-                            dense_size = resolve_dimensions()
+            # Atomic replace
+            if self._persist_path.exists():
+                import shutil
 
-                # Access metadata with lock protection (create a copy to avoid holding lock during validation)
-                async with self._collection_metadata_lock:  # type: ignore
-                    raw_metadata = self._collection_metadata.get(col.name)  # type: ignore[unresolved-attribute]
-                    # Create a shallow copy to safely use outside the lock
-                    raw_metadata = dict(raw_metadata) if raw_metadata else None
+                if self._persist_path.is_dir():
+                    shutil.rmtree(self._persist_path)
+                else:
+                    self._persist_path.unlink()
 
-                # Try to validate existing metadata, fall back to creating new if invalid
-                metadata: CollectionMetadata | None = None
-                if raw_metadata:
-                    try:
-                        metadata = CollectionMetadata.model_validate(raw_metadata)
-                    except Exception:
-                        # Metadata exists but is incomplete/invalid - will create new below
-                        metadata = None
-
-                if metadata is None:
-                    metadata = CollectionMetadata(
-                        created_at=datetime.now(UTC),
-                        provider=str(self._provider),
-                        project_name=_get_project_name(),
-                        collection_name=col.name,
-                        vector_config={
-                            "dense": VectorParams(size=dense_size, distance=Distance.COSINE)
-                        },
-                        sparse_config={"sparse": SparseVectorParams()},
-                    )
-                    # Store the newly created metadata for future use
-                    async with self._collection_metadata_lock:  # type: ignore
-                        self._collection_metadata[col.name] = metadata.model_dump(mode="json")  # type: ignore
-
-                def _serialize_vector(vector: Any) -> Any:
-                    """Serialize vector data, converting SparseVector to JSON-compatible format."""
-                    from qdrant_client.models import SparseVector
-
-                    if isinstance(vector, SparseVector):
-                        return {"indices": list(vector.indices), "values": list(vector.values)}
-                    if isinstance(vector, dict):
-                        return {k: _serialize_vector(v) for k, v in vector.items()}
-                    return vector
-
-                collections_data[col.name] = {
-                    "metadata": metadata.model_dump(mode="json"),
-                    "vectors_config": {"dense": {"size": dense_size, "distance": "Cosine"}},
-                    "sparse_vectors_config": {"sparse": {}},
-                    "points": [
-                        {
-                            "id": str(point.id),
-                            "vector": _serialize_vector(point.vector),
-                            "payload": point.payload,
-                        }
-                        for point in points
-                    ],
-                }
-
-            # Create persistence data
-            persistence_data = {
-                "version": "1.0",
-                "metadata": {
-                    "created_at": datetime.now(UTC).isoformat(),
-                    "last_modified": datetime.now(UTC).isoformat(),
-                },
-                "collections": collections_data,
-            }
-
-            # Write to temporary file first (atomic write)
-            temp_path = self._persist_path.with_suffix(".tmp")  # type: ignore
-            temp_path.parent.mkdir(parents=True, exist_ok=True)  # type: ignore
-            temp_path.write_text(json.dumps(persistence_data, indent=2))  # type: ignore
-
-            # Atomic rename
-            temp_path.replace(self._persist_path)  # type: ignore
+            temp_path.rename(self._persist_path)
 
         except Exception as e:
+            if temp_path.exists():
+                import shutil
+
+                shutil.rmtree(temp_path)
             raise PersistenceError(f"Failed to persist to disk: {e}") from e
 
     async def _restore_from_disk(self) -> None:
-        """Restore in-memory state from JSON file.
+        """Restore in-memory state from Qdrant storage directory.
 
         Raises:
-            PersistenceError: Failed to read or parse persistence file.
-            ValidationError: Persistence file format invalid.
+            PersistenceError: Failed to restore from disk.
         """
-        from pydantic_core import from_json
-        from qdrant_client.models import Datatype, Distance, PointStruct, VectorParams
+        if not self._persist_path.exists():
+            return
 
-        def _raise_persistence_error(msg: str) -> None:
-            raise PersistenceError(msg)
-
-        if not self._ensure_client(self._client):
-            raise ProviderError("Qdrant client not initialized")
-        try:
-            # Read and parse JSON
-            data = from_json(cast(Path, self._persist_path).read_bytes())  # type: ignore
-
-            # Validate version
-            if data.get("version") != "1.0":
-                _raise_persistence_error(f"Unsupported persistence version: {data.get('version')}")
-
-            # Restore each collection
-            for collection_name, collection_data in data.get("collections", {}).items():
-                # Check if collection already exists
-                with contextlib.suppress(Exception):
-                    _ = await self._client.get_collection(collection_name=collection_name)
-                    # Collection exists, delete it first to ensure clean restore
-                    _ = await self._client.delete_collection(collection_name=collection_name)
-
-                # Create collection with vector configuration
-                vectors_config = collection_data["vectors_config"]
-                dense_config = vectors_config.get("dense", {})
-
-                # Map distance from persisted data
-                distance_repr = dense_config.get("distance", "Cosine")
-                distance_map = {
-                    "Cosine": Distance.COSINE,
-                    "Dot": Distance.DOT,
-                    "Euclid": Distance.EUCLID,
-                    "Euclidean": Distance.EUCLID,
-                }
-                distance = distance_map.get(distance_repr, Distance.COSINE)
-
-                # Map datatype from persisted data
-                datatype_repr = dense_config.get("datatype", "Float32")
-                datatype_map = {
-                    "Float32": Datatype.FLOAT32,
-                    "Float16": Datatype.FLOAT16,
-                    "Uint8": Datatype.UINT8,
-                }
-                datatype = datatype_map.get(datatype_repr, Datatype.FLOAT32)
-
-                await self._client.create_collection(
-                    collection_name=collection_name,
-                    vectors_config={
-                        "dense": VectorParams(
-                            size=dense_config.get("size", 768),
-                            distance=distance,
-                            datatype=datatype,
-                            # quantization_config restored if present in future
-                        )
-                    },
-                    sparse_vectors_config={"sparse": {}},  # type: ignore
-                )
-
-                # Store collection metadata if it exists (protected by lock)
-                if "metadata" in collection_data:
-                    async with self._collection_metadata_lock:  # type: ignore
-                        self._collection_metadata[collection_name] = collection_data["metadata"]  # type: ignore
-
-                def _deserialize_vector(vector: Any) -> Any:
-                    """Deserialize vector data, converting sparse dict to SparseVector."""
-                    from qdrant_client.models import SparseVector
-
-                    if isinstance(vector, dict):
-                        # Check if it's a serialized sparse vector
-                        if "indices" in vector and "values" in vector:
-                            return SparseVector(indices=vector["indices"], values=vector["values"])
-                        # Otherwise recursively deserialize dict values
-                        return {k: _deserialize_vector(v) for k, v in vector.items()}
-                    return vector
-
-                # Restore points in batches
-                points_data = collection_data.get("points", [])
-                for i in range(0, len(points_data), 100):
-                    batch = points_data[i : i + 100]
-                    points = [
-                        PointStruct(
-                            id=point["id"],
-                            vector=_deserialize_vector(point["vector"]),
-                            payload=point["payload"],  # type: ignore
-                        )
-                        for point in batch
-                    ]
-                    _ = await self._client.upsert(collection_name=collection_name, points=points)
-
-        except Exception as e:
-            raise PersistenceError(f"Failed to restore from disk: {e}") from e
+        # Check if it's a directory (new format)
+        if self._persist_path.is_dir():
+            try:
+                source_client = AsyncQdrantClient(path=str(self._persist_path))
+                await self.migrate_from(source_client)
+                await source_client.close()
+            except Exception as e:
+                raise PersistenceError(f"Failed to restore from disk: {e}") from e
+        else:
+            logger.warning("Persistence path exists but is not a directory. Skipping restore.")
 
     async def _periodic_persist_task(self) -> None:
         """Background task for periodic persistence.

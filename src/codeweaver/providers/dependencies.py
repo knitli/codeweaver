@@ -42,25 +42,45 @@ This is expected on the feat/di_monorepo branch.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Annotated, Any
 
 from codeweaver.core import (
     INJECTED,
     BaseCodeWeaverSettings,
     ConfigurationError,
-    NoneDep,
+    SDKClient,
     SettingsDep,
     TypeIs,
+    dependency_provider,
     depends,
+    lazy_import,
     rpartial,
 )
-from codeweaver.providers.config import CodeWeaverProviderSettings
+from codeweaver.providers.backup_factory import create_backup_class
+from codeweaver.providers.embedding.capabilities.resolver import (
+    EmbeddingCapabilityResolver,
+    SparseEmbeddingCapabilityResolver,
+)
 from codeweaver.providers.reranking.capabilities.resolver import RerankingCapabilityResolver
 
 
 if TYPE_CHECKING:
-    from codeweaver.providers.config import CodeWeaverProviderSettings
+    from codeweaver.core import LazyImport
+    from codeweaver.providers.config import (
+        AgentProviderSettings,
+        BaseProviderSettings,
+        ClientOptions,
+        CodeWeaverProviderSettings,
+        DataProviderSettings,
+        EmbeddingConfigT,
+        EmbeddingProviderSettings,
+        ProviderSettings,
+        RerankingConfigT,
+        RerankingProviderSettings,
+        SparseEmbeddingProviderSettings,
+        VectorStoreProviderSettings,
+    )
 
 
 def _create_backup_func[T: Any](func: Callable[..., T]) -> Callable[..., T]:
@@ -101,6 +121,7 @@ def _get_settings(settings: SettingsDep = INJECTED) -> CodeWeaverProviderSetting
     return resolved_settings
 
 
+@dependency_provider(ProviderSettings, scope="singleton")
 def _get_provider_settings() -> Any:
     """Factory for creating root provider settings from configuration."""
     return _get_settings().provider
@@ -125,6 +146,27 @@ def _get_provider_settings() -> Any:
 # at module initialization to ensure it's available when providers are created.
 
 
+def _resolve_client(client: SDKClient) -> Any:
+    """Helper to resolve client if it's a LazyImport."""
+    return client._resolve() if isinstance(client, LazyImport) else client
+
+
+def _instantiate_client(client_cls: Any, options: ClientOptions | None = None) -> Any:
+    """Instantiate an SDK client with the given options."""
+    return client_cls(**(options.as_settings() if options else {}))
+
+
+def _resolve_provider_settings(
+    settings: BaseProviderSettings | tuple[BaseProviderSettings, ...], *, backup: bool = False
+) -> BaseProviderSettings | None:
+    """Helper to resolve provider settings if they're LazyImports."""
+    if isinstance(settings, tuple) and backup:
+        return next((s for s in settings if s.as_backup), None)
+    if isinstance(settings, tuple):
+        return next((s for s in settings if not s.as_backup), None)
+    return settings
+
+
 def _create_embedding_client(*, backup: bool = False) -> Any:  # AsyncOpenAI
     """Universal client factory for all embedding providers.
 
@@ -134,292 +176,371 @@ def _create_embedding_client(*, backup: bool = False) -> Any:  # AsyncOpenAI
     Raises:
         ConfigurationError: If config is missing, provider unsupported, or SDK not installed
     """
-    embedding_settings = _get_provider_settings().embedding
+    default_embedding_config: LazyImport[EmbeddingConfigT] = lazy_import(
+        "codeweaver.providers.config.providers", "DefaultEmbeddingProviderSettings"
+    )
+    embedding_settings = _get_provider_settings().embedding or default_embedding_config._resolve()
+    if backup and (config := _resolve_provider_settings(embedding_settings, backup=True)):
+        resolved_settings = config
+    else:
+        resolved_settings = _resolve_provider_settings(embedding_settings)
+    if not resolved_settings:
+        raise ConfigurationError(
+            "No embedding provider configuration found",
+            suggestions=["Ensure at least one embedding provider is configured in settings"],
+        )
+    client = _resolve_client(resolved_settings.client)  # ty:ignore[invalid-argument-type]
+    return _instantiate_client(client, resolved_settings.client_options)
+
+
+def _create_sparse_embedding_client(*, backup: bool = False) -> Any:
+    """Universal client factory for all sparse embedding providers.
+
+    Returns:
+        Configured SDK client instance appropriate for the provider type
+
+    Raises:
+        ConfigurationError: If config is missing, provider unsupported, or SDK not installed
+    """
+    default_sparse_embedding_config: LazyImport[EmbeddingConfigT] = lazy_import(
+        "codeweaver.providers.config.providers", "DefaultSparseEmbeddingProviderSettings"
+    )
+    sparse_embedding_settings = (
+        _get_provider_settings().sparse_embedding or default_sparse_embedding_config._resolve()
+    )
+    if backup and (config := _resolve_provider_settings(sparse_embedding_settings, backup=True)):
+        resolved_settings = config
+    else:
+        resolved_settings = _resolve_provider_settings(sparse_embedding_settings)
+    if not resolved_settings:
+        raise ConfigurationError(
+            "No sparse embedding provider configuration found",
+            suggestions=["Ensure at least one sparse embedding provider is configured in settings"],
+        )
+    client = _resolve_client(resolved_settings.client)  # ty:ignore[invalid-argument-type]
+    return _instantiate_client(client, resolved_settings.client_options)
+
+
+def _create_reranking_client(*, backup: bool = False) -> Any:
+    """Universal client factory for all reranking providers.
+
+    Returns:
+        Configured SDK client instance appropriate for the provider type
+
+    Raises:
+        ConfigurationError: If config is missing, provider unsupported, or SDK not installed
+    """
+    default_reranking_config: LazyImport[RerankingConfigT] = lazy_import(
+        "codeweaver.providers.config.providers", "DefaultRerankingProviderSettings"
+    )
+    reranking_settings = _get_provider_settings().reranking or default_reranking_config._resolve()
+    if backup and (config := _resolve_provider_settings(reranking_settings, backup=True)):
+        resolved_settings = config
+    else:
+        resolved_settings = _resolve_provider_settings(reranking_settings)
+    if not resolved_settings:
+        raise ConfigurationError(
+            "No reranking provider configuration found",
+            suggestions=["Ensure at least one reranking provider is configured in settings"],
+        )
+    client = _resolve_client(resolved_settings.client)  # ty:ignore[invalid-argument-type]
+    return _instantiate_client(client, resolved_settings.client_options)
+
+
+def _create_vector_client(*, backup: bool = False) -> Any:
+    """Universal client factory for all vector store providers.
+
+    Returns:
+        Configured SDK client instance appropriate for the provider type
+
+    Raises:
+        ConfigurationError: If config is missing, provider unsupported, or SDK not installed
+    """
+    default_vector_store_config: LazyImport[VectorStoreProviderSettings] = lazy_import(
+        "codeweaver.providers.config.providers", "DefaultVectorStoreProviderSettings"
+    )
+    vector_store_settings = (
+        _get_provider_settings().vector_store or default_vector_store_config._resolve()
+    )
+    if backup and (config := _resolve_provider_settings(vector_store_settings, backup=True)):
+        resolved_settings = config
+    else:
+        resolved_settings = _resolve_provider_settings(vector_store_settings)
+    if not resolved_settings:
+        raise ConfigurationError(
+            "No vector store provider configuration found",
+            suggestions=["Ensure at least one vector store provider is configured in settings"],
+        )
+    client = _resolve_client(resolved_settings.client)  # ty:ignore[invalid-argument-type]
+    return _instantiate_client(client, resolved_settings.client_options)
 
 
 # Universal client dependency type for all embedding providers
-type ClientDep[T] = Annotated[T, depends(_create_embedding_client)]
-"""Universal client dependency type for embedding providers.
+type EmbeddingClientDep[T] = Annotated[T, depends(_create_embedding_client)]
+"""Type alias for DI injection of embedding SDK client."""
 
-This type alias provides DI injection of SDK clients based on the configured provider.
-The type parameter T should match the expected SDK client type (e.g., AsyncOpenAI,
-VoyageAsyncClient, etc.).
+type SparseEmbeddingClientDep[T] = Annotated[T, depends(_create_sparse_embedding_client)]
+"""Type alias for DI injection of sparse embedding SDK client."""
 
-Pattern:
-    ```python
-    class OpenAIEmbeddingProvider:
-        def __init__(
-            self,
-            client: ClientDep[AsyncOpenAI] = INJECTED,
-            config: EmbeddingConfigDep = INJECTED,
-        ):
-            self.client = client  # Already configured AsyncOpenAI instance
-            self.config = config
-    ```
+type RerankingClientDep[T] = Annotated[T, depends(_create_reranking_client)]
+"""Type alias for DI injection of reranking SDK client."""
 
-Type Safety:
-    The type parameter provides type hints for static analysis, while the actual
-    client type is determined at runtime based on config.provider.
+type VectorStoreClientDep[T] = Annotated[T, depends(_create_vector_client)]
+"""Type alias for DI injection of vector store SDK client."""
+
+
+# ===========================================================================
+# *              Provider Kinds Factories - DI TYPE ALIASES
+# ===========================================================================
+BackupEmbeddingProviderSettings = create_backup_class(EmbeddingProviderSettings)
+BackupSparseEmbeddingProviderSettings = create_backup_class(SparseEmbeddingProviderSettings)
+BackupRerankingProviderSettings = create_backup_class(RerankingProviderSettings)
+BackupVectorStoreProviderSettings = create_backup_class(VectorStoreProviderSettings)
+BackupAgentProviderSettings = create_backup_class(AgentProviderSettings)
+BackupDataProviderSettings = create_backup_class(DataProviderSettings)
+
+
+def _get_primary_provider_config_for[
+    T: EmbeddingProviderSettings
+    | SparseEmbeddingProviderSettings
+    | RerankingProviderSettings
+    | VectorStoreProviderSettings
+    | AgentProviderSettings
+    | DataProviderSettings
+](settings: Sequence[T]) -> T:
+    """Helper to get the primary provider config from a sequence of configs."""
+    if primary_config := next((s for s in settings if not s.as_backup), None):
+        return primary_config
+    raise ConfigurationError(
+        "No primary provider configuration found",
+        suggestions=["Ensure at least one provider is configured as primary in settings"],
+    )
+
+
+def _get_backup_provider_config_for[
+    T: BackupEmbeddingProviderSettings
+    | BackupSparseEmbeddingProviderSettings
+    | BackupRerankingProviderSettings
+    | BackupVectorStoreProviderSettings
+    | BackupAgentProviderSettings
+    | BackupDataProviderSettings
+](settings: Sequence[T]) -> T:
+    """Helper to get the backup provider config from a sequence of configs."""
+    if backup_config := next((s for s in settings if s.as_backup), None):
+        return backup_config
+    raise ConfigurationError(
+        "No backup provider configuration found",
+        suggestions=["Ensure at least one provider is configured as backup in settings"],
+    )
+
+
+@dependency_provider(EmbeddingProviderSettings, scope="singleton", collection=True)
+def _create_all_embedding_configs() -> tuple[EmbeddingProviderSettings, ...]:
+    """Factory for creating ALL embedding configs (primary + backups) from settings."""
+    embedding_configs = _get_settings().provider.embedding
+    return (
+        embedding_configs
+        if isinstance(embedding_configs, tuple)
+        else (embedding_configs,)
+        if embedding_configs
+        else ()
+    )
+
+
+@dependency_provider(EmbeddingProviderSettings, scope="singleton")
+def _create_primary_embedding_config() -> EmbeddingProviderSettings:
+    """Factory for creating PRIMARY embedding config from settings."""
+    return _get_primary_provider_config_for(_create_all_embedding_configs())
+
+
+@dependency_provider(create_backup_class(EmbeddingProviderSettings), scope="singleton")
+def _create_backup_embedding_config() -> EmbeddingProviderSettings:
+    """Factory for creating BACKUP embedding config from settings."""
+    return _get_backup_provider_config_for(_create_all_embedding_configs())
+
+
+type EmbeddingProviderSettingsDep = Annotated[
+    EmbeddingProviderSettings, depends(_create_primary_embedding_config, use_cache=False)
+]
+"""Type alias for DI injection of PRIMARY embedding provider settings."""
+
+type BackupEmbeddingProviderSettingsDep = Annotated[
+    EmbeddingProviderSettings, depends(_create_backup_embedding_config, use_cache=False)
+]
+
+type AllEmbeddingConfigsDep = Annotated[
+    Sequence[EmbeddingProviderSettings], depends(_create_all_embedding_configs, use_cache=False)
+]
+"""Type alias for DI injection of all embedding provider settings.
 """
 
-
-if TYPE_CHECKING:
-    # Aggregated union types (discriminated by provider)
-    # Specific embedding provider settings
-    # Reranking provider settings
-    # Vector store provider settings
-    # Other provider settings
-    from codeweaver.providers.config.kinds import (
-        AzureEmbeddingProviderSettings,
-        BedrockEmbeddingProviderSettings,
-        BedrockRerankingProviderSettings,
-        FastEmbedEmbeddingProviderSettings,
-        FastEmbedRerankingProviderSettings,
-        FastEmbedSparseEmbeddingProviderSettings,
-        QdrantVectorStoreProviderSettings,
-    )
-
-    # Root provider settings
-    from codeweaver.providers.config.providers import (
-        AgentProviderSettingsType,
-        DataProviderSettingsType,
-        EmbeddingProviderSettingsType,
-        ProviderSettings,
-        RerankingProviderSettingsType,
-        SparseEmbeddingProviderSettingsType,
-        VectorStoreProviderSettingsType,
-    )
-    from codeweaver.providers.embedding.capabilities.resolver import EmbeddingCapabilityResolver
+type EmbeddingCapabilityResolverDep = Annotated[
+    EmbeddingCapabilityResolver, depends(EmbeddingCapabilityResolver)
+]
+"""Type alias for DI injection of embedding capability resolver."""
 
 
-# ===========================================================================
-# *              EMBEDDING PROVIDER SETTINGS - DI TYPE ALIASES
-# ===========================================================================
+@dependency_provider(SparseEmbeddingProviderSettings, scope="singleton", collection=True)
+def _create_all_sparse_embedding_configs() -> tuple[SparseEmbeddingProviderSettings, ...]:
+    """Factory for creating ALL sparse embedding configs (primary + backups) from settings.
 
-
-def _create_embedding_provider_settings_dep():
-    """Factory for creating PRIMARY embedding provider config from settings.
-
-    Returns the first (primary) embedding config from settings.provider.embedding.
-    For all configs (primary + backups), inject Sequence[EmbeddingConfigT] instead.
-
-    Note: This factory should be decorated with @dependency_provider at module init.
-    """
-    return next(
-        iter(
-            embedding_config
-            if (embedding_config := _get_settings().provider.embedding)
-            and "backup" not in embedding_config.__name__.lower()
-            else ()
-        ),
-        None,
-    )
-
-
-def _create_all_embedding_configs():
-    """Factory for creating ALL embedding configs (primary + backups) from settings.
-
-    Returns a sequence of all configured embedding providers.
+    Returns a sequence of all configured sparse embedding providers.
     Use this when you need access to backup providers, not just the primary.
 
     Note: This factory should be decorated with @dependency_provider at module init.
     """
-    from codeweaver.core.di import INJECTED
-
-    settings: BaseCodeWeaverSettings = INJECTED
-    return settings.provider.embedding or ()
-
-
-type EmbeddingProviderSettingsDep = Annotated[
-    EmbeddingProviderSettingsType,  # type: ignore[name-defined]
-    depends(_create_embedding_provider_settings_dep),
-]
-"""Type alias for DI injection of PRIMARY embedding provider settings."""
-
-type AllEmbeddingConfigsDep = Annotated[
-    Sequence[EmbeddingConfigT],  # type: ignore[name-defined]
-    depends(_create_all_embedding_configs),
-]
-"""Type alias for DI injection of embedding provider settings.
-
-When a function or class requests this type with = INJECTED, the DI container
-will call the factory to resolve the appropriate embedding settings based on
-the current configuration.
-
-Example:
-    ```python
-    def create_embedding(
-        settings: EmbeddingProviderSettingsDep = INJECTED
-    ) -> EmbeddingProvider:
-        # settings is already configured and ready to use
-        return EmbeddingProvider(settings)
-    ```
-"""
+    sparse_embedding_configs = _get_settings().provider.sparse_embedding
+    return (
+        sparse_embedding_configs
+        if isinstance(sparse_embedding_configs, tuple)
+        else (sparse_embedding_configs,)
+        if sparse_embedding_configs
+        else ()
+    )
 
 
-# ⏳ Factory pending
-def _create_azure_embedding_settings_dep() -> AzureEmbeddingProviderSettings:  # type: ignore[name-defined]
-    """Factory for Azure-specific embedding provider settings."""
+@dependency_provider(SparseEmbeddingProviderSettings, scope="singleton")
+def _create_primary_sparse_embedding_config() -> SparseEmbeddingProviderSettings:
+    """Factory for creating PRIMARY sparse embedding config from settings."""
+    return _get_primary_provider_config_for(_create_all_sparse_embedding_configs())
 
 
-type AzureEmbeddingProviderSettingsDep = Annotated[
-    AzureEmbeddingProviderSettings,  # type: ignore[name-defined]
-    depends(_create_azure_embedding_settings_dep),
-]
-"""Type alias for DI injection of Azure embedding provider settings."""
-
-
-# ⏳ Factory pending
-def _create_bedrock_embedding_settings_dep() -> BedrockEmbeddingProviderSettings:  # type: ignore[name-defined]
-    """Factory for Bedrock-specific embedding provider settings."""
-
-
-type BedrockEmbeddingProviderSettingsDep = Annotated[
-    BedrockEmbeddingProviderSettings,  # type: ignore[name-defined]
-    depends(_create_bedrock_embedding_settings_dep),
-]
-"""Type alias for DI injection of Bedrock embedding provider settings."""
-
-
-# ⏳ Factory pending
-def _create_fastembed_embedding_settings_dep() -> FastEmbedEmbeddingProviderSettings:  # type: ignore[name-defined]
-    """Factory for FastEmbed embedding provider settings."""
-
-
-type FastEmbedEmbeddingProviderSettingsDep = Annotated[
-    FastEmbedEmbeddingProviderSettings,  # type: ignore[name-defined]
-    depends(_create_fastembed_embedding_settings_dep),
-]
-"""Type alias for DI injection of FastEmbed embedding provider settings."""
-
-
-# ===========================================================================
-# *            SPARSE EMBEDDING PROVIDER SETTINGS - DI TYPE ALIASES
-# ===========================================================================
-
-
-# ⏳ Factory pending
-def _create_sparse_embedding_provider_settings_dep() -> SparseEmbeddingProviderSettingsType:  # type: ignore[name-defined]
-    """Factory for creating sparse embedding provider settings."""
+@dependency_provider(BackupSparseEmbeddingProviderSettings, scope="singleton")
+def _create_backup_sparse_embedding_config() -> SparseEmbeddingProviderSettings:
+    """Factory for creating BACKUP sparse embedding config from settings."""
+    return _get_backup_provider_config_for(_create_all_sparse_embedding_configs())
 
 
 type SparseEmbeddingProviderSettingsDep = Annotated[
-    SparseEmbeddingProviderSettingsType,  # type: ignore[name-defined]
-    depends(_create_sparse_embedding_provider_settings_dep),
+    SparseEmbeddingProviderSettings,
+    depends(_create_primary_sparse_embedding_config, use_cache=False),
 ]
-"""Type alias for DI injection of sparse embedding provider settings."""
-
-
-# ⏳ Factory pending
-def _create_fastembed_sparse_embedding_settings_dep() -> FastEmbedSparseEmbeddingProviderSettings:  # type: ignore[name-defined]
-    """Factory for FastEmbed sparse embedding provider settings."""
-
-
-type FastEmbedSparseEmbeddingProviderSettingsDep = Annotated[
-    FastEmbedSparseEmbeddingProviderSettings,  # type: ignore[name-defined]
-    depends(_create_fastembed_sparse_embedding_settings_dep),
+type BackupSparseEmbeddingProviderSettingsDep = Annotated[
+    BackupSparseEmbeddingProviderSettings,
+    depends(_create_backup_sparse_embedding_config, use_cache=False),
 ]
-"""Type alias for DI injection of FastEmbed sparse embedding provider settings."""
+type AllSparseEmbeddingConfigsDep = Annotated[
+    Sequence[SparseEmbeddingProviderSettings],
+    depends(_create_all_sparse_embedding_configs, use_cache=False),
+]
+
+type SparseCapabilityResolverDep = Annotated[
+    SparseEmbeddingCapabilityResolver, depends(SparseEmbeddingCapabilityResolver)
+]
 
 
-# ===========================================================================
-# *              RERANKING PROVIDER SETTINGS - DI TYPE ALIASES
-# ===========================================================================
+@dependency_provider(RerankingProviderSettings, scope="singleton", collection=True)
+def _create_all_reranking_configs() -> tuple[RerankingProviderSettings, ...]:
+    """Factory for creating ALL reranking configs (primary + backups) from settings."""
+    reranking_configs = _get_settings().provider.reranking
+    return (
+        reranking_configs
+        if isinstance(reranking_configs, tuple)
+        else (reranking_configs,)
+        if reranking_configs
+        else ()
+    )
 
 
-# ⏳ Factory pending
-def _create_reranking_provider_settings_dep() -> RerankingProviderSettingsType:  # type: ignore[name-defined]
-    """Factory for creating reranking provider settings from configuration."""
+@dependency_provider(RerankingProviderSettings, scope="singleton")
+def _create_primary_reranking_config() -> RerankingProviderSettings:
+    """Factory for creating PRIMARY reranking config from settings."""
+    return _get_primary_provider_config_for(_create_all_reranking_configs())
+
+
+@dependency_provider(BackupRerankingProviderSettings, scope="singleton")
+def _create_backup_reranking_config() -> BackupRerankingProviderSettings:
+    """Factory for creating BACKUP reranking config from settings."""
+    return _get_backup_provider_config_for(_create_all_reranking_configs())
 
 
 type RerankingProviderSettingsDep = Annotated[
-    RerankingProviderSettingsType,  # type: ignore[name-defined]
-    depends(_create_reranking_provider_settings_dep),
+    RerankingProviderSettings,  # type: ignore[name-defined]
+    depends(_create_primary_reranking_config, use_cache=False),
 ]
 """Type alias for DI injection of reranking provider settings."""
 
-
-# Type alias for dependency injection
-type EmbeddingCapabilityResolverDep = Annotated[
-    EmbeddingCapabilityResolver,
-    depends(EmbeddingCapabilityResolver, use_cache=True, scope="singleton"),
+type BackupRerankingProviderSettingsDep = Annotated[
+    BackupRerankingProviderSettings,  # type: ignore[name-defined]
+    depends(_create_backup_reranking_config, use_cache=False),
 ]
+"""Type alias for DI injection of backup reranking provider settings."""
 
+type AllRerankingConfigsDep = Annotated[
+    Sequence[RerankingProviderSettings],  # type: ignore[name-defined]
+    depends(_create_all_reranking_configs, use_cache=False),
+]
+"""Type alias for DI injection of all reranking provider settings."""
 
 # Type alias for dependency injection
 type RerankingCapabilityResolverDep = Annotated[
     RerankingCapabilityResolver, depends(RerankingCapabilityResolver)
 ]
+"""Type alias for DI injection of reranking capability resolver."""
 
 
-# ⏳ Factory pending
-def _create_fastembed_reranking_settings_dep() -> FastEmbedRerankingProviderSettings:  # type: ignore[name-defined]
-    """Factory for FastEmbed reranking provider settings."""
+@dependency_provider(VectorStoreProviderSettings, scope="singleton", collection=True)
+def _create_all_vector_store_configs() -> tuple[VectorStoreProviderSettings, ...]:
+    """Factory for creating ALL vector store configs (primary + backups) from settings."""
+    vector_store_configs = _get_settings().provider.vector_store
+    return (
+        vector_store_configs
+        if isinstance(vector_store_configs, tuple)
+        else (vector_store_configs,)
+        if vector_store_configs
+        else ()
+    )
 
 
-type FastEmbedRerankingProviderSettingsDep = Annotated[
-    FastEmbedRerankingProviderSettings,  # type: ignore[name-defined]
-    depends(_create_fastembed_reranking_settings_dep),
-]
-"""Type alias for DI injection of FastEmbed reranking provider settings."""
+@dependency_provider(VectorStoreProviderSettings, scope="singleton")
+def _create_primary_vector_store_config() -> VectorStoreProviderSettings:
+    """Factory for creating PRIMARY vector store config from settings."""
+    return _get_primary_provider_config_for(_create_all_vector_store_configs())
 
 
-# ⏳ Factory pending
-def _create_bedrock_reranking_settings_dep() -> BedrockRerankingProviderSettings:  # type: ignore[name-defined]
-    """Factory for Bedrock reranking provider settings."""
-
-
-type BedrockRerankingProviderSettingsDep = Annotated[
-    BedrockRerankingProviderSettings,  # type: ignore[name-defined]
-    depends(_create_bedrock_reranking_settings_dep),
-]
-"""Type alias for DI injection of Bedrock reranking provider settings."""
-
-
-# ===========================================================================
-# *             VECTOR STORE PROVIDER SETTINGS - DI TYPE ALIASES
-# ===========================================================================
-
-
-# ⏳ Factory pending
-def _create_vector_store_provider_settings_dep() -> VectorStoreProviderSettingsType:  # type: ignore[name-defined]
-    """Factory for creating vector store provider settings from configuration."""
+@dependency_provider(BackupVectorStoreProviderSettings, scope="singleton")
+def _create_backup_vector_store_config() -> BackupVectorStoreProviderSettings:
+    """Factory for creating BACKUP vector store config from settings."""
+    return _get_backup_provider_config_for(_create_all_vector_store_configs())
 
 
 type VectorStoreProviderSettingsDep = Annotated[
-    VectorStoreProviderSettingsType,  # type: ignore[name-defined]
-    depends(_create_vector_store_provider_settings_dep),
+    VectorStoreProviderSettings,  # type: ignore[name-defined]
+    depends(_create_primary_vector_store_config, use_cache=False),
 ]
 """Type alias for DI injection of vector store provider settings."""
 
-
-# ⏳ Factory pending
-def _create_qdrant_vector_store_settings_dep() -> QdrantVectorStoreProviderSettings:  # type: ignore[name-defined]
-    """Factory for Qdrant vector store provider settings."""
-
-
-type QdrantVectorStoreProviderSettingsDep = Annotated[
-    QdrantVectorStoreProviderSettings,  # type: ignore[name-defined]
-    depends(_create_qdrant_vector_store_settings_dep),
+type BackupVectorStoreProviderSettingsDep = Annotated[
+    BackupVectorStoreProviderSettings,  # type: ignore[name-defined]
+    depends(_create_backup_vector_store_config, use_cache=False),
 ]
-"""Type alias for DI injection of Qdrant vector store provider settings."""
+"""Type alias for DI injection of backup vector store provider settings."""
 
-
-# ===========================================================================
-# *                  DATA PROVIDER SETTINGS - DI TYPE ALIASES
-# ===========================================================================
-
-
-# ⏳ Factory pending
-def _create_data_provider_settings_dep() -> DataProviderSettingsType:  # type: ignore[name-defined]
-    """Factory for creating data provider settings from configuration."""
-
-
-type DataProviderSettingsDep = Annotated[
-    DataProviderSettingsType,  # type: ignore[name-defined]
-    depends(_create_data_provider_settings_dep),
+type AllVectorStoreConfigsDep = Annotated[
+    Sequence[VectorStoreProviderSettings],  # type: ignore[name-defined]
+    depends(_create_all_vector_store_configs, use_cache=False),
 ]
-"""Type alias for DI injection of data provider settings."""
+"""Type alias for DI injection of all vector store provider settings."""
+
+
+@dependency_provider(DataProviderSettings, scope="singleton", collection=True)
+def _create_all_data_provider_configs() -> tuple[DataProviderSettings, ...]:
+    """Factory for creating ALL data provider configs (primary + backups) from settings."""
+    data_provider_configs = _get_settings().provider.data
+    return (
+        data_provider_configs
+        if isinstance(data_provider_configs, tuple)
+        else (data_provider_configs,)
+        if data_provider_configs
+        else ()
+    )
+
+
+type AllDataProviderConfigsDep = Annotated[
+    Sequence[DataProviderSettings],  # type: ignore[name-defined]
+    depends(_create_all_data_provider_configs, use_cache=False),
+]
+"""Type alias for DI injection of all data provider settings."""
 
 
 # ===========================================================================
@@ -427,14 +548,31 @@ type DataProviderSettingsDep = Annotated[
 # ===========================================================================
 
 
-# ⏳ Factory pending
-def _create_agent_provider_settings_dep() -> AgentProviderSettingsType:  # type: ignore[name-defined]
-    """Factory for creating agent provider settings from configuration."""
+@dependency_provider(AgentProviderSettings, scope="singleton", collection=True)
+def _create_all_agent_provider_configs() -> tuple[AgentProviderSettings, ...]:
+    """Factory for creating ALL agent provider configs (primary + backups) from settings."""
+    agent_configs = _get_settings().provider.agent
+    return (
+        agent_configs
+        if isinstance(agent_configs, tuple)
+        else (agent_configs,)
+        if agent_configs
+        else ()
+    )
+
+
+@dependency_provider(AgentProviderSettings, scope="singleton")
+def _create_primary_agent_provider_config() -> AgentProviderSettings:
+    """Factory for creating PRIMARY agent provider config from settings."""
+    if (
+        agent_config := _get_primary_provider_config_for(_create_all_agent_provider_configs())
+    ) is not None:
+        return agent_config
+    raise ConfigurationError("No primary agent provider config found")
 
 
 type AgentProviderSettingsDep = Annotated[
-    AgentProviderSettingsType,  # type: ignore[name-defined]
-    depends(_create_agent_provider_settings_dep),
+    AgentProviderSettings, depends(_create_all_agent_provider_configs, use_cache=False)
 ]
 """Type alias for DI injection of agent provider settings."""
 
@@ -444,20 +582,9 @@ type AgentProviderSettingsDep = Annotated[
 # ===========================================================================
 
 
-# ⏳ Factory pending
-def _create_provider_settings_dep() -> ProviderSettings:  # type: ignore[name-defined]
-    """Factory for creating root provider settings from configuration.
-
-    This is the entry point for provider configuration DI. It:
-    1. Loads the [provider] section from settings/environment
-    2. Creates the root ProviderSettings container
-    3. Resolves all embedded provider configurations
-    """
-
-
 type ProviderSettingsDep = Annotated[
     ProviderSettings,  # type: ignore[name-defined]
-    depends(_create_provider_settings_dep),
+    depends(_get_provider_settings, use_cache=False),
 ]
 """Type alias for DI injection of root provider settings.
 
@@ -478,256 +605,30 @@ Example:
 
 
 # ===========================================================================
-# *                    PROVIDER FACTORIES (WITH BACKUP SUPPORT)
-# ===========================================================================
-#
-# These factories create actual provider instances (not just configs).
-# They integrate with backup_factory.py to handle primary + backup discrimination.
-#
-# Pattern:
-#   1. Get all configs from settings (primary + backups)
-#   2. For each config after first, wrap class with create_backup_class()
-#   3. Instantiate providers with resolved dependencies (client, caps, config)
-#   4. Return as Sequence[Provider] for DI resolution
-#
-# Implementation Note: This is the core integration point between:
-# - Settings system (config collection)
-# - Client factories (SDK clients)
-# - Capability resolvers (model capabilities)
-# - Backup factory (type discrimination)
-
-
-def _get_provider_class_for_config(config: EmbeddingConfigT) -> type:  # type: ignore[name-defined]
-    """Map embedding config to its provider class.
-
-    Args:
-        config: The embedding configuration instance
-
-    Returns:
-        The provider class for this config type
-
-    Raises:
-        ConfigurationError: If no provider class found for config type
-    """
-    from codeweaver.core import Provider
-
-    # Import provider classes
-    from codeweaver.providers.embedding.providers import (
-        BedrockEmbeddingProvider,
-        CohereEmbeddingProvider,
-        FastEmbedEmbeddingProvider,
-        GoogleEmbeddingProvider,
-        HuggingFaceEmbeddingProvider,
-        MistralEmbeddingProvider,
-        SentenceTransformersEmbeddingProvider,
-        VoyageEmbeddingProvider,
-    )
-    from codeweaver.providers.embedding.providers.openai_factory import OpenAIEmbeddingBase
-
-    # Map provider enum to provider class
-    provider_map = {
-        Provider.OPENAI: OpenAIEmbeddingBase,
-        Provider.AZURE: OpenAIEmbeddingBase,
-        Provider.OLLAMA: OpenAIEmbeddingBase,
-        Provider.FIREWORKS: OpenAIEmbeddingBase,
-        Provider.TOGETHER: OpenAIEmbeddingBase,
-        Provider.GITHUB: OpenAIEmbeddingBase,
-        Provider.HEROKU: OpenAIEmbeddingBase,
-        Provider.VOYAGE: VoyageEmbeddingProvider,
-        Provider.COHERE: CohereEmbeddingProvider,
-        Provider.MISTRAL: MistralEmbeddingProvider,
-        Provider.GOOGLE: GoogleEmbeddingProvider,
-        Provider.BEDROCK: BedrockEmbeddingProvider,
-        Provider.HUGGINGFACE_INFERENCE: HuggingFaceEmbeddingProvider,
-        Provider.FASTEMBED: FastEmbedEmbeddingProvider,
-        Provider.SENTENCE_TRANSFORMERS: SentenceTransformersEmbeddingProvider,
-    }
-
-    provider_cls = provider_map.get(config.provider)
-    if not provider_cls:
-        raise ConfigurationError(
-            f"No provider class found for provider: {config.provider}",
-            details={
-                "provider": str(config.provider),
-                "config_type": type(config).__name__,
-                "available_providers": list(provider_map.keys()),
-            },
-            suggestions=[
-                "Check that the provider is supported",
-                "Verify the config.provider value is correct",
-                "Ensure the provider module is imported",
-            ],
-        )
-
-    return provider_cls
-
-
-def _create_client_for_config(config: EmbeddingConfigT) -> Any:  # type: ignore[name-defined]
-    """Create SDK client for the given config.
-
-    This function wraps the universal client factory. Since we have a single
-    factory that handles all provider types, we just delegate to it.
-
-    Args:
-        config: The embedding configuration instance (unused, kept for compatibility)
-
-    Returns:
-        The initialized SDK client
-
-    Raises:
-        ConfigurationError: If provider unsupported or SDK not installed
-    """
-    # Delegate to the universal client factory
-    # The factory will use DI to inject the config
-    return _create_embedding_client()
-
-
-def _instantiate_provider(
-    provider_cls: type,
-    config: EmbeddingConfigT,  # type: ignore[name-defined]
-    client: Any,
-    caps: Any,
-) -> Any:
-    """Instantiate a provider with the given dependencies.
-
-    Args:
-        provider_cls: The provider class to instantiate
-        config: The embedding configuration
-        client: The SDK client instance
-        caps: The model capabilities
-
-    Returns:
-        The initialized provider instance
-    """
-    # Instantiate provider with dependencies
-    # Most providers expect: client, config, caps
-    return provider_cls(client=client, config=config, caps=caps)
-
-
-async def create_all_embedding_providers() -> tuple[Any, ...]:
-    """Factory for creating ALL embedding providers (primary + backups).
-
-    This is the main provider factory that:
-    1. Gets all embedding configs from settings (primary + backups)
-    2. Creates backup classes for non-primary providers
-    3. Resolves clients and capabilities for each provider
-    4. Instantiates all providers with proper dependencies
-    5. Returns as tuple for DI resolution
-
-    Integration points:
-    - backup_factory.create_backup_class() for type discrimination
-    - Settings resolution for config collection
-    - Client factories for SDK clients
-    - Capability resolvers for model capabilities
-
-    Returns:
-        Tuple of all configured embedding providers (primary first, then backups)
-    """
-    from codeweaver.core.di import INJECTED
-    from codeweaver.providers.backup_factory import create_backup_class
-
-    # Inject dependencies
-    configs: AllEmbeddingConfigsDep = INJECTED  # type: ignore[name-defined]
-    caps_resolver: EmbeddingCapabilityResolverDep = INJECTED
-
-    if not configs:
-        return tuple()
-
-    providers = []
-
-    for i, config in enumerate(configs):
-        is_backup = i > 0
-
-        # Get provider class for this config
-        provider_cls = _get_provider_class_for_config(config)
-
-        # Wrap with backup class if this is a backup provider
-        if is_backup:
-            provider_cls = create_backup_class(provider_cls)
-
-        # Create client for this config
-        client = _create_client_for_config(config)
-
-        # Resolve capabilities for this model
-        caps = caps_resolver.resolve(config.model_name)
-
-        # Instantiate provider
-        provider = _instantiate_provider(provider_cls, config, client, caps)
-
-        providers.append(provider)
-
-    return tuple(providers)
-
-
-async def get_primary_embedding_provider(
-    all_providers: Any,  # Sequence[EmbeddingProvider]
-) -> Any:  # EmbeddingProvider
-    """Get the primary (first) embedding provider from the collection.
-
-    Args:
-        all_providers: All embedding providers (primary + backups)
-
-    Returns:
-        The primary embedding provider (first in sequence)
-
-    Raises:
-        ConfigurationError: If no providers are configured
-    """
-    if not all_providers:
-        raise ConfigurationError(
-            "No embedding providers configured",
-            suggestions=["Configure at least one embedding provider in settings"],
-        )
-
-    return all_providers[0]
-
-
-# Type aliases for provider injection
-if TYPE_CHECKING:
-    from collections.abc import Sequence
-
-
-type AllEmbeddingProvidersDep = Annotated[
-    tuple[Any, ...],  # Sequence[EmbeddingProvider] in runtime
-    depends(create_all_embedding_providers),
-]
-"""Type alias for DI injection of ALL embedding providers (primary + backups).
-
-Use this when you need access to backup providers, not just the primary.
-
-Example:
-    ```python
-    async def handle_failover(
-        all_providers: AllEmbeddingProvidersDep = INJECTED
-    ) -> None:
-        primary = all_providers[0]
-        backups = all_providers[1:]
-        # Implement failover logic...
-    ```
-"""
-
-
-type PrimaryEmbeddingProviderDep = Annotated[
-    Any,  # EmbeddingProvider in runtime
-    depends(get_primary_embedding_provider),
-]
-"""Type alias for DI injection of the primary embedding provider only.
-
-Use this when you only need the primary provider, not backups.
-
-Example:
-    ```python
-    async def embed_documents(
-        provider: PrimaryEmbeddingProviderDep = INJECTED,
-        documents: list[CodeChunk],
-    ) -> list[list[float]]:
-        return await provider.embed_documents(documents)
-    ```
-"""
-
-
-# ===========================================================================
 # *                            MODULE EXPORTS
 # ===========================================================================
 
-__all__ = ("NoneDep",)
+__all__ = (
+    "AgentProviderSettingsDep",
+    "AllDataProviderConfigsDep",
+    "AllEmbeddingConfigsDep",
+    "AllRerankingConfigsDep",
+    "AllSparseEmbeddingConfigsDep",
+    "AllVectorStoreConfigsDep",
+    "BackupEmbeddingProviderSettingsDep",
+    "BackupRerankingProviderSettingsDep",
+    "BackupSparseEmbeddingProviderSettingsDep",
+    "BackupVectorStoreProviderSettingsDep",
+    "EmbeddingCapabilityResolverDep",
+    "EmbeddingClientDep",
+    "EmbeddingProviderSettingsDep",
+    "ProviderSettingsDep",
+    "RerankingCapabilityResolverDep",
+    "RerankingClientDep",
+    "RerankingProviderSettingsDep",
+    "SparseCapabilityResolverDep",
+    "SparseEmbeddingClientDep",
+    "SparseEmbeddingProviderSettingsDep",
+    "VectorStoreClientDep",
+    "VectorStoreProviderSettingsDep",
+)

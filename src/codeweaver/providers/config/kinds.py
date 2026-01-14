@@ -16,12 +16,15 @@ The overall pattern:
 from __future__ import annotations
 
 import contextlib
+import importlib
 import logging
 
 from abc import ABC, abstractmethod
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Annotated, Any, Literal, NotRequired, Required, Self, TypedDict, cast, overload
+from typing import Annotated, Any, Literal, NotRequired, Required, Self, TypedDict, cast
 
+from beartype.typing import ClassVar
 from pydantic import (
     AnyUrl,
     ConfigDict,
@@ -36,18 +39,18 @@ from pydantic import (
     model_validator,
 )
 from pydantic_ai.settings import ModelSettings as AgentModelSettings
-from qdrant_client.http.models.models import Distance, SparseVectorParams, VectorParams
+from qdrant_client.http.models.models import SparseVectorParams, VectorParams
 
 from codeweaver.core import (
     AnonymityConversion,
     BasedModel,
-    ConfigurationError,
     FilteredKey,
     FilteredKeyT,
     Provider,
     ProviderLiteral,
     SDKClient,
-    get_user_config_dir,
+    generate_collection_name,
+    get_user_cache_dir,
 )
 from codeweaver.providers.config.clients import (
     BedrockClientOptions,
@@ -146,14 +149,61 @@ class BaseProviderSettings(BasedModel, ABC):
         ),
     ] = False
 
+    def __init__(self, **data: Any) -> None:
+        """Initialize base provider settings."""
+        if "tag" not in data:
+            data["tag"] = data.get("provider").variable
+        object.__setattr__(self, "tag", data["tag"])
+        object.__setattr__(self, "client_options", data.get("client_options"))
+        object.__setattr__(self, "as_backup", data.get("as_backup", False))
+        if self.as_backup and not hasattr(self, "is_provider_backup"):
+            self = self._return_as_backup()
+        data |= {
+            "tag": self.tag,
+            "client_options": self.client_options,
+            "as_backup": self.as_backup,
+        }
+        super().__init__()
+
+    @staticmethod
+    def _handle_backup_client_options(client_options: ClientOptions | None) -> ClientOptions | None:
+        """Handle client options for backup providers."""
+        if client_options is None:
+            return None
+        if hasattr(client_options, "is_provider_backup"):
+            return client_options
+        from codeweaver.providers.config.utils import create_backup_class
+
+        backup_cls = create_backup_class(
+            type(client_options),
+            namespace=importlib.import_module(client_options.__module__).__dict__,
+        )
+
+        return backup_cls.model_copy(update=(client_options.model_dump() | {"_as_backup": True}))
+
+    def _return_as_backup(self) -> Self:
+        """Return a copy of self with as_backup set to True."""
+        from codeweaver.providers.config.utils import create_backup_class
+
+        backup_cls = create_backup_class(type(self), namespace=globals())
+        instance_settings = {
+            k: v if k != "client_options" else self._handle_backup_client_options(v)
+            for k, v in self.model_dump().items()
+        }
+        return backup_cls.model_copy(update=instance_settings)
+
     def __model_post_init__(self) -> None:
         """Post-initialization to register in DI container and config registry."""
         # Register self in DI container as singleton
+        if self.as_backup and not getattr(self.client_options, "is_provider_backup", False):
+            object.__setattr__(
+                self, "client_options", self._handle_backup_client_options(self.client_options)
+            )
         try:
             from codeweaver.core.di import get_container
 
             container = get_container()
-            container.register(type(self), lambda: self, singleton=True)
+            container.register(type(self), lambda: self)
         except Exception as e:
             # Log if DI not available (monorepo compatibility)
             logger.debug(
@@ -221,6 +271,8 @@ class BaseProviderSettingsDict(TypedDict, total=False):
     provider: Required[Provider]
     connection: NotRequired[ConnectionConfiguration | None]
     tag: NotRequired[ProviderLiteral]
+    client_options: NotRequired[ClientOptions | None]
+    as_backup: NotRequired[bool]
 
 
 # ===========================================================================
@@ -329,23 +381,13 @@ class FastEmbedProviderMixin:
 # ===========================================================================
 
 
-class VectorConfig(TypedDict, total=False):
-    """Configuration for individual vector types in a collection."""
-
-    dense: VectorParams | None
-    sparse: SparseVectorParams | None
-
-
 class CollectionConfig(TypedDict, total=False):
     """Common collection configuration for vector store providers."""
 
     collection_name: NotRequired[str | None]
     """Collection name override. Defaults to a unique name based on the project name."""
-    dense_vector_name: NotRequired[str]
-    """Named vector for dense embeddings. Defaults to 'dense'."""
-    sparse_vector_name: NotRequired[str]
-    """Named vector for sparse embeddings. Defaults to 'sparse'."""
-    vector_config: NotRequired[VectorConfig | None]
+
+    vector_config: NotRequired[Mapping[str, VectorParams | SparseVectorParams] | None]
     """Configuration for individual vector types in the collection."""
 
 
@@ -353,74 +395,49 @@ class MemoryConfig(TypedDict, total=False):
     """Configuration for in-memory vector store provider."""
 
     persist_path: NotRequired[Path]
-    f"""Path for JSON persistence file. Defaults to {get_user_config_dir()}/codeweaver/vectors/[your_project_name]_vector_store.json."""
+    f"""Path for JSON persistence file. Defaults to {get_user_cache_dir()}/vectors/[your_project_name]_store.json."""
     auto_persist: NotRequired[bool]
     """Automatically save after operations. Defaults to True."""
     persist_interval: NotRequired[PositiveInt | None]
     """Periodic persist interval in seconds. Defaults to 300 (5 minutes). Set to None to disable periodic persistence."""
 
 
-class QdrantProviderMixin:
-    """Settings for Qdrant vector store provider."""
-
-    collection: CollectionConfig | None = None
-    in_memory_config: MemoryConfig | None = None
-
-    def _telemetry_handler(self, _serialized_self: dict[str, Any], /) -> dict[str, Any]:
-        """Custom telemetry handler to avoid logging sensitive collection names or paths."""
-        if (collection := _serialized_self.get("collection")) and (
-            collection_name := collection.get("collection_name")
-        ):
-            return {
-                "collection": {
-                    "collection_name": AnonymityConversion.HASH.filtered(collection_name)
-                }
-            }
-        return {}
-
-
 class VectorStoreProviderSettings(BaseProviderSettings):
     """Settings for vector store provider selection and configuration."""
+
+    provider: ClassVar[Literal[Provider.QDRANT, Provider.MEMORY]]
 
     batch_size: Annotated[
         PositiveInt | None,
         Field(description="Batch size for bulk upsert operations. Defaults to 64."),
-    ] = 64
+    ] = 96
 
 
-class QdrantVectorStoreProviderSettings(QdrantProviderMixin, VectorStoreProviderSettings):
+class _BaseQdrantVectorStoreProviderSettings(VectorStoreProviderSettings):
     """Qdrant-specific settings for the Qdrant and Memory providers. Qdrant is the only currently supported vector store, but others may be added in the future."""
 
     client_options: Annotated[
         QdrantClientOptions | None, Field(description="Client options for the provider's client.")
     ] = None
 
-    @overload
-    def __init__(
-        self,
-        provider: Literal[Provider.MEMORY],
-        client_options: QdrantClientOptions | None = None,
-        collection: CollectionConfig | None = None,
-        in_memory_config: MemoryConfig | None = None,
-        batch_size: PositiveInt | None = 64,
-    ) -> None: ...
-    @overload
-    def __init__(
-        self,
-        provider: Literal[Provider.QDRANT],
-        client_options: QdrantClientOptions | None = None,
-        collection: CollectionConfig | None = None,
-        in_memory_config: None = None,
-        batch_size: PositiveInt | None = 64,
-    ) -> None: ...
+    collection: Annotated[
+        CollectionConfig, Field(description="Collection configuration for the vector store.")
+    ]
+
+    def _initialize(self, **data: Any) -> None:
+        """Initialize Qdrant vector store provider settings."""
+
     def __init__(
         self,
         provider: Literal[Provider.QDRANT, Provider.MEMORY] = Provider.QDRANT,
         connection: ConnectionConfiguration | None = None,
         client_options: QdrantClientOptions | None = None,
         collection: CollectionConfig | None = None,
-        in_memory_config: MemoryConfig | None = None,
-        batch_size: PositiveInt | None = 64,
+        batch_size: PositiveInt | None = 96,
+        *,
+        project_name: str | None = None,
+        project_path: Path | None = None,
+        as_backup: bool | None = None,
     ) -> None:
         """Initialize Qdrant vector store provider settings.
 
@@ -429,19 +446,42 @@ class QdrantVectorStoreProviderSettings(QdrantProviderMixin, VectorStoreProvider
             connection: Connection configuration for the vector store.
             client_options: Client options for the provider's client.
             collection: Collection configuration for the vector store.
-            in_memory_config: In-memory configuration for the Memory provider.
             batch_size: Batch size for bulk upsert operations.
+            as_backup: Whether this provider is a backup provider.
+            project_name: The name of the project.
+            project_path: The path to the project.
         """
-        if provider == Provider.QDRANT and in_memory_config is not None:
-            raise ConfigurationError("in_memory_config can only be set when provider is MEMORY.")
-        object.__setattr__(self, "client_options", client_options)
-        object.__setattr__(self, "collection", collection)
-        object.__setattr__(self, "in_memory_config", in_memory_config)
+        object.__setattr__(self, "client_options", client_options or QdrantClientOptions())
+        object.__setattr__(
+            self,
+            "collection",
+            CollectionConfig(
+                **(self._default_collection(project_name=project_name, project_path=project_path))
+                | (collection or {})
+            ),
+        )
+        object.__setattr__(self, "as_backup", as_backup)
+        super().__setattr__("provider", provider)
+        super().__setattr__("connection", connection)
+        super().__setattr__("batch_size", batch_size)
         super().__init__(provider=provider, connection=connection, batch_size=batch_size)
 
     # Track resolved values
     _resolved_dimension: int | None = PrivateAttr(default=None)
     _resolved_datatype: str | None = PrivateAttr(default=None)
+
+    def _default_collection(
+        self, *, project_name: str | None = None, project_path: Path | None = None
+    ) -> CollectionConfig:
+        """Return the default collection config."""
+        from codeweaver.core import generate_collection_name
+
+        return CollectionConfig(
+            collection_name=generate_collection_name(
+                is_backup=self.as_backup, project_name=project_name, project_path=project_path
+            ),
+            vector_config={"dense": VectorParams(), "sparse": SparseVectorParams()},
+        )
 
     @model_validator(mode="after")
     def _ensure_consistent_config(self) -> Self:
@@ -453,9 +493,11 @@ class QdrantVectorStoreProviderSettings(QdrantProviderMixin, VectorStoreProvider
             )
         if self.provider == Provider.MEMORY:
             # we'll resolve the project name later if the user didn't provide a path
-            self.in_memory_config = MemoryConfig(auto_persist=True, persist_interval=300) | (
-                self.in_memory_config or {}
-            )
+            self.in_memory_config = self.in_memory_config or getattr(
+                self,
+                "_default_memory_config",
+                lambda _x: {"collection_name": generate_collection_name(is_backup=self.as_backup)},
+            )(self.collection.get("collection_name"))
         # we'll handle collection config later too -- when models are getting instantiated it's much less painful to wait until the dust settles for inter-model dependencies
 
         # Register self in DI container as singleton
@@ -489,78 +531,43 @@ class QdrantVectorStoreProviderSettings(QdrantProviderMixin, VectorStoreProvider
     def config_dependencies(self) -> dict[str, type]:
         """Vector store needs embedding config for dimension/datatype."""
         # Import here to avoid circular dependencies
-        from codeweaver.providers.config.embedding import BaseEmbeddingConfig
 
-        return {"embedding": BaseEmbeddingConfig}
+        return {
+            "provider.embedding": EmbeddingProviderSettings,
+            "provider.sparse_embedding": SparseEmbeddingProviderSettings,
+        }
 
     async def apply_resolved_config(self, **resolved: Any) -> None:
         """Apply dimension and datatype from embedding config.
 
         Args:
-            **resolved: Should contain "embedding" key with embedding config instance
+            **resolved: Should contain "provider.embedding" key with embedding config instance
         """
-        if not (embedding_config := resolved.get("embedding")):
-            return
-
-        # Get dimension and datatype from embedding config
-        dimension = await embedding_config.get_dimension()
-        datatype = await embedding_config.get_datatype()
-
-        # Apply if we got values
-        if dimension:
-            self._resolved_dimension = dimension
-            self._configure_for_dimension(dimension)
-
-        if datatype:
-            self._resolved_datatype = datatype
-            self._configure_for_datatype(datatype)
-
-    def _configure_for_dimension(self, dimension: int) -> None:
-        """Configure collection for specific dimension.
-
-        Args:
-            dimension: Embedding dimension to configure for
-        """
-        if not self.collection:
-            self.collection = {}
-
-        # Type cast for type checker - we just ensured collection is a dict
-        collection = cast(dict[str, Any], self.collection)
-
-        # Update vector configuration
-        if "vector_config" not in collection:
-            collection["vector_config"] = {}
-
-        vector_config: dict[str, Any] = collection["vector_config"]
-        if "dense" not in vector_config:
-            vector_config["dense"] = VectorParams(size=dimension, distance=Distance.COSINE)
-        else:
-            # Update existing config
-            dense_config = vector_config["dense"]
-            dense_config.size = dimension
-            if not hasattr(dense_config, "distance"):
-                dense_config.distance = Distance.COSINE
-
-    def _configure_for_datatype(self, datatype: str) -> None:
-        """Configure collection quantization based on datatype.
-
-        Args:
-            datatype: Embedding datatype (float16, uint8, etc.)
-        """
-        if not self.collection:
-            self.collection = {}
-
-        # Type cast for type checker - we just ensured collection is a dict
-        collection = cast(dict[str, Any], self.collection)
-
-        # Configure quantization for reduced precision types
-        if datatype in {"float16", "uint8", "int8"}:
-            quantization_config: dict[str, Any] = {"scalar": {"type": datatype, "always_ram": True}}
-            # Add quantile for integer types
-            if "int" in datatype:
-                quantization_config["scalar"]["quantile"] = 0.99
-
-            collection["quantization_config"] = quantization_config
+        config = self.collection.get("vector_config", ())
+        dense_key, dense_config = (
+            next((k, v) for k, v in config.items() if isinstance(v, VectorParams)),
+            ("dense", None),
+        )
+        self.collection = self.collection or CollectionConfig(vector_config={})
+        if (embedding_settings := resolved.get("provider.embedding")) is not None:
+            dense_params = embedding_settings.embedding_config.as_vector_params()
+            self._resolved_dimension = dense_params.size
+            self._resolved_datatype = dense_params.datatype
+            if dense_config:
+                dense_key = dense_key or "dense"
+                self.collection["vector_config"][dense_key] = dense_params  # ty:ignore[invalid-assignment]
+        if (sparse_embedding_settings := resolved.get("provider.sparse_embedding")) is not None:
+            sparse_config = self.collection.get("vector_config", ())
+            sparse_key, sparse_params = (
+                next((k, v) for k, v in sparse_config.items() if isinstance(v, SparseVectorParams)),
+                None,
+            )
+            sparse_vector_params = (
+                sparse_embedding_settings.embedding_config.as_sparse_vector_params()
+            )
+            if sparse_params:
+                sparse_key = sparse_key or "sparse"
+                self.collection["vector_config"][sparse_key] = sparse_vector_params  # ty:ignore[invalid-assignment]
 
     @computed_field
     @property
@@ -573,6 +580,60 @@ class QdrantVectorStoreProviderSettings(QdrantProviderMixin, VectorStoreProvider
     def client(self) -> Literal[SDKClient.QDRANT]:
         """Return the Qdrant SDKClient enum member."""
         return SDKClient.QDRANT
+
+
+class QdrantVectorStoreProviderSettings(_BaseQdrantVectorStoreProviderSettings):
+    """Settings for Qdrant vector store provider."""
+
+    provider: ClassVar[Literal[Provider.QDRANT]] = Provider.QDRANT
+
+
+class MemoryVectorStoreProviderSettings(_BaseQdrantVectorStoreProviderSettings):
+    """Settings for in-memory vector store provider."""
+
+    provider: ClassVar[Literal[Provider.MEMORY]] = Provider.MEMORY
+
+    in_memory_config: Annotated[
+        MemoryConfig, Field(description="In-memory vector store configuration.")
+    ]
+
+    def __init__(self, **data: Any) -> None:
+        """Initialize Memory vector store provider settings."""
+        object.__setattr__(
+            self, "in_memory_config", data.get("in_memory_config") or self._default_memory_config()
+        )
+        super().__init__(**data)
+
+    @staticmethod
+    def _get_persist_path(
+        *,
+        collection_name: str | None = None,
+        project_name: str | None = None,
+        project_path: Path | None = None,
+    ) -> Path:
+        """Get the persist path from in_memory_config."""
+        return Path(
+            f"{get_user_cache_dir()}/vectors/{generate_collection_name(collection_name=collection_name, project_name=project_name, project_path=project_path)}"
+        )
+
+    @staticmethod
+    def _default_memory_config(
+        collection_name: str | None = None,
+        project_name: str | None = None,
+        project_path: Path | None = None,
+        persist_path: Path | None = None,
+    ) -> MemoryConfig:
+        """Return the default memory config."""
+        return MemoryConfig(
+            auto_persist=True,
+            persist_interval=300,
+            persist_path=persist_path
+            or MemoryVectorStoreProviderSettings._get_persist_path(
+                collection_name=collection_name,
+                project_name=project_name,
+                project_path=project_path,
+            ),
+        )
 
 
 # ===========================================================================
@@ -883,11 +944,10 @@ __all__ = (
     "FastEmbedRerankingProviderSettings",
     "FastEmbedSparseEmbeddingProviderSettings",
     "MemoryConfig",
+    "MemoryVectorStoreProviderSettings",
     "ModelString",
-    "QdrantProviderMixin",
     "QdrantVectorStoreProviderSettings",
     "RerankingProviderSettings",
     "SparseEmbeddingProviderSettings",
-    "VectorConfig",
     "VectorStoreProviderSettings",
 )

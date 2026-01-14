@@ -12,10 +12,11 @@ import contextlib
 import os
 import shutil
 import subprocess
+import sys
 
 from functools import cache
 from pathlib import Path
-from typing import cast
+from typing import Literal, cast
 
 import platformdirs
 
@@ -24,11 +25,21 @@ from codeweaver.core.types.sentinel import MISSING, Missing
 
 
 @cache
+def _get_app_name() -> Literal["CodeWeaver", "codeweaver"]:
+    return "CodeWeaver" if sys.platform != "linux" else "codeweaver"
+
+
+@cache
 def get_user_config_dir(*, base_only: bool = False) -> Path:
     """Get the user configuration directory based on the operating system."""
     if base_only:
         return Path(platformdirs.user_config_dir())
-    return Path(platformdirs.user_config_dir("codeweaver"))
+    return Path(
+        # NOTE: appauthor is only used on Windows
+        platformdirs.user_config_dir(
+            appname=_get_app_name(), appauthor="Knitli", ensure_exists=True
+        )
+    )
 
 
 @cache
@@ -36,7 +47,9 @@ def get_user_data_dir(*, base_only: bool = False) -> Path:
     """Get the user data directory based on the operating system."""
     if base_only:
         return Path(platformdirs.user_data_dir())
-    return Path(platformdirs.user_data_dir("codeweaver"))
+    return Path(
+        platformdirs.user_data_dir(appname=_get_app_name(), appauthor="Knitli", ensure_exists=True)
+    )
 
 
 @cache
@@ -44,7 +57,19 @@ def get_user_cache_dir(*, base_only: bool = False) -> Path:
     """Get the user cache directory based on the operating system."""
     if base_only:
         return Path(platformdirs.user_cache_dir())
-    return Path(platformdirs.user_cache_dir("codeweaver"))
+    return Path(
+        platformdirs.user_cache_dir(appname=_get_app_name(), appauthor="Knitli", ensure_exists=True)
+    )
+
+
+@cache
+def get_user_state_dir(*, base_only: bool = False) -> Path:
+    """Get the user state directory based on the operating system."""
+    if base_only:
+        return Path(platformdirs.user_state_dir())
+    return Path(
+        platformdirs.user_state_dir(appname=_get_app_name(), appauthor="Knitli", ensure_exists=True)
+    )
 
 
 def try_git_rev_parse() -> Path | None:
@@ -102,6 +127,10 @@ def _walk_up_to_git_root(path: Path | None = None) -> Path:
 
 def get_project_path(root_path: Path | None = None) -> Path:
     """Get the root directory of the project."""
+    if (env_path := os.environ.get("CODEWEAVER_PROJECT_PATH")) and (
+        path := Path(env_path)
+    ).is_dir():
+        return path
     if (
         root_path is None
         and (git_root := try_git_rev_parse())
@@ -110,11 +139,6 @@ def get_project_path(root_path: Path | None = None) -> Path:
         return git_root
     if isinstance(root_path, Path) and root_path.is_dir() and is_git_dir(root_path):
         return root_path
-
-    if (env_path := os.environ.get("CODEWEAVER_PROJECT_PATH")) and (
-        path := Path(env_path)
-    ).is_dir():
-        return path
 
     return _walk_up_to_git_root(root_path)
 
@@ -439,6 +463,7 @@ __all__ = (
     "get_user_cache_dir",
     "get_user_config_dir",
     "get_user_data_dir",
+    "get_user_state_dir",
     "has_git",
     "in_codeweaver_clone",
     "is_git_dir",

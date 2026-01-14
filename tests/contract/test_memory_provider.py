@@ -37,7 +37,7 @@ def temp_persist_path():
 async def memory_config(temp_persist_path):
     """Provide test Memory configuration."""
     return {
-        "persist_path": str(temp_persist_path / "vector_store.json"),  # Full file path
+        "persist_path": str(temp_persist_path / "vector_store"),  # Directory path
         "auto_persist": True,
         "persist_interval": None,  # Disable periodic persistence for tests
         "collection_name": f"test_memory_{uuid4().hex[:8]}",
@@ -180,13 +180,15 @@ class TestMemoryProviderContract:
         )
 
     async def test_persist_to_disk(self, memory_provider, memory_config, sample_chunk):
-        """Test _persist_to_disk creates JSON file."""
+        """Test _persist_to_disk creates persistence directory."""
         await memory_provider.upsert([sample_chunk])
         await memory_provider._persist_to_disk()
 
         persist_path = Path(memory_config["persist_path"])
-        assert persist_path.exists(), "Persistence file should be created"
-        assert persist_path.stat().st_size > 0, "Persistence file should not be empty"
+        assert persist_path.exists(), "Persistence directory should be created"
+        assert persist_path.is_dir(), "Persistence path should be a directory"
+        # Check if Qdrant files exist inside (simple check)
+        assert any(persist_path.iterdir()), "Persistence directory should not be empty"
 
     async def test_restore_from_disk(
         self, memory_config, sample_chunk, temp_persist_path, test_embedding_caps
@@ -226,20 +228,6 @@ class TestMemoryProviderContract:
             for r in results
         )
 
-    async def test_persistence_file_format(self, memory_provider, memory_config, sample_chunk):
-        """Test persistence file has correct JSON structure."""
-        import json
-
-        await memory_provider.upsert([sample_chunk])
-        await memory_provider._persist_to_disk()
-
-        persist_path = Path(memory_config["persist_path"])
-        data = json.loads(persist_path.read_text())
-        # Verify top-level structure
-        assert "version" in data
-        assert "collections" in data or "metadata" in data
-        assert data["version"] == "1.0"
-
     async def test_auto_persist_on_upsert(
         self, memory_config, sample_chunk, temp_persist_path, test_embedding_caps
     ):
@@ -256,6 +244,7 @@ class TestMemoryProviderContract:
         # Auto-persist should have created the file
         persist_file = Path(memory_config["persist_path"])
         assert persist_file.exists()
+        assert persist_file.is_dir()
 
     async def test_collection_property(self, memory_provider, memory_config):
         """Test collection property returns configured collection name."""

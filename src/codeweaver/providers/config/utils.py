@@ -11,6 +11,11 @@ from typing import Any, TypedDict
 
 from pydantic import SecretStr
 
+from codeweaver.core import lazy_import
+
+
+create_backup_class = lazy_import("codeweaver.providers.backup_factory", "create_backup_class")
+
 
 class AzureOptions(TypedDict, total=False):
     """Azure-specific options."""
@@ -95,9 +100,20 @@ def try_for_azure_endpoint(options: dict[str, Any], *, cohere: bool = False) -> 
     return None
 
 
+def this_as_backup_cls[U: Any, BackupT: type[U]](
+    instance: Any, *, namespace: dict[str, Any]
+) -> BackupT | None:
+    """Return the instance as the backup type if possible.
+
+    This is a helper to create a backup class from an instance's type, it's only for local use in the config package to avoid circular imports.
+    """
+    return create_backup_class(type(instance), extra_namespace=namespace)
+
+
 __all__ = (
     "AzureOptions",
     "ensure_endpoint_version",
+    "this_as_backup_cls",
     "try_for_azure_endpoint",
     "try_for_heroku_endpoint",
 )

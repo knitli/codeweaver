@@ -38,7 +38,7 @@ async def test_inmemory_persistence():
     Then: System stores embeddings in memory and persists to disk on shutdown
     """
     with tempfile.TemporaryDirectory() as tmpdir:
-        temp_path = Path(tmpdir) / "test_memory.json"
+        temp_path = Path(tmpdir) / "test_memory_db"
         config = MemoryConfig(
             persist_path=temp_path, auto_persist=True, collection_name="test_memory"
         )
@@ -69,7 +69,8 @@ async def test_inmemory_persistence():
         await provider1._persist_to_disk()
 
         # Verify persistence file exists
-        assert temp_path.exists(), "Persistence file should be created"
+        assert temp_path.exists(), "Persistence directory should be created"
+        assert temp_path.is_dir(), "Persistence path should be a directory"
 
         # Phase 2: Restore from disk
         provider2 = MemoryVectorStoreProvider(_provider=Provider.MEMORY, config=config)

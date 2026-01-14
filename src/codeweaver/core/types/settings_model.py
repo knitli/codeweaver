@@ -494,7 +494,7 @@ class BaseCodeWeaverSettings(BaseSettings):
         """
         user_config_dir = get_user_config_dir()
         if is_test_environment():
-            return get_config_locations(settings_cls, user_config_dir, for_test=True)
+            return get_config_locations(settings_cls, for_test=True)
         config_sources: list[PydanticBaseSettingsSource | None] = [
             EnvSettingsSource(
                 settings_cls,
@@ -505,7 +505,7 @@ class BaseCodeWeaverSettings(BaseSettings):
                 env_ignore_empty=True,
             ),
             *get_dotenv_locations(settings_cls),
-            *get_config_locations(settings_cls, user_config_dir, for_test=False),
+            *get_config_locations(settings_cls, for_test=False),
             aws_secret_store_configured(settings_cls) or None,
             azure_key_vault_configured(settings_cls) or None,
             google_secret_manager_configured(settings_cls) or None,
