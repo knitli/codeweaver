@@ -75,13 +75,40 @@ def voyage_context_capabilities():
     )
 
 
+@pytest.fixture
+def mock_voyage_config():
+    """Create a mock config for Voyage embedding provider."""
+    config = MagicMock()
+    config.embedding_config = MagicMock()
+    config.embedding_config.as_options = MagicMock(
+        return_value={"model_name": "voyage-3", "embedding": {}, "query": {}}
+    )
+    return config
+
+
+@pytest.fixture
+def mock_embedding_registry():
+    """Create a mock embedding registry."""
+    from codeweaver.providers.embedding.registry import EmbeddingRegistry
+
+    registry = MagicMock(spec=EmbeddingRegistry)
+    registry.get = MagicMock(return_value=None)
+    registry.add = MagicMock()
+    return registry
+
+
 class TestVoyageEmbeddingProviderInitialization:
     """Test VoyageEmbeddingProvider initialization."""
 
-    def test_provider_initialization_with_client(self, mock_voyage_client, voyage_capabilities):
+    def test_provider_initialization_with_client(
+        self, mock_voyage_client, mock_voyage_config, mock_embedding_registry, voyage_capabilities
+    ):
         """Test that provider initializes correctly with a client."""
         provider = VoyageEmbeddingProvider(
-            client=mock_voyage_client, caps=voyage_capabilities, kwargs=None
+            client=mock_voyage_client,
+            config=mock_voyage_config,
+            registry=mock_embedding_registry,
+            caps=voyage_capabilities,
         )
 
         assert provider.client is mock_voyage_client
@@ -90,20 +117,32 @@ class TestVoyageEmbeddingProviderInitialization:
         assert not provider._is_context_model
 
     def test_provider_initialization_with_context_model(
-        self, mock_voyage_client, voyage_context_capabilities
+        self,
+        mock_voyage_client,
+        mock_voyage_config,
+        mock_embedding_registry,
+        voyage_context_capabilities,
     ):
         """Test that context models are detected during initialization."""
         provider = VoyageEmbeddingProvider(
-            client=mock_voyage_client, caps=voyage_context_capabilities, kwargs=None
+            client=mock_voyage_client,
+            config=mock_voyage_config,
+            registry=mock_embedding_registry,
+            caps=voyage_context_capabilities,
         )
 
         assert provider._is_context_model
         assert "context" in provider.caps.name
 
-    def test_provider_sets_doc_andquery_options(self, mock_voyage_client, voyage_capabilities):
+    def test_provider_sets_doc_andquery_options(
+        self, mock_voyage_client, mock_voyage_config, mock_embedding_registry, voyage_capabilities
+    ):
         """Test that embed_options and query_options are set correctly."""
         provider = VoyageEmbeddingProvider(
-            client=mock_voyage_client, caps=voyage_capabilities, kwargs=None
+            client=mock_voyage_client,
+            config=mock_voyage_config,
+            registry=mock_embedding_registry,
+            caps=voyage_capabilities,
         )
 
         # Check that model name and output params are set
@@ -129,10 +168,15 @@ class TestVoyageEmbeddingProviderInitialization:
         assert provider.embed_options["custom_param"] == "value"
         assert provider.query_options["custom_param"] == "value"
 
-    def test_provider_base_url(self, mock_voyage_client, voyage_capabilities):
+    def test_provider_base_url(
+        self, mock_voyage_client, mock_voyage_config, mock_embedding_registry, voyage_capabilities
+    ):
         """Test that base_url property returns correct value."""
         provider = VoyageEmbeddingProvider(
-            client=mock_voyage_client, caps=voyage_capabilities, kwargs=None
+            client=mock_voyage_client,
+            config=mock_voyage_config,
+            registry=mock_embedding_registry,
+            caps=voyage_capabilities,
         )
 
         assert provider.base_url == "https://api.voyageai.com/v1"
@@ -142,7 +186,9 @@ class TestVoyageEmbeddingProviderEmbedding:
     """Test VoyageEmbeddingProvider embedding operations."""
 
     @pytest.mark.asyncio
-    async def test_embed_documents_success(self, mock_voyage_client, voyage_capabilities):
+    async def test_embed_documents_success(
+        self, mock_voyage_client, mock_voyage_config, mock_embedding_registry, voyage_capabilities
+    ):
         """Test successful document embedding."""
         # Setup mock response with correct dimension (1024)
         mock_response = MagicMock()
@@ -154,7 +200,10 @@ class TestVoyageEmbeddingProviderEmbedding:
         mock_voyage_client.embed.return_value = mock_response
 
         provider = VoyageEmbeddingProvider(
-            client=mock_voyage_client, caps=voyage_capabilities, kwargs=None
+            client=mock_voyage_client,
+            config=mock_voyage_config,
+            registry=mock_embedding_registry,
+            caps=voyage_capabilities,
         )
         from pathlib import Path
 
@@ -200,7 +249,9 @@ class TestVoyageEmbeddingProviderEmbedding:
         assert call_kwargs["model"] == "voyage-3"
 
     @pytest.mark.asyncio
-    async def test_embed_query_success(self, mock_voyage_client, voyage_capabilities):
+    async def test_embed_query_success(
+        self, mock_voyage_client, mock_voyage_config, mock_embedding_registry, voyage_capabilities
+    ):
         """Test successful query embedding."""
         # Setup mock response
         mock_response = MagicMock()
@@ -209,7 +260,10 @@ class TestVoyageEmbeddingProviderEmbedding:
         mock_voyage_client.embed.return_value = mock_response
 
         provider = VoyageEmbeddingProvider(
-            client=mock_voyage_client, caps=voyage_capabilities, kwargs=None
+            client=mock_voyage_client,
+            config=mock_voyage_config,
+            registry=mock_embedding_registry,
+            caps=voyage_capabilities,
         )
 
         # Call embed_query
@@ -227,7 +281,9 @@ class TestVoyageEmbeddingProviderEmbedding:
         assert call_kwargs["model"] == "voyage-3"
 
     @pytest.mark.asyncio
-    async def test_embed_query_with_multiple_queries(self, mock_voyage_client, voyage_capabilities):
+    async def test_embed_query_with_multiple_queries(
+        self, mock_voyage_client, mock_voyage_config, mock_embedding_registry, voyage_capabilities
+    ):
         """Test embedding multiple queries at once."""
         # Setup mock response
         mock_response = MagicMock()
@@ -236,7 +292,10 @@ class TestVoyageEmbeddingProviderEmbedding:
         mock_voyage_client.embed.return_value = mock_response
 
         provider = VoyageEmbeddingProvider(
-            client=mock_voyage_client, caps=voyage_capabilities, kwargs=None
+            client=mock_voyage_client,
+            config=mock_voyage_config,
+            registry=mock_embedding_registry,
+            caps=voyage_capabilities,
         )
 
         # Call embed_query with list
@@ -277,7 +336,10 @@ class TestVoyageEmbeddingProviderEmbedding:
 
         try:
             provider = VoyageEmbeddingProvider(
-                client=mock_voyage_client, caps=voyage_context_capabilities, kwargs=None
+                client=mock_voyage_client,
+                config=mock_voyage_config,
+                registry=mock_embedding_registry,
+                caps=voyage_context_capabilities,
             )
 
             from pathlib import Path
@@ -333,7 +395,10 @@ class TestVoyageEmbeddingProviderErrorHandling:
         mock_voyage_client.embed.side_effect = ConnectionError("Connection failed")
 
         provider = VoyageEmbeddingProvider(
-            client=mock_voyage_client, caps=voyage_capabilities, kwargs=None
+            client=mock_voyage_client,
+            config=mock_voyage_config,
+            registry=mock_embedding_registry,
+            caps=voyage_capabilities,
         )
 
         from pathlib import Path
@@ -368,12 +433,17 @@ class TestVoyageEmbeddingProviderErrorHandling:
         assert "error" in result
 
     @pytest.mark.asyncio
-    async def test_embed_query_handles_timeout_error(self, mock_voyage_client, voyage_capabilities):
+    async def test_embed_query_handles_timeout_error(
+        self, mock_voyage_client, mock_voyage_config, mock_embedding_registry, voyage_capabilities
+    ):
         """Test that timeout errors are handled with retry logic."""
         mock_voyage_client.embed.side_effect = TimeoutError("Request timed out")
 
         provider = VoyageEmbeddingProvider(
-            client=mock_voyage_client, caps=voyage_capabilities, kwargs=None
+            client=mock_voyage_client,
+            config=mock_voyage_config,
+            registry=mock_embedding_registry,
+            caps=voyage_capabilities,
         )
 
         # Call embed_query - should return error info
@@ -392,7 +462,10 @@ class TestVoyageEmbeddingProviderDimension:
     ):
         """Test that dimension property returns the correct value."""
         provider = VoyageEmbeddingProvider(
-            client=mock_voyage_client, caps=voyage_capabilities, kwargs=None
+            client=mock_voyage_client,
+            config=mock_voyage_config,
+            registry=mock_embedding_registry,
+            caps=voyage_capabilities,
         )
 
         assert provider.dimension == 1024
@@ -407,6 +480,11 @@ class TestVoyageEmbeddingProviderDimension:
             tokenizer="tokenizers",
         )
 
-        provider = VoyageEmbeddingProvider(client=mock_voyage_client, caps=caps, kwargs=None)
+        provider = VoyageEmbeddingProvider(
+            client=mock_voyage_client,
+            config=mock_voyage_config,
+            registry=mock_embedding_registry,
+            caps=caps,
+        )
 
         assert provider.dimension == 768

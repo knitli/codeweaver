@@ -74,10 +74,7 @@ def test_conditional_provider():
     """Test provider with conditional logic."""
     condition = True
 
-    register_default_provider(
-        "test.conditional",
-        lambda: "enabled" if condition else "disabled"
-    )
+    register_default_provider("test.conditional", lambda: "enabled" if condition else "disabled")
 
     assert get_default("test.conditional") == "enabled"
 
@@ -85,19 +82,13 @@ def test_conditional_provider():
     condition = False
     # Note: The lambda captures the variable, so this won't change the result
     # This test demonstrates that providers are evaluated at call time
-    register_default_provider(
-        "test.conditional2",
-        lambda: "enabled" if condition else "disabled"
-    )
+    register_default_provider("test.conditional2", lambda: "enabled" if condition else "disabled")
 
     assert get_default("test.conditional2") == "disabled"
 
 
 def test_provider_with_computation():
     """Test provider that does computation."""
-    register_default_provider(
-        "test.computed",
-        lambda: 10 * 20 + 5
-    )
+    register_default_provider("test.computed", lambda: 10 * 20 + 5)
 
     assert get_default("test.computed") == 205

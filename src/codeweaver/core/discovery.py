@@ -6,36 +6,24 @@
 """Defines the DiscoveredFile dataclass representing files found during project scanning."""
 
 from __future__ import annotations
+
 import contextlib
 import logging
+
 from functools import cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, cast
-from pydantic import (
-    UUID7,
-    AfterValidator,
-    Field,
-    NonNegativeInt,
-    computed_field,
-    model_validator,
-)
+
+from pydantic import UUID7, AfterValidator, Field, NonNegativeInt, computed_field, model_validator
 from pydantic.dataclasses import dataclass
+
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.language import is_semantic_config_ext
 from codeweaver.core.metadata import ExtKind
 from codeweaver.core.stores import BlakeHashKey, BlakeKey, get_blake_hash
-from codeweaver.core.types import (
-    DATACLASS_CONFIG,
-    MISSING,
-    DataclassSerializationMixin,
-    Missing,
-)
-from codeweaver.core.utils import (
-    get_git_branch,
-    sanitize_unicode,
-    set_relative_path,
-    uuid7,
-)
+from codeweaver.core.types import DATACLASS_CONFIG, MISSING, DataclassSerializationMixin, Missing
+from codeweaver.core.utils import get_git_branch, sanitize_unicode, set_relative_path, uuid7
+
 
 if TYPE_CHECKING:
     from codeweaver.core.types import AnonymityConversion, FilteredKeyT
@@ -52,9 +40,7 @@ class DiscoveredFile(DataclassSerializationMixin):
 
     path: Annotated[
         Path,
-        Field(
-            description="Relative path to the discovered file from the project root."
-        ),
+        Field(description="Relative path to the discovered file from the project root."),
         AfterValidator(set_relative_path),
     ]
     ext_kind: ExtKind | None = None
@@ -66,8 +52,7 @@ class DiscoveredFile(DataclassSerializationMixin):
         ),
     ] = None
     _git_branch: Annotated[
-        str | Missing,
-        Field(description="Git branch the file was discovered in, if detected."),
+        str | Missing, Field(description="Git branch the file was discovered in, if detected.")
     ] = MISSING
     source_id: Annotated[
         UUID7,
@@ -86,9 +71,7 @@ class DiscoveredFile(DataclassSerializationMixin):
             and (path := data["path"])
             and isinstance(path, (Path, str))
         ):
-            data["ext_kind"] = ExtKind.from_file(
-                path if isinstance(path, Path) else Path(path)
-            )
+            data["ext_kind"] = ExtKind.from_file(path if isinstance(path, Path) else Path(path))
         return data
 
     def __init__(
@@ -132,11 +115,7 @@ class DiscoveredFile(DataclassSerializationMixin):
 
     @classmethod
     def from_path(
-        cls,
-        path: Path,
-        *,
-        file_hash: BlakeKey | None = None,
-        project_path: Path | None = None,
+        cls, path: Path, *, file_hash: BlakeKey | None = None, project_path: Path | None = None
     ) -> DiscoveredFile | None:
         """Create a DiscoveredFile from a file path."""
         branch = get_git_branch(path if path.is_dir() else path.parent) or "main"
@@ -162,9 +141,7 @@ class DiscoveredFile(DataclassSerializationMixin):
         """Create a DiscoveredFile from a CodeChunk, if it has a valid file_path."""
         if chunk.file_path and chunk.file_path.is_file() and chunk.file_path.exists():
             return cast(DiscoveredFile, cls.from_path(chunk.file_path))
-        raise ValueError(
-            "CodeChunk must have a valid file_path to create a DiscoveredFile."
-        )
+        raise ValueError("CodeChunk must have a valid file_path to create a DiscoveredFile.")
 
     @computed_field
     @property
@@ -192,11 +169,7 @@ class DiscoveredFile(DataclassSerializationMixin):
     @property
     def size(self) -> NonNegativeInt:
         """Return the size of the file in bytes."""
-        if (
-            self.ext_kind
-            and self.absolute_path.exists()
-            and self.absolute_path.is_file()
-        ):
+        if self.ext_kind and self.absolute_path.exists() and self.absolute_path.is_file():
             return self.absolute_path.stat().st_size
         return 0
 
@@ -233,9 +206,7 @@ class DiscoveredFile(DataclassSerializationMixin):
                     return False
                 if b"\x00" in chunk:
                     return True
-                text_characters = bytearray(
-                    {7, 8, 9, 10, 12, 13, 27} | set(range(32, 256))
-                )
+                text_characters = bytearray({7, 8, 9, 10, 12, 13, 27} | set(range(32, 256)))
                 nontext = chunk.translate(None, text_characters)
                 return len(nontext) / len(chunk) > 0.3
         except Exception:
@@ -269,9 +240,7 @@ class DiscoveredFile(DataclassSerializationMixin):
     def contents(self) -> str:
         """Return the normalized contents of the file."""
         with contextlib.suppress(Exception):
-            return self.normalize_content(
-                self.absolute_path.read_text(errors="replace")
-            )
+            return self.normalize_content(self.absolute_path.read_text(errors="replace"))
         return ""
 
     @property

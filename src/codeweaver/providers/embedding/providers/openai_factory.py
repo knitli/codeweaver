@@ -27,6 +27,7 @@ from codeweaver.providers.embedding.providers.base import (
     EmbeddingCustomDeps,
     EmbeddingImplementationDeps,
     EmbeddingProvider,
+    EmbeddingRegistry,
 )
 
 
@@ -70,6 +71,7 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
         provider: Provider,
         config: OpenAIEmbeddingConfig,
         client: AsyncOpenAI,
+        registry: EmbeddingRegistry,
         caps: EmbeddingModelCapabilities | None = None,
     ) -> type[Self]:
         """
@@ -82,6 +84,7 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
             _provider: Provider,
             _client: AsyncOpenAI,
             _config: OpenAIEmbeddingConfig,
+            _registry: EmbeddingRegistry,
             _caps: EmbeddingModelCapabilities | None = None,
             _impl_deps: EmbeddingImplementationDeps = INJECTED,
             _custom_deps: EmbeddingCustomDeps = INJECTED,
@@ -90,19 +93,27 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
             Construct an __init__ method for our newborn provider class.
             """
 
-            def __init__(
+            def __init__(  # noqa: N807
                 self: EmbeddingProvider[AsyncOpenAI],
                 provider: Provider = _provider,
                 client: AsyncOpenAI = _client,
+                registry: EmbeddingRegistry = _registry,
                 caps: EmbeddingModelCapabilities | None = _caps,
                 **kwargs: Any,
-            ) -> None:  # noqa: N807  # it's an __init__! It has to be __init__
+            ) -> None:  # it's an __init__! It has to be __init__
                 """
                 Initialize the embedding provider.
                 """
-                cls.__init__(self, client=client, config=config, caps=caps, **kwargs)
-                # 4. Set provider-specific attributes AFTER parent initialization
                 cls.provider = provider
+                cls.__init__(
+                    self,
+                    client=client,
+                    config=config,
+                    caps=caps,
+                    registry=registry,
+                    **kwargs,  # ty:ignore[invalid-argument-type]
+                )
+                # 4. Set provider-specific attributes AFTER parent initialization
 
             return __init__
 
@@ -122,7 +133,9 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
         object.__setattr__(
             parent_cls,
             "__init__",
-            make_init(cls, provider, _client=client, _config=config, _caps=caps),
+            make_init(
+                cls, provider, _client=client, _config=config, _registry=registry, _caps=caps
+            ),
         )
 
         # Create the new provider class with proper field definitions
@@ -134,6 +147,8 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
             __validators__=None,
             client=(AsyncOpenAI, client),
             _provider=(Provider, provider),
+            config=(OpenAIEmbeddingConfig, config),
+            registry=(EmbeddingRegistry, registry),
             caps=(EmbeddingModelCapabilities, caps),
         )
 
@@ -141,12 +156,11 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
         new_class._default_model_name = model_name
         new_class._default_provider = provider
         new_class._default_config = config or {}
-
+        new_class._default_registry = registry
         return new_class
 
     client: AsyncOpenAI
     provider: ClassVar[Provider]
-    caps: EmbeddingModelCapabilities | None = None
 
     @property
     def base_url(self) -> str:

@@ -59,4 +59,4 @@ def get_qwen_reranking_capabilities() -> tuple[QwenRerankingCapabilities, ...]:
     return tuple(assembled_capabilities)
 
 
-__all__ = ("get_qwen_reranking_capabilities", "QwenRerankingCapabilities")
+__all__ = ("QwenRerankingCapabilities", "get_qwen_reranking_capabilities")

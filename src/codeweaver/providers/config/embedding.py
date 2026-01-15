@@ -854,10 +854,7 @@ async def _to_sparse_vector_params(instance: BaseEmbeddingConfig) -> SparseVecto
     )
     index_params = SparseIndexParams(datatype=Datatype(resolved_datatype))
     modifier = Modifier.IDF if ("bm25" in instance.model_name.lower()) else Modifier.NONE
-    return SparseVectorParams(
-        index=index_params,
-        modifier=modifier,
-    )
+    return SparseVectorParams(index=index_params, modifier=modifier)
 
 
 class SentenceTransformersSparseEmbeddingConfig(SentenceTransformersEmbeddingConfig):
@@ -868,10 +865,10 @@ class SentenceTransformersSparseEmbeddingConfig(SentenceTransformersEmbeddingCon
 
     _is_sparse: ClassVar[bool] = True
 
-
     async def as_sparse_vector_params(self) -> SparseVectorParams:
         """Get Qdrant SparseVectorParams for this sparse embedding configuration."""
         return await _to_sparse_vector_params(self)
+
 
 class FastEmbedSparseEmbeddingConfig(FastEmbedEmbeddingConfig):
     """Configuration options for FastEmbed sparse embedding models.
@@ -884,6 +881,7 @@ class FastEmbedSparseEmbeddingConfig(FastEmbedEmbeddingConfig):
     async def as_sparse_vector_params(self) -> SparseVectorParams:
         """Get Qdrant SparseVectorParams for this sparse embedding configuration."""
         return await _to_sparse_vector_params(self)
+
 
 # ============================================================================
 # Discriminator Type Unions

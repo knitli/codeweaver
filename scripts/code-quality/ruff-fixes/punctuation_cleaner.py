@@ -7,10 +7,12 @@
 Clean up trailing punctuation when removing redundant exceptions from logging calls.
 This handles the cases that ast-grep can't handle with complex pattern matching.
 """
+
 import ast
 import re
 import sys
 from pathlib import Path
+
 
 class PunctuationCleaner(ast.NodeTransformer):
     """Clean up logging.exception calls that have redundant exception references with trailing punctuation."""
@@ -22,7 +24,16 @@ class PunctuationCleaner(ast.NodeTransformer):
     def visit_Call(self, node: ast.Call) -> ast.Call:
         """Clean up logging.exception calls with redundant exception references."""
         _ = self.generic_visit(node)
-        if isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name) and (node.func.value.id in ('logger', 'logging', 'log')) and (node.func.attr == 'exception') and (len(node.args) >= 2) and isinstance(node.args[0], ast.Constant) and isinstance(node.args[0].value, str) and self._is_exception_variable(node.args[-1]):
+        if (
+            isinstance(node.func, ast.Attribute)
+            and isinstance(node.func.value, ast.Name)
+            and (node.func.value.id in ("logger", "logging", "log"))
+            and (node.func.attr == "exception")
+            and (len(node.args) >= 2)
+            and isinstance(node.args[0], ast.Constant)
+            and isinstance(node.args[0].value, str)
+            and self._is_exception_variable(node.args[-1])
+        ):
             cleaned_message = self._clean_message_punctuation(node.args[0].value)
             if cleaned_message != node.args[0].value:
                 node.args[0] = ast.Constant(value=cleaned_message)
@@ -33,55 +44,70 @@ class PunctuationCleaner(ast.NodeTransformer):
     def _is_exception_variable(self, node: ast.expr) -> bool:
         """Check if this is likely an exception variable (e, exc, exception)."""
         if isinstance(node, ast.Name):
-            return node.id in ('e', 'exc', 'exception')
+            return node.id in ("e", "exc", "exception")
         return False
 
     def _clean_message_punctuation(self, message: str) -> str:
         """Clean trailing punctuation patterns when removing exception from logging message."""
-        patterns = [(': %s$', ''), (':\\s*%s$', ''), (' - %s$', ''), ('-\\s*%s$', ''), (', %s$', ''), (',\\s*%s$', ''), (' \\(%s\\)$', ''), ('\\(%s\\)$', ''), (' %s\\.$', ''), ('\\s*%s\\.$', '')]
+        patterns = [
+            (": %s$", ""),
+            (":\\s*%s$", ""),
+            (" - %s$", ""),
+            ("-\\s*%s$", ""),
+            (", %s$", ""),
+            (",\\s*%s$", ""),
+            (" \\(%s\\)$", ""),
+            ("\\(%s\\)$", ""),
+            (" %s\\.$", ""),
+            ("\\s*%s\\.$", ""),
+        ]
         for pattern, replacement in patterns:
             message = re.sub(pattern, replacement, message)
         return message.rstrip()
 
+
 def clean_file(file_path: Path) -> bool:
     """Clean punctuation in a single file. Returns True if changes were made."""
     try:
-        content = file_path.read_text(encoding='utf-8')
+        content = file_path.read_text(encoding="utf-8")
         tree = ast.parse(content)
         cleaner = PunctuationCleaner()
         new_tree = cleaner.visit(tree)
         if cleaner.changes_made:
             new_content = ast.unparse(new_tree)
-            _ = file_path.write_text(new_content, encoding='utf-8')
+            _ = file_path.write_text(new_content, encoding="utf-8")
             return True
     except (SyntaxError, UnicodeDecodeError) as e:
-        print(f'Warning: Could not process {file_path}: {e}', file=sys.stderr)
+        print(f"Warning: Could not process {file_path}: {e}", file=sys.stderr)
         return False
     else:
         return False
 
+
 def main() -> None:
     """Main entry point."""
     args = sys.argv
-    if len(args) < 2 or args[1] == '.':
-        args = [args[0], './src', './tests', './scripts']
+    if len(args) < 2 or args[1] == ".":
+        args = [args[0], "./src", "./tests", "./scripts"]
     files_changed = 0
     total_files = 0
     for arg in args[1:]:
         path = Path(arg)
-        if path.is_file() and path.suffix == '.py':
+        if path.is_file() and path.suffix == ".py":
             total_files += 1
             if clean_file(path):
                 files_changed += 1
-                print(f'✅ Cleaned punctuation in: {path}')
+                print(f"✅ Cleaned punctuation in: {path}")
         elif path.is_dir():
-            for py_file in path.rglob('*.py'):
+            for py_file in path.rglob("*.py"):
                 total_files += 1
                 if clean_file(py_file):
                     files_changed += 1
-                    print(f'✅ Cleaned punctuation in: {py_file}')
+                    print(f"✅ Cleaned punctuation in: {py_file}")
         else:
-            print(f'Warning: {path} is not a Python file or directory', file=sys.stderr)
-    print(f'\n📊 Processed {total_files} files, cleaned punctuation in {files_changed} files')
-if __name__ == '__main__':
+            print(f"Warning: {path} is not a Python file or directory", file=sys.stderr)
+    print(f"\n📊 Processed {total_files} files, cleaned punctuation in {files_changed} files")
+
+
+if __name__ == "__main__":
     main()

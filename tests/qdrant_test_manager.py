@@ -14,18 +14,22 @@ specifically for integration testing, with features for:
 - Optional authentication support for testing auth scenarios
 - Prevention of interference with existing Qdrant instances
 """
+
 import asyncio
 import os
 import platform
 import socket
 import subprocess
 import time
+
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 from uuid import uuid4
+
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.http import models as qmodels
+
 
 def _is_wsl() -> bool:
     """Detect if running in WSL (Windows Subsystem for Linux).
@@ -34,10 +38,11 @@ def _is_wsl() -> bool:
         True if running in WSL, False otherwise
     """
     try:
-        with open('/proc/version', encoding='utf-8') as f:
-            return 'microsoft' in f.read().lower() or 'wsl' in f.read().lower()
+        with open("/proc/version", encoding="utf-8") as f:
+            return "microsoft" in f.read().lower() or "wsl" in f.read().lower()
     except Exception:
         return False
+
 
 def _get_docker_command() -> str:
     """Get the appropriate docker command for the current platform.
@@ -45,9 +50,14 @@ def _get_docker_command() -> str:
     Returns:
         Docker command to use ('docker' or 'docker.exe')
     """
-    if _is_wsl() and subprocess.run(['which', 'docker.exe'], capture_output=True, check=False).returncode == 0:
-        return 'docker.exe'
-    return 'docker'
+    if (
+        _is_wsl()
+        and subprocess.run(["which", "docker.exe"], capture_output=True, check=False).returncode
+        == 0
+    ):
+        return "docker.exe"
+    return "docker"
+
 
 def _is_docker_available() -> bool:
     """Check if Docker is available and running.
@@ -57,11 +67,12 @@ def _is_docker_available() -> bool:
     """
     docker_cmd = _get_docker_command()
     try:
-        result = subprocess.run([docker_cmd, 'info'], capture_output=True, timeout=5, check=False)
+        result = subprocess.run([docker_cmd, "info"], capture_output=True, timeout=5, check=False)
     except Exception:
         return False
     else:
         return result.returncode == 0
+
 
 def _find_qdrant_container(container_name: str) -> str | None:
     """Find a running Qdrant container by name.
@@ -74,12 +85,21 @@ def _find_qdrant_container(container_name: str) -> str | None:
     """
     docker_cmd = _get_docker_command()
     with suppress(Exception):
-        result = subprocess.run([docker_cmd, 'ps', '-q', '-f', f'name={container_name}'], capture_output=True, text=True, timeout=5, check=False)
+        result = subprocess.run(
+            [docker_cmd, "ps", "-q", "-f", f"name={container_name}"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
         if result.returncode == 0 and result.stdout.strip():
             return result.stdout.strip()
     return None
 
-def _start_qdrant_container(*, port: int=6333, container_name: str='qdrant-test', image: str='qdrant/qdrant:v1.16.1') -> bool:
+
+def _start_qdrant_container(
+    *, port: int = 6333, container_name: str = "qdrant-test", image: str = "qdrant/qdrant:v1.16.1"
+) -> bool:
     """Start a Qdrant Docker container for testing.
 
     Args:
@@ -92,18 +112,32 @@ def _start_qdrant_container(*, port: int=6333, container_name: str='qdrant-test'
     """
     docker_cmd = _get_docker_command()
     with suppress(Exception):
-        result = subprocess.run([docker_cmd, 'ps', '-a', '-q', '-f', f'name={container_name}'], capture_output=True, text=True, timeout=5, check=False)
+        result = subprocess.run(
+            [docker_cmd, "ps", "-a", "-q", "-f", f"name={container_name}"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
         if result.returncode == 0 and result.stdout.strip():
-            _ = subprocess.run([docker_cmd, 'start', container_name], capture_output=True, timeout=10, check=False)
+            _ = subprocess.run(
+                [docker_cmd, "start", container_name], capture_output=True, timeout=10, check=False
+            )
             time.sleep(2)
             return _find_qdrant_container(container_name) is not None
     try:
-        _ = subprocess.run([docker_cmd, 'run', '-d', '--name', container_name, '-p', f'{port}:6333', image], capture_output=True, timeout=30, check=False)
+        _ = subprocess.run(
+            [docker_cmd, "run", "-d", "--name", container_name, "-p", f"{port}:6333", image],
+            capture_output=True,
+            timeout=30,
+            check=False,
+        )
         time.sleep(3)
     except Exception:
         return False
     else:
         return _find_qdrant_container(container_name) is not None
+
 
 def _stop_qdrant_container(container_name: str) -> bool:
     """Stop a Qdrant Docker container.
@@ -116,11 +150,14 @@ def _stop_qdrant_container(container_name: str) -> bool:
     """
     docker_cmd = _get_docker_command()
     try:
-        _ = subprocess.run([docker_cmd, 'stop', container_name], capture_output=True, timeout=10, check=False)
+        _ = subprocess.run(
+            [docker_cmd, "stop", container_name], capture_output=True, timeout=10, check=False
+        )
     except Exception:
         return False
     else:
         return True
+
 
 def _remove_qdrant_container(container_name: str) -> bool:
     """Remove a Qdrant Docker container.
@@ -133,11 +170,14 @@ def _remove_qdrant_container(container_name: str) -> bool:
     """
     docker_cmd = _get_docker_command()
     try:
-        _ = subprocess.run([docker_cmd, 'rm', '-f', container_name], capture_output=True, timeout=10, check=False)
+        _ = subprocess.run(
+            [docker_cmd, "rm", "-f", container_name], capture_output=True, timeout=10, check=False
+        )
     except Exception:
         return False
     else:
         return True
+
 
 class QdrantTestManager:
     """Manages Qdrant test instances with isolation and cleanup.
@@ -161,7 +201,17 @@ class QdrantTestManager:
     - QDRANT_TEST_CONTAINER_NAME: Custom container name (default: qdrant-test)
     """
 
-    def __init__(self, *, host: str | None=None, port: int | None=None, prefer_grpc: bool=False, api_key: str | None=None, storage_path: Path | None=None, timeout: float=30.0, auto_start_docker: bool=True):
+    def __init__(
+        self,
+        *,
+        host: str | None = None,
+        port: int | None = None,
+        prefer_grpc: bool = False,
+        api_key: str | None = None,
+        storage_path: Path | None = None,
+        timeout: float = 30.0,
+        auto_start_docker: bool = True,
+    ):
         """Initialize Qdrant test manager.
 
         Args:
@@ -174,29 +224,33 @@ class QdrantTestManager:
             auto_start_docker: Whether to auto-start Docker if no instance found
                 (can be disabled via QDRANT_TEST_SKIP_DOCKER env var)
         """
-        env_url = os.getenv('QDRANT_TEST_URL')
-        env_host = os.getenv('QDRANT_TEST_HOST', 'localhost')
-        env_port = os.getenv('QDRANT_TEST_PORT')
-        env_api_key = os.getenv('QDRANT_TEST_API_KEY')
-        env_skip_docker = os.getenv('QDRANT_TEST_SKIP_DOCKER', '').lower() in ('1', 'true', 'yes')
+        env_url = os.getenv("QDRANT_TEST_URL")
+        env_host = os.getenv("QDRANT_TEST_HOST", "localhost")
+        env_port = os.getenv("QDRANT_TEST_PORT")
+        env_api_key = os.getenv("QDRANT_TEST_API_KEY")
+        env_skip_docker = os.getenv("QDRANT_TEST_SKIP_DOCKER", "").lower() in ("1", "true", "yes")
         self.host = host or env_host
         self.api_key = api_key or env_api_key
         self.prefer_grpc = prefer_grpc
         self.storage_path = storage_path
         self.timeout = timeout
         self.auto_start_docker = auto_start_docker and (not env_skip_docker)
-        self.docker_image = os.getenv('QDRANT_TEST_IMAGE', 'qdrant/qdrant:v1.16.1')
-        self.container_name = os.getenv('QDRANT_TEST_CONTAINER_NAME', 'qdrant-test')
+        self.docker_image = os.getenv("QDRANT_TEST_IMAGE", "qdrant/qdrant:v1.16.1")
+        self.container_name = os.getenv("QDRANT_TEST_CONTAINER_NAME", "qdrant-test")
         self._docker_started = False
         if env_url:
-            url_parts = env_url.replace('http://', '').replace('https://', '').split(':')
+            url_parts = env_url.replace("http://", "").replace("https://", "").split(":")
             if len(url_parts) == 2:
                 self.host = url_parts[0]
-                self.port = int(url_parts[1].split('/')[0])
+                self.port = int(url_parts[1].split("/")[0])
             else:
-                self.port = port or (int(env_port) if env_port else None) or self._find_or_start_qdrant()
+                self.port = (
+                    port or (int(env_port) if env_port else None) or self._find_or_start_qdrant()
+                )
         else:
-            self.port = port or (int(env_port) if env_port else None) or self._find_or_start_qdrant()
+            self.port = (
+                port or (int(env_port) if env_port else None) or self._find_or_start_qdrant()
+            )
         self._client: AsyncQdrantClient | None = None
         self._collections_created: set[str] = set()
 
@@ -213,16 +267,18 @@ class QdrantTestManager:
             return self._find_qdrant_instance()
         if self.auto_start_docker and _is_docker_available():
             for test_port in range(6333, 6401):
-                if not self._check_port_in_use(self.host, test_port) and _start_qdrant_container(port=test_port, container_name=self.container_name, image=self.docker_image):
+                if not self._check_port_in_use(self.host, test_port) and _start_qdrant_container(
+                    port=test_port, container_name=self.container_name, image=self.docker_image
+                ):
                     self._docker_started = True
                     return test_port
-        platform_info = 'WSL' if _is_wsl() else platform.system()
-        docker_available = 'available' if _is_docker_available() else 'NOT available'
-        msg = f'No running Qdrant instance found and Docker auto-start failed.\nPlatform: {platform_info} (Docker {docker_available})\nTried ports: 6333-6400\n\nTo fix this:\n1. Start Qdrant manually: docker run -d -p 6336:6333 qdrant/qdrant:latest\n2. Or set QDRANT_TEST_PORT to your running instance port\n3. Or install/start Docker for auto-start capability'
+        platform_info = "WSL" if _is_wsl() else platform.system()
+        docker_available = "available" if _is_docker_available() else "NOT available"
+        msg = f"No running Qdrant instance found and Docker auto-start failed.\nPlatform: {platform_info} (Docker {docker_available})\nTried ports: 6333-6400\n\nTo fix this:\n1. Start Qdrant manually: docker run -d -p 6336:6333 qdrant/qdrant:latest\n2. Or set QDRANT_TEST_PORT to your running instance port\n3. Or install/start Docker for auto-start capability"
         raise RuntimeError(msg)
 
     @staticmethod
-    def _find_qdrant_instance(start: int=6333, end: int=6400) -> int:
+    def _find_qdrant_instance(start: int = 6333, end: int = 6400) -> int:
         """Find a running Qdrant instance in the given port range.
 
         Scans ports for running Qdrant instances (not free ports).
@@ -243,12 +299,12 @@ class QdrantTestManager:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
                 sock.settimeout(1.0)
                 try:
-                    result = sock.connect_ex(('localhost', port))
+                    result = sock.connect_ex(("localhost", port))
                     if result == 0:
                         return port
                 except Exception:
                     continue
-        msg = f'No running services found in port range {start}-{end}'
+        msg = f"No running services found in port range {start}-{end}"
         raise RuntimeError(msg)
 
     @staticmethod
@@ -274,7 +330,7 @@ class QdrantTestManager:
     @property
     def url(self) -> str:
         """Get the Qdrant instance URL."""
-        return f'http://{self.host}:{self.port}'
+        return f"http://{self.host}:{self.port}"
 
     async def _create_client(self) -> AsyncQdrantClient:
         """Create and configure Qdrant client.
@@ -282,9 +338,9 @@ class QdrantTestManager:
         Returns:
             Configured AsyncQdrantClient instance
         """
-        client_kwargs = {'url': self.url, 'prefer_grpc': self.prefer_grpc, 'timeout': self.timeout}
+        client_kwargs = {"url": self.url, "prefer_grpc": self.prefer_grpc, "timeout": self.timeout}
         if self.api_key:
-            client_kwargs['api_key'] = self.api_key
+            client_kwargs["api_key"] = self.api_key
         return AsyncQdrantClient(**client_kwargs)
 
     async def verify_connection(self) -> bool:
@@ -300,7 +356,9 @@ class QdrantTestManager:
             return False
         try:
             if self._client is None:
-                temp_client = AsyncQdrantClient(url=f'http://{self.host}:{self.port}', prefer_grpc=self.prefer_grpc, timeout=2)
+                temp_client = AsyncQdrantClient(
+                    url=f"http://{self.host}:{self.port}", prefer_grpc=self.prefer_grpc, timeout=2
+                )
                 _ = await asyncio.wait_for(temp_client.get_collections(), timeout=2)
                 await temp_client.close()
                 self._client = await self._create_client()
@@ -321,11 +379,11 @@ class QdrantTestManager:
         if self._client is None:
             self._client = await self._create_client()
         if not await self.verify_connection():
-            msg = f'Cannot connect to Qdrant at {self.url}. Ensure Qdrant is running on port {self.port}. Start with: docker run -p {{port}}:6333 qdrant/qdrant:latest'
+            msg = f"Cannot connect to Qdrant at {self.url}. Ensure Qdrant is running on port {self.port}. Start with: docker run -p {{port}}:6333 qdrant/qdrant:latest"
             raise RuntimeError(msg)
         return self._client
 
-    def create_collection_name(self, prefix: str='test') -> str:
+    def create_collection_name(self, prefix: str = "test") -> str:
         """Create a unique collection name for testing.
 
         Args:
@@ -335,9 +393,18 @@ class QdrantTestManager:
             Unique collection name with format: {prefix}-{uuid}
         """
         unique_id = uuid4().hex[:8]
-        return f'{prefix}-{unique_id}'
+        return f"{prefix}-{unique_id}"
 
-    async def create_collection(self, collection_name: str, *, dense_vector_size: int=768, sparse_vector_size: int | None=None, dense_vector_name: str='dense', sparse_vector_name: str='sparse', distance: qmodels.Distance=qmodels.Distance.COSINE) -> str:
+    async def create_collection(
+        self,
+        collection_name: str,
+        *,
+        dense_vector_size: int = 768,
+        sparse_vector_size: int | None = None,
+        dense_vector_name: str = "dense",
+        sparse_vector_name: str = "sparse",
+        distance: qmodels.Distance = qmodels.Distance.COSINE,
+    ) -> str:
         """Create a test collection with specified vector configuration.
 
         Args:
@@ -355,11 +422,19 @@ class QdrantTestManager:
             RuntimeError: If client not connected
         """
         client = await self.ensure_client()
-        vectors_config = {dense_vector_name: qmodels.VectorParams(size=dense_vector_size, distance=distance)}
+        vectors_config = {
+            dense_vector_name: qmodels.VectorParams(size=dense_vector_size, distance=distance)
+        }
         sparse_vectors_config = None
         if sparse_vector_size is not None:
-            sparse_vectors_config = {sparse_vector_name: qmodels.SparseVectorParams(index=qmodels.SparseIndexParams())}
-        _ = await client.create_collection(collection_name=collection_name, vectors_config=vectors_config, sparse_vectors_config=sparse_vectors_config)
+            sparse_vectors_config = {
+                sparse_vector_name: qmodels.SparseVectorParams(index=qmodels.SparseIndexParams())
+            }
+        _ = await client.create_collection(
+            collection_name=collection_name,
+            vectors_config=vectors_config,
+            sparse_vectors_config=sparse_vectors_config,
+        )
         self._collections_created.add(collection_name)
         return collection_name
 
@@ -398,7 +473,13 @@ class QdrantTestManager:
             self._docker_started = False
 
     @asynccontextmanager
-    async def collection_context(self, prefix: str='test', *, dense_vector_size: int=768, sparse_vector_size: int | None=None) -> AsyncIterator[tuple[AsyncQdrantClient, str]]:
+    async def collection_context(
+        self,
+        prefix: str = "test",
+        *,
+        dense_vector_size: int = 768,
+        sparse_vector_size: int | None = None,
+    ) -> AsyncIterator[tuple[AsyncQdrantClient, str]]:
         """Context manager for a test collection with automatic cleanup.
 
         Args:
@@ -417,13 +498,20 @@ class QdrantTestManager:
         """
         collection_name = self.create_collection_name(prefix)
         try:
-            _ = await self.create_collection(collection_name, dense_vector_size=dense_vector_size, sparse_vector_size=sparse_vector_size)
+            _ = await self.create_collection(
+                collection_name,
+                dense_vector_size=dense_vector_size,
+                sparse_vector_size=sparse_vector_size,
+            )
             client = await self.ensure_client()
             yield (client, collection_name)
         finally:
             await self.delete_collection(collection_name)
 
-def get_qdrant_test_config(*, collection_suffix: str='', port: int | None=None, api_key: str | None=None) -> dict:
+
+def get_qdrant_test_config(
+    *, collection_suffix: str = "", port: int | None = None, api_key: str | None = None
+) -> dict:
     """Get test-specific Qdrant configuration.
 
     This is a convenience function for creating Qdrant config dicts
@@ -438,7 +526,13 @@ def get_qdrant_test_config(*, collection_suffix: str='', port: int | None=None, 
         Configuration dict for QdrantVectorStoreProvider
     """
     manager = QdrantTestManager(port=port, api_key=api_key)
-    config = {'url': manager.url, 'prefer_grpc': False, 'collection_name': manager.create_collection_name(f'codeweaver-test-{collection_suffix}' if collection_suffix else 'codeweaver-test')}
+    config = {
+        "url": manager.url,
+        "prefer_grpc": False,
+        "collection_name": manager.create_collection_name(
+            f"codeweaver-test-{collection_suffix}" if collection_suffix else "codeweaver-test"
+        ),
+    }
     if api_key:
-        config['api_key'] = api_key
+        config["api_key"] = api_key
     return config

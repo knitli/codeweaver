@@ -9,6 +9,8 @@ from __future__ import annotations
 import contextlib
 import logging
 
+from genai_prices.types import Provider
+
 
 with contextlib.suppress(Exception):
     import warnings
@@ -21,7 +23,7 @@ with contextlib.suppress(Exception):
     os.environ["PYTHONWARNINGS"] = "ignore::pydantic.warnings.PydanticDeprecatedSince212"
 
 from collections.abc import Iterable, Sequence
-from typing import TYPE_CHECKING, Any, Literal, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, cast
 
 from codeweaver.core import BaseEnum, ConfigurationError
 from codeweaver.providers.embedding.providers.base import EmbeddingProvider
@@ -79,6 +81,7 @@ class GoogleEmbeddingProvider(EmbeddingProvider[genai.Client]):
     """Google embedding provider."""
 
     client: genai.Client
+    _provider: ClassVar[Provider] = Provider.GOOGLE
 
     async def _report_stats(self, documents: Iterable[genai_types.Part]) -> None:
         """Report token usage statistics."""

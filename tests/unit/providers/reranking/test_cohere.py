@@ -6,7 +6,7 @@
 """Unit tests for CohereRerankingProvider."""
 
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -45,65 +45,63 @@ def cohere_rerank_capabilities():
     )
 
 
+@pytest.fixture
+def mock_cohere_rerank_config():
+    """Create a mock config for Cohere reranking provider."""
+    config = MagicMock()
+    config.reranking_config = MagicMock()
+    config.reranking_config._as_options = MagicMock(
+        return_value={"model_name": "rerank-english-v3.0", "rerank": {}, "model": {}}
+    )
+    return config
+
+
 @pytest.mark.async_test
 @pytest.mark.mock_only
 @pytest.mark.unit
 class TestCohereRerankingProviderInitialization:
     """Test CohereRerankingProvider initialization."""
 
-    @patch.dict("os.environ", {"COHERE_API_KEY": "test-api-key"})
-    def test_provider_initialization_with_env_api_key(self, cohere_rerank_capabilities):
-        """Test that provider initializes with API key from environment."""
-        from codeweaver.providers import CohereRerankingProvider
-
-        provider = CohereRerankingProvider(caps=cohere_rerank_capabilities)
-
-        assert provider.caps == cohere_rerank_capabilities
-        assert provider.client is not None
-        assert provider._provider == Provider.COHERE
-
-    @patch.dict("os.environ", {}, clear=True)
-    def test_provider_initialization_without_api_key_raises_error(self, cohere_rerank_capabilities):
-        """Test that provider raises error without API key."""
-        from codeweaver.core import ConfigurationError
-        from codeweaver.providers import CohereRerankingProvider
-
-        with pytest.raises(ConfigurationError) as exc_info:
-            CohereRerankingProvider(caps=cohere_rerank_capabilities)
-
-        assert "API key not found" in str(exc_info.value)
-
     def test_provider_initialization_with_client(
-        self, mock_cohere_rerank_client, cohere_rerank_capabilities
+        self, mock_cohere_rerank_client, mock_cohere_rerank_config, cohere_rerank_capabilities
     ):
         """Test that provider initializes correctly with a provided client."""
         from codeweaver.providers import CohereRerankingProvider
 
         provider = CohereRerankingProvider(
-            caps=cohere_rerank_capabilities, client=mock_cohere_rerank_client
+            client=mock_cohere_rerank_client,
+            config=mock_cohere_rerank_config,
+            caps=cohere_rerank_capabilities,
         )
 
         assert provider.client is mock_cohere_rerank_client
         assert provider.caps == cohere_rerank_capabilities
 
     def test_provider_initialization_with_top_n(
-        self, mock_cohere_rerank_client, cohere_rerank_capabilities
+        self, mock_cohere_rerank_client, mock_cohere_rerank_config, cohere_rerank_capabilities
     ):
         """Test that top_n is set correctly during initialization."""
         from codeweaver.providers import CohereRerankingProvider
 
         provider = CohereRerankingProvider(
-            caps=cohere_rerank_capabilities, client=mock_cohere_rerank_client, top_n=25
+            client=mock_cohere_rerank_client,
+            config=mock_cohere_rerank_config,
+            caps=cohere_rerank_capabilities,
+            top_n=25,
         )
 
         assert provider.top_n == 25
 
-    def test_provider_base_url(self, mock_cohere_rerank_client, cohere_rerank_capabilities):
+    def test_provider_base_url(
+        self, mock_cohere_rerank_client, mock_cohere_rerank_config, cohere_rerank_capabilities
+    ):
         """Test that base_url property returns correct value."""
         from codeweaver.providers import CohereRerankingProvider
 
         provider = CohereRerankingProvider(
-            caps=cohere_rerank_capabilities, client=mock_cohere_rerank_client
+            client=mock_cohere_rerank_client,
+            config=mock_cohere_rerank_config,
+            caps=cohere_rerank_capabilities,
         )
 
         assert provider.base_url == "https://api.cohere.com"
@@ -117,7 +115,7 @@ class TestCohereRerankingProviderReranking:
 
     @pytest.mark.asyncio
     async def test_execute_rerank_success(
-        self, mock_cohere_rerank_client, cohere_rerank_capabilities
+        self, mock_cohere_rerank_client, mock_cohere_rerank_config, cohere_rerank_capabilities
     ):
         """Test successful reranking execution."""
         from codeweaver.providers import CohereRerankingProvider
@@ -136,7 +134,9 @@ class TestCohereRerankingProviderReranking:
         mock_cohere_rerank_client.rerank.return_value = mock_response
 
         provider = CohereRerankingProvider(
-            caps=cohere_rerank_capabilities, client=mock_cohere_rerank_client
+            client=mock_cohere_rerank_client,
+            config=mock_cohere_rerank_config,
+            caps=cohere_rerank_capabilities,
         )
 
         # Execute rerank
@@ -156,7 +156,7 @@ class TestCohereRerankingProviderReranking:
 
     @pytest.mark.asyncio
     async def test_rerank_with_code_chunks(
-        self, mock_cohere_rerank_client, cohere_rerank_capabilities
+        self, mock_cohere_rerank_client, mock_cohere_rerank_config, cohere_rerank_capabilities
     ):
         """Test reranking with CodeChunk objects."""
         from codeweaver.providers import CohereRerankingProvider
@@ -175,7 +175,9 @@ class TestCohereRerankingProviderReranking:
         mock_cohere_rerank_client.rerank.return_value = mock_response
 
         provider = CohereRerankingProvider(
-            caps=cohere_rerank_capabilities, client=mock_cohere_rerank_client
+            client=mock_cohere_rerank_client,
+            config=mock_cohere_rerank_config,
+            caps=cohere_rerank_capabilities,
         )
         from pathlib import Path
 
@@ -216,7 +218,7 @@ class TestCohereRerankingProviderReranking:
 
     @pytest.mark.asyncio
     async def test_rerank_with_single_chunk(
-        self, mock_cohere_rerank_client, cohere_rerank_capabilities
+        self, mock_cohere_rerank_client, mock_cohere_rerank_config, cohere_rerank_capabilities
     ):
         """Test that reranking works correctly with a single chunk."""
         from codeweaver.providers import CohereRerankingProvider
@@ -232,7 +234,9 @@ class TestCohereRerankingProviderReranking:
         mock_cohere_rerank_client.rerank.return_value = mock_response
 
         provider = CohereRerankingProvider(
-            caps=cohere_rerank_capabilities, client=mock_cohere_rerank_client
+            client=mock_cohere_rerank_client,
+            config=mock_cohere_rerank_config,
+            caps=cohere_rerank_capabilities,
         )
         from pathlib import Path
 
@@ -265,7 +269,7 @@ class TestCohereRerankingProviderErrorHandling:
 
     @pytest.mark.asyncio
     async def test_rerank_handles_connection_error(
-        self, mock_cohere_rerank_client, cohere_rerank_capabilities
+        self, mock_cohere_rerank_client, mock_cohere_rerank_config, cohere_rerank_capabilities
     ):
         """Test that connection errors trigger retry logic."""
         from codeweaver.providers import CohereRerankingProvider
@@ -273,7 +277,9 @@ class TestCohereRerankingProviderErrorHandling:
         mock_cohere_rerank_client.rerank.side_effect = ConnectionError("Connection failed")
 
         provider = CohereRerankingProvider(
-            caps=cohere_rerank_capabilities, client=mock_cohere_rerank_client
+            client=mock_cohere_rerank_client,
+            config=mock_cohere_rerank_config,
+            caps=cohere_rerank_capabilities,
         )
 
         # Call rerank - should return empty list after retries
@@ -285,7 +291,7 @@ class TestCohereRerankingProviderErrorHandling:
 
     @pytest.mark.asyncio
     async def test_rerank_handles_timeout_error(
-        self, mock_cohere_rerank_client, cohere_rerank_capabilities
+        self, mock_cohere_rerank_client, mock_cohere_rerank_config, cohere_rerank_capabilities
     ):
         """Test that timeout errors trigger retry logic."""
         from codeweaver.providers import CohereRerankingProvider
@@ -293,7 +299,9 @@ class TestCohereRerankingProviderErrorHandling:
         mock_cohere_rerank_client.rerank.side_effect = TimeoutError("Request timed out")
 
         provider = CohereRerankingProvider(
-            caps=cohere_rerank_capabilities, client=mock_cohere_rerank_client
+            client=mock_cohere_rerank_client,
+            config=mock_cohere_rerank_config,
+            caps=cohere_rerank_capabilities,
         )
 
         # Call rerank - should return empty list after retries
@@ -310,22 +318,30 @@ class TestCohereRerankingProviderErrorHandling:
 class TestCohereRerankingProviderProperties:
     """Test CohereRerankingProvider properties."""
 
-    def test_provider_property(self, mock_cohere_rerank_client, cohere_rerank_capabilities):
+    def test_provider_property(
+        self, mock_cohere_rerank_client, mock_cohere_rerank_config, cohere_rerank_capabilities
+    ):
         """Test that provider property returns correct value."""
         from codeweaver.providers import CohereRerankingProvider
 
         provider = CohereRerankingProvider(
-            caps=cohere_rerank_capabilities, client=mock_cohere_rerank_client
+            client=mock_cohere_rerank_client,
+            config=mock_cohere_rerank_config,
+            caps=cohere_rerank_capabilities,
         )
 
         assert provider.provider == Provider.COHERE
 
-    def test_model_name_property(self, mock_cohere_rerank_client, cohere_rerank_capabilities):
+    def test_model_name_property(
+        self, mock_cohere_rerank_client, mock_cohere_rerank_config, cohere_rerank_capabilities
+    ):
         """Test that model_name property returns correct value."""
         from codeweaver.providers import CohereRerankingProvider
 
         provider = CohereRerankingProvider(
-            caps=cohere_rerank_capabilities, client=mock_cohere_rerank_client
+            client=mock_cohere_rerank_client,
+            config=mock_cohere_rerank_config,
+            caps=cohere_rerank_capabilities,
         )
 
         assert provider.model_name == "rerank-english-v3.0"

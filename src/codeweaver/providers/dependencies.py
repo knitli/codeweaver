@@ -43,7 +43,7 @@ This is expected on the feat/di_monorepo branch.
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from typing import TYPE_CHECKING, Annotated, Any, TypedDict
+from typing import TYPE_CHECKING, Annotated, Any, TypedDict, cast
 
 from codeweaver.core import (
     INJECTED,
@@ -87,6 +87,7 @@ if TYPE_CHECKING:
     )
     from codeweaver.providers.embedding import EmbeddingProvider, SparseEmbeddingProvider
     from codeweaver.providers.reranking import RerankingProvider
+    from codeweaver.providers.types import ConfiguredCapability
     from codeweaver.providers.vector_stores import (
         MemoryVectorStoreProvider,
         QdrantVectorStoreProvider,
@@ -161,10 +162,10 @@ def _resolve_client(client: LazyImport[Any]) -> Any:
     return client._resolve() if isinstance(client, LazyImport) else client
 
 
-def _instantiate_client(client_cls: Any, options: ClientOptions | None = None) -> Any:
+def _instantiate_client(client_cls: Any, *args: Any, options: ClientOptions | None = None) -> Any:
     """Instantiate an SDK client with the given options."""
     try:
-        return client_cls(**(options.as_settings() if options else {}))
+        return client_cls(*args, **(options.as_settings() if options else {}))
     except (TypeError, ValueError) as e:
         raise ConfigurationError(
             "Failed to instantiate SDK client with provided options",
@@ -210,7 +211,11 @@ def _create_embedding_client() -> Any:  # AsyncOpenAI
         sdk_client.client["embed"] if isinstance(sdk_client.client, dict) else sdk_client.client
     )  # ty:ignore[invalid-assignment]
     client = _resolve_client(client_import)
-    return _instantiate_client(client, resolved_settings.client_options)
+    if "bedrock" in sdk_client.variable:
+        return _instantiate_client(
+            client, "bedrock-runtime", options=resolved_settings.client_options
+        )
+    return _instantiate_client(client, options=resolved_settings.client_options)
 
 
 def _create_sparse_embedding_client() -> Any:
@@ -239,7 +244,7 @@ def _create_sparse_embedding_client() -> Any:
         sdk_client.client["sparse"] if isinstance(sdk_client.client, dict) else sdk_client.client
     )  # ty:ignore[invalid-assignment]
     client = _resolve_client(client_import)
-    return _instantiate_client(client, resolved_settings.client_options)
+    return _instantiate_client(client, options=resolved_settings.client_options)
 
 
 def _create_reranking_client() -> Any:
@@ -266,7 +271,11 @@ def _create_reranking_client() -> Any:
         sdk_client.client["reranking"] if isinstance(sdk_client.client, dict) else sdk_client.client
     )  # ty:ignore[invalid-assignment]
     client = _resolve_client(client_import)
-    return _instantiate_client(client, resolved_settings.client_options)
+    if "bedrock" in sdk_client.variable:
+        return _instantiate_client(
+            client, "bedrock-agent-runtime", options=resolved_settings.client_options
+        )
+    return _instantiate_client(client, options=resolved_settings.client_options)
 
 
 def _create_vector_client() -> Any:
@@ -290,8 +299,8 @@ def _create_vector_client() -> Any:
             "No vector store provider configuration found",
             suggestions=["Ensure at least one vector store provider is configured in settings"],
         )
-    client = _resolve_client(resolved_settings.client)  # ty:ignore[invalid-argument-type]
-    return _instantiate_client(client, resolved_settings.client_options)
+    client = _resolve_client(cast(LazyImport[Any], resolved_settings.client().client))
+    return _instantiate_client(client, options=resolved_settings.client_options)
 
 
 # Universal client dependency type for all embedding providers
@@ -400,6 +409,23 @@ type EmbeddingCapabilityResolverDep = Annotated[
 ]
 """Type alias for DI injection of embedding capability resolver."""
 
+type SparseEmbeddingCapabilityResolverDep = Annotated[
+    SparseEmbeddingCapabilityResolver, depends(SparseEmbeddingCapabilityResolver)
+]
+"""Type alias for DI injection of sparse embedding capability resolver."""
+
+BackupEmbeddingCapabilityResolver = create_backup_class(EmbeddingCapabilityResolver)
+
+BackupSparseEmbeddingCapabilityResolver = create_backup_class(SparseEmbeddingCapabilityResolver)
+
+type BackupEmbeddingCapabilityResolverDep = Annotated[
+    BackupEmbeddingCapabilityResolver, depends(BackupEmbeddingCapabilityResolver)
+]
+
+type BackupSparseEmbeddingCapabilityResolverDep = Annotated[
+    BackupSparseEmbeddingCapabilityResolver, depends(BackupSparseEmbeddingCapabilityResolver)
+]
+
 
 @dependency_provider(SparseEmbeddingProviderSettings, scope="singleton", collection=True)
 def _create_all_sparse_embedding_configs() -> tuple[SparseEmbeddingProviderSettings, ...]:
@@ -498,6 +524,12 @@ type RerankingCapabilityResolverDep = Annotated[
     RerankingCapabilityResolver, depends(RerankingCapabilityResolver)
 ]
 """Type alias for DI injection of reranking capability resolver."""
+
+BackupRerankingCapabilityResolver = create_backup_class(RerankingCapabilityResolver)
+
+type BackupRerankingCapabilityResolverDep = Annotated[
+    BackupRerankingCapabilityResolver, depends(BackupRerankingCapabilityResolver)
+]
 
 
 @dependency_provider(VectorStoreProviderSettings, scope="singleton", collection=True)
@@ -671,7 +703,11 @@ def _get_embedding_provider_for_config(
     config: EmbeddingProviderSettings, registry: EmbeddingRegistryDep = INJECTED
 ) -> EmbeddingProvider:
     """Helper to get the embedding provider settings from config."""
-    client = _resolve_client(config.client)
+    client = _resolve_client(
+        config.client.client["embed"]
+        if isinstance(config.client.client, dict)
+        else config.client.client  # ty:ignore[invalid-argument-type]
+    )
     capabilities = config.embedding_config.capabilities
     provider = config.client.embedding_provider
     try:
@@ -685,16 +721,29 @@ def _get_embedding_provider_for_config(
             ],
         ) from e
     client = _instantiate_client(client, config.client_options)
-    return resolved_provider(
-        client=client, registry=registry, capabilities=capabilities, config=config
-    )
+    if "open" in config.client.variable:
+        from codeweaver.providers.embedding.providers.openai_factory import OpenAIEmbeddingBase
+
+        return cast(OpenAIEmbeddingBase, resolved_provider).get_provider_class(
+            model_name=config.model_name or config.embedding_config.model_name,
+            client=client,
+            provider=config.provider,
+            registry=registry,
+            caps=capabilities,  # ty:ignore[invalid-argument-type]
+            config=config,  # ty:ignore[invalid-argument-type]
+        )  # ty:ignore[invalid-return-type]
+    return resolved_provider(client=client, registry=registry, caps=capabilities, config=config)
 
 
 def _get_backup_embedding_provider_for_config(
     config: BackupEmbeddingProviderSettings, registry: BackupEmbeddingRegistryDep = INJECTED
 ) -> BackupEmbeddingProvider:
     """Helper to get the backup embedding provider settings from config."""
-    client = _resolve_client(config.client)
+    client = _resolve_client(
+        config.client.client["embed"]
+        if isinstance(config.client.client, dict)
+        else config.client.client
+    )
     capabilities = config.embedding_config.capabilities
     provider = config.client.embedding_provider
     try:
@@ -708,9 +757,7 @@ def _get_backup_embedding_provider_for_config(
             ],
         ) from e
     client = _instantiate_client(client, config.client_options)
-    return resolved_provider(
-        client=client, registry=registry, capabilities=capabilities, config=config
-    )
+    return resolved_provider(client=client, registry=registry, caps=capabilities, config=config)
 
 
 type EmbeddingProviderDep = Annotated[
@@ -736,7 +783,11 @@ def _get_sparse_embedding_provider_for_config(
     config: SparseEmbeddingProviderSettings, registry: EmbeddingRegistryDep = INJECTED
 ) -> SparseEmbeddingProvider:
     """Helper to get the sparse embedding provider settings from config."""
-    client = _resolve_client(config.client)
+    client = _resolve_client(
+        config.client.client["sparse"]
+        if isinstance(config.client.client, dict)
+        else config.client.client  # ty:ignore[invalid-argument-type]
+    )
     capabilities = config.sparse_embedding_config.capabilities
     provider = config.client.embedding_provider
     try:
@@ -750,16 +801,18 @@ def _get_sparse_embedding_provider_for_config(
             ],
         ) from e
     client = _instantiate_client(client, config.client_options)
-    return resolved_provider(
-        client=client, registry=registry, capabilities=capabilities, config=config
-    )
+    return resolved_provider(client=client, registry=registry, caps=capabilities, config=config)
 
 
 def _get_backup_sparse_embedding_provider_for_config(
     config: BackupSparseEmbeddingProviderSettings, registry: BackupEmbeddingRegistryDep = INJECTED
 ) -> BackupSparseEmbeddingProvider:
     """Helper to get the backup sparse embedding provider settings from config."""
-    client = _resolve_client(config.client)
+    client = _resolve_client(
+        config.client.client["sparse"]
+        if isinstance(config.client.client, dict)
+        else config.client.client
+    )
     capabilities = config.sparse_embedding_config.capabilities
     provider = config.client.embedding_provider
     try:
@@ -773,9 +826,7 @@ def _get_backup_sparse_embedding_provider_for_config(
             ],
         ) from e
     client = _instantiate_client(client, config.client_options)
-    return resolved_provider(
-        client=client, registry=registry, capabilities=capabilities, config=config
-    )
+    return resolved_provider(client=client, registry=registry, caps=capabilities, config=config)
 
 
 type SparseEmbeddingProviderDep = Annotated[
@@ -812,7 +863,11 @@ BackupRerankingProvider = create_backup_class(
 
 def _get_reranking_provider_for_config(config: RerankingProviderSettings) -> RerankingProvider:
     """Helper to get the reranking provider settings from config."""
-    client = _resolve_client(config.client)
+    client = _resolve_client(
+        config.client.client["rerank"]
+        if isinstance(config.client.client, dict)
+        else config.client.client  # ty:ignore[invalid-argument-type]
+    )
     capabilities = config.reranking_config.capabilities
     provider = config.client.reranking_provider
     try:
@@ -826,14 +881,18 @@ def _get_reranking_provider_for_config(config: RerankingProviderSettings) -> Rer
             ],
         ) from e
     client = _instantiate_client(client, config.client_options)
-    return resolved_provider(client=client, capabilities=capabilities, config=config)
+    return resolved_provider(client=client, config=config, caps=capabilities)
 
 
 def _get_backup_reranking_provider_for_config(
     config: BackupRerankingProviderSettings,
 ) -> BackupRerankingProvider:
     """Helper to get the backup reranking provider settings from config."""
-    client = _resolve_client(config.client)
+    client = _resolve_client(
+        config.client.client["rerank"]
+        if isinstance(config.client.client, dict)
+        else config.client.client
+    )
     capabilities = config.reranking_config.capabilities
     provider = config.client.reranking_provider
     try:
@@ -847,7 +906,7 @@ def _get_backup_reranking_provider_for_config(
             ],
         ) from e
     client = _instantiate_client(client, config.client_options)
-    return resolved_provider(client=client, capabilities=capabilities, config=config)
+    return resolved_provider(client=client, config=config, caps=capabilities)
 
 
 type RerankingProviderDep = Annotated[
@@ -1004,6 +1063,67 @@ type AllProvidersDep = Annotated[
 ]
 """Type alias for DI injection of all providers."""
 
+
+def _assemble_configured_capabilities(
+    dense_configs,
+    sparse_configs,
+    dense_resolver: EmbeddingCapabilityResolver,
+    sparse_resolver: SparseEmbeddingCapabilityResolver,
+):
+    """Assemble configured capabilities from dense and sparse configs."""
+    dense_caps = (
+        dense_resolver.resolve(config.model_name or config.embedding_config.model_name)
+        for config in dense_configs
+    )
+    sparse_caps = (
+        sparse_resolver.resolve(config.model_name or config.sparse_embedding_config.model_name)
+        for config in sparse_configs
+    )
+    dense_conf_caps = zip(dense_configs, dense_caps, strict=True)
+    sparse_conf_caps = zip(sparse_configs, sparse_caps, strict=True)
+    from codeweaver.providers.types import ConfiguredCapability
+
+    return tuple(
+        ConfiguredCapability(*conf_tup) for conf_tup in (*dense_conf_caps, *sparse_conf_caps)
+    )
+
+
+def _create_all_configured_capabilities(
+    dense_resolver: EmbeddingCapabilityResolverDep = INJECTED,
+    sparse_resolver: SparseEmbeddingCapabilityResolverDep = INJECTED,
+) -> tuple[ConfiguredCapability, ...]:
+    """Get all configured capabilities for non-backup providers."""
+    dense_configs = (cfg for cfg in _create_all_embedding_configs() if not cfg.as_backup)
+    sparse_configs = (cfg for cfg in _create_all_sparse_embedding_configs() if not cfg.as_backup)
+    return _assemble_configured_capabilities(
+        dense_configs, sparse_configs, dense_resolver, sparse_resolver
+    )
+
+
+def _create_all_backup_configured_capabilities(
+    dense_resolver: BackupEmbeddingCapabilityResolver = INJECTED,
+    sparse_resolver: BackupSparseEmbeddingCapabilityResolver = INJECTED,
+) -> tuple[ConfiguredCapability, ...]:
+    """Get all configured capabilities for backup providers."""
+    dense_configs = (cfg for cfg in _create_all_embedding_configs() if cfg.as_backup)
+    sparse_configs = (cfg for cfg in _create_all_sparse_embedding_configs() if cfg.as_backup)
+    return _assemble_configured_capabilities(
+        dense_configs, sparse_configs, dense_resolver, sparse_resolver
+    )
+
+
+type ConfiguredCapabilitiesDep = Annotated[
+    tuple[ConfiguredCapability],
+    depends(_create_all_configured_capabilities, use_cache=True, scope="singleton"),
+]
+"""Assembled configured capabilities for non-backup sparse/dense embedding providers."""
+
+type BackupConfiguredCapabilitiesDep = Annotated[
+    tuple[ConfiguredCapability],
+    depends(_create_all_backup_configured_capabilities, use_cache=True, scope="singleton"),
+]
+"""Assembled configured capabilities for backup sparse/dense embedding providers."""
+
 # ===========================================================================
 # *                            MODULE EXPORTS
 # ===========================================================================
@@ -1012,18 +1132,33 @@ __all__ = (
     "AgentProviderSettingsDep",
     "AllDataProviderConfigsDep",
     "AllEmbeddingConfigsDep",
+    "AllProvidersDep",
     "AllRerankingConfigsDep",
     "AllSparseEmbeddingConfigsDep",
     "AllVectorStoreConfigsDep",
+    "BackupConfiguredCapabilitiesDep",
+    "BackupEmbeddingCapabilityResolver",
+    "BackupEmbeddingProvider",
     "BackupEmbeddingProviderDep",
+    "BackupEmbeddingProviderSettings",
     "BackupEmbeddingProviderSettingsDep",
     "BackupEmbeddingRegistryDep",
+    "BackupRerankingCapabilityResolver",
+    "BackupRerankingCapabilityResolverDep",
+    "BackupRerankingProvider",
     "BackupRerankingProviderDep",
+    "BackupRerankingProviderSettings",
     "BackupRerankingProviderSettingsDep",
+    "BackupSparseEmbeddingCapabilityResolver",
+    "BackupSparseEmbeddingProvider",
     "BackupSparseEmbeddingProviderDep",
+    "BackupSparseEmbeddingProviderSettings",
     "BackupSparseEmbeddingProviderSettingsDep",
+    "BackupVectorStoreProvider",
     "BackupVectorStoreProviderDep",
+    "BackupVectorStoreProviderSettings",
     "BackupVectorStoreProviderSettingsDep",
+    "ConfiguredCapabilitiesDep",
     "EmbeddingCapabilityResolverDep",
     "EmbeddingClientDep",
     "EmbeddingProviderDep",

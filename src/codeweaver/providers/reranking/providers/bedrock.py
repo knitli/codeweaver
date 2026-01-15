@@ -22,8 +22,6 @@ from pydantic.alias_generators import to_camel, to_snake
 
 from codeweaver.core import BasedModel, ConfigurationError, Provider
 from codeweaver.core import ValidationError as CodeWeaverValidationError
-from codeweaver.providers.config import BedrockProviderSettings
-from codeweaver.providers.reranking.capabilities.amazon import get_amazon_reranking_capabilities
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 from codeweaver.providers.reranking.providers.base import RerankingProvider, RerankingResult
 
@@ -216,7 +214,6 @@ class BedrockRerankingResult(BaseBedrockModel):
 
 
 try:
-    from boto3 import client as boto3_client
     from types_boto3_bedrock_agent_runtime.client import AgentsforBedrockRuntimeClient
 
 except ImportError as e:
@@ -286,7 +283,7 @@ def bedrock_reranking_output_transformer(
     results: list[RerankingResult] = []
     for item in parsed_response.results:
         # ty doesn't know that this will always be CodeChunk-as-JSON because that's what we send.
-        chunk = CodeChunk.model_validate_json(item.document.json_document)
+        chunk = CodeChunk.model_validate_json(item.document.json_document)  # ty:ignore[invalid-argument-type]
         results.append(
             RerankingResult(
                 original_index=original_chunks.index(chunk)
@@ -305,7 +302,6 @@ class BedrockRerankingProvider(RerankingProvider[AgentsforBedrockRuntimeClient])
 
     client: AgentsforBedrockRuntimeClient
     _provider = Provider.BEDROCK
-    caps: RerankingModelCapabilities = get_amazon_reranking_capabilities()[0]
     model_configuration: RerankConfiguration
 
     _kwargs: dict[str, Any] | None
@@ -315,52 +311,53 @@ class BedrockRerankingProvider(RerankingProvider[AgentsforBedrockRuntimeClient])
 
     def __init__(
         self,
-        bedrock_provider_settings: BedrockProviderSettings,
-        model_config: RerankConfiguration | None = None,
-        caps: RerankingModelCapabilities | None = None,
-        client: AgentsforBedrockRuntimeClient | None = None,
-        top_n: PositiveInt = 40,
+        client: AgentsforBedrockRuntimeClient,
+        config: Any,  # RerankingProviderSettings (actually BedrockProviderSettings)
+        caps: RerankingModelCapabilities,
         **kwargs: Any,
     ) -> None:
-        """Override base init to set up Bedrock-specific client and configuration."""
-        from pydantic import SecretStr
+        """Initialize the Bedrock reranking provider.
 
-        # Prepare all values BEFORE calling super().__init__()
-        bedrock_settings = {
-            k: v.get_secret_value() if isinstance(v, SecretStr) else v
-            for k, v in bedrock_provider_settings.items()
-            if v is not None
-        }
-        model_configuration = model_config or RerankConfiguration.from_arn(
-            bedrock_provider_settings["model_arn"], kwargs.get("top_n", 40) if kwargs else top_n
+        Args:
+            client: The Bedrock AgentsforBedrockRuntimeClient (provided by DI)
+            config: Configuration settings including reranking options (provided by DI)
+            caps: Model capabilities (provided by DI)
+            **kwargs: Additional keyword arguments to override config
+        """
+        # Extract Bedrock-specific configuration
+        rerank_opts = (
+            config.reranking_config._as_options().get("rerank", {})
+            if hasattr(config, "reranking_config")
+            else {}
         )
-        _ = bedrock_provider_settings.pop("model_arn")  # ty: ignore[invalid-argument-type]  # the typed dict is mine, I do what I want
+        top_n_value = rerank_opts.get("top_n", 40)
 
-        # Initialize client if not provided
-        if client is None:
-            client = boto3_client(  # ty: ignore[invalid-assignment,no-matching-overload]
-                "bedrock-agent-runtime",
-                **(bedrock_settings if isinstance(bedrock_settings, dict) else {}),  # ty: ignore[invalid-argument-type]
-            )
+        model_configuration = kwargs.pop("model_configuration", None) or (
+            RerankConfiguration.from_arn(config.model_arn, top_n_value)
+            if hasattr(config, "model_arn")
+            else None
+        )
 
-        final_caps = caps or get_amazon_reranking_capabilities()[0]
+        if not model_configuration:
+            raise ValueError("Bedrock reranking requires a model configuration with ARN")
 
-        if not client:
-            raise ValueError("Either a Bedrock client or provider settings must be provided.")
+        # Call super().__init__() with client, config, and caps
+        super().__init__(client=client, config=config, caps=caps, **kwargs)
 
-        # Call super().__init__() FIRST which handles all Pydantic initialization
-        super().__init__(client=client, caps=final_caps, top_n=top_n, **kwargs)
-
-        # Set instance attributes AFTER Pydantic initialization
-        self._bedrock_provider_settings = bedrock_settings
+        # Set Bedrock-specific attributes
         self.model_configuration = model_configuration
+        self._initialize()
+
+    def _initialize(self) -> None:
+        """Initialize the Bedrock reranking provider after Pydantic setup."""
+        # Input and output transformers are already set as class attributes
 
     async def _execute_rerank(
         self,
         query: str,
         documents: Sequence[BedrockInlineDocumentSource],
         *,
-        top_n: int = 40,
+        top_n: int = 10,
         **kwargs: dict[str, Any] | None,
     ) -> Any:  # ty:ignore[invalid-method-override]
         """

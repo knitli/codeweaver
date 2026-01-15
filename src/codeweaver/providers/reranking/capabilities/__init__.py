@@ -11,15 +11,24 @@ Use RerankingCapabilityResolver for capability lookup and management.
 from __future__ import annotations
 
 from types import MappingProxyType
+from typing import TYPE_CHECKING
 
 from codeweaver.core import create_lazy_getattr
+
+
+if TYPE_CHECKING:
+    from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
+    from codeweaver.providers.reranking.capabilities.resolver import RerankingCapabilityResolver
+    from codeweaver.providers.reranking.capabilities.types import (
+        PartialRerankingCapabilitiesDict,
+        RerankingCapabilitiesDict,
+    )
 
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "PartialRerankingCapabilitiesDict": (__spec__.parent, "types"),
     "RerankingCapabilitiesDict": (__spec__.parent, "types"),
-    "RerankingCapabilityResolver": (__spec__.parent, "dependencies"),
-    "RerankingCapabilityResolverDep": (__spec__.parent, "dependencies"),
+    "RerankingCapabilityResolver": (__spec__.parent, "resolver"),
     "RerankingModelCapabilities": (__spec__.parent, "base"),
 })
 
@@ -29,7 +38,6 @@ __all__ = (
     "PartialRerankingCapabilitiesDict",
     "RerankingCapabilitiesDict",
     "RerankingCapabilityResolver",
-    "RerankingCapabilityResolverDep",
     "RerankingModelCapabilities",
 )
 

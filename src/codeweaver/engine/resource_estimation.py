@@ -76,7 +76,6 @@ def get_walker() -> rignore.Walker:
     from codeweaver.core import Unset
     from codeweaver.engine import DefaultIndexerSettings
 
-    settings = get_settings()
     index_settings = (
         DefaultIndexerSettings if isinstance(settings.indexer, Unset) else settings.indexer
     )

@@ -23,8 +23,6 @@ else:
 def _get_provider_defaults() -> ProviderSettingsDict:
     """Get built-in default providers."""
     if importlib.util.find_spec("codeweaver.providers") is not None:
-        from codeweaver.providers import get_profile
-
         return get_profile("recommended", "local")
     return {}
 

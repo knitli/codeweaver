@@ -165,9 +165,8 @@ def test_provider_with_generic_type(clean_registry):
 
 def test_provider_with_union_type(clean_registry):
     """Test provider with union type hints."""
-    from typing import Union
 
-    UnionType = Union[ServiceA, ServiceB]
+    UnionType = ServiceA | ServiceB
 
     @provider(UnionType, scope="singleton")  # type: ignore
     def create() -> ServiceA:
@@ -179,9 +178,8 @@ def test_provider_with_union_type(clean_registry):
 
 def test_provider_with_optional_type(clean_registry):
     """Test provider with Optional type hints."""
-    from typing import Optional
 
-    OptionalType = Optional[ServiceA]
+    OptionalType = ServiceA | None
 
     @provider(OptionalType, scope="singleton")  # type: ignore
     def create() -> ServiceA | None:
@@ -196,6 +194,7 @@ def test_provider_with_optional_type(clean_registry):
 
 
 def test_provider_generator_that_raises(clean_registry):
+    # sourcery skip: remove-unreachable-code
     """Test generator provider that raises during setup."""
 
     @provider(ServiceA, scope="singleton")
@@ -211,6 +210,7 @@ def test_provider_generator_that_raises(clean_registry):
 
 
 async def test_provider_async_generator_that_raises(clean_registry):
+    # sourcery skip: remove-unreachable-code
     """Test async generator provider that raises during setup."""
 
     @provider(ServiceA, scope="singleton")
@@ -382,7 +382,7 @@ def test_registry_thread_safety_under_exception(clean_registry):
 
     # All should succeed (lock should not be stuck)
     assert len(successes) == 10
-    assert len(errors) == 0
+    assert not errors
 
 
 # ==============================================================================

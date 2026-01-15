@@ -46,7 +46,6 @@ from codeweaver.core import (
     INJECTED,
     AnonymityConversion,
     BasedModel,
-    BaseEnum,
     BatchKeys,
     BlakeStore,
     ChunkEmbeddings,
@@ -68,6 +67,8 @@ from codeweaver.core import (
 )
 from codeweaver.core import ValidationError as CodeWeaverValidationError
 from codeweaver.providers.config import EmbeddingConfigT, EmbeddingProviderSettings
+from codeweaver.providers.exceptions import CircuitBreakerOpenError
+from codeweaver.providers.types import CircuitBreakerState
 
 
 if TYPE_CHECKING:
@@ -108,26 +109,7 @@ def my_custom_deps() -> LiterallyAnything:
 ```
 """
 
-
 logger = logging.getLogger(__name__)
-
-
-class CircuitBreakerState(BaseEnum):
-    """Circuit breaker states for provider resilience."""
-
-    CLOSED = "closed"  # Normal operation
-    OPEN = "open"  # Failing, rejecting requests
-    HALF_OPEN = "half_open"  # Testing if service recovered
-
-
-class CircuitBreakerOpenError(Exception):
-    """Raised when circuit breaker is open and rejecting requests."""
-
-
-def _get_registry() -> EmbeddingRegistry:
-    from codeweaver.providers.embedding.registry import get_embedding_registry
-
-    return get_embedding_registry()
 
 
 class EmbeddingErrorInfo(TypedDict):

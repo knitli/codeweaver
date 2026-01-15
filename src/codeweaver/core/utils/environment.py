@@ -231,6 +231,7 @@ def detect_root_package() -> Literal["server", "engine", "provider", "core"]:
 
 
 __all__ = (
+    "detect_root_package",
     "format_file_link",
     "get_codeweaver_config_paths",
     "get_possible_env_vars",

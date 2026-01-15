@@ -381,27 +381,6 @@ class FastEmbedProviderMixin:
 # ===========================================================================
 
 
-class CollectionConfig(TypedDict, total=False):
-    """Common collection configuration for vector store providers."""
-
-    collection_name: NotRequired[str | None]
-    """Collection name override. Defaults to a unique name based on the project name."""
-
-    vector_config: NotRequired[Mapping[str, VectorParams | SparseVectorParams] | None]
-    """Configuration for individual vector types in the collection."""
-
-
-class MemoryConfig(TypedDict, total=False):
-    """Configuration for in-memory vector store provider."""
-
-    persist_path: NotRequired[Path]
-    f"""Path for JSON persistence file. Defaults to {get_user_cache_dir()}/vectors/[your_project_name]_store.json."""
-    auto_persist: NotRequired[bool]
-    """Automatically save after operations. Defaults to True."""
-    persist_interval: NotRequired[PositiveInt | None]
-    """Periodic persist interval in seconds. Defaults to 300 (5 minutes). Set to None to disable periodic persistence."""
-
-
 class VectorStoreProviderSettings(BaseProviderSettings):
     """Settings for vector store provider selection and configuration."""
 
@@ -411,6 +390,16 @@ class VectorStoreProviderSettings(BaseProviderSettings):
         PositiveInt | None,
         Field(description="Batch size for bulk upsert operations. Defaults to 64."),
     ] = 96
+
+
+class CollectionConfig(TypedDict, total=False):
+    """Common collection configuration for vector store providers."""
+
+    collection_name: NotRequired[str | None]
+    """Collection name override. Defaults to a unique name based on the project name."""
+
+    vector_config: NotRequired[Mapping[str, VectorParams | SparseVectorParams] | None]
+    """Configuration for individual vector types in the collection."""
 
 
 class _BaseQdrantVectorStoreProviderSettings(VectorStoreProviderSettings):
@@ -588,6 +577,17 @@ class QdrantVectorStoreProviderSettings(_BaseQdrantVectorStoreProviderSettings):
     provider: ClassVar[Literal[Provider.QDRANT]] = Provider.QDRANT
 
 
+class MemoryConfig(TypedDict, total=False):
+    """Configuration for in-memory vector store provider."""
+
+    persist_path: NotRequired[Path]
+    f"""Path for JSON persistence file. Defaults to {get_user_cache_dir()}/vectors/[your_project_name]_store.json."""
+    auto_persist: NotRequired[bool]
+    """Automatically save after operations. Defaults to True."""
+    persist_interval: NotRequired[PositiveInt | None]
+    """Periodic persist interval in seconds. Defaults to 300 (5 minutes). Set to None to disable periodic persistence."""
+
+
 class MemoryVectorStoreProviderSettings(_BaseQdrantVectorStoreProviderSettings):
     """Settings for in-memory vector store provider."""
 
@@ -600,7 +600,14 @@ class MemoryVectorStoreProviderSettings(_BaseQdrantVectorStoreProviderSettings):
     def __init__(self, **data: Any) -> None:
         """Initialize Memory vector store provider settings."""
         object.__setattr__(
-            self, "in_memory_config", data.get("in_memory_config") or self._default_memory_config()
+            self,
+            "in_memory_config",
+            data.get("in_memory_config")
+            or self._default_memory_config(
+                collection_name=data.get("collection", {}).get("collection_name", None),
+                project_name=data.get("project_name"),
+                project_path=data.get("project_path"),
+            ),
         )
         super().__init__(**data)
 
@@ -862,7 +869,7 @@ class FastEmbedRerankingProviderSettings(FastEmbedProviderMixin, RerankingProvid
 
     client_options: Annotated[
         FastEmbedClientOptions | None,
-        Field(description="Client options for the provider's client."),
+        Field(description="Client options for the SDK provider's client."),
     ] = None
 
 
@@ -870,7 +877,8 @@ class BedrockRerankingProviderSettings(BedrockProviderMixin, RerankingProviderSe
     """Provider settings for Bedrock reranking models."""
 
     client_options: Annotated[
-        BedrockClientOptions | None, Field(description="Client options for the provider's client.")
+        BedrockClientOptions | None,
+        Field(description="Client options for the SDK provider's client."),
     ] = None
 
 

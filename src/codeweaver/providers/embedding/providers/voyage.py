@@ -104,9 +104,7 @@ class VoyageEmbeddingProvider(EmbeddingProvider[AsyncClient]):
                 mid = len(documents) // 2
                 first_half = await self._embed_documents(documents[:mid], **kwargs)
                 second_half = await self._embed_documents(documents[mid:], **kwargs)
-                return cast(
-                    list[list[int | float]] | list[list[int]], first_half + second_half
-                )
+                return cast(list[list[int | float]] | list[list[int]], first_half + second_half)
             raise
         else:
             return self._process_output(results)

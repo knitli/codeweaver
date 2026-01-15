@@ -23,11 +23,7 @@ from codeweaver.core.types.aliases import (
     LanguageNameT,
     LiteralStringT,
 )
-from codeweaver.core.utils import (
-    COMMON_LLM_TOOLING_PATHS,
-    COMMON_TOOLING_PATHS,
-    lazy_import,
-)
+from codeweaver.core.utils import COMMON_LLM_TOOLING_PATHS, COMMON_TOOLING_PATHS, lazy_import
 
 
 if TYPE_CHECKING:
@@ -35,161 +31,153 @@ if TYPE_CHECKING:
     from codeweaver.core.utils import LazyImport
 
 
-LangPair: LazyImport[ExtLangPair] = lazy_import(
-    "codeweaver.core.metadata", "ExtLangPair"
-)
+LangPair: LazyImport[ExtLangPair] = lazy_import("codeweaver.core.metadata", "ExtLangPair")
 
 
 METADATA_PATH = "metadata"
 
 
-DEFAULT_EXCLUDED_DIRS: frozenset[DirectoryNameT] = frozenset(
-    {
-        DirectoryName(".DS_Store"),
-        DirectoryName(".cache"),
-        DirectoryName(".eslintcache"),
-        DirectoryName(".git"),
-        DirectoryName(".hg"),
-        DirectoryName(".history"),
-        DirectoryName(".htmlcov"),
-        DirectoryName(".idea"),
-        DirectoryName(".jj"),
-        DirectoryName(".next"),
-        DirectoryName(".nuxt"),
-        DirectoryName(".ruff_cache"),
-        DirectoryName(".svn"),
-        DirectoryName(".temp"),
-        DirectoryName(".tmp"),
-        DirectoryName(".tsbuildinfo"),
-        DirectoryName(".venv"),
-        DirectoryName(".vs"),
-        DirectoryName("Debug"),
-        DirectoryName("Release"),
-        DirectoryName("Releases"),
-        DirectoryName("Thumbs.db"),
-        DirectoryName("__pycache__"),
-        DirectoryName("__pytest_cache__"),
-        DirectoryName("aarch64"),
-        DirectoryName("arm"),
-        DirectoryName("arm64"),
-        DirectoryName("bower_components"),
-        DirectoryName("debug"),
-        DirectoryName("dist"),
-        DirectoryName("htmlcov"),
-        DirectoryName("lib64"),
-        DirectoryName("log"),
-        DirectoryName("logs"),
-        DirectoryName("node_modules"),
-        DirectoryName("obj"),
-        DirectoryName("out"),
-        DirectoryName("release"),
-        DirectoryName("releases"),
-        DirectoryName("remote-debug-profile"),
-        DirectoryName("site"),
-        DirectoryName("target"),
-        DirectoryName("temp"),
-        DirectoryName("tmp"),
-        DirectoryName("vendor"),
-        DirectoryName("venv"),
-        DirectoryName("win32"),
-        DirectoryName("win64"),
-        DirectoryName("x64"),
-        DirectoryName("x86"),
-    }
-)
+DEFAULT_EXCLUDED_DIRS: frozenset[DirectoryNameT] = frozenset({
+    DirectoryName(".DS_Store"),
+    DirectoryName(".cache"),
+    DirectoryName(".eslintcache"),
+    DirectoryName(".git"),
+    DirectoryName(".hg"),
+    DirectoryName(".history"),
+    DirectoryName(".htmlcov"),
+    DirectoryName(".idea"),
+    DirectoryName(".jj"),
+    DirectoryName(".next"),
+    DirectoryName(".nuxt"),
+    DirectoryName(".ruff_cache"),
+    DirectoryName(".svn"),
+    DirectoryName(".temp"),
+    DirectoryName(".tmp"),
+    DirectoryName(".tsbuildinfo"),
+    DirectoryName(".venv"),
+    DirectoryName(".vs"),
+    DirectoryName("Debug"),
+    DirectoryName("Release"),
+    DirectoryName("Releases"),
+    DirectoryName("Thumbs.db"),
+    DirectoryName("__pycache__"),
+    DirectoryName("__pytest_cache__"),
+    DirectoryName("aarch64"),
+    DirectoryName("arm"),
+    DirectoryName("arm64"),
+    DirectoryName("bower_components"),
+    DirectoryName("debug"),
+    DirectoryName("dist"),
+    DirectoryName("htmlcov"),
+    DirectoryName("lib64"),
+    DirectoryName("log"),
+    DirectoryName("logs"),
+    DirectoryName("node_modules"),
+    DirectoryName("obj"),
+    DirectoryName("out"),
+    DirectoryName("release"),
+    DirectoryName("releases"),
+    DirectoryName("remote-debug-profile"),
+    DirectoryName("site"),
+    DirectoryName("target"),
+    DirectoryName("temp"),
+    DirectoryName("tmp"),
+    DirectoryName("vendor"),
+    DirectoryName("venv"),
+    DirectoryName("win32"),
+    DirectoryName("win64"),
+    DirectoryName("x64"),
+    DirectoryName("x86"),
+})
 
-DEFAULT_EXCLUDED_EXTENSIONS: frozenset[FileExtensionT] = frozenset(
-    {
-        FileExt(".7z"),
-        FileExt(".avi"),
-        FileExt(".avif"),
-        FileExt(".bmp"),
-        FileExt(".builds"),
-        FileExt(".cache"),
-        FileExt(".class"),
-        FileExt("codeweaver.local.json"),
-        FileExt("codeweaver.local.toml"),
-        FileExt("codeweaver.local.yaml"),
-        FileExt(".code-workspace"),
-        FileExt(".coverage"),
-        FileExt(".coverage.xml"),
-        FileExt(".dll"),
-        FileExt(".dmg"),
-        FileExt(".env"),  # avoid env because api keys/secrets
-        FileExt(".exe"),
-        FileExt(".gif"),
-        FileExt(".gz"),
-        FileExt(".iobj"),
-        FileExt(".jar"),
-        FileExt(".jpeg"),
-        FileExt(".jpg"),
-        FileExt(".lcov"),
-        FileExt(".local"),
-        FileExt(".lock"),
-        FileExt(".log"),
-        FileExt(".meta"),
-        FileExt(".mov"),
-        FileExt(".mp3"),
-        FileExt(".mp4"),
-        FileExt(".mpeg"),
-        FileExt(".mpg"),
-        FileExt(".ms"),
-        FileExt(".msi"),
-        FileExt(".o"),
-        FileExt(".obj"),
-        FileExt(".pch"),
-        FileExt(".pdb"),
-        FileExt(".pgc"),
-        FileExt(".pgd"),
-        FileExt(".png"),
-        FileExt(".pyc"),
-        FileExt(".pyo"),
-        FileExt(".rar"),
-        FileExt(".rsp"),
-        FileExt(".scc"),
-        FileExt(".sig"),
-        FileExt(".snk"),
-        FileExt(".so"),
-        FileExt(".svclog"),
-        FileExt(".svg"),
-        FileExt(".swo"),
-        FileExt(".swp"),
-        FileExt(".tar"),
-        FileExt(".temp"),
-        FileExt(".tlb"),
-        FileExt(".tlog"),
-        FileExt(".tmp"),
-        FileExt(".tmp_proj"),
-        FileExt(".vspec"),
-        FileExt(".vssscc"),
-        FileExt(".wav"),
-        FileExt(".webm"),
-        FileExt(".webp"),
-        FileExt(".zip"),
-    }
-)
+DEFAULT_EXCLUDED_EXTENSIONS: frozenset[FileExtensionT] = frozenset({
+    FileExt(".7z"),
+    FileExt(".avi"),
+    FileExt(".avif"),
+    FileExt(".bmp"),
+    FileExt(".builds"),
+    FileExt(".cache"),
+    FileExt(".class"),
+    FileExt("codeweaver.local.json"),
+    FileExt("codeweaver.local.toml"),
+    FileExt("codeweaver.local.yaml"),
+    FileExt(".code-workspace"),
+    FileExt(".coverage"),
+    FileExt(".coverage.xml"),
+    FileExt(".dll"),
+    FileExt(".dmg"),
+    FileExt(".env"),  # avoid env because api keys/secrets
+    FileExt(".exe"),
+    FileExt(".gif"),
+    FileExt(".gz"),
+    FileExt(".iobj"),
+    FileExt(".jar"),
+    FileExt(".jpeg"),
+    FileExt(".jpg"),
+    FileExt(".lcov"),
+    FileExt(".local"),
+    FileExt(".lock"),
+    FileExt(".log"),
+    FileExt(".meta"),
+    FileExt(".mov"),
+    FileExt(".mp3"),
+    FileExt(".mp4"),
+    FileExt(".mpeg"),
+    FileExt(".mpg"),
+    FileExt(".ms"),
+    FileExt(".msi"),
+    FileExt(".o"),
+    FileExt(".obj"),
+    FileExt(".pch"),
+    FileExt(".pdb"),
+    FileExt(".pgc"),
+    FileExt(".pgd"),
+    FileExt(".png"),
+    FileExt(".pyc"),
+    FileExt(".pyo"),
+    FileExt(".rar"),
+    FileExt(".rsp"),
+    FileExt(".scc"),
+    FileExt(".sig"),
+    FileExt(".snk"),
+    FileExt(".so"),
+    FileExt(".svclog"),
+    FileExt(".svg"),
+    FileExt(".swo"),
+    FileExt(".swp"),
+    FileExt(".tar"),
+    FileExt(".temp"),
+    FileExt(".tlb"),
+    FileExt(".tlog"),
+    FileExt(".tmp"),
+    FileExt(".tmp_proj"),
+    FileExt(".vspec"),
+    FileExt(".vssscc"),
+    FileExt(".wav"),
+    FileExt(".webm"),
+    FileExt(".webp"),
+    FileExt(".zip"),
+})
 
-REPO_POLICY_FILES: frozenset[FileGlobT] = frozenset(
-    {
-        FileGlob("CODE_OF_CONDUCT.*"),
-        FileGlob("CODE_OF_CONDUCT*"),
-        FileGlob("SECURITY.*"),
-        FileGlob("SECURITY*"),
-        FileGlob("CONTRIBUTING.*"),
-        FileGlob("CONTRIBUTING*"),
-        FileGlob("NOTICE.*"),
-        FileGlob("NOTICE*"),
-        FileGlob("AUTHORS.*"),
-        FileGlob("AUTHORS*"),
-        FileGlob("MAINTAINERS.*"),
-        FileGlob("MAINTAINERS*"),
-        FileGlob("CONTRIBUTORS*"),  # CLA files
-        FileGlob("CLA*"),
-        FileGlob("CODEOWNERS"),
-        FileGlob("DEVELOPERS*"),  # DCO files
-        FileGlob("DCO*"),
-    }
-)
+REPO_POLICY_FILES: frozenset[FileGlobT] = frozenset({
+    FileGlob("CODE_OF_CONDUCT.*"),
+    FileGlob("CODE_OF_CONDUCT*"),
+    FileGlob("SECURITY.*"),
+    FileGlob("SECURITY*"),
+    FileGlob("CONTRIBUTING.*"),
+    FileGlob("CONTRIBUTING*"),
+    FileGlob("NOTICE.*"),
+    FileGlob("NOTICE*"),
+    FileGlob("AUTHORS.*"),
+    FileGlob("AUTHORS*"),
+    FileGlob("MAINTAINERS.*"),
+    FileGlob("MAINTAINERS*"),
+    FileGlob("CONTRIBUTORS*"),  # CLA files
+    FileGlob("CLA*"),
+    FileGlob("CODEOWNERS"),
+    FileGlob("DEVELOPERS*"),  # DCO files
+    FileGlob("DCO*"),
+})
 """Common file name patterns for repository policy files, not including license files."""
 
 DATA_FILES_EXTENSIONS: tuple[ExtLangPair, ...] = (
@@ -548,14 +536,7 @@ def all_js_exts(stem: str) -> tuple[str, ...]:
     Returns:
         A tuple of file names with common JavaScript-related extensions. Does not include `.jsx` or `.tsx` extensions.
     """
-    return (
-        f"{stem}.js",
-        f"{stem}.cjs",
-        f"{stem}.mjs",
-        f"{stem}.ts",
-        f"{stem}.cts",
-        f"{stem}.mts",
-    )
+    return (f"{stem}.js", f"{stem}.cjs", f"{stem}.mjs", f"{stem}.ts", f"{stem}.cts", f"{stem}.mts")
 
 
 type LlmTool = Literal[
@@ -572,119 +553,87 @@ type LlmTool = Literal[
     "specify",
 ]
 
-_js_fam_paths = frozenset(
-    (
-        Path("package.json"),
-        Path("package-lock.json"),
-        Path("yarn.lock"),
-        Path("pnpm-lock.yaml"),
-        Path("node_modules"),
-        Path("bun.lockb"),
-        Path("bun.lock"),
-    )
-)
+_js_fam_paths = frozenset((
+    Path("package.json"),
+    Path("package-lock.json"),
+    Path("yarn.lock"),
+    Path("pnpm-lock.yaml"),
+    Path("node_modules"),
+    Path("bun.lockb"),
+    Path("bun.lock"),
+))
 """Common paths for JavaScript family languages (JavaScript, TypeScript, JSX, TSX)."""
 
-LANGUAGE_SPECIFIC_PATHS: MappingProxyType[LanguageNameT, frozenset[Path]] = (
-    MappingProxyType(
-        {
-            LanguageName("csharp"): frozenset(
-                (*Path().glob("*.csproj"), Path("*.sln"))
-            ),
-            LanguageName(cast(LiteralStringT, "elixir")): frozenset(
-                (Path("mix.exs"), Path("mix.lock"))
-            ),
-            LanguageName("erlang"): frozenset(
-                (Path("rebar.config"), Path("rebar.lock"))
-            ),
-            LanguageName("go"): frozenset(
-                (
-                    Path("go.mod"),
-                    Path("go.sum"),
-                    Path("go.work"),
-                    Path("cmd"),
-                    Path("internal"),
-                )
-            ),
-            LanguageName("haskell"): frozenset(
-                (
-                    Path("stack.yaml"),
-                    Path("cabal.project"),
-                    Path("package.yaml"),
-                )
-            ),
-            LanguageName("java"): frozenset(
-                (
-                    Path("build.gradle"),
-                    Path("build.gradle.kts"),
-                    Path("pom.xml"),
-                    Path("pom.xml"),
-                    Path("src/main/java"),
-                    Path("src/main/tests"),
-                )
-            ),
-            LanguageName("javascript"): _js_fam_paths,
-            LanguageName("jsx"): _js_fam_paths,
-            LanguageName("kotlin"): frozenset(
-                (Path("src/main/kotlin"), Path("src/test/kotlin"))
-            ),
-            LanguageName("lua"): frozenset((Path("*.rockspec"),)),
-            LanguageName("php"): frozenset(
-                (Path("composer.json"), Path("composer.lock"))
-            ),
-            LanguageName("python"): frozenset(
-                (
-                    Path("Pipfile"),
-                    Path("Pipfile.lock"),
-                    Path("pyproject.toml"),
-                    Path("requirements-dev.txt"),
-                    Path("requirements.txt"),
-                    Path("setup.cfg"),
-                    Path("setup.py"),
-                )
-            ),
-            LanguageName("ruby"): frozenset(
-                (
-                    Path("*.gemspec"),
-                    Path("Gemfile"),
-                    Path("Gemfile.lock"),
-                    Path("Rakefile"),
-                    Path("config.ru"),
-                    Path("spec"),
-                )
-            ),
-            LanguageName("rust"): frozenset((Path("Cargo.toml"), Path("Cargo.lock"))),
-            LanguageName("scala"): frozenset(
-                (
-                    Path("build.sbt"),
-                    Path("project/build.properties"),
-                    Path("project/plugins.sbt"),
-                    Path("src/main/scala"),
-                    Path("src/test/scala"),
-                )
-            ),
-            LanguageName("solidity"): frozenset(
-                (
-                    Path("contracts"),
-                    Path("foundry.toml"),
-                    Path("hardhat.config.js"),
-                    Path("hardhat.config.ts"),
-                    Path("truffle-config.js"),
-                    Path("truffle-config.ts"),
-                )
-            ),
-            LanguageName("swift"): frozenset(
-                (
-                    Path("Package.swift"),
-                    Path(".xcodeproj"),
-                    Path(".xcworkspace"),
-                )
-            ),
-            LanguageName("typescript"): _js_fam_paths,
-            LanguageName("tsx"): _js_fam_paths,
-        }
-    )
-)
+LANGUAGE_SPECIFIC_PATHS: MappingProxyType[LanguageNameT, frozenset[Path]] = MappingProxyType({
+    LanguageName("csharp"): frozenset((*Path().glob("*.csproj"), Path("*.sln"))),
+    LanguageName(cast(LiteralStringT, "elixir")): frozenset((Path("mix.exs"), Path("mix.lock"))),
+    LanguageName("erlang"): frozenset((Path("rebar.config"), Path("rebar.lock"))),
+    LanguageName("go"): frozenset((
+        Path("go.mod"),
+        Path("go.sum"),
+        Path("go.work"),
+        Path("cmd"),
+        Path("internal"),
+    )),
+    LanguageName("haskell"): frozenset((
+        Path("stack.yaml"),
+        Path("cabal.project"),
+        Path("package.yaml"),
+    )),
+    LanguageName("java"): frozenset((
+        Path("build.gradle"),
+        Path("build.gradle.kts"),
+        Path("pom.xml"),
+        Path("pom.xml"),
+        Path("src/main/java"),
+        Path("src/main/tests"),
+    )),
+    LanguageName("javascript"): _js_fam_paths,
+    LanguageName("jsx"): _js_fam_paths,
+    LanguageName("kotlin"): frozenset((Path("src/main/kotlin"), Path("src/test/kotlin"))),
+    LanguageName("lua"): frozenset((Path("*.rockspec"),)),
+    LanguageName("php"): frozenset((Path("composer.json"), Path("composer.lock"))),
+    LanguageName("python"): frozenset((
+        Path("Pipfile"),
+        Path("Pipfile.lock"),
+        Path("pyproject.toml"),
+        Path("requirements-dev.txt"),
+        Path("requirements.txt"),
+        Path("setup.cfg"),
+        Path("setup.py"),
+    )),
+    LanguageName("ruby"): frozenset((
+        Path("*.gemspec"),
+        Path("Gemfile"),
+        Path("Gemfile.lock"),
+        Path("Rakefile"),
+        Path("config.ru"),
+        Path("spec"),
+    )),
+    LanguageName("rust"): frozenset((Path("Cargo.toml"), Path("Cargo.lock"))),
+    LanguageName("scala"): frozenset((
+        Path("build.sbt"),
+        Path("project/build.properties"),
+        Path("project/plugins.sbt"),
+        Path("src/main/scala"),
+        Path("src/test/scala"),
+    )),
+    LanguageName("solidity"): frozenset((
+        Path("contracts"),
+        Path("foundry.toml"),
+        Path("hardhat.config.js"),
+        Path("hardhat.config.ts"),
+        Path("truffle-config.js"),
+        Path("truffle-config.ts"),
+    )),
+    LanguageName("swift"): frozenset((
+        Path("Package.swift"),
+        Path(".xcodeproj"),
+        Path(".xcworkspace"),
+    )),
+    LanguageName("typescript"): _js_fam_paths,
+    LanguageName("tsx"): _js_fam_paths,
+})
 """A mapping of language names to their specific common project paths."""
 
 
@@ -699,66 +648,56 @@ class FallBackTestDef(TypedDict):
     """The language to fallback to if the test passes."""
 
 
-FALLBACK_TEST: MappingProxyType[FileExtensionT, FallBackTestDef] = MappingProxyType(
-    {
-        FileExt(".v"): FallBackTestDef(
-            {
-                "values": ("Proof", "Qed", "Proof", "Defined", "Admitted"),
-                "on": "not in",
-                "fallback_to": LanguageName(cast(LiteralStringT, "verilog")),  # type: ignore
-            }
+FALLBACK_TEST: MappingProxyType[FileExtensionT, FallBackTestDef] = MappingProxyType({
+    FileExt(".v"): FallBackTestDef({
+        "values": ("Proof", "Qed", "Proof", "Defined", "Admitted"),
+        "on": "not in",
+        "fallback_to": LanguageName(cast(LiteralStringT, "verilog")),  # type: ignore
+    }),
+    FileExt(".m"): FallBackTestDef({
+        "values": ("switch", "end", "parfor", "function"),
+        "on": "not in",
+        "fallback_to": LanguageName(cast(LiteralStringT, "objective-c")),  # type: ignore
+    }),
+    FileExt(""): FallBackTestDef({
+        "values": (
+            "#!/bin/bash",
+            "!#/bin/sh",
+            "#!/usr/bin/env bash",
+            "#!/usr/bin/env sh",
+            "#!/usr/bin/env zsh",
+            "#!/usr/bin/env fish",
+            "#!/usr/bin/env /bin/bash",
+            "#!/usr/bin/env /bin/sh",
+            "#!/usr/bin/env /bin/zsh",
+            "#!/usr/bin/env /usr/bin/zsh",
+            "#!/usr/bin/env /usr/bin/fish",
         ),
-        FileExt(".m"): FallBackTestDef(
-            {
-                "values": ("switch", "end", "parfor", "function"),
-                "on": "not in",
-                "fallback_to": LanguageName(cast(LiteralStringT, "objective-c")),  # type: ignore
-            }
-        ),
-        FileExt(""): FallBackTestDef(
-            {
-                "values": (
-                    "#!/bin/bash",
-                    "!#/bin/sh",
-                    "#!/usr/bin/env bash",
-                    "#!/usr/bin/env sh",
-                    "#!/usr/bin/env zsh",
-                    "#!/usr/bin/env fish",
-                    "#!/usr/bin/env /bin/bash",
-                    "#!/usr/bin/env /bin/sh",
-                    "#!/usr/bin/env /bin/zsh",
-                    "#!/usr/bin/env /usr/bin/zsh",
-                    "#!/usr/bin/env /usr/bin/fish",
-                ),
-                "on": "in",
-                "fallback_to": LanguageName(cast(LiteralStringT, "bash")),  # type: ignore
-            }
-        ),
-    }
-)
+        "on": "in",
+        "fallback_to": LanguageName(cast(LiteralStringT, "bash")),  # type: ignore
+    }),
+})
 """A mapping of file extensions to their fallback test definitions."""
 
 
-CONFIG_FILE_LANGUAGES = frozenset(
-    {
-        LanguageName("bash"),
-        LanguageName("cfg"),
-        LanguageName("cmake"),
-        LanguageName("docker"),
-        LanguageName("hcl"),
-        LanguageName("ini"),
-        LanguageName("json"),
-        LanguageName("json5"),
-        LanguageName("jsonc"),
-        LanguageName("just"),
-        LanguageName("make"),
-        LanguageName("pkl"),
-        LanguageName("properties"),
-        LanguageName("toml"),
-        LanguageName("xml"),
-        LanguageName("yaml"),
-    }
-)
+CONFIG_FILE_LANGUAGES = frozenset({
+    LanguageName("bash"),
+    LanguageName("cfg"),
+    LanguageName("cmake"),
+    LanguageName("docker"),
+    LanguageName("hcl"),
+    LanguageName("ini"),
+    LanguageName("json"),
+    LanguageName("json5"),
+    LanguageName("jsonc"),
+    LanguageName("just"),
+    LanguageName("make"),
+    LanguageName("pkl"),
+    LanguageName("properties"),
+    LanguageName("toml"),
+    LanguageName("xml"),
+    LanguageName("yaml"),
+})
 
 
 def _get_languages_helper() -> tuple[
@@ -801,8 +740,8 @@ __all__ = (
     "DATA_LANGUAGES",
     "DEFAULT_EXCLUDED_DIRS",
     "DEFAULT_EXCLUDED_EXTENSIONS",
-    "DOC_FILES_EXTENSIONS",
     "DOCS_LANGUAGES",
+    "DOC_FILES_EXTENSIONS",
     "FALLBACK_TEST",
     "LANGUAGE_SPECIFIC_PATHS",
     "REPO_POLICY_FILES",

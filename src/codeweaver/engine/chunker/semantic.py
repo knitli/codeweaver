@@ -35,6 +35,7 @@ from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID
 
 from ast_grep_py import SgNode
+from codeweaver_tokenizers import Tokenizer
 from pydantic import UUID7
 
 from codeweaver.core import (

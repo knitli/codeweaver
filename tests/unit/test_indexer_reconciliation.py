@@ -19,7 +19,7 @@ pytestmark = [pytest.mark.unit]
 
 
 class Point:
-    def __init__(self, id, vector, payload):
+    def __init__(self, id, vector, payload):  # noqa: A002
         self.id = id
         self.vector = vector
         self.payload = payload

@@ -25,6 +25,7 @@ if TYPE_CHECKING:
         is_wsl_vscode,
     )
     from codeweaver.core.utils.environment import (
+        detect_root_package,
         format_file_link,
         get_codeweaver_config_paths,
         get_possible_env_vars,
@@ -161,6 +162,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "backup_file_path": (__spec__.parent, "filesystem"),
     "clean_args": (__spec__.parent, "introspect"),
     "create_lazy_getattr": (__spec__.parent, "lazy_import"),
+    "detect_root_package": (__spec__.parent, "environment"),
     "dict_set_to_tuple": (__spec__.parent, "general"),
     "effective_cpu_count": (__spec__.parent, "procs"),
     "elapsed_time_to_human_readable": (__spec__.parent, "text"),

@@ -7,28 +7,25 @@
 
 from __future__ import annotations
 
+import importlib
 import os
 
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
-from codeweaver.core.di import depends
-from codeweaver.core.types import get_possible_config_paths
+from codeweaver.core.di import INJECTED, dependency_provider, depends
+from codeweaver.core.types import Unset, get_possible_config_paths
+
+
+if TYPE_CHECKING:
+    from codeweaver.core.config.telemetry import TelemetrySettings
+    from codeweaver.core.statistics import SessionStatistics
 
 
 def _resolve_config_file() -> Path | None:
     if (declared_env := os.getenv("CODEWEAVER_CONFIG_FILE")) is not None:
         return Path(declared_env)
     return None
-
-
-# Import for decorator
-from codeweaver.core.di import dependency_provider
-
-
-if TYPE_CHECKING:
-    from codeweaver.core.statistics import SessionStatistics
-    from codeweaver.core.types.settings_model import BaseCodeWeaverSettings
 
 
 def _resolve_config_file() -> Path | None:
@@ -45,7 +42,7 @@ def _resolve_config_file() -> Path | None:
     return None
 
 
-def bootstrap_settings(config_file: Path | None = None) -> BaseCodeWeaverSettings:
+def bootstrap_settings(config_file: Path | None = None) -> CodeWeaverSettingsType:
     """Bootstrap global settings as DI root.
 
     Auto-detects the appropriate settings class based on installed packages
@@ -67,18 +64,34 @@ def bootstrap_settings(config_file: Path | None = None) -> BaseCodeWeaverSetting
     SettingsEnvVars.from_defaults().register_values()
 
     config_file = config_file if config_file and config_file.exists() else _resolve_config_file()
-    return get_settings(config_file=config_file)
+    return get_settings(config_file=config_file)  # ty:ignore[invalid-return-type]
 
 
-# Register factory after definition (import here to avoid circular dependency at module top)
-from codeweaver.core.types.settings_model import BaseCodeWeaverSettings
+if importlib.util.find_spec("codeweaver.server"):
+    from codeweaver.server.config.settings import CodeWeaverSettings
+
+    type CodeWeaverSettingsType = CodeWeaverSettings
+
+elif importlib.util.find_spec("codeweaver.engine"):
+    from codeweaver.engine.config.root_settings import CodeWeaverEngineSettings
+
+    type CodeWeaverSettingsType = CodeWeaverEngineSettings
+
+elif importlib.util.find_spec("codeweaver.providers"):
+    from codeweaver.providers.config.root_settings import CodeWeaverProviderSettings
+
+    type CodeWeaverSettingsType = CodeWeaverProviderSettings
+
+else:
+    from codeweaver.core.config.core_settings import CodeWeaverCoreSettings
+
+    type CodeWeaverSettingsType = CodeWeaverCoreSettings
 
 
-dependency_provider(BaseCodeWeaverSettings, scope="singleton")(bootstrap_settings)
+dependency_provider(CodeWeaverSettingsType, scope="singleton")(bootstrap_settings)  # ty:ignore[no-matching-overload]
 
 
-type SettingsDep = Annotated[BaseCodeWeaverSettings, depends(bootstrap_settings)]
-
+type SettingsDep = Annotated[CodeWeaverSettingsType, depends(bootstrap_settings)]
 
 type NoneDep = Annotated[None, depends(lambda: None, use_cache=True, scope="singleton")]
 
@@ -97,4 +110,16 @@ def _get_statistics() -> SessionStatistics:
 
 type StatisticsDep = Annotated[SessionStatistics, depends(_get_statistics)]
 
-__all__ = ("NoneDep", "SettingsDep", "StatisticsDep", "bootstrap_settings")
+
+@dependency_provider(TelemetrySettings, scope="singleton")
+def _get_telemetry_settings(settings: SettingsDep = INJECTED) -> TelemetrySettings:
+    from codeweaver.core.config import TelemetrySettings
+
+    return (
+        settings.telemetry if settings.telemetry is not Unset else TelemetrySettings()  # ty:ignore[invalid-return-type]
+    )  # ty:ignore[invalid-return-type]
+
+
+type TelemetrySettingsDep = Annotated[TelemetrySettings, depends(_get_telemetry_settings)]
+
+__all__ = ("NoneDep", "SettingsDep", "StatisticsDep", "TelemetrySettingsDep", "bootstrap_settings")

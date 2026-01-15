@@ -15,6 +15,8 @@ import logging
 
 from typing import TYPE_CHECKING
 
+from codeweaver.core.utils import detect_root_package
+
 
 if TYPE_CHECKING:
     from codeweaver.core.types.settings_model import BaseCodeWeaverSettings
@@ -72,5 +74,8 @@ def get_settings(**kwargs) -> BaseCodeWeaverSettings:
 
             return CodeWeaverCoreSettings(**kwargs)
 
+        case _:
+            raise ImportError(f"Unsupported package detected: {package}")
 
-__all__ = ("detect_root_package", "get_settings")
+
+__all__ = ("get_settings",)

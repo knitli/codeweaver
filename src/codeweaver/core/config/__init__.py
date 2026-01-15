@@ -41,7 +41,7 @@ if TYPE_CHECKING:
         environment_variables,
         get_provider_vars,
     )
-    from codeweaver.core.config.loader import detect_root_package, get_settings
+    from codeweaver.core.config.loader import get_settings
     from codeweaver.core.config.registry import (
         clear_configurables,
         get_configurable_components,
@@ -75,7 +75,6 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "TelemetrySettings": (__spec__.parent, "telemetry"),
     "clear_configurables": (__spec__.parent, "registry"),
     "clear_defaults": (__spec__.parent, "defaults"),
-    "detect_root_package": (__spec__.parent, "loader"),
     "environment_variables": (__spec__.parent, "envs"),
     "get_configurable_components": (__spec__.parent, "registry"),
     "get_configurable_values": (__spec__.parent, "registry"),
@@ -109,7 +108,6 @@ __all__ = (
     "TelemetrySettings",
     "clear_configurables",
     "clear_defaults",
-    "detect_root_package",
     "environment_variables",
     "get_configurable_components",
     "get_configurable_values",

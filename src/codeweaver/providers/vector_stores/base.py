@@ -19,8 +19,15 @@ import httpx
 from pydantic import UUID7, ConfigDict, PrivateAttr
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
-from codeweaver.core import TypeIs
+from codeweaver.core import BasedModel, CodeChunk, Provider, ProviderError, StrategizedQuery, TypeIs
+from codeweaver.providers.config import VectorStoreProviderSettings
+from codeweaver.providers.exceptions import CircuitBreakerOpenError
+from codeweaver.providers.types import CircuitBreakerState, EmbeddingCapabilityGroup
+from codeweaver.providers.vector_stores.search import Filter
 
+
+if TYPE_CHECKING:
+    from codeweaver.core import SearchResult
 
 # Common retryable exceptions for vector store operations
 # Include httpcore and qdrant-specific exceptions that indicate transient network issues
@@ -43,20 +50,6 @@ except ImportError:
     # Fallback if httpcore or qdrant_client not available
     RETRYABLE_EXCEPTIONS = (ConnectionError, TimeoutError, OSError, httpx.TimeoutException)
 
-from codeweaver.core import (
-    BasedModel,
-    BaseEnum,
-    CodeChunk,
-    Provider,
-    ProviderError,
-    StrategizedQuery,
-)
-from codeweaver.providers.vector_stores.search import Filter
-
-
-if TYPE_CHECKING:
-    from codeweaver.core import SearchResult
-
 
 logger = logging.getLogger(__name__)
 
@@ -69,27 +62,14 @@ type MixedQueryInput = (
 _embedding_caps_lock = threading.Lock()
 
 
-class CircuitBreakerState(BaseEnum):
-    """Circuit breaker states for provider resilience."""
-
-    CLOSED = "closed"  # Normal operation
-    OPEN = "open"  # Failing, rejecting requests
-    HALF_OPEN = "half_open"  # Testing if service recovered
-
-
-class CircuitBreakerOpenError(Exception):
-    """Raised when circuit breaker is open and rejecting requests."""
-
-
 class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
     """Abstract interface for vector storage providers."""
 
     model_config = BasedModel.model_config | ConfigDict(extra="allow")
 
-    config: Any = None  # Provider-specific configuration object
-    _client: VectorStoreClient | None
-    _embedding_caps: EmbeddingCapsDict = PrivateAttr(default_factory=_default_embedding_caps)
-    _settings: EmbeddingSettingsDict = PrivateAttr(default_factory=_get_embedding_settings)
+    config: VectorStoreProviderSettings
+    client: VectorStoreClient
+
     _known_collections: set[str] = PrivateAttr(default_factory=set)
 
     _provider: ClassVar[Provider] = Provider.NOT_SET
@@ -102,9 +82,9 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
 
     def __init__(
         self,
-        config: Any = None,
-        client: VectorStoreClient | None = None,
-        embedding_caps: EmbeddingCapsDict | None = None,
+        client: VectorStoreClient,
+        config: VectorStoreProviderSettings,
+        capabilities: EmbeddingCapabilityGroup,
         **kwargs: Any,
     ) -> None:
         """Initialize the vector store provider with embedding capabilities."""
@@ -113,7 +93,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
         if config is not None:
             init_data["config"] = config
         if client is not None:
-            init_data["_client"] = client
+            init_data["client"] = client
         # Note: Don't pass _embedding_caps here - PrivateAttr with default_factory
         # will always call the factory. Set it after super().__init__() instead.
 
@@ -148,7 +128,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
     @property
     def client(self) -> VectorStoreClient:
         """Returns the vector store client instance."""
-        if not self._ensure_client(self._client):
+        if not self._ensure_client(self.client):
             raise ProviderError(
                 "Vector store client not initialized",
                 details={
@@ -163,7 +143,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
                     "Verify required dependencies are installed",
                 ],
             )
-        return cast(VectorStoreClient, self._client)
+        return cast(VectorStoreClient, self.client)
 
     @property
     def name(self) -> Provider:
@@ -193,22 +173,13 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
         return None
 
     @property
-    def embedding_capabilities(self) -> EmbeddingCapsDict:
+    def embedding_capabilities(self) -> EmbeddingCapabilityGroup:
         """Get the embedding capabilities for this vector store provider.
 
         Returns:
             Embedding capabilities dictionary with 'dense' and 'sparse' keys.
         """
-        return self._embedding_caps
-
-    @property
-    def embedding_settings(self) -> EmbeddingSettingsDict:
-        """Get the embedding model settings for this vector store provider.
-
-        Returns:
-            Embedding model settings dictionary with 'dense' and 'sparse' keys.
-        """
-        return self._settings
+        return self.embedding_capabilities
 
     @property
     def dense_dimension(self) -> int | None:
@@ -217,7 +188,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
         Returns:
             Dimension of dense embeddings, or None if dense embeddings not supported.
         """
-        dense_caps = self.embedding_capabilities.get("dense")
+        dense_caps = self.embedding_capabilities.dense
         default_dim = dense_caps.default_dimension if dense_caps else None
 
         dense_settings = self.embedding_settings.get("dense")

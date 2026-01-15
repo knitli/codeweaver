@@ -40,14 +40,14 @@ class ServiceA:
 class ServiceB:
     """Service B that depends on A."""
 
-    def __init__(self, service_a: Annotated[ServiceA, Depends()] = INJECTED[ServiceA]):
+    def __init__(self, service_a: Annotated[ServiceA, Depends()] = INJECTED):
         self.service_a = service_a
 
 
 class ServiceC:
     """Service C that depends on B."""
 
-    def __init__(self, service_b: Annotated[ServiceB, Depends()] = INJECTED[ServiceB]):
+    def __init__(self, service_b: Annotated[ServiceB, Depends()] = INJECTED):
         self.service_b = service_b
 
 
@@ -55,7 +55,7 @@ class CircularServiceA:
     """Service A in circular dependency: A -> B -> A."""
 
     def __init__(
-        self, service_b: Annotated[CircularServiceB, Depends()] = INJECTED[CircularServiceB]
+        self, service_b: Annotated[CircularServiceB, Depends()] = INJECTED
     ):
         self.service_b = service_b
 
@@ -64,7 +64,7 @@ class CircularServiceB:
     """Service B in circular dependency: B -> A -> B."""
 
     def __init__(
-        self, service_a: Annotated[CircularServiceA, Depends()] = INJECTED[CircularServiceA]
+        self, service_a: Annotated[CircularServiceA, Depends()] = INJECTED
     ):
         self.service_a = service_a
 
@@ -145,15 +145,15 @@ async def test_circular_dependency_with_three_services():
     """Test circular dependency detection with three services: A -> B -> C -> A."""
 
     class ServiceX:
-        def __init__(self, service_z: Annotated[ServiceZ, Depends()] = INJECTED[ServiceZ]):
+        def __init__(self, service_z: Annotated[ServiceZ, Depends()] = INJECTED):
             self.service_z = service_z
 
     class ServiceY:
-        def __init__(self, service_x: Annotated[ServiceX, Depends()] = INJECTED[ServiceX]):
+        def __init__(self, service_x: Annotated[ServiceX, Depends()] = INJECTED):
             self.service_x = service_x
 
     class ServiceZ:
-        def __init__(self, service_y: Annotated[ServiceY, Depends()] = INJECTED[ServiceY]):
+        def __init__(self, service_y: Annotated[ServiceY, Depends()] = INJECTED):
             self.service_y = service_y
 
     container = Container()
@@ -712,7 +712,7 @@ async def test_union_type_resolution_first_match():
     container.register(ImplementationY)
 
     # Register X first, should resolve to X
-    result = await container.resolve(Union[ImplementationX, ImplementationY])
+    result = await container.resolve(ImplementationX | ImplementationY)
     assert isinstance(result, ImplementationX)
     assert result.name == "X"
 
@@ -735,8 +735,8 @@ async def test_union_type_skips_none():
     container = Container()
     container.register(ImplementationX)
 
-    # Union[ImplementationX, None] should resolve to ImplementationX
-    result = await container.resolve(Union[ImplementationX, None])
+    # ImplementationX | None should resolve to ImplementationX
+    result = await container.resolve(ImplementationX | None)
     assert isinstance(result, ImplementationX)
     assert result.name == "X"
 
@@ -752,7 +752,7 @@ async def test_union_type_tries_unregistered():
     container = Container()
     # Don't register NotRegistered, but it has a valid __init__
 
-    result = await container.resolve(Union[NotRegistered, ImplementationX])
+    result = await container.resolve(NotRegistered | ImplementationX)
     assert isinstance(result, NotRegistered)
     assert result.name == "not_registered"
 
@@ -769,7 +769,7 @@ async def test_union_type_all_fail_raises():
     # Don't register ServiceA, so NeedsDependency can't be instantiated
 
     with pytest.raises(ValueError) as exc_info:
-        await container.resolve(Union[NeedsDependency, None])
+        await container.resolve(NeedsDependency | None)
 
     assert "Could not resolve any type from union" in str(exc_info.value)
 
@@ -786,7 +786,7 @@ async def test_union_with_override():
     override_x.name = "X_override"
     container.override(ImplementationX, override_x)
 
-    result = await container.resolve(Union[ImplementationX, ImplementationY])
+    result = await container.resolve(ImplementationX | ImplementationY)
     assert result is override_x
     assert result.name == "X_override"
 
@@ -797,7 +797,7 @@ async def test_union_none_only_raises():
     container = Container()
 
     with pytest.raises(ValueError) as exc_info:
-        await container.resolve(Union[None])
+        await container.resolve(Union[None])  # noqa: UP007
 
     assert "Could not resolve any type from union" in str(exc_info.value)
 
@@ -955,8 +955,7 @@ async def test_use_cache_with_generator():
     """Test use_cache flag works correctly with generator dependencies."""
 
     async def counter_generator() -> AsyncIterator[CounterService]:
-        service = CounterService()
-        yield service
+        yield CounterService()
 
     container = Container()
     CounterService.reset()
@@ -1020,7 +1019,7 @@ async def test_circular_in_union_type():
     container.register(CircularServiceB)
 
     with pytest.raises(CircularDependencyError):
-        await container.resolve(Union[CircularServiceA, CircularServiceB])
+        await container.resolve(CircularServiceA | CircularServiceB)
 
 
 @pytest.mark.asyncio
@@ -1028,8 +1027,7 @@ async def test_generator_with_error_aggregation():
     """Test generator dependencies work correctly with error aggregation."""
 
     async def gen_service() -> AsyncIterator[ServiceA]:
-        service = ServiceA("gen")
-        yield service
+        yield ServiceA("gen")
 
     class FailingDep:
         def __init__(self):
@@ -1074,7 +1072,7 @@ async def test_scope_with_union_resolution():
         "c",
         None,  # type: ignore
         Depends(get_counter, scope="request"),
-        Union[CounterService, ServiceA],
+        CounterService | ServiceA,
         {},
         None,
     )
@@ -1082,7 +1080,7 @@ async def test_scope_with_union_resolution():
         "c",
         None,  # type: ignore
         Depends(get_counter, scope="request"),
-        Union[CounterService, ServiceA],
+        CounterService | ServiceA,
         {},
         None,
     )
@@ -1096,7 +1094,7 @@ async def test_scope_with_union_resolution():
         "c",
         None,  # type: ignore
         Depends(get_counter, scope="request"),
-        Union[CounterService, ServiceA],
+        CounterService | ServiceA,
         {},
         None,
     )

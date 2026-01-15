@@ -26,7 +26,6 @@ from pydantic import SkipValidation
 
 from codeweaver.core import ConfigurationError, Provider, rpartial
 from codeweaver.core import SparseEmbedding as CodeWeaverSparseEmbedding
-from codeweaver.providers.embedding.capabilities import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.capabilities.base import SparseEmbeddingModelCapabilities
 from codeweaver.providers.embedding.providers import EmbeddingProvider
 from codeweaver.providers.embedding.providers.base import SparseEmbeddingProvider
@@ -93,7 +92,6 @@ class FastEmbedEmbeddingProvider(EmbeddingProvider[TextEmbedding]):
 
     client: SkipValidation[TextEmbedding]
     _provider: Provider = Provider.FASTEMBED
-    caps: EmbeddingModelCapabilities | None = None
 
     _output_transformer: Callable[[Any], list[list[float]] | list[list[int]]] = (
         fastembed_output_transformer

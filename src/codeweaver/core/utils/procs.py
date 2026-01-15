@@ -139,9 +139,7 @@ def low_priority() -> Generator[None, None, None]:
             # Range is -20 (highest) to 19 (lowest)
             new_nice = min(original_nice + 10, 19)
             process.nice(new_nice)
-            logger.debug(
-                "Set process nice value to %d (was %d)", new_nice, original_nice
-            )
+            logger.debug("Set process nice value to %d (was %d)", new_nice, original_nice)
 
     except ImportError:
         logger.debug("psutil not available, running at normal priority")

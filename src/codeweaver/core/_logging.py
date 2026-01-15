@@ -101,9 +101,7 @@ def _setup_config_logger(
     raise ValueError("No logging configuration provided")
 
 
-def _setup_logger_with_rich_handler(
-    rich_options: dict[str, Any] | None, name: str, level: int
-):
+def _setup_logger_with_rich_handler(rich_options: dict[str, Any] | None, name: str, level: int):
     """Set up a logger with rich handler."""
     handler = get_rich_handler(**(rich_options or {}))
     logger = logging.getLogger(name)

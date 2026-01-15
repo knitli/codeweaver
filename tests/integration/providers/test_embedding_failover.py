@@ -74,6 +74,8 @@ async def primary_embedding_provider():
     """
     pytest.importorskip("sentence_transformers", reason="SentenceTransformers required for test")
 
+    from unittest.mock import MagicMock
+
     from sentence_transformers import SentenceTransformer
 
     from codeweaver.providers import (
@@ -81,6 +83,7 @@ async def primary_embedding_provider():
         EmbeddingModelCapabilities,
         Provider,
         SentenceTransformersEmbeddingProvider,
+        get_embedding_registry,
     )
 
     # Use a small model for fast testing (384 dimensions)
@@ -92,7 +95,23 @@ async def primary_embedding_provider():
     }  # type: ignore
     caps = EmbeddingModelCapabilities.model_validate(caps_dict)
 
-    return SentenceTransformersEmbeddingProvider(caps=caps, client=model)
+    # Create mock config
+    config = MagicMock()
+    config.embedding_config = MagicMock()
+    config.embedding_config.as_options = MagicMock(
+        return_value={
+            "model_name": "ibm-granite/granite-embedding-small-english-r2",
+            "embedding": {},
+            "query": {},
+        }
+    )
+
+    # Get registry
+    registry = get_embedding_registry()
+
+    return SentenceTransformersEmbeddingProvider(
+        client=model, config=config, registry=registry, caps=caps
+    )
 
 
 @pytest.fixture
@@ -104,6 +123,8 @@ async def backup_embedding_provider():
     """
     pytest.importorskip("sentence_transformers", reason="SentenceTransformers required for test")
 
+    from unittest.mock import MagicMock
+
     from sentence_transformers import SentenceTransformer
 
     from codeweaver.providers import (
@@ -111,6 +132,7 @@ async def backup_embedding_provider():
         EmbeddingModelCapabilities,
         Provider,
         SentenceTransformersEmbeddingProvider,
+        get_embedding_registry,
     )
 
     # Use larger Granite model (768 dimensions - different from primary's 384!)
@@ -122,7 +144,23 @@ async def backup_embedding_provider():
     }  # type: ignore
     caps = EmbeddingModelCapabilities.model_validate(caps_dict)
 
-    return SentenceTransformersEmbeddingProvider(caps=caps, client=model)
+    # Create mock config
+    config = MagicMock()
+    config.embedding_config = MagicMock()
+    config.embedding_config.as_options = MagicMock(
+        return_value={
+            "model_name": "ibm-granite/granite-embedding-english-r2",
+            "embedding": {},
+            "query": {},
+        }
+    )
+
+    # Get registry
+    registry = get_embedding_registry()
+
+    return SentenceTransformersEmbeddingProvider(
+        client=model, config=config, registry=registry, caps=caps
+    )
 
 
 @pytest.mark.asyncio

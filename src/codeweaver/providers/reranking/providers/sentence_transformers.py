@@ -18,7 +18,6 @@ import numpy as np
 
 from codeweaver.core import Provider, rpartial
 from codeweaver.core import ValidationError as CodeWeaverValidationError
-from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 from codeweaver.providers.reranking.providers.base import RerankingProvider
 
 
@@ -58,50 +57,14 @@ class SentenceTransformersRerankingProvider(RerankingProvider[CrossEncoder]):
     """
 
     client: CrossEncoder
-    _provider: Provider = Provider.SENTENCE_TRANSFORMERS
-    caps: RerankingModelCapabilities
-
-    # Use regular dict instead of MappingProxyType to avoid pickle errors
-    _rerank_kwargs: ClassVar[dict[str, Any]] = {"trust_remote_code": True}
-
-    def __init__(
-        self,
-        caps: RerankingModelCapabilities,
-        client: CrossEncoder | None = None,
-        top_n: int = 40,
-        **kwargs: Any,
-    ) -> None:
-        """Initialize the SentenceTransformersRerankingProvider."""
-        # Call super().__init__() FIRST which handles all Pydantic initialization
-        # This ensures _rerank_kwargs and other private attrs are properly initialized
-        if client is None:
-            # Extract client_options from kwargs (similar to embedding provider pattern)
-            client_opts = kwargs.get("client_options", {}) if isinstance(kwargs, dict) else {}
-            client = CrossEncoder(caps.name, **client_opts)
-        super().__init__(client=client, caps=caps, top_n=top_n, **kwargs)
-
-        # Now we can safely access _rerank_kwargs after Pydantic initialization
-        # Initialize client if not provided
-        if self._rerank_kwargs:
-            client_opts = kwargs.get("client_options", {}) if isinstance(kwargs, dict) else {}
-            object.__setattr__(
-                self, "client", CrossEncoder(caps.name, **(self._rerank_kwargs | client_opts))
-            )
+    _provider: ClassVar[Provider] = Provider.SENTENCE_TRANSFORMERS
 
     def _initialize(self) -> None:
         """
-        Initialize the SentenceTransformersRerankingProvider.
+        Initialize the SentenceTransformers reranking provider after Pydantic setup.
         """
-        # Set default model path if not provided
-        if "model_name" not in self.kwargs and "model_name_or_path" not in self.kwargs:
-            self.kwargs["model_name_or_path"] = self.caps.name
-
-        # Extract model name, with fallback to capabilities name
-        name = (
-            self.kwargs.pop("model_name", None)
-            or self.kwargs.pop("model_name_or_path", None)
-            or self.caps.name
-        )
+        # Extract model name from capabilities
+        name = self.caps.name
 
         if not isinstance(name, str):
             raise CodeWeaverValidationError(
@@ -118,12 +81,12 @@ class SentenceTransformersRerankingProvider(RerankingProvider[CrossEncoder]):
                 ],
             )
 
-        # Note: _client is already initialized by __init__, no need to reinitialize
+        # Client is already initialized by DI, just set up model-specific configuration
         if "Qwen3" in name:
             self._setup_qwen3()
 
     async def _execute_rerank(
-        self, query: str, documents: Sequence[str], *, top_n: int = 40, **kwargs: Any
+        self, query: str, documents: Sequence[str], *, top_n: int = 10, **kwargs: Any
     ) -> Any:
         """Execute the reranking process."""
         preprocessed = (

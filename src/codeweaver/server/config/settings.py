@@ -498,7 +498,7 @@ class CodeWeaverSettings(BaseCodeWeaverSettings):
 
     _map: Annotated[DictView[CodeWeaverSettingsDict] | None, PrivateAttr()] = None
 
-    _unset_fields: Annotated[set[str], PrivateAttr(default_factory=set)] = set()
+    _unset_fields: set[str] = PrivateAttr(default_factory=set)
 
     _resolution_complete: bool = PrivateAttr(default=False)
 

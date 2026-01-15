@@ -7,25 +7,12 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
-import importlib
 import logging
 import time
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterator, Mapping, Sequence
-from types import MappingProxyType
-from typing import (
-    TYPE_CHECKING,
-    Annotated,
-    Any,
-    ClassVar,
-    Literal,
-    NamedTuple,
-    cast,
-    overload,
-    override,
-)
+from typing import TYPE_CHECKING, Annotated, Any, Literal, overload, override
 
 from codeweaver_tokenizers import Tokenizer, get_tokenizer
 from pydantic import ConfigDict, Field, PositiveInt, PrivateAttr, SkipValidation, TypeAdapter
@@ -41,14 +28,17 @@ from tenacity import (
 )
 
 from codeweaver.core import (
+    INJECTED,
     BasedModel,
-    BaseEnum,
     Provider,
     RerankingProviderError,
+    StatisticsDep,
     ValidationError,
-    generate_field_title,
 )
+from codeweaver.providers.exceptions import CircuitBreakerOpenError
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
+from codeweaver.providers.reranking.providers.types import RerankingResult
+from codeweaver.providers.types import CircuitBreakerState
 
 
 if TYPE_CHECKING:
@@ -59,77 +49,14 @@ if TYPE_CHECKING:
         SessionStatistics,
         StructuredDataInput,
     )
+    from codeweaver.providers.config import RerankingConfigT, RerankingProviderSettings
 
 logger = logging.getLogger(__name__)
 
 
-class CircuitBreakerState(BaseEnum):
-    """Circuit breaker states for provider resilience."""
-
-    CLOSED = "closed"  # Normal operation
-    OPEN = "open"  # Failing, rejecting requests
-    HALF_OPEN = "half_open"  # Testing if service recovered
-
-
-class CircuitBreakerOpenError(Exception):
-    """Raised when circuit breaker is open and rejecting requests."""
-
-
-class RerankingResult(NamedTuple):
-    """Result of a reranking operation."""
-
-    original_index: Annotated[
-        int,
-        Field(
-            description="Original index of the document", field_title_generator=generate_field_title
-        ),
-    ]
-    batch_rank: Annotated[
-        int,
-        Field(
-            description="Rank of the document in the batch",
-            field_title_generator=generate_field_title,
-        ),
-    ]
-    score: Annotated[
-        float,
-        Field(description="Score of the document", field_title_generator=generate_field_title),
-    ]
-    chunk: Annotated[
-        CodeChunk,
-        Field(
-            description="Code chunk associated with the document",
-            field_title_generator=generate_field_title,
-        ),
-    ]
-    # Optional search metadata preserved from vector search results
-    original_score: Annotated[
-        float | None,
-        Field(
-            description="Original score of the document", field_title_generator=generate_field_title
-        ),
-    ] = None
-    # currently CodeWeaver only uses Reciprocal Rank Fusion, returning combined ranks. But we keep these fields for potential future use.
-    dense_score: Annotated[
-        float | None,
-        Field(
-            description="Dense score of the document", field_title_generator=generate_field_title
-        ),
-    ] = None
-    sparse_score: Annotated[
-        float | None,
-        Field(
-            description="Sparse score of the document", field_title_generator=generate_field_title
-        ),
-    ] = None
-
-
-def _get_statistics() -> SessionStatistics:
+def _get_statistics(stats: StatisticsDep = INJECTED) -> SessionStatistics:
     """Get the statistics source for the reranking provider."""
-    statistics_module = importlib.import_module("codeweaver.core")
-    # we need SessionStatistics in this namespace at runtime for pydantic to find it
-    SessionStatistics = statistics_module.SessionStatistics  # type: ignore # noqa: F841, N806
-    return statistics_module.get_session_statistics()
+    return stats
 
 
 def default_reranking_input_transformer(documents: StructuredDataInput) -> Iterator[str]:
@@ -171,21 +98,6 @@ def default_reranking_output_transformer(
     return processed_results
 
 
-class QueryType(NamedTuple):
-    """Represents a query and its associated metadata."""
-
-    query: Annotated[
-        str, Field(description="The query string", field_title_generator=generate_field_title)
-    ]
-
-    docs: Annotated[
-        Sequence[CodeChunk],
-        Field(
-            description="The document chunks to rerank", field_title_generator=generate_field_title
-        ),
-    ]
-
-
 class RerankingProvider[RerankingClient](BasedModel, ABC):
     """Base class for reranking providers."""
 
@@ -203,7 +115,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
     ]
 
     config: Annotated[
-        Any,  # Will be properly typed as RerankingProviderSettings in TYPE_CHECKING
+        RerankingConfigT,  # type: ignore[name-defined]
         Field(description="Configuration for the reranking model, including all request options."),
     ]
 
@@ -226,7 +138,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
     )
     """The output transformer is a function that takes the raw results from the provider and returns a Sequence of RerankingResult."""
 
-    _chunk_store: tuple[CodeChunk, ...] | None = PrivateAttr(default=None)
+    _chunk_store: tuple[CodeChunk, ...] | None = PrivateAttr(default_factory=tuple)
     """Stores the chunks while they are processed. We do this because we don't send the whole chunk to the provider, so we save them for later, like squirrels."""
 
     # Circuit breaker state tracking
@@ -238,36 +150,42 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
     def __init__(
         self,
         client: RerankingClient,
+        config: RerankingProviderSettings,  # type: ignore[name-defined]
         caps: RerankingModelCapabilities,
-        top_n: PositiveInt = 40,
         **kwargs: Any,
     ) -> None:
-        """Initialize the RerankingProvider."""
-        # Store values we'll need after super().__init__()
-        # Get _rerank_kwargs safely - it might not be defined in the subclass
-        _rerank_kwargs = kwargs or {}
-        with contextlib.suppress(AttributeError, TypeError):
-            class_rerank_kwargs = type(self)._rerank_kwargs
-            if class_rerank_kwargs and isinstance(class_rerank_kwargs, dict):
-                _rerank_kwargs = {**class_rerank_kwargs, **_rerank_kwargs}
+        """Initialize the RerankingProvider.
 
-        _top_n = cast(int, _rerank_kwargs.get("top_n", top_n))
-
+        Args:
+            client: The SDK client for the reranking provider
+            config: Configuration settings including reranking options
+            caps: Model capabilities
+            **kwargs: Additional keyword arguments to override config
+        """
         # Use object.__setattr__ to bypass Pydantic's validation for pre-super() initialization
         object.__setattr__(self, "_model_dump_json", super().model_dump_json)
 
-        logger.debug("RerankingProvider kwargs", extra=_rerank_kwargs)
-        logger.debug("Initialized RerankingProvider with top_n=%d", _top_n)
-
-        # Initialize circuit breaker state using object.__setattr__
+        # Initialize circuit breaker state
         object.__setattr__(self, "_circuit_state", CircuitBreakerState.CLOSED)
         object.__setattr__(self, "_failure_count", 0)
         object.__setattr__(self, "_last_failure_time", None)
 
-        # Initialize pydantic model with the proper fields BEFORE _initialize
-        super().__init__(client=client, caps=caps)
+        # Extract rerank options from config
+        rerank_options = (
+            config.reranking_config._as_options().get("rerank", {})
+            if config and hasattr(config, "reranking_config")
+            else {}
+        )
+        _rerank_kwargs = dict(rerank_options) | kwargs
+        _top_n = _rerank_kwargs.get("top_n", 10)
 
-        # Now that Pydantic is initialized, set kwargs as normal attributes
+        logger.debug("RerankingProvider kwargs", extra=_rerank_kwargs)
+        logger.debug("Initialized RerankingProvider with top_n=%d", _top_n)
+
+        # Initialize pydantic model with the proper fields
+        super().__init__(client=client, config=config, caps=caps)
+
+        # Set instance attributes after Pydantic initialization
         self.kwargs = _rerank_kwargs
         self._top_n = _top_n
 
@@ -342,7 +260,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         reraise=True,
     )
     async def _execute_rerank_with_retry(
-        self, query: str, documents: Sequence[str], *, top_n: int = 40, **kwargs: Any
+        self, query: str, documents: Sequence[str], *, top_n: int = 10, **kwargs: Any
     ) -> Any:
         """Wrapper around _execute_rerank with retry logic and circuit breaker.
 
@@ -371,7 +289,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
 
     @abstractmethod
     async def _execute_rerank(
-        self, query: str, documents: Sequence[str], *, top_n: int = 40, **kwargs: Any
+        self, query: str, documents: Sequence[str], *, top_n: int = 10, **kwargs: Any
     ) -> Any:
         """Execute the reranking process.
 
@@ -449,7 +367,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
     @property
     def model_name(self) -> str:
         """Get the model name for the reranking provider."""
-        return self.caps.name
+        return self.config.model_name
 
     @property
     def model_capabilities(self) -> RerankingModelCapabilities:
@@ -541,6 +459,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         after the number of kept results.
 
         We use `tiktoken` with `cl100k_base` as a reasonable default tokenizer for estimating the user LLM's token usage (we're not estimating based on the reranking model's tokenizer).
+        TODO: We have the latent capability to use the LLM's actual tokenizer through its API; we just need to figure out how best to hook it up. Low priority because this gets us 95% there.
         """
         if not processed_chunks or not results or len(results) >= len(processed_chunks):
             return 0
@@ -576,11 +495,11 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         from codeweaver.core import AnonymityConversion, FilteredKey
 
         return {
-            FilteredKey("_client"): AnonymityConversion.FORBIDDEN,
+            FilteredKey("client"): AnonymityConversion.FORBIDDEN,
             FilteredKey("_input_transformer"): AnonymityConversion.FORBIDDEN,
             FilteredKey("_output_transformer"): AnonymityConversion.FORBIDDEN,
-            FilteredKey("_rerank_kwargs"): AnonymityConversion.COUNT,
             FilteredKey("_chunk_store"): AnonymityConversion.COUNT,
+            FilteredKey("config"): AnonymityConversion.AGGREGATE,
         }
 
     @override
@@ -604,7 +523,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         return self._model_dump_json(  # ty: ignore[unresolved-attribute]
             indent=indent,
             include=include,
-            exclude={"_client", "_input_transformer", "_output_transformer"},
+            exclude={"client", "_input_transformer", "_output_transformer"},
             context=context,
             by_alias=by_alias,
             exclude_unset=exclude_unset,

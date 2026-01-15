@@ -8,17 +8,14 @@
 from __future__ import annotations
 
 import logging
-import os
 
-from collections.abc import Callable, Iterator, Sequence
-from types import MappingProxyType
+from collections.abc import Iterator, Sequence
 from typing import TYPE_CHECKING, Any, cast
 from warnings import filterwarnings
 
-from pydantic import ConfigDict, SecretStr, SkipValidation
+from pydantic import ConfigDict, SkipValidation
 
 from codeweaver.core import Provider, ProviderError, rpartial
-from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 from codeweaver.providers.reranking.providers.base import RerankingProvider, RerankingResult
 
 
@@ -74,68 +71,21 @@ def voyage_reranking_output_transformer(
 
 
 class VoyageRerankingProvider(RerankingProvider[AsyncClient]):
-    """Base class for reranking providers."""
+    """Voyage AI reranking provider implementation."""
 
     model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
 
     client: SkipValidation[AsyncClient]
     _provider: Provider = Provider.VOYAGE
-    caps: RerankingModelCapabilities
-
-    _rerank_kwargs: MappingProxyType[str, Any]
-    _output_transformer: Callable[
-        [Any, Iterator[CodeChunk] | tuple[CodeChunk, ...]], list[RerankingResult]
-    ] = lambda x, y: x  # placeholder, actually set in _initialize()
-
-    def __init__(
-        self,
-        client: AsyncClient | None = None,
-        caps: RerankingModelCapabilities | None = None,
-        **kwargs: Any,
-    ) -> None:
-        """Initialize the reranking provider."""
-        if caps is None:
-            from codeweaver.core import get_model_registry
-
-            registry = get_model_registry()
-            caps = registry.configured_models_for_kind("reranking")  # ty: ignore[invalid-assignment]
-            if isinstance(caps, tuple) and len(caps) > 0:
-                caps = caps[0]
-        if not caps:
-            from codeweaver.providers.reranking.capabilities.voyage import (
-                get_voyage_reranking_capabilities,
-            )
-
-            voyage_caps = get_voyage_reranking_capabilities()
-            caps = (
-                next((cap for cap in voyage_caps if cap.name == "rerank-2.5"), None)
-                or voyage_caps[0]
-            )
-        if client is None:
-            if api_key := kwargs.pop("api_key", None) or os.getenv("VOYAGE_API_KEY"):
-                if isinstance(api_key, SecretStr):
-                    api_key = api_key.get_secret_value()
-                client = AsyncClient(api_key=api_key)
-
-            else:
-                logger.warning(
-                    "We could not find an API key for Voyage AI. In case you have other means of authentication, we're going to proceed without an explicit API key... if you get authentication errors, please set the VOYAGE_API_KEY environment variable."
-                )
-                client = AsyncClient()
-
-        # Call super().__init__() with client and caps
-        super().__init__(client=client, caps=caps, **kwargs)
-
-        self._initialize()
 
     def _initialize(self) -> None:
-
-        type(self)._output_transformer = rpartial(
+        """Initialize after Pydantic setup."""
+        type(self)._output_transformer = rpartial(  # ty:ignore[invalid-assignment]
             voyage_reranking_output_transformer, _instance=self
         )
 
     async def _execute_rerank(
-        self, query: str, documents: Sequence[str], *, top_n: int = 40, **kwargs: Any
+        self, query: str, documents: Sequence[str], *, top_n: int = 10, **kwargs: Any
     ) -> Any:
         """Execute the reranking process."""
         try:

@@ -21,6 +21,7 @@ This script handles:
 from __future__ import annotations
 
 import ast
+import contextlib
 import importlib
 import importlib.util
 import json
@@ -29,6 +30,7 @@ import subprocess
 import sys
 import warnings
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import Literal, NamedTuple
 
@@ -99,10 +101,8 @@ IS_EXCEPTION = (
     "codeweaver.providers.agent.AgentProfileSpec",
     "codeweaver.providers.reranking.providers.sentence_transformers",
     "codeweaver.providers.embedding.providers.sentence_transformers",
-    "codeweaver.providers.reranking.KnownRerankModelName",
     "codeweaver.providers.reranking.capabilities.dependency_map",
     "codeweaver.providers.reranking.capabilities.load_default_capabilities",
-    "codeweaver.providers.reranking.get_rerank_model_provider",
     "codeweaver.providers.vector_stores.get_vector_store_provider",
     "codeweaver_tokenizers.get_tokenizer",
     "codeweaver.providers.embedding.capabilities.load_default_capabilities",
@@ -115,6 +115,8 @@ IS_EXCEPTION = (
 
 
 class ExportInfo(NamedTuple):
+    """Details about an export in a module."""
+
     name: str
     type: str  # "function", "class", "variable"
     is_public: bool
@@ -144,109 +146,123 @@ def get_module_path(file_path: Path) -> str:
             rel_path = file_path.relative_to(SRC_DIR.parent)
 
         module_path = str(rel_path.with_suffix("")).replace("/", ".")
-        module_path = module_path.removesuffix(".__init__")
-        return module_path
     except ValueError:
         return str(file_path)
+    else:
+        return module_path.removesuffix(".__init__")
 
 
-def check_import_exists(module_path: str, name: str | None = None, seen_mods: set[str] | None = None) -> bool:
+def check_import_exists(
+    module_path: str, name: str | None = None, seen_mods: set[str] | None = None
+) -> bool:
     """Check if a module or attribute exists without executing code."""
     if seen_mods is None:
         seen_mods = set()
-    
+
     if module_path in seen_mods:
         return False
     seen_mods.add(module_path)
 
     try:
-        # Handle cases where the module might be named with a leading underscore
-        possible_paths = [module_path]
-        if "." in module_path:
-            parts = module_path.split(".")
-            if not parts[-1].startswith("_"):
-                parts[-1] = "_" + parts[-1]
-                possible_paths.append(".".join(parts))
-
-        spec = None
-        for p in possible_paths:
-            spec = importlib.util.find_spec(p)
-            if spec:
-                module_path = p
-                break
-
-        if spec is None:
-            return False
-        if name is None:
-            return True
-
-        # Check submodules
-        try:
-            if importlib.util.find_spec(f"{module_path}.{name}"):
-                return True
-        except Exception:
-            pass
-
-        # Check AST
-        if spec.origin:
-            origin_path = Path(spec.origin)
-            if origin_path.suffix == ".py":
-                try:
-                    tree = ast.parse(origin_path.read_text(encoding="utf-8"))
-                    
-                    all_names, dynamic_imports, tc_names = get_lazy_import_data(tree)
-                    
-                    # If it's in dynamic_imports or tc_names, we need to check if the target exists
-                    # This allows traversing re-exports
-                    if name in dynamic_imports:
-                        _, submodule = dynamic_imports[name]
-                        return check_import_exists(f"{module_path}.{submodule}", name, seen_mods)
-                    
-                    if name in tc_names:
-                        # Find which module it's imported from in the TYPE_CHECKING block
-                        for node in tree.body:
-                            if isinstance(node, ast.If) and isinstance(node.test, ast.Name) and node.test.id == "TYPE_CHECKING":
-                                for tc_node in node.body:
-                                    if isinstance(tc_node, ast.ImportFrom):
-                                        for alias in tc_node.names:
-                                            if alias.name == name:
-                                                # Resolve relative import if needed
-                                                target_mod = tc_node.module
-                                                if tc_node.level > 0:
-                                                    parts = module_path.split('.')
-                                                    target_mod = '.'.join(parts[: -tc_node.level]) + (f".{tc_node.module}" if tc_node.module else "")
-                                                return check_import_exists(target_mod, name, seen_mods)
-                        return True # Fallback if we can't find the source but it is in TC
-
-                    # Check direct definitions
-                    for node in tree.body:
-                        if isinstance(node, ast.FunctionDef | ast.ClassDef | ast.AsyncFunctionDef):
-                            if node.name == name:
-                                return True
-                        elif isinstance(node, ast.Assign):
-                            for target in node.targets:
-                                if isinstance(target, ast.Name) and target.id == name:
-                                    return True
-                        elif isinstance(node, ast.AnnAssign):
-                            if isinstance(node.target, ast.Name) and node.target.id == name:
-                                return True
-                        elif hasattr(ast, "TypeAlias") and isinstance(node, ast.TypeAlias):
-                            if isinstance(node.name, ast.Name) and node.name.id == name:
-                                return True
-                        elif isinstance(node, ast.ImportFrom):
-                            for alias in node.names:
-                                if alias.asname == name or (not alias.asname and alias.name == name):
-                                    return True
-                        elif isinstance(node, ast.Import):
-                            for alias in node.names:
-                                if alias.asname == name or (not alias.asname and alias.name.split('.')[-1] == name):
-                                    return True
-                except Exception:
-                    pass
-
-        return False
+        return _check_module_import_exists(module_path, name, check_import_exists, seen_mods)
     except Exception:
         return False
+
+
+def _check_module_import_exists(
+    module_path: str,
+    name: str,
+    check_import_exists: Callable[[str, str | None, set[str] | None], bool],
+    seen_mods: set[str],
+):  # sourcery skip: low-code-quality
+    """Check if a module or attribute exists without executing code."""
+    # Handle cases where the module might be named with a leading underscore
+    possible_paths = [module_path]
+    if "." in module_path:
+        parts = module_path.split(".")
+        if not parts[-1].startswith("_"):
+            parts[-1] = f"_{parts[-1]}"
+            possible_paths.append(".".join(parts))
+
+    spec = None
+    for p in possible_paths:
+        spec = importlib.util.find_spec(p)
+        if spec:
+            module_path = p
+            break
+
+    if spec is None:
+        return False
+    if name is None:
+        return True
+
+        # Check submodules
+    with contextlib.suppress(Exception):
+        if importlib.util.find_spec(f"{module_path}.{name}"):
+            return True
+        # Check AST
+    if spec.origin:
+        origin_path = Path(spec.origin)
+        if origin_path.suffix == ".py":
+            with contextlib.suppress(Exception):
+                tree = ast.parse(origin_path.read_text(encoding="utf-8"))
+
+                _all_names, dynamic_imports, tc_names = get_lazy_import_data(tree)
+
+                # If it's in dynamic_imports or tc_names, we need to check if the target exists
+                # This allows traversing re-exports
+                if name in dynamic_imports:
+                    _, submodule = dynamic_imports[name]
+                    return check_import_exists(f"{module_path}.{submodule}", name, seen_mods)
+
+                if name in tc_names:
+                    # Find which module it's imported from in the TYPE_CHECKING block
+                    for node in tree.body:
+                        if (
+                            isinstance(node, ast.If)
+                            and isinstance(node.test, ast.Name)
+                            and node.test.id == "TYPE_CHECKING"
+                        ):
+                            for tc_node in node.body:
+                                if isinstance(tc_node, ast.ImportFrom):
+                                    for alias in tc_node.names:
+                                        if alias.name == name:
+                                            # Resolve relative import if needed
+                                            target_mod = tc_node.module
+                                            if tc_node.level > 0:
+                                                parts = module_path.split(".")
+                                                target_mod = ".".join(parts[: -tc_node.level]) + (
+                                                    f".{tc_node.module}" if tc_node.module else ""
+                                                )
+                                            return check_import_exists(target_mod, name, seen_mods)
+                    return True  # Fallback if we can't find the source but it is in TC
+
+                # Check direct definitions
+                for node in tree.body:
+                    if isinstance(node, ast.FunctionDef | ast.ClassDef | ast.AsyncFunctionDef):
+                        if node.name == name:
+                            return True
+                    elif isinstance(node, ast.Assign):
+                        for target in node.targets:
+                            if isinstance(target, ast.Name) and target.id == name:
+                                return True
+                    elif isinstance(node, ast.AnnAssign):
+                        if isinstance(node.target, ast.Name) and node.target.id == name:
+                            return True
+                    elif hasattr(ast, "TypeAlias") and isinstance(node, ast.TypeAlias):
+                        if isinstance(node.name, ast.Name) and node.name.id == name:
+                            return True
+                    elif isinstance(node, ast.ImportFrom):
+                        for alias in node.names:
+                            if alias.asname == name or (not alias.asname and alias.name == name):
+                                return True
+                    elif isinstance(node, ast.Import):
+                        for alias in node.names:
+                            if alias.asname == name or (
+                                not alias.asname and alias.name.split(".")[-1] == name
+                            ):
+                                return True
+    return False
 
 
 def load_config() -> dict:
@@ -259,7 +275,7 @@ def load_config() -> dict:
     return {"exclusions": {}, "module_exclusions": {}}
 
 
-def save_config(config: dict):
+def save_config(config: dict) -> None:
     """Save exclusions configuration."""
     if "exclusions" not in config:
         config["exclusions"] = {}
@@ -276,10 +292,11 @@ def format_code(code: str) -> str:
         result = subprocess.run(
             ["black", "-q", "-"], input=code, capture_output=True, text=True, check=True
         )
-        return result.stdout
     except Exception as e:
         console.print(f"[yellow]Warning: Could not format code with black: {e}[/yellow]")
         return code
+    else:
+        return result.stdout
 
 
 def get_current_all(tree: ast.Module) -> list[str] | None:
@@ -292,7 +309,11 @@ def get_current_all(tree: ast.Module) -> list[str] | None:
                     and target.id == "__all__"
                     and isinstance(node.value, ast.Tuple | ast.List)
                 ):
-                    return [elt.value for elt in node.value.elts if isinstance(elt, ast.Constant)]
+                    return [
+                        elt.value
+                        for elt in node.value.elts
+                        if isinstance(elt, ast.Constant) and isinstance(elt.value, str)
+                    ]
     return None
 
 
@@ -324,17 +345,22 @@ def get_public_members(file_path: Path) -> tuple[list[ExportInfo], list[str] | N
                     ):
                         members.append(ExportInfo(target.id, "variable", True))
                 elif isinstance(target, ast.Tuple | ast.List):
-                    for elt in target.elts:
+                    members.extend(
+                        ExportInfo(elt.id, "variable", True)
+                        for elt in target.elts
                         if (
                             isinstance(elt, ast.Name)
                             and not elt.id.startswith("_")
                             and elt.id.isupper()
-                        ):
-                            members.append(ExportInfo(elt.id, "variable", True))
-        elif isinstance(node, ast.AnnAssign):
-            if isinstance(node.target, ast.Name):
-                if not node.target.id.startswith("_") and node.target.id.isupper():
-                    members.append(ExportInfo(node.target.id, "variable", True))
+                        )
+                    )
+        elif (
+            isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and (not node.target.id.startswith("_"))
+            and node.target.id.isupper()
+        ):
+            members.append(ExportInfo(node.target.id, "variable", True))
 
     return sorted(members, key=lambda x: x.name), current_all
 
@@ -345,6 +371,8 @@ def get_public_members(file_path: Path) -> tuple[list[ExportInfo], list[str] | N
 
 
 class FunctionCallError(NamedTuple):
+    """Description of a function call that raised an error."""
+
     file_ref: str
     module: str
     obj: str
@@ -374,13 +402,11 @@ def validate_function_calls(paths: list[Path] | None = None) -> list[FunctionCal
                 search_paths.append(p)
 
     for py_file in search_paths:
-        try:
+        with contextlib.suppress(Exception):
             content = py_file.read_text(encoding="utf-8")
-        except Exception:
-            continue
         for match in LAZY_IMPORT_PATTERN.finditer(content):
             module = match.group("module").strip('" \n\t')
-            obj = match.group("object").strip(', " \n\t') if match.group("object") else None
+            obj = match.group("object").strip(', " \n\t') if match.group("object") else None  # noqa: B005
             # Use our non-executing check first
             if not check_import_exists(module, obj):
                 line_num = content.count("\n", 0, match.span()[0]) + 1
@@ -398,6 +424,8 @@ def validate_function_calls(paths: list[Path] | None = None) -> list[FunctionCal
 
 
 class PackageError(NamedTuple):
+    """Rep"""
+
     module_name: str
     category: Literal["ERROR", "WARNING", "INFO"]
     message: str
@@ -406,23 +434,26 @@ class PackageError(NamedTuple):
 def get_lazy_import_data(
     tree: ast.Module,
 ) -> tuple[list[str], dict[str, tuple[str, str]], list[str]]:
+    # sourcery skip: low-code-quality
     """Extract __all__, _dynamic_imports, and TYPE_CHECKING names from AST."""
     all_names = []
     dynamic_imports = {}
     tc_names = []
 
     for node in tree.body:
-        # __all__
         if isinstance(node, ast.Assign):
             for target in node.targets:
-                if isinstance(target, ast.Name) and target.id == "__all__":
-                    if isinstance(node.value, ast.Tuple | ast.List):
-                        all_names = [
-                            elt.value for elt in node.value.elts if isinstance(elt, ast.Constant)
-                        ]
+                if (
+                    isinstance(target, ast.Name)
+                    and target.id == "__all__"
+                    and isinstance(node.value, ast.Tuple | ast.List)
+                ):
+                    all_names = [
+                        elt.value
+                        for elt in node.value.elts
+                        if isinstance(elt, ast.Constant) and isinstance(elt.value, str)
+                    ]
 
-        # _dynamic_imports
-        if isinstance(node, ast.Assign):
             for target in node.targets:
                 if isinstance(target, ast.Name) and target.id == "_dynamic_imports":
                     # Handle MappingProxyType({...}) or just {...}
@@ -431,7 +462,7 @@ def get_lazy_import_data(
                         dict_node = dict_node.args[0]
 
                     if isinstance(dict_node, ast.Dict):
-                        for k, v in zip(dict_node.keys, dict_node.values):
+                        for k, v in zip(dict_node.keys, dict_node.values, strict=True):
                             if (
                                 isinstance(k, ast.Constant)
                                 and isinstance(v, ast.Tuple)
@@ -451,11 +482,12 @@ def get_lazy_import_data(
             and node.test.id == "TYPE_CHECKING"
         ):
             for tc_node in node.body:
-                for alias in tc_node.names:
-                    if isinstance(tc_node, ast.ImportFrom):
-                        tc_names.append(alias.name)
-                    elif isinstance(tc_node, ast.Import):
-                        tc_names.append(alias.name.split(".")[-1])
+                if isinstance(tc_node, ast.Import | ast.ImportFrom):
+                    for alias in tc_node.names:
+                        if isinstance(tc_node, ast.ImportFrom):
+                            tc_names.append(alias.name)
+                        elif isinstance(tc_node, ast.Import):
+                            tc_names.append(alias.name.split(".")[-1])
 
     return all_names, dynamic_imports, tc_names
 
@@ -483,12 +515,6 @@ def validate_package_level_imports() -> tuple[
         if not dynamic_imports:
             info.append(PackageError(mod_name, "INFO", "No _dynamic_imports"))
             continue
-
-        # Check consistency
-        for name in all_names:
-            if name not in dynamic_imports and name not in tc_names:
-                # Might be locally defined
-                pass
 
         for name in dynamic_imports:
             if name not in all_names:
@@ -526,6 +552,8 @@ def validate_package_level_imports() -> tuple[
 
 
 class ImportErrorDetail(NamedTuple):
+    """Details about an import error found during scanning."""
+
     file_path: Path
     line: int
     module: str
@@ -534,53 +562,55 @@ class ImportErrorDetail(NamedTuple):
 
 
 def scan_all_imports() -> list[ImportErrorDetail]:
+    # sourcery skip: low-code-quality
     """Scan all python files for broken imports."""
     errors = []
     py_files = list(SRC_DIR.rglob("*.py"))
 
     with console.status("[bold blue]Scanning all imports..."):
         for py_file in py_files:
-            try:
+            with contextlib.suppress(Exception):
                 tree = ast.parse(py_file.read_text(encoding="utf-8"))
                 for node in ast.walk(tree):
                     if isinstance(node, ast.Import):
+                        errors.extend(
+                            ImportErrorDetail(
+                                py_file, node.lineno, alias.name, None, "Module not found"
+                            )
+                            for alias in node.names
+                            if alias.name.startswith("codeweaver")
+                            and not check_import_exists(alias.name)
+                        )
+                    elif (
+                        isinstance(node, ast.ImportFrom)
+                        and node.module
+                        and (
+                            node.module.startswith("codeweaver", "code-weaver", "code_weaver")
+                            or node.level > 0
+                        )
+                    ):
+                        module_path = node.module or ""
+                        if node.level > 0:
+                            # Resolve relative import
+                            parts = get_module_path(py_file).split(".")
+                            module_path = ".".join(parts[: -node.level]) + (
+                                f".{node.module}" if node.module else ""
+                            )
+
                         for alias in node.names:
-                            if alias.name.startswith("codeweaver"):
-                                if not check_import_exists(alias.name):
-                                    errors.append(
-                                        ImportErrorDetail(
-                                            py_file,
-                                            node.lineno,
-                                            alias.name,
-                                            None,
-                                            "Module not found",
-                                        )
+                            if alias.name == "*":
+                                continue
+                            if not check_import_exists(module_path, alias.name):
+                                errors.append(
+                                    ImportErrorDetail(
+                                        py_file,
+                                        node.lineno,
+                                        module_path,
+                                        alias.name,
+                                        "Import not found",
                                     )
-                    elif isinstance(node, ast.ImportFrom):
-                        if node.module and (node.module.startswith("codeweaver") or node.level > 0):
-                            module_path = node.module or ""
-                            if node.level > 0:
-                                # Resolve relative import
-                                parts = get_module_path(py_file).split(".")
-                                module_path = ".".join(parts[: -node.level]) + (
-                                    f".{node.module}" if node.module else ""
                                 )
 
-                            for alias in node.names:
-                                if alias.name == "*":
-                                    continue
-                                if not check_import_exists(module_path, alias.name):
-                                    errors.append(
-                                        ImportErrorDetail(
-                                            py_file,
-                                            node.lineno,
-                                            module_path,
-                                            alias.name,
-                                            "Import not found",
-                                        )
-                                    )
-            except Exception:
-                continue
     return errors
 
 
@@ -591,13 +621,11 @@ def scan_all_imports() -> list[ImportErrorDetail]:
 
 def generate_init_content(package_dir: Path, sub_exports: dict[str, list[str]]) -> str:
     module_name = get_module_path(package_dir)
-    
+
     # Flatten exports into a list of (name, full_module) for easier sorting
     flat_exports = []
     for mod, exports in sub_exports.items():
-        for exp in exports:
-            flat_exports.append((exp, mod))
-    
+        flat_exports.extend((exp, mod) for exp in exports)
     # Sort exports by name using our custom key
     flat_exports.sort(key=lambda x: export_sort_key(x[0]))
 
@@ -607,33 +635,29 @@ def generate_init_content(package_dir: Path, sub_exports: dict[str, list[str]]) 
         if mod not in modules_to_exports:
             modules_to_exports[mod] = []
         modules_to_exports[mod].append(exp)
-    
+
     # Sort modules based on the custom sort key of their first export
     sorted_mods = sorted(
-        modules_to_exports.keys(), 
-        key=lambda m: export_sort_key(modules_to_exports[m][0])
+        modules_to_exports.keys(), key=lambda m: export_sort_key(modules_to_exports[m][0])
     )
 
     tc_lines = ["if TYPE_CHECKING:"]
     for mod in sorted_mods:
-        exports = sorted(modules_to_exports[mod], key=export_sort_key)
-        if exports:
+        if exports := sorted(modules_to_exports[mod], key=export_sort_key):
             tc_lines.append(f"    from {mod} import (")
-            for exp in exports:
-                tc_lines.append(f"        {exp},")
+            tc_lines.extend(f"        {exp}," for exp in exports)
             tc_lines.append("    )")
 
     # _dynamic_imports mapping - Sorted by the name of the import
     di_lines = ["_dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({"]
     for exp, mod in flat_exports:
-        rel_mod = mod.removeprefix(module_name + ".")
+        rel_mod = mod.removeprefix(f"{module_name}.")
         di_lines.append(f'    "{exp}": (__spec__.parent, "{rel_mod}"),')
     di_lines.append("})")
 
     # __all__ tuple - Sorted by name
     all_lines = ["__all__ = ("]
-    for exp, _ in flat_exports:
-        all_lines.append(f'    "{exp}",')
+    all_lines.extend(f'    "{exp}",' for exp, _ in flat_exports)
     all_lines.append(")")
 
     docstring = f'"""Package-level lazy imports for {module_name}."""'
@@ -668,15 +692,14 @@ def get_package_exports(package_dir: Path) -> dict[str, list[str]]:
         mod_path = get_module_path(item)
         if item.is_file() and item.suffix == ".py" and item.name != "__init__.py":
             members, _ = get_public_members(item)
-            effective = [m.name for m in members if m.name not in exclusions.get(mod_path, [])]
-            if effective:
+            if effective := [m.name for m in members if m.name not in exclusions.get(mod_path, [])]:
                 sub_exports[mod_path] = effective
         elif item.is_dir() and (item / "__init__.py").exists():
             _, current_all = get_public_members(item / "__init__.py")
-            if current_all:
-                effective = [e for e in current_all if e not in exclusions.get(mod_path, [])]
-                if effective:
-                    sub_exports[mod_path] = effective
+            if current_all and (
+                effective := [e for e in current_all if e not in exclusions.get(mod_path, [])]
+            ):
+                sub_exports[mod_path] = effective
     return sub_exports
 
 
@@ -686,51 +709,52 @@ def get_module_health(file_path: Path, full_mod_name: str) -> tuple[bool, bool]:
     errors = get_broken_imports(file_path, full_mod_name)
     broken = len(errors) > 0
 
-    # Missing exports
-    missing = False
     config = load_config()
     mod_excl = config.get("module_exclusions", {}).get(full_mod_name, [])
     mems, current_all = get_public_members(file_path)
     current_all = current_all or []
-    if any(m.name for m in mems if m.name not in current_all and m.name not in mod_excl):
-        missing = True
-
+    missing = any(m.name for m in mems if m.name not in current_all and m.name not in mod_excl)
     return broken, missing
 
 
 def get_broken_imports(file_path: Path, full_mod_name: str) -> list[ImportErrorDetail]:
     """Get specific broken imports for a module."""
     errors = []
-    try:
+    with contextlib.suppress(Exception):
         tree = ast.parse(file_path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
-                for alias in node.names:
-                    if alias.name.startswith("codeweaver") and not check_import_exists(alias.name):
-                        errors.append(
-                            ImportErrorDetail(file_path, node.lineno, alias.name, None, "Module not found")
-                        )
-            elif isinstance(node, ast.ImportFrom):
-                if node.module and (node.module.startswith("codeweaver") or node.level > 0):
-                    module_path = node.module or ""
-                    if node.level > 0:
-                        parts = full_mod_name.split(".")
-                        module_path = ".".join(parts[: -node.level]) + (
-                            f".{node.module}" if node.module else ""
-                        )
-                    for alias in node.names:
-                        if alias.name != "*" and not check_import_exists(module_path, alias.name):
-                            errors.append(
-                                ImportErrorDetail(
-                                    file_path, node.lineno, module_path, alias.name, "Import not found"
-                                )
-                            )
-    except Exception:
-        pass
+                errors.extend(
+                    ImportErrorDetail(file_path, node.lineno, alias.name, None, "Module not found")
+                    for alias in node.names
+                    if alias.name.startswith("codeweaver") and not check_import_exists(alias.name)
+                )
+            elif (
+                isinstance(node, ast.ImportFrom)
+                and node.module
+                and (
+                    node.module.startswith("codeweaver", "code-weaver", "code_weaver")
+                    or node.level > 0
+                )
+            ):
+                module_path = node.module or ""
+                if node.level > 0:
+                    parts = full_mod_name.split(".")
+                    module_path = ".".join(parts[: -node.level]) + (
+                        f".{node.module}" if node.module else ""
+                    )
+                errors.extend(
+                    ImportErrorDetail(
+                        file_path, node.lineno, module_path, alias.name, "Import not found"
+                    )
+                    for alias in node.names
+                    if alias.name != "*" and not check_import_exists(module_path, alias.name)
+                )
     return errors
 
 
 def manage_tui():
+    """Handle TUI interaction."""
     if not is_tty():
         console.print(
             "[bold red]Error: Management TUI requires an interactive terminal (TTY).[/bold red]"
@@ -740,7 +764,7 @@ def manage_tui():
     try:
         while True:
             packages = sorted([p.parent for p in SRC_DIR.rglob("__init__.py")])
-            
+
             # Pre-calculate package health
             pkg_health = {}
             with console.status("[bold blue]Auditing packages..."):
@@ -749,36 +773,42 @@ def manage_tui():
                     # Check __init__.py consistency
                     try:
                         tree = ast.parse((pkg / "__init__.py").read_text(encoding="utf-8"))
-                        all_names, dynamic_imports, tc_names = get_lazy_import_data(tree)
-                        has_init_issue = not all_names or any(n not in all_names for n in dynamic_imports)
+                        all_names, dynamic_imports, _tc_names = get_lazy_import_data(tree)
+                        has_init_issue = not all_names or any(
+                            n not in all_names for n in dynamic_imports
+                        )
                     except Exception:
                         has_init_issue = True
-                    
+
                     # Check if any children have issues
                     has_child_issue = False
                     for item in pkg.iterdir():
                         if item.is_file() and item.suffix == ".py" and item.name != "__init__.py":
                             b, m = get_module_health(item, get_module_path(item))
                             if b or m:
-                                has_child_issue = True; break
-                    
+                                has_child_issue = True
+                                break
+
                     pkg_health[mod_path] = (has_init_issue, has_child_issue)
 
             table = Table(title="\nCodeWeaver Packages", expand=True)
             table.add_column("ID", style="dim", width=4)
             table.add_column("Package", style="cyan")
             table.add_column("Status", width=12)
-            
+
             for i, pkg in enumerate(packages):
                 name = get_module_path(pkg)
                 init_err, child_err = pkg_health[name]
-                
+
                 style = "bold magenta" if init_err else "white"
                 status = ""
-                if init_err: status += "[bold red]INIT[/bold red] "
-                if child_err: status += "[yellow]SUB[/yellow]"
-                if not status: status = "[green]OK[/green]"
-                
+                if init_err:
+                    status += "[bold red]INIT[/bold red] "
+                if child_err:
+                    status += "[yellow]SUB[/yellow]"
+                if not status:
+                    status = "[green]OK[/green]"
+
                 table.add_row(str(i), f"[{style}]{name}[/{style}]", status)
             console.print(table)
 
@@ -798,30 +828,36 @@ def manage_tui():
                         style="blue",
                     )
                 )
-                
+
                 table = Table(box=None, expand=True)
                 table.add_column("Module", style="cyan", width=40)
                 table.add_column("Status", width=10)
                 table.add_column("Exports", style="green")
-                
+
                 for mod, exports in sub_exports.items():
                     # Check health for coloring
                     f_path = selected_pkg / (mod.split(".")[-1] + ".py")
-                    if not f_path.exists(): f_path = selected_pkg / mod.split(".")[-1] / "__init__.py"
-                    
+                    if not f_path.exists():
+                        f_path = selected_pkg / mod.split(".")[-1] / "__init__.py"
+
                     broken, missing = get_module_health(f_path, mod)
-                    
+
                     status = ""
-                    if broken: status += "[bold red]![/bold red]"
-                    if missing: status += "[yellow]? [/yellow]"
-                    if not status: status = "[green]✓[/green]"
-                    
-                    mod_display = f"[bold yellow]{mod}[/bold yellow]" if (broken or missing) else mod
+                    if broken:
+                        status += "[bold red]![/bold red]"
+                    if missing:
+                        status += "[yellow]? [/yellow]"
+                    if not status:
+                        status = "[green]✓[/green]"
+
+                    mod_display = (
+                        f"[bold yellow]{mod}[/bold yellow]" if (broken or missing) else mod
+                    )
                     table.add_row(mod_display, status, ", ".join(exports))
                 console.print(table)
 
                 # Create a mapping of short names to full module paths for easy input
-                short_to_full = {m.split(".")[-1]: m for m in sub_exports.keys()}
+                short_to_full = {m.split(".")[-1]: m for m in sub_exports}
 
                 console.print("\n[bold]Actions:[/bold]")
                 console.print(
@@ -833,9 +869,7 @@ def manage_tui():
                     "[[bold cyan]b[/bold cyan]]ack"
                 )
                 action = Prompt.ask(
-                    "\nChoice",
-                    choices=["g", "e", "m", "f", "r", "b"],
-                    show_choices=False,
+                    "\nChoice", choices=["g", "e", "m", "f", "r", "b"], show_choices=False
                 )
                 if action == "b":
                     break
@@ -883,7 +917,9 @@ def manage_tui():
                     ]
 
                     console.print(f"\n[bold]Audit for {mod_choice}:[/bold]")
-                    console.print(f"  Current __all__: {', '.join(current_all) or '[dim]None[/dim]'}")
+                    console.print(
+                        f"  Current __all__: {', '.join(current_all) or '[dim]None[/dim]'}"
+                    )
                     console.print(f"  Discovered Public: {', '.join(member_names)}")
 
                     if not missing:
@@ -944,19 +980,17 @@ def manage_tui():
 
                     for err in sorted(errors, key=lambda x: x.line, reverse=True):
                         full_name = f"{err.module}.{err.name}" if err.name else err.module
-                        console.print(f"\n[bold red]Broken Import:[/bold red] {full_name} at line {err.line}")
-                        console.print(f"[dim]{lines[err.line-1].strip()}[/dim]")
-                        
-                        fix_type = Prompt.ask(
-                            "Fix",
-                            choices=["r", "s", "m", "k"],
-                            default="k"
+                        console.print(
+                            f"\n[bold red]Broken Import:[/bold red] {full_name} at line {err.line}"
                         )
+                        console.print(f"[dim]{lines[err.line - 1].strip()}[/dim]")
+
+                        fix_type = Prompt.ask("Fix", choices=["r", "s", "m", "k"], default="k")
                         # r: remove, s: substring, m: manual, k: keep
 
                         if fix_type == "k":
                             continue
-                        
+
                         changes_made = True
                         if fix_type == "r":
                             # Remove the line (simplest approach for now)
@@ -969,14 +1003,15 @@ def manage_tui():
                             console.print(f"  [yellow]~ Replaced {old} with {new}[/yellow]")
                         elif fix_type == "m":
                             new_val = Prompt.ask("Enter replacement for this part of the import")
-                            target = err.name if err.name else err.module
+                            target = err.name or err.module
                             lines[err.line - 1] = lines[err.line - 1].replace(target, new_val)
-                            console.print(f"  [green]+ Updated import to reference {new_val}[/green]")
+                            console.print(
+                                f"  [green]+ Updated import to reference {new_val}[/green]"
+                            )
 
-                    if changes_made:
-                        if Confirm.ask("Save changes and format?"):
-                            f_path.write_text(format_code("\n".join(lines) + "\n"), encoding="utf-8")
-                            console.print("[green]File updated and formatted.[/green]")
+                    if changes_made and Confirm.ask("Save changes and format?"):
+                        f_path.write_text(format_code("\n".join(lines) + "\n"), encoding="utf-8")
+                        console.print("[green]File updated and formatted.[/green]")
 
                 elif action == "r":
                     # Find public things in submodules that ARE NOT in current sub_exports
@@ -1056,6 +1091,7 @@ def manage_tui():
 
 
 def main():
+    """Main entry point for the import validator and manager."""
     if "--manage" in sys.argv:
         manage_tui()
         return 0
@@ -1064,8 +1100,7 @@ def main():
 
     # Global Import Scan
     console.print("\n[bold blue]Section 0: Global Import Scan[/bold blue]")
-    import_errors = scan_all_imports()
-    if import_errors:
+    if import_errors := scan_all_imports():
         for e in import_errors:
             name_part = f".{e.name}" if e.name else ""
             console.print(
@@ -1075,8 +1110,7 @@ def main():
         console.print("[green]✓ No broken internal imports found.[/green]")
 
     console.print("\n[bold blue]Section 1: lazy_import() Function Calls[/bold blue]")
-    f_errors = validate_function_calls()
-    if f_errors:
+    if f_errors := validate_function_calls():
         for e in f_errors:
             console.print(f"[red]ERROR[/red] {e.file_ref}: {e.status} ({e.module}.{e.obj})")
 

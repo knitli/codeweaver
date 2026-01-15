@@ -56,15 +56,28 @@ def voyage_rerank_capabilities():
     )
 
 
+@pytest.fixture
+def mock_voyage_rerank_config():
+    """Create a mock config for Voyage reranking provider."""
+    config = MagicMock()
+    config.reranking_config = MagicMock()
+    config.reranking_config._as_options = MagicMock(
+        return_value={"model_name": "rerank-2", "rerank": {}, "model": {}}
+    )
+    return config
+
+
 class TestVoyageRerankingProviderInitialization:
     """Test VoyageRerankingProvider initialization."""
 
     def test_provider_initialization_with_client(
-        self, mock_voyage_rerank_client, voyage_rerank_capabilities
+        self, mock_voyage_rerank_client, mock_voyage_rerank_config, voyage_rerank_capabilities
     ):
         """Test that provider initializes correctly with a client."""
         provider = VoyageRerankingProvider(
-            client=mock_voyage_rerank_client, caps=voyage_rerank_capabilities
+            client=mock_voyage_rerank_client,
+            config=mock_voyage_rerank_config,
+            caps=voyage_rerank_capabilities,
         )
 
         assert provider.client is mock_voyage_rerank_client
@@ -72,42 +85,50 @@ class TestVoyageRerankingProviderInitialization:
         assert provider.provider == Provider.VOYAGE
 
     def test_provider_initialization_sets_output_transformer(
-        self, mock_voyage_rerank_client, voyage_rerank_capabilities
+        self, mock_voyage_rerank_client, mock_voyage_rerank_config, voyage_rerank_capabilities
     ):
         """Test that _initialize sets the output transformer correctly."""
         provider = VoyageRerankingProvider(
-            client=mock_voyage_rerank_client, caps=voyage_rerank_capabilities
+            client=mock_voyage_rerank_client,
+            config=mock_voyage_rerank_config,
+            caps=voyage_rerank_capabilities,
         )
 
         # Verify _output_transformer is callable
         assert callable(type(provider)._output_transformer)
 
     def test_provider_initialization_with_top_n(
-        self, mock_voyage_rerank_client, voyage_rerank_capabilities
+        self, mock_voyage_rerank_client, mock_voyage_rerank_config, voyage_rerank_capabilities
     ):
         """Test that top_n is set correctly during initialization."""
         provider = VoyageRerankingProvider(
-            client=mock_voyage_rerank_client, caps=voyage_rerank_capabilities, top_n=20
+            client=mock_voyage_rerank_client,
+            config=mock_voyage_rerank_config,
+            caps=voyage_rerank_capabilities,
+            top_n=20,
         )
 
         assert provider.top_n == 20
 
     def test_provider_initialization_default_top_n(
-        self, mock_voyage_rerank_client, voyage_rerank_capabilities
+        self, mock_voyage_rerank_client, mock_voyage_rerank_config, voyage_rerank_capabilities
     ):
         """Test that default top_n is 40."""
         provider = VoyageRerankingProvider(
-            client=mock_voyage_rerank_client, caps=voyage_rerank_capabilities
+            client=mock_voyage_rerank_client,
+            config=mock_voyage_rerank_config,
+            caps=voyage_rerank_capabilities,
         )
 
         assert provider.top_n == 40
 
     def test_provider_prompt_not_supported(
-        self, mock_voyage_rerank_client, voyage_rerank_capabilities
+        self, mock_voyage_rerank_client, mock_voyage_rerank_config, voyage_rerank_capabilities
     ):
         """Test that custom prompts are stored but not used by Voyage."""
         provider = VoyageRerankingProvider(
             client=mock_voyage_rerank_client,
+            config=mock_voyage_rerank_config,
             caps=voyage_rerank_capabilities,
             prompt="custom prompt",
         )
@@ -121,7 +142,7 @@ class TestVoyageRerankingProviderReranking:
 
     @pytest.mark.asyncio
     async def test_execute_rerank_success(
-        self, mock_voyage_rerank_client, voyage_rerank_capabilities
+        self, mock_voyage_rerank_client, mock_voyage_rerank_config, voyage_rerank_capabilities
     ):
         """Test successful reranking execution."""
         # Setup mock response
@@ -134,7 +155,9 @@ class TestVoyageRerankingProviderReranking:
         mock_voyage_rerank_client.rerank.return_value = mock_response
 
         provider = VoyageRerankingProvider(
-            client=mock_voyage_rerank_client, caps=voyage_rerank_capabilities
+            client=mock_voyage_rerank_client,
+            config=mock_voyage_rerank_config,
+            caps=voyage_rerank_capabilities,
         )
 
         # Execute rerank
@@ -155,7 +178,7 @@ class TestVoyageRerankingProviderReranking:
 
     @pytest.mark.asyncio
     async def test_rerank_with_code_chunks(
-        self, mock_voyage_rerank_client, voyage_rerank_capabilities
+        self, mock_voyage_rerank_client, mock_voyage_rerank_config, voyage_rerank_capabilities
     ):
         """Test reranking with CodeChunk objects."""
         # Setup mock response
@@ -168,7 +191,9 @@ class TestVoyageRerankingProviderReranking:
         mock_voyage_rerank_client.rerank.return_value = mock_response
 
         provider = VoyageRerankingProvider(
-            client=mock_voyage_rerank_client, caps=voyage_rerank_capabilities
+            client=mock_voyage_rerank_client,
+            config=mock_voyage_rerank_config,
+            caps=voyage_rerank_capabilities,
         )
         from pathlib import Path
 
@@ -208,7 +233,9 @@ class TestVoyageRerankingProviderReranking:
         assert results[1].chunk == chunks[0]
 
     @pytest.mark.asyncio
-    async def test_rerank_with_strings(self, mock_voyage_rerank_client, voyage_rerank_capabilities):
+    async def test_rerank_with_strings(
+        self, mock_voyage_rerank_client, mock_voyage_rerank_config, voyage_rerank_capabilities
+    ):
         """Test reranking with string documents."""
         # Setup mock response
         mock_response = MagicMock()
@@ -219,7 +246,9 @@ class TestVoyageRerankingProviderReranking:
         mock_voyage_rerank_client.rerank.return_value = mock_response
 
         provider = VoyageRerankingProvider(
-            client=mock_voyage_rerank_client, caps=voyage_rerank_capabilities
+            client=mock_voyage_rerank_client,
+            config=mock_voyage_rerank_config,
+            caps=voyage_rerank_capabilities,
         )
 
         # Call rerank with CodeChunk
@@ -233,7 +262,7 @@ class TestVoyageRerankingProviderReranking:
 
     @pytest.mark.asyncio
     async def test_rerank_limits_results_to_top_n(
-        self, mock_voyage_rerank_client, voyage_rerank_capabilities
+        self, mock_voyage_rerank_client, mock_voyage_rerank_config, voyage_rerank_capabilities
     ):
         """Test that rerank limits results to top_n."""
         # Setup mock response with more results than top_n
@@ -247,7 +276,10 @@ class TestVoyageRerankingProviderReranking:
         mock_voyage_rerank_client.rerank.return_value = mock_response
 
         provider = VoyageRerankingProvider(
-            client=mock_voyage_rerank_client, caps=voyage_rerank_capabilities, top_n=5
+            client=mock_voyage_rerank_client,
+            config=mock_voyage_rerank_config,
+            caps=voyage_rerank_capabilities,
+            top_n=5,
         )
 
         chunks = [make_test_chunk(f"doc {i}", i) for i in range(10)]
@@ -264,7 +296,7 @@ class TestVoyageRerankingProviderErrorHandling:
 
     @pytest.mark.asyncio
     async def test_execute_rerank_handles_provider_error(
-        self, mock_voyage_rerank_client, voyage_rerank_capabilities
+        self, mock_voyage_rerank_client, mock_voyage_rerank_config, voyage_rerank_capabilities
     ):
         """Test that provider errors are wrapped correctly."""
         from codeweaver.core import ProviderError
@@ -272,7 +304,9 @@ class TestVoyageRerankingProviderErrorHandling:
         mock_voyage_rerank_client.rerank.side_effect = Exception("API error")
 
         provider = VoyageRerankingProvider(
-            client=mock_voyage_rerank_client, caps=voyage_rerank_capabilities
+            client=mock_voyage_rerank_client,
+            config=mock_voyage_rerank_config,
+            caps=voyage_rerank_capabilities,
         )
 
         # Execute rerank should raise ProviderError
@@ -283,13 +317,15 @@ class TestVoyageRerankingProviderErrorHandling:
 
     @pytest.mark.asyncio
     async def test_rerank_handles_connection_error(
-        self, mock_voyage_rerank_client, voyage_rerank_capabilities
+        self, mock_voyage_rerank_client, mock_voyage_rerank_config, voyage_rerank_capabilities
     ):
         """Test that connection errors trigger retry logic."""
         mock_voyage_rerank_client.rerank.side_effect = ConnectionError("Connection failed")
 
         provider = VoyageRerankingProvider(
-            client=mock_voyage_rerank_client, caps=voyage_rerank_capabilities
+            client=mock_voyage_rerank_client,
+            config=mock_voyage_rerank_config,
+            caps=voyage_rerank_capabilities,
         )
 
         # Call rerank - should return empty list after retries
@@ -301,13 +337,15 @@ class TestVoyageRerankingProviderErrorHandling:
 
     @pytest.mark.asyncio
     async def test_rerank_handles_timeout_error(
-        self, mock_voyage_rerank_client, voyage_rerank_capabilities
+        self, mock_voyage_rerank_client, mock_voyage_rerank_config, voyage_rerank_capabilities
     ):
         """Test that timeout errors trigger retry logic."""
         mock_voyage_rerank_client.rerank.side_effect = TimeoutError("Request timed out")
 
         provider = VoyageRerankingProvider(
-            client=mock_voyage_rerank_client, caps=voyage_rerank_capabilities
+            client=mock_voyage_rerank_client,
+            config=mock_voyage_rerank_config,
+            caps=voyage_rerank_capabilities,
         )
 
         # Call rerank - should return empty list after retries
@@ -321,28 +359,38 @@ class TestVoyageRerankingProviderErrorHandling:
 class TestVoyageRerankingProviderProperties:
     """Test VoyageRerankingProvider properties."""
 
-    def test_provider_property(self, mock_voyage_rerank_client, voyage_rerank_capabilities):
+    def test_provider_property(
+        self, mock_voyage_rerank_client, mock_voyage_rerank_config, voyage_rerank_capabilities
+    ):
         """Test that provider property returns correct value."""
         provider = VoyageRerankingProvider(
-            client=mock_voyage_rerank_client, caps=voyage_rerank_capabilities
+            client=mock_voyage_rerank_client,
+            config=mock_voyage_rerank_config,
+            caps=voyage_rerank_capabilities,
         )
 
         assert provider.provider == Provider.VOYAGE
 
-    def test_model_name_property(self, mock_voyage_rerank_client, voyage_rerank_capabilities):
+    def test_model_name_property(
+        self, mock_voyage_rerank_client, mock_voyage_rerank_config, voyage_rerank_capabilities
+    ):
         """Test that model_name property returns correct value."""
         provider = VoyageRerankingProvider(
-            client=mock_voyage_rerank_client, caps=voyage_rerank_capabilities
+            client=mock_voyage_rerank_client,
+            config=mock_voyage_rerank_config,
+            caps=voyage_rerank_capabilities,
         )
 
         assert provider.model_name == "rerank-2"
 
     def test_model_capabilities_property(
-        self, mock_voyage_rerank_client, voyage_rerank_capabilities
+        self, mock_voyage_rerank_client, mock_voyage_rerank_config, voyage_rerank_capabilities
     ):
         """Test that model_capabilities property returns correct value."""
         provider = VoyageRerankingProvider(
-            client=mock_voyage_rerank_client, caps=voyage_rerank_capabilities
+            client=mock_voyage_rerank_client,
+            config=mock_voyage_rerank_config,
+            caps=voyage_rerank_capabilities,
         )
 
         assert provider.model_capabilities == voyage_rerank_capabilities
@@ -353,13 +401,15 @@ class TestVoyageRerankingProviderCircuitBreaker:
 
     @pytest.mark.asyncio
     async def test_circuit_breaker_opens_after_failures(
-        self, mock_voyage_rerank_client, voyage_rerank_capabilities
+        self, mock_voyage_rerank_client, mock_voyage_rerank_config, voyage_rerank_capabilities
     ):
         """Test that circuit breaker opens after repeated failures."""
         mock_voyage_rerank_client.rerank.side_effect = ConnectionError("Connection failed")
 
         provider = VoyageRerankingProvider(
-            client=mock_voyage_rerank_client, caps=voyage_rerank_capabilities
+            client=mock_voyage_rerank_client,
+            config=mock_voyage_rerank_config,
+            caps=voyage_rerank_capabilities,
         )
 
         # Make multiple failed requests
@@ -371,11 +421,13 @@ class TestVoyageRerankingProviderCircuitBreaker:
         assert provider.circuit_breaker_state in ["closed", "open"]
 
     def test_circuit_breaker_initial_state(
-        self, mock_voyage_rerank_client, voyage_rerank_capabilities
+        self, mock_voyage_rerank_client, mock_voyage_rerank_config, voyage_rerank_capabilities
     ):
         """Test that circuit breaker starts in closed state."""
         provider = VoyageRerankingProvider(
-            client=mock_voyage_rerank_client, caps=voyage_rerank_capabilities
+            client=mock_voyage_rerank_client,
+            config=mock_voyage_rerank_config,
+            caps=voyage_rerank_capabilities,
         )
 
         assert provider.circuit_breaker_state == "closed"

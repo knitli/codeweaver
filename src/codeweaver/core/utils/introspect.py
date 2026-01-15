@@ -95,9 +95,7 @@ def get_generic_params_for_type(tp: type[Any]) -> tuple[Any, ...]:
     return getattr(tp, "__args__", ())
 
 
-def get_function_parameters(
-    func: Callable[..., Any],
-) -> MappingProxyType[str, Parameter]:
+def get_function_parameters(func: Callable[..., Any]) -> MappingProxyType[str, Parameter]:
     """Retrieve the parameters of a given function.
 
     Args:
@@ -198,9 +196,7 @@ def takes_args(func: Callable[..., Any]) -> bool:
         bool: True if the function accepts *args, False otherwise.
     """
     signature = get_function_signature(func)
-    return any(
-        param.kind == param.VAR_POSITIONAL for param in signature.parameters.values()
-    )
+    return any(param.kind == param.VAR_POSITIONAL for param in signature.parameters.values())
 
 
 def takes_kwargs(func: Callable[..., Any]) -> bool:
@@ -213,9 +209,7 @@ def takes_kwargs(func: Callable[..., Any]) -> bool:
         bool: True if the function accepts **kwargs, False otherwise.
     """
     signature = get_function_signature(func)
-    return any(
-        param.kind == param.VAR_KEYWORD for param in signature.parameters.values()
-    )
+    return any(param.kind == param.VAR_KEYWORD for param in signature.parameters.values())
 
 
 def get_file_path(obj: Any) -> Path | None:
@@ -313,9 +307,7 @@ def get_class_constructor(cls: type) -> Attribute:
     """
     return next(
         (attr for attr in inspect.classify_class_attrs(cls) if attr.name == "__init__"),
-        next(
-            attr for attr in inspect.classify_class_attrs(cls) if attr.name == "__new__"
-        ),
+        next(attr for attr in inspect.classify_class_attrs(cls) if attr.name == "__new__"),
     )
 
 
@@ -333,9 +325,7 @@ def is_constructor_arg[ClassT: type](
         bool: True if the argument is a constructor argument, False otherwise.
     """
     constructor = get_class_constructor(cls)
-    return arg_name in get_function_parameters(
-        cast(Any, alt_constructor or constructor.object)
-    )
+    return arg_name in get_function_parameters(cast(Any, alt_constructor or constructor.object))
 
 
 def _construct_args(
@@ -345,9 +335,7 @@ def _construct_args(
     if not positional:
         return ((), calling_args)
     new_pos_args = {}
-    if "args" in calling_args and (
-        isinstance(calling_args.get("args"), dict) or takes_args(func)
-    ):
+    if "args" in calling_args and (isinstance(calling_args.get("args"), dict) or takes_args(func)):
         if isinstance(calling_args.get("args"), dict):
             new_pos_args = calling_args.pop("args", {})
         elif (
@@ -382,11 +370,7 @@ def _add_conditional_kwargs(
         elif (
             key in calling_args
             and isinstance(calling_args[key], dict)
-            and (
-                more_kwargs := {
-                    k: v for k, v in calling_args[key].items() if k in keywords
-                }
-            )
+            and (more_kwargs := {k: v for k, v in calling_args[key].items() if k in keywords})
         ):
             kw_args |= more_kwargs
             calling_args.pop(key)
@@ -405,9 +389,7 @@ def _construct_kwargs(
         kw_args = {k: v for k, v in combined.items() if k in keywords}
     else:
         kw_args = combined.copy()
-    kw_args |= _add_conditional_kwargs(
-        keywords, combined, takes_kwargs=takes_kwargs(func)
-    )
+    kw_args |= _add_conditional_kwargs(keywords, combined, takes_kwargs=takes_kwargs(func))
     return kw_args
 
 
@@ -429,20 +411,12 @@ def clean_args(
         raise TypeError("func must be a function, method, or class")
     keywords = keyword_args(func)
     positional = [arg for arg in positional_args(func) if arg not in keywords]
-    if (
-        "kwargs" in args
-        and isinstance(args.get("kwargs"), dict)
-        and ("kwargs" not in keywords)
-    ):
+    if "kwargs" in args and isinstance(args.get("kwargs"), dict) and ("kwargs" not in keywords):
         args |= args.pop("kwargs")
     new_pos_args, new_kw_args = (
         _construct_args(positional, args, func) if positional else ((), args)
     )
-    kwargs = (
-        _construct_kwargs(keywords, new_kw_args, func)
-        if keywords and new_kw_args
-        else {}
-    )
+    kwargs = _construct_kwargs(keywords, new_kw_args, func) if keywords and new_kw_args else {}
     return (new_pos_args, kwargs)
 
 

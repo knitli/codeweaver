@@ -12,7 +12,6 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 from pydantic import Field
-from pydantic.main import Context
 from qdrant_client.http.models import SparseVectorParams, VectorParams
 
 from codeweaver.core import BasedModel, CodeChunk, DimensionMismatchError, ModelSwitchError
@@ -101,8 +100,6 @@ class CollectionMetadata(BasedModel):
         bool, Field(description="Whether this collection is for backup embeddings")
     ] = False
     version: Annotated[str, Field(description="Metadata schema version")] = "1.0.0"
-
-    def model_post_init(self, __context: Context) -> None:
 
     def to_collection(self) -> dict[str, Any]:
         """Convert to a dictionary that is the argument for collection creation."""

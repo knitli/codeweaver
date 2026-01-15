@@ -11,7 +11,6 @@ from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, cast
 
 from codeweaver.core import ConfigurationError, Provider
-from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.providers.base import EmbeddingProvider
 
 
@@ -32,7 +31,6 @@ class MistralEmbeddingProvider(EmbeddingProvider[Mistral]):
 
     client: Mistral
     _provider: ClassVar[Literal[Provider.MISTRAL]] = Provider.MISTRAL
-    caps: EmbeddingModelCapabilities | None = None
 
     @property
     def base_url(self) -> str | None:

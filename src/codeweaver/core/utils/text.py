@@ -24,9 +24,7 @@ from codeweaver.core import ConfigurationError
 logger = logging.getLogger(__name__)
 
 
-REMOVE_ID = re.compile(
-    r"(?P<trailing_id>(?!^)_id$)|(?P<lone_id>\b_id$|(?<=\b)_id(?=\b))"
-)
+REMOVE_ID = re.compile(r"(?P<trailing_id>(?!^)_id$)|(?P<lone_id>\b_id$|(?<=\b)_id(?=\b))")
 """Matches trailing and lone _id patterns. Only matches _id at the end of a string or surrounded by word boundaries."""
 
 BOUNDARY = re.compile(r"(\W+)")
@@ -86,9 +84,7 @@ def humanize(word: str) -> str:
 def format_docstring(docstring: str) -> str:
     """Format a docstring for display."""
     lines = docstring.strip().splitlines()
-    return textwrap.dedent(
-        "\n".join([to_lowly_lowercase(textcase.title(lines[0])), *lines[1:]])
-    )
+    return textwrap.dedent("\n".join([to_lowly_lowercase(textcase.title(lines[0])), *lines[1:]]))
 
 
 def format_snippet_name(name: str) -> str:
@@ -132,9 +128,7 @@ def truncate_text(text: str, max_length: int = 100, ellipsis: str = "...") -> st
     return text[: max_length - len(ellipsis)] + ellipsis
 
 
-def elapsed_time_to_human_readable(
-    elapsed_seconds: NonNegativeFloat | NonNegativeInt,
-) -> str:
+def elapsed_time_to_human_readable(elapsed_seconds: NonNegativeFloat | NonNegativeInt) -> str:
     """Convert elapsed time between start_time and end_time to a human-readable format."""
     minutes, sec = divmod(int(elapsed_seconds), 60)
     hours, min_ = divmod(minutes, 60)
@@ -184,9 +178,7 @@ def sanitize_unicode(
     matches = list(INJECT_PATTERN.finditer(filtered))
     for match in reversed(matches):
         start, end = match.span()
-        logger.warning(
-            "Possible prompt injection detected and neutralized: %s", match.group(0)
-        )
+        logger.warning("Possible prompt injection detected and neutralized: %s", match.group(0))
         replacement = "[[ POSSIBLE PROMPT INJECTION REMOVED ]]"
         filtered = filtered[:start] + replacement + filtered[end:]
 
@@ -250,9 +242,7 @@ def _walk_pattern(s: str) -> str:
     return "".join(out)
 
 
-def validate_regex_pattern(
-    value: re.Pattern[str] | str | None,
-) -> re.Pattern[str] | None:
+def validate_regex_pattern(value: re.Pattern[str] | str | None) -> re.Pattern[str] | None:
     """Validate and compile a regex pattern from config/env.
 
     - Accepts compiled patterns as-is.
@@ -280,8 +270,7 @@ def validate_regex_pattern(
     # Optional sanity check on number of groups (very large numbers are often accidental or risky)
     try:
         open_groups = sum(
-            c == "(" and (i == 0 or normalized[i - 1] != "\\")
-            for i, c in enumerate(normalized)
+            c == "(" and (i == 0 or normalized[i - 1] != "\\") for i, c in enumerate(normalized)
         )
     except Exception:
         logging.getLogger(__name__).debug(
@@ -289,9 +278,7 @@ def validate_regex_pattern(
         )
     else:
         if open_groups > 100:
-            raise ConfigurationError(
-                "Pattern uses too many capturing/non-capturing groups (>100)."
-            )
+            raise ConfigurationError("Pattern uses too many capturing/non-capturing groups (>100).")
 
     try:
         return re.compile(normalized)

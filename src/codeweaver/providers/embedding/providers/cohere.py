@@ -13,7 +13,6 @@ from cohere import EmbedByTypeResponse
 from pydantic import SkipValidation
 
 from codeweaver.core import ConfigurationError, Provider
-from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.providers.base import (
     EmbeddingCustomDeps,
     EmbeddingImplementationDeps,
@@ -40,9 +39,8 @@ class CohereEmbeddingProvider(EmbeddingProvider[CohereClient]):
     _provider: ClassVar[Literal[Provider.COHERE]] = (
         Provider.COHERE
     )  # can also be Heroku or Azure, but default to Cohere
-    caps: EmbeddingModelCapabilities | None = None
 
-    def _initializeself(
+    def _initialize(
         self, impl_deps: EmbeddingImplementationDeps = None, custom_deps: EmbeddingCustomDeps = None
     ) -> None:
         """Initialize the provider."""

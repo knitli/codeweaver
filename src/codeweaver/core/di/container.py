@@ -115,11 +115,7 @@ class Container[T]:
             return eval(type_str, globalns)
 
         return next(
-            (
-                factory_type
-                for factory_type in self._factories
-                if factory_type.__name__ == type_str
-            ),
+            (factory_type for factory_type in self._factories if factory_type.__name__ == type_str),
             None,
         )
 
@@ -145,8 +141,7 @@ class Container[T]:
                 # Fallback to singleton if no metadata (shouldn't happen)
                 self.register(interface, factory, singleton=True)
                 logger.warning(
-                    "Provider %s has no metadata, defaulting to singleton",
-                    interface.__name__,
+                    "Provider %s has no metadata, defaulting to singleton", interface.__name__
                 )
                 continue
 
@@ -171,11 +166,7 @@ class Container[T]:
         logger.debug("Loaded %d providers from registry", len(providers))
 
     def register(
-        self,
-        interface: type[T],
-        factory: Callable[..., T] | None = None,
-        *,
-        singleton: bool = True,
+        self, interface: type[T], factory: Callable[..., T] | None = None, *, singleton: bool = True
     ) -> None:
         """Register a dependency.
 
@@ -187,9 +178,7 @@ class Container[T]:
         target = factory or interface
         self._factories[interface] = target
         self._is_singleton[interface] = singleton
-        logger.debug(
-            "Registered %s -> %s (singleton=%s)", interface.__name__, target, singleton
-        )
+        logger.debug("Registered %s -> %s (singleton=%s)", interface.__name__, target, singleton)
 
     def override(self, interface: type[T], instance: Any) -> None:
         """Override a dependency, primarily for testing.
@@ -201,9 +190,7 @@ class Container[T]:
         self._overrides[interface] = instance
 
     @contextmanager
-    def use_overrides(
-        self, overrides: dict[type[Any], Any]
-    ) -> Generator[Container, None, None]:
+    def use_overrides(self, overrides: dict[type[Any], Any]) -> Generator[Container, None, None]:
         """Context manager to temporarily apply multiple overrides.
 
         Args:
@@ -309,9 +296,7 @@ class Container[T]:
 
         raise ValueError(f"Could not resolve any type from union: {union_args}")
 
-    async def resolve(
-        self, interface: type[T], _resolution_stack: list[str] | None = None
-    ) -> T:
+    async def resolve(self, interface: type[T], _resolution_stack: list[str] | None = None) -> T:
         """Resolve a dependency with circular dependency detection.
 
         Args:
@@ -346,9 +331,7 @@ class Container[T]:
         if self._is_union_type(interface):
             _resolution_stack.append(cache_key)
             try:
-                instance = await self._resolve_union_dependency(
-                    interface, _resolution_stack
-                )
+                instance = await self._resolve_union_dependency(interface, _resolution_stack)
             finally:
                 _resolution_stack.pop()
             return instance  # type: ignore
@@ -361,9 +344,7 @@ class Container[T]:
                 _resolution_stack.append(cache_key)
                 try:
                     # collect_errors=False by default, so this won't return ResolutionResult
-                    return cast(
-                        T, await self._call_with_injection(override, _resolution_stack)
-                    )
+                    return cast(T, await self._call_with_injection(override, _resolution_stack))
                 finally:
                     _resolution_stack.pop()
             return cast(T, override)
@@ -496,9 +477,7 @@ class Container[T]:
         if (
             isinstance(annotation, str)
             and (resolved_type := self._resolve_string_type(annotation, globalns))
-            and (
-                marker := self._create_depends_from_type(param, resolved_type, globalns)
-            )
+            and (marker := self._create_depends_from_type(param, resolved_type, globalns))
         ):
             return await self._resolve_dependency(
                 name, param, marker, resolved_type, globalns, _resolution_stack
@@ -595,13 +574,7 @@ class Container[T]:
                     )
                 elif isinstance(param.default, (DependsPlaceholder, _InjectedProxy)):
                     kwargs[name] = await self._resolve_injected_parameter(
-                        name,
-                        param,
-                        annotation,
-                        real_type,
-                        globalns,
-                        obj,
-                        _resolution_stack,
+                        name, param, annotation, real_type, globalns, obj, _resolution_stack
                     )
                 elif param.default is inspect.Parameter.empty:
                     resolved = await self._try_resolve_required_parameter(
@@ -654,9 +627,7 @@ class Container[T]:
 
             if self._cleanup_stack:
                 # Enter async-wrapped sync context manager into async stack
-                return await self._cleanup_stack.enter_async_context(
-                    async_sync_gen_cm()
-                )
+                return await self._cleanup_stack.enter_async_context(async_sync_gen_cm())
             # No cleanup stack - use directly within context
             async with async_sync_gen_cm() as value:
                 return value
@@ -676,10 +647,10 @@ class Container[T]:
         """Try to create a Depends marker from just the type annotation.
 
         This allows for simpler syntax:
-            async def func(embedding: EmbeddingProvider = INJECTED[EmbeddingProvider]) -> None: ...
+            async def func(embedding: EmbeddingProvider = INJECTED) -> None: ...
 
         Instead of requiring:
-            async def func(embedding:  Annotated[EmbeddingProvider, Depends()] = INJECTED[EmbeddingProvider]) -> None: ...
+            async def func(embedding:  Annotated[EmbeddingProvider, Depends()] = INJECTED) -> None: ...
         """
         target_type = annotation or param.annotation
 
@@ -701,10 +672,7 @@ class Container[T]:
         if (
             target_type in self._factories
             or target_type in self._overrides
-            or (
-                isinstance(target_type, type)
-                and not target_type.__module__.startswith("typing")
-            )
+            or (isinstance(target_type, type) and not target_type.__module__.startswith("typing"))
         ):
             return Depends(dependency=None)  # Will resolve by type
 
@@ -758,7 +726,7 @@ class Container[T]:
             The resolved dependency value.
         """
         # Determine scope (default to singleton if use_cache=True)
-        scope = marker.scope or ("singleton" if marker.use_cache else "function")
+        scope = marker.scope or ("singleton" if marker.use_cache else "function")  # ty:ignore[unresolved-attribute]
 
         # Get target type for caching
         target_type = annotation or param.annotation
@@ -768,19 +736,17 @@ class Container[T]:
                 target_type = resolved
         target_type = self._unwrap_annotated(target_type)
 
-        if target_type is inspect.Parameter.empty and not marker.dependency:
+        if target_type is inspect.Parameter.empty and not marker.dependency:  # ty:ignore[unresolved-attribute]
             raise ValueError(f"Parameter {name} has Depends() but no type hint.")
 
         # Use marker.dependency if provided, otherwise use target_type
-        cache_key = marker.dependency or target_type
+        cache_key = marker.dependency or target_type  # ty:ignore[unresolved-attribute]
 
         # Function scope - always create new instance
-        if scope == "function" or not marker.use_cache:
+        if scope == "function" or not marker.use_cache:  # ty:ignore[unresolved-attribute]
             # Bypass all caching - always create new instance
-            if marker.dependency:
-                return await self._call_with_injection(
-                    marker.dependency, _resolution_stack
-                )
+            if marker.dependency:  # ty:ignore[unresolved-attribute]
+                return await self._call_with_injection(marker.dependency, _resolution_stack)  # ty:ignore[unresolved-attribute]
             # Resolve from annotation without caching
             factory = self._factories.get(target_type, target_type)
             return await self._call_with_injection(factory, _resolution_stack)
@@ -791,8 +757,8 @@ class Container[T]:
                 return self._request_cache[cache_key]
 
             # Create and cache in request scope
-            if marker.dependency:
-                instance = await self.resolve(marker.dependency, _resolution_stack)
+            if marker.dependency:  # ty:ignore[unresolved-attribute]
+                instance = await self.resolve(marker.dependency, _resolution_stack)  # ty:ignore[unresolved-attribute]
             else:
                 instance = await self.resolve(target_type, _resolution_stack)
 
@@ -800,9 +766,9 @@ class Container[T]:
             return instance
 
         # Singleton scope - use normal container resolution (default behavior)
-        if marker.dependency:
+        if marker.dependency:  # ty:ignore[unresolved-attribute]
             # Resolve via container to support registration, singletons, and overrides
-            return await self.resolve(marker.dependency, _resolution_stack)
+            return await self.resolve(marker.dependency, _resolution_stack)  # ty:ignore[unresolved-attribute]
 
         return await self.resolve(target_type, _resolution_stack)
 
@@ -844,9 +810,7 @@ class Container[T]:
         """
         if interface in self._singletons:
             return cast(T, self._singletons[interface])
-        raise KeyError(
-            f"Type {interface.__name__} not yet resolved or not a singleton."
-        )
+        raise KeyError(f"Type {interface.__name__} not yet resolved or not a singleton.")
 
 
 # Global default container for convenience (though explicit usage is preferred)

@@ -14,7 +14,6 @@ from collections.abc import Sequence
 from typing import Any, ClassVar
 
 from codeweaver.core import Provider, ProviderError
-from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 from codeweaver.providers.reranking.providers.base import RerankingProvider
 
 
@@ -70,20 +69,10 @@ class FastEmbedRerankingProvider(RerankingProvider[TextCrossEncoder]):
     """
 
     client: TextCrossEncoder
-    _provider: Provider = Provider.FASTEMBED
-    caps: RerankingModelCapabilities
-
-    _kwargs: ClassVar[dict[str, Any]] = fastembed_kwargs()
-
-    # default transformers work fine for fastembed]
-
-    def _initialize(self) -> None:
-        if "model_name" not in self.kwargs:
-            self.kwargs["model_name"] = self.caps.name
-        self.client = TextCrossEncoder(**self.kwargs)
+    _provider: ClassVar[Provider] = Provider.FASTEMBED
 
     async def _execute_rerank(
-        self, query: str, documents: Sequence[str], *, top_n: int = 40, **kwargs: Any
+        self, query: str, documents: Sequence[str], *, top_n: int = 10, **kwargs: Any
     ) -> Any:
         """Execute the reranking process."""
         try:

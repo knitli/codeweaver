@@ -300,7 +300,7 @@ class UvicornServerSettings(BasedModel):
         )
 
     @classmethod
-    def codeweaver.server.mcp(cls) -> UvicornServerSettingsDict:
+    def codeweaver_server_mcp(cls) -> UvicornServerSettingsDict:
         """Get default Uvicorn settings for CodeWeaver MCP Server."""
         return UvicornServerSettingsDict(
             cls.codeweaver_management_defaults()

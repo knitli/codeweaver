@@ -96,13 +96,5 @@ class HuggingFaceEmbeddingProvider(EmbeddingProvider[AsyncInferenceClient]):
         self._fire_and_forget(lambda: self._update_token_stats(from_docs=query))
         return self._process_output(output)
 
-    @property
-    def dimension(self) -> int:
-        """Get the size of the vector for the collection.
-
-        While some models may support multiple dimensions, the HF Inference API does not.
-        """
-        return self.caps.default_dimension or 1024
-
 
 __all__ = ("HuggingFaceEmbeddingProvider",)

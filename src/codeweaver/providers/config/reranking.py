@@ -137,7 +137,7 @@ class BaseRerankingConfig(BasedModel):
         return self._as_options()
 
     @property
-    def capabilities(self) -> RerankingModelCapabilities:
+    def capabilities(self) -> RerankingModelCapabilities | None:
         """Get the capabilities of the reranking model based on the provider and model name."""
         from codeweaver.providers.reranking.capabilities.resolver import RerankingCapabilityResolver
 

@@ -115,4 +115,4 @@ def get_voyage_reranking_capabilities() -> tuple[
     ), VoyageRerankingCapabilities.model_validate(lite_capabilities)
 
 
-__all__ = ("get_voyage_reranking_capabilities", "VoyageRerankingCapabilities")
+__all__ = ("VoyageRerankingCapabilities", "get_voyage_reranking_capabilities")

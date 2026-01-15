@@ -88,4 +88,4 @@ def get_marco_reranking_capabilities() -> tuple[MsMarcoRerankingCapabilities, ..
     return tuple(assembled_capabilities)
 
 
-__all__ = ("get_marco_reranking_capabilities", "MsMarcoRerankingCapabilities")
+__all__ = ("MsMarcoRerankingCapabilities", "get_marco_reranking_capabilities")

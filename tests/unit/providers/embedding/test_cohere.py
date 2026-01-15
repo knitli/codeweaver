@@ -72,6 +72,28 @@ def cohere_4_capabilities():
     )
 
 
+@pytest.fixture
+def mock_cohere_config():
+    """Create a mock config for Cohere embedding provider."""
+    config = MagicMock()
+    config.embedding_config = MagicMock()
+    config.embedding_config.as_options = MagicMock(
+        return_value={"model_name": "embed-english-v3.0", "embedding": {}, "query": {}}
+    )
+    return config
+
+
+@pytest.fixture
+def mock_embedding_registry():
+    """Create a mock embedding registry."""
+    from codeweaver.providers.embedding.registry import EmbeddingRegistry
+
+    registry = MagicMock(spec=EmbeddingRegistry)
+    registry.get = MagicMock(return_value=None)
+    registry.add = MagicMock()
+    return registry
+
+
 @pytest.mark.async_test
 @pytest.mark.mock_only
 @pytest.mark.unit
@@ -100,7 +122,9 @@ class TestCohereEmbeddingProviderInitialization:
 
         assert "API key not found" in str(exc_info.value)
 
-    def test_provider_initialization_with_client(self, mock_cohere_client, cohere_capabilities):
+    def test_provider_initialization_with_client(
+        self, mock_cohere_client, mock_cohere_config, mock_embedding_registry, cohere_capabilities
+    ):
         """Test that provider initializes correctly with a provided client."""
         from codeweaver.providers import CohereEmbeddingProvider
 
@@ -155,7 +179,9 @@ class TestCohereEmbeddingProviderEmbedding:
     """Test CohereEmbeddingProvider embedding operations."""
 
     @pytest.mark.asyncio
-    async def test_embed_documents_success(self, mock_cohere_client, cohere_capabilities):
+    async def test_embed_documents_success(
+        self, mock_cohere_client, mock_cohere_config, mock_embedding_registry, cohere_capabilities
+    ):
         """Test successful document embedding."""
         from codeweaver.providers import CohereEmbeddingProvider
 
@@ -213,7 +239,9 @@ class TestCohereEmbeddingProviderEmbedding:
         mock_cohere_client.embed.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_embed_query_success(self, mock_cohere_client, cohere_capabilities):
+    async def test_embed_query_success(
+        self, mock_cohere_client, mock_cohere_config, mock_embedding_registry, cohere_capabilities
+    ):
         """Test successful query embedding."""
         from codeweaver.providers import CohereEmbeddingProvider
 
@@ -243,7 +271,9 @@ class TestCohereEmbeddingProviderEmbedding:
         mock_cohere_client.embed.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_embed_documents_v4_model(self, mock_cohere_client, cohere_4_capabilities):
+    async def test_embed_documents_v4_model(
+        self, mock_cohere_client, mock_cohere_config, mock_embedding_registry, cohere_4_capabilities
+    ):
         """Test embedding with v4.0 model uses correct embedding_types."""
         from codeweaver.providers import CohereEmbeddingProvider
 
