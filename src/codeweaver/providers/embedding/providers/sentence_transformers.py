@@ -15,9 +15,8 @@ from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 
-from codeweaver.core import INJECTED, ConfigurationError, Provider, rpartial
+from codeweaver.core import ConfigurationError, Provider, rpartial
 from codeweaver.core import SparseEmbedding as CodeWeaverSparseEmbedding
-from codeweaver.providers import EmbeddingCapabilityResolverDep
 from codeweaver.providers.embedding.capabilities.base import (
     EmbeddingModelCapabilities,
     SparseEmbeddingModelCapabilities,
@@ -69,8 +68,8 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
 
     def __init__(
         self,
-        caps: EmbeddingModelCapabilities,
-        client: ClientDep[SentenceTransformer] = INJECTED,
+        client: SentenceTransformer,
+        caps: EmbeddingModelCapabilities | None = None,
         **kwargs: Any,
     ) -> None:
         """Initialize the Sentence Transformers embedding provider.
@@ -82,7 +81,7 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
         """
         # Call super().__init__ with None for client if not provided
         # We'll initialize it asynchronously in initialize_async
-        super().__init__(client=client, caps=caps, kwargs=kwargs)  # type: ignore
+        super().__init__(client=client, caps=caps, **kwargs)  # type: ignore
 
     async def initialize_async(self) -> None:
         """Initialize the SentenceTransformer client asynchronously."""
@@ -170,12 +169,12 @@ class SentenceTransformersSparseProvider(SparseEmbeddingProvider[_SparseEncoderT
 
     client: _SparseEncoderType
     provider: Provider = Provider.SENTENCE_TRANSFORMERS
-    caps: SparseEmbeddingModelCapabilities
+    caps: SparseEmbeddingModelCapabilities | None = None
 
     def __init__(
         self,
-        caps: EmbeddingCapabilityResolverDep[SparseEmbeddingModelCapabilities] = INJECTED,
-        client: ClientDept[_SparseEncoderType] = INJECTED,
+        client: _SparseEncoderType,
+        caps: SparseEmbeddingModelCapabilities | None = None,
         **kwargs: Any,
     ) -> None:
         """Initialize the Sentence Transformers sparse embedding provider.

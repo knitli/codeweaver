@@ -7,8 +7,6 @@
 
 from __future__ import annotations
 
-import os
-
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, cast
 
@@ -34,31 +32,7 @@ class MistralEmbeddingProvider(EmbeddingProvider[Mistral]):
 
     client: Mistral
     _provider: ClassVar[Literal[Provider.MISTRAL]] = Provider.MISTRAL
-    caps: EmbeddingModelCapabilities
-
-    def __init__(
-        self, caps: EmbeddingModelCapabilities, client: Mistral | None = None, **kwargs: Any
-    ) -> None:
-        """Initialize the Mistral embedding provider."""
-        kwargs = kwargs or {}
-
-        # Initialize client if not provided
-        if not client:
-            client_options = kwargs.get("client_options", {})
-            api_key = os.environ.get(
-                "MISTRAL_API_KEY", kwargs.get("api_key")
-            ) or client_options.get("api_key")
-            # Support connection pooling via async_client injection
-            # Mistral SDK accepts async_client as an AsyncHttpClient protocol (httpx.AsyncClient compatible)
-            if "httpx_client" in kwargs:
-                client_options["async_client"] = kwargs.pop("httpx_client")
-            client = Mistral(api_key=api_key, **client_options)
-
-        # Call super().__init__() FIRST which handles all Pydantic initialization
-        super().__init__(client=client, caps=caps, kwargs=kwargs)
-
-        # Set model attribute after Pydantic initialization completes
-        self.model = caps.name
+    caps: EmbeddingModelCapabilities | None = None
 
     @property
     def base_url(self) -> str | None:

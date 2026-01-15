@@ -26,6 +26,7 @@ from pydantic import SkipValidation
 
 from codeweaver.core import ConfigurationError, Provider, rpartial
 from codeweaver.core import SparseEmbedding as CodeWeaverSparseEmbedding
+from codeweaver.providers.embedding.capabilities import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.capabilities.base import SparseEmbeddingModelCapabilities
 from codeweaver.providers.embedding.providers import EmbeddingProvider
 from codeweaver.providers.embedding.providers.base import SparseEmbeddingProvider
@@ -92,6 +93,7 @@ class FastEmbedEmbeddingProvider(EmbeddingProvider[TextEmbedding]):
 
     client: SkipValidation[TextEmbedding]
     _provider: Provider = Provider.FASTEMBED
+    caps: EmbeddingModelCapabilities | None = None
 
     _output_transformer: Callable[[Any], list[list[float]] | list[list[int]]] = (
         fastembed_output_transformer
@@ -148,13 +150,13 @@ class FastEmbedSparseProvider(SparseEmbeddingProvider[SparseTextEmbedding]):
     """
 
     client: type[SparseTextEmbedding] | SparseTextEmbedding = _SparseTextEmbedding  # type: ignore
-    caps: SparseEmbeddingModelCapabilities
+    caps: SparseEmbeddingModelCapabilities | None = None
     _output_transformer: Callable[[Any], list[CodeWeaverSparseEmbedding]] = (  # type: ignore
         fastembed_sparse_output_transformer
     )  # type: ignore
 
     @override
-    def _initialize(self, caps: SparseEmbeddingModelCapabilities) -> None:  # type: ignore
+    def _initialize(self, caps: SparseEmbeddingModelCapabilities | None = None) -> None:  # type: ignore
         """Initialize the FastEmbed client."""
         # 1. Set _caps from parameter, not from self
         self.caps = caps

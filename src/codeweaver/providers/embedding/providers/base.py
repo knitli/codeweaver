@@ -57,6 +57,7 @@ from codeweaver.core import (
     Provider,
     ProviderError,
     SparseEmbedding,
+    StatisticsDep,
     UUIDStore,
     depends,
     get_blake_hash,
@@ -66,37 +67,23 @@ from codeweaver.core import (
     uuid7,
 )
 from codeweaver.core import ValidationError as CodeWeaverValidationError
-from codeweaver.providers.config.embedding import EmbeddingConfigT
-from codeweaver.providers.embedding import EmbeddingCapabilityResolverDep
-from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
-from codeweaver.providers.embedding.registry import EmbeddingRegistry
+from codeweaver.providers.config import EmbeddingConfigT, EmbeddingProviderSettings
+
+
+if TYPE_CHECKING:
+    from codeweaver.core import (
+        AnonymityConversion,
+        CodeChunk,
+        FilteredKeyT,
+        SerializedStrOnlyCodeChunk,
+        StructuredDataInput,
+    )
+    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+    from codeweaver.providers.embedding.registry import EmbeddingRegistry
 
 
 ONE_KB = 1024
 ONE_MB = ONE_KB * 1024  # I guess it could be ONE_KB** but that'd be confusing
-
-
-# Generic client dependency type for providers
-# Note: Individual providers should use specific client type aliases from providers.dependencies
-# (e.g., OpenAIClientDep, VoyageClientDep) when possible
-type ClientDep[T] = Annotated[T, depends(lambda: None)]
-"""Generic client dependency type for embedding providers.
-
-For specific provider implementations, prefer using the concrete client type aliases
-from codeweaver.providers.dependencies (OpenAIClientDep, VoyageClientDep, etc.).
-
-This generic type is used in the base class where the client type is parameterized.
-"""
-
-
-# Generic config dependency type for providers
-type EmbeddingConfigDep[T] = Annotated[T, depends(lambda: None)]
-"""Generic config dependency type for embedding providers.
-
-For most use cases, use EmbeddingProviderSettingsDep from codeweaver.providers.dependencies
-which injects the primary embedding config. Use this generic type when you need a
-parameterized config type in the base class.
-"""
 
 
 type EmbeddingImplementationDeps = Annotated[Any, depends(lambda: None)]
@@ -120,16 +107,6 @@ def my_custom_deps() -> LiterallyAnything:
     return LiterallyAnything()
 ```
 """
-
-if TYPE_CHECKING:
-    from codeweaver.core import (
-        AnonymityConversion,
-        CodeChunk,
-        FilteredKeyT,
-        SerializedStrOnlyCodeChunk,
-        SessionStatistics,
-        StructuredDataInput,
-    )
 
 
 logger = logging.getLogger(__name__)
@@ -216,17 +193,24 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         ),
     ]
 
-    caps: Annotated[
-        EmbeddingModelCapabilities | None,
-        Field(
-            description="The capabilities of the embedding model. Can be None if capabilities are not available. If you are adding a custom model, you'll get best results if you define an `EmbeddingModelCapabilities` object for it and register it with the DI system (using `@dependency_provider` decorator).",
-        ),
-    ] = None
-
     config: Annotated[
         EmbeddingConfigT,
         Field(description="Configuration for the embedding model, including all request options."),
     ]
+
+    registry: Annotated[
+        EmbeddingRegistry,
+        Field(
+            description="The embedding registry. Stores completed embedding batches for deduplication and caching."
+        ),
+    ]
+
+    caps: Annotated[
+        EmbeddingModelCapabilities | None,
+        Field(
+            description="The capabilities of the embedding model. Can be None if capabilities are not available. If you are adding a custom model, you'll get best results if you define an `EmbeddingModelCapabilities` object for it and register it with the DI system (using `@dependency_provider` decorator)."
+        ),
+    ] = None
 
     _provider: ClassVar[LiteralProvider] = cast(LiteralProvider, Provider.NOT_SET)
     _max_tokens: ClassVar[PositiveInt] = 120_000
@@ -256,9 +240,10 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
 
     def __init__(
         self,
-        client: ClientDep[EmbeddingClient] = INJECTED,
-        config: EmbeddingConfigDep[EmbeddingConfigT] = INJECTED,
-        caps: EmbeddingCapabilityResolverDep = INJECTED,
+        client: EmbeddingClient,
+        config: EmbeddingProviderSettings,
+        registry: EmbeddingRegistry,
+        caps: EmbeddingModelCapabilities | None = None,
         impl_deps: EmbeddingImplementationDeps = None,
         custom_deps: EmbeddingCustomDeps = None,
         **kwargs: Any,
@@ -289,6 +274,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         object.__setattr__(self, "_hash_store", make_blake_store(**hash_store_kwargs))
         self._initialize(impl_deps, custom_deps)
         object.__setattr__(self, "caps", caps)
+        object.__setattr__(self, "registry", registry)
         super().__init__(client=client, config=config, caps=caps, **defaults)
 
     @abstractmethod
@@ -803,7 +789,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         token_count: int | None = None,
         from_docs: Sequence[str] | Sequence[Sequence[str]] | None = None,
         sparse: bool = False,
-        statistics: StatisticsDep[SessionStatistics] = INJECTED,
+        statistics: StatisticsDep = INJECTED,
     ) -> None:
         """Update token statistics for the embedding provider."""
         if token_count is not None:
@@ -915,9 +901,9 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         chunks: Sequence[CodeChunk],
         batch_id: UUID7,
         embeddings: Sequence[Sequence[float]] | Sequence[Sequence[int]] | Sequence[SparseEmbedding],
-        registry: RegistryDep[EmbeddingRegistry] = INJECTED,
     ) -> None:  # sourcery skip: low-code-quality
         """Register chunks in the embedding registry."""
+        registry = self.registry
         is_sparse = self._is_sparse
         attr = "sparse" if is_sparse else "dense"
 

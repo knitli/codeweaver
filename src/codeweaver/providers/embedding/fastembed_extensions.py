@@ -8,6 +8,8 @@
 
 from __future__ import annotations
 
+from codeweaver.core import dependency_provider
+
 
 try:
     from fastembed.common.model_description import (
@@ -96,6 +98,7 @@ CUSTOM_DENSE_MODELS = tuple(model.model for model in DENSE_MODELS)
 # CUSTOM_SPARSE_MODELS = tuple(model.model for model in SPARSE_MODELS)
 
 
+@dependency_provider(SparseTextEmbedding)  # ty:ignore[invalid-argument-type]
 def get_sparse_embedder() -> type[SparseTextEmbedding]:
     """
     Get the sparse embedder with added custom models.
@@ -106,6 +109,7 @@ def get_sparse_embedder() -> type[SparseTextEmbedding]:
     return SparseTextEmbedding
 
 
+@dependency_provider(TextEmbedding)  # ty:ignore[invalid-argument-type]
 def get_text_embedder() -> type[TextEmbedding]:
     """
     Get the text embedder with added custom models.

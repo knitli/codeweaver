@@ -43,7 +43,7 @@ This is expected on the feat/di_monorepo branch.
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any, TypedDict
 
 from codeweaver.core import (
     INJECTED,
@@ -62,7 +62,9 @@ from codeweaver.providers.embedding.capabilities.resolver import (
     EmbeddingCapabilityResolver,
     SparseEmbeddingCapabilityResolver,
 )
+from codeweaver.providers.embedding.registry import EmbeddingRegistry
 from codeweaver.providers.reranking.capabilities.resolver import RerankingCapabilityResolver
+from codeweaver.providers.vector_stores import VectorStoreProvider
 
 
 if TYPE_CHECKING:
@@ -75,11 +77,19 @@ if TYPE_CHECKING:
         DataProviderSettings,
         EmbeddingConfigT,
         EmbeddingProviderSettings,
+        MemoryVectorStoreProviderSettings,
         ProviderSettings,
+        QdrantVectorStoreProviderSettings,
         RerankingConfigT,
         RerankingProviderSettings,
         SparseEmbeddingProviderSettings,
         VectorStoreProviderSettings,
+    )
+    from codeweaver.providers.embedding import EmbeddingProvider, SparseEmbeddingProvider
+    from codeweaver.providers.reranking import RerankingProvider
+    from codeweaver.providers.vector_stores import (
+        MemoryVectorStoreProvider,
+        QdrantVectorStoreProvider,
     )
 
 
@@ -146,14 +156,23 @@ def _get_provider_settings() -> Any:
 # at module initialization to ensure it's available when providers are created.
 
 
-def _resolve_client(client: SDKClient) -> Any:
+def _resolve_client(client: LazyImport[Any]) -> Any:
     """Helper to resolve client if it's a LazyImport."""
     return client._resolve() if isinstance(client, LazyImport) else client
 
 
 def _instantiate_client(client_cls: Any, options: ClientOptions | None = None) -> Any:
     """Instantiate an SDK client with the given options."""
-    return client_cls(**(options.as_settings() if options else {}))
+    try:
+        return client_cls(**(options.as_settings() if options else {}))
+    except (TypeError, ValueError) as e:
+        raise ConfigurationError(
+            "Failed to instantiate SDK client with provided options",
+            details={"client_class": client_cls, "options": options},
+            suggestions=[
+                "Check that the client options match the SDK client's expected parameters"
+            ],
+        ) from e
 
 
 def _resolve_provider_settings(
@@ -167,7 +186,7 @@ def _resolve_provider_settings(
     return settings
 
 
-def _create_embedding_client(*, backup: bool = False) -> Any:  # AsyncOpenAI
+def _create_embedding_client() -> Any:  # AsyncOpenAI
     """Universal client factory for all embedding providers.
 
     Returns:
@@ -180,20 +199,21 @@ def _create_embedding_client(*, backup: bool = False) -> Any:  # AsyncOpenAI
         "codeweaver.providers.config.providers", "DefaultEmbeddingProviderSettings"
     )
     embedding_settings = _get_provider_settings().embedding or default_embedding_config._resolve()
-    if backup and (config := _resolve_provider_settings(embedding_settings, backup=True)):
-        resolved_settings = config
-    else:
-        resolved_settings = _resolve_provider_settings(embedding_settings)
+    resolved_settings = _resolve_provider_settings(embedding_settings)
     if not resolved_settings:
         raise ConfigurationError(
             "No embedding provider configuration found",
             suggestions=["Ensure at least one embedding provider is configured in settings"],
         )
-    client = _resolve_client(resolved_settings.client)  # ty:ignore[invalid-argument-type]
+    sdk_client: SDKClient = resolved_settings.client()
+    client_import: LazyImport[Any] = (
+        sdk_client.client["embed"] if isinstance(sdk_client.client, dict) else sdk_client.client
+    )  # ty:ignore[invalid-assignment]
+    client = _resolve_client(client_import)
     return _instantiate_client(client, resolved_settings.client_options)
 
 
-def _create_sparse_embedding_client(*, backup: bool = False) -> Any:
+def _create_sparse_embedding_client() -> Any:
     """Universal client factory for all sparse embedding providers.
 
     Returns:
@@ -208,20 +228,21 @@ def _create_sparse_embedding_client(*, backup: bool = False) -> Any:
     sparse_embedding_settings = (
         _get_provider_settings().sparse_embedding or default_sparse_embedding_config._resolve()
     )
-    if backup and (config := _resolve_provider_settings(sparse_embedding_settings, backup=True)):
-        resolved_settings = config
-    else:
-        resolved_settings = _resolve_provider_settings(sparse_embedding_settings)
+    resolved_settings = _resolve_provider_settings(sparse_embedding_settings)
     if not resolved_settings:
         raise ConfigurationError(
             "No sparse embedding provider configuration found",
             suggestions=["Ensure at least one sparse embedding provider is configured in settings"],
         )
-    client = _resolve_client(resolved_settings.client)  # ty:ignore[invalid-argument-type]
+    sdk_client: SDKClient = resolved_settings.client()
+    client_import: LazyImport[Any] = (
+        sdk_client.client["sparse"] if isinstance(sdk_client.client, dict) else sdk_client.client
+    )  # ty:ignore[invalid-assignment]
+    client = _resolve_client(client_import)
     return _instantiate_client(client, resolved_settings.client_options)
 
 
-def _create_reranking_client(*, backup: bool = False) -> Any:
+def _create_reranking_client() -> Any:
     """Universal client factory for all reranking providers.
 
     Returns:
@@ -234,20 +255,21 @@ def _create_reranking_client(*, backup: bool = False) -> Any:
         "codeweaver.providers.config.providers", "DefaultRerankingProviderSettings"
     )
     reranking_settings = _get_provider_settings().reranking or default_reranking_config._resolve()
-    if backup and (config := _resolve_provider_settings(reranking_settings, backup=True)):
-        resolved_settings = config
-    else:
-        resolved_settings = _resolve_provider_settings(reranking_settings)
+    resolved_settings = _resolve_provider_settings(reranking_settings)
     if not resolved_settings:
         raise ConfigurationError(
             "No reranking provider configuration found",
             suggestions=["Ensure at least one reranking provider is configured in settings"],
         )
-    client = _resolve_client(resolved_settings.client)  # ty:ignore[invalid-argument-type]
+    sdk_client: SDKClient = resolved_settings.client()
+    client_import: LazyImport[Any] = (
+        sdk_client.client["reranking"] if isinstance(sdk_client.client, dict) else sdk_client.client
+    )  # ty:ignore[invalid-assignment]
+    client = _resolve_client(client_import)
     return _instantiate_client(client, resolved_settings.client_options)
 
 
-def _create_vector_client(*, backup: bool = False) -> Any:
+def _create_vector_client() -> Any:
     """Universal client factory for all vector store providers.
 
     Returns:
@@ -262,10 +284,7 @@ def _create_vector_client(*, backup: bool = False) -> Any:
     vector_store_settings = (
         _get_provider_settings().vector_store or default_vector_store_config._resolve()
     )
-    if backup and (config := _resolve_provider_settings(vector_store_settings, backup=True)):
-        resolved_settings = config
-    else:
-        resolved_settings = _resolve_provider_settings(vector_store_settings)
+    resolved_settings = _resolve_provider_settings(vector_store_settings)
     if not resolved_settings:
         raise ConfigurationError(
             "No vector store provider configuration found",
@@ -276,16 +295,18 @@ def _create_vector_client(*, backup: bool = False) -> Any:
 
 
 # Universal client dependency type for all embedding providers
-type EmbeddingClientDep[T] = Annotated[T, depends(_create_embedding_client)]
+type EmbeddingClientDep[T] = Annotated[T, depends(_create_embedding_client, scope="function")]
 """Type alias for DI injection of embedding SDK client."""
 
-type SparseEmbeddingClientDep[T] = Annotated[T, depends(_create_sparse_embedding_client)]
+type SparseEmbeddingClientDep[T] = Annotated[
+    T, depends(_create_sparse_embedding_client, scope="function")
+]
 """Type alias for DI injection of sparse embedding SDK client."""
 
-type RerankingClientDep[T] = Annotated[T, depends(_create_reranking_client)]
+type RerankingClientDep[T] = Annotated[T, depends(_create_reranking_client, scope="function")]
 """Type alias for DI injection of reranking SDK client."""
 
-type VectorStoreClientDep[T] = Annotated[T, depends(_create_vector_client)]
+type VectorStoreClientDep[T] = Annotated[T, depends(_create_vector_client, scope="function")]
 """Type alias for DI injection of vector store SDK client."""
 
 
@@ -603,6 +624,385 @@ Example:
     ```
 """
 
+# ===========================================================================
+# *              Embedding Registry
+# ===========================================================================
+
+BackupEmbeddingRegistry = lazy_import(
+    "codeweaver.providers.embedding.registry", "BackupEmbeddingRegistry"
+)._resolve()
+
+
+def _get_embedding_registry() -> EmbeddingRegistry:
+    from codeweaver.providers.embedding.registry import EmbeddingRegistry
+
+    return EmbeddingRegistry()
+
+
+def _get_backup_embedding_registry() -> BackupEmbeddingRegistry:
+    return BackupEmbeddingRegistry()
+
+
+type EmbeddingRegistryDep = Annotated[
+    EmbeddingRegistry, depends(_get_embedding_registry, use_cache=True, scope="singleton")
+]
+"""Type alias for DI injection of embedding registry."""
+
+type BackupEmbeddingRegistryDep = Annotated[
+    BackupEmbeddingRegistry,
+    depends(_get_backup_embedding_registry, use_cache=True, scope="singleton"),
+]
+"""Type alias for DI injection of backup embedding registry."""
+
+
+# ===========================================================================
+# *              Embedding and Sparse Embedding Providers
+# ===========================================================================
+
+BackupEmbeddingProvider = create_backup_class(
+    lazy_import("codeweaver.providers.embedding.providers", "EmbeddingProvider")._resolve()
+)
+BackupSparseEmbeddingProvider = create_backup_class(
+    lazy_import("codeweaver.providers.embedding.providers", "SparseEmbeddingProvider")._resolve()
+)
+
+
+def _get_embedding_provider_for_config(
+    config: EmbeddingProviderSettings, registry: EmbeddingRegistryDep = INJECTED
+) -> EmbeddingProvider:
+    """Helper to get the embedding provider settings from config."""
+    client = _resolve_client(config.client)
+    capabilities = config.embedding_config.capabilities
+    provider = config.client.embedding_provider
+    try:
+        resolved_provider = provider._resolve()
+    except (AttributeError, ImportError) as e:
+        raise ConfigurationError(
+            f"Failed to resolve embedding provider for config {config}",
+            suggestions=[
+                f"Ensure the embedding provider {config.client.as_title} SDK is installed and accessible",
+                "Check that the provider client is correctly configured",
+            ],
+        ) from e
+    client = _instantiate_client(client, config.client_options)
+    return resolved_provider(
+        client=client, registry=registry, capabilities=capabilities, config=config
+    )
+
+
+def _get_backup_embedding_provider_for_config(
+    config: BackupEmbeddingProviderSettings, registry: BackupEmbeddingRegistryDep = INJECTED
+) -> BackupEmbeddingProvider:
+    """Helper to get the backup embedding provider settings from config."""
+    client = _resolve_client(config.client)
+    capabilities = config.embedding_config.capabilities
+    provider = config.client.embedding_provider
+    try:
+        resolved_provider = provider._resolve()
+    except (AttributeError, ImportError) as e:
+        raise ConfigurationError(
+            f"Failed to resolve backup embedding provider for config {config}",
+            suggestions=[
+                f"Ensure the embedding provider {config.client.as_title} SDK is installed and accessible",
+                "Check that the provider client is correctly configured",
+            ],
+        ) from e
+    client = _instantiate_client(client, config.client_options)
+    return resolved_provider(
+        client=client, registry=registry, capabilities=capabilities, config=config
+    )
+
+
+type EmbeddingProviderDep = Annotated[
+    EmbeddingProvider,
+    depends(
+        lambda: _get_embedding_provider_for_config(_create_primary_embedding_config()),
+        use_cache=False,
+    ),
+]
+"""Type alias for DI injection of embedding provider."""
+
+type BackupEmbeddingProviderDep = Annotated[
+    BackupEmbeddingProvider,
+    depends(
+        lambda: _get_backup_embedding_provider_for_config(_create_backup_embedding_config()),
+        use_cache=False,
+    ),
+]
+"""Type alias for DI injection of backup embedding provider."""
+
+
+def _get_sparse_embedding_provider_for_config(
+    config: SparseEmbeddingProviderSettings, registry: EmbeddingRegistryDep = INJECTED
+) -> SparseEmbeddingProvider:
+    """Helper to get the sparse embedding provider settings from config."""
+    client = _resolve_client(config.client)
+    capabilities = config.sparse_embedding_config.capabilities
+    provider = config.client.embedding_provider
+    try:
+        resolved_provider = provider._resolve()
+    except (AttributeError, ImportError) as e:
+        raise ConfigurationError(
+            f"Failed to resolve sparse embedding provider for config {config}",
+            suggestions=[
+                f"Ensure the sparse embedding provider {config.client.as_title} SDK is installed and accessible",
+                "Check that the provider client is correctly configured",
+            ],
+        ) from e
+    client = _instantiate_client(client, config.client_options)
+    return resolved_provider(
+        client=client, registry=registry, capabilities=capabilities, config=config
+    )
+
+
+def _get_backup_sparse_embedding_provider_for_config(
+    config: BackupSparseEmbeddingProviderSettings, registry: BackupEmbeddingRegistryDep = INJECTED
+) -> BackupSparseEmbeddingProvider:
+    """Helper to get the backup sparse embedding provider settings from config."""
+    client = _resolve_client(config.client)
+    capabilities = config.sparse_embedding_config.capabilities
+    provider = config.client.embedding_provider
+    try:
+        resolved_provider = provider._resolve()
+    except (AttributeError, ImportError) as e:
+        raise ConfigurationError(
+            f"Failed to resolve backup sparse embedding provider for config {config}",
+            suggestions=[
+                f"Ensure the sparse embedding provider {config.client.as_title} SDK is installed and accessible",
+                "Check that the provider client is correctly configured",
+            ],
+        ) from e
+    client = _instantiate_client(client, config.client_options)
+    return resolved_provider(
+        client=client, registry=registry, capabilities=capabilities, config=config
+    )
+
+
+type SparseEmbeddingProviderDep = Annotated[
+    SparseEmbeddingProvider,
+    depends(
+        lambda: _get_sparse_embedding_provider_for_config(
+            _create_primary_sparse_embedding_config()
+        ),
+        use_cache=False,
+    ),
+]
+"""Type alias for DI injection of sparse embedding provider."""
+
+type BackupSparseEmbeddingProviderDep = Annotated[
+    BackupSparseEmbeddingProvider,
+    depends(
+        lambda: _get_backup_sparse_embedding_provider_for_config(
+            _create_backup_sparse_embedding_config()
+        ),
+        use_cache=False,
+    ),
+]
+"""Type alias for DI injection of backup sparse embedding provider."""
+
+
+# ===========================================================================
+# *              Rerranking Provider
+# ===========================================================================
+
+BackupRerankingProvider = create_backup_class(
+    lazy_import("codeweaver.providers.reranking.providers", "RerankingProvider")._resolve()
+)
+
+
+def _get_reranking_provider_for_config(config: RerankingProviderSettings) -> RerankingProvider:
+    """Helper to get the reranking provider settings from config."""
+    client = _resolve_client(config.client)
+    capabilities = config.reranking_config.capabilities
+    provider = config.client.reranking_provider
+    try:
+        resolved_provider = provider._resolve()
+    except (AttributeError, ImportError) as e:
+        raise ConfigurationError(
+            f"Failed to resolve reranking provider for config {config}",
+            suggestions=[
+                f"Ensure the reranking provider {config.client.as_title} SDK is installed and accessible",
+                "Check that the provider client is correctly configured",
+            ],
+        ) from e
+    client = _instantiate_client(client, config.client_options)
+    return resolved_provider(client=client, capabilities=capabilities, config=config)
+
+
+def _get_backup_reranking_provider_for_config(
+    config: BackupRerankingProviderSettings,
+) -> BackupRerankingProvider:
+    """Helper to get the backup reranking provider settings from config."""
+    client = _resolve_client(config.client)
+    capabilities = config.reranking_config.capabilities
+    provider = config.client.reranking_provider
+    try:
+        resolved_provider = provider._resolve()
+    except (AttributeError, ImportError) as e:
+        raise ConfigurationError(
+            f"Failed to resolve backup reranking provider for config {config}",
+            suggestions=[
+                f"Ensure the reranking provider {config.client.as_title} SDK is installed and accessible",
+                "Check that the provider client is correctly configured",
+            ],
+        ) from e
+    client = _instantiate_client(client, config.client_options)
+    return resolved_provider(client=client, capabilities=capabilities, config=config)
+
+
+type RerankingProviderDep = Annotated[
+    RerankingProvider,
+    depends(
+        lambda: _get_reranking_provider_for_config(_create_primary_reranking_config()),
+        use_cache=False,
+    ),
+]
+"""Type alias for DI injection of reranking provider."""
+
+type BackupRerankingProviderDep = Annotated[
+    BackupRerankingProvider,
+    depends(
+        lambda: _get_backup_reranking_provider_for_config(_create_backup_reranking_config()),
+        use_cache=False,
+    ),
+]
+"""Type alias for DI injection of backup reranking provider."""
+
+# ===========================================================================
+# *              Vector Store Provider
+# ===========================================================================
+
+
+def _create_backup_vector_provider_cls() -> type[QdrantVectorStoreProvider]:
+    """Universal factory for all vector store providers."""
+    config = _create_backup_vector_store_config()
+    if "Memory" in config.__class__.__name__:
+        from codeweaver.providers.vector_stores.inmemory import MemoryVectorStoreProvider
+
+        return create_backup_class(MemoryVectorStoreProvider)
+    from codeweaver.providers.vector_stores.qdrant import QdrantVectorStoreProvider
+
+    return create_backup_class(QdrantVectorStoreProvider)
+
+
+BackupVectorStoreProvider = Annotated[
+    VectorStoreProvider, depends(_create_backup_vector_provider_cls)
+]
+
+
+def _get_vector_store_provider_for_config(
+    config: QdrantVectorStoreProviderSettings | MemoryVectorStoreProviderSettings,
+) -> QdrantVectorStoreProvider | MemoryVectorStoreProvider:
+    """Helper to get the vector store provider settings from config."""
+    client = _resolve_client(config.client)  # ty:ignore[invalid-argument-type]
+    provider = config.client.vector_store_provider
+    try:
+        resolved_provider = provider._resolve()
+    except (AttributeError, ImportError) as e:
+        raise ConfigurationError(
+            f"Failed to resolve vector store provider for config {config}",
+            suggestions=[
+                f"Ensure the vector store provider {config.client.as_title} SDK is installed and accessible",
+                "Check that the provider client is correctly configured",
+            ],
+        ) from e
+    client = _instantiate_client(client, config.client_options)
+    return resolved_provider(client=client, config=config)
+
+
+def _get_backup_vector_store_provider_for_config(
+    config: BackupVectorStoreProviderSettings,
+) -> BackupVectorStoreProvider:
+    """Helper to get the backup vector store provider settings from config."""
+    client = _resolve_client(config.client)  # ty:ignore[invalid-argument-type]
+    provider = config.client.vector_store_provider
+    try:
+        resolved_provider = provider._resolve()
+    except (AttributeError, ImportError) as e:
+        raise ConfigurationError(
+            f"Failed to resolve backup vector store provider for config {config}",
+            suggestions=[
+                f"Ensure the vector store provider {config.client.as_title} SDK is installed and accessible",
+                "Check that the provider client is correctly configured",
+            ],
+        ) from e
+    client = _instantiate_client(client, config.client_options)
+    return resolved_provider(client=client, config=config)
+
+
+type VectorStoreProviderDep = Annotated[
+    QdrantVectorStoreProvider | MemoryVectorStoreProvider,
+    depends(
+        lambda: _get_vector_store_provider_for_config(_create_primary_vector_store_config()),  # ty:ignore[invalid-argument-type]
+        use_cache=False,
+    ),
+]
+"""Type alias for DI injection of vector store provider."""
+
+type BackupVectorStoreProviderDep = Annotated[
+    BackupVectorStoreProvider,
+    depends(
+        lambda: _get_backup_vector_store_provider_for_config(_create_backup_vector_store_config()),  # ty:ignore[invalid-argument-type]
+        use_cache=False,
+    ),
+]
+"""Type alias for DI injection of backup vector store provider."""
+
+
+# ===========================================================================
+# *                            All Providers
+# ===========================================================================
+
+
+class ProviderDict(TypedDict):
+    """TypedDict for all providers."""
+
+    embedding: tuple[EmbeddingProvider | BackupEmbeddingProvider, ...]
+    sparse_embedding: tuple[SparseEmbeddingProvider | BackupSparseEmbeddingProvider, ...]
+    reranking: tuple[RerankingProvider | BackupRerankingProvider, ...]
+    vector_store: tuple[VectorStoreProvider | BackupVectorStoreProvider, ...]
+
+
+@dependency_provider(ProviderDict, scope="singleton")
+def _get_all_providers() -> ProviderDict:
+    """Factory to get all providers from settings."""
+    configs = _get_provider_settings()
+    embedding_providers = tuple(
+        _get_backup_embedding_provider_for_config(cfg)
+        if cfg.as_backup
+        else _get_embedding_provider_for_config(cfg)
+        for cfg in configs.embedding or ()
+    )
+    sparse_embedding_providers = tuple(
+        _get_backup_sparse_embedding_provider_for_config(cfg)
+        if cfg.as_backup
+        else _get_sparse_embedding_provider_for_config(cfg)
+        for cfg in configs.sparse_embedding or ()
+    )
+    reranking_providers = tuple(
+        _get_backup_reranking_provider_for_config(cfg)
+        if cfg.as_backup
+        else _get_reranking_provider_for_config(cfg)
+        for cfg in configs.reranking or ()
+    )
+    vector_store_providers = tuple(
+        _get_backup_vector_store_provider_for_config(cfg)
+        if cfg.as_backup
+        else _get_vector_store_provider_for_config(cfg)
+        for cfg in configs.vector_store or ()
+    )
+    return ProviderDict(
+        embedding=embedding_providers,
+        sparse_embedding=sparse_embedding_providers,
+        reranking=reranking_providers,
+        vector_store=vector_store_providers,
+    )
+
+
+type AllProvidersDep = Annotated[
+    ProviderDict, depends(_get_all_providers, use_cache=True, scope="singleton")
+]
+"""Type alias for DI injection of all providers."""
 
 # ===========================================================================
 # *                            MODULE EXPORTS
@@ -615,20 +1015,30 @@ __all__ = (
     "AllRerankingConfigsDep",
     "AllSparseEmbeddingConfigsDep",
     "AllVectorStoreConfigsDep",
+    "BackupEmbeddingProviderDep",
     "BackupEmbeddingProviderSettingsDep",
+    "BackupEmbeddingRegistryDep",
+    "BackupRerankingProviderDep",
     "BackupRerankingProviderSettingsDep",
+    "BackupSparseEmbeddingProviderDep",
     "BackupSparseEmbeddingProviderSettingsDep",
+    "BackupVectorStoreProviderDep",
     "BackupVectorStoreProviderSettingsDep",
     "EmbeddingCapabilityResolverDep",
     "EmbeddingClientDep",
+    "EmbeddingProviderDep",
     "EmbeddingProviderSettingsDep",
+    "EmbeddingRegistryDep",
     "ProviderSettingsDep",
     "RerankingCapabilityResolverDep",
     "RerankingClientDep",
+    "RerankingProviderDep",
     "RerankingProviderSettingsDep",
     "SparseCapabilityResolverDep",
     "SparseEmbeddingClientDep",
+    "SparseEmbeddingProviderDep",
     "SparseEmbeddingProviderSettingsDep",
     "VectorStoreClientDep",
+    "VectorStoreProviderDep",
     "VectorStoreProviderSettingsDep",
 )

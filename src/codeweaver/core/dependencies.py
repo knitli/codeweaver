@@ -21,12 +21,15 @@ def _resolve_config_file() -> Path | None:
         return Path(declared_env)
     return None
 
+
 # Import for decorator
 from codeweaver.core.di import dependency_provider
 
 
 if TYPE_CHECKING:
+    from codeweaver.core.statistics import SessionStatistics
     from codeweaver.core.types.settings_model import BaseCodeWeaverSettings
+
 
 def _resolve_config_file() -> Path | None:
     """Resolve the configuration file path.
@@ -40,6 +43,7 @@ def _resolve_config_file() -> Path | None:
     if (declared_env := os.getenv("CODEWEAVER_CONFIG_FILE")) is not None:
         return Path(declared_env)
     return None
+
 
 def bootstrap_settings(config_file: Path | None = None) -> BaseCodeWeaverSettings:
     """Bootstrap global settings as DI root.
@@ -78,4 +82,19 @@ type SettingsDep = Annotated[BaseCodeWeaverSettings, depends(bootstrap_settings)
 
 type NoneDep = Annotated[None, depends(lambda: None, use_cache=True, scope="singleton")]
 
-__all__ = ("NoneDep", "SettingsDep", "bootstrap_settings")
+
+@dependency_provider(SessionStatistics, scope="singleton")
+def _get_statistics() -> SessionStatistics:
+    from codeweaver.core.statistics import SessionStatistics
+
+    return SessionStatistics(
+        _successful_request_log=[],
+        _failed_request_log=[],
+        _successful_http_request_log=[],
+        _failed_http_request_log=[],
+    )
+
+
+type StatisticsDep = Annotated[SessionStatistics, depends(_get_statistics)]
+
+__all__ = ("NoneDep", "SettingsDep", "StatisticsDep", "bootstrap_settings")

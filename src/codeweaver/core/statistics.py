@@ -10,6 +10,7 @@ Statistics tracking for CodeWeaver, including file indexing, retrieval, and sess
 from __future__ import annotations
 
 import contextlib
+import importlib
 import statistics
 import time
 
@@ -990,28 +991,27 @@ class SessionStatistics(DataclassSerializationMixin):
             default_factory=FileStatistics,
             description="""Comprehensive file statistics tracking categories, languages, and operations.""",
         ),
-    ]
+    ] = None
     token_statistics: Annotated[
         TokenCounter | None,
         Field(
             default_factory=TokenCounter,
             description="""A typed Counter that tracks token usage statistics.""",
         ),
-    ]
+    ] = None
     semantic_statistics: Annotated[
         Any | None,
         Field(
-            default=None,
-            description="""Semantic category usage metrics. Uses UsageMetrics from semantic.classifications.""",
+            description="""Semantic category usage metrics. Uses UsageMetrics from semantic.classifications."""
         ),
-    ]
+    ] = None
     failover_statistics: Annotated[
         FailoverStats | None,
         Field(
             default_factory=FailoverStats,
             description="""Vector store failover statistics tracking backup operations and status.""",
         ),
-    ]
+    ] = None
 
     _successful_request_log: Annotated[
         list[Identifier], Field(default_factory=list, init=False, repr=False)
@@ -1034,6 +1034,10 @@ class SessionStatistics(DataclassSerializationMixin):
             self.token_statistics = TokenCounter()
         if not self.failover_statistics:
             self.failover_statistics = FailoverStats()
+        if not self.semantic_statistics and importlib.util.find_spec("codeweaver.semantic"):
+            from codeweaver.semantic.classifications import UsageMetrics
+
+            self.semantic_statistics = UsageMetrics(Counter())
         self.timing_statistics = TimingStatistics(
             on_call_tool_requests={},
             on_read_resource_requests={},
@@ -1057,6 +1061,10 @@ class SessionStatistics(DataclassSerializationMixin):
         ):
             if (hasattr(self, attr) and getattr(self, attr)) is None or (not hasattr(self, attr)):
                 setattr(self, attr, [])
+        from codeweaver.core.di import get_container
+
+        container = get_container()
+        container.register(type(self), lambda: self, singleton=True)
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         return {

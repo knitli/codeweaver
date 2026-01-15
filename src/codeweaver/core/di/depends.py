@@ -38,14 +38,15 @@ class _InjectedProxy[Dep: type[T], S: Sentinel]:
 
     @overload
     def __getitem__(self, item: type[T_co]) -> T_co: ...
-
-    def __getitem__(self, item: type[Dep]) -> Dep:
+    @overload
+    def __getitem__(self, item: type[Dep]) -> Dep: ...
+    def __getitem__(self, item: type[Dep | T_co]) -> Dep | T_co:
         """Return the sentinel cast to the requested type.
 
         This allows: `param: SomeType = INJECTED[SomeType]`
         Type checkers see it as type T, runtime gets the sentinel.
         """
-        return cast(Dep, self._sentinel)
+        return cast(Dep | T_co, self._sentinel)
 
     def __getattr__(self, name: str) -> Any:
         """Delegate attribute access to the sentinel."""

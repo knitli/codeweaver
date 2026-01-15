@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 
 from collections.abc import Iterator, Sequence
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 import numpy as np
 
@@ -58,8 +58,8 @@ class HuggingFaceEmbeddingProvider(EmbeddingProvider[AsyncInferenceClient]):
     """HuggingFace embedding provider."""
 
     client: AsyncInferenceClient
-    _provider: Provider = Provider.HUGGINGFACE_INFERENCE
-    caps: EmbeddingModelCapabilities
+    _provider: ClassVar[Provider] = Provider.HUGGINGFACE_INFERENCE
+    caps: EmbeddingModelCapabilities | None = None
 
     _output_transformer = staticmethod(huggingface_hub_output_transformer)
 

@@ -201,13 +201,18 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
             validation_alias="_client",
         ),
     ]
-    _provider: Provider
+
+    config: Annotated[
+        Any,  # Will be properly typed as RerankingProviderSettings in TYPE_CHECKING
+        Field(description="Configuration for the reranking model, including all request options."),
+    ]
+
     caps: Annotated[
         RerankingModelCapabilities,
         Field(description="The capabilities of the reranking model.", validation_alias="_caps"),
     ]
 
-    _rerank_kwargs: ClassVar[MappingProxyType[str, Any]]
+    _provider: Provider
     # transforms the input documents into a format suitable for the provider
     _input_transformer: Callable[[StructuredDataInput], Any] = PrivateAttr(
         default_factory=lambda: default_reranking_input_transformer

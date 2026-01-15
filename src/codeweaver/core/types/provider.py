@@ -108,8 +108,12 @@ class SDKClient(BaseEnum):
                 return lazy_import("cohere", "AsyncClientV2")
             case SDKClient.FASTEMBED:
                 return FastEmbedClientLazyImportDict(
-                    embed=lazy_import("fastembed.text", "TextEmbedding"),
-                    sparse=lazy_import("fastembed.sparse", "SparseTextEmbedding"),
+                    embed=lazy_import(
+                        "codeweaver.providers.embedding.fastembed_extensions", "get_text_embedder"
+                    ),
+                    sparse=lazy_import(
+                        "codeweaver.providers.embedding.fastembed_extensions", "get_sparse_embedder"
+                    ),
                     reranking=lazy_import("fastembed.rerank.cross_encoder", "TextCrossEncoder"),
                 )
             case SDKClient.GOOGLE:
@@ -132,6 +136,110 @@ class SDKClient(BaseEnum):
                 return lazy_import("voyageai.client_async", "AsyncClient")
             case _:
                 raise ValueError(f"Unsupported SDK client: {self.value}")
+
+    @property
+    def embedding_provider(self) -> LazyImport[Any] | None:
+        """Get the default embedding provider for the SDK client."""
+        match self:
+            case SDKClient.BEDROCK:
+                return lazy_import(
+                    "codeweaver.providers.embedding.providers.bedrock", "BedrockEmbeddingProvider"
+                )
+            case SDKClient.COHERE:
+                return lazy_import(
+                    "codeweaver.providers.embedding.providers.cohere", "CohereEmbeddingProvider"
+                )
+            case SDKClient.FASTEMBED:
+                return lazy_import(
+                    "codeweaver.providers.embedding.providers.fastembed",
+                    "FastEmbedEmbeddingProvider",
+                )
+            case SDKClient.GOOGLE:
+                return lazy_import(
+                    "codeweaver.providers.embedding.providers.google", "GoogleEmbeddingProvider"
+                )
+            case SDKClient.HUGGINGFACE_INFERENCE:
+                return lazy_import(
+                    "codeweaver.providers.embedding.providers.hf_inference",
+                    "HuggingFaceInferenceEmbeddingProvider",
+                )
+            case SDKClient.MISTRAL:
+                return lazy_import(
+                    "codeweaver.providers.embedding.providers.mistral", "MistralEmbeddingProvider"
+                )
+            case SDKClient.OPENAI:
+                return lazy_import(
+                    "codeweaver.providers.embedding.providers.openai", "OpenAIEmbeddingProvider"
+                )
+            case SDKClient.SENTENCE_TRANSFORMERS:
+                return lazy_import(
+                    "codeweaver.providers.embedding.providers.sentence_transformers",
+                    "SentenceTransformersEmbeddingProvider",
+                )
+            case SDKClient.VOYAGE:
+                return lazy_import(
+                    "codeweaver.providers.embedding.providers.voyage", "VoyageEmbeddingProvider"
+                )
+            case _:
+                return None
+
+    @property
+    def sparse_embedding_provider(self) -> LazyImport[Any] | None:
+        """Get the default sparse embedding provider for the SDK client."""
+        match self:
+            case SDKClient.FASTEMBED:
+                return lazy_import(
+                    "codeweaver.providers.embedding.providers.fastembed",
+                    "FastEmbedSparseEmbeddingProvider",
+                )
+            case SDKClient.SENTENCE_TRANSFORMERS:
+                return lazy_import(
+                    "codeweaver.providers.embedding.providers.sentence_transformers",
+                    "SentenceTransformersSparseEmbeddingProvider",
+                )
+            case _:
+                return None
+
+    @property
+    def reranking_provider(self) -> LazyImport[Any] | None:
+        """Get the default reranking provider for the SDK client."""
+        match self:
+            case SDKClient.FASTEMBED:
+                return lazy_import(
+                    "codeweaver.providers.reranking.providers.fastembed",
+                    "FastEmbedRerankingProvider",
+                )
+            case SDKClient.SENTENCE_TRANSFORMERS:
+                return lazy_import(
+                    "codeweaver.providers.reranking.providers.sentence_transformers",
+                    "SentenceTransformersRerankingProvider",
+                )
+            case SDKClient.BEDROCK:
+                return lazy_import(
+                    "codeweaver.providers.reranking.providers.bedrock", "BedrockRerankingProvider"
+                )
+            case SDKClient.COHERE:
+                return lazy_import(
+                    "codeweaver.providers.reranking.providers.cohere", "CohereRerankingProvider"
+                )
+            case SDKClient.VOYAGE:
+                return lazy_import(
+                    "codeweaver.providers.reranking.providers.voyage", "VoyageRerankingProvider"
+                )
+            case _:
+                return None
+
+    @property
+    def vector_store_provider(self) -> LazyImport[Any] | None:
+        """Get the default vector store provider for the SDK client."""
+        match self:
+            case SDKClient.QDRANT:
+                return lazy_import(
+                    "codeweaver.providers.vector_store.providers.qdrant",
+                    "QdrantVectorStoreProvider",
+                )
+            case _:
+                return None
 
 
 class Provider(BaseEnum):

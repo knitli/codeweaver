@@ -36,7 +36,7 @@ from pydantic import (
 from pydantic.alias_generators import to_camel, to_snake
 from types_boto3_bedrock_runtime.client import BedrockRuntimeClient
 
-from codeweaver.core import BasedModel, ConfigurationError, Provider, ProviderError
+from codeweaver.core import BasedModel, Provider, ProviderError
 from codeweaver.core import ValidationError as CodeWeaverValidationError
 from codeweaver.providers import BedrockEmbeddingConfig
 from codeweaver.providers.embedding.providers.base import (
@@ -440,27 +440,13 @@ class BedrockInvokeEmbeddingResponse(BaseBedrockModel):
         return cls.model_validate_json(response, by_alias=True)
 
 
-try:
-    from boto3 import client as boto3_client
-
-
-except ImportError as e:
-    logger.warning(
-        "Failed to import boto3. Bedrock embedding provider will not work. You should install boto3.",
-        exc_info=True,
-    )
-    raise ConfigurationError(
-        r"Failed to import boto3. You need to install the boto3 package, you can do this by running 'pip install code-weaver\[bedrock]'"
-    ) from e
-
-
 class BedrockEmbeddingProvider(EmbeddingProvider[BedrockRuntimeClient]):
     """Bedrock embedding provider."""
 
     _provider: ClassVar[Provider] = Provider.BEDROCK
 
-    client: ClientDep[BedrockRuntimeClient]
-    config: EmbeddingConfigDep[BedrockEmbeddingConfig]
+    client: BedrockRuntimeClient
+    config: BedrockEmbeddingConfig
 
     def _initialize(
         self, impl_deps: EmbeddingImplementationDeps = None, custom_deps: EmbeddingCustomDeps = None

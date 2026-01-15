@@ -59,7 +59,7 @@ if TYPE_CHECKING:
         register_default_provider,
         resolve_all_configs,
     )
-    from codeweaver.core.dependencies import NoneDep, SettingsDep, bootstrap_settings
+    from codeweaver.core.dependencies import NoneDep, SettingsDep, StatisticsDep, bootstrap_settings
     from codeweaver.core.di import (
         INJECTED,
         Container,
@@ -622,6 +622,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "SpanGroup": (__spec__.parent, "spans"),
     "SpanTuple": (__spec__.parent, "spans"),
     "SparseEmbedding": (__spec__.parent, "types"),
+    "StatisticsDep": (__spec__.parent, "dependencies"),
     "StoreDict": (__spec__.parent, "stores"),
     "StoredEmbeddingVectors": (__spec__.parent, "types"),
     "StrategizedQuery": (__spec__.parent, "types"),
@@ -1016,6 +1017,7 @@ __all__ = (
     "SpanGroup",
     "SpanTuple",
     "SparseEmbedding",
+    "StatisticsDep",
     "StoreDict",
     "StoredEmbeddingVectors",
     "StrategizedQuery",

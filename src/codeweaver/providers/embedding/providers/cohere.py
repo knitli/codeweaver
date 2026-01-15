@@ -40,7 +40,7 @@ class CohereEmbeddingProvider(EmbeddingProvider[CohereClient]):
     _provider: ClassVar[Literal[Provider.COHERE]] = (
         Provider.COHERE
     )  # can also be Heroku or Azure, but default to Cohere
-    caps: EmbeddingModelCapabilities
+    caps: EmbeddingModelCapabilities | None = None
 
     def _initializeself(
         self, impl_deps: EmbeddingImplementationDeps = None, custom_deps: EmbeddingCustomDeps = None

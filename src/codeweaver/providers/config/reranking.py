@@ -14,6 +14,7 @@ from typing import Annotated, Any, Literal, LiteralString, NotRequired, Required
 from pydantic import Field
 
 from codeweaver.core import BasedModel, LiteralProvider, Provider
+from codeweaver.providers import RerankingModelCapabilities
 
 
 class SerializedRerankingOptionsDict(TypedDict, total=False):
@@ -134,6 +135,14 @@ class BaseRerankingConfig(BasedModel):
     def as_options(self) -> SerializedRerankingOptionsDict:
         """Return the configuration as a dictionary of options."""
         return self._as_options()
+
+    @property
+    def capabilities(self) -> RerankingModelCapabilities:
+        """Get the capabilities of the reranking model based on the provider and model name."""
+        from codeweaver.providers.reranking.capabilities.resolver import RerankingCapabilityResolver
+
+        resolver = RerankingCapabilityResolver()
+        return resolver.resolve(self.model_name)
 
 
 # ============================================================================

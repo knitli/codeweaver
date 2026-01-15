@@ -23,6 +23,7 @@ from codeweaver.core import (
     InvalidEmbeddingModelError,
     ModelNameT,
     UUIDStore,
+    dependency_provider,
 )
 from codeweaver.core import ValidationError as CodeWeaverValidationError
 
@@ -52,6 +53,7 @@ class EmbeddingRegistry(UUIDStore[ChunkEmbeddings]):
             size_limit (int): The maximum size of the store in bytes. Defaults to 100 MB.
         """
         self.is_backup_provider = is_backup_provider
+        super().__init__(size_limit=size_limit, _value_type=ChunkEmbeddings)
 
     @property
     def complete(self) -> bool:
@@ -141,6 +143,11 @@ class BackupEmbeddingRegistry(EmbeddingRegistry):
     This class is identical to `EmbeddingRegistry` but is used to differentiate between primary and backup embedding stores.
     """
 
+    def __init__(
+        self, *, size_limit: int = 100 * ONE_MB, is_backup_provider: Literal[True] = True
+    ) -> None:
+        super().__init__(size_limit=size_limit, is_backup_provider=is_backup_provider)
+
 
 def _rebuild_store(store: type[EmbeddingRegistry | BackupEmbeddingRegistry]) -> None:
     """Rebuild the given UUIDStore to ensure proper initialization after model changes."""
@@ -161,14 +168,24 @@ def get_embedding_registry(*, backup: Literal[True]) -> BackupEmbeddingRegistry:
 
 def get_embedding_registry(*, backup: bool = False) -> EmbeddingRegistry | BackupEmbeddingRegistry:
     """Get the global EmbeddingRegistry instance, creating it if it doesn't exist."""
-    from codeweaver.core import ChunkEmbeddings
-
     _rebuild_store(BackupEmbeddingRegistry if backup else EmbeddingRegistry)
     return (
-        BackupEmbeddingRegistry(store={}, _value_type=ChunkEmbeddings)
+        BackupEmbeddingRegistry(is_backup_provider=True)
         if backup
-        else EmbeddingRegistry()
+        else EmbeddingRegistry(is_backup_provider=False)
     )
+
+
+@dependency_provider(EmbeddingRegistry, scope="singleton", module=__name__)
+def _get_main_registry() -> EmbeddingRegistry:
+    """Get the main EmbeddingRegistry instance."""
+    return get_embedding_registry(backup=False)
+
+
+@dependency_provider(BackupEmbeddingRegistry, scope="singleton", module=__name__)
+def _get_backup_registry() -> BackupEmbeddingRegistry:
+    """Get the backup EmbeddingRegistry instance."""
+    return get_embedding_registry(backup=True)  # ty:ignore[invalid-return-type]
 
 
 __all__ = ("EmbeddingRegistry", "get_embedding_registry")
