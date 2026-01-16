@@ -21,9 +21,11 @@ from typing import cast
 from uuid import UUID
 
 import pytest
+from qdrant_client import AsyncQdrantClient
+from pydantic import AnyUrl
 
 from codeweaver.core import CodeChunk, SearchStrategy, Span, StrategizedQuery
-from codeweaver.providers import QdrantVectorStoreProvider
+from codeweaver.providers import QdrantVectorStoreProvider, QdrantVectorStoreProviderSettings, CollectionConfig, QdrantClientOptions, Provider, EmbeddingCapabilityGroup, ConfiguredCapability, EmbeddingModelCapabilities, EmbeddingProviderSettings, EmbeddingConfig
 
 
 pytestmark = [pytest.mark.integration, pytest.mark.external_api]
@@ -32,7 +34,6 @@ pytestmark = [pytest.mark.integration, pytest.mark.external_api]
 @pytest.fixture
 async def qdrant_provider(qdrant_test_manager):
     """Create a QdrantVectorStoreProvider instance using test manager."""
-    from codeweaver.providers import EmbeddingModelCapabilities
 
     # Create test collection with both dense and sparse vectors
     collection_name = qdrant_test_manager.create_collection_name("codeweaver-test-contract")
@@ -46,25 +47,33 @@ async def qdrant_provider(qdrant_test_manager):
     )
 
     # Create config for provider
-    config = {
-        "url": qdrant_test_manager.url,
-        "collection_name": collection_name,
-        "batch_size": 64,
-        "dense_vector_name": "dense",
-        "sparse_vector_name": "sparse",
-    }
+    config = QdrantVectorStoreProviderSettings(
+        provider=Provider.QDRANT,
+        client_options=QdrantClientOptions(url=AnyUrl(qdrant_test_manager.url)),
+        collection=CollectionConfig(collection_name=collection_name),
+        batch_size=64
+    )
 
-    # Use model_construct to bypass validation and create instance with proper embedding caps
-    provider = QdrantVectorStoreProvider.model_construct(
+    # Create capability group
+    mock_settings = EmbeddingProviderSettings(
+        provider=Provider.OPENAI,
+        model_name="test-dense-model",
+        embedding_config=EmbeddingConfig(model_name="test-dense-model")
+    )
+    
+    configured_dense = ConfiguredCapability(
+        capability=dense_caps,
+        config=mock_settings
+    )
+    
+    caps = EmbeddingCapabilityGroup(dense=configured_dense, sparse=None)
+
+    # Use standard instantiation
+    client = AsyncQdrantClient(url=qdrant_test_manager.url)
+    provider = QdrantVectorStoreProvider(
+        client=client,
         config=config,
-        _client=None,
-        _metadata=None,
-        _embedding_caps={
-            "dense": dense_caps,
-            "sparse": None,
-            "backup_dense": dense_caps,
-            "backup_sparse": None,
-        },
+        caps=caps
     )
     await provider._initialize()
 

@@ -525,14 +525,18 @@ def get_qdrant_test_config(
     Returns:
         Configuration dict for QdrantVectorStoreProvider
     """
+    from codeweaver.providers.config import QdrantVectorStoreProviderSettings, CollectionConfig, QdrantClientOptions
+    from codeweaver.core import Provider
+    from pydantic import AnyUrl
+
     manager = QdrantTestManager(port=port, api_key=api_key)
-    config = {
-        "url": manager.url,
-        "prefer_grpc": False,
-        "collection_name": manager.create_collection_name(
-            f"codeweaver-test-{collection_suffix}" if collection_suffix else "codeweaver-test"
-        ),
-    }
-    if api_key:
-        config["api_key"] = api_key
-    return config
+    
+    collection_name = manager.create_collection_name(
+        f"codeweaver-test-{collection_suffix}" if collection_suffix else "codeweaver-test"
+    )
+
+    return QdrantVectorStoreProviderSettings(
+        provider=Provider.QDRANT,
+        client_options=QdrantClientOptions(url=AnyUrl(manager.url), api_key=api_key),
+        collection=CollectionConfig(collection_name=collection_name)
+    )

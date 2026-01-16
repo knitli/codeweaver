@@ -14,10 +14,11 @@ from pathlib import Path
 from uuid import uuid4
 
 import pytest
+from qdrant_client import AsyncQdrantClient
 
 from codeweaver.core import CodeChunk, SearchStrategy, Span, StrategizedQuery
 from codeweaver.core import SemanticSearchLanguage as Language
-from codeweaver.providers import MemoryVectorStoreProvider, Provider
+from codeweaver.providers import MemoryVectorStoreProvider, Provider, MemoryVectorStoreProviderSettings, EmbeddingCapabilityGroup, ConfiguredCapability, EmbeddingModelCapabilities, EmbeddingProviderSettings, EmbeddingConfig
 
 
 pytestmark = [pytest.mark.validation]
@@ -36,36 +37,53 @@ def temp_persist_path():
 @pytest.fixture
 async def memory_config(temp_persist_path):
     """Provide test Memory configuration."""
-    return {
-        "persist_path": str(temp_persist_path / "vector_store"),  # Directory path
-        "auto_persist": True,
-        "persist_interval": None,  # Disable periodic persistence for tests
-        "collection_name": f"test_memory_{uuid4().hex[:8]}",
-    }
+    return MemoryVectorStoreProviderSettings(
+        provider=Provider.MEMORY,
+        in_memory_config={
+            "persist_path": str(temp_persist_path / "vector_store"),
+            "auto_persist": True,
+            "persist_interval": None,
+            "collection_name": f"test_memory_{uuid4().hex[:8]}",
+        }
+    )
 
 
 @pytest.fixture
 async def test_embedding_caps():
     """Provide test embedding capabilities with 768 dimensions."""
-    from codeweaver.providers import EmbeddingModelCapabilities
-
+    
     dense_caps = EmbeddingModelCapabilities(
         name="test-dense-model",
         default_dimension=768,
         default_dtype="float32",
         preferred_metrics=("cosine", "dot"),
     )
+    
+    # We need a ConfiguredCapability for the group
+    # Mocking the settings to satisfy ConfiguredCapability
+    mock_settings = EmbeddingProviderSettings(
+        provider=Provider.OPENAI, # Dummy provider
+        model_name="test-dense-model",
+        embedding_config=EmbeddingConfig(model_name="test-dense-model")
+    )
 
-    return {"dense": dense_caps, "sparse": None}
+    configured_dense = ConfiguredCapability(
+        capability=dense_caps,
+        config=mock_settings
+    )
+
+    return EmbeddingCapabilityGroup(dense=configured_dense, sparse=None)
 
 
 @pytest.fixture
 async def memory_provider(memory_config, test_embedding_caps):
     """Create a MemoryVectorStoreProvider instance for testing."""
-    from codeweaver.providers import Provider
-
+    client = AsyncQdrantClient(location=":memory:")
+    
     provider = MemoryVectorStoreProvider(
-        _provider=Provider.MEMORY, config=memory_config, embedding_caps=test_embedding_caps
+        client=client,
+        config=memory_config,
+        caps=test_embedding_caps
     )
     await provider._initialize()
     return provider
@@ -184,7 +202,7 @@ class TestMemoryProviderContract:
         await memory_provider.upsert([sample_chunk])
         await memory_provider._persist_to_disk()
 
-        persist_path = Path(memory_config["persist_path"])
+        persist_path = Path(memory_config.in_memory_config["persist_path"])
         assert persist_path.exists(), "Persistence directory should be created"
         assert persist_path.is_dir(), "Persistence path should be a directory"
         # Check if Qdrant files exist inside (simple check)
@@ -194,19 +212,23 @@ class TestMemoryProviderContract:
         self, memory_config, sample_chunk, temp_persist_path, test_embedding_caps
     ):
         """Test _restore_from_disk loads data from JSON."""
-        from codeweaver.providers import Provider
-
         # Create and persist data
+        client1 = AsyncQdrantClient(location=":memory:")
         provider1 = MemoryVectorStoreProvider(
-            _provider=Provider.MEMORY, config=memory_config, embedding_caps=test_embedding_caps
+            client=client1,
+            config=memory_config,
+            caps=test_embedding_caps
         )
         await provider1._initialize()
         await provider1.upsert([sample_chunk])
         await provider1._persist_to_disk()
 
         # Create new provider and restore
+        client2 = AsyncQdrantClient(location=":memory:")
         provider2 = MemoryVectorStoreProvider(
-            _provider=Provider.MEMORY, config=memory_config, embedding_caps=test_embedding_caps
+            client=client2,
+            config=memory_config,
+            caps=test_embedding_caps
         )
         await provider2._initialize()
 
@@ -232,17 +254,31 @@ class TestMemoryProviderContract:
         self, memory_config, sample_chunk, temp_persist_path, test_embedding_caps
     ):
         """Test auto_persist triggers persistence on upsert."""
-        config_with_auto = memory_config.copy()
-        config_with_auto["auto_persist"] = True
+        # Config is already a settings object, we need to create a new one with modified inner config
+        # or just modify the dict used to create it if we were doing that.
+        # Since memory_config is a Pydantic model, we should use model_copy with update if possible, 
+        # but in_memory_config is a dict inside.
+        
+        # Easiest way is to create a new settings object
+        new_config_dict = memory_config.in_memory_config.copy()
+        new_config_dict["auto_persist"] = True
+        
+        config_with_auto = MemoryVectorStoreProviderSettings(
+            provider=Provider.MEMORY,
+            in_memory_config=new_config_dict
+        )
 
+        client = AsyncQdrantClient(location=":memory:")
         provider = MemoryVectorStoreProvider(
-            _provider=Provider.MEMORY, config=config_with_auto, embedding_caps=test_embedding_caps
+            client=client,
+            config=config_with_auto,
+            caps=test_embedding_caps
         )
         await provider._initialize()
         await provider.upsert([sample_chunk])
 
         # Auto-persist should have created the file
-        persist_file = Path(memory_config["persist_path"])
+        persist_file = Path(memory_config.in_memory_config["persist_path"])
         assert persist_file.exists()
         assert persist_file.is_dir()
 

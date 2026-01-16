@@ -15,7 +15,7 @@ import pytest
 
 from codeweaver.core import SearchStrategy, StrategizedQuery, uuid7
 from codeweaver.core import SemanticSearchLanguage as Language
-from codeweaver.providers import QdrantConfig, QdrantVectorStoreProvider, SparseEmbedding
+from codeweaver.providers import QdrantVectorStoreProvider, SparseEmbedding
 
 # sourcery skip: dont-import-test-modules
 from tests.conftest import create_test_chunk_with_embeddings
@@ -25,17 +25,20 @@ pytestmark = [pytest.mark.integration, pytest.mark.external_api]
 
 
 @pytest.fixture
-async def qdrant_provider(qdrant_test_manager: Any):
+async def qdrant_provider(qdrant_test_manager: Any, vector_store_factory):
     """Create Qdrant provider for testing."""
     # Create unique collection
     collection_name = qdrant_test_manager.create_collection_name("hybrid")
-    await qdrant_test_manager.create_collection(
-        collection_name, dense_vector_size=768, sparse_vector_size=1000
+    
+    provider = await vector_store_factory(
+        QdrantVectorStoreProvider,
+        config_overrides={
+            "collection_name": collection_name,
+            "url": qdrant_test_manager.url,
+            "dense_vector_size": 768,
+            "sparse_vector_size": 1000
+        }
     )
-
-    config = QdrantConfig(url=qdrant_test_manager.url, collection_name=collection_name)
-    provider = QdrantVectorStoreProvider(config=config)
-    await provider._initialize()
     return provider
     # Cleanup handled by test manager
 

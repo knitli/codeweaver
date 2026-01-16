@@ -17,7 +17,6 @@ import pytest
 from codeweaver.core import uuid7
 from codeweaver.core import SemanticSearchLanguage as Language
 from codeweaver.providers import MemoryVectorStoreProvider
-from codeweaver.server import MemoryConfig
 
 # sourcery skip: dont-import-test-modules
 from tests.conftest import create_test_chunk_with_embeddings
@@ -29,7 +28,7 @@ pytestmark = [pytest.mark.integration]
 pytestmark = pytest.mark.integration
 
 
-async def test_inmemory_persistence():
+async def test_inmemory_persistence(vector_store_factory):
     """
     User Story: Use in-memory storage with automatic persistence.
 
@@ -39,13 +38,16 @@ async def test_inmemory_persistence():
     """
     with tempfile.TemporaryDirectory() as tmpdir:
         temp_path = Path(tmpdir) / "test_memory_db"
-        config = MemoryConfig(
-            persist_path=temp_path, auto_persist=True, collection_name="test_memory"
-        )
-
+        
         # Phase 1: Create and populate
-        provider1 = MemoryVectorStoreProvider(_provider=Provider.MEMORY, config=config)
-        await provider1._initialize()
+        provider1 = await vector_store_factory(
+            MemoryVectorStoreProvider,
+            config_overrides={
+                "persist_path": temp_path,
+                "auto_persist": True,
+                "collection_name": "test_memory"
+            }
+        )
 
         # Get the actual dimension from the embedding provider configuration
         # This dynamically adapts to whatever model is configured (testing profile uses minishlab/potion-base-8M = 256 dims)
@@ -73,8 +75,14 @@ async def test_inmemory_persistence():
         assert temp_path.is_dir(), "Persistence path should be a directory"
 
         # Phase 2: Restore from disk
-        provider2 = MemoryVectorStoreProvider(_provider=Provider.MEMORY, config=config)
-        await provider2._initialize()
+        provider2 = await vector_store_factory(
+            MemoryVectorStoreProvider,
+            config_overrides={
+                "persist_path": temp_path,
+                "auto_persist": True,
+                "collection_name": "test_memory"
+            }
+        )
 
         # Verify: Chunk restored from disk
         from codeweaver.core import SearchStrategy, StrategizedQuery

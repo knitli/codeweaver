@@ -56,7 +56,7 @@ logger = logging.getLogger(__name__)
 
 def _chunk_single_file(
     file: DiscoveredFile, governor: ChunkGovernor, tokenizer: Any | None = None
-) -> tuple[Path, list[CodeChunk]] | tuple[Path, None]:
+) -> tuple[Path, list[CodeChunk] | None]:
     """Chunk a single file using appropriate chunker with graceful fallback.
 
     This function is designed to be called in worker processes/threads.

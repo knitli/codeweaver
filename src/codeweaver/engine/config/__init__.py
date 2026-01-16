@@ -15,10 +15,16 @@ if TYPE_CHECKING:
     from codeweaver.engine.config.chunker import (
         ChunkerSettings,
         ChunkerSettingsDict,
+        ConcurrencySettings,
+        ConcurrencySettingsDict,
         CustomDelimiter,
         CustomLanguage,
+        DefaultChunkerSettings,
+        PerformanceSettings,
+        PerformanceSettingsDict,
     )
     from codeweaver.engine.config.indexer import (
+        DefaultIndexerSettings,
         IndexerSettings,
         IndexerSettingsDict,
         RignoreSettings,
@@ -30,10 +36,16 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "ChunkerSettings": (__spec__.parent, "chunker"),
     "ChunkerSettingsDict": (__spec__.parent, "chunker"),
     "CodeWeaverEngineSettings": (__spec__.parent, "root_settings"),
+    "ConcurrencySettings": (__spec__.parent, "chunker"),
+    "ConcurrencySettingsDict": (__spec__.parent, "chunker"),
     "CustomDelimiter": (__spec__.parent, "chunker"),
     "CustomLanguage": (__spec__.parent, "chunker"),
+    "DefaultChunkerSettings": (__spec__.parent, "chunker"),
+    "DefaultIndexerSettings": (__spec__.parent, "indexer"),
     "IndexerSettings": (__spec__.parent, "indexer"),
     "IndexerSettingsDict": (__spec__.parent, "indexer"),
+    "PerformanceSettings": (__spec__.parent, "chunker"),
+    "PerformanceSettingsDict": (__spec__.parent, "chunker"),
     "RignoreSettings": (__spec__.parent, "indexer"),
 })
 
@@ -45,10 +57,16 @@ __all__ = (
     "ChunkerSettings",
     "ChunkerSettingsDict",
     "CodeWeaverEngineSettings",
+    "ConcurrencySettings",
+    "ConcurrencySettingsDict",
     "CustomDelimiter",
     "CustomLanguage",
+    "DefaultChunkerSettings",
+    "DefaultIndexerSettings",
     "IndexerSettings",
     "IndexerSettingsDict",
+    "PerformanceSettings",
+    "PerformanceSettingsDict",
     "RignoreSettings",
 )
 

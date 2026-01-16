@@ -166,6 +166,7 @@ if TYPE_CHECKING:
         RepoChecklistDict,
         RepoDirectory,
     )
+    from codeweaver.core.secondary_languages import SecondarySupportedLanguage
     from codeweaver.core.spans import ONE_LINE, Span, SpanGroup, SpanTuple
     from codeweaver.core.statistics import (
         FailoverStats,
@@ -618,6 +619,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "SearchEvent": (__spec__.parent, "telemetry"),
     "SearchResult": (__spec__.parent, "types"),
     "SearchStrategy": (__spec__.parent, "types"),
+    "SecondarySupportedLanguage": (__spec__.parent, "secondary_languages"),
     "SemanticSearchLanguage": (__spec__.parent, "language"),
     "Sentinel": (__spec__.parent, "types"),
     "SentinelName": (__spec__.parent, "types"),
@@ -1017,6 +1019,7 @@ __all__ = (
     "SearchEvent",
     "SearchResult",
     "SearchStrategy",
+    "SecondarySupportedLanguage",
     "SemanticSearchLanguage",
     "Sentinel",
     "SentinelName",

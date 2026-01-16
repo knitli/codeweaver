@@ -21,24 +21,26 @@ from tests.conftest import create_test_chunk_with_embeddings
 pytestmark = [pytest.mark.integration, pytest.mark.external_api]
 
 
-async def test_partial_embeddings(qdrant_test_manager):
+async def test_partial_embeddings(qdrant_test_manager, vector_store_factory):
     """
     User Story: Handle cases where dense embedding generation fails.
 
     Edge Case: Partial embedding failure
     Then: Store chunk with sparse-only and mark as 'incomplete'
     """
-    from codeweaver.server import QdrantConfig
 
     # Create unique collection
     collection_name = qdrant_test_manager.create_collection_name("partial")
-    await qdrant_test_manager.create_collection(
-        collection_name, dense_vector_size=768, sparse_vector_size=1000
+    
+    provider = await vector_store_factory(
+        QdrantVectorStoreProvider,
+        config_overrides={
+            "collection_name": collection_name,
+            "url": qdrant_test_manager.url,
+            "dense_vector_size": 768,
+            "sparse_vector_size": 1000
+        }
     )
-
-    config = QdrantConfig(url=qdrant_test_manager.url, collection_name=collection_name)
-    provider = QdrantVectorStoreProvider(config=config)
-    await provider._initialize()
 
     # Create chunk with sparse-only embedding (dense failed)
     # Use consistent sparse embedding for both chunk and search

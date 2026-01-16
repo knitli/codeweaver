@@ -15,7 +15,6 @@ import pytest
 from codeweaver.core import SearchStrategy, StrategizedQuery, uuid7
 from codeweaver.core import SemanticSearchLanguage as Language
 from codeweaver.providers import QdrantVectorStoreProvider
-from codeweaver.server import QdrantConfig
 
 # sourcery skip: dont-import-test-modules
 from tests.conftest import create_test_chunk_with_embeddings
@@ -24,7 +23,7 @@ from tests.conftest import create_test_chunk_with_embeddings
 pytestmark = [pytest.mark.integration, pytest.mark.external_api]
 
 
-async def test_persistence_across_restarts(qdrant_test_manager):
+async def test_persistence_across_restarts(qdrant_test_manager, vector_store_factory):
     """
     User Story: Previously indexed data persists across restarts.
 
@@ -34,15 +33,16 @@ async def test_persistence_across_restarts(qdrant_test_manager):
     """
     # Create unique collection with sparse vector support (needed for BM25)
     collection_name = qdrant_test_manager.create_collection_name("persist")
-    await qdrant_test_manager.create_collection(
-        collection_name, dense_vector_size=768, sparse_vector_size=1000
-    )
-
-    config = QdrantConfig(url=qdrant_test_manager.url, collection_name=collection_name)
-
     # Phase 1: Initial indexing
-    provider1 = QdrantVectorStoreProvider(config=config)
-    await provider1._initialize()
+    provider1 = await vector_store_factory(
+        QdrantVectorStoreProvider,
+        config_overrides={
+            "collection_name": collection_name,
+            "url": qdrant_test_manager.url,
+            "dense_vector_size": 768,
+            "sparse_vector_size": 1000
+        }
+    )
 
     chunk = create_test_chunk_with_embeddings(
         chunk_id=uuid7(),
@@ -59,8 +59,15 @@ async def test_persistence_across_restarts(qdrant_test_manager):
     original_chunk_id = chunk.chunk_id
 
     # Simulate restart: Create new provider instance
-    provider2 = QdrantVectorStoreProvider(config=config)
-    await provider2._initialize()
+    provider2 = await vector_store_factory(
+        QdrantVectorStoreProvider,
+        config_overrides={
+            "collection_name": collection_name,
+            "url": qdrant_test_manager.url,
+            "dense_vector_size": 768,
+            "sparse_vector_size": 1000
+        }
+    )
 
     # Verify: Previously stored chunk is retrievable
     results = await provider2.search(

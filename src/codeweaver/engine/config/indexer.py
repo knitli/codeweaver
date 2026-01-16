@@ -633,4 +633,4 @@ DefaultIndexerSettings = IndexerSettingsDict(
     IndexerSettings().model_dump(exclude_none=True, exclude_computed_fields=True)  # type: ignore
 )
 
-__all__ = ("DefaultIndexerSettings", "IndexerSettings")
+__all__ = ("DefaultIndexerSettings", "IndexerSettings", "IndexerSettingsDict", "RignoreSettings")

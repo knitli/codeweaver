@@ -166,17 +166,7 @@ def get_config_locations(
 def get_dotenv_locations(settings_cls: type[BaseSettings]) -> tuple[DotEnvSettingsSource, ...]:
     """Get standard dotenv file locations for CodeWeaverSettings."""
     return tuple(
-        DotEnvSettingsSource(settings_cls, path, env_ignore_empty=True)
-        for path in (
-            ".local.env",
-            ".env",
-            ".codeweaver.local.env",
-            ".codeweaver.env",
-            ".codeweaver/.local.env",
-            ".codeweaver/.env",
-            ".config/codeweaver/.local.env",
-            ".config/codeweaver/.env",
-        )
+        DotEnvSettingsSource(settings_cls, path, env_ignore_empty=True) for path in _DOTENV_PATHS
     )
 
 

@@ -45,33 +45,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def _get_collection_name(*, secondary: bool) -> str:
-    """Get the collection name for primary or backup vector store.
-
-    Args:
-        secondary: Whether to get the backup collection name
-
-    Returns:
-        The collection name for the primary or backup vector store.
-    """
-    if secondary:
-        backup_config = _backup_profile()
-        if vector_store := backup_config.get("vector_store"):
-            # Handle tuple or single VectorStoreProviderSettings
-            settings = vector_store[0] if isinstance(vector_store, tuple) else vector_store
-            return settings.get("provider_settings", {}).get("collection_name", "codeweaver-backup")  # type: ignore[union-attr]
-        return "codeweaver-backup"
-    from codeweaver.core import get_provider_config_for
-
-    if (config := get_provider_config_for("vector_store")) and (
-        collection_name := config.get("provider_settings", {}).get("collection_name")
-    ):
-        return f"{collection_name}-backup" if secondary else collection_name
-    from codeweaver.core import generate_collection_name
-
-    return generate_collection_name(is_backup=secondary)
-
-
 class VectorStoreFailoverManager(BasedModel):
     """Manages failover between primary and backup vector stores.
 

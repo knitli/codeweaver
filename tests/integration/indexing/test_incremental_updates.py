@@ -15,7 +15,6 @@ import pytest
 from codeweaver.core import SemanticSearchLanguage as Language
 from codeweaver.core import uuid7
 from codeweaver.providers import QdrantVectorStoreProvider
-from codeweaver.server import QdrantConfig
 
 # sourcery skip: dont-import-test-modules
 from tests.conftest import create_test_chunk_with_embeddings
@@ -24,7 +23,7 @@ from tests.conftest import create_test_chunk_with_embeddings
 pytestmark = [pytest.mark.integration, pytest.mark.external_api]
 
 
-async def test_incremental_updates(qdrant_test_manager):
+async def test_incremental_updates(qdrant_test_manager, vector_store_factory):
     """
     User Story: File updates only re-index changed chunks.
 
@@ -34,13 +33,16 @@ async def test_incremental_updates(qdrant_test_manager):
     """
     # Create unique collection with sparse vector support (needed for BM25)
     collection_name = qdrant_test_manager.create_collection_name("incremental")
-    await qdrant_test_manager.create_collection(
-        collection_name, dense_vector_size=768, sparse_vector_size=1000
+    
+    provider = await vector_store_factory(
+        QdrantVectorStoreProvider,
+        config_overrides={
+            "collection_name": collection_name,
+            "url": qdrant_test_manager.url,
+            "dense_vector_size": 768,
+            "sparse_vector_size": 1000
+        }
     )
-
-    config = QdrantConfig(url=qdrant_test_manager.url, collection_name=collection_name)
-    provider = QdrantVectorStoreProvider(config=config)
-    await provider._initialize()
 
     file_path = Path("src/updated_file.py")
 

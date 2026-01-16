@@ -38,10 +38,8 @@ from codeweaver.core import (
     StrategizedQuery,
 )
 from codeweaver.providers import (
-    MemoryConfig,
     MemoryVectorStoreProvider,
     Provider,
-    QdrantConfig,
     QdrantVectorStoreProvider,
 )
 
@@ -101,36 +99,43 @@ async def qdrant_client(qdrant_test_manager) -> AsyncQdrantClient:
 
 
 @pytest.fixture
-async def qdrant_store(qdrant_test_manager) -> QdrantVectorStoreProvider:
+async def qdrant_store(qdrant_test_manager, vector_store_factory) -> QdrantVectorStoreProvider:
     """Create a QdrantVectorStoreProvider for testing."""
     # Create unique collection
     collection_name = qdrant_test_manager.create_collection_name("perf_test")
-    await qdrant_test_manager.create_collection(
-        collection_name, dense_vector_size=384, sparse_vector_size=1
+    
+    # Use factory to create provider
+    # It will handle collection creation if we pass the name and sizes
+    store = await vector_store_factory(
+        QdrantVectorStoreProvider,
+        config_overrides={
+            "collection_name": collection_name,
+            "dense_vector_size": 384,
+            "sparse_vector_size": 1,
+            "batch_size": 64
+        }
     )
-
-    config = QdrantConfig(
-        url=qdrant_test_manager.url, collection_name=collection_name, batch_size=64
-    )
-    store = QdrantVectorStoreProvider(config=config)
-    await store._initialize()
     return store
     # Cleanup handled by test manager
 
 
 @pytest.fixture
-async def memory_store() -> AsyncGenerator[MemoryVectorStoreProvider, None]:
+async def memory_store(vector_store_factory) -> AsyncGenerator[MemoryVectorStoreProvider, None]:
     """Create a MemoryVectorStoreProvider for testing."""
     from codeweaver.core import uuid7
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        config = MemoryConfig(
-            persist_path=Path(tmpdir) / "test_store.json",
-            auto_persist=False,
-            collection_name=f"perf_test_{uuid7().hex[:8]}",
+        collection_name = f"perf_test_{uuid7().hex[:8]}"
+        persist_path = Path(tmpdir) / "test_store.json"
+        
+        store = await vector_store_factory(
+            MemoryVectorStoreProvider,
+            config_overrides={
+                "persist_path": persist_path,
+                "auto_persist": False,
+                "collection_name": collection_name
+            }
         )
-        store = MemoryVectorStoreProvider(_provider=Provider.MEMORY, config=config)
-        await store._initialize()
         yield store
 
 
@@ -289,10 +294,17 @@ async def test_memory_persistence_performance(chunk_count: int) -> None:
 
         # Measure restore performance
         # Create a new store - _initialize will automatically restore from disk
-        new_store = MemoryVectorStoreProvider(_provider=Provider.MEMORY, config=config)
+        new_store = await vector_store_factory(
+            MemoryVectorStoreProvider,
+            config_overrides={
+                "persist_path": persist_path,
+                "auto_persist": False,
+                "collection_name": "perf_test" # Reuse same collection name/config
+            }
+        )
 
         start = time.perf_counter()
-        await new_store._initialize()
+        await new_store._initialize() # Redundant as factory calls it, but ensures restore timing
         restore_duration = time.perf_counter() - start
 
         print(f"  Restore: {restore_duration:.3f}s")

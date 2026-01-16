@@ -196,7 +196,7 @@ class DelimiterChunker(BaseChunker):
         ):
             return performance_settings
 
-        from codeweaver.server import PerformanceSettings
+        from codeweaver.engine.config import PerformanceSettings
 
         return PerformanceSettings()
 
@@ -638,7 +638,7 @@ class DelimiterChunker(BaseChunker):
         for struct in sorted(allowed, key=len, reverse=True):
             struct_len = len(struct)
             if content[pos : pos + struct_len] == struct:
-                return pos, struct
+                return pos, cast(str, struct)
         return None
 
     def _find_matching_close(
