@@ -34,7 +34,7 @@ from codeweaver.core import (
     CodeChunk,
     Provider,
     ProviderError,
-    ResolvedProjectName,
+    ResolvedProjectNameDep,
     SearchResult,
     SearchStrategy,
     StrategizedQuery,
@@ -50,7 +50,7 @@ from codeweaver.providers.vector_stores.search import Filter
 logger = logging.getLogger(__name__)
 
 
-def _project_name(name: ResolvedProjectName = INJECTED) -> str:
+def _project_name(name: ResolvedProjectNameDep = INJECTED) -> str:
     """Return the resolved project name."""
     return name
 

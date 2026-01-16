@@ -241,16 +241,16 @@ class LanguageFamily(str, BaseEnum):
             lang.rstrip("ml"),
             lang.rstrip("script"),
         }
-        if language_found := _LANGUAGE_TO_FAMILY.get(lang):
+        if language_found := LANGUAGE_TO_FAMILY.get(lang):
             return language_found
         for variant in lang_variants:
-            if language_found := _LANGUAGE_TO_FAMILY.get(variant):
+            if language_found := LANGUAGE_TO_FAMILY.get(variant):
                 return language_found
         return cls.UNKNOWN
 
 
 # Language-to-family mapping for known languages
-_LANGUAGE_TO_FAMILY: dict[str, LanguageFamily] = {
+LANGUAGE_TO_FAMILY: dict[str, LanguageFamily] = {
     "agda": LanguageFamily.FUNCTIONAL_STYLE,
     "amslatex": LanguageFamily.LATEX_STYLE,
     "asciidoc": LanguageFamily.MARKUP_STYLE,
@@ -552,4 +552,11 @@ class DelimiterPattern(NamedTuple):
         return self.formatter(text) if self.formatter else text
 
 
-__all__ = ("DelimiterDict", "DelimiterKind", "DelimiterPattern", "LanguageFamily", "LineStrategy")
+__all__ = (
+    "LANGUAGE_TO_FAMILY",
+    "DelimiterDict",
+    "DelimiterKind",
+    "DelimiterPattern",
+    "LanguageFamily",
+    "LineStrategy",
+)

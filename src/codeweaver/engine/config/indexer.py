@@ -121,12 +121,6 @@ def _get_settings(
     *, view: bool = False
 ) -> CodeWeaverSettings | DictView[CodeWeaverSettingsDict] | None:
     """Get the current CodeWeaver settings."""
-    if view:
-        from codeweaver.serversettings import get_settings_map
-
-        return get_settings_map()
-    from codeweaver.serversettings import get_settings
-
     return get_settings()
 
 

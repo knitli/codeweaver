@@ -138,7 +138,7 @@ def _get_canonical_project_path(settings: SettingsDep = INJECTED) -> DirectoryPa
     return settings.project_path if settings.project_path is not Unset else get_project_path()  # ty:ignore[invalid-return-type]
 
 
-type ResolvedProjectPath = Annotated[DirectoryPath, depends(_get_canonical_project_path)]
+type ResolvedProjectPathDep = Annotated[DirectoryPath, depends(_get_canonical_project_path)]
 
 
 def _get_canonical_project_name(settings: SettingsDep = INJECTED) -> str:
@@ -149,12 +149,13 @@ def _get_canonical_project_name(settings: SettingsDep = INJECTED) -> str:
     )
 
 
-type ResolvedProjectName = Annotated[str, depends(_get_canonical_project_name)]
+type ResolvedProjectNameDep = Annotated[str, depends(_get_canonical_project_name)]
 
 __all__ = (
+    "CodeWeaverSettingsType",
     "NoneDep",
-    "ResolvedProjectName",
-    "ResolvedProjectPath",
+    "ResolvedProjectNameDep",
+    "ResolvedProjectPathDep",
     "SettingsDep",
     "StatisticsDep",
     "TelemetrySettingsDep",

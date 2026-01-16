@@ -24,12 +24,14 @@ from codeweaver.core import (
     CONFIG_FILE_LANGUAGES,
     DEFAULT_EXCLUDED_DIRS,
     DOC_FILES_EXTENSIONS,
+    INJECTED,
     ConfigLanguage,
-    DictView,
+    ResolvedProjectPathDep,
     SemanticSearchLanguage,
     Unset,
 )
-from codeweaver.server import CodeWeaverSettingsDict, RignoreSettings
+from codeweaver.engine.config import RignoreSettings
+from codeweaver.engine.dependencies import IndexerSettingsDep
 
 
 logger = logging.getLogger(__name__)
@@ -233,7 +235,9 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
 
     @classmethod
     def from_settings(
-        cls, settings: DictView[CodeWeaverSettingsDict] | None = None
+        cls,
+        project_path: ResolvedProjectPathDep = INJECTED,
+        index_settings: IndexerSettingsDep = INJECTED,
     ) -> IgnoreFilter[rignore.Walker]:
         """Create an IgnoreFilter instance from settings (sync version).
 
@@ -242,7 +246,8 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
         manually configure the walker's inc_exc patterns after creation.
 
         Args:
-            settings: Optional settings dictionary
+            project_path: The resolved project path dependency
+            index_settings: The resolved indexer settings dependency
 
         Returns:
             Configured IgnoreFilter instance (may need async initialization)
@@ -282,7 +287,9 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
 
     @classmethod
     async def from_settings_async(
-        cls, settings: DictView[CodeWeaverSettingsDict] | None = None
+        cls,
+        project_path: ResolvedProjectPathDep = INJECTED,
+        index_settings: IndexerSettingsDep = INJECTED,
     ) -> IgnoreFilter[rignore.Walker]:
         """Create an IgnoreFilter instance from settings with full async initialization.
 

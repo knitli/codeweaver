@@ -204,9 +204,4 @@ async def log_to_client_or_fallback(
         logger.log(int_level, msg, extra=extra)
 
 
-__all__ = (
-    "SESSION_LOG_FILENAME",
-    "get_session_log_path",
-    "log_to_client_or_fallback",
-    "setup_logger",
-)
+__all__ = ("SESSION_LOG_FILE", "get_session_log_path", "log_to_client_or_fallback", "setup_logger")

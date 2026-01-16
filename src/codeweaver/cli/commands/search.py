@@ -20,10 +20,15 @@ from cyclopts import App
 from pydantic import FilePath
 from rich.table import Table
 
-from codeweaver.agent_api.find_code import CodeMatch, FindCodeResponseSummary, IntentType, find_code
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
 from codeweaver.core import CodeWeaverError, resolve_project_root
 from codeweaver.server import get_settings_map
+from codeweaver.server.agent_api.find_code import (
+    CodeMatch,
+    FindCodeResponseSummary,
+    IntentType,
+    find_code,
+)
 
 
 if TYPE_CHECKING:

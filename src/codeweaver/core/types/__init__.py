@@ -63,6 +63,7 @@ if TYPE_CHECKING:
         SerializationKwargs,
     )
     from codeweaver.core.types.delimiter import (
+        LANGUAGE_TO_FAMILY,
         DelimiterDict,
         DelimiterKind,
         DelimiterPattern,
@@ -182,6 +183,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "FilteredKey": (__spec__.parent, "aliases"),
     "FilteredKeyT": (__spec__.parent, "aliases"),
     "HttpRequestsDict": (__spec__.parent, "statistics"),
+    "LANGUAGE_TO_FAMILY": (__spec__.parent, "delimiter"),
     "LanguageFamily": (__spec__.parent, "delimiter"),
     "LanguageName": (__spec__.parent, "aliases"),
     "LanguageNameT": (__spec__.parent, "aliases"),
@@ -252,6 +254,7 @@ __all__ = (
     "DATACLASS_CONFIG",
     "DEFAULT_BASE_SETTINGS_CONFIG",
     "FROZEN_BASEDMODEL_CONFIG",
+    "LANGUAGE_TO_FAMILY",
     "MISSING",
     "UNSET",
     "AnonymityConversion",

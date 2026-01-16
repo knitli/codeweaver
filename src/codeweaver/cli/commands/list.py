@@ -96,8 +96,6 @@ def providers(
 
     Shows provider name, capabilities, and status (ready or needs configuration).
     """
-    from codeweaver.core import get_provider_registry
-
     display = _display
     registry = get_provider_registry()
     provider_capabilities = {

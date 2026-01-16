@@ -37,7 +37,12 @@ from codeweaver.core import (
     Span,
     StrategizedQuery,
 )
-from codeweaver.providers import MemoryVectorStoreProvider, Provider, QdrantVectorStoreProvider
+from codeweaver.providers import (
+    MemoryConfig,
+    MemoryVectorStoreProvider,
+    Provider,
+    QdrantVectorStoreProvider,
+)
 
 
 pytestmark = [pytest.mark.async_test, pytest.mark.performance, pytest.mark.slow]
@@ -108,8 +113,8 @@ async def qdrant_store(qdrant_test_manager, vector_store_factory) -> QdrantVecto
             "collection_name": collection_name,
             "dense_vector_size": 384,
             "sparse_vector_size": 1,
-            "batch_size": 64
-        }
+            "batch_size": 64,
+        },
     )
     return store
     # Cleanup handled by test manager
@@ -129,8 +134,8 @@ async def memory_store(vector_store_factory) -> AsyncGenerator[MemoryVectorStore
             config_overrides={
                 "persist_path": persist_path,
                 "auto_persist": False,
-                "collection_name": collection_name
-            }
+                "collection_name": collection_name,
+            },
         )
         yield store
 
@@ -295,12 +300,12 @@ async def test_memory_persistence_performance(chunk_count: int) -> None:
             config_overrides={
                 "persist_path": persist_path,
                 "auto_persist": False,
-                "collection_name": "perf_test" # Reuse same collection name/config
-            }
+                "collection_name": "perf_test",  # Reuse same collection name/config
+            },
         )
 
         start = time.perf_counter()
-        await new_store._initialize() # Redundant as factory calls it, but ensures restore timing
+        await new_store._initialize()  # Redundant as factory calls it, but ensures restore timing
         restore_duration = time.perf_counter() - start
 
         print(f"  Restore: {restore_duration:.3f}s")

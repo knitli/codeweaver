@@ -25,15 +25,12 @@ from typing import TYPE_CHECKING
 
 from pydantic import NonNegativeFloat, NonNegativeInt
 
-from codeweaver.core import _LANGUAGE_TO_FAMILY, LanguageFamily
+from codeweaver.core import LANGUAGE_TO_FAMILY, LanguageFamily
 
 
 if TYPE_CHECKING:
-    from codeweaver.core import DelimiterKind, LanguageFamily
+    from codeweaver.core import DelimiterKind
     from codeweaver.engine.chunker.delimiters.patterns import DelimiterPattern
-
-
-# Language-to-family mapping for known languages -- moved to core.types.delimiter
 
 
 def defined_languages() -> tuple[str, ...]:
@@ -49,7 +46,7 @@ def defined_languages() -> tuple[str, ...]:
         >>> "unknownlang" in defined_languages()
         False
     """
-    return tuple(_LANGUAGE_TO_FAMILY.keys())
+    return tuple(LANGUAGE_TO_FAMILY.keys())
 
 
 # Family delimiter pattern mappings

@@ -51,12 +51,12 @@ from codeweaver.core import (
     ConfigurationError,
     SettingsDep,
     TypeIs,
+    create_backup_class,
     dependency_provider,
     depends,
     lazy_import,
     rpartial,
 )
-from codeweaver.providers.backup_factory import create_backup_class
 from codeweaver.providers.embedding.capabilities.resolver import (
     EmbeddingCapabilityResolver,
     SparseEmbeddingCapabilityResolver,
@@ -70,7 +70,6 @@ if TYPE_CHECKING:
     from codeweaver.core import LazyImport
     from codeweaver.providers.config import (
         AgentProviderSettings,
-        BaseProviderSettings,
         ClientOptions,
         CodeWeaverProviderSettings,
         DataProviderSettings,
@@ -175,9 +174,13 @@ def _instantiate_client(client_cls: Any, *args: Any, options: ClientOptions | No
         ) from e
 
 
-def _resolve_provider_settings(
-    settings: BaseProviderSettings | tuple[BaseProviderSettings, ...], *, backup: bool = False
-) -> BaseProviderSettings | None:
+def _resolve_provider_settings[
+    T: EmbeddingProviderSettings
+    | RerankingProviderSettings
+    | VectorStoreProviderSettings
+    | AgentProviderSettings
+    | DataProviderSettings
+](settings: tuple[T, ...], *, backup: bool = False) -> T | None:
     """Helper to resolve provider settings if they're LazyImports."""
     if isinstance(settings, tuple) and backup:
         return next((s for s in settings if s.as_backup), None)
@@ -902,22 +905,26 @@ def _get_vector_store_provider_for_config(
     """Helper to get the vector store provider settings from config."""
     from codeweaver.providers.types import EmbeddingCapabilityGroup
 
+    embedding_config = None
+    sparse_embedding_config = None
     # Get embedding and sparse embedding configs to construct EmbeddingCapabilityGroup
     provider_settings = _get_provider_settings()
-    embedding_config = _resolve_provider_settings(provider_settings.embedding, backup=config.as_backup)
-    sparse_embedding_config = _resolve_provider_settings(
-        provider_settings.sparse_embedding, backup=config.as_backup
-    )
+    if embedding_settings := provider_settings.embedding:
+        embedding_config = _resolve_provider_settings(embedding_settings, backup=config.as_backup)
+    if sparse_embedding_settings := provider_settings.sparse_embedding:
+        sparse_embedding_config = _resolve_provider_settings(
+            sparse_embedding_settings, backup=config.as_backup
+        )
 
     # Build list of ConfiguredCapability objects
-    capabilities = []
-    if embedding_config:
-        capabilities.append(embedding_config.embedding_config.capabilities)
-    if sparse_embedding_config:
-        capabilities.append(sparse_embedding_config.sparse_embedding_config.capabilities)
+    capabilities = [cap for cap in (embedding_config, sparse_embedding_config) if cap]
 
     # Create EmbeddingCapabilityGroup from capabilities
-    caps = EmbeddingCapabilityGroup.from_capabilities(capabilities) if capabilities else EmbeddingCapabilityGroup()
+    caps = (
+        EmbeddingCapabilityGroup.from_capabilities(capabilities)
+        if capabilities
+        else EmbeddingCapabilityGroup()
+    )
 
     provider = config.client.vector_store_provider
     try:
@@ -942,20 +949,22 @@ def _get_backup_vector_store_provider_for_config(
 
     # Get embedding and sparse embedding configs to construct EmbeddingCapabilityGroup
     provider_settings = _get_provider_settings()
-    embedding_config = _resolve_provider_settings(provider_settings.embedding, backup=True)
-    sparse_embedding_config = _resolve_provider_settings(
-        provider_settings.sparse_embedding, backup=True
-    )
+    embedding_config = None
+    sparse_embedding_config = None
+    if embedding_settings := provider_settings.embedding:
+        embedding_config = _resolve_provider_settings(embedding_settings, backup=True)
+    if sparse_embedding_settings := provider_settings.sparse_embedding:
+        sparse_embedding_config = _resolve_provider_settings(sparse_embedding_settings, backup=True)
 
     # Build list of ConfiguredCapability objects
-    capabilities = []
-    if embedding_config:
-        capabilities.append(embedding_config.embedding_config.capabilities)
-    if sparse_embedding_config:
-        capabilities.append(sparse_embedding_config.sparse_embedding_config.capabilities)
+    capabilities = [cap for cap in (embedding_config, sparse_embedding_config) if cap]
 
     # Create EmbeddingCapabilityGroup from capabilities
-    caps = EmbeddingCapabilityGroup.from_capabilities(capabilities) if capabilities else EmbeddingCapabilityGroup()
+    caps = (
+        EmbeddingCapabilityGroup.from_capabilities(capabilities)
+        if capabilities
+        else EmbeddingCapabilityGroup()
+    )
 
     provider = config.client.vector_store_provider
     try:
