@@ -21,6 +21,8 @@ import rignore
 
 from pydantic import NonNegativeFloat, NonNegativeInt
 
+from codeweaver.core import INJECTED
+
 
 if TYPE_CHECKING:
     from codeweaver.engine.indexer.progress import IndexingStats

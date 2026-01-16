@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import datetime
 import logging
 
 from importlib import import_module
@@ -17,7 +18,9 @@ from typing import TYPE_CHECKING, Any, Literal
 from fastmcp import Context
 from pydantic_core import to_json
 
-from codeweaver.core import LoggingConfigDict, is_ci, is_tty, lazy_import
+from codeweaver.core.dependencies import LoggingSettingsDep
+from codeweaver.core.di import INJECTED
+from codeweaver.core.utils import get_user_state_dir, is_ci, is_tty, lazy_import
 
 
 if TYPE_CHECKING:
@@ -32,16 +35,15 @@ IS_CI = is_ci()
 IS_TTY = is_tty()
 
 # Session log file name
-SESSION_LOG_FILENAME = "session.log"
+LOG_PATH = get_user_state_dir() / "logs"
+SESSION_LOG_FILE = (
+    LOG_PATH / f"session-{datetime.datetime.now(datetime.UTC).strftime('%Y%m%d-%H%M%S')}.log"
+)
 
 
 def get_session_log_path() -> Path:
-    """Get the path to the session log file in the user config directory."""
-    from codeweaver.core import get_user_config_dir
-
-    config_dir = get_user_config_dir()
-    config_dir.mkdir(parents=True, exist_ok=True)
-    return config_dir / SESSION_LOG_FILENAME
+    """Get the path to the session log file. The utility ensures the log directory exists."""
+    return SESSION_LOG_FILE
 
 
 def create_session_file_handler(level: int = logging.DEBUG) -> logging.FileHandler:
@@ -82,7 +84,7 @@ def _setup_config_logger(
     level: int = logging.WARNING,
     rich: bool = True,
     rich_options: dict[str, Any] | None = None,
-    logging_kwargs: LoggingConfigDict | None = None,
+    logging_kwargs: LoggingSettingsDep = INJECTED,
     session_log: bool = True,
 ) -> logging.Logger:
     """Set up a logger with optional rich formatting."""
@@ -118,7 +120,7 @@ def setup_logger(
     level: int = logging.WARNING,
     rich: bool = True,
     rich_options: dict[str, Any] | None = None,
-    logging_kwargs: LoggingConfigDict | None = None,
+    logging_kwargs: LoggingSettingsDep = INJECTED,
     session_log: bool = True,
 ) -> logging.Logger:
     """Set up a logger with optional rich formatting.

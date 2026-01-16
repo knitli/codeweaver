@@ -98,7 +98,7 @@ def _chunk_single_file(
             # Create delimiter chunker as fallback
             language = (
                 file.ext_kind.language.variable
-                if file.ext_kind and hasattr(file.ext_kind.language, "variable")
+                if file.ext_kind and file.ext_kind.language
                 else "unknown"
             )
             fallback_chunker = DelimiterChunker(governor, language=language)

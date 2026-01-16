@@ -176,9 +176,9 @@ def _get_known_extensions() -> set[str]:
     from codeweaver.core import ConfigLanguage, SemanticSearchLanguage, get_ext_lang_pairs
 
     return (
-        {ext.ext.lower() for ext in get_ext_lang_pairs()}
-        | {ext.lower() for lang in SemanticSearchLanguage for ext in lang.extensions}  # ty: ignore[not-iterable]
-        | {ext.lower() for lang in ConfigLanguage for ext in lang.extensions}
+        {str(ext.ext).lower() for ext in get_ext_lang_pairs()}
+        | {str(ext).lower() for lang in SemanticSearchLanguage for ext in lang.extensions}  # ty: ignore[not-iterable]
+        | {str(ext).lower() for lang in ConfigLanguage for ext in lang.extensions}
     )
 
 

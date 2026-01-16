@@ -235,12 +235,12 @@ class ExtLangPair(NamedTuple):
     @property
     def is_actual_ext(self) -> bool:
         """Check if the extension is a valid file extension."""
-        return self.ext.startswith(".")
+        return str(self.ext).startswith(".")
 
     @property
     def is_file_name(self) -> bool:
         """Check if the extension is a file name."""
-        return not self.ext.startswith(".")
+        return not str(self.ext).startswith(".")
 
     @property
     def is_config(self) -> bool:
@@ -295,21 +295,21 @@ class ExtLangPair(NamedTuple):
         """Check if a file extension doesn't fit the usual pattern of a dot followed by alphanumerics."""
         if not self.is_actual_ext or self.is_file_name:
             return True
-        if self.ext.istitle():
+        if str(self.ext).istitle():
             return True
-        return True if self.ext.find(".", 1) != -1 else "." not in str(self.ext)
+        return True if str(self.ext).find(".", 1) != -1 else "." not in str(self.ext)
 
     def is_same(self, filename: str) -> bool:
         """Check if the given filename is the same filetype as the extension."""
         # fast case first for elimination
-        if self.ext.lower() not in filename.lower():
+        if str(self.ext).lower() not in filename.lower():
             return False
         # a couple of these may seem redundant but we're descending in confidence levels here
         if not self.is_weird_extension and filename.endswith(str(self.ext)):
             return True
         if self.is_file_name and filename == self.ext:
             return True
-        return bool(self.is_weird_extension and filename.lower().endswith(self.ext.lower()))
+        return bool(self.is_weird_extension and filename.lower().endswith(str(self.ext).lower()))
 
 
 def determine_ext_kind(validated_data: dict[str, Any]) -> ExtKind | None:

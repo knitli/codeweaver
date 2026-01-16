@@ -27,13 +27,7 @@ from qdrant_client.http.models.models import CollectionInfo
 
 from codeweaver.core import BasedModel, log_to_client_or_fallback
 from codeweaver.engine.resource_estimation import estimate_backup_memory_requirements
-from codeweaver.providers import (
-    CircuitBreakerState,
-    ProviderSettingsDict,
-    QdrantBaseProvider,
-    _backup_profile,
-    get_profile,
-)
+from codeweaver.providers import CircuitBreakerState, ProviderSettingsDict
 
 
 if TYPE_CHECKING:

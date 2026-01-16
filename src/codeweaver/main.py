@@ -343,7 +343,7 @@ async def run(
 if __name__ == "__main__":
     from codeweaver.core import asyncio_or_uvloop
 
-    asyncio = asyncio_or_uvloop()
+    asyncio = asyncio_or_uvloop()  # ty:ignore[invalid-assignment]
     try:
         asyncio.run(run())
     except Exception as e:

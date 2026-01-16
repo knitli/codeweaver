@@ -288,7 +288,7 @@ def validate_regex_pattern(value: re.Pattern[str] | str | None) -> re.Pattern[st
 
 def variable_to_env_var(var: str) -> str:
     """Convert a variable name to an environment variable name."""
-    return textcase.screaming_snake(var)
+    return textcase.snake(var).upper()
 
 
 __all__ = (

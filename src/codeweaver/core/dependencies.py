@@ -15,6 +15,8 @@ from typing import TYPE_CHECKING, Annotated
 
 from pydantic import DirectoryPath
 
+from codeweaver.core import LoggingSettingsDict
+from codeweaver.core.config import DefaultLoggingSettings
 from codeweaver.core.di import INJECTED, dependency_provider, depends
 from codeweaver.core.types import Unset, get_possible_config_paths
 from codeweaver.core.utils import get_project_path
@@ -118,6 +120,18 @@ def _get_telemetry_settings(settings: SettingsDep = INJECTED) -> TelemetrySettin
 
 
 type TelemetrySettingsDep = Annotated[TelemetrySettings, depends(_get_telemetry_settings)]
+
+
+@dependency_provider(LoggingSettingsDict, scope="singleton")
+def _get_logging_settings(settings: SettingsDep = INJECTED) -> LoggingSettingsDict:
+    return (
+        settings.logging  # type: ignore[return-value]
+        if settings.logging is not Unset
+        else DefaultLoggingSettings
+    )  # type: ignore[return-value]
+
+
+type LoggingSettingsDep = Annotated[LoggingSettingsDict, depends(_get_logging_settings)]
 
 
 def _get_canonical_project_path(settings: SettingsDep = INJECTED) -> DirectoryPath:
