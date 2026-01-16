@@ -20,7 +20,6 @@ from codeweaver.providers import MemoryVectorStoreProvider
 
 # sourcery skip: dont-import-test-modules
 from tests.conftest import create_test_chunk_with_embeddings
-from codeweaver.providers import Provider
 
 pytestmark = [pytest.mark.integration]
 
@@ -38,7 +37,7 @@ async def test_inmemory_persistence(vector_store_factory):
     """
     with tempfile.TemporaryDirectory() as tmpdir:
         temp_path = Path(tmpdir) / "test_memory_db"
-        
+
         # Phase 1: Create and populate
         provider1 = await vector_store_factory(
             MemoryVectorStoreProvider,

@@ -8,16 +8,20 @@
 import shutil
 import subprocess
 import sys
+
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from functools import cache, partial
 from pathlib import Path
 from typing import Annotated, NamedTuple
+
 import reuse.comment
 import rignore
+
 from cyclopts import App, Group, Parameter, validators
 from pydantic_core._pydantic_core import from_json
 from reuse.comment import EXTENSION_COMMENT_STYLE_MAP, CppCommentStyle, TSXCommentStyle
+
 
 EXTENSION_COMMENT_STYLE_MAP = EXTENSION_COMMENT_STYLE_MAP | {
     ".astro": TSXCommentStyle,
@@ -334,7 +338,7 @@ def get_contributor() -> str:
     if contributor := input(
         "What's your name and email? (e.g. 'Adam Poulemanos <adam@knit.li>' (the default)): "
     ).strip():
-        if all((char in contributor for char in ("<", ">", "@"))):
+        if all(char in contributor for char in ("<", ">", "@")):
             return contributor
         if "@" in contributor and "@" in contributor.split(" ")[-1]:
             parts = contributor.split(" ")

@@ -14,11 +14,21 @@ from pathlib import Path
 from uuid import uuid4
 
 import pytest
+
 from qdrant_client import AsyncQdrantClient
 
 from codeweaver.core import CodeChunk, SearchStrategy, Span, StrategizedQuery
 from codeweaver.core import SemanticSearchLanguage as Language
-from codeweaver.providers import MemoryVectorStoreProvider, Provider, MemoryVectorStoreProviderSettings, EmbeddingCapabilityGroup, ConfiguredCapability, EmbeddingModelCapabilities, EmbeddingProviderSettings, EmbeddingConfig
+from codeweaver.providers import (
+    ConfiguredCapability,
+    EmbeddingCapabilityGroup,
+    EmbeddingConfig,
+    EmbeddingModelCapabilities,
+    EmbeddingProviderSettings,
+    MemoryVectorStoreProvider,
+    MemoryVectorStoreProviderSettings,
+    Provider,
+)
 
 
 pytestmark = [pytest.mark.validation]
@@ -51,14 +61,14 @@ async def memory_config(temp_persist_path):
 @pytest.fixture
 async def test_embedding_caps():
     """Provide test embedding capabilities with 768 dimensions."""
-    
+
     dense_caps = EmbeddingModelCapabilities(
         name="test-dense-model",
         default_dimension=768,
         default_dtype="float32",
         preferred_metrics=("cosine", "dot"),
     )
-    
+
     # We need a ConfiguredCapability for the group
     # Mocking the settings to satisfy ConfiguredCapability
     mock_settings = EmbeddingProviderSettings(
@@ -79,7 +89,7 @@ async def test_embedding_caps():
 async def memory_provider(memory_config, test_embedding_caps):
     """Create a MemoryVectorStoreProvider instance for testing."""
     client = AsyncQdrantClient(location=":memory:")
-    
+
     provider = MemoryVectorStoreProvider(
         client=client,
         config=memory_config,
@@ -256,13 +266,13 @@ class TestMemoryProviderContract:
         """Test auto_persist triggers persistence on upsert."""
         # Config is already a settings object, we need to create a new one with modified inner config
         # or just modify the dict used to create it if we were doing that.
-        # Since memory_config is a Pydantic model, we should use model_copy with update if possible, 
+        # Since memory_config is a Pydantic model, we should use model_copy with update if possible,
         # but in_memory_config is a dict inside.
-        
+
         # Easiest way is to create a new settings object
         new_config_dict = memory_config.in_memory_config.copy()
         new_config_dict["auto_persist"] = True
-        
+
         config_with_auto = MemoryVectorStoreProviderSettings(
             provider=Provider.MEMORY,
             in_memory_config=new_config_dict

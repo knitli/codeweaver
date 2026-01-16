@@ -37,11 +37,7 @@ from codeweaver.core import (
     Span,
     StrategizedQuery,
 )
-from codeweaver.providers import (
-    MemoryVectorStoreProvider,
-    Provider,
-    QdrantVectorStoreProvider,
-)
+from codeweaver.providers import MemoryVectorStoreProvider, Provider, QdrantVectorStoreProvider
 
 
 pytestmark = [pytest.mark.async_test, pytest.mark.performance, pytest.mark.slow]
@@ -103,7 +99,7 @@ async def qdrant_store(qdrant_test_manager, vector_store_factory) -> QdrantVecto
     """Create a QdrantVectorStoreProvider for testing."""
     # Create unique collection
     collection_name = qdrant_test_manager.create_collection_name("perf_test")
-    
+
     # Use factory to create provider
     # It will handle collection creation if we pass the name and sizes
     store = await vector_store_factory(
@@ -127,7 +123,7 @@ async def memory_store(vector_store_factory) -> AsyncGenerator[MemoryVectorStore
     with tempfile.TemporaryDirectory() as tmpdir:
         collection_name = f"perf_test_{uuid7().hex[:8]}"
         persist_path = Path(tmpdir) / "test_store.json"
-        
+
         store = await vector_store_factory(
             MemoryVectorStoreProvider,
             config_overrides={

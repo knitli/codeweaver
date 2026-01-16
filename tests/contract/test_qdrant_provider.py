@@ -21,11 +21,23 @@ from typing import cast
 from uuid import UUID
 
 import pytest
-from qdrant_client import AsyncQdrantClient
+
 from pydantic import AnyUrl
+from qdrant_client import AsyncQdrantClient
 
 from codeweaver.core import CodeChunk, SearchStrategy, Span, StrategizedQuery
-from codeweaver.providers import QdrantVectorStoreProvider, QdrantVectorStoreProviderSettings, CollectionConfig, QdrantClientOptions, Provider, EmbeddingCapabilityGroup, ConfiguredCapability, EmbeddingModelCapabilities, EmbeddingProviderSettings, EmbeddingConfig
+from codeweaver.providers import (
+    CollectionConfig,
+    ConfiguredCapability,
+    EmbeddingCapabilityGroup,
+    EmbeddingConfig,
+    EmbeddingModelCapabilities,
+    EmbeddingProviderSettings,
+    Provider,
+    QdrantClientOptions,
+    QdrantVectorStoreProvider,
+    QdrantVectorStoreProviderSettings,
+)
 
 
 pytestmark = [pytest.mark.integration, pytest.mark.external_api]
@@ -60,12 +72,12 @@ async def qdrant_provider(qdrant_test_manager):
         model_name="test-dense-model",
         embedding_config=EmbeddingConfig(model_name="test-dense-model")
     )
-    
+
     configured_dense = ConfiguredCapability(
         capability=dense_caps,
         config=mock_settings
     )
-    
+
     caps = EmbeddingCapabilityGroup(dense=configured_dense, sparse=None)
 
     # Use standard instantiation

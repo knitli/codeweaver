@@ -12,14 +12,18 @@ Docker will build and maintain the image with enhanced security features includi
 cryptographic signatures, provenance tracking, and SBOMs.
 """
 from __future__ import annotations
+
 import subprocess
+
 from pathlib import Path
+
 import yaml
-from codeweaver import __version__
+
 from codeweaver.config import environment_variables
-from codeweaver.core import ALL_LANGUAGES
-from codeweaver.core import ConfigLanguage, SemanticSearchLanguage
-from codeweaver.core import Provider
+
+from codeweaver import __version__
+from codeweaver.core import ALL_LANGUAGES, ConfigLanguage, Provider, SemanticSearchLanguage
+
 
 def _languages() -> list[str]:
     """Get all supported programming languages."""

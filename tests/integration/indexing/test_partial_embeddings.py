@@ -31,7 +31,7 @@ async def test_partial_embeddings(qdrant_test_manager, vector_store_factory):
 
     # Create unique collection
     collection_name = qdrant_test_manager.create_collection_name("partial")
-    
+
     provider = await vector_store_factory(
         QdrantVectorStoreProvider,
         config_overrides={

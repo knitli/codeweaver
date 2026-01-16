@@ -402,96 +402,100 @@ async def qdrant_test_collection(
 
 
 @pytest.fixture
-def vector_store_factory(qdrant_test_manager):
+def vector_store_factory(qdrant_test_manager) -> Any:
     """Factory fixture to create configured vector store providers.
-    
+
     Handles creation of settings, client, and capabilities for DI-compliant instantiation.
     """
+
     async def _factory(provider_cls, config_overrides=None, embedding_caps=None):
-        from codeweaver.providers import (
-            QdrantVectorStoreProvider, 
-            MemoryVectorStoreProvider,
-            QdrantVectorStoreProviderSettings,
-            MemoryVectorStoreProviderSettings,
-            QdrantClientOptions,
-            CollectionConfig,
-            Provider,
-            EmbeddingCapabilityGroup,
-            ConfiguredCapability,
-            EmbeddingModelCapabilities,
-            EmbeddingProviderSettings,
-            EmbeddingConfig
-        )
-        from qdrant_client import AsyncQdrantClient
-        from pydantic import AnyUrl
         from uuid import uuid4
 
+        from pydantic import AnyUrl
+        from qdrant_client import AsyncQdrantClient
+
+        from codeweaver.providers import (
+            CollectionConfig,
+            ConfiguredCapability,
+            EmbeddingCapabilityGroup,
+            EmbeddingConfig,
+            EmbeddingModelCapabilities,
+            EmbeddingProviderSettings,
+            MemoryVectorStoreProvider,
+            MemoryVectorStoreProviderSettings,
+            Provider,
+            QdrantClientOptions,
+            QdrantVectorStoreProvider,
+            QdrantVectorStoreProviderSettings,
+        )
+
         config_overrides = config_overrides or {}
-        
+
         # Default caps if not provided
         if embedding_caps is None:
-             dense_caps = EmbeddingModelCapabilities(
+            dense_caps = EmbeddingModelCapabilities(
                 name="test-dense-model",
                 default_dimension=768,
-                default_dtype="float32",
+                default_dtype="float16",
                 preferred_metrics=("cosine", "dot"),
             )
-             # Mock settings to satisfy ConfiguredCapability
-             mock_settings = EmbeddingProviderSettings(
-                provider=Provider.OPENAI, # Dummy provider
+            # Mock settings to satisfy ConfiguredCapability
+            mock_settings = EmbeddingProviderSettings(
+                provider=Provider.OPENAI,  # Dummy provider
                 model_name="test-dense-model",
-                embedding_config=EmbeddingConfig(model_name="test-dense-model")
+                embedding_config=EmbeddingConfig(model_name="test-dense-model"),
             )
-             configured_dense = ConfiguredCapability(capability=dense_caps, config=mock_settings)
-             embedding_caps = EmbeddingCapabilityGroup(dense=configured_dense, sparse=None)
+            configured_dense = ConfiguredCapability(capability=dense_caps, config=mock_settings)
+            embedding_caps = EmbeddingCapabilityGroup(dense=configured_dense, sparse=None)
 
         if provider_cls is QdrantVectorStoreProvider:
             collection_name = config_overrides.get("collection_name")
             if not collection_name:
-                 collection_name = qdrant_test_manager.create_collection_name("factory-test")
-                 # Create collection if we generated the name (assumes default vector size if not specified)
-                 # If config_overrides has vector sizes, user might want to create it themselves, but for convenience:
-                 dense_size = config_overrides.get("dense_vector_size", 768)
-                 sparse_size = config_overrides.get("sparse_vector_size", None)
-                 await qdrant_test_manager.create_collection(
-                     collection_name, 
-                     dense_vector_size=dense_size,
-                     sparse_vector_size=sparse_size
-                 )
-            
+                collection_name = qdrant_test_manager.create_collection_name("factory-test")
+                # Create collection if we generated the name (assumes default vector size if not specified)
+                # If config_overrides has vector sizes, user might want to create it themselves, but for convenience:
+                dense_size = config_overrides.get("dense_vector_size", 768)
+                sparse_size = config_overrides.get("sparse_vector_size", None)
+                await qdrant_test_manager.create_collection(
+                    collection_name, dense_vector_size=dense_size, sparse_vector_size=sparse_size
+                )
+
             url = config_overrides.get("url", qdrant_test_manager.url)
-            
+
             settings = QdrantVectorStoreProviderSettings(
                 provider=Provider.QDRANT,
                 client_options=QdrantClientOptions(url=AnyUrl(url)),
                 collection=CollectionConfig(collection_name=collection_name),
-                batch_size=config_overrides.get("batch_size", 64)
+                batch_size=config_overrides.get("batch_size", 64),
             )
             client = AsyncQdrantClient(url=url)
-            provider = QdrantVectorStoreProvider(client=client, config=settings, caps=embedding_caps)
+            provider = QdrantVectorStoreProvider(
+                client=client, _provider=Provider.QDRANT, config=settings, caps=embedding_caps
+            )
             await provider._initialize()
             return provider
 
-        elif provider_cls is MemoryVectorStoreProvider:
-             collection_name = config_overrides.get("collection_name", f"mem-test-{uuid4().hex[:8]}")
-             persist_path = config_overrides.get("persist_path") 
-             
-             in_memory_config = {
-                 "collection_name": collection_name,
-                 "auto_persist": config_overrides.get("auto_persist", False)
-             }
-             if persist_path:
-                 in_memory_config["persist_path"] = persist_path
+        if provider_cls is MemoryVectorStoreProvider:
+            collection_name = config_overrides.get("collection_name", f"mem-test-{uuid4().hex[:8]}")
+            persist_path = config_overrides.get("persist_path")
 
-             settings = MemoryVectorStoreProviderSettings(
-                provider=Provider.MEMORY,
-                in_memory_config=in_memory_config
+            in_memory_config = {
+                "collection_name": collection_name,
+                "auto_persist": config_overrides.get("auto_persist", False),
+            }
+            if persist_path:
+                in_memory_config["persist_path"] = persist_path
+
+            settings = MemoryVectorStoreProviderSettings(
+                provider=Provider.MEMORY, in_memory_config=in_memory_config
             )
-             client = AsyncQdrantClient(location=":memory:")
-             provider = MemoryVectorStoreProvider(client=client, config=settings, caps=embedding_caps)
-             await provider._initialize()
-             return provider
-        
+            client = AsyncQdrantClient(location=":memory:")
+            provider = MemoryVectorStoreProvider(
+                client=client, _provider=Provider.MEMORY, config=settings, caps=embedding_caps
+            )
+            await provider._initialize()
+            return provider
+
         raise ValueError(f"Unknown provider class: {provider_cls}")
 
     return _factory

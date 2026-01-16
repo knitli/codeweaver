@@ -525,12 +525,17 @@ def get_qdrant_test_config(
     Returns:
         Configuration dict for QdrantVectorStoreProvider
     """
-    from codeweaver.providers.config import QdrantVectorStoreProviderSettings, CollectionConfig, QdrantClientOptions
-    from codeweaver.core import Provider
     from pydantic import AnyUrl
 
+    from codeweaver.core import Provider
+    from codeweaver.providers.config import (
+        CollectionConfig,
+        QdrantClientOptions,
+        QdrantVectorStoreProviderSettings,
+    )
+
     manager = QdrantTestManager(port=port, api_key=api_key)
-    
+
     collection_name = manager.create_collection_name(
         f"codeweaver-test-{collection_suffix}" if collection_suffix else "codeweaver-test"
     )

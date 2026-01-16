@@ -299,20 +299,20 @@ async def actual_vector_store() -> MemoryVectorStoreProvider:
     if _shared_memory_vector_store is None:
         # Get embedding capabilities to construct EmbeddingCapabilityGroup
         from codeweaver.providers.types import ConfiguredCapability, EmbeddingCapabilityGroup
-        
+
         dense_caps, sparse_caps, _ = _get_caps()
         dense_config = _get_configs()
         sparse_config = _get_configs(sparse=True)
-        
+
         # Create ConfiguredCapability objects
         capabilities = [
             ConfiguredCapability(capability=dense_caps, config=dense_config),
             ConfiguredCapability(capability=sparse_caps, config=sparse_config),
         ]
-        
+
         # Create EmbeddingCapabilityGroup
         caps = EmbeddingCapabilityGroup.from_capabilities(capabilities)
-        
+
         # Pass collection_name in config so model_post_init uses it
         _shared_memory_vector_store = MemoryVectorStoreProvider(
             config={"collection_name": "codeweaver-test-collection"},

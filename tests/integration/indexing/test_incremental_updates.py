@@ -33,7 +33,7 @@ async def test_incremental_updates(qdrant_test_manager, vector_store_factory):
     """
     # Create unique collection with sparse vector support (needed for BM25)
     collection_name = qdrant_test_manager.create_collection_name("incremental")
-    
+
     provider = await vector_store_factory(
         QdrantVectorStoreProvider,
         config_overrides={

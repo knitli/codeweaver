@@ -66,27 +66,27 @@ async def test_custom_configuration(qdrant_test_manager, vector_store_factory):
             "collection_name": "my_custom_collection",
             "url": qdrant_url,
             "batch_size": 128
-            # api_key is handled by qdrant_client creation in factory if we passed it, 
-            # but factory currently only takes url. 
+            # api_key is handled by qdrant_client creation in factory if we passed it,
+            # but factory currently only takes url.
             # qdrant_test_manager.url typically embeds api key or we might need to enhance factory.
             # However, standard test setup usually doesn't use API key for local Qdrant.
             # If qdrant_test_manager has api_key, we should pass it.
         }
     )
     # Note: factory uses qdrant_test_manager.url default if not provided, but we provide it.
-    # If API key is separate, factory might need update. 
-    # Current factory implementation: 
+    # If API key is separate, factory might need update.
+    # Current factory implementation:
     # client_options=QdrantClientOptions(url=AnyUrl(url)),
     # It doesn't pass api_key explicitly to ClientOptions.
     # If qdrant_test_manager.url is full URL, it might be fine.
     # But let's check factory implementation again.
-    
+
     # Factory:
     # url = config_overrides.get("url", qdrant_test_manager.url)
     # settings = QdrantVectorStoreProviderSettings(..., client_options=QdrantClientOptions(url=AnyUrl(url)), ...)
     # client = AsyncQdrantClient(url=url)
-    
-    # If api_key is needed, AsyncQdrantClient needs it. 
+
+    # If api_key is needed, AsyncQdrantClient needs it.
     # The factory as implemented in previous turn *does not* take api_key from config_overrides for client creation.
     # It just uses `AsyncQdrantClient(url=url)`.
     # This might be a limitation if tests require auth.

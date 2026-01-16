@@ -29,7 +29,7 @@ async def qdrant_provider(qdrant_test_manager: Any, vector_store_factory):
     """Create Qdrant provider for testing."""
     # Create unique collection
     collection_name = qdrant_test_manager.create_collection_name("hybrid")
-    
+
     provider = await vector_store_factory(
         QdrantVectorStoreProvider,
         config_overrides={

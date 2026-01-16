@@ -7,8 +7,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from codeweaver.core import PROVIDER_CAPABILITIES
-from codeweaver.core import Provider, ProviderKind
+from codeweaver.core import PROVIDER_CAPABILITIES, Provider, ProviderKind
 
 
 def generate_category(category: str) -> list[str]:
