@@ -68,6 +68,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
     model_config = BasedModel.model_config | ConfigDict(extra="allow")
 
     config: VectorStoreProviderSettings
+    caps: EmbeddingCapabilityGroup
     client: VectorStoreClient
 
     _known_collections: set[str] = PrivateAttr(default_factory=set)
@@ -84,7 +85,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
         self,
         client: VectorStoreClient,
         config: VectorStoreProviderSettings,
-        capabilities: EmbeddingCapabilityGroup,
+        caps: EmbeddingCapabilityGroup,
         **kwargs: Any,
     ) -> None:
         """Initialize the vector store provider with embedding capabilities."""
@@ -94,15 +95,12 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
             init_data["config"] = config
         if client is not None:
             init_data["client"] = client
-        # Note: Don't pass _embedding_caps here - PrivateAttr with default_factory
-        # will always call the factory. Set it after super().__init__() instead.
+
+        object.__setattr__(self, "caps", caps)
+        object.__setattr__(self, "client", client)
+        object.__setattr__(self, "config", config)
 
         super().__init__(**init_data)
-
-        # Override _embedding_caps if explicitly provided (after super().__init__)
-        # This is required because PrivateAttr with default_factory always calls the factory
-        if embedding_caps is not None:
-            object.__setattr__(self, "_embedding_caps", embedding_caps)
 
         # Initialize circuit breaker state
         self._circuit_state = CircuitBreakerState.CLOSED
@@ -179,37 +177,25 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
         Returns:
             Embedding capabilities dictionary with 'dense' and 'sparse' keys.
         """
-        return self.embedding_capabilities
+        return self.caps
 
-    @property
-    def dense_dimension(self) -> int | None:
+    async def dense_dimension(self) -> int | None:
         """Get the dimension of dense embeddings for this vector store provider.
 
         Returns:
             Dimension of dense embeddings, or None if dense embeddings not supported.
         """
         dense_caps = self.embedding_capabilities.dense
-        default_dim = dense_caps.default_dimension if dense_caps else None
+        return await dense_caps.dimension() if dense_caps else None
 
-        dense_settings = self.embedding_settings.get("dense")
-        set_dim = dense_settings.get("dimension") if dense_settings else None
-
-        return set_dim or default_dim
-
-    @property
-    def dense_dtype(self) -> Literal["float32", "float16", "int8", "binary"]:
+    async def dense_dtype(self) -> Literal["float32", "float16", "int8", "binary"]:
         """Get the data type of dense embeddings for this vector store provider.
 
         Returns:
             Data type of dense embeddings.
         """
-        dense_caps = self.embedding_capabilities.get("dense")
-        default_dtype = dense_caps.default_dtype if dense_caps else "float16"
-
-        dense_settings = self.embedding_settings.get("dense")
-        set_dtype = dense_settings.get("data_type") if dense_settings else None
-
-        return cast(Literal["float32", "float16", "int8", "binary"], set_dtype or default_dtype)
+        dense_caps = self.embedding_capabilities.dense
+        return await dense_caps.datatype() if dense_caps else "float32"  # ty:ignore[invalid-return-type]
 
     @property
     def distance_metric(self) -> Literal["cosine", "dot", "euclidean"]:
@@ -218,9 +204,13 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
         Returns:
             Distance metric as a string.
         """
-        dense_caps = self.embedding_capabilities.get("dense")
-        if dense_caps and dense_caps.preferred_metrics:
-            return dense_caps.preferred_metrics[0]
+        dense_caps = self.embedding_capabilities.dense
+        if dense_caps and dense_caps.capability.preferred_metrics:
+            return next(
+                measure
+                for measure in dense_caps.capability.preferred_metrics
+                if measure.lower() in {"cosine", "dot", "euclidean", "manhattan"}
+            )
         return "cosine"
 
     @property
@@ -230,8 +220,11 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
         Returns:
             Dense model name, or None if not configured.
         """
-        dense_caps = self.embedding_capabilities.get("dense")
-        return dense_caps.name if dense_caps else None
+        return (
+            self.embedding_capabilities.dense.config.model_name
+            if self.embedding_capabilities.dense
+            else None
+        )
 
     @property
     def sparse_model(self) -> str | None:
@@ -240,8 +233,11 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
         Returns:
             Sparse model name, or None if not configured.
         """
-        sparse_caps = self.embedding_capabilities.get("sparse")
-        return sparse_caps.name if sparse_caps else None
+        return (
+            self.embedding_capabilities.sparse.config.model_name
+            if self.embedding_capabilities.sparse
+            else self.embedding_capabilities.idf.config.model_name
+        )
 
     @property
     def _check_circuit_breaker(self) -> None:
@@ -425,9 +421,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
         retry=retry_if_exception_type(RETRYABLE_EXCEPTIONS),
         reraise=True,
     )
-    async def _upsert_with_retry(
-        self, chunks: list[CodeChunk], context: Any = None, *, for_backup: bool = False
-    ) -> None:
+    async def _upsert_with_retry(self, chunks: list[CodeChunk], context: Any = None) -> None:
         """Wrapper around upsert with retry logic and circuit breaker."""
         from codeweaver.core import log_to_client_or_fallback
 
@@ -443,7 +437,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
         )
 
         try:
-            await self.upsert(chunks, for_backup=for_backup)
+            await self.upsert(chunks)
             self._record_success()
 
             await log_to_client_or_fallback(
@@ -493,7 +487,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
             raise
 
     @abstractmethod
-    async def upsert(self, chunks: list[CodeChunk], *, for_backup: bool = False) -> None:
+    async def upsert(self, chunks: list[CodeChunk]) -> None:
         """Insert or update code chunks with their embeddings.
 
         Args:
@@ -502,7 +496,6 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
                 - Each chunk must have at least one embedding (sparse or dense).
                 - Embedding dimensions must match collection configuration.
                 - Maximum 1000 chunks per batch.
-            for_backup: Whether these chunks are being upserted as part of a backup process.
 
         Raises:
             CollectionNotFoundError: Collection doesn't exist.

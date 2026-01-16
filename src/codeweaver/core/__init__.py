@@ -58,7 +58,15 @@ if TYPE_CHECKING:
         register_default_provider,
         resolve_all_configs,
     )
-    from codeweaver.core.dependencies import NoneDep, SettingsDep, StatisticsDep, bootstrap_settings
+    from codeweaver.core.dependencies import (
+        NoneDep,
+        ResolvedProjectName,
+        ResolvedProjectPath,
+        SettingsDep,
+        StatisticsDep,
+        TelemetrySettingsDep,
+        bootstrap_settings,
+    )
     from codeweaver.core.di import (
         INJECTED,
         Container,
@@ -598,6 +606,8 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "RerankingModelNameT": (__spec__.parent, "types"),
     "RerankingProviderError": (__spec__.parent, "exceptions"),
     "ResourceUri": (__spec__.parent, "types"),
+    "ResolvedProjectName": (__spec__.parent, "dependencies"),
+    "ResolvedProjectPath": (__spec__.parent, "dependencies"),
     "Role": (__spec__.parent, "types"),
     "RoleT": (__spec__.parent, "types"),
     "RootedRoot": (__spec__.parent, "types"),
@@ -635,6 +645,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "TelemetryEvent": (__spec__.parent, "telemetry"),
     "TelemetryService": (__spec__.parent, "telemetry"),
     "TelemetrySettings": (__spec__.parent, "config"),
+    "TelemetrySettingsDep": (__spec__.parent, "dependencies"),
     "ThingName": (__spec__.parent, "types"),
     "ThingNameT": (__spec__.parent, "types"),
     "ThingOrCategoryNameT": (__spec__.parent, "types"),
@@ -995,6 +1006,8 @@ __all__ = (
     "RerankingModelName",
     "RerankingModelNameT",
     "RerankingProviderError",
+    "ResolvedProjectName",
+    "ResolvedProjectPath",
     "ResourceUri",
     "Role",
     "RoleT",
@@ -1030,6 +1043,7 @@ __all__ = (
     "TelemetryService",
     "TelemetrySettings",
     "TelemetrySettings",
+    "TelemetrySettingsDep",
     "ThingName",
     "ThingNameT",
     "ThingOrCategoryNameT",

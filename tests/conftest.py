@@ -90,7 +90,6 @@ def _mock_get_tokenizer(tokenizer: str, model: str) -> MockTokenizer:
 # Note: Qdrant configuration now handled by qdrant_test_manager fixture
 # See tests/qdrant_test_manager.py for details
 
-
 # ===========================================================================
 # *                    Mock Provider Fixtures
 # ===========================================================================

@@ -8,7 +8,6 @@
 from __future__ import annotations
 
 import logging
-import multiprocessing
 
 from collections.abc import Sequence
 from typing import Any, ClassVar
@@ -31,34 +30,6 @@ except ImportError as e:
     raise ConfigurationError(
         r"FastEmbed is not installed. Please install it with `pip install code-weaver\[fastembed]` or `codeweaver\[fastembed-gpu]`."
     ) from e
-
-
-def fastembed_kwargs(**kwargs: Any) -> dict[str, Any]:
-    """Get all possible kwargs for FastEmbed embedding methods."""
-    default_kwargs: dict[str, Any] = {"threads": multiprocessing.cpu_count(), "lazy_load": True}
-    if kwargs:
-        device_ids: list[int] | None = kwargs.get("device_ids")
-        cuda: bool | None = kwargs.get("cuda")
-        if cuda == False:  # user **explicitly** disabled cuda  # noqa: E712
-            return default_kwargs | kwargs
-        cuda = bool(cuda)
-        from codeweaver.providers.optimize import decide_fastembed_runtime
-
-        decision = decide_fastembed_runtime(explicit_cuda=cuda, explicit_device_ids=device_ids)
-        if isinstance(decision, tuple) and len(decision) == 2:
-            cuda = True
-            device_ids = decision[1]
-        elif decision == "gpu":
-            cuda = True
-            device_ids = [0]
-        else:
-            cuda = False
-            device_ids = None
-        if cuda:
-            kwargs["cuda"] = True
-            kwargs["device_ids"] = device_ids
-            kwargs["providers"] = ["CUDAExecutionProvider"]
-    return default_kwargs | kwargs
 
 
 class FastEmbedRerankingProvider(RerankingProvider[TextCrossEncoder]):

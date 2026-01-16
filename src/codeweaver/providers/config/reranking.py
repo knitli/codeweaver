@@ -17,6 +17,9 @@ from codeweaver.core import BasedModel, LiteralProvider, Provider
 from codeweaver.providers import RerankingModelCapabilities
 
 
+DEFAULT_RERANK_TOP_K = 10
+
+
 class SerializedRerankingOptionsDict(TypedDict, total=False):
     """A dictionary representing serialized reranking options for different providers."""
 
@@ -221,9 +224,14 @@ class BedrockRerankingConfig(BaseRerankingConfig):
         """Convert the Bedrock reranking configuration to a dictionary of options."""
         return SerializedRerankingOptionsDict(
             model_name=self.model_name,
-            rerank=cast(dict[str, Any], self.rerank or {}),
+            rerank=cast(dict[str, Any], (self._defaults | (self.rerank or {}))),
             model=cast(dict[str, Any], self.model),
         )
+
+    @property
+    def _defaults(self) -> BedrockRerankingOptionsDict:
+        """Default config values for the rerank config."""
+        return {}
 
 
 class FastEmbedRerankingConfig(BaseRerankingConfig):
@@ -263,8 +271,15 @@ class SentenceTransformersRerankingConfig(BaseRerankingConfig):
     def _as_options(self) -> SerializedRerankingOptionsDict:
         """Convert the Sentence Transformers reranking configuration to a dictionary of options."""
         return SerializedRerankingOptionsDict(
-            model_name=self.model_name, rerank=cast(dict[str, Any], self.rerank or {}), model={}
+            model_name=self.model_name,
+            rerank=cast(dict[str, Any], (self._defaults | (self.rerank or {}))),
+            model={},
         )
+
+    @property
+    def _defaults(self) -> SentenceTransformersRerankingOptionsDict:
+        """Default config values for the rerank config."""
+        return {"top_k": DEFAULT_RERANK_TOP_K, "show_progress_bar": False}
 
 
 # ============================================================================

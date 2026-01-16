@@ -44,6 +44,7 @@ from qdrant_client.http.models.models import SparseVectorParams, VectorParams
 from codeweaver.core import (
     AnonymityConversion,
     BasedModel,
+    CodeWeaverDeveloperError,
     FilteredKey,
     FilteredKeyT,
     Provider,
@@ -255,11 +256,21 @@ class BaseProviderSettings(BasedModel, ABC):
             else {}
         )
         client_import = cast(SDKClient, self.client).client
+        kind = next(
+            (name for name in {"sparse", "embed", "rerank"} if name in type(self).__name__.lower()),
+            None,
+        )
+        if self.provider == Provider.BEDROCK:
+            if not kind:
+                raise CodeWeaverDeveloperError(
+                    "Kind must be one of 'sparse', 'embed', or 'rerank' for Bedrock provider. File an issue. This is unexpected."
+                )
+            return client_import._resolve()(
+                "bedrock-runtime" if kind == "embed" else "bedrock-agent-runtime", **options
+            )
         if not isinstance(client_import, dict):
             return client_import._resolve()(**options)
-        kind = next(
-            name for name in {"sparse", "embed", "rerank"} if name in type(self).__name__.lower()
-        )
+
         client_class = client_import.get(kind)._resolve()
 
         return client_class(**options)

@@ -15,37 +15,33 @@ from collections.abc import Iterable
 from datetime import UTC, datetime
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Literal, NoReturn
+from typing import Any, Literal, NoReturn, cast
 
 from pydantic import UUID7
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.http.exceptions import UnexpectedResponse
 from qdrant_client.http.models.models import (
-    BinaryQuantization,
     CollectionInfo,
-    CollectionsResponse,
-    Datatype,
-    Distance,
     Document,
-    Modifier,
     PointStruct,
     QueryResponse,
-    SparseIndexParams,
     SparseVector,
-    SparseVectorParams,
-    VectorParams,
 )
+from qdrant_client.models import UpdateResult
 
 from codeweaver.core import (
+    INJECTED,
     CodeChunk,
     Provider,
     ProviderError,
+    ResolvedProjectName,
     SearchResult,
     SearchStrategy,
     StrategizedQuery,
-    TypeIs,
 )
 from codeweaver.core import SparseEmbedding as CodeWeaverSparseEmbedding
+from codeweaver.providers.config import QdrantVectorStoreProviderSettings
+from codeweaver.providers.types import EmbeddingCapabilityGroup
 from codeweaver.providers.vector_stores.base import MixedQueryInput, VectorStoreProvider
 from codeweaver.providers.vector_stores.metadata import CollectionMetadata, HybridVectorPayload
 from codeweaver.providers.vector_stores.search import Filter
@@ -54,31 +50,36 @@ from codeweaver.providers.vector_stores.search import Filter
 logger = logging.getLogger(__name__)
 
 
+def _project_name(name: ResolvedProjectName = INJECTED) -> str:
+    """Return the resolved project name."""
+    return name
+
+
 class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
     """Base class for Qdrant and In Memory Qdrant vector stores with shared functionality."""
 
-    _base_url: str | None = None
-    _collection: str | None = None
-    _auto_persist: bool | None = None
-    _client: AsyncQdrantClient | None = None
+    client: AsyncQdrantClient
+    caps: EmbeddingCapabilityGroup
+    config: QdrantVectorStoreProviderSettings
     _provider: Literal[Provider.QDRANT, Provider.MEMORY]
 
     @property
     def base_url(self) -> str | None:
         """Get the base URL for the Qdrant instance."""
-        return self._base_url
+        return str(self.config.client_options.url)
 
     @property
-    def collection(self) -> str | None:
+    def collection_name(self) -> str:
         """Get the collection name for the Qdrant instance."""
-        return self._collection
+        # we ensure it's set when the config initializes
+        return cast(str, self.config.collection["collection_name"])
 
     def _telemetry_keys(self) -> None:
         return None
 
     async def _metadata(self) -> CollectionMetadata | None:
         """Get the collection metadata."""
-        collection = await self.get_collection(collection_name=self._collection)
+        collection = await self.get_collection(collection_name=self.collection_name)
         if (
             collection
             and collection.config
@@ -92,135 +93,72 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         """Get the collection metadata."""
         return await self._metadata()
 
-    @staticmethod
-    def _ensure_client(client: Any) -> TypeIs[AsyncQdrantClient]:
-        """Ensure the Qdrant client is initialized and ready.
+    def _create_metadata_from_config(self) -> CollectionMetadata:
+        """Create CollectionMetadata from config.collection (source of truth).
 
-        Args:
-            client: The client instance to check.
-
-        Returns:
-            True if the client is initialized and ready.
-        """
-        return client is not None and isinstance(client, AsyncQdrantClient)
-
-    def _generate_metadata(
-        self, *, for_backup: bool = False, collection_name: str | None = None
-    ) -> CollectionMetadata:
-        """Generate collection metadata from current provider configuration.
+        This is used both for creating new collections and validating existing ones.
+        Config.collection should already have dimension/datatype resolved via apply_resolved_config().
 
         Returns:
-            CollectionMetadata configured according to provider settings.
+            CollectionMetadata configured from provider settings.
         """
-        from codeweaver.core import get_project_path
-        from codeweaver.providers.config import get_settings_map
+        collection_config = self.config.collection
+        # Extract vector configs
+        vector_config = collection_config.get("vector_config", {})
+        dense_config = vector_config.get("dense")
+        sparse_config = vector_config.get("sparse")
 
-        settings_map = get_settings_map()
-        project_name = (
-            settings_map.get("project_name")
-            if isinstance(settings_map.get("project_name"), str)
-            else get_project_path().name
-        )
-        distance = (
-            Distance.COSINE
-            if self.distance_metric == "cosine"
-            else Distance.DOT
-            if self.distance_metric == "dot"
-            else Distance.EUCLID
-        )
-        datatype = (
-            Datatype.FLOAT32
-            if self.dense_dtype == "float32"
-            else Datatype.FLOAT16
-            if self.dense_dtype == "float16"
-            else Datatype.UINT8
-        )
-        quantization_config = BinaryQuantization() if self.dense_dtype == "binary" else None
-        if self.dense_dtype in ("binary", "int8") or for_backup:
-            datatype = Datatype.UINT8
-        sparse_model = (
-            getattr(self._embedding_caps["backup_sparse"], "name", None)
-            if for_backup
-            else self.sparse_model
-        )
+        # Get model names from capabilities
+        dense_model = None
+        sparse_model = None
+        if self.caps:
+            if dense := self.caps.dense:
+                dense_model = (
+                    dense.config.model_name
+                    or dense.config.embedding_config.model_name
+                    or dense.capability.name
+                )
+            elif (idf := self.caps.idf) and not self.caps.sparse:
+                sparse_model = (
+                    idf.config.model_name
+                    or idf.config.sparse_embedding_config.model_name
+                    or idf.capability.name
+                )
+            elif sparse := self.caps.sparse:
+                sparse_model = (
+                    sparse.config.model_name
+                    or sparse.config.sparse_embedding_config.model_name
+                    or sparse.capability.name
+                )
+
         sparse_model = sparse_model or "qdrant/bm25"
+        if not sparse_config:
+            from codeweaver.providers.config.profiles import ProviderProfile
+
+            test_profile = ProviderProfile.TESTING
+            # We know it exists because it's defined in the module
+            assert test_profile.vector_store is not None  # noqa: S101
+            assert test_profile.vector_store[0].collection["vector_config"] is not None  # noqa: S101
+            sparse_config = test_profile.vector_store[0].collection["vector_config"]["sparse"]
+
         return CollectionMetadata.model_validate({
-            "provider": self._provider.variable,
+            "provider": type(self)._provider.variable,
             "created_at": datetime.now(UTC),
-            "project_name": project_name,
-            "vector_config": {
-                "dense": VectorParams(
-                    size=getattr(self._embedding_caps["backup_dense"], "default_dimension", 256)
-                    if for_backup
-                    else self._settings.get("dense", {}).get("dimension") or dense_dim
-                    if (
-                        dense_dim := getattr(
-                            self._embedding_caps.get("dense"), "default_dimension", None
-                        )
-                    )
-                    is not None
-                    else 768,
-                    distance=distance,
-                    quantization_config=quantization_config,
-                    datatype=datatype,
-                )
-            },
-            "sparse_config": {
-                "sparse": SparseVectorParams(
-                    index=SparseIndexParams(datatype=Datatype.FLOAT16),
-                    modifier=Modifier.IDF if sparse_model == "qdrant/bm25" else None,
-                )
-            },
-            "collection_name": collection_name
-            or self.config.get("collection_name")
-            or self._default_collection_name(),
-            "is_backup": for_backup,
-            "dense_model": getattr(self._embedding_caps["backup_dense"], "name", None)
-            if for_backup
-            else self.dense_model,
+            "project_name": _project_name(),
+            "vector_config": dense_config,
+            "sparse_config": sparse_config,
+            "collection_name": self.collection_name,
+            "dense_model": dense_model,
             "sparse_model": sparse_model,
         })
 
-    def _default_collection_name(self) -> str:
-        """Generate a default collection name based on the provider settings."""
-        from codeweaver.core import generate_collection_name
-
-        return generate_collection_name(is_backup=False)
-
     async def _initialize(self) -> None:
         """Initialize the Qdrant provider with configurations."""
-        if self._client is not None:
-            logger.debug(
-                "%s already initialized, skipping re-initialization", self.__class__.__name__
-            )
-            return
-        provided_collection_name = self.config.get("collection_name") if self.config else None
-        config = self._fetch_config()
-        qdrant_config = config["provider_settings"]
-        if provided_collection_name:
-            merged_config = dict(qdrant_config)
-            merged_config["collection_name"] = provided_collection_name
-            object.__setattr__(self, "config", merged_config)
-            collection_name = provided_collection_name
-        else:
-            object.__setattr__(self, "config", qdrant_config)
-            collection_name = (
-                qdrant_config.get("collection_name") or self._default_collection_name()
-            )
-        base_url = qdrant_config.get("url") if self._provider == Provider.QDRANT else ":memory:"
-        object.__setattr__(self, "_collection", collection_name)
-        object.__setattr__(self, "_base_url", base_url)
-        client = await self._build_client()
-        object.__setattr__(self, "_client", client)
         await self._init_provider()
 
     @abstractmethod
     async def _init_provider(self) -> None:
         """Initialize the provider with necessary configurations."""
-
-    @abstractmethod
-    async def _build_client(self) -> AsyncQdrantClient:
-        """Build and return the Qdrant client instance."""
 
     async def list_collections(self) -> list[str] | None:
         """List all collections in the Qdrant instance.
@@ -232,10 +170,10 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
             ConnectionError: Failed to connect to Qdrant server.
             ProviderError: Qdrant operation failed.
         """
-        if not self._client:
+        if not self.client:
             raise ProviderError("Qdrant client is not initialized")
         try:
-            collections = await self._client.get_collections()
+            collections = await self.client.get_collections()
         except Exception as e:
             logger.warning("Failed to list collections from Qdrant")
             raise ProviderError(f"Failed to list collections: {e}") from e
@@ -259,12 +197,10 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
             CollectionNotFoundError: Collection doesn't exist.
             SearchError: Search operation failed.
         """
-        if not self._ensure_client(self._client):
+        if not self._ensure_client(self.client):
             raise ProviderError("Qdrant client not initialized")
-        await self._ensure_collection(
-            collection_name=self._collection or self._default_collection_name()
-        )
-        collection_name = self.collection
+        await self._ensure_collection(collection_name=self.collection_name)
+        collection_name = self.collection_name
         if not collection_name:
             raise ProviderError("No collection configured")
         strategized_vector = self._normalize_vector_input(vector)
@@ -275,40 +211,36 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         else:
             return self._convert_search_results(results, strategized_vector)
 
-    async def _ensure_collection(
-        self, collection_name: str, dense_dim: int | None = None, *, for_backup: bool = False
-    ) -> None:
+    async def _ensure_collection(self, collection_name: str, dense_dim: int | None = None) -> None:
         """Ensure collection exists, creating it if necessary.
 
         Args:
             collection_name: Name of the collection to ensure exists.
             dense_dim: Dimension of dense vectors (deprecated - config is source of truth).
         """
-        for_backup = for_backup or collection_name.endswith("backup")
         if collection_name in self._known_collections:
             return
-        if not self._client:
+        if not self.client:
             raise ProviderError("Qdrant client is not initialized")
         try:
-            if await self._client.collection_exists(collection_name):
+            if await self.client.collection_exists(collection_name):
                 self._known_collections.add(collection_name)
+                # Validate existing collection matches current config
+                await self._validate_collection_config(collection_name)
                 return
-            await self._client.create_collection(
-                **self._generate_metadata(
-                    for_backup=for_backup, collection_name=collection_name
-                ).to_collection()
-            )
+
+            # Create new collection from config.collection (source of truth)
+            metadata = self._create_metadata_from_config()
+            await self.client.create_collection(**metadata.to_collection())
             self._known_collections.add(collection_name)
         except UnexpectedResponse:
             try:
-                if collections := (await self._client.get_collections()):
+                if collections := (await self.client.get_collections()):
                     self._known_collections |= {col.name for col in collections.collections}
                 if collection_name not in self._known_collections:
-                    await self._client.create_collection(
-                        **self._generate_metadata(
-                            for_backup=for_backup, collection_name=collection_name
-                        ).to_collection()
-                    )
+                    # Create new collection from config.collection
+                    metadata = self._create_metadata_from_config()
+                    await self.client.create_collection(**metadata.to_collection())
                     self._known_collections.add(collection_name)
                     return
                 await self._validate_collection_config(collection_name)
@@ -350,8 +282,8 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
             )
 
         try:
-            collection_info = await self._client.get_collection(collection_name)
-            expected_metadata = self._generate_metadata()
+            collection_info = await self.client.get_collection(collection_name)
+            expected_metadata = self._create_metadata_from_config()
             actual_vectors = collection_info.config.params.vectors
             if isinstance(actual_vectors, dict) and "dense" in actual_vectors:
                 actual_dense = actual_vectors["dense"]
@@ -388,7 +320,7 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         field_schema: Literal[
             "keyword", "integer", "float", "geo", "text", "datetime", "bool", "uuid"
         ],
-    ) -> CollectionsResponse:
+    ) -> UpdateResult:
         """Create a payload index on the specified field.
 
         Args:
@@ -400,14 +332,14 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
             ProviderError: Qdrant operation failed.
 
         Returns:
-            CollectionsResponse: Response from Qdrant after creating the index.
+            UpdateResult: Response from Qdrant after creating the index.
         """
-        self._ensure_client(self._client)
-        if not self._client:
+        self._ensure_client(self.client)
+        if not self.client:
             raise ProviderError("Qdrant client is not initialized")
         await self._ensure_collection(collection_name=collection_name)
         try:
-            return await self._client.create_payload_index(
+            return await self.client.create_payload_index(
                 collection_name=collection_name, field_name=field_name, field_schema=field_schema
             )
         except Exception as e:
@@ -458,9 +390,9 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
                         type(p.query),
                         getattr(p, "using", None),
                     )
-            response = await self._client.query_points(**query_params)
+            response = await self.client.query_points(**query_params)
         else:
-            response = await self._client.query_points(
+            response = await self.client.query_points(
                 **vector.to_query(kwargs=args | {"collection_name": collection_name})
             )
         return response.points if hasattr(response, "points") else response
@@ -479,8 +411,7 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         Raises:
             ProviderError: Invalid vector input format.
         """
-        from codeweaver.core import StrategizedQuery
-        from codeweaver.providers.embedding.types import SparseEmbedding
+        from codeweaver.core import SparseEmbedding, StrategizedQuery
 
         if isinstance(vector, StrategizedQuery):
             return vector
@@ -595,7 +526,7 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
             "values": normed_values,
         })
 
-    def _create_payload(self, chunk: CodeChunk, *, for_backup: bool = False) -> HybridVectorPayload:
+    def _create_payload(self, chunk: CodeChunk) -> HybridVectorPayload:
         """Create payload for a code chunk.
 
         Args:
@@ -614,7 +545,6 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
             indexed_at=datetime.now(UTC).isoformat(),
             hash=chunk.blake_hash,
             provider=self._provider.variable,
-            is_backup=for_backup,
             embedding_complete=bool(chunk.dense_batch_key and chunk.sparse_batch_key),
         )
 
@@ -630,18 +560,18 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         Raises:
             ProviderError: If client is not initialized or operation fails.
         """
-        if not self._client:
+        if not self.client:
             raise ProviderError("Qdrant client is not initialized")
-        target_collection = collection_name or self.collection
+        target_collection = collection_name or self.collection_name
         if not target_collection:
             raise ProviderError("No collection specified for deletion")
         try:
-            collections = await self._client.get_collections()
+            collections = await self.client.get_collections()
             collection_names = [col.name for col in collections.collections]
             if target_collection not in collection_names:
                 logger.info("Collection '%s' does not exist, nothing to delete", target_collection)
                 return False
-            await self._client.delete_collection(collection_name=target_collection)
+            await self.client.delete_collection(collection_name=target_collection)
             logger.info("Successfully deleted collection '%s'", target_collection)
         except Exception as e:
             raise ProviderError(
@@ -657,16 +587,16 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         Args:
             file_path: File path to remove from index.
         """
-        if not self._ensure_client(self._client):
+        if not self._ensure_client(self.client):
             raise ProviderError("Qdrant client not initialized")
-        collection_name = self.collection
+        collection_name = self.collection_name
         if not collection_name:
             raise ProviderError("No collection configured")
         await self._ensure_collection(collection_name)
         from qdrant_client.models import FieldCondition, MatchValue
         from qdrant_client.models import Filter as QdrantFilter
 
-        _ = await self._client.delete(
+        _ = await self.client.delete(
             collection_name=collection_name,
             points_selector=QdrantFilter(
                 must=[FieldCondition(key="file_path", match=MatchValue(value=str(file_path)))]
@@ -689,7 +619,7 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         Raises:
             ProviderError: If client is not initialized or operation fails.
         """
-        if not self._ensure_client(self._client):
+        if not self._ensure_client(self.client):
             raise ProviderError("Qdrant client not initialized")
         try:
             await self._ensure_collection(collection_name=collection_name)
@@ -699,7 +629,7 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
                 details={"collection": collection_name, "error": str(e)},
             ) from e
         else:
-            return await self._client.get_collection(collection_name=collection_name)
+            return await self.client.get_collection(collection_name=collection_name)
 
     async def delete_by_id(self, ids: list[UUID7]) -> None:
         """Delete chunks by their unique identifiers.
@@ -707,16 +637,16 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         Args:
             ids: List of chunk IDs to delete.
         """
-        if not self._ensure_client(self._client):
+        if not self._ensure_client(self.client):
             raise ProviderError("Qdrant client not initialized")
-        collection_name = self.collection
+        collection_name = self.collection_name
         if not collection_name:
             raise ProviderError("No collection configured")
         await self._ensure_collection(collection_name)
         point_ids = [id_.hex for id_ in ids]
         for i in range(0, len(point_ids), 1000):
             batch = point_ids[i : i + 1000]
-            await self._client.delete(collection_name=collection_name, points_selector=batch)
+            await self.client.delete(collection_name=collection_name, points_selector=batch)
         await self.handle_persistence()
 
     async def delete_by_name(self, names: list[str]) -> None:
@@ -725,16 +655,16 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         Args:
             names: List of chunk names to delete.
         """
-        if not self._ensure_client(self._client):
+        if not self._ensure_client(self.client):
             raise ProviderError("Qdrant client not initialized")
-        collection_name = self.collection
+        collection_name = self.collection_name
         if not collection_name:
             raise ProviderError("No collection configured")
         await self._ensure_collection(collection_name)
         from qdrant_client.models import FieldCondition, MatchAny
         from qdrant_client.models import Filter as QdrantFilter
 
-        _ = await self._client.delete(
+        _ = await self.client.delete(
             collection_name=collection_name,
             points_selector=QdrantFilter(
                 must=[FieldCondition(key="chunk.chunk_name", match=MatchAny(any=names))]
@@ -742,9 +672,7 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         )
         await self.handle_persistence()
 
-    def _chunks_to_points(
-        self, chunks: list[CodeChunk], *, for_backup: bool = False
-    ) -> list[PointStruct]:
+    def _chunks_to_points(self, chunks: list[CodeChunk]) -> list[PointStruct]:
         """Convert code chunks to Qdrant points.
 
         Args:
@@ -756,19 +684,18 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         points: list[PointStruct] = []
         for chunk in chunks:
             vectors = self._prepare_vectors(chunk)
-            payload = self._create_payload(chunk, for_backup=for_backup)
+            payload = self._create_payload(chunk)
             serialized_payload = payload.model_dump(mode="json", exclude_none=True, round_trip=True)
             points.append(
                 PointStruct(id=chunk.chunk_id.hex, vector=vectors, payload=serialized_payload)
             )
         return points
 
-    async def upsert(self, chunks: list[CodeChunk], *, for_backup: bool = False) -> None:
+    async def upsert(self, chunks: list[CodeChunk]) -> None:
         """Insert or update code chunks with hybrid embeddings.
 
         Args:
             chunks: List of code chunks with embeddings to store.
-            for_backup: Whether these chunks are being upserted as part of a backup process.
 
         Raises:
             CollectionNotFoundError: Collection doesn't exist.
@@ -776,18 +703,15 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         """
         if not chunks:
             return
-        self._ensure_client(self._client)
-        await self._ensure_collection(
-            collection_name=self._collection or self._default_collection_name(),
-            for_backup=for_backup,
-        )
-        if not self._client:
+        self._ensure_client(self.client)
+        await self._ensure_collection(collection_name=self.collection_name)
+        if not self.client:
             raise ProviderError("Qdrant client not initialized")
-        collection_name = self.collection
+        collection_name = self.collection_name
         if not collection_name:
             raise ProviderError("No collection configured")
-        points = self._chunks_to_points(chunks, for_backup=for_backup)
-        _result = await self._client.upsert(collection_name=collection_name, points=points)
+        points = self._chunks_to_points(chunks)
+        _result = await self.client.upsert(collection_name=collection_name, points=points)
         await self.handle_persistence()
 
     async def migrate_to(
@@ -806,9 +730,9 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         Raises:
             ProviderError: If client is not initialized.
         """
-        if not self._client:
+        if not self.client:
             raise ProviderError("Qdrant client not initialized")
-        await self._migrate_data(self._client, dest_client, collection_names, batch_size)
+        await self._migrate_data(self.client, dest_client, collection_names, batch_size)
 
     async def migrate_from(
         self,
@@ -826,9 +750,9 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         Raises:
             ProviderError: If client is not initialized.
         """
-        if not self._client:
+        if not self.client:
             raise ProviderError("Qdrant client not initialized")
-        await self._migrate_data(source_client, self._client, collection_names, batch_size)
+        await self._migrate_data(source_client, self.client, collection_names, batch_size)
 
     @staticmethod
     async def _migrate_data(  # noqa: C901

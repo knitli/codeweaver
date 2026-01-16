@@ -23,17 +23,19 @@ import time
 from functools import cache
 from importlib.util import find_spec
 from types import TracebackType
-from typing import Any, Self
+from typing import Any, Self, cast
 
 from pydantic import HttpUrl
 from pydantic.types import SecretStr
 
 from codeweaver.core import Unset, UUID7HexT, uuid7
+from codeweaver.core.dependencies import TelemetrySettingsDep
+from codeweaver.core.di import INJECTED
 from codeweaver.core.telemetry._project import CODEWEAVER_POSTHOG_PROJECT_KEY
 
 
 NO_HOG = find_spec("posthog") is None
-SESSION_ID = uuid7().hex
+SESSION_ID: UUID7HexT = uuid7().hex  # ty:ignore[invalid-assignment]
 if NO_HOG:
 
     class Posthog:
@@ -144,18 +146,17 @@ class TelemetryService:
             self.logger.info("Telemetry disabled by configuration")
 
     @classmethod
-    def from_settings(cls, settings: TelemetrySettingsDep) -> TelemetryService:
+    def from_settings(cls, settings: TelemetrySettingsDep = INJECTED) -> TelemetryService:
         """
         Create PostHog client from telemetry settings.
 
         Returns:
             Configured PostHog client instance
         """
-        from codeweaver.core.telemetry.config import TelemetrySettings
+        from codeweaver.core.config import TelemetrySettings
 
-        settings = get_settings().telemetry
         if not isinstance(settings, TelemetrySettings):
-            from codeweaver.core.telemetry.config import DefaultTelemetrySettings
+            from codeweaver.core.config.telemetry import DefaultTelemetrySettings
 
             settings = TelemetrySettings.model_validate(DefaultTelemetrySettings)
         if (
@@ -255,7 +256,7 @@ class TelemetryService:
         if not self.enabled or not self._client:
             return None
         try:
-            return self._client.get_feature_flag(flag_key, self.session_id)
+            return cast(str | None, self._client.get_feature_flag(flag_key, self.session_id))
         except Exception:
             self.logger.warning("Failed to get feature flag '%s'", flag_key)
             return None

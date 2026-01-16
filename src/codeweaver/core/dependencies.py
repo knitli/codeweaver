@@ -13,19 +13,16 @@ import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
+from pydantic import DirectoryPath
+
 from codeweaver.core.di import INJECTED, dependency_provider, depends
 from codeweaver.core.types import Unset, get_possible_config_paths
+from codeweaver.core.utils import get_project_path
 
 
 if TYPE_CHECKING:
     from codeweaver.core.config.telemetry import TelemetrySettings
     from codeweaver.core.statistics import SessionStatistics
-
-
-def _resolve_config_file() -> Path | None:
-    if (declared_env := os.getenv("CODEWEAVER_CONFIG_FILE")) is not None:
-        return Path(declared_env)
-    return None
 
 
 def _resolve_config_file() -> Path | None:
@@ -122,4 +119,30 @@ def _get_telemetry_settings(settings: SettingsDep = INJECTED) -> TelemetrySettin
 
 type TelemetrySettingsDep = Annotated[TelemetrySettings, depends(_get_telemetry_settings)]
 
-__all__ = ("NoneDep", "SettingsDep", "StatisticsDep", "TelemetrySettingsDep", "bootstrap_settings")
+
+def _get_canonical_project_path(settings: SettingsDep = INJECTED) -> DirectoryPath:
+    return settings.project_path if settings.project_path is not Unset else get_project_path()  # ty:ignore[invalid-return-type]
+
+
+type ResolvedProjectPath = Annotated[DirectoryPath, depends(_get_canonical_project_path)]
+
+
+def _get_canonical_project_name(settings: SettingsDep = INJECTED) -> str:
+    return (
+        settings.project_name  # ty:ignore[invalid-return-type]
+        if settings.project_name is not Unset
+        else _get_canonical_project_path.name
+    )
+
+
+type ResolvedProjectName = Annotated[str, depends(_get_canonical_project_name)]
+
+__all__ = (
+    "NoneDep",
+    "ResolvedProjectName",
+    "ResolvedProjectPath",
+    "SettingsDep",
+    "StatisticsDep",
+    "TelemetrySettingsDep",
+    "bootstrap_settings",
+)

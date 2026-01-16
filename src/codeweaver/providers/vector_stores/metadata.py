@@ -51,12 +51,6 @@ class HybridVectorPayload(BasedModel):
             description="Whether the chunk has been fully embedded with both sparse and dense embeddings"
         ),
     ]
-    is_backup: Annotated[
-        bool,
-        Field(
-            description="Whether the vector was created as part of a backup chunking/embedding/memory storage process"
-        ),
-    ] = False
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         from codeweaver.core import AnonymityConversion, FilteredKey
@@ -96,9 +90,6 @@ class CollectionMetadata(BasedModel):
         None
     )
     collection_name: Annotated[str, Field(description="Name of the collection")] = ""
-    is_backup: Annotated[
-        bool, Field(description="Whether this collection is for backup embeddings")
-    ] = False
     version: Annotated[str, Field(description="Metadata schema version")] = "1.0.0"
 
     def to_collection(self) -> dict[str, Any]:
@@ -110,7 +101,6 @@ class CollectionMetadata(BasedModel):
             round_trip=True,
             exclude={
                 "created_at",
-                "is_backup",
                 "project_name",
                 "version",
                 "provider",

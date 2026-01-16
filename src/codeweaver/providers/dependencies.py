@@ -49,7 +49,6 @@ from codeweaver.core import (
     INJECTED,
     BaseCodeWeaverSettings,
     ConfigurationError,
-    SDKClient,
     SettingsDep,
     TypeIs,
     dependency_provider,
@@ -87,7 +86,7 @@ if TYPE_CHECKING:
     )
     from codeweaver.providers.embedding import EmbeddingProvider, SparseEmbeddingProvider
     from codeweaver.providers.reranking import RerankingProvider
-    from codeweaver.providers.types import ConfiguredCapability
+    from codeweaver.providers.types import ConfiguredCapability, EmbeddingCapabilityGroup
     from codeweaver.providers.vector_stores import (
         MemoryVectorStoreProvider,
         QdrantVectorStoreProvider,
@@ -200,22 +199,12 @@ def _create_embedding_client() -> Any:  # AsyncOpenAI
         "codeweaver.providers.config.providers", "DefaultEmbeddingProviderSettings"
     )
     embedding_settings = _get_provider_settings().embedding or default_embedding_config._resolve()
-    resolved_settings = _resolve_provider_settings(embedding_settings)
-    if not resolved_settings:
-        raise ConfigurationError(
-            "No embedding provider configuration found",
-            suggestions=["Ensure at least one embedding provider is configured in settings"],
-        )
-    sdk_client: SDKClient = resolved_settings.client()
-    client_import: LazyImport[Any] = (
-        sdk_client.client["embed"] if isinstance(sdk_client.client, dict) else sdk_client.client
-    )  # ty:ignore[invalid-assignment]
-    client = _resolve_client(client_import)
-    if "bedrock" in sdk_client.variable:
-        return _instantiate_client(
-            client, "bedrock-runtime", options=resolved_settings.client_options
-        )
-    return _instantiate_client(client, options=resolved_settings.client_options)
+    if resolved_settings := _resolve_provider_settings(embedding_settings):
+        return resolved_settings.get_client()
+    raise ConfigurationError(
+        "No embedding provider configuration found",
+        suggestions=["Ensure at least one embedding provider is configured in settings"],
+    )
 
 
 def _create_sparse_embedding_client() -> Any:
@@ -233,18 +222,12 @@ def _create_sparse_embedding_client() -> Any:
     sparse_embedding_settings = (
         _get_provider_settings().sparse_embedding or default_sparse_embedding_config._resolve()
     )
-    resolved_settings = _resolve_provider_settings(sparse_embedding_settings)
-    if not resolved_settings:
-        raise ConfigurationError(
-            "No sparse embedding provider configuration found",
-            suggestions=["Ensure at least one sparse embedding provider is configured in settings"],
-        )
-    sdk_client: SDKClient = resolved_settings.client()
-    client_import: LazyImport[Any] = (
-        sdk_client.client["sparse"] if isinstance(sdk_client.client, dict) else sdk_client.client
-    )  # ty:ignore[invalid-assignment]
-    client = _resolve_client(client_import)
-    return _instantiate_client(client, options=resolved_settings.client_options)
+    if resolved_settings := _resolve_provider_settings(sparse_embedding_settings):
+        return resolved_settings.get_client()
+    raise ConfigurationError(
+        "No sparse embedding provider configuration found",
+        suggestions=["Ensure at least one sparse embedding provider is configured in settings"],
+    )
 
 
 def _create_reranking_client() -> Any:
@@ -260,22 +243,13 @@ def _create_reranking_client() -> Any:
         "codeweaver.providers.config.providers", "DefaultRerankingProviderSettings"
     )
     reranking_settings = _get_provider_settings().reranking or default_reranking_config._resolve()
-    resolved_settings = _resolve_provider_settings(reranking_settings)
-    if not resolved_settings:
-        raise ConfigurationError(
-            "No reranking provider configuration found",
-            suggestions=["Ensure at least one reranking provider is configured in settings"],
-        )
-    sdk_client: SDKClient = resolved_settings.client()
-    client_import: LazyImport[Any] = (
-        sdk_client.client["reranking"] if isinstance(sdk_client.client, dict) else sdk_client.client
-    )  # ty:ignore[invalid-assignment]
-    client = _resolve_client(client_import)
-    if "bedrock" in sdk_client.variable:
-        return _instantiate_client(
-            client, "bedrock-agent-runtime", options=resolved_settings.client_options
-        )
-    return _instantiate_client(client, options=resolved_settings.client_options)
+    if resolved_settings := _resolve_provider_settings(reranking_settings):
+        return resolved_settings.get_client()
+
+    raise ConfigurationError(
+        "No reranking provider configuration found",
+        suggestions=["Ensure at least one reranking provider is configured in settings"],
+    )
 
 
 def _create_vector_client() -> Any:
@@ -293,14 +267,12 @@ def _create_vector_client() -> Any:
     vector_store_settings = (
         _get_provider_settings().vector_store or default_vector_store_config._resolve()
     )
-    resolved_settings = _resolve_provider_settings(vector_store_settings)
-    if not resolved_settings:
-        raise ConfigurationError(
-            "No vector store provider configuration found",
-            suggestions=["Ensure at least one vector store provider is configured in settings"],
-        )
-    client = _resolve_client(cast(LazyImport[Any], resolved_settings.client().client))
-    return _instantiate_client(client, options=resolved_settings.client_options)
+    if resolved_settings := _resolve_provider_settings(vector_store_settings):
+        return resolved_settings.get_client()
+    raise ConfigurationError(
+        "No vector store provider configuration found",
+        suggestions=["Ensure at least one vector store provider is configured in settings"],
+    )
 
 
 # Universal client dependency type for all embedding providers
@@ -703,11 +675,6 @@ def _get_embedding_provider_for_config(
     config: EmbeddingProviderSettings, registry: EmbeddingRegistryDep = INJECTED
 ) -> EmbeddingProvider:
     """Helper to get the embedding provider settings from config."""
-    client = _resolve_client(
-        config.client.client["embed"]
-        if isinstance(config.client.client, dict)
-        else config.client.client  # ty:ignore[invalid-argument-type]
-    )
     capabilities = config.embedding_config.capabilities
     provider = config.client.embedding_provider
     try:
@@ -720,8 +687,8 @@ def _get_embedding_provider_for_config(
                 "Check that the provider client is correctly configured",
             ],
         ) from e
-    client = _instantiate_client(client, config.client_options)
-    if "open" in config.client.variable:
+    client = config.get_client()
+    if "openai" in config.client.variable:
         from codeweaver.providers.embedding.providers.openai_factory import OpenAIEmbeddingBase
 
         return cast(OpenAIEmbeddingBase, resolved_provider).get_provider_class(
@@ -739,11 +706,6 @@ def _get_backup_embedding_provider_for_config(
     config: BackupEmbeddingProviderSettings, registry: BackupEmbeddingRegistryDep = INJECTED
 ) -> BackupEmbeddingProvider:
     """Helper to get the backup embedding provider settings from config."""
-    client = _resolve_client(
-        config.client.client["embed"]
-        if isinstance(config.client.client, dict)
-        else config.client.client
-    )
     capabilities = config.embedding_config.capabilities
     provider = config.client.embedding_provider
     try:
@@ -756,7 +718,7 @@ def _get_backup_embedding_provider_for_config(
                 "Check that the provider client is correctly configured",
             ],
         ) from e
-    client = _instantiate_client(client, config.client_options)
+    client = config.get_client()
     return resolved_provider(client=client, registry=registry, caps=capabilities, config=config)
 
 
@@ -783,11 +745,6 @@ def _get_sparse_embedding_provider_for_config(
     config: SparseEmbeddingProviderSettings, registry: EmbeddingRegistryDep = INJECTED
 ) -> SparseEmbeddingProvider:
     """Helper to get the sparse embedding provider settings from config."""
-    client = _resolve_client(
-        config.client.client["sparse"]
-        if isinstance(config.client.client, dict)
-        else config.client.client  # ty:ignore[invalid-argument-type]
-    )
     capabilities = config.sparse_embedding_config.capabilities
     provider = config.client.embedding_provider
     try:
@@ -800,7 +757,7 @@ def _get_sparse_embedding_provider_for_config(
                 "Check that the provider client is correctly configured",
             ],
         ) from e
-    client = _instantiate_client(client, config.client_options)
+    client = config.get_client()
     return resolved_provider(client=client, registry=registry, caps=capabilities, config=config)
 
 
@@ -808,11 +765,6 @@ def _get_backup_sparse_embedding_provider_for_config(
     config: BackupSparseEmbeddingProviderSettings, registry: BackupEmbeddingRegistryDep = INJECTED
 ) -> BackupSparseEmbeddingProvider:
     """Helper to get the backup sparse embedding provider settings from config."""
-    client = _resolve_client(
-        config.client.client["sparse"]
-        if isinstance(config.client.client, dict)
-        else config.client.client
-    )
     capabilities = config.sparse_embedding_config.capabilities
     provider = config.client.embedding_provider
     try:
@@ -825,7 +777,7 @@ def _get_backup_sparse_embedding_provider_for_config(
                 "Check that the provider client is correctly configured",
             ],
         ) from e
-    client = _instantiate_client(client, config.client_options)
+    client = config.get_client()
     return resolved_provider(client=client, registry=registry, caps=capabilities, config=config)
 
 
@@ -888,11 +840,6 @@ def _get_backup_reranking_provider_for_config(
     config: BackupRerankingProviderSettings,
 ) -> BackupRerankingProvider:
     """Helper to get the backup reranking provider settings from config."""
-    client = _resolve_client(
-        config.client.client["rerank"]
-        if isinstance(config.client.client, dict)
-        else config.client.client
-    )
     capabilities = config.reranking_config.capabilities
     provider = config.client.reranking_provider
     try:
@@ -905,7 +852,7 @@ def _get_backup_reranking_provider_for_config(
                 "Check that the provider client is correctly configured",
             ],
         ) from e
-    client = _instantiate_client(client, config.client_options)
+    client = config.get_client()
     return resolved_provider(client=client, config=config, caps=capabilities)
 
 
@@ -953,7 +900,25 @@ def _get_vector_store_provider_for_config(
     config: QdrantVectorStoreProviderSettings | MemoryVectorStoreProviderSettings,
 ) -> QdrantVectorStoreProvider | MemoryVectorStoreProvider:
     """Helper to get the vector store provider settings from config."""
-    client = _resolve_client(config.client)  # ty:ignore[invalid-argument-type]
+    from codeweaver.providers.types import EmbeddingCapabilityGroup
+    
+    # Get embedding and sparse embedding configs to construct EmbeddingCapabilityGroup
+    provider_settings = _get_provider_settings()
+    embedding_config = _resolve_provider_settings(provider_settings.embedding, backup=config.as_backup)
+    sparse_embedding_config = _resolve_provider_settings(
+        provider_settings.sparse_embedding, backup=config.as_backup
+    )
+    
+    # Build list of ConfiguredCapability objects
+    capabilities = []
+    if embedding_config:
+        capabilities.append(embedding_config.embedding_config.capabilities)
+    if sparse_embedding_config:
+        capabilities.append(sparse_embedding_config.sparse_embedding_config.capabilities)
+    
+    # Create EmbeddingCapabilityGroup from capabilities
+    caps = EmbeddingCapabilityGroup.from_capabilities(capabilities) if capabilities else EmbeddingCapabilityGroup()
+    
     provider = config.client.vector_store_provider
     try:
         resolved_provider = provider._resolve()
@@ -965,15 +930,33 @@ def _get_vector_store_provider_for_config(
                 "Check that the provider client is correctly configured",
             ],
         ) from e
-    client = _instantiate_client(client, config.client_options)
-    return resolved_provider(client=client, config=config)
+    client = config.get_client()
+    return resolved_provider(client=client, config=config, caps=caps)
 
 
 def _get_backup_vector_store_provider_for_config(
     config: BackupVectorStoreProviderSettings,
 ) -> BackupVectorStoreProvider:
     """Helper to get the backup vector store provider settings from config."""
-    client = _resolve_client(config.client)  # ty:ignore[invalid-argument-type]
+    from codeweaver.providers.types import EmbeddingCapabilityGroup
+    
+    # Get embedding and sparse embedding configs to construct EmbeddingCapabilityGroup
+    provider_settings = _get_provider_settings()
+    embedding_config = _resolve_provider_settings(provider_settings.embedding, backup=True)
+    sparse_embedding_config = _resolve_provider_settings(
+        provider_settings.sparse_embedding, backup=True
+    )
+    
+    # Build list of ConfiguredCapability objects
+    capabilities = []
+    if embedding_config:
+        capabilities.append(embedding_config.embedding_config.capabilities)
+    if sparse_embedding_config:
+        capabilities.append(sparse_embedding_config.sparse_embedding_config.capabilities)
+    
+    # Create EmbeddingCapabilityGroup from capabilities
+    caps = EmbeddingCapabilityGroup.from_capabilities(capabilities) if capabilities else EmbeddingCapabilityGroup()
+    
     provider = config.client.vector_store_provider
     try:
         resolved_provider = provider._resolve()
@@ -985,8 +968,8 @@ def _get_backup_vector_store_provider_for_config(
                 "Check that the provider client is correctly configured",
             ],
         ) from e
-    client = _instantiate_client(client, config.client_options)
-    return resolved_provider(client=client, config=config)
+    client = config.get_client()
+    return resolved_provider(client=client, config=config, caps=caps)
 
 
 type VectorStoreProviderDep = Annotated[
