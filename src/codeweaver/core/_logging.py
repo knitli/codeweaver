@@ -24,6 +24,7 @@ from codeweaver.core.utils import get_user_state_dir, is_ci, is_tty, lazy_import
 
 
 if TYPE_CHECKING:
+    from rich.console import Console
     from rich.logging import RichHandler
 
     from codeweaver.core import LazyImport
@@ -68,6 +69,23 @@ def create_session_file_handler(level: int = logging.DEBUG) -> logging.FileHandl
     handler.setFormatter(formatter)
 
     return handler
+
+
+def get_rich_console() -> Console:
+    """Get shared Rich Console instance for non-CLI output.
+
+    Used by RichConsoleProgressReporter in server/daemon mode.
+    Returns the same Console instance that RichHandler uses.
+    """
+    from rich.console import Console
+
+    # Return Console from RichHandler if it exists, else create new
+    logger = logging.getLogger("codeweaver")
+    for handler in logger.handlers:
+        if isinstance(handler, RichHandler) and hasattr(handler, "console"):
+            return handler.console
+    # No RichHandler found, create new Console
+    return Console(markup=True, soft_wrap=True, emoji=True)
 
 
 def get_rich_handler(**kwargs: Any) -> RichHandler:
@@ -204,4 +222,10 @@ async def log_to_client_or_fallback(
         logger.log(int_level, msg, extra=extra)
 
 
-__all__ = ("SESSION_LOG_FILE", "get_session_log_path", "log_to_client_or_fallback", "setup_logger")
+__all__ = (
+    "SESSION_LOG_FILE",
+    "get_rich_console",
+    "get_session_log_path",
+    "log_to_client_or_fallback",
+    "setup_logger",
+)

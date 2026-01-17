@@ -543,5 +543,5 @@ def get_qdrant_test_config(
     return QdrantVectorStoreProviderSettings(
         provider=Provider.QDRANT,
         client_options=QdrantClientOptions(url=AnyUrl(manager.url), api_key=api_key),
-        collection=CollectionConfig(collection_name=collection_name)
+        collection=CollectionConfig(collection_name=collection_name),
     )

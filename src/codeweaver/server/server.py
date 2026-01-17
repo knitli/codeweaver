@@ -15,7 +15,7 @@ import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import TYPE_CHECKING, Annotated
 
 from fastmcp import FastMCP
 from pydantic import ConfigDict, DirectoryPath, Field, NonNegativeInt, PrivateAttr, computed_field
@@ -28,14 +28,20 @@ from codeweaver.core import (
     AnonymityConversion,
     DataclassSerializationMixin,
     InitializationError,
+    ProgressReporter,
+    RichConsoleProgressReporter,
     SessionStatistics,
+    StatisticsDep,
+    TelemetryService,
     Unset,
     elapsed_time_to_human_readable,
     get_container,
     get_project_path,
+    get_settings,
 )
 from codeweaver.core import Provider as Provider
-from codeweaver.engine import Indexer, VectorStoreFailoverManager
+from codeweaver.engine.services.failover_service import FailoverService
+from codeweaver.engine.services.indexing_service import IndexingService
 from codeweaver.providers import HttpClientPool
 from codeweaver.server.config import CodeWeaverSettings
 from codeweaver.server.health.health_service import HealthService
@@ -45,8 +51,15 @@ from codeweaver.server.mcp import CwMcpHttpState
 
 if TYPE_CHECKING:
     from codeweaver.core import AnonymityConversion, FilteredKeyT
+
 _logger = logging.getLogger(__name__)
+
 BRACKET_PATTERN: re.Pattern[str] = re.compile("\\[.+\\]")
+
+
+def _get_statistics(stats: StatisticsDep) -> SessionStatistics:
+    """Dependency injector helper to get session statistics."""
+    return stats
 
 
 @dataclass(order=True, kw_only=True, config=DATACLASS_CONFIG | ConfigDict(extra="forbid"))
@@ -80,19 +93,19 @@ class CodeWeaverState(DataclassSerializationMixin):
     statistics: Annotated[
         SessionStatistics,
         Field(
-            default_factory=get_session_statistics,
+            default_factory=_get_statistics,
             description="Session statistics and performance tracking",
         ),
     ]
     indexer: Annotated[
-        Indexer | None, Field(description="Indexer instance for background indexing")
+        IndexingService | None,
+        Field(description="IndexingService instance for background indexing"),
     ] = None
     health_service: Annotated[
         HealthService | None, Field(description="Health service instance", exclude=True)
     ] = None
     failover_manager: Annotated[
-        VectorStoreFailoverManager | None,
-        Field(description="Failover manager instance", exclude=True),
+        FailoverService | None, Field(description="Failover service instance", exclude=True)
     ] = None
     startup_time: NonNegativeInt = Field(default_factory=lambda: int(time.time()))
     startup_stopwatch: NonNegativeInt = Field(default_factory=lambda: int(time.monotonic()))
@@ -186,7 +199,7 @@ def _get_health_service() -> HealthService:
 async def _cleanup_state(
     state: CodeWeaverState,
     indexing_task: asyncio.Task | None,
-    status_display: Any,
+    progress_reporter: ProgressReporter,
     *,
     verbose: bool = False,
 ) -> None:
@@ -195,10 +208,10 @@ async def _cleanup_state(
     Args:
         state: Application state
         indexing_task: Background indexing task to cancel
-        status_display: StatusDisplay instance for user-facing output
+        progress_reporter: ProgressReporter instance for user-facing output
         verbose: Whether to show verbose output
     """
-    status_display.print_shutdown_start()
+    progress_reporter.report_status("Saving state...", extra={"end": ""})
     if indexing_task and (not indexing_task.done()):
         indexing_task.cancel()
         try:
@@ -238,7 +251,8 @@ async def _cleanup_state(
             logging.getLogger(__name__).exception("Error closing HTTP client pools")
     if verbose:
         _logger.info("Exiting CodeWeaver lifespan context manager...")
-    status_display.print_shutdown_complete()
+    progress_reporter.report_status("✓")
+    progress_reporter.report_status("Goodbye!")
     state.initialized = False
 
 
@@ -260,12 +274,12 @@ async def lifespan(
         verbose: Enable verbose logging
         debug: Enable debug logging
     """
-    from codeweaver.cli import StatusDisplay
-
-    status_display = StatusDisplay()
+    progress_reporter = RichConsoleProgressReporter()
     server_host = getattr(app, "host", "127.0.0.1") if hasattr(app, "host") else "127.0.0.1"
     server_port = getattr(app, "port", 9329) if hasattr(app, "port") else 9329
-    status_display.print_header(host=server_host, port=server_port)
+    progress_reporter.report_status(f"Server: http://{server_host}:{server_port}")
+    progress_reporter.report_status("Built with FastMCP (https://gofastmcp.com)", level="debug")
+
     if verbose or debug:
         _logger.info("Entering lifespan context manager...")
     if settings is None:
@@ -286,36 +300,46 @@ async def lifespan(
             from codeweaver.server.background_services import run_background_indexing
 
             indexing_task = asyncio.create_task(
-                run_background_indexing(state, status_display, verbose=verbose, debug=debug)
+                run_background_indexing(state, progress_reporter, verbose=verbose, debug=debug)
             )
-            status_display.print_step("Health checks...")
+            progress_reporter.report_status("Health checks...")
             if state.health_service:
                 health_response = await state.health_service.get_health_response()
                 vs_status = health_response.services.vector_store.status
-                status_display.print_health_check("Vector store (Qdrant)", vs_status)
+                status_icon = {"up": "✅", "down": "❌", "degraded": "⚠️"}.get(vs_status, vs_status)
+                progress_reporter.report_status(f"Vector store (Qdrant): {status_icon}")
+
                 if vs_status in ("down", "degraded") and (not (verbose or debug)):
-                    status_display.console.print(
-                        "  [dim]Unable to connect. Continuing with sparse-only search.[/dim]"
+                    progress_reporter.report_status(
+                        "  Unable to connect. Continuing with sparse-only search.", level="warning"
                     )
-                    status_display.console.print(
-                        "  [dim]To enable semantic search: docker run -p 6333:6333 qdrant/qdrant[/dim]"
+                    progress_reporter.report_status(
+                        "  To enable semantic search: docker run -p 6333:6333 qdrant/qdrant",
+                        level="warning",
                     )
                 elif vs_status in ("down", "degraded"):
                     _logger.warning(
                         "Failed to connect to Qdrant. Check configuration and ensure Qdrant is running."
                     )
-                status_display.print_health_check(
-                    "Embeddings (Voyage AI)",
-                    health_response.services.embedding_provider.status,
-                    model=health_response.services.embedding_provider.model,
+
+                emb_status = health_response.services.embedding_provider.status
+                emb_model = health_response.services.embedding_provider.model
+                status_icon = {"up": "✅", "down": "❌", "degraded": "⚠️"}.get(
+                    emb_status, emb_status
                 )
-                status_display.print_health_check(
-                    f"Sparse embeddings ({health_response.services.sparse_embedding.provider})",
-                    health_response.services.sparse_embedding.status,
+                progress_reporter.report_status(
+                    f"Embeddings (Voyage AI): {status_icon} ({emb_model})"
                 )
+
+                sparse_prov = health_response.services.sparse_embedding.provider
+                sparse_status = health_response.services.sparse_embedding.status
+                status_icon = {"up": "✅", "down": "❌", "degraded": "⚠️"}.get(
+                    sparse_status, sparse_status
+                )
+                progress_reporter.report_status(f"Sparse embeddings ({sparse_prov}): {status_icon}")
             if not state.failover_manager:
-                state.failover_manager = VectorStoreFailoverManager()
-            status_display.print_ready()
+                state.failover_manager = await get_container().resolve(FailoverService)
+            progress_reporter.report_status("Ready for connections.")
             if verbose or debug:
                 _logger.info("Lifespan start actions complete, server initialized.")
             state.initialized = True
@@ -324,7 +348,7 @@ async def lifespan(
             state.initialized = False
             raise
         finally:
-            await _cleanup_state(state, indexing_task, status_display, verbose=verbose or debug)
+            await _cleanup_state(state, indexing_task, progress_reporter, verbose=verbose or debug)
 
 
 async def _initialize_cw_state(

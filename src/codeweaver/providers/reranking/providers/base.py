@@ -380,7 +380,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
             return get_tokenizer(
                 tokenizer, self.model_capabilities.tokenizer_model or self.model_capabilities.name
             )
-        return get_tokenizer("tiktoken", "cl100k_base")
+        return get_tokenizer("tiktoken", "o200k_base")
 
     @property
     def tokenizer(self) -> Tokenizer[Any]:
@@ -458,14 +458,14 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         followed by all excluded (discarded) chunks. Token savings equals the token count of the tail
         after the number of kept results.
 
-        We use `tiktoken` with `cl100k_base` as a reasonable default tokenizer for estimating the user LLM's token usage (we're not estimating based on the reranking model's tokenizer).
+        We use `tiktoken` with `o200k_base` as a reasonable default tokenizer for estimating the user LLM's token usage (we're not estimating based on the reranking model's tokenizer).
         TODO: We have the latent capability to use the LLM's actual tokenizer through its API; we just need to figure out how best to hook it up. Low priority because this gets us 95% there.
         """
         if not processed_chunks or not results or len(results) >= len(processed_chunks):
             return 0
         # All discarded chunks are in the tail after the kept results
         discarded_chunks = processed_chunks[len(results) :]
-        tokenizer = get_tokenizer("tiktoken", "cl100k_base")
+        tokenizer = get_tokenizer("tiktoken", "o200k_base")
         return tokenizer.estimate_batch(discarded_chunks)
 
     @classmethod

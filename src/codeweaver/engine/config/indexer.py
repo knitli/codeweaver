@@ -11,24 +11,13 @@ Settings for `codeweaver.engineIndexer`, `codeweaver.engineFileWatcher`, and rel
 
 from __future__ import annotations
 
-import contextlib
 import logging
 import re
 
 from collections.abc import Callable
 from functools import cache, cached_property
 from pathlib import Path
-from typing import (
-    TYPE_CHECKING,
-    Annotated,
-    Any,
-    Literal,
-    NamedTuple,
-    NotRequired,
-    TypedDict,
-    cast,
-    overload,
-)
+from typing import TYPE_CHECKING, Annotated, Any, NamedTuple, NotRequired, TypedDict
 
 from fastmcp import Context as FastMCPContext
 from pydantic import DirectoryPath, Field, FilePath, PrivateAttr, computed_field
@@ -44,12 +33,13 @@ from codeweaver.core import (
     FileGlobT,
     FilteredKeyT,
     Unset,
+    get_project_name,
+    get_user_state_dir,
 )
 
 
 if TYPE_CHECKING:
-    from codeweaver.core import AnonymityConversion, DictView
-    from codeweaver.server import CodeWeaverSettings, CodeWeaverSettingsDict
+    from codeweaver.core import AnonymityConversion
 
 logger = logging.getLogger(__name__)
 
@@ -113,46 +103,9 @@ class IndexerSettingsDict(TypedDict, total=False):
     only_index_on_command: NotRequired[bool]
 
 
-@overload
-def _get_settings(*, view: Literal[False]) -> CodeWeaverSettings | None: ...
-@overload
-def _get_settings(*, view: Literal[True]) -> DictView[CodeWeaverSettingsDict] | None: ...
-def _get_settings(
-    *, view: bool = False
-) -> CodeWeaverSettings | DictView[CodeWeaverSettingsDict] | None:
-    """Get the current CodeWeaver settings."""
-    return get_settings()
-
-
-def _get_project_name() -> str:
-    """Get the current project name from settings."""
-    # Avoid circular dependency: check if settings exist without triggering initialization
-    if globals().get("_init", False) is False and (settings := _get_settings(view=False)):
-        with contextlib.suppress(AttributeError, ValueError):
-            if (
-                hasattr(settings, "project_name")
-                and settings.project_name
-                and not isinstance(settings.project_name, Unset)
-            ):
-                return cast(str, settings.project_name)
-            if hasattr(settings, "project_path") and not isinstance(settings.project_path, Unset):
-                return cast(Path, settings.project_path).name
-            if hasattr(settings, "project_name") and not isinstance(settings.project_name, Unset):
-                return cast(str, settings.project_name)
-    with contextlib.suppress(Exception):
-        from codeweaver.core import get_project_path
-
-        project_name = get_project_path().name
-        globals()["_init"] = False
-        return project_name
-    return "your_project_name"
-
-
 def get_storage_path() -> DirectoryPath:
     """Get the default storage directory for index and checkpoint data."""
-    from codeweaver.core import get_user_config_dir
-
-    return Path(get_user_config_dir()) / ".indexes"
+    return Path(get_user_state_dir()) / "indexes"
 
 
 def _resolve_globs(path_string: str, repo_root: Path) -> set[Path]:
@@ -396,7 +349,7 @@ class IndexerSettings(BasedModel):
     @property
     def storage_file(self) -> FilePath:
         """Effective storage file path for index data."""
-        project_name = _get_project_name()
+        project_name = get_project_name()
         if self._index_cache_dir:
             return self._index_cache_dir / f"{project_name}_index.json"
         return self.cache_dir / f"{project_name}_index.json"

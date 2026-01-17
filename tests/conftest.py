@@ -76,7 +76,7 @@ class MockTokenizer:
     @staticmethod
     def encoders() -> Sequence[str]:
         """List mock encoder names."""
-        return ["mock", "cl100k_base", "gpt2"]
+        return ["mock", "o200k_base", "gpt2"]
 
 
 def _mock_get_tokenizer(tokenizer: str, model: str) -> MockTokenizer:

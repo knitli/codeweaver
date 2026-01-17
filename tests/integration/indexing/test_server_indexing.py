@@ -24,7 +24,7 @@ import pytest
 from watchfiles.main import Change
 
 from codeweaver.core import get_container
-from codeweaver.engine import Indexer
+from codeweaver.engine import IndexingService
 from codeweaver.server import CodeWeaverSettings, reset_settings
 
 
@@ -129,7 +129,7 @@ def test_project_path(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-async def indexer(test_project_path: Path, clean_container) -> Indexer:
+async def indexer(test_project_path: Path, clean_container) -> IndexingService:
     """Create indexer instance for test project using DI container."""
     from codeweaver.server import get_settings
 
@@ -149,12 +149,12 @@ async def indexer(test_project_path: Path, clean_container) -> Indexer:
 
     # Resolve indexer from container - this will now use the overridden settings
     # and properly initialize all dependencies (chunking_service, etc.)
-    return await clean_container.resolve(Indexer)
+    return await clean_container.resolve(IndexingService)
 
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_server_starts_without_errors(indexer: Indexer):
+async def test_server_starts_without_errors(indexer: IndexingService):
     """T009: Server starts, indexer initializes, no errors.
 
     Given: Test project directory with 5 files
@@ -163,7 +163,7 @@ async def test_server_starts_without_errors(indexer: Indexer):
     """
     # Verify indexer initialized
     assert indexer._project_path is not None
-    assert indexer._walker_settings is not None
+    assert indexer._settings is not None
 
     # Verify providers initialized (if available)
     # Note: May be None if API keys not configured, that's acceptable
@@ -174,7 +174,7 @@ async def test_server_starts_without_errors(indexer: Indexer):
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_auto_indexing_on_startup(indexer: Indexer, test_project_path: Path):
+async def test_auto_indexing_on_startup(indexer: IndexingService, test_project_path: Path):
     """T009: Auto-indexing begins on server start.
 
     Given: Server started with project path
@@ -182,7 +182,7 @@ async def test_auto_indexing_on_startup(indexer: Indexer, test_project_path: Pat
     Then: Files discovered, chunking begins
     """
     # Prime index to discover files
-    discovered_count = await indexer.prime_index(force_reindex=True)
+    discovered_count = await indexer.index_project(force_reindex=True)
 
     # Should discover 5 files (auth.py, database.py, test_auth.py, README.md, .gitignore)
     # Note: .gitignore itself might be indexed depending on filtering rules
@@ -196,7 +196,7 @@ async def test_auto_indexing_on_startup(indexer: Indexer, test_project_path: Pat
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_indexing_progress_via_health(indexer: Indexer):
+async def test_indexing_progress_via_health(indexer: IndexingService):
     """T009: Health endpoint shows indexing progress.
 
     Given: Indexing in progress
@@ -204,7 +204,7 @@ async def test_indexing_progress_via_health(indexer: Indexer):
     Then: Progress information is accurate
     """
     # Start indexing
-    await indexer.prime_index(force_reindex=True)
+    await indexer.index_project(force_reindex=True)
 
     # Check stats
     stats = indexer.stats
@@ -225,7 +225,7 @@ async def test_indexing_progress_via_health(indexer: Indexer):
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_indexing_completes_successfully(indexer: Indexer, test_project_path: Path):
+async def test_indexing_completes_successfully(indexer: IndexingService, test_project_path: Path):
     """T009: Indexing completes for small test project.
 
     Given: Small test project (5 files, ~100 lines)
@@ -233,7 +233,7 @@ async def test_indexing_completes_successfully(indexer: Indexer, test_project_pa
     Then: All files processed, chunks created, no errors
     """
     # Run indexing
-    discovered_count = await indexer.prime_index(force_reindex=True)
+    discovered_count = await indexer.index_project(force_reindex=True)
 
     # Allow time for async indexing to complete
     await asyncio.sleep(2)
@@ -283,10 +283,10 @@ async def test_indexing_error_recovery(test_project_path: Path):
         return settings
 
     container.override(CodeWeaverSettings, get_test_settings)
-    indexer = await container.resolve(Indexer)
+    indexer = await container.resolve(IndexingService)
 
     # Run indexing
-    await indexer.prime_index(force_reindex=True)
+    await indexer.index_project(force_reindex=True)
 
     # Allow indexing to complete
     await asyncio.sleep(2)
@@ -309,7 +309,7 @@ async def test_indexing_error_recovery(test_project_path: Path):
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_file_change_indexing(indexer: Indexer, test_project_path: Path):
+async def test_file_change_indexing(indexer: IndexingService, test_project_path: Path):
     """T009: File changes trigger reindexing.
 
     Given: Project already indexed
@@ -317,7 +317,7 @@ async def test_file_change_indexing(indexer: Indexer, test_project_path: Path):
     Then: Modified file reindexed automatically
     """
     # Initial indexing
-    await indexer.prime_index(force_reindex=True)
+    await indexer.index_project(force_reindex=True)
     await asyncio.sleep(1)
 
     initial_stats = indexer.stats
@@ -331,7 +331,7 @@ async def test_file_change_indexing(indexer: Indexer, test_project_path: Path):
 
     # Simulate file change event
     change = (Change.modified, str(auth_file))
-    await indexer.index(change)
+    await indexer.process_changes([change])
 
     # Allow reindexing to complete
     await asyncio.sleep(1)
@@ -349,7 +349,7 @@ async def test_file_change_indexing(indexer: Indexer, test_project_path: Path):
 
 @pytest.mark.integration
 @pytest.mark.benchmark
-async def test_indexing_performance(indexer: Indexer):
+async def test_indexing_performance(indexer: IndexingService):
     """T009: Indexing meets performance requirements.
 
     Given: Test project with 5 files
@@ -359,7 +359,7 @@ async def test_indexing_performance(indexer: Indexer):
     # Note: 5 files is too small for meaningful performance test
     # This test validates the timing mechanism works
 
-    await indexer.prime_index(force_reindex=True)
+    await indexer.index_project(force_reindex=True)
     await asyncio.sleep(1)
 
     stats = indexer.stats

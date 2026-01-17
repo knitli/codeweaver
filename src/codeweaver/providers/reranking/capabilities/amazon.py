@@ -26,9 +26,9 @@ def get_amazon_reranking_capabilities() -> tuple[AmazonRerankingCapabilities, ..
             "provider": Provider.BEDROCK,
             "max_input": 4096,  # we actually have no idea, Amazon doesn't provide any info on model capabilities and limits
             "supports_custom_prompt": False,
-            # we'll default to tiktoken/cl100k_base because Amazon doesn't provide any info on tokenizer
+            # we'll default to tiktoken/o200k_base because Amazon doesn't provide any info on tokenizer
             "tokenizer": "tiktoken",
-            "tokenizer_model": "cl100k_base",
+            "tokenizer_model": "o200k_base",
         }),
     )
 

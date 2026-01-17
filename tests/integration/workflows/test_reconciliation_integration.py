@@ -92,8 +92,8 @@ async def test_prime_index_reconciliation_without_force_reindex(
             "collection_name": collection_name,
             "url": qdrant_test_manager.url,
             "dense_vector_size": 768,
-            "sparse_vector_size": 1000
-        }
+            "sparse_vector_size": 1000,
+        },
     )
 
     # Create test project directory with Python files
@@ -255,8 +255,8 @@ async def test_reconciliation_with_add_dense_flag(
             "collection_name": collection_name,
             "url": qdrant_test_manager.url,
             "dense_vector_size": 768,
-            "sparse_vector_size": 1000
-        }
+            "sparse_vector_size": 1000,
+        },
     )
 
     project_path = tmp_path / "test_project_dense"
@@ -350,8 +350,8 @@ async def test_reconciliation_with_add_sparse_flag(
             "collection_name": collection_name,
             "url": qdrant_test_manager.url,
             "dense_vector_size": 768,
-            "sparse_vector_size": 1000
-        }
+            "sparse_vector_size": 1000,
+        },
     )
 
     project_path = tmp_path / "test_project_sparse"
@@ -445,8 +445,8 @@ async def test_reconciliation_skipped_when_no_files_need_embeddings(
             "collection_name": collection_name,
             "url": qdrant_test_manager.url,
             "dense_vector_size": 768,
-            "sparse_vector_size": 1000
-        }
+            "sparse_vector_size": 1000,
+        },
     )
 
     project_path = tmp_path / "test_project_complete"
@@ -529,7 +529,12 @@ async def test_reconciliation_skipped_when_no_files_need_embeddings(
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_reconciliation_handles_provider_error_gracefully(
-    qdrant_test_manager, tmp_path, initialized_cw_state, clean_container, caplog, vector_store_factory
+    qdrant_test_manager,
+    tmp_path,
+    initialized_cw_state,
+    clean_container,
+    caplog,
+    vector_store_factory,
 ):
     """Verify prime_index continues when reconciliation fails with ProviderError."""
     from codeweaver.core import ProviderError
@@ -549,8 +554,8 @@ async def test_reconciliation_handles_provider_error_gracefully(
             "collection_name": collection_name,
             "url": qdrant_test_manager.url,
             "dense_vector_size": 768,
-            "sparse_vector_size": 1000
-        }
+            "sparse_vector_size": 1000,
+        },
     )
 
     project_path = tmp_path / "test_error_project"
@@ -650,7 +655,12 @@ async def test_reconciliation_handles_provider_error_gracefully(
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_reconciliation_handles_indexing_error_gracefully(
-    qdrant_test_manager, tmp_path, initialized_cw_state, clean_container, caplog, vector_store_factory
+    qdrant_test_manager,
+    tmp_path,
+    initialized_cw_state,
+    clean_container,
+    caplog,
+    vector_store_factory,
 ):
     """Verify prime_index continues when reconciliation fails with IndexingError."""
     from codeweaver.core import IndexingError
@@ -667,8 +677,8 @@ async def test_reconciliation_handles_indexing_error_gracefully(
             "collection_name": collection_name,
             "url": qdrant_test_manager.url,
             "dense_vector_size": 768,
-            "sparse_vector_size": 1000
-        }
+            "sparse_vector_size": 1000,
+        },
     )
 
     project_path = tmp_path / "test_error_indexing"
@@ -778,7 +788,12 @@ async def test_reconciliation_handles_indexing_error_gracefully(
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_reconciliation_handles_connection_error_gracefully(
-    qdrant_test_manager, tmp_path, initialized_cw_state, clean_container, caplog, vector_store_factory
+    qdrant_test_manager,
+    tmp_path,
+    initialized_cw_state,
+    clean_container,
+    caplog,
+    vector_store_factory,
 ):
     """Verify prime_index continues when reconciliation fails with ConnectionError."""
 
@@ -793,8 +808,8 @@ async def test_reconciliation_handles_connection_error_gracefully(
             "collection_name": collection_name,
             "url": qdrant_test_manager.url,
             "dense_vector_size": 768,
-            "sparse_vector_size": 1000
-        }
+            "sparse_vector_size": 1000,
+        },
     )
 
     project_path = tmp_path / "test_error_connection"
@@ -914,8 +929,8 @@ async def test_reconciliation_not_called_when_force_reindex_true(
             "collection_name": collection_name,
             "url": qdrant_test_manager.url,
             "dense_vector_size": 768,
-            "sparse_vector_size": 1000
-        }
+            "sparse_vector_size": 1000,
+        },
     )
 
     project_path = tmp_path / "test_skip"
@@ -1091,8 +1106,8 @@ async def test_reconciliation_not_called_when_no_providers(
             "collection_name": collection_name,
             "url": qdrant_test_manager.url,
             "dense_vector_size": 768,
-            "sparse_vector_size": 1000
-        }
+            "sparse_vector_size": 1000,
+        },
     )
 
     project_path = tmp_path / "test_no_providers"

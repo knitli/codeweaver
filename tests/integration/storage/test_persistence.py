@@ -40,8 +40,8 @@ async def test_persistence_across_restarts(qdrant_test_manager, vector_store_fac
             "collection_name": collection_name,
             "url": qdrant_test_manager.url,
             "dense_vector_size": 768,
-            "sparse_vector_size": 1000
-        }
+            "sparse_vector_size": 1000,
+        },
     )
 
     chunk = create_test_chunk_with_embeddings(
@@ -65,8 +65,8 @@ async def test_persistence_across_restarts(qdrant_test_manager, vector_store_fac
             "collection_name": collection_name,
             "url": qdrant_test_manager.url,
             "dense_vector_size": 768,
-            "sparse_vector_size": 1000
-        }
+            "sparse_vector_size": 1000,
+        },
     )
 
     # Verify: Previously stored chunk is retrievable

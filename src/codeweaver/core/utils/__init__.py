@@ -280,6 +280,7 @@ __all__ = (
     "backup_file_path",
     "clean_args",
     "create_lazy_getattr",
+    "detect_root_package",
     "dict_set_to_tuple",
     "effective_cpu_count",
     "elapsed_time_to_human_readable",

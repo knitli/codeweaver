@@ -30,16 +30,15 @@ async def qdrant_provider(qdrant_test_manager: Any, vector_store_factory):
     # Create unique collection
     collection_name = qdrant_test_manager.create_collection_name("hybrid")
 
-    provider = await vector_store_factory(
+    return await vector_store_factory(
         QdrantVectorStoreProvider,
         config_overrides={
             "collection_name": collection_name,
             "url": qdrant_test_manager.url,
             "dense_vector_size": 768,
-            "sparse_vector_size": 1000
-        }
+            "sparse_vector_size": 1000,
+        },
     )
-    return provider
     # Cleanup handled by test manager
 
 

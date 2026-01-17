@@ -133,6 +133,8 @@ if TYPE_CHECKING:
         BackupSparseEmbeddingProviderDep,
         BackupSparseEmbeddingProviderSettings,
         BackupSparseEmbeddingProviderSettingsDep,
+        BackupTokenizer,
+        BackupTokenizerDep,
         BackupVectorStoreProvider,
         BackupVectorStoreProviderDep,
         BackupVectorStoreProviderSettings,
@@ -152,6 +154,7 @@ if TYPE_CHECKING:
         SparseEmbeddingClientDep,
         SparseEmbeddingProviderDep,
         SparseEmbeddingProviderSettingsDep,
+        TokenizerDep,
         VectorStoreClientDep,
         VectorStoreProviderDep,
         VectorStoreProviderSettingsDep,
@@ -177,6 +180,7 @@ if TYPE_CHECKING:
         get_embedding_registry,
     )
     from codeweaver.providers.exceptions import CircuitBreakerOpenError
+    from codeweaver.providers.http_pool import HttpClientPool, PoolLimits, PoolTimeouts
     from codeweaver.providers.optimize import (
         AvailableOptimizations,
         OptimizationDecisions,
@@ -250,6 +254,8 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "BackupSparseEmbeddingProviderDep": (__spec__.parent, "dependencies"),
     "BackupSparseEmbeddingProviderSettings": (__spec__.parent, "dependencies"),
     "BackupSparseEmbeddingProviderSettingsDep": (__spec__.parent, "dependencies"),
+    "BackupTokenizer": (__spec__.parent, "dependencies"),
+    "BackupTokenizerDep": (__spec__.parent, "dependencies"),
     "BackupVectorStoreProvider": (__spec__.parent, "dependencies"),
     "BackupVectorStoreProviderDep": (__spec__.parent, "dependencies"),
     "BackupVectorStoreProviderSettings": (__spec__.parent, "dependencies"),
@@ -324,6 +330,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "GoogleEmbeddingProvider": (__spec__.parent, "embedding"),
     "GrpcParams": (__spec__.parent, "config"),
     "HFInferenceClientOptions": (__spec__.parent, "config"),
+    "HttpClientPool": (__spec__.parent, "http_pool"),
     "HttpxClientParams": (__spec__.parent, "config"),
     "HuggingFaceEmbeddingConfig": (__spec__.parent, "config"),
     "HuggingFaceEmbeddingProvider": (__spec__.parent, "embedding"),
@@ -340,6 +347,8 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "OpenAIEmbeddingConfig": (__spec__.parent, "config"),
     "OpenAIEmbeddingRequestParams": (__spec__.parent, "config"),
     "OptimizationDecisions": (__spec__.parent, "optimize"),
+    "PoolLimits": (__spec__.parent, "http_pool"),
+    "PoolTimeouts": (__spec__.parent, "http_pool"),
     "PrefixedToolset": (__spec__.parent, "agent"),
     "PreparedToolset": (__spec__.parent, "agent"),
     "ProviderSettings": (__spec__.parent, "config"),
@@ -380,6 +389,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "SparseEmbeddingProviderDep": (__spec__.parent, "dependencies"),
     "SparseEmbeddingProviderSettings": (__spec__.parent, "config"),
     "SparseEmbeddingProviderSettingsDep": (__spec__.parent, "dependencies"),
+    "TokenizerDep": (__spec__.parent, "dependencies"),
     "ToolsetTool": (__spec__.parent, "agent"),
     "VectorStoreClientDep": (__spec__.parent, "dependencies"),
     "VectorStoreProvider": (__spec__.parent, "vector_stores.base"),
@@ -454,6 +464,8 @@ __all__ = (
     "BackupSparseEmbeddingProviderDep",
     "BackupSparseEmbeddingProviderSettings",
     "BackupSparseEmbeddingProviderSettingsDep",
+    "BackupTokenizer",
+    "BackupTokenizerDep",
     "BackupVectorStoreProvider",
     "BackupVectorStoreProviderDep",
     "BackupVectorStoreProviderSettings",
@@ -530,6 +542,7 @@ __all__ = (
     "GoogleEmbeddingProvider",
     "GrpcParams",
     "HFInferenceClientOptions",
+    "HttpClientPool",
     "HttpxClientParams",
     "HuggingFaceEmbeddingConfig",
     "HuggingFaceEmbeddingProvider",
@@ -547,6 +560,8 @@ __all__ = (
     "OpenAIEmbeddingConfig",
     "OpenAIEmbeddingRequestParams",
     "OptimizationDecisions",
+    "PoolLimits",
+    "PoolTimeouts",
     "PrefixedToolset",
     "PreparedToolset",
     "ProviderSettings",
@@ -588,6 +603,7 @@ __all__ = (
     "SparseEmbeddingProviderDep",
     "SparseEmbeddingProviderSettings",
     "SparseEmbeddingProviderSettingsDep",
+    "TokenizerDep",
     "ToolsetTool",
     "VectorStoreProvider",
     "VectorStoreProviderDep",
@@ -620,4 +636,5 @@ __all__ = (
 
 
 def __dir__() -> list[str]:
+    """Override dir() to include all dynamically imported names."""
     return list(__all__)

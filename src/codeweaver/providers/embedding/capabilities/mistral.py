@@ -31,7 +31,7 @@ def get_mistral_embedding_capabilities() -> tuple[MistralEmbeddingCapabilities, 
         # So we will only fall back to tiktoken if we need to estimate token counts locally.
         # We didn't want to add another dependency just to get backup token counts.
         "tokenizer": "tiktoken",
-        "tokenizer_model": "cl100k_base",
+        "tokenizer_model": "o200k_base",
         "context_window": 8192,
         "supports_context_chunk_embedding": False,
         "hf_name": None,

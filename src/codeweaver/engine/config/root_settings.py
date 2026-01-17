@@ -28,6 +28,7 @@ from codeweaver.core.types import (
     Unset,
 )
 from codeweaver.engine import ChunkerSettings, IndexerSettings
+from codeweaver.engine.config.failover import FailoverSettings
 from codeweaver.providers.config import ProviderSettings
 
 
@@ -79,6 +80,14 @@ class CodeWeaverEngineSettings(BaseCodeWeaverSettings):
         Field(
             default_factory=ChunkerSettings,
             description="Chunking configuration for code segmentation",
+        ),
+    ] = UNSET
+
+    failover: Annotated[
+        FailoverSettings | Unset,
+        Field(
+            default_factory=FailoverSettings,
+            description="Failover configuration for service resilience",
         ),
     ] = UNSET
 

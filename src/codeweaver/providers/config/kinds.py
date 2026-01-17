@@ -164,6 +164,33 @@ class BaseProviderSettings(BasedModel, ABC):
             "client_options": self.client_options,
             "as_backup": self.as_backup,
         }
+        if (
+            "model_name" in type(self).model_fields
+            and "model_name" not in data
+            and (
+                kind_config := getattr(self, "embedding_config", None)
+                or getattr(self, "sparse_embedding_config", None)
+                or getattr(self, "reranking_config", None)
+            )
+            and kind_config.model_name
+        ):
+            object.__setattr__(self, "model_name", kind_config.model_name)
+        elif (
+            "model_name" in type(self).model_fields
+            and "model_name" not in data
+            and self.client_options
+            and (
+                model_name := next(
+                    (
+                        getattr(self.client_options, k, None)
+                        for k in ("model_name", "model", "model_id", "model_name_or_path")
+                        if getattr(self.client_options, k, None)
+                    ),
+                    None,
+                )
+            )
+        ):
+            object.__setattr__(self, "model_name", model_name)
         super().__init__()
 
     @staticmethod
@@ -592,7 +619,7 @@ class MemoryConfig(TypedDict, total=False):
     """Configuration for in-memory vector store provider."""
 
     persist_path: NotRequired[Path]
-    f"""Path for JSON persistence file. Defaults to {get_user_cache_dir()}/vectors/[your_project_name]_store.json."""
+    f"""Path for JSON persistence file. Defaults to {get_user_cache_dir()}/vectors/[your_project_name]-[filepath-hash]"""
     auto_persist: NotRequired[bool]
     """Automatically save after operations. Defaults to True."""
     persist_interval: NotRequired[PositiveInt | None]

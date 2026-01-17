@@ -34,7 +34,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from codeweaver.core import FailoverStats, Identifier, SessionStatistics
-from codeweaver.engine import Indexer, IndexingStats
+from codeweaver.engine import IndexingService, IndexingStats
 from codeweaver.server import (
     HealthResponse,
     HealthService,
@@ -297,7 +297,7 @@ async def test_health_during_indexing(
     Then: Indexing progress reflects current state, estimated completion provided
     """
     # Create mock indexer with in-progress stats
-    mock_indexer = mocker.MagicMock(spec=Indexer)
+    mock_indexer = mocker.MagicMock(spec=IndexingService)
     mock_indexer.stats = IndexingStats(
         files_discovered=100,
         files_processed=45,
@@ -446,7 +446,7 @@ async def test_health_indexing_progress(health_service: HealthService, mocker):
     Then: Progress reflects current indexing state accurately
     """
     # Stage 1: Indexing just started
-    mock_indexer = mocker.MagicMock(spec=Indexer)
+    mock_indexer = mocker.MagicMock(spec=IndexingService)
     mock_indexer.stats = IndexingStats(
         files_discovered=50, files_processed=5, chunks_created=35, start_time=time.time()
     )
@@ -565,7 +565,7 @@ async def test_health_statistics(
     Then: Statistics reflect session metrics accurately
     """
     # Add some indexed data
-    mock_indexer = mocker.MagicMock(spec=Indexer)
+    mock_indexer = mocker.MagicMock(spec=IndexingService)
     mock_indexer.stats = IndexingStats(
         files_discovered=25,
         files_processed=25,
@@ -577,8 +577,8 @@ async def test_health_statistics(
 
     # Mock session_statistics on the indexer - health service uses this path
     # Set index_statistics to None so it falls back to indexer.stats
-    mock_indexer.session_statistics = mocker.MagicMock()
-    mock_indexer.session_statistics.index_statistics = None
+    # mock_indexer.session_statistics = mocker.MagicMock()
+    # mock_indexer.session_statistics.index_statistics = None
 
     health_service.set_indexer(mock_indexer)
     health_service.add_indexed_language("python")

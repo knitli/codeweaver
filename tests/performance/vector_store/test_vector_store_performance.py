@@ -107,7 +107,7 @@ async def qdrant_store(qdrant_test_manager, vector_store_factory) -> QdrantVecto
 
     # Use factory to create provider
     # It will handle collection creation if we pass the name and sizes
-    store = await vector_store_factory(
+    return await vector_store_factory(
         QdrantVectorStoreProvider,
         config_overrides={
             "collection_name": collection_name,
@@ -116,7 +116,6 @@ async def qdrant_store(qdrant_test_manager, vector_store_factory) -> QdrantVecto
             "batch_size": 64,
         },
     )
-    return store
     # Cleanup handled by test manager
 
 

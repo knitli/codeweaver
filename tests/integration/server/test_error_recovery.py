@@ -306,7 +306,7 @@ async def test_indexing_continues_on_file_errors(
     When: Indexing runs
     Then: Successfully discovers and processes the 2 Python files
     """
-    from codeweaver.engine import Indexer
+    from codeweaver.engine import IndexingService
     from codeweaver.server import CodeWeaverSettings
 
     # Configure settings for this test
@@ -321,17 +321,17 @@ async def test_indexing_continues_on_file_errors(
 
     with clean_container.use_overrides(overrides):
         # Resolve Indexer via DI
-        indexer = await clean_container.resolve(Indexer)
+        indexer = await clean_container.resolve(IndexingService)
 
         # Ensure it's not trying to hit real APIs
-        indexer._providers_initialized = True
+        # indexer._providers_initialized = True
 
         # Manually set walker settings if they didn't get picked up
         # Indexer uses _walker_settings internally
-        indexer._walker_settings = {"path": str(test_project_path)}
+        # indexer._walker_settings = {"path": str(test_project_path)}
 
         # Run indexing
-        discovered_count = await indexer.prime_index(force_reindex=True)
+        discovered_count = await indexer.index_project(force_reindex=True)
 
         # Should discover the 2 Python files (.bin files are filtered out during discovery)
         assert isinstance(discovered_count, int)
@@ -358,7 +358,7 @@ async def test_warning_at_25_errors(initialize_test_settings, tmp_path: Path, cl
     When: Indexing encounters ≥25 errors
     Then: Warning displayed to stderr
     """
-    from codeweaver.engine import Indexer
+    from codeweaver.engine import IndexingService
     from codeweaver.server import CodeWeaverSettings
 
     # Create project with many corrupted files
@@ -384,8 +384,8 @@ async def test_warning_at_25_errors(initialize_test_settings, tmp_path: Path, cl
     clean_container.override(CodeWeaverSettings, get_test_settings)
 
     # Resolve Indexer via DI
-    indexer = await clean_container.resolve(Indexer)
-    indexer._providers_initialized = True
+    indexer = await clean_container.resolve(IndexingService)
+    # indexer._providers_initialized = True
 
     # Capture stderr
     import io
@@ -394,7 +394,7 @@ async def test_warning_at_25_errors(initialize_test_settings, tmp_path: Path, cl
     captured_stderr = io.StringIO()
 
     with patch.object(sys, "stderr", captured_stderr):
-        indexer.prime_index(force_reindex=True)
+        await indexer.index_project(force_reindex=True)
         await asyncio.sleep(2)
 
         # Check if warning was logged
@@ -542,7 +542,7 @@ async def test_graceful_shutdown_with_checkpoint(initialize_test_settings, clean
     # Create test project
     import tempfile
 
-    from codeweaver.engine import CheckpointManager, Indexer
+    from codeweaver.engine import CheckpointManager, IndexingService
     from codeweaver.server import CodeWeaverSettings
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -560,19 +560,19 @@ async def test_graceful_shutdown_with_checkpoint(initialize_test_settings, clean
         clean_container.override(CodeWeaverSettings, get_test_settings)
 
         # Resolve Indexer via DI
-        indexer = await clean_container.resolve(Indexer)
-        indexer._providers_initialized = True
+        indexer = await clean_container.resolve(IndexingService)
+        # indexer._providers_initialized = True
 
         # Start indexing
         # Note: we need to ensure walker settings are present on the indexer instance
-        indexer._walker_settings = {"path": str(project_root)}
+        # indexer._walker_settings = {"path": str(project_root)}
 
-        indexer.prime_index(force_reindex=True)
+        await indexer.index_project(force_reindex=True)
 
         # Simulate SIGTERM by calling signal handler
         # Note: Actual signal testing requires special setup
-        if hasattr(indexer, "_handle_shutdown") and callable(indexer._handle_shutdown):
-            indexer._handle_shutdown()
+        # if hasattr(indexer, "_handle_shutdown") and callable(indexer._handle_shutdown):
+        #     indexer._handle_shutdown()
 
         # Verify checkpoint exists
         checkpoint_mgr = CheckpointManager(project_root)
@@ -630,7 +630,7 @@ async def test_error_logging_structured(clean_container):
         # Create temporary directory with a file that will cause processing errors
         import tempfile
 
-        from codeweaver.engine import Indexer
+        from codeweaver.engine import IndexingService
         from codeweaver.server import CodeWeaverSettings
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -650,11 +650,11 @@ async def test_error_logging_structured(clean_container):
             clean_container.override(CodeWeaverSettings, get_test_settings)
 
             # Resolve Indexer via DI
-            indexer = await clean_container.resolve(Indexer)
-            indexer._providers_initialized = True
-            indexer._walker_settings = {"path": str(test_path)}
+            indexer = await clean_container.resolve(IndexingService)
+            # indexer._providers_initialized = True
+            # indexer._walker_settings = {"path": str(test_path)}
 
-            await indexer.prime_index(force_reindex=True)
+            await indexer.index_project(force_reindex=True)
 
         # Check log output has error messages
         log_stream.getvalue()

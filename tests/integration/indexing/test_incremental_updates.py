@@ -40,8 +40,8 @@ async def test_incremental_updates(qdrant_test_manager, vector_store_factory):
             "collection_name": collection_name,
             "url": qdrant_test_manager.url,
             "dense_vector_size": 768,
-            "sparse_vector_size": 1000
-        }
+            "sparse_vector_size": 1000,
+        },
     )
 
     file_path = Path("src/updated_file.py")

@@ -11,7 +11,7 @@ from codeweaver_tokenizers import get_tokenizer
 @pytest.mark.unit
 def test_get_tokenizer_tiktoken() -> None:
     """Test getting the Tiktoken tokenizer."""
-    tokenizer = get_tokenizer("tiktoken", "cl100k_base")
+    tokenizer = get_tokenizer("tiktoken", "o200k_base")
     assert tokenizer is not None
 
     text = "Hello world"
@@ -23,7 +23,7 @@ def test_get_tokenizer_tiktoken() -> None:
 @pytest.mark.unit
 def test_tokenizer_estimate() -> None:
     """Test the estimate method of the tokenizer."""
-    tokenizer = get_tokenizer("tiktoken", "cl100k_base")
+    tokenizer = get_tokenizer("tiktoken", "o200k_base")
     text = "This is a test of the emergency broadcast system."
     estimate = tokenizer.estimate(text)
     actual = len(tokenizer.encode(text))

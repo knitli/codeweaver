@@ -30,6 +30,8 @@ from cyclopts import App, Parameter
 from codeweaver import __version__
 from codeweaver.cli.ui import get_display
 from codeweaver.core import CODEWEAVER_PREFIX
+from codeweaver.core.di import get_container
+from codeweaver.core.ui_protocol import ProgressReporter
 
 
 if TYPE_CHECKING:
@@ -78,6 +80,10 @@ def _handle_keyboard_interrupt():
 
 def main() -> None:
     """Main CLI entry point."""
+    # Override DI to use StatusDisplay instead of default RichConsoleProgressReporter
+    # This must happen before any commands are executed (which might resolve dependencies)
+    get_container().override(ProgressReporter, display)
+
     try:
         app()
     except KeyboardInterrupt:

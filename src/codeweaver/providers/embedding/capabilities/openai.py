@@ -43,7 +43,7 @@ def _get_shared_openai_embedding_capabilities() -> PartialCapabilities:
         "is_normalized": True,
         "tokenizer": "tiktoken",
         "max_batch_tokens": 64_000,
-        "tokenizer_model": "cl100k_base",
+        "tokenizer_model": "o200k_base",
         "supports_context_chunk_embedding": False,
         "context_window": 8192,
         "default_dtype": "float",

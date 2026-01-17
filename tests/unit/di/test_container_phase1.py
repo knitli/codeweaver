@@ -54,18 +54,14 @@ class ServiceC:
 class CircularServiceA:
     """Service A in circular dependency: A -> B -> A."""
 
-    def __init__(
-        self, service_b: Annotated[CircularServiceB, Depends()] = INJECTED
-    ):
+    def __init__(self, service_b: Annotated[CircularServiceB, Depends()] = INJECTED):
         self.service_b = service_b
 
 
 class CircularServiceB:
     """Service B in circular dependency: B -> A -> B."""
 
-    def __init__(
-        self, service_a: Annotated[CircularServiceA, Depends()] = INJECTED
-    ):
+    def __init__(self, service_a: Annotated[CircularServiceA, Depends()] = INJECTED):
         self.service_a = service_a
 
 

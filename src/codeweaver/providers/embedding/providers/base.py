@@ -86,6 +86,9 @@ if TYPE_CHECKING:
 ONE_KB = 1024
 ONE_MB = ONE_KB * 1024  # I guess it could be ONE_KB** but that'd be confusing
 
+DEFAULT_MAX_TOKENS = 120_000
+
+OPEN_CIRCUIT_DURATION = 30.0  # seconds
 
 type EmbeddingImplementationDeps = Annotated[Any, depends(lambda: None)]
 "Implementation-specific dependencies for the provider. To use this type, implement a dependency provider callable and register it with the DI system using this type as the key."
@@ -195,7 +198,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
     ] = None
 
     _provider: ClassVar[LiteralProvider] = cast(LiteralProvider, Provider.NOT_SET)
-    _max_tokens: ClassVar[PositiveInt] = 120_000
+    _max_tokens: ClassVar[PositiveInt] = DEFAULT_MAX_TOKENS
     _input_transformer: Callable[[StructuredDataInput], Any] = default_input_transformer
     _output_transformer: Callable[[Any], list[list[float]] | list[list[int]]] = (
         default_output_transformer
@@ -218,7 +221,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
     _circuit_state: CircuitBreakerState = CircuitBreakerState.CLOSED
     _failure_count: int = 0
     _last_failure_time: float | None = None
-    _circuit_open_duration: float = 30.0  # 30 seconds
+    _circuit_open_duration: float = OPEN_CIRCUIT_DURATION  # 30 seconds
 
     def __init__(
         self,
@@ -237,7 +240,9 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         object.__setattr__(self, "_failure_count", kwargs.get("failure_count", 0))
         object.__setattr__(self, "_last_failure_time", kwargs.get("last_failure_time"))
         object.__setattr__(
-            self, "_circuit_open_duration", kwargs.get("circuit_open_duration", 30.0)
+            self,
+            "_circuit_open_duration",
+            kwargs.get("circuit_open_duration", OPEN_CIRCUIT_DURATION),
         )
         object.__setattr__(self, "client", client)
         object.__setattr__(self, "config", config)
@@ -246,9 +251,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             self, "embed_options", config.embedding if config and config.embedding else {}
         )
         object.__setattr__(self, "model_options", config.model if config and config.model else {})
-        store_kwargs = kwargs.get(
-            "store_kwargs", {"value_type": list, "size_limit": 1024 * 1024 * 3}
-        )
+        store_kwargs = kwargs.get("store_kwargs", {"value_type": list, "size_limit": ONE_MB * 3})
         object.__setattr__(self, "_store", make_uuid_store(**store_kwargs))
         hash_store_kwargs = kwargs.get(
             "hash_store_kwargs", {"value_type": UUID, "size_limit": ONE_KB * 256}
@@ -317,7 +320,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         if not chunks:
             return []
 
-        max_tokens = max_tokens or 120_000
+        max_tokens = max_tokens or DEFAULT_MAX_TOKENS
         # Apply 85% safety margin to account for tokenizer estimation variance
         # This prevents edge cases where our token estimate slightly underestimates
         # the provider's actual token count, which would cause API errors
@@ -485,13 +488,14 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
 
     async def embed_documents(  # noqa: C901
         self,
-        documents: Sequence[CodeChunk],  # type: ignore # intentionally obscurred
+        documents: Sequence[CodeChunk],
         *,
         batch_id: UUID7 | None = None,
         skip_deduplication: bool = False,
         context: Any = None,
         **kwargs: Any,
     ) -> list[list[float]] | list[list[int]] | list[SparseEmbedding] | EmbeddingErrorInfo:
+        # sourcery skip: low-code-quality
         """Embed a list of documents into vectors.
 
         Optionally takes a `batch_id` parameter to reprocess a specific batch of documents.
@@ -720,7 +724,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         """Get the model name for the embedding provider."""
         if self.caps:
             return self.caps.name
-        return self.config.model_name if self.config else "unknown"
+        return self.config.model_name or self.config.embedding_config.model_name or "unknown-model"
 
     @property
     def model_capabilities(self) -> EmbeddingModelCapabilities | None:
@@ -736,7 +740,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         """Get the tokenizer for the embedding provider."""
         if self.caps and (defined_tokenizer := self.caps.tokenizer):
             return get_tokenizer(defined_tokenizer, self.caps.tokenizer_model or self.caps.name)
-        return get_tokenizer("tiktoken", "cl100k_base")
+        return get_tokenizer("tiktoken", "o200k_base")
 
     @property
     def tokenizer(self) -> Tokenizer[Any]:

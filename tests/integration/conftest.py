@@ -1083,12 +1083,12 @@ async def indexed_test_project(known_test_codebase, clean_container):
 
     This fixture:
     1. Configures CodeWeaverSettings with project path
-    2. Resolves and initializes the Indexer via DI
+    2. Resolves and initializes the IndexingService via DI
     3. Indexes the test codebase
     4. Ensures global state is correctly initialized
     5. Yields the project path for tests
     """
-    from codeweaver.engine import Indexer
+    from codeweaver.engine import IndexingService
     from codeweaver.server import CodeWeaverSettings, CodeWeaverState, get_settings
 
     # Ensure known_test_codebase is absolute
@@ -1122,12 +1122,12 @@ async def indexed_test_project(known_test_codebase, clean_container):
 
     with patch("codeweaver.agent_api", side_effect=mock_time):
         # Resolve indexer from container
-        indexer = await clean_container.resolve(Indexer)
+        indexer = await clean_container.resolve(IndexingService)
 
         # Ensure it's using the correct project path
         indexer._project_path = project_path
 
-        await indexer.prime_index(force_reindex=True)
+        await indexer.index_project(force_reindex=True)
 
         yield project_path
 

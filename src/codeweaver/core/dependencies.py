@@ -16,9 +16,15 @@ from typing import TYPE_CHECKING, Annotated
 from pydantic import DirectoryPath
 
 from codeweaver.core import LoggingSettingsDict
+from codeweaver.core._logging import get_rich_console
 from codeweaver.core.config import DefaultLoggingSettings
 from codeweaver.core.di import INJECTED, dependency_provider, depends
 from codeweaver.core.types import Unset, get_possible_config_paths
+from codeweaver.core.ui_protocol import (
+    NoOpProgressReporter,
+    ProgressReporter,
+    RichConsoleProgressReporter,
+)
 from codeweaver.core.utils import get_project_path
 
 
@@ -134,6 +140,34 @@ def _get_logging_settings(settings: SettingsDep = INJECTED) -> LoggingSettingsDi
 type LoggingSettingsDep = Annotated[LoggingSettingsDict, depends(_get_logging_settings)]
 
 
+@dependency_provider(ProgressReporter, scope="singleton")
+def _create_progress_reporter(settings: SettingsDep = INJECTED) -> ProgressReporter:
+    """Factory for progress reporter.
+
+    Returns:
+        - NoOpProgressReporter for testing
+        - RichConsoleProgressReporter for server/daemon (uses Rich Console)
+        - CLI can override with StatusDisplay implementation
+    """
+    # Check if we're in CLI mode
+    if hasattr(settings, "cli_mode") and settings.cli_mode:
+        # CLI will override this with StatusDisplay
+        # For now, return Rich console reporter as fallback
+        console = get_rich_console()
+        return RichConsoleProgressReporter(console=console)
+
+    # Server/daemon mode: use Rich Console
+    if hasattr(settings, "daemon_mode") and settings.daemon_mode:
+        console = get_rich_console()
+        return RichConsoleProgressReporter(console=console)
+
+    # Default: no-op (e.g., testing)
+    return NoOpProgressReporter()
+
+
+type ProgressReporterDep = Annotated[ProgressReporter, depends(_create_progress_reporter)]
+
+
 def _get_canonical_project_path(settings: SettingsDep = INJECTED) -> DirectoryPath:
     return settings.project_path if settings.project_path is not Unset else get_project_path()  # ty:ignore[invalid-return-type]
 
@@ -153,7 +187,9 @@ type ResolvedProjectNameDep = Annotated[str, depends(_get_canonical_project_name
 
 __all__ = (
     "CodeWeaverSettingsType",
+    "LoggingSettingsDep",
     "NoneDep",
+    "ProgressReporterDep",
     "ResolvedProjectNameDep",
     "ResolvedProjectPathDep",
     "SettingsDep",

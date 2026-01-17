@@ -79,7 +79,7 @@ async def test_incremental_indexing_updates_search_results(
     """Validate that adding new files updates search results."""
     from codeweaver.agent_api import IntentType, find_code
 
-    from codeweaver.engine import Indexer
+    from codeweaver.engine import IndexingService
     from codeweaver.providers import VectorStoreProvider
     from codeweaver.server import CodeWeaverSettings, get_settings
 
@@ -107,8 +107,8 @@ def process_payment(amount: float, card_token: str) -> str:
 
     with clean_container.use_overrides(overrides):
         # Re-index
-        indexer = await clean_container.resolve(Indexer)
-        await indexer.prime_index(force_reindex=True)
+        indexer = await clean_container.resolve(IndexingService)
+        await indexer.index_project(force_reindex=True)
 
         # Search for new file's content
         response = await find_code(
@@ -130,7 +130,7 @@ async def test_pipeline_handles_large_codebase(tmp_path, actual_vector_store, cl
 
     from codeweaver.agent_api import IntentType, find_code
 
-    from codeweaver.engine import Indexer
+    from codeweaver.engine import IndexingService
     from codeweaver.providers import VectorStoreProvider
     from codeweaver.server import CodeWeaverSettings, get_settings
 
@@ -155,8 +155,8 @@ async def test_pipeline_handles_large_codebase(tmp_path, actual_vector_store, cl
 
     with clean_container.use_overrides(overrides):
         start_time = time.time()
-        indexer = await clean_container.resolve(Indexer)
-        await indexer.prime_index(force_reindex=True)
+        indexer = await clean_container.resolve(IndexingService)
+        await indexer.index_project(force_reindex=True)
         indexing_time = time.time() - start_time
 
         # Search
@@ -177,7 +177,7 @@ async def test_pipeline_handles_file_updates(
     """Validate that modifying files updates their embeddings."""
     from codeweaver.agent_api import IntentType, find_code
 
-    from codeweaver.engine import Indexer
+    from codeweaver.engine import IndexingService
     from codeweaver.providers import VectorStoreProvider
     from codeweaver.server import CodeWeaverSettings, get_settings
 
@@ -195,8 +195,8 @@ async def test_pipeline_handles_file_updates(
     }
 
     with clean_container.use_overrides(overrides):
-        indexer = await clean_container.resolve(Indexer)
-        await indexer.prime_index(force_reindex=True)
+        indexer = await clean_container.resolve(IndexingService)
+        await indexer.index_project(force_reindex=True)
 
         # Search should now find OAuth content
         response_after = await find_code(query="OAuth2 JWT token", intent=IntentType.UNDERSTAND)
@@ -214,7 +214,7 @@ async def test_pipeline_coordination_with_errors(tmp_path, actual_vector_store, 
     """Validate pipeline handles partial failures gracefully."""
     from codeweaver.agent_api import IntentType, find_code
 
-    from codeweaver.engine import Indexer
+    from codeweaver.engine import IndexingService
     from codeweaver.providers import VectorStoreProvider
     from codeweaver.server import CodeWeaverSettings, get_settings
 
@@ -236,8 +236,8 @@ async def test_pipeline_coordination_with_errors(tmp_path, actual_vector_store, 
     }
 
     with clean_container.use_overrides(overrides):
-        indexer = await clean_container.resolve(Indexer)
-        await indexer.prime_index(force_reindex=True)
+        indexer = await clean_container.resolve(IndexingService)
+        await indexer.index_project(force_reindex=True)
 
         response = await find_code(query="function", intent=IntentType.UNDERSTAND)
 
@@ -299,7 +299,7 @@ async def test_indexing_performance_with_real_providers(
 
     from codeweaver.agent_api import IntentType, find_code
 
-    from codeweaver.engine import Indexer
+    from codeweaver.engine import IndexingService
     from codeweaver.providers import VectorStoreProvider
     from codeweaver.server import CodeWeaverSettings, get_settings
 
@@ -322,8 +322,8 @@ async def test_indexing_performance_with_real_providers(
 
     with clean_container.use_overrides(overrides):
         start_time = time.time()
-        indexer = await clean_container.resolve(Indexer)
-        await indexer.prime_index(force_reindex=True)
+        indexer = await clean_container.resolve(IndexingService)
+        await indexer.index_project(force_reindex=True)
         indexing_time = time.time() - start_time
 
         response = await find_code(query="function", intent=IntentType.UNDERSTAND)

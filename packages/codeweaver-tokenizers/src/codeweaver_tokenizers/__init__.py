@@ -21,7 +21,7 @@ def get_tokenizer(
 
     Args:
         tokenizer: The type of tokenizer to use (e.g., "tiktoken", "tokenizers").
-        model: The specific model name for the tokenizer.
+        model: The specific model name for the tokenizer. In many cases, this may be different from the model you are using. This is always true for `tiktoken`, and may be true for `tokenizers`. For tokenizers, you can usually find this information in the model's HuggingFace card or documentation.
 
     Returns:
         The tokenizer class corresponding to the specified type and model.
@@ -39,8 +39,8 @@ def get_tokenizer(
     raise ValueError(f"Unsupported tokenizer type: {tokenizer}")
 
 
-def estimate_tokens(text: str | bytes, encoder: str = "cl100k_base") -> int:
-    """Estimate the number of tokens in a text using tiktoken. Defaults to cl100k_base encoding."""
+def estimate_tokens(text: str | bytes, encoder: str = "o200k_base") -> int:
+    """Estimate the number of tokens in a text using tiktoken. Defaults to o200k_base encoding."""
     import tiktoken
 
     encoding = tiktoken.get_encoding(encoder)

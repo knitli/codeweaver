@@ -9,7 +9,7 @@ from __future__ import annotations
 import time
 
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from rich.console import Console
 from rich.live import Live
@@ -28,6 +28,7 @@ from rich.table import Table
 from rich.text import Text
 
 from codeweaver import __version__
+from codeweaver.core.ui_protocol import ProgressReporter
 
 
 if TYPE_CHECKING:
@@ -524,7 +525,7 @@ class IndexingProgress:
             self.console.file.flush()
 
 
-class StatusDisplay:
+class StatusDisplay(ProgressReporter):
     """Clean status display using rich for user-facing output.
 
     This class provides clean, formatted status output that bypasses the logging system
@@ -862,6 +863,45 @@ class StatusDisplay:
             duration: Duration in seconds
         """
         self.console.print(f"↻ Reindexed {files} files, {chunks} chunks ({duration:.1f}s)")
+
+    def report_progress(
+        self, phase: str, current: int, total: int, *, extra: dict[str, Any] | None = None
+    ) -> None:
+        """Implement ProgressReporter.report_progress."""
+        self.print_progress(current, total, phase)
+
+    def report_status(
+        self, message: str, *, level: str = "info", extra: dict[str, Any] | None = None
+    ) -> None:
+        """Implement ProgressReporter.report_status."""
+        if level == "error":
+            self.print_error(message)
+        elif level == "warning":
+            self.print_warning(message)
+        else:
+            self.print_info(message)
+
+    def report_error(
+        self,
+        error: Exception | str,
+        *,
+        recoverable: bool = False,
+        extra: dict[str, Any] | None = None,
+    ) -> None:
+        """Implement ProgressReporter.report_error."""
+        self.print_error(str(error))
+
+    def start_operation(self, operation: str, *, description: str | None = None) -> None:
+        """Implement ProgressReporter.start_operation."""
+        msg = description or operation
+        self.print_step(f"Starting: {msg}")
+
+    def complete_operation(
+        self, operation: str, *, success: bool = True, message: str | None = None
+    ) -> None:
+        """Implement ProgressReporter.complete_operation."""
+        msg = message or operation
+        self.print_completion(msg, success=success)
 
 
 _display: StatusDisplay | None = None

@@ -78,7 +78,7 @@ class RerankingModelCapabilities(BasedModel):
         # Set defaults before calling super().__init__()
         if "tokenizer" not in data:
             data["tokenizer"] = "tiktoken"
-            data["tokenizer_model"] = "cl100k_base"
+            data["tokenizer_model"] = "o200k_base"
         if "other" not in data:
             data["other"] = {}
 
@@ -95,7 +95,7 @@ class RerankingModelCapabilities(BasedModel):
 
         if self.tokenizer and self.tokenizer_model:
             return get_tokenizer(self.tokenizer, self.tokenizer_model)
-        return get_tokenizer("tiktoken", "cl100k_base")
+        return get_tokenizer("tiktoken", "o200k_base")
 
     @property
     def available(self) -> bool:

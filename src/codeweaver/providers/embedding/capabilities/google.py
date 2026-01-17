@@ -35,7 +35,7 @@ def get_google_embedding_capabilities() -> tuple[GoogleEmbeddingCapabilities, ..
             supports_context_chunk_embedding=False,
             # Google uses an undisclosed tokenizer through an API call. We will use tiktoken as a *fallback* if API calls fail.
             tokenizer="tiktoken",
-            tokenizer_model="cl100k_base",
+            tokenizer_model="o200k_base",
             preferred_metrics=("cosine", "euclidean"),
             hf_name=None,
             other={},

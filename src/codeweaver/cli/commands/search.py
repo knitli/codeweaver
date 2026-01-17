@@ -106,9 +106,7 @@ async def _run_search_indexing(
         ) -> None:
             progress_tracker.update(indexer.stats, phase)  # ty: ignore[invalid-argument-type]
 
-        await indexer.prime_index(
-            force_reindex=False, progress_callback=progress_callback, status_display=display
-        )
+        await indexer.prime_index(force_reindex=False, progress_callback=progress_callback)
 
         # Show quick summary
         stats = indexer.stats

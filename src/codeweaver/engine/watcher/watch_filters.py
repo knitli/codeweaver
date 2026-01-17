@@ -17,6 +17,7 @@ from typing import Any, ClassVar, Unpack, cast, overload
 import rignore
 import watchfiles
 
+from pydantic import DirectoryPath
 from watchfiles import Change, DefaultFilter
 
 from codeweaver.core import (
@@ -28,7 +29,6 @@ from codeweaver.core import (
     ConfigLanguage,
     ResolvedProjectPathDep,
     SemanticSearchLanguage,
-    Unset,
 )
 from codeweaver.engine.config import RignoreSettings
 from codeweaver.engine.dependencies import IndexerSettingsDep
@@ -154,17 +154,17 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
     _allowed_complete: bool
 
     @overload
-    def __init__(self, *, base_path: None, settings: None, walker: rignore.Walker) -> None: ...
+    def __init__(self, *, base_path: None, walker: Walker, settings: None = None) -> None: ...
     @overload
     def __init__(
-        self, *, base_path: Path, walker: None = None, **settings: Unpack[RignoreSettings]
-    ) -> None: ...
-    def __init__(  # type: ignore
         self,
         *,
-        base_path: Path | None = None,
-        walker: Walker | None = None,
-        settings: RignoreSettings | None = None,
+        base_path: ResolvedProjectPathDep = INJECTED,
+        walker: None = None,
+        **settings: Unpack[RignoreSettings],
+    ) -> None: ...
+    def __init__(  # type: ignore
+        self, *, base_path: DirectoryPath | None, walker: Walker, settings: RignoreSettings
     ) -> None:
         """Initialize the IgnoreFilter with either rignore settings or a pre-configured walker."""
         if not walker and not (settings and base_path):
@@ -176,14 +176,6 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
         if walker:
             self._walker = walker
         else:
-            if settings is None:
-                raise ValueError(
-                    "You must provide either settings or a walker. We need to know what to ignore!"
-                )
-            if base_path is None:
-                raise ValueError(
-                    "You must provide a base path if you don't provide a walker instance."
-                )
             self._walker = rignore.walk(path=base_path, **cast(dict[str, Any], settings))  # type: ignore
         self._allowed = set()
         self._allowed_complete = False
@@ -238,7 +230,7 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
         cls,
         project_path: ResolvedProjectPathDep = INJECTED,
         index_settings: IndexerSettingsDep = INJECTED,
-    ) -> IgnoreFilter[rignore.Walker]:
+    ) -> IgnoreFilter[Walker]:
         """Create an IgnoreFilter instance from settings (sync version).
 
         Note: This method cannot set inc_exc patterns asynchronously.
@@ -252,20 +244,6 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
         Returns:
             Configured IgnoreFilter instance (may need async initialization)
         """
-        from codeweaver.core import get_project_path
-        from codeweaver.engine.config import (
-            DefaultIndexerSettings,
-            IndexerSettings,
-            get_settings_map,
-        )
-
-        settings = settings or get_settings_map()
-        index_settings = (
-            settings["indexer"]
-            if isinstance(settings["indexer"], IndexerSettings)
-            else IndexerSettings.model_validate(DefaultIndexerSettings)
-        )
-
         # Note: inc_exc setting is skipped in sync version
         # The walker will be created with default settings
         # For proper inc_exc patterns, use from_settings_async()
@@ -278,19 +256,14 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
         walker = rignore.Walker(
             **(index_settings.to_settings())  # type: ignore
         )
-        return cls(
-            walker=walker,
-            base_path=get_project_path()
-            if isinstance(settings["project_path"], Unset)
-            else settings["project_path"],
-        )
+        return cls(base_path=None, walker=walker, settings=None)
 
     @classmethod
     async def from_settings_async(
         cls,
         project_path: ResolvedProjectPathDep = INJECTED,
         index_settings: IndexerSettingsDep = INJECTED,
-    ) -> IgnoreFilter[rignore.Walker]:
+    ) -> IgnoreFilter[Walker]:
         """Create an IgnoreFilter instance from settings with full async initialization.
 
         This method properly awaits all async operations including inc_exc pattern setting.
@@ -302,42 +275,18 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
         Returns:
             Fully initialized IgnoreFilter instance
         """
-        from codeweaver.core import get_project_path
-        from codeweaver.engine.config import (
-            DefaultIndexerSettings,
-            IndexerSettings,
-            get_settings_map,
-        )
-
-        settings = settings or get_settings_map()
-        index_settings = (
-            settings["indexer"]
-            if isinstance(settings["indexer"], IndexerSettings)
-            else IndexerSettings.model_validate(DefaultIndexerSettings)
-        )
-
         # Properly await inc_exc initialization
         if not index_settings.inc_exc_set:
-            project_path = (
-                get_project_path()
-                if isinstance(settings["project_path"], Unset)
-                else settings["project_path"]
-            )
             await index_settings.set_inc_exc(project_path)
             logger.debug("inc_exc patterns initialized for project: %s", project_path)
 
         walker = rignore.Walker(
             **(index_settings.to_settings())  # type: ignore
         )
-        return cls(
-            walker=walker,
-            base_path=get_project_path()
-            if isinstance(settings["project_path"], Unset)
-            else settings["project_path"],
-        )
+        return cls(base_path=None, walker=walker, settings=None)
 
     @property
-    def walker(self) -> rignore.Walker:
+    def walker(self) -> Walker:
         """Return the underlying rignore walker used by this filter."""
         return self._walker
 

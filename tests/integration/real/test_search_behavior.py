@@ -292,7 +292,7 @@ async def test_search_handles_empty_codebase(tmp_path, clean_container):
     """
     from codeweaver.agent_api import IntentType, find_code
 
-    from codeweaver.engine import Indexer
+    from codeweaver.engine import IndexingService
     from codeweaver.server import CodeWeaverSettings, get_settings
 
     empty_dir = tmp_path / "empty_codebase"
@@ -318,8 +318,8 @@ async def test_search_handles_empty_codebase(tmp_path, clean_container):
 
     with patch("codeweaver.agent_api", side_effect=mock_time):
         # Resolve indexer from container
-        indexer = await clean_container.resolve(Indexer)
-        await indexer.prime_index()
+        indexer = await clean_container.resolve(IndexingService)
+        await indexer.index_project()
 
         response = await find_code(query="any query", intent=IntentType.UNDERSTAND)
 

@@ -36,7 +36,7 @@ def get_amazon_embedding_capabilities() -> tuple[AmazonEmbeddingCapabilities, ..
             "supports_context_chunk_embedding": True,
             # we don't know what tokenizer they use, but they do return token counts
             "tokenizer": "tiktoken",
-            "tokenizer_model": "cl100k_base",  # just our default if we need to guess; it'll be close enough
+            "tokenizer_model": "o200k_base",  # just our default if we need to guess; it'll be close enough
             "preferred_metrics": (
                 "dot",
                 "cosine",

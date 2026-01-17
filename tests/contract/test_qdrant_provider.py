@@ -63,30 +63,23 @@ async def qdrant_provider(qdrant_test_manager):
         provider=Provider.QDRANT,
         client_options=QdrantClientOptions(url=AnyUrl(qdrant_test_manager.url)),
         collection=CollectionConfig(collection_name=collection_name),
-        batch_size=64
+        batch_size=64,
     )
 
     # Create capability group
     mock_settings = EmbeddingProviderSettings(
         provider=Provider.OPENAI,
         model_name="test-dense-model",
-        embedding_config=EmbeddingConfig(model_name="test-dense-model")
+        embedding_config=EmbeddingConfig(model_name="test-dense-model"),
     )
 
-    configured_dense = ConfiguredCapability(
-        capability=dense_caps,
-        config=mock_settings
-    )
+    configured_dense = ConfiguredCapability(capability=dense_caps, config=mock_settings)
 
     caps = EmbeddingCapabilityGroup(dense=configured_dense, sparse=None)
 
     # Use standard instantiation
     client = AsyncQdrantClient(url=qdrant_test_manager.url)
-    provider = QdrantVectorStoreProvider(
-        client=client,
-        config=config,
-        caps=caps
-    )
+    provider = QdrantVectorStoreProvider(client=client, config=config, caps=caps)
     await provider._initialize()
 
     yield provider  # noqa: PT022  # The fixture is an async context manager, so it cleans up after yield

@@ -44,8 +44,8 @@ async def test_inmemory_persistence(vector_store_factory):
             config_overrides={
                 "persist_path": temp_path,
                 "auto_persist": True,
-                "collection_name": "test_memory"
-            }
+                "collection_name": "test_memory",
+            },
         )
 
         # Get the actual dimension from the embedding provider configuration
@@ -79,8 +79,8 @@ async def test_inmemory_persistence(vector_store_factory):
             config_overrides={
                 "persist_path": temp_path,
                 "auto_persist": True,
-                "collection_name": "test_memory"
-            }
+                "collection_name": "test_memory",
+            },
         )
 
         # Verify: Chunk restored from disk

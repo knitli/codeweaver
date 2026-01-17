@@ -19,11 +19,11 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING
 
+from codeweaver.core.ui_protocol import ProgressReporter, RichConsoleProgressReporter
 from codeweaver.server.server import CodeWeaverState
 
 
 if TYPE_CHECKING:
-    from codeweaver.cli import StatusDisplay
     from codeweaver.core import SessionStatistics
     from codeweaver.server.config import CodeWeaverSettings
     from codeweaver.server.mcp import CwMcpHttpState
@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 async def background_services_lifespan(
     settings: CodeWeaverSettings | None = None,
     statistics: SessionStatistics | None = None,
-    status_display: StatusDisplay | None = None,
+    progress_reporter: ProgressReporter | None = None,
     *,
     verbose: bool = False,
     debug: bool = False,
@@ -55,20 +55,19 @@ async def background_services_lifespan(
     Args:
         settings: Configuration settings
         statistics: Session statistics instance
-        status_display: StatusDisplay for user-facing output (created if None)
+        progress_reporter: ProgressReporter for user-facing output (created if None)
         verbose: Enable verbose logging
         debug: Enable debug logging
 
     Yields:
         CodeWeaverState instance for background services
     """
-    from codeweaver.cli import StatusDisplay
     from codeweaver.core import Unset, get_project_path
     from codeweaver.server.config import get_settings
 
-    # Create StatusDisplay if not provided
-    if status_display is None:
-        status_display = StatusDisplay()
+    # Create ProgressReporter if not provided
+    if progress_reporter is None:
+        progress_reporter = RichConsoleProgressReporter()
 
     if verbose or debug:
         logger.info("Entering background services lifespan context manager...")
@@ -94,42 +93,47 @@ async def background_services_lifespan(
         from codeweaver.server.background_services import run_background_indexing
 
         indexing_task = asyncio.create_task(
-            run_background_indexing(background_state, status_display, verbose=verbose, debug=debug)
+            run_background_indexing(
+                background_state, progress_reporter, verbose=verbose, debug=debug
+            )
         )
 
         # Perform health checks and display results
-        status_display.print_step("Health checks...")
+        progress_reporter.report_status("Health checks...")
 
         if background_state.health_service:
             health_response = await background_state.health_service.get_health_response()
 
             # Vector store health with degraded handling
             vs_status = health_response.services.vector_store.status
-            status_display.print_health_check("Vector store (Qdrant)", vs_status)
+            status_icon = {"up": "✅", "down": "❌", "degraded": "⚠️"}.get(vs_status, vs_status)
+            progress_reporter.report_status(f"Vector store (Qdrant): {status_icon}")
 
             # Show helpful message for degraded/down vector store
             if vs_status in ("down", "degraded") and not verbose and not debug:
-                status_display.console.print(
-                    "  [dim]Unable to connect. Continuing with sparse-only search.[/dim]"
+                progress_reporter.report_status(
+                    "  Unable to connect. Continuing with sparse-only search.", level="warning"
                 )
-                status_display.console.print(
-                    "  [dim]To enable semantic search: docker run -p 6333:6333 qdrant/qdrant[/dim]"
+                progress_reporter.report_status(
+                    "  To enable semantic search: docker run -p 6333:6333 qdrant/qdrant",
+                    level="warning",
                 )
 
             # Embeddings health
-            status_display.print_health_check(
-                "Embeddings (Voyage AI)",
-                health_response.services.embedding_provider.status,
-                model=health_response.services.embedding_provider.model,
-            )
+            emb_status = health_response.services.embedding_provider.status
+            emb_model = health_response.services.embedding_provider.model
+            status_icon = {"up": "✅", "down": "❌", "degraded": "⚠️"}.get(emb_status, emb_status)
+            progress_reporter.report_status(f"Embeddings (Voyage AI): {status_icon} ({emb_model})")
 
             # Sparse embeddings health
-            status_display.print_health_check(
-                f"Sparse embeddings ({health_response.services.sparse_embedding.provider})",
-                health_response.services.sparse_embedding.status,
+            sparse_prov = health_response.services.sparse_embedding.provider
+            sparse_status = health_response.services.sparse_embedding.status
+            status_icon = {"up": "✅", "down": "❌", "degraded": "⚠️"}.get(
+                sparse_status, sparse_status
             )
+            progress_reporter.report_status(f"Sparse embeddings ({sparse_prov}): {status_icon}")
 
-        status_display.print_ready()
+        progress_reporter.report_status("Ready for connections.")
 
         if verbose or debug:
             logger.info("Background services initialized successfully.")
@@ -147,7 +151,7 @@ async def background_services_lifespan(
         from codeweaver.server.server import _cleanup_state
 
         await _cleanup_state(
-            background_state, indexing_task, status_display, verbose=verbose or debug
+            background_state, indexing_task, progress_reporter, verbose=verbose or debug
         )
 
 
@@ -156,7 +160,7 @@ async def http_lifespan(
     mcp_state: CwMcpHttpState,
     settings: CodeWeaverSettings | None = None,
     statistics: SessionStatistics | None = None,
-    status_display: StatusDisplay | None = None,
+    progress_reporter: ProgressReporter | None = None,
     *,
     verbose: bool = False,
     debug: bool = False,
@@ -171,21 +175,21 @@ async def http_lifespan(
         mcp_state: MCP HTTP server state containing FastMCP app and config
         settings: Configuration settings
         statistics: Session statistics instance
-        status_display: StatusDisplay for user-facing output (created if None)
+        progress_reporter: ProgressReporter for user-facing output (created if None)
         verbose: Enable verbose logging
         debug: Enable debug logging
 
     Yields:
         CodeWeaverState instance for background services
     """
-    from codeweaver.cli import StatusDisplay
-
-    # Create StatusDisplay if not provided
-    if status_display is None:
-        status_display = StatusDisplay()
+    # Create ProgressReporter if not provided
+    if progress_reporter is None:
+        progress_reporter = RichConsoleProgressReporter()
 
     # Print header with MCP server info
-    status_display.print_header(host=mcp_state.host, port=mcp_state.port)
+    # status_display.print_header(host=mcp_state.host, port=mcp_state.port)
+    progress_reporter.report_status(f"Server: http://{mcp_state.host}:{mcp_state.port}")
+    progress_reporter.report_status("Built with FastMCP (https://gofastmcp.com)", level="debug")
 
     if verbose or debug:
         logger.info("Entering HTTP server lifespan context manager...")
@@ -194,7 +198,7 @@ async def http_lifespan(
     async with background_services_lifespan(
         settings=settings,
         statistics=statistics,
-        status_display=status_display,
+        progress_reporter=progress_reporter,
         verbose=verbose,
         debug=debug,
     ) as background_state:

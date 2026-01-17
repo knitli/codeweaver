@@ -54,7 +54,7 @@ async def memory_config(temp_persist_path):
             "auto_persist": True,
             "persist_interval": None,
             "collection_name": f"test_memory_{uuid4().hex[:8]}",
-        }
+        },
     )
 
 
@@ -72,15 +72,12 @@ async def test_embedding_caps():
     # We need a ConfiguredCapability for the group
     # Mocking the settings to satisfy ConfiguredCapability
     mock_settings = EmbeddingProviderSettings(
-        provider=Provider.OPENAI, # Dummy provider
+        provider=Provider.OPENAI,  # Dummy provider
         model_name="test-dense-model",
-        embedding_config=EmbeddingConfig(model_name="test-dense-model")
+        embedding_config=EmbeddingConfig(model_name="test-dense-model"),
     )
 
-    configured_dense = ConfiguredCapability(
-        capability=dense_caps,
-        config=mock_settings
-    )
+    configured_dense = ConfiguredCapability(capability=dense_caps, config=mock_settings)
 
     return EmbeddingCapabilityGroup(dense=configured_dense, sparse=None)
 
@@ -91,9 +88,7 @@ async def memory_provider(memory_config, test_embedding_caps):
     client = AsyncQdrantClient(location=":memory:")
 
     provider = MemoryVectorStoreProvider(
-        client=client,
-        config=memory_config,
-        caps=test_embedding_caps
+        client=client, config=memory_config, caps=test_embedding_caps
     )
     await provider._initialize()
     return provider
@@ -144,6 +139,8 @@ def sample_chunk():
 
 
 @pytest.mark.async_test
+@pytest.mark.external_api
+@pytest.mark.qdrant
 class TestMemoryProviderContract:
     """Contract tests for MemoryVectorStoreProvider implementation."""
 
@@ -225,9 +222,7 @@ class TestMemoryProviderContract:
         # Create and persist data
         client1 = AsyncQdrantClient(location=":memory:")
         provider1 = MemoryVectorStoreProvider(
-            client=client1,
-            config=memory_config,
-            caps=test_embedding_caps
+            client=client1, config=memory_config, caps=test_embedding_caps
         )
         await provider1._initialize()
         await provider1.upsert([sample_chunk])
@@ -236,9 +231,7 @@ class TestMemoryProviderContract:
         # Create new provider and restore
         client2 = AsyncQdrantClient(location=":memory:")
         provider2 = MemoryVectorStoreProvider(
-            client=client2,
-            config=memory_config,
-            caps=test_embedding_caps
+            client=client2, config=memory_config, caps=test_embedding_caps
         )
         await provider2._initialize()
 
@@ -274,15 +267,12 @@ class TestMemoryProviderContract:
         new_config_dict["auto_persist"] = True
 
         config_with_auto = MemoryVectorStoreProviderSettings(
-            provider=Provider.MEMORY,
-            in_memory_config=new_config_dict
+            provider=Provider.MEMORY, in_memory_config=new_config_dict
         )
 
         client = AsyncQdrantClient(location=":memory:")
         provider = MemoryVectorStoreProvider(
-            client=client,
-            config=config_with_auto,
-            caps=test_embedding_caps
+            client=client, config=config_with_auto, caps=test_embedding_caps
         )
         await provider._initialize()
         await provider.upsert([sample_chunk])
