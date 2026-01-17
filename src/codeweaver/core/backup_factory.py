@@ -27,10 +27,13 @@ import textcase
 
 
 _BASE_CLASS_NAMES = (
+    "AgentProviderSettings",
     "BaseEmbeddingConfig",
     "BaseProviderSettings",
     "BaseRerankingConfig",
     "ClientOptions",
+    "DataProviderSettings",
+    "EmbeddingCapabilityGroup",
     "EmbeddingCapabilityResolver",
     "EmbeddingProvider",
     "EmbeddingProviderCapabilities",

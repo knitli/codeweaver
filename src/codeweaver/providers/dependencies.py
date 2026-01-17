@@ -51,6 +51,7 @@ from codeweaver.core import (
     INJECTED,
     BaseCodeWeaverSettings,
     ConfigurationError,
+    SDKClient,
     SettingsDep,
     TypeIs,
     Unset,
@@ -60,7 +61,7 @@ from codeweaver.core import (
     lazy_import,
     rpartial,
 )
-from codeweaver.providers import AllDefaultProviderSettings
+from codeweaver.providers import AllDefaultProviderSettings, EmbeddingCapabilityGroup
 from codeweaver.providers.embedding.capabilities.resolver import (
     EmbeddingCapabilityResolver,
     SparseEmbeddingCapabilityResolver,
@@ -305,7 +306,7 @@ type VectorStoreClientDep[T] = Annotated[T, depends(_create_vector_client, scope
 BackupEmbeddingProviderSettings = create_backup_class(EmbeddingProviderSettings)
 BackupSparseEmbeddingProviderSettings = create_backup_class(SparseEmbeddingProviderSettings)
 BackupRerankingProviderSettings = create_backup_class(RerankingProviderSettings)
-BackupQdrantVectorStoreProviderSettings = create_backup_class(QdrantVectorStoreProviderSettings)
+BackupVectorStoreProviderSettings = create_backup_class(QdrantVectorStoreProviderSettings)
 
 BackupMemoryVectorStoreProviderSettings = create_backup_class(MemoryVectorStoreProviderSettings)
 BackupAgentProviderSettings = create_backup_class(AgentProviderSettings)
@@ -485,27 +486,19 @@ def _create_all_vector_store_configs(
     )
 
 
-@dependency_provider(VectorStoreProviderSettings, scope="singleton")
+@dependency_provider(_BaseQdrantVectorStoreProviderSettings, scope="singleton")
 def _create_primary_vector_store_config(
     configs: AllVectorStoreConfigsDep = INJECTED,
-) -> VectorStoreProviderSettings:
+) -> QdrantVectorStoreProviderSettings | MemoryVectorStoreProviderSettings:
     """Factory for creating PRIMARY vector store config from settings."""
     return _get_primary_provider_config_for(configs)
 
 
-@dependency_provider(BackupQdrantVectorStoreProviderSettings, scope="singleton")
+@dependency_provider(BackupVectorStoreProviderSettings, scope="singleton")
 def _create_backup_vector_store_config(
     configs: AllVectorStoreConfigsDep = INJECTED,
-) -> BackupQdrantVectorStoreProviderSettings:
+) -> BackupVectorStoreProviderSettings:
     """Factory for creating BACKUP vector store config from settings."""
-    return _get_backup_provider_config_for(configs)
-
-
-@dependency_provider(BackupMemoryVectorStoreProviderSettings, scope="singleton")
-def _create_backup_memory_vector_store_config(
-    configs: AllVectorStoreConfigsDep = INJECTED,
-) -> BackupMemoryVectorStoreProviderSettings:
-    """Factory for creating BACKUP memory vector store config from settings."""
     return _get_backup_provider_config_for(configs)
 
 
@@ -620,17 +613,11 @@ type VectorStoreProviderSettingsDep = Annotated[
 ]
 """Type alias for DI injection of vector store provider settings."""
 
-type BackupQdrantVectorStoreProviderSettingsDep = Annotated[
-    BackupQdrantVectorStoreProviderSettings,
-    depends(_create_backup_vector_store_config, use_cache=False),
+type BackupVectorStoreProviderSettingsDep = Annotated[
+    BackupVectorStoreProviderSettings, depends(_create_backup_vector_store_config, use_cache=False)
 ]
-"""Type alias for DI injection of backup vector store provider settings."""
+"""Type alias for DI injection of vector store provider settings."""
 
-type BackupMemoryVectorStoreProviderSettingsDep = Annotated[
-    BackupMemoryVectorStoreProviderSettings,
-    depends(_create_backup_memory_vector_store_config, use_cache=False),
-]
-"""Type alias for DI injection of backup memory vector store provider settings."""
 
 # --- Resolvers ---
 
@@ -707,7 +694,7 @@ def _get_embedding_registry() -> EmbeddingRegistry:
 
 
 def _get_backup_embedding_registry() -> BackupEmbeddingRegistry:
-    return BackupEmbeddingRegistry()
+    return BackupEmbeddingRegistry(is_backup_provider=True)
 
 
 type EmbeddingRegistryDep = Annotated[
@@ -732,6 +719,38 @@ BackupEmbeddingProvider = create_backup_class(
 BackupSparseEmbeddingProvider = create_backup_class(
     lazy_import("codeweaver.providers.embedding.providers", "SparseEmbeddingProvider")._resolve()
 )
+
+BackupEmbeddingCapabilityGroup = create_backup_class(EmbeddingCapabilityGroup)
+
+
+@dependency_provider(EmbeddingCapabilityGroup, scope="singleton")
+def _get_primary_embedding_capability_group(
+    configured_caps: ConfiguredCapabilitiesDep = INJECTED,
+) -> EmbeddingCapabilityGroup:
+    """Creates the primary embedding capability group from both embedding and sparse embedding settings."""
+    return EmbeddingCapabilityGroup.from_capabilities(configured_caps)
+
+
+type EmbeddingCapabilityGroupDep = Annotated[
+    EmbeddingCapabilityGroup,
+    depends(_get_primary_embedding_capability_group, use_cache=True, scope="singleton"),
+]
+"""Type alias for DI injection of primary embedding capability group."""
+
+
+@dependency_provider(BackupEmbeddingCapabilityGroup, scope="singleton")
+def _get_backup_embedding_capability_group(
+    configured_caps: BackupConfiguredCapabilitiesDep = INJECTED,
+) -> BackupEmbeddingCapabilityGroup:
+    """Creates the backup embedding capability group from both embedding and sparse embedding settings."""
+    return BackupEmbeddingCapabilityGroup.from_capabilities(configured_caps)
+
+
+type BackupEmbeddingCapabilityGroupDep = Annotated[
+    BackupEmbeddingCapabilityGroup,
+    depends(_get_backup_embedding_capability_group, use_cache=True, scope="singleton"),
+]
+"""Type alias for DI injection of backup embedding capability group."""
 
 
 def _get_embedding_provider_for_config(
@@ -920,85 +939,55 @@ BackupMemoryVectorStoreProvider = create_backup_class(
 
 
 def _get_vector_store_provider_for_config(
-    config: QdrantVectorStoreProviderSettings | MemoryVectorStoreProviderSettings,
-    provider_settings: ProviderSettingsDep = INJECTED,
+    config: VectorStoreProviderSettings,
+    embedding_capabilities: EmbeddingCapabilityGroupDep = INJECTED,
 ) -> QdrantVectorStoreProvider | MemoryVectorStoreProvider:
     """Helper to get the vector store provider settings from config."""
-    from codeweaver.providers.types import EmbeddingCapabilityGroup
-
-    embedding_config = None
-    sparse_embedding_config = None
-    # Get embedding and sparse embedding configs to construct EmbeddingCapabilityGroup
-    if embedding_settings := provider_settings.embedding:
-        embedding_config = _resolve_provider_settings(embedding_settings, backup=config.as_backup)
-    if sparse_embedding_settings := provider_settings.sparse_embedding:
-        sparse_embedding_config = _resolve_provider_settings(
-            sparse_embedding_settings, backup=config.as_backup
-        )
-
     # Build list of ConfiguredCapability objects
-    capabilities = [cap for cap in (embedding_config, sparse_embedding_config) if cap]
-
-    # Create EmbeddingCapabilityGroup from capabilities
-    caps = (
-        EmbeddingCapabilityGroup.from_capabilities(capabilities)
-        if capabilities
-        else EmbeddingCapabilityGroup()
-    )
-
-    provider = config.client.vector_store_provider
+    if (provider := config.provider) and provider.variable == "qdrant":
+        provider_cls = cast(SDKClient, config.client).vector_store_provider
+    else:
+        provider_cls = lazy_import(
+            "codeweaver.providers.vector_stores.inmemory", "MemoryVectorStoreProvider"
+        )
     try:
-        resolved_provider = provider._resolve()
+        resolved_provider = provider_cls._resolve()
     except (AttributeError, ImportError) as e:
         raise ConfigurationError(
             f"Failed to resolve vector store provider for config {config}",
             suggestions=[
-                f"Ensure the vector store provider {config.client.as_title} SDK is installed and accessible",
+                f"Ensure the vector store provider {config.client.as_title} SDK is installed and accessible",  # ty:ignore[unresolved-attribute]
                 "Check that the provider client is correctly configured",
             ],
         ) from e
     client = config.get_client()
-    return resolved_provider(client=client, config=config, caps=caps)
+    return resolved_provider(client=client, config=config, caps=embedding_capabilities)
 
 
 def _get_backup_vector_store_provider_for_config(
-    config: BackupQdrantVectorStoreProviderSettings,
-    provider_settings: ProviderSettingsDep = INJECTED,
-) -> BackupQdrantVectorStoreProvider:
+    config: BackupVectorStoreProviderSettings,
+    embedding_capabilities: BackupEmbeddingCapabilityGroupDep = INJECTED,
+) -> BackupQdrantVectorStoreProvider | BackupMemoryVectorStoreProvider:
     """Helper to get the backup vector store provider settings from config."""
-    from codeweaver.providers.types import EmbeddingCapabilityGroup
-
-    # Get embedding and sparse embedding configs to construct EmbeddingCapabilityGroup
-    embedding_config = None
-    sparse_embedding_config = None
-    if embedding_settings := provider_settings.embedding:
-        embedding_config = _resolve_provider_settings(embedding_settings, backup=True)
-    if sparse_embedding_settings := provider_settings.sparse_embedding:
-        sparse_embedding_config = _resolve_provider_settings(sparse_embedding_settings, backup=True)
-
     # Build list of ConfiguredCapability objects
-    capabilities = [cap for cap in (embedding_config, sparse_embedding_config) if cap]
-
-    # Create EmbeddingCapabilityGroup from capabilities
-    caps = (
-        EmbeddingCapabilityGroup.from_capabilities(capabilities)
-        if capabilities
-        else EmbeddingCapabilityGroup()
-    )
-
-    provider = config.client.vector_store_provider
+    if (provider := config.provider) and provider.variable == "qdrant":
+        provider_cls = cast(SDKClient, config.client).vector_store_provider
+    else:
+        provider_cls = lazy_import(
+            "codeweaver.providers.vector_stores.inmemory", "MemoryVectorStoreProvider"
+        )
     try:
-        resolved_provider = provider._resolve()
+        resolved_provider = provider_cls._resolve()
     except (AttributeError, ImportError) as e:
         raise ConfigurationError(
             f"Failed to resolve backup vector store provider for config {config}",
             suggestions=[
-                f"Ensure the vector store provider {config.client.as_title} SDK is installed and accessible",
+                f"Ensure the vector store provider {config.client.as_title} SDK is installed and accessible",  # ty:ignore[unresolved-attribute]
                 "Check that the provider client is correctly configured",
             ],
         ) from e
     client = config.get_client()
-    return resolved_provider(client=client, config=config, caps=caps)  # type: ignore[return-value]
+    return resolved_provider(client=client, config=config, caps=embedding_capabilities)
 
 
 type VectorStoreProviderDep = Annotated[
@@ -1143,7 +1132,7 @@ def _create_vector_store_provider(
 
 @dependency_provider(BackupQdrantVectorStoreProvider, scope="singleton")
 def _create_backup_vector_store_provider(
-    config: BackupQdrantVectorStoreProviderSettingsDep = INJECTED,
+    config: VectorStoreProviderSettingsDep = INJECTED,
     provider_settings: ProviderSettingsDep = INJECTED,
 ) -> BackupQdrantVectorStoreProvider:
     return _get_backup_vector_store_provider_for_config(config, provider_settings)
@@ -1151,7 +1140,7 @@ def _create_backup_vector_store_provider(
 
 @dependency_provider(BackupMemoryVectorStoreProvider, scope="singleton")
 def _create_backup_memory_vector_store_provider(
-    config: BackupMemoryVectorStoreProviderSettingsDep = INJECTED,
+    config: VectorStoreProviderSettingsDep = INJECTED,
     provider_settings: ProviderSettingsDep = INJECTED,
 ) -> BackupMemoryVectorStoreProvider:
     return _get_backup_vector_store_provider_for_config(config, provider_settings)
@@ -1187,9 +1176,9 @@ def _get_all_providers(
         for cfg in reranking_configs or ()
     )
     vector_store_providers = tuple(
-        _get_backup_vector_store_provider_for_config(cfg, provider_settings)
+        _get_backup_vector_store_provider_for_config(cfg)
         if cfg.as_backup
-        else _get_vector_store_provider_for_config(cfg, provider_settings)
+        else _get_vector_store_provider_for_config(cfg)
         for cfg in vector_store_configs or ()
     )
     return ProviderDict(
@@ -1335,8 +1324,6 @@ __all__ = (
     "BackupEmbeddingRegistryDep",
     "BackupQdrantVectorStoreProvider",
     "BackupQdrantVectorStoreProviderDep",
-    "BackupQdrantVectorStoreProviderSettings",
-    "BackupQdrantVectorStoreProviderSettingsDep",
     "BackupRerankingCapabilityResolver",
     "BackupRerankingCapabilityResolverDep",
     "BackupRerankingProvider",
@@ -1350,6 +1337,8 @@ __all__ = (
     "BackupSparseEmbeddingProviderSettingsDep",
     "BackupTokenizer",
     "BackupTokenizerDep",
+    "BackupVectorStoreProviderSettings",
+    "BackupVectorStoreProviderSettingsDep",
     "ConfiguredCapabilitiesDep",
     "EmbeddingCapabilityResolverDep",
     "EmbeddingClientDep",
