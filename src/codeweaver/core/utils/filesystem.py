@@ -440,22 +440,9 @@ def get_tooling_dirs() -> set[Path]:
     return _tooling_dirs
 
 
-def backup_file_path(*, project_name: str | None = None, project_path: Path | None = None) -> Path:
-    """Get the default backup file path for the vector store."""
-    from codeweaver.core.utils.general import generate_collection_name
-
-    return (
-        get_user_data_dir()
-        / "vectors"
-        / "backup"
-        / f"{generate_collection_name(is_backup=True, project_name=project_name, project_path=project_path)}.json"
-    )
-
-
 __all__ = (
     "COMMON_LLM_TOOLING_PATHS",
     "COMMON_TOOLING_PATHS",
-    "backup_file_path",
     "get_git_branch",
     "get_git_revision",
     "get_project_path",

@@ -26,8 +26,12 @@ from typing import (
 
 from pydantic import BeforeValidator, Field, FieldSerializationInfo, PrivateAttr, field_serializer
 
-from codeweaver.core.types import AnonymityConversion, BasedModel
-from codeweaver.core.utils import is_tty, validate_regex_pattern
+from codeweaver.core.types.enum import AnonymityConversion
+from codeweaver.core.types.models import BasedModel
+from codeweaver.core.utils.environment import (
+    is_tty,  # direct import to avoid early initialization issue
+)
+from codeweaver.core.utils.text import validate_regex_pattern
 
 
 if TYPE_CHECKING:

@@ -18,7 +18,7 @@ import textcase
 
 from pydantic import NonNegativeFloat, NonNegativeInt
 
-from codeweaver.core import ConfigurationError
+from codeweaver.core.exceptions import ConfigurationError
 
 
 logger = logging.getLogger(__name__)

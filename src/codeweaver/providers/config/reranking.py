@@ -109,7 +109,7 @@ class SentenceTransformersRerankingOptionsDict(TypedDict, total=False):
 class BaseRerankingConfig(BasedModel):
     """Base configuration for reranking models."""
 
-    _tag: LiteralProvider = Field(
+    tag: LiteralProvider = Field(
         ...,
         description="The provider tag for the reranking model. Used for discriminated unions.",
         exclude=True,
@@ -156,7 +156,7 @@ class BaseRerankingConfig(BasedModel):
 class VoyageRerankingConfig(BaseRerankingConfig):
     """Configuration options for Voyage AI reranking models."""
 
-    _tag: Literal["voyage"] = "voyage"
+    tag: Literal["voyage"] = "voyage"
     provider: Literal[Provider.VOYAGE] = Provider.VOYAGE
 
     model_name: Literal["rerank-2.5", "rerank-2.5-lite"] | LiteralString
@@ -175,7 +175,7 @@ class VoyageRerankingConfig(BaseRerankingConfig):
 class CohereRerankingConfig(BaseRerankingConfig):
     """Configuration options for Cohere reranking models."""
 
-    _tag: Literal["cohere"] = "cohere"
+    tag: Literal["cohere"] = "cohere"
     provider: Literal[Provider.COHERE] = Provider.COHERE
 
     model_name: (
@@ -208,7 +208,7 @@ class BedrockRerankingConfig(BaseRerankingConfig):
     Bedrock is the only provider that requires model-level configuration.
     """
 
-    _tag: Literal["bedrock"] = "bedrock"
+    tag: Literal["bedrock"] = "bedrock"
     provider: Literal[Provider.BEDROCK] = Provider.BEDROCK
 
     model_name: Literal["amazon.rerank-v1:0", "cohere.rerank-v3-5:0"] | LiteralString
@@ -237,7 +237,7 @@ class BedrockRerankingConfig(BaseRerankingConfig):
 class FastEmbedRerankingConfig(BaseRerankingConfig):
     """Configuration options for FastEmbed reranking models."""
 
-    _tag: Literal["fastembed"] = "fastembed"
+    tag: Literal["fastembed"] = "fastembed"
     provider: Literal[Provider.FASTEMBED] = Provider.FASTEMBED
 
     model_name: LiteralString
@@ -259,7 +259,7 @@ class SentenceTransformersRerankingConfig(BaseRerankingConfig):
     Uses CrossEncoder models for reranking tasks.
     """
 
-    _tag: Literal["sentence_transformers"] = "sentence_transformers"
+    tag: Literal["sentence_transformers"] = "sentence_transformers"
     provider: Literal[Provider.SENTENCE_TRANSFORMERS] = Provider.SENTENCE_TRANSFORMERS
 
     model_name: LiteralString

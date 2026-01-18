@@ -15,7 +15,7 @@ import logging
 
 from typing import TYPE_CHECKING
 
-from codeweaver.core.utils import detect_root_package
+from codeweaver.core.utils.environment import detect_root_package
 
 
 if TYPE_CHECKING:

@@ -13,6 +13,7 @@ import logging
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
+from codeweaver.core.utils.procs import very_low_priority
 from codeweaver.providers import CircuitBreakerState
 
 
@@ -40,29 +41,35 @@ class FailoverService:
         primary_store: VectorStoreProvider | None,
         backup_store: VectorStoreProvider | None,
         indexing_service: IndexingService,
+        backup_indexing_service: IndexingService,
         settings: FailoverSettings,
     ):
         """Initialize failover service with required dependencies."""
         self.primary_store = primary_store
         self.backup_store = backup_store
         self.indexing_service = indexing_service
+        self.backup_indexing_service = backup_indexing_service
         self.settings = settings
 
         # State
         self._active_store: VectorStoreProvider | None = primary_store
         self._failover_active = False
         self._monitor_task: asyncio.Task | None = None
+        self._backup_maintenance_task: asyncio.Task | None = None
         self._failover_time: datetime | None = None
 
     async def start_monitoring(self) -> None:
-        """Start health monitoring and automatic failover."""
+        """Start health monitoring, automatic failover, and backup maintenance."""
         if self.settings.disable_failover or not self.primary_store:
             return
 
         self._monitor_task = asyncio.create_task(
             self._monitor_health(), name="failover_health_monitor"
         )
-        logger.info("Failover health monitoring started")
+        self._backup_maintenance_task = asyncio.create_task(
+            self._maintain_backup_loop(), name="backup_maintenance_loop"
+        )
+        logger.info("Failover health monitoring and backup maintenance started")
 
     async def _monitor_health(self) -> None:
         """Monitor primary store health."""
@@ -90,6 +97,28 @@ class FailoverService:
             except Exception:
                 logger.warning("Error in failover health monitor", exc_info=True)
 
+    async def _maintain_backup_loop(self) -> None:
+        """Periodically sync the backup store using the backup indexing service."""
+        while True:
+            try:
+                # Sync interval from settings (default 5 mins)
+                await asyncio.sleep(self.settings.backup_sync_interval)
+
+                # Only run if not currently failing over (if failover is active, backup is live anyway)
+                if not self._failover_active and self.backup_store:
+                    # Use very low priority for background maintenance
+                    with very_low_priority():
+                        # We use index_project() on the backup service.
+                        # It respects the shared file manifest, so it only indexes what needs indexing.
+                        # Since it uses backup embedding models (via its own dependencies),
+                        # it creates backup-compatible chunks/embeddings.
+                        await self.backup_indexing_service.index_project()
+
+            except asyncio.CancelledError:
+                break
+            except Exception:
+                logger.warning("Error in backup maintenance loop", exc_info=True)
+
     async def _activate_failover(self) -> None:
         """Activate backup store."""
         if not self.backup_store:
@@ -112,7 +141,14 @@ class FailoverService:
         """Restore primary store after recovery."""
         logger.info("Primary vector store recovered, restoring")
 
-        # In a real implementation, we would sync changes here
+        # Sync changes from backup to primary
+        # This handles the complex reconciliation logic
+        if self.backup_store:
+            try:
+                await self.indexing_service.reconcile_from_backup(self.backup_store)
+            except Exception:
+                logger.exception("Failed to reconcile from backup during restore")
+                # We restore anyway, eventual consistency will catch up via standard indexing
 
         self._active_store = self.primary_store
         self._failover_active = False

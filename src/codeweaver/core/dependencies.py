@@ -15,17 +15,19 @@ from typing import TYPE_CHECKING, Annotated
 
 from pydantic import DirectoryPath
 
-from codeweaver.core import LoggingSettingsDict
 from codeweaver.core._logging import get_rich_console
-from codeweaver.core.config import DefaultLoggingSettings
-from codeweaver.core.di import INJECTED, dependency_provider, depends
-from codeweaver.core.types import Unset, get_possible_config_paths
+from codeweaver.core.config._logging import DefaultLoggingSettings, LoggingSettingsDict
+from codeweaver.core.di.depends import INJECTED, depends
+from codeweaver.core.di.utils import dependency_provider
+from codeweaver.core.types.aliases import BlakeKey
+from codeweaver.core.types.sentinel import Unset
+from codeweaver.core.types.settings_model import get_possible_config_paths
 from codeweaver.core.ui_protocol import (
     NoOpProgressReporter,
     ProgressReporter,
     RichConsoleProgressReporter,
 )
-from codeweaver.core.utils import get_project_path
+from codeweaver.core.utils.filesystem import get_project_path
 
 
 if TYPE_CHECKING:
@@ -185,6 +187,15 @@ def _get_canonical_project_name(settings: SettingsDep = INJECTED) -> str:
 
 type ResolvedProjectNameDep = Annotated[str, depends(_get_canonical_project_name)]
 
+
+def _get_resolved_project_path_hash(project_path: ResolvedProjectPathDep = INJECTED) -> BlakeKey:
+    from codeweaver.core.utils import get_blake_hash
+
+    return get_blake_hash(str(project_path.absolute()))
+
+
+type ResolvedProjectPathHashDep = Annotated[BlakeKey, depends(_get_resolved_project_path_hash)]
+
 __all__ = (
     "CodeWeaverSettingsType",
     "LoggingSettingsDep",
@@ -192,6 +203,7 @@ __all__ = (
     "ProgressReporterDep",
     "ResolvedProjectNameDep",
     "ResolvedProjectPathDep",
+    "ResolvedProjectPathHashDep",
     "SettingsDep",
     "StatisticsDep",
     "TelemetrySettingsDep",

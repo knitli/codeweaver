@@ -14,7 +14,7 @@ from pydantic import SecretStr
 from codeweaver.core import lazy_import
 
 
-create_backup_class = lazy_import("codeweaver.providers.backup_factory", "create_backup_class")
+create_backup_class = lazy_import("codeweaver.core.backup_factory", "create_backup_class")
 
 
 class AzureOptions(TypedDict, total=False):

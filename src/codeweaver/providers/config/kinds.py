@@ -52,6 +52,7 @@ from codeweaver.core import (
     SDKClient,
     generate_collection_name,
     get_user_cache_dir,
+    get_user_state_dir,
 )
 from codeweaver.providers.config.clients import (
     BedrockClientOptions,
@@ -152,6 +153,17 @@ class BaseProviderSettings(BasedModel, ABC):
 
     def __init__(self, **data: Any) -> None:
         """Initialize base provider settings."""
+        from codeweaver.core.di import get_container
+
+        try:
+            container = get_container()
+            container.register(type(self), lambda: self)
+        except Exception as e:
+            # Log if DI not available (monorepo compatibility)
+            logger.debug(
+                "Dependency injection container not available, skipping registration of ProviderSettings: %s",
+                e,
+            )
         if "tag" not in data:
             data["tag"] = data.get("provider").variable
         object.__setattr__(self, "tag", data["tag"])
@@ -658,7 +670,7 @@ class MemoryVectorStoreProviderSettings(_BaseQdrantVectorStoreProviderSettings):
     ) -> Path:
         """Get the persist path from in_memory_config."""
         return Path(
-            f"{get_user_cache_dir()}/vectors/{generate_collection_name(collection_name=collection_name, project_name=project_name, project_path=project_path)}"
+            f"{get_user_state_dir()}/vectors/{generate_collection_name(collection_name=collection_name, project_name=project_name, project_path=project_path)}"
         )
 
     @staticmethod

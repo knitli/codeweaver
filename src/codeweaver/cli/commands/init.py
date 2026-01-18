@@ -27,7 +27,7 @@ from pydantic_core import to_json as to_json
 from rich.prompt import Confirm
 
 from codeweaver.cli.ui import CLIErrorHandler, get_display
-from codeweaver.core import CodeWeaverError, get_user_config_dir, resolve_project_root
+from codeweaver.core import CodeWeaverError, get_project_path, get_user_config_dir
 
 
 if TYPE_CHECKING:
@@ -218,7 +218,7 @@ def config(
         profile = "quickstart"
 
     # Validate vector_url if cloud deployment
-    project_path = project or resolve_project_root()
+    project_path = project or get_project_path()
     parsed_vector_url: AnyHttpUrl | None = None
     if vector_deployment == "cloud" and not vector_url:
         error_handler.handle_error(
@@ -687,7 +687,7 @@ def mcp(
     display.print_section("MCP Client Configuration Setup")
 
     # Determine project path
-    project_path = project or resolve_project_root()
+    project_path = project or get_project_path()
     project_path = Path(project_path).resolve()
     display.console.print(f"[dim]Project:[/dim] {project_path}\n")
 
@@ -844,7 +844,7 @@ def init(
         profile = "quickstart"
 
     # Determine project path
-    project_path = (project or resolve_project_root()).resolve()
+    project_path = (project or get_project_path()).resolve()
     if not project_path.exists():
         error_handler.handle_error(
             CodeWeaverError(f"Project path does not exist: {project_path}"),
@@ -1322,7 +1322,7 @@ def service(
     display.print_command_header("init service", "Install CodeWeaver as a system service")
 
     # Determine project path
-    project_path = (project or resolve_project_root()).resolve()
+    project_path = (project or get_project_path()).resolve()
     display.print_info(f"Working directory: {project_path}\n")
 
     # Find the codeweaver executable

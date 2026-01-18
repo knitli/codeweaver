@@ -24,6 +24,7 @@ from codeweaver.core import (
     INJECTED,
     CodeWeaverSettingsType,
     ProgressReporterDep,
+    ResolvedProjectNameDep,
     ResolvedProjectPathDep,
     SettingsDep,
     Unset,
@@ -39,20 +40,25 @@ from codeweaver.engine.config import (
     IndexerSettings,
 )
 from codeweaver.providers import (
+    BackupEmbeddingProviderDep,
+    BackupTokenizerDep,
     BackupVectorStoreProviderDep,
     EmbeddingProviderDep,
     SparseEmbeddingProviderDep,
+    TokenizerDep,
     VectorStoreProviderDep,
 )
 
 
 if TYPE_CHECKING:
+    from codeweaver.engine.chunker import ChunkGovernor
     from codeweaver.engine.managers.checkpoint_manager import CheckpointManager
     from codeweaver.engine.managers.manifest_manager import FileManifestManager
     from codeweaver.engine.managers.progress_tracker import IndexingProgressTracker, IndexingStats
     from codeweaver.engine.services.chunking_service import ChunkingService
     from codeweaver.engine.services.failover_service import FailoverService
     from codeweaver.engine.services.indexing_service import IndexingService
+    from codeweaver.engine.services.watching_service import FileWatchingService
     from codeweaver.engine.watcher.watch_filters import ExtensionFilter, IgnoreFilter
 
 
@@ -109,14 +115,15 @@ type FailoverSettingsDep = Annotated[
 @dependency_provider(CheckpointManager, scope="singleton")
 def _create_checkpoint_manager(
     project_path: ResolvedProjectPathDep = INJECTED,
-    settings: Annotated[IndexerSettings, depends(_get_indexer_settings)] = INJECTED,
+    settings: IndexerSettingsDep = INJECTED,
+    project_name: ResolvedProjectNameDep = INJECTED,
 ) -> CheckpointManager:
     """Factory for checkpoint manager."""
     from codeweaver.engine.managers.checkpoint_manager import CheckpointManager
 
     return CheckpointManager(
         project_path=project_path,
-        project_name=get_project_name(project_path),
+        project_name=project_name,
         checkpoint_dir=settings.checkpoint_file.parent,
     )
 
@@ -124,14 +131,15 @@ def _create_checkpoint_manager(
 @dependency_provider(FileManifestManager, scope="singleton")
 def _create_manifest_manager(
     project_path: ResolvedProjectPathDep = INJECTED,
-    settings: Annotated[IndexerSettings, depends(_get_indexer_settings)] = INJECTED,
+    project_name: ResolvedProjectNameDep = INJECTED,
+    settings: IndexerSettingsDep = INJECTED,
 ) -> FileManifestManager:
     """Factory for file manifest manager."""
     from codeweaver.engine.managers.manifest_manager import FileManifestManager
 
     return FileManifestManager(
         project_path=project_path,
-        project_name=get_project_name(project_path),
+        project_name=project_name,
         manifest_dir=settings.cache_dir / "manifests",
     )
 
@@ -171,13 +179,54 @@ type ProgressTrackerDep = Annotated[
 # ===========================================================================
 
 
+@dependency_provider(ChunkGovernor, scope="singleton")
+def _create_chunk_governor(settings: ChunkerSettingsDep = INJECTED) -> ChunkGovernor:
+    """Factory for chunk governor."""
+    from codeweaver.engine.chunker import ChunkGovernor
+
+    return ChunkGovernor.from_settings(settings)
+
+
+type ChunkGovernorDep = Annotated[
+    "ChunkGovernor", depends(_create_chunk_governor, scope="singleton")
+]
+
+
+@dependency_provider(ChunkGovernor, scope="singleton", tags=["backup"])
+def _create_backup_chunk_governor(settings: ChunkerSettingsDep = INJECTED) -> ChunkGovernor:
+    """Factory for backup chunk governor."""
+    from codeweaver.engine.chunker import ChunkGovernor
+    from codeweaver.providers.config import get_profile
+
+    # Use the backup profile to determine capabilities
+    backup_profile = get_profile("backup", "local")
+    return ChunkGovernor.from_backup_profile(backup_profile, settings)
+
+
+type BackupChunkGovernorDep = Annotated[
+    "ChunkGovernor", depends(_create_backup_chunk_governor, scope="singleton")
+]
+
+
 @dependency_provider(ChunkingService, scope="singleton")
 def _create_chunking_service(
-    governor: ChunkGovernorDep = INJECTED,  # Placeholder for GovernorDep
-    tokenizer: TokenizerDep = INJECTED,  # Placeholder for TokenizerDep
+    governor: ChunkGovernorDep = INJECTED,
+    tokenizer: TokenizerDep = INJECTED,
     settings: ChunkerSettingsDep = INJECTED,
 ) -> ChunkingService:
     """Factory for primary chunking service."""
+    from codeweaver.engine.services.chunking_service import ChunkingService
+
+    return ChunkingService(governor=governor, tokenizer=tokenizer, settings=settings)
+
+
+@dependency_provider(ChunkingService, scope="singleton", tags=["backup"])
+def _create_backup_chunking_service(
+    governor: BackupChunkGovernorDep = INJECTED,
+    tokenizer: BackupTokenizerDep = INJECTED,
+    settings: ChunkerSettingsDep = INJECTED,
+) -> ChunkingService:
+    """Factory for backup chunking service."""
     from codeweaver.engine.services.chunking_service import ChunkingService
 
     return ChunkingService(governor=governor, tokenizer=tokenizer, settings=settings)
@@ -191,7 +240,7 @@ def _create_indexing_service(
     vector_store: VectorStoreProviderDep = INJECTED,
     settings: IndexerSettingsDep = INJECTED,
     progress_reporter: ProgressReporterDep = INJECTED,
-    progress_tracker: IndexingProgressTrackerDep = INJECTED,
+    progress_tracker: ProgressTrackerDep = INJECTED,
     checkpoint_manager: CheckpointManagerDep = INJECTED,
     manifest_manager: ManifestManagerDep = INJECTED,
     project_path: ResolvedProjectPathDep = INJECTED,
@@ -218,6 +267,7 @@ def _create_failover_service(
     primary_vector_store: VectorStoreProviderDep = INJECTED,
     backup_vector_store: BackupVectorStoreProviderDep = INJECTED,
     indexing_service: IndexingServiceDep = INJECTED,
+    backup_indexing_service: BackupIndexingServiceDep = INJECTED,
     settings: FailoverSettingsDep = INJECTED,
 ) -> FailoverService:
     """Factory for failover service."""
@@ -227,6 +277,7 @@ def _create_failover_service(
         primary_store=primary_vector_store,
         backup_store=backup_vector_store,
         indexing_service=indexing_service,
+        backup_indexing_service=backup_indexing_service,
         settings=settings,
     )
 
@@ -234,11 +285,76 @@ def _create_failover_service(
 type ChunkingServiceDep = Annotated[
     "ChunkingService", depends(_create_chunking_service, scope="singleton")
 ]
+type BackupChunkingServiceDep = Annotated[
+    "ChunkingService", depends(_create_backup_chunking_service, scope="singleton")
+]
 type IndexingServiceDep = Annotated[
     "IndexingService", depends(_create_indexing_service, scope="singleton")
 ]
+type BackupIndexingServiceDep = Annotated[
+    "IndexingService", depends(_create_backup_indexing_service, scope="singleton")
+]
 type FailoverServiceDep = Annotated[
     "FailoverService", depends(_create_failover_service, scope="singleton")
+]
+
+
+@dependency_provider(FileWatchingService, scope="singleton")
+def _create_watching_service(
+    indexer: IndexingServiceDep = INJECTED,
+    progress_reporter: ProgressReporterDep = INJECTED,
+    file_filter: IgnoreFilterDep = INJECTED,
+    project_path: ResolvedProjectPathDep = INJECTED,
+    # Optional settings could be injected here if needed, or defaults used
+) -> FileWatchingService:
+    """Factory for file watching service."""
+    from codeweaver.engine.services.watching_service import FileWatchingService
+
+    return FileWatchingService(
+        indexer=indexer,
+        progress_reporter=progress_reporter,
+        file_filter=file_filter,
+        project_path=project_path,
+    )
+
+
+type FileWatchingServiceDep = Annotated[
+    "FileWatchingService", depends(_create_watching_service, scope="singleton")
+]
+
+
+@dependency_provider(IndexingService, scope="singleton", tags=["backup"])
+def _create_backup_indexing_service(
+    chunking_service: BackupChunkingServiceDep = INJECTED,
+    embedding_provider: BackupEmbeddingProviderDep = INJECTED,
+    sparse_provider: SparseEmbeddingProviderDep = INJECTED,
+    vector_store: BackupVectorStoreProviderDep = INJECTED,
+    settings: IndexerSettingsDep = INJECTED,
+    progress_reporter: ProgressReporterDep = INJECTED,
+    progress_tracker: ProgressTrackerDep = INJECTED,
+    checkpoint_manager: CheckpointManagerDep = INJECTED,
+    manifest_manager: ManifestManagerDep = INJECTED,
+    project_path: ResolvedProjectPathDep = INJECTED,
+) -> IndexingService:
+    """Factory for backup indexing service."""
+    from codeweaver.engine.services.indexing_service import IndexingService
+
+    return IndexingService(
+        chunking_service=chunking_service,
+        embedding_provider=embedding_provider,
+        sparse_provider=sparse_provider,
+        vector_store=vector_store,
+        settings=settings,
+        progress_reporter=progress_reporter,
+        progress_tracker=progress_tracker,
+        checkpoint_manager=checkpoint_manager,
+        manifest_manager=manifest_manager,
+        project_path=project_path,
+    )
+
+
+type BackupIndexingServiceDep = Annotated[
+    "IndexingService", depends(_create_backup_indexing_service, scope="singleton")
 ]
 
 
@@ -254,7 +370,7 @@ def _create_extension_filter() -> ExtensionFilter:
     return ExtensionFilter(tuple(str(s) for s in DEFAULT_EXCLUDED_EXTENSIONS))
 
 
-@dependency_provider(IgnoreFilter, scope="request")
+@dependency_provider(IgnoreFilter, scope="singleton")
 def _create_ignore_filter(
     project_path: ResolvedProjectPathDep, indexer_settings: IndexerSettingsDep
 ) -> IgnoreFilter:
@@ -266,15 +382,18 @@ def _create_ignore_filter(
 type ExtensionFilterDep = Annotated[
     ExtensionFilter, depends(_create_extension_filter, scope="singleton")
 ]
-type IgnoreFilterDep = Annotated[IgnoreFilter, depends(_create_ignore_filter, scope="request")]
+type IgnoreFilterDep = Annotated[IgnoreFilter, depends(_create_ignore_filter, scope="singleton")]
 
 __all__ = (
+    "BackupChunkingServiceDep",
+    "BackupIndexingServiceDep",
     "CheckpointManagerDep",
     "ChunkerSettingsDep",
     "ChunkingServiceDep",
     "ExtensionFilterDep",
     "FailoverServiceDep",
     "FailoverSettingsDep",
+    "FileWatchingServiceDep",
     "IgnoreFilterDep",
     "IndexerSettingsDep",
     "IndexingServiceDep",

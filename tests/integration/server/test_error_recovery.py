@@ -37,6 +37,7 @@ from codeweaver.providers import (
 def create_failing_provider_mock() -> MagicMock:
     """Create a mock provider that always fails for circuit breaker testing."""
     mock_provider = MagicMock(spec=EmbeddingProvider)
+    mock_provider.name = Provider.OPENAI  # Set name property
     mock_provider.embed_query = AsyncMock(side_effect=ConnectionError("Simulated API failure"))
     mock_provider.embed_documents = AsyncMock(side_effect=ConnectionError("Simulated API failure"))
     mock_provider.circuit_breaker_state = CircuitBreakerState.CLOSED.value
@@ -74,6 +75,7 @@ def create_half_open_provider_mock() -> MagicMock:
     mock_provider._failure_count = 0
     mock_provider._last_failure_time = None
     mock_provider._provider = Provider.OPENAI
+    mock_provider.name = Provider.OPENAI  # Set name property
     mock_provider._call_count = call_count
     return mock_provider
 
@@ -106,6 +108,7 @@ def create_flaky_provider_mock() -> MagicMock:
     mock_provider._failure_count = 0
     mock_provider._last_failure_time = None
     mock_provider._provider = Provider.OPENAI
+    mock_provider.name = Provider.OPENAI  # Set name property
     mock_provider.attempt_count = attempt_count["value"]
     mock_provider.attempt_times = attempt_times
     mock_provider._attempt_data = {"count": attempt_count, "times": attempt_times}
@@ -150,10 +153,12 @@ async def test_sparse_only_fallback(initialize_test_settings, clean_container):
 
     # Dense embedding fails
     mock_dense_provider = AsyncMock(spec=EmbeddingProvider)
+    mock_dense_provider.name = Provider.VOYAGE  # Set name property
     mock_dense_provider.embed_query.side_effect = ConnectionError("API unavailable")
 
     # Sparse embedding works - returns SparseEmbedding format
     mock_sparse_provider = AsyncMock(spec=SparseEmbeddingProvider)
+    mock_sparse_provider.name = Provider.SENTENCE_TRANSFORMERS  # Set name property
     mock_sparse_provider.embed_query.return_value = SparseEmbedding(
         indices=[0, 1, 2], values=[0.5, 0.3, 0.2]
     )

@@ -21,7 +21,7 @@ from pydantic import FilePath
 from rich.table import Table
 
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
-from codeweaver.core import CodeWeaverError, resolve_project_root
+from codeweaver.core import CodeWeaverError, get_project_path
 from codeweaver.server import get_settings_map
 from codeweaver.server.agent_api.find_code import (
     CodeMatch,
@@ -55,7 +55,7 @@ async def _index_exists(settings: DictView[CodeWeaverSettingsDict]) -> bool:
         project_path = (
             settings.get("project_path")
             if isinstance(settings.get("project_path"), Path)
-            else resolve_project_root()
+            else get_project_path()
         )
         if not project_path:
             return False

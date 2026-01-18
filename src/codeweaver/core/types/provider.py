@@ -16,7 +16,7 @@ from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Literal, TypedDict, cast
 
 from codeweaver.core.types.enum import BaseEnum
-from codeweaver.core.utils.lazy_import import LazyImport, lazy_import
+from codeweaver.core.utils.lazy_importer import LazyImport, lazy_import
 
 
 if TYPE_CHECKING:

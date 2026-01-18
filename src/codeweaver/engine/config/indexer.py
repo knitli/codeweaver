@@ -25,6 +25,7 @@ from pydantic import DirectoryPath, Field, FilePath, PrivateAttr, computed_field
 from codeweaver.core import (
     DEFAULT_EXCLUDED_DIRS,
     DEFAULT_EXCLUDED_EXTENSIONS,
+    INJECTED,
     UNSET,
     BasedModel,
     DirectoryNameT,
@@ -32,6 +33,8 @@ from codeweaver.core import (
     FileGlob,
     FileGlobT,
     FilteredKeyT,
+    ResolvedProjectNameDep,
+    ResolvedProjectPathDep,
     Unset,
     get_project_name,
     get_user_state_dir,
@@ -364,7 +367,10 @@ class IndexerSettings(BasedModel):
     @property
     def checkpoint_file(self) -> FilePath:
         """Path to the checkpoint file for indexing progress."""
-        return self.cache_dir / "indexing_checkpoint.json"
+        return self.cache_dir / str(self._project_name()) / "indexing_checkpoint.json"
+
+    def _project_name(self, project_name: ResolvedProjectNameDep = INJECTED) -> str:
+        return project_name
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         from codeweaver.core import FilteredKey
@@ -385,7 +391,7 @@ class IndexerSettings(BasedModel):
         self.forced_includes, self.excludes = await FilteredPaths.from_settings(self, project_path)
         self._inc_exc_set = True
 
-    def _as_settings(self, project_path: Path | None = None) -> RignoreSettings:
+    def _as_settings(self, project_path: ResolvedProjectPathDep = INJECTED) -> RignoreSettings:
         """Convert IndexerSettings to kwargs for rignore.Walker.
 
         This method configures rignore to:
@@ -408,22 +414,6 @@ class IndexerSettings(BasedModel):
             # filtering not working properly).
             same_file_system=True,
         ) | ({} if isinstance(self.rignore_options, Unset) else self.rignore_options)
-
-        if project_path is None:
-            # Try to get from global settings without triggering recursion
-            _settings = _get_settings(view=True)
-            if (
-                _settings is not None
-                and _settings["project_path"]
-                and not isinstance(_settings["project_path"], Unset)
-            ):
-                project_path = _settings["project_path"]
-            else:
-                # Fallback to our method for trying to identify it directly
-                # this finds the git root or uses the current working directory as a last resort
-                from codeweaver.core import get_project_path
-
-                project_path = get_project_path()
 
         rignore_settings["path"] = project_path
 

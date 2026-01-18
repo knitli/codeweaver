@@ -94,7 +94,7 @@ IS_EXCEPTION = (
     "codeweaver.server.mcp.user_agent",
     "codeweaver.core.utils.create_lazy_getattr",
     "codeweaver.core.utils.LazyImport",
-    "codeweaver.core.utils.lazy_import",
+    "codeweaver.core.utils.lazy_importer",
     "codeweaver.server.mcp.middleware.default_middleware_for_transport",
     "codeweaver.server.mcp.middleware.McpMiddleware",
     "codeweaver.providers.agent.AgentProfile",
@@ -668,7 +668,7 @@ def generate_init_content(package_dir: Path, sub_exports: dict[str, list[str]]) 
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
-from codeweaver.core.utils.lazy_import import create_lazy_getattr
+from codeweaver.core.utils.lazy_importer import create_lazy_getattr
 
 {chr(10).join(tc_lines)}
 

@@ -605,6 +605,7 @@ __all__ = (
     "SparseEmbeddingProviderSettingsDep",
     "TokenizerDep",
     "ToolsetTool",
+    "VectorStoreClientDep",
     "VectorStoreProvider",
     "VectorStoreProviderDep",
     "VectorStoreProviderSettings",

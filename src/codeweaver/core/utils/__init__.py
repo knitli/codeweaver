@@ -5,7 +5,7 @@
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
-from codeweaver.core.utils.lazy_import import create_lazy_getattr
+from codeweaver.core.utils.lazy_importer import LazyImport, create_lazy_getattr, lazy_import
 
 
 if TYPE_CHECKING:
@@ -33,14 +33,12 @@ if TYPE_CHECKING:
         in_ide,
         is_codeweaver_config_path,
         is_tty,
-        resolve_project_root,
         we_are_in_jetbrains,
         we_are_in_vscode,
     )
     from codeweaver.core.utils.filesystem import (
         COMMON_LLM_TOOLING_PATHS,
         COMMON_TOOLING_PATHS,
-        backup_file_path,
         get_git_branch,
         get_git_revision,
         get_project_path,
@@ -101,12 +99,7 @@ if TYPE_CHECKING:
         takes_args,
         takes_kwargs,
     )
-    from codeweaver.core.utils.lazy_import import (
-        INTROSPECTION_ATTRS,
-        LazyImport,
-        create_lazy_getattr,
-        lazy_import,
-    )
+    from codeweaver.core.utils.lazy_importer import INTROSPECTION_ATTRS
     from codeweaver.core.utils.procs import (
         asyncio_or_uvloop,
         effective_cpu_count,
@@ -147,7 +140,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "COMMON_TOOLING_PATHS": (__spec__.parent, "filesystem"),
     "CONTROL_CHARS": (__spec__.parent, "text"),
     "INJECT_PATTERN": (__spec__.parent, "text"),
-    "INTROSPECTION_ATTRS": (__spec__.parent, "lazy_import"),
+    "INTROSPECTION_ATTRS": (__spec__.parent, "lazy_importer"),
     "INVISIBLE_CHARS": (__spec__.parent, "text"),
     "INVISIBLE_PATTERN": (__spec__.parent, "text"),
     "LOCALHOST_INDICATORS": (__spec__.parent, "checks"),
@@ -156,12 +149,9 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "NORMALIZE_FORM": (__spec__.parent, "text"),
     "POSSIBLE_PROMPT_INJECTS": (__spec__.parent, "text"),
     "REMOVE_ID": (__spec__.parent, "text"),
-    "LazyImport": (__spec__.parent, "lazy_import"),
     "TypeIs": (__spec__.parent, "checks"),
     "asyncio_or_uvloop": (__spec__.parent, "procs"),
-    "backup_file_path": (__spec__.parent, "filesystem"),
     "clean_args": (__spec__.parent, "introspect"),
-    "create_lazy_getattr": (__spec__.parent, "lazy_import"),
     "detect_root_package": (__spec__.parent, "environment"),
     "dict_set_to_tuple": (__spec__.parent, "general"),
     "effective_cpu_count": (__spec__.parent, "procs"),
@@ -230,12 +220,10 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "isfunction": (__spec__.parent, "introspect"),
     "ismethod": (__spec__.parent, "introspect"),
     "keyword_args": (__spec__.parent, "introspect"),
-    "lazy_import": (__spec__.parent, "lazy_import"),
     "low_priority": (__spec__.parent, "procs"),
     "normalize_ext": (__spec__.parent, "filesystem"),
     "positional_args": (__spec__.parent, "introspect"),
     "python_version": (__spec__.parent, "procs"),
-    "resolve_project_root": (__spec__.parent, "environment"),
     "return_type": (__spec__.parent, "introspect"),
     "rpartial": (__spec__.parent, "general"),
     "sanitize_unicode": (__spec__.parent, "text"),
@@ -277,7 +265,6 @@ __all__ = (
     "LazyImport",
     "TypeIs",
     "asyncio_or_uvloop",
-    "backup_file_path",
     "clean_args",
     "create_lazy_getattr",
     "detect_root_package",
@@ -353,7 +340,6 @@ __all__ = (
     "normalize_ext",
     "positional_args",
     "python_version",
-    "resolve_project_root",
     "return_type",
     "rpartial",
     "sanitize_unicode",

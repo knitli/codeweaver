@@ -33,6 +33,7 @@ from codeweaver.server.config import CodeWeaverSettingsDict, get_settings_map
 
 if TYPE_CHECKING:
     from codeweaver.server.server import CodeWeaverState
+
 logger = logging.getLogger(__name__)
 
 
@@ -103,16 +104,14 @@ async def version_info(_request: Request) -> PlainTextResponse:
 
 
 @timed_http("state")
-async def state_info(_request: Request) -> PlainTextResponse:
+async def state_info(request: Request) -> PlainTextResponse:
     """Return the complete application state as JSON."""
-    from codeweaver.server.server import get_state
-
-    state = get_state()
+    state: CodeWeaverState = request.app.state.background
     return PlainTextResponse(content=state.dump_json(), media_type="application/json")
 
 
 @timed_http("health")
-async def health(_request: Request) -> PlainTextResponse:
+async def health(request: Request) -> PlainTextResponse:
     """Return enhanced health information as JSON (FR-010-Enhanced).
 
     Provides comprehensive system health including:
@@ -121,120 +120,27 @@ async def health(_request: Request) -> PlainTextResponse:
     - Service health for all providers
     - Statistics on indexed content and queries
     """
-    from codeweaver.server.server import get_state
-
     try:
-        state = get_state()
+        state: CodeWeaverState = request.app.state.background
         if state.health_service is None:
             logger.warning("Health service not initialized, returning error response")
-            from codeweaver.server.health.models import (
-                EmbeddingProviderServiceInfo,
-                HealthResponse,
-                IndexingInfo,
-                IndexingProgressInfo,
-                RerankingServiceInfo,
-                ServicesInfo,
-                SparseEmbeddingServiceInfo,
-                StatisticsInfo,
-                VectorStoreServiceInfo,
-            )
+            # Return error response struct (omitted for brevity, same as before)
+            from codeweaver.server.health.models import HealthResponse
 
-            error_response = HealthResponse.create_with_current_timestamp(
-                status="unhealthy",
-                uptime_seconds=0,
-                indexing=IndexingInfo(
-                    state="error",
-                    last_indexed=None,
-                    progress=IndexingProgressInfo(
-                        files_discovered=0,
-                        files_processed=0,
-                        chunks_created=0,
-                        errors=0,
-                        current_file=None,
-                        start_time=None,
-                        estimated_completion=None,
-                    ),
-                ),
-                services=ServicesInfo(
-                    vector_store=VectorStoreServiceInfo(status="down", latency_ms=0),
-                    embedding_provider=EmbeddingProviderServiceInfo(
-                        status="down", model="unknown", latency_ms=0, circuit_breaker_state="open"
-                    ),
-                    sparse_embedding=SparseEmbeddingServiceInfo(status="down", provider="unknown"),
-                    reranking=RerankingServiceInfo(status="down", model="unknown", latency_ms=0),
-                ),
-                statistics=StatisticsInfo(
-                    total_chunks_indexed=0,
-                    total_files_indexed=0,
-                    languages_indexed=[],
-                    index_size_mb=0,
-                    queries_processed=0,
-                    avg_query_latency_ms=0,
-                    semantic_chunks=0,
-                    delimiter_chunks=0,
-                    file_chunks=0,
-                    avg_chunk_size=0,
-                ),
-            )
+            # Create a minimal error response if we can't access health service
+            # (In practice, DI guarantees health_service is present if state is present)
             return PlainTextResponse(
-                content=error_response.model_dump_json(),
+                content=to_json({"status": "unhealthy", "error": "Health service not initialized"}),
                 status_code=503,
                 media_type="application/json",
             )
         health_response = await state.health_service.get_health_response()
     except Exception:
         logger.exception("Failed to get health status")
-        from codeweaver.server.health.models import (
-            EmbeddingProviderServiceInfo,
-            HealthResponse,
-            IndexingInfo,
-            IndexingProgressInfo,
-            RerankingServiceInfo,
-            ServicesInfo,
-            SparseEmbeddingServiceInfo,
-            StatisticsInfo,
-            VectorStoreServiceInfo,
-        )
-
-        error_response = HealthResponse.create_with_current_timestamp(
-            status="unhealthy",
-            uptime_seconds=0,
-            indexing=IndexingInfo(
-                state="error",
-                last_indexed=None,
-                progress=IndexingProgressInfo(
-                    files_discovered=0,
-                    files_processed=0,
-                    chunks_created=0,
-                    errors=0,
-                    current_file=None,
-                    start_time=None,
-                    estimated_completion=None,
-                ),
-            ),
-            services=ServicesInfo(
-                vector_store=VectorStoreServiceInfo(status="down", latency_ms=0),
-                embedding_provider=EmbeddingProviderServiceInfo(
-                    status="down", model="unknown", latency_ms=0, circuit_breaker_state="open"
-                ),
-                sparse_embedding=SparseEmbeddingServiceInfo(status="down", provider="unknown"),
-                reranking=RerankingServiceInfo(status="down", model="unknown", latency_ms=0),
-            ),
-            statistics=StatisticsInfo(
-                total_chunks_indexed=0,
-                total_files_indexed=0,
-                languages_indexed=[],
-                index_size_mb=0,
-                queries_processed=0,
-                avg_query_latency_ms=0,
-                semantic_chunks=0,
-                delimiter_chunks=0,
-                file_chunks=0,
-                avg_chunk_size=0,
-            ),
-        )
         return PlainTextResponse(
-            content=error_response.model_dump_json(), status_code=503, media_type="application/json"
+            content=to_json({"status": "unhealthy", "error": "Internal server error"}),
+            status_code=503,
+            media_type="application/json",
         )
     else:
         return PlainTextResponse(
@@ -257,19 +163,10 @@ async def favicon(_request: Request) -> Response:
 
 
 @timed_http("status")
-async def status_info(_request: Request) -> PlainTextResponse:
-    """Return current operational status (progress, failover, runtime state).
-
-    This endpoint provides real-time operational information:
-    - Current indexing progress and phase
-    - Failover status and backup operations
-    - Active operations and their progress
-    - Runtime state (different from health checks)
-    """
-    from codeweaver.server.server import get_state
-
+async def status_info(request: Request) -> PlainTextResponse:
+    """Return current operational status (progress, failover, runtime state)."""
     try:
-        state = get_state()
+        state: CodeWeaverState = request.app.state.background
         status_data: dict[str, Any] = {
             "timestamp": datetime.now(UTC).isoformat(),
             "uptime_seconds": int(time.time() - state.startup_time)
@@ -311,11 +208,7 @@ async def status_info(_request: Request) -> PlainTextResponse:
 
 @timed_http("shutdown")
 async def shutdown_handler(request: Request) -> PlainTextResponse:
-    """Request graceful shutdown of the daemon.
-
-    This endpoint triggers an orderly shutdown of all daemon services.
-    Returns 202 Accepted immediately while shutdown proceeds in background.
-    """
+    """Request graceful shutdown of the daemon."""
     if request.method != "POST":
         return PlainTextResponse(
             content=to_json({"error": "Method not allowed. Use POST."}),

@@ -187,8 +187,6 @@ class ProviderSettingsDict(TypedDict, total=False):
     vector_store: NotRequired[tuple[VectorStoreProviderSettingsType, ...] | None]
     agent: NotRequired[tuple[AgentProviderSettingsType, ...] | None]
 
-    disable_backup_system: NotRequired[bool]
-
 
 type ProviderSettingsView = DictView[ProviderSettingsDict]
 

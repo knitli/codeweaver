@@ -40,9 +40,10 @@ if TYPE_CHECKING:
 
 type KeyPath = tuple[LiteralStringT, ...]
 
-get_ext_lang_pairs: LazyImport[Generator[ExtLangPair, None, None]] = lazy_import(
-    "codeweaver.core.metadata", "get_ext_lang_pairs"
-)
+def get_ext_lang_pairs_generator() -> Generator[ExtLangPair, None, None]:
+    """Helper to lazily get ext lang pairs."""
+    from codeweaver.core.metadata import get_ext_lang_pairs
+    return get_ext_lang_pairs()
 
 ConfigPathPair = NamedTuple(
     "ConfigPathPair", (("path", Path), ("language", "SemanticSearchLanguage"))
@@ -932,7 +933,6 @@ class SemanticSearchLanguage(str, BaseEnum):
             test_dirs=(DirectoryName("tests"), DirectoryName("test"), DirectoryName("spec")),
             test_patterns=(FileGlob("test_*"), FileGlob("_test")),
             binary_dirs=(DirectoryName("build"), DirectoryName("bin"), DirectoryName("obj")),
-            workspace_defined_in_file=False,
         )
         return {
             SemanticSearchLanguage.BASH: defaults
@@ -998,7 +998,7 @@ class SemanticSearchLanguage(str, BaseEnum):
                 test_dirs=(DirectoryName("test"),),
                 test_patterns=(FileGlob("_test.exs"),),
                 binary_dirs=(DirectoryName("_build"), DirectoryName("deps")),
-                workspace_dirs=(DirectoryName("apps"),),
+                workspace_dirs=(DirectoryName("app"), DirectoryName("apps")),
                 workspace_files=(FileName("mix.exs"),),
                 workspace_defined_in_file=True,
                 workspace_definition_files=(
@@ -1118,7 +1118,6 @@ class SemanticSearchLanguage(str, BaseEnum):
                     DirectoryName("build"),
                 ),
                 private_package_dirs=(DirectoryName("node_modules"),),
-                workspace_dirs=(DirectoryName("packages"), DirectoryName("apps")),
                 workspace_files=(
                     FileName("package.json"),
                     FileName("lerna.json"),
@@ -1157,7 +1156,6 @@ class SemanticSearchLanguage(str, BaseEnum):
                     DirectoryName("build"),
                 ),
                 private_package_dirs=(DirectoryName("node_modules"),),
-                workspace_dirs=(DirectoryName("packages"), DirectoryName("apps")),
                 workspace_files=(
                     FileName("package.json"),
                     FileName("lerna.json"),
@@ -1364,7 +1362,6 @@ class SemanticSearchLanguage(str, BaseEnum):
                     DirectoryName("build"),
                 ),
                 private_package_dirs=(DirectoryName("node_modules"),),
-                workspace_dirs=(DirectoryName("packages"), DirectoryName("apps")),
                 workspace_files=(
                     FileName("package.json"),
                     FileName("lerna.json"),
@@ -1404,7 +1401,6 @@ class SemanticSearchLanguage(str, BaseEnum):
                     DirectoryName("build"),
                 ),
                 private_package_dirs=(DirectoryName("node_modules"),),
-                workspace_dirs=(DirectoryName("packages"), DirectoryName("apps")),
                 workspace_files=(
                     FileName("package.json"),
                     FileName("lerna.json"),

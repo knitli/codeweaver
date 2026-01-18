@@ -7,7 +7,8 @@
 
 from __future__ import annotations
 
-from types import MappingProxyType
+from importlib import import_module
+from types import MappingProxyType, ModuleType
 from typing import Any, cast
 
 
@@ -154,19 +155,42 @@ def create_lazy_getattr(
 ) -> object:
     """Create a standardized __getattr__ function for package lazy imports."""
 
-    def __getattr__(name: str) -> object:  # noqa: N807
-        """Dynamic __getattr__ for lazy imports in the module."""
-        if name in dynamic_imports:
-            parent_module, submodule_name = dynamic_imports[name]
-            module = __import__(f"{parent_module}.{submodule_name}", fromlist=[""])
-            result = getattr(module, name)
-            if isinstance(result, LazyImport):
-                result = result._resolve()
-            module_globals[name] = result
+    def __getattr__(attr_name: str) -> object:  # noqa: N807
+        print("DEBUG: __getattr__ called for ", attr_name)
+        from codeweaver.core.utils.introspect import get_caller, get_caller_modulename
+
+        print(f"DEBUG: __getattr__ was called by {get_caller_modulename()}")
+        print(f"DEBUG: __getattr__ dynamic imports: {dynamic_imports}")
+        print(f"DEBUG: __getattr__ caller: {get_caller()}")
+        dynamic_attr = dynamic_imports[attr_name]
+        print(f"DEBUG: __getattr__ dynamic_attr: {dynamic_attr}")
+        package, module_name = dynamic_attr
+
+        if module_name == "__module__":
+            result = import_module(f".{attr_name}", package=package)
+            print("DEBUG: Resolving lazy import for ", attr_name)
+            print("DEBUG: Resolved as ", result)
+            print("DEBUG: Resolved type:", type(result))
+            globals()[attr_name] = result._resolve() if isinstance(result, LazyImport) else result
             return result
-        if name in module_globals:
-            return module_globals[name]
-        raise AttributeError(f"module {module_name!r} has no attribute {name!r}")
+        print("DEBUG: Resolving lazy import for ", attr_name)
+        print("DEBUG: Attempting import of ", module_name)
+        print("DEBUG: Importing module from package ", package)
+        module: ModuleType = import_module(module_name, package=package)
+        result = getattr(module, attr_name)
+
+        g = globals()
+        for k, (_, v_module_name) in dynamic_imports.items():
+            if v_module_name == module_name:
+                print("DEBUG: Resolving lazy import for ", k)
+                print("DEBUG: Resolved as ", getattr(module, k))
+                print("DEBUG: Resolved type:", type(getattr(module, k)))
+                g[k] = (
+                    getattr(module, k)._resolve()
+                    if isinstance(getattr(module, k), LazyImport)
+                    else getattr(module, k)
+                )
+        return result._resolve() if isinstance(result, LazyImport) else result
 
     __getattr__.__module__ = module_name
     __getattr__.__doc__ = f"Dynamic __getattr__ for lazy imports in module {module_name!r}."

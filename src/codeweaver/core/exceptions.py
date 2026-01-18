@@ -1,3 +1,4 @@
+# sourcery skip: no-complex-if-expressions
 # SPDX-FileCopyrightText: 2026 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
@@ -52,7 +53,7 @@ class LocationInfo(NamedTuple):
 
 def _get_issue_information() -> tuple[str, ...]:
     """Generate issue reporting information."""
-    from codeweaver.core import is_tty as _is_tty
+    from codeweaver.core.utils.environment import is_tty as _is_tty
 
     if _is_tty():
         return (
@@ -115,8 +116,8 @@ class CodeWeaverError(Exception):
 
     def __str__(self) -> str:
         """Return descriptive error message with context details."""
-        from codeweaver.core import format_file_link
-        from codeweaver.core import is_tty as _is_tty
+        from codeweaver.core.utils.environment import format_file_link
+        from codeweaver.core.utils.environment import is_tty as _is_tty
 
         if _is_tty():
             location_info = (

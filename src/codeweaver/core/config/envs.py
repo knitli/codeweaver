@@ -16,15 +16,11 @@ from typing import Literal, TypedDict, get_args
 from pydantic import AnyUrl, SecretStr
 from pydantic.dataclasses import asdict, dataclass
 
-from codeweaver.core.types import (
-    DataclassSerializationMixin,
-    DictView,
-    EnvFormat,
-    EnvVarInfo,
-    LiteralProviderKindType,
-    Provider,
-)
-from codeweaver.core.utils import detect_root_package
+from codeweaver.core.types.dataclasses import DataclassSerializationMixin
+from codeweaver.core.types.dictview import DictView
+from codeweaver.core.types.env import EnvFormat, EnvVarInfo
+from codeweaver.core.types.provider import LiteralProviderKindType, Provider
+from codeweaver.core.utils.environment import detect_root_package
 
 
 @dataclass

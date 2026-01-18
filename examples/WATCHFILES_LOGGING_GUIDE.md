@@ -24,7 +24,7 @@ The `WatchfilesLogManager` class provides comprehensive integration between `wat
 ### Basic Usage
 
 ```python
-from codeweaver.engine.indexer import FileWatcher
+from codeweaver.engine.services import FileWatchingService
 import logging
 
 # Enable watchfiles logging with default settings

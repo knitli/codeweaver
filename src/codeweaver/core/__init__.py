@@ -5,7 +5,8 @@
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
-from codeweaver.core.utils.lazy_import import create_lazy_getattr
+from codeweaver.core.di.container import Container, get_container, reset_container
+from codeweaver.core.utils.lazy_importer import LazyImport, create_lazy_getattr, lazy_import
 
 
 if TYPE_CHECKING:
@@ -78,7 +79,6 @@ if TYPE_CHECKING:
     )
     from codeweaver.core.di import (
         INJECTED,
-        Container,
         Depends,
         DependsPlaceholder,
         ProviderMetadata,
@@ -86,12 +86,10 @@ if TYPE_CHECKING:
         depends,
         get_all_provider_metadata,
         get_all_providers,
-        get_container,
         get_provider,
         get_provider_metadata,
         is_depends_marker,
         is_provider_registered,
-        reset_container,
     )
     from codeweaver.core.discovery import DiscoveredFile
     from codeweaver.core.exceptions import (
@@ -341,12 +339,9 @@ if TYPE_CHECKING:
         NORMALIZE_FORM,
         POSSIBLE_PROMPT_INJECTS,
         REMOVE_ID,
-        LazyImport,
         TypeIs,
         asyncio_or_uvloop,
-        backup_file_path,
         clean_args,
-        create_lazy_getattr,
         detect_root_package,
         dict_set_to_tuple,
         effective_cpu_count,
@@ -415,12 +410,10 @@ if TYPE_CHECKING:
         isfunction,
         ismethod,
         keyword_args,
-        lazy_import,
         low_priority,
         normalize_ext,
         positional_args,
         python_version,
-        resolve_project_root,
         return_type,
         rpartial,
         sanitize_unicode,
@@ -485,7 +478,6 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "ConfigurableComponent": (__spec__.parent, "config"),
     "ConfigurationError": (__spec__.parent, "exceptions"),
     "ConfigurationValue": (__spec__.parent, "config"),
-    "Container": (__spec__.parent, "di"),
     "DATACLASS_CONFIG": (__spec__.parent, "types"),
     "DATA_FILES_EXTENSIONS": (__spec__.parent, "file_extensions"),
     "DATA_LANGUAGES": (__spec__.parent, "file_extensions"),
@@ -570,7 +562,6 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "LanguageName": (__spec__.parent, "types"),
     "LanguageNameT": (__spec__.parent, "types"),
     "LanguageSummary": (__spec__.parent, "statistics"),
-    "LazyImport": (__spec__.parent, "utils"),
     "LineStrategy": (__spec__.parent, "types"),
     "LiteralProvider": (__spec__.parent, "types"),
     "LiteralProviderKind": (__spec__.parent, "types"),
@@ -691,7 +682,6 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "add_successful_request": (__spec__.parent, "statistics"),
     "all_js_exts": (__spec__.parent, "file_extensions"),
     "asyncio_or_uvloop": (__spec__.parent, "utils"),
-    "backup_file_path": (__spec__.parent, "utils"),
     "bootstrap_settings": (__spec__.parent, "dependencies"),
     "capture_search_event": (__spec__.parent, "telemetry"),
     "capture_session_event": (__spec__.parent, "telemetry"),
@@ -701,7 +691,6 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "clear_configurables": (__spec__.parent, "config"),
     "clear_defaults": (__spec__.parent, "config"),
     "create_backup_class": (__spec__.parent, "backup_factory"),
-    "create_lazy_getattr": (__spec__.parent, "utils"),
     "create_session_file_handler": (__spec__.parent, "_logging"),
     "create_tagged_class": (__spec__.parent, "backup_factory"),
     "dependency_provider": (__spec__.parent, "di"),
@@ -739,7 +728,6 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "get_config_locations": (__spec__.parent, "types"),
     "get_configurable_components": (__spec__.parent, "config"),
     "get_configurable_values": (__spec__.parent, "config"),
-    "get_container": (__spec__.parent, "di"),
     "get_cpu_count": (__spec__.parent, "utils"),
     "get_default": (__spec__.parent, "config"),
     "get_dotenv_locations": (__spec__.parent, "types"),
@@ -798,7 +786,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "is_pydantic_basemodel": (__spec__.parent, "utils"),
     "is_semantic_config_ext": (__spec__.parent, "language"),
     "is_test_environment": (__spec__.parent, "utils"),
-    "is_tty": (__spec__.parent, "utils"),
+    "is_tty": ("codeweaver.core.utils", "is_tty"),
     "is_typeadapter": (__spec__.parent, "utils"),
     "is_wsl": (__spec__.parent, "utils"),
     "is_wsl_vscode": (__spec__.parent, "utils"),
@@ -809,7 +797,6 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "language_from_config_file": (__spec__.parent, "language"),
     "language_from_path": (__spec__.parent, "language"),
     "languages_present_from_configs": (__spec__.parent, "language"),
-    "lazy_import": (__spec__.parent, "utils"),
     "log_to_client_or_fallback": (__spec__.parent, "_logging"),
     "low_priority": (__spec__.parent, "utils"),
     "make_blake_store": (__spec__.parent, "stores"),
@@ -821,9 +808,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "record_timed_http_request": (__spec__.parent, "statistics"),
     "register_configurable": (__spec__.parent, "config"),
     "register_default_provider": (__spec__.parent, "config"),
-    "reset_container": (__spec__.parent, "di"),
     "resolve_all_configs": (__spec__.parent, "config"),
-    "resolve_project_root": (__spec__.parent, "utils"),
     "return_type": (__spec__.parent, "utils"),
     "rpartial": (__spec__.parent, "utils"),
     "sanitize_unicode": (__spec__.parent, "utils"),
@@ -1029,6 +1014,7 @@ __all__ = (
     "ProviderKindLiteral",
     "ProviderLiteral",
     "ProviderMetadata",
+    "ProviderRegistry",
     "ProviderSwitchError",
     "QueryError",
     "QueryResult",
@@ -1079,7 +1065,6 @@ __all__ = (
     "TelemetryEvent",
     "TelemetryService",
     "TelemetrySettings",
-    "TelemetrySettings",
     "TelemetrySettingsDep",
     "ThingName",
     "ThingNameT",
@@ -1100,7 +1085,6 @@ __all__ = (
     "add_successful_request",
     "all_js_exts",
     "asyncio_or_uvloop",
-    "backup_file_path",
     "bootstrap_settings",
     "capture_search_event",
     "capture_session_event",
@@ -1232,7 +1216,6 @@ __all__ = (
     "register_default_provider",
     "reset_container",
     "resolve_all_configs",
-    "resolve_project_root",
     "return_type",
     "rpartial",
     "sanitize_unicode",

@@ -16,6 +16,7 @@ prevent state contamination across chunking operations.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 
 from typing import TYPE_CHECKING, Any
@@ -163,17 +164,17 @@ class ChunkerSelector:
                     extra={"file_path": str(file.absolute_path), "error": str(e)},
                 )
         is_large_file = False
-        try:
+        with contextlib.suppress(OSError, AttributeError):
             if file.absolute_path.stat().st_size > 500 * 1024:
                 is_large_file = True
-        except (OSError, AttributeError):
-            pass
         language = self._detect_language(file)
         if isinstance(language, SemanticSearchLanguage) and (not is_large_file):
             try:
                 semantic_chunker = SemanticChunker(self.governor, language, self.tokenizer)
-                lang_str = language.variable if hasattr(language, "variable") else str(language)
-                fallback = DelimiterChunker(self.governor, language=lang_str)
+                language_name = (
+                    language.variable if hasattr(language, "variable") else str(language)
+                )
+                fallback = DelimiterChunker(self.governor, language=language_name)
             except (ParseError, NotImplementedError) as e:
                 logger.warning(
                     "Semantic chunking unavailable for %s: %s. Using delimiter fallback.",
@@ -225,13 +226,13 @@ class ChunkerSelector:
             >>> selector._detect_language(file_xyz)
             'xyz'
         """
-        ext = file.absolute_path.suffix
         if file.ext_kind:
             return (
                 file.ext_kind.language
                 if isinstance(file.ext_kind.language, (SemanticSearchLanguage, ConfigLanguage))
                 else str(file.ext_kind.language)
             )
+        ext = file.absolute_path.suffix
         return ext.lstrip(".").lower()
 
 

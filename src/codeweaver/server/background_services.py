@@ -18,7 +18,7 @@ from codeweaver.core.ui_protocol import ProgressReporter
 
 
 if TYPE_CHECKING:
-    from codeweaver.server.lifespan import CodeWeaverState
+    from codeweaver.server.server import CodeWeaverState
 
 _logger = logging.getLogger(__name__)
 
@@ -73,13 +73,10 @@ async def start_watcher(
 ) -> asyncio.Task[None | int]:
     """Start the file watcher as an asynchronous task."""
     from codeweaver.core import get_container
-    from codeweaver.engine import FileWatcher
+    from codeweaver.engine.services.watching_service import FileWatchingService
 
-    # Use DI container to resolve FileWatcher with all its dependencies
-    watcher = await get_container().resolve(FileWatcher)
-
-    # We may still need to set the progress reporter if it's not handled by DI
-    watcher._progress_reporter = progress_reporter
+    # Use DI container to resolve FileWatchingService with all its dependencies
+    watcher = await get_container().resolve(FileWatchingService)
 
     # Run watcher in a separate task so we can cancel it cleanly
     return asyncio.create_task(watcher.run())

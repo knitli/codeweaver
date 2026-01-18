@@ -37,12 +37,14 @@ class ProviderMetadata:
         is_generator: Whether the provider is a generator function (for cleanup)
         is_async_generator: Whether the provider is an async generator (for cleanup)
         module: Optional module name for scoped registration
+        tags: Optional tags for categorizing providers (e.g. "backup")
     """
 
     scope: Literal["singleton", "request", "function"]
     is_generator: bool
     is_async_generator: bool
     module: str | None
+    tags: frozenset[str] = frozenset()
 
     @classmethod
     def from_provider(
@@ -50,6 +52,7 @@ class ProviderMetadata:
         scope: Literal["singleton", "request", "function"],
         factory: Callable[..., Any],
         module: str | None = None,
+        tags: Sequence[str] | None = None,
     ) -> ProviderMetadata:
         """Create ProviderMetadata from a factory function.
 
@@ -57,13 +60,20 @@ class ProviderMetadata:
             scope: The lifecycle scope.
             factory: The provider function or class.
             module: Optional module name.
+            tags: Optional tags.
 
         Returns:
             An instance of ProviderMetadata.
         """
         is_async_gen = inspect.isasyncgenfunction(factory)
         is_gen = inspect.isgeneratorfunction(factory)
-        return cls(scope=scope, is_generator=is_gen, is_async_generator=is_async_gen, module=module)
+        return cls(
+            scope=scope,
+            is_generator=is_gen,
+            is_async_generator=is_async_gen,
+            module=module,
+            tags=frozenset(tags) if tags else frozenset(),
+        )
 
 
 @overload
@@ -72,6 +82,7 @@ def dependency_provider[T](
     *,
     scope: Literal["singleton", "request", "function"] = "singleton",
     module: str | None = None,
+    tags: Sequence[str] | None = None,
     collection: Literal[True],
 ) -> Callable[[Callable[..., Sequence[T]]], Callable[..., Sequence[T]]]: ...
 
@@ -82,6 +93,7 @@ def dependency_provider[T](
     *,
     scope: Literal["singleton", "request", "function"] = "singleton",
     module: str | None = None,
+    tags: Sequence[str] | None = None,
     collection: Literal[False] = False,
 ) -> Callable[[Callable[..., T]], Callable[..., T]]: ...
 
@@ -92,6 +104,7 @@ def dependency_provider[T](
     *,
     scope: Literal["singleton", "request", "function"] = "singleton",
     module: str | None = None,
+    tags: Sequence[str] | None = None,
     collection: Literal[False] = False,
 ) -> Callable[[type[T]], type[T]]: ...
 
@@ -101,6 +114,7 @@ def dependency_provider[T](
     *,
     scope: Literal["singleton", "request", "function"] = "singleton",
     module: str | None = None,
+    tags: Sequence[str] | None = None,
     collection: bool = False,
 ) -> (
     Callable[[Callable[..., T]], Callable[..., T]]
@@ -150,6 +164,7 @@ def dependency_provider[T](
         scope: The lifecycle scope - "singleton" (app lifetime, default),
                "request" (per request), or "function" (per call, no caching).
         module: Optional module name for scoped registration.
+        tags: Optional tags for categorizing providers.
         collection: If True, the factory returns a Sequence[T] instead of T.
                    Use this when registering a provider that returns multiple instances.
 
@@ -221,7 +236,13 @@ def dependency_provider[T](
     if cls is None:
 
         def class_decorator(target_cls: type[T]) -> type[T]:
-            _register_provider(interface=target_cls, factory=target_cls, scope=scope, module=module)
+            _register_provider(
+                interface=target_cls,
+                factory=target_cls,
+                scope=scope,
+                module=module,
+                tags=tags,
+            )
             return target_cls
 
         return class_decorator
@@ -238,6 +259,7 @@ def dependency_provider[T](
             factory=fn_or_cls,  # type: ignore
             scope=scope,
             module=module,
+            tags=tags,
         )
         return fn_or_cls
 
@@ -249,6 +271,7 @@ def _register_provider[T](
     factory: Callable[..., T],
     scope: Literal["singleton", "request", "function"],
     module: str | None,
+    tags: Sequence[str] | None,
 ) -> None:
     """Register a provider with metadata in a thread-safe manner.
 
@@ -257,6 +280,7 @@ def _register_provider[T](
         factory: The factory function or class.
         scope: The lifecycle scope.
         module: Optional module name.
+        tags: Optional tags.
     """
     # Detect generator functions for lifecycle management
     is_async_gen = inspect.isasyncgenfunction(factory)
@@ -264,7 +288,11 @@ def _register_provider[T](
 
     # Create metadata
     metadata = ProviderMetadata(
-        scope=scope, is_generator=is_gen, is_async_generator=is_async_gen, module=module
+        scope=scope,
+        is_generator=is_gen,
+        is_async_generator=is_async_gen,
+        module=module,
+        tags=frozenset(tags) if tags else frozenset(),
     )
 
     # Thread-safe registration

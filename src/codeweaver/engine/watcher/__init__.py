@@ -18,6 +18,7 @@ from codeweaver.core import create_lazy_getattr
 
 if TYPE_CHECKING:
     from codeweaver.engine.watcher._logging import WatchfilesLogManager
+    from codeweaver.engine.watcher.progress import IndexingProgressUI
     from codeweaver.engine.watcher.types import FileChange, WatchfilesArgs
     from codeweaver.engine.watcher.watch_filters import (
         CodeFilter,
@@ -28,22 +29,21 @@ if TYPE_CHECKING:
         ExtensionFilter,
         IgnoreFilter,
     )
-    from codeweaver.engine.watcher.watcher import FileWatcher
 
 parent = __spec__.parent or "codeweaver.engine.watcher"
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
-    "WatchfilesLogManager": (parent, "_logging"),
-    "FileChange": (parent, "types"),
-    "WatchfilesArgs": (parent, "types"),
     "CodeFilter": (parent, "watch_filters"),
     "ConfigFilter": (parent, "watch_filters"),
     "DefaultExtensionFilter": (parent, "watch_filters"),
-    "DocsFilter": (parent, "watch_filters"),
     "DefaultFilter": (parent, "watch_filters"),
+    "DocsFilter": (parent, "watch_filters"),
     "ExtensionFilter": (parent, "watch_filters"),
+    "FileChange": (parent, "types"),
     "IgnoreFilter": (parent, "watch_filters"),
-    "FileWatcher": (parent, "watcher"),
+    "IndexingProgressUI": (parent, "progress"),
+    "WatchfilesArgs": (parent, "types"),
+    "WatchfilesLogManager": (parent, "_logging"),
 })
 
 __getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
@@ -57,8 +57,8 @@ __all__ = (
     "DocsFilter",
     "ExtensionFilter",
     "FileChange",
-    "FileWatcher",
     "IgnoreFilter",
+    "IndexingProgressUI",
     "WatchfilesArgs",
     "WatchfilesLogManager",
 )

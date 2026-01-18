@@ -86,6 +86,10 @@ class ChunkingService:
             else:
                 yield from self._chunk_sequential([file])
 
+    def can_reuse_chunks(self, chunks: list[CodeChunk] | None) -> bool:
+        """Check if existing chunks fit in backup model context (public API)."""
+        return self._can_reuse_chunks(chunks)
+
     def _can_reuse_chunks(self, chunks: list[CodeChunk] | None) -> bool:
         """Check if existing chunks fit in backup model context."""
         if not chunks:

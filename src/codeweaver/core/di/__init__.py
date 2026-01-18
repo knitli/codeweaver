@@ -88,11 +88,11 @@ from __future__ import annotations
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
-from codeweaver.core import create_lazy_getattr
+from codeweaver.core.di.container import Container, get_container, reset_container
+from codeweaver.core.utils import create_lazy_getattr
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.di.container import Container, get_container, reset_container
     from codeweaver.core.di.depends import (
         INJECTED,
         Depends,
@@ -112,9 +112,6 @@ if TYPE_CHECKING:
 
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
-    "Container": (__spec__.parent, "container"),
-    "get_container": (__spec__.parent, "container"),
-    "reset_container": (__spec__.parent, "container"),
     "INJECTED": (__spec__.parent, "depends"),
     "Depends": (__spec__.parent, "depends"),
     "DependsPlaceholder": (__spec__.parent, "depends"),

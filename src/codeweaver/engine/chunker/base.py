@@ -17,7 +17,6 @@ This multi-tiered approach ensures reliable chunking across 170+ languages while
 
 from __future__ import annotations
 
-import contextlib
 import logging
 
 from abc import ABC, abstractmethod
@@ -28,17 +27,16 @@ from pydantic import ConfigDict, Field, PositiveInt, PrivateAttr, computed_field
 
 from codeweaver.core import BasedModel, CodeChunk
 
-# Import ChunkerSettings at runtime for model rebuild to work
-from codeweaver.engine.config import ChunkerSettings
+
+if TYPE_CHECKING:
+    from codeweaver.core import DiscoveredFile
+    from codeweaver.engine.config import ChunkerSettings
+
 from codeweaver.providers import (
     EmbeddingModelCapabilities,
     ProviderSettingsDict,
     RerankingModelCapabilities,
 )
-
-
-if TYPE_CHECKING:
-    from codeweaver.core import DiscoveredFile
 
 
 logger = logging.getLogger(__name__)
@@ -94,11 +92,6 @@ class ChunkGovernor(BasedModel):
 
     def _telemetry_keys(self) -> None:
         return None
-
-    def model_post_init(self, /, __context: Any) -> None:
-        """Ensure models are rebuilt on first instantiation."""
-        _rebuild_models()
-        super().model_post_init(__context)
 
     @staticmethod
     def _get_caps() -> (
@@ -169,6 +162,7 @@ class ChunkGovernor(BasedModel):
         Returns:
             A ChunkGovernor instance configured for backup model constraints.
         """
+        from codeweaver.engine.config import ChunkerSettings
         from codeweaver.providers.embedding.capabilities.dependencies import (
             EmbeddingCapabilityResolver,
         )
@@ -288,52 +282,7 @@ class BaseChunker(ABC):
 __all__ = ("BaseChunker", "ChunkGovernor")
 
 
-# Rebuild models to resolve forward references after all types are imported
-# This is done lazily on first use to avoid circular import with settings module
-_models_rebuilt = False
-
-
-def _rebuild_models() -> None:
-    """Rebuild pydantic models after all types are defined.
-
-    This is called lazily on first use to avoid circular imports with the settings module.
-    """
-    global _models_rebuilt
-    if _models_rebuilt:
-        return
-
-    logger = logging.getLogger(__name__)
-    try:
-        if not ChunkGovernor.__pydantic_complete__:
-            # Import ChunkerSettings to ensure it's available for rebuild
-            # The import is safe here because ChunkerSettings imports are already resolved
-            from codeweaver.engine.chunker.delimiters.families import LanguageFamily
-            from codeweaver.engine.chunker.delimiters.patterns import DelimiterPattern
-            from codeweaver.engine.config import ChunkerSettings as _ChunkerSettings
-
-            # Build namespace for model rebuild with all required types
-            # ChunkGovernor needs ChunkerSettings, and BaseChunker methods use CodeChunk
-            namespace = {
-                "ChunkerSettings": _ChunkerSettings,
-                "CodeChunk": CodeChunk,
-                "DelimiterPattern": DelimiterPattern,
-                "EmbeddingModelCapabilities": EmbeddingModelCapabilities,
-                "LanguageFamily": LanguageFamily,
-                "RerankingModelCapabilities": RerankingModelCapabilities,
-            }
-            _ = ChunkGovernor.model_rebuild(_types_namespace=namespace)
-        _models_rebuilt = True
-    except Exception as e:
-        # If rebuild fails, model will still work but may have issues with ChunkerSettings
-        logger.debug("Failed to rebuild ChunkGovernor model: %s", e, exc_info=True)
-
-
-# Attempt to rebuild models at module level to resolve forward references
-# This ensures models are ready before first instantiation in most cases
-# NOTE: This happens after module-level imports are complete, but ChunkerSettings
-# may rebuild itself during its module initialization, which would invalidate our rebuild.
-# To handle this, we also call rebuild in model_post_init as a fallback.
-with contextlib.suppress(Exception):
-    _rebuild_models()
-
-__all__ = ("BaseChunker", "ChunkGovernor")
+def _get_capabilities() -> tuple[Any, ...]:
+    """Retrieve all configured model capabilities."""
+    # TODO: Implement capability retrieval from provider registry
+    return ()

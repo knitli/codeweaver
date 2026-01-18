@@ -122,24 +122,38 @@ class ClientOptions(BasedModel):
         ),
     ]
 
-    _as_backup: bool = Field(
+    as_backup: bool = Field(
         False,
         exclude=True,
         init=False,
         repr=False,
-        compare=True,
         description="Whether this client options instance is for a backup provider.",
     )
 
     def __init__(self, **data: Any) -> None:
         """Initialize the ClientOptions, setting _as_backup if applicable."""
-        self._as_backup = data.pop("_as_backup", False)
-        if self._as_backup and not hasattr(self, "is_provider_backup"):
+        from codeweaver.core.di import get_container
+
+        try:
+            container = get_container()
+            container.register(type(self), lambda: self)
+        except Exception as e:
+            # Log if DI not available (monorepo compatibility)
+            logger.debug(
+                "Dependency injection container not available, skipping registration of ClientOptions: %s",
+                e,
+            )
+        as_backup = data.pop("_as_backup", False)
+        object.__setattr__(self, "as_backup", as_backup)
+        if as_backup and not hasattr(self, "is_provider_backup"):
             from codeweaver.providers.config.utils import this_as_backup_cls
 
             backup_cls = this_as_backup_cls(type(self), namespace=globals())
             if backup_cls is not None:
                 self.__class__ = backup_cls
+        object.__setattr__(self, "is_provider_backup", as_backup)
+        object.__setattr__(self, "_core_provider", data.pop("_core_provider", Provider.NOT_SET))
+        object.__setattr__(self, "_providers", data.pop("_providers", ()))
         super().__init__(**data)
 
     @model_validator(mode="before")
@@ -449,6 +463,13 @@ class OpenAIClientOptions(ClientOptions):
     default_query: Mapping[str, object] | None = None
     http_client: httpx.Client | None = None
     _strict_response_validation: bool = False
+
+    def __init__(self, **data: Any) -> None:
+        """Initialize the OpenAI client options."""
+        object.__setattr__(
+            self, "_strict_response_validation", data.pop("_strict_response_validation", False)
+        )
+        super().__init__(**data)
 
     def default_base_url(self, provider: LiteralProviderType) -> str | None:
         """Return the default base URL for the OpenAI client based on the provider."""

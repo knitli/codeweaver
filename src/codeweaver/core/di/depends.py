@@ -12,8 +12,8 @@ from typing import Any, Literal, cast, overload
 
 from beartype.typing import TypeVar
 
-from codeweaver.core.types import Sentinel, SentinelName
-from codeweaver.core.utils import TypeIs
+from codeweaver.core.types.sentinel import Sentinel, SentinelName
+from codeweaver.core.utils.checks import TypeIs
 
 
 T = TypeVar("T", bound=Any)

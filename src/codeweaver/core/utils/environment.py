@@ -12,16 +12,13 @@ import logging
 import os
 import sys
 
-from collections.abc import Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, cast
+from typing import TYPE_CHECKING, Literal
 
 from pydantic import NonNegativeInt
 
-from codeweaver.core.types.dictview import DictView
 from codeweaver.core.types.provider import Provider
-from codeweaver.core.utils.filesystem import get_project_path
-from codeweaver.core.utils.lazy_import import LazyImport, lazy_import
+from codeweaver.core.utils.lazy_importer import LazyImport, lazy_import
 
 
 logger = logging.getLogger(__name__)
@@ -32,11 +29,7 @@ else:
     type Console = object
 
 if TYPE_CHECKING:
-    if importlib.util.find_spec("codeweaver.server") is not None:
-        from codeweaver.server import CodeWeaverSettings, CodeWeaverSettingsDict
-    else:
-        type CodeWeaverSettings = object
-        type CodeWeaverSettingsDict = Mapping[str, object]
+    from codeweaver.core.dependencies import CodeWeaverSettingsType
 
 console: LazyImport[Console] = lazy_import("rich.console", "Console")
 
@@ -85,17 +78,6 @@ def get_possible_env_vars() -> tuple[tuple[str, str], ...] | None:
     return found_vars or None
 
 
-def resolve_project_root() -> Path:
-    """Resolve the project root directory."""
-    from codeweaver.server import get_settings_map
-
-    settings_map = get_settings_map()
-    if isinstance(settings_map.get("project_path"), Path):
-        return settings_map["project_path"]
-
-    return get_project_path()
-
-
 def get_terminal_width() -> int:
     """Get the terminal width."""
     fallback = 120 if in_ide() else 80
@@ -117,7 +99,9 @@ def format_file_link(file_path: str | Path, line: NonNegativeInt | None = None) 
         return f"file://{path.absolute()!s}{formatted_line}"
     if we_are_in_jetbrains():
         try:
-            relative_path = path.relative_to(resolve_project_root())
+            from codeweaver.core.utils.filesystem import get_project_path
+
+            relative_path = path.relative_to(get_project_path())
         except ValueError:
             relative_path = path
         return (
@@ -130,51 +114,9 @@ def format_file_link(file_path: str | Path, line: NonNegativeInt | None = None) 
 
 def get_codeweaver_config_paths() -> tuple[Path, ...]:
     """Get all possible CodeWeaver configuration file paths."""
-    from codeweaver.core import get_user_config_dir
-    from codeweaver.server import get_settings_map
+    from codeweaver.core.types.settings_model import get_possible_config_paths
 
-    settings_map = get_settings_map()
-    project_path = (
-        settings_map["project_path"]
-        if isinstance(settings_map["project_path"], Path)
-        else resolve_project_root()
-    )
-    user_config_dir = get_user_config_dir()
-    repo_paths = [
-        project_path / f"{config_path}.{ext}"
-        for config_path in (
-            "codeweaver.test.local",
-            "codeweaver.test",
-            ".codeweaver.test.local",
-            ".codeweaver.test",
-            "codeweaver/codeweaver.test.local",
-            "codeweaver/codeweaver.test",
-            "codeweaver/config.test.local",
-            "codeweaver/config.test",
-            ".codeweaver/codeweaver.test.local",
-            ".codeweaver/codeweaver.test",
-            ".config/codeweaver/test.local",
-            ".config/codeweaver/test",
-            ".config/codeweaver/config.test.local",
-            ".config/codeweaver/config.test",
-            ".config/codeweaver/codeweaver.test.local",
-            ".config/codeweaver/codeweaver.test",
-        )
-        for ext in ("toml", "yaml", "yml", "json")
-    ]
-    repo_paths.extend([
-        user_config_dir / f"codeweaver.{ext}" for ext in ("toml", "yaml", "yml", "json")
-    ])
-    env_config = os.environ.get("CODEWEAVER_CONFIG_FILE")
-    if (
-        env_config
-        and (env_path := Path(env_config)).exists()
-        and env_path.is_file()
-        and env_path not in repo_paths
-        and env_path.suffix.lstrip(".") in {"toml", "yaml", "yml", "json"}
-    ):
-        repo_paths.append(env_path)
-    return tuple(repo_paths)
+    return tuple(get_possible_config_paths())
 
 
 def is_codeweaver_config_path(path: Path) -> bool:
@@ -182,23 +124,20 @@ def is_codeweaver_config_path(path: Path) -> bool:
     return any(path.samefile(config_path) for config_path in get_codeweaver_config_paths())
 
 
-def _set_settings_for_config(config_file: Path) -> CodeWeaverSettings:
+def _set_settings_for_config(config_file: Path) -> CodeWeaverSettingsType:
     """Set the global settings based on the given config file."""
     from codeweaver.server import get_settings
 
     return get_settings(config_file=config_file)
 
 
-def _set_project_path(project_path: Path) -> DictView[CodeWeaverSettingsDict]:
+def _set_project_path(project_path: Path) -> CodeWeaverSettingsType:
     """Set the global project path."""
-    if importlib.util.find_spec("code-weaver-server") is None:
-        raise ImportError("codeweaver_server module is not available.")
-    from codeweaver.server import CodeWeaverSettingsDict, get_settings_map, update_settings
+    from codeweaver.core.config import get_settings
 
-    return cast(
-        DictView[CodeWeaverSettingsDict],
-        update_settings(**(dict(get_settings_map()) | {"project_path": project_path})),
-    )  # ty:ignore[invalid-return-type]
+    settings = get_settings()
+    settings.project_path = project_path
+    return settings  # ty:ignore[invalid-return-type]
 
 
 def detect_root_package() -> Literal["server", "engine", "provider", "core"]:
@@ -239,7 +178,6 @@ __all__ = (
     "in_ide",
     "is_codeweaver_config_path",
     "is_tty",
-    "resolve_project_root",
     "we_are_in_jetbrains",
     "we_are_in_vscode",
 )

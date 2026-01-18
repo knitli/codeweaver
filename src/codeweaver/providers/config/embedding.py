@@ -115,7 +115,7 @@ class BaseEmbeddingConfig(BasedModel):
 
     _is_sparse: ClassVar[bool] = False
 
-    _tag: LiteralProvider = Field(
+    tag: LiteralProvider = Field(
         ...,
         description="The provider tag for the embedding model. Used for discriminated unions.",
         exclude=True,
@@ -167,6 +167,7 @@ class BaseEmbeddingConfig(BasedModel):
             data["embedding"] = {}
         if not query:
             data["query"] = {}
+        object.__setattr__(self, "_is_sparse", data.pop("_is_sparse", False))
         super().__init__(**data)
 
     def config_dependencies(self) -> dict[str, type]:
@@ -406,7 +407,7 @@ type BedrockModelConfig = Annotated[
 class BedrockEmbeddingConfig(BaseEmbeddingConfig):
     """Configuration options for Bedrock embedding models."""
 
-    _tag: Literal["bedrock"] = "bedrock"
+    tag: Literal["bedrock"] = "bedrock"
     provider: Literal[Provider.BEDROCK] = Provider.BEDROCK
 
     model_name: (
@@ -476,7 +477,7 @@ class CohereEmbeddingOptionsDict(TypedDict, total=False):
 class CohereEmbeddingConfig(BaseEmbeddingConfig):
     """Configuration options for Cohere embedding models."""
 
-    _tag: Literal["cohere"] = "cohere"
+    tag: Literal["cohere"] = "cohere"
     provider: Literal[Provider.COHERE] = Provider.COHERE
 
     model_name: (
@@ -503,7 +504,7 @@ class CohereEmbeddingConfig(BaseEmbeddingConfig):
 class FastEmbedEmbeddingConfig(BaseEmbeddingConfig):
     """Configuration options for FastEmbed embedding models."""
 
-    _tag: Literal["fastembed"] = "fastembed"
+    tag: Literal["fastembed"] = "fastembed"
     provider: Literal[Provider.FASTEMBED] = Provider.FASTEMBED
 
     def _as_options(self) -> SerializedEmbeddingOptionsDict:
@@ -523,7 +524,7 @@ class GoogleEmbeddingRequestParams(TypedDict, total=False):
 class GoogleEmbeddingConfig(BaseEmbeddingConfig):
     """Configuration options for Google embedding models."""
 
-    _tag: Literal["google"] = "google"
+    tag: Literal["google"] = "google"
     provider: Literal[Provider.GOOGLE] = Provider.GOOGLE
 
     model_name: Literal["gemini-embedding-001"] | LiteralString
@@ -554,7 +555,7 @@ class GoogleEmbeddingConfig(BaseEmbeddingConfig):
 class HuggingFaceEmbeddingConfig(BaseEmbeddingConfig):
     """Configuration options for HuggingFace embedding models."""
 
-    _tag: Literal["huggingface"] = "huggingface"
+    tag: Literal["huggingface"] = "huggingface"
     provider: Literal[Provider.HUGGINGFACE_INFERENCE] = Provider.HUGGINGFACE_INFERENCE
 
     def _as_options(self) -> SerializedEmbeddingOptionsDict:
@@ -601,7 +602,7 @@ class MistralEmbeddingOptionsDict(TypedDict, total=False):
 class MistralEmbeddingConfig(BaseEmbeddingConfig):
     """Configuration options for Mistral AI embedding models."""
 
-    _tag: Literal["mistral"] = "mistral"
+    tag: Literal["mistral"] = "mistral"
     provider: Literal[Provider.MISTRAL] = Provider.MISTRAL
 
     model_name: Literal["mistral-embed", "codestral-embed"] | LiteralString
@@ -655,7 +656,7 @@ class OpenAIEmbeddingConfig(BaseEmbeddingConfig):
     Supports OpenAI, Azure OpenAI, Ollama, Fireworks, Together AI, GitHub Models, Groq, and other OpenAI-compatible providers.
     """
 
-    _tag: Literal["openai"] = "openai"
+    tag: Literal["openai"] = "openai"
     provider: Literal[Provider.OPENAI] = Provider.OPENAI
 
     model_name: Literal["text-embedding-3-large", "text-embedding-3-small"] | LiteralString
@@ -748,7 +749,7 @@ class SentenceTransformersEmbeddingConfig(BaseEmbeddingConfig):
     Note: Sentence Transformers receives model kwargs through its client constructor. Provide model options to the `model_kwargs` field in `SentenceTransformersClientOptions`.
     """
 
-    _tag: Literal["sentence_transformers"] = "sentence_transformers"
+    tag: Literal["sentence_transformers"] = "sentence_transformers"
     provider: Literal[Provider.SENTENCE_TRANSFORMERS] = Provider.SENTENCE_TRANSFORMERS
 
     model_name: LiteralString
@@ -804,7 +805,7 @@ class VoyageEmbeddingOptionsDict(TypedDict, total=False):
 class VoyageEmbeddingConfig(BaseEmbeddingConfig):
     """Configuration options for Voyage AI embedding models."""
 
-    _tag: Literal["voyage"] = "voyage"
+    tag: Literal["voyage"] = "voyage"
     provider: Literal[Provider.VOYAGE] = Provider.VOYAGE
 
     model_name: (

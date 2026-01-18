@@ -31,7 +31,6 @@ from pydantic_settings import (
     YamlConfigSettingsSource,
 )
 
-from codeweaver.core import get_project_path
 from codeweaver.core.types.aliases import FilteredKey, FilteredKeyT, LiteralStringT
 from codeweaver.core.types.enum import AnonymityConversion
 from codeweaver.core.types.sentinel import UNSET, Unset
@@ -40,7 +39,12 @@ from codeweaver.core.types.utils import (
     generate_field_title,
     generate_title,
 )
-from codeweaver.core.utils import get_user_config_dir, get_user_data_dir, is_test_environment
+from codeweaver.core.utils.checks import is_test_environment
+from codeweaver.core.utils.filesystem import (
+    get_project_path,
+    get_user_config_dir,
+    get_user_data_dir,
+)
 
 
 SUPPORTED_CONFIG_FILE_EXTENSIONS = MappingProxyType({
@@ -119,17 +123,18 @@ def get_possible_config_paths(
     project_path: Path | None = None, *, for_test: bool = False
 ) -> tuple[Path, ...]:
     """Get possible configuration file paths for CodeWeaverSettings."""
+    resolved_project_path = _resolve_project_path()
     if for_test:
         return (
             tuple(project_path / path for path in _BASE_TEST_PATHS)
             if project_path
-            else tuple(_resolve_project_path() / path for path in _BASE_TEST_PATHS)
+            else tuple(resolved_project_path / path for path in _BASE_TEST_PATHS)
         )
     return (
         *(
             (project_path / path for path in _BASE_PROD_PATHS)
             if project_path
-            else (_resolve_project_path() / path for path in _BASE_PROD_PATHS)
+            else (resolved_project_path / path for path in _BASE_PROD_PATHS)
         ),
         *(Path(path) for path in _USER_PROD_PATHS),
     )

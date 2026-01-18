@@ -25,6 +25,7 @@ from codeweaver.core.types.aliases import (
 )
 from codeweaver.core.utils import COMMON_LLM_TOOLING_PATHS, COMMON_TOOLING_PATHS, lazy_import
 
+print(f"DEBUG: lazy_import is {lazy_import} type: {type(lazy_import)}")
 
 if TYPE_CHECKING:
     from codeweaver.core.metadata import ExtLangPair

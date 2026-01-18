@@ -39,7 +39,6 @@ from codeweaver.core import (
     get_project_path,
     get_settings,
 )
-from codeweaver.core import Provider as Provider
 from codeweaver.engine.services.failover_service import FailoverService
 from codeweaver.engine.services.indexing_service import IndexingService
 from codeweaver.providers import HttpClientPool
@@ -54,7 +53,7 @@ if TYPE_CHECKING:
 
 _logger = logging.getLogger(__name__)
 
-BRACKET_PATTERN: re.Pattern[str] = re.compile("\\[.+\\]")
+BRACKET_PATTERN: re.Pattern[str] = re.compile("\\\\\[.+\\\\]")
 
 
 def _get_statistics(stats: StatisticsDep) -> SessionStatistics:
@@ -133,10 +132,8 @@ class CodeWeaverState(DataclassSerializationMixin):
     _tasks: Annotated[list[asyncio.Task] | None, PrivateAttr(default_factory=list)] = None
 
     def __post_init__(self) -> None:
-        """Post-initialization to set the global state reference."""
+        """Post-initialization."""
         self._tasks = []
-        global _state
-        _state = self
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         from codeweaver.core import AnonymityConversion, FilteredKey
@@ -166,34 +163,6 @@ class CodeWeaverState(DataclassSerializationMixin):
     def mcp_http_server(self) -> FastMCP[CwMcpHttpState] | None:
         """Get the MCP HTTP server instance."""
         return self._mcp_http_server
-
-
-_state: CodeWeaverState | None = None
-
-
-def get_state() -> CodeWeaverState:
-    """Get the current application state."""
-    global _state
-    if _state is None:
-        try:
-            import asyncio
-        except Exception as e:
-            raise InitializationError(
-                "CodeWeaverState has not been initialized yet. Ensure the server is properly set up before accessing the state."
-            ) from e
-        else:
-            return asyncio.run(get_container().resolve(CodeWeaverState))
-    return _state
-
-
-def _get_health_service() -> HealthService:
-    """Get the health service instance."""
-    state = get_state()
-    return HealthService(
-        statistics=state.statistics,
-        indexer=state.indexer,
-        startup_stopwatch=state.startup_stopwatch,
-    )
 
 
 async def _cleanup_state(
@@ -282,26 +251,60 @@ async def lifespan(
 
     if verbose or debug:
         _logger.info("Entering lifespan context manager...")
-    if settings is None:
-        settings = get_settings._resolve()()
-    if isinstance(settings.project_path, Unset):
-        settings.project_path = get_project_path()
-    state = await _initialize_cw_state(settings, statistics)
+    
+    # Bootstrap settings via DI system implicitly when resolving state
+    # But if passed explicitly (e.g. tests), we might want to respect that.
+    # For now, we assume standard DI flow.
+
+    container = get_container()
+    
+    # Register core singletons if provided explicitly
+    # (Note: settings and statistics might need to be overridden in container if passed here,
+    # but standard flow resolves them from container)
+
+    try:
+        # Resolve the entire state graph
+        # This triggers factories in codeweaver.server.dependencies
+        # which injects IndexingService, HealthService, etc.
+        state = await container.resolve(CodeWeaverState)
+    except Exception as e:
+        raise InitializationError(
+            "Failed to resolve CodeWeaverState. Check configuration and dependencies.",
+            details={"error": str(e)}
+        ) from e
+        
     if not isinstance(state, CodeWeaverState):
         raise InitializationError(
             "CodeWeaverState should be an instance of CodeWeaverState, but isn't. Something is wrong. Please report this issue.",
             details={"state": state},
         )
+    
+    # Initialize telemetry if not already done by factory (it's currently done in factory if configured)
+    if not state.telemetry:
+        from codeweaver.core import TelemetryService
+        state.telemetry = TelemetryService.from_settings(state.settings)
+        
+    if state.telemetry and state.telemetry.enabled:
+        # Start session with simplified metadata (provider registry is gone, 
+        # so we'd need to inspect providers manually if we want that data, 
+        # or rely on what's available)
+        state.telemetry.start_session({
+            "codeweaver_version": version,
+        })
+
     indexing_task = None
-    async with get_container().lifespan():
+    async with container.lifespan():
         try:
             if verbose or debug:
                 _logger.info("Ensuring services set up...")
             from codeweaver.server.background_services import run_background_indexing
 
+            # Note: run_background_indexing resolves FileWatchingService internally or we pass it?
+            # Existing code passed state.
             indexing_task = asyncio.create_task(
                 run_background_indexing(state, progress_reporter, verbose=verbose, debug=debug)
             )
+            
             progress_reporter.report_status("Health checks...")
             if state.health_service:
                 health_response = await state.health_service.get_health_response()
@@ -337,8 +340,7 @@ async def lifespan(
                     sparse_status, sparse_status
                 )
                 progress_reporter.report_status(f"Sparse embeddings ({sparse_prov}): {status_icon}")
-            if not state.failover_manager:
-                state.failover_manager = await get_container().resolve(FailoverService)
+            
             progress_reporter.report_status("Ready for connections.")
             if verbose or debug:
                 _logger.info("Lifespan start actions complete, server initialized.")
@@ -351,57 +353,4 @@ async def lifespan(
             await _cleanup_state(state, indexing_task, progress_reporter, verbose=verbose or debug)
 
 
-async def _initialize_cw_state(
-    settings: CodeWeaverSettings | None = None, statistics: SessionStatistics | None = None
-) -> CodeWeaverState:
-    """Initialize application state if not already present."""
-    from codeweaver.core import get_container
-
-    container = get_container()
-    state = await container.resolve(CodeWeaverState)
-    if not state.health_service:
-        from codeweaver.server.health.health_service import HealthService
-
-        state.health_service = HealthService(
-            provider_registry=state.provider_registry,
-            statistics=state.statistics,
-            indexer=state.indexer,
-            failover_manager=state.failover_manager,
-            startup_stopwatch=float(state.startup_stopwatch),
-        )
-    if not state.telemetry:
-        from codeweaver.core import TelemetryService
-
-        state.telemetry = TelemetryService.from_settings(state.settings)
-    if state.telemetry and state.telemetry.enabled:
-        state.telemetry.start_session({
-            "codeweaver_version": version,
-            "vector_store": vector_store_provider
-            if (
-                vector_store_provider := state.provider_registry.get_provider_enum_for(
-                    "vector_store"
-                )
-            )
-            else "Qdrant",
-            "embedding_provider": embedding_provider_provider
-            if (
-                embedding_provider_provider := state.provider_registry.get_provider_enum_for(
-                    "embedding"
-                )
-            )
-            else "Voyage",
-            "sparse_embedding_provider": sparse_embedding_provider
-            if (
-                sparse_embedding_provider := state.provider_registry.get_provider_enum_for(
-                    "sparse_embedding"
-                )
-            )
-            else "None",
-            "reranking_provider": reranking_provider
-            if (reranking_provider := state.provider_registry.get_provider_enum_for("reranking"))
-            else "None",
-        })
-    return state
-
-
-__all__ = ("CodeWeaverState", "get_state", "lifespan")
+__all__ = ("CodeWeaverState", "lifespan")

@@ -23,7 +23,7 @@ from typing import TYPE_CHECKING, Any, Literal, NamedTuple, Protocol, runtime_ch
 
 from pydantic import PositiveInt, computed_field
 
-from codeweaver.core.di import get_container
+from codeweaver.core.di.container import get_container
 
 
 if TYPE_CHECKING:

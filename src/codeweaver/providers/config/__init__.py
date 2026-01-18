@@ -5,7 +5,7 @@
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
-from codeweaver.core.utils.lazy_import import create_lazy_getattr
+from codeweaver.core.utils.lazy_importer import create_lazy_getattr
 
 
 if TYPE_CHECKING:

@@ -15,7 +15,7 @@ from codeweaver.core.config.envs import environment_variables
 
 
 if TYPE_CHECKING and importlib.util.find_spec("codeweaver.providers") is not None:
-    from codeweaver.providers import ProviderSettingsDict
+    from codeweaver.providers.config import ProviderSettingsDict
 else:
     ProviderSettingsDict = dict[str, Any]
 

@@ -20,7 +20,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from codeweaver.core import ProviderRegistry
 from codeweaver.providers import FastEmbedEmbeddingProvider, MemoryVectorStoreProvider
 
 
