@@ -231,15 +231,19 @@ def _quickstart_default(
     from codeweaver.core import Provider
 
     embedding_model = (
-        "ibm-granite/granite-embedding-small-english-r2" if HAS_ST else "BAAI/bge-small-en-v1.5"
+        ModelName("ibm-granite/granite-embedding-small-english-r2")
+        if HAS_ST
+        else ModelName("BAAI/bge-small-en-v1.5")
     )
     sparse_model = (
-        "opensearch/opensearch-neural-sparse-encoding-doc-v3-gte"
+        ModelName("opensearch/opensearch-neural-sparse-encoding-doc-v3-gte")
         if HAS_ST
-        else "prithivida/Splade_PP_en_v1"
+        else ModelName("prithivida/Splade_PP_en_v1")
     )
     reranking_model = (
-        "BAAI/bge-reranking-v2-m3" if HAS_ST else "jinaai/jina-reranking-v2-base-multilingual"
+        ModelName("BAAI/bge-reranking-v2-m3")
+        if HAS_ST
+        else ModelName("jinaai/jina-reranking-v2-base-multilingual")
     )
 
     return ProviderSettingsDict(
@@ -331,19 +335,21 @@ def _backup_profile(
     backup_settings = _quickstart_default("local") | {
         "sparse_embedding": SparseEmbeddingProviderSettings(
             provider=Provider.FASTEMBED,
-            model_name="qdrant/bm25",
-            sparse_embedding_config=FastEmbedSparseEmbeddingConfig(model_name="qdrant/bm25"),
+            model_name=ModelName("qdrant/bm25"),
+            sparse_embedding_config=FastEmbedSparseEmbeddingConfig(
+                model_name=ModelName("qdrant/bm25")
+            ),
             as_backup=as_backup,
         ),
         # For the dense embeddings, we essentially choose the lightest available model
         # potion-base-8M is a static embedding model, which again loses some quality, but is extremely light weight and virtually instant
         "embedding": EmbeddingProviderSettings(
             provider=Provider.SENTENCE_TRANSFORMERS if HAS_ST else Provider.FASTEMBED,
-            model_name=embedding_model,
+            model_name=ModelName(embedding_model),
             embedding_config=(
-                SentenceTransformersEmbeddingConfig(model_name=embedding_model)
+                SentenceTransformersEmbeddingConfig(model_name=ModelName(embedding_model))
                 if HAS_ST
-                else FastEmbedEmbeddingConfig(model_name=embedding_model)
+                else FastEmbedEmbeddingConfig(model_name=ModelName(embedding_model))
             ),
             as_backup=as_backup,
         ),
@@ -352,11 +358,11 @@ def _backup_profile(
     backup_settings["reranking"] = (
         RerankingProviderSettings(
             provider=Provider.SENTENCE_TRANSFORMERS if HAS_ST else Provider.FASTEMBED,
-            model_name=reranking_model,
+            model_name=ModelName(reranking_model),
             reranking_config=(
-                SentenceTransformersRerankingConfig(model_name=reranking_model)
+                SentenceTransformersRerankingConfig(model_name=ModelName(reranking_model))
                 if HAS_ST
-                else FastEmbedRerankingConfig(model_name=reranking_model)
+                else FastEmbedRerankingConfig(model_name=ModelName(reranking_model))
             ),
             as_backup=as_backup,
         ),

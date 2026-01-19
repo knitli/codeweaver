@@ -226,7 +226,7 @@ class BedrockRerankingConfig(BaseRerankingConfig):
     def _as_options(self) -> SerializedRerankingOptionsDict:
         """Convert the Bedrock reranking configuration to a dictionary of options."""
         return SerializedRerankingOptionsDict(
-            model_name=self.model_name,
+            model_name=ModelName(self.model_name),
             rerank=cast(dict[str, Any], (self._defaults | (self.rerank or {}))),
             model=cast(dict[str, Any], self.model),
         )
@@ -243,7 +243,7 @@ class FastEmbedRerankingConfig(BaseRerankingConfig):
     tag: Literal["fastembed"] = "fastembed"
     provider: Literal[Provider.FASTEMBED] = Provider.FASTEMBED
 
-    model_name: LiteralString
+    model_name: ModelNameT
     """The FastEmbed reranking model to use (e.g., 'Xenova/ms-marco-MiniLM-L-6-v2')."""
 
     rerank: FastEmbedRerankingOptionsDict | None = None
@@ -265,7 +265,7 @@ class SentenceTransformersRerankingConfig(BaseRerankingConfig):
     tag: Literal["sentence_transformers"] = "sentence_transformers"
     provider: Literal[Provider.SENTENCE_TRANSFORMERS] = Provider.SENTENCE_TRANSFORMERS
 
-    model_name: LiteralString
+    model_name: ModelNameT
     """The Sentence Transformers cross-encoder model to use (e.g., 'cross-encoder/ms-marco-MiniLM-L6-v2')."""
 
     rerank: SentenceTransformersRerankingOptionsDict | None = None

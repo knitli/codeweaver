@@ -184,8 +184,8 @@ a, b, c = 1, 2, 3; total = a + b + c  # Another multi-statement line
             assert "line_start" in chunk.metadata, "Chunks should have line_start metadata"  # ty: ignore[unsupported-operator]
             assert "line_end" in chunk.metadata, "Chunks should have line_end metadata"  # ty: ignore[unsupported-operator]
 
-            line_start = chunk.metadata["line_start"]  # ty: ignore[non-subscriptable]
-            line_end = chunk.metadata["line_end"]  # ty: ignore[non-subscriptable]
+            line_start = chunk.metadata["line_start"]  # ty: ignore[not-subscriptable]
+            line_end = chunk.metadata["line_end"]  # ty: ignore[not-subscriptable]
 
             assert isinstance(line_start, int), "line_start should be integer"
             assert isinstance(line_end, int), "line_end should be integer"

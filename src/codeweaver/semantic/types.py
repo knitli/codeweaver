@@ -14,7 +14,7 @@ from __future__ import annotations
 import re
 
 from enum import Flag, auto
-from typing import Annotated, Any, Literal, NamedTuple, TypedDict, cast
+from typing import TYPE_CHECKING, Annotated, Any, Literal, NamedTuple, TypedDict, cast
 
 from pydantic import ConfigDict, Field, PrivateAttr, computed_field
 

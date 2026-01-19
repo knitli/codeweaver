@@ -267,7 +267,6 @@ from codeweaver.core import (
     CategoryName,
     CategoryNameT,
     DataclassSerializationMixin,
-    LazyImport,
     LiteralStringT,
     Role,
     RoleT,
@@ -275,9 +274,10 @@ from codeweaver.core import (
     ThingName,
     ThingNameT,
     ThingOrCategoryNameT,
-    lazy_import,
 )
+from codeweaver.core.di import INJECTED
 from codeweaver.semantic.classifications import ThingClass
+from codeweaver.semantic.dependencies import ThingRegistryDep
 from codeweaver.semantic.types import (
     ConnectionClass,
     ConnectionConstraint,
@@ -292,8 +292,6 @@ if TYPE_CHECKING:
     from codeweaver.semantic.classifier import GrammarBasedClassifier, GrammarClassificationResult
     from codeweaver.semantic.registry import ThingRegistry
 
-
-registry: LazyImport[ThingRegistry] = lazy_import("codeweaver.semantic.registry", "get_registry")
 
 logger = logging.getLogger()
 
@@ -428,7 +426,7 @@ class Thing(BasedModel):
             return frozenset(
                 cat
                 for name in self.category_names
-                if (cat := registry().get_category_by_name(name, language=self.language))  # type: ignore
+                if (cat := self._registry().get_category_by_name(name, language=self.language))  # type: ignore
             )
         finally:
             _resolving_grammar.reset(token)
@@ -583,12 +581,14 @@ class CompositeThing(Thing):
             data["is_file"] = False
         super().__init__(**data)
 
+    @staticmethod
+    def _registry(registry: ThingRegistryDep = INJECTED) -> ThingRegistry:
+        return registry
+
     @property
     def direct_connections(self) -> frozenset[DirectConnection]:
         """Resolve DirectConnections from registry by source Thing name."""
-        from codeweaver.semantic.registry import get_registry
-
-        registry = get_registry()
+        registry = self._registry()
         connections = registry.get_direct_connections_by_source(self.name, language=self.language)
         return frozenset(connections)
 
@@ -598,9 +598,7 @@ class CompositeThing(Thing):
 
         Note: There can be at most one PositionalConnections per CompositeThing, since children are ordered. The PositionalConnections itself can reference multiple target Things. **Not all CompositeThings have PositionalConnections.**
         """
-        from codeweaver.semantic.registry import get_registry
-
-        registry = get_registry()
+        registry = self._registry()
         # direct=False guarantees PositionalConnections
         return registry.get_positional_connections_by_source(self.name, language=self.language)
 
@@ -756,9 +754,7 @@ class Category(BasedModel):
 
         token = _resolving_grammar.set(True)
         try:
-            from codeweaver.semantic.registry import get_registry
-
-            registry = get_registry()
+            registry = self._registry()
             return frozenset(
                 thing
                 for name in self.member_thing_names
@@ -885,9 +881,7 @@ class Connection(BasedModel):
 
     def __init__(self, **data: Any) -> None:
         """Initialize a Connection."""
-        from codeweaver.semantic.registry import get_registry
-
-        registry = get_registry()
+        registry = self._registry()
         if data["target_thing_names"]:
             data["target_thing_names"] = tuple(
                 cat_name_normalizer(name)

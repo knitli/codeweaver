@@ -68,12 +68,8 @@ from codeweaver.core import BasedModel, MissingValueError
 
 
 if TYPE_CHECKING:
-    from codeweaver.core import (
-        AnonymityConversion,
-        CodeWeaverMCPConfigDict,
-        FilteredKeyT,
-        StdioCodeWeaverConfigDict,
-    )
+    from codeweaver.core import AnonymityConversion, FilteredKeyT
+    from codeweaver.server.config import CodeWeaverMCPConfigDict, StdioCodeWeaverConfigDict
 
 CODEWEAVER_DESCRIPTION = "CodeWeaver advanced code search and understanding server."
 

@@ -61,6 +61,7 @@ from codeweaver.core import (
     lazy_import,
     rpartial,
 )
+from codeweaver.core.types import ModelName
 from codeweaver.providers import AllDefaultProviderSettings, EmbeddingCapabilityGroup
 from codeweaver.providers.embedding.capabilities.resolver import (
     EmbeddingCapabilityResolver,
@@ -774,7 +775,7 @@ def _get_embedding_provider_for_config(
         from codeweaver.providers.embedding.providers.openai_factory import OpenAIEmbeddingBase
 
         return cast(OpenAIEmbeddingBase, resolved_provider).get_provider_class(
-            model_name=config.model_name or config.embedding_config.model_name,
+            model_name=ModelName(config.model_name or config.embedding_config.model_name),
             client=client,
             provider=config.provider,
             registry=registry,

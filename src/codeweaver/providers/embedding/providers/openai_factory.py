@@ -21,6 +21,7 @@ from pydantic import create_model
 
 from codeweaver.core import INJECTED, CodeChunk, ConfigurationError, Provider, ProviderError, TypeIs
 from codeweaver.core import ValidationError as CodeWeaverValidationError
+from codeweaver.core.types import ModelName
 from codeweaver.providers.config.embedding import OpenAIEmbeddingConfig
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.providers.base import (
@@ -67,7 +68,7 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
     @classmethod
     def get_provider_class(
         cls,
-        model_name: str,
+        model_name: ModelName,
         provider: Provider,
         config: OpenAIEmbeddingConfig,
         client: AsyncOpenAI,

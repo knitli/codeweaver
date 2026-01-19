@@ -41,6 +41,7 @@ if TYPE_CHECKING:
         UvicornServerSettings,
         UvicornServerSettingsDict,
     )
+    from codeweaver.server.dependencies import CodeWeaverStateDep
     from codeweaver.server.health import (
         EmbeddingProviderServiceInfo,
         HealthResponse,

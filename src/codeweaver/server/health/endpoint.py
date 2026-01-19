@@ -21,7 +21,6 @@ from codeweaver.server.health.models import (
 
 if TYPE_CHECKING:
     from codeweaver.server.health.health_service import HealthService
-    from codeweaver.server.server import get_state
 
 
 logger = logging.getLogger(__name__)
