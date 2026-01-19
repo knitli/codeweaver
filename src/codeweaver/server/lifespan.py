@@ -26,7 +26,6 @@ from codeweaver.server.server import CodeWeaverState
 
 if TYPE_CHECKING:
     from codeweaver.core import SessionStatistics
-    from codeweaver.server.config import CodeWeaverSettings
     from codeweaver.server.mcp import CwMcpHttpState
 
 logger = logging.getLogger(__name__)
@@ -34,9 +33,9 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def background_services_lifespan(
-    settings: CodeWeaverSettings | None = None,
-    statistics: SessionStatistics | None = None,
-    progress_reporter: ProgressReporter | None = None,
+    settings: CodeWeaverSettingsType,
+    statistics: SessionStatistics,
+    progress_reporter: ProgressReporter,
     *,
     verbose: bool = False,
     debug: bool = False,
@@ -63,29 +62,14 @@ async def background_services_lifespan(
     Yields:
         CodeWeaverState instance for background services
     """
-    from codeweaver.core import Unset, get_project_path
-    from codeweaver.server.config import get_settings
-
-    # Create ProgressReporter if not provided
-    if progress_reporter is None:
-        progress_reporter = RichConsoleProgressReporter()
-
     if verbose or debug:
         logger.info("Entering background services lifespan context manager...")
 
-    # Load settings if not provided
-    if settings is None:
-        settings = get_settings()
-    if isinstance(settings.project_path, Unset):
-        settings.project_path = get_project_path()
-
     # Initialize CodeWeaverState
     container = get_container()
-    container.override(CodeWeaverSettingsType, settings)
-    
-    if statistics:
-        from codeweaver.core import SessionStatistics
-        container.override(SessionStatistics, statistics)
+    container.override(CodeWeaverSettingsType, settings)  # ty:ignore[invalid-argument-type]
+
+    container.override(SessionStatistics, statistics)
 
     background_state: CodeWeaverState = await container.resolve(CodeWeaverState)
 
@@ -164,7 +148,7 @@ async def background_services_lifespan(
 @asynccontextmanager
 async def http_lifespan(
     mcp_state: CwMcpHttpState,
-    settings: CodeWeaverSettings | None = None,
+    settings: CodeWeaverSettingsType | None = None,
     statistics: SessionStatistics | None = None,
     progress_reporter: ProgressReporter | None = None,
     *,

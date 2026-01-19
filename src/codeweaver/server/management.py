@@ -125,7 +125,6 @@ async def health(request: Request) -> PlainTextResponse:
         if state.health_service is None:
             logger.warning("Health service not initialized, returning error response")
             # Return error response struct (omitted for brevity, same as before)
-            from codeweaver.server.health.models import HealthResponse
 
             # Create a minimal error response if we can't access health service
             # (In practice, DI guarantees health_service is present if state is present)
@@ -184,7 +183,7 @@ async def status_info(request: Request) -> PlainTextResponse:
         if getattr(state, "failover_manager", None):
             failover_stats = statistics().failover_statistics
             if failover_stats:
-                status_data["failover"] = failover_stats.dump_python()
+                status_data["failover"] = failover_stats.model_dump()
             else:
                 status_data["failover"] = {"enabled": True, "active": False}
         else:

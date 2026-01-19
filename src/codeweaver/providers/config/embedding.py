@@ -546,7 +546,7 @@ class GoogleEmbeddingConfig(BaseEmbeddingConfig):
         """Convert the Google embedding configuration to a dictionary of options."""
         embedding_options = {"model": self.model_name} | (self.embedding or {})
         return SerializedEmbeddingOptionsDict(
-            model_name=self.model_name,
+            model_name=ModelName(self.model_name),
             embedding=embedding_options,
             query=embedding_options,
             model={},
@@ -615,7 +615,7 @@ class MistralEmbeddingConfig(BaseEmbeddingConfig):
     tag: Literal["mistral"] = "mistral"
     provider: Literal[Provider.MISTRAL] = Provider.MISTRAL
 
-    model_name: Literal["mistral-embed", "codestral-embed"] | LiteralString
+    model_name: Literal["mistral-embed", "codestral-embed"] | ModelNameT
     """The Mistral AI embedding model to use."""
 
     embedding: MistralEmbeddingOptionsDict | None = None

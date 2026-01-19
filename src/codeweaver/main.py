@@ -14,15 +14,20 @@ import signal
 import sys
 
 from pathlib import Path
-from typing import Any, Literal, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 from codeweaver_daemon import start_daemon_if_needed
 from fastmcp import FastMCP
 from pydantic import FilePath
 
-from codeweaver.core import InitializationError
+from codeweaver.core import InitializationError, ProgressReporterDep, SettingsDep, StatisticsDep
 from codeweaver.core import Provider as Provider
-from codeweaver.server import CodeWeaverSettingsDict
+from codeweaver.core.config.types import CodeWeaverSettingsDict
+from codeweaver.core.di.depends import INJECTED
+
+
+if TYPE_CHECKING:
+    pass
 
 
 class UvicornAccessLogFilter(logging.Filter):
@@ -89,6 +94,9 @@ async def _run_http_server(
     port: int = 9329,
     verbose: bool = False,
     debug: bool = False,
+    _settings: SettingsDep = INJECTED,
+    _statistics: StatisticsDep = INJECTED,
+    _progress_reporter: ProgressReporterDep = INJECTED,
 ) -> None:
     """Run HTTP MCP server with integrated background services and management server.
 
@@ -105,18 +113,17 @@ async def _run_http_server(
         verbose: Enable verbose logging
         debug: Enable debug logging
     """
-    from codeweaver.cli import StatusDisplay
-    from codeweaver.core import Unset, get_project_path, get_session_statistics
+    from codeweaver.core import Unset, get_project_path
     from codeweaver.server import (
         CwMcpHttpState,
         ManagementServer,
         create_http_server,
-        get_settings,
         http_lifespan,
     )
 
+    settings = _settings
+
     # Load settings
-    settings = get_settings()
     if config_file:
         settings.config_file = config_file  # type: ignore
     if project_path:
@@ -127,20 +134,16 @@ async def _run_http_server(
     # Setup logging
     if verbose or debug:
         from codeweaver.core import setup_logger
-        from codeweaver.server import get_settings_map
 
-        setup_logger(get_settings_map())
+        setup_logger(LoggerSettingsDict(**get_settings_map()))
 
     # Create MCP HTTP server state
     mcp_state: CwMcpHttpState = await create_http_server(
         host=host, port=port, verbose=verbose, debug=debug
     )
 
-    # Create status display
-    status_display = StatusDisplay()
-
     # Get statistics
-    statistics = get_session_statistics()
+    statistics = _statistics
 
     # Setup management server
     mgmt_host = getattr(settings, "management_host", "127.0.0.1")
@@ -159,7 +162,7 @@ async def _run_http_server(
             mcp_state=mcp_state,
             settings=settings,
             statistics=statistics,
-            status_display=status_display,
+            progress_reporter=_progress_reporter,
             verbose=verbose,
             debug=debug,
         ) as background_state:
@@ -267,21 +270,10 @@ async def get_stdio_server(
 
     if config_file or project_path:
         # We normally want to use the global settings instance, but here because a proxied stdio client could be used in isolation and outside a typical configuration, we create a unique settings instance.
-        from codeweaver.server import CodeWeaverSettings, get_settings
+        from codeweaver.core.dependencies import bootstrap_settings
 
-        global_settings = get_settings()
         if config_file and isinstance(config_file, Path) and config_file.exists():
-            settings = (
-                CodeWeaverSettings(config_file=config_file, project_path=project_path)
-                if project_path
-                else CodeWeaverSettings(config_file=config_file)
-            )
-        elif project_path and project_path.exists():
-            settings = global_settings.model_copy(update={"project_path": project_path})
-        else:
-            settings = None
-        if settings:
-            settings = CodeWeaverSettingsDict(**settings.model_dump())
+            settings = bootstrap_settings(config_file=config_file, project_path=project_path)
     else:
         settings = None
     return await create_stdio_server(

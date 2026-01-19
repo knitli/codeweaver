@@ -24,7 +24,7 @@ def make_test_chunk(content: str, index: int = 0) -> CodeChunk:
         content=content,
         ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
         language=SemanticSearchLanguage.PYTHON,
-        line_range=Span(start=index + 1, end=index + 1, _source_id=uuid7()),
+        line_range=Span(start=index + 1, end=index + 1, source_id=uuid7()),
         file_path=Path("/test/file.py"),
     )
 
@@ -72,6 +72,7 @@ class TestCohereRerankingProviderInitialization:
             client=mock_cohere_rerank_client,
             config=mock_cohere_rerank_config,
             caps=cohere_rerank_capabilities,
+            _provider=Provider.COHERE,
         )
 
         assert provider.client is mock_cohere_rerank_client
@@ -87,6 +88,7 @@ class TestCohereRerankingProviderInitialization:
             client=mock_cohere_rerank_client,
             config=mock_cohere_rerank_config,
             caps=cohere_rerank_capabilities,
+            _provider=Provider.COHERE,
             top_n=25,
         )
 
@@ -99,6 +101,7 @@ class TestCohereRerankingProviderInitialization:
         from codeweaver.providers import CohereRerankingProvider
 
         provider = CohereRerankingProvider(
+            _provider=Provider.COHERE,
             client=mock_cohere_rerank_client,
             config=mock_cohere_rerank_config,
             caps=cohere_rerank_capabilities,
@@ -134,6 +137,7 @@ class TestCohereRerankingProviderReranking:
         mock_cohere_rerank_client.rerank.return_value = mock_response
 
         provider = CohereRerankingProvider(
+            _provider=Provider.COHERE,
             client=mock_cohere_rerank_client,
             config=mock_cohere_rerank_config,
             caps=cohere_rerank_capabilities,
@@ -175,6 +179,7 @@ class TestCohereRerankingProviderReranking:
         mock_cohere_rerank_client.rerank.return_value = mock_response
 
         provider = CohereRerankingProvider(
+            _provider=Provider.COHERE,
             client=mock_cohere_rerank_client,
             config=mock_cohere_rerank_config,
             caps=cohere_rerank_capabilities,
@@ -189,14 +194,14 @@ class TestCohereRerankingProviderReranking:
                 content="def foo(): pass",
                 ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
                 language=SemanticSearchLanguage.PYTHON,
-                line_range=Span(start=1, end=1, _source_id=uuid7()),
+                line_range=Span(start=1, end=1, source_id=uuid7()),
                 file_path=Path("/test/file.py"),
             ),
             CodeChunk(
                 content="def bar(): pass",
                 language=SemanticSearchLanguage.PYTHON,
                 ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
-                line_range=Span(start=2, end=2, _source_id=uuid7()),
+                line_range=Span(start=2, end=2, source_id=uuid7()),
                 file_path=Path("/test/file.py"),
             ),
         ]
@@ -234,6 +239,7 @@ class TestCohereRerankingProviderReranking:
         mock_cohere_rerank_client.rerank.return_value = mock_response
 
         provider = CohereRerankingProvider(
+            _provider=Provider.COHERE,
             client=mock_cohere_rerank_client,
             config=mock_cohere_rerank_config,
             caps=cohere_rerank_capabilities,
@@ -246,7 +252,7 @@ class TestCohereRerankingProviderReranking:
             content="test content",
             ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
             language=SemanticSearchLanguage.PYTHON,
-            line_range=Span(start=1, end=1, _source_id=uuid7()),
+            line_range=Span(start=1, end=1, source_id=uuid7()),
             file_path=Path("/test/file.py"),
         )
 
@@ -277,6 +283,7 @@ class TestCohereRerankingProviderErrorHandling:
         mock_cohere_rerank_client.rerank.side_effect = ConnectionError("Connection failed")
 
         provider = CohereRerankingProvider(
+            _provider=Provider.COHERE,
             client=mock_cohere_rerank_client,
             config=mock_cohere_rerank_config,
             caps=cohere_rerank_capabilities,
@@ -302,6 +309,7 @@ class TestCohereRerankingProviderErrorHandling:
             client=mock_cohere_rerank_client,
             config=mock_cohere_rerank_config,
             caps=cohere_rerank_capabilities,
+            _provider=Provider.COHERE,
         )
 
         # Call rerank - should return empty list after retries
@@ -325,6 +333,7 @@ class TestCohereRerankingProviderProperties:
         from codeweaver.providers import CohereRerankingProvider
 
         provider = CohereRerankingProvider(
+            _provider=Provider.COHERE,
             client=mock_cohere_rerank_client,
             config=mock_cohere_rerank_config,
             caps=cohere_rerank_capabilities,
@@ -339,6 +348,7 @@ class TestCohereRerankingProviderProperties:
         from codeweaver.providers import CohereRerankingProvider
 
         provider = CohereRerankingProvider(
+            _provider=Provider.COHERE,
             client=mock_cohere_rerank_client,
             config=mock_cohere_rerank_config,
             caps=cohere_rerank_capabilities,

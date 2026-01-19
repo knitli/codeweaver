@@ -163,12 +163,8 @@ class ChunkGovernor(BasedModel):
             A ChunkGovernor instance configured for backup model constraints.
         """
         from codeweaver.engine.config import ChunkerSettings
-        from codeweaver.providers.embedding.capabilities.dependencies import (
-            EmbeddingCapabilityResolver,
-        )
-        from codeweaver.providers.reranking.capabilities.dependencies import (
-            RerankingCapabilityResolver,
-        )
+        from codeweaver.providers.embedding.capabilities import EmbeddingCapabilityResolver
+        from codeweaver.providers.reranking.capabilities import RerankingCapabilityResolver
 
         embedding_resolver = EmbeddingCapabilityResolver()
         reranking_resolver = RerankingCapabilityResolver()

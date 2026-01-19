@@ -17,12 +17,11 @@ from importlib.util import find_spec
 from pathlib import Path
 from types import ModuleType
 from typing import TYPE_CHECKING, Annotated, Any, Literal, cast
-from urllib.parse import urlparse
 
 import cyclopts
 
 from cyclopts import App
-from pydantic import FilePath, ValidationError
+from pydantic import AnyUrl, FilePath, ValidationError
 from rich.table import Table
 
 from codeweaver.cli.dependencies import setup_cli_di
@@ -357,6 +356,7 @@ type DeploymentType = Literal["local docker", "cloud", "local", "remote", "in-me
 
 
 async def check_vector_store_config(settings: ProviderSettings) -> DoctorCheck:
+    # sourcery skip: low-code-quality
     """Check vector store configuration with Docker/Cloud detection."""
     from codeweaver.core import Provider
 
@@ -380,16 +380,14 @@ async def check_vector_store_config(settings: ProviderSettings) -> DoctorCheck:
     # Detect deployment type
     deployment_type = "unknown"
     url = None
-    vector_provider_config = vector_config["provider_settings"]
-    # this is intentionally generalized to cover other providers in the future
-    if (provider := vector_config["provider"]) != Provider.MEMORY and (
-        url := vector_provider_config.get("url")
+    if (provider := vector_config.provider) != Provider.MEMORY and (
+        url := vector_config.client_options.url
     ):
-        host = urlparse(url).hostname
+        host = cast(url, AnyUrl)  # ty:ignore[invalid-type-form]
         if host and (host == "qdrant.io" or host.endswith(".qdrant.io")):
             deployment_type = "cloud"
         # if they have port in the path we need to check for inclusion, not membership or equality
-        elif "localhost" not in url and "127.0.0.1" not in url:
+        elif "localhost" not in str(url) and "127.0.0.1" not in str(url):
             deployment_type = "remote"
         else:
             deployment_type = (

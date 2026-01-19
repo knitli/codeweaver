@@ -34,15 +34,12 @@ if TYPE_CHECKING:
     )
     from codeweaver.server.config.settings import (
         CodeWeaverSettings,
-        CodeWeaverSettingsDict,
         FastMcpHttpServerSettings,
         FastMcpStdioServerSettings,
-        get_settings,
-        get_settings_map,
-        update_settings,
     )
     from codeweaver.server.config.types import (
         CodeWeaverMCPConfigDict,
+        EndpointSettingsDict,
         FastMcpHttpRunArgs,
         FastMcpServerSettingsDict,
         MCPConfigDict,
@@ -57,8 +54,8 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "CodeWeaverMCPConfig": (__spec__.parent, "mcp"),
     "CodeWeaverMCPConfigDict": (__spec__.parent, "types"),
     "CodeWeaverSettings": (__spec__.parent, "settings"),
-    "CodeWeaverSettingsDict": (__spec__.parent, "types"),
     "ErrorHandlingMiddlewareSettings": (__spec__.parent, "middleware"),
+    "EndpointSettingsDict": (__spec__.parent, "types"),
     "FastMcpHttpRunArgs": (__spec__.parent, "types"),
     "FastMcpHttpServerSettings": (__spec__.parent, "settings"),
     "FastMcpServerSettingsDict": (__spec__.parent, "types"),
@@ -82,9 +79,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "UvicornServerSettings": (__spec__.parent, "types"),
     "UvicornServerSettingsDict": (__spec__.parent, "types"),
     "default_for_transport": (__spec__.parent, "middleware"),
-    "get_settings": (__spec__.parent, "settings"),
-    "get_settings_map": (__spec__.parent, "settings"),
-    "update_settings": (__spec__.parent, "settings"),
+
 })
 """Dynamically import submodules and classes for the config package.
 
@@ -99,12 +94,12 @@ __all__ = (
     "CodeWeaverMCPConfig",
     "CodeWeaverMCPConfigDict",
     "CodeWeaverSettings",
-    "CodeWeaverSettingsDict",
     "DefaultEndpointSettings",
     "DefaultFastMcpHttpRunArgs",
     "DefaultFastMcpServerSettings",
     "DefaultUvicornSettings",
     "DefaultUvicornSettingsForMcp",
+    "EndpointSettingsDict",
     "ErrorHandlingMiddlewareSettings",
     "FastEmbedGPUProviderSettings",
     "FastMcpHttpRunArgs",

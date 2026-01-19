@@ -15,8 +15,12 @@ import pytest
 
 from voyageai.client_async import AsyncClient
 
+from codeweaver.core.types import ModelName, Provider
 from codeweaver.providers import (
+    EmbeddingCapabilitiesRegistry,
+    EmbeddingProviderSettings,
     QdrantVectorStoreProvider,
+    VoyageEmbeddingConfig,
     VoyageEmbeddingProvider,
     get_voyage_embedding_capabilities,
 )
@@ -30,10 +34,16 @@ embedding_caps = next(
 # This prevents collection errors when the environment variable is not set
 embedding_provider = None
 if os.environ.get("VOYAGE_API_KEY"):
+    config = EmbeddingProviderSettings(
+        provider=Provider.VOYAGE,
+        model_name=ModelName("voyage-code-3"),
+        embedding_config=VoyageEmbeddingConfig(model_name="voyage-code-3"),
+    )
     embedding_provider = VoyageEmbeddingProvider(
+        config=config,
+        registry=EmbeddingCapabilitiesRegistry(),
         client=AsyncClient(api_key=os.environ["VOYAGE_API_KEY"]),  # type: ignore
         caps=embedding_caps,  # type: ignore
-        kwargs=None,  # type: ignore
     )
 
 

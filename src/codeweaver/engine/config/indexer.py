@@ -232,7 +232,7 @@ class IndexerSettings(BasedModel):
     )
     excludes: frozenset[DirectoryNameT | FileGlobT | Path] = Field(
         DEFAULT_EXCLUDED_DIRS,
-        description="""Directories, files, or [glob patterns](https://docs.python.org/3/library/pathlib.html#pathlib-pattern-language) to exclude from search and indexing. This is a set of strings, so you can use glob patterns like `**/node_modules/**` or `**/*.log` to exclude directories or files.""",
+        description="""Directories, files, or [glob patterns](https://docs.python.org/3/library/pathlib.html#pathlib-pattern-language) to exclude from search and indexing. This is a set of strings, so you can use glob patterns like `**/node_modules/**` or `**/*.log` to exclude directories or files (though both examples are excluded by default)""",
     )
     excluded_extensions: Annotated[
         frozenset[FileExtensionT],
@@ -486,7 +486,7 @@ class IndexerSettings(BasedModel):
         """
         known_extensions = _get_known_extensions()
         excluded_extensions = {
-            ext if ext.startswith(".") else f".{ext}" for ext in self.excluded_extensions
+            ext if str(ext).startswith(".") else f".{ext!s}" for ext in self.excluded_extensions
         }
 
         # Build set of tooling directory names for fast lookup
@@ -555,14 +555,9 @@ class IndexerSettings(BasedModel):
         """Cached property for the filter function."""
         return self.construct_filter()
 
-    def to_settings(self, project_path: Path | None = None) -> RignoreSettings:
-        """Serialize to `RignoreSettings`.
-
-        Args:
-            project_path: Optional project path to use for walker configuration.
-                        If not provided, falls back to global settings or get_project_path().
-        """
-        return self._as_settings(project_path=project_path)
+    def to_settings(self) -> RignoreSettings:
+        """Serialize to `RignoreSettings`."""
+        return self._as_settings()
 
 
 if not IndexerSettings.__pydantic_complete__:

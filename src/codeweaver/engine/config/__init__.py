@@ -23,7 +23,11 @@ if TYPE_CHECKING:
         PerformanceSettings,
         PerformanceSettingsDict,
     )
-    from codeweaver.engine.config.failover import DefaultFailoverSettings, FailoverSettings
+    from codeweaver.engine.config.failover import (
+        DefaultFailoverSettings,
+        FailoverSettings,
+        FailoverSettingsDict,
+    )
     from codeweaver.engine.config.indexer import (
         DefaultIndexerSettings,
         IndexerSettings,
@@ -45,6 +49,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "DefaultFailoverSettings": (__spec__.parent, "failover"),
     "DefaultIndexerSettings": (__spec__.parent, "indexer"),
     "FailoverSettings": (__spec__.parent, "failover"),
+    "FailoverSettingsDict": (__spec__.parent, "failover"),
     "IndexerSettings": (__spec__.parent, "indexer"),
     "IndexerSettingsDict": (__spec__.parent, "indexer"),
     "PerformanceSettings": (__spec__.parent, "chunker"),
@@ -68,6 +73,7 @@ __all__ = (
     "DefaultFailoverSettings",
     "DefaultIndexerSettings",
     "FailoverSettings",
+    "FailoverSettingsDict",
     "IndexerSettings",
     "IndexerSettingsDict",
     "PerformanceSettings",

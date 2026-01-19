@@ -197,11 +197,11 @@ type ChunkGovernorDep = Annotated[
 def _create_backup_chunk_governor(settings: ChunkerSettingsDep = INJECTED) -> ChunkGovernor:
     """Factory for backup chunk governor."""
     from codeweaver.engine.chunker import ChunkGovernor
-    from codeweaver.providers.config import get_profile
+    from codeweaver.providers.config import ProviderProfile
 
     # Use the backup profile to determine capabilities
-    backup_profile = get_profile("backup", "local")
-    return ChunkGovernor.from_backup_profile(backup_profile, settings)
+    backup_profile = ProviderProfile.TESTING_DB
+    return ChunkGovernor.from_backup_profile(backup_profile.as_settings_dict(), settings)
 
 
 type BackupChunkGovernorDep = Annotated[

@@ -1,3 +1,4 @@
+# sourcery skip: lambdas-should-be-short
 # SPDX-FileCopyrightText: 2026 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
@@ -5,17 +6,21 @@
 
 """Base settings model for CodeWeaver using Pydantic Settings."""
 
+from __future__ import annotations
+
 import abc
 import importlib
 import logging
 import os
 
 from collections.abc import Iterator
+from dataclasses import asdict
 from pathlib import Path
 from types import MappingProxyType
-from typing import Annotated, Any, ClassVar, Literal, Self, cast
+from typing import TYPE_CHECKING, Annotated, Any, ClassVar, Literal, Self, cast
 
-from pydantic import DirectoryPath, Field, FilePath, PrivateAttr, computed_field
+from pydantic import BaseModel, DirectoryPath, Field, FilePath, HttpUrl, PrivateAttr, computed_field
+from pydantic_core import to_json
 from pydantic_settings import (
     AWSSecretsManagerSettingsSource,
     AzureKeyVaultSettingsSource,
@@ -31,8 +36,11 @@ from pydantic_settings import (
     YamlConfigSettingsSource,
 )
 
+from codeweaver.core.config._logging import DefaultLoggingSettings, LoggingSettingsDict
+from codeweaver.core.config.telemetry import DefaultTelemetrySettings, TelemetrySettings
 from codeweaver.core.exceptions import ValidationError
 from codeweaver.core.types.aliases import FilteredKey, FilteredKeyT, LiteralStringT
+from codeweaver.core.types.dictview import DictView
 from codeweaver.core.types.enum import AnonymityConversion
 from codeweaver.core.types.sentinel import UNSET, Unset
 from codeweaver.core.types.utils import (
@@ -41,11 +49,14 @@ from codeweaver.core.types.utils import (
     generate_title,
 )
 from codeweaver.core.utils.checks import is_test_environment
-from codeweaver.core.utils.filesystem import (
-    get_project_path,
-    get_user_config_dir,
-    get_user_data_dir,
-)
+from codeweaver.core.utils.filesystem import get_project_path, get_user_config_dir
+
+
+if TYPE_CHECKING:
+    from codeweaver.core.config.types import CodeWeaverSettingsDict
+
+
+SCHEMA_VERSION = "1.2.0"
 
 
 SUPPORTED_CONFIG_FILE_EXTENSIONS = MappingProxyType({
@@ -60,6 +71,7 @@ CODEWEAVER_SETTINGS_AVAILABLE = importlib.util.find_spec("codeweaver.server") is
 
 
 def _get_user_config_dir() -> Path:
+    """Get the user configuration directory for CodeWeaver."""
     return get_user_config_dir()
 
 
@@ -124,7 +136,9 @@ def get_possible_config_paths(
     project_path: Path | None = None, *, for_test: bool = False
 ) -> tuple[Path, ...]:
     """Get possible configuration file paths for CodeWeaverSettings."""
-    resolved_project_path = _resolve_project_path()
+    resolved_project_path = (
+        project_path if project_path and project_path.exists() else _resolve_project_path()
+    )
     if for_test:
         return (
             tuple(project_path / path for path in _BASE_TEST_PATHS)
@@ -311,25 +325,39 @@ class BaseCodeWeaverSettings(BaseSettings):
         ),
     ]
 
-    user_config_dir: Annotated[
-        DirectoryPath,
+    logging: Annotated[
+        LoggingSettingsDict | Unset,
         Field(
-            description="Path to the user configuration directory",
-            default_factory=get_user_config_dir,
-            exclude=CODEWEAVER_SETTINGS_AVAILABLE,
-            init=False,
+            default=UNSET,
+            description="Logging configuration for CodeWeaver",
+            validate_default=False,
         ),
-    ]
+    ] = UNSET
 
-    user_data_dir: Annotated[
-        DirectoryPath,
+    telemetry: Annotated[
+        TelemetrySettings | Unset,
         Field(
-            description="Path to the user data directory",
-            default_factory=get_user_data_dir,
-            exclude=CODEWEAVER_SETTINGS_AVAILABLE,
-            init=False,
+            default=UNSET,
+            description="Telemetry configuration for CodeWeaver",
+            validate_default=False,
         ),
-    ]
+    ] = UNSET
+
+    __version__: Annotated[
+        str,
+        Field(
+            description="""Schema version for CodeWeaver settings""",
+            pattern=r"\d{1,2}\.\d{1,3}\.\d{1,3}",
+            alias="schema_version",
+        ),
+    ] = SCHEMA_VERSION
+
+    schema_: HttpUrl = Field(
+        description="URL to the CodeWeaver settings schema",
+        default_factory=lambda data: HttpUrl(
+            f"https://raw.githubusercontent.com/knitli/codeweaver/main/schema/v{data.get('__version__', data.get('schema_version')) or SCHEMA_VERSION}/codeweaver.schema.json"
+        ),
+    )
 
     _unset_fields: set[str] = PrivateAttr(default_factory=set)
     """Fields that were left unset during initialization."""
@@ -344,41 +372,80 @@ class BaseCodeWeaverSettings(BaseSettings):
         project_path: DirectoryPath | Unset = UNSET,
         project_name: str | Unset = UNSET,
         config_file: FilePath | Unset = UNSET,
-        user_config_dir: DirectoryPath | Unset = UNSET,
-        user_data_dir: DirectoryPath | Unset = UNSET,
+        logging: LoggingSettingsDict | Unset = UNSET,
+        telemetry: TelemetrySettings | Unset = UNSET,
         **data: Any,
     ) -> None:
         """Initialize the BaseCodeWeaverSettings instance."""
-        if config_file is not UNSET:
+        if config_file is not UNSET and config_file.exists():
             self = type(self).from_config(
                 cast(Path, config_file),
                 project_path=cast(Path | None, project_path if project_path is not UNSET else None),
                 **data,
             )
         for key in type(self).model_fields:
-            if key not in data or key not in {"project_path", "config_file", "user_config_dir"}:
+            if data.get(key) is UNSET or locals().get(key) is UNSET:
                 self._unset_fields.add(key)
         if project_path is UNSET:
-            project_path = get_project_path()
+            project_path = Path(
+                os.getenv("CODEWEAVER_PROJECT_PATH", data.get("project_path", get_project_path()))
+            )
         if config_file is UNSET:
             config_file = None  # ty:ignore[invalid-assignment]
-        object.__setattr__(self, "user_config_dir", get_user_config_dir())
-        object.__setattr__(self, "project_path", project_path)
-        object.__setattr__(self, "config_file", config_file)
-        self._initialize()
+        if logging is UNSET:
+            logging = data.get("logging", DefaultLoggingSettings)
+        if telemetry is UNSET:
+            telemetry = data.get("telemetry", TelemetrySettings(**DefaultTelemetrySettings))  # ty:ignore[invalid-argument-type]
+        if project_name is UNSET:
+            project_name = data.get(
+                "project_name", os.getenv("CODEWEAVER_PROJECT_NAME", project_path.name)
+            )
+        data |= {
+            "logging": logging,
+            "telemetry": telemetry,
+            "project_path": project_path,
+            "config_file": config_file,
+            "project_name": project_name,
+        }
+        data = self._initialize(**data)
         super().__init__(**data)
+        if not type(self).__pydantic_complete__:
+            type(self).model_rebuild()
 
     @abc.abstractmethod
-    def _initialize(self) -> None:
+    def _initialize(self, **kwargs: Any) -> dict[str, Any]:
         """Optional initialization logic for subclasses.
 
-        This method is called during the class's `__init__` method to allow subclasses to perform any necessary setup after the base initialization but before the instance is fully constructed.
+        This method is called during the class's `__init__` method to allow subclasses to perform any necessary setup after the base initialization but before the instance is fully constructed.It must return the finalized kwargs dictionary to be passed to the superclass `__init__`.
         """
 
-    @abc.abstractmethod
-    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion] | None:
-        """Get telemetry keys for the dataclass."""
-        raise NotImplementedError("Subclasses must implement _telemetry_keys method.")
+    @staticmethod
+    def _resolve_default_and_provided(defaults: dict[str, Any], provided: Any) -> dict[str, Any]:
+        """Resolve the final configuration by merging defaults with provided values. Do not use for primitives (str, int, float, bool)."""
+        if provided is UNSET or not provided:
+            return defaults
+        if isinstance(provided, dict):
+            return BaseCodeWeaverSettings._deep_merge(defaults, provided)
+        if isinstance(provided, BaseModel):
+            return BaseCodeWeaverSettings._deep_merge(defaults, provided.model_dump())
+        # NamedTuple
+        if isinstance(provided, tuple):
+            return BaseCodeWeaverSettings._deep_merge(defaults, provided._asdict())
+        # dataclass
+        if hasattr(provided, "__dataclass_fields__"):
+            return BaseCodeWeaverSettings._deep_merge(defaults, asdict(provided))
+        return defaults
+
+    @staticmethod
+    def _deep_merge(dict1: dict[str, Any], dict2: dict[str, Any]) -> dict[str, Any]:
+        """Recursively merge two dictionaries."""
+        result = dict1.copy()
+        for key, value in dict2.items():
+            if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+                result[key] = BaseCodeWeaverSettings._deep_merge(result[key], value)
+            else:
+                result[key] = value
+        return result
 
     def _telemetry_handler(self, _serialized_self: dict[str, Any], /) -> dict[str, Any]:
         """An optional handler for subclasses to modify telemetry serialization. By default, it returns an empty dict.
@@ -386,6 +453,14 @@ class BaseCodeWeaverSettings(BaseSettings):
         We use any returned keys as overrides for the serialized_self.
         """
         return {}
+
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion] | None:
+        """Define telemetry filtering for core settings."""
+        return {
+            FilteredKey("project_path"): AnonymityConversion.HASH,
+            FilteredKey("project_name"): AnonymityConversion.HASH,
+            FilteredKey("config_file"): AnonymityConversion.HASH,
+        }
 
     def serialize_for_telemetry(self) -> dict[str, Any]:
         """Serialize the model for telemetry output, filtering sensitive keys."""
@@ -429,6 +504,114 @@ class BaseCodeWeaverSettings(BaseSettings):
         self._resolution_complete = False
         return self
 
+    @staticmethod
+    def _to_serializable(
+        obj: BaseCodeWeaverSettings, path: Path | None = None, **override_kwargs: Any
+    ) -> Any:
+        """Convert an object to a serializable form."""
+        from codeweaver.core import get_project_path
+
+        kwargs = {
+            "indent": 4,
+            "exclude_unset": True,
+            "by_alias": True,
+            "exclude_defaults": True,
+            "round_trip": True,
+            "exclude_computed_fields": True,
+            "mode": "python",
+        } | override_kwargs
+        as_obj = obj.model_dump(**kwargs)  # type: ignore
+        config_file = (
+            path
+            or obj.config_file
+            or (
+                obj.project_path
+                if isinstance(obj.project_path, Path)
+                else get_project_path() or Path.cwd()
+            )
+            / Path("codeweaver.toml")
+        )
+        extension = config_file.suffix.lower()
+        match extension:
+            case ".json":
+                from pydantic_core import to_json
+
+                data = to_json(
+                    as_obj,
+                    **{
+                        k: v
+                        for k, v in kwargs.items()
+                        if k not in {"exclude_unset", "exclude_defaults", "exclude_computed_fields"}
+                    },  # type: ignore
+                ).decode("utf-8")
+            case ".toml":
+                import tomli_w
+
+                data = tomli_w.dumps(as_obj)
+            case ".yaml" | ".yml":
+                import yaml
+
+                data = yaml.dump(obj.model_dump())
+            case _:
+                raise ValueError(f"Unsupported configuration file format: {extension}")
+        return data
+
+    @staticmethod
+    def _write_config_file(path: Path, data: str) -> None:
+        """Write configuration data to a file."""
+        path.parent.mkdir(parents=True, exist_ok=True)
+        _ = path.write_text(data, encoding="utf-8")
+
+    def save_to_file(self, path: Path | None = None) -> None:
+        """Save the current settings to a configuration file.
+
+        The file format is determined by the file extension (.toml, .yaml/.yml, .json).
+        """
+        path = (  # ty:ignore[invalid-assignment]
+            path
+            if path and path is not Unset
+            else self.config_file
+            if self.config_file is not UNSET
+            else None
+        )
+        if path is None and isinstance(self.project_path, Path):
+            path = self.project_path / "codeweaver.toml"
+        if path is None:
+            raise ValueError("No path provided to save configuration file.")
+        extension = path.suffix.lower()
+        # Use mode='json' to serialize Path objects to strings (needed for TOML/YAML)
+        # model_dump kwargs (indent is NOT a valid model_dump parameter)
+        dump_kwargs = {
+            "exclude_unset": True,
+            "by_alias": True,
+            "exclude_defaults": True,
+            "round_trip": True,
+            "exclude_computed_fields": True,
+            "mode": "json",  # Changed from "python" to handle Path serialization
+            "exclude_none": True,  # Exclude None values for TOML compatibility
+            "exclude": {"config_file", "default_mcp_config"},
+        }
+        # JSON serialization kwargs (includes indent for to_json)
+        json_kwargs = {"indent": 4, "round_trip": True}
+        as_obj = self.model_dump(**dump_kwargs)  # type: ignore
+        data: str
+        match extension:
+            case ".json":
+                from pydantic_core import to_json
+
+                data = to_json(as_obj, **json_kwargs).decode("utf-8")  # type: ignore
+            case ".toml":
+                import tomli_w
+
+                data = tomli_w.dumps(as_obj)
+            case ".yaml" | ".yml":
+                import yaml
+
+                data = yaml.dump(self.model_dump())
+            case _:
+                raise ValueError(f"Unsupported configuration file format: {extension}")
+        _ = path.write_text(data, encoding="utf-8")
+
     async def finalize(self) -> Self:
         """Finalize settings with config resolution.
 
@@ -462,6 +645,16 @@ class BaseCodeWeaverSettings(BaseSettings):
         return self
 
     @classmethod
+    def generate_default_config(cls, path: Path) -> None:
+        """Generate a default configuration file at the specified path.
+
+        The file format is determined by the file extension (.toml, .yaml/.yml, .json).
+        """
+        default_settings = cls()
+        data = cls._to_serializable(default_settings, path=path)
+        cls._write_config_file(path, data)
+
+    @classmethod
     def from_config(cls, path: FilePath, project_path: Path | None = None, **kwargs: Any) -> Self:
         """Create a CodeWeaverSettings instance from a configuration file.
 
@@ -484,6 +677,7 @@ class BaseCodeWeaverSettings(BaseSettings):
         )  # ty:ignore[invalid-argument-type]
 
     @computed_field
+    @property
     def project_root(self) -> Path:
         """Get the project root directory. Alias for `project_path`."""
         if isinstance(self.project_path, Unset):
@@ -542,6 +736,27 @@ class BaseCodeWeaverSettings(BaseSettings):
         return cls._base_settings_sources(settings_cls)
 
     # spellchecker:on
+
+    @classmethod
+    def python_json_schema(cls) -> dict[str, Any]:
+        """Get the JSON validation schema for the settings model as a string."""
+        return cls.model_json_schema(by_alias=True)
+
+    @classmethod
+    def json_schema(cls) -> bytes:
+        """Get the JSON validation schema for the settings model.
+
+        Note: For build-time schema generation, use scripts/build/generate-schema.py instead.
+        This method is kept for runtime introspection and testing purposes.
+        """
+        return to_json(cls.python_json_schema(), indent=2).replace(b"schema_", b"$schema")
+
+    @property
+    def view(self) -> DictView[CodeWeaverSettingsDict]:
+        """Get a read-only mapping view of the settings."""
+        if self._map is None:
+            self._map = DictView(self.model_dump(exclude_computed_fields=True))  # type: ignore
+        return self._map  # type: ignore
 
 
 __all__ = (

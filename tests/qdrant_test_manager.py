@@ -30,6 +30,8 @@ from uuid import uuid4
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.http import models as qmodels
 
+from codeweaver.providers import QdrantVectorStoreProviderSettings
+
 
 def _is_wsl() -> bool:
     """Detect if running in WSL (Windows Subsystem for Linux).
@@ -484,7 +486,7 @@ class QdrantTestManager:
 
 def get_qdrant_test_config(
     *, collection_suffix: str = "", port: int | None = None, api_key: str | None = None
-) -> dict:
+) -> QdrantVectorStoreProviderSettings:
     """Get test-specific Qdrant configuration.
 
     This is a convenience function for creating Qdrant config dicts

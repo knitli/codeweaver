@@ -128,7 +128,7 @@ async def memory_store(vector_store_factory) -> AsyncGenerator[MemoryVectorStore
         collection_name = f"perf_test_{uuid7().hex[:8]}"
         persist_path = Path(tmpdir) / "test_store.json"
 
-        store = await vector_store_factory(
+        yield await vector_store_factory(
             MemoryVectorStoreProvider,
             config_overrides={
                 "persist_path": persist_path,
@@ -136,7 +136,6 @@ async def memory_store(vector_store_factory) -> AsyncGenerator[MemoryVectorStore
                 "collection_name": collection_name,
             },
         )
-        yield store
 
 
 # Performance Tests
@@ -265,14 +264,21 @@ async def test_memory_persistence_performance(chunk_count: int) -> None:
     Contract requirement: 1-3.5s for 10k chunks persist (relaxed for CI/WSL environments).
     Restore should complete in under 4s.
     """
-    with tempfile.TemporaryDirectory() as tmpdir:
-        persist_path = Path(tmpdir) / "test_store.json"
-        config = MemoryConfig(
-            persist_path=persist_path, auto_persist=False, collection_name="perf_test"
-        )
+    from codeweaver.providers.config import MemoryVectorStoreProviderSettings
+    from codeweaver.providers.embedding.capabilities.resolver import EmbeddingCapabilityResolver
 
+    with tempfile.TemporaryDirectory() as tmpdir:
+        settings = MemoryVectorStoreProviderSettings(
+            collection=MemoryConfig(persist_path=Path(tmpdir), auto_persist=False),
+            collection_name="perf_test",
+        )
         # Create store and populate
-        store = MemoryVectorStoreProvider(_provider=Provider.MEMORY, config=config)
+        store = MemoryVectorStoreProvider(
+            _provider=Provider.MEMORY,
+            config=settings,
+            caps=EmbeddingCapabilityResolver().resolve("minishlab/potion-base-8M"),
+            client=settings.get_client(),
+        )
         await store._initialize()
 
         chunks = create_test_chunks(count=chunk_count, files=10)
@@ -284,8 +290,8 @@ async def test_memory_persistence_performance(chunk_count: int) -> None:
         persist_duration = time.perf_counter() - start
 
         # Check file was created
-        assert persist_path.exists()
-        file_size_mb = persist_path.stat().st_size / (1024 * 1024)
+        assert settings.collection.persist_path.exists()
+        file_size_mb = settings.collection.persist_path.stat().st_size / (1024 * 1024)
 
         print(f"\nPersist {chunk_count} chunks:")
         print(f"  Duration: {persist_duration:.3f}s")
@@ -297,7 +303,7 @@ async def test_memory_persistence_performance(chunk_count: int) -> None:
         new_store = await vector_store_factory(
             MemoryVectorStoreProvider,
             config_overrides={
-                "persist_path": persist_path,
+                "persist_path": settings.collection.persist_path,
                 "auto_persist": False,
                 "collection_name": "perf_test",  # Reuse same collection name/config
             },
@@ -473,13 +479,13 @@ async def test_performance_regression_check(qdrant_store: QdrantVectorStoreProvi
         baseline = json.loads(baseline_path.read_text())
 
         # Compare against baseline
-        search_regression = (metrics["search"]["p95_ms"] - baseline["search"]["p95_ms"]) / baseline[  # ty: ignore[non-subscriptable]
+        search_regression = (metrics["search"]["p95_ms"] - baseline["search"]["p95_ms"]) / baseline[ # ty:ignore[not-subscriptable]
             "search"
         ]["p95_ms"]
 
         print("\nPerformance comparison vs baseline:")
         print(
-            f"  Search P95: {metrics['search']['p95_ms']:.2f}ms (baseline: {baseline['search']['p95_ms']:.2f}ms)"  # ty: ignore[non-subscriptable]
+            f"  Search P95: {metrics['search']['p95_ms']:.2f}ms (baseline: {baseline['search']['p95_ms']:.2f}ms)"  # ty: ignore[not-subscriptable]
         )
         print(f"  Regression: {search_regression * 100:+.1f}%")
 
@@ -490,5 +496,5 @@ async def test_performance_regression_check(qdrant_store: QdrantVectorStoreProvi
             )
 
     print("\nCurrent performance metrics:")
-    print(f"  Search P95: {metrics['search']['p95_ms']:.2f}ms")  # ty: ignore[non-subscriptable]
-    print(f"  Delete: {metrics['delete']['latency_ms']:.2f}ms")  # ty: ignore[non-subscriptable]
+    print(f"  Search P95: {metrics['search']['p95_ms']:.2f}ms")  # ty: ignore[not-subscriptable]
+    print(f"  Delete: {metrics['delete']['latency_ms']:.2f}ms")  # ty: ignore[not-subscriptable]

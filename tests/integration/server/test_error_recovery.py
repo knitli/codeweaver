@@ -578,9 +578,11 @@ async def test_graceful_shutdown_with_checkpoint(initialize_test_settings, clean
         # Note: Actual signal testing requires special setup
         # if hasattr(indexer, "_handle_shutdown") and callable(indexer._handle_shutdown):
         #     indexer._handle_shutdown()
-
+        checkpoint_dir = tmp_path / ".checkpoints"
         # Verify checkpoint exists
-        checkpoint_mgr = CheckpointManager(project_root)
+        checkpoint_mgr = CheckpointManager(
+            project_path=project_root, checkpoint_dir=checkpoint_dir, project_name="test_project"
+        )
         checkpoint_file = checkpoint_mgr.checkpoint_file
 
         # Note: Checkpoint may not exist if indexing completed

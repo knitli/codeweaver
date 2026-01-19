@@ -20,7 +20,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from codeweaver.providers import FastEmbedEmbeddingProvider, MemoryVectorStoreProvider
+from codeweaver.providers import (
+    FastEmbedEmbeddingProvider,
+    MemoryVectorStoreProvider,
+    MemoryVectorStoreProviderSettings,
+)
 
 
 if TYPE_CHECKING:
@@ -99,10 +103,8 @@ def _get_configs(
 
     profile = get_profile("backup", vector_deployment="local")
     if rerank:
-        # reranking is a tuple with one element
-        return profile["reranking"][0]  # ty:ignore[non-subscriptable,invalid-key]
-    # the profile returns single values for each setting -- so while it can be a tuple, it isn't.
-    return profile["sparse_embedding"] if sparse else profile["embedding"]  # ty:ignore[invalid-key,invalid-return-type]
+        return profile["reranking"][0]
+    return profile["sparse_embedding"] if sparse else profile["embedding"]
 
 
 @pytest.fixture
@@ -150,7 +152,9 @@ def mock_embedding_provider() -> AsyncMock:
 
 
 def _get_caps() -> tuple[
-    EmbeddingModelCapabilities, SparseEmbeddingModelCapabilities, RerankingModelCapabilities
+    EmbeddingModelCapabilities | None,
+    SparseEmbeddingModelCapabilities | None,
+    RerankingModelCapabilities | None,
 ]:
     from codeweaver.providers.embedding.capabilities.resolver import (
         EmbeddingCapabilityResolver,
@@ -159,15 +163,15 @@ def _get_caps() -> tuple[
     from codeweaver.providers.reranking.capabilities.resolver import RerankingCapabilityResolver
 
     settings = (_get_configs(), _get_configs(sparse=True), _get_configs(rerank=True))
-    
+
     embed_resolver = EmbeddingCapabilityResolver()
     sparse_resolver = SparseEmbeddingCapabilityResolver()
     rerank_resolver = RerankingCapabilityResolver()
-    
+
     return (
-        embed_resolver.resolve(settings[0]["model_settings"]["model"]),
-        sparse_resolver.resolve(settings[1]["model_settings"]["model"]),
-        rerank_resolver.resolve(settings[2]["model_settings"]["model"]),
+        embed_resolver.resolve(settings[0].model_name),
+        sparse_resolver.resolve(settings[1].model_name),
+        rerank_resolver.resolve(settings[2].model_name),
     )
 
 
@@ -183,14 +187,13 @@ async def actual_dense_embedding_provider() -> (
         SentenceTransformersEmbeddingProvider,
     )
     from codeweaver.providers.embedding.registry import EmbeddingRegistry
-    
-    provider = SentenceTransformersEmbeddingProvider(
+
+    return SentenceTransformersEmbeddingProvider(
         client=None,  # Not needed for ST provider usually or handles internally
         registry=EmbeddingRegistry(),
         caps=caps,
         config=config,
     )
-    return provider
 
 
 @pytest.fixture
@@ -217,19 +220,15 @@ async def actual_sparse_embedding_provider() -> (
     """Provide an actual sparse embedding provider using SentenceTransformers."""
     _, caps, _ = _get_caps()
     config = _get_configs(sparse=True)
-    
+
     from codeweaver.providers.embedding.providers.sentence_transformers import (
         SentenceTransformersSparseEmbeddingProvider,
     )
     from codeweaver.providers.embedding.registry import EmbeddingRegistry
 
-    provider = SentenceTransformersSparseEmbeddingProvider(
-        client=None,
-        registry=EmbeddingRegistry(),
-        caps=caps,
-        config=config
+    return SentenceTransformersSparseEmbeddingProvider(
+        client=None, registry=EmbeddingRegistry(), caps=caps, config=config
     )
-    return provider
 
 
 @pytest.fixture
@@ -257,7 +256,7 @@ def mock_vector_store() -> AsyncMock:
             file_path=file_path,
             language=SemanticSearchLanguage.PYTHON,
             content=content,
-            line_range=Span(start=1, end=10, _source_id=chunk_id),
+            line_range=Span(start=1, end=10, source_id=chunk_id),
         )
 
     # Create mock search results
@@ -299,11 +298,7 @@ async def actual_vector_store() -> MemoryVectorStoreProvider:
     different components (e.g., Indexer and Search) share the same in-memory data.
     """
     from codeweaver.core import get_container
-    from codeweaver.providers import (
-        MemoryVectorStoreProvider,
-        Provider,
-        VectorStoreProvider,
-    )
+    from codeweaver.providers import MemoryVectorStoreProvider, Provider, VectorStoreProvider
 
     global _shared_memory_vector_store
     if _shared_memory_vector_store is None:
@@ -322,12 +317,10 @@ async def actual_vector_store() -> MemoryVectorStoreProvider:
 
         # Create EmbeddingCapabilityGroup
         caps = EmbeddingCapabilityGroup.from_capabilities(capabilities)
-
+        config = MemoryVectorStoreProviderSettings(collection_name="codeweaver-test-collection")
         # Pass collection_name in config so model_post_init uses it
         _shared_memory_vector_store = MemoryVectorStoreProvider(
-            config={"collection_name": "codeweaver-test-collection"},
-            _provider=Provider.MEMORY,
-            caps=caps,
+            client=config.get_client(), config=config, _provider=Provider.MEMORY, caps=caps
         )
 
     # ALWAYS ensure it's initialized and collection exists
@@ -399,25 +392,24 @@ async def actual_reranking_provider() -> (
     """Provide an actual reranking provider using SentenceTransformers."""
     _, _, caps = _get_caps()
     config = _get_configs(rerank=True)
-    
+
+    from codeweaver.core.types import Provider
     from codeweaver.providers.reranking.providers.sentence_transformers import (
         SentenceTransformersRerankingProvider,
     )
 
-    provider = SentenceTransformersRerankingProvider(
-        client=None,
-        config=config,
-        caps=caps
+    return SentenceTransformersRerankingProvider(
+        client=None, config=config, caps=caps, _provider=Provider.SENTENCE_TRANSFORMERS
     )
-    return provider
 
 
 # ===========================================================================
 # Provider Registry Configuration Fixtures
 # ===========================================================================
 
-# Removed Mock Registry Fixtures (mock_provider_registry, configured_providers) 
+# Removed Mock Registry Fixtures (mock_provider_registry, configured_providers)
 # as they are no longer needed with DI overrides.
+
 
 @pytest.fixture
 def configured_providers(
@@ -429,10 +421,10 @@ def configured_providers(
     """Fixture that overrides providers in the DI container."""
     from codeweaver.core import get_container
     from codeweaver.providers import (
-        EmbeddingProvider, 
-        RerankingProvider, 
+        EmbeddingProvider,
+        RerankingProvider,
         SparseEmbeddingProvider,
-        VectorStoreProvider
+        VectorStoreProvider,
     )
 
     container = get_container()
@@ -875,24 +867,21 @@ def real_provider_registry(
 ) -> None:
     """NO OP - Use real_providers fixture instead."""
     # This fixture is deprecated/removed in favor of real_providers setup
-    return None
+    return
 
 
 @pytest.fixture
 def real_providers(
-    real_embedding_provider,
-    real_sparse_provider,
-    real_vector_store,
-    real_reranking_provider
+    real_embedding_provider, real_sparse_provider, real_vector_store, real_reranking_provider
 ) -> Generator[None, None, None]:
     """Fixture that overrides providers in DI container with REAL providers."""
-    
+
     from codeweaver.core import get_container
     from codeweaver.providers import (
-        EmbeddingProvider, 
-        RerankingProvider, 
+        EmbeddingProvider,
+        RerankingProvider,
         SparseEmbeddingProvider,
-        VectorStoreProvider
+        VectorStoreProvider,
     )
 
     container = get_container()

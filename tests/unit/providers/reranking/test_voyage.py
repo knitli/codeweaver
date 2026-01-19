@@ -35,7 +35,7 @@ def make_test_chunk(content: str, index: int = 0) -> CodeChunk:
         content=content,
         ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
         language=SemanticSearchLanguage.PYTHON,
-        line_range=Span(start=index + 1, end=index + 1, _source_id=uuid7()),
+        line_range=Span(start=index + 1, end=index + 1, source_id=uuid7()),
         file_path=Path("/test/file.py"),
     )
 
@@ -205,14 +205,14 @@ class TestVoyageRerankingProviderReranking:
                 content="def foo(): pass",
                 ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
                 language=SemanticSearchLanguage.PYTHON,
-                line_range=Span(start=1, end=1, _source_id=uuid7()),
+                line_range=Span(start=1, end=1, source_id=uuid7()),
                 file_path=Path("/test/file.py"),
             ),
             CodeChunk(
                 content="def bar(): pass",
                 ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
                 language=SemanticSearchLanguage.PYTHON,
-                line_range=Span(start=2, end=2, _source_id=uuid7()),
+                line_range=Span(start=2, end=2, source_id=uuid7()),
                 file_path=Path("/test/file.py"),
             ),
         ]

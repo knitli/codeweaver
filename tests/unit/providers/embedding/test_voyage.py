@@ -156,18 +156,6 @@ class TestVoyageEmbeddingProviderInitialization:
         assert provider.query_options["output_dimension"] == 1024
         assert provider.query_options["output_dtype"] == "float"
 
-    def test_provider_initialization_with_custom_kwargs(
-        self, mock_voyage_client, voyage_capabilities
-    ):
-        """Test that custom kwargs are merged correctly."""
-        custom_kwargs = {"custom_param": "value"}
-        provider = VoyageEmbeddingProvider(
-            client=mock_voyage_client, caps=voyage_capabilities, kwargs=custom_kwargs
-        )
-
-        assert provider.embed_options["custom_param"] == "value"
-        assert provider.query_options["custom_param"] == "value"
-
     def test_provider_base_url(
         self, mock_voyage_client, mock_voyage_config, mock_embedding_registry, voyage_capabilities
     ):
@@ -215,7 +203,7 @@ class TestVoyageEmbeddingProviderEmbedding:
                 content="test content 1",
                 ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
                 language=SemanticSearchLanguage.PYTHON,
-                line_range=Span(start=1, end=1, _source_id=uuid7()),
+                line_range=Span(start=1, end=1, source_id=uuid7()),
                 file_path=Path("/test/file.py"),
                 chunk_id=uuid7(),
             ),
@@ -223,7 +211,7 @@ class TestVoyageEmbeddingProviderEmbedding:
                 content="test content 2",
                 ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
                 language=SemanticSearchLanguage.PYTHON,
-                line_range=Span(start=2, end=2, _source_id=uuid7()),
+                line_range=Span(start=2, end=2, source_id=uuid7()),
                 file_path=Path("/test/file.py"),
                 chunk_id=uuid7(),
             ),
@@ -237,8 +225,8 @@ class TestVoyageEmbeddingProviderEmbedding:
         assert len(result) == 2
         assert len(result[0]) == 1024  # ty: ignore[invalid-key]
         assert len(result[1]) == 1024  # ty: ignore[invalid-key]
-        assert result[0][0] == 0.1  # Check first element
-        assert result[1][0] == 0.2  # Check first element
+        assert result[0][0] == 0.1  # ty:ignore[invalid-key]
+        assert result[1][0] == 0.2  # ty:ignore[invalid-key]
 
         # Verify client was called correctly
         mock_voyage_client.embed.assert_called_once()
@@ -352,7 +340,7 @@ class TestVoyageEmbeddingProviderEmbedding:
                     content="test content 1",
                     ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
                     language=SemanticSearchLanguage.PYTHON,
-                    line_range=Span(start=1, end=1, _source_id=uuid7()),
+                    line_range=Span(start=1, end=1, source_id=uuid7()),
                     file_path=Path("/test/file.py"),
                     chunk_id=uuid7(),
                 ),
@@ -360,7 +348,7 @@ class TestVoyageEmbeddingProviderEmbedding:
                     content="test content 2",
                     ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
                     language=SemanticSearchLanguage.PYTHON,
-                    line_range=Span(start=2, end=2, _source_id=uuid7()),
+                    line_range=Span(start=2, end=2, source_id=uuid7()),
                     file_path=Path("/test/file.py"),
                     chunk_id=uuid7(),
                 ),
@@ -411,7 +399,7 @@ class TestVoyageEmbeddingProviderErrorHandling:
                 content="test content 1",
                 ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
                 language=SemanticSearchLanguage.PYTHON,
-                line_range=Span(start=1, end=1, _source_id=uuid7()),
+                line_range=Span(start=1, end=1, source_id=uuid7()),
                 file_path=Path("/test/file.py"),
                 chunk_id=uuid7(),
             ),
@@ -419,7 +407,7 @@ class TestVoyageEmbeddingProviderErrorHandling:
                 content="test content 2",
                 ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
                 language=SemanticSearchLanguage.PYTHON,
-                line_range=Span(start=2, end=2, _source_id=uuid7()),
+                line_range=Span(start=2, end=2, source_id=uuid7()),
                 file_path=Path("/test/file.py"),
                 chunk_id=uuid7(),
             ),

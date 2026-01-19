@@ -12,7 +12,14 @@ import logging
 from os import cpu_count
 from typing import TYPE_CHECKING, Annotated, Any, Literal, NotRequired, Self, TypedDict
 
-from pydantic import ConfigDict, Field, NonNegativeFloat, PositiveInt, model_validator
+from pydantic import (
+    ConfigDict,
+    Field,
+    NonNegativeFloat,
+    PositiveFloat,
+    PositiveInt,
+    model_validator,
+)
 
 from codeweaver.core import (
     ALL_LANGUAGES,
@@ -68,7 +75,7 @@ class ChunkerSettingsDict(TypedDict, total=False):
 
     custom_delimiters: Annotated[list[CustomDelimiter] | None, NotRequired]
     custom_languages: Annotated[list[CustomLanguage] | None, NotRequired]
-    semantic_importance_threshold: NotRequired[NonNegativeFloat | None]
+    semantic_importance_threshold: NotRequired[PositiveFloat | None]
     performance: NotRequired[PerformanceSettingsDict | None]
     concurrency: NotRequired[ConcurrencySettingsDict | None]
 

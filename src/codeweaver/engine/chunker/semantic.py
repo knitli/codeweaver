@@ -56,7 +56,7 @@ from codeweaver.core import (
 from codeweaver.engine.chunker.base import BaseChunker
 from codeweaver.engine.chunker.exceptions import ASTDepthExceededError, BinaryFileError, ParseError
 from codeweaver.engine.chunker.governance import ResourceGovernor
-from codeweaver.semantic import SemanticMetadata
+from codeweaver.semantic.types import SemanticMetadata
 
 
 if TYPE_CHECKING:
@@ -70,6 +70,9 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 PERFORMANCE_THRESHOLD_MS = 1000.0  # 1 second
+ONE_MEGABYTE = 1024 * 1024
+THREE_MEGABYTES = 3 * ONE_MEGABYTE
+TWO_HUNDRED_FIFTY_SIX_KB = 256 * 1024
 
 
 class SemanticChunker(BaseChunker):
@@ -95,20 +98,19 @@ class SemanticChunker(BaseChunker):
     Attributes:
         language: Target language for semantic parsing
         _importance_threshold: Minimum importance score for node inclusion
-        _store: Class-level UUID store for chunk batches
-        _hash_store: Class-level Blake3 store for content hashes
+        _store: UUID store for chunk batches
+        _hash_store: BlakeStore[UUID7] = make_blake_store(
     """
 
     language: SemanticSearchLanguage
 
-    # Class-level deduplication stores shared across instances
     _store: UUIDStore[list[CodeChunk]] = make_uuid_store(
         value_type=list,
-        size_limit=3 * 1024 * 1024,  # 3MB cache for chunk batches
+        size_limit=THREE_MEGABYTES,  # 3MB cache for chunk batches
     )
     _hash_store: BlakeStore[UUID7] = make_blake_store(
         value_type=UUID,  # UUID7 but UUID is the type
-        size_limit=256 * 1024,  # 256KB cache for content hashes
+        size_limit=TWO_HUNDRED_FIFTY_SIX_KB,  # 256KB cache for content hashes
     )
 
     @classmethod
@@ -122,11 +124,11 @@ class SemanticChunker(BaseChunker):
         # Recreate stores instead of clearing to avoid weak reference issues with lists
         cls._store = make_uuid_store(
             value_type=list,
-            size_limit=3 * 1024 * 1024,  # 3MB cache for chunk batches
+            size_limit=THREE_MEGABYTES,  # 3MB cache for chunk batches
         )
         cls._hash_store = make_blake_store(
             value_type=UUID,  # UUID7 but UUID is the type
-            size_limit=256 * 1024,  # 256KB cache for content hashes
+            size_limit=TWO_HUNDRED_FIFTY_SIX_KB,  # 256KB cache for content hashes
         )
 
     def __init__(
@@ -273,7 +275,7 @@ class SemanticChunker(BaseChunker):
         if self.governor.settings is not None:
             return self.governor.settings.performance
 
-        from codeweaver.server import PerformanceSettings
+        from codeweaver.engine.config import PerformanceSettings
 
         return PerformanceSettings()
 

@@ -111,7 +111,7 @@ def sample_chunk():
         language=Language.PYTHON,
         ext_kind=ExtKind.from_language(Language.PYTHON, ChunkKind.CODE),
         content="def test_func():\n    return True",
-        line_range=Span(start=1, end=2, _source_id=chunk_id),
+        line_range=Span(start=1, end=2, source_id=chunk_id),
     )
 
     # Register embeddings in the registry

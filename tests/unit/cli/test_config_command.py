@@ -102,9 +102,12 @@ provider = "invalid_provider_xyz"
 model = "test-model"
 """
         config_path.write_text(config_content)
-
+        project_path = temp_project
+        project_name = "temp_project"
         from codeweaver.core import CodeWeaverError
         from codeweaver.server import CodeWeaverSettings
 
         with pytest.raises((CodeWeaverError, ValueError)):
-            CodeWeaverSettings(config_file=config_path)
+            CodeWeaverSettings(
+                config_file=config_path, project_path=project_path, project_name=project_name
+            )

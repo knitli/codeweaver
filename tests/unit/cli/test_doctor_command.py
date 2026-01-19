@@ -167,10 +167,9 @@ class TestDoctorProviderEnvVars:
         from codeweaver.providers import ProviderKind
 
         embedding_providers = [
-            prov for prov, caps in PROVIDER_CAPABILITIES.items() 
-            if ProviderKind.EMBEDDING in caps
+            prov for prov, caps in PROVIDER_CAPABILITIES.items() if ProviderKind.EMBEDDING in caps
         ]
-        
+
         # bedrock is a special case with many different auth methods and a very long list of env vars that aren't implemented in Provider.other_env_vars
         cloud_providers = [
             provider
@@ -181,11 +180,11 @@ class TestDoctorProviderEnvVars:
         for provider in cloud_providers:
             if provider and provider.other_env_vars:
                 # Need to handle potential tuple of env vars
-                env_vars_list = provider.other_env_vars
-                if not isinstance(env_vars_list, tuple):
-                    env_vars_list = (env_vars_list,)
-                
-                has_api_key = any("api_key" in ev for ev in env_vars_list)
+                env_vars = provider.other_env_vars
+                if not isinstance(env_vars, tuple):
+                    env_vars = (env_vars,)
+
+                has_api_key = any("api_key" in ev for ev in env_vars)
                 assert has_api_key, f"Provider {provider} missing api_key in env vars"
 
 
@@ -309,7 +308,7 @@ class TestDoctorConfigAssumptions:
                 Provider.VOYAGE,
             )
         else:
-            assert embedding_settings["provider"] in (
+            assert embedding_settings.provider in (
                 Provider.SENTENCE_TRANSFORMERS,
                 Provider.FASTEMBED,
                 Provider.VOYAGE,

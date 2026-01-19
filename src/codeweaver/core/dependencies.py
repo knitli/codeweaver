@@ -34,7 +34,9 @@ from codeweaver.core.utils.filesystem import get_git_branch, get_project_path
 
 if TYPE_CHECKING:
     from codeweaver.core.config.telemetry import TelemetrySettings
+    from codeweaver.core.config.types import CodeWeaverSettingsDict
     from codeweaver.core.statistics import SessionStatistics
+    from codeweaver.core.types.dictview import DictView
 
 
 def _resolve_config_file() -> Path | None:
@@ -68,6 +70,11 @@ async def bootstrap_settings(config_file: Path | None = None) -> CodeWeaverSetti
     from codeweaver.core.config.envs import SettingsEnvVars
 
     await asyncio.sleep(0)
+    config_file = (
+        config_file or Path(env)
+        if (env := os.environ.get("CODEWEAVER_CONFIG_FILE")) is not None
+        else None
+    )
 
     if (
         config_file
@@ -103,12 +110,19 @@ else:
     type CodeWeaverSettingsType = CodeWeaverCoreSettings
 
 
-dependency_provider(CodeWeaverSettingsType, scope="singleton")(bootstrap_settings)  # ty:ignore[no-matching-overload]
-
-
-type SettingsDep = Annotated[CodeWeaverSettingsType, depends(CodeWeaverSettingsType)]
+type SettingsDep = Annotated[
+    CodeWeaverSettingsType, depends(bootstrap_settings, scope="singleton", tags={"settings"})
+]
 
 type NoneDep = Annotated[None, depends(lambda: None, use_cache=True, scope="singleton")]
+
+
+@dependency_provider(DictView[CodeWeaverSettingsDict])
+def _get_settings_map(settings: SettingsDep = INJECTED) -> DictView[CodeWeaverSettingsDict]:
+    """Marker for providing a DictView of the current settings."""
+    from codeweaver.core.types.dictview import DictView
+
+    return DictView(settings.model_dump())
 
 
 @dependency_provider(SessionStatistics, scope="singleton")
@@ -159,16 +173,10 @@ def _create_progress_reporter(settings: SettingsDep = INJECTED) -> ProgressRepor
         - RichConsoleProgressReporter for server/daemon (uses Rich Console)
         - CLI can override with StatusDisplay implementation
     """
-    # Check if we're in CLI mode
-    if hasattr(settings, "cli_mode") and settings.cli_mode:
-        # CLI will override this with StatusDisplay
-        # For now, return Rich console reporter as fallback
-        console = get_rich_console()
-        return RichConsoleProgressReporter(console=console)
+    from codeweaver.core.utils.environment import is_tty
 
-    # Server/daemon mode: use Rich Console
-    if hasattr(settings, "daemon_mode") and settings.daemon_mode:
-        console = get_rich_console()
+    console = get_rich_console()
+    if is_tty():
         return RichConsoleProgressReporter(console=console)
 
     # Default: no-op (e.g., testing)
@@ -239,6 +247,7 @@ async def _create_telemetry_service(settings: TelemetrySettingsDep = INJECTED) -
 
 
 type TelemetryServiceDep = Annotated[TelemetryService, depends(_create_telemetry_service)]
+
 
 __all__ = (
     "CodeWeaverSettingsType",

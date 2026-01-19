@@ -105,7 +105,7 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
     ) -> list[list[float]] | list[list[int]]:
         """Embed a sequence of documents."""
         preprocessed = cast(list[str], self.chunks_to_strings(documents))
-        if "nomic" in self.model_name:
+        if "nomic" in str(self.model_name):
             preprocessed = [f"search_document: {doc}" for doc in preprocessed]
 
         embed_partial = rpartial(self.client.encode, **self.embed_options)  # type: ignore
@@ -121,7 +121,7 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
         preprocessed = cast(list[str], query)
         if "qwen3" in self.model_name.lower() or "instruct" in self.model_name.lower():
             preprocessed = self.preprocess(preprocessed)  # type: ignore
-        elif "nomic" in self.model_name:
+        elif "nomic" in str(self.model_name):
             preprocessed = [f"search_query: {query}" for query in preprocessed]
         # Filter incoming kwargs to remove dict structure keys before merging
         embed_partial = rpartial(self.client.encode, **self.query_options)  # type: ignore

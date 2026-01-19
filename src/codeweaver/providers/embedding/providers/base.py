@@ -66,6 +66,7 @@ from codeweaver.core import (
     uuid7,
 )
 from codeweaver.core import ValidationError as CodeWeaverValidationError
+from codeweaver.core.types import ModelNameT
 from codeweaver.providers.config import EmbeddingConfigT, EmbeddingProviderSettings
 from codeweaver.providers.exceptions import CircuitBreakerOpenError
 from codeweaver.providers.types import CircuitBreakerState
@@ -720,11 +721,13 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             return results
 
     @property
-    def model_name(self) -> str:
+    def model_name(self) -> ModelNameT:
         """Get the model name for the embedding provider."""
         if self.caps:
-            return self.caps.name
-        return self.config.model_name or self.config.embedding_config.model_name or "unknown-model"
+            return ModelName(self.caps.name)
+        return ModelName(
+            self.config.model_name or self.config.embedding_config.model_name or "unknown-model"
+        )
 
     @property
     def model_capabilities(self) -> EmbeddingModelCapabilities | None:

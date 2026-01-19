@@ -32,12 +32,15 @@ from codeweaver.cli.ui import get_display
 from codeweaver.core import CODEWEAVER_PREFIX
 from codeweaver.core.di import get_container
 from codeweaver.core.ui_protocol import ProgressReporter
+from codeweaver.core.utils.environment import detect_root_package
 
 
 if TYPE_CHECKING:
     from rich.console import Console
 
     from codeweaver.cli.ui.status_display import StatusDisplay
+
+ROOT_PACKAGE = detect_root_package()
 
 display: StatusDisplay = get_display()
 console: Console = display.console
@@ -48,20 +51,24 @@ app = App(
     version=__version__,
     console=console,
 )
+# command availability depends on what codeweaver packages are installed
+# if server; everything is available, and then progressively less from there
+if ROOT_PACKAGE == "server":
+    app.command("codeweaver.cli.commands.init:app", name="init")
+    app.command("codeweaver.cli.commands.search:app", name="search")
+    app.command("codeweaver.cli.commands.server:app", name="server")
+    app.command("codeweaver.cli.commands.start:app", name="start")
+    app.command("codeweaver.cli.commands.stop:app", name="stop")
+    app.command("codeweaver.cli.commands.status:app", name="status")
+    # these are scaffolded for future implementation
+    # app.command("codeweaver.cli.commands.context:app", name="context", alias="prep")
+if ROOT_PACKAGE in ("engine", "server"):
+    app.command("codeweaver.cli.commands.index:app", name="index")
+if ROOT_PACKAGE in ("provider", "engine", "server"):
+    app.command("codeweaver.cli.commands.doctor:app", name="doctor")
+    app.command("codeweaver.cli.commands.list:app", name="list", alias="ls")
+
 app.command("codeweaver.cli.commands.config:app", name="config")
-app.command("codeweaver.cli.commands.search:app", name="search")
-app.command("codeweaver.cli.commands.server:app", name="server")
-app.command("codeweaver.cli.commands.start:app", name="start")
-app.command("codeweaver.cli.commands.stop:app", name="stop")
-app.command("codeweaver.cli.commands.index:app", name="index")
-app.command("codeweaver.cli.commands.doctor:app", name="doctor")
-app.command("codeweaver.cli.commands.list:app", name="list", alias="ls")
-app.command("codeweaver.cli.commands.init:app", name="init")
-app.command("codeweaver.cli.commands.status:app", name="status")
-
-
-# these are scaffolded for future implementation
-# app.command("codeweaver.cli.commands.context:app", name="context", alias="prep")
 
 
 def _handle_keyboard_interrupt():

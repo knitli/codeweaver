@@ -17,7 +17,6 @@ import cyclopts
 from cyclopts import App
 from rich.table import Table
 
-from codeweaver.cli.dependencies import setup_cli_di
 from codeweaver.cli.ui import CLIErrorHandler, get_display
 from codeweaver.cli.utils import check_provider_package_available
 from codeweaver.core import Provider, ProviderKind, get_container
@@ -97,7 +96,7 @@ def providers(
     Shows provider name, capabilities, and status (ready or needs configuration).
     """
     display = _display
-    
+
     # Use PROVIDER_CAPABILITIES map to find providers for each kind
     # This replaces registry.list_providers(p)
     provider_capabilities = {}
@@ -105,9 +104,7 @@ def providers(
         if p == ProviderKind.UNSET:
             continue
         # Invert the map: Find all providers that have capability `p`
-        providers_with_cap = [
-            prov for prov, caps in PROVIDER_CAPABILITIES.items() if p in caps
-        ]
+        providers_with_cap = [prov for prov, caps in PROVIDER_CAPABILITIES.items() if p in caps]
         provider_capabilities[p] = providers_with_cap
 
     # Filter by kind if specified
@@ -146,7 +143,7 @@ def providers(
                     "status": _get_status_indicator(provider, has_key=has_key),
                 }
             elif capability and provider_map.get(provider) and is_typeddict(provider_map[provider]):
-                provider_map[provider]["capabilities"].append(capability)  # ty: ignore[non-subscriptable]  # not sure how else to prove it..
+                provider_map[provider]["capabilities"].append(capability)  # ty: ignore[not-subscriptable]  # not sure how else to prove it..
 
     # Count valid providers
     valid_providers = [p for p, info in provider_map.items() if info]
@@ -223,10 +220,10 @@ async def models(
     # Resolve capabilities using DI
     # We don't need full settings setup, just resolvers
     container = get_container()
-    
+
     # We might need to ensure providers are loaded to populate resolvers?
     # Resolvers usually self-populate or are static.
-    
+
     try:
         from codeweaver.providers.embedding.capabilities.resolver import (
             EmbeddingCapabilityResolver,

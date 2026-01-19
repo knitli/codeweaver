@@ -15,19 +15,18 @@ from __future__ import annotations
 
 import os
 
-from typing import Annotated, Literal
+from typing import Annotated, Any
 
 from pydantic import Field
 from pydantic_settings import SettingsConfigDict
 
-from codeweaver.core.types.aliases import FilteredKey, FilteredKeyT
-from codeweaver.core.types.enum import AnonymityConversion
+from codeweaver.core.config.core_settings import CodeWeaverCoreSettings
 from codeweaver.core.types.sentinel import UNSET, Unset
-from codeweaver.core.types.settings_model import BaseCodeWeaverSettings
+from codeweaver.providers.config import ProviderProfile
 from codeweaver.providers.config.providers import ProviderSettings
 
 
-class CodeWeaverProviderSettings(BaseCodeWeaverSettings):
+class CodeWeaverProviderSettings(CodeWeaverCoreSettings):
     """Root settings wrapper for provider-only installation.
 
     When only the providers package is installed (with core), this provides
@@ -54,7 +53,7 @@ class CodeWeaverProviderSettings(BaseCodeWeaverSettings):
         provider field.
     """
 
-    model_config = model_config = BaseCodeWeaverSettings.model_config | SettingsConfigDict(
+    model_config = model_config = CodeWeaverCoreSettings.model_config | SettingsConfigDict(
         title="CodeWeaver Provider Settings"
     )
 
@@ -67,7 +66,7 @@ class CodeWeaverProviderSettings(BaseCodeWeaverSettings):
     ] = UNSET
 
     profile: Annotated[
-        Literal["recommended", "quickstart", "testing"] | Unset | None,
+        ProviderProfile | Unset | None,
         Field(
             description="""Use a premade provider profile.  The recommended profile uses Voyage AI for top-quality embedding and reranking, but requires an API key. The quickstart profile is entirely free and local, and does not require any API key. It sacrifices some search quality and performance compared to the recommended profile. The testing profile is only recommended for testing -- it uses an in-memory vector store and very light weight local models. The testing profile is also CodeWeaver's backup system when a cloud embedding or vector store provider isn't available. Both the quickstart and recommended profiles default to a local qdrant instance for the vector store. If you want to use a cloud or remote instance (which we recommend) you must also provide a URL for it, either with the environment variable CODEWEAVER_VECTOR_STORE_URL or in your codeweaver config in the vector_store settings.""",
             validate_default=False,
@@ -75,22 +74,25 @@ class CodeWeaverProviderSettings(BaseCodeWeaverSettings):
     ] = (
         profile
         if (profile := os.environ.get("CODEWEAVER_PROFILE"))
-        and profile.lower() in ("recommended", "quickstart", "testing")
+        and profile.lower() in tuple(p.name.lower() for p in ProviderProfile)
         else UNSET
     )  # ty: ignore[invalid-assignment]
 
-    def _initialize(self) -> None:
+    def _initialize(self, **kwargs: Any) -> dict[str, Any]:  # ty:ignore[invalid-method-override]
         """Initialize provider settings."""
-        if self.profile:
-            pass
-
-    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion] | None:
-        """Define telemetry filtering for provider settings."""
-        return {
-            FilteredKey("project_path"): AnonymityConversion.HASH,
-            FilteredKey("user_config_dir"): AnonymityConversion.HASH,
-            FilteredKey("config_file"): AnonymityConversion.HASH,
-        }
+        profile_config = (
+            profile.as_settings_dict() if (profile := kwargs.get("profile")) is not Unset else {}
+        )
+        if provider_config := kwargs.get("provider"):
+            provider = ProviderSettings.model_validate(
+                **(self._resolve_default_and_provided(profile_config, provider_config))
+            )
+        else:
+            provider = ProviderSettings.model_construct(**profile_config)
+        kwargs["provider"] = provider
+        kwargs["profile"] = kwargs.get("profile")
+        kwargs |= super()._initialize(**(kwargs or {}))
+        return kwargs
 
 
 __all__ = ("CodeWeaverProviderSettings",)

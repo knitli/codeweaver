@@ -14,21 +14,23 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Literal
 
 from codeweaver.core import ConfigLanguage, LanguageName, SearchStrategy, SemanticSearchLanguage
+from codeweaver.core.di import INJECTED
 from codeweaver.providers import (
     EmbeddingProviderDep,
     SparseEmbeddingProviderDep,
     VectorStoreProviderDep,
 )
 from codeweaver.server.agent_api.find_code.intent import IntentType
+from codeweaver.server.dependencies import CodeWeaverStateDep
 
 
 if TYPE_CHECKING:
     from codeweaver.server.agent_api.find_code.types import CodeMatch, FindCodeResponseSummary
 
 
-def get_indexer_state_info(state: CodeWeaverStateDep) -> tuple[
-    Literal["complete", "in_progress", "not_started", "unknown"], float | None
-]:
+def get_indexer_state_info(
+    state: CodeWeaverStateDep = INJECTED,
+) -> tuple[Literal["complete", "in_progress", "not_started", "unknown"], float | None]:
     """Get indexing state and coverage from global application state.
 
     Returns:
@@ -55,6 +57,7 @@ def get_indexer_state_info(state: CodeWeaverStateDep) -> tuple[
         indexing_state = "in_progress"
 
     return (indexing_state, coverage)
+
 
 def calculate_token_count(code_matches: list[CodeMatch], token_limit: int) -> int:
     """Calculate approximate token count from code matches.

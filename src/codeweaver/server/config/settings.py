@@ -12,43 +12,19 @@ clear precedence hierarchy and validation.
 
 from __future__ import annotations
 
-import inspect
 import logging
-import os
 
-from pathlib import Path
-from typing import Annotated, Any, Literal, Self, cast, get_origin, overload
+from typing import Annotated, Any, Literal
 
 from fastmcp.server.server import DuplicateBehavior
 from mcp.server.auth.settings import AuthSettings
 from mcp.server.lowlevel.server import LifespanResultT
-from pydantic import DirectoryPath, Field, FilePath, PositiveInt, PrivateAttr, computed_field
-from pydantic.fields import FieldInfo
-from pydantic.networks import HttpUrl
-from pydantic_core import from_json, to_json
-from pydantic_settings import BaseSettings
+from pydantic import Field, PositiveInt, computed_field
+from pydantic_settings import SettingsConfigDict
 
-from codeweaver.core import (
-    UNSET,
-    AnonymityConversion,
-    BaseCodeWeaverSettings,
-    BasedModel,
-    DefaultLoggingSettings,
-    DefaultTelemetrySettings,
-    DictView,
-    FilteredKeyT,
-    LoggingSettingsDict,
-    TelemetrySettings,
-    Unset,
-    lazy_import,
-)
-from codeweaver.engine import (
-    ChunkerSettings,
-    DefaultChunkerSettings,
-    DefaultIndexerSettings,
-    IndexerSettings,
-)
-from codeweaver.providers import AllDefaultProviderSettings, ProviderSettings
+from codeweaver.core import UNSET, BasedModel, Unset
+from codeweaver.engine.config import CodeWeaverEngineSettings
+from codeweaver.providers import ProviderSettings
 from codeweaver.server.config.mcp import MCPServerConfig, StdioCodeWeaverConfig
 from codeweaver.server.config.middleware import DefaultMiddlewareSettings, MiddlewareOptions
 from codeweaver.server.config.server_defaults import (
@@ -57,7 +33,6 @@ from codeweaver.server.config.server_defaults import (
     DefaultUvicornSettings,
 )
 from codeweaver.server.config.types import (
-    CodeWeaverSettingsDict,
     EndpointSettingsDict,
     FastMcpHttpRunArgs,
     FastMcpServerSettingsDict,
@@ -69,85 +44,7 @@ from codeweaver.server.mcp import McpMiddleware
 
 logger = logging.getLogger(__name__)
 
-
-def _determine_setting(
-    field_name: str, field_info: FieldInfo, obj: BaseSettings | BasedModel
-) -> Any:
-    """Determine the correct value for a setting field that was Unset."""
-    if (
-        isinstance(field_info.default, Unset)
-        and hasattr(obj, "_defaults")
-        and (defaults := obj._defaults() if callable(obj._defaults) else obj._defaults)  # type: ignore
-        and (value := defaults.get(field_name))  # type: ignore
-    ):
-        return value  # type: ignore
-    if (
-        (annotation := field_info.annotation)
-        and hasattr(annotation, "__args__")
-        and (args := annotation.__args__)
-        and (other_sources := tuple(arg for arg in args if arg is not Unset and arg is not None))
-        and (other := other_sources[0])
-    ):
-        # Don't return class references or typing constructs - return None instead
-        # This prevents TypedDict classes and Annotated types from being returned as values
-        if inspect.isclass(other) or get_origin(other) is not None:
-            return None
-        return other
-    return None
-
-
-def _process_nested_value(value: Any) -> Any:
-    """Process a nested value, ensuring all fields are set."""
-    if isinstance(value, BaseSettings | BasedModel):
-        return ensure_set_fields(value)
-    if isinstance(value, list):
-        return [
-            ensure_set_fields(item) if isinstance(item, BaseSettings | BasedModel) else item
-            for item in value
-        ]
-    if isinstance(value, dict):
-        return {
-            key: ensure_set_fields(item) if isinstance(item, BaseSettings | BasedModel) else item
-            for key, item in value.items()
-        }  # type: ignore
-    return value
-
-
-def _should_set_field(value: Any, field_type: Any) -> bool:
-    """Check if a None value should be set for a field based on its type annotation."""
-    if value is not None:
-        return True
-    if not field_type:
-        return True
-    args = getattr(field_type, "__args__", None)
-    return type(None) in args if args else True
-
-
-def ensure_set_fields(obj: BaseSettings | BasedModel) -> BaseSettings | BasedModel:
-    """Ensure all fields in a pydantic model are set, replacing Unset with None where applicable."""
-    for field_name in type(obj).model_fields:
-        value = getattr(obj, field_name)
-
-        if not isinstance(value, Unset):
-            setattr(obj, field_name, _process_nested_value(value))
-            continue
-
-        # Handle Unset values
-        field_info = type(obj).model_fields[field_name]
-        new_value = _determine_setting(field_name, field_info, obj)
-
-        # Handle class references - instantiate if it's a BaseSettings/BasedModel subclass
-        if inspect.isclass(new_value) and issubclass(new_value, BaseSettings | BasedModel):
-            new_value = ensure_set_fields(new_value())
-
-        # Check if None is acceptable for this field
-        field_type = field_info.annotation
-        if not _should_set_field(new_value, field_type):
-            continue
-
-        setattr(obj, field_name, new_value)
-
-    return obj
+ONE_MEGABYTE = 1 * 1024 * 1024
 
 
 DEFAULT_BASE_MIDDLEWARE = [
@@ -257,7 +154,12 @@ class BaseFastMcpServerSettings(BasedModel):
 
     def as_settings(self) -> FastMcpServerSettingsDict:
         """Convert to FastMcpServerSettingsDict for use with FastMCP server."""
-        return FastMcpServerSettingsDict(**self.model_dump(exclude_none=True))
+        return FastMcpServerSettingsDict(
+            **self.model_dump(
+                exclude_none=True,
+                exclude={f for f in type(self).model_fields if getattr(self, f, None) is UNSET},
+            )
+        )
 
 
 class FastMcpStdioServerSettings(BaseFastMcpServerSettings):
@@ -290,88 +192,23 @@ if not ProviderSettings.__pydantic_complete__:
     _ = ProviderSettings.model_rebuild()
 
 
-@overload
-def _resolve_env_settings_path(*, directory: Literal[False]) -> FilePath | Unset: ...
-@overload
-def _resolve_env_settings_path(*, directory: Literal[True]) -> DirectoryPath | Unset: ...
-def _resolve_env_settings_path(*, directory: bool = False) -> FilePath | DirectoryPath | Unset:
-    """Resolve the configuration file path or project directory path from environment variable, if set."""
-    if (
-        directory
-        and (env_var := os.environ.get("CODEWEAVER_PROJECT_PATH"))
-        and (env_path := Path(env_var))
-        and env_path.exists()
-        and env_path.is_dir()
-    ):
-        return env_path
-    if directory:
-        return UNSET
-    if (
-        (env_var := os.environ.get("CODEWEAVER_CONFIG_FILE"))
-        and (env_config := Path(env_var))
-        and env_config.exists()
-        and env_config.is_file()
-    ):
-        return env_config
-    return UNSET
+class CodeWeaverSettings(CodeWeaverEngineSettings):
+    """Main configuration model following pydantic-settings patterns."""
 
-
-class CodeWeaverSettings(BaseCodeWeaverSettings):
-    """Main configuration model following pydantic-settings patterns.
-
-    Configuration precedence (highest to lowest):
-    1. Environment variables (CODEWEAVER_*)
-    2. Local config (codeweaver.local.toml (or .yaml, .yml, .json) in project root, or in .codeweaver/, codeweaver/, .config/codeweaver/. In subdirectories, can also be named 'config.local.toml')
-    3. Project config (codeweaver.toml (or .yaml, .yml, .json) in project root, or in .codeweaver/, codeweaver/, .config/codeweaver/. In subdirectories, can also be named 'config.toml')
-    4. User config ($XDG_CONFIG_HOME/codeweaver/ or equivalent platform-specific config dir. Can also be named 'config.toml')
-    5. Defaults
-
-    NOTE: You should add local configs to the .gitignore, either at the project .gitignore, or if it's not your repo, in .git/info/exclude (like with: `echo "codeweaver.local.toml" >> .git/info/exclude`). You should tell projects you work on to add a *.local.* pattern to their .gitiginore if they haven't already because this is a common pattern for local config files.
-    """
-
-    # Core settings
-    project_path: Annotated[
-        DirectoryPath | Unset,
-        Field(
-            description="""Root path of the codebase to analyze. CodeWeaver will try to detect the project path automatically if you don't provide one.""",
-            validate_default=False,
-        ),
-    ] = UNSET
-
-    project_name: Annotated[
-        str | Unset,
-        Field(
-            description="""Project name (auto-detected from directory if None)""",
-            validate_default=False,
-        ),
-    ] = UNSET
-
-    provider: Annotated[
-        ProviderSettings | Unset,
-        Field(
-            description="""Provider and model configurations for agents, data, embedding, reranking, sparse embedding, and vector store providers. Will default to default profile if not provided.""",
-            validate_default=False,
-        ),
-    ] = UNSET
-
-    config_file: Annotated[
-        FilePath | Unset,
-        Field(description="""Path to the configuration file, if any""", exclude=True),
-    ] = _resolve_env_settings_path(directory=False)
+    model_config = CodeWeaverEngineSettings.model_config | SettingsConfigDict(
+        title="CodeWeaver Settings"
+    )
 
     # Performance settings
     token_limit: Annotated[
         PositiveInt | Unset,
         Field(description="""Maximum tokens per response""", validate_default=False),
     ] = UNSET
-    max_file_size: Annotated[
-        PositiveInt | Unset,
-        Field(description="""Maximum file size to process in bytes""", validate_default=False),
-    ] = UNSET
+
     max_results: Annotated[
         PositiveInt | Unset,
         Field(
-            description="""Maximum code matches to return. Because CodeWeaver primarily indexes ast-nodes, a page can return multiple matches per file, so this is not the same as the number of files returned. This is the maximum number of code matches returned in a single response. The default is 30.""",
+            description="""Maximum code matches to return. Because CodeWeaver primarily indexes ast-nodes, a page can return multiple matches per file, so this is not the same as the number of files returned. This is the maximum number of code matches returned in a single response. The default is 15.""",
             validate_default=False,
         ),
     ] = UNSET
@@ -387,23 +224,9 @@ class CodeWeaverSettings(BaseCodeWeaverSettings):
         Field(description="""Settings for stdio MCP servers.""", validate_default=False),
     ] = UNSET
 
-    logging: Annotated[
-        LoggingSettingsDict | Unset,
-        Field(description="""Logging configuration""", validate_default=False),
-    ] = UNSET
-
     middleware: Annotated[
         MiddlewareOptions | Unset,
-        Field(description="""Middleware settings""", validate_default=False),
-    ] = UNSET
-
-    indexer: Annotated[
-        IndexerSettings | Unset, Field(description="""Indexer settings""", validate_default=False)
-    ] = UNSET
-
-    chunker: Annotated[
-        ChunkerSettings | Unset,
-        Field(description="""Chunker system configuration""", validate_default=False),
+        Field(description="""MCP middleware settings""", validate_default=False),
     ] = UNSET
 
     endpoints: Annotated[
@@ -432,11 +255,6 @@ class CodeWeaverSettings(BaseCodeWeaverSettings):
         ),
     ] = UNSET
 
-    telemetry: Annotated[
-        TelemetrySettings | Unset,
-        Field(description="""Telemetry configuration""", validate_default=False),
-    ] = UNSET
-
     # Management Server (Always HTTP, independent of MCP transport)
     management_host: Annotated[
         str | Unset,
@@ -459,506 +277,51 @@ class CodeWeaverSettings(BaseCodeWeaverSettings):
         ),
     ] = UNSET
 
-    profile: Annotated[  # ty: ignore[invalid-assignment]
-        Literal["recommended", "quickstart", "testing"] | Unset | None,
-        Field(
-            description="""Use a premade provider profile.  The recommended profile uses Voyage AI for top-quality embedding and reranking, but requires an API key. The quickstart profile is entirely free and local, and does not require any API key. It sacrifices some search quality and performance compared to the recommended profile. The testing profile is only recommended for testing -- it uses an in-memory vector store and very light weight local models. The testing profile is also CodeWeaver's backup system when a cloud embedding or vector store provider isn't available. Both the quickstart and recommended profiles default to a local qdrant instance for the vector store. If you want to use a cloud or remote instance (which we recommend) you must also provide a URL for it, either with the environment variable CODEWEAVER_VECTOR_STORE_URL or in your codeweaver config in the vector_store settings.""",
-            validate_default=False,
-        ),
-    ] = (
-        profile
-        if (profile := os.environ.get("CODEWEAVER_PROFILE"))
-        and profile in ("recommended", "quickstart", "testing")
-        else UNSET
-    )  # ty: ignore[invalid-assignment]
-
-    __version__: Annotated[
-        str,
-        Field(
-            description="""Schema version for CodeWeaver settings""",
-            pattern=r"\d{1,2}\.\d{1,3}\.\d{1,3}",
-            alias="schema_version",
-        ),
-    ] = "1.2.0"
-
-    schema_: HttpUrl = Field(
-        description="URL to the CodeWeaver settings schema",
-        default_factory=lambda data: HttpUrl(
-            f"https://raw.githubusercontent.com/knitli/codeweaver/main/schema/v{data.get('__version__', data.get('schema_version')) or '1.2.0'}/codeweaver.schema.json"
-        ),
-    )
-
-    _map: Annotated[DictView[CodeWeaverSettingsDict] | None, PrivateAttr()] = None
-
-    _unset_fields: set[str] = PrivateAttr(default_factory=set)
-
-    _resolution_complete: bool = PrivateAttr(default=False)
-
-    def __init__(self, **kwargs: Any) -> None:
-        """Initialize CodeWeaverSettings, loading from config file if provided."""
-        if (config := kwargs.get("config_file")) and config is not UNSET:
-            content = from_json(config.read_bytes())
-            if content and content != kwargs:
-                kwargs |= content
-        super().__init__(**kwargs)
-
-    def model_post_init(self, __context: Any, /) -> None:
-        """Post-initialization validation."""
-        self._unset_fields = {
-            field for field in type(self).model_fields if getattr(self, field) is Unset
-        }
-        # Re-check environment variable for project_path before falling back to auto-detection
-        if isinstance(self.project_path, Unset):
-            env_path = _resolve_env_settings_path(directory=True)
-            if not isinstance(env_path, Unset):
-                self.project_path = env_path
-            else:
-                self.project_path = lazy_import("codeweaver.core", "get_project_path")()
-        # Re-check environment variable for project_name before falling back to auto-detection
-        if isinstance(self.project_name, Unset):
-            if env_name := os.environ.get("CODEWEAVER_PROJECT_NAME"):
-                self.project_name = env_name
-            else:
-                self.project_name = cast(DirectoryPath, self.project_path).name
-        self.profile = None if isinstance(self.profile, Unset) else self.profile
-        if self.profile:
-            self._setup_profile()
-        else:
-            self.provider = (
-                ProviderSettings.model_validate(AllDefaultProviderSettings)
-                if isinstance(self.provider, Unset) or self.provider is None
-                else self.provider
-            )
-        # Serena uses 17,000 tokens *each turn*, so I feel like 30,000 is a reasonable default limit. We'll strive to keep it well under that.
-        self.token_limit = 30_000 if isinstance(self.token_limit, Unset) else self.token_limit
-        self.max_file_size = (
-            1 * 1024 * 1024 if isinstance(self.max_file_size, Unset) else self.max_file_size
+    def _initialize(self, **kwargs: Any) -> dict[str, Any]:
+        """Initialize server settings."""
+        constructors = (
+            FastMcpHttpServerSettings,
+            FastMcpStdioServerSettings,
+            StdioCodeWeaverConfig,
+            UvicornServerSettings,
         )
-        self.max_results = 30 if isinstance(self.max_results, Unset) else self.max_results
-        self.mcp_server = (
-            FastMcpHttpServerSettings() if isinstance(self.mcp_server, Unset) else self.mcp_server
-        )
-        self.stdio_server = (
-            FastMcpStdioServerSettings()
-            if isinstance(self.stdio_server, Unset)
-            else self.stdio_server
-        )
-        self.middleware = (
-            DefaultMiddlewareSettings if isinstance(self.middleware, Unset) else self.middleware
-        )
-        self.logging = DefaultLoggingSettings if isinstance(self.logging, Unset) else self.logging
-        # by default, IndexerSettings has `rignore_options` UNSET, but that needs to be deferred until after CodeWeaverSettings is initialized
-        self.indexer = IndexerSettings() if isinstance(self.indexer, Unset) else self.indexer
-        self.chunker = ChunkerSettings() if isinstance(self.chunker, Unset) else self.chunker
-        self.telemetry = (
-            TelemetrySettings._default()  # type: ignore
-            if isinstance(self.telemetry, Unset)
-            else self.telemetry
-        )
-        self.management_host = (
-            "127.0.0.1" if isinstance(self.management_host, Unset) else self.management_host
-        )
-        self.management_port = (
-            9329 if isinstance(self.management_port, Unset) else self.management_port
-        )
-        self.uvicorn = (
-            UvicornServerSettings.model_validate(DefaultUvicornSettings)
-            if isinstance(self.uvicorn, Unset)
-            else self.uvicorn
-        )
-        self.endpoints = (
-            DefaultEndpointSettings
-            if isinstance(self.endpoints, Unset) or self.endpoints is None
-            else DefaultEndpointSettings | self.endpoints
-        )
-        self.default_mcp_config = (
-            StdioCodeWeaverConfig()
-            if isinstance(self.default_mcp_config, Unset)
-            else self.default_mcp_config
-        )
-        if not type(self).__pydantic_complete__:
-            result = type(self).model_rebuild()
-            logger.debug("Rebuilt CodeWeaverSettings during post-init, result: %s", result)
-        if type(self).__pydantic_complete__:
-            # Ensure all nested Unset values are replaced with defaults
-            self = cast(CodeWeaverSettings, ensure_set_fields(self))
-            # Exclude computed fields to prevent circular dependency during initialization
-            # Computed fields like IndexingSettings.cache_dir may call get_settings()
-            self._map = cast(
-                DictView[CodeWeaverSettingsDict],
-                DictView(self.model_dump(mode="python", exclude_computed_fields=True)),
-            )
-            globals()["_mapped_settings"] = self._map
-
-    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
-        from codeweaver.core import AnonymityConversion, FilteredKey
-
-        return {
-            FilteredKey("project_path"): AnonymityConversion.HASH,
-            FilteredKey("project_name"): AnonymityConversion.BOOLEAN,
-            FilteredKey("config_file"): AnonymityConversion.HASH,
-        }
-
-    def _setup_profile(self) -> None:
-        """Set up provider settings based on the selected profile."""
-        from codeweaver.providers import get_profile
-
-        if self.provider is not UNSET and (
-            (vector_url := os.environ.get("CODEWEAVER_VECTOR_STORE_URL"))
-            or (
-                (
-                    vector_settings := self.provider.vector_store
-                    if isinstance(self.provider.vector_store, dict)
-                    else self.provider.vector_store[0]
-                    if isinstance(self.provider.vector_store, tuple)
-                    else None
+        fields = type(self).model_fields
+        for k, v in type(self)._defaults().items():
+            if (value := kwargs.get(k)) is Unset or not value:
+                kwargs[k] = (
+                    constructor.model_construct(**v)
+                    if (field_info := fields.get(k))
+                    and (constructor := field_info.annotation) in constructors
+                    else v
                 )
-                and (
-                    vector_url := vector_settings.get("provider_settings", {}).get("url")
-                    or vector_settings.get("connection", {}).get("url")
+            elif k in ("token_limit", "max_results", "management_host", "management_port"):
+                kwargs[k] = value
+            elif (field_info := fields.get(k)) and (
+                constructor := field_info.annotation
+            ) in constructors:
+                kwargs[k] = constructor.model_validatee(
+                    **self._resolve_default_and_provided(v, value)
                 )
-            )
-        ):
-            import re
-
-            from urllib.parse import urlparse
-
-            is_cloud = urlparse(vector_url).hostname not in (
-                "localhost",
-                "127.0.0.1",
-                "0.0.0.0",  # noqa: S104
-                "::1",
-                "0:0:0:0:0:0:0:1",
-                "::",  # I guess ruff is ok if we bind to all interfaces in ipv6
-                # save the more expensive check for second
-                # this checks if the ip range is in private ranges
-            ) and not re.match(
-                r"^(((192\.168|10\.\d{1,3}|172\.(1[6-9]|2\d|3[0-1]))\.\d{1,3}\.\d{1,3})|(fe80|fc00|fd00):(?:[0-9a-fA-F]{1,4}:){0,7}[0-9a-fA-F]{1,4}(%[0-9a-zA-Z]+))$",
-                urlparse(vector_url).hostname or "",
-            )  # type: ignore
-            self.provider = ProviderSettings.model_validate(
-                get_profile(
-                    self.profile if self.profile != "testing" else "backup",
-                    vector_deployment="cloud" if is_cloud else "local",
-                    url=vector_url if is_cloud else None,
-                )  # ty: ignore[no-matching-overload]
-            )  # type: ignore
-        else:
-            self.provider = ProviderSettings.model_validate(
-                get_profile(
-                    self.profile if self.profile != "testing" else "backup",  # ty: ignore[invalid-argument-type]
-                    vector_deployment="local",
-                )  # ty: ignore[no-matching-overload]
-            )
+            else:
+                kwargs[k] = value
+        kwargs |= super()._initialize(**kwargs)
+        return kwargs
 
     @classmethod
-    def python_json_schema(cls) -> dict[str, Any]:
-        """Get the JSON validation schema for the settings model as a string."""
-        return cls.model_json_schema(by_alias=True)
-
-    @classmethod
-    def json_schema(cls) -> bytes:
-        """Get the JSON validation schema for the settings model.
-
-        Note: For build-time schema generation, use scripts/build/generate-schema.py instead.
-        This method is kept for runtime introspection and testing purposes.
-        """
-        return to_json(cls.python_json_schema(), indent=2).replace(b"schema_", b"$schema")
-
-    @classmethod
-    def _defaults(cls) -> CodeWeaverSettingsDict:
+    def _defaults(cls) -> dict[str, Any]:
         """Get a default settings dictionary."""
-        # Check environment variable first to support Docker deployments without .git
-        path = _resolve_env_settings_path(directory=True)
-        return CodeWeaverSettingsDict(
-            project_path=path,
-            project_name=path.name if isinstance(path, Path) else "",
-            provider=AllDefaultProviderSettings,
-            token_limit=30_000,
-            max_file_size=1 * 1024 * 1024,
-            max_results=30,
-            mcp_server=FastMcpHttpServerSettings().as_settings(),
-            stdio_server=FastMcpStdioServerSettings().as_settings(),
-            logging=DefaultLoggingSettings,
-            middleware=DefaultMiddlewareSettings,
-            indexer=DefaultIndexerSettings,
-            chunker=DefaultChunkerSettings,
-            management_host="127.0.0.1",
-            management_port=9329,
-            default_mcp_config=StdioCodeWeaverConfigDict(StdioCodeWeaverConfig().model_dump()),  # ty: ignore[missing-typed-dict-key, invalid-argument-type]
-            telemetry=DefaultTelemetrySettings,
-            uvicorn=DefaultUvicornSettings,
-            endpoints=DefaultEndpointSettings,
-        )
-
-    async def finalize(self) -> Self:
-        """Finalize settings with config resolution.
-
-        This should be called after all configs are loaded but before
-        the application starts. It resolves all interdependencies.
-
-        Returns:
-            Self for chaining
-        """
-        if self._resolution_complete:
-            return self
-
-        try:
-            from codeweaver.core.config.resolver import resolve_all_configs
-
-            # Trigger config resolution across all registered components
-            await resolve_all_configs()
-
-            self._resolution_complete = True
-        except Exception:
-            # Silently fail if config resolution not available (monorepo compatibility)
-            logger.debug("Config resolution not available, skipping finalization")
-
-        return self
-
-    @classmethod
-    def reload(cls) -> Self:
-        """Reloads settings from configuration sources.
-
-        You can use this method to refresh the settings instance, re-reading configuration files and environment variables. This is useful if you expect configuration to change at runtime and want to apply those changes without restarting the application.
-        """
-        instance = globals().get("_settings")
-        if instance is None:
-            return cls()
-        instance.__init__()
-        return instance
-
-    @property
-    def view(self) -> DictView[CodeWeaverSettingsDict]:
-        """Get a read-only mapping view of the settings."""
-        if self._map is None or not self._map:
-            try:
-                self._map = DictView(self.model_dump(exclude_computed_fields=True))  # type: ignore
-            except Exception:
-                logger.warning("Failed to create settings map view")
-                _ = type(self).model_rebuild()
-                self._map = DictView(self.model_dump())  # type: ignore
-        if not self._map:
-            raise TypeError("Settings map view is not a valid DictView[CodeWeaverSettingsDict]")
-        if unset_fields := tuple(
-            field for field in type(self).model_fields if getattr(self, field) is Unset
-        ):
-            logger.warning("Some fields in CodeWeaverSettings are still unset: %s", unset_fields)
-            self._unset_fields |= set(unset_fields)
-            self = ensure_set_fields(self)
-            self._map = DictView(self.model_dump(exclude_computed_fields=True))  # type: ignore
-        return self._map  # type: ignore
-
-    @classmethod
-    def generate_default_config(cls, path: Path) -> None:
-        """Generate a default configuration file at the specified path.
-
-        The file format is determined by the file extension (.toml, .yaml/.yml, .json).
-        """
-        default_settings = cls()
-        data = cls._to_serializable(default_settings, path=path)
-        cls._write_config_file(path, data)
-
-    @staticmethod
-    def _to_serializable(
-        obj: CodeWeaverSettings, path: Path | None = None, **override_kwargs: Any
-    ) -> Any:
-        """Convert an object to a serializable form."""
-        from codeweaver.core import get_project_path
-
-        kwargs = {
-            "indent": 4,
-            "exclude_unset": True,
-            "by_alias": True,
-            "exclude_defaults": True,
-            "round_trip": True,
-            "exclude_computed_fields": True,
-            "mode": "python",
-        } | override_kwargs
-        as_obj = obj.model_dump(**kwargs)  # type: ignore
-        config_file = (
-            path
-            or obj.config_file
-            or (
-                obj.project_path
-                if isinstance(obj.project_path, Path)
-                else get_project_path() or Path.cwd()
-            )
-            / Path("codeweaver.toml")
-        )
-        extension = config_file.suffix.lower()
-        match extension:
-            case ".json":
-                from pydantic_core import to_json
-
-                data = to_json(
-                    as_obj,
-                    **{
-                        k: v
-                        for k, v in kwargs.items()
-                        if k not in {"exclude_unset", "exclude_defaults", "exclude_computed_fields"}
-                    },  # type: ignore
-                ).decode("utf-8")
-            case ".toml":
-                import tomli_w
-
-                data = tomli_w.dumps(as_obj)
-            case ".yaml" | ".yml":
-                import yaml
-
-                data = yaml.dump(obj.model_dump())
-            case _:
-                raise ValueError(f"Unsupported configuration file format: {extension}")
-        return data
-
-    @staticmethod
-    def _write_config_file(path: Path, data: str) -> None:
-        """Write configuration data to a file."""
-        path.parent.mkdir(parents=True, exist_ok=True)
-        _ = path.write_text(data, encoding="utf-8")
-
-    def save_to_file(self, path: Path | None = None) -> None:
-        """Save the current settings to a configuration file.
-
-        The file format is determined by the file extension (.toml, .yaml/.yml, .json).
-        """
-        path = (  # ty:ignore[invalid-assignment]
-            path
-            if path and path is not Unset
-            else self.config_file
-            if self.config_file is not UNSET
-            else None
-        )
-        if path is None and isinstance(self.project_path, Path):
-            path = self.project_path / "codeweaver.toml"
-        if path is None:
-            raise ValueError("No path provided to save configuration file.")
-        extension = path.suffix.lower()
-        # Use mode='json' to serialize Path objects to strings (needed for TOML/YAML)
-        # model_dump kwargs (indent is NOT a valid model_dump parameter)
-        dump_kwargs = {
-            "exclude_unset": True,
-            "by_alias": True,
-            "exclude_defaults": True,
-            "round_trip": True,
-            "exclude_computed_fields": True,
-            "mode": "json",  # Changed from "python" to handle Path serialization
-            "exclude_none": True,  # Exclude None values for TOML compatibility
-            "exclude": {"config_file", "default_mcp_config"},
+        return {
+            "token_limit": 15_000,
+            "max_results": 15,
+            "mcp_server": FastMcpHttpServerSettings().as_settings(),
+            "stdio_server": FastMcpStdioServerSettings().as_settings(),
+            "middleware": DefaultMiddlewareSettings,
+            "management_host": "127.0.0.1",
+            "management_port": 9329,
+            "default_mcp_config": StdioCodeWeaverConfigDict(StdioCodeWeaverConfig().model_dump()),  # ty: ignore[missing-typed-dict-key, invalid-argument-type]
+            "uvicorn": DefaultUvicornSettings,
+            "endpoints": DefaultEndpointSettings,
         }
-        # JSON serialization kwargs (includes indent for to_json)
-        json_kwargs = {"indent": 4, "round_trip": True}
-        as_obj = self.model_dump(**dump_kwargs)  # type: ignore
-        data: str
-        match extension:
-            case ".json":
-                from pydantic_core import to_json
-
-                data = to_json(as_obj, **json_kwargs).decode("utf-8")  # type: ignore
-            case ".toml":
-                import tomli_w
-
-                data = tomli_w.dumps(as_obj)
-            case ".yaml" | ".yml":
-                import yaml
-
-                data = yaml.dump(self.model_dump())
-            case _:
-                raise ValueError(f"Unsupported configuration file format: {extension}")
-        _ = path.write_text(data, encoding="utf-8")
 
 
-# Global settings instance
-_settings: CodeWeaverSettings | None = None
-"""The global settings instance. Use `get_settings()` to access it."""
-
-_mapped_settings: DictView[CodeWeaverSettingsDict] | None = None
-"""An immutable mapping view of the global settings instance. Use `get_settings_map()` to access it."""
-
-
-def get_settings(config_file: FilePath | None = None) -> CodeWeaverSettings:
-    """Get the global settings instance.
-
-    This should not be your first choice for getting settings. For most needs, you should. Use get_settings_map() to get a read-only mapping view of the settings. This map is a *live view*, meaning it will update if the settings are updated.
-
-    If you **really** need to get the mutable settings instance, you can use this function. It will create the global instance if it doesn't exist, optionally loading from a configuration file (like, codeweaver.toml) if you provide a path.
-    """
-    global _settings
-    # Ensure chunker models are rebuilt before creating settings
-    if not ChunkerSettings.__pydantic_complete__:
-        ChunkerSettings._ensure_models_rebuilt()  # type: ignore
-
-    # Rebuild CodeWeaverSettings if needed before instantiation
-    if not CodeWeaverSettings.__pydantic_complete__:
-        _ = CodeWeaverSettings.model_rebuild()
-    if config_file and config_file.exists():
-        _settings = CodeWeaverSettings(config_file=config_file)
-    if _settings is None or isinstance(_settings, Unset):
-        _settings = CodeWeaverSettings()  # type: ignore
-
-    if isinstance(_settings.project_path, Unset):
-        from codeweaver.core import get_project_path
-
-        _settings.project_path = get_project_path()
-    if isinstance(_settings.project_name, Unset):
-        _settings.project_name = _settings.project_path.name
-    return _settings
-
-
-def update_settings(**kwargs: CodeWeaverSettingsDict) -> DictView[CodeWeaverSettingsDict]:
-    """Update the global settings instance.
-
-    Returns a read-only mapping view of the updated settings.
-    """
-    global _settings
-    if _settings is None:
-        try:
-            _settings = get_settings()
-        except Exception:
-            logger.warning("Failed to get settings: ")
-            _ = CodeWeaverSettings.model_rebuild()
-            _settings = get_settings()
-    _settings = _settings._update_settings(**kwargs)  # type: ignore
-    return _settings.view
-
-
-def get_settings_map() -> DictView[CodeWeaverSettingsDict]:
-    """Get a read-only mapping view of the global settings instance.
-
-    Almost nothing in CodeWeaver should need to modify settings at runtime,
-    so instead we distribute a live, read-only view of the global settings. It's thread-safe and will update if the settings are changed.
-    """
-    global _mapped_settings
-    global _settings
-    try:
-        settings = _settings or get_settings()
-    except Exception:
-        logger.warning("Failed to get settings: ")
-        _ = CodeWeaverSettings.model_rebuild()
-        settings = get_settings()
-    if _mapped_settings is None or _mapped_settings != settings.view:
-        _mapped_settings = settings.view or (
-            _mapped_settings or DictView(settings.model_dump(round_trip=True))
-        )  # type: ignore
-    if not _mapped_settings:
-        raise TypeError("Mapped settings is not a valid DictView[CodeWeaverSettingsDict]")
-    return _mapped_settings
-
-
-def reset_settings() -> None:
-    """Reload settings from configuration sources."""
-    global _settings
-    global _mapped_settings
-    _settings = None
-    _mapped_settings = None  # the mapping will be regenerated on next access
-
-
-__all__ = (
-    "CodeWeaverSettings",
-    "FastMcpHttpServerSettings",
-    "FastMcpStdioServerSettings",
-    "get_settings",
-    "get_settings_map",
-    "reset_settings",
-    "update_settings",
-)
+__all__ = ("CodeWeaverSettings", "FastMcpHttpServerSettings", "FastMcpStdioServerSettings")

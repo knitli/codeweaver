@@ -26,15 +26,24 @@ def temp_project_dir():
 
 
 @pytest.fixture
-def manifest_manager(temp_project_dir):
+def manifest_dir():
+    """Create a temporary directory for manifest files."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        yield Path(tmpdir)
+
+
+@pytest.fixture
+def manifest_manager(temp_project_dir, manifest_dir):
     """Create a manifest manager for testing."""
-    return FileManifestManager(project_path=temp_project_dir)
+    return FileManifestManager(
+        project_path=temp_project_dir, project_name="test_project", manifest_dir=manifest_dir
+    )
 
 
 @pytest.fixture
 def sample_manifest(temp_project_dir):
     """Create a sample manifest with some files."""
-    manifest = IndexFileManifest(project_path=temp_project_dir)
+    manifest = IndexFileManifest(project_path=temp_project_dir, project_name="test_project")
 
     # Add some sample files
     manifest.add_file(

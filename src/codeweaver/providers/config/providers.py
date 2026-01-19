@@ -19,17 +19,7 @@ import importlib
 import logging
 import os
 
-from typing import (
-    Annotated,
-    Any,
-    Literal,
-    LiteralString,
-    NamedTuple,
-    NotRequired,
-    TypedDict,
-    cast,
-    is_typeddict,
-)
+from typing import Annotated, Any, Literal, NamedTuple, NotRequired, TypedDict, cast, is_typeddict
 
 from pydantic import Discriminator, Field, SecretStr, Tag, computed_field, model_validator
 from pydantic_ai.settings import ModelSettings as AgentModelSettings
@@ -43,6 +33,7 @@ from codeweaver.core import (
     ProviderKind,
     Unset,
 )
+from codeweaver.core.types import ModelName, ModelNameT
 from codeweaver.providers.config import ProviderProfile
 from codeweaver.providers.config.clients import QdrantClientOptions
 from codeweaver.providers.config.embedding import (
@@ -208,9 +199,9 @@ DefaultDataProviderSettings = (
 class DeterminedDefaults(NamedTuple):
     """Tuple for determined default embedding settings."""
 
-    provider: Provider
-    model: LiteralString
-    enabled: bool
+    provider: Provider | Literal[Provider.NOT_SET]
+    model: ModelNameT | None
+    enabled: bool | Literal[False]
 
 
 def _get_default_embedding_settings() -> DeterminedDefaults:
@@ -227,38 +218,40 @@ def _get_default_embedding_settings() -> DeterminedDefaults:
             # all three of the top defaults are extremely capable and finetuned for code tasks
             if lib == "voyageai":
                 return DeterminedDefaults(
-                    provider=Provider.VOYAGE, model="voyage-code-3", enabled=True
+                    provider=Provider.VOYAGE, model=ModelName("voyage-code-3"), enabled=True
                 )
             if lib == "mistral":
                 return DeterminedDefaults(
-                    provider=Provider.MISTRAL, model="codestral-embed", enabled=True
+                    provider=Provider.MISTRAL, model=ModelName("codestral-embed"), enabled=True
                 )
             if lib == "google":
                 return DeterminedDefaults(
-                    provider=Provider.GOOGLE, model="gemini-embedding-001", enabled=True
+                    provider=Provider.GOOGLE, model=ModelName("gemini-embedding-001"), enabled=True
                 )
             if lib in {"fastembed-gpu", "fastembed"}:
                 return DeterminedDefaults(
-                    provider=Provider.FASTEMBED, model="BAAI/bge-small-en-v1.5", enabled=True
+                    provider=Provider.FASTEMBED,
+                    model=ModelName("BAAI/bge-small-en-v1.5"),
+                    enabled=True,
                 )
             if lib == "sentence-transformers":
                 return DeterminedDefaults(
                     provider=Provider.SENTENCE_TRANSFORMERS,
                     # embedding-small-english-r2 is *very lightweight* and quite capable with a good context window (8192 tokens)
                     # Good upgrade from the likes of all-minilm-L6-v2 while still being very efficient
-                    model="ibm-granite/granite-embedding-small-english-r2",
+                    model=ModelName("ibm-granite/granite-embedding-small-english-r2"),
                     enabled=True,
                 )
     logger.warning(
         "No default embedding provider libraries found. Embedding functionality will be disabled unless explicitly set in your config or environment variables."
     )
-    return DeterminedDefaults(provider=Provider.NOT_SET, model="NONE", enabled=False)
+    return DeterminedDefaults(provider=Provider.NOT_SET, model=ModelName("NONE"), enabled=False)
 
 
 _embedding_defaults = _get_default_embedding_settings()
 
 
-def _create_embedding_config(provider: Provider, model: LiteralString) -> EmbeddingConfigT:
+def _create_embedding_config(provider: Provider, model: ModelNameT) -> EmbeddingConfigT:
     """Create provider-specific embedding config based on provider type."""
     if provider == Provider.VOYAGE:
         return VoyageEmbeddingConfig(model_name=model)
@@ -277,9 +270,10 @@ DefaultEmbeddingProviderSettings = (
     (
         EmbeddingProviderSettings(
             provider=_embedding_defaults.provider,
-            model_name=_embedding_defaults.model,
+            model_name=_embedding_defaults.model,  # ty:ignore[invalid-argument-type]
             embedding_config=_create_embedding_config(
-                _embedding_defaults.provider, _embedding_defaults.model
+                _embedding_defaults.provider,
+                _embedding_defaults.model,  # ty:ignore[invalid-argument-type]
             ),
         ),
     )
@@ -295,23 +289,27 @@ def _get_default_sparse_embedding_settings() -> DeterminedDefaults:
             if lib == "sentence-transformers":
                 return DeterminedDefaults(
                     provider=Provider.SENTENCE_TRANSFORMERS,
-                    model="opensearch/opensearch-neural-sparse-encoding-doc-v3-gte",
+                    model=ModelName("opensearch/opensearch-neural-sparse-encoding-doc-v3-gte"),
                     enabled=True,
                 )
             if lib in {"fastembed-gpu", "fastembed"}:
                 return DeterminedDefaults(
-                    provider=Provider.FASTEMBED, model="prithivida/Splade_PP_en_v1", enabled=True
+                    provider=Provider.FASTEMBED,
+                    model=ModelName("prithivida/Splade_PP_en_v1"),
+                    enabled=True,
                 )
     # qdrant_client has built-in BM25 support
     # if FastEmbed isn't available, we will use that automatically
-    return DeterminedDefaults(provider=Provider.FASTEMBED, model="qdrant/bm25", enabled=True)
+    return DeterminedDefaults(
+        provider=Provider.FASTEMBED, model=ModelName("qdrant/bm25"), enabled=True
+    )
 
 
 _sparse_embedding_defaults = _get_default_sparse_embedding_settings()
 
 
 def _create_sparse_embedding_config(
-    provider: Provider, model: LiteralString
+    provider: Provider, model: ModelNameT
 ) -> SparseEmbeddingConfigT:
     """Create provider-specific sparse embedding config based on provider type."""
     if provider == Provider.SENTENCE_TRANSFORMERS:
@@ -324,9 +322,10 @@ def _create_sparse_embedding_config(
 DefaultSparseEmbeddingProviderSettings = (
     SparseEmbeddingProviderSettings(
         provider=_sparse_embedding_defaults.provider,
-        model_name=_sparse_embedding_defaults.model,
+        model_name=_sparse_embedding_defaults.model,  # ty:ignore[invalid-argument-type]
         sparse_embedding_config=_create_sparse_embedding_config(
-            _sparse_embedding_defaults.provider, _sparse_embedding_defaults.model
+            _sparse_embedding_defaults.provider,
+            _sparse_embedding_defaults.model,  # ty:ignore[invalid-argument-type]
         ),
     ),
 )
@@ -338,19 +337,19 @@ def _get_default_reranking_settings() -> DeterminedDefaults:
         if importlib.util.find_spec(lib) is not None:
             if lib == "voyageai":
                 return DeterminedDefaults(
-                    provider=Provider.VOYAGE, model="voyage:rerank-2.5", enabled=True
+                    provider=Provider.VOYAGE, model=ModelName("voyage:rerank-2.5"), enabled=True
                 )
             if lib in {"fastembed-gpu", "fastembed"}:
                 return DeterminedDefaults(
                     provider=Provider.FASTEMBED,
-                    model="fastembed:jinaai/jina-reranking-v2-base-multilingual",
+                    model=ModelName("fastembed:jinaai/jina-reranking-v2-base-multilingual"),
                     enabled=True,
                 )
             if lib == "sentence-transformers":
                 return DeterminedDefaults(
                     provider=Provider.SENTENCE_TRANSFORMERS,
                     # on the heavier side for what we aim for as a default but very capable
-                    model="sentence-transformers:BAAI/bge-reranking-v2-m3",
+                    model=ModelName("sentence-transformers:BAAI/bge-reranking-v2-m3"),
                     enabled=True,
                 )
     possible_libs = [
@@ -366,13 +365,13 @@ def _get_default_reranking_settings() -> DeterminedDefaults:
             else "You have no known reranking libraries installed."
         ),
     )
-    return DeterminedDefaults(provider=Provider.NOT_SET, model="NONE", enabled=False)
+    return DeterminedDefaults(provider=Provider.NOT_SET, model=None, enabled=False)
 
 
 _reranking_defaults = _get_default_reranking_settings()
 
 
-def _create_reranking_config(provider: Provider, model: LiteralString) -> RerankingConfigT:
+def _create_reranking_config(provider: Provider, model: ModelNameT) -> RerankingConfigT:
     """Create provider-specific reranking config based on provider type."""
     if provider == Provider.VOYAGE:
         return VoyageRerankingConfig(model_name=model)
@@ -387,9 +386,10 @@ DefaultRerankingProviderSettings = (
     (
         RerankingProviderSettings(
             provider=_reranking_defaults.provider,
-            model_name=_reranking_defaults.model,
+            model_name=_reranking_defaults.model,  # ty:ignore[invalid-argument-type]
             reranking_config=_create_reranking_config(
-                _reranking_defaults.provider, _reranking_defaults.model
+                _reranking_defaults.provider,
+                _reranking_defaults.model,  # ty:ignore[invalid-argument-type]
             ),
         ),
     )

@@ -20,6 +20,7 @@ from pydantic import UUID7, ConfigDict, PrivateAttr
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from codeweaver.core import BasedModel, CodeChunk, Provider, StrategizedQuery
+from codeweaver.core.types import ModelNameT
 from codeweaver.providers.config import VectorStoreProviderSettings
 from codeweaver.providers.exceptions import CircuitBreakerOpenError
 from codeweaver.providers.types import CircuitBreakerState, EmbeddingCapabilityGroup
@@ -190,7 +191,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
         return "cosine"
 
     @property
-    def dense_model(self) -> str | None:
+    def dense_model(self) -> ModelNameT | None:
         """Get the name of the dense embedding model.
 
         Returns:
@@ -203,7 +204,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
         )
 
     @property
-    def sparse_model(self) -> str | None:
+    def sparse_model(self) -> ModelNameT | None:
         """Get the name of the sparse embedding model.
 
         Returns:

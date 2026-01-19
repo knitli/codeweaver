@@ -572,8 +572,13 @@ class _BaseQdrantVectorStoreProviderSettings(VectorStoreProviderSettings):
             self,
             "collection",
             CollectionConfig.model_validate(
-                **(self._default_collection(project_name=project_name, project_path=project_path))
-                | (collection or {})
+                **(
+                    self._default_collection(
+                        project_name=project_name, project_path=project_path
+                    ).model_dump()
+                    | collection
+                    or {}
+                )
             ),
         )
         object.__setattr__(self, "as_backup", as_backup)
@@ -596,7 +601,8 @@ class _BaseQdrantVectorStoreProviderSettings(VectorStoreProviderSettings):
             collection_name=generate_collection_name(
                 is_backup=self.as_backup, project_name=project_name, project_path=project_path
             ),
-            vector_config={"dense": VectorParams(), "sparse": SparseVectorParams()},
+            vectors_config={"dense": VectorParams()},
+            sparse_vectors_config={"sparse": SparseVectorParams()},
         )
 
     @model_validator(mode="after")

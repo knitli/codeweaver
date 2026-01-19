@@ -12,27 +12,19 @@ and chunking functionality without the full CodeWeaver server.
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Any
 
 from pydantic import Field
 from pydantic_settings import SettingsConfigDict
 
-from codeweaver.core.config._logging import LoggingSettingsDict
-from codeweaver.core.config.telemetry import TelemetrySettings
-from codeweaver.core.types import (
-    UNSET,
-    AnonymityConversion,
-    BaseCodeWeaverSettings,
-    FilteredKey,
-    FilteredKeyT,
-    Unset,
-)
-from codeweaver.engine import ChunkerSettings, IndexerSettings
-from codeweaver.engine.config.failover import FailoverSettings
-from codeweaver.providers.config import ProviderSettings
+from codeweaver.core.types import UNSET, Unset
+from codeweaver.engine import ChunkerSettings, DefaultChunkerSettings, IndexerSettings
+from codeweaver.engine.config.failover import DefaultFailoverSettings, FailoverSettings
+from codeweaver.engine.config.indexer import DefaultIndexerSettings
+from codeweaver.providers.config import CodeWeaverProviderSettings
 
 
-class CodeWeaverEngineSettings(BaseCodeWeaverSettings):
+class CodeWeaverEngineSettings(CodeWeaverProviderSettings):
     """Root settings wrapper for engine-only installation.
 
     When only the engine package is installed (with core and providers),
@@ -63,7 +55,7 @@ class CodeWeaverEngineSettings(BaseCodeWeaverSettings):
         ChunkerSettings under their respective fields.
     """
 
-    model_config = model_config = BaseCodeWeaverSettings.model_config | SettingsConfigDict(
+    model_config = model_config = CodeWeaverProviderSettings.model_config | SettingsConfigDict(
         title="CodeWeaver Engine Settings"
     )
 
@@ -91,42 +83,28 @@ class CodeWeaverEngineSettings(BaseCodeWeaverSettings):
         ),
     ] = UNSET
 
-    provider: Annotated[
-        ProviderSettings | Unset,
-        Field(
-            default_factory=ProviderSettings,
-            description="Provider configuration for embedding, vector store, reranking, etc.",
-        ),
-    ] = UNSET
-
-    logging: Annotated[
-        LoggingSettingsDict | Unset,
-        Field(
-            default=UNSET,
-            description="Logging configuration for CodeWeaver",
-            validate_default=False,
-        ),
-    ] = UNSET
-
-    telemetry: Annotated[
-        TelemetrySettings | Unset,
-        Field(
-            default=UNSET,
-            description="Telemetry configuration for CodeWeaver",
-            validate_default=False,
-        ),
-    ] = UNSET
-
-    def _initialize(self) -> None:
+    def _initialize(self, **kwargs: Any) -> dict[str, Any]:  # ty:ignore[invalid-method-override]
         """Initialize engine settings - nothing special needed."""
-
-    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion] | None:
-        """Define telemetry filtering for engine settings."""
-        return {
-            FilteredKey("project_path"): AnonymityConversion.HASH,
-            FilteredKey("user_config_dir"): AnonymityConversion.HASH,
-            FilteredKey("config_file"): AnonymityConversion.HASH,
-        }
+        if kwargs.get("indexer") is UNSET:
+            kwargs["indexer"] = IndexerSettings.model_construct(**DefaultIndexerSettings)
+        else:
+            kwargs["indexer"] = IndexerSettings(
+                **self._resolve_default_and_provided(DefaultIndexerSettings, kwargs["indexer"])  # ty:ignore[invalid-argument-type]
+            )
+        if kwargs.get("chunker") is UNSET:
+            kwargs["chunker"] = ChunkerSettings.model_construct(**DefaultChunkerSettings)
+        else:
+            kwargs["chunker"] = ChunkerSettings.model_validate(
+                self._resolve_default_and_provided(DefaultChunkerSettings, kwargs["chunker"])  # ty:ignore[invalid-argument-type]
+            )
+        if kwargs.get("failover") is UNSET:
+            kwargs["failover"] = FailoverSettings.model_construct(**DefaultFailoverSettings)
+        else:
+            kwargs["failover"] = FailoverSettings.model_validate(
+                self._resolve_default_and_provided(DefaultFailoverSettings, kwargs["failover"])  # ty:ignore[invalid-argument-type]
+            )
+        kwargs |= super()._initialize(**kwargs)
+        return kwargs
 
 
 __all__ = ("CodeWeaverEngineSettings",)

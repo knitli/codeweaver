@@ -53,7 +53,11 @@ if TYPE_CHECKING:
         ConfigurationValue,
         resolve_all_configs,
     )
-    from codeweaver.core.config.telemetry import DefaultTelemetrySettings, TelemetrySettings
+    from codeweaver.core.config.telemetry import (
+        DefaultTelemetrySettings,
+        TelemetrySettings,
+        TelemetrySettingsDict,
+    )
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "CodeWeaverCoreSettings": (__spec__.parent, "core_settings"),
@@ -74,6 +78,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "SerializableLoggingFilter": (__spec__.parent, "_logging"),
     "SettingsEnvVars": (__spec__.parent, "envs"),
     "TelemetrySettings": (__spec__.parent, "telemetry"),
+    "TelemetrySettingsDict": (__spec__.parent, "telemetry"),
     "clear_configurables": (__spec__.parent, "registry"),
     "clear_defaults": (__spec__.parent, "defaults"),
     "environment_variables": (__spec__.parent, "envs"),
@@ -108,6 +113,7 @@ __all__ = (
     "SerializableLoggingFilter",
     "SettingsEnvVars",
     "TelemetrySettings",
+    "TelemetrySettingsDict",
     "clear_configurables",
     "clear_defaults",
     "environment_variables",

@@ -305,6 +305,11 @@ _classifier: GrammarBasedClassifier | None = None
 _resolving_grammar: ContextVar[bool] = ContextVar("_resolving_grammar", default=False)
 
 
+def _get_registry(registry: ThingRegistryDep = INJECTED) -> ThingRegistry:
+    """Lazily import and return the global ThingRegistry instance."""
+    return registry
+
+
 def _get_classifier() -> GrammarBasedClassifier:
     """Lazily import and return the global GrammarBasedClassifier instance."""
     global _classifier
@@ -754,7 +759,7 @@ class Category(BasedModel):
 
         token = _resolving_grammar.set(True)
         try:
-            registry = self._registry()
+            registry = _get_registry()
             return frozenset(
                 thing
                 for name in self.member_thing_names
@@ -881,7 +886,7 @@ class Connection(BasedModel):
 
     def __init__(self, **data: Any) -> None:
         """Initialize a Connection."""
-        registry = self._registry()
+        registry = _get_registry()
         if data["target_thing_names"]:
             data["target_thing_names"] = tuple(
                 cat_name_normalizer(name)
@@ -892,6 +897,10 @@ class Connection(BasedModel):
             )
 
         super().__init__(**data)
+
+    @staticmethod
+    def _registry(registry: ThingRegistryDep) -> ThingRegistry:
+        return registry
 
     def _telemetry_keys(self) -> None:
         return None
@@ -904,9 +913,7 @@ class Connection(BasedModel):
 
         token = _resolving_grammar.set(True)
         try:
-            from codeweaver.semantic.registry import get_registry
-
-            registry = get_registry()
+            registry = _get_registry()
             return frozenset(
                 thing
                 for name in self.target_thing_names
@@ -1053,9 +1060,7 @@ class DirectConnection(Connection):
     def specific_target(self) -> ThingOrCategoryType | None:
         """Get the specific target Thing if this DirectConnection requires exactly one specific target; otherwise, return None."""
         if self.requires_specific_target:
-            from codeweaver.semantic.registry import get_registry
-
-            registry = get_registry()
+            registry = _get_registry()
             target_name = self.target_thing_names[0]
             return registry.get_thing_by_name(target_name, language=self.language)
         return None
@@ -1176,9 +1181,7 @@ class Grammar(DataclassSerializationMixin):
             A Grammar instance for the specified language.
         """
         try:
-            from codeweaver.semantic.registry import get_registry
-
-            registry: ThingRegistry = get_registry()
+            registry: ThingRegistry = _get_registry()
 
         except Exception:
             from codeweaver.semantic.node_type_parser import NodeTypeParser
@@ -1289,18 +1292,14 @@ class Grammar(DataclassSerializationMixin):
     @property
     def direct_connections_by_source(self) -> MappingProxyType[ThingName, list[DirectConnection]]:
         """Get DirectConnections grouped by source Thing name."""
-        from codeweaver.semantic.registry import get_registry
-
-        return MappingProxyType(get_registry().direct_connections[self.language])
+        return MappingProxyType(_get_registry().direct_connections[self.language])
 
     @property
     def positional_connections_by_source(
         self,
     ) -> MappingProxyType[ThingName, PositionalConnections]:
         """Get PositionalConnections grouped by source Thing name."""
-        from codeweaver.semantic.registry import get_registry
-
-        return MappingProxyType(get_registry().positional_connections[self.language])
+        return MappingProxyType(_get_registry().positional_connections[self.language])
 
     @property
     def category_groups(self) -> MappingProxyType[CategoryName, frozenset[ThingType]]:

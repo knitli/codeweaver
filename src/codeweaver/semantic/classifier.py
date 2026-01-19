@@ -32,15 +32,23 @@ from codeweaver.core import (
     generate_field_title,
     rpartial,
 )
+from codeweaver.core.di import INJECTED
 from codeweaver.semantic.classifications import ImportanceRank, SemanticClass
+from codeweaver.semantic.dependencies import ThingRegistryDep
 
 
 if TYPE_CHECKING:
     from codeweaver.semantic.ast_grep import AstThing
     from codeweaver.semantic.grammar import CompositeThing, Token
+    from codeweaver.semantic.registry import ThingRegistry
 
 
 CONFIDENCE_THRESHOLD = 0.80
+
+
+def _get_registry(registry: ThingRegistryDep = INJECTED) -> ThingRegistry:
+    """Lazily import and return the global ThingRegistry instance."""
+    return registry
 
 
 def is_token(thing: CompositeThing | Token) -> TypeIs[Token]:
@@ -461,9 +469,7 @@ class GrammarBasedClassifier:
         """Classify known exceptions that don't fit other patterns or that have very high confidence based on their specific characteristics."""
         if classification := self._handle_comment_cases(thing, language):
             return classification
-        from codeweaver.semantic.registry import get_registry
-
-        registry = get_registry()
+        registry = self._registry()
         result_func = rpartial(
             self._to_classification_result,
             method=ClassificationMethod.SPECIFIC_THING,
@@ -723,9 +729,7 @@ class GrammarBasedClassifier:
         Returns:
             Classification result with reduced confidence, or None if no match found
         """
-        from codeweaver.semantic.registry import get_registry
-
-        registry = get_registry()
+        registry = _get_registry()
 
         thing_name = str(thing.name)
         if (

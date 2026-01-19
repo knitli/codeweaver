@@ -294,9 +294,11 @@ class TestGetEmbeddingModelInfo:
 class TestManifestPersistence:
     """Tests for saving/loading manifests with embedding metadata."""
 
-    def test_save_and_load_with_embedding_metadata(self, temp_project_dir):
+    def test_save_and_load_with_embedding_metadata(self, temp_project_dir, tmpdir):
         """Test that embedding metadata persists across save/load."""
-        manager = FileManifestManager(project_path=temp_project_dir)
+        manager = FileManifestManager(
+            project_path=temp_project_dir, manifest_dir=tmpdir, project_name="test_project"
+        )
         manifest = manager.create_new()
 
         # Add file with embedding metadata

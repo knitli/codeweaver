@@ -1,3 +1,4 @@
+# sourcery skip: lambdas-should-be-short
 # SPDX-FileCopyrightText: 2026 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
@@ -11,16 +12,12 @@ is installed (logging and telemetry configuration only).
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Any
 
-from pydantic import Field
-
-from codeweaver.core.config._logging import LoggingSettingsDict
-from codeweaver.core.config.telemetry import TelemetrySettings
-from codeweaver.core.types.aliases import FilteredKey, FilteredKeyT
-from codeweaver.core.types.enum import AnonymityConversion
-from codeweaver.core.types.sentinel import UNSET, Unset
 from codeweaver.core.types.settings_model import BaseCodeWeaverSettings
+
+
+SCHEMA_VERSION = "1.2.0"
 
 
 class CodeWeaverCoreSettings(BaseCodeWeaverSettings):
@@ -45,34 +42,9 @@ class CodeWeaverCoreSettings(BaseCodeWeaverSettings):
         "description": "Core settings for CodeWeaver (logging and telemetry only).",
     }
 
-    logging: Annotated[
-        LoggingSettingsDict | Unset,
-        Field(
-            default=UNSET,
-            description="Logging configuration for CodeWeaver",
-            validate_default=False,
-        ),
-    ] = UNSET
-
-    telemetry: Annotated[
-        TelemetrySettings | Unset,
-        Field(
-            default=UNSET,
-            description="Telemetry configuration for CodeWeaver",
-            validate_default=False,
-        ),
-    ] = UNSET
-
-    def _initialize(self) -> None:
+    def _initialize(self, **kwargs: Any) -> dict[str, Any]:
         """Initialize core settings - nothing special needed."""
-
-    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion] | None:
-        """Define telemetry filtering for core settings."""
-        return {
-            FilteredKey("project_path"): AnonymityConversion.HASH,
-            FilteredKey("user_config_dir"): AnonymityConversion.HASH,
-            FilteredKey("config_file"): AnonymityConversion.HASH,
-        }
+        return kwargs
 
 
 __all__ = ("CodeWeaverCoreSettings",)

@@ -27,7 +27,7 @@ from fastmcp.server.server import DuplicateBehavior
 from fastmcp.tools import Tool
 from mcp.server.auth.settings import AuthSettings
 from mcp.server.lowlevel.server import LifespanResultT
-from pydantic import DirectoryPath, Field, FilePath, PositiveFloat, PositiveInt, SecretStr
+from pydantic import Field, PositiveFloat, PositiveInt, SecretStr
 from starlette.middleware import Middleware as ASGIMiddleware
 from uvicorn.config import (
     SSL_PROTOCOL_VERSION,
@@ -42,18 +42,13 @@ from codeweaver.core import (
     AnonymityConversion,
     BasedModel,
     LoggingConfigDict,
-    TelemetrySettingsDict,
     Unset,
 )
-from codeweaver.engine import ChunkerSettingsDict, IndexerSettingsDict
 from codeweaver.server.mcp import McpMiddleware
 
 
 if TYPE_CHECKING:
     from codeweaver.core import AnonymityConversion, FilteredKeyT
-    from codeweaver.core._logging import LoggingSettingsDict
-    from codeweaver.providers import ProviderSettingsDict
-    from codeweaver.server.config.middleware import MiddlewareOptions
 
 
 # ===========================================================================
@@ -114,35 +109,6 @@ class EndpointSettingsDict(TypedDict, total=False):
     enable_state: NotRequired[bool | Unset]
     enable_settings: NotRequired[bool | Unset]
     enable_version: NotRequired[bool | Unset]
-
-
-class CodeWeaverSettingsDict(TypedDict, total=False):
-    """TypedDict for CodeWeaver settings.
-
-    Not intended to be used directly; used for internal type checking and validation.
-    """
-
-    project_path: NotRequired[DirectoryPath | Unset]
-    project_name: NotRequired[str | Unset]
-    provider: NotRequired[ProviderSettingsDict | Unset]
-    config_file: NotRequired[FilePath | Unset]
-    token_limit: NotRequired[PositiveInt | Unset]
-    max_file_size: NotRequired[PositiveInt | Unset]
-    max_results: NotRequired[PositiveInt | Unset]
-    # Mcp HTTP Server Settings
-    mcp_server: NotRequired[FastMcpServerSettingsDict | Unset]
-    stdio_server: NotRequired[FastMcpServerSettingsDict | Unset]
-    logging: NotRequired[LoggingSettingsDict | Unset]
-    middleware: NotRequired[MiddlewareOptions | Unset]
-    chunker: NotRequired[ChunkerSettingsDict | Unset]
-    uvicorn: NotRequired[UvicornServerSettingsDict | Unset]
-    # Management Server (Always HTTP, independent of MCP transport)
-    management_host: NotRequired[str | Unset]
-    management_port: NotRequired[PositiveInt | Unset]
-    indexer: NotRequired[IndexerSettingsDict | Unset]
-    telemetry: NotRequired[TelemetrySettingsDict | Unset]
-    endpoints: NotRequired[EndpointSettingsDict | Unset]
-    default_mcp_config: NotRequired[dict[str, dict] | Unset]
 
 
 # ===========================================================================
@@ -355,7 +321,6 @@ class MCPConfigDict(TypedDict):
 
 __all__ = (
     "CodeWeaverMCPConfigDict",
-    "CodeWeaverSettingsDict",
     "FastMcpHttpRunArgs",
     "FastMcpServerSettingsDict",
     "MCPConfigDict",

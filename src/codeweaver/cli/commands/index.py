@@ -79,10 +79,12 @@ async def _derive_collection_name(
         and isinstance(provider_settings, ProviderSettings)
         and (vector_settings := provider_settings.vector_store)
         and vector_settings is not Unset
-        and (vector_provider_config := vector_settings.get("provider_settings"))
     ):
-        collection_name = vector_provider_config.get("collection_name", collection_name)
-
+        return (
+            vector_settings[0].collection_name
+            if isinstance(vector_settings, tuple) and len(vector_settings) > 0
+            else vector_settings.collection_name  # ty:ignore[unresolved-attribute]
+        )
     return collection_name
 
 
@@ -122,7 +124,7 @@ async def _perform_clear_operation(
     display.print_info("Clearing vector store and checkpoints...")
 
     container = get_container()
-    
+
     # Resolve managers
     checkpoint_mgr = await container.resolve(CheckpointManager)
     manifest = await container.resolve(FileManifestManager)
@@ -149,7 +151,7 @@ async def _perform_clear_operation(
 
     display.print_success("Clear operation complete")
     display.console.print()
-    
+
     # Clean up local backup files if they exist
     indexes_dir = (
         settings.indexer.cache_dir
@@ -225,10 +227,7 @@ def _check_and_print_server_status(display: StatusDisplay):
 
 
 async def _run_standalone_indexing(
-    settings: CodeWeaverSettings,
-    *,
-    force_reindex: bool,
-    display: StatusDisplay,
+    settings: CodeWeaverSettings, *, force_reindex: bool, display: StatusDisplay
 ) -> None:
     """Run standalone indexing operation.
 
@@ -243,7 +242,7 @@ async def _run_standalone_indexing(
     from codeweaver.core import get_container
 
     display.print_info("Initializing indexer...")
-    
+
     container = get_container()
     indexing_service = await container.resolve(IndexingService)
 
@@ -402,14 +401,17 @@ async def index(
     try:
         # Setup DI Container
         container = setup_cli_di(config_file, project_path, verbose=verbose)
-        
+
         # We need to retrieve settings from the container now
         from codeweaver.core.dependencies import CodeWeaverSettingsType
+
         settings = await container.resolve(CodeWeaverSettingsType)
 
         # Handle --clear flag
         if clear:
-            await _perform_clear_operation(settings, Path(str(settings.project_path)), yes=yes, display=display)
+            await _perform_clear_operation(
+                settings, Path(str(settings.project_path)), yes=yes, display=display
+            )
             force_reindex = True  # Continue to reindex after clearing
 
         # Check server status and decide whether to proceed

@@ -61,7 +61,7 @@ type HealthServiceDep = Annotated[
 ]
 
 
-@dependency_provider(CodeWeaverState, scope="singleton")
+@dependency_provider(CodeWeaverState, scope="singleton")  # ty:ignore[invalid-argument-type]
 async def _create_cw_state(
     settings: SettingsDep = INJECTED,
     statistics: StatisticsDep = INJECTED,

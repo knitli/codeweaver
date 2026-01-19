@@ -201,4 +201,4 @@ DefaultTelemetrySettings = TelemetrySettingsDict(
 )  # type: ignore
 
 
-__all__ = ("TelemetrySettings", "TelemetrySettingsDict")
+__all__ = ("DefaultTelemetrySettings", "TelemetrySettings", "TelemetrySettingsDict")

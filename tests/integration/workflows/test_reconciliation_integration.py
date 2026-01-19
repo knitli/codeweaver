@@ -27,7 +27,6 @@ Coverage Areas:
    - test_reconciliation_not_called_when_no_providers
 """
 
-import asyncio
 import logging
 
 from pathlib import Path
@@ -40,7 +39,7 @@ from codeweaver.core import uuid7
 from codeweaver.engine.services.indexing_service import IndexingService
 from codeweaver.providers import QdrantVectorStoreProvider
 
-# sourcery skip: dont-import-test-modules
+# sourcery skip: dont-import-test-modules, lambdas-should-be-short
 from tests.conftest import create_test_chunk_with_embeddings
 
 
@@ -139,24 +138,27 @@ async def test_index_project_reconciliation_without_force_reindex(
 
     # Resolve indexing service
     indexing_service = await clean_container.resolve(IndexingService)
-    
-    # Manually inject project path if needed, though clean_container resolution should handle it 
+
+    # Manually inject project path if needed, though clean_container resolution should handle it
     # if dependencies are setup correctly for tests. For safety in test:
     indexing_service._project_path = project_path
+    manifest_path = tmp_path / ".manifests"
 
     # Initialize manifest manager
     from codeweaver.engine import FileManifestManager
 
-    indexing_service._manifest_manager = FileManifestManager(project_path=project_path)
+    indexing_service._manifest_manager = FileManifestManager(
+        project_path=project_path, manifest_dir=manifest_path, project_name="test_project"
+    )
     indexing_service._file_manifest = indexing_service._manifest_manager.create_new()
 
     # Simulate manifest state needing reconciliation (missing sparse)
     # Note: IndexingService doesn't have explicit reconciliation method yet like add_missing_embeddings...
     # But prime_index/index_project should handle re-indexing if manifest says so.
-    
+
     # We need to set the manifest so file_needs_reindexing returns true for "missing sparse"
     # The file discovery process in IndexingService checks manifest.
-    
+
     indexing_service._file_manifest.add_file(
         path=Path("module1.py"),
         content_hash="test_hash_1",
@@ -164,7 +166,7 @@ async def test_index_project_reconciliation_without_force_reindex(
         dense_embedding_provider="test-provider",
         dense_embedding_model="test-dense-model",
         has_dense_embeddings=True,
-        has_sparse_embeddings=False, # Missing sparse -> needs reindex
+        has_sparse_embeddings=False,  # Missing sparse -> needs reindex
     )
 
     indexing_service._file_manifest.add_file(
@@ -174,42 +176,45 @@ async def test_index_project_reconciliation_without_force_reindex(
         dense_embedding_provider="test-provider",
         dense_embedding_model="test-dense-model",
         has_dense_embeddings=True,
-        has_sparse_embeddings=False, # Missing sparse -> needs reindex
+        has_sparse_embeddings=False,  # Missing sparse -> needs reindex
     )
 
     # Mock discovery to verify it finds these files
     # We rely on actual discovery logic here, but we need to mock blake hash calculation
     # or ensure files exist (they do).
-    
+
     # Mock _get_current_embedding_models to match what we expect
     object.__setattr(
         indexing_service,
         "_get_current_embedding_models",
-        lambda:
-            {
-                "dense_provider": "test-provider",
-                "dense_model": "test-dense-model",
-                "sparse_provider": "test-sparse-provider",
-                "sparse_model": "test-sparse-model",
-            },
+        lambda: {
+            "dense_provider": "test-provider",
+            "dense_model": "test-dense-model",
+            "sparse_provider": "test-sparse-provider",
+            "sparse_model": "test-sparse-model",
+        },
     )
-    
+
     # We need to mock get_blake_hash to match manifest hash if we want precise control,
-    # or just let it calculate real hash and update manifest. 
+    # or just let it calculate real hash and update manifest.
     # But wait, we WANT it to reindex.
     # If content hash matches but provider config differs (missing sparse), it SHOULD reindex.
-    
+
     # Let's mock _discover_files_to_index to return our files directly to skip rignore complexity
     # and focus on the processing logic.
     original_discover = indexing_service._discover_files_to_index
-    object.__setattr__(indexing_service, "_discover_files_to_index", lambda progress_callback=None: [file1, file2])
+    object.__setattr__(
+        indexing_service, "_discover_files_to_index", lambda progress_callback=None: [file1, file2]
+    )
 
     # Trigger indexing
-    files_indexed = await indexing_service.index_project(force_reindex=False, add_dense=True, add_sparse=True)
+    files_indexed = await indexing_service.index_project(
+        force_reindex=False, add_dense=True, add_sparse=True
+    )
 
     # Verify 2 files were indexed (reconciled)
     assert files_indexed == 2
-    
+
     # Verify embed_documents was called on sparse provider
     assert mock_sparse_provider.embed_documents.called
 
@@ -239,7 +244,8 @@ async def test_reconciliation_skipped_when_no_files_need_embeddings(
 
     project_path = tmp_path / "test_project_complete"
     project_path.mkdir()
-    
+    manifest_path = tmp_path / ".test_manifest"
+
     file1 = project_path / "module.py"
     file1.write_text("def func():\n    pass")
 
@@ -262,15 +268,17 @@ async def test_reconciliation_skipped_when_no_files_need_embeddings(
     indexing_service._project_path = project_path
 
     # Initialize manifest
-    from codeweaver.engine import FileManifestManager
     from codeweaver.core import get_blake_hash
+    from codeweaver.engine import FileManifestManager
 
-    indexing_service._manifest_manager = FileManifestManager(project_path=project_path)
+    indexing_service._manifest_manager = FileManifestManager(
+        project_path=project_path, manifest_dir=manifest_path, project_name="test_project"
+    )
     indexing_service._file_manifest = indexing_service._manifest_manager.create_new()
 
     # Track file as having BOTH embeddings and matching hash
     content_hash = get_blake_hash(file1.read_bytes())
-    
+
     indexing_service._file_manifest.add_file(
         path=Path("module.py"),
         content_hash=content_hash,
@@ -283,14 +291,14 @@ async def test_reconciliation_skipped_when_no_files_need_embeddings(
         has_sparse_embeddings=True,
     )
 
-    # Use REAL discovery (which checks manifest) 
+    # Use REAL discovery (which checks manifest)
     # Since hash and providers match, it should return empty list
-    
+
     # We need to make sure _get_current_embedding_models returns matching info
     # IndexingService uses the provider instances to get this.
     # Our mocks need attributes set.
     # mock_dense_provider.name.variable = "test-provider" set above
-    
+
     files_indexed = await indexing_service.index_project(force_reindex=False)
 
     # Verify no files were processed

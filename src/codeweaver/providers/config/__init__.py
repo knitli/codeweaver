@@ -213,8 +213,6 @@ __all__ = (
     "BaseEmbeddingConfig",
     "BaseEmbeddingProviderSettings",
     "BaseProviderSettings",
-    "BaseProviderSettings",
-    "BaseProviderSettingsDict",
     "BaseProviderSettingsDict",
     "BaseRerankingConfig",
     "BedrockClientOptions",
@@ -266,6 +264,7 @@ __all__ = (
     "OpenAIEmbeddingConfig",
     "OpenAIEmbeddingRequestParams",
     "ProviderConfigProfile",
+    "ProviderConfigProfile",
     "ProviderNameMap",
     "ProviderProfile",
     "ProviderSettings",
@@ -291,9 +290,6 @@ __all__ = (
     "VoyageRerankingConfig",
     "VoyageRerankingOptionsDict",
     "discriminate_azure_embedding_client_options",
-    "get_profile",
-    "get_profile",
-    "get_profile",
     "merge_agent_model_settings",
 )
 

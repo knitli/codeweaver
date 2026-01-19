@@ -155,7 +155,7 @@ def sample_chunk():
         chunk_name="test.py:test_function",
         file_path=Path("test.py"),
         content="def test_function():\n    pass",
-        line_range=Span(start=1, end=2, _source_id=uuid7()),
+        line_range=Span(start=1, end=2, source_id=uuid7()),
     )
 
     # Register embeddings properly in the registry
@@ -273,7 +273,7 @@ class TestQdrantProviderContract:
                 chunk_name=f"test_{i}.py:func",
                 file_path=Path(f"test_{i}.py"),
                 content=f"def func_{i}(): pass",
-                line_range=Span(start=1, end=1, _source_id=uuid7()),
+                line_range=Span(start=1, end=1, source_id=uuid7()),
             )
             # Register embeddings properly
             chunk_with_emb = _register_chunk_embeddings(chunk, dense=[float(i)] * 768)

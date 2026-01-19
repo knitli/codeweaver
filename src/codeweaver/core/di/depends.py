@@ -195,6 +195,7 @@ class Depends:
         *,
         use_cache: bool = True,
         scope: Literal["singleton", "request", "function"] | None = None,
+        tags: set[str] | None = None,
     ) -> None:
         """Initialize the dependency marker.
 
@@ -203,10 +204,12 @@ class Depends:
             use_cache: Whether to cache the result within a scope.
             scope: Lifecycle scope - singleton (app lifetime), request (per request),
                    function (per call). None means default to singleton if use_cache=True.
+            tags: Optional set of tags to categorize the dependency.
         """
         self.dependency = dependency
         self.use_cache = use_cache
         self.scope = scope
+        self.tags = tags
 
     def __repr__(self) -> str:
         """Return a string representation of the marker."""
@@ -219,9 +222,10 @@ def depends[T: Any](
     *,
     use_cache: bool = True,
     scope: Literal["singleton", "request", "function"] | None = None,
+    tags: set[str] | None = None,
 ) -> Depends[T]:
     """Helper function to create a Depends marker."""
-    return Depends(dependency, use_cache=use_cache, scope=scope)
+    return Depends(dependency, use_cache=use_cache, scope=scope, tags=tags)
 
 
 def _is_injected_proxy[Dep: Any](value: Any) -> TypeIs[_InjectedProxy[Dep, DependsPlaceholder]]:

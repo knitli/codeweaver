@@ -214,7 +214,6 @@ if TYPE_CHECKING:
         MemoryVectorStoreProvider,
         QdrantVectorStoreProvider,
         VectorStoreProvider,
-        resolve_dimensions,
     )
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
@@ -417,7 +416,6 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "load_default_agent_providers": (__spec__.parent, "agent"),
     "load_default_data_providers": (__spec__.parent, "data"),
     "override_allow_model_requests": (__spec__.parent, "agent"),
-    "resolve_dimensions": (__spec__.parent, "vector_stores"),
 })
 
 
@@ -632,7 +630,6 @@ __all__ = (
     "load_default_agent_providers",
     "load_default_data_providers",
     "override_allow_model_requests",
-    "resolve_dimensions",
 )
 
 

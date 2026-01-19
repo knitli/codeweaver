@@ -265,26 +265,18 @@ def temp_test_file(tmp_path: Path) -> Path:
 
 
 @pytest.fixture(autouse=True)
-def clear_all_deduplication_stores() -> GeneratorType:
+def clear_collection_name_cache() -> GeneratorType:
     """Clear all class-level deduplication stores before each test.
 
     This prevents test interference where chunks or embeddings from one test are
     marked as duplicates in subsequent tests.
     """
     from codeweaver.core import generate_collection_name
-    from codeweaver.engine import SemanticChunker
-    from codeweaver.providers import EmbeddingProvider, SparseEmbeddingProvider
 
     generate_collection_name.cache_clear()
-    SemanticChunker.clear_deduplication_stores()
-    EmbeddingProvider.clear_deduplication_stores()
-    SparseEmbeddingProvider.clear_deduplication_stores()
     yield
     # Clear again after test for extra safety
     generate_collection_name.cache_clear()
-    SemanticChunker.clear_deduplication_stores()
-    EmbeddingProvider.clear_deduplication_stores()
-    SparseEmbeddingProvider.clear_deduplication_stores()
 
 
 # ===========================================================================
@@ -545,7 +537,7 @@ def create_test_chunk_with_embeddings(
         file_path=file_path,
         language=language,  # ty:ignore[invalid-argument-type]
         content=content,
-        line_range=Span(start=line_start, end=line_end, _source_id=chunk_id),
+        line_range=Span(start=line_start, end=line_end, source_id=chunk_id),
     )
 
     registry = get_embedding_registry()

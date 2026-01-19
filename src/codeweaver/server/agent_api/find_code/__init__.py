@@ -89,8 +89,8 @@ from codeweaver.server.agent_api.find_code.types import CodeMatch, FindCodeRespo
 
 
 if TYPE_CHECKING:
-    from codeweaver.core import DictView
-    from codeweaver.server.config import CodeWeaverSettingsDict
+    from codeweaver.core.config.types import CodeWeaverSettingsDict
+    from codeweaver.core.types import DictView
 
 
 logger = logging.getLogger(__name__)

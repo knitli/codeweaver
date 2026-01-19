@@ -184,7 +184,7 @@ class IndexingService:
         self, progress_callback: ProgressCallback | None = None
     ) -> list[Path]:
         """Discover files using rignore walker and filter via manifest."""
-        walker_settings = self._settings.to_settings(project_path=self._project_path)
+        walker_settings = self._settings.to_settings()
         walker = rignore.Walker(**walker_settings)
 
         all_files: list[Path] = []

@@ -59,7 +59,7 @@ def sample_chunk() -> CodeChunk:
 
     return CodeChunk(
         content="def test_function():\n    return 42",
-        line_range=Span(start=1, end=2, _source_id=uuid7()),
+        line_range=Span(start=1, end=2, source_id=uuid7()),
         file_path=Path("test.py"),
         language="python",
     )

@@ -168,6 +168,7 @@ def detect_root_package() -> Literal["server", "engine", "provider", "core"]:
     logger.debug("Only core package detected - using CodeWeaverCoreSettings")
     return "core"
 
+CODEWEAVER_PREFIX = """[CodeWeaver]"""
 
 __all__ = (
     "detect_root_package",
