@@ -56,16 +56,13 @@ from pydantic import NonNegativeInt, PositiveInt
 
 from codeweaver.core import (
     INJECTED,
-    EmbeddingDep,
-    RerankingDep,
     SearchStrategy,
     Span,
-    SparseEmbeddingDep,
-    VectorStoreDep,
     capture_search_event,
     log_to_client_or_fallback,
 )
 from codeweaver.providers import EmbeddingProvider, RerankingProvider, VectorStoreProvider
+from codeweaver.providers.dependencies import AllProvidersDep
 from codeweaver.semantic import AgentTask
 from codeweaver.server.agent_api.find_code.conversion import convert_search_result_to_code_match
 from codeweaver.server.agent_api.find_code.filters import apply_filters
@@ -221,10 +218,7 @@ async def find_code(
     focus_languages: tuple[str, ...] | None = None,
     max_results: int = _set_max_results,
     context: Context | None = None,
-    vector_store: VectorStoreDep = INJECTED[VectorStoreProvider],
-    embedding_provider: EmbeddingDep = INJECTED[EmbeddingProvider],
-    sparse_provider: SparseEmbeddingDep = INJECTED[Any],
-    reranking_provider: RerankingDep = INJECTED[RerankingProvider | None],
+    providers: AllProvidersDep = INJECTED,
 ) -> FindCodeResponseSummary:
     """Find relevant code based on semantic search with intent-driven ranking.
 
@@ -237,10 +231,7 @@ async def find_code(
         focus_languages: Optional language filter
         max_results: Maximum number of results to return (default: 30)
         context: Optional FastMCP Context for client communication
-        vector_store: Injected vector store instance
-        embedding_provider: Injected dense embedding provider
-        sparse_provider: Injected sparse embedding provider
-        reranking_provider: Injected reranking provider
+        providers: dependency injected values of all configured providers (embedding, sparse embedding, reranking, vector store)
 
     Returns:
         FindCodeResponseSummary with ranked matches and metadata
@@ -250,7 +241,12 @@ async def find_code(
 
     # Manually resolve providers if not injected (DI fallback)
     from codeweaver.core import Depends, DependsPlaceholder, get_container
-    from codeweaver.providers import EmbeddingProvider, VectorStoreProvider
+    from codeweaver.providers import VectorStoreProvider
+
+    embedding_provider = providers.get("embedding")
+    sparse_provider = providers.get("sparse_embedding")
+    reranking_provider = providers.get("reranking")
+    vector_store = providers.get("vector_store")
 
     container = get_container()
 

@@ -152,20 +152,22 @@ def mock_embedding_provider() -> AsyncMock:
 def _get_caps() -> tuple[
     EmbeddingModelCapabilities, SparseEmbeddingModelCapabilities, RerankingModelCapabilities
 ]:
-    from codeweaver.core import get_model_registry
+    from codeweaver.providers.embedding.capabilities.resolver import (
+        EmbeddingCapabilityResolver,
+        SparseEmbeddingCapabilityResolver,
+    )
+    from codeweaver.providers.reranking.capabilities.resolver import RerankingCapabilityResolver
 
-    model_registry = get_model_registry()
     settings = (_get_configs(), _get_configs(sparse=True), _get_configs(rerank=True))
+    
+    embed_resolver = EmbeddingCapabilityResolver()
+    sparse_resolver = SparseEmbeddingCapabilityResolver()
+    rerank_resolver = RerankingCapabilityResolver()
+    
     return (
-        model_registry.get_embedding_capabilities(
-            settings[0]["provider"], settings[0]["model_settings"]["model"]
-        )[0],  # ty:ignore[non-subscriptable]
-        model_registry.get_sparse_embedding_capabilities(
-            settings[1]["provider"], settings[1]["model_settings"]["model"]
-        )[0],  # ty:ignore[non-subscriptable]
-        model_registry.get_reranking_capabilities(
-            settings[2]["provider"], settings[2]["model_settings"]["model"]
-        )[0],  # ty:ignore[non-subscriptable]
+        embed_resolver.resolve(settings[0]["model_settings"]["model"]),
+        sparse_resolver.resolve(settings[1]["model_settings"]["model"]),
+        rerank_resolver.resolve(settings[2]["model_settings"]["model"]),
     )
 
 
@@ -175,14 +177,20 @@ async def actual_dense_embedding_provider() -> (
 ):
     """Provide an actual dense embedding provider using SentenceTransformers."""
     caps, _, _ = _get_caps()
-    from codeweaver.core import get_provider_registry
-
-    registry = get_provider_registry()
-    # Registry will get capabilities from the configured "testing" profile settings
-    provider = registry.get_provider_instance(caps.provider, "embedding", singleton=True)  # type: ignore
-    if hasattr(provider, "initialize_async"):
-        await provider.initialize_async()  # type: ignore
-    return provider  # ty:ignore[invalid-return-type]
+    config = _get_configs()
+    # Manually instantiate for tests instead of using registry
+    from codeweaver.providers.embedding.providers.sentence_transformers import (
+        SentenceTransformersEmbeddingProvider,
+    )
+    from codeweaver.providers.embedding.registry import EmbeddingRegistry
+    
+    provider = SentenceTransformersEmbeddingProvider(
+        client=None,  # Not needed for ST provider usually or handles internally
+        registry=EmbeddingRegistry(),
+        caps=caps,
+        config=config,
+    )
+    return provider
 
 
 @pytest.fixture
@@ -208,16 +216,20 @@ async def actual_sparse_embedding_provider() -> (
 ):
     """Provide an actual sparse embedding provider using SentenceTransformers."""
     _, caps, _ = _get_caps()
-    from codeweaver.core import get_provider_registry
+    config = _get_configs(sparse=True)
+    
+    from codeweaver.providers.embedding.providers.sentence_transformers import (
+        SentenceTransformersSparseEmbeddingProvider,
+    )
+    from codeweaver.providers.embedding.registry import EmbeddingRegistry
 
-    registry = get_provider_registry()
-    # Pass caps explicitly so registry doesn't need to look them up from global settings
-    provider = registry.get_provider_instance(
-        caps.provider, "sparse_embedding", singleton=True, caps=caps
-    )  # type: ignore
-    if hasattr(provider, "initialize_async"):
-        await provider.initialize_async()  # type: ignore
-    return provider  # ty:ignore[invalid-return-type]
+    provider = SentenceTransformersSparseEmbeddingProvider(
+        client=None,
+        registry=EmbeddingRegistry(),
+        caps=caps,
+        config=config
+    )
+    return provider
 
 
 @pytest.fixture
@@ -286,11 +298,10 @@ async def actual_vector_store() -> MemoryVectorStoreProvider:
     Uses a singleton instance and a FIXED collection name to ensure that
     different components (e.g., Indexer and Search) share the same in-memory data.
     """
-    from codeweaver.core import get_container, get_provider_registry
+    from codeweaver.core import get_container
     from codeweaver.providers import (
         MemoryVectorStoreProvider,
         Provider,
-        ProviderKind,
         VectorStoreProvider,
     )
 
@@ -320,20 +331,12 @@ async def actual_vector_store() -> MemoryVectorStoreProvider:
         )
 
     # ALWAYS ensure it's initialized and collection exists
-    # This handles cases where collection was deleted in previous test cleanup
-    # Bypass the guard by calling the private _initialize if needed or ensuring collection
     if _shared_memory_vector_store._client is None:
         await _shared_memory_vector_store._initialize()
     else:
-        # Collection might have been deleted, re-ensure it
         await _shared_memory_vector_store._ensure_collection("codeweaver-test-collection")
 
-    # CRITICAL: Register this instance in the global registry singleton cache
-    registry = get_provider_registry()
-    instance_cache = registry._get_instance_cache_for_kind(ProviderKind.VECTOR_STORE)
-    instance_cache[Provider.MEMORY] = _shared_memory_vector_store
-
-    # ALSO register in DI container
+    # Override in DI container
     get_container().override(VectorStoreProvider, _shared_memory_vector_store)
 
     import sys
@@ -395,82 +398,46 @@ async def actual_reranking_provider() -> (
 ):
     """Provide an actual reranking provider using SentenceTransformers."""
     _, _, caps = _get_caps()
-    from codeweaver.core import get_provider_registry
+    config = _get_configs(rerank=True)
+    
+    from codeweaver.providers.reranking.providers.sentence_transformers import (
+        SentenceTransformersRerankingProvider,
+    )
 
-    registry = get_provider_registry()
-    # Pass caps explicitly so registry doesn't need to look them up from global settings
-    provider = registry.get_provider_instance(caps.provider, "reranking", singleton=True, caps=caps)  # type: ignore
-    if hasattr(provider, "initialize_async"):
-        await provider.initialize_async()  # type: ignore
-    return provider  # ty:ignore[invalid-return-type]
+    provider = SentenceTransformersRerankingProvider(
+        client=None,
+        config=config,
+        caps=caps
+    )
+    return provider
 
 
 # ===========================================================================
 # Provider Registry Configuration Fixtures
 # ===========================================================================
 
-
-@pytest.fixture
-def mock_provider_registry(
-    mock_embedding_provider: MagicMock,
-    mock_sparse_provider: MagicMock,
-    mock_vector_store: MagicMock,
-    mock_reranking_provider: MagicMock,
-) -> MagicMock:
-    """Configure mock provider registry with all providers."""
-    from enum import Enum
-
-    class MockProviderEnum(Enum):
-        VOYAGE = "voyage"
-        FASTEMBED = "fastembed"
-        QDRANT = "qdrant"
-
-    mock_registry = MagicMock()
-
-    # Configure get_provider_enum_for to return mock provider enums
-    def get_provider_enum_for(kind: str) -> MockProviderEnum | None:
-        if kind == "embedding":
-            return MockProviderEnum.VOYAGE
-        if kind == "sparse_embedding":
-            return MockProviderEnum.FASTEMBED
-        if kind == "vector_store":
-            return MockProviderEnum.QDRANT
-        return MockProviderEnum.VOYAGE if kind == "reranking" else None
-
-    mock_registry.get_provider_enum_for = MagicMock(side_effect=get_provider_enum_for)
-
-    # Configure get_provider_instance to return mock providers
-    def get_provider_instance(
-        enum_value: MockProviderEnum, kind: str, singleton: bool = True
-    ) -> AsyncMock | None:
-        if kind == "embedding":
-            return mock_embedding_provider
-        if kind == "sparse_embedding":
-            return mock_sparse_provider
-        if kind == "vector_store":
-            return mock_vector_store
-        return mock_reranking_provider if kind == "reranking" else None
-
-    mock_registry.get_provider_instance = MagicMock(side_effect=get_provider_instance)
-
-    return mock_registry
-
+# Removed Mock Registry Fixtures (mock_provider_registry, configured_providers) 
+# as they are no longer needed with DI overrides.
 
 @pytest.fixture
 def configured_providers(
-    mock_provider_registry: MagicMock,
     mock_embedding_provider: MagicMock,
     mock_sparse_provider: MagicMock,
     mock_vector_store: MagicMock,
     mock_reranking_provider: MagicMock,
-) -> Generator[MagicMock, None, None]:
-    """Fixture that patches the provider registry with mock providers."""
-    # Patch both the provider registry and time.time to ensure monotonic timing
+) -> Generator[None, None, None]:
+    """Fixture that overrides providers in the DI container."""
     from codeweaver.core import get_container
-    from codeweaver.providers import EmbeddingProvider, RerankingProvider, VectorStoreProvider
+    from codeweaver.providers import (
+        EmbeddingProvider, 
+        RerankingProvider, 
+        SparseEmbeddingProvider,
+        VectorStoreProvider
+    )
 
     container = get_container()
     container.override(EmbeddingProvider, mock_embedding_provider)
+    container.override(SparseEmbeddingProvider, mock_sparse_provider)
     container.override(VectorStoreProvider, mock_vector_store)
     container.override(RerankingProvider, mock_reranking_provider)
 
@@ -481,11 +448,8 @@ def configured_providers(
         # Return monotonically increasing time values (start from a baseline)
         return 1000000.0 + call_count[0] * 0.001
 
-    with (
-        patch("codeweaver.core", return_value=mock_provider_registry),
-        patch("codeweaver.agent_api", side_effect=mock_time),
-    ):
-        yield mock_provider_registry
+    with patch("codeweaver.agent_api", side_effect=mock_time):
+        yield
         container.clear_overrides()
 
 
@@ -908,118 +872,44 @@ def real_provider_registry(
     real_sparse_provider: SentenceTransformersSparseProvider,
     real_vector_store: MemoryVectorStoreProvider,
     real_reranking_provider: SentenceTransformersRerankingProvider,
-) -> MagicMock:
-    """Configure provider registry with REAL providers for behavior validation.
-
-    This fixture creates a complete provider ecosystem using actual implementations:
-    - Real embedding generation (SentenceTransformers)
-    - Real or mock sparse embeddings (depending on SparseEncoder availability)
-    - Real vector storage (Qdrant in-memory)
-    - Real reranking (MS MARCO)
-
-    Tests using this fixture validate actual search behavior, not just structure.
-
-    Use for tests marked with @pytest.mark.real_providers.
-
-    **Note on Sparse Encoding:**
-    If SparseEncoder is unavailable, uses mock sparse provider. This is expected
-    for Alpha 1 and allows dense-only search validation.
-    """
-    from enum import Enum
-    from unittest.mock import MagicMock
-
-    class RealProviderEnum(Enum):
-        SENTENCE_TRANSFORMERS = "sentence_transformers"
-        OPENAI = "openai"
-        FASTEMBED = "fastembed"
-        MEMORY = "memory"
-
-    mock_registry = MagicMock()
-
-    # Configure get_provider_enum_for to return real provider enums
-    def get_provider_enum_for(kind: str) -> RealProviderEnum | None:
-        if kind == "vector_store":
-            return RealProviderEnum.MEMORY
-        # For testing/backup profile, prefer SentenceTransformers with lightweight models
-        # (minishlab/potion-base-8M is 256 dims vs BAAI/bge-small-en-v1.5 at 384 dims)
-        return (
-            RealProviderEnum.SENTENCE_TRANSFORMERS
-            if HAS_SENTENCE_TRANSFORMERS
-            else RealProviderEnum.FASTEMBED
-        )
-
-    mock_registry.get_provider_enum_for = MagicMock(side_effect=get_provider_enum_for)
-
-    # Configure get_provider_instance to return real providers
-    def get_provider_instance(
-        enum_value: RealProviderEnum, kind: str, singleton: bool = True
-    ) -> Any | MagicMock:
-        if kind == "embedding":
-            return real_embedding_provider
-        if kind == "sparse_embedding":
-            return real_sparse_provider
-        if kind == "vector_store":
-            return real_vector_store
-        return real_reranking_provider if kind == "reranking" else None
-
-    mock_registry.get_provider_instance = MagicMock(side_effect=get_provider_instance)
-
-    return mock_registry
+) -> None:
+    """NO OP - Use real_providers fixture instead."""
+    # This fixture is deprecated/removed in favor of real_providers setup
+    return None
 
 
 @pytest.fixture
-def real_providers(real_provider_registry: MagicMock) -> Generator[ProviderRegistry, None, None]:
-    """Fixture that patches the provider registry with REAL providers.
+def real_providers(
+    real_embedding_provider,
+    real_sparse_provider,
+    real_vector_store,
+    real_reranking_provider
+) -> Generator[None, None, None]:
+    """Fixture that overrides providers in DI container with REAL providers."""
+    
+    from codeweaver.core import get_container
+    from codeweaver.providers import (
+        EmbeddingProvider, 
+        RerankingProvider, 
+        SparseEmbeddingProvider,
+        VectorStoreProvider
+    )
 
-    This is the main fixture for Tier 2 tests. It provides actual provider
-    implementations that generate real embeddings, store real vectors, and
-    perform real search operations.
+    container = get_container()
+    container.override(EmbeddingProvider, real_embedding_provider)
+    container.override(SparseEmbeddingProvider, real_sparse_provider)
+    container.override(VectorStoreProvider, real_vector_store)
+    container.override(RerankingProvider, real_reranking_provider)
 
-    **When to use this vs configured_providers:**
-
-    - Use `configured_providers` (Tier 1) for:
-      * Structure validation tests
-      * Error path testing
-      * Fast feedback loops
-      * Response format verification
-
-    - Use `real_providers` (Tier 2) for:
-      * Search quality validation
-      * End-to-end pipeline testing
-      * Performance benchmarking
-      * Behavior validation
-
-    **Example usage:**
-
-    ```python
-    @pytest.mark.integration
-    @pytest.mark.real_providers
-    async def test_search_finds_auth_code(real_providers, known_test_codebase):
-        # This test validates actual search behavior
-        response = await find_code("authentication logic")
-
-        # Should actually find auth.py in top results
-        assert any("auth.py" in r.file_path for r in response.results[:3])
-    ```
-
-    **Performance note:** These tests are slower (~2-10s each) because they:
-    - Generate real embeddings (CPU/GPU intensive)
-    - Perform real vector similarity search
-    - Run actual reranking models
-
-    Mark tests with @pytest.mark.slow if they take >5s.
-    """
     call_count = [0]
 
     def mock_time() -> float:
         call_count[0] += 1
         return 1000000.0 + call_count[0] * 0.001
 
-    with (
-        patch("codeweaver.core", return_value=real_provider_registry),
-        patch("codeweaver.agent_api", side_effect=mock_time),
-    ):
-        yield real_provider_registry
+    with patch("codeweaver.agent_api", side_effect=mock_time):
+        yield
+        container.clear_overrides()
 
 
 # ===========================================================================

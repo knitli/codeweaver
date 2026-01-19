@@ -52,24 +52,30 @@ class EmbeddingRegistry(UUIDStore[ChunkEmbeddings]):
         Args:
             size_limit (int): The maximum size of the store in bytes. Defaults to 100 MB.
         """
+        from codeweaver.core.di.container import get_container
+        try:
+            container = get_container()
+            container.register(type(self), lambda: self, singleton=True)
+        except Exception as e:
+            logger.warning("Failed to get DI container: %s", e)
         self.is_backup_provider = is_backup_provider
         super().__init__(size_limit=size_limit, _value_type=ChunkEmbeddings)
 
     @property
     def complete(self) -> bool:
-        """Check if all chunks have both primary dense and sparse embeddings."""
+        """Check if all chunks have both dense and sparse embeddings."""
         return all(embeddings.is_complete for embeddings in self.values())
 
     @property
     def dense_only(self) -> bool:
-        """Check if all chunks have only (primary) dense embeddings."""
+        """Check if all chunks have only dense embeddings."""
         return all(
             embeddings.has_dense and not embeddings.has_sparse for embeddings in self.values()
         )
 
     @property
     def sparse_only(self) -> bool:
-        """Check if all chunks have only (primary) sparse embeddings."""
+        """Check if all chunks have only sparse embeddings."""
         return all(
             not embeddings.has_dense and embeddings.has_sparse for embeddings in self.values()
         )

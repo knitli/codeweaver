@@ -247,6 +247,7 @@ import logging
 from collections import defaultdict
 from collections.abc import Iterator
 from contextvars import ContextVar
+from dataclasses import dataclass
 from functools import cached_property
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Annotated, Any, ClassVar, Literal, TypedDict, cast, override
@@ -259,10 +260,8 @@ from pydantic import (
     computed_field,
     field_validator,
 )
-from pydantic.dataclasses import dataclass
 
 from codeweaver.core import (
-    DATACLASS_CONFIG,
     FROZEN_BASEDMODEL_CONFIG,
     BasedModel,
     CategoryName,
@@ -1110,7 +1109,7 @@ class PositionalConnections(Connection):
         return f"PositionalConnections: {self.source_thing} --{self.constraints.variable}--> [{targets}] (Language: {self.language.variable})"
 
 
-@dataclass(frozen=True, config=DATACLASS_CONFIG, slots=True)
+@dataclass(frozen=True, slots=True)
 class Grammar(DataclassSerializationMixin):
     """Grammar provides the primary API for evaluating defined grammar rules for a language. We use grammars to analyze observed AST nodes and determine their semantic meaning.
 

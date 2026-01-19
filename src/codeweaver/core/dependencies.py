@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import importlib
 import os
 
@@ -15,6 +16,7 @@ from typing import TYPE_CHECKING, Annotated
 
 from pydantic import DirectoryPath
 
+from codeweaver.core import TelemetryService
 from codeweaver.core._logging import get_rich_console
 from codeweaver.core.config._logging import DefaultLoggingSettings, LoggingSettingsDict
 from codeweaver.core.di.depends import INJECTED, depends
@@ -27,7 +29,7 @@ from codeweaver.core.ui_protocol import (
     ProgressReporter,
     RichConsoleProgressReporter,
 )
-from codeweaver.core.utils.filesystem import get_project_path
+from codeweaver.core.utils.filesystem import get_git_branch, get_project_path
 
 
 if TYPE_CHECKING:
@@ -49,7 +51,7 @@ def _resolve_config_file() -> Path | None:
     return None
 
 
-def bootstrap_settings(config_file: Path | None = None) -> CodeWeaverSettingsType:
+async def bootstrap_settings(config_file: Path | None = None) -> CodeWeaverSettingsType:
     """Bootstrap global settings as DI root.
 
     Auto-detects the appropriate settings class based on installed packages
@@ -65,13 +67,19 @@ def bootstrap_settings(config_file: Path | None = None) -> CodeWeaverSettingsTyp
     from codeweaver.core.config.loader import get_settings  # noqa: I001
     from codeweaver.core.config.envs import SettingsEnvVars
 
-    if config_file and config_file.exists() and config_file in get_possible_config_paths():
+    await asyncio.sleep(0)
+
+    if (
+        config_file
+        and config_file.exists()
+        and config_file in await asyncio.to_thread(get_possible_config_paths)
+    ):
         # let pydantic_settings handle loading from the file if it's in a standard location
         config_file = None
     SettingsEnvVars.from_defaults().register_values()
 
     config_file = config_file if config_file and config_file.exists() else _resolve_config_file()
-    return get_settings(config_file=config_file)  # ty:ignore[invalid-return-type]
+    return await asyncio.to_thread(get_settings, config_file=config_file)  # ty:ignore[invalid-return-type]
 
 
 if importlib.util.find_spec("codeweaver.server"):
@@ -98,7 +106,7 @@ else:
 dependency_provider(CodeWeaverSettingsType, scope="singleton")(bootstrap_settings)  # ty:ignore[no-matching-overload]
 
 
-type SettingsDep = Annotated[CodeWeaverSettingsType, depends(bootstrap_settings)]
+type SettingsDep = Annotated[CodeWeaverSettingsType, depends(CodeWeaverSettingsType)]
 
 type NoneDep = Annotated[None, depends(lambda: None, use_cache=True, scope="singleton")]
 
@@ -170,42 +178,80 @@ def _create_progress_reporter(settings: SettingsDep = INJECTED) -> ProgressRepor
 type ProgressReporterDep = Annotated[ProgressReporter, depends(_create_progress_reporter)]
 
 
-def _get_canonical_project_path(settings: SettingsDep = INJECTED) -> DirectoryPath:
-    return settings.project_path if settings.project_path is not Unset else get_project_path()  # ty:ignore[invalid-return-type]
+async def _get_canonical_project_path(settings: SettingsDep = INJECTED) -> DirectoryPath:
+    await asyncio.sleep(0)  # Yield control to the event loop
+    return (
+        settings.project_path  # ty:ignore[invalid-return-type]
+        if settings.project_path is not Unset
+        else await asyncio.to_thread(get_project_path)
+    )
 
 
 type ResolvedProjectPathDep = Annotated[DirectoryPath, depends(_get_canonical_project_path)]
 
 
-def _get_canonical_project_name(settings: SettingsDep = INJECTED) -> str:
+async def _get_canonical_project_name(
+    settings: SettingsDep = INJECTED, project_path: ResolvedProjectPathDep = INJECTED
+) -> str:
+    await asyncio.sleep(0)  # Yield control to the event loop
     return (
         settings.project_name  # ty:ignore[invalid-return-type]
         if settings.project_name is not Unset
-        else _get_canonical_project_path.name
+        else project_path.name
     )
 
 
 type ResolvedProjectNameDep = Annotated[str, depends(_get_canonical_project_name)]
 
 
-def _get_resolved_project_path_hash(project_path: ResolvedProjectPathDep = INJECTED) -> BlakeKey:
+async def _get_resolved_project_path_hash(
+    project_path: ResolvedProjectPathDep = INJECTED,
+) -> BlakeKey:
     from codeweaver.core.utils import get_blake_hash
 
-    return get_blake_hash(str(project_path.absolute()))
+    await asyncio.sleep(0)  # Yield control to the event loop
+    return await asyncio.to_thread(get_blake_hash, str(project_path.absolute()))  # ty:ignore[invalid-argument-type]
 
 
 type ResolvedProjectPathHashDep = Annotated[BlakeKey, depends(_get_resolved_project_path_hash)]
+
+
+async def _get_resolved_git_branch(project_path: ResolvedProjectPathDep = INJECTED) -> str:
+    """Get the git branch for the given project path. Always returns a string.
+
+    If the branch can't be found, it return an empty string.
+    """
+    await asyncio.sleep(0)  # Yield control to the event loop
+    return await asyncio.to_thread(get_git_branch, project_path)
+
+
+type ResolvedGitBranchDep = Annotated[str, depends(_get_resolved_git_branch)]
+
+
+async def _create_telemetry_service(settings: TelemetrySettingsDep = INJECTED) -> TelemetryService:
+    from codeweaver.core.telemetry.client import TelemetryService
+
+    return TelemetryService(
+        api_key=settings.posthog_project_key,
+        host=str(settings.posthog_host),
+        enabled=not settings.disable_telemetry,
+    )
+
+
+type TelemetryServiceDep = Annotated[TelemetryService, depends(_create_telemetry_service)]
 
 __all__ = (
     "CodeWeaverSettingsType",
     "LoggingSettingsDep",
     "NoneDep",
     "ProgressReporterDep",
+    "ResolvedGitBranchDep",
     "ResolvedProjectNameDep",
     "ResolvedProjectPathDep",
     "ResolvedProjectPathHashDep",
     "SettingsDep",
     "StatisticsDep",
+    "TelemetryServiceDep",
     "TelemetrySettingsDep",
     "bootstrap_settings",
 )

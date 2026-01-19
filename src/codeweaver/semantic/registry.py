@@ -455,9 +455,6 @@ class ThingRegistry:
         )
 
 
-_registry: ThingRegistry | None = None
-
-
 def build_models() -> None:
     """Build models to populate the registry."""
     from codeweaver.semantic.grammar import (
@@ -475,25 +472,4 @@ def build_models() -> None:
         _ = model.model_rebuild()
 
 
-def get_registry() -> ThingRegistry:
-    """Get the ThingRegistry instance."""
-    global _registry
-    if _registry is None:
-        _registry = ThingRegistry()
-        # we need to make sure NodeTypeParser isn't the caller, because that would cause infinite recursion
-        # And it will call this function to get the registry to populate it
-        import inspect
-
-        caller = inspect.stack()[1]
-        if "NodeTypeParser" in caller.filename or "node_type_parser" in caller.filename:
-            return _registry
-        if not any(_registry.has_language(lang) for lang in SemanticSearchLanguage):
-            from codeweaver.semantic.node_type_parser import NodeTypeParser
-
-            parser = NodeTypeParser()
-            build_models()
-            _ = parser.parse_all_nodes()
-    return _registry
-
-
-__all__ = ("ThingRegistry", "get_registry")
+__all__ = ("ThingRegistry",)

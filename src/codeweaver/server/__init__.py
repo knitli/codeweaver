@@ -20,6 +20,11 @@ if TYPE_CHECKING:
         CodeWeaverMCPConfigDict,
         CodeWeaverSettings,
         CodeWeaverSettingsDict,
+        DefaultEndpointSettings,
+        DefaultFastMcpHttpRunArgs,
+        DefaultFastMcpServerSettings,
+        DefaultUvicornSettings,
+        DefaultUvicornSettingsForMcp,
         ErrorHandlingMiddlewareSettings,
         FastMcpHttpRunArgs,
         FastMcpHttpServerSettings,
@@ -35,9 +40,6 @@ if TYPE_CHECKING:
         StdioCodeWeaverConfigDict,
         UvicornServerSettings,
         UvicornServerSettingsDict,
-        get_settings,
-        get_settings_map,
-        update_settings,
     )
     from codeweaver.server.health import (
         EmbeddingProviderServiceInfo,
@@ -50,7 +52,6 @@ if TYPE_CHECKING:
         SparseEmbeddingServiceInfo,
         StatisticsInfo,
         VectorStoreServiceInfo,
-        get_health,
     )
     from codeweaver.server.lifespan import background_services_lifespan, http_lifespan
     from codeweaver.server.management import ManagementServer
@@ -74,7 +75,7 @@ if TYPE_CHECKING:
         get_bulk_tool,
         register_tool,
     )
-    from codeweaver.server.server import CodeWeaverState, get_state, lifespan
+    from codeweaver.server.server import CodeWeaverState, lifespan
 
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
@@ -94,6 +95,11 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "FastMcpStdioServerSettings": (__spec__.parent, "settings"),
     "FastEmbedGPUProviderSettings": (__spec__.parent, "providers"),
     "FindCodeResponseSummary": (__spec__.parent, "agent_api"),
+    "DefaultEndpointSettings": (__spec__.parent, "config"),
+    "DefaultFastMcpHttpRunArgs": (__spec__.parent, "config"),
+    "DefaultFastMcpServerSettings": (__spec__.parent, "config"),
+    "DefaultUvicornSettings": (__spec__.parent, "config"),
+    "DefaultUvicornSettingsForMcp": (__spec__.parent, "config"),
     "HealthResponse": (__spec__.parent, "health"),
     "HealthService": (__spec__.parent, "health"),
     "IndexingInfo": (__spec__.parent, "health"),
@@ -134,10 +140,6 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "find_code_tool": (__spec__.parent, "user_agent"),
     "find_code_tool_definition": (__spec__.parent, "tools"),
     "get_bulk_tool": (__spec__.parent, "tools"),
-    "get_health": (__spec__.parent, "health"),
-    "get_settings": (__spec__.parent, "settings"),
-    "get_settings_map": (__spec__.parent, "settings"),
-    "get_state": (__spec__.parent, "server"),
     "http_lifespan": (__spec__.parent, "lifespan"),
     "lifespan": (__spec__.parent, "server"),
     "register_tool": (__spec__.parent, "tools"),
@@ -156,6 +158,11 @@ __all__ = (
     "CodeWeaverSettingsDict",
     "CodeWeaverState",
     "CwMcpHttpState",
+    "DefaultEndpointSettings",
+    "DefaultFastMcpHttpRunArgs",
+    "DefaultFastMcpServerSettings",
+    "DefaultUvicornSettings",
+    "DefaultUvicornSettingsForMcp",
     "EmbeddingProviderServiceInfo",
     "ErrorHandlingMiddleware",
     "ErrorHandlingMiddlewareSettings",
@@ -202,10 +209,6 @@ __all__ = (
     "find_code_tool",
     "find_code_tool_definition",
     "get_bulk_tool",
-    "get_health",
-    "get_settings",
-    "get_settings_map",
-    "get_state",
     "http_lifespan",
     "lifespan",
     "register_tool",

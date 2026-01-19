@@ -17,8 +17,11 @@ import cyclopts
 from cyclopts import App
 from rich.table import Table
 
+from codeweaver.cli.dependencies import setup_cli_di
 from codeweaver.cli.ui import CLIErrorHandler, get_display
-from codeweaver.core import Provider, ProviderKind
+from codeweaver.cli.utils import check_provider_package_available
+from codeweaver.core import Provider, ProviderKind, get_container
+from codeweaver.core.types.provider import PROVIDER_CAPABILITIES
 from codeweaver.providers import EmbeddingModelCapabilities, RerankingModelCapabilities
 
 
@@ -45,10 +48,7 @@ def _check_api_key(provider: Provider, kind: ProviderKind) -> bool:
         return True
 
     if provider.is_local_provider:
-        from codeweaver.core import get_provider_registry
-
-        registry = get_provider_registry()
-        return registry.is_provider_available(provider, kind)
+        return check_provider_package_available(provider, kind)
     return provider.has_env_auth
 
 
@@ -97,10 +97,18 @@ def providers(
     Shows provider name, capabilities, and status (ready or needs configuration).
     """
     display = _display
-    registry = get_provider_registry()
-    provider_capabilities = {
-        p: registry.list_providers(p) for p in ProviderKind if p != ProviderKind.UNSET
-    }
+    
+    # Use PROVIDER_CAPABILITIES map to find providers for each kind
+    # This replaces registry.list_providers(p)
+    provider_capabilities = {}
+    for p in ProviderKind:
+        if p == ProviderKind.UNSET:
+            continue
+        # Invert the map: Find all providers that have capability `p`
+        providers_with_cap = [
+            prov for prov, caps in PROVIDER_CAPABILITIES.items() if p in caps
+        ]
+        provider_capabilities[p] = providers_with_cap
 
     # Filter by kind if specified
     kind_filter = None
@@ -115,7 +123,7 @@ def providers(
             )
             sys.exit(1)
 
-    providers = sorted(
+    providers_list = sorted(
         (provider for provider in Provider if provider != Provider.NOT_SET),
         key=lambda p: p.variable,
     )
@@ -125,9 +133,9 @@ def providers(
         for k, v in provider_capabilities.items()
         if ((kind_filter and k == kind_filter) or not kind_filter)
     }
-    provider_map = dict.fromkeys(providers)
-    for capability, providers_list in provider_capabilities.items():
-        for provider in providers_list:
+    provider_map = dict.fromkeys(providers_list)
+    for capability, p_list in provider_capabilities.items():
+        for provider in p_list:
             if provider not in provider_map:
                 continue
             if not provider_map.get(provider):
@@ -171,7 +179,7 @@ def providers(
 
 
 @app.command
-def models(
+async def models(
     provider_name: Annotated[
         Provider | str,
         cyclopts.Parameter(
@@ -212,28 +220,52 @@ def models(
         )
         error_handler.handle_error(error, "List models", exit_code=1)
 
-    # Get provider capabilities to determine what kind of models it supports
-    from codeweaver.core import get_model_registry
+    # Resolve capabilities using DI
+    # We don't need full settings setup, just resolvers
+    container = get_container()
+    
+    # We might need to ensure providers are loaded to populate resolvers?
+    # Resolvers usually self-populate or are static.
+    
+    try:
+        from codeweaver.providers.embedding.capabilities.resolver import (
+            EmbeddingCapabilityResolver,
+            SparseEmbeddingCapabilityResolver,
+        )
+        from codeweaver.providers.reranking.capabilities.resolver import RerankingCapabilityResolver
 
-    registry = get_model_registry()
-    capabilities = registry.models_for_provider(provider)
-    if not capabilities:
+        embed_resolver = await container.resolve(EmbeddingCapabilityResolver)
+        sparse_resolver = await container.resolve(SparseEmbeddingCapabilityResolver)
+        rerank_resolver = await container.resolve(RerankingCapabilityResolver)
+
+        embed_models = [
+            cap for cap in embed_resolver.all_capabilities() if cap.provider == provider
+        ]
+        sparse_models = [
+            cap for cap in sparse_resolver.all_capabilities() if cap.provider == provider
+        ]
+        rerank_models = [
+            cap for cap in rerank_resolver.all_capabilities() if cap.provider == provider
+        ]
+
+    except Exception as e:
+        display.print_warning(f"Failed to load model capabilities: {e}")
+        return
+
+    if not (embed_models or sparse_models or rerank_models):
         display.print_warning(f"No models found for provider: {provider_name}")
         return
 
     # Check if provider supports embedding models
-    if capabilities.embedding:
-        _list_embedding_models(provider, capabilities.embedding)
+    if embed_models:
+        _list_embedding_models(provider, embed_models)
 
-    if capabilities.sparse_embedding:
-        _list_sparse_embedding_models(provider, capabilities.sparse_embedding)
+    if sparse_models:
+        _list_sparse_embedding_models(provider, sparse_models)
 
     # Check if provider supports reranking models
-    if capabilities.reranking:
-        _list_reranking_models(provider, capabilities.reranking)
-
-    if capabilities.agent:
-        display.print_warning("Agent models listing not yet implemented.")
+    if rerank_models:
+        _list_reranking_models(provider, rerank_models)
 
 
 def _list_embedding_models(

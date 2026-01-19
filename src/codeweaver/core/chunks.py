@@ -34,6 +34,7 @@ from typing import (
 from pydantic import (
     UUID7,
     AfterValidator,
+    ConfigDict,
     Field,
     NonNegativeInt,
     PositiveFloat,
@@ -176,6 +177,8 @@ class CodeChunkDict(TypedDict, total=False):
 
 class CodeChunk(BasedModel):
     """Represents a chunk of code or docs with metadata."""
+
+    model_config = BasedModel.model_config | ConfigDict(frozen=True)
 
     content: str
     line_range: Annotated[Span, Field(description="""Line range in the source file""")]

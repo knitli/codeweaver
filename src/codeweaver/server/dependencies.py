@@ -14,19 +14,19 @@ import time
 
 from typing import TYPE_CHECKING, Annotated
 
-from codeweaver.core import (
-    INJECTED,
-    ProgressReporterDep,
+from codeweaver.core.dependencies import (
+    ResolvedProjectNameDep,
+    ResolvedProjectPathDep,
     SettingsDep,
     StatisticsDep,
-    dependency_provider,
-    depends,
+    TelemetryServiceDep,
 )
+from codeweaver.core.di import INJECTED, dependency_provider, depends
+from codeweaver.engine.dependencies import FailoverServiceDep, IndexingServiceDep
 from codeweaver.providers import AllProvidersDep
 
 
 if TYPE_CHECKING:
-    from codeweaver.providers.dependencies import ProviderDict
     from codeweaver.server.health.health_service import HealthService
     from codeweaver.server.management import ManagementServer
     from codeweaver.server.server import CodeWeaverState
@@ -37,7 +37,7 @@ if TYPE_CHECKING:
 # ===========================================================================
 
 
-@dependency_provider("HealthService", scope="singleton")
+@dependency_provider(HealthService, scope="singleton")
 def _create_health_service(
     statistics: StatisticsDep = INJECTED,
     indexer: IndexingServiceDep = INJECTED,
@@ -61,36 +61,38 @@ type HealthServiceDep = Annotated[
 ]
 
 
-@dependency_provider("CodeWeaverState", scope="singleton")
+@dependency_provider(CodeWeaverState, scope="singleton")
 async def _create_cw_state(
     settings: SettingsDep = INJECTED,
     statistics: StatisticsDep = INJECTED,
     indexer: IndexingServiceDep = INJECTED,
     health_service: HealthServiceDep = INJECTED,
     failover_manager: FailoverServiceDep = INJECTED,
+    project_path: ResolvedProjectPathDep = INJECTED,
+    project_name: ResolvedProjectNameDep = INJECTED,
+    telemetry: TelemetryServiceDep = INJECTED,
 ) -> CodeWeaverState:
     """Factory for application state."""
     from codeweaver.server.server import CodeWeaverState
 
     return CodeWeaverState(
         initialized=False,
+        project_path=project_path,
+        config_path=settings.config_path,
         settings=settings,
         statistics=statistics,
         indexer=indexer,
         health_service=health_service,
         failover_manager=failover_manager,
+        telemetry=telemetry,
     )
 
 
-type CodeWeaverStateDep = Annotated[
-    "CodeWeaverState", depends(_create_cw_state, scope="singleton")
-]
+type CodeWeaverStateDep = Annotated[CodeWeaverState, depends(_create_cw_state, scope="singleton")]
 
 
-@dependency_provider("ManagementServer", scope="singleton")
-def _create_management_server(
-    state: CodeWeaverStateDep = INJECTED,
-) -> ManagementServer:
+@dependency_provider(ManagementServer, scope="singleton")
+def _create_management_server(state: CodeWeaverStateDep = INJECTED) -> ManagementServer:
     """Factory for management server."""
     from codeweaver.server.management import ManagementServer
 
@@ -101,8 +103,4 @@ type ManagementServerDep = Annotated[
     "ManagementServer", depends(_create_management_server, scope="singleton")
 ]
 
-__all__ = (
-    "CodeWeaverStateDep",
-    "HealthServiceDep",
-    "ManagementServerDep",
-)
+__all__ = ("CodeWeaverStateDep", "HealthServiceDep", "ManagementServerDep")

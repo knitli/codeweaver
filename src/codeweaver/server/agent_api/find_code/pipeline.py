@@ -20,15 +20,20 @@ from typing import TYPE_CHECKING, Any, NoReturn
 
 from codeweaver.core import (
     ConfigurationError,
-    EmbeddingDep,
     QueryError,
-    RerankingDep,
+    QueryResult,
+    RawEmbeddingVectors,
     SearchStrategy,
-    SparseEmbeddingDep,
+    SparseEmbedding,
     StrategizedQuery,
-    VectorStoreDep,
 )
-from codeweaver.providers import QueryResult, RawEmbeddingVectors, SparseEmbedding
+from codeweaver.core.di import INJECTED
+from codeweaver.providers import (
+    EmbeddingProviderDep,
+    RerankingProviderDep,
+    SparseEmbeddingProviderDep,
+    VectorStoreProviderDep,
+)
 
 
 if TYPE_CHECKING:
@@ -55,16 +60,12 @@ def raise_value_error(message: str) -> NoReturn:
 
 
 async def _embed_dense(
-    query: str, dense_provider_enum: Any, context: Any
+    query: str, dense_provider: EmbeddingProviderDep, context: Any
 ) -> RawEmbeddingVectors | None:
     """Attempt dense embedding, return None on failure."""
-    from codeweaver.core import get_provider_registry, log_to_client_or_fallback
+    from codeweaver.core import log_to_client_or_fallback
 
-    registry = get_provider_registry()
     try:
-        dense_provider = registry.get_provider_instance(
-            dense_provider_enum, "embedding", singleton=True
-        )
         result = await dense_provider.embed_query(query)
 
         if isinstance(result, dict) and "error" in result:
@@ -118,16 +119,12 @@ async def _embed_dense(
 
 
 async def _embed_sparse(
-    query: str, sparse_provider_enum: Any, context: Any
+    query: str, context: Any, sparse_provider: SparseEmbeddingProviderDep = INJECTED
 ) -> SparseEmbedding | None:
     """Attempt sparse embedding, return None on failure."""
-    from codeweaver.core import get_provider_registry, log_to_client_or_fallback
+    from codeweaver.core import log_to_client_or_fallback
 
-    registry = get_provider_registry()
     try:
-        sparse_provider = registry.get_provider_instance(
-            sparse_provider_enum, "sparse_embedding", singleton=True
-        )
         result = await sparse_provider.embed_query(query)
 
         if isinstance(result, dict) and "error" in result:
@@ -191,8 +188,8 @@ async def _embed_sparse(
 async def embed_query(
     query: str,
     context: Any = None,
-    dense_provider: EmbeddingDep | None = None,
-    sparse_provider: SparseEmbeddingDep | None = None,
+    dense_provider: EmbeddingProviderDep = INJECTED,
+    sparse_provider: SparseEmbeddingProviderDep = INJECTED,
 ) -> QueryResult:
     """Embed query using configured embedding providers.
 
@@ -212,48 +209,9 @@ async def embed_query(
         ValueError: If no embedding providers configured or both fail
     """
     from codeweaver.core import log_to_client_or_fallback
-    from codeweaver.providers import QueryResult
 
     _query_cv.set(query.strip())
 
-    # Manually resolve providers if not injected (DI fallback)
-    from codeweaver.core import get_container
-    from codeweaver.providers import EmbeddingProvider
-
-    container = get_container()
-
-    if dense_provider is None or hasattr(
-        dense_provider, "__pydantic_serializer__"
-    ):  # Handle sentinel
-        try:
-            dense_provider = await container.resolve(EmbeddingProvider)
-        except Exception as e:
-            logger.warning("Failed to resolve dense provider: %s", e)
-            dense_provider = None
-
-    if sparse_provider is None or hasattr(sparse_provider, "__pydantic_serializer__"):
-        try:
-            from codeweaver.providers import SparseEmbeddingProvider
-
-            sparse_provider = await container.resolve(SparseEmbeddingProvider)
-        except Exception:
-            sparse_provider = None
-
-    await log_to_client_or_fallback(
-        context,
-        "info",
-        {
-            "msg": "Starting query embedding",
-            "extra": {
-                "phase": "query_embedding",
-                "query_length": len(query),
-                "dense_provider_available": dense_provider is not None,
-                "sparse_provider_available": sparse_provider is not None,
-            },
-        },
-    )
-
-    # Attempt embeddings
     dense_query_embedding = None
     if dense_provider:
         try:
@@ -372,7 +330,9 @@ def build_query_vector(query_result: QueryResult, query: str) -> StrategizedQuer
 
 
 async def execute_vector_search(
-    query_vector: StrategizedQuery, context: Any = None, vector_store: VectorStoreDep | None = None
+    query_vector: StrategizedQuery,
+    context: Any = None,
+    vector_store: VectorStoreProviderDep = INJECTED,
 ) -> list[SearchResult]:
     """Execute vector search against configured vector store.
 
@@ -429,7 +389,7 @@ async def rerank_results(
     query: str,
     candidates: list[SearchResult],
     context: Any = None,
-    reranking: RerankingDep | None = None,
+    reranking: RerankingProviderDep = INJECTED,
 ) -> tuple[list[Any] | None, SearchStrategy | None]:
     """Rerank search results using configured reranking provider.
 
@@ -453,8 +413,8 @@ async def rerank_results(
             from codeweaver.providers import RerankingProvider
 
             reranking = await get_container().resolve(RerankingProvider)
-        except Exception:
-            reranking = None
+        except Exception as e:
+            logger.warning("Failed to resolve reranking provider: %s", e)
 
     if not reranking or not candidates:
         await log_to_client_or_fallback(

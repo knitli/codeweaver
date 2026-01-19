@@ -39,7 +39,18 @@ from pydantic import (
     model_validator,
 )
 from pydantic_ai.settings import ModelSettings as AgentModelSettings
-from qdrant_client.http.models.models import SparseVectorParams, VectorParams
+from qdrant_client.grpc import ProductQuantization, ScalarQuantization
+from qdrant_client.models import (
+    BinaryQuantization,
+    Document,
+    HnswConfig,
+    OptimizersConfig,
+    SparseVectorParams,
+    TokenizerType,
+    VectorParams,
+    WalConfig,
+)
+from qdrant_client.models import Bm25Config as QdrantBm25Config
 
 from codeweaver.core import (
     AnonymityConversion,
@@ -47,6 +58,8 @@ from codeweaver.core import (
     CodeWeaverDeveloperError,
     FilteredKey,
     FilteredKeyT,
+    ModelName,
+    ModelNameT,
     Provider,
     ProviderLiteral,
     SDKClient,
@@ -202,7 +215,7 @@ class BaseProviderSettings(BasedModel, ABC):
                 )
             )
         ):
-            object.__setattr__(self, "model_name", model_name)
+            object.__setattr__(self, "model_name", ModelName(model_name))
         super().__init__()
 
     @staticmethod
@@ -442,14 +455,78 @@ class VectorStoreProviderSettings(BaseProviderSettings):
     ] = 96
 
 
-class CollectionConfig(TypedDict, total=False):
-    """Common collection configuration for vector store providers."""
+class _Bm25Config(QdrantBm25Config):
+    """CodeWeaver's BM25 configuration for Qdrant vector store."""
 
-    collection_name: NotRequired[str | None]
+    k: float = 1.2
+    """Frequency term saturation. Higher values = more impact on term frequency."""
+    b: float = 0.3
+    """Document length normalization (0 to 1) -- higher numbers penalize long documents. We set this low because document length is not well correlated to relevance for code."""
+    avg_len: int = 512
+    """Average document length for BM25 normalization. This is a placeholder value, in practice it's computed from the text batch for embedding."""
+    tokenizer: TokenizerType = TokenizerType.WORD
+    """Tokenizer type to use for BM25. WORD is currently the best available for code, though less than ideal. Trying to submit a code specific tokenizer upstream is on the to-do list."""
+    language: Literal["none"] = "none"
+    """Language for the tokenizer and stemmer -- we disable it with 'none' because language normalization messes up code."""
+    lowercase: bool = True
+    """Whether to lowercase tokens. Defaults to True."""
+    ascii_folding: bool = False
+    """Whether to fold ASCII characters. Defaults to False."""
+    stopwords: None = None
+    """Stopwords to remove. Set to None to avoid loss of keywords like 'as' 'is', 'with' that have significance in code."""
+    stemmer: None = None
+    """Stemmer to use for tokens. Set to None to avoid stemming code tokens."""
+    min_token_len: int = 1
+    """Minimum token length to include in the index."""
+    max_token_len: int = 128
+    """Maximum token length to include in the index."""
+
+    def serialize_for_upsert(self, avg_length: int) -> dict[str, Any]:
+        self.avg_len = avg_length
+        return self.model_dump()
+
+
+class _DocumentRepr(BasedModel):
+    """A shell representation of a `qdrant_client.models.Document`. Document itself requires text for embedding, and a model name, which in our case is always `Qdrant/Bm25`, but this representation only includes the fields necessary for configuration purposes.
+
+    We don't currently allow users to set these options directly -- we want to experiment and identify optimal configuration for general and specific code search use cases, so we need to control these settings internally.
+    """
+
+    model: Literal["Qdrant/Bm25"] = "Qdrant/Bm25"
+
+    options: _Bm25Config = Field(default_factory=_Bm25Config)
+
+    def serialize_for_upsert(self, texts: list[str]) -> list[Document]:
+        avg_length = int(sum(len(text.strip()) for text in texts) / len(texts)) if texts else 0
+        options = self.options.serialize_for_upsert(avg_length)
+        return [Document(text=text, model=self.model, options=options) for text in texts]
+
+
+class CollectionConfig(BasedModel, total=False):
+    """Collection configuration for Qdrant and in-memory vector stores."""
+
+    collection_name: str | None = None
     """Collection name override. Defaults to a unique name based on the project name."""
 
-    vector_config: NotRequired[Mapping[str, VectorParams | SparseVectorParams] | None]
+    vectors_config: Mapping[str, VectorParams] | None = None
     """Configuration for individual vector types in the collection."""
+
+    quantization_config: ScalarQuantization | ProductQuantization | BinaryQuantization | None = None
+    """Configuration for quantization used in the collection."""
+
+    sparse_vectors_config: Mapping[str, SparseVectorParams] | None = None
+    """Configuration for individual sparse vector types in the collection."""
+
+    wal_config: WalConfig | None = None
+    """Configuration for the write-ahead log (WAL) used in the collection. We have no default configuration for the WAL at this time. Qdrant's defaults are good for nearly all cases, but you can customize it for performance tuning, resource, or durability requirements."""
+
+    optimizers_config: OptimizersConfig | None = None
+    """Configuration for optimizers used in the collection. No default configuration. Optimizing segments can increase throughput/concurrency at the cost of additional memory usage.  See https://qdrant.tech/documentation/concepts/optimizer/"""
+
+    hnsw_config: HnswConfig | None = Field(
+        default_factory=lambda: HnswConfig(m=24, ef_construct=130, payload_m=120)
+    )
+    """Configuration for HNSW (Hierarchical Navigable Small World) index used for approximate nearest neighbor search. We generally recommend you keep our defaults here, which we will tweak and fine-tune over time to get optimal performance for code search."""
 
 
 class _BaseQdrantVectorStoreProviderSettings(VectorStoreProviderSettings):
@@ -494,7 +571,7 @@ class _BaseQdrantVectorStoreProviderSettings(VectorStoreProviderSettings):
         object.__setattr__(
             self,
             "collection",
-            CollectionConfig(
+            CollectionConfig.model_validate(
                 **(self._default_collection(project_name=project_name, project_path=project_path))
                 | (collection or {})
             ),
@@ -716,7 +793,7 @@ class EmbeddingProviderSettings(BaseEmbeddingProviderSettings):
     """Settings for dense embedding models."""
 
     model_name: Annotated[
-        str,
+        ModelNameT,
         Field(
             description="The name of the embedding model to use. This should correspond to a model supported by the selected provider and formatted as the provider expects. For builtin models, this is the name as listed with `codeweaver list models`."
         ),
@@ -747,7 +824,7 @@ class EmbeddingProviderSettings(BaseEmbeddingProviderSettings):
             raise ValueError(
                 f"Cannot resolve embedding client for provider {self.provider.variable}."
             )
-        if self.model_name.startswith("cohere") or self.model_name.startswith("embed"):
+        if str(self.model_name).startswith("cohere") or str(self.model_name).startswith("embed"):
             return SDKClient.COHERE
         return SDKClient.OPENAI
 
@@ -851,7 +928,9 @@ class FastEmbedEmbeddingProviderSettings(FastEmbedProviderMixin, EmbeddingProvid
 class SparseEmbeddingProviderSettings(BaseProviderSettings):
     """Settings for sparse embedding models."""
 
-    model_name: Annotated[str, Field(description="The name of the sparse embedding model to use.")]
+    model_name: Annotated[
+        ModelNameT, Field(description="The name of the sparse embedding model to use.")
+    ]
     sparse_embedding_config: Annotated[
         SparseEmbeddingConfigT,
         Field(description="Model configuration for sparse embedding operations."),
@@ -893,7 +972,7 @@ class FastEmbedSparseEmbeddingProviderSettings(
 class RerankingProviderSettings(BaseProviderSettings):
     """Settings for re-ranking models."""
 
-    model_name: Annotated[str, Field(description="The name of the re-ranking model to use.")]
+    model_name: Annotated[ModelNameT, Field(description="The name of the re-ranking model to use.")]
     reranking_config: Annotated[
         RerankingConfigT, Field(description="Model configuration for reranking operations.")
     ]

@@ -25,6 +25,13 @@ if TYPE_CHECKING:
         RetryMiddlewareSettings,
         default_for_transport,
     )
+    from codeweaver.server.config.server_defaults import (
+        DefaultEndpointSettings,
+        DefaultFastMcpHttpRunArgs,
+        DefaultFastMcpServerSettings,
+        DefaultUvicornSettings,
+        DefaultUvicornSettingsForMcp,
+    )
     from codeweaver.server.config.settings import (
         CodeWeaverSettings,
         CodeWeaverSettingsDict,
@@ -56,6 +63,11 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "FastMcpHttpServerSettings": (__spec__.parent, "settings"),
     "FastMcpServerSettingsDict": (__spec__.parent, "types"),
     "FastMcpStdioServerSettings": (__spec__.parent, "settings"),
+    "DefaultEndpointSettings": (__spec__.parent, "server_defaults"),
+    "DefaultFastMcpHttpRunArgs": (__spec__.parent, "server_defaults"),
+    "DefaultFastMcpServerSettings": (__spec__.parent, "server_defaults"),
+    "DefaultUvicornSettings": (__spec__.parent, "server_defaults"),
+    "DefaultUvicornSettingsForMcp": (__spec__.parent, "server_defaults"),
     "FastEmbedGPUProviderSettings": (__spec__.parent, "providers"),
     "LoggingMiddlewareSettings": (__spec__.parent, "middleware"),
     "LoggingSettingsDict": (__spec__.parent, "_logging"),
@@ -88,6 +100,11 @@ __all__ = (
     "CodeWeaverMCPConfigDict",
     "CodeWeaverSettings",
     "CodeWeaverSettingsDict",
+    "DefaultEndpointSettings",
+    "DefaultFastMcpHttpRunArgs",
+    "DefaultFastMcpServerSettings",
+    "DefaultUvicornSettings",
+    "DefaultUvicornSettingsForMcp",
     "ErrorHandlingMiddlewareSettings",
     "FastEmbedGPUProviderSettings",
     "FastMcpHttpRunArgs",

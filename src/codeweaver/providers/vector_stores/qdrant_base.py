@@ -15,10 +15,11 @@ from collections.abc import Iterable
 from datetime import UTC, datetime
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Literal, NoReturn, cast
+from typing import Any, ClassVar, Literal, NoReturn, cast
 
 from pydantic import UUID7
 from qdrant_client import AsyncQdrantClient
+from qdrant_client.conversions.common_types import SparseVectorParams
 from qdrant_client.http.exceptions import UnexpectedResponse
 from qdrant_client.http.models.models import (
     CollectionInfo,
@@ -27,7 +28,7 @@ from qdrant_client.http.models.models import (
     QueryResponse,
     SparseVector,
 )
-from qdrant_client.models import UpdateResult
+from qdrant_client.models import UpdateResult, VectorParams
 
 from codeweaver.core import (
     INJECTED,
@@ -61,7 +62,7 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
     client: AsyncQdrantClient
     caps: EmbeddingCapabilityGroup
     config: QdrantVectorStoreProviderSettings
-    _provider: Literal[Provider.QDRANT, Provider.MEMORY]
+    _provider: ClassVar[Literal[Provider.QDRANT, Provider.MEMORY]]
 
     @property
     def base_url(self) -> str | None:
@@ -105,31 +106,22 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         collection_config = self.config.collection
         # Extract vector configs
         vector_config = collection_config.get("vector_config", {})
-        dense_config = vector_config.get("dense")
-        sparse_config = vector_config.get("sparse")
+        dense_config = next(
+            ((k, v) for k, v in vector_config.items() if isinstance(v, VectorParams)), None
+        )
+        sparse_config = next(
+            ((k, v) for k, v in vector_config.items() if isinstance(v, SparseVectorParams)), None
+        )
+        idf_config = next(
+            ((k, v) for k, v in vector_config.items() if isinstance(v, Document)), None
+        )
 
         # Get model names from capabilities
-        dense_model = None
-        sparse_model = None
-        if self.caps:
-            if dense := self.caps.dense:
-                dense_model = (
-                    dense.config.model_name
-                    or dense.config.embedding_config.model_name
-                    or dense.capability.name
-                )
-            elif (idf := self.caps.idf) and not self.caps.sparse:
-                sparse_model = (
-                    idf.config.model_name
-                    or idf.config.sparse_embedding_config.model_name
-                    or idf.capability.name
-                )
-            elif sparse := self.caps.sparse:
-                sparse_model = (
-                    sparse.config.model_name
-                    or sparse.config.sparse_embedding_config.model_name
-                    or sparse.capability.name
-                )
+        dense_model = self.embedding_capabilities.dense_model
+
+        sparse_model = self.embedding_capabilities.sparse_model
+
+        idf_model = self.embedding_capabilities.idf_model
 
         sparse_model = sparse_model or "qdrant/bm25"
         if not sparse_config:
@@ -197,8 +189,6 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
             CollectionNotFoundError: Collection doesn't exist.
             SearchError: Search operation failed.
         """
-        if not self._ensure_client(self.client):
-            raise ProviderError("Qdrant client not initialized")
         await self._ensure_collection(collection_name=self.collection_name)
         collection_name = self.collection_name
         if not collection_name:
@@ -334,9 +324,6 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         Returns:
             UpdateResult: Response from Qdrant after creating the index.
         """
-        self._ensure_client(self.client)
-        if not self.client:
-            raise ProviderError("Qdrant client is not initialized")
         await self._ensure_collection(collection_name=collection_name)
         try:
             return await self.client.create_payload_index(
@@ -587,8 +574,6 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         Args:
             file_path: File path to remove from index.
         """
-        if not self._ensure_client(self.client):
-            raise ProviderError("Qdrant client not initialized")
         collection_name = self.collection_name
         if not collection_name:
             raise ProviderError("No collection configured")
@@ -619,8 +604,6 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         Raises:
             ProviderError: If client is not initialized or operation fails.
         """
-        if not self._ensure_client(self.client):
-            raise ProviderError("Qdrant client not initialized")
         try:
             await self._ensure_collection(collection_name=collection_name)
         except Exception as e:
@@ -637,8 +620,6 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         Args:
             ids: List of chunk IDs to delete.
         """
-        if not self._ensure_client(self.client):
-            raise ProviderError("Qdrant client not initialized")
         collection_name = self.collection_name
         if not collection_name:
             raise ProviderError("No collection configured")
@@ -655,8 +636,6 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         Args:
             names: List of chunk names to delete.
         """
-        if not self._ensure_client(self.client):
-            raise ProviderError("Qdrant client not initialized")
         collection_name = self.collection_name
         if not collection_name:
             raise ProviderError("No collection configured")
@@ -703,10 +682,7 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         """
         if not chunks:
             return
-        self._ensure_client(self.client)
         await self._ensure_collection(collection_name=self.collection_name)
-        if not self.client:
-            raise ProviderError("Qdrant client not initialized")
         collection_name = self.collection_name
         if not collection_name:
             raise ProviderError("No collection configured")

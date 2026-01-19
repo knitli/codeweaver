@@ -48,13 +48,13 @@ A common way to move ("traverse") through the AST is to start at the root node (
 from __future__ import annotations
 
 import contextlib
+import importlib
 import logging
 
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterator
 from contextvars import ContextVar
 from functools import cached_property
 from pathlib import Path
-from types import ModuleType
 from typing import (
     TYPE_CHECKING,
     Annotated,
@@ -100,29 +100,39 @@ from codeweaver.core import (
     BasedModel,
     BaseEnum,
     FileExt,
-    LazyImport,
     LiteralStringT,
     SemanticSearchLanguage,
     ThingName,
     ThingNameT,
     generate_field_title,
     humanize,
-    lazy_import,
     uuid7,
 )
+from codeweaver.core.di.depends import INJECTED
+from codeweaver.semantic.dependencies import ThingRegistryDep
 
 # Runtime imports needed for cast operations and type checking
 from codeweaver.semantic.grammar import Category, CompositeThing, Token
 
 
+if importlib.util.find_spec("codeweaver.engine") is not None:
+    from codeweaver.engine.dependencies import SourceIdRegistryDep
+else:
+    SourceIdRegistryDep = None
+
 # type-only imports
 if TYPE_CHECKING:
-    from codeweaver.core import AnonymityConversion, FilteredKey
+    from codeweaver.core import AnonymityConversion, DiscoveredFile, FilteredKey
     from codeweaver.semantic.classifications import AgentTask, ImportanceScores, ThingClass
+    from codeweaver.semantic.registry import ThingRegistry
+
+    if importlib.util.find_spec("codeweaver.engine") is not None:
+        from codeweaver.engine.chunker.registry import SourceIdRegistry
+    else:
+        SourceIdRegistry = None
+
 
 logger = logging.getLogger(__name__)
-
-registry_module: LazyImport[ModuleType] = lazy_import("codeweaver.semantic.registry")
 
 _resolving_ast_thing: ContextVar[set[int] | None] = ContextVar("_resolving_ast_thing", default=None)
 
@@ -282,6 +292,26 @@ class FileThing[SgRoot: (AstGrepRoot)](BasedModel):
             return self._file_path
         return Path(self._root.filename())
 
+    @staticmethod
+    def _file_registry(registry: SourceIdRegistryDep = INJECTED) -> SourceIdRegistry | None:
+        return registry
+
+    @property
+    def discovered_file(self) -> DiscoveredFile | None:
+        """Get the discovered file associated with this FileThing."""
+        if not (registry := self._file_registry()):
+            return None
+        return registry.file_from_path(self.filename)
+
+    @computed_field
+    @property
+    def file_source_id(self) -> UUID7 | None:
+        """Get the source ID of the discovered file associated with this FileThing."""
+        if discovered_file := self.discovered_file:
+            return discovered_file.source_id
+        return None
+
+    @computed_field
     @property
     def id(self) -> UUID7:
         """Return the unique ID of the file thing."""
@@ -316,6 +346,15 @@ class FileThing[SgRoot: (AstGrepRoot)](BasedModel):
         return cls.from_sg_root(
             AstGrepRoot(content, cast(SemanticSearchLanguage, language).variable)
         )
+
+    def serialize_for_embedding(self) -> dict[str, Any]:
+        """Serialize the FileThing for embedding purposes."""
+        return {
+            "filename": str(self.filename),
+            "id": str(self._id),
+            "root": self.filename,
+            "file_path": str(self._file_path) if self._file_path is not None else None,
+        }
 
 
 class AstThing[SgNode: (AstGrepNode)](BasedModel):
@@ -436,16 +475,16 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
     # ================================================
     # *      Identity and Metadata Properties       *
     # ================================================
+    @staticmethod
+    def _thing_registry(registry: ThingRegistryDep = INJECTED) -> ThingRegistry:
+        return registry
 
     @computed_field
     @property
     def thing(self) -> CompositeThing | Token | Category | None:
         """Get the grammar Thing that this node represents."""
         thing_name: ThingName = self.name  # type: ignore
-        # Handle ERROR nodes from ast-grep (syntax errors)
-        if thing_name == ThingName("ERROR"):
-            return None
-        registry = registry_module  # Access the module, don't call it
+        registry = self._thing_registry()
         if thing := registry.get_registry().get_thing_by_name(thing_name, language=self.language):  # ty: ignore[unresolved-attribute]
             return cast(CompositeThing | Token | Category, thing)
         # Return None for unknown things rather than raising
@@ -748,46 +787,69 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
         """Commit a list of edits to the source code."""
         raise NotImplementedError("Edit functionality is not implemented yet.")
 
+    @cached_property
     def serialize_as_child(self) -> str:
         """Serialize the AstThing as a child for output."""
         return f"{self.title}: {self.get_file().filename} [{self.range.start.line}:{self.range.start.column}-{self.range.end.line}:{self.range.end.column}]"
 
-    def serialize_for_cli(self) -> dict[str, Any]:
-        """Serialize the AstThing for CLI output."""
-        as_python = self.model_dump(
-            mode="python",
-            round_trip=True,
-            exclude={
-                "_node",
-                "_registry",
-                "has_explicit_rule",
-                "is_explicit_rule_token",
-                "range",
-                "importance",
-                "thing_id",
-                "parent_thing_id",
-                "language",
-                "text",
-            },
-        )
-        for k, v in as_python.items():
-            if isinstance(v, Sequence | Iterator) and not isinstance(v, str):
-                as_python[k] = [
-                    item.serialize_as_child()  # type: ignore
+    @property
+    def _excluded_fields(self) -> set[str]:
+        return {
+            "_node",
+            "_registry",
+            "has_explicit_rule",
+            "is_explicit_rule_token",
+            "range",
+            "importance",
+            "thing_id",
+            "parent_thing_id",
+            "language",
+            "text",
+        } | self._special_fields
+
+    @property
+    def _special_fields(self) -> set[str]:
+        return {"parent", "positional_connections", "thing", "_root"}
+
+    def serialize_special_fields(self, *, for_cli: bool = False) -> dict[str, Any]:
+        """Serialize the special fields of the AstThing."""
+        fields: dict[str, Any] = {}
+        for field in self._special_fields:
+            value = getattr(self, field)
+            if isinstance(value, tuple):
+                fields[field] = tuple(
+                    item.serialize_as_child  # type: ignore
                     if hasattr(item, "serialize_as_child")  # type: ignore
                     else item.serialize_for_cli()  # type: ignore
                     if hasattr(item, "serialize_for_cli")  # type: ignore
                     else item
-                    for item in v  # type: ignore
-                ]
-        return {
-            k: v.serialize_as_child()
-            if hasattr(v, "serialize_as_child")
-            else v.serialize_for_cli()
-            if hasattr(v, "serialize_for_cli")
-            else v
-            for k, v in as_python.items()
-        }
+                    for item in value  # type: ignore
+                )
+                if for_cli and len(fields[field]) > 4:
+                    fields[field] = (*fields[field][:4], "...")
+                elif for_cli and len(fields) == 1:
+                    fields[field] = fields[field][0]
+            else:
+                fields[field] = (
+                    value.serialize_as_child
+                    if hasattr(value, "serialize_as_child")
+                    else value.serialize_for_cli()
+                    if hasattr(value, "serialize_for_cli")
+                    else value
+                )
+        return fields
+
+    def serialize_for_cli(self) -> dict[str, Any]:
+        """Serialize the AstThing for CLI output."""
+        return self.model_dump(
+            mode="python", round_trip=True, exclude=self._excluded_fields
+        ) | self.serialize_special_fields(for_cli=True)
+
+    def serialize_for_embedding(self) -> dict[str, Any]:
+        """Serialize the AstThing for embedding purposes."""
+        return self.model_dump(
+            mode="python", round_trip=True, exclude=self._excluded_fields
+        ) | self.serialize_special_fields(for_cli=False)
 
 
 __all__ = (

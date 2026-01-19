@@ -15,15 +15,8 @@ import time
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Literal, NoReturn, cast
 
-from codeweaver.core import (
-    INJECTED,
-    ConfigurationError,
-    FailoverServiceDep,
-    IndexingServiceDep,
-    SessionStatistics,
-    StatisticsDep,
-)
-from codeweaver.engine.services.failover_service import FailoverService
+from codeweaver.core import INJECTED, ConfigurationError, StatisticsDep
+from codeweaver.engine.dependencies import FailoverServiceDep, IndexingServiceDep
 from codeweaver.engine.services.indexing_service import IndexingService
 from codeweaver.providers import AllProvidersDep
 from codeweaver.server.health.models import (
@@ -42,7 +35,7 @@ from codeweaver.server.health.models import (
 
 
 if TYPE_CHECKING:
-    from codeweaver.core import FileStatistics
+    from codeweaver.core import FileStatistics, SessionStatistics
     from codeweaver.providers.dependencies import ProviderDict
 
 logger = logging.getLogger(__name__)
@@ -91,11 +84,7 @@ class HealthService:
 
     async def _resolve_dependencies(self) -> None:
         """Resolve dependencies if they were provided as Depends objects."""
-        from codeweaver.core import (
-            SessionStatistics,
-            get_container,
-            is_depends_marker,
-        )
+        from codeweaver.core import SessionStatistics, get_container, is_depends_marker
         from codeweaver.engine.services.failover_service import FailoverService
         from codeweaver.engine.services.indexing_service import IndexingService
         from codeweaver.providers.dependencies import ProviderDict
@@ -111,7 +100,7 @@ class HealthService:
                 providers = await container.resolve(ProviderDict)  # type: ignore
                 self._providers = cast("ProviderDict", providers)
             except Exception as e:
-                logger.error("Failed to resolve providers: %s", e)
+                logger.warning("Failed to resolve providers: %s", e)
                 # If we can't resolve providers, we are in trouble.
                 # But we shouldn't crash here if we can avoid it.
                 self._providers = {
@@ -145,24 +134,7 @@ class HealthService:
         if not self._providers:
             return None
         providers = self._providers.get(kind, ())  # type: ignore
-        # Assuming the tuple contains mix of primary and backup.
-        # We need to distinguish them.
-        # The DI factory _get_all_providers populates them.
-        # It puts backup providers in the same tuple.
-        # We can check for 'Backup' in class name or check if it's an instance of a Backup class.
-        # But `HealthService` doesn't import Backup classes to avoid circular deps.
-        # However, typically only ONE primary is supported per kind currently in CodeWeaver,
-        # or at least we want the *main* one.
-        # Let's assume the first one that is NOT a backup is the primary.
-        # We can check `is_backup_provider` attribute if it exists (Backup registries have it).
-        # Providers themselves?
-        # Let's inspect the object.
-        for p in providers:
-            # Backup providers are created via `create_backup_class` which creates a subclass.
-            # We can check class name.
-            if "Backup" not in p.__class__.__name__:
-                return p
-        return None
+        return next((p for p in providers if "Backup" not in p.__class__.__name__), None)
 
     async def get_health_response(self) -> HealthResponse:
         """Collect health information from all components and return complete response.
@@ -203,20 +175,6 @@ class HealthService:
 
     async def _get_indexing_info(self) -> IndexingInfo:
         """Get indexing state and progress information."""
-        if self._indexer is None:
-            return IndexingInfo(
-                state="idle",
-                progress=IndexingProgressInfo(
-                    files_discovered=0,
-                    files_processed=0,
-                    chunks_created=0,
-                    errors=0,
-                    current_file=None,
-                    start_time=None,
-                    estimated_completion=None,
-                ),
-                last_indexed=self._last_indexed,
-            )
         return IndexingInfo(
             state="idle",
             progress=IndexingProgressInfo(
@@ -254,9 +212,7 @@ class HealthService:
             logger.error("No vector store provider configured")
             raise ConfigurationError(
                 "No vector store provider configured.",
-                suggestions=[
-                    "Ensure a vector store provider is configured in your settings.",
-                ],
+                suggestions=["Ensure a vector store provider is configured in your settings."],
             )
 
         try:
@@ -302,7 +258,7 @@ class HealthService:
                     status=status,
                     model=model_name,
                     latency_ms=latency_ms,
-                    circuit_breaker_state=circuit_state,
+                    circuit_breaker_state=circuit_state,  # ty:ignore[invalid-argument-type]
                 )
             raise_error()
         except Exception as e:
@@ -314,13 +270,10 @@ class HealthService:
     async def _check_sparse_embedding_health(self) -> SparseEmbeddingServiceInfo:
         """Check sparse embedding provider health."""
         try:
-            sparse_provider_instance = self._get_primary_provider("sparse_embedding")
-            if sparse_provider_instance:
+            if sparse_provider_instance := self._get_primary_provider("sparse_embedding"):
                 # Assuming provider name is available or just use class name
                 provider_name = sparse_provider_instance.__class__.__name__
-                return SparseEmbeddingServiceInfo(
-                    status="up", provider=provider_name
-                )
+                return SparseEmbeddingServiceInfo(status="up", provider=provider_name)
             logger.info("No sparse embedding provider configured")
         except Exception as e:
             logger.warning("Sparse embedding health check failed: %s", e)
@@ -331,8 +284,7 @@ class HealthService:
     async def _check_reranking_health(self) -> RerankingServiceInfo:
         """Check reranking service health."""
         try:
-            reranking_instance = self._get_primary_provider("reranking")
-            if reranking_instance:
+            if reranking_instance := self._get_primary_provider("reranking"):
                 circuit_state = self._extract_circuit_breaker_state(
                     getattr(reranking_instance, "circuit_breaker_state", "closed")
                 )
@@ -387,7 +339,7 @@ class HealthService:
         return 0.0
 
     async def _get_statistics_info(self) -> StatisticsInfo:
-        stats = self._statistics
+        stats: SessionStatistics = self._statistics
         total_chunks = 0
         total_files = 0
         semantic_chunks = 0

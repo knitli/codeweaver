@@ -19,7 +19,7 @@ import httpx
 from pydantic import UUID7, ConfigDict, PrivateAttr
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
-from codeweaver.core import BasedModel, CodeChunk, Provider, ProviderError, StrategizedQuery, TypeIs
+from codeweaver.core import BasedModel, CodeChunk, Provider, StrategizedQuery
 from codeweaver.providers.config import VectorStoreProviderSettings
 from codeweaver.providers.exceptions import CircuitBreakerOpenError
 from codeweaver.providers.types import CircuitBreakerState, EmbeddingCapabilityGroup
@@ -114,33 +114,9 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
         any async initialization. Override in subclasses for custom initialization.
         """
 
-    @staticmethod
-    @abstractmethod
-    def _ensure_client(client: Any) -> TypeIs[VectorStoreClient]:
-        """Ensure the vector store client is initialized.
-
-        Returns:
-            bool: True if the client is initialized and ready.
-        """
-
     @property
     def client(self) -> VectorStoreClient:
         """Returns the vector store client instance."""
-        if not self._ensure_client(self.client):
-            raise ProviderError(
-                "Vector store client not initialized",
-                details={
-                    "provider": type(self)._provider.variable
-                    if hasattr(self, "_provider")
-                    else "unknown",
-                    "client_type": type(self).__name__,
-                },
-                suggestions=[
-                    "Ensure initialize() method was called before use",
-                    "Check vector store configuration is valid",
-                    "Verify required dependencies are installed",
-                ],
-            )
         return cast(VectorStoreClient, self.client)
 
     @property

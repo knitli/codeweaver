@@ -16,8 +16,8 @@ from __future__ import annotations
 import pytest
 
 from codeweaver.cli import app as list_app
-from codeweaver.core import get_provider_registry
-from codeweaver.providers import ProviderKind
+from codeweaver.core import Provider, ProviderKind
+from codeweaver.core.types.provider import PROVIDER_CAPABILITIES
 
 
 @pytest.mark.unit
@@ -25,8 +25,8 @@ from codeweaver.providers import ProviderKind
 class TestListProviders:
     """Tests for list providers command."""
 
-    def test_list_providers_uses_registry(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """Test list providers uses ProviderRegistry."""
+    def test_list_providers_uses_capabilities(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """Test list providers uses PROVIDER_CAPABILITIES."""
         with pytest.raises(SystemExit) as exc_info:
             list_app("providers")
         captured = capsys.readouterr()
@@ -47,13 +47,10 @@ class TestListProviders:
 
         assert exc_info.value.code == 0
 
-        # Get actual provider count from registry
-        registry = get_provider_registry()
+        # Get actual provider count from capabilities
         all_providers = set()
-
-        for kind in ProviderKind:
-            if kind != ProviderKind.UNSET:
-                all_providers.update(registry.list_providers(kind))
+        for provider in PROVIDER_CAPABILITIES:
+            all_providers.add(provider)
 
         # Should show at least 90% of actual providers
         # (some may be unavailable due to missing dependencies)
@@ -154,8 +151,9 @@ class TestListCoverage:
 
     def test_list_embedding_providers_coverage(self, capsys: pytest.CaptureFixture[str]) -> None:
         """Test list shows >90% of embedding providers."""
-        registry = get_provider_registry()
-        embedding_providers = registry.list_providers(ProviderKind.EMBEDDING)
+        embedding_providers = [
+            prov for prov, caps in PROVIDER_CAPABILITIES.items() if ProviderKind.EMBEDDING in caps
+        ]
 
         with pytest.raises(SystemExit) as exc_info:
             list_app(["providers", "--kind", "embedding"])
@@ -173,8 +171,9 @@ class TestListCoverage:
 
     def test_list_reranking_providers_coverage(self, capsys: pytest.CaptureFixture[str]) -> None:
         """Test list shows reranking providers."""
-        registry = get_provider_registry()
-        reranking_providers = registry.list_providers(ProviderKind.RERANKING)
+        reranking_providers = [
+            prov for prov, caps in PROVIDER_CAPABILITIES.items() if ProviderKind.RERANKING in caps
+        ]
 
         with pytest.raises(SystemExit) as exc_info:
             list_app(["providers", "--kind", "reranking"])
@@ -190,8 +189,9 @@ class TestListCoverage:
 
     def test_list_sparse_providers_coverage(self, capsys: pytest.CaptureFixture[str]) -> None:
         """Test list shows sparse embedding providers."""
-        registry = get_provider_registry()
-        sparse_providers = registry.list_providers(ProviderKind.SPARSE_EMBEDDING)
+        sparse_providers = [
+            prov for prov, caps in PROVIDER_CAPABILITIES.items() if ProviderKind.SPARSE_EMBEDDING in caps
+        ]
 
         if len(sparse_providers) > 0:
             with pytest.raises(SystemExit) as exc_info:
@@ -205,26 +205,6 @@ class TestListCoverage:
             )
 
             assert shown_count > 0
-
-
-@pytest.mark.unit
-@pytest.mark.config
-class TestListModelRegistry:
-    """Tests for ModelRegistry integration."""
-
-    @pytest.mark.skip(
-        reason="Test needs access to internal model registry API which may not be public"
-    )
-    def test_uses_model_registry(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """Test list command uses ModelRegistry."""
-        # Skipping - requires internal model registry API
-
-    @pytest.mark.skip(
-        reason="Test needs access to internal model registry API which may not be public"
-    )
-    def test_model_registry_has_sparse_models(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """Test ModelRegistry includes sparse embedding models."""
-        # Skipping - requires internal model registry API
 
 
 @pytest.mark.unit

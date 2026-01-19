@@ -12,6 +12,7 @@ from typing import Annotated, Literal, NamedTuple, cast
 
 from pydantic import UUID7, Field, NonNegativeInt, PositiveInt
 
+from codeweaver.core import BasedModel
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.types.aliases import LiteralStringT, ModelName, ModelNameT
 from codeweaver.core.types.enum import BaseEnum
@@ -96,8 +97,8 @@ class QueryResult(NamedTuple):
     ]
 
 
-class EmbeddingBatchInfo(NamedTuple):
-    """NamedTuple representing metadata about a CodeChunk's embedding within a batch."""
+class EmbeddingBatchInfo(BasedModel):
+    """BasedModel representing metadata about a CodeChunk's embedding within a batch."""
 
     batch_id: Annotated[
         UUID7,
@@ -270,7 +271,7 @@ class EmbeddingModelInfo(NamedTuple):
     ]
 
 
-class ChunkEmbeddings(NamedTuple):
+class ChunkEmbeddings(BasedModel):
     """NamedTuple representing the embeddings associated with a specific CodeChunk."""
 
     sparse: Annotated[
@@ -365,19 +366,21 @@ class ChunkEmbeddings(NamedTuple):
             raise ValueError(
                 f"Embedding chunk ID {embedding_info.chunk_id} does not match ChunkEmbeddings chunk ID {self.chunk.chunk_id}."
             )
-        return self._replace(
-            dense=embedding_info
-            if embedding_info.kind == EmbeddingKind.DENSE and not embedding_info.backup
-            else self.dense,
-            sparse=embedding_info
-            if embedding_info.kind == EmbeddingKind.SPARSE and not embedding_info.backup
-            else self.sparse,
-            backup_dense=embedding_info
-            if embedding_info.kind == EmbeddingKind.DENSE and embedding_info.backup
-            else self.backup_dense,
-            backup_sparse=embedding_info
-            if embedding_info.kind == EmbeddingKind.SPARSE and embedding_info.backup
-            else self.backup_sparse,
+        return self.model_copy(
+            update={
+                "dense": embedding_info
+                if embedding_info.kind == EmbeddingKind.DENSE and not embedding_info.backup
+                else self.dense,
+                "sparse": embedding_info
+                if embedding_info.kind == EmbeddingKind.SPARSE and not embedding_info.backup
+                else self.sparse,
+                "backup_dense": embedding_info
+                if embedding_info.kind == EmbeddingKind.DENSE and embedding_info.backup
+                else self.backup_dense,
+                "backup_sparse": embedding_info
+                if embedding_info.kind == EmbeddingKind.SPARSE and embedding_info.backup
+                else self.backup_sparse,
+            }
         )
 
     def update(self, embedding_info: EmbeddingBatchInfo) -> ChunkEmbeddings:
@@ -396,19 +399,21 @@ class ChunkEmbeddings(NamedTuple):
             raise ValueError(
                 f"Embedding chunk ID {embedding_info.chunk_id} does not match ChunkEmbeddings chunk ID {self.chunk.chunk_id}."
             )
-        return self._replace(
-            dense=embedding_info
-            if embedding_info.kind == EmbeddingKind.DENSE and not embedding_info.backup
-            else self.dense,
-            sparse=embedding_info
-            if embedding_info.kind == EmbeddingKind.SPARSE and not embedding_info.backup
-            else self.sparse,
-            backup_dense=embedding_info
-            if embedding_info.kind == EmbeddingKind.DENSE and embedding_info.backup
-            else self.backup_dense,
-            backup_sparse=embedding_info
-            if embedding_info.kind == EmbeddingKind.SPARSE and embedding_info.backup
-            else self.backup_sparse,
+        return self.model_copy(
+            update={
+                "dense": embedding_info
+                if embedding_info.kind == EmbeddingKind.DENSE and not embedding_info.backup
+                else self.dense,
+                "sparse": embedding_info
+                if embedding_info.kind == EmbeddingKind.SPARSE and not embedding_info.backup
+                else self.sparse,
+                "backup_dense": embedding_info
+                if embedding_info.kind == EmbeddingKind.DENSE and embedding_info.backup
+                else self.backup_dense,
+                "backup_sparse": embedding_info
+                if embedding_info.kind == EmbeddingKind.SPARSE and embedding_info.backup
+                else self.backup_sparse,
+            }
         )
 
     @property

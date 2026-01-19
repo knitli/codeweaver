@@ -24,7 +24,6 @@ from typing import TYPE_CHECKING, Annotated, Any, ClassVar, Literal, NamedTuple,
 
 from fastmcp import Context
 from pydantic import (
-    ConfigDict,
     Field,
     FieldSerializationInfo,
     NonNegativeFloat,
@@ -36,16 +35,14 @@ from pydantic import (
     field_serializer,
     field_validator,
 )
-from pydantic.dataclasses import dataclass
 from starlette.responses import PlainTextResponse
 
+from codeweaver.core import BasedModel
 from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
 from codeweaver.core.metadata import ChunkKind, ExtKind
 from codeweaver.core.types import (
-    DATACLASS_CONFIG,
     AnonymityConversion,
     BaseEnum,
-    DataclassSerializationMixin,
     FilteredKey,
     FilteredKeyT,
     LanguageName,
@@ -67,8 +64,7 @@ if TYPE_CHECKING:
     from codeweaver.core import CodeChunk, DiscoveredFile
 
 
-@dataclass(config=DATACLASS_CONFIG | ConfigDict(extra="forbid", defer_build=True))
-class TimingStatistics(DataclassSerializationMixin):
+class TimingStatistics(BasedModel):
     """By-operation timing statistics for CodeWeaver operations."""
 
     on_call_tool_requests: dict[ToolOrPromptName, list[PositiveFloat]] = Field(
@@ -308,8 +304,7 @@ class TimingStatistics(DataclassSerializationMixin):
         }
 
 
-@dataclass(config=DATACLASS_CONFIG | ConfigDict(extra="forbid", defer_build=True))
-class _LanguageStatistics(DataclassSerializationMixin):
+class _LanguageStatistics(BasedModel):
     """Statistics for a specific language within a category."""
 
     language: Annotated[
@@ -446,8 +441,7 @@ def normalize_language(language: str) -> LanguageNameT | SemanticSearchLanguage 
     return LanguageName(language)
 
 
-@dataclass(config=DATACLASS_CONFIG | ConfigDict(extra="forbid", defer_build=True))
-class _CategoryStatistics(DataclassSerializationMixin):
+class _CategoryStatistics(BasedModel):
     """Statistics for a file category (code, config, docs, other)."""
 
     category: Annotated[
@@ -586,8 +580,7 @@ class _CategoryStatistics(DataclassSerializationMixin):
         )
 
 
-@dataclass(config=DATACLASS_CONFIG | ConfigDict(extra="forbid", defer_build=True))
-class FileStatistics(DataclassSerializationMixin):
+class FileStatistics(BasedModel):
     """Comprehensive file statistics tracking categories, languages, and operations."""
 
     categories: dict[ChunkKind, _CategoryStatistics] = Field(
@@ -954,8 +947,7 @@ class Identifier(NamedTuple):
         )
 
 
-@dataclass(config=DATACLASS_CONFIG | ConfigDict(extra="forbid", defer_build=True))
-class FailoverStats(DataclassSerializationMixin):
+class FailoverStats(BasedModel):
     """Statistics tracking for vector store failover operations."""
 
     failover_active: bool = False
@@ -977,8 +969,7 @@ class FailoverStats(DataclassSerializationMixin):
         # No identifying information in failover statistics
 
 
-@dataclass(kw_only=True, config=DATACLASS_CONFIG | ConfigDict(defer_build=True))
-class SessionStatistics(DataclassSerializationMixin):
+class SessionStatistics(BasedModel):
     """Statistics for tracking session performance and usage."""
 
     timing_statistics: Annotated[
@@ -1026,6 +1017,17 @@ class SessionStatistics(DataclassSerializationMixin):
         list[Identifier], Field(default_factory=list, init=False, repr=False)
     ]
 
+    def __init__(self, **data: Any) -> None:
+        """Initialize the SessionStatistics object."""
+        for field in (
+            "_successful_request_log",
+            "_failed_request_log",
+            "_successful_http_request_log",
+            "_failed_http_request_log",
+        ):
+            object.__setattr__(self, field, data.pop(field, []))
+        super().__init__(**data)
+
     def __post_init__(self) -> None:
         """Post-initialization processing."""
         if not self.index_statistics:
@@ -1037,7 +1039,7 @@ class SessionStatistics(DataclassSerializationMixin):
         if not self.semantic_statistics and importlib.util.find_spec("codeweaver.semantic"):
             from codeweaver.semantic.classifications import UsageMetrics
 
-            self.semantic_statistics = UsageMetrics(Counter())
+            self.semantic_statistics = UsageMetrics(category_usage_counts=Counter())
         self.timing_statistics = TimingStatistics(
             on_call_tool_requests={},
             on_read_resource_requests={},

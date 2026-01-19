@@ -51,7 +51,8 @@ from codeweaver.providers import (
 
 
 if TYPE_CHECKING:
-    from codeweaver.engine.chunker import ChunkGovernor
+    from codeweaver.engine.chunker.base import ChunkGovernor
+    from codeweaver.engine.chunker.registry import SourceIdRegistry
     from codeweaver.engine.managers.checkpoint_manager import CheckpointManager
     from codeweaver.engine.managers.manifest_manager import FileManifestManager
     from codeweaver.engine.managers.progress_tracker import IndexingProgressTracker, IndexingStats
@@ -384,6 +385,18 @@ type ExtensionFilterDep = Annotated[
 ]
 type IgnoreFilterDep = Annotated[IgnoreFilter, depends(_create_ignore_filter, scope="singleton")]
 
+
+@dependency_provider(SourceIdRegistry, scope="singleton")
+def _create_sourceid_registry() -> SourceIdRegistry:
+    """Factory for SourceIdRegistry."""
+    return SourceIdRegistry()
+
+
+type SourceIdRegistryDep = Annotated[
+    SourceIdRegistry, depends(_create_sourceid_registry, scope="singleton")
+]
+
+
 __all__ = (
     "BackupChunkingServiceDep",
     "BackupIndexingServiceDep",
@@ -400,4 +413,5 @@ __all__ = (
     "IndexingStatsDep",
     "ManifestManagerDep",
     "ProgressTrackerDep",
+    "SourceIdRegistryDep",
 )

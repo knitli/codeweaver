@@ -25,8 +25,11 @@ from cyclopts import App
 from pydantic import FilePath, ValidationError
 from rich.table import Table
 
+from codeweaver.cli.dependencies import setup_cli_di
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
+from codeweaver.cli.utils import check_provider_package_available
 from codeweaver.core import (
+    CodeWeaverSettingsType,
     ProviderKind,
     Unset,
     get_codeweaver_config_paths,
@@ -266,16 +269,11 @@ def check_project_path(settings: CodeWeaverSettings) -> DoctorCheck:
     )
 
 
-def check_configuration_file(settings: CodeWeaverSettings | None = None) -> DoctorCheck:
+def check_configuration_file(settings: CodeWeaverSettings) -> DoctorCheck:
     """Check if configuration file exists and is valid."""
     check = DoctorCheck("Configuration File")
 
     try:
-        if settings is None:
-            from codeweaver.server import get_settings
-
-            settings = get_settings()
-
         possible_config_locations = get_codeweaver_config_paths()
 
         # The function also checks for environment variable config file
@@ -351,7 +349,7 @@ async def _qdrant_running_at_url(url: Any | None = None) -> bool:
         return False
     else:
         return response.status_code == 200 and bool(
-            re.search(r'app_info\{name="qdrant"\}', response.text)
+            re.search(r'app_info{name="qdrant"}', response.text)
         )
 
 
@@ -592,9 +590,6 @@ def check_provider_availability(settings: ProviderSettings) -> list[DoctorCheck]
     check = DoctorCheck("Provider Availability")
 
     try:
-        from codeweaver.core import get_provider_registry
-
-        registry = get_provider_registry()
         tested_providers: list[DoctorCheck] = []
 
         if not (configs := settings.provider_configs):
@@ -614,8 +609,8 @@ def check_provider_availability(settings: ProviderSettings) -> list[DoctorCheck]
             for provider_config in provider_configs:
                 kind = ProviderKind.from_string(cast(str, kind))
                 provider = provider_config["provider"]
-                # Let users know these aren't fully available
-                is_package_available = registry.is_provider_available(provider, kind)
+                # Check package availability manually (Registry replacement)
+                is_package_available = check_provider_package_available(provider, kind)
                 has_auth = provider.has_env_auth or provider.is_local_provider
                 if kind in {ProviderKind.DATA, ProviderKind.AGENT}:
                     tested_providers.append(
@@ -752,26 +747,22 @@ def _print_summary(has_failures: bool, has_warnings: bool, display: StatusDispla
         sys.exit(1)
 
 
-async def process_checks(display: StatusDisplay) -> list[DoctorCheck]:
+async def process_checks(display: StatusDisplay, settings: CodeWeaverSettings) -> list[DoctorCheck]:
     """Process all doctor checks and return the results.
 
     Args:
         display: StatusDisplay for output
+        settings: CodeWeaver settings object
 
     Returns:
         List of DoctorCheck results
     """
     from codeweaver.core import CodeWeaverError
 
-    settings: CodeWeaverSettings | None = None
-
     checks: list[DoctorCheck] = [check_python_version(), check_required_dependencies()]
     # Configuration checks
     config_failed = False
     try:
-        from codeweaver.server import get_settings
-
-        settings = get_settings()
         checks.append(check_configuration_file(settings))
 
     except CodeWeaverError as e:
@@ -866,17 +857,15 @@ async def doctor(
         display = _display
     _display = display  # Set module-level display for check functions
 
-    # Update settings if config_file or project_path provided
-    if config_file or project_path:
-        from codeweaver.server import update_settings
-
-        _ = update_settings(config_file=config_file, project_path=project_path)  # type: ignore
-
     display.console.print()
     display.print_section("Running diagnostic checks...")
     display.console.print()
 
-    checks: list[DoctorCheck] = await process_checks(display)
+    # Setup DI Container
+    container = setup_cli_di(config_file, project_path, verbose=verbose)
+    settings = await container.resolve(CodeWeaverSettingsType)
+
+    checks: list[DoctorCheck] = await process_checks(display, settings)
     # Display results table
     table = Table(show_header=True, header_style="bold blue", box=None)
     table.add_column("Status", style="white", no_wrap=True, width=6)

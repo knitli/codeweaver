@@ -15,9 +15,8 @@ from __future__ import annotations
 import inspect
 
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
 from threading import Lock
-from typing import Any, Literal, TypeVar, cast, overload
+from typing import Any, Literal, NamedTuple, TypeVar, cast, overload
 
 
 T = TypeVar("T")
@@ -28,8 +27,7 @@ _providers: dict[type, Callable[..., Any]] = {}
 _provider_metadata: dict[type, ProviderMetadata] = {}
 
 
-@dataclass(frozen=True)
-class ProviderMetadata:
+class ProviderMetadata(NamedTuple):
     """Metadata about a registered provider.
 
     Attributes:
@@ -237,11 +235,7 @@ def dependency_provider[T](
 
         def class_decorator(target_cls: type[T]) -> type[T]:
             _register_provider(
-                interface=target_cls,
-                factory=target_cls,
-                scope=scope,
-                module=module,
-                tags=tags,
+                interface=target_cls, factory=target_cls, scope=scope, module=module, tags=tags
             )
             return target_cls
 

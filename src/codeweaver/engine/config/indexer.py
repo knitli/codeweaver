@@ -36,7 +36,6 @@ from codeweaver.core import (
     ResolvedProjectNameDep,
     ResolvedProjectPathDep,
     Unset,
-    get_project_name,
     get_user_state_dir,
 )
 
@@ -348,11 +347,14 @@ class IndexerSettings(BasedModel):
             self._index_cache_dir = dir_path
         return self._index_cache_dir
 
+    def _project_name(self, project_name: ResolvedProjectNameDep = INJECTED) -> str:
+        return project_name
+
     @computed_field
     @property
     def storage_file(self) -> FilePath:
         """Effective storage file path for index data."""
-        project_name = get_project_name()
+        project_name = self._project_name()
         if self._index_cache_dir:
             return self._index_cache_dir / f"{project_name}_index.json"
         return self.cache_dir / f"{project_name}_index.json"

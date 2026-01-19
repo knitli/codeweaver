@@ -13,32 +13,26 @@ import time
 from typing import TYPE_CHECKING, Annotated, Any
 
 from fastmcp import FastMCP
-from pydantic import (
-    ConfigDict,
-    Field,
-    NonNegativeFloat,
-    NonNegativeInt,
-    PrivateAttr,
-    computed_field,
-)
-from pydantic.dataclasses import dataclass
+from pydantic import Field, NonNegativeFloat, NonNegativeInt, PrivateAttr, computed_field
 
 from codeweaver.core import (
-    DATACLASS_CONFIG,
-    DataclassSerializationMixin,
+    CodeWeaverSettingsType,
     DictView,
     Unset,
     elapsed_time_to_human_readable,
     lazy_import,
 )
+from codeweaver.core.types import BasedModel
+from codeweaver.server import FastMcpHttpServerSettings, FastMcpStdioServerSettings
 from codeweaver.server.config import (
-    CodeWeaverSettingsDict,
     DefaultFastMcpHttpRunArgs,
     FastMcpHttpRunArgs,
     FastMcpServerSettingsDict,
 )
 from codeweaver.server.mcp.middleware import McpMiddleware
 
+
+type FastMCPServerSettings = FastMcpHttpServerSettings | FastMcpStdioServerSettings
 
 if TYPE_CHECKING:
     from fastmcp import FastMCP
@@ -70,24 +64,26 @@ def _get_fastmcp_settings_map(*, http: bool = False) -> DictView[FastMcpServerSe
     )
 
 
-@dataclass(config=DATACLASS_CONFIG | ConfigDict(extra="forbid"))
-class CwMcpHttpState(DataclassSerializationMixin):
+class CwMcpHttpState(BasedModel):
     """State object for MCP HTTP server deployments."""
 
     app: Annotated[FastMCP[Any], PrivateAttr()]
 
-    logger: logging.Logger = Field(
-        default_factory=lambda: logging.getLogger("codeweaver.server.mcp.http"),
-        description="Logger instance for the MCP HTTP server.",
-    )
+    logger: Annotated[
+        logging.Logger,
+        Field(
+            default_factory=lambda: logging.getLogger("codeweaver.server.mcp.http"),
+            description="Logger instance for the MCP HTTP server.",
+        ),
+    ]
 
-    settings: DictView[CodeWeaverSettingsDict] = Field(
-        default_factory=lambda: get_settings_map(), description="CodeWeaver settings view."
-    )
+    settings: Annotated[
+        CodeWeaverSettingsType, Field(description="CodeWeaver configuration settings")
+    ]
 
-    mcp_settings: DictView[FastMcpServerSettingsDict] = Field(
-        default_factory=_get_fastmcp_settings_map,
-        description="FastMCP server settings view for the MCP HTTP server.",
+    mcp_settings: FastMCPServerSettings = Field(
+        default_factory=lambda data: data["settings"].mcp_server,
+        description="FastMCP server settings for the MCP HTTP server.",
     )
 
     run_args: FastMcpHttpRunArgs = Field(

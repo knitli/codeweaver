@@ -257,7 +257,8 @@ from typing import TYPE_CHECKING, Annotated, Any, ClassVar, TypedDict, cast, ove
 from pydantic import DirectoryPath, Field
 from pydantic_core import from_json
 
-from codeweaver.core import CategoryNameT, RootedRoot, SemanticSearchLanguage, ThingName
+from codeweaver.core import INJECTED, CategoryNameT, RootedRoot, SemanticSearchLanguage, ThingName
+from codeweaver.semantic.dependencies import ThingRegistryDep
 from codeweaver.semantic.types import NodeTypeDTO
 
 
@@ -708,13 +709,11 @@ class NodeTypeParser:
             for lang in self._languages
         )
 
-    def _register_everything(self) -> None:
+    def _register_everything(self, registry: ThingRegistryDep = INJECTED) -> None:
         """Register all Things and Categories in the internal mapping."""
         if not type(self)._registration_cache:
             _ = self.parse_all_nodes()
-        from codeweaver.semantic.registry import get_registry
 
-        registry = get_registry()
         for language in self._languages:
             for thing in self._flattened_nodes_for_language(language):
                 registry.register_thing(thing)
@@ -827,12 +826,10 @@ class NodeTypeParser:
             )
         return self._flattened_nodes_for_language(node_array.language)
 
-    def _validate(self) -> None:
+    def _validate(self, registry: ThingRegistryDep = INJECTED) -> None:
         """Validate the internal state of the parser."""
         from codeweaver.semantic.grammar import CompositeThing, Token
-        from codeweaver.semantic.registry import get_registry
 
-        registry = get_registry()
         for language in self._languages:
             if len(self._registration_cache[language]["composites"]) > 0:
                 for thing in self._flattened_nodes_for_language(language):

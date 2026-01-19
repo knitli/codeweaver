@@ -30,7 +30,7 @@ from pydantic.dataclasses import as_dict
 from pydantic_ai.settings import ModelSettings as AgentModelSettings
 from qdrant_client.models import SparseVectorParams, VectorParams
 
-from codeweaver.core import BaseDataclassEnum, Provider, generate_collection_name
+from codeweaver.core import BaseDataclassEnum, ModelName, Provider, generate_collection_name
 from codeweaver.providers.config.clients import QdrantClientOptions
 from codeweaver.providers.config.embedding import (
     FastEmbedEmbeddingConfig,
@@ -171,8 +171,8 @@ def _recommended_default(
     return ProviderSettingsDict(
         embedding=(
             EmbeddingProviderSettings(
-                model_name="voyage-code-3",
-                embedding_config=VoyageEmbeddingConfig(model_name="voyage-code-3"),
+                model_name=ModelName("voyage-code-3"),
+                embedding_config=VoyageEmbeddingConfig(model_name=ModelName("voyage-code-3")),
                 provider=Provider.VOYAGE,
             ),
         ),
@@ -183,17 +183,17 @@ def _recommended_default(
                 # Splade models are slow to generate embeddings, but lightning fast at inference time
                 # This version comes without license complications associated with `naver`'s versions
                 # There is a v2 available, but not yet supported by FastEmbed
-                model_name="prithivida/Splade_PP_en_v1",
+                model_name=ModelName("prithivida/Splade_PP_en_v1"),
                 sparse_embedding_config=FastEmbedSparseEmbeddingConfig(
-                    model_name="prithivida/Splade_PP_en_v1"
+                    model_name=ModelName("prithivida/Splade_PP_en_v1")
                 ),
             ),
         ),
         reranking=(
             RerankingProviderSettings(
                 provider=Provider.VOYAGE,
-                model_name="voyage-rerank-2.5",
-                reranking_config=VoyageRerankingConfig(model_name="voyage-rerank-2.5"),
+                model_name=ModelName("voyage-rerank-2.5"),
+                reranking_config=VoyageRerankingConfig(model_name=ModelName("voyage-rerank-2.5")),
             ),
         ),
         agent=(

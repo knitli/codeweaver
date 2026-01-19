@@ -8,43 +8,78 @@
 from __future__ import annotations
 
 import contextlib
+import importlib
 import logging
 
 from functools import cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, cast
 
-from pydantic import UUID7, AfterValidator, Field, NonNegativeInt, computed_field, model_validator
-from pydantic.dataclasses import dataclass
+from pydantic import (
+    UUID7,
+    AfterValidator,
+    ConfigDict,
+    DirectoryPath,
+    Field,
+    NonNegativeInt,
+    computed_field,
+    model_validator,
+)
 
+from codeweaver.core import BasedModel, ResolvedProjectPathDep
 from codeweaver.core.chunks import CodeChunk
+from codeweaver.core.di import INJECTED
 from codeweaver.core.language import is_semantic_config_ext
 from codeweaver.core.metadata import ExtKind
-from codeweaver.core.stores import BlakeHashKey, BlakeKey, get_blake_hash
-from codeweaver.core.types import DATACLASS_CONFIG, MISSING, DataclassSerializationMixin, Missing
-from codeweaver.core.utils import get_git_branch, sanitize_unicode, set_relative_path, uuid7
+from codeweaver.core.types import MISSING, BlakeHashKey, BlakeKey, Missing
+from codeweaver.core.utils import (
+    get_blake_hash,
+    get_git_branch,
+    sanitize_unicode,
+    set_relative_path,
+    uuid7,
+)
 
 
 if TYPE_CHECKING:
     from codeweaver.core.types import AnonymityConversion, FilteredKeyT
+
+if importlib.util.find_spec("codeweaver.engine"):
+    SourceIdRegistry = importlib.import_module(
+        "codeweaver.engine.chunker.registry"
+    ).SourceIdRegistry
+else:
+    # SourceIdRegistry is a UUIDStore subclass
+    SourceIdRegistry = importlib.import_module("codeweaver.core.stores").UUIDStore
+
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True, slots=True, config=DATACLASS_CONFIG)
-class DiscoveredFile(DataclassSerializationMixin):
+def _get_git_branch(path: Path) -> str | None:
+    """Get the git branch for the given path, if available."""
+    try:
+        return get_git_branch(path)
+    except Exception as e:
+        logger.warning("Failed to get git branch for %s: %s", path, e)
+        return None
+
+
+class DiscoveredFile(BasedModel):
     """Represents a file discovered during project scanning.
 
     `DiscoveredFile` instances are immutable and hashable, making them suitable for use in sets and as dictionary keys, and ensuring that their state cannot be altered after creation.
     In CodeWeaver operations, they are created using the `from_path` method when scanning and indexing a codebase.
     """
 
+    model_config = BasedModel.model_config | ConfigDict(frozen=True)
+
     path: Annotated[
         Path,
         Field(description="Relative path to the discovered file from the project root."),
         AfterValidator(set_relative_path),
     ]
-    ext_kind: ExtKind | None = None
-    project_path: Path | None = None
+    ext_kind: ExtKind
+    project_path: DirectoryPath
     _file_hash: Annotated[
         BlakeHashKey | None,
         Field(
@@ -80,7 +115,8 @@ class DiscoveredFile(DataclassSerializationMixin):
         ext_kind: ExtKind | None = None,
         file_hash: BlakeKey | None = None,
         git_branch: str | None = None,
-        project_path: Path | None = None,
+        project_path: ResolvedProjectPathDep = INJECTED,
+        registry: SourceIdRegistry = INJECTED,
         **kwargs: Any,
     ) -> None:
         """Initialize DiscoveredFile with optional file_hash and git_branch."""
@@ -115,7 +151,11 @@ class DiscoveredFile(DataclassSerializationMixin):
 
     @classmethod
     def from_path(
-        cls, path: Path, *, file_hash: BlakeKey | None = None, project_path: Path | None = None
+        cls,
+        path: Path,
+        *,
+        file_hash: BlakeKey | None = None,
+        project_path: ResolvedProjectPathDep = INJECTED,
     ) -> DiscoveredFile | None:
         """Create a DiscoveredFile from a file path."""
         branch = get_git_branch(path if path.is_dir() else path.parent) or "main"

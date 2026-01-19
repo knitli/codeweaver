@@ -13,9 +13,10 @@ The package also includes serializable wrappers around `Ast-Grep`'s core types, 
 
 from __future__ import annotations
 
-from importlib import import_module
 from types import MappingProxyType
 from typing import TYPE_CHECKING
+
+from codeweaver.core.utils.lazy_importer import create_lazy_getattr
 
 
 if TYPE_CHECKING:
@@ -46,6 +47,7 @@ if TYPE_CHECKING:
         GrammarBasedClassifier,
         GrammarClassificationResult,
     )
+    from codeweaver.semantic.dependencies import NodeParserDep, ThingRegistryDep
     from codeweaver.semantic.grammar import (
         Category,
         CompositeThing,
@@ -57,7 +59,7 @@ if TYPE_CHECKING:
         get_all_grammars,
         get_grammar,
     )
-    from codeweaver.semantic.registry import ThingRegistry, get_registry
+    from codeweaver.semantic.registry import ThingRegistry
     from codeweaver.semantic.scoring import SemanticScorer
     from codeweaver.semantic.types import (
         ConnectionClass,
@@ -83,10 +85,11 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "GrammarClassificationResult": (__spec__.parent, "classifier"),
     "ImportanceScores": (__spec__.parent, "classifications"),
     "MetaVar": (__spec__.parent, "ast_grep"),
+    "NodeParserDep": (__spec__.parent, "dependencies"),
     "NthChild": (__spec__.parent, "ast_grep"),
     "Pattern": (__spec__.parent, "ast_grep"),
-    "Position": (__spec__.parent, "ast_grep"),
     "PosRule": (__spec__.parent, "ast_grep"),
+    "Position": (__spec__.parent, "ast_grep"),
     "PositionalConnections": (__spec__.parent, "grammar"),
     "Range": (__spec__.parent, "ast_grep"),
     "RangeRule": (__spec__.parent, "ast_grep"),
@@ -98,12 +101,12 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "ThingClass": (__spec__.parent, "classifications"),
     "ThingKind": (__spec__.parent, "types"),
     "ThingRegistry": (__spec__.parent, "registry"),
+    "ThingRegistryDep": (__spec__.parent, "dependencies"),
     "ThingType": (__spec__.parent, "grammar"),
     "Token": (__spec__.parent, "grammar"),
     "TokenPurpose": (__spec__.parent, "types"),
     "get_all_grammars": (__spec__.parent, "grammar"),
     "get_grammar": (__spec__.parent, "grammar"),
-    "get_registry": (__spec__.parent, "registry"),
 })
 """Dynamically import submodules and classes for the semantic package.
 
@@ -111,17 +114,7 @@ Maps class/function/type names to their respective module paths for lazy loading
 """
 
 
-def __getattr__(name: str) -> object:
-    """Dynamically import submodules and classes for the semantic package."""
-    if name in _dynamic_imports:
-        module_name, submodule_name = _dynamic_imports[name]
-        module = import_module(f"{module_name}.{submodule_name}")
-        result = getattr(module, name)
-        globals()[name] = result  # Cache in globals for future access
-        return result
-    if globals().get(name) is not None:
-        return globals()[name]
-    raise AttributeError(f"module {__name__} has no attribute {name}")
+__getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
 
 
 __all__ = (
@@ -141,6 +134,7 @@ __all__ = (
     "GrammarClassificationResult",
     "ImportanceScores",
     "MetaVar",
+    "NodeParserDep",
     "NthChild",
     "Pattern",
     "PosRule",
@@ -156,12 +150,12 @@ __all__ = (
     "ThingClass",
     "ThingKind",
     "ThingRegistry",
+    "ThingRegistryDep",
     "ThingType",
     "Token",
     "TokenPurpose",
     "get_all_grammars",
     "get_grammar",
-    "get_registry",
 )
 
 

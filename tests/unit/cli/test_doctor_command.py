@@ -162,11 +162,15 @@ class TestDoctorProviderEnvVars:
 
     def test_all_cloud_providers_have_env_vars(self) -> None:
         """Test all cloud providers have other_env_vars defined."""
-        from codeweaver.core import get_provider_registry
+        # We manually list providers instead of using registry
+        from codeweaver.core.types.provider import PROVIDER_CAPABILITIES
         from codeweaver.providers import ProviderKind
 
-        registry = get_provider_registry()
-        embedding_providers = registry.list_providers(ProviderKind.EMBEDDING)
+        embedding_providers = [
+            prov for prov, caps in PROVIDER_CAPABILITIES.items() 
+            if ProviderKind.EMBEDDING in caps
+        ]
+        
         # bedrock is a special case with many different auth methods and a very long list of env vars that aren't implemented in Provider.other_env_vars
         cloud_providers = [
             provider
@@ -176,8 +180,13 @@ class TestDoctorProviderEnvVars:
 
         for provider in cloud_providers:
             if provider and provider.other_env_vars:
-                env_vars = next((var for var in provider.other_env_vars if var.get("api_key")), {})
-                assert "api_key" in env_vars
+                # Need to handle potential tuple of env vars
+                env_vars_list = provider.other_env_vars
+                if not isinstance(env_vars_list, tuple):
+                    env_vars_list = (env_vars_list,)
+                
+                has_api_key = any("api_key" in ev for ev in env_vars_list)
+                assert has_api_key, f"Provider {provider} missing api_key in env vars"
 
 
 @pytest.mark.unit

@@ -17,20 +17,12 @@ import logging
 import os
 
 from pathlib import Path
-from typing import Annotated, Any, Literal, Self, Unpack, cast, get_origin, overload
+from typing import Annotated, Any, Literal, Self, cast, get_origin, overload
 
 from fastmcp.server.server import DuplicateBehavior
 from mcp.server.auth.settings import AuthSettings
 from mcp.server.lowlevel.server import LifespanResultT
-from pydantic import (
-    DirectoryPath,
-    Field,
-    FilePath,
-    PositiveInt,
-    PrivateAttr,
-    ValidationError,
-    computed_field,
-)
+from pydantic import DirectoryPath, Field, FilePath, PositiveInt, PrivateAttr, computed_field
 from pydantic.fields import FieldInfo
 from pydantic.networks import HttpUrl
 from pydantic_core import from_json, to_json
@@ -699,26 +691,6 @@ class CodeWeaverSettings(BaseCodeWeaverSettings):
             endpoints=DefaultEndpointSettings,
         )
 
-    @classmethod
-    def from_config(cls, path: FilePath, **kwargs: Unpack[CodeWeaverSettingsDict]) -> Self:
-        """Create a CodeWeaverSettings instance from a configuration file.
-
-        This is a convenience method for creating a settings instance from a specific config file. By default, CodeWeaverSettings will look for configuration files in standard locations (like codeweaver.toml in the project root). This method allows you to specify a particular config file to load settings from, primarily for testing or special use cases.
-        """
-        extension = path.suffix.lower()
-        match extension:
-            case ".json":
-                cls.model_config["json_file"] = path
-            case ".toml":
-                cls.model_config["toml_file"] = path
-            case ".yaml" | ".yml":
-                cls.model_config["yaml_file"] = path
-            case _:
-                raise ValueError(f"Unsupported configuration file format: {extension}")
-        from codeweaver.core import get_project_path
-
-        return cls(project_path=get_project_path(), **{**kwargs, "config_file": path})  # type: ignore
-
     async def finalize(self) -> Self:
         """Finalize settings with config resolution.
 
@@ -742,23 +714,6 @@ class CodeWeaverSettings(BaseCodeWeaverSettings):
             # Silently fail if config resolution not available (monorepo compatibility)
             logger.debug("Config resolution not available, skipping finalization")
 
-        return self
-
-    def _update_settings(self, **kwargs: Unpack[CodeWeaverSettingsDict]) -> Self:
-        """Update settings, validating a new CodeWeaverSettings instance and updating the global instance."""
-        try:
-            self.__init__(**kwargs)  # type: ignore # Unpack doesn't extend to nested dicts
-        except ValidationError:
-            logger.warning(
-                "`CodeWeaverSettings` received invalid settings for an update. The settings failed to validate. We did not update the settings."
-            )
-            return self
-        # The global _settings doesn't need updated because its reference didn't change
-        # But we do need to update the global _mapped_settings because it's a copy
-        # And other modules are using references to that copy
-        globals()["_mapped_settings"] = self.view  # this recreates self._map as well
-        # Reset resolution flag when settings are updated
-        self._resolution_complete = False
         return self
 
     @classmethod

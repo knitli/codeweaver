@@ -14,6 +14,7 @@ from typing import Annotated, Any, Literal, LiteralString, NotRequired, Required
 from pydantic import Field
 
 from codeweaver.core import BasedModel, LiteralProvider, Provider
+from codeweaver.core.types import ModelName, ModelNameT
 from codeweaver.providers import RerankingModelCapabilities
 
 
@@ -23,7 +24,7 @@ DEFAULT_RERANK_TOP_K = 10
 class SerializedRerankingOptionsDict(TypedDict, total=False):
     """A dictionary representing serialized reranking options for different providers."""
 
-    model_name: Required[LiteralString]
+    model_name: Required[ModelNameT]
     """The name of the reranking model in the format used by the provider."""
 
     rerank: NotRequired[dict[str, Any]]
@@ -159,7 +160,7 @@ class VoyageRerankingConfig(BaseRerankingConfig):
     tag: Literal["voyage"] = "voyage"
     provider: Literal[Provider.VOYAGE] = Provider.VOYAGE
 
-    model_name: Literal["rerank-2.5", "rerank-2.5-lite"] | LiteralString
+    model_name: Literal["rerank-2.5", "rerank-2.5-lite"] | ModelNameT
     """The Voyage AI reranking model to use (e.g., 'rerank-2.5', 'rerank-2.5-lite')."""
 
     rerank: VoyageRerankingOptionsDict | None = None
@@ -168,7 +169,9 @@ class VoyageRerankingConfig(BaseRerankingConfig):
     def _as_options(self) -> SerializedRerankingOptionsDict:
         """Convert the Voyage reranking configuration to a dictionary of options."""
         return SerializedRerankingOptionsDict(
-            model_name=self.model_name, rerank=cast(dict[str, Any], self.rerank or {}), model={}
+            model_name=ModelName(self.model_name),
+            rerank=cast(dict[str, Any], self.rerank or {}),
+            model={},
         )
 
 
@@ -196,7 +199,7 @@ class CohereRerankingConfig(BaseRerankingConfig):
     def _as_options(self) -> SerializedRerankingOptionsDict:
         """Convert the Cohere reranking configuration to a dictionary of options."""
         return SerializedRerankingOptionsDict(
-            model_name=self.model_name,
+            model_name=ModelName(self.model_name),
             rerank=cast(dict[str, Any], self.rerank or {}) | {"model": self.model_name},
             model={},
         )

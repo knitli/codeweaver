@@ -12,9 +12,18 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 from pydantic import Field
+from qdrant_client.grpc import CollectionConfig
 from qdrant_client.http.models import SparseVectorParams, VectorParams
 
-from codeweaver.core import BasedModel, CodeChunk, DimensionMismatchError, ModelSwitchError
+from codeweaver.core import (
+    BasedModel,
+    CodeChunk,
+    DimensionMismatchError,
+    ModelSwitchError,
+    ResolvedProjectNameDep,
+)
+from codeweaver.core.di.depends import INJECTED
+from codeweaver.core.types import Provider
 
 
 if TYPE_CHECKING:
@@ -44,7 +53,7 @@ class HybridVectorPayload(BasedModel):
         ),
     ]
     hash: Annotated[str, Field(description="blake 3 hash of the code chunk")]
-    provider: Annotated[str, Field(description="Provider name for the vector store")]
+    provider: Annotated[Provider, Field(description="Provider name for the vector store")]
     embedding_complete: Annotated[
         bool,
         Field(
@@ -85,12 +94,33 @@ class CollectionMetadata(BasedModel):
         ),
     ]
 
-    dense_model: Annotated[str | None, Field(description="Embedding model name used")] = None
-    sparse_model: Annotated[str | None, Field(description="Sparse embedding model name used")] = (
-        None
-    )
+    dense_model: Annotated[
+        str | None, Field(description="Name of the dense embedding model used.")
+    ] = None
+    sparse_model: Annotated[
+        str | None, Field(description="Name of the sparse embedding model used.")
+    ] = None
     collection_name: Annotated[str, Field(description="Name of the collection")] = ""
-    version: Annotated[str, Field(description="Metadata schema version")] = "1.0.0"
+    version: Annotated[str, Field(description="Metadata schema version")] = "1.1.0"
+
+    @classmethod
+    def from_collection_config(
+        cls, config: CollectionConfig, project_name: ResolvedProjectNameDep = INJECTED
+    ) -> CollectionMetadata:
+        """Create CollectionMetadata from a CollectionConfig."""
+        # TODO -- this is a placeholder -- the mappings are not correct; need to get some fields from elsewhere
+        collection_data = config.model_dump()
+        return cls.model_validate({
+            "provider": collection_data.get("provider"),
+            "created_at": collection_data.get("created_at"),
+            "project_name": project_name,
+            "vector_config": collection_data.get("vector_config"),
+            "sparse_config": collection_data.get("sparse_config"),
+            "dense_model": collection_data.get("dense_model"),
+            "sparse_model": collection_data.get("sparse_model"),
+            "collection_name": collection_data.get("collection_name"),
+            "version": collection_data.get("version", "1.1.0"),
+        })
 
     def to_collection(self) -> dict[str, Any]:
         """Convert to a dictionary that is the argument for collection creation."""

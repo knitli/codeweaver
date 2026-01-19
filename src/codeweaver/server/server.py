@@ -14,18 +14,18 @@ import time
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
 from fastmcp import FastMCP
-from pydantic import ConfigDict, DirectoryPath, Field, NonNegativeInt, PrivateAttr, computed_field
-from pydantic.dataclasses import dataclass
+from pydantic import DirectoryPath, Field, NonNegativeInt, PrivateAttr, computed_field
 from starlette.middleware import Middleware as ASGIMiddleware
 
 from codeweaver import __version__ as version
 from codeweaver.core import (
-    DATACLASS_CONFIG,
     AnonymityConversion,
+    CodeWeaverSettingsType,
     DataclassSerializationMixin,
     InitializationError,
     ProgressReporter,
@@ -33,7 +33,6 @@ from codeweaver.core import (
     SessionStatistics,
     StatisticsDep,
     TelemetryService,
-    Unset,
     elapsed_time_to_human_readable,
     get_container,
     get_project_path,
@@ -53,7 +52,7 @@ if TYPE_CHECKING:
 
 _logger = logging.getLogger(__name__)
 
-BRACKET_PATTERN: re.Pattern[str] = re.compile("\\\\\[.+\\\\]")
+BRACKET_PATTERN: re.Pattern[str] = re.compile("\\\\\\[.+\\\\]")
 
 
 def _get_statistics(stats: StatisticsDep) -> SessionStatistics:
@@ -61,7 +60,7 @@ def _get_statistics(stats: StatisticsDep) -> SessionStatistics:
     return stats
 
 
-@dataclass(order=True, kw_only=True, config=DATACLASS_CONFIG | ConfigDict(extra="forbid"))
+@dataclass(order=True, kw_only=True)
 class CodeWeaverState(DataclassSerializationMixin):
     """Application state for CodeWeaver server.
 
@@ -79,7 +78,7 @@ class CodeWeaverState(DataclassSerializationMixin):
         bool, Field(description="Indicates if the server has been initialized")
     ] = False
     settings: Annotated[
-        CodeWeaverSettings | None,
+        CodeWeaverSettingsType | None,
         Field(default_factory=get_settings, description="CodeWeaver configuration settings"),
     ]
     config_path: Annotated[
@@ -106,8 +105,8 @@ class CodeWeaverState(DataclassSerializationMixin):
     failover_manager: Annotated[
         FailoverService | None, Field(description="Failover service instance", exclude=True)
     ] = None
-    startup_time: NonNegativeInt = Field(default_factory=lambda: int(time.time()))
-    startup_stopwatch: NonNegativeInt = Field(default_factory=lambda: int(time.monotonic()))
+    startup_time: NonNegativeInt = int(time.time())
+    startup_stopwatch: NonNegativeInt = int(time.monotonic())
     management_server: Annotated[
         ManagementServer | None,
         Field(
@@ -251,13 +250,16 @@ async def lifespan(
 
     if verbose or debug:
         _logger.info("Entering lifespan context manager...")
-    
+
     # Bootstrap settings via DI system implicitly when resolving state
     # But if passed explicitly (e.g. tests), we might want to respect that.
     # For now, we assume standard DI flow.
 
     container = get_container()
-    
+
+    if settings:
+        container.override(CodeWeaverSettingsType, settings)
+
     # Register core singletons if provided explicitly
     # (Note: settings and statistics might need to be overridden in container if passed here,
     # but standard flow resolves them from container)
@@ -270,27 +272,26 @@ async def lifespan(
     except Exception as e:
         raise InitializationError(
             "Failed to resolve CodeWeaverState. Check configuration and dependencies.",
-            details={"error": str(e)}
+            details={"error": str(e)},
         ) from e
-        
+
     if not isinstance(state, CodeWeaverState):
         raise InitializationError(
             "CodeWeaverState should be an instance of CodeWeaverState, but isn't. Something is wrong. Please report this issue.",
             details={"state": state},
         )
-    
+
     # Initialize telemetry if not already done by factory (it's currently done in factory if configured)
     if not state.telemetry:
         from codeweaver.core import TelemetryService
+
         state.telemetry = TelemetryService.from_settings(state.settings)
-        
+
     if state.telemetry and state.telemetry.enabled:
-        # Start session with simplified metadata (provider registry is gone, 
-        # so we'd need to inspect providers manually if we want that data, 
+        # Start session with simplified metadata (provider registry is gone,
+        # so we'd need to inspect providers manually if we want that data,
         # or rely on what's available)
-        state.telemetry.start_session({
-            "codeweaver_version": version,
-        })
+        state.telemetry.start_session({"codeweaver_version": version})
 
     indexing_task = None
     async with container.lifespan():
@@ -304,7 +305,7 @@ async def lifespan(
             indexing_task = asyncio.create_task(
                 run_background_indexing(state, progress_reporter, verbose=verbose, debug=debug)
             )
-            
+
             progress_reporter.report_status("Health checks...")
             if state.health_service:
                 health_response = await state.health_service.get_health_response()
@@ -340,7 +341,7 @@ async def lifespan(
                     sparse_status, sparse_status
                 )
                 progress_reporter.report_status(f"Sparse embeddings ({sparse_prov}): {status_icon}")
-            
+
             progress_reporter.report_status("Ready for connections.")
             if verbose or debug:
                 _logger.info("Lifespan start actions complete, server initialized.")

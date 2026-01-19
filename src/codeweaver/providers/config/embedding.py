@@ -39,7 +39,14 @@ from qdrant_client.models import (
     VectorParams,
 )
 
-from codeweaver.core import BasedModel, ConfigurationError, LiteralProvider, Provider
+from codeweaver.core import (
+    BasedModel,
+    ConfigurationError,
+    LiteralProvider,
+    ModelName,
+    ModelNameT,
+    Provider,
+)
 from codeweaver.providers.config.types import CohereRequestOptionsDict
 
 
@@ -69,14 +76,14 @@ DIMENSION_FIELDS = {
 
 @overload
 def _get_embedding_capabilities_for_model(
-    model_name: LiteralString, *, sparse: Literal[True]
+    model_name: ModelNameT, *, sparse: Literal[True]
 ) -> SparseEmbeddingModelCapabilities | None: ...
 @overload
 def _get_embedding_capabilities_for_model(
-    model_name: LiteralString, *, sparse: Literal[False] = False
+    model_name: ModelNameT, *, sparse: Literal[False] = False
 ) -> EmbeddingModelCapabilities | None: ...
 def _get_embedding_capabilities_for_model(
-    model_name: LiteralString, *, sparse: bool = False
+    model_name: ModelNameT, *, sparse: bool = False
 ) -> EmbeddingModelCapabilities | SparseEmbeddingModelCapabilities | None:
     """Get the embedding model capabilities for a given model name.
 
@@ -100,7 +107,7 @@ def _get_embedding_capabilities_for_model(
 class SerializedEmbeddingOptionsDict(TypedDict, total=False):
     """A dictionary representing serialized embedding options for different providers."""
 
-    model_name: Required[LiteralString]
+    model_name: Required[ModelNameT]
     """The name of the embedding model in the format used by the provider."""
 
     embedding: NotRequired[dict[str, Any]]
@@ -126,7 +133,7 @@ class BaseEmbeddingConfig(BasedModel):
         description="The provider for this embedding configuration. Used for discriminated unions.",
     )
 
-    model_name: LiteralString
+    model_name: ModelNameT
     """The name of the embedding model."""
 
     embedding: Annotated[
@@ -416,7 +423,7 @@ class BedrockEmbeddingConfig(BaseEmbeddingConfig):
             "cohere.embed-english-v3.0",
             "cohere.embed-multilingual-v3.0",
         ]
-        | LiteralString
+        | ModelNameT
     )
     """The Bedrock embedding model to use. Can be one of the predefined models or a custom model identifier. Note that this isn't the AWS `model_id` (usually its ARN) - that's specified in the embedding request params."""
 
@@ -432,7 +439,7 @@ class BedrockEmbeddingConfig(BaseEmbeddingConfig):
         """Convert the Bedrock embedding configuration to a dictionary of options."""
         model = self.model.copy()
         return SerializedEmbeddingOptionsDict(
-            model_name=self.model_name,
+            model_name=ModelName(self.model_name),
             model=model,  # ty:ignore[invalid-argument-type]
             embedding=self.embedding or {},  # ty:ignore[invalid-argument-type]
             query=self.embedding or {},  # ty:ignore[invalid-argument-type]
@@ -488,7 +495,7 @@ class CohereEmbeddingConfig(BaseEmbeddingConfig):
             "embed-multilingual-v3.0",
             "embed-multilingual-light-v3.0",
         ]
-        | LiteralString
+        | ModelNameT
     )
     """The Cohere embedding model to use."""
 
@@ -497,7 +504,10 @@ class CohereEmbeddingConfig(BaseEmbeddingConfig):
         embedding_options = {"model": self.model_name} | (self.embedding or {})
         query_options = {"model": self.model_name} | (self.query or {})
         return SerializedEmbeddingOptionsDict(
-            model_name=self.model_name, embedding=embedding_options, query=query_options, model={}
+            model_name=ModelName(self.model_name),
+            embedding=embedding_options,
+            query=query_options,
+            model={},
         )
 
 
@@ -527,7 +537,7 @@ class GoogleEmbeddingConfig(BaseEmbeddingConfig):
     tag: Literal["google"] = "google"
     provider: Literal[Provider.GOOGLE] = Provider.GOOGLE
 
-    model_name: Literal["gemini-embedding-001"] | LiteralString
+    model_name: Literal["gemini-embedding-001"] | ModelNameT
     """The Google embedding model to use."""
     embedding: GoogleEmbeddingRequestParams | None = None
     """Parameters for the embedding request to Google."""
@@ -547,7 +557,7 @@ class GoogleEmbeddingConfig(BaseEmbeddingConfig):
         """Return default values for the configuration."""
         return (
             {"embedding": {"output_dimensionality": 768}}
-            if self.model_name == "gemini-embedding-001"
+            if self.model_name == ModelName("gemini-embedding-001")
             else {}
         )
 
@@ -617,7 +627,7 @@ class MistralEmbeddingConfig(BaseEmbeddingConfig):
     def _as_options(self) -> SerializedEmbeddingOptionsDict:
         """Convert the Mistral embedding configuration to a dictionary of options."""
         return SerializedEmbeddingOptionsDict(
-            model_name=self.model_name,
+            model_name=ModelName(self.model_name),
             embedding=cast(dict[str, Any], self.embedding or {}),
             query=cast(dict[str, Any], self.query or {}),
             model={},
@@ -659,7 +669,7 @@ class OpenAIEmbeddingConfig(BaseEmbeddingConfig):
     tag: Literal["openai"] = "openai"
     provider: Literal[Provider.OPENAI] = Provider.OPENAI
 
-    model_name: Literal["text-embedding-3-large", "text-embedding-3-small"] | LiteralString
+    model_name: Literal["text-embedding-3-large", "text-embedding-3-small"] | ModelNameT
     """The OpenAI-compatible embedding model to use."""
 
     embedding: OpenAIEmbeddingRequestParams | None = None
@@ -671,7 +681,7 @@ class OpenAIEmbeddingConfig(BaseEmbeddingConfig):
     def _as_options(self) -> SerializedEmbeddingOptionsDict:
         """Convert the OpenAI embedding configuration to a dictionary of options."""
         return SerializedEmbeddingOptionsDict(
-            model_name=self.model_name,
+            model_name=ModelName(self.model_name),
             embedding=cast(dict[str, Any], self.embedding or {}),
             query=cast(dict[str, Any], self.query or {}),
             model={},
@@ -752,7 +762,7 @@ class SentenceTransformersEmbeddingConfig(BaseEmbeddingConfig):
     tag: Literal["sentence_transformers"] = "sentence_transformers"
     provider: Literal[Provider.SENTENCE_TRANSFORMERS] = Provider.SENTENCE_TRANSFORMERS
 
-    model_name: LiteralString
+    model_name: ModelNameT
     """The Sentence Transformers model to use."""
 
     embedding: SentenceTransformersEncodeDict | None = None
@@ -764,7 +774,7 @@ class SentenceTransformersEmbeddingConfig(BaseEmbeddingConfig):
     def _as_options(self) -> SerializedEmbeddingOptionsDict:
         """Convert the Sentence Transformers configuration to a dictionary of options."""
         return SerializedEmbeddingOptionsDict(
-            model_name=self.model_name,
+            model_name=ModelName(self.model_name),
             embedding=cast(dict[str, Any], self.embedding or {}),
             query=cast(dict[str, Any], self.query or {}),
             model={},
@@ -812,7 +822,7 @@ class VoyageEmbeddingConfig(BaseEmbeddingConfig):
         Literal[
             "voyage-code-3", "voyage-3.5", "voyage-3.5-lite", "voyage-3-large", "voyage-context-3"
         ]
-        | LiteralString
+        | ModelNameT
     )
     """The Voyage AI embedding model to use."""
 
@@ -825,7 +835,7 @@ class VoyageEmbeddingConfig(BaseEmbeddingConfig):
     def _as_options(self) -> SerializedEmbeddingOptionsDict:
         """Convert the Voyage embedding configuration to a dictionary of options."""
         return SerializedEmbeddingOptionsDict(
-            model_name=self.model_name,
+            model_name=ModelName(self.model_name),
             embedding=cast(dict[str, Any], (self.embedding or {}) | {"input_type": "document"}),
             query=cast(dict[str, Any], (self.query or {}) | {"input_type": "query"}),
             model={},
@@ -854,7 +864,7 @@ async def _to_sparse_vector_params(instance: BaseEmbeddingConfig) -> SparseVecto
         else "uint8"
     )
     index_params = SparseIndexParams(datatype=Datatype(resolved_datatype))
-    modifier = Modifier.IDF if ("bm25" in instance.model_name.lower()) else Modifier.NONE
+    modifier = Modifier.IDF if ("bm25" in str(instance.model_name).lower()) else Modifier.NONE
     return SparseVectorParams(index=index_params, modifier=modifier)
 
 

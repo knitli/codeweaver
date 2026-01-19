@@ -14,12 +14,12 @@ from types import MappingProxyType
 from typing import TYPE_CHECKING, Annotated, ClassVar, Literal, Self, TypedDict, cast
 
 from pydantic import DirectoryPath, Field, computed_field
-from pydantic.dataclasses import dataclass
 
+from codeweaver.core import BasedModel
 from codeweaver.core.file_extensions import COMMON_TOOLING_PATHS, TEST_DIR_NAMES
 from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
-from codeweaver.core.types.aliases import FilteredKeyT, LiteralStringT
-from codeweaver.core.types.dataclasses import DATACLASS_CONFIG, DataclassSerializationMixin
+from codeweaver.core.types import DevToolNameT, LlmToolNameT
+from codeweaver.core.types.aliases import FilteredKeyT
 from codeweaver.core.types.enum import BaseEnum
 
 
@@ -135,8 +135,7 @@ class DirectoryPurpose(str, BaseEnum):
         return MappingProxyType({member: member.validator for member in cls})
 
 
-@dataclass(config=DATACLASS_CONFIG)
-class RepoDirectory(DataclassSerializationMixin):
+class RepoDirectory(BasedModel):
     """Representation of a directory in the repository with its purpose.
 
     `RepoDirectory` also have detailed properties that are lazily evaluated, and helper methods for working with directories.
@@ -196,14 +195,13 @@ class RepoChecklistDict(TypedDict):
     has_migrations_dir: PathOrFalse
     has_notebooks_dir: PathOrFalse
     has_data_dir: PathOrFalse
-    tooling: tuple[tuple[str, Path], ...]
-    llm_tooling: tuple[tuple[str, Path], ...]
+    tooling: tuple[tuple[DevToolNameT, Path], ...]
+    llm_tooling: tuple[tuple[LlmToolNameT, Path], ...]
     config_files: tuple[tuple[str, Path], ...]
     language_specific_files: tuple[tuple[str, Path], ...]
 
 
-@dataclass(config=DATACLASS_CONFIG)
-class RepoChecklist(DataclassSerializationMixin):
+class RepoChecklist(BasedModel):
     """A checklist-style representation of repository structure.
 
     The attribute names aren't 1-for-1 to directory names. For example, `has_src_dir` indicates a directory named `src` or `source`.
@@ -252,8 +250,8 @@ class RepoChecklist(DataclassSerializationMixin):
     has_data_dir: PathOrFalse
 
     # common tooling files and directories
-    tooling: tuple[tuple[str, Path], ...]
-    llm_tooling: tuple[tuple[str, Path], ...]
+    tooling: tuple[tuple[DevToolNameT, Path], ...]
+    llm_tooling: tuple[tuple[LlmToolNameT, Path], ...]
 
     # configuration files
     config_files: tuple[tuple[str, Path], ...]
@@ -392,10 +390,10 @@ class RepoChecklist(DataclassSerializationMixin):
     def _gather_tooling_paths(
         files: Sequence[Path],
         project_path: Path,
-        common_tooling_paths: tuple[tuple[LiteralStringT, tuple[Path, ...]], ...],
-    ) -> tuple[tuple[str, Path], ...]:
+        common_tooling_paths: tuple[tuple[DevToolNameT, tuple[Path, ...]], ...],
+    ) -> tuple[tuple[DevToolNameT, Path], ...]:
         """Gather common tooling paths from the repository files."""
-        tooling_paths: list[tuple[str, Path]] = []
+        tooling_paths: list[tuple[DevToolNameT, Path]] = []
         for tool_name, possible_paths in common_tooling_paths:
             for rel_path in possible_paths:
                 abs_path = project_path / rel_path
@@ -408,10 +406,10 @@ class RepoChecklist(DataclassSerializationMixin):
     def _gather_llm_tooling_paths(
         files: Sequence[Path],
         project_path: Path,
-        common_llm_tooling_paths: tuple[tuple[LiteralStringT, tuple[Path, ...]], ...],
-    ) -> tuple[tuple[str, Path], ...]:
+        common_llm_tooling_paths: tuple[tuple[LlmToolNameT, tuple[Path, ...]], ...],
+    ) -> tuple[tuple[LlmToolNameT, Path], ...]:
         """Gather common LLM tooling paths from the repository files."""
-        llm_tooling_paths: list[tuple[str, Path]] = []
+        llm_tooling_paths: list[tuple[LlmToolNameT, Path]] = []
         for tool_name, possible_paths in common_llm_tooling_paths:
             if valid_paths := (
                 project_path / rel_path

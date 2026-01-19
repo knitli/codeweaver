@@ -15,7 +15,7 @@ from typing import NamedTuple
 
 from pydantic import PositiveInt
 
-from codeweaver.core import BaseEnum, InvalidEmbeddingModelError
+from codeweaver.core import BaseEnum, InvalidEmbeddingModelError, ModelName, ModelNameT
 from codeweaver.providers.config import EmbeddingProviderSettings, SparseEmbeddingProviderSettings
 from codeweaver.providers.embedding.capabilities.base import (
     EmbeddingModelCapabilities,
@@ -150,8 +150,8 @@ class ConfiguredCapability(NamedTuple):
     config: EmbeddingProviderSettings | SparseEmbeddingProviderSettings
 
     @property
-    def model_name(self) -> str:
-        return (
+    def model_name(self) -> ModelNameT:
+        return ModelName(
             self.config.model_name
             or self.config.embedding_config.model_name
             or self.capability.name
@@ -232,7 +232,7 @@ class EmbeddingCapabilityGroup(NamedTuple):
                 and any(
                     n
                     for n in ("bm25", "idf", "inverse")
-                    if n in model_name.lower().replace("-", "")
+                    if n in str(model_name).lower().replace("-", "")
                 )
             ):
                 values["idf"] = values["idf"] or capability
@@ -241,6 +241,20 @@ class EmbeddingCapabilityGroup(NamedTuple):
             else:
                 values["dense"] = values["dense"] or capability
 
+    @property
+    def dense_model(self) -> ModelNameT | None:
+        """Get the name of the dense embedding model."""
+        return self.dense.model_name
+
+    @property
+    def sparse_model(self) -> ModelNameT | None:
+        """Get the name of the sparse embedding model."""
+        return self.sparse.model_name
+    @property
+    def idf_model(self) -> ModelNameT | None:
+        """Get the name of the IDF embedding model."""
+        return self.idf.model_name if self.idf else None
+
 
 __all__ = (
     "BaseEmbeddingCapabilityResolver",
@@ -248,5 +262,4 @@ __all__ = (
     "BaseSparseEmbeddingCapabilityResolver",
     "CircuitBreakerState",
     "EmbeddingCapabilityGroup",
-    "get_all_provider_types",
 )

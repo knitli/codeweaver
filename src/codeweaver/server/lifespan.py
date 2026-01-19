@@ -19,6 +19,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING
 
+from codeweaver.core import CodeWeaverSettingsType, get_container
 from codeweaver.core.ui_protocol import ProgressReporter, RichConsoleProgressReporter
 from codeweaver.server.server import CodeWeaverState
 
@@ -79,9 +80,14 @@ async def background_services_lifespan(
         settings.project_path = get_project_path()
 
     # Initialize CodeWeaverState
-    from codeweaver.server.server import _initialize_cw_state
+    container = get_container()
+    container.override(CodeWeaverSettingsType, settings)
+    
+    if statistics:
+        from codeweaver.core import SessionStatistics
+        container.override(SessionStatistics, statistics)
 
-    background_state: CodeWeaverState = await _initialize_cw_state(settings, statistics)
+    background_state: CodeWeaverState = await container.resolve(CodeWeaverState)
 
     indexing_task = None
 

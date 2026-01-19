@@ -31,6 +31,7 @@ from pydantic_settings import (
     YamlConfigSettingsSource,
 )
 
+from codeweaver.core.exceptions import ValidationError
 from codeweaver.core.types.aliases import FilteredKey, FilteredKeyT, LiteralStringT
 from codeweaver.core.types.enum import AnonymityConversion
 from codeweaver.core.types.sentinel import UNSET, Unset
@@ -415,6 +416,18 @@ class BaseCodeWeaverSettings(BaseSettings):
             )
             for key, value in data.items()
         } | {"unset_fields": list(self._unset_fields)}
+
+    def _update_settings(self, **kwargs: Any) -> Self:
+        """Update settings, validating a new CodeWeaverSettings instance and updating the global instance."""
+        try:
+            self.__init__(**kwargs)  # type: ignore # Unpack doesn't extend to nested dicts
+        except ValidationError:
+            logger.warning(
+                "`CodeWeaverSettings` received invalid settings for an update. The settings failed to validate. We did not update the settings."
+            )
+            return self
+        self._resolution_complete = False
+        return self
 
     async def finalize(self) -> Self:
         """Finalize settings with config resolution.

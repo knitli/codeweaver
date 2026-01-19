@@ -255,6 +255,13 @@ class ValidationError(CodeWeaverError):
     """
 
 
+class NodeParsingFailureError(CodeWeaverError):
+    """Node parsing failure error.
+
+    Raised when there is a failure in parsing nodes from the source files.
+    """
+
+
 class MissingValueError(CodeWeaverError):
     """Missing value errors.
 
@@ -477,6 +484,7 @@ __all__ = (
     "InitializationError",
     "InvalidEmbeddingModelError",
     "MissingValueError",
+    "NodeParsingFailureError",
     "PersistenceError",
     "ProviderError",
     "ProviderSwitchError",

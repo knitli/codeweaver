@@ -17,9 +17,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypedDict
 
 from pydantic import Field
-from pydantic.dataclasses import dataclass
 
-from codeweaver.core import BaseEnum, DataclassSerializationMixin, elapsed_time_to_human_readable
+from codeweaver.core import BaseEnum, elapsed_time_to_human_readable
+from codeweaver.core.types import BasedModel
 
 
 if TYPE_CHECKING:
@@ -36,8 +36,7 @@ class IndexingErrorDict(TypedDict):
     timestamp: str
 
 
-@dataclass
-class IndexingStats(DataclassSerializationMixin):
+class IndexingStats(BasedModel):
     """Statistics tracking for indexing progress."""
 
     files_discovered: int = Field(0)

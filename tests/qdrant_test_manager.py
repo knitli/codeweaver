@@ -332,17 +332,6 @@ class QdrantTestManager:
         """Get the Qdrant instance URL."""
         return f"http://{self.host}:{self.port}"
 
-    async def _create_client(self) -> AsyncQdrantClient:
-        """Create and configure Qdrant client.
-
-        Returns:
-            Configured AsyncQdrantClient instance
-        """
-        client_kwargs = {"url": self.url, "prefer_grpc": self.prefer_grpc, "timeout": self.timeout}
-        if self.api_key:
-            client_kwargs["api_key"] = self.api_key
-        return AsyncQdrantClient(**client_kwargs)
-
     async def verify_connection(self) -> bool:
         """Verify connection to Qdrant instance.
 
@@ -366,22 +355,6 @@ class QdrantTestManager:
             return False
         else:
             return True
-
-    async def ensure_client(self) -> AsyncQdrantClient:
-        """Ensure client is created and connected.
-
-        Returns:
-            Configured AsyncQdrantClient instance
-
-        Raises:
-            RuntimeError: If cannot connect to Qdrant
-        """
-        if self._client is None:
-            self._client = await self._create_client()
-        if not await self.verify_connection():
-            msg = f"Cannot connect to Qdrant at {self.url}. Ensure Qdrant is running on port {self.port}. Start with: docker run -p {{port}}:6333 qdrant/qdrant:latest"
-            raise RuntimeError(msg)
-        return self._client
 
     def create_collection_name(self, prefix: str = "test") -> str:
         """Create a unique collection name for testing.

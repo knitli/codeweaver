@@ -166,7 +166,12 @@ class Container[T]:
         logger.debug("Loaded %d providers from registry", len(providers))
 
     def register(
-        self, interface: type[T], factory: Callable[..., T] | None = None, *, singleton: bool = True
+        self,
+        interface: type[T],
+        factory: Callable[..., T] | None = None,
+        *,
+        singleton: bool = True,
+        stale_while_revalidate: bool = False,
     ) -> None:
         """Register a dependency.
 
@@ -174,11 +179,20 @@ class Container[T]:
             interface: The type or interface to register.
             factory: The factory function or class. If None, the interface itself is used.
             singleton: Whether to cache the instance.
+            stale_while_revalidate: Whether to use stale-while-revalidate caching strategy.
         """
         target = factory or interface
         self._factories[interface] = target
         self._is_singleton[interface] = singleton
-        logger.debug("Registered %s -> %s (singleton=%s)", interface.__name__, target, singleton)
+        if stale_while_revalidate:
+            self._stale_while_revalidate[interface] = True
+        logger.debug(
+            "Registered %s -> %s (singleton=%s, stale_while_revalidate=%s)",
+            interface.__name__,
+            target,
+            singleton,
+            stale_while_revalidate,
+        )
 
     def override(self, interface: type[T], instance: Any) -> None:
         """Override a dependency, primarily for testing.

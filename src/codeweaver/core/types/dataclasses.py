@@ -9,11 +9,11 @@
 import sys as _sys
 
 from collections.abc import Callable, Iterator, Sequence
+from dataclasses import dataclass
 from functools import cached_property
 from typing import Annotated, Any, Literal, NotRequired, Self, TypedDict, Unpack, cast
 
 from pydantic import ConfigDict, Field, PrivateAttr, TypeAdapter, computed_field
-from pydantic.dataclasses import dataclass
 from pydantic.main import IncEx
 
 from codeweaver.core.types.aliases import FilteredKeyT
@@ -191,8 +191,8 @@ DATACLASS_CONFIG = ConfigDict(
 )
 
 
-@dataclass(config=DATACLASS_CONFIG, order=True, frozen=True)
-class BaseEnumData(DataclassSerializationMixin):
+@dataclass
+class BaseEnumData:
     """A dataclass to hold enum member data.
 
     `BaseEnumData` provides a standard structure for enum member data, including name, value, aliases, and description. Subclasses can extend this dataclass to include additional fields as needed.

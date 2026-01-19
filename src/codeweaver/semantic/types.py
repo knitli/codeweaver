@@ -21,11 +21,18 @@ from pydantic import ConfigDict, Field, PrivateAttr, computed_field
 from codeweaver.core import (
     BasedModel,
     BaseEnum,
+    LanguageNameT,
     LiteralStringT,
     SemanticSearchLanguage,
     generate_field_title,
     uuid7,
 )
+
+
+if TYPE_CHECKING:
+    from ast_grep_py import SgNode
+
+    from codeweaver.semantic.ast_grep import AstThing
 
 
 class SimpleNodeTypeDTO(TypedDict):
@@ -251,10 +258,10 @@ class SemanticMetadata(BasedModel):
     )
 
     language: Annotated[
-        SemanticSearchLanguage | str,
+        SemanticSearchLanguage | LanguageNameT,
         Field(description="""The programming language of the code chunk"""),
     ]
-    thing: Any = None  # AstThing[SgNode] | None
+    thing: AstThing[SgNode]
     positional_connections: Any = ()  # tuple[AstThing[SgNode], ...]
     symbol: Annotated[
         str | None,

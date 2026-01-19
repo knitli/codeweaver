@@ -28,7 +28,6 @@ from pydantic.dataclasses import dataclass
 from pydantic_core import ArgsKwargs, core_schema
 
 from codeweaver.core import (
-    DATACLASS_CONFIG,
     BaseDataclassEnum,
     BasedModel,
     BaseEnum,
@@ -77,7 +76,7 @@ class ImportanceScoresDict(TypedDict):
     ]
 
 
-@dataclass(frozen=True, config=DATACLASS_CONFIG)
+@dataclass(frozen=True)
 class ImportanceScores(DataclassSerializationMixin):
     """Multi-dimensional importance scoring for AI assistant contexts."""
 
@@ -1061,8 +1060,7 @@ def _validate_categories(
 # =============================================================================
 
 
-@dataclass(config=DATACLASS_CONFIG)
-class UsageMetrics(DataclassSerializationMixin):
+class UsageMetrics(BasedModel):
     """Metrics on real-world usage of semantic categories."""
 
     category_usage_counts: Counter[SemanticClass]
@@ -1092,8 +1090,7 @@ class UsageMetrics(DataclassSerializationMixin):
         self.category_usage_counts.update(categories)
 
 
-@dataclass(config=DATACLASS_CONFIG)
-class ScoreValidation(DataclassSerializationMixin):
+class ScoreValidation(BasedModel):
     """Validation results for importance score accuracy."""
 
     def _telemetry_keys(self) -> None:

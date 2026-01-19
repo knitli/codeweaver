@@ -36,12 +36,7 @@ if TYPE_CHECKING:
     )
     from codeweaver.engine.chunker.governance import ResourceGovernor
     from codeweaver.engine.chunker.parallel import chunk_files_parallel, chunk_files_parallel_dict
-    from codeweaver.engine.chunker.registry import (
-        SourceIdRegistry,
-        clear_store,
-        get_store,
-        source_id_for,
-    )
+    from codeweaver.engine.chunker.registry import SourceIdRegistry
     from codeweaver.engine.chunker.selector import ChunkerSelector, GracefulChunker
     from codeweaver.engine.chunker.semantic import SemanticChunker
 
@@ -70,11 +65,8 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "SourceIdRegistry": (__spec__.parent, "registry"),
     "chunk_files_parallel": (__spec__.parent, "parallel"),
     "chunk_files_parallel_dict": (__spec__.parent, "parallel"),
-    "clear_store": (__spec__.parent, "registry"),
     "detect_language_family": (__spec__.parent, "delimiters"),
     "expand_pattern": (__spec__.parent, "delimiters"),
-    "get_store": (__spec__.parent, "registry"),
-    "source_id_for": (__spec__.parent, "registry"),
 })
 
 
@@ -105,11 +97,8 @@ __all__ = (
     "SourceIdRegistry",
     "chunk_files_parallel",
     "chunk_files_parallel_dict",
-    "clear_store",
     "detect_language_family",
     "expand_pattern",
-    "get_store",
-    "source_id_for",
 )
 
 

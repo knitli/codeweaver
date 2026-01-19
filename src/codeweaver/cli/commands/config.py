@@ -19,7 +19,10 @@ from pydantic import FilePath
 from rich.table import Table
 
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
-from codeweaver.core import is_codeweaver_config_path
+from codeweaver.core.dependencies import ResolvedProjectPathDep
+from codeweaver.core.di import INJECTED
+from codeweaver.core.utils import is_codeweaver_config_path
+from codeweaver.providers import ProviderSettingsDep
 
 
 class ConfigProfile(StrEnum):
@@ -33,11 +36,14 @@ class ConfigProfile(StrEnum):
 
 if TYPE_CHECKING:
     from codeweaver.core import DictView
-    from codeweaver.providers import ProviderSettingsDict
     from codeweaver.server import CodeWeaverSettingsDict
 
 display: StatusDisplay = get_display()
 app = App("config", help="Manage and view your CodeWeaver config.", console=display.console)
+
+
+def _project_path(project_path: ResolvedProjectPathDep) -> Path:
+    return project_path
 
 
 @app.default()
@@ -122,7 +128,7 @@ def _show_config(settings: DictView[CodeWeaverSettingsDict]) -> None:
         _show_provider_config(provider_settings)
 
 
-def _show_provider_config(provider_settings: ProviderSettingsDict) -> None:
+def _show_provider_config(provider_settings: ProviderSettingsDep = INJECTED) -> None:
     """Display provider configuration details."""
     from codeweaver.core import Unset
 
