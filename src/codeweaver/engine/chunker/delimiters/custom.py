@@ -21,7 +21,8 @@ from types import MappingProxyType
 
 import textcase
 
-from codeweaver.core import Unset
+from codeweaver.core import SettingsDep, Unset
+from codeweaver.core.di.depends import INJECTED
 from codeweaver.engine.chunker.delimiters.kind import DelimiterKind
 from codeweaver.engine.chunker.delimiters.patterns import (
     EMPTY_PATTERN,
@@ -332,14 +333,14 @@ def generate_rst_character_ranges(character: str) -> list[str]:
 
 RST_SECTION_PATTERN = DelimiterPattern(
     starts=sorted(
-        (
+        [
             c
             for char in ("=", "-", "*", "~", "^", '"', "+", "#", "<", ">")
             for c in generate_rst_character_ranges(char)
-        ),
+        ],
         key=len,
         reverse=True,
-    ),
+    ),  # ty:ignore[invalid-argument-type]
     ends=PARAGRAPH_BREAK,
     kind=DelimiterKind.BLOCK,
     inclusive=True,
@@ -665,7 +666,7 @@ _pattern_registry: dict[str, list[DelimiterPattern]] = {}
 
 
 @cache
-def get_custom_patterns(language: str) -> list[DelimiterPattern]:
+def get_custom_patterns(language: str, settings: SettingsDep = INJECTED) -> list[DelimiterPattern]:
     """Get custom delimiter patterns for a language.
 
     Args:
@@ -680,13 +681,12 @@ def get_custom_patterns(language: str) -> list[DelimiterPattern]:
         6
     """
     from codeweaver.core import ConfigLanguage, SemanticSearchLanguage
-    from codeweaver.server import get_settings
 
     language = textcase.snake(language)
     delimiters: list[DelimiterPattern] = []
     if (
-        (settings := get_settings())
-        and (chunker := settings.chunker)
+        settings
+        and (chunker := settings.chunker)  # ty:ignore[unresolved-attribute]
         and not isinstance(chunker, Unset)
         and (custom_delimiters := chunker.custom_delimiters)
     ):

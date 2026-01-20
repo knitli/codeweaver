@@ -31,7 +31,7 @@ from codeweaver.core.types.aliases import (
     LiteralStringT,
 )
 from codeweaver.core.types.enum import BaseEnum
-from codeweaver.core.utils import LazyImport, lazy_import, normalize_ext
+from codeweaver.core.utils import normalize_ext
 
 
 if TYPE_CHECKING:
@@ -40,10 +40,13 @@ if TYPE_CHECKING:
 
 type KeyPath = tuple[LiteralStringT, ...]
 
+
 def get_ext_lang_pairs_generator() -> Generator[ExtLangPair, None, None]:
     """Helper to lazily get ext lang pairs."""
     from codeweaver.core.metadata import get_ext_lang_pairs
+
     return get_ext_lang_pairs()
+
 
 ConfigPathPair = NamedTuple(
     "ConfigPathPair", (("path", Path), ("language", "SemanticSearchLanguage"))

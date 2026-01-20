@@ -19,7 +19,8 @@ from pydantic import FilePath
 from rich.table import Table
 
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
-from codeweaver.core.dependencies import ResolvedProjectPathDep
+from codeweaver.core.config.types import CodeWeaverSettingsDict
+from codeweaver.core.dependencies import CodeWeaverSettingsType, ResolvedProjectPathDep, SettingsDep
 from codeweaver.core.di import INJECTED
 from codeweaver.core.utils import is_codeweaver_config_path
 from codeweaver.providers import ProviderSettingsDep
@@ -36,7 +37,6 @@ class ConfigProfile(StrEnum):
 
 if TYPE_CHECKING:
     from codeweaver.core import DictView
-    from codeweaver.server import CodeWeaverSettingsDict
 
 display: StatusDisplay = get_display()
 app = App("config", help="Manage and view your CodeWeaver config.", console=display.console)
@@ -46,8 +46,12 @@ def _project_path(project_path: ResolvedProjectPathDep) -> Path:
     return project_path
 
 
+def _settings(settings: SettingsDep) -> CodeWeaverSettingsType:
+    return settings
+
+
 @app.default()
-def config(
+async def config(
     *,
     project_path: Annotated[
         Path | None, cyclopts.Parameter(name=["--project", "-p"], help="Path to project directory")
@@ -67,31 +71,27 @@ def config(
 ) -> None:
     """Manage CodeWeaver configuration."""
     from codeweaver.core import CodeWeaverError
-    from codeweaver.server import get_settings_map
 
     error_handler = CLIErrorHandler(display, verbose=verbose, debug=debug)
+    if config_file and not is_codeweaver_config_path(config_file):
+        try:
+            from codeweaver.core.dependencies import bootstrap_settings
 
-    try:
-        settings = get_settings_map()
-        if project_path or (config_file and not is_codeweaver_config_path(config_file)):
-            from codeweaver.server import update_settings
+            settings = await bootstrap_settings(config_file=config_file)
+        except Exception as e:
+            error_handler.handle_error(e, "Configuration", exit_code=1)
 
-            if config_file:
-                display.print_info(f"Updating settings from config file: {config_file}")
-                display.print_info(
-                    "[red]Your config file is not in a standard location or name.[/red]"
-                )
-                display.print_info(
-                    f"[blue]Tip[/blue]: To ensure CodeWeaver finds it, you must set the `CODEWEAVER_CONFIG_FILE` environment variable to {config_file}, or always specify it with the `--config-file` option"
-                )
-            settings = update_settings(project_path=project_path, config_file=config_file)  # type: ignore
+        settings.project_path = project_path or settings.project_path
 
-        _show_config(settings)
-
-    except CodeWeaverError as e:
-        error_handler.handle_error(e, "Configuration", exit_code=1)
-    except Exception as e:
-        error_handler.handle_error(e, "Configuration", exit_code=1)
+    else:
+        try:
+            settings = _settings()  # ty:ignore[missing-argument]
+            settings.project_path = project_path or settings.project_path
+        except CodeWeaverError as e:
+            error_handler.handle_error(e, "Configuration", exit_code=1)
+        except Exception as e:
+            error_handler.handle_error(e, "Configuration", exit_code=1)
+    _show_config(settings.view)
 
 
 def _show_config(settings: DictView[CodeWeaverSettingsDict]) -> None:

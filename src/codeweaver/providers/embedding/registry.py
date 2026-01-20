@@ -53,6 +53,7 @@ class EmbeddingRegistry(UUIDStore[ChunkEmbeddings]):
             size_limit (int): The maximum size of the store in bytes. Defaults to 100 MB.
         """
         from codeweaver.core.di.container import get_container
+
         try:
             container = get_container()
             container.register(type(self), lambda: self, singleton=True)

@@ -40,12 +40,18 @@ from pydantic import AnyUrl
 from codeweaver.core import (
     McpOperationRequests,
     SessionStatistics,
+    StatisticsDep,
     TimingStatistics,
     TimingStatisticsDict,
-    get_session_statistics,
 )
+from codeweaver.core.di.depends import INJECTED
 from codeweaver.core.exceptions import ProviderError
 from codeweaver.core.utils import TypeIs
+
+
+def _get_statistics(stats: StatisticsDep = INJECTED):
+    """Get the current statistics dependency."""
+    return stats
 
 
 class StatisticsMiddleware(McpMiddleware):
@@ -64,7 +70,7 @@ class StatisticsMiddleware(McpMiddleware):
             logger: Logger instance to use for logging
             log_level: Logging level to use
         """
-        self.statistics = statistics or get_session_statistics()
+        self.statistics = statistics or _get_statistics()
         self.timing_statistics = self.statistics.timing_statistics
         self.logger = logger or logging.getLogger(__name__)
         self.log_level = log_level or logging.WARNING

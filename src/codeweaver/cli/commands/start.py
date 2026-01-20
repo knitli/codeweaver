@@ -24,15 +24,36 @@ from cyclopts import App, Parameter
 from pydantic import FilePath, PositiveInt
 
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
-from codeweaver.core import TypeIs, get_settings_map_for, lazy_import
+from codeweaver.core import (
+    CodeWeaverSettingsType,
+    ProgressReporter,
+    ProgressReporterDep,
+    SettingsDep,
+    SettingsMapDep,
+    StatisticsDep,
+    TypeIs,
+    lazy_import,
+)
+from codeweaver.core.di import INJECTED
+from codeweaver.core.statistics import SessionStatistics
 
 
 if TYPE_CHECKING:
     from codeweaver.core import DictView
-    from codeweaver.server import CodeWeaverSettingsDict
+    from codeweaver.core.config.types import CodeWeaverSettingsDict
 
 _display: StatusDisplay = get_display()
 app = App("start", help="Start CodeWeaver background services.")
+
+
+def _get_reporter(reporter: ProgressReporterDep = INJECTED):
+    """Get the progress reporter."""
+    return reporter
+
+
+def _get_statistics(statistics: StatisticsDep = INJECTED):
+    """Get the session statistics."""
+    return statistics
 
 
 class NetworkConfig(NamedTuple):
@@ -44,11 +65,26 @@ class NetworkConfig(NamedTuple):
     mcp_port: int | None
 
 
-def _get_settings_map() -> DictView[CodeWeaverSettingsDict]:
+def _get_settings_map(settings: SettingsMapDep = INJECTED) -> DictView[CodeWeaverSettingsDict]:
     """Get the current settings map."""
-    from codeweaver.server import get_settings_map
+    return settings
 
-    return get_settings_map()
+
+def _get_settings(settings: SettingsDep = INJECTED) -> CodeWeaverSettingsType:
+    """Get the current settings."""
+    return settings
+
+
+def _get_settings_map_for(
+    config_file: Path | None = None, project_path: Path | None = None
+) -> DictView[CodeWeaverSettingsDict]:
+    """Get the settings map for a specific configuration file or project path."""
+    if not config_file and not project_path:
+        return _get_settings_map()
+    from codeweaver.core.config.loader import get_settings
+
+    settings = get_settings(config_file=config_file, project_path=project_path)
+    return settings.view
 
 
 async def are_services_running(management_host: str, management_port: int) -> bool:
@@ -137,6 +173,8 @@ async def start_cw_services(
     mcp_port: PositiveInt,
     management_host: str,
     management_port: PositiveInt,
+    progress_reporter: ProgressReporter | None = None,
+    statistics: SessionStatistics | None = None,
     *,
     start_mcp_http_server: bool = True,  # Start MCP HTTP server for stdio proxy support
     verbose: bool = False,
@@ -147,17 +185,19 @@ async def start_cw_services(
     By default, starts both the management server (port 9329) and MCP HTTP server
     (port 9328) to support stdio proxy connections.
     """
-    from codeweaver.core import get_session_statistics
     from codeweaver.server import ManagementServer, background_services_lifespan
 
-    statistics = get_session_statistics()
+    if not statistics:
+        statistics = _get_statistics()
+    if not progress_reporter:
+        progress_reporter = _get_reporter()
 
     # Use background_services_lifespan (the new Phase 1 implementation)
     async with background_services_lifespan(
         settings=lazy_import("codeweaver.server", "get_settings")._resolve()(),
         statistics=statistics,
-        status_display=display,
         verbose=verbose,
+        progress_reporter=progress_reporter,
         debug=debug,
     ) as background_state:
         management_server = ManagementServer(background_state)
@@ -335,7 +375,7 @@ async def start(
 
     MCP HTTP server available at http://127.0.0.1:9328/mcp/ (by default).
     """
-    settings_map = get_settings_map_for(config_file=config_file, project_path=project)
+    settings_map = _get_settings_map_for(config_file=config_file, project_path=project)
     display = _display
     error_handler = CLIErrorHandler(display, verbose=verbose, debug=debug)
     network_config = get_network_settings()

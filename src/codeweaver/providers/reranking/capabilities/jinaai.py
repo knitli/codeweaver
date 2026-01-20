@@ -40,10 +40,23 @@ def get_jinaai_reranking_capabilities() -> Sequence[JinaaiRerankingCapabilities]
             "tokenizer_model": "jinaai/jina-reranking-m0",
             "supports_custom_prompt": False,
         },
+        "jinaai/jina-reranker-v1-tiny-en": {
+            "provider": Provider.FASTEMBED,
+            "max_input": 8192,
+            "context_window": 8192,
+            "tokenizer": "tokenizers",
+            "tokenizer_model": "jinaai/jina-reranker-v1-tiny-en",
+            "supports_custom_prompt": False,
+        },
     }
     return [
         JinaaiRerankingCapabilities.model_validate({**cap, "name": name})
         for name, cap in capabilities.items()
+    ] + [
+        JinaaiRerankingCapabilities.model_validate(
+            capabilities["jinaai/jina-reranker-v1-tiny-en"]
+            | {"provider": Provider.SENTENCE_TRANSFORMERS}
+        )
     ]
 
 

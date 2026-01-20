@@ -49,7 +49,7 @@ import logging
 import time
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, NamedTuple
+from typing import TYPE_CHECKING, NamedTuple, cast
 
 from fastmcp.server.context import Context
 from pydantic import NonNegativeInt, PositiveInt
@@ -58,12 +58,16 @@ from codeweaver.core import (
     INJECTED,
     SearchStrategy,
     Span,
+    TelemetryServiceDep,
+    TelemetrySettingsDep,
     capture_search_event,
     log_to_client_or_fallback,
 )
-from codeweaver.providers import EmbeddingProvider, RerankingProvider, VectorStoreProvider
-from codeweaver.providers.dependencies import AllProvidersDep
+from codeweaver.engine.services.indexing_service import IndexingService
+from codeweaver.providers import SearchPackageDep, VectorStoreProvider
+from codeweaver.providers.types import SearchPackage
 from codeweaver.semantic import AgentTask
+from codeweaver.server import CodeWeaverStateDep
 from codeweaver.server.agent_api.find_code.conversion import convert_search_result_to_code_match
 from codeweaver.server.agent_api.find_code.filters import apply_filters
 from codeweaver.server.agent_api.find_code.intent import (
@@ -127,7 +131,7 @@ def _get_settings() -> DictView[CodeWeaverSettingsDict]:
 
 
 async def _check_index_status(
-    context: Context | None, vector_store: VectorStoreDep = INJECTED[VectorStoreProvider]
+    context: Context | None, vector_store: VectorStoreProvider | None
 ) -> tuple[bool, int]:
     """Check if index exists and get chunk count.
 
@@ -178,36 +182,40 @@ async def _check_index_status(
         return True, info.points_count or 0
 
 
+def _get_indexer(indexer: IndexingServiceDep = INJECTED) -> IndexingService | None:
+    """Get the indexing service from the dependency injection system."""
+    return indexer
+
+
 async def _ensure_index_ready(
-    context: Any, vector_store: VectorStoreProvider | None = None
+    context: Context | None = None,
+    vector_store: VectorStoreProvider | None = None,
+    indexer: IndexingService | None = None,
 ) -> None:
     """Ensure that the codebase is indexed before performing a search.
 
     If indexing is already complete or in progress, this is a no-op.
     """
-    from codeweaver.server import get_state
-
-    state = get_state()
-    if indexer := state.indexer:
-        # Resolve providers before checking if index exists
-        # This is needed because prime_index initializes providers lazily
-        if not indexer._providers_initialized:
-            await indexer._initialize_providers_async(vector_store=vector_store)
-
-        # Check if index exists by querying vector store for any chunks
-        # This is more robust than relying on manifest which might be out of sync
-        if indexer._vector_store:
-            try:
-                # Prime the index if no collections exist or if current is empty
-                # prime_index handles incremental indexing via manifest
-                # We enable reconciliation by default to fix any partial indexes
-                await indexer.prime_index(add_dense=True, add_sparse=True)
-            except Exception as e:
-                logger.warning("Auto-indexing failed: %s", e)
+    indexer = indexer or _get_indexer()
+    # Check if index exists by querying vector store for any chunks
+    # This is more robust than relying on manifest which might be out of sync
+    if indexer._vector_store:
+        try:
+            # Prime the index if no collections exist or if current is empty
+            # prime_index handles incremental indexing via manifest
+            # We enable reconciliation by default to fix any partial indexes
+            await indexer.prime_index(add_dense=True, add_sparse=True)
+        except Exception as e:
+            logger.warning("Auto-indexing failed: %s", e)
 
 
 _set_max = get_max_tokens()
 _set_max_results = get_max_results()
+
+
+async def _build_search_package(package: SearchPackageDep) -> SearchPackage:
+    """Build a search package from the given dependency."""
+    return package
 
 
 async def find_code(
@@ -218,7 +226,9 @@ async def find_code(
     focus_languages: tuple[str, ...] | None = None,
     max_results: int = _set_max_results,
     context: Context | None = None,
-    providers: AllProvidersDep = INJECTED,
+    search_package: SearchPackageDep = INJECTED,
+    telemetry_settings: TelemetrySettingsDep = INJECTED,
+    telemetry: TelemetryServiceDep = INJECTED,
 ) -> FindCodeResponseSummary:
     """Find relevant code based on semantic search with intent-driven ranking.
 
@@ -231,7 +241,7 @@ async def find_code(
         focus_languages: Optional language filter
         max_results: Maximum number of results to return (default: 30)
         context: Optional FastMCP Context for client communication
-        providers: dependency injected values of all configured providers (embedding, sparse embedding, reranking, vector store)
+        search_package: dependency injected SearchPackage
 
     Returns:
         FindCodeResponseSummary with ranked matches and metadata
@@ -239,48 +249,11 @@ async def find_code(
     start_time = time.monotonic()
     strategies_used: list[SearchStrategy] = []
 
-    # Manually resolve providers if not injected (DI fallback)
-    from codeweaver.core import Depends, DependsPlaceholder, get_container
-    from codeweaver.providers import VectorStoreProvider
-
-    embedding_provider = providers.get("embedding")
-    sparse_provider = providers.get("sparse_embedding")
-    reranking_provider = providers.get("reranking")
-    vector_store = providers.get("vector_store")
-
-    container = get_container()
-
-    if vector_store is None or isinstance(vector_store, (Depends, DependsPlaceholder)):
-        try:
-            vector_store = await container.resolve(VectorStoreProvider)
-        except Exception:
-            vector_store = None
-
-    if embedding_provider is None or isinstance(embedding_provider, (Depends, DependsPlaceholder)):
-        try:
-            embedding_provider = await container.resolve(EmbeddingProvider)
-        except Exception:
-            embedding_provider = None
-
-    if sparse_provider is None or isinstance(sparse_provider, (Depends, DependsPlaceholder)):
-        try:
-            from codeweaver.providers import SparseEmbeddingProvider
-
-            sparse_provider = await container.resolve(SparseEmbeddingProvider)
-        except Exception:
-            sparse_provider = None
-
-    if reranking_provider is None or isinstance(reranking_provider, (Depends, DependsPlaceholder)):
-        try:
-            from codeweaver.providers import RerankingProvider
-
-            reranking_provider = await container.resolve(RerankingProvider)
-        except Exception:
-            reranking_provider = None
-
     try:
         # Step 0: Auto-index if needed
-        index_exists, chunk_count = await _check_index_status(context, vector_store=vector_store)
+        index_exists, chunk_count = await _check_index_status(
+            context, vector_store=search_package.vector_store
+        )
 
         if not index_exists or chunk_count == 0:
             # Full indexing needed - BLOCK and wait
@@ -291,7 +264,7 @@ async def find_code(
                     "message": "The code index is not ready. Starting index. This could take awhile..."
                 },
             )
-            await _ensure_index_ready(context, vector_store=vector_store)
+            await _ensure_index_ready(context, vector_store=search_package.vector_store)
 
         # Step 1: Intent detection
         if intent is not None:
@@ -311,8 +284,8 @@ async def find_code(
         embeddings = await embed_query(
             query,
             context=context,
-            dense_provider=embedding_provider,
-            sparse_provider=sparse_provider,
+            dense_provider=search_package.embedding,
+            sparse_provider=search_package.sparse_embedding,
         )
 
         # Step 3: Build query vector and determine strategy
@@ -321,7 +294,7 @@ async def find_code(
 
         # Step 4: Execute vector search
         candidates = await execute_vector_search(
-            query_vector, context=context, vector_store=vector_store
+            query_vector, context=context, vector_store=search_package.vector_store
         )
 
         # Step 5: Post-search filtering
@@ -335,7 +308,7 @@ async def find_code(
 
         # Step 7: Rerank (optional, if provider configured)
         reranked_results, rerank_strategy = await rerank_results(
-            query, candidates, context=context, reranking=reranking_provider
+            query, candidates, context=context, reranking=search_package.reranking
         )
         if rerank_strategy:
             strategies_used.append(rerank_strategy)
@@ -378,34 +351,36 @@ async def find_code(
             strategies_used=strategies_used,
         )
 
-        # Step 12: Capture search telemetry
-        settings = _get_settings()
-        tools_over_privacy = settings["telemetry"]["tools_over_privacy"]
-        try:
-            from codeweaver.core import get_telemetry_client
-
-            client = get_telemetry_client()
+        if telemetry_settings.tools_over_privacy:
             feature_flags = {
-                "search-ranking-v2": client.get_feature_flag("search-ranking-v2"),
-                "rerank-strategy": client.get_feature_flag("rerank-strategy"),
+                "search-ranking-v2": telemetry.client.get_feature_flag("search-ranking-v2"),  # ty:ignore[unresolved-attribute]
+                "rerank-strategy": telemetry.client.get_feature_flag("rerank-strategy"),  # ty:ignore[unresolved-attribute]
             }
-
-            capture_search_event(
-                response=response,
-                query=query,
-                intent_type=intent_type,
-                strategies=strategies_used,
-                execution_time_ms=execution_time_ms,
-                tools_over_privacy=tools_over_privacy,
-                feature_flags=feature_flags,
-            )
-        except Exception:
-            logger.debug("Failed to capture search telemetry")
+            try:
+                capture_search_event(
+                    response=response,
+                    query=query,
+                    intent_type=intent_type,
+                    strategies=strategies_used,
+                    execution_time_ms=execution_time_ms,
+                    tools_over_privacy=telemetry_settings.tools_over_privacy,
+                    feature_flags=feature_flags,
+                )
+            except Exception:
+                logger.debug("Failed to capture search telemetry")
 
     except Exception as e:
         logger.warning("find_code failed: %s", e, exc_info=True)
         execution_time_ms = (time.monotonic() - start_time) * 1000
-        error_response = build_error_response(e, intent, execution_time_ms)
+        error_response = build_error_response(
+            e,
+            intent,
+            execution_time_ms,
+            vector_store=search_package.vector_store,
+            dense=search_package.embedding,
+            reranking=search_package.reranking,
+            sparse=search_package.sparse_embedding,
+        )
 
         try:
             capture_search_event(
@@ -414,7 +389,7 @@ async def find_code(
                 intent_type=intent or IntentType.UNDERSTAND,
                 strategies=strategies_used,
                 execution_time_ms=execution_time_ms,
-                tools_over_privacy=tools_over_privacy,
+                tools_over_privacy=telemetry_settings.tools_over_privacy,
                 feature_flags=None,
             )
         except Exception:

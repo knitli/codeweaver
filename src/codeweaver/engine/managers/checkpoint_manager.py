@@ -74,15 +74,15 @@ def get_checkpoint_settings_map(
 
     # These values will already have been resolved by dependency injection with defaults if needed
     settings = cast(CodeWeaverSettingsType, get_settings())
-    indexer: IndexerSettings = cast(IndexerSettings, settings.indexer)
+    indexer: IndexerSettings = cast(IndexerSettings, settings.indexer)  # ty:ignore[unresolved-attribute]
 
     indexer_map = indexer.model_dump(mode="json", exclude_computed_fields=True, exclude_none=True)
 
     return CheckpointSettingsFingerprint(
         indexer=indexer_map,
-        embedding_provider=settings.provider.embedding,
-        sparse_provider=settings.provider.sparse_embedding,
-        vector_store=settings.provider.vector_store,
+        embedding_provider=settings.provider.embedding,  # ty:ignore[unresolved-attribute]
+        sparse_provider=settings.provider.sparse_embedding,  # ty:ignore[unresolved-attribute]
+        vector_store=settings.provider.vector_store,  # ty:ignore[unresolved-attribute]
         project_path=project_path,
         project_name=project_name,
     )

@@ -107,12 +107,12 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
                 """
                 cls.provider = provider
                 cls.__init__(
-                    self,
+                    self,  # ty:ignore[invalid-argument-type]
                     client=client,
                     config=config,
                     caps=caps,
                     registry=registry,
-                    **kwargs,  # ty:ignore[invalid-argument-type]
+                    **kwargs,
                 )
                 # 4. Set provider-specific attributes AFTER parent initialization
 

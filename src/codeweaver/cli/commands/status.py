@@ -19,7 +19,10 @@ from pydantic_core import from_json
 from rich.table import Table
 
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
-from codeweaver.core import Unset
+from codeweaver.core import SettingsMapDep, Unset
+from codeweaver.core.config.types import CodeWeaverSettingsDict
+from codeweaver.core.di.depends import INJECTED
+from codeweaver.core.types.dictview import DictView
 from codeweaver.server import DefaultFastMcpHttpRunArgs
 
 
@@ -27,11 +30,14 @@ _display: StatusDisplay = get_display()
 app = App("status", help="Show CodeWeaver runtime status.")
 
 
+def _settings_map(settings: SettingsMapDep = INJECTED) -> DictView[CodeWeaverSettingsDict]:
+    """Get the settings map."""
+    return settings
+
+
 def get_url() -> str:
     """Get the MCP server URL from settings (http transport)."""
-    from codeweaver.server import get_settings_map
-
-    settings_map = get_settings_map()
+    settings_map = _settings_map()
     mcp_server_settings = settings_map["mcp_server"]
     run_args = (
         DefaultFastMcpHttpRunArgs
@@ -45,9 +51,7 @@ def get_url() -> str:
 
 def get_management_url() -> str:
     """Get the management server URL from settings."""
-    from codeweaver.server import get_settings_map
-
-    settings_map = get_settings_map()
+    settings_map = _settings_map()
     mgmt_host = (
         settings_map["management_host"]
         if settings_map["management_host"] is not Unset

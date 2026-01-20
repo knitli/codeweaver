@@ -51,7 +51,9 @@ class TestDoctorUnsetHandling:
 
     def test_project_path_auto_detection(self) -> None:
         """Test project_path is auto-detected from git root."""
-        settings = CodeWeaverSettings()
+        settings = CodeWeaverSettings(
+            project_path=temp_project, project_name=temp_project.name, config_file=None
+        )
 
         # Settings should auto-detect project_path, not leave it as Unset
         assert not isinstance(settings.project_path, Unset)
@@ -75,9 +77,12 @@ class TestDoctorUnsetHandling:
         """Test doctor handles settings with auto-detected fields correctly."""
         # Setup minimal provider configuration via env vars to avoid provider initialization errors
         monkeypatch.setenv("CODEWEAVER_EMBEDDING_PROVIDER", "fastembed")
-
+        project_path = temp_project
+        project_name = temp_project.name
         # Create minimal settings
-        settings = CodeWeaverSettings()
+        settings = CodeWeaverSettings(
+            project_path=project_path, project_name=project_name, config_file=None
+        )
 
         # project_path should be auto-detected
         assert not isinstance(settings.project_path, Unset)
@@ -294,7 +299,9 @@ class TestDoctorConfigAssumptions:
         monkeypatch.setenv("CODEWEAVER_VECTOR_STORE_TYPE", "qdrant")
 
         # Create settings - pass project_path directly rather than relying on env var
-        settings = CodeWeaverSettings(project_path=temp_project)
+        settings = CodeWeaverSettings(
+            project_path=temp_project, project_name="test_project", config_file=None
+        )
 
         # Should be valid - embedding is now a tuple
         assert settings.project_path == temp_project
@@ -325,7 +332,9 @@ class TestDoctorConfigAssumptions:
         custom_path.mkdir()
 
         # Pass project_path directly to ensure init_settings source takes precedence
-        settings = CodeWeaverSettings(project_path=custom_path)
+        settings = CodeWeaverSettings(
+            project_path=custom_path, project_name="test_project", config_file=None
+        )
 
         # Verify the init arg was used
         assert settings.project_path == custom_path, (

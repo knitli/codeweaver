@@ -469,7 +469,7 @@ class GrammarBasedClassifier:
         """Classify known exceptions that don't fit other patterns or that have very high confidence based on their specific characteristics."""
         if classification := self._handle_comment_cases(thing, language):
             return classification
-        registry = self._registry()
+        registry = _get_registry()
         result_func = rpartial(
             self._to_classification_result,
             method=ClassificationMethod.SPECIFIC_THING,
@@ -479,7 +479,7 @@ class GrammarBasedClassifier:
         if is_token(thing) and (str(thing.name) in registry.composite_things[language]):
             # a rare number of Things are *both* Tokens and CompositeThings in some languages
             return result_func(
-                classification=SemanticClass.from_token_purpose(thing.purpose, thing.name)
+                classification=SemanticClass.from_token_purpose(thing.purpose, str(thing.name))
             )  # ty:ignore[missing-argument]
         if (
             is_composite_thing(thing)

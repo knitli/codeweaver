@@ -126,9 +126,9 @@ def is_codeweaver_config_path(path: Path) -> bool:
 
 def _set_settings_for_config(config_file: Path) -> CodeWeaverSettingsType:
     """Set the global settings based on the given config file."""
-    from codeweaver.server import get_settings
+    from codeweaver.core.config.loader import get_settings
 
-    return get_settings(config_file=config_file)
+    return get_settings(config_file=config_file)  # ty:ignore[invalid-return-type]
 
 
 def _set_project_path(project_path: Path) -> CodeWeaverSettingsType:
@@ -168,6 +168,30 @@ def detect_root_package() -> Literal["server", "engine", "provider", "core"]:
     logger.debug("Only core package detected - using CodeWeaverCoreSettings")
     return "core"
 
+
+def settings_type_for_root_package(
+    root_package: Literal["server", "engine", "provider", "core"],
+) -> type[CodeWeaverSettingsType]:
+    """Get the settings type for the given root package."""
+    match root_package:
+        case "server":
+            from codeweaver.server.config.settings import CodeWeaverSettings
+
+            return CodeWeaverSettings
+        case "engine":
+            from codeweaver.engine.config.root_settings import CodeWeaverEngineSettings
+
+            return CodeWeaverEngineSettings
+        case "provider":
+            from codeweaver.providers.config.root_settings import CodeWeaverProviderSettings
+
+            return CodeWeaverProviderSettings
+        case "core":
+            from codeweaver.core.config.core_settings import CodeWeaverCoreSettings
+
+            return CodeWeaverCoreSettings
+
+
 CODEWEAVER_PREFIX = """[CodeWeaver]"""
 
 __all__ = (
@@ -179,6 +203,7 @@ __all__ = (
     "in_ide",
     "is_codeweaver_config_path",
     "is_tty",
+    "settings_type_for_root_package",
     "we_are_in_jetbrains",
     "we_are_in_vscode",
 )

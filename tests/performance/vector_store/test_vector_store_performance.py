@@ -479,7 +479,7 @@ async def test_performance_regression_check(qdrant_store: QdrantVectorStoreProvi
         baseline = json.loads(baseline_path.read_text())
 
         # Compare against baseline
-        search_regression = (metrics["search"]["p95_ms"] - baseline["search"]["p95_ms"]) / baseline[ # ty:ignore[not-subscriptable]
+        search_regression = (metrics["search"]["p95_ms"] - baseline["search"]["p95_ms"]) / baseline[  # ty:ignore[not-subscriptable]
             "search"
         ]["p95_ms"]
 

@@ -16,8 +16,15 @@ from cyclopts import App, Parameter
 from pydantic import PositiveInt
 
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
-from codeweaver.core import Unset
-from codeweaver.server import get_settings_map
+from codeweaver.core import SettingsMapDep, Unset
+from codeweaver.core.config.types import CodeWeaverSettingsDict
+from codeweaver.core.di import INJECTED
+from codeweaver.core.types.dictview import DictView
+
+
+def _settings_map(settings: SettingsMapDep = INJECTED) -> DictView[CodeWeaverSettingsDict]:
+    """Get the settings map."""
+    return settings
 
 
 _display: StatusDisplay = get_display()
@@ -26,7 +33,7 @@ app = App("stop", help="Stop CodeWeaver background services.")
 
 def _get_default_host_port() -> tuple[str, int]:
     """Get default management host/port from settings."""
-    settings_map = get_settings_map()
+    settings_map = _settings_map()
     mgmt_host = (
         settings_map["management_host"]
         if settings_map["management_host"] is not Unset

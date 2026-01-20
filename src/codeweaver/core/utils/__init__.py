@@ -33,6 +33,7 @@ if TYPE_CHECKING:
         in_ide,
         is_codeweaver_config_path,
         is_tty,
+        settings_type_for_root_package,
         we_are_in_jetbrains,
         we_are_in_vscode,
     )
@@ -228,6 +229,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "rpartial": (__spec__.parent, "general"),
     "sanitize_unicode": (__spec__.parent, "text"),
     "set_relative_path": (__spec__.parent, "filesystem"),
+    "settings_type_for_root_package": (__spec__.parent, "environment"),
     "supported_language_count": (__spec__.parent, "general"),
     "supported_languages": (__spec__.parent, "general"),
     "takes_args": (__spec__.parent, "introspect"),
@@ -344,6 +346,7 @@ __all__ = (
     "rpartial",
     "sanitize_unicode",
     "set_relative_path",
+    "settings_type_for_root_package",
     "supported_language_count",
     "supported_languages",
     "takes_args",

@@ -9,20 +9,11 @@ from __future__ import annotations
 import logging
 
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Annotated, Any, Literal
+from typing import TYPE_CHECKING, Annotated, Any, Literal, TypedDict
 
-from pydantic import Field
-from qdrant_client.grpc import CollectionConfig
-from qdrant_client.http.models import SparseVectorParams, VectorParams
+from pydantic import Field, computed_field
 
-from codeweaver.core import (
-    BasedModel,
-    CodeChunk,
-    DimensionMismatchError,
-    ModelSwitchError,
-    ResolvedProjectNameDep,
-)
-from codeweaver.core.di.depends import INJECTED
+from codeweaver.core import BasedModel, CodeChunk, ModelSwitchError
 from codeweaver.core.types import Provider
 
 
@@ -30,6 +21,22 @@ if TYPE_CHECKING:
     from codeweaver.core import AnonymityConversion, FilteredKeyT
 
 logger = logging.getLogger(__name__)
+
+
+class PayloadFieldDict(TypedDict):
+    """A mapping of payload field names to their corresponding Qdrant data types; not all fields are indexed, but if they were, these would be the types."""
+
+    chunk: Literal["text"]
+    chunk_id: Literal["uuid"]
+    file_path: Literal["text"]
+    line_start: Literal["integer"]
+    line_end: Literal["integer"]
+    indexed_at: Literal["datetime"]
+    chunked_on: Literal["datetime"]
+    hash: Literal["keyword"]  # use keyword to find specific hashes
+    provider: Literal["keyword"]
+    embedding_complete: Literal["bool"]
+    symbol: Literal["keyword"]
 
 
 class HybridVectorPayload(BasedModel):
@@ -61,6 +68,16 @@ class HybridVectorPayload(BasedModel):
         ),
     ]
 
+    @computed_field
+    @property
+    def symbol(self) -> str | None:
+        """Return the symbol associated with the semantic metadata, if available."""
+        if hasattr(self, "_symbol"):
+            return self._symbol  # ty:ignore[invalid-return-type]
+        if not self.chunk.metadata or not (metadata := self.chunk.metadata.get("semantic_meta")):
+            return None
+        return metadata.symbol
+
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         from codeweaver.core import AnonymityConversion, FilteredKey
 
@@ -68,12 +85,43 @@ class HybridVectorPayload(BasedModel):
 
     def to_payload(self) -> dict[str, Any]:
         """Convert to a dictionary payload for storage."""
-        return self.model_dump(mode="json", exclude_none=True, by_alias=True, round_trip=True)
+        return self.model_dump(
+            mode="json",
+            exclude_none=True,
+            by_alias=True,
+            round_trip=True,
+            exclude_computed_fields=False,
+        )
 
     @classmethod
     def from_payload(cls, payload: dict[str, Any]) -> HybridVectorPayload:
         """Create a HybridVectorPayload from a dictionary payload."""
-        return cls.model_validate(payload)
+        context = payload.pop("symbol", None)
+        new = cls.model_validate(payload)
+        new._symbol = context  # ty:ignore[unresolved-attribute]
+        return new
+
+    @staticmethod
+    def indexed_fields() -> tuple[str, ...]:
+        """Return the payload fields that are indexed by default in the Qdrant collection."""
+        return ("chunk_id", "symbol", "indexed_at")
+
+    @staticmethod
+    def index_field_types() -> PayloadFieldDict:
+        """Return the payload fields mapped to their datatype for Qdrant indexing."""
+        return PayloadFieldDict({
+            "chunk": "text",
+            "chunk_id": "uuid",
+            "file_path": "text",
+            "line_start": "integer",
+            "line_end": "integer",
+            "indexed_at": "datetime",
+            "chunked_on": "datetime",
+            "hash": "keyword",
+            "provider": "keyword",
+            "embedding_complete": "bool",
+            "symbol": "keyword",
+        })
 
 
 class CollectionMetadata(BasedModel):
@@ -82,17 +130,6 @@ class CollectionMetadata(BasedModel):
     provider: Annotated[str, Field(description="Provider name that created collection")]
     created_at: Annotated[datetime, Field(default_factory=lambda: datetime.now(UTC))]
     project_name: Annotated[str, Field(description="Project/repository name")]
-    vector_config: Annotated[
-        dict[Literal["dense"], VectorParams],
-        Field(description="Vector configuration snapshot", serialization_alias="vectors_config"),
-    ]
-    sparse_config: Annotated[
-        dict[Literal["sparse"], SparseVectorParams],
-        Field(
-            description="Sparse embedding configuration snapshot",
-            serialization_alias="sparse_vectors_config",
-        ),
-    ]
 
     dense_model: Annotated[
         str | None, Field(description="Name of the dense embedding model used.")
@@ -100,44 +137,20 @@ class CollectionMetadata(BasedModel):
     sparse_model: Annotated[
         str | None, Field(description="Name of the sparse embedding model used.")
     ] = None
+    backup_enabled: Annotated[
+        bool, Field(description="Whether backup is enabled for the collection")
+    ] = False
+    backup_model: Annotated[
+        str | None,
+        Field(description="Name of the backup dense embedding model used for the collection"),
+    ] = None
     collection_name: Annotated[str, Field(description="Name of the collection")] = ""
-    version: Annotated[str, Field(description="Metadata schema version")] = "1.1.0"
-
-    @classmethod
-    def from_collection_config(
-        cls, config: CollectionConfig, project_name: ResolvedProjectNameDep = INJECTED
-    ) -> CollectionMetadata:
-        """Create CollectionMetadata from a CollectionConfig."""
-        # TODO -- this is a placeholder -- the mappings are not correct; need to get some fields from elsewhere
-        collection_data = config.model_dump()
-        return cls.model_validate({
-            "provider": collection_data.get("provider"),
-            "created_at": collection_data.get("created_at"),
-            "project_name": project_name,
-            "vector_config": collection_data.get("vector_config"),
-            "sparse_config": collection_data.get("sparse_config"),
-            "dense_model": collection_data.get("dense_model"),
-            "sparse_model": collection_data.get("sparse_model"),
-            "collection_name": collection_data.get("collection_name"),
-            "version": collection_data.get("version", "1.1.0"),
-        })
+    version: Annotated[str, Field(description="Metadata schema version")] = "1.2.0"
 
     def to_collection(self) -> dict[str, Any]:
         """Convert to a dictionary that is the argument for collection creation."""
         # Return collection creation params without metadata (metadata is stored separately)
-        return self.model_dump(
-            exclude_none=True,
-            by_alias=True,
-            round_trip=True,
-            exclude={
-                "created_at",
-                "project_name",
-                "version",
-                "provider",
-                "dense_model",
-                "sparse_model",
-            },
-        )
+        return self.model_dump(exclude_none=True, by_alias=True, round_trip=True)
 
     @classmethod
     def from_collection(cls, data: dict[str, Any]) -> CollectionMetadata:
@@ -194,40 +207,6 @@ class CollectionMetadata(BasedModel):
                     "current_provider": other.provider,
                     "collection_model": other.dense_model,
                     "current_model": self.dense_model,
-                    "collection": self.project_name,
-                },
-            )
-
-        if (
-            (dense_dim := self.vector_config["dense"].size) is not None
-            and (other_dense_dim := other.vector_config["dense"].size) is not None
-            and dense_dim != other_dense_dim
-        ):
-            raise DimensionMismatchError(
-                f"Embedding dimension mismatch: collection expects {other_dense_dim}, but current embedder produces {dense_dim}.",
-                suggestions=[
-                    "Option 1: Use an embedding model with matching dimensions (the same model as before)",
-                    "Option 2: Re-index with the current embedding model and dimensions",
-                    "Option 3: Check your embedding provider configuration",
-                ],
-                details={
-                    "expected_dimension": dense_dim,
-                    "actual_dimension": other_dense_dim,
-                    "collection": self.project_name,
-                },
-            )
-        if (
-            (dtype := self.vector_config["dense"].datatype)
-            and (other_dtype := other.vector_config["dense"].datatype)
-            and dtype != other_dtype
-        ):
-            logger.warning(
-                "Embedding data type mismatch: collection was created with '%s', but current embedder produces '%s'. This can produce unexpected results.",
-                other_dtype,
-                dtype,
-                extra={
-                    "expected_dtype": other_dtype,
-                    "actual_dtype": dtype,
                     "collection": self.project_name,
                 },
             )

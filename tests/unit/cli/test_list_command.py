@@ -16,7 +16,7 @@ from __future__ import annotations
 import pytest
 
 from codeweaver.cli import app as list_app
-from codeweaver.core import Provider, ProviderKind
+from codeweaver.core import ProviderKind
 from codeweaver.core.types.provider import PROVIDER_CAPABILITIES
 
 
@@ -190,7 +190,9 @@ class TestListCoverage:
     def test_list_sparse_providers_coverage(self, capsys: pytest.CaptureFixture[str]) -> None:
         """Test list shows sparse embedding providers."""
         sparse_providers = [
-            prov for prov, caps in PROVIDER_CAPABILITIES.items() if ProviderKind.SPARSE_EMBEDDING in caps
+            prov
+            for prov, caps in PROVIDER_CAPABILITIES.items()
+            if ProviderKind.SPARSE_EMBEDDING in caps
         ]
 
         if len(sparse_providers) > 0:

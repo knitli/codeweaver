@@ -35,6 +35,7 @@ from codeweaver.core import (
     StatisticsDep,
     ValidationError,
 )
+from codeweaver.core.types import ModelName, ModelNameT
 from codeweaver.providers.exceptions import CircuitBreakerOpenError
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 from codeweaver.providers.reranking.providers.types import RerankingResult
@@ -365,9 +366,9 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         return provider_value
 
     @property
-    def model_name(self) -> str:
+    def model_name(self) -> ModelNameT:
         """Get the model name for the reranking provider."""
-        return self.config.model_name
+        return ModelName(self.config.model_name)
 
     @property
     def model_capabilities(self) -> RerankingModelCapabilities:

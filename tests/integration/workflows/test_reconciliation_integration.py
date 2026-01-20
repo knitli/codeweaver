@@ -202,7 +202,6 @@ async def test_index_project_reconciliation_without_force_reindex(
 
     # Let's mock _discover_files_to_index to return our files directly to skip rignore complexity
     # and focus on the processing logic.
-    original_discover = indexing_service._discover_files_to_index
     object.__setattr__(
         indexing_service, "_discover_files_to_index", lambda progress_callback=None: [file1, file2]
     )

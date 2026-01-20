@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 def check_provider_package_available(provider: Provider, kind: ProviderKind) -> bool:
     """Check if the required package for a provider is installed.
-    
+
     This replaces the registry.is_provider_available logic.
     """
     from codeweaver.core.types.provider import SDK_MAP, SDKClient
@@ -28,8 +28,8 @@ def check_provider_package_available(provider: Provider, kind: ProviderKind) -> 
         # Fallback to defaults or assume available (e.g. Memory)
         if provider.value == "memory":
             return True
-        # If no SDK mapped, assume it might be available if not strictly required? 
-        # Or return False? 
+        # If no SDK mapped, assume it might be available if not strictly required?
+        # Or return False?
         # For "not_set" or others, False is safer.
         return False
 
@@ -61,5 +61,5 @@ def check_provider_package_available(provider: Provider, kind: ProviderKind) -> 
             if pkg_name == "fastembed" and find_spec("fastembed_gpu"):
                 continue
             return False
-            
+
     return True

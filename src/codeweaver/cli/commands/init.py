@@ -28,15 +28,23 @@ from rich.prompt import Confirm
 
 from codeweaver.cli.ui import CLIErrorHandler, get_display
 from codeweaver.core import CodeWeaverError, get_project_path, get_user_config_dir
+from codeweaver.core.di.depends import INJECTED
+from codeweaver.providers.config.profiles import ProviderProfile
 
 
 if TYPE_CHECKING:
     from codeweaver.cli.ui import StatusDisplay
+    from codeweaver.core.dependencies import CodeWeaverSettingsType, SettingsDep
     from codeweaver.server import CodeWeaverMCPConfig, StdioCodeWeaverConfig
+
 
 type MCPClient = Literal[
     "claude_code", "claude_desktop", "cursor", "gemini_cli", "vscode", "mcpjson"
 ]
+
+
+def _get_settings(settings: SettingsDep = INJECTED) -> CodeWeaverSettingsType:
+    return settings
 
 
 def _lazy_import_httpx() -> None:
@@ -104,8 +112,7 @@ def _backup_config(path: Path) -> Path:
 def _create_codeweaver_config(
     project_path: Path,
     *,
-    profile: Literal["recommended", "quickstart", "test"],
-    vector_deployment: Literal["local", "cloud"] = "local",
+    profile: ProviderProfile,
     vector_url: AnyHttpUrl | None = None,
     config_path: Path,
 ) -> Path:
@@ -113,7 +120,7 @@ def _create_codeweaver_config(
 
     Args:
         project_path: Path to project directory
-        profile: Profile name to use ("recommended", "quickstart", "test")
+        profile: Profile to use for configuration
         vector_deployment: Vector store deployment type ("local" or "cloud")
         vector_url: URL for cloud vector deployment (required if vector_deployment="cloud")
         config_path: Custom config file path (defaults to codeweaver.toml in project)
@@ -124,22 +131,6 @@ def _create_codeweaver_config(
     display = _display
 
     config_path.parent.mkdir(parents=True, exist_ok=True)
-    from codeweaver.providers.config import get_profile
-
-    deployment_profile = (
-        get_profile("backup" if profile == "test" else profile, vector_deployment, url=vector_url)  # ty: ignore[no-matching-overload]
-        if profile
-        else None
-    )  # ty: ignore[no-matching-overload]
-    from codeweaver.server import get_settings, update_settings
-
-    settings = get_settings()
-    # Don't pass config_file when creating a new config - the file doesn't exist yet
-    _settings_view = update_settings(
-        **({"project_path": project_path} | (deployment_profile or {}))  # type: ignore
-    )
-    # The reference should reflect the updated settings, but we'll refetch to be sure
-    settings = get_settings()
 
     # Save to TOML file
     settings.save_to_file(config_path)

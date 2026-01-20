@@ -25,12 +25,19 @@ from importlib import util
 from pathlib import Path
 from typing import Any, Literal, overload
 
+from integration.conftest import HAS_FASTEMBED
 from pydantic import AnyHttpUrl
 from pydantic.dataclasses import as_dict
 from pydantic_ai.settings import ModelSettings as AgentModelSettings
 from qdrant_client.models import SparseVectorParams, VectorParams
 
-from codeweaver.core import BaseDataclassEnum, ModelName, Provider, generate_collection_name
+from codeweaver.core import (
+    BaseDataclassEnum,
+    ModelName,
+    Provider,
+    generate_collection_name,
+    get_user_data_dir,
+)
 from codeweaver.providers.config.clients import QdrantClientOptions
 from codeweaver.providers.config.embedding import (
     FastEmbedEmbeddingConfig,
@@ -44,7 +51,6 @@ from codeweaver.providers.config.kinds import (
     CollectionConfig,
     DataProviderSettings,
     EmbeddingProviderSettings,
-    MemoryVectorStoreProviderSettings,
     QdrantVectorStoreProviderSettings,
     RerankingProviderSettings,
     SparseEmbeddingProviderSettings,
@@ -75,7 +81,8 @@ def _default_collection_options(
         collection_name=generate_collection_name(
             is_backup=as_backup, project_name=project_name, project_path=project_path
         ),
-        vector_config={"dense": VectorParams(), "sparse": SparseVectorParams()},
+        vectors_config={"dense": VectorParams()},
+        sparse_vectors_config={"sparse": SparseVectorParams()},
     )
 
 
@@ -324,10 +331,8 @@ def _backup_profile(
 
     # NOTE: qdrant/bm25 doesn't require FASTEMBED -- FastEmbed can generate with it, but so can the qdrant_client itself
     # We lose true sparse embeddings with bm25, but it's a good lightweight backup option
-    embedding_model = "minishlab/potion-base-8M" if HAS_ST else "BAAI/bge-small-en-v1.5"
-    reranking_model = (
-        "cross-encoder/ms-marco-TinyBERT-L2-v2" if HAS_ST else "jinaai/jina-reranker-v1-tiny-en"
-    )
+    embedding_model = "minishlab/potion-base-8M" if HAS_ST else "jinaai/jina-embeddings-v2-small-en"
+    reranking_model = "jinaai/jina-reranker-v1-tiny-en"
     default_collection = _default_collection_options(
         as_backup=as_backup, project_name=project_name, project_path=project_path
     )
@@ -357,12 +362,12 @@ def _backup_profile(
 
     backup_settings["reranking"] = (
         RerankingProviderSettings(
-            provider=Provider.SENTENCE_TRANSFORMERS if HAS_ST else Provider.FASTEMBED,
+            provider=Provider.FASTEMBED if HAS_FASTEMBED else Provider.SENTENCE_TRANSFORMERS,
             model_name=ModelName(reranking_model),
             reranking_config=(
-                SentenceTransformersRerankingConfig(model_name=ModelName(reranking_model))
-                if HAS_ST
-                else FastEmbedRerankingConfig(model_name=ModelName(reranking_model))
+                FastEmbedRerankingConfig(model_name=ModelName(reranking_model))
+                if HAS_FASTEMBED
+                else SentenceTransformersRerankingConfig(model_name=ModelName(reranking_model))
             ),
             as_backup=as_backup,
         ),
@@ -377,14 +382,13 @@ def _backup_profile(
             ),
         )
     else:
-        backup_settings["vector_store"] = MemoryVectorStoreProviderSettings(
-            provider=Provider.MEMORY,
-            client_options=QdrantClientOptions(location=":memory:"),
+        backup_settings["vector_store"] = QdrantVectorStoreProviderSettings(
+            provider=Provider.QDRANT,
+            client_options=QdrantClientOptions(
+                path=str(get_user_data_dir() / f"backup-{project_name}")
+            ),
             collection=default_collection,
             as_backup=as_backup,
-            in_memory_config=MemoryVectorStoreProviderSettings._default_memory_config(
-                project_name=project_name, project_path=project_path
-            ),
         )
 
     return ProviderSettingsDict(**backup_settings)

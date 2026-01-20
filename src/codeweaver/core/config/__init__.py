@@ -58,9 +58,11 @@ if TYPE_CHECKING:
         TelemetrySettings,
         TelemetrySettingsDict,
     )
+    from codeweaver.core.config.types import CodeWeaverSettingsDict
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "CodeWeaverCoreSettings": (__spec__.parent, "core_settings"),
+    "CodeWeaverSettingsDict": (__spec__.parent, "types"),
     "ConfigurableComponent": (__spec__.parent, "resolver"),
     "ConfigurationValue": (__spec__.parent, "resolver"),
     "DefaultLoggingSettings": (__spec__.parent, "_logging"),
@@ -96,6 +98,7 @@ __getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
 
 __all__ = (
     "CodeWeaverCoreSettings",
+    "CodeWeaverSettingsDict",
     "ConfigurableComponent",
     "ConfigurationValue",
     "DefaultLoggingSettings",

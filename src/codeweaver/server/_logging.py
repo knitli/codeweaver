@@ -16,7 +16,7 @@ from codeweaver.core import DefaultLoggingSettings, LoggingSettingsDict, Unset
 
 if TYPE_CHECKING:
     from codeweaver.core import DictView
-    from codeweaver.server.config import CodeWeaverSettingsDict
+    from codeweaver.core.config.types import CodeWeaverSettingsDict
 
 
 def _set_log_levels():
@@ -77,7 +77,7 @@ def setup_logger(settings: DictView[CodeWeaverSettingsDict]) -> logging.Logger:
         else settings.get("logging", {})
     )
     level = app_logger_settings.get("level", 30)
-    rich = app_logger_settings.get("use_rich", True)
+    use_rich = app_logger_settings.get("use_rich", True)
     rich_options = app_logger_settings.get("rich_options", {})
     logging_kwargs = app_logger_settings.get("dict_config", None)
     from codeweaver.core import setup_logger as setup_global_logging
@@ -85,7 +85,7 @@ def setup_logger(settings: DictView[CodeWeaverSettingsDict]) -> logging.Logger:
     app_logger = setup_global_logging(
         name="codeweaver",
         level=level,
-        rich=rich,
+        use_rich=use_rich,
         rich_options=rich_options,
         logging_kwargs=logging_kwargs,
     )

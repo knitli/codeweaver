@@ -11,9 +11,10 @@ from collections.abc import Sequence
 from functools import cache
 from threading import Lock
 from types import MappingProxyType
-from typing import NamedTuple
+from typing import Any, Literal, NamedTuple, TypedDict
 
 from pydantic import PositiveInt
+from qdrant_client.models import CollectionParams
 
 from codeweaver.core import BaseEnum, InvalidEmbeddingModelError, ModelName, ModelNameT
 from codeweaver.providers.config import EmbeddingProviderSettings, SparseEmbeddingProviderSettings
@@ -21,7 +22,10 @@ from codeweaver.providers.embedding.capabilities.base import (
     EmbeddingModelCapabilities,
     SparseEmbeddingModelCapabilities,
 )
+from codeweaver.providers.embedding.providers.base import EmbeddingProvider, SparseEmbeddingProvider
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
+from codeweaver.providers.reranking.providers.base import RerankingProvider
+from codeweaver.providers.vector_stores.base import VectorStoreProvider
 
 
 type EmbeddingCapabilityType = EmbeddingModelCapabilities | SparseEmbeddingModelCapabilities
@@ -114,7 +118,7 @@ class BaseSparseEmbeddingCapabilityResolver(
 
 
 @cache
-def get_all_provider_types() -> tuple[type, ...]:
+def get_all_provider_config_types() -> tuple[type, ...]:
     """Get all defined provider types.
 
     Returns:
@@ -160,6 +164,20 @@ class ConfiguredCapability(NamedTuple):
     async def datatype(self) -> str | None:
         return await self.config.embedding_config.get_datatype()
 
+    async def distance(self) -> Literal["Cosine", "Dot", "Euclidean", "Manhattan"] | None:
+        if self.is_sparse or self.is_idf:
+            return None
+        if self.capability:
+            return next(
+                (
+                    metric
+                    for metric in self.capability.preferred_metrics
+                    if metric.lower() in ("cosine", "dot", "euclidean", "manhattan")
+                ),
+                "Cosine",
+            )
+        return "Cosine"
+
     async def dimension(self) -> PositiveInt | None:
         if isinstance(self.capability, SparseEmbeddingModelCapabilities) or isinstance(
             self.config, SparseEmbeddingProviderSettings
@@ -189,6 +207,28 @@ class ConfiguredCapability(NamedTuple):
             closest_value = min(allowed_values, key=lambda x: abs(x - configured_dimension))
             configured_dimension = closest_value
         return configured_dimension
+
+    @property
+    def is_dense(self) -> bool:
+        return self.capability is not None and not isinstance(
+            self.capability, SparseEmbeddingModelCapabilities
+        )
+
+    @property
+    def is_sparse(self) -> bool:
+        return self.capability is not None and isinstance(
+            self.capability, SparseEmbeddingModelCapabilities
+        )
+
+    @property
+    def is_idf(self) -> bool:
+        return (
+            self.is_sparse
+            and self.capability is not None
+            and "bm25" in str(self.capability.name).lower()
+            if self.capability is not None
+            else False
+        )
 
 
 class EmbeddingCapabilityGroup(NamedTuple):
@@ -250,10 +290,95 @@ class EmbeddingCapabilityGroup(NamedTuple):
     def sparse_model(self) -> ModelNameT | None:
         """Get the name of the sparse embedding model."""
         return self.sparse.model_name
+
     @property
     def idf_model(self) -> ModelNameT | None:
         """Get the name of the IDF embedding model."""
         return self.idf.model_name if self.idf else None
+
+    async def as_vector_params(self) -> CollectionParams:
+        """Convert the embedding capability group to Qdrant collection parameters."""
+        params: dict[str, Any] = {}
+        if self.dense:
+            size = await self.dense.dimension()
+            datatype = await self.dense.datatype()
+            quantization = {"scalar": {"type": "uint8"}} if datatype == "uint8" else None
+            distance = await self.dense.distance()
+            params["vectors"] = {
+                "dense": {
+                    "size": size,
+                    "distance": distance,
+                    "quantization": quantization,
+                    "datatype": datatype,
+                }
+            }
+        if self.sparse:
+            datatype = await self.sparse.datatype()
+            params["sparse_vectors"] = {"sparse": {"datatype": datatype}}
+        if self.idf:
+            datatype = await self.idf.datatype()
+            params["sparse_vectors"] = {"idf": {"datatype": datatype, "modifier": "idf"}}
+
+        return CollectionParams.model_construct(**params)
+
+
+class ModelNameDict(TypedDict, total=False):
+    dense: ModelNameT | None
+    sparse: ModelNameT | None
+    reranking: ModelNameT | None
+
+
+class ModelCapDict(TypedDict, total=False):
+    dense: EmbeddingModelCapabilities | None
+    sparse: SparseEmbeddingModelCapabilities | None
+    reranking: RerankingModelCapabilities | None
+
+
+class SearchPackage:
+    """Represents a complete package of CodeWeaver providers."""
+
+    embedding: EmbeddingProvider
+
+    sparse_embedding: SparseEmbeddingProvider
+
+    reranking: RerankingProvider
+
+    vector_store: VectorStoreProvider
+
+    capabilities: EmbeddingCapabilityGroup
+
+    def __init__(
+        self,
+        embedding: EmbeddingProvider,
+        sparse_embedding: SparseEmbeddingProvider,
+        reranking: RerankingProvider,
+        vector_store: VectorStoreProvider,
+        capabilities: EmbeddingCapabilityGroup,
+    ):
+        """Initializes a SearchPackage with the given providers and capabilities."""
+        self.embedding = embedding
+        self.sparse_embedding = sparse_embedding
+        self.reranking = reranking
+        self.vector_store = vector_store
+        self.capabilities = capabilities
+
+    @property
+    def model_names(self) -> ModelNameDict:
+        """Get the names of the models used in this search package."""
+        return ModelNameDict(
+            dense=self.capabilities.dense_model,
+            sparse=self.capabilities.sparse_model or self.capabilities.idf_model,
+            reranking=ModelName(self.reranking.model_name or self.reranking.config.model_name),
+        )
+
+    @property
+    def caps(self) -> ModelCapDict:
+        """Get the capabilities of the models used in this search package."""
+        return ModelCapDict(
+            dense=self.capabilities.dense.capability if self.capabilities.dense else None,  # ty:ignore[invalid-argument-type]
+            sparse=self.capabilities.sparse.capability if self.capabilities.sparse else None,  # ty:ignore[invalid-argument-type]
+            reranking=self.reranking.caps,
+        )
 
 
 __all__ = (
@@ -262,4 +387,5 @@ __all__ = (
     "BaseSparseEmbeddingCapabilityResolver",
     "CircuitBreakerState",
     "EmbeddingCapabilityGroup",
+    "SearchPackage",
 )

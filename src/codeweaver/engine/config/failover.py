@@ -16,6 +16,8 @@ from codeweaver.core import BasedModel
 
 MAX_RAM_MB = 2048
 
+FIVE_MINUTES_IN_SECONDS = 300
+
 
 class FailoverSettings(BasedModel):
     """Settings for vector store failover and service resilience.
@@ -28,7 +30,7 @@ class FailoverSettings(BasedModel):
 
     We designed the backup system to be very lightweight so that it can run on most systems without significant resource overhead. However, if you are running on a very constrained system or have specific requirements, you can adjust the settings below to better suit your needs. You may also want to disable the failover system if you are using all local providers as your primary providers.
 
-    Importantly, while the system is lightweight, it's still extremely capable -- our backup is more robust than most search tools' primary systems. It maPositiveIntains full hybrid multivector search and reranking support, ensuring that your search experience remains seamless even during failover events.
+    Importantly, while the system is lightweight, it's still extremely capable -- our backup is more robust than most search tools' primary systems. It has full hybrid multivector search and reranking support, ensuring that your search experience remains seamless even during failover events.
     """
 
     disable_failover: Annotated[
@@ -41,19 +43,12 @@ class FailoverSettings(BasedModel):
     backup_sync: Annotated[
         PositiveInt,
         Field(description="PositiveInterval in seconds for syncing primary state to backup"),
-    ] = 300
+    ] = FIVE_MINUTES_IN_SECONDS
 
-    auto_restore: Annotated[
-        bool,
-        Field(
-            description="Whether to automatically restore to primary store when it becomes healthy"
-        ),
-    ] = True
-
-    restore_delay: Annotated[
+    recovery_window_sec: Annotated[
         PositiveInt,
         Field(description="Seconds to wait after primary becomes healthy before restoring"),
-    ] = 60
+    ] = FIVE_MINUTES_IN_SECONDS
 
     max_memory_mb: Annotated[
         PositiveInt,
@@ -69,7 +64,7 @@ class FailoverSettingsDict(TypedDict, total=False):
     disable_failover: NotRequired[bool]
     backup_sync: NotRequired[PositiveInt]
     auto_restore: NotRequired[bool]
-    restore_delay: NotRequired[PositiveInt]
+    recovery_window_sec: NotRequired[PositiveInt]
     max_memory_mb: NotRequired[PositiveInt]
 
 

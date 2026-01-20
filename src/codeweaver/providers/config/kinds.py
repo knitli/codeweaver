@@ -22,9 +22,19 @@ import logging
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Annotated, Any, Literal, NotRequired, Required, Self, TypedDict, cast
+from typing import (
+    TYPE_CHECKING,
+    Annotated,
+    Any,
+    ClassVar,
+    Literal,
+    NotRequired,
+    Required,
+    Self,
+    TypedDict,
+    cast,
+)
 
-from beartype.typing import ClassVar
 from pydantic import (
     AnyUrl,
     ConfigDict,
@@ -39,20 +49,24 @@ from pydantic import (
     model_validator,
 )
 from pydantic_ai.settings import ModelSettings as AgentModelSettings
-from qdrant_client.grpc import ProductQuantization, ScalarQuantization
 from qdrant_client.models import (
     BinaryQuantization,
+    CollectionParams,
     Document,
     HnswConfig,
     OptimizersConfig,
+    ProductQuantization,
+    ScalarQuantization,
     SparseVectorParams,
     TokenizerType,
     VectorParams,
     WalConfig,
 )
 from qdrant_client.models import Bm25Config as QdrantBm25Config
+from qdrant_client.models import CollectionConfig as QdrantCollectionConfig
 
 from codeweaver.core import (
+    INJECTED,
     AnonymityConversion,
     BasedModel,
     CodeWeaverDeveloperError,
@@ -67,6 +81,8 @@ from codeweaver.core import (
     get_user_cache_dir,
     get_user_state_dir,
 )
+from codeweaver.core.utils.checks import is_local_host
+from codeweaver.providers import EmbeddingCapabilityGroupDep
 from codeweaver.providers.config.clients import (
     BedrockClientOptions,
     ClientOptions,
@@ -89,6 +105,11 @@ from codeweaver.providers.config.utils import (
 )
 
 
+if TYPE_CHECKING:
+    from codeweaver.providers.types import EmbeddingCapabilityGroup
+    from codeweaver.providers.vector_stores.metadata import CollectionMetadata
+
+
 logger = logging.getLogger(__name__)
 
 type LiteralSDKClient = Literal[
@@ -99,6 +120,11 @@ type LiteralSDKClient = Literal[
     SDKClient.SENTENCE_TRANSFORMERS,
     SDKClient.QDRANT,
 ]
+
+
+def _get_embedding_group(group: EmbeddingCapabilityGroupDep = INJECTED) -> EmbeddingCapabilityGroup:
+    """Get the embedding capability group, using dependency injection."""
+    return group
 
 
 # ===========================================================================
@@ -293,6 +319,15 @@ class BaseProviderSettings(BasedModel, ABC):
 
     def _telemetry_keys(self) -> None:
         return None
+
+    @abstractmethod
+    def is_cloud(self) -> bool:
+        """Return True if the provider settings are for a cloud deployment."""
+        raise NotImplementedError("is_cloud must be implemented by subclasses.")
+
+    def is_local(self) -> bool:
+        """Return True if the provider settings are for a local deployment."""
+        return not self.is_cloud
 
     @abstractmethod
     @computed_field
@@ -502,8 +537,22 @@ class _DocumentRepr(BasedModel):
         return [Document(text=text, model=self.model, options=options) for text in texts]
 
 
+def _deep_merge(dict1: dict[str, Any], dict2: dict[str, Any]) -> dict[str, Any]:
+    """Recursively merge two dictionaries."""
+    result = dict1.copy()
+    for key, value in dict2.items():
+        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            result[key] = _deep_merge(result[key], value)
+        else:
+            result[key] = value
+    return result
+
+
 class CollectionConfig(BasedModel, total=False):
-    """Collection configuration for Qdrant and in-memory vector stores."""
+    """Collection configuration for Qdrant and in-memory vector stores.
+
+    NOTE: The vector configurations share many of the same properties as these collection parameters. If vector configurations exist, such as for hnsw_config or quantization_config, they will override the corresponding collection parameters.
+    """
 
     collection_name: str | None = None
     """Collection name override. Defaults to a unique name based on the project name."""
@@ -520,13 +569,50 @@ class CollectionConfig(BasedModel, total=False):
     wal_config: WalConfig | None = None
     """Configuration for the write-ahead log (WAL) used in the collection. We have no default configuration for the WAL at this time. Qdrant's defaults are good for nearly all cases, but you can customize it for performance tuning, resource, or durability requirements."""
 
-    optimizers_config: OptimizersConfig | None = None
+    optimizer_config: OptimizersConfig | None = None
     """Configuration for optimizers used in the collection. No default configuration. Optimizing segments can increase throughput/concurrency at the cost of additional memory usage.  See https://qdrant.tech/documentation/concepts/optimizer/"""
 
     hnsw_config: HnswConfig | None = Field(
         default_factory=lambda: HnswConfig(m=24, ef_construct=130, payload_m=120)
     )
     """Configuration for HNSW (Hierarchical Navigable Small World) index used for approximate nearest neighbor search. We generally recommend you keep our defaults here, which we will tweak and fine-tune over time to get optimal performance for code search."""
+
+    _vectors_set: bool = PrivateAttr(default=False)
+
+    async def params(self) -> CollectionParams:
+        """Return the Qdrant collection parameters for this configuration."""
+        if not self._vectors_set:
+            await self.set_vector_params()
+        return CollectionParams.model_construct(
+            values={"vectors": self.vectors_config, "sparse_vectors": self.sparse_vectors_config}
+        )
+
+    async def set_vector_params(
+        self, embedding_group: EmbeddingCapabilityGroup | None = None
+    ) -> None:
+        """Assemble the vector parameters for the collection."""
+        embedding_group = embedding_group or _get_embedding_group()
+        params = await embedding_group.as_vector_params()
+        # TODO: Our merge here assumes they're using 'dense' and 'sparse' for the vector names, which may not always be the case.
+        self.vectors_config = _deep_merge(
+            dict(self.vectors_config or {}),
+            cast(dict[str, VectorParams], params.vectors.model_dump()),
+        )
+        self.sparse_vectors_config = _deep_merge(
+            dict(self.sparse_vectors_config or {}),
+            cast(dict[str, SparseVectorParams], params.sparse_vectors),
+        )
+        self._vectors_set = True
+
+    async def as_qdrant_config(self, metadata: CollectionMetadata) -> QdrantCollectionConfig:
+        """Convert the collection configuration to a QdrantCollectionConfig object."""
+        return QdrantCollectionConfig.model_validate({
+            "params": await self.params(),
+            "hnsw_config": self.hnsw_config,
+            "optimizer_config": self.optimizer_config,
+            "wal_config": self.wal_config,
+            "metadata": metadata,
+        })
 
 
 class _BaseQdrantVectorStoreProviderSettings(VectorStoreProviderSettings):
@@ -670,16 +756,16 @@ class _BaseQdrantVectorStoreProviderSettings(VectorStoreProviderSettings):
             next((k, v) for k, v in config.items() if isinstance(v, VectorParams)),
             ("dense", None),
         )
-        self.collection = self.collection or CollectionConfig(vector_config={})
+        self.collection = self.collection or CollectionConfig(vectors_config={})
         if (embedding_settings := resolved.get("provider.embedding")) is not None:
             dense_params = embedding_settings.embedding_config.as_vector_params()
             self._resolved_dimension = dense_params.size
             self._resolved_datatype = dense_params.datatype
             if dense_config:
                 dense_key = dense_key or "dense"
-                self.collection["vector_config"][dense_key] = dense_params  # ty:ignore[invalid-assignment]
+                self.collection["vectors_config"][dense_key] = dense_params  # ty:ignore[invalid-assignment]
         if (sparse_embedding_settings := resolved.get("provider.sparse_embedding")) is not None:
-            sparse_config = self.collection.get("vector_config", ())
+            sparse_config = self.collection.get("vectors_config", ())
             sparse_key, sparse_params = (
                 next((k, v) for k, v in sparse_config.items() if isinstance(v, SparseVectorParams)),
                 None,
@@ -689,7 +775,11 @@ class _BaseQdrantVectorStoreProviderSettings(VectorStoreProviderSettings):
             )
             if sparse_params:
                 sparse_key = sparse_key or "sparse"
-                self.collection["vector_config"][sparse_key] = sparse_vector_params  # ty:ignore[invalid-assignment]
+                self.collection["vectors_config"][sparse_key] = sparse_vector_params  # ty:ignore[invalid-assignment]
+
+    def is_cloud(self) -> bool:
+        """Return True if the provider settings are for a cloud deployment."""
+        return not self.is_local_qdrant or self.provider != Provider.MEMORY
 
     @computed_field
     @property
@@ -702,6 +792,9 @@ class _BaseQdrantVectorStoreProviderSettings(VectorStoreProviderSettings):
     def client(self) -> Literal[SDKClient.QDRANT]:
         """Return the Qdrant SDKClient enum member."""
         return SDKClient.QDRANT
+
+    async def get_collection_config(self, metadata: CollectionMetadata) -> QdrantCollectionConfig:
+        return await self.collection.as_qdrant_config(metadata=metadata)
 
 
 class QdrantVectorStoreProviderSettings(_BaseQdrantVectorStoreProviderSettings):
@@ -781,6 +874,27 @@ class MemoryVectorStoreProviderSettings(_BaseQdrantVectorStoreProviderSettings):
 # ===========================================================================
 
 
+def _is_cloud_provider(_instance: BaseProviderSettings) -> bool:
+    if _instance.provider.always_cloud or not _instance.provider.always_local:
+        return True
+    return bool(
+        _instance.client_options
+        and (
+            url := getattr(
+                _instance.client_options,
+                "url",
+                getattr(
+                    _instance.client_options,
+                    "endpoint",
+                    getattr(_instance.client_options, "base_url", None),
+                ),
+            )
+        )
+        is not None
+        and not is_local_host(url)
+    )
+
+
 class BaseEmbeddingProviderSettings(BaseProviderSettings, ABC):
     """Settings for (dense) embedding models. It validates that the model and provider settings are compatible and complete, reconciling environment variables and config file settings as needed."""
 
@@ -793,6 +907,10 @@ class BaseEmbeddingProviderSettings(BaseProviderSettings, ABC):
     def get_query_embed_kwargs(self) -> dict[str, Any]:
         """Get keyword arguments for query embedding requests based on the provider settings."""
         raise NotImplementedError("get_query_embed_kwargs must be implemented by subclasses.")
+
+    def is_cloud(self) -> bool:
+        """Return True if the provider settings are for a cloud deployment."""
+        return _is_cloud_provider(self)
 
 
 class EmbeddingProviderSettings(BaseEmbeddingProviderSettings):
@@ -998,6 +1116,10 @@ class RerankingProviderSettings(BaseProviderSettings):
         # currently all reranking providers only use their own clients
         return cast(LiteralSDKClient, SDKClient.from_string(self.provider.variable))
 
+    def is_cloud(self) -> bool:
+        """Return True if the provider is a cloud provider, False otherwise."""
+        return _is_cloud_provider(self)
+
 
 class FastEmbedRerankingProviderSettings(FastEmbedProviderMixin, RerankingProviderSettings):
     """Provider settings for FastEmbed reranking models."""
@@ -1037,6 +1159,10 @@ class DataProviderSettings(BaseProviderSettings):
         """Return the data SDKClient enum member."""
         raise NotImplementedError("Data provider client resolution is not yet implemented.")
 
+    def is_cloud(self) -> bool:
+        """Return True if the provider is a cloud provider, False otherwise."""
+        return _is_cloud_provider(self)
+
 
 # ===========================================================================
 # *                       Agent Provider Settings
@@ -1065,6 +1191,10 @@ class AgentProviderSettings(BaseProviderSettings):
     def client(self) -> LiteralSDKClient:
         """Return the agent SDKClient enum member."""
         raise NotImplementedError("Agent provider client resolution is not yet implemented.")
+
+    def is_cloud(self) -> bool:
+        """Return True if the provider is a cloud provider, False otherwise."""
+        return _is_cloud_provider(self)
 
 
 __all__ = (

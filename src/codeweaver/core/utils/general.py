@@ -13,19 +13,10 @@ import os
 from collections.abc import Callable, Iterable
 from functools import cache
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import cast
 
 from codeweaver.core.types import BaseCodeWeaverSettings
 from codeweaver.core.types.aliases import CategoryName, LiteralStringT
-
-
-if TYPE_CHECKING:
-    from importlib.util import find_spec
-
-    if find_spec("code-weaver-server") is not None:
-        from codeweaver_server import CodeWeaverSettingsDict
-    else:
-        CodeWeaverSettingsDict = dict[str, object]
 
 
 @cache

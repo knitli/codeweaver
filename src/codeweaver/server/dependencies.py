@@ -23,7 +23,7 @@ from codeweaver.core.dependencies import (
 )
 from codeweaver.core.di import INJECTED, dependency_provider, depends
 from codeweaver.engine.dependencies import FailoverServiceDep, IndexingServiceDep
-from codeweaver.providers import AllProvidersDep
+from codeweaver.providers import AllProviderSettingsDep
 
 
 if TYPE_CHECKING:
@@ -42,7 +42,7 @@ def _create_health_service(
     statistics: StatisticsDep = INJECTED,
     indexer: IndexingServiceDep = INJECTED,
     failover_manager: FailoverServiceDep = INJECTED,
-    providers: AllProvidersDep = INJECTED,
+    providers: AllProviderSettingsDep = INJECTED,
 ) -> HealthService:
     """Factory for health service."""
     from codeweaver.server.health.health_service import HealthService

@@ -15,11 +15,9 @@ from typing import TYPE_CHECKING, Literal
 
 from codeweaver.core import ConfigLanguage, LanguageName, SearchStrategy, SemanticSearchLanguage
 from codeweaver.core.di import INJECTED
-from codeweaver.providers import (
-    EmbeddingProviderDep,
-    SparseEmbeddingProviderDep,
-    VectorStoreProviderDep,
-)
+from codeweaver.providers.embedding.providers.base import EmbeddingProvider, SparseEmbeddingProvider
+from codeweaver.providers.reranking.providers.base import RerankingProvider
+from codeweaver.providers.vector_stores.base import VectorStoreProvider
 from codeweaver.server.agent_api.find_code.intent import IntentType
 from codeweaver.server.dependencies import CodeWeaverStateDep
 
@@ -193,9 +191,10 @@ def build_error_response(
     error: Exception,
     query_intent: IntentType | None,
     execution_time_ms: float,
-    vector_store: VectorStoreProviderDep,
-    dense: EmbeddingProviderDep,
-    sparse: SparseEmbeddingProviderDep,
+    vector_store: VectorStoreProvider | None,
+    dense: EmbeddingProvider | None,
+    reranking: RerankingProvider | None,
+    sparse: SparseEmbeddingProvider | None,
 ) -> FindCodeResponseSummary:
     """Build an error response with graceful degradation.
 
@@ -215,7 +214,7 @@ def build_error_response(
     capabilities = vector_store.embedding_capabilities
     mode = (
         "hybrid"
-        if ((dense := capabilities.get("dense")) and (sparse := capabilities.get("sparse")))
+        if ((dense := capabilities.dense) and (sparse := capabilities.sparse))  # ty:ignore[invalid-assignment]
         else ("dense_only" if dense else "sparse_only" if sparse else "unknown")
     )
     error_message = f"Critical error: {type(error).__name__}: {str(error)!s}"
@@ -227,7 +226,15 @@ def build_error_response(
         total_results=0,
         token_count=0,
         execution_time_ms=execution_time_ms,
-        search_strategy=(SearchStrategy.KEYWORD_FALLBACK,),
+        search_strategy=(
+            SearchStrategy.HYBRID_SEARCH
+            if mode == "hybrid"
+            else SearchStrategy.DENSE_ONLY
+            if mode == "dense_only"
+            else SearchStrategy.SPARSE_ONLY
+            if mode == "sparse_only"
+            else SearchStrategy.KEYWORD_FALLBACK,
+        ),
         languages_found=(),
         status="error",
         warnings=[(error_message if len(error_message) <= 200 else f"{error_message[:200]}...")],

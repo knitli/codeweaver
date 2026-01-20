@@ -246,7 +246,7 @@ def _set_symbol(data: Any) -> str | None:
         and isinstance(symbol, str)
         and (0 < len(symbol.strip()) < 20)
     ):
-        return symbol
+        return symbol if len(symbol.strip()) < 20 else symbol.strip()[:20]
     return None
 
 
@@ -275,6 +275,11 @@ class SemanticMetadata(BasedModel):
             description="""Whether the node is a partial node. Partial nodes are created when the node is too large for the context window."""
         ),
     ] = False
+
+    def __init__(self, **data: Any) -> None:
+        if not data.get("symbol"):
+            data["symbol"] = _set_symbol(data)
+        super().__init__(**data)
 
     def _telemetry_keys(self) -> None:
         return None

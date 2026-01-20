@@ -18,10 +18,12 @@ from pydantic import Field, NonNegativeFloat, NonNegativeInt, PrivateAttr, compu
 from codeweaver.core import (
     CodeWeaverSettingsType,
     DictView,
+    SettingsMapDep,
     Unset,
     elapsed_time_to_human_readable,
-    lazy_import,
 )
+from codeweaver.core.config.types import CodeWeaverSettingsDict
+from codeweaver.core.di.depends import INJECTED
 from codeweaver.core.types import BasedModel
 from codeweaver.server import FastMcpHttpServerSettings, FastMcpStdioServerSettings
 from codeweaver.server.config import (
@@ -37,20 +39,20 @@ type FastMCPServerSettings = FastMcpHttpServerSettings | FastMcpStdioServerSetti
 if TYPE_CHECKING:
     from fastmcp import FastMCP
 
-get_settings_map = lazy_import("codeweaver.server.config", "get_settings_map")
 
 logger = logging.getLogger(__name__)
 
 
+def _get_settings_map(settings: SettingsMapDep = INJECTED) -> DictView[CodeWeaverSettingsDict]:
+    """Get the current settings map."""
+    return settings
+
+
 def _get_fastmcp_settings_map(*, http: bool = False) -> DictView[FastMcpServerSettingsDict]:
     """Get the current FastMCP server settings."""
-    from codeweaver.server.config import (
-        FastMcpHttpServerSettings,
-        FastMcpStdioServerSettings,
-        get_settings_map,
-    )
+    from codeweaver.server.config import FastMcpHttpServerSettings, FastMcpStdioServerSettings
 
-    settings_map = get_settings_map()
+    settings_map = _get_settings_map()
     if http:
         return (
             settings_map.get_subview("mcp_server")

@@ -20,17 +20,41 @@ type JinaaiProvider = Literal[Provider.FASTEMBED, Provider.SENTENCE_TRANSFORMERS
 
 CAP_MAP: dict[
     Literal[
+        "jinaai/jina-embeddings-v2-small-en",
         "jinaai/jina-embeddings-v2-base-code",
         "jinaai/jina-embeddings-v3",
         "jinaai/jina-embeddings-v4",
     ],
     tuple[JinaaiProvider, ...],
 ] = {
+    "jinaai/jina-embeddings-v2-small-en": (Provider.FASTEMBED,),
     "jinaai/jina-embeddings-v2-base-code": (Provider.FASTEMBED,),
     "jinaai/jina-embeddings-v3": (Provider.FASTEMBED,),
     "jinaai/jina-embeddings-v4": (Provider.SENTENCE_TRANSFORMERS,),
 }
 
+JINAAI_JINA_EMBEDDINGS_V2_SMALL_EN_CAPABILITIES: PartialCapabilities = {
+    "name": "jinaai/jina-embeddings-v2-small-en",
+    "default_dimension": 512,
+    "context_window": 8192,
+    "preferred_metrics": ("cosine", "dot", "euclidean"),
+    "supports_context_chunk_embedding": False,
+    "tokenizer": "tokenizers",
+    "tokenizer_model": "Xenova/jina-embeddings-v2-small-en",
+    "default_dtype": "float",
+    "output_dtypes": ("float",),
+    "version": 2,
+    "supports_custom_prompts": False,
+    "custom_query_prompt": None,
+    "custom_document_prompt": None,
+    "other": {
+        "adapted_from": "jina-bert-base-en-v1",
+        "modalities": ["text"],
+        "open_weights": True,
+        "reference": "https://huggingface.co/Xenova/jina-embeddings-v2-small-en",
+        "release_date": "2023-09-27",
+    },
+}
 
 JINAAI_JINA_EMBEDDINGS_V2_BASE_CODE_CAPABILITIES: PartialCapabilities = {
     "name": "jinaai/jina-embeddings-v2-base-code",
@@ -156,6 +180,7 @@ JINAAI_JINA_EMBEDDINGS_V4_CAPABILITIES: PartialCapabilities = {
 
 
 ALL_CAPABILITIES: tuple[PartialCapabilities, ...] = (
+    JINAAI_JINA_EMBEDDINGS_V2_SMALL_EN_CAPABILITIES,
     JINAAI_JINA_EMBEDDINGS_V2_BASE_CODE_CAPABILITIES,
     JINAAI_JINA_EMBEDDINGS_V3_CAPABILITIES,
     JINAAI_JINA_EMBEDDINGS_V4_CAPABILITIES,

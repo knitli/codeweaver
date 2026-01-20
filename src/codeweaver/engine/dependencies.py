@@ -42,7 +42,6 @@ from codeweaver.engine.config import (
 from codeweaver.providers import (
     BackupEmbeddingProviderDep,
     BackupTokenizerDep,
-    BackupVectorStoreProviderDep,
     EmbeddingProviderDep,
     SparseEmbeddingProviderDep,
     TokenizerDep,
@@ -76,7 +75,7 @@ def _get_settings(settings: SettingsDep = INJECTED) -> CodeWeaverSettingsType:
 @dependency_provider(IndexerSettings, scope="singleton")
 def _get_indexer_settings(settings: SettingsDep = INJECTED) -> IndexerSettings:
     """Factory for indexing service settings."""
-    if settings.indexer is not Unset:
+    if settings.indexer is not Unset:  # ty:ignore[unresolved-attribute]
         return settings.indexer  # type: ignore
     return IndexerSettings.model_validate(DefaultIndexerSettings)
 
@@ -84,7 +83,7 @@ def _get_indexer_settings(settings: SettingsDep = INJECTED) -> IndexerSettings:
 @dependency_provider(ChunkerSettings, scope="singleton")
 def _get_chunker_settings(settings: SettingsDep = INJECTED) -> ChunkerSettings:
     """Factory for chunking service settings."""
-    if settings.chunker is not Unset:
+    if settings.chunker is not Unset:  # ty:ignore[unresolved-attribute]
         return settings.chunker  # type: ignore
     return ChunkerSettings.model_validate(DefaultChunkerSettings)
 
@@ -92,7 +91,7 @@ def _get_chunker_settings(settings: SettingsDep = INJECTED) -> ChunkerSettings:
 @dependency_provider(FailoverSettings, scope="singleton")
 def _get_failover_settings(settings: SettingsDep = INJECTED) -> FailoverSettings:
     """Factory for failover service settings."""
-    if settings.failover is not Unset:
+    if settings.failover is not Unset:  # ty:ignore[unresolved-attribute]
         return settings.failover  # type: ignore
     return FailoverSettings.model_validate(DefaultFailoverSettings)
 

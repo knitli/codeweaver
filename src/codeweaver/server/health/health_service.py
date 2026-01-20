@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING, Any, Literal, NoReturn, cast
 from codeweaver.core import INJECTED, ConfigurationError, StatisticsDep
 from codeweaver.engine.dependencies import FailoverServiceDep, IndexingServiceDep
 from codeweaver.engine.services.indexing_service import IndexingService
-from codeweaver.providers import AllProvidersDep
+from codeweaver.providers import AllProviderSettingsDep
 from codeweaver.server.health.models import (
     EmbeddingProviderServiceInfo,
     FailoverInfo,
@@ -36,9 +36,12 @@ from codeweaver.server.health.models import (
 
 if TYPE_CHECKING:
     from codeweaver.core import FileStatistics, SessionStatistics
-    from codeweaver.providers.dependencies import ProviderDict
 
 logger = logging.getLogger(__name__)
+
+
+def _get_statistics(statistics: StatisticsDep) -> SessionStatistics:
+    return statistics
 
 
 class HealthService:
@@ -47,7 +50,7 @@ class HealthService:
     def __init__(
         self,
         *,
-        providers: AllProvidersDep = INJECTED,
+        providers: AllProviderSettingsDep = INJECTED,
         statistics: StatisticsDep = INJECTED,
         indexer: IndexingServiceDep = INJECTED,
         failover_manager: FailoverServiceDep = INJECTED,
@@ -82,53 +85,6 @@ class HealthService:
         """Add a language to the set of indexed languages."""
         self._indexed_languages.add(language)
 
-    async def _resolve_dependencies(self) -> None:
-        """Resolve dependencies if they were provided as Depends objects."""
-        from codeweaver.core import SessionStatistics, get_container, is_depends_marker
-        from codeweaver.engine.services.failover_service import FailoverService
-        from codeweaver.engine.services.indexing_service import IndexingService
-        from codeweaver.providers.dependencies import ProviderDict
-
-        container = get_container()
-        logger.debug(
-            "HealthService resolving dependencies. Statistics type: %s", type(self._statistics)
-        )
-        if is_depends_marker(self._providers):
-            try:
-                # Resolve ProviderDict (singleton)
-                # Note: This relies on _get_all_providers being registered
-                providers = await container.resolve(ProviderDict)  # type: ignore
-                self._providers = cast("ProviderDict", providers)
-            except Exception as e:
-                logger.warning("Failed to resolve providers: %s", e)
-                # If we can't resolve providers, we are in trouble.
-                # But we shouldn't crash here if we can avoid it.
-                self._providers = {
-                    "embedding": (),
-                    "sparse_embedding": (),
-                    "reranking": (),
-                    "vector_store": (),
-                }
-
-        if is_depends_marker(self._statistics):
-            try:
-                self._statistics = await container.resolve(SessionStatistics)
-            except Exception:
-                from codeweaver.core import get_session_statistics
-
-                self._statistics = get_session_statistics()
-
-        if is_depends_marker(self._indexer):
-            try:
-                self._indexer = await container.resolve(IndexingService)
-            except Exception:
-                self._indexer = None
-        if is_depends_marker(self._failover_manager):
-            try:
-                self._failover_manager = await container.resolve(FailoverService)
-            except Exception:
-                self._failover_manager = None
-
     def _get_primary_provider(self, kind: str) -> Any | None:
         """Get the primary (non-backup) provider of a given kind."""
         if not self._providers:
@@ -142,7 +98,6 @@ class HealthService:
         Returns:
             HealthResponse with current system health
         """
-        await self._resolve_dependencies()
         indexing_info_task = asyncio.create_task(self._get_indexing_info())
         services_info_task = asyncio.create_task(self._get_services_info())
         statistics_info_task = asyncio.create_task(self._get_statistics_info())
@@ -350,8 +305,8 @@ class HealthService:
         if self._indexer:
             if hasattr(self._indexer, "session_statistics"):
                 session_stats = self._indexer.session_statistics
-                if session_stats.index_statistics:
-                    index_stats = session_stats.index_statistics
+                if session_stats.index_statistics:  # ty:ignore[unresolved-attribute]
+                    index_stats = session_stats.index_statistics  # ty:ignore[unresolved-attribute]
                     total_files = index_stats.total_unique_files
                     total_chunks, semantic_chunks, delimiter_chunks, file_chunks, avg_chunk_size = (
                         self._aggregate_chunk_statistics(index_stats)

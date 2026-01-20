@@ -79,7 +79,6 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "UvicornServerSettings": (__spec__.parent, "types"),
     "UvicornServerSettingsDict": (__spec__.parent, "types"),
     "default_for_transport": (__spec__.parent, "middleware"),
-
 })
 """Dynamically import submodules and classes for the config package.
 

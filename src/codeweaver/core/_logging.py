@@ -18,8 +18,7 @@ from typing import TYPE_CHECKING, Any, Literal
 from fastmcp import Context
 from pydantic_core import to_json
 
-from codeweaver.core.dependencies import LoggingSettingsDep
-from codeweaver.core.di import INJECTED
+from codeweaver.core import LoggingConfigDict
 from codeweaver.core.utils import get_user_state_dir, is_ci, is_tty, lazy_import
 
 
@@ -30,7 +29,6 @@ if TYPE_CHECKING:
     from codeweaver.core import LazyImport
 else:
     RichHandler: LazyImport[RichHandler] = lazy_import("rich.logging", "RichHandler")
-
 
 IS_CI = is_ci()
 IS_TTY = is_tty()
@@ -100,25 +98,24 @@ def _setup_config_logger(
     name: str = "codeweaver",
     *,
     level: int = logging.WARNING,
-    rich: bool = True,
+    use_rich: bool = True,
     rich_options: dict[str, Any] | None = None,
-    logging_kwargs: LoggingSettingsDep = INJECTED,
+    logging_kwargs: LoggingConfigDict | None = None,
     session_log: bool = True,
 ) -> logging.Logger:
     """Set up a logger with optional rich formatting."""
     if logging_kwargs:
         dictConfig({**logging_kwargs})  # ty: ignore[missing-typed-dict-key]
-        if rich and IS_TTY and not IS_CI:
-            logger = _setup_logger_with_rich_handler(rich_options, name, level)
-        else:
-            logger = logging.getLogger(name)
+    if use_rich and IS_TTY and not IS_CI:
+        logger = _setup_logger_with_rich_handler(rich_options, name, level)
+    else:
+        logger = logging.getLogger(name)
 
-        # Add session file handler if enabled
-        if session_log:
-            logger.addHandler(create_session_file_handler())
+    # Add session file handler if enabled
+    if session_log:
+        logger.addHandler(create_session_file_handler())
 
-        return logger
-    raise ValueError("No logging configuration provided")
+    return logger
 
 
 def _setup_logger_with_rich_handler(rich_options: dict[str, Any] | None, name: str, level: int):
@@ -136,9 +133,9 @@ def setup_logger(
     name: str = "codeweaver",
     *,
     level: int = logging.WARNING,
-    rich: bool = True,
+    use_rich: bool = True,
     rich_options: dict[str, Any] | None = None,
-    logging_kwargs: LoggingSettingsDep = INJECTED,
+    logging_kwargs: LoggingConfigDict | None = None,
     session_log: bool = True,
 ) -> logging.Logger:
     """Set up a logger with optional rich formatting.
@@ -146,7 +143,7 @@ def setup_logger(
     Args:
         name: Logger name
         level: Logging level
-        rich: Whether to use rich formatting for console output
+        use_rich: Whether to use rich formatting for console output
         rich_options: Options to pass to RichHandler
         logging_kwargs: Dictionary config for logging
         session_log: Whether to write logs to a session file (default True)
@@ -158,12 +155,12 @@ def setup_logger(
         return _setup_config_logger(
             name=name,
             level=level,
-            rich=rich,
+            use_rich=use_rich,
             rich_options=rich_options,
             logging_kwargs=logging_kwargs,
             session_log=session_log,
         )
-    if not rich:
+    if not use_rich:
         logging.basicConfig(level=level)
         logger = logging.getLogger(name)
         if session_log:

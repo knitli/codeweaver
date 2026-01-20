@@ -84,12 +84,8 @@ class FailoverService:
 
                 if state == CircuitBreakerState.OPEN and not self._failover_active:
                     await self._activate_failover()
-                elif (
-                    state == CircuitBreakerState.CLOSED
-                    and self._failover_active
-                    and self.settings.auto_restore
-                ):
-                    await asyncio.sleep(self.settings.restore_delay)
+                elif state == CircuitBreakerState.CLOSED and self._failover_active:
+                    await asyncio.sleep(self.settings.recovery_window_sec)
                     await self._restore_primary()
 
             except asyncio.CancelledError:

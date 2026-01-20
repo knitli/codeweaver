@@ -58,7 +58,7 @@ def uuid7_as_timestamp(
 
 try:
     # there are a handful of rare situations where users might not be able to install blake3
-    # luckily the apis are the same
+    # luckily the api is the same as the builtin blake2b
     from blake3 import blake3
 except ImportError:
     from hashlib import blake2b as blake3

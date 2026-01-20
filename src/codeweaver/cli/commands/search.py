@@ -13,7 +13,7 @@ import sys
 
 from collections.abc import Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Literal
+from typing import Annotated, Literal
 
 import cyclopts
 
@@ -25,7 +25,7 @@ from codeweaver.cli.dependencies import setup_cli_di
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
 from codeweaver.core import CodeWeaverError
 from codeweaver.core.dependencies import CodeWeaverSettingsType
-from codeweaver.providers.dependencies import AllProvidersDep
+from codeweaver.providers.dependencies import AllProviderSettingsDep
 from codeweaver.server.agent_api.find_code import (
     CodeMatch,
     FindCodeResponseSummary,
@@ -33,9 +33,6 @@ from codeweaver.server.agent_api.find_code import (
     find_code,
 )
 
-
-if TYPE_CHECKING:
-    from codeweaver.server import CodeWeaverSettingsDict
 
 _display: StatusDisplay = get_display()
 logger = logging.getLogger(__name__)
@@ -73,7 +70,7 @@ async def search(
     try:
         # Setup DI Container
         container = setup_cli_di(config_file, project_path, verbose=verbose)
-        
+
         # Resolve Settings
         settings = await container.resolve(CodeWeaverSettingsType)
 
@@ -84,7 +81,7 @@ async def search(
         # Resolve Providers
         # We explicitly resolve this because find_code expects a dictionary-like object (ProviderDict),
         # but if we don't pass it, the default value is the INJECTED marker, which doesn't behave like a dict.
-        providers = await container.resolve(AllProvidersDep)
+        providers = await container.resolve(AllProviderSettingsDep)
 
         response = await find_code(
             query=query,

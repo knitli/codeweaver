@@ -1385,8 +1385,7 @@ class SessionStatistics(BasedModel):
 
     def report(self) -> bytes:
         """Generate a report of the current statistics."""
-        return self.dump_json(
-            exclude_unset=True,
+        return self.model_dump_json(
             exclude_none=True,
             exclude={
                 "_successful_request_log",
@@ -1394,7 +1393,7 @@ class SessionStatistics(BasedModel):
                 "_successful_http_request_log",
                 "_failed_http_request_log",
             },
-        )
+        ).encode("utf-8")
 
     def log_request_from_context(
         self, context: Context | None = None, *, successful: bool = True

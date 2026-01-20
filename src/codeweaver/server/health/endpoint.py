@@ -10,6 +10,8 @@ import logging
 
 from typing import TYPE_CHECKING, Any, NoReturn
 
+from codeweaver.core.di.depends import INJECTED
+from codeweaver.server import CodeWeaverStateDep
 from codeweaver.server.health.models import (
     EmbeddingProviderServiceInfo,
     HealthResponse,
@@ -26,7 +28,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-async def get_health() -> HealthResponse | Any:
+async def get_health(ctx: CodeWeaverStateDep = INJECTED) -> HealthResponse | Any:
     """Health check endpoint returning server status and metrics.
 
     This endpoint provides comprehensive health information including:
@@ -47,7 +49,6 @@ async def get_health() -> HealthResponse | Any:
         raise RuntimeError("Health service not initialized")
 
     try:
-        ctx = get_state()
         # Get health service from app state
         if ctx.health_service is None:
             raise_runtime_error()

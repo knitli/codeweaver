@@ -90,7 +90,11 @@ if TYPE_CHECKING:
     from codeweaver.providers.config.kinds import _BaseQdrantVectorStoreProviderSettings
     from codeweaver.providers.embedding import EmbeddingProvider, SparseEmbeddingProvider
     from codeweaver.providers.reranking import RerankingProvider
-    from codeweaver.providers.types import ConfiguredCapability
+    from codeweaver.providers.types import (
+        ConfiguredCapability,
+        EmbeddingCapabilityGroup,
+        SearchPackage,
+    )
     from codeweaver.providers.vector_stores import (
         MemoryVectorStoreProvider,
         QdrantVectorStoreProvider,
@@ -144,8 +148,8 @@ def _get_provider_settings(settings: SettingsDep = INJECTED) -> ProviderSettings
     return cast(
         ProviderSettings,
         ProviderSettings.model_validate(AllDefaultProviderSettings)
-        if settings.provider is Unset
-        else settings.provider,
+        if settings.provider is Unset  # ty:ignore[unresolved-attribute]
+        else settings.provider,  # ty:ignore[unresolved-attribute]
     )
 
 
@@ -1023,7 +1027,7 @@ class ProviderDict(TypedDict):
 
 
 @dependency_provider(ProviderDict, scope="singleton")
-def _get_all_providers(
+def _get_all_provider_settings(
     embedding_configs: AllEmbeddingConfigsDep = INJECTED,
     sparse_embedding_configs: AllSparseEmbeddingConfigsDep = INJECTED,
     reranking_configs: AllRerankingConfigsDep = INJECTED,
@@ -1065,8 +1069,8 @@ def _get_all_providers(
     )
 
 
-type AllProvidersDep = Annotated[
-    ProviderDict, depends(_get_all_providers, use_cache=True, scope="singleton")
+type AllProviderSettingsDep = Annotated[
+    ProviderDict, depends(_get_all_provider_settings, use_cache=True, scope="singleton")
 ]
 """Type alias for DI injection of all providers."""
 
@@ -1148,7 +1152,7 @@ def _create_backup_memory_vector_store_provider(
 
 
 @dependency_provider(ProviderDict, scope="singleton")
-def _get_all_providers(
+def _get_all_provider_settings(
     embedding_configs: AllEmbeddingConfigsDep = INJECTED,
     sparse_embedding_configs: AllSparseEmbeddingConfigsDep = INJECTED,
     reranking_configs: AllRerankingConfigsDep = INJECTED,
@@ -1257,6 +1261,23 @@ type BackupConfiguredCapabilitiesDep = Annotated[
 ]
 """Assembled configured capabilities for backup sparse/dense embedding providers."""
 
+
+def _create_primary_embedding_capability_group(caps: ConfiguredCapabilitiesDep = INJECTED):
+    """Create a primary embedding capability group from the given configured capabilities."""
+    dense = next((cap for cap in caps if cap.is_dense), None)
+    sparse = next((cap for cap in caps if cap.is_sparse), None)
+    idf = next((cap for cap in caps if cap.is_idf), None)
+    if sparse == idf:
+        sparse = None
+    return EmbeddingCapabilityGroup(dense=dense, sparse=sparse, idf=idf)
+
+
+type EmbeddingCapabilityGroupDep = Annotated[
+    "EmbeddingCapabilityGroup",
+    depends(_create_primary_embedding_capability_group, use_cache=True, scope="singleton"),
+]
+"""Type alias for DI injection of primary embedding capability group."""
+
 # ===========================================================================
 # *                           Embedding Tokenizers
 # ===========================================================================
@@ -1304,6 +1325,29 @@ type BackupTokenizerDep = Annotated[
 ]
 """Type alias for DI injection of backup embedding tokenizer."""
 
+
+async def _get_search_package(
+    embedding: EmbeddingProviderDep = INJECTED,
+    sparse: SparseEmbeddingProviderDep = INJECTED,
+    reranking: RerankingProviderDep = INJECTED,
+    vector_store: VectorStoreProviderDep = INJECTED,
+    capabilities: EmbeddingCapabilityGroupDep = INJECTED,
+):
+    """Get the search package containing all necessary providers and capabilities."""
+    return SearchPackage(
+        embedding=embedding,
+        sparse_embedding=sparse,
+        reranking=reranking,
+        vector_store=vector_store,
+        capabilities=capabilities,
+    )
+
+
+type SearchPackageDep = Annotated[
+    SearchPackage, depends(_get_search_package, use_cache=True, scope="singleton")
+]
+"""Type alias for DI injection of search package."""
+
 # ===========================================================================
 # *                            MODULE EXPORTS
 # ===========================================================================
@@ -1312,7 +1356,7 @@ __all__ = (
     "AgentProviderSettingsDep",
     "AllDataProviderConfigsDep",
     "AllEmbeddingConfigsDep",
-    "AllProvidersDep",
+    "AllProviderSettingsDep",
     "AllRerankingConfigsDep",
     "AllSparseEmbeddingConfigsDep",
     "AllVectorStoreConfigsDep",
@@ -1341,6 +1385,7 @@ __all__ = (
     "BackupVectorStoreProviderSettings",
     "BackupVectorStoreProviderSettingsDep",
     "ConfiguredCapabilitiesDep",
+    "EmbeddingCapabilityGroupDep",
     "EmbeddingCapabilityResolverDep",
     "EmbeddingClientDep",
     "EmbeddingProviderDep",
@@ -1351,6 +1396,7 @@ __all__ = (
     "RerankingClientDep",
     "RerankingProviderDep",
     "RerankingProviderSettingsDep",
+    "SearchPackageDep",
     "SparseCapabilityResolverDep",
     "SparseEmbeddingClientDep",
     "SparseEmbeddingProviderDep",

@@ -20,7 +20,8 @@ from fastmcp.client.transports import StreamableHttpTransport
 from fastmcp.server.proxy import FastMCPProxy, ProxyClient
 from fastmcp.tools import Tool
 
-from codeweaver.core import DictView, Unset, lazy_import
+from codeweaver.core import DictView, SettingsMapDep, Unset, lazy_import
+from codeweaver.core.di.depends import INJECTED
 from codeweaver.server.config import (
     FastMcpHttpRunArgs,
     FastMcpHttpServerSettings,
@@ -33,7 +34,8 @@ from codeweaver.server.mcp.middleware import McpMiddleware, StatisticsMiddleware
 
 
 if TYPE_CHECKING:
-    from codeweaver.server.config import CodeWeaverSettingsDict, FastMcpServerSettingsDict
+    from codeweaver.core.config.types import CodeWeaverSettingsDict
+    from codeweaver.server.config import FastMcpServerSettingsDict
     from codeweaver.server.mcp.state import CwMcpHttpState
 
 
@@ -42,11 +44,10 @@ TOOLS_TO_REGISTER = ("find_code",)
 type StdioClientLifespan = AsyncIterator[Any]
 
 
-def _get_fastmcp_settings_map(*, http: bool = False) -> DictView[FastMcpServerSettingsDict]:
+def _get_fastmcp_settings_map(
+    *, http: bool = False, settings_map: SettingsMapDep = INJECTED
+) -> DictView[FastMcpServerSettingsDict]:
     """Get the current settings."""
-    from codeweaver.server.config import get_settings_map
-
-    settings_map = get_settings_map()
     if http:
         return (
             settings_map.get_subview("mcp_server")
@@ -60,11 +61,10 @@ def _get_fastmcp_settings_map(*, http: bool = False) -> DictView[FastMcpServerSe
     )
 
 
-def _get_middleware_settings() -> DictView[MiddlewareOptions] | None:
+def _get_middleware_settings(
+    settings_map: SettingsMapDep = INJECTED,
+) -> DictView[MiddlewareOptions] | None:
     """Get the current middleware settings."""
-    from codeweaver.server.config import get_settings_map
-
-    settings_map = get_settings_map()
     return (
         settings_map.get_subview("middleware")
         if settings_map.get("middleware") is not Unset

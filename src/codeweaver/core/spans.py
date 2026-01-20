@@ -313,6 +313,10 @@ class Span(NamedTuple):
             or self.start - ONE_LINE == other.end
         )
 
+    def serialize_for_cli(self) -> str:
+        """Serialize the span for CLI output."""
+        return f"{self.start}-{self.end} ({self.source_id})"
+
 
 class SpanGroup(BasedModel):
     """A group of spans that can be manipulated as a single unit.

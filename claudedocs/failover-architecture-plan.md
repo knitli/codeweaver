@@ -214,10 +214,11 @@ async def store_chunks(
 
 **Collection Naming:**
 ```
-Primary:   "{project_id}_primary_{provider_name}"
-Backup:    "{project_id}_backup_{provider_name}"
-Shadow:    "{project_id}_shadow_wal"  # For remote failures
+Primary:   "{project_id}_primary_{provider_name}-{path_hash}"
+Backup:    "{project_id}_backup_{provider_name}-{path_hash}"
+Shadow:    "{project_id}_shadow_wal-{path_hash}"  # For remote failures
 ```
+(collection name generation logic is in codeweaver.core.utils.general -- `generate_collection_name`)
 
 **Overhead Analysis:**
 - **Storage**: 2x vectors (acceptable for reliability)
@@ -264,7 +265,8 @@ Shadow:    "{project_id}_shadow_wal"  # For remote failures
 
 **Transition Parameters:**
 ```python
-class FailoverConfig(BasedModel):
+class FailoverSettings(BasedModel):
+    # existing settings may need revised
     degraded_timeout_ms: int = 500      # Fast timeout in degraded
     failure_threshold: int = 3          # Failures before BACKUP_ONLY
     recovery_window_sec: int = 300      # Green period before HEALTHY
@@ -277,16 +279,18 @@ class FailoverConfig(BasedModel):
 
 **Recovery Optimization:**
 ```python
+from codeweaver.core.utils import uuid7_as_timestamp
+
 def filter_chunks_modified_during_outage(
     all_chunks: list[CodeChunk],
     outage_start: datetime,
     outage_end: datetime
-) -> list[CodeChunk]:
+) -> tuple[CodeChunk, ...]:
     """Filter chunks by source_id timestamp."""
-    return [
+    return tuple(
         chunk for chunk in all_chunks
-        if outage_start <= chunk.line_range.source_id.timestamp <= outage_end
-    ]
+        if outage_start <= uuid7_as_timestamp(chunk.source_id, datetime=True) <= outage_end
+    )
 ```
 
 **Benefits:**
@@ -331,7 +335,7 @@ backup_governor = ChunkGovernor(
         constraints={"tier": "backup"}
     )
 )
-# chunk_limit = 512 (from Cohere reranker)
+# chunk_limit = 512 (from backup reranker)
 ```
 
 ---
@@ -640,39 +644,36 @@ class IndexingService:
 **New File**: `src/codeweaver/engine/failover/state_machine.py`
 
 ```python
-from enum import Enum
+from collections.abc import Callable
 from datetime import datetime, timedelta
-from typing import Callable
-from pydantic import BaseModel
+from typing import TYPE_CHECKING
 
-class FailoverState(str, Enum):
+from codeweaver.core.types import BaseEnum
+
+if TYPE_CHECKING:
+    from codeweaver.engine.config.failover import FailoverSettings
+
+
+class FailoverState(str, BaseEnum):
     """Failover system states."""
     HEALTHY = "healthy"
     DEGRADED = "degraded"
     BACKUP_ONLY = "backup_only"
     RECOVERY = "recovery"
 
-class FailoverEvent(str, Enum):
+class FailoverEvent(str, BaseEnum):
     """Events triggering state transitions."""
     PROVIDER_ERROR = "provider_error"
     CONSECUTIVE_FAILURES = "consecutive_failures"
     PRIMARY_RESTORED = "primary_restored"
     ALL_GREEN = "all_green"
 
-class FailoverConfig(BaseModel):
-    """Configuration for failover behavior."""
-    degraded_timeout_ms: int = 500
-    failure_threshold: int = 3
-    recovery_window_sec: int = 300
-    circuit_breaker_reset_sec: int = 60
-    max_retries: int = 3
-
 class FailoverStateMachine:
     """Event-driven state machine for provider failover."""
 
     def __init__(
         self,
-        config: FailoverConfig,
+        config: FailoverSettings,
         on_state_change: Callable[[FailoverState, FailoverState], None] | None = None
     ) -> None:
         self.config = config
@@ -1173,16 +1174,18 @@ def register_failover_providers(container: Container) -> None:
 
 ### Configuration Schema
 
-**New File**: `src/codeweaver/config/failover.py`
+`src/codeweaver/config/failover.py`
 
 ```python
-from pydantic import BaseModel, Field
+from pydantic import Field
 
-class FailoverSettings(BaseModel):
+from codeweaver.core.types import BasedModel
+
+class FailoverSettings(BasedModel):
     """Failover system configuration."""
 
     # State machine
-    enabled: bool = True
+    disable_failover: bool = False
     degraded_timeout_ms: int = Field(500, ge=100, le=5000)
     failure_threshold: int = Field(3, ge=1, le=10)
     recovery_window_sec: int = Field(300, ge=60, le=3600)

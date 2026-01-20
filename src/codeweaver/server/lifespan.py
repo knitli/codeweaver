@@ -186,8 +186,8 @@ async def http_lifespan(
 
     # Use background services lifespan for all the heavy lifting
     async with background_services_lifespan(
-        settings=settings,
-        statistics=statistics,
+        settings=settings,  # ty:ignore[invalid-argument-type]
+        statistics=statistics,  # ty:ignore[invalid-argument-type]
         progress_reporter=progress_reporter,
         verbose=verbose,
         debug=debug,

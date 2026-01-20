@@ -19,10 +19,17 @@ from mcp.shared.context import RequestContext
 from starlette.requests import Request
 
 from codeweaver.core import SemanticSearchLanguage, lazy_import
+from codeweaver.core.di.depends import INJECTED
+from codeweaver.server import CodeWeaverStateDep
 from codeweaver.server.agent_api import FindCodeResponseSummary, IntentType, find_code
 
 
 _logger = logging.getLogger(__name__)
+
+
+def _get_state(state: CodeWeaverStateDep = INJECTED):
+    """Get the current CodeWeaver state."""
+    return state
 
 
 # -------------------------
@@ -68,10 +75,7 @@ async def find_code_tool(
         )
         statistics = lazy_import("codeweaver.core", "get_session_statistics")
 
-        # Set context on failover manager for notifications
-        from codeweaver.server import get_state
-
-        state = get_state()
+        state = _get_state()
         if state.failover_manager and context:
             state.failover_manager.set_context(context)
 

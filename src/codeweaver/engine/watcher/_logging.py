@@ -103,7 +103,7 @@ class WatchfilesLogManager:
             logger = setup_logger(
                 name="watchfiles",
                 level=self.log_level,
-                rich=True,
+                use_rich=True,
                 rich_options={
                     "show_time": True,
                     "show_level": True,

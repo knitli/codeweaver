@@ -14,20 +14,26 @@ import signal
 import sys
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal, cast
+from typing import Any, Literal, cast
 
 from codeweaver_daemon import start_daemon_if_needed
 from fastmcp import FastMCP
 from pydantic import FilePath
 
-from codeweaver.core import InitializationError, ProgressReporterDep, SettingsDep, StatisticsDep
+from codeweaver.core import (
+    InitializationError,
+    LoggerDep,
+    ProgressReporterDep,
+    SettingsDep,
+    StatisticsDep,
+)
 from codeweaver.core import Provider as Provider
 from codeweaver.core.config.types import CodeWeaverSettingsDict
 from codeweaver.core.di.depends import INJECTED
 
 
-if TYPE_CHECKING:
-    pass
+def _logger(logger: LoggerDep = INJECTED) -> logging.Logger:
+    return logger
 
 
 class UvicornAccessLogFilter(logging.Filter):
@@ -133,9 +139,7 @@ async def _run_http_server(
 
     # Setup logging
     if verbose or debug:
-        from codeweaver.core import setup_logger
-
-        setup_logger(LoggerSettingsDict(**get_settings_map()))
+        _logger()
 
     # Create MCP HTTP server state
     mcp_state: CwMcpHttpState = await create_http_server(
@@ -273,7 +277,8 @@ async def get_stdio_server(
         from codeweaver.core.dependencies import bootstrap_settings
 
         if config_file and isinstance(config_file, Path) and config_file.exists():
-            settings = bootstrap_settings(config_file=config_file, project_path=project_path)
+            settings = await bootstrap_settings(config_file=config_file)
+            settings.project_path = project_path or settings.project_path
     else:
         settings = None
     return await create_stdio_server(

@@ -9,21 +9,12 @@
 from __future__ import annotations
 
 import contextlib
+import importlib
 import re
 
 from collections.abc import Callable, Generator
 from pathlib import Path
-from typing import (
-    TYPE_CHECKING,
-    Annotated,
-    Any,
-    Literal,
-    NamedTuple,
-    NotRequired,
-    Required,
-    TypedDict,
-    cast,
-)
+from typing import Annotated, Any, Literal, NamedTuple, NotRequired, Required, TypedDict, cast
 
 from pydantic import UUID7, Field, PositiveFloat
 
@@ -38,8 +29,10 @@ from codeweaver.core.types.aliases import (
 from codeweaver.core.types.enum import BaseEnum
 
 
-if TYPE_CHECKING:
-    pass
+if importlib.util.find_spec("codeweaver.semantic"):
+    from codeweaver.semantic.types import SemanticMetadata as SemanticMetadata
+else:
+    SemanticMetadata = Any
 
 
 # ------------------------------------------------
@@ -128,7 +121,9 @@ class Metadata(TypedDict, total=False):
             Field(description="""Tags associated with the code chunk, if applicable"""),
         ]
     ]
-    semantic_meta: NotRequired[Annotated[Any | None, Field(description="""Semantic metadata""")]]
+    semantic_meta: NotRequired[
+        Annotated[SemanticMetadata | None, Field(description="""Semantic metadata""")]
+    ]
     context: Annotated[
         dict[str, Any] | None,
         Field(

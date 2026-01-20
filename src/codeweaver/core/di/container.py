@@ -184,8 +184,6 @@ class Container[T]:
         target = factory or interface
         self._factories[interface] = target
         self._is_singleton[interface] = singleton
-        if stale_while_revalidate:
-            self._stale_while_revalidate[interface] = True
         logger.debug(
             "Registered %s -> %s (singleton=%s, stale_while_revalidate=%s)",
             interface.__name__,

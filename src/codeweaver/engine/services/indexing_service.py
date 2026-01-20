@@ -67,11 +67,7 @@ class IndexingService:
         manifest_manager: FileManifestManager,
         project_path: Path,
     ):
-        """Initialize indexing service with required dependencies.
-
-        No default values, no INJECTED markers.
-        Dependencies must be provided by the factory.
-        """
+        """Initialize indexing service with required dependencies."""
         self._chunking_service = chunking_service
         self._embedding_provider = embedding_provider
         self._sparse_provider = sparse_provider

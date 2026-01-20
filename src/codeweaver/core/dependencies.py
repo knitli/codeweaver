@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import importlib
+import logging
 import os
 
 from pathlib import Path
@@ -125,6 +126,11 @@ def _get_settings_map(settings: SettingsDep = INJECTED) -> DictView[CodeWeaverSe
     return DictView(settings.model_dump())
 
 
+type SettingsMapDep = Annotated[
+    DictView[CodeWeaverSettingsDict], depends(_get_settings_map, use_cache=False, scope="request")
+]
+
+
 @dependency_provider(SessionStatistics, scope="singleton")
 def _get_statistics() -> SessionStatistics:
     from codeweaver.core.statistics import SessionStatistics
@@ -162,6 +168,16 @@ def _get_logging_settings(settings: SettingsDep = INJECTED) -> LoggingSettingsDi
 
 
 type LoggingSettingsDep = Annotated[LoggingSettingsDict, depends(_get_logging_settings)]
+
+
+@dependency_provider(logging.Logger, scope="singleton")
+def _get_logger(settings: LoggingSettingsDep = INJECTED) -> logging.Logger:
+    from codeweaver.core._logging import setup_logger
+
+    return setup_logger(**settings)
+
+
+type LoggerDep = Annotated[logging.Logger, depends(_get_logger)]
 
 
 @dependency_provider(ProgressReporter, scope="singleton")
@@ -251,6 +267,7 @@ type TelemetryServiceDep = Annotated[TelemetryService, depends(_create_telemetry
 
 __all__ = (
     "CodeWeaverSettingsType",
+    "LoggerDep",
     "LoggingSettingsDep",
     "NoneDep",
     "ProgressReporterDep",
@@ -259,6 +276,7 @@ __all__ = (
     "ResolvedProjectPathDep",
     "ResolvedProjectPathHashDep",
     "SettingsDep",
+    "SettingsMapDep",
     "StatisticsDep",
     "TelemetryServiceDep",
     "TelemetrySettingsDep",

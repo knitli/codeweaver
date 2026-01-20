@@ -27,8 +27,10 @@ from starlette.requests import Request
 from starlette.responses import PlainTextResponse, Response
 from starlette.routing import Route
 
-from codeweaver.core import DictView, SessionStatistics, get_session_statistics, timed_http
-from codeweaver.server.config import CodeWeaverSettingsDict, get_settings_map
+from codeweaver.cli.commands.start import _get_settings_map
+from codeweaver.core import DictView, SettingsMapDep, StatisticsDep, timed_http
+from codeweaver.core.config.types import CodeWeaverSettingsDict
+from codeweaver.core.di import INJECTED
 
 
 if TYPE_CHECKING:
@@ -37,23 +39,17 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def statistics() -> SessionStatistics:
-    """Get the current session statistics."""
-    return get_session_statistics()
-
-
-def settings() -> DictView[CodeWeaverSettingsDict]:
+def settings(settings: SettingsMapDep = INJECTED) -> DictView[CodeWeaverSettingsDict]:
     """Get the current settings."""
-    return get_settings_map()
+    return settings
 
 
 @timed_http("metrics")
-async def stats_info(_request: Request) -> PlainTextResponse:
+async def stats_info(_request: Request, statistics: StatisticsDep = INJECTED) -> PlainTextResponse:
     """Return current session statistics as JSON."""
-    global statistics
-    if stats := statistics():
+    if statistics:
         try:
-            return PlainTextResponse(content=stats.report(), media_type="application/json")
+            return PlainTextResponse(content=statistics.report(), media_type="application/json")
         except Exception as e:
             logger.exception("Failed to serialize session statistics")
             return PlainTextResponse(
@@ -162,7 +158,7 @@ async def favicon(_request: Request) -> Response:
 
 
 @timed_http("status")
-async def status_info(request: Request) -> PlainTextResponse:
+async def status_info(request: Request, statistics: StatisticsDep = INJECTED) -> PlainTextResponse:
     """Return current operational status (progress, failover, runtime state)."""
     try:
         state: CodeWeaverState = request.app.state.background
@@ -181,18 +177,18 @@ async def status_info(request: Request) -> PlainTextResponse:
         else:
             status_data["indexing"] = {"active": False}
         if getattr(state, "failover_manager", None):
-            failover_stats = statistics().failover_statistics
+            failover_stats = statistics.failover_statistics
             if failover_stats:
                 status_data["failover"] = failover_stats.model_dump()
             else:
                 status_data["failover"] = {"enabled": True, "active": False}
         else:
             status_data["failover"] = {"enabled": False}
-        if stats := statistics():
+        if statistics:
             status_data["statistics"] = {
-                "total_requests": stats.total_requests,
-                "successful_requests": stats.successful_requests,
-                "failed_requests": stats.failed_requests,
+                "total_requests": statistics.total_requests,
+                "successful_requests": statistics.successful_requests,
+                "failed_requests": statistics.failed_requests,
             }
     except Exception:
         logger.exception("Failed to get status information")
@@ -272,7 +268,7 @@ class ManagementServer:
         """Check if shutdown has been requested."""
         return cls._shutdown_event is not None and cls._shutdown_event.is_set()
 
-    def create_app(self) -> Starlette:
+    def create_app(self, settings: DictView[CodeWeaverSettingsDict] | None = None) -> Starlette:
         """
         Create Starlette app with management routes.
 
@@ -281,9 +277,7 @@ class ManagementServer:
 
         IMPORTANT: Reuses existing handlers from app_bindings.py.
         """
-        from codeweaver.server.config import get_settings_map
-
-        settings_map = get_settings_map()
+        settings_map = settings or _get_settings_map()
         endpoint_settings = settings_map.get("endpoints", {})
         routes = [
             Route("/favicon.ico", favicon, methods=["GET"], include_in_schema=False),

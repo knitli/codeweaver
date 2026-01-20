@@ -19,7 +19,10 @@ from pydantic import FilePath
 
 from codeweaver.cli.dependencies import setup_cli_di
 from codeweaver.cli.ui import CLIErrorHandler, IndexingProgress, StatusDisplay, get_display
-from codeweaver.core import CodeWeaverError, Unset, get_user_config_dir
+from codeweaver.core import CodeWeaverError, SettingsMapDep, Unset, get_user_config_dir
+from codeweaver.core.config.types import CodeWeaverSettingsDict
+from codeweaver.core.di.depends import INJECTED
+from codeweaver.core.types.dictview import DictView
 from codeweaver.engine import CheckpointManager, FileManifestManager
 from codeweaver.engine.services.indexing_service import IndexingService
 from codeweaver.providers import VectorStoreProvider
@@ -31,6 +34,11 @@ if TYPE_CHECKING:
 _display: StatusDisplay = get_display()
 
 app = App("index", help="Index codebase for semantic search.", console=_display.console)
+
+
+def _settings_map(settings: SettingsMapDep = INJECTED) -> DictView[CodeWeaverSettingsDict]:
+    """Get the settings map."""
+    return settings
 
 
 async def _check_server_health() -> bool:
