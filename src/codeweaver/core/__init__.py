@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 """Package-level lazy imports for codeweaver.core."""
 
+import sys
+
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
@@ -443,6 +445,7 @@ if TYPE_CHECKING:
         we_are_in_vscode,
     )
 
+
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "ALL_LANGUAGES": (__spec__.parent, "file_extensions"),
     "AnonymityConversion": (__spec__.parent, "types"),
@@ -850,6 +853,12 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
 })
 
 __getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
+
+CODEWEAVER_PREFIX = (
+    "[bold dark_goldenrod][CodeWeaver][/bold dark_goldenrod]"
+    if sys.stdout.isatty()
+    else "[CodeWeaver]"
+)
 
 __all__ = (
     "ALL_LANGUAGES",

@@ -29,6 +29,7 @@ from rich.prompt import Confirm
 from codeweaver.cli.ui import CLIErrorHandler, get_display
 from codeweaver.core import CodeWeaverError, get_project_path, get_user_config_dir
 from codeweaver.core.di.depends import INJECTED
+from codeweaver.core.exceptions import ConfigurationError
 from codeweaver.providers.config.profiles import ProviderProfile
 
 
@@ -133,7 +134,7 @@ def _create_codeweaver_config(
     config_path.parent.mkdir(parents=True, exist_ok=True)
 
     # Save to TOML file
-    settings.save_to_file(config_path)
+    _get_settings().save_to_file(config_path)
 
     display.print_success(f"Created configuration file: {config_path}")
     if profile:
@@ -147,12 +148,8 @@ def config(
     *,
     project: Annotated[Path | None, cyclopts.Parameter(name=["--project", "-p"])] = None,
     profile: Annotated[
-        Literal["recommended", "quickstart", "test"],
-        cyclopts.Parameter(
-            name=["--profile"],
-            help="Configuration profile to use (recommended, quickstart, or test)",
-        ),
-    ] = "recommended",
+        ProviderProfile, cyclopts.Parameter(name=["--profile"], help="Configuration profile to use")
+    ] = ProviderProfile.RECOMMENDED,
     quickstart: Annotated[
         bool,
         cyclopts.Parameter(
@@ -194,7 +191,7 @@ def config(
 
     Args:
         project: Path to project directory (defaults to current directory)
-        profile: Configuration profile to use (recommended, quickstart, or backup)
+        profile: Configuration profile to use
         vector_deployment: Vector store deployment type (local or cloud)
         vector_url: URL for cloud vector deployment
         config_path: Custom path for configuration file
@@ -206,29 +203,10 @@ def config(
     display.print_command_header("init config", "Initialize CodeWeaver configuration file.")
 
     if quickstart:
-        profile = "quickstart"
+        profile = ProviderProfile.QUICKSTART
 
-    # Validate vector_url if cloud deployment
+    # Validate project path
     project_path = project or get_project_path()
-    parsed_vector_url: AnyHttpUrl | None = None
-    if vector_deployment == "cloud" and not vector_url:
-        error_handler.handle_error(
-            CodeWeaverError(
-                "Vector URL is required for cloud vector deployment. "
-                "Please provide a valid --vector-url when using --vector-deployment=cloud."
-            ),
-            "Configuration validation",
-            exit_code=1,
-        )
-
-    if not config_path:
-        if config_level == "local":
-            config_path = project_path / f"codeweaver.local.{config_extension}"
-        elif config_level == "project":
-            config_path = project_path / f"codeweaver.{config_extension}"
-        else:
-            config_path = get_user_config_dir() / f"codeweaver.{config_extension}"
-
     if not project_path.is_dir():
         error_handler.handle_error(
             CodeWeaverError(
@@ -241,33 +219,53 @@ def config(
 
     display.console.print(f"[dim]Project:[/dim] {project_path}\n")
 
-    # Determine final config path
-    final_config_path = config_path or project_path / f"codeweaver.{config_extension}"
-
-    if final_config_path.exists() and not force:
-        if Confirm.ask(
-            f"[yellow]Configuration file already exists at {final_config_path}. Overwrite?[/yellow]",
-            default=False,
-        ):
-            created_path = _create_codeweaver_config(
-                project_path,
-                profile=profile,
-                vector_deployment=vector_deployment,
-                vector_url=parsed_vector_url,
-                config_path=final_config_path,
-            )
-            display.print_success(f"Config created: {created_path}\n")
-        else:
-            display.print_warning("Skipping CodeWeaver config creation.\n")
-    else:
-        created_path = _create_codeweaver_config(
-            project_path,
-            profile=profile,
-            vector_deployment=vector_deployment,
-            vector_url=parsed_vector_url,
-            config_path=final_config_path,
+    # Validate vector_url if cloud deployment
+    if vector_deployment == "cloud" and not vector_url:
+        error_handler.handle_error(
+            CodeWeaverError(
+                "Vector URL is required for cloud vector deployment. "
+                "Please provide a valid --vector-url when using --vector-deployment=cloud."
+            ),
+            "Configuration validation",
+            exit_code=1,
         )
-        display.print_completion(f"Config created: {created_path}\n")
+
+    # Adjust profile for cloud deployment
+    if vector_deployment == "cloud":
+        if profile == ProviderProfile.RECOMMENDED:
+            profile = ProviderProfile.RECOMMENDED_CLOUD
+        elif profile != ProviderProfile.RECOMMENDED_CLOUD:
+            raise ConfigurationError(
+                "Cloud vector deployment requires the RECOMMENDED_CLOUD profile."
+            )
+
+    # Determine config file path
+    if not config_path:
+        match config_level:
+            case "local":
+                config_path = project_path / f"codeweaver.local.{config_extension}"
+            case "project":
+                config_path = project_path / f"codeweaver.{config_extension}"
+            case "user":
+                config_path = get_user_config_dir() / f"codeweaver.{config_extension}"
+
+    # Handle existing configuration
+    if (
+        config_path.exists()
+        and not force
+        and not Confirm.ask(
+            f"[yellow]Configuration file already exists at {config_path}. Overwrite?[/yellow]",
+            default=False,
+        )
+    ):
+        display.print_warning("Skipping CodeWeaver config creation.\n")
+        return
+
+    # Create the configuration
+    created_path = _create_codeweaver_config(
+        project_path, profile=profile, vector_url=None, config_path=config_path
+    )
+    display.print_completion(f"Config created: {created_path}\n")
 
 
 def _get_client_config_path(
@@ -721,12 +719,12 @@ def init(
     mcp_only: Annotated[bool, cyclopts.Parameter(name=["--mcp-only"])] = False,
     quickstart: Annotated[bool, cyclopts.Parameter(name=["--quickstart", "-q"])] = False,
     profile: Annotated[
-        Literal["recommended", "quickstart", "test"],
+        ProviderProfile,
         cyclopts.Parameter(
             name=["--profile"],
             help="Configuration profile to use (recommended, quickstart, or test). Defaults to 'recommended' with --recommended.",
         ),
-    ] = "recommended",
+    ] = ProviderProfile.RECOMMENDED,
     vector_deployment: Annotated[
         Literal["local", "cloud"],
         cyclopts.Parameter(name=["--vector-deployment"], help="Vector store deployment type"),
@@ -832,7 +830,7 @@ def init(
     )
 
     if quickstart:
-        profile = "quickstart"
+        profile = ProviderProfile.QUICKSTART
 
     # Determine project path
     project_path = (project or get_project_path()).resolve()

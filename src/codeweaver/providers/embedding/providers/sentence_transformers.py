@@ -108,7 +108,7 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
         if "nomic" in str(self.model_name):
             preprocessed = [f"search_document: {doc}" for doc in preprocessed]
 
-        embed_partial = rpartial(self.client.encode, **self.embed_options)  # type: ignore
+        embed_partial = rpartial(self.client.encode_document, **self.embed_options)  # type: ignore
         loop = asyncio.get_running_loop()
         results: np.ndarray = await loop.run_in_executor(None, embed_partial, preprocessed)  # type: ignore
         _ = self._fire_and_forget(lambda: self._update_token_stats(from_docs=preprocessed))
@@ -124,7 +124,7 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
         elif "nomic" in str(self.model_name):
             preprocessed = [f"search_query: {query}" for query in preprocessed]
         # Filter incoming kwargs to remove dict structure keys before merging
-        embed_partial = rpartial(self.client.encode, **self.query_options)  # type: ignore
+        embed_partial = rpartial(self.client.encode_query, **self.query_options)  # type: ignore
         loop = asyncio.get_running_loop()
         results: np.ndarray = await loop.run_in_executor(None, embed_partial, preprocessed)  # type: ignore
         _ = self._fire_and_forget(

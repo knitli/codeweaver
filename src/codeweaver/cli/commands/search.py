@@ -25,7 +25,6 @@ from codeweaver.cli.dependencies import setup_cli_di
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
 from codeweaver.core import CodeWeaverError
 from codeweaver.core.dependencies import CodeWeaverSettingsType
-from codeweaver.providers.dependencies import AllProviderSettingsDep
 from codeweaver.server.agent_api.find_code import (
     CodeMatch,
     FindCodeResponseSummary,
@@ -81,7 +80,6 @@ async def search(
         # Resolve Providers
         # We explicitly resolve this because find_code expects a dictionary-like object (ProviderDict),
         # but if we don't pass it, the default value is the INJECTED marker, which doesn't behave like a dict.
-        providers = await container.resolve(AllProviderSettingsDep)
 
         response = await find_code(
             query=query,
@@ -89,7 +87,6 @@ async def search(
             token_limit=settings.token_limit or 30000,
             focus_languages=None,
             context=None,
-            providers=providers,
         )
 
         # Check for error status in response

@@ -46,6 +46,7 @@ from codeweaver.core import (
     ExtKind,
     Metadata,
     SemanticSearchLanguage,
+    SessionStatistics,
     Span,
     UUIDStore,
     get_blake_hash,
@@ -103,6 +104,8 @@ class SemanticChunker(BaseChunker):
     """
 
     language: SemanticSearchLanguage
+
+    _statistics: SessionStatistics
 
     _store: UUIDStore[list[CodeChunk]] = make_uuid_store(
         value_type=list,
@@ -196,9 +199,6 @@ class SemanticChunker(BaseChunker):
             ChunkLimitExceededError: If chunk count exceeds configured maximum
             ASTDepthExceededError: If AST nesting exceeds safe depth limit
         """
-        from codeweaver.core import get_session_statistics
-
-        statistics = get_session_statistics()
         start_time = time.perf_counter()
         batch_id = uuid7()
 
@@ -220,7 +220,7 @@ class SemanticChunker(BaseChunker):
                 unique_chunks = self._finalize_chunks(chunks, batch_id)
 
                 # Track statistics and metrics
-                self._track_statistics(file_path, statistics, unique_chunks, start_time)
+                self._track_statistics(file_path, self._statistics, unique_chunks, start_time)
 
             except ParseError as e:
                 # Log at debug level - this is an expected condition for malformed files
@@ -243,7 +243,7 @@ class SemanticChunker(BaseChunker):
                     fallback_triggered=True,  # Caller will trigger fallback
                 )
 
-                self._track_skipped_file(file_path, statistics)
+                self._track_skipped_file(file_path, self._statistics)
                 raise
             else:
                 return unique_chunks

@@ -258,7 +258,7 @@ async def lifespan(
     container = get_container()
 
     if settings:
-        container.override(CodeWeaverSettingsType, settings)
+        container.override(CodeWeaverSettingsType, settings)  # ty:ignore[invalid-argument-type]
 
     # Register core singletons if provided explicitly
     # (Note: settings and statistics might need to be overridden in container if passed here,

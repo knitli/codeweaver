@@ -16,7 +16,7 @@ import types
 from collections.abc import AsyncIterator, Callable, Generator
 from contextlib import AsyncExitStack, asynccontextmanager, contextmanager, suppress
 from dataclasses import dataclass
-from typing import Annotated, Any, Union, cast, get_args, get_origin
+from typing import Annotated, Any, TypeAliasType, Union, cast, get_args, get_origin
 
 # Pydantic internal utilities for robust type resolution
 from pydantic._internal._core_utils import get_type_ref
@@ -192,7 +192,7 @@ class Container[T]:
             stale_while_revalidate,
         )
 
-    def override(self, interface: type[T], instance: Any) -> None:
+    def override(self, interface: type[T] | TypeAliasType[T], instance: Any) -> None:
         """Override a dependency, primarily for testing.
 
         Args:
@@ -308,7 +308,9 @@ class Container[T]:
 
         raise ValueError(f"Could not resolve any type from union: {union_args}")
 
-    async def resolve(self, interface: type[T], _resolution_stack: list[str] | None = None) -> T:
+    async def resolve(
+        self, interface: type[T] | TypeAliasType[T], _resolution_stack: list[str] | None = None
+    ) -> T:
         """Resolve a dependency with circular dependency detection.
 
         Args:

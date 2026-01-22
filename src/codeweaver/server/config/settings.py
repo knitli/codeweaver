@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, TypedDict
 
 from fastmcp.server.server import DuplicateBehavior
 from mcp.server.auth.settings import AuthSettings
@@ -322,6 +322,21 @@ class CodeWeaverSettings(CodeWeaverEngineSettings):
             "uvicorn": DefaultUvicornSettings,
             "endpoints": DefaultEndpointSettings,
         }
+
+
+class CodeWeaverSettingsDict(TypedDict, total=False):
+    """TypedDict for CodeWeaverSettings serialization."""
+
+    token_limit: PositiveInt | None
+    max_results: PositiveInt | None
+    mcp_server: FastMcpServerSettingsDict | None
+    stdio_server: FastMcpServerSettingsDict | None
+    middleware: MiddlewareOptions | None
+    endpoints: EndpointSettingsDict | None
+    uvicorn: UvicornServerSettingsDict | None
+    management_host: str | None
+    management_port: PositiveInt | None
+    default_mcp_config: StdioCodeWeaverConfigDict | None
 
 
 __all__ = ("CodeWeaverSettings", "FastMcpHttpServerSettings", "FastMcpStdioServerSettings")

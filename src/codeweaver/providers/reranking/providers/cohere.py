@@ -92,7 +92,14 @@ class CohereRerankingProvider(RerankingProvider[CohereClient]):
         self, query: str, documents: Sequence[str], *, top_n: int = 10, **kwargs: Any
     ) -> V2RerankResponse:
         return await self.client.rerank(
-            model=self.model_name or self.caps.name,
+            model=str(
+                self.model_name
+                or self.config.model_name
+                or self.config.rerank.model_name
+                or self.caps.name
+                if self.caps
+                else ""
+            ),
             query=query,
             documents=documents,
             top_n=top_n,

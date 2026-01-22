@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, NamedTuple, cast
 
 from codeweaver.core import CodeChunk, Metadata, Span, get_blake_hash, uuid7
-from codeweaver.engine.chunker.base import BaseChunker, ChunkGovernor
+from codeweaver.engine.chunker.base import AdaptiveChunkBehavior, BaseChunker, ChunkGovernor
 from codeweaver.engine.chunker.delimiter_model import Boundary, Delimiter, DelimiterMatch
 from codeweaver.engine.chunker.exceptions import (
     BinaryFileError,
@@ -33,6 +33,16 @@ if TYPE_CHECKING:
 
 
 PERFORMANCE_THRESHOLD_MS = 1000.0  # 1 second
+
+# Token estimation: ~4 chars per token for code (conservative)
+# This is a heuristic; actual tokenization varies by model
+CHARS_PER_TOKEN = 4
+
+# Sliding window overlap for force splits (as fraction of window)
+SLIDING_WINDOW_OVERLAP = 0.1
+
+# Minimum lines for paragraph-based splitting
+MIN_LINES_FOR_PARAGRAPH_SPLIT = 3
 
 
 class StringParseState(NamedTuple):
@@ -132,8 +142,14 @@ class DelimiterChunker(BaseChunker):
                     context = {}
 
                 if matches := self._get_matches_with_fallback(content, governor, context):
-                    chunks = self._process_matches_to_chunks(
+                    chunks, boundaries = self._process_matches_to_chunks(
                         matches, content, file_path, source_id, context, governor
+                    )
+
+                    # Phase 4: Apply adaptive sizing
+                    governor.check_timeout()
+                    chunks = self._apply_adaptive_sizing(
+                        chunks, content, boundaries, file_path, source_id, context
                     )
 
                 else:
@@ -231,7 +247,7 @@ class DelimiterChunker(BaseChunker):
         source_id: Any,
         context: dict[str, Any] | None,
         governor: Any,
-    ) -> list[CodeChunk]:
+    ) -> tuple[list[CodeChunk], list[Boundary]]:
         """Process delimiter matches into code chunks.
 
         Args:
@@ -243,14 +259,14 @@ class DelimiterChunker(BaseChunker):
             governor: Resource governor for tracking
 
         Returns:
-            List of code chunks
+            Tuple of (list of code chunks, list of resolved boundaries)
         """
         # Phase 2: Extract boundaries from matches
         governor.check_timeout()
         boundaries = self._extract_boundaries(matches)
 
         if not boundaries:
-            return []
+            return [], []
 
         # Phase 3: Resolve overlapping boundaries
         governor.check_timeout()
@@ -263,7 +279,7 @@ class DelimiterChunker(BaseChunker):
         for _ in chunks:
             governor.register_chunk()
 
-        return chunks
+        return chunks, resolved
 
     def _enforce_chunk_limit(self, chunks: list[CodeChunk], file_path: Path | None) -> None:
         """Enforce maximum chunk count limit.
@@ -1364,6 +1380,611 @@ class DelimiterChunker(BaseChunker):
         """
         # For non-whole-line chunks, use same logic as expand
         return self._expand_to_lines(start_pos, end_pos, lines)
+
+    # =========================================================================
+    # Adaptive Chunk Sizing Methods
+    # =========================================================================
+
+    def _estimate_tokens(self, content: str) -> int:
+        """Estimate token count for content.
+
+        Uses a simple character-based heuristic. For code, ~4 characters per
+        token is a reasonable approximation across most tokenizers.
+
+        Args:
+            content: Text content to estimate
+
+        Returns:
+            Estimated token count
+        """
+        return len(content) // CHARS_PER_TOKEN
+
+    def _apply_adaptive_sizing(
+        self,
+        chunks: list[CodeChunk],
+        content: str,
+        boundaries: list[Boundary],
+        file_path: Path | None,
+        source_id: Any,
+        context: dict[str, Any] | None,
+    ) -> list[CodeChunk]:
+        """Post-process chunks with adaptive size enforcement.
+
+        Iterates through chunks and applies size-based actions:
+        - MERGE: Combine undersized chunks with neighbors
+        - KEEP: Leave chunk as-is
+        - TRY_CHILDREN: Attempt semantic split using child boundaries
+        - FORCE_SPLIT: Mechanically split oversized chunks
+
+        Args:
+            chunks: Initial chunks from boundary extraction
+            content: Full source content
+            boundaries: Resolved boundaries that created the chunks
+            file_path: Optional source file path
+            source_id: Source identifier for spans
+            context: Optional additional context
+
+        Returns:
+            List of adaptively-sized chunks
+        """
+        if not chunks:
+            return chunks
+
+        result: list[CodeChunk] = []
+        i = 0
+
+        while i < len(chunks):
+            chunk = chunks[i]
+            tokens = self._estimate_tokens(chunk.content)
+            action = self.governor.classify_chunk_size(tokens)
+
+            if action == AdaptiveChunkBehavior.MERGE:
+                # Try to merge with next chunk if available and compatible
+                merged_chunk, next_idx = self._try_merge_forward(
+                    chunks, i, content, file_path, source_id, context
+                )
+                result.append(merged_chunk)
+                i = next_idx
+
+            elif action == AdaptiveChunkBehavior.TRY_CHILDREN:
+                if boundary := self._find_boundary_for_chunk(chunk, boundaries):
+                    children = self._rediscover_children(chunk.content, boundary)
+                    if children:
+                        split_chunks = self._split_at_children(
+                            chunk, children, file_path, source_id, context
+                        )
+                        result.extend(split_chunks)
+                    else:
+                        # No semantic children, try paragraphs
+                        para_chunks = self._split_at_paragraphs(
+                            chunk, file_path, source_id, context
+                        )
+                        result.extend(para_chunks)
+                else:
+                    # Can't find boundary, try paragraph split
+                    para_chunks = self._split_at_paragraphs(chunk, file_path, source_id, context)
+                    result.extend(para_chunks)
+                i += 1
+
+            elif action == AdaptiveChunkBehavior.FORCE_SPLIT:
+                # Must split - exceeds context window
+                split_chunks = self._sliding_window_split(chunk, file_path, source_id, context)
+                result.extend(split_chunks)
+                i += 1
+
+            else:  # KEEP
+                result.append(chunk)
+                i += 1
+
+        return result
+
+    def _try_merge_forward(
+        self,
+        chunks: list[CodeChunk],
+        start_idx: int,
+        content: str,
+        file_path: Path | None,
+        source_id: Any,
+        context: dict[str, Any] | None,
+    ) -> tuple[CodeChunk, int]:
+        """Attempt to merge undersized chunk with following chunks.
+
+        Merges chunks until the combined size reaches the floor threshold or
+        we run out of mergeable chunks. Only merges chunks that are adjacent
+        in the source content.
+        """
+        from codeweaver.core import ExtKind
+
+        current = chunks[start_idx]
+        merged_content = current.content
+        merged_start_line = current.line_range.start if current.line_range else 1
+        merged_end_line = current.line_range.end if current.line_range else 1
+        next_idx = start_idx + 1
+        content_lines: list[str] | None = None
+
+        while (
+            next_idx < len(chunks)
+            and self._estimate_tokens(merged_content) < self.governor.floor_tokens
+        ):
+            next_chunk = chunks[next_idx]
+
+            # Adjacency check using line numbers
+            if current.line_range and next_chunk.line_range:
+                gap = next_chunk.line_range.start - merged_end_line
+                if not 0 <= gap <= 3:  # Stop if gap > 2 empty lines or chunks overlap
+                    break
+
+                # Handle gap padding from source content if necessary
+                gap_content = ""
+                if gap > 1:
+                    if content_lines is None:
+                        content_lines = content.splitlines(keepends=True)
+                    gap_content = "".join(
+                        content_lines[merged_end_line : next_chunk.line_range.start - 1]
+                    )
+                merged_content = f"{merged_content.rstrip('\n')}\n{gap_content}{next_chunk.content}"
+            else:
+                # Merge anyway if line info is missing (fallback behavior)
+                merged_content = f"{merged_content.rstrip('\n')}\n{next_chunk.content}"
+
+            if next_chunk.line_range:
+                merged_end_line = next_chunk.line_range.end
+            next_idx += 1
+
+        # Create merged chunk
+        merged_metadata = self._build_merge_metadata(
+            merged_content, merged_start_line, merged_end_line, context
+        )
+
+        merged_chunk = CodeChunk(
+            content=merged_content,
+            ext_kind=ExtKind.from_file(file_path) if file_path else None,
+            line_range=Span(merged_start_line, merged_end_line, source_id),
+            file_path=file_path,
+            metadata=merged_metadata,
+        )
+
+        return merged_chunk, next_idx
+
+    def _build_merge_metadata(
+        self, content: str, start_line: int, end_line: int, context: dict[str, Any] | None
+    ) -> Metadata:
+        """Build metadata for a merged chunk.
+
+        Args:
+            content: Merged chunk content
+            start_line: Starting line number
+            end_line: Ending line number
+            context: Optional additional context
+
+        Returns:
+            Metadata dictionary
+        """
+        from codeweaver.engine.chunker.delimiter_model import DelimiterKind
+
+        chunk_context: dict[str, Any] = {
+            "chunker_type": "delimiter",
+            "content_hash": str(get_blake_hash(content)),
+            "delimiter_kind": DelimiterKind.GENERIC.name,
+            "adaptive_action": "merged",
+        }
+
+        if context:
+            chunk_context |= context
+
+        metadata: Metadata = {
+            "chunk_id": uuid7(),
+            "created_at": datetime.now(UTC).timestamp(),
+            "name": f"Merged block at line {start_line}",
+            "kind": DelimiterKind.GENERIC,
+            "nesting_level": 0,
+            "priority": DelimiterKind.GENERIC.default_priority,
+            "line_start": start_line,
+            "line_end": end_line,
+            "context": chunk_context,
+        }
+
+        return metadata
+
+    def _find_boundary_for_chunk(
+        self, chunk: CodeChunk, boundaries: list[Boundary]
+    ) -> Boundary | None:
+        """Find the boundary that created a given chunk.
+
+        Args:
+            chunk: The chunk to find the boundary for
+            boundaries: List of boundaries from extraction
+
+        Returns:
+            The matching Boundary, or None if not found
+        """
+        if not chunk.line_range:
+            return None
+
+        chunk_start = chunk.line_range.start
+        chunk_end = chunk.line_range.end
+
+        return next(
+            (
+                boundary
+                for boundary in boundaries
+                if (
+                    chunk.metadata
+                    and chunk.metadata.get("line_start") == chunk_start
+                    and chunk.metadata.get("line_end") == chunk_end
+                )
+            ),
+            None,
+        )
+
+    # spellchecker:off
+    def _rediscover_children(self, content: str, parent: Boundary) -> list[Boundary]:
+        """Re-run delimiter matching to find child boundaries for splitting.
+
+        Only finds delimiters with LOWER priority than parent (more specific
+        structural elements). For example, if the parent is a CLASS(85), this
+        will find FUNCTIONs(70), METHODs(65), etc. within it.
+
+        Args:
+            content: The chunk content to search within
+            parent: The boundary that defined the oversized chunk
+
+        Returns:
+            List of child boundaries sorted by position, or empty if none found
+        """
+        # spellchecker:on
+        # Run delimiter matching on this content
+        matches = self._find_delimiter_matches(content)
+        if not matches:
+            return []
+
+        # Extract boundaries
+        boundaries = self._extract_boundaries(matches)
+        if not boundaries:
+            return []
+
+        # Filter to lower priority than parent (more specific elements)
+        parent_priority = parent.delimiter.priority
+        children = [b for b in boundaries if b.delimiter.priority < parent_priority]
+
+        # Also require minimum size to avoid fragmenting into tiny pieces
+        min_child_chars = self.governor.floor_tokens * CHARS_PER_TOKEN
+        children = [b for b in children if (b.end - b.start) >= min_child_chars]
+
+        # Sort by position
+        return sorted(children, key=lambda b: b.start)
+
+    def _split_at_children(
+        self,
+        chunk: CodeChunk,
+        children: list[Boundary],
+        file_path: Path | None,
+        source_id: Any,
+        context: dict[str, Any] | None,
+    ) -> list[CodeChunk]:
+        """Split a chunk at child boundary positions.
+
+        Creates new chunks from each child boundary, plus chunks for any
+        content between children (preamble, interludes, postamble).
+
+        Args:
+            chunk: The oversized chunk to split
+            children: Child boundaries within the chunk
+            file_path: Optional source file path
+            source_id: Source identifier
+            context: Optional additional context
+
+        Returns:
+            List of split chunks
+        """
+        result: list[CodeChunk] = []
+        content = chunk.content
+        lines = content.splitlines(keepends=True)
+        base_line = chunk.line_range.start if chunk.line_range else 1
+
+        current_pos = 0
+
+        for child in children:
+            # Add any content before this child (preamble/interlude)
+            if child.start > current_pos:
+                preamble = content[current_pos : child.start]
+                if preamble.strip():  # Only if non-empty
+                    preamble_start, preamble_end = self._expand_to_lines(
+                        current_pos, child.start, lines
+                    )
+                    preamble_chunk = self._create_split_chunk(
+                        preamble,
+                        base_line + preamble_start - 1,
+                        base_line + preamble_end - 1,
+                        file_path,
+                        source_id,
+                        context,
+                        "preamble",
+                    )
+                    result.append(preamble_chunk)
+
+            # Add the child boundary as a chunk
+            child_content = content[child.start : child.end]
+            child_start, child_end = self._expand_to_lines(child.start, child.end, lines)
+            child_chunk = self._create_split_chunk(
+                child_content,
+                base_line + child_start - 1,
+                base_line + child_end - 1,
+                file_path,
+                source_id,
+                context,
+                "child",
+                child.delimiter,
+            )
+            result.append(child_chunk)
+
+            current_pos = child.end
+
+        # Add any remaining content (postamble)
+        if current_pos < len(content):
+            postamble = content[current_pos:]
+            if postamble.strip():
+                postamble_start, postamble_end = self._expand_to_lines(
+                    current_pos, len(content), lines
+                )
+                postamble_chunk = self._create_split_chunk(
+                    postamble,
+                    base_line + postamble_start - 1,
+                    base_line + postamble_end - 1,
+                    file_path,
+                    source_id,
+                    context,
+                    "postamble",
+                )
+                result.append(postamble_chunk)
+
+        return result or [chunk]  # Return original if split failed
+
+    def _create_split_chunk(
+        self,
+        content: str,
+        start_line: int,
+        end_line: int,
+        file_path: Path | None,
+        source_id: Any,
+        context: dict[str, Any] | None,
+        split_type: str,
+        delimiter: Delimiter | None = None,
+    ) -> CodeChunk:
+        """Create a chunk from split content.
+
+        Args:
+            content: Chunk content
+            start_line: Starting line number
+            end_line: Ending line number
+            file_path: Optional source file path
+            source_id: Source identifier
+            context: Optional additional context
+            split_type: Type of split ("child", "preamble", "postamble", etc.)
+            delimiter: Optional delimiter that defined this chunk
+
+        Returns:
+            A new CodeChunk
+        """
+        from codeweaver.core import ExtKind
+        from codeweaver.engine.chunker.delimiter_model import DelimiterKind
+
+        kind = delimiter.kind if delimiter else DelimiterKind.GENERIC
+        priority = delimiter.priority if delimiter else DelimiterKind.GENERIC.default_priority
+
+        chunk_context: dict[str, Any] = {
+            "chunker_type": "delimiter",
+            "content_hash": str(get_blake_hash(content)),
+            "delimiter_kind": kind.name,
+            "adaptive_action": f"split_{split_type}",
+        }
+
+        if context:
+            chunk_context |= context
+
+        metadata: Metadata = {
+            "chunk_id": uuid7(),
+            "created_at": datetime.now(UTC).timestamp(),
+            "name": f"{kind.name.title()} at line {start_line}",
+            "kind": kind,
+            "nesting_level": 0,
+            "priority": int(priority),
+            "line_start": start_line,
+            "line_end": end_line,
+            "context": chunk_context,
+        }
+
+        return CodeChunk(
+            content=content,
+            ext_kind=ExtKind.from_file(file_path) if file_path else None,
+            line_range=Span(start_line, end_line, source_id),
+            file_path=file_path,
+            metadata=metadata,
+        )
+
+    def _split_at_paragraphs(
+        self,
+        chunk: CodeChunk,
+        file_path: Path | None,
+        source_id: Any,
+        context: dict[str, Any] | None,
+    ) -> list[CodeChunk]:
+        """Split chunk at paragraph boundaries (blank lines).
+
+        Fallback when no semantic children are found. Accumulates paragraphs
+        until reaching optimal size, then starts a new chunk.
+
+        Args:
+            chunk: The oversized chunk to split
+            file_path: Optional source file path
+            source_id: Source identifier
+            context: Optional additional context
+
+        Returns:
+            List of paragraph-based chunks
+        """
+        import re
+
+        content = chunk.content
+        base_line = chunk.line_range.start if chunk.line_range else 1
+
+        # Split by double newlines (paragraph boundaries)
+        paragraphs = re.split(r"\n\n+", content)
+
+        if len(paragraphs) < MIN_LINES_FOR_PARAGRAPH_SPLIT:
+            # Not enough paragraphs, fall back to sliding window
+            return self._sliding_window_split(chunk, file_path, source_id, context)
+
+        result: list[CodeChunk] = []
+        current_content = ""
+        current_start_line = base_line
+        line_offset = 0
+
+        for para in paragraphs:
+            if not para.strip():
+                line_offset += para.count("\n") + 2  # Account for split
+                continue
+
+            # Check if adding this paragraph would exceed optimal
+            test_content = current_content + ("\n\n" if current_content else "") + para
+            test_tokens = self._estimate_tokens(test_content)
+
+            if test_tokens > self.governor.acceptable_max_tokens and current_content:
+                # Emit current chunk, start new one
+                current_lines = current_content.count("\n") + 1
+                split_chunk = self._create_split_chunk(
+                    current_content,
+                    current_start_line,
+                    current_start_line + current_lines - 1,
+                    file_path,
+                    source_id,
+                    context,
+                    "paragraph",
+                )
+                result.append(split_chunk)
+
+                current_content = para
+                current_start_line = base_line + line_offset
+            else:
+                current_content = test_content
+
+            line_offset += para.count("\n") + 2  # +2 for the split "\n\n"
+
+        # Emit final chunk
+        if current_content.strip():
+            current_lines = current_content.count("\n") + 1
+            split_chunk = self._create_split_chunk(
+                current_content,
+                current_start_line,
+                current_start_line + current_lines - 1,
+                file_path,
+                source_id,
+                context,
+                "paragraph",
+            )
+            result.append(split_chunk)
+
+        return result or [chunk]
+
+    def _sliding_window_split(
+        self,
+        chunk: CodeChunk,
+        file_path: Path | None,
+        source_id: Any,
+        context: dict[str, Any] | None,
+    ) -> list[CodeChunk]:
+        """Split chunk using sliding window with overlap.
+
+        Last resort mechanical splitting when semantic and paragraph
+        approaches fail. Respects line boundaries to avoid mid-line splits.
+
+        Args:
+            chunk: The oversized chunk to split
+            file_path: Optional source file path
+            source_id: Source identifier
+            context: Optional additional context
+
+        Returns:
+            List of window-based chunks
+        """
+        content = chunk.content
+        lines = content.splitlines(keepends=True)
+        base_line = chunk.line_range.start if chunk.line_range else 1
+
+        # Calculate window size in characters (based on optimal tokens)
+        window_chars = self.governor.optimal_chunk_tokens * CHARS_PER_TOKEN
+        overlap_chars = int(window_chars * SLIDING_WINDOW_OVERLAP)
+
+        result: list[CodeChunk] = []
+        current_pos = 0
+        current_line = 0
+
+        while current_pos < len(content):
+            # Adjust to line boundary
+            end_pos = current_pos
+            end_line = current_line
+            chars_so_far = 0
+
+            for i in range(current_line, len(lines)):
+                line_len = len(lines[i])
+                if chars_so_far + line_len >= window_chars:
+                    # Include this line if it doesn't push us too far over
+                    if chars_so_far + line_len <= window_chars * 1.2:  # 20% tolerance
+                        end_pos = current_pos + chars_so_far + line_len
+                        end_line = i + 1
+                    else:
+                        end_pos = current_pos + chars_so_far
+                        end_line = i
+                    break
+                chars_so_far += line_len
+                end_pos = current_pos + chars_so_far
+                end_line = i + 1
+            else:
+                # Reached end of content
+                end_pos = len(content)
+                end_line = len(lines)
+
+            # Ensure we make progress
+            if end_pos <= current_pos:
+                end_pos = min(current_pos + window_chars, len(content))
+                end_line = min(current_line + 1, len(lines))
+
+            # Extract window content
+            window_content = content[current_pos:end_pos]
+
+            if window_content.strip():
+                window_chunk = self._create_split_chunk(
+                    window_content,
+                    base_line + current_line,
+                    base_line + end_line - 1,
+                    file_path,
+                    source_id,
+                    context,
+                    "window",
+                )
+                result.append(window_chunk)
+
+            # Move forward with overlap
+            overlap_start = max(current_pos, end_pos - overlap_chars)
+
+            # Find line boundary for overlap start
+            chars_counted = 0
+            for i in range(current_line, end_line):
+                line_len = len(lines[i])
+                if current_pos + chars_counted + line_len > overlap_start:
+                    current_line = i
+                    current_pos = current_pos + chars_counted
+                    break
+                chars_counted += line_len
+            else:
+                current_pos = end_pos
+                current_line = end_line
+
+            # Prevent infinite loop
+            if current_pos >= len(content) - 1:
+                break
+
+        return result or [chunk]
 
 
 __all__ = ("DelimiterChunker",)

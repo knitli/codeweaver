@@ -18,8 +18,10 @@ This multi-tiered approach ensures reliable chunking across 170+ languages while
 from __future__ import annotations
 
 import logging
+import math
 
 from abc import ABC, abstractmethod
+from enum import Enum
 from functools import cached_property
 from typing import TYPE_CHECKING, Annotated, Any, cast
 
@@ -44,6 +46,46 @@ logger = logging.getLogger(__name__)
 
 SAFETY_MARGIN = 0.1
 """A safety margin to apply to chunk sizes to account for metadata and tokenization variability."""
+
+# Adaptive chunking constants
+RETRIEVAL_OPTIMAL = 600
+"""LongEmbed benchmark sweet spot for retrieval quality (tokens)."""
+
+MIN_VIABLE_CHUNK = 100
+"""Minimum chunk size below which content becomes noise (tokens)."""
+
+SMALL_MODEL_RATIO = 0.80
+"""Use 80% of context window for small models."""
+
+TRANSITION_POINT = 512
+"""Context window size where we start transitioning to optimal (tokens)."""
+
+ACCEPTABLE_OVERAGE_RATIO = 1.67
+"""How much larger than optimal is acceptable before splitting (ratio)."""
+
+FLOOR_RATIO = 0.15
+"""Floor as percentage of optimal (ratio)."""
+
+MIN_FLOOR = 50
+"""Absolute minimum floor regardless of optimal (tokens)."""
+
+
+class AdaptiveChunkBehavior(str, Enum):
+    """Actions for adaptive chunk sizing.
+
+    The adaptive chunking system classifies each chunk by size and determines
+    the appropriate action:
+
+    - KEEP: Chunk is within acceptable range, use as-is
+    - MERGE: Chunk is too small, should combine with neighbors
+    - TRY_CHILDREN: Chunk exceeds optimal, try semantic split first
+    - FORCE_SPLIT: Chunk exceeds hard limit, must split mechanically
+    """
+
+    KEEP = "keep"
+    MERGE = "merge"
+    TRY_CHILDREN = "try_children"
+    FORCE_SPLIT = "force_split"
 
 
 class ChunkGovernor(BasedModel):
@@ -89,6 +131,101 @@ class ChunkGovernor(BasedModel):
         Calculates as 20% of the chunk_limit, clamped between 50 and 200 tokens. Practically, we only use this value when we can't determine a better overlap based on the tokenizer or other factors. `ChunkGovernor` may override this value based on more complex logic, aiming to identify and encapsulate logical boundaries within the text with no need for overlap.
         """
         return int(max(50, min(200, self.chunk_limit * 0.2)))
+
+    @computed_field
+    @cached_property
+    def optimal_chunk_tokens(self) -> PositiveInt:
+        """Target chunk size for best retrieval quality.
+
+        Based on LongEmbed benchmarks, retrieval quality peaks around 500-800 tokens
+        regardless of model context window. Larger context windows let you *accept*
+        more tokens, but don't improve *retrieval* of relevant content.
+
+        Scaling:
+        - Small models (≤512 context): 80% of context window
+        - Medium models (512-8192): logarithmic curve toward 600
+        - Large models (8192+): capped at 600
+
+        Examples:
+        - all-MiniLM-L6-v2 (256 context) → 205 optimal
+        - bge-small (512 context) → 410 optimal
+        - bge-base (1024 context) → 457 optimal
+        - voyage-code-3 (8192 context) → 600 optimal
+        - voyage-3-large (32000 context) → 600 optimal
+        - cohere-embed-v4 (128000 context) → 600 optimal
+        """
+        # Check for user override first
+        if (
+            self.settings is not None
+            and hasattr(self.settings, "target_chunk_tokens")
+            and (target := getattr(self.settings, "target_chunk_tokens", None)) is not None
+        ):
+            # Respect override but cap at context window
+            return (min(target, self.chunk_limit))
+
+        context = self.chunk_limit
+
+        if context <= TRANSITION_POINT:
+            # Small models: use 80% of available context
+            return (max(MIN_VIABLE_CHUNK, int(context * SMALL_MODEL_RATIO)))
+
+        # Logarithmic transition from 410 (512*0.8) to 600
+        # log2(1024/512) = 1, log2(8192/512) = 4
+        log_factor = math.log2(context / TRANSITION_POINT)
+
+        # Scale from 410 toward 600, reaching 600 at log_factor=4 (8192 tokens)
+        base = int(TRANSITION_POINT * SMALL_MODEL_RATIO)  # 410
+        headroom = RETRIEVAL_OPTIMAL - base  # 190
+
+        scaled = base + headroom * min(1.0, log_factor / 4)
+
+        return (min(int(scaled), RETRIEVAL_OPTIMAL))
+
+    @computed_field
+    @cached_property
+    def floor_tokens(self) -> PositiveInt:
+        """Minimum viable chunk size.
+
+        Chunks smaller than this are likely noise and should be merged with
+        neighbors. Calculated as ~15% of optimal, with a minimum of 50 tokens.
+        """
+        return (max(MIN_FLOOR, int(self.optimal_chunk_tokens * FLOOR_RATIO)))
+
+    @computed_field
+    @cached_property
+    def acceptable_max_tokens(self) -> PositiveInt:
+        """Maximum chunk size before trying to split.
+
+        Chunks larger than this should attempt semantic splitting (finding child
+        boundaries). This is ~1.67x optimal, capped at the hard context limit.
+
+        The 1.67x ratio allows capturing complete "context units" (e.g., a function
+        that's slightly larger than optimal) without forcing unnecessary splits.
+        """
+        return (
+            min(int(self.optimal_chunk_tokens * ACCEPTABLE_OVERAGE_RATIO), self.chunk_limit)
+        )
+
+    def classify_chunk_size(self, tokens: int) -> AdaptiveChunkBehavior:
+        """Determine what action to take for a chunk of given size.
+
+        Args:
+            tokens: Estimated token count of the chunk
+
+        Returns:
+            AdaptiveChunkBehavior indicating the recommended action:
+            - MERGE: tokens < floor_tokens (too small, combine with neighbors)
+            - KEEP: floor_tokens <= tokens <= acceptable_max_tokens (good size)
+            - TRY_CHILDREN: acceptable_max_tokens < tokens <= chunk_limit (try semantic split)
+            - FORCE_SPLIT: tokens > chunk_limit (must split mechanically)
+        """
+        if tokens < self.floor_tokens:
+            return AdaptiveChunkBehavior.MERGE
+        if tokens <= self.acceptable_max_tokens:
+            return AdaptiveChunkBehavior.KEEP
+        if tokens <= self.chunk_limit:
+            return AdaptiveChunkBehavior.TRY_CHILDREN
+        return AdaptiveChunkBehavior.FORCE_SPLIT
 
     def _telemetry_keys(self) -> None:
         return None
@@ -275,7 +412,7 @@ class BaseChunker(ABC):
         return self._governor.simple_overlap
 
 
-__all__ = ("BaseChunker", "ChunkGovernor")
+__all__ = ("AdaptiveChunkBehavior", "BaseChunker", "ChunkGovernor")
 
 
 def _get_capabilities() -> tuple[Any, ...]:

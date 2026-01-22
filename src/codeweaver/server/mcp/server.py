@@ -20,7 +20,7 @@ from fastmcp.client.transports import StreamableHttpTransport
 from fastmcp.server.proxy import FastMCPProxy, ProxyClient
 from fastmcp.tools import Tool
 
-from codeweaver.core import DictView, SettingsMapDep, Unset, lazy_import
+from codeweaver.core import DictView, SettingsMapDep, StatisticsDep, Unset, lazy_import
 from codeweaver.core.di.depends import INJECTED
 from codeweaver.server.config import (
     FastMcpHttpRunArgs,
@@ -35,6 +35,7 @@ from codeweaver.server.mcp.middleware import McpMiddleware, StatisticsMiddleware
 
 if TYPE_CHECKING:
     from codeweaver.core.config.types import CodeWeaverSettingsDict
+    from codeweaver.core.statistics import SessionStatistics
     from codeweaver.server.config import FastMcpServerSettingsDict
     from codeweaver.server.mcp.state import CwMcpHttpState
 
@@ -42,6 +43,10 @@ if TYPE_CHECKING:
 TOOLS_TO_REGISTER = ("find_code",)
 
 type StdioClientLifespan = AsyncIterator[Any]
+
+
+def _get_statistics(stats: StatisticsDep = INJECTED) -> SessionStatistics:
+    return stats
 
 
 def _get_fastmcp_settings_map(
@@ -82,15 +87,18 @@ def _get_default_middleware() -> Container[type[McpMiddleware]]:
 
 
 def get_statistics_middleware(
-    settings: MiddlewareOptions | DictView[MiddlewareOptions],
+    settings: MiddlewareOptions | DictView[MiddlewareOptions] | None = None,
+    statistics: SessionStatistics | None = None,
 ) -> StatisticsMiddleware:
     """Get the statistics middleware instance."""
-    from codeweaver.core import get_session_statistics
     from codeweaver.server.mcp.middleware.statistics import StatisticsMiddleware
 
+    settings = settings or _get_middleware_settings()
+    statistics = statistics or _get_statistics()
+
     return StatisticsMiddleware(
-        statistics=get_session_statistics(),
-        logger=logging.getLogger("codeweaver.middleware.statistics"),
+        statistics=statistics,
+        logger=logging.getLogger("codeweaver.server.mcpmiddleware.statistics"),
         log_level=settings.get("logging", {}).get("log_level", 30),
     )
 

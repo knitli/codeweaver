@@ -1,3 +1,4 @@
+# sourcery skip: no-complex-if-expressions
 # SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
@@ -49,25 +50,28 @@ import logging
 import time
 
 from pathlib import Path
-from typing import TYPE_CHECKING, NamedTuple, cast
+from typing import NamedTuple, cast
 
 from fastmcp.server.context import Context
 from pydantic import NonNegativeInt, PositiveInt
 
 from codeweaver.core import (
     INJECTED,
+    CodeWeaverSettingsType,
     SearchStrategy,
+    SettingsDep,
     Span,
     TelemetryServiceDep,
     TelemetrySettingsDep,
     capture_search_event,
     log_to_client_or_fallback,
 )
+from codeweaver.core.types import Unset
+from codeweaver.engine import IndexingServiceDep
 from codeweaver.engine.services.indexing_service import IndexingService
 from codeweaver.providers import SearchPackageDep, VectorStoreProvider
 from codeweaver.providers.types import SearchPackage
 from codeweaver.semantic import AgentTask
-from codeweaver.server import CodeWeaverStateDep
 from codeweaver.server.agent_api.find_code.conversion import convert_search_result_to_code_match
 from codeweaver.server.agent_api.find_code.filters import apply_filters
 from codeweaver.server.agent_api.find_code.intent import (
@@ -90,14 +94,15 @@ from codeweaver.server.agent_api.find_code.scoring import (
     process_unranked_results,
 )
 from codeweaver.server.agent_api.find_code.types import CodeMatch, FindCodeResponseSummary
-
-
-if TYPE_CHECKING:
-    from codeweaver.core.config.types import CodeWeaverSettingsDict
-    from codeweaver.core.types import DictView
+from codeweaver.server.config.settings import CodeWeaverSettings
 
 
 logger = logging.getLogger(__name__)
+
+
+def _get_settings(settings: SettingsDep = INJECTED) -> CodeWeaverSettingsType:
+    """Get the CodeWeaver settings from the dependency."""
+    return settings
 
 
 class MatchedSection(NamedTuple):
@@ -109,25 +114,6 @@ class MatchedSection(NamedTuple):
     filename: str | None = None
     file_path: Path | None = None
     chunk_number: PositiveInt | None = None
-
-
-def get_max_tokens() -> int:
-    """Get maximum tokens allowed in find_code response."""
-    settings = _get_settings()
-    return settings["token_limit"]
-
-
-def get_max_results() -> int:
-    """Get maximum results allowed in find_code response."""
-    settings = _get_settings()
-    return settings["max_results"]
-
-
-def _get_settings() -> DictView[CodeWeaverSettingsDict]:
-    """Get settings view from codeweaver settings."""
-    from codeweaver.server.config import get_settings_map
-
-    return get_settings_map()
 
 
 async def _check_index_status(
@@ -209,8 +195,18 @@ async def _ensure_index_ready(
             logger.warning("Auto-indexing failed: %s", e)
 
 
-_set_max = get_max_tokens()
-_set_max_results = get_max_results()
+_set_max = cast(
+    int,
+    token_limit
+    if (token_limit := cast(CodeWeaverSettings, _get_settings()).token_limit) is not Unset
+    else 15000,
+)
+_set_max_results = cast(
+    int,
+    max_results
+    if (max_results := cast(CodeWeaverSettings, _get_settings()).max_results) is not Unset
+    else 30,
+)
 
 
 async def _build_search_package(package: SearchPackageDep) -> SearchPackage:
@@ -237,7 +233,7 @@ async def find_code(
     Args:
         query: Natural language query
         intent: Optional IntentType to override detection
-        token_limit: Maximum tokens to return (default: 30000)
+        token_limit: Maximum tokens to return (default: 15000)
         focus_languages: Optional language filter
         max_results: Maximum number of results to return (default: 30)
         context: Optional FastMCP Context for client communication

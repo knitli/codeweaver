@@ -23,7 +23,7 @@ import textcase
 
 from codeweaver.core import SettingsDep, Unset
 from codeweaver.core.di.depends import INJECTED
-from codeweaver.engine.chunker.delimiters.kind import DelimiterKind
+from codeweaver.core.types import DelimiterKind
 from codeweaver.engine.chunker.delimiters.patterns import (
     EMPTY_PATTERN,
     LINEBREAK,

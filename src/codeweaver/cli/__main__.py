@@ -55,6 +55,7 @@ app = App(
 # if server; everything is available, and then progressively less from there
 if ROOT_PACKAGE == "server":
     app.command("codeweaver.cli.commands.init:app", name="init")
+    app.command("codeweaver.cli.commands.doctor:app", name="doctor")
     app.command("codeweaver.cli.commands.search:app", name="search")
     app.command("codeweaver.cli.commands.server:app", name="server")
     app.command("codeweaver.cli.commands.start:app", name="start")
@@ -65,7 +66,6 @@ if ROOT_PACKAGE == "server":
 if ROOT_PACKAGE in ("engine", "server"):
     app.command("codeweaver.cli.commands.index:app", name="index")
 if ROOT_PACKAGE in ("provider", "engine", "server"):
-    app.command("codeweaver.cli.commands.doctor:app", name="doctor")
     app.command("codeweaver.cli.commands.list:app", name="list", alias="ls")
 
 app.command("codeweaver.cli.commands.config:app", name="config")

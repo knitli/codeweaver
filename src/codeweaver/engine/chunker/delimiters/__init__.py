@@ -39,7 +39,6 @@ from codeweaver.core import create_lazy_getattr
 
 if TYPE_CHECKING:
     from codeweaver.engine.chunker.delimiters.families import LanguageFamily, detect_language_family
-    from codeweaver.engine.chunker.delimiters.kind import DelimiterKind, LineStrategy
     from codeweaver.engine.chunker.delimiters.patterns import (
         DelimiterDict,
         DelimiterPattern,
@@ -53,8 +52,6 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "LanguageFamily": (__spec__.parent, "families"),
     "detect_language_family": (__spec__.parent, "families"),
     "DelimiterDict": (__spec__.parent, "patterns"),
-    "DelimiterKind": (__spec__.parent, "kind"),
-    "LineStrategy": (__spec__.parent, "kind"),
 })
 
 __getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
@@ -62,10 +59,8 @@ __getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
 
 __all__ = (
     "DelimiterDict",
-    "DelimiterKind",
     "DelimiterPattern",
     "LanguageFamily",
-    "LineStrategy",
     "detect_language_family",
     "expand_pattern",
 )

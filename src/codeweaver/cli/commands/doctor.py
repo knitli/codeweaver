@@ -30,11 +30,15 @@ from codeweaver.cli.utils import check_provider_package_available
 from codeweaver.core import (
     CodeWeaverSettingsType,
     ProviderKind,
+    SettingsMapDep,
     Unset,
     get_codeweaver_config_paths,
     get_project_path,
     is_git_dir,
 )
+from codeweaver.core.config.types import CodeWeaverSettingsDict
+from codeweaver.core.di import INJECTED
+from codeweaver.core.types.dictview import DictView
 
 
 if TYPE_CHECKING:
@@ -45,6 +49,11 @@ if TYPE_CHECKING:
 
 # Module-level display for check functions
 _display: StatusDisplay = get_display()
+
+
+def _get_settings_map(settings: SettingsMapDep = INJECTED) -> DictView[CodeWeaverSettingsDict]:
+    """Get the settings map for CodeWeaver provider settings."""
+    return settings  # ty:ignore[invalid-return-type]
 
 
 def _get_display() -> StatusDisplay:
@@ -400,7 +409,7 @@ async def check_vector_store_config(settings: ProviderSettings) -> DoctorCheck:
     elif provider == Provider.QDRANT:
         deployment_type = "local" if await _qdrant_running_at_url() else "unknown"
     elif provider == Provider.MEMORY:
-        deployment_type = "in-memory"
+        deployment_type = "local"
     else:
         deployment_type = "unknown"
     _display.console.print(
@@ -412,7 +421,7 @@ async def check_vector_store_config(settings: ProviderSettings) -> DoctorCheck:
     # Deployment-specific checks
     match deployment_type:
         case "cloud":
-            return _check_qdrant_cloud_api_key(provider, settings, check, url)
+            return _check_qdrant_cloud_api_key(provider, settings, check, url)  # ty:ignore[invalid-argument-type]
         case "local" | "local docker":
             _display.console.print(
                 f"  [green]✓[/green] Local Qdrant {'docker container' if deployment_type == 'local docker' else 'install'} detected"
@@ -473,7 +482,7 @@ def _check_qdrant_cloud_api_key(
     return check
 
 
-def _check_qdrant_api_key_env_vars(provider, check) -> DoctorCheck:
+def _check_qdrant_api_key_env_vars(provider: Provider, check: DoctorCheck) -> DoctorCheck:
     possible_keys = cast(tuple[str, ...], provider.api_key_env_vars)
 
     # Check if env vars are actually set (for debugging)
@@ -682,9 +691,7 @@ def check_provider_availability(settings: ProviderSettings) -> list[DoctorCheck]
 
 
 def _get_health_endpoint():
-    from codeweaver.server import get_settings_map
-
-    settings_map = get_settings_map()
+    settings_map = _get_settings_map()
     host = settings_map.get("management_host", "localhost")
     port = settings_map.get("management_port", 9329)
     return f"http://{host}:{port}/health/"

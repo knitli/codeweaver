@@ -14,7 +14,6 @@ from codeweaver.core.config.loader import get_settings
 from codeweaver.core.dependencies import CodeWeaverSettingsType
 from codeweaver.core.di import Container, get_container
 from codeweaver.core.ui_protocol import ProgressReporter
-from codeweaver.server import update_settings
 
 
 def setup_cli_di(
@@ -36,7 +35,7 @@ def setup_cli_di(
         # update_settings returns a new settings object
         # We need to cast the result because update_settings dynamic return type
         # might confuse type checkers in this context
-        settings = update_settings(project_path=project_path)  # type: ignore
+        settings.project_path = project_path
 
     # 2. Get global container
     container = get_container()

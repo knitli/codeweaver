@@ -13,15 +13,13 @@ from codeweaver.core import create_lazy_getattr
 
 
 if TYPE_CHECKING:
-    from codeweaver.engine.chunker.base import ChunkGovernor
+    from codeweaver.engine.chunker.base import AdaptiveChunkBehavior, ChunkGovernor
     from codeweaver.engine.chunker.delimiter import DelimiterChunker
     from codeweaver.engine.chunker.delimiter_model import Boundary, Delimiter, DelimiterMatch
     from codeweaver.engine.chunker.delimiters import (
         DelimiterDict,
-        DelimiterKind,
         DelimiterPattern,
         LanguageFamily,
-        LineStrategy,
         detect_language_family,
         expand_pattern,
     )
@@ -41,6 +39,7 @@ if TYPE_CHECKING:
     from codeweaver.engine.chunker.semantic import SemanticChunker
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
+    "AdaptiveChunkBehavior": (__spec__.parent, "base"),
     "ASTDepthExceededError": (__spec__.parent, "exceptions"),
     "BinaryFileError": (__spec__.parent, "exceptions"),
     "Boundary": (__spec__.parent, "delimiter_model"),
@@ -52,12 +51,10 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "Delimiter": (__spec__.parent, "delimiter_model"),
     "DelimiterChunker": (__spec__.parent, "delimiter"),
     "DelimiterDict": (__spec__.parent, "delimiters"),
-    "DelimiterKind": (__spec__.parent, "delimiter_model"),
     "DelimiterMatch": (__spec__.parent, "delimiter_model"),
     "DelimiterPattern": (__spec__.parent, "delimiters"),
     "GracefulChunker": (__spec__.parent, "selector"),
     "LanguageFamily": (__spec__.parent, "delimiters"),
-    "LineStrategy": (__spec__.parent, "delimiters"),
     "OversizedChunkError": (__spec__.parent, "exceptions"),
     "ParseError": (__spec__.parent, "exceptions"),
     "ResourceGovernor": (__spec__.parent, "governance"),
@@ -73,6 +70,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
 __getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
 
 __all__ = (
+    "AdaptiveChunkBehavior",
     "ASTDepthExceededError",
     "BinaryFileError",
     "Boundary",
@@ -84,12 +82,10 @@ __all__ = (
     "Delimiter",
     "DelimiterChunker",
     "DelimiterDict",
-    "DelimiterKind",
     "DelimiterMatch",
     "DelimiterPattern",
     "GracefulChunker",
     "LanguageFamily",
-    "LineStrategy",
     "OversizedChunkError",
     "ParseError",
     "ResourceGovernor",

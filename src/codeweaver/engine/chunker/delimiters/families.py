@@ -421,7 +421,7 @@ def _detect_language_family_sync(content: str, min_confidence: int = 3) -> Langu
         weighted_score = float(stats.get("weighted_score", 0.0))
         matches = int(stats.get("pattern_matches", 0))
         # Use total non-excluded patterns as another tiebreaker
-        from codeweaver.engine.chunker.delimiters.kind import DelimiterKind
+        from codeweaver.core.types import DelimiterKind
 
         excluded_kinds = {
             DelimiterKind.PARAGRAPH,
@@ -484,7 +484,7 @@ async def detect_language_family(content: str, min_confidence: int = 3) -> Langu
 
 def _get_excluded_kinds() -> set[DelimiterKind]:
     """Get delimiter kinds to exclude from family detection."""
-    from codeweaver.engine.chunker.delimiters.kind import DelimiterKind
+    from codeweaver.core.types import DelimiterKind
 
     return {
         DelimiterKind.PARAGRAPH,

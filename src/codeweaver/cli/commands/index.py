@@ -198,9 +198,7 @@ async def _handle_server_status(*, standalone: bool, display: StatusDisplay) -> 
 
 
 def _get_url():
-    from codeweaver.server import get_settings_map
-
-    settings_map = get_settings_map()
+    settings_map = _settings_map()
     host = settings_map.get("management_host", "localhost")
     port = settings_map.get("management_port", 9329)
     return f"http://{host}:{port}"

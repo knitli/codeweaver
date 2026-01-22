@@ -15,15 +15,17 @@ from __future__ import annotations
 
 import os
 
-from typing import Annotated, Any
+from typing import Annotated, Any, TypedDict
 
-from pydantic import Field
+from pydantic import DirectoryPath, Field, FilePath
 from pydantic_settings import SettingsConfigDict
 
+from codeweaver.core.config._logging import LoggingSettingsDict
 from codeweaver.core.config.core_settings import CodeWeaverCoreSettings
+from codeweaver.core.config.telemetry import TelemetrySettingsDict
 from codeweaver.core.types.sentinel import UNSET, Unset
 from codeweaver.providers.config import ProviderProfile
-from codeweaver.providers.config.providers import ProviderSettings
+from codeweaver.providers.config.providers import ProviderSettings, ProviderSettingsDict
 
 
 class CodeWeaverProviderSettings(CodeWeaverCoreSettings):
@@ -93,6 +95,18 @@ class CodeWeaverProviderSettings(CodeWeaverCoreSettings):
         kwargs["profile"] = kwargs.get("profile")
         kwargs |= super()._initialize(**(kwargs or {}))
         return kwargs
+
+
+class CodeWeaverProviderSettingsDict(TypedDict, total=False):
+    """TypedDict for CodeWeaver provider settings."""
+
+    project_path: DirectoryPath | None
+    project_name: str | None
+    config_file: FilePath | None
+    logging: LoggingSettingsDict | None
+    provider: ProviderSettingsDict
+    profile: ProviderProfile | None
+    telemetry: TelemetrySettingsDict | None
 
 
 __all__ = ("CodeWeaverProviderSettings",)

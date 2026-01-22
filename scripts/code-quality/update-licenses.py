@@ -2,7 +2,7 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
-
+# ruff: noqa: S603
 """Update licenses for files in the repository."""
 
 import shutil
@@ -112,7 +112,7 @@ BASE_CMD = [
     "--fallback-dot-license",
     "--skip-existing",
 ]
-REUSE_PATH = shutil.which("reuse")
+REUSE_PATH = str(shutil.which("reuse") or "")
 if not REUSE_PATH:
     print("Reuse is not installed or not found in PATH. Please install it to use this script.")
     sys.exit(1)
@@ -219,7 +219,8 @@ def get_staged_files() -> list[Path]:
             print("Git is not installed or not found in PATH.")
             sys.exit(1)
         result = subprocess.run(
-            [git_path, "diff", "--cached", "--name-only"],
+            ["diff", "--cached", "--name-only"],  # noqa: S607
+            executable=git_path,
             capture_output=True,
             text=True,
             check=True,
