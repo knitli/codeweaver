@@ -17,7 +17,7 @@ from pathlib import Path
 from textwrap import dedent
 from typing import Any, ClassVar, Literal, NoReturn, cast
 
-from pydantic import UUID7
+from pydantic import UUID7, Field
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.http.exceptions import UnexpectedResponse
 from qdrant_client.models import (
@@ -25,7 +25,6 @@ from qdrant_client.models import (
     Document,
     PointStruct,
     QueryResponse,
-    SparseVector,
     SparseVectorParams,
     UpdateResult,
     VectorParams,
@@ -48,6 +47,7 @@ from codeweaver.providers.types import EmbeddingCapabilityGroup
 from codeweaver.providers.vector_stores.base import MixedQueryInput, VectorStoreProvider
 from codeweaver.providers.vector_stores.metadata import CollectionMetadata, HybridVectorPayload
 from codeweaver.providers.vector_stores.search import Filter
+from codeweaver.providers.vector_stores.vector_names import VectorNames
 
 
 logger = logging.getLogger(__name__)
@@ -64,6 +64,16 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
     client: AsyncQdrantClient
     caps: EmbeddingCapabilityGroup
     config: QdrantVectorStoreProviderSettings
+    vector_names: VectorNames = Field(
+        default_factory=lambda: VectorNames(
+            mapping={
+                "primary": "dense",  # Map "primary" intent to "dense" vector name
+                "sparse": "sparse",  # Map "sparse" intent to "sparse" vector name
+                "backup": "backup_dense",  # Map "backup" intent to "backup_dense" vector name
+            }
+        ),
+        description="Mapping from logical intent names to physical Qdrant vector names",
+    )
     _provider: ClassVar[Literal[Provider.QDRANT, Provider.MEMORY]]
 
     @property
@@ -217,14 +227,21 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         def _raise_dimension_error() -> NoReturn:
             from codeweaver.core import DimensionMismatchError
 
+            if actual_dense and expected_dense:
+                actual_dim = actual_dense.size
+                expected_dim = expected_dense.size
+            else:
+                actual_dim = "unknown"
+                expected_dim = "unknown"
+
             raise DimensionMismatchError(
                 dedent(
-                    f"                Collection '{collection_name}' has {actual_dense.size}-dimensional vectors but current configuration specifies {expected_dense.size} dimensions.\n\n                This typically happens when:\n\n                    • The embedding model changed (e.g., switched providers or model versions)\n                    • The embedding configuration changed\n                    • The collection was created with different settings\n                "
+                    f"                Collection '{collection_name}' has {actual_dim}-dimensional vectors but current configuration specifies {expected_dim} dimensions.\n\n                This typically happens when:\n\n                    • The embedding model changed (e.g., switched providers or model versions)\n                    • The embedding configuration changed\n                    • The collection was created with different settings\n                "
                 ),
                 details={
                     "collection": collection_name,
-                    "actual_dimension": actual_dense.size,
-                    "expected_dimension": expected_dense.size,
+                    "actual_dimension": actual_dim if actual_dense else None,
+                    "expected_dimension": expected_dim if expected_dense else None,
                     "resolution_command": "cw index --force --clear",
                 },
                 suggestions=[
@@ -246,8 +263,18 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
                 )
             store_config = collection_info.config
             store_params = store_config.params
-            actual_dense = store_params.vectors.get("dense")
-            expected_dense = (await self.config.collection.params()).vectors.get("dense")
+
+            # Check for any dense vector (primary, dense, backup, etc.) for dimension validation
+            # Get the first dense vector we can find for comparison
+            actual_dense = None
+            expected_dense = None
+            for vector_name, vector_config in store_params.vectors.items():
+                if isinstance(vector_config, VectorParams):
+                    actual_dense = vector_config
+                    # Try to find matching expected vector
+                    expected_dense = (await self.config.collection.params()).vectors.get(vector_name)
+                    if expected_dense:
+                        break
             # We flatten the vector configs to make sure ours matches the existing collection's config
             # This is the quick route -- there are some config changes that aren't problems
             flattened_params = cast(dict[str, Any], store_params.vectors) | cast(
@@ -493,60 +520,66 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
     def _prepare_vectors(self, chunk: CodeChunk) -> dict[str, Any]:
         """Prepare vector dictionary for a code chunk.
 
+        Dynamically iterates over all embeddings in the chunk and maps them to physical
+        vector names using the configured VectorNames mapping.
+
         Args:
             chunk: Code chunk with embeddings.
 
         Returns:
-            Dictionary with dense and/or sparse vectors.
+            Dictionary mapping physical vector names to vector data.
         """
         from qdrant_client.http.models import SparseVector
 
-        from codeweaver.core import EmbeddingBatchInfo
+        from codeweaver.providers.embedding.registry import embedding_registry
 
         vectors: dict[str, Any] = {}
-        if chunk.dense_embeddings:
-            dense_info = chunk.dense_embeddings
-            if isinstance(dense_info, EmbeddingBatchInfo):
-                vectors["dense"] = list(dense_info.embeddings)
-            else:
-                vectors["dense"] = list(dense_info)
-        if sparse_info := chunk.sparse_embeddings:
-            if isinstance(sparse_info, EmbeddingBatchInfo):
-                sparse_emb = sparse_info.embeddings
-                if isinstance(sparse_emb, CodeWeaverSparseEmbedding):
-                    self._prepare_sparse_vector_data(sparse_emb, SparseVector, vectors)
-            elif isinstance(sparse_info, CodeWeaverSparseEmbedding):
-                self._prepare_sparse_vector_data(sparse_info, SparseVector, vectors)
-        if not sparse_info:
-            vectors["sparse"] = Document(text=chunk.content, model="qdrant/bm25")
-        return vectors
+        has_sparse = False
 
-    def _prepare_sparse_vector_data(
-        self,
-        sparse_embedding: CodeWeaverSparseEmbedding,
-        sparse_vector: SparseVector,
-        vectors: dict[str, Any],
-    ):
-        indices = sparse_embedding.indices
-        values = sparse_embedding.values
-        normed_indices = (
-            indices
-            if isinstance(indices, list)
-            else list(indices)
-            if isinstance(indices, Iterable)
-            else [indices]
-        )
-        normed_values = (
-            values
-            if isinstance(values, list)
-            else list(values)
-            if isinstance(values, Iterable)
-            else [values]
-        )
-        vectors["sparse"] = sparse_vector.model_validate({
-            "indices": normed_indices,
-            "values": normed_values,
-        })
+        # Iterate over all embeddings in the chunk
+        for intent, batch_keys in chunk.embeddings.items():
+            # Get the actual embedding data from the registry
+            embedding_info = embedding_registry.get(batch_keys)
+
+            # Resolve physical vector name from intent
+            vector_name = self.vector_names.resolve(intent)
+
+            # Prepare vector data based on embedding kind
+            if embedding_info.is_dense:
+                # Dense vector: just convert to list
+                vectors[vector_name] = list(embedding_info.embeddings)
+            elif embedding_info.is_sparse:
+                # Sparse vector: convert to Qdrant SparseVector format
+                has_sparse = True
+                sparse_emb = embedding_info.embeddings
+                if isinstance(sparse_emb, CodeWeaverSparseEmbedding):
+                    indices = sparse_emb.indices
+                    values = sparse_emb.values
+                    # Normalize to lists
+                    normed_indices = (
+                        indices
+                        if isinstance(indices, list)
+                        else list(indices)
+                        if isinstance(indices, Iterable)
+                        else [indices]
+                    )
+                    normed_values = (
+                        values
+                        if isinstance(values, list)
+                        else list(values)
+                        if isinstance(values, Iterable)
+                        else [values]
+                    )
+                    vectors[vector_name] = SparseVector.model_validate({
+                        "indices": normed_indices,
+                        "values": normed_values,
+                    })
+
+        # Fallback: if no sparse vector exists, use BM25 document
+        if not has_sparse and "sparse" not in vectors:
+            vectors["sparse"] = Document(text=chunk.content, model="qdrant/bm25")
+
+        return vectors
 
     def _create_payload(self, chunk: CodeChunk) -> HybridVectorPayload:
         """Create payload for a code chunk.

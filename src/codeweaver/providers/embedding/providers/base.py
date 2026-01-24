@@ -961,10 +961,8 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
 
         for i, info in enumerate(chunk_infos):
             if (registered := registry.get(info.chunk_id)) is not None:
-                # Check if we already have this type of embedding
-                has_existing = (info.kind.variable == "dense" and registered.dense is not None) or (
-                    info.kind.variable == "sparse" and registered.sparse is not None
-                )
+                # Check if we already have an embedding with this intent
+                has_existing = info.intent in registered.embeddings
 
                 if has_existing:
                     # Replace existing embedding (e.g., during re-embedding with skip_deduplication=True)
@@ -975,13 +973,10 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
 
                 if registered.chunk != chunks[i]:
                     # because we create new CodeChunk instances during processing, we need to update the chunk reference
-                    registry[info.chunk_id] = registry[info.chunk_id]._replace(chunk=chunks[i])
+                    registry[info.chunk_id] = registry[info.chunk_id].model_copy(update={"chunk": chunks[i]})
             else:
-                registry[info.chunk_id] = ChunkEmbeddings(
-                    dense=info if attr == "dense" else None,
-                    sparse=info if attr == "sparse" else None,
-                    chunk=chunks[i],
-                )
+                # Create new ChunkEmbeddings with the chunk, then add the embedding
+                registry[info.chunk_id] = ChunkEmbeddings(chunk=chunks[i]).add(info)
 
     def _process_input(
         self,

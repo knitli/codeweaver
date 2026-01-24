@@ -6,10 +6,14 @@
 
 from __future__ import annotations
 
-from types import MappingProxyType
+import types as _types
+
 from typing import TYPE_CHECKING
 
 from codeweaver.core.utils import create_lazy_getattr
+
+
+MappingProxyType = _types.MappingProxyType
 
 
 if TYPE_CHECKING:
@@ -76,7 +80,6 @@ if TYPE_CHECKING:
         DataType,
         EmbeddingBatchInfo,
         EmbeddingKind,
-        EmbeddingModelInfo,
         QueryResult,
         RawEmbeddingVectors,
         SparseEmbedding,
@@ -126,6 +129,7 @@ if TYPE_CHECKING:
         TimingStatisticsDict,
         ToolOrPromptName,
     )
+    from codeweaver.core.types.strategy import EmbeddingStrategy, VectorStrategy
     from codeweaver.core.types.utils import (
         clean_sentinel_from_schema,
         generate_field_title,
@@ -166,8 +170,8 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "DirectoryPathT": (__spec__.parent, "aliases"),
     "EmbeddingBatchInfo": (__spec__.parent, "embeddings"),
     "EmbeddingKind": (__spec__.parent, "embeddings"),
-    "EmbeddingModelInfo": (__spec__.parent, "embeddings"),
     "EmbeddingModelName": (__spec__.parent, "aliases"),
+    "EmbeddingStrategy": (__spec__.parent, "strategy"),
     "EmbeddingModelNameT": (__spec__.parent, "aliases"),
     "EnvFormat": (__spec__.parent, "env"),
     "EnvVarInfo": (__spec__.parent, "env"),
@@ -228,6 +232,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "SparseEmbedding": (__spec__.parent, "embeddings"),
     "StoredEmbeddingVectors": (__spec__.parent, "embeddings"),
     "StrategizedQuery": (__spec__.parent, "search"),
+    "VectorStrategy": (__spec__.parent, "strategy"),
     "ThingName": (__spec__.parent, "aliases"),
     "ThingNameT": (__spec__.parent, "aliases"),
     "ThingOrCategoryNameT": (__spec__.parent, "aliases"),
@@ -285,9 +290,9 @@ __all__ = (
     "DirectoryPathT",
     "EmbeddingBatchInfo",
     "EmbeddingKind",
-    "EmbeddingModelInfo",
     "EmbeddingModelName",
     "EmbeddingModelNameT",
+    "EmbeddingStrategy",
     "EnvFormat",
     "EnvVarInfo",
     "FileExt",
@@ -353,6 +358,7 @@ __all__ = (
     "UUID7Hex",
     "UUID7HexT",
     "Unset",
+    "VectorStrategy",
     "clean_sentinel_from_schema",
     "generate_field_title",
     "generate_title",

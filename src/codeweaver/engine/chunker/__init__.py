@@ -70,8 +70,8 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
 __getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
 
 __all__ = (
-    "AdaptiveChunkBehavior",
     "ASTDepthExceededError",
+    "AdaptiveChunkBehavior",
     "BinaryFileError",
     "Boundary",
     "ChunkGovernor",

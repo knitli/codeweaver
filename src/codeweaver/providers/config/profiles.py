@@ -23,7 +23,7 @@ import os
 
 from importlib import util
 from pathlib import Path
-from typing import Any, Literal, overload
+from typing import Literal, overload
 
 from integration.conftest import HAS_FASTEMBED
 from pydantic import AnyHttpUrl
@@ -397,35 +397,23 @@ def _backup_profile(
 class ProviderConfigProfile(BaseDataclassEnum):
     """Dataclass wrapper for provider settings profiles."""
 
-    _profile: ProviderSettingsDict
-
-    def __init__(self, profile: ProviderSettingsDict, *args: Any, **kwargs: Any):
-        """Initialize the provider config profile."""
-        object.__setattr__(self, "_profile", profile)
-        super().__init__(*args, **kwargs)
+    vector_store: tuple[QdrantVectorStoreProviderSettings, ...] | None
+    embedding: tuple[EmbeddingProviderSettings, ...] | None
+    sparse_embedding: tuple[SparseEmbeddingProviderSettings, ...] | None
+    reranking: tuple[RerankingProviderSettings, ...] | None
+    agent: tuple[AgentProviderSettings, ...] | None
+    data: tuple[DataProviderSettings, ...] | None
 
     def __and__(self, other: ProviderConfigProfile) -> ProviderConfigProfile:
         """Combine two provider config profiles."""
         return ProviderConfigProfile(
             ProviderSettingsDict(
-                vector_store=(
-                    *(self._profile["vector_store"] or ()),
-                    *(other._profile["vector_store"] or ()),
-                ),
-                embedding=(
-                    *(self._profile["embedding"] or ()),
-                    *(other._profile["embedding"] or ()),
-                ),
-                sparse_embedding=(
-                    *(self._profile["sparse_embedding"] or ()),
-                    *(other._profile["sparse_embedding"] or ()),
-                ),
-                reranking=(
-                    *(self._profile["reranking"] or ()),
-                    *(other._profile["reranking"] or ()),
-                ),
-                agent=(*(self._profile["agent"] or ()), *(other._profile["agent"] or ())),
-                data=(*(self._profile["data"] or ()), *(other._profile["data"] or ())),
+                vector_store=(*(self.vector_store or ()), *(other.vector_store or ())),
+                embedding=(*(self.embedding or ()), *(other.embedding or ())),
+                sparse_embedding=(*(self.sparse_embedding or ()), *(other.sparse_embedding or ())),
+                reranking=(*(self.reranking or ()), *(other.reranking or ())),
+                agent=(*(self.agent or ()), *(other.agent or ())),
+                data=(*(self.data or ()), *(other.data or ())),
             ),
             self._aliases or (),  # ty:ignore[unresolved-attribute]
             self._description or "",  # ty:ignore[unresolved-attribute]
@@ -496,36 +484,6 @@ class ProviderProfile(ProviderConfigProfile, BaseDataclassEnum):
             )
         return provider
 
-    @property
-    def data(self) -> tuple[DataProviderSettings, ...] | None:
-        """Get the data provider settings."""
-        return self._profile.get("data")
-
-    @property
-    def embedding(self) -> tuple[EmbeddingProviderSettings, ...] | None:
-        """Get the embedding provider settings."""
-        return self._profile.get("embedding")
-
-    @property
-    def sparse_embedding(self) -> tuple[SparseEmbeddingProviderSettings, ...] | None:
-        """Get the sparse embedding provider settings."""
-        return self._profile.get("sparse_embedding")
-
-    @property
-    def reranking(self) -> tuple[RerankingProviderSettings, ...] | None:
-        """Get the reranking provider settings."""
-        return self._profile.get("reranking")
-
-    @property
-    def vector_store(self) -> tuple[QdrantVectorStoreProviderSettings, ...] | None:
-        """Get the vector store provider settings."""
-        return self._profile.get("vector_store")
-
-    @property
-    def agent(self) -> tuple[AgentProviderSettings, ...] | None:
-        """Get the agent provider settings."""
-        return self._profile.get("agent")
-
     def as_settings_dict(self) -> ProviderSettingsDict:
         """Get the provider settings as a dictionary."""
         profile = (
@@ -533,9 +491,11 @@ class ProviderProfile(ProviderConfigProfile, BaseDataclassEnum):
             if self in {ProviderProfile.TESTING, ProviderProfile.TESTING_DB}
             or os.environ.get("CODEWEAVER_DISABLE_BACKUP_SYSTEM", "0").lower()
             in {"1", "true", "yes"}
-            else (self._profile | ProviderProfile.TESTING._profile)
+            else (self.value)
         )
-        return as_dict(profile._profile)
+        return ProviderSettingsDict(**{
+            k: v for k, v in as_dict(profile).items() if k not in {"aliases", "description"}
+        })
 
 
 __all__ = ("ProviderConfigProfile", "ProviderProfile")

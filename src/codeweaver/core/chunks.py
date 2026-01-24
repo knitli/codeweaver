@@ -56,7 +56,7 @@ if TYPE_CHECKING:
     from codeweaver_tokenizers.base import Tokenizer
 
     from codeweaver.core.discovery import DiscoveredFile
-    from codeweaver.core.types import AnonymityConversion, EmbeddingBatchInfo
+    from codeweaver.core.types import AnonymityConversion
     from codeweaver.providers import EmbeddingRegistry
 
 # ---------------------------------------------------------------------------
@@ -82,42 +82,6 @@ def _get_registry() -> EmbeddingRegistry:
     from codeweaver.providers import get_embedding_registry
 
     return get_embedding_registry()
-
-
-class BatchKeyIndex(NamedTuple):
-    """Tuple representing the index of a chunk within a batch.
-
-    NOTE: While a CodeChunk can hypothetically have both primary and secondary batch keys for both dense and sparse embeddings, in practice, it's unlikely. The secondary/backup embedding process uses ultralightweight models with narrower context windows than most users will have by default. Consequently, the chunkers will produce smaller chunks that fit within these context windows, and these chunks will be embedded separately from the primary embeddings.
-    """
-
-    primary_dense: Annotated[
-        BatchKeys | None,
-        Field(
-            description="""UUID7 key for looking up the embedding batch of the chunk's primary dense embeddings.""",
-            field_title_generator=generate_field_title,
-        ),
-    ] = None
-    primary_sparse: Annotated[
-        BatchKeys | None,
-        Field(
-            description="""UUID7 key for looking up the embedding batch of the chunk's primary sparse embeddings.""",
-            field_title_generator=generate_field_title,
-        ),
-    ] = None
-    secondary_dense: Annotated[
-        BatchKeys | None,
-        Field(
-            description="""UUID7 key for looking up the embedding batch of the chunk's secondary dense embeddings.""",
-            field_title_generator=generate_field_title,
-        ),
-    ] = None
-    secondary_sparse: Annotated[
-        BatchKeys | None,
-        Field(
-            description="""UUID7 key for looking up the embedding batch of the chunk's secondary sparse embeddings.""",
-            field_title_generator=generate_field_title,
-        ),
-    ] = None
 
 
 class BatchKeys(NamedTuple):
@@ -162,13 +126,12 @@ class CodeChunkDict(TypedDict, total=False):
     parent_id: NotRequired[UUID7 | None]
     metadata: NotRequired[Metadata | None]
     chunk_name: NotRequired[str | None]
-    _embedding_index: NotRequired[BatchKeyIndex | None]
+    _embeddings: NotRequired[dict[str, BatchKeys]]
     blake_hash: NotRequired[BlakeHashKey]
     name: NotRequired[str]
     title: NotRequired[str]
     dense_batch_key: NotRequired[BatchKeys | None]
     sparse_batch_key: NotRequired[BatchKeys | None]
-    secondary_keys: NotRequired[tuple[BatchKeys, BatchKeys] | tuple[BatchKeys] | None]
     length: NotRequired[PositiveInt]
     token_estimate: NotRequired[PositiveInt]
     line_start: NotRequired[PositiveInt]
@@ -230,15 +193,20 @@ class CodeChunk(BasedModel):
     ] = None
 
     _version: Annotated[str, Field(repr=True, init=False, serialization_alias="chunk_version")] = (
-        "1.0.0"
+        "1.1.0"
     )
-    _embedding_index: Annotated[
-        BatchKeyIndex | None,
-        Field(
-            repr=True,
-            description="""Primary and secondary batch keys for embedding operations associated with this chunk""",
-        ),
-    ] = None
+    _embeddings: dict[str, BatchKeys] = Field(
+        default_factory=dict,
+        description="Mapping of embedding intents to their corresponding batch keys.",
+        serialization_alias="embeddings",
+        exclude=True,
+    )
+
+    def __init__(self, **data: Any) -> None:
+        """Initialize CodeChunk and ensure metadata is properly set."""
+        object.__setattr__(self, "_version", data.pop("_version", "1.1.0"))
+        object.__setattr__(self, "_embeddings", data.pop("_embeddings", {}))
+        super().__init__(**data)
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         from codeweaver.core.types import AnonymityConversion, FilteredKey
@@ -247,7 +215,7 @@ class CodeChunk(BasedModel):
             FilteredKey("content"): AnonymityConversion.TEXT_COUNT,
             FilteredKey("file_path"): AnonymityConversion.BOOLEAN,
             FilteredKey("metadata"): AnonymityConversion.AGGREGATE,
-            FilteredKey("_embedding_index"): AnonymityConversion.BOOLEAN,
+            FilteredKey("_embeddings"): AnonymityConversion.COUNT,
             FilteredKey("chunk_name"): AnonymityConversion.BOOLEAN,
             FilteredKey("name"): AnonymityConversion.HASH,
         }
@@ -305,21 +273,21 @@ class CodeChunk(BasedModel):
         )
 
     @property
-    def embeddings(self) -> BatchKeyIndex | None:
-        """Get the embedding batch key index, if available."""
-        return self._embedding_index
+    def embeddings(self) -> dict[str, BatchKeys]:
+        """Get the embedding batch keys dictionary."""
+        return self._embeddings
 
     @computed_field
     @property
     def dense_batch_key(self) -> BatchKeys | None:
-        """Get the dense embedding batch key, if available."""
-        return self._embedding_index.primary_dense if self._embedding_index else None
+        """Get the primary dense embedding batch key, if available."""
+        return self._embeddings.get("primary")
 
     @computed_field
     @property
     def sparse_batch_key(self) -> BatchKeys | None:
         """Get the sparse embedding batch key, if available."""
-        return self._embedding_index.primary_sparse if self._embedding_index else None
+        return self._embeddings.get("sparse")
 
     @property
     def embedding_batch_id(self) -> UUID7 | None:
@@ -328,22 +296,6 @@ class CodeChunk(BasedModel):
         Returns the ID from the dense batch key for backward compatibility.
         """
         return batch_key.id if (batch_key := self.dense_batch_key) else None
-
-    @property
-    def dense_embeddings(self) -> EmbeddingBatchInfo | None:
-        """Get the dense embeddings info, if available."""
-        if not self.dense_batch_key:
-            return None
-        registry = _get_registry()
-        return registry[self.chunk_id].dense if self.chunk_id in registry else None
-
-    @property
-    def sparse_embeddings(self) -> EmbeddingBatchInfo | None:
-        """Get the sparse embeddings info, if available."""
-        if not self.sparse_batch_key:
-            return None
-        registry = _get_registry()
-        return registry[self.chunk_id].sparse if self.chunk_id in registry else None
 
     def _serialize_metadata_for_cli(self) -> dict[str, Any]:
         """Serialize the metadata for CLI output."""
@@ -388,7 +340,7 @@ class CodeChunk(BasedModel):
         """Get the base fields to exclude during serialization."""
         return {
             "_version",
-            "_embedding_index",
+            "_embeddings",
             "chunk_version",
             "timestamp",
             "chunk_id",
@@ -402,7 +354,9 @@ class CodeChunk(BasedModel):
             "title",
         }
 
-    def set_batch_keys(self, batch_keys: BatchKeys, *, secondary: bool = False) -> Self:
+    def set_batch_keys(
+        self, batch_keys: BatchKeys, *, intent: str | None = None, secondary: bool = False
+    ) -> Self:
         """Set the batch keys for the code chunk.
 
         Returns a new CodeChunk instance with updated batch keys.
@@ -410,48 +364,28 @@ class CodeChunk(BasedModel):
 
         Args:
             batch_keys: The batch keys to set
+            intent: The intent/name for this embedding (e.g., "primary", "backup", "sparse").
+                   If None, infers from sparse flag and secondary parameter.
+            secondary: Deprecated - use intent parameter instead. If True and intent is None,
+                      uses "backup" as intent.
 
         Returns:
             New CodeChunk instance with batch keys set
         """
-        if self._embedding_index and (
-            (
-                not batch_keys.sparse
-                and self._embedding_index.primary_dense
-                and self._embedding_index.primary_dense == batch_keys
-            )
-            or (
-                batch_keys.sparse
-                and self._embedding_index.primary_sparse
-                and self._embedding_index.primary_sparse == batch_keys
-            )
-            or (
-                not batch_keys.sparse
-                and self._embedding_index.secondary_dense
-                and self._embedding_index.secondary_dense == batch_keys
-            )
-            or (
-                batch_keys.sparse
-                and self._embedding_index.secondary_sparse
-                and self._embedding_index.secondary_sparse == batch_keys
-            )
-        ):
+        # Infer intent if not provided
+        if intent is None:
+            intent = "backup" if secondary else "sparse" if batch_keys.sparse else "primary"
+
+        # Check if this exact batch key is already set for this intent
+        if intent in self._embeddings and self._embeddings[intent] == batch_keys:
             return self
 
         metadata_copy = dict(self.metadata.items()) if self.metadata else None
-        embedding_index = self._embedding_index or BatchKeyIndex()
-        new_index = BatchKeyIndex(
-            primary_dense=embedding_index.primary_dense
-            or (batch_keys if not batch_keys.sparse and not secondary else None),
-            primary_sparse=embedding_index.primary_sparse
-            or (batch_keys if batch_keys.sparse and not secondary else None),
-            secondary_dense=embedding_index.secondary_dense
-            or (batch_keys if not batch_keys.sparse and secondary else None),
-            secondary_sparse=embedding_index.secondary_sparse
-            or (batch_keys if batch_keys.sparse and secondary else None),
-        )
+        new_embeddings = dict(self._embeddings)
+        new_embeddings[intent] = batch_keys
+
         return self.model_copy(
-            update={"_embedding_index": new_index, "metadata": metadata_copy},
+            update={"_embeddings": new_embeddings, "metadata": metadata_copy},
             deep=False,  # Shallow copy to avoid pickling issues with SgNode in metadata
         )
 
@@ -577,7 +511,6 @@ class CodeChunk(BasedModel):
 
 
 __all__ = (
-    "BatchKeyIndex",
     "BatchKeys",
     "ChunkSequence",
     "CodeChunk",

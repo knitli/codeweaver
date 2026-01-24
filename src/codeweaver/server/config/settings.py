@@ -33,11 +33,13 @@ from codeweaver.server.config.server_defaults import (
     DefaultUvicornSettings,
 )
 from codeweaver.server.config.types import (
+    CodeWeaverSettingsDict,
     EndpointSettingsDict,
     FastMcpHttpRunArgs,
     FastMcpServerSettingsDict,
     StdioCodeWeaverConfigDict,
     UvicornServerSettings,
+    UvicornServerSettingsDict,
 )
 from codeweaver.server.mcp import McpMiddleware
 

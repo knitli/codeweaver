@@ -52,7 +52,16 @@ class VoyageEmbeddingCapabilities(EmbeddingModelCapabilities):
 @dependency_provider(VoyageEmbeddingCapabilities, scope="singleton", collection=True)
 def get_voyage_embedding_capabilities() -> tuple[VoyageEmbeddingCapabilities, ...]:
     """Get the capabilities for Voyage AI embedding models."""
-    models = "voyage-3-large", "voyage-3.5", "voyage-3.5-lite", "voyage-code-3", "voyage-context-3"
+    models = (
+        "voyage-3-large",
+        "voyage-3.5",
+        "voyage-3.5-lite",
+        "voyage-code-3",
+        "voyage-context-3",
+        "voyage-4-large",
+        "voyage-4",
+        "voyage-4-lite",
+    )
     settings = [{**_get_shared_capabilities()} for _ in models]
     for i, model in enumerate(models):
         settings[i]["name"] = model

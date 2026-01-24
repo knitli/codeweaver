@@ -501,7 +501,7 @@ class IndexingService:
                         if chunk.chunk_id in registry:
                             registry[chunk.chunk_id] = registry[chunk.chunk_id].add(info)
                         else:
-                            registry[chunk.chunk_id] = ChunkEmbeddings(sparse=info, chunk=chunk)
+                            registry[chunk.chunk_id] = ChunkEmbeddings(chunk=chunk).add(info)
                     except Exception:
                         # If conversion fails, just skip injection (will regenerate)
                         logger.debug(
@@ -526,13 +526,13 @@ class IndexingService:
             "dense_provider": self._embedding_provider.name.variable
             if self._embedding_provider
             else None,
-            "dense_model": self._embedding_provider.model_name
+            "dense_model": str(self._embedding_provider.model_name)
             if self._embedding_provider
             else None,
             "sparse_provider": self._sparse_provider.name.variable
             if self._sparse_provider
             else None,
-            "sparse_model": self._sparse_provider.model_name if self._sparse_provider else None,
+            "sparse_model": str(self._sparse_provider.model_name) if self._sparse_provider else None,
         }
 
 

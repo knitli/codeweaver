@@ -8,7 +8,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Annotated, Literal, NamedTuple, cast
+from typing import Annotated, Literal, NamedTuple, override
 
 from pydantic import UUID7, Field, NonNegativeInt, PositiveInt
 
@@ -84,17 +84,37 @@ class EmbeddingKind(BaseEnum):
     SPARSE = "sparse"
 
 
-class QueryResult(NamedTuple):
-    """NamedTuple representing the result of an embedding query."""
+class QueryResult(BasedModel):
+    """Multi-vector embedding result from an embedding query.
 
-    dense: Annotated[
-        RawEmbeddingVectors | None,
-        Field(description="The dense embedding vector", title="Dense Embedding"),
-    ]
-    sparse: Annotated[
-        SparseEmbedding | None,
-        Field(description="The sparse embedding representation", title="Sparse Embedding"),
-    ]
+    Stores embeddings from multiple intents (primary, backup, sparse, etc.)
+    in a dictionary keyed by intent name.
+    """
+
+    vectors: Annotated[
+        dict[str, RawEmbeddingVectors | SparseEmbedding],
+        Field(
+            description="Embeddings keyed by intent name",
+            field_title_generator=generate_field_title,
+        ),
+    ] = Field(default_factory=dict)
+
+    @override
+    def __getitem__(self, intent: str) -> RawEmbeddingVectors | SparseEmbedding:  # ty: ignore[invalid-method-override]
+        """Get embedding for a specific intent."""
+        return self.vectors[intent]
+
+    @override
+    def get(  # ty: ignore[invalid-method-override]
+        self, intent: str, default: RawEmbeddingVectors | SparseEmbedding | None = None
+    ) -> RawEmbeddingVectors | SparseEmbedding | None:
+        """Get embedding for an intent with optional default."""
+        return self.vectors.get(intent, default)
+
+    @property
+    def intents(self) -> set[str]:
+        """Get all available intent names."""
+        return set(self.vectors.keys())
 
 
 class EmbeddingBatchInfo(BasedModel):
@@ -111,6 +131,13 @@ class EmbeddingBatchInfo(BasedModel):
         NonNegativeInt,
         Field(
             description="Index of the chunk within the batch",
+            field_title_generator=generate_field_title,
+        ),
+    ]
+    intent: Annotated[
+        str,
+        Field(
+            description="Intent/purpose of this embedding (e.g., 'primary', 'backup', 'sparse')",
             field_title_generator=generate_field_title,
         ),
     ]
@@ -153,13 +180,6 @@ class EmbeddingBatchInfo(BasedModel):
         Literal["float32", "float16", "int8", "binary"],
         Field(description="Data type of the embedding", field_title_generator=generate_field_title),
     ] = "float32"
-    backup: Annotated[
-        bool,
-        Field(
-            description="Whether this embedding is for the backup vector store",
-            field_title_generator=generate_field_title,
-        ),
-    ] = False
 
     @classmethod
     def create_dense(
@@ -171,20 +191,20 @@ class EmbeddingBatchInfo(BasedModel):
         embeddings: RawEmbeddingVectors,
         dimension: PositiveInt,
         *,
+        intent: str = "primary",
         dtype: Literal["float32", "float16", "int8", "binary"] = "float32",
-        backup: bool = False,
     ) -> EmbeddingBatchInfo:
         """Create EmbeddingBatchInfo for dense embeddings."""
         return cls(
             batch_id=batch_id,
             batch_index=batch_index,
+            intent=intent,
             kind=EmbeddingKind.DENSE,
             chunk_id=chunk_id,
             model=ModelName(model),
             embeddings=tuple(embeddings),
             dimension=dimension,
             dtype=dtype,
-            backup=backup,
         )
 
     @classmethod
@@ -196,8 +216,8 @@ class EmbeddingBatchInfo(BasedModel):
         model: LiteralStringT | ModelNameT,
         embeddings: SparseEmbedding,
         *,
+        intent: str = "sparse",
         dimension: Literal[0] = 0,
-        backup: bool = False,
         dtype: Literal["float32", "float16", "int8", "binary"] = "float32",
     ) -> EmbeddingBatchInfo:
         """Create EmbeddingBatchInfo for sparse embeddings.
@@ -208,13 +228,14 @@ class EmbeddingBatchInfo(BasedModel):
             chunk_id: Unique identifier for the chunk
             model: Model name
             embeddings: SparseEmbedding with indices and values
+            intent: Intent/purpose of this embedding (default: "sparse")
             dimension: Dimensionality of the embedding (always 0 for sparse)
             dtype: Data type of the embedding values
-            backup: Whether this embedding is for the backup vector store
         """
         return cls(
             batch_id=batch_id,
             batch_index=batch_index,
+            intent=intent,
             kind=EmbeddingKind.SPARSE,
             chunk_id=chunk_id,
             model=ModelName(model),
@@ -223,7 +244,6 @@ class EmbeddingBatchInfo(BasedModel):
             if dimension
             else dimension,  # just to be safe -- we keep it 0 but in signature for clarity
             dtype=dtype,
-            backup=backup,
         )
 
     @property
@@ -236,218 +256,116 @@ class EmbeddingBatchInfo(BasedModel):
         """Check if the embedding kind is sparse."""
         return self.kind == EmbeddingKind.SPARSE
 
-    @property
-    def is_backup(self) -> bool:
-        """Check if the embedding is marked as a backup."""
-        return self.backup
-
-
-class EmbeddingModelInfo(NamedTuple):
-    """NamedTuple representing information about configured embedding models."""
-
-    dense: Annotated[
-        ModelNameT | None,
-        Field(description="Dense embedding model name", field_title_generator=generate_field_title),
-    ]
-    sparse: Annotated[
-        ModelNameT | None,
-        Field(
-            description="Sparse embedding model name", field_title_generator=generate_field_title
-        ),
-    ]
-    backup_dense: Annotated[
-        ModelNameT | None,
-        Field(
-            description="Backup dense embedding model name",
-            field_title_generator=generate_field_title,
-        ),
-    ]
-    backup_sparse: Annotated[
-        ModelNameT | None,
-        Field(
-            description="Backup sparse embedding model name",
-            field_title_generator=generate_field_title,
-        ),
-    ]
-
 
 class ChunkEmbeddings(BasedModel):
-    """NamedTuple representing the embeddings associated with a specific CodeChunk."""
+    """Model representing the embeddings associated with a specific CodeChunk.
 
-    sparse: Annotated[
-        EmbeddingBatchInfo | None,
-        Field(
-            description="Sparse embedding information", field_title_generator=generate_field_title
-        ),
-    ]
-    dense: Annotated[
-        EmbeddingBatchInfo | None,
-        Field(
-            description="Dense embedding information", field_title_generator=generate_field_title
-        ),
-    ]
-    chunk: Annotated[
-        CodeChunk,
-        Field(
-            description="The code chunk associated with the embeddings",
-            field_title_generator=generate_field_title,
-        ),
-    ]
-    backup_dense: Annotated[
-        EmbeddingBatchInfo | None,
-        Field(
-            description="Backup dense embedding information",
-            field_title_generator=generate_field_title,
-        ),
-    ] = None
-    backup_sparse: Annotated[
-        EmbeddingBatchInfo | None,
-        Field(
-            description="Backup sparse embedding information",
-            field_title_generator=generate_field_title,
-        ),
-    ] = None
+    Uses a dynamic dictionary to support arbitrary named embeddings (intents).
+    Common keys include: "primary", "sparse", "backup", "summary", "ast".
+    """
 
-    @property
-    def is_complete(self) -> bool:
-        """Check if both sparse and dense embeddings are present for primary embeddings."""
-        return self.has_dense and self.has_sparse
-
-    @property
-    def is_backup_complete(self) -> bool:
-        """Check if both sparse and dense embeddings are present for backup embeddings."""
-        return self.backup_dense is not None and self.backup_sparse is not None
-
-    @property
-    def has_dense(self) -> bool:
-        """Check if dense embeddings are present."""
-        return self.dense is not None
-
-    @property
-    def has_sparse(self) -> bool:
-        """Check if sparse embeddings are present."""
-        return self.sparse is not None
+    embeddings: dict[str, EmbeddingBatchInfo] = Field(
+        default_factory=dict, description="Dictionary mapping intent names to embedding information"
+    )
+    chunk: CodeChunk
 
     def add(self, embedding_info: EmbeddingBatchInfo) -> ChunkEmbeddings:
         """Add an EmbeddingBatchInfo to the ChunkEmbeddings.
 
         Args:
-            embedding_info (EmbeddingBatchInfo): The embedding information to add.
+            embedding_info: The embedding information to add (intent is extracted from this object).
 
         Returns:
             ChunkEmbeddings: A new ChunkEmbeddings instance with the added embedding.
+
+        Raises:
+            ValueError: If embedding already exists for this intent or chunk IDs don't match.
         """
-        if (
-            (
-                embedding_info.kind == EmbeddingKind.DENSE
-                and embedding_info.backup
-                and self.backup_dense is not None
-            )
-            or (
-                embedding_info.kind == EmbeddingKind.DENSE
-                and not embedding_info.backup
-                and self.dense is not None
-            )
-            or (
-                embedding_info.kind == EmbeddingKind.SPARSE
-                and embedding_info.backup
-                and self.backup_sparse is not None
-            )
-            or (
-                embedding_info.kind == EmbeddingKind.SPARSE
-                and not embedding_info.backup
-                and self.sparse is not None
-            )
-        ):
-            raise ValueError(
-                f"Embeddings are already set for {embedding_info.kind.variable} in chunk {embedding_info.chunk_id}."
-            )
         if self.chunk.chunk_id != embedding_info.chunk_id:
             raise ValueError(
                 f"Embedding chunk ID {embedding_info.chunk_id} does not match ChunkEmbeddings chunk ID {self.chunk.chunk_id}."
             )
-        return self.model_copy(
-            update={
-                "dense": embedding_info
-                if embedding_info.kind == EmbeddingKind.DENSE and not embedding_info.backup
-                else self.dense,
-                "sparse": embedding_info
-                if embedding_info.kind == EmbeddingKind.SPARSE and not embedding_info.backup
-                else self.sparse,
-                "backup_dense": embedding_info
-                if embedding_info.kind == EmbeddingKind.DENSE and embedding_info.backup
-                else self.backup_dense,
-                "backup_sparse": embedding_info
-                if embedding_info.kind == EmbeddingKind.SPARSE and embedding_info.backup
-                else self.backup_sparse,
-            }
-        )
+
+        intent = embedding_info.intent
+
+        if intent in self.embeddings:
+            raise ValueError(
+                f"Embeddings are already set for intent '{intent}' in chunk {embedding_info.chunk_id}."
+            )
+
+        new_embeddings = dict(self.embeddings)
+        new_embeddings[intent] = embedding_info
+        return self.model_copy(update={"embeddings": new_embeddings})
 
     def update(self, embedding_info: EmbeddingBatchInfo) -> ChunkEmbeddings:
         """Update or replace an EmbeddingBatchInfo in the ChunkEmbeddings.
 
-        Unlike `add()`, this method will replace existing embeddings of the same kind.
+        Unlike `add()`, this method will replace existing embeddings of the same intent.
         This is useful for re-embedding scenarios where we want to update embeddings.
 
         Args:
-            embedding_info (EmbeddingBatchInfo): The embedding information to update/replace.
+            embedding_info: The embedding information to update/replace (intent is extracted from this object).
 
         Returns:
             ChunkEmbeddings: A new ChunkEmbeddings instance with the updated embedding.
+
+        Raises:
+            ValueError: If chunk IDs don't match.
         """
         if self.chunk.chunk_id != embedding_info.chunk_id:
             raise ValueError(
                 f"Embedding chunk ID {embedding_info.chunk_id} does not match ChunkEmbeddings chunk ID {self.chunk.chunk_id}."
             )
-        return self.model_copy(
-            update={
-                "dense": embedding_info
-                if embedding_info.kind == EmbeddingKind.DENSE and not embedding_info.backup
-                else self.dense,
-                "sparse": embedding_info
-                if embedding_info.kind == EmbeddingKind.SPARSE and not embedding_info.backup
-                else self.sparse,
-                "backup_dense": embedding_info
-                if embedding_info.kind == EmbeddingKind.DENSE and embedding_info.backup
-                else self.backup_dense,
-                "backup_sparse": embedding_info
-                if embedding_info.kind == EmbeddingKind.SPARSE and embedding_info.backup
-                else self.backup_sparse,
-            }
-        )
+
+        intent = embedding_info.intent
+
+        new_embeddings = dict(self.embeddings)
+        new_embeddings[intent] = embedding_info
+        return self.model_copy(update={"embeddings": new_embeddings})
 
     @property
-    def models(self) -> tuple[ModelNameT] | tuple[ModelNameT, ModelNameT]:
-        """Get the set of models used for the embeddings."""
-        if not self.is_complete:
-            return (
-                (self.dense.model,)
-                if self.dense is not None
-                else (cast(EmbeddingBatchInfo, self.sparse).model,)
-            )  # type: ignore
-        assert self.dense is not None  # noqa: S101
-        assert self.sparse is not None  # noqa: S101
-        return self.dense.model, self.sparse.model
+    def models(self) -> tuple[ModelNameT, ...]:
+        """Get all unique models used for the embeddings."""
+        return tuple({emb.model for emb in self.embeddings.values()})
 
     @property
     def dense_model(self) -> ModelNameT | None:
-        """Get the model name used for dense embeddings, if any."""
-        return self.dense.model if self.dense is not None else None
+        """Get the model name used for primary dense embeddings, if any."""
+        return self.embeddings.get("primary").model if "primary" in self.embeddings else None
 
     @property
     def sparse_model(self) -> ModelNameT | None:
         """Get the model name used for sparse embeddings, if any."""
-        return self.sparse.model if self.sparse is not None else None
+        return self.embeddings.get("sparse").model if "sparse" in self.embeddings else None
 
     @property
     def backup_dense_model(self) -> ModelNameT | None:
         """Get the model name used for backup dense embeddings, if any."""
-        return self.backup_dense.model if self.backup_dense is not None else None
+        return self.embeddings.get("backup").model if "backup" in self.embeddings else None
 
     @property
     def backup_sparse_model(self) -> ModelNameT | None:
-        """Get the model name used for backup sparse embeddings, if any."""
-        return self.backup_sparse.model if self.backup_sparse is not None else None
+        """Get the model name used for backup sparse embeddings, if any (typically not used)."""
+        return (
+            self.embeddings.get("backup_sparse").model
+            if "backup_sparse" in self.embeddings
+            else None
+        )
+
+    @property
+    def has_dense(self) -> bool:
+        """Check if this chunk has any dense embedding (primary or backup)."""
+        return any(emb.is_dense for emb in self.embeddings.values())
+
+    @property
+    def has_sparse(self) -> bool:
+        """Check if this chunk has any sparse embedding."""
+        return any(emb.is_sparse for emb in self.embeddings.values())
+
+    @property
+    def is_complete(self) -> bool:
+        """Check if this chunk has both dense and sparse embeddings."""
+        return self.has_dense and self.has_sparse
 
 
 __all__ = (
@@ -455,7 +373,6 @@ __all__ = (
     "DataType",
     "EmbeddingBatchInfo",
     "EmbeddingKind",
-    "EmbeddingModelInfo",
     "QueryResult",
     "RawEmbeddingVectors",
     "SparseEmbedding",

@@ -278,15 +278,22 @@ async def embed_query(
     if dense_query_embedding is None and sparse_query_embedding is None:
         return raise_value_error("Both dense and sparse embedding failed")
 
-    return QueryResult(dense=dense_query_embedding, sparse=sparse_query_embedding)
+    # Build vectors dict with intent-based keys
+    vectors = {}
+    if dense_query_embedding is not None:
+        vectors["primary"] = dense_query_embedding
+    if sparse_query_embedding is not None:
+        vectors["sparse"] = sparse_query_embedding
+
+    return QueryResult(vectors=vectors)
 
 
 def build_query_vector(query_result: QueryResult, query: str) -> StrategizedQuery:
     """Build query vector for search from embeddings.
 
     Args:
-        dense_embedding: Dense embedding vector (batch result from provider)
-        sparse_embedding: Sparse embedding vector (batch result from provider)
+        query_result: QueryResult containing embeddings keyed by intent
+        query: Natural language query string
 
     Returns:
         A StrategizedQuery containing sparse and/or dense vectors and the chosen strategy
@@ -294,28 +301,32 @@ def build_query_vector(query_result: QueryResult, query: str) -> StrategizedQuer
     Raises:
         ValueError: If both embeddings are None
     """
-    if query_result.dense:
+    # Access embeddings by intent name
+    dense_embedding = query_result.get("primary")
+    sparse_embedding = query_result.get("sparse")
+
+    if dense_embedding:
         # Unwrap batch results (embed_query returns list[list[float]], we need list[float])
         dense_vector = (
-            query_result.dense[0] if isinstance(query_result.dense[0], list) else query_result.dense
+            dense_embedding[0] if isinstance(dense_embedding[0], list) else dense_embedding
         )
 
-        if query_result.sparse:
+        if sparse_embedding:
             return StrategizedQuery(
                 query=query,
                 dense=dense_vector,
-                sparse=query_result.sparse,
+                sparse=sparse_embedding,
                 strategy=SearchStrategy.HYBRID_SEARCH,
             )
         logger.warning("Using dense-only search (sparse embeddings unavailable)")
         return StrategizedQuery(
             query=query, dense=dense_vector, sparse=None, strategy=SearchStrategy.DENSE_ONLY
         )
-    if query_result.sparse:
+    if sparse_embedding:
         logger.warning("Using sparse-only search (dense embeddings unavailable - degraded mode)")
         # Unwrap batch results (take first element) and ensure float type
         return StrategizedQuery(
-            query=query, dense=None, sparse=query_result.sparse, strategy=SearchStrategy.SPARSE_ONLY
+            query=query, dense=None, sparse=sparse_embedding, strategy=SearchStrategy.SPARSE_ONLY
         )
     # Both failed - should not reach here due to earlier validation
     raise QueryError(
