@@ -124,8 +124,13 @@ def _register_chunk_embeddings(chunk, dense=None, sparse=None):
             embeddings=sparse_emb,
         )
 
-    # Register the embeddings - ChunkEmbeddings is a NamedTuple (sparse, dense, chunk)
-    registry[chunk.chunk_id] = ChunkEmbeddings(sparse=sparse_info, dense=dense_info, chunk=chunk)
+    # Register the embeddings - Create ChunkEmbeddings then add each embedding
+    chunk_embeddings = ChunkEmbeddings(chunk=chunk)
+    if dense_info:
+        chunk_embeddings = chunk_embeddings.add(dense_info)
+    if sparse_info:
+        chunk_embeddings = chunk_embeddings.add(sparse_info)
+    registry[chunk.chunk_id] = chunk_embeddings
 
     # Update chunk with batch keys - need to add both dense and sparse keys
     from codeweaver.core import BatchKeys

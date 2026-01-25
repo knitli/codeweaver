@@ -133,7 +133,7 @@ def sample_chunk():
     chunk = chunk.set_batch_keys(dense_batch_key)
 
     # Register in the embedding registry
-    registry[chunk_id] = ChunkEmbeddings(sparse=None, dense=dense_info, chunk=chunk)
+    registry[chunk_id] = ChunkEmbeddings(chunk=chunk).add(dense_info)
 
     return chunk
 

@@ -583,7 +583,13 @@ def create_test_chunk_with_embeddings(
 
     # Register in the embedding registry
     if dense_info or sparse_info:
-        registry[chunk_id] = ChunkEmbeddings(sparse=sparse_info, dense=dense_info, chunk=chunk)
+        # Create ChunkEmbeddings with the chunk, then add embeddings
+        chunk_embeddings = ChunkEmbeddings(chunk=chunk)
+        if dense_info:
+            chunk_embeddings = chunk_embeddings.add(dense_info)
+        if sparse_info:
+            chunk_embeddings = chunk_embeddings.add(sparse_info)
+        registry[chunk_id] = chunk_embeddings
 
     return chunk
 
