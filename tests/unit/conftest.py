@@ -45,9 +45,10 @@ def isolated_test_environment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     - Resetting CodeWeaver settings between tests
 
     Applied automatically to all unit tests.
-    """
-    from codeweaver.server import reset_settings
 
+    Note: Settings are now managed through DI container, which is reset
+    by the reset_di_container fixture in the root conftest.py.
+    """
     # Create isolated HOME directory
     fake_home = tmp_path / "home"
     fake_home.mkdir(exist_ok=True)
@@ -56,10 +57,4 @@ def isolated_test_environment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     # Enable test mode for CodeWeaver settings
     monkeypatch.setenv("CODEWEAVER_TEST_MODE", "1")
 
-    # Reset settings to prevent cross-test contamination
-    reset_settings()
-
-    yield
-
-    # Cleanup after test
-    reset_settings()
+    return

@@ -6,8 +6,8 @@
 
 import pytest
 
+from codeweaver.core import SparseEmbedding
 from codeweaver.core.types import QueryResult
-from codeweaver.providers import SparseEmbedding
 
 
 @pytest.mark.unit

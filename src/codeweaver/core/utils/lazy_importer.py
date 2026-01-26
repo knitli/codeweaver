@@ -156,41 +156,23 @@ def create_lazy_getattr(
     """Create a standardized __getattr__ function for package lazy imports."""
 
     def __getattr__(attr_name: str) -> object:  # noqa: N807
-        print("DEBUG: __getattr__ called for ", attr_name)
-        from codeweaver.core.utils.introspect import get_caller, get_caller_modulename
-
-        print(f"DEBUG: __getattr__ was called by {get_caller_modulename()}")
-        print(f"DEBUG: __getattr__ dynamic imports: {dynamic_imports}")
-        print(f"DEBUG: __getattr__ caller: {get_caller()}")
         dynamic_attr = dynamic_imports[attr_name]
-        print(f"DEBUG: __getattr__ dynamic_attr: {dynamic_attr}")
         package, module_name = dynamic_attr
 
         if module_name == "__module__":
             result = import_module(f".{attr_name}", package=package)
-            print("DEBUG: Resolving lazy import for ", attr_name)
-            print("DEBUG: Resolved as ", result)
-            print("DEBUG: Resolved type:", type(result))
             globals()[attr_name] = result._resolve() if isinstance(result, LazyImport) else result
             return result
-        print("DEBUG: Resolving lazy import for ", attr_name)
-        print("DEBUG: Attempting import of ", module_name)
-        print("DEBUG: Importing module from package ", package)
-        module: ModuleType = import_module(module_name, package=package)
+
+        module: ModuleType = import_module(f".{module_name}", package=package)
         result = getattr(module, attr_name)
 
+        # Cache only the requested attribute, not all attributes from the module
+        # This avoids circular import issues during eager caching
         g = globals()
-        for k, (_, v_module_name) in dynamic_imports.items():
-            if v_module_name == module_name:
-                print("DEBUG: Resolving lazy import for ", k)
-                print("DEBUG: Resolved as ", getattr(module, k))
-                print("DEBUG: Resolved type:", type(getattr(module, k)))
-                g[k] = (
-                    getattr(module, k)._resolve()
-                    if isinstance(getattr(module, k), LazyImport)
-                    else getattr(module, k)
-                )
-        return result._resolve() if isinstance(result, LazyImport) else result
+        g[attr_name] = result._resolve() if isinstance(result, LazyImport) else result
+
+        return g[attr_name]
 
     __getattr__.__module__ = module_name
     __getattr__.__doc__ = f"Dynamic __getattr__ for lazy imports in module {module_name!r}."

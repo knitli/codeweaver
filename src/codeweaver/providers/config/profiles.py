@@ -19,15 +19,14 @@ The recommended flag gives you access to:
 from __future__ import annotations
 
 import contextlib
-import os
 
+from dataclasses import asdict
 from importlib import util
+from importlib.util import find_spec
 from pathlib import Path
 from typing import Literal, overload
 
-from integration.conftest import HAS_FASTEMBED
 from pydantic import AnyHttpUrl
-from pydantic.dataclasses import as_dict
 from pydantic_ai.settings import ModelSettings as AgentModelSettings
 from qdrant_client.models import SparseVectorParams, VectorParams
 
@@ -56,6 +55,11 @@ from codeweaver.providers.config.kinds import (
     SparseEmbeddingProviderSettings,
 )
 from codeweaver.providers.config.providers import ProviderSettingsDict
+
+
+# Check if FastEmbed is available
+HAS_FASTEMBED = find_spec("fastembed") is not None or find_spec("fastembed-gpu") is not None
+
 from codeweaver.providers.config.reranking import (
     FastEmbedRerankingConfig,
     SentenceTransformersRerankingConfig,
@@ -404,6 +408,9 @@ class ProviderConfigProfile(BaseDataclassEnum):
     agent: tuple[AgentProviderSettings, ...] | None
     data: tuple[DataProviderSettings, ...] | None
 
+    def _telemetry_keys(self) -> None:
+        return None
+
     def __and__(self, other: ProviderConfigProfile) -> ProviderConfigProfile:
         """Combine two provider config profiles."""
         return ProviderConfigProfile(
@@ -486,15 +493,8 @@ class ProviderProfile(ProviderConfigProfile, BaseDataclassEnum):
 
     def as_settings_dict(self) -> ProviderSettingsDict:
         """Get the provider settings as a dictionary."""
-        profile = (
-            self
-            if self in {ProviderProfile.TESTING, ProviderProfile.TESTING_DB}
-            or os.environ.get("CODEWEAVER_DISABLE_BACKUP_SYSTEM", "0").lower()
-            in {"1", "true", "yes"}
-            else (self.value)
-        )
         return ProviderSettingsDict(**{
-            k: v for k, v in as_dict(profile).items() if k not in {"aliases", "description"}
+            k: v for k, v in asdict(self.value).items() if k not in {"aliases", "description"}
         })
 
 

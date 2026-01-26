@@ -8,7 +8,6 @@
 from __future__ import annotations
 
 import asyncio
-import importlib
 import logging
 import os
 
@@ -17,12 +16,17 @@ from typing import TYPE_CHECKING, Annotated
 
 from pydantic import DirectoryPath
 
-from codeweaver.core import TelemetryService
 from codeweaver.core._logging import get_rich_console
 from codeweaver.core.config._logging import DefaultLoggingSettings, LoggingSettingsDict
+
+# Runtime imports for decorator usage and type aliases
+from codeweaver.core.config.telemetry import TelemetrySettings
+from codeweaver.core.config.types import CodeWeaverSettingsDict
 from codeweaver.core.di.depends import INJECTED, depends
 from codeweaver.core.di.utils import dependency_provider
+from codeweaver.core.statistics import SessionStatistics
 from codeweaver.core.types.aliases import BlakeKey
+from codeweaver.core.types.dictview import DictView
 from codeweaver.core.types.sentinel import Unset
 from codeweaver.core.types.settings_model import get_possible_config_paths
 from codeweaver.core.ui_protocol import (
@@ -34,10 +38,11 @@ from codeweaver.core.utils.filesystem import get_git_branch, get_project_path
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.config.telemetry import TelemetrySettings
-    from codeweaver.core.config.types import CodeWeaverSettingsDict
-    from codeweaver.core.statistics import SessionStatistics
-    from codeweaver.core.types.dictview import DictView
+    # Settings types only needed for type checking - actual type resolved at runtime
+    from codeweaver.core.config.core_settings import CodeWeaverCoreSettings
+    from codeweaver.engine.config.root_settings import CodeWeaverEngineSettings
+    from codeweaver.providers.config.root_settings import CodeWeaverProviderSettings
+    from codeweaver.server.config.settings import CodeWeaverSettings
 
 
 def _resolve_config_file() -> Path | None:
@@ -90,25 +95,15 @@ async def bootstrap_settings(config_file: Path | None = None) -> CodeWeaverSetti
     return await asyncio.to_thread(get_settings, config_file=config_file)  # ty:ignore[invalid-return-type]
 
 
-if importlib.util.find_spec("codeweaver.server"):
-    from codeweaver.server.config.settings import CodeWeaverSettings
-
-    type CodeWeaverSettingsType = CodeWeaverSettings
-
-elif importlib.util.find_spec("codeweaver.engine"):
-    from codeweaver.engine.config.root_settings import CodeWeaverEngineSettings
-
-    type CodeWeaverSettingsType = CodeWeaverEngineSettings
-
-elif importlib.util.find_spec("codeweaver.providers"):
-    from codeweaver.providers.config.root_settings import CodeWeaverProviderSettings
-
-    type CodeWeaverSettingsType = CodeWeaverProviderSettings
-
-else:
-    from codeweaver.core.config.core_settings import CodeWeaverCoreSettings
-
-    type CodeWeaverSettingsType = CodeWeaverCoreSettings
+# Union type covering all possible settings types
+# Imports moved to TYPE_CHECKING block to avoid circular dependencies
+# Actual runtime type is resolved by bootstrap_settings -> get_settings()
+type CodeWeaverSettingsType = (
+    "CodeWeaverSettings"
+    | "CodeWeaverEngineSettings"
+    | "CodeWeaverProviderSettings"
+    | "CodeWeaverCoreSettings"
+)
 
 
 type SettingsDep = Annotated[
@@ -262,7 +257,7 @@ async def _create_telemetry_service(settings: TelemetrySettingsDep = INJECTED) -
     )
 
 
-type TelemetryServiceDep = Annotated[TelemetryService, depends(_create_telemetry_service)]
+type TelemetryServiceDep = Annotated["TelemetryService", depends(_create_telemetry_service)]
 
 
 __all__ = (

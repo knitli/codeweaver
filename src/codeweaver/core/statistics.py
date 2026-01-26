@@ -982,14 +982,14 @@ class SessionStatistics(BasedModel):
             default_factory=FileStatistics,
             description="""Comprehensive file statistics tracking categories, languages, and operations.""",
         ),
-    ] = None
+    ]
     token_statistics: Annotated[
         TokenCounter | None,
         Field(
             default_factory=TokenCounter,
             description="""A typed Counter that tracks token usage statistics.""",
         ),
-    ] = None
+    ]
     semantic_statistics: Annotated[
         Any | None,
         Field(
@@ -1002,7 +1002,7 @@ class SessionStatistics(BasedModel):
             default_factory=FailoverStats,
             description="""Vector store failover statistics tracking backup operations and status.""",
         ),
-    ] = None
+    ]
 
     _successful_request_log: Annotated[
         list[Identifier], Field(default_factory=list, init=False, repr=False)

@@ -232,6 +232,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "SparseEmbedding": (__spec__.parent, "embeddings"),
     "StoredEmbeddingVectors": (__spec__.parent, "embeddings"),
     "StrategizedQuery": (__spec__.parent, "search"),
+    "SummaryKey": (__spec__.parent, "statistics"),
     "VectorStrategy": (__spec__.parent, "strategy"),
     "ThingName": (__spec__.parent, "aliases"),
     "ThingNameT": (__spec__.parent, "aliases"),

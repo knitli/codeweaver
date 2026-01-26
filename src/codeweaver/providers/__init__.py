@@ -227,7 +227,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "AgentProviderSettingsDep": (__spec__.parent, "dependencies"),
     "AgentProviderSettingsType": (__spec__.parent, "config"),
     "AllDataProviderConfigsDep": (__spec__.parent, "dependencies"),
-    "AllDefaultProviderSettings": (__spec__.parent, "providers"),
+    "AllDefaultProviderSettings": (__spec__.parent, "config.providers"),
     "AllEmbeddingConfigsDep": (__spec__.parent, "dependencies"),
     "AllProviderSettingsDep": (__spec__.parent, "dependencies"),
     "AllRerankingConfigsDep": (__spec__.parent, "dependencies"),

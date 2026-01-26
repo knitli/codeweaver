@@ -39,6 +39,7 @@ from pydantic import (
     NonNegativeInt,
     PositiveFloat,
     PositiveInt,
+    PrivateAttr,
     computed_field,
 )
 from pydantic_core import to_json
@@ -195,12 +196,8 @@ class CodeChunk(BasedModel):
     _version: Annotated[str, Field(repr=True, init=False, serialization_alias="chunk_version")] = (
         "1.1.0"
     )
-    _embeddings: dict[str, BatchKeys] = Field(
-        default_factory=dict,
-        description="Mapping of embedding intents to their corresponding batch keys.",
-        serialization_alias="embeddings",
-        exclude=True,
-    )
+    # Private attribute for embedding batch keys (Python 3.13 compatibility)
+    _embeddings: dict[str, BatchKeys] = PrivateAttr(default_factory=dict)
 
     def __init__(self, **data: Any) -> None:
         """Initialize CodeChunk and ensure metadata is properly set."""

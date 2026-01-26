@@ -8,7 +8,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Annotated, Literal, NamedTuple, override
+from typing import TYPE_CHECKING, Annotated, Literal, NamedTuple, override
 
 from pydantic import UUID7, Field, NonNegativeInt, PositiveInt
 
@@ -19,6 +19,9 @@ from codeweaver.core.types.enum import BaseEnum
 from codeweaver.core.types.provider import Provider
 from codeweaver.core.types.utils import generate_field_title
 
+
+if TYPE_CHECKING:
+    from codeweaver.core.types import AnonymityConversion, FilteredKeyT
 
 type RawEmbeddingVectors = Sequence[float] | Sequence[int]
 type StoredEmbeddingVectors = tuple[float, ...] | tuple[int, ...]
@@ -98,6 +101,11 @@ class QueryResult(BasedModel):
             field_title_generator=generate_field_title,
         ),
     ] = Field(default_factory=dict)
+
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
+        from codeweaver.core.types import AnonymityConversion, FilteredKey
+
+        return {FilteredKey("vectors"): AnonymityConversion.COUNT}
 
     @override
     def __getitem__(self, intent: str) -> RawEmbeddingVectors | SparseEmbedding:  # ty: ignore[invalid-method-override]
@@ -180,6 +188,9 @@ class EmbeddingBatchInfo(BasedModel):
         Literal["float32", "float16", "int8", "binary"],
         Field(description="Data type of the embedding", field_title_generator=generate_field_title),
     ] = "float32"
+
+    def _telemetry_keys(self) -> None:
+        return None
 
     @classmethod
     def create_dense(
@@ -268,6 +279,9 @@ class ChunkEmbeddings(BasedModel):
         default_factory=dict, description="Dictionary mapping intent names to embedding information"
     )
     chunk: CodeChunk
+
+    def _telemetry_keys(self) -> None:
+        return None
 
     def add(self, embedding_info: EmbeddingBatchInfo) -> ChunkEmbeddings:
         """Add an EmbeddingBatchInfo to the ChunkEmbeddings.

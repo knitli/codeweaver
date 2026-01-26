@@ -668,12 +668,13 @@ def cli_api_keys(monkeypatch: pytest.MonkeyPatch) -> dict[str, str]:
 
 @pytest.fixture(autouse=True)
 def reset_cli_settings_cache() -> GeneratorType:
-    """Reset settings cache between CLI tests."""
-    from codeweaver.server import reset_settings
+    """Reset settings cache between CLI tests.
 
-    reset_settings()
-    yield
-    reset_settings()
+    Note: Settings are now managed through DI container, which is reset
+    by the reset_di_container fixture. This fixture is kept for compatibility
+    but no longer performs any action.
+    """
+    return
 
 
 @pytest.fixture(autouse=True)

@@ -82,7 +82,6 @@ from codeweaver.core import (
     get_user_state_dir,
 )
 from codeweaver.core.utils.checks import is_local_host
-from codeweaver.providers import EmbeddingCapabilityGroupDep
 from codeweaver.providers.config.clients import (
     BedrockClientOptions,
     ClientOptions,
@@ -106,6 +105,7 @@ from codeweaver.providers.config.utils import (
 
 
 if TYPE_CHECKING:
+    from codeweaver.providers.dependencies import EmbeddingCapabilityGroupDep
     from codeweaver.providers.types import EmbeddingCapabilityGroup
     from codeweaver.providers.vector_stores.metadata import CollectionMetadata
 
@@ -468,9 +468,9 @@ class FastEmbedProviderMixin:
     Important: You cannot have both `fastembed` and `fastembed-gpu` installed at the same time. They conflict with each other. Make sure to uninstall `fastembed` if you want to use `fastembed-gpu`.
     """
 
-    cuda: NotRequired[bool | None]
+    cuda: bool | None = None
     """Whether to use CUDA (if available). If `None`, will auto-detect. We'll generally assume you want to use CUDA if it's available unless you provide a `False` value here."""
-    device_ids: NotRequired[list[int] | None]
+    device_ids: list[int] | None = None
     """List of GPU device IDs to use. If `None`, we will try to detect available GPUs using `nvidia-smi` if we can find it. We recommend specifying them because our checks aren't perfect."""
 
 
@@ -548,7 +548,7 @@ def _deep_merge(dict1: dict[str, Any], dict2: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
-class CollectionConfig(BasedModel, total=False):
+class CollectionConfig(BasedModel):
     """Collection configuration for Qdrant and in-memory vector stores.
 
     NOTE: The vector configurations share many of the same properties as these collection parameters. If vector configurations exist, such as for hnsw_config or quantization_config, they will override the corresponding collection parameters.
@@ -1182,8 +1182,8 @@ type ModelString = Annotated[
 class AgentProviderSettings(BaseProviderSettings):
     """Settings for agent models."""
 
-    model: Required[ModelString]
-    model_options: Required[AgentModelSettings | None]
+    model: ModelString
+    model_options: AgentModelSettings | None
     """Settings for the agent model(s)."""
 
     @computed_field
