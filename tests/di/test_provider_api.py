@@ -19,12 +19,12 @@ import pytest
 
 from codeweaver.core import (
     create_provider_factory,
+    dependency_provider,
     get_all_provider_metadata,
     get_all_providers,
     get_provider,
     get_provider_metadata,
     is_provider_registered,
-    provider,
 )
 
 
@@ -71,7 +71,7 @@ def clean_registry():
 def test_get_provider_returns_registered_factory(clean_registry):
     """Test that get_provider returns the registered factory function."""
 
-    @provider(ServiceA)
+    @dependency_provider(ServiceA)
     def create_service() -> ServiceA:
         return ServiceA(value=100)
 
@@ -82,7 +82,7 @@ def test_get_provider_returns_registered_factory(clean_registry):
 def test_get_provider_returns_registered_class(clean_registry):
     """Test that get_provider returns registered class for self-registration."""
 
-    @provider(scope="singleton")
+    @dependency_provider(scope="singleton")
     class SelfRegisteredService:
         pass
 
@@ -103,11 +103,11 @@ def test_get_provider_raises_key_error_for_unregistered(clean_registry):
 def test_get_provider_with_multiple_registrations(clean_registry):
     """Test get_provider with multiple registered providers."""
 
-    @provider(ServiceA)
+    @dependency_provider(ServiceA)
     def create_a() -> ServiceA:
         return ServiceA()
 
-    @provider(ServiceB)
+    @dependency_provider(ServiceB)
     def create_b() -> ServiceB:
         return ServiceB()
 
@@ -124,7 +124,7 @@ def test_get_provider_with_multiple_registrations(clean_registry):
 def test_get_provider_metadata_returns_metadata(clean_registry):
     """Test that get_provider_metadata returns correct metadata."""
 
-    @provider(ServiceA, scope="request", module="test.module")
+    @dependency_provider(ServiceA, scope="request", module="test.module")
     def create_service() -> ServiceA:
         return ServiceA()
 
@@ -150,7 +150,7 @@ def test_get_provider_metadata_with_generator(clean_registry):
     """Test get_provider_metadata correctly identifies generators."""
     from collections.abc import Iterator
 
-    @provider(ServiceA)
+    @dependency_provider(ServiceA)
     def create_with_cleanup() -> Iterator[ServiceA]:
         service = ServiceA()
         yield service
@@ -166,7 +166,7 @@ def test_get_provider_metadata_with_async_generator(clean_registry):
     """Test get_provider_metadata correctly identifies async generators."""
     from collections.abc import AsyncIterator
 
-    @provider(ServiceA)
+    @dependency_provider(ServiceA)
     async def create_with_async_cleanup() -> AsyncIterator[ServiceA]:
         service = ServiceA()
         yield service
@@ -186,7 +186,7 @@ def test_get_provider_metadata_with_async_generator(clean_registry):
 def test_is_provider_registered_returns_true_for_registered(clean_registry):
     """Test that is_provider_registered returns True for registered types."""
 
-    @provider(ServiceA)
+    @dependency_provider(ServiceA)
     def create() -> ServiceA:
         return ServiceA()
 
@@ -205,11 +205,11 @@ def test_is_provider_registered_returns_false_for_unregistered(clean_registry):
 def test_is_provider_registered_after_multiple_registrations(clean_registry):
     """Test is_provider_registered with multiple providers."""
 
-    @provider(ServiceA)
+    @dependency_provider(ServiceA)
     def create_a() -> ServiceA:
         return ServiceA()
 
-    @provider(ServiceB)
+    @dependency_provider(ServiceB)
     def create_b() -> ServiceB:
         return ServiceB()
 
@@ -233,11 +233,11 @@ def test_get_all_providers_returns_empty_dict_when_empty(clean_registry):
 def test_get_all_providers_returns_all_registered(clean_registry):
     """Test that get_all_providers returns all registered providers."""
 
-    @provider(ServiceA)
+    @dependency_provider(ServiceA)
     def create_a() -> ServiceA:
         return ServiceA()
 
-    @provider(ServiceB)
+    @dependency_provider(ServiceB)
     def create_b() -> ServiceB:
         return ServiceB()
 
@@ -252,7 +252,7 @@ def test_get_all_providers_returns_all_registered(clean_registry):
 def test_get_all_providers_returns_copy_not_reference(clean_registry):
     """Test that get_all_providers returns a copy of the registry."""
 
-    @provider(ServiceA)
+    @dependency_provider(ServiceA)
     def create() -> ServiceA:
         return ServiceA()
 
@@ -271,11 +271,11 @@ def test_get_all_providers_returns_copy_not_reference(clean_registry):
 def test_get_all_providers_with_overwritten_registration(clean_registry):
     """Test get_all_providers when a provider is overwritten."""
 
-    @provider(ServiceA)
+    @dependency_provider(ServiceA)
     def first_factory() -> ServiceA:
         return ServiceA(value=1)
 
-    @provider(ServiceA)
+    @dependency_provider(ServiceA)
     def second_factory() -> ServiceA:
         return ServiceA(value=2)
 
@@ -300,11 +300,11 @@ def test_get_all_provider_metadata_returns_empty_dict_when_empty(clean_registry)
 def test_get_all_provider_metadata_returns_all_metadata(clean_registry):
     """Test that get_all_provider_metadata returns all metadata."""
 
-    @provider(ServiceA, scope="singleton", module="module.a")
+    @dependency_provider(ServiceA, scope="singleton", module="module.a")
     def create_a() -> ServiceA:
         return ServiceA()
 
-    @provider(ServiceB, scope="request", module="module.b")
+    @dependency_provider(ServiceB, scope="request", module="module.b")
     def create_b() -> ServiceB:
         return ServiceB()
 
@@ -323,7 +323,7 @@ def test_get_all_provider_metadata_returns_all_metadata(clean_registry):
 def test_get_all_provider_metadata_returns_copy(clean_registry):
     """Test that get_all_provider_metadata returns a copy."""
 
-    @provider(ServiceA)
+    @dependency_provider(ServiceA)
     def create() -> ServiceA:
         return ServiceA()
 
@@ -342,7 +342,7 @@ def test_get_all_provider_metadata_returns_copy(clean_registry):
 def test_create_provider_factory_returns_callable(clean_registry):
     """Test that create_provider_factory returns a callable."""
 
-    @provider(ServiceA)
+    @dependency_provider(ServiceA)
     def create() -> ServiceA:
         return ServiceA(value=100)
 
@@ -353,7 +353,7 @@ def test_create_provider_factory_returns_callable(clean_registry):
 def test_create_provider_factory_callable_returns_instance(clean_registry):
     """Test that the factory getter returns an instance."""
 
-    @provider(ServiceA)
+    @dependency_provider(ServiceA)
     def create() -> ServiceA:
         return ServiceA(value=100)
 
@@ -366,7 +366,7 @@ def test_create_provider_factory_callable_returns_instance(clean_registry):
 def test_create_provider_factory_callable_has_correct_metadata(clean_registry):
     """Test that factory getter has correct metadata."""
 
-    @provider(ServiceA)
+    @dependency_provider(ServiceA)
     def create() -> ServiceA:
         return ServiceA()
 
@@ -394,11 +394,11 @@ def test_create_provider_factory_raises_if_not_registered(clean_registry):
 def test_create_provider_factory_for_different_types(clean_registry):
     """Test create_provider_factory for multiple types."""
 
-    @provider(ServiceA)
+    @dependency_provider(ServiceA)
     def create_a() -> ServiceA:
         return ServiceA(value=1)
 
-    @provider(ServiceB)
+    @dependency_provider(ServiceB)
     def create_b() -> ServiceB:
         return ServiceB(name="test")
 
@@ -423,7 +423,7 @@ def test_create_provider_factory_for_different_types(clean_registry):
 def test_api_functions_are_consistent(clean_registry):
     """Test that all API functions work consistently together."""
 
-    @provider(ServiceA, scope="request", module="test")
+    @dependency_provider(ServiceA, scope="request", module="test")
     def create() -> ServiceA:
         return ServiceA()
 
@@ -505,7 +505,7 @@ def test_full_workflow_register_and_retrieve(clean_registry):
     """Test complete workflow: register provider and use all API functions."""
 
     # Step 1: Register provider
-    @provider(ServiceA, scope="singleton", module="integration.test")
+    @dependency_provider(ServiceA, scope="singleton", module="integration.test")
     def create_service() -> ServiceA:
         return ServiceA(value=999)
 
@@ -539,12 +539,12 @@ def test_full_workflow_register_and_retrieve(clean_registry):
 def test_api_functions_after_provider_overwrite(clean_registry):
     """Test API functions after overwriting a provider."""
 
-    @provider(ServiceA, scope="singleton")
+    @dependency_provider(ServiceA, scope="singleton")
     def first_factory() -> ServiceA:
         return ServiceA(value=1)
 
     # Overwrite
-    @provider(ServiceA, scope="request")
+    @dependency_provider(ServiceA, scope="request")
     def second_factory() -> ServiceA:
         return ServiceA(value=2)
 

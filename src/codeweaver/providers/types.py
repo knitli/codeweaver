@@ -11,7 +11,7 @@ from collections.abc import Sequence
 from functools import cache
 from threading import Lock
 from types import MappingProxyType
-from typing import Any, Literal, NamedTuple, TypedDict
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypedDict
 
 from pydantic import PositiveInt
 from qdrant_client.models import CollectionParams
@@ -22,10 +22,12 @@ from codeweaver.providers.embedding.capabilities.base import (
     EmbeddingModelCapabilities,
     SparseEmbeddingModelCapabilities,
 )
-from codeweaver.providers.embedding.providers.base import EmbeddingProvider, SparseEmbeddingProvider
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
-from codeweaver.providers.reranking.providers.base import RerankingProvider
-from codeweaver.providers.vector_stores.base import VectorStoreProvider
+
+if TYPE_CHECKING:
+    from codeweaver.providers.embedding.providers.base import EmbeddingProvider, SparseEmbeddingProvider
+    from codeweaver.providers.reranking.providers.base import RerankingProvider
+    from codeweaver.providers.vector_stores.base import VectorStoreProvider
 
 
 type EmbeddingCapabilityType = EmbeddingModelCapabilities | SparseEmbeddingModelCapabilities
@@ -337,22 +339,22 @@ class ModelCapDict(TypedDict, total=False):
 class SearchPackage:
     """Represents a complete package of CodeWeaver providers."""
 
-    embedding: EmbeddingProvider
+    embedding: "EmbeddingProvider"
 
-    sparse_embedding: SparseEmbeddingProvider
+    sparse_embedding: "SparseEmbeddingProvider"
 
-    reranking: RerankingProvider
+    reranking: "RerankingProvider"
 
-    vector_store: VectorStoreProvider
+    vector_store: "VectorStoreProvider"
 
     capabilities: EmbeddingCapabilityGroup
 
     def __init__(
         self,
-        embedding: EmbeddingProvider,
-        sparse_embedding: SparseEmbeddingProvider,
-        reranking: RerankingProvider,
-        vector_store: VectorStoreProvider,
+        embedding: "EmbeddingProvider",
+        sparse_embedding: "SparseEmbeddingProvider",
+        reranking: "RerankingProvider",
+        vector_store: "VectorStoreProvider",
         capabilities: EmbeddingCapabilityGroup,
     ):
         """Initializes a SearchPackage with the given providers and capabilities."""

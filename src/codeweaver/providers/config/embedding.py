@@ -160,15 +160,16 @@ class BaseEmbeddingConfig(BasedModel):
                 "Dependency injection container not available, skipping registration of EmbeddingConfig: %s",
                 e,
             )
+        embedding = data.get("embedding")
+        query = data.get("query")
         if (
-            ((embedding := data.get("embedding")) and not (query := data.get("query")))
-            or (query and not embedding)
+            (embedding and not query) or (query and not embedding)
         ) and self._query_and_embedding_same_type():
             # if only one of embedding or query is provided, and they are the same type, copy it over, with caveats
             no_copy_keys = {"prompt", "prompt_name", "task"}
-            if embedding and not query:
+            if embedding:
                 data["query"] = {k: v for k, v in embedding.copy().items() if k not in no_copy_keys}
-            elif query and not embedding:
+            elif query:
                 data["embedding"] = {k: v for k, v in query.copy().items() if k not in no_copy_keys}
         if not embedding:
             data["embedding"] = {}

@@ -66,7 +66,7 @@ def create_find_code_response(
     index_coverage=100.0,
 ):
     """Create a FindCodeResponseSummary with all required fields."""
-    from codeweaver.agent_api import FindCodeResponseSummary, IntentType
+    from codeweaver.server.agent_api import FindCodeResponseSummary, IntentType
 
     from codeweaver.core import SearchStrategy
 
@@ -280,7 +280,7 @@ class TestSearchEvent:
 
     def test_search_event_creation(self) -> None:
         """Test SearchEvent can be created."""
-        from codeweaver.agent_api import IntentType
+        from codeweaver.server.agent_api import IntentType
 
         from codeweaver.core import SearchEvent, SearchStrategy
 
@@ -301,7 +301,7 @@ class TestSearchEvent:
 
     def test_search_event_to_posthog_event(self) -> None:
         """Test SearchEvent converts to PostHog event format."""
-        from codeweaver.agent_api import IntentType
+        from codeweaver.server.agent_api import IntentType
 
         from codeweaver.core import SearchEvent, SearchStrategy
 
@@ -338,7 +338,7 @@ class TestSearchEvent:
 
     def test_search_event_with_tools_over_privacy(self) -> None:
         """Test SearchEvent includes query details when tools_over_privacy=True."""
-        from codeweaver.agent_api import IntentType
+        from codeweaver.server.agent_api import IntentType
 
         from codeweaver.core import SearchEvent, SearchStrategy
 
@@ -366,7 +366,7 @@ class TestSearchEvent:
 
     def test_search_event_without_tools_over_privacy(self) -> None:
         """Test SearchEvent excludes query details when tools_over_privacy=False."""
-        from codeweaver.agent_api import IntentType
+        from codeweaver.server.agent_api import IntentType
 
         from codeweaver.core import SearchEvent, SearchStrategy
 
@@ -457,7 +457,7 @@ class TestConvenienceFunctions:
 
     def test_capture_search_event_respects_opt_out(self) -> None:
         """Test capture_search_event doesn't capture when disabled."""
-        from codeweaver.agent_api import IntentType
+        from codeweaver.server.agent_api import IntentType
 
         from codeweaver.core import SearchStrategy, capture_search_event
 

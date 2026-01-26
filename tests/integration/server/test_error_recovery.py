@@ -141,7 +141,7 @@ async def test_sparse_only_fallback(initialize_test_settings, clean_container):
     When: Search query submitted
     Then: Falls back to sparse-only search, warns user
     """
-    from codeweaver.agent_api import find_code
+    from codeweaver.server.agent_api import find_code
 
     from codeweaver.core import SearchStrategy
     from codeweaver.providers import (

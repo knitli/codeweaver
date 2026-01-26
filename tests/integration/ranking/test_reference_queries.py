@@ -29,7 +29,7 @@ from typing import NamedTuple
 import pytest
 import yaml
 
-from codeweaver.agent_api import IntentType, find_code
+from codeweaver.server.agent_api import IntentType, find_code
 
 
 logger = logging.getLogger(__name__)

@@ -24,7 +24,7 @@ from dataclasses import asdict
 from importlib import util
 from importlib.util import find_spec
 from pathlib import Path
-from typing import Literal, overload
+from typing import TYPE_CHECKING, Literal, overload
 
 from pydantic import AnyHttpUrl
 from pydantic_ai.settings import ModelSettings as AgentModelSettings
@@ -54,7 +54,9 @@ from codeweaver.providers.config.kinds import (
     RerankingProviderSettings,
     SparseEmbeddingProviderSettings,
 )
-from codeweaver.providers.config.providers import ProviderSettingsDict
+
+if TYPE_CHECKING:
+    from codeweaver.providers.config.providers import ProviderSettingsDict
 
 
 # Check if FastEmbed is available
@@ -108,7 +110,7 @@ def _get_profile(
     url: AnyHttpUrl | None = None,
     project_name: str | None = None,
     project_path: Path | None = None,
-) -> ProviderSettingsDict: ...
+) -> "ProviderSettingsDict": ...
 @overload
 def _get_profile(
     profile: Literal["recommended", "quickstart", "testing"],
@@ -117,7 +119,7 @@ def _get_profile(
     url: AnyHttpUrl,
     project_name: str | None = None,
     project_path: Path | None = None,
-) -> ProviderSettingsDict: ...
+) -> "ProviderSettingsDict": ...
 def _get_profile(
     profile: Literal["recommended", "quickstart", "testing"],
     vector_deployment: Literal["cloud", "local"],
@@ -125,7 +127,7 @@ def _get_profile(
     project_name: str | None = None,
     project_path: Path | None = None,
     url: AnyHttpUrl | None = None,
-) -> ProviderSettingsDict:
+) -> "ProviderSettingsDict":
     """Get the default provider settings profile.
 
     Args:
@@ -172,12 +174,13 @@ def _recommended_default(
     url: AnyHttpUrl | None = None,
     project_name: str | None = None,
     project_path: Path | None = None,
-) -> ProviderSettingsDict:
+) -> "ProviderSettingsDict":
     """Recommended default settings profile.
 
     This profile leans towards high-quality providers, but without excessive cost or setup. It uses Voyage AI for embeddings and rerankings, which has a generous free tier and class-leading performance. Qdrant can be deployed locally for free or as a cloud service with a generous free tier. Anthropic Claude Haiku is used for agents, which has a strong balance of cost and performance.
     """
     from codeweaver.core import Provider
+    from codeweaver.providers.config.providers import ProviderSettingsDict
 
     return ProviderSettingsDict(
         embedding=(
@@ -234,12 +237,13 @@ def _quickstart_default(
     url: AnyHttpUrl | None = None,
     project_name: str | None = None,
     project_path: Path | None = None,
-) -> ProviderSettingsDict:
+) -> "ProviderSettingsDict":
     """Quickstart default settings profile.
 
     This profile uses free-tier or open-source providers to allow for immediate use without cost.
     """
     from codeweaver.core import Provider
+    from codeweaver.providers.config.providers import ProviderSettingsDict
 
     embedding_model = (
         ModelName("ibm-granite/granite-embedding-small-english-r2")
@@ -318,7 +322,7 @@ def _backup_profile(
     as_backup: bool = True,
     project_name: str | None = None,
     project_path: Path | None = None,
-) -> ProviderSettingsDict:
+) -> "ProviderSettingsDict":
     """Backup profile for local development with backup vector store.
 
     Exposed through the CLI as the "testing" profile. We choose the lightest models available for either FastEmbed or Sentence Transformers, depending on availability.
@@ -332,6 +336,7 @@ def _backup_profile(
         project_path: The path to the project, used for generating collection names.
     """
     from codeweaver.core import Provider
+    from codeweaver.providers.config.providers import ProviderSettingsDict
 
     # NOTE: qdrant/bm25 doesn't require FASTEMBED -- FastEmbed can generate with it, but so can the qdrant_client itself
     # We lose true sparse embeddings with bm25, but it's a good lightweight backup option
@@ -413,6 +418,8 @@ class ProviderConfigProfile(BaseDataclassEnum):
 
     def __and__(self, other: ProviderConfigProfile) -> ProviderConfigProfile:
         """Combine two provider config profiles."""
+        from codeweaver.providers.config.providers import ProviderSettingsDict
+
         return ProviderConfigProfile(
             ProviderSettingsDict(
                 vector_store=(*(self.vector_store or ()), *(other.vector_store or ())),
@@ -491,8 +498,10 @@ class ProviderProfile(ProviderConfigProfile, BaseDataclassEnum):
             )
         return provider
 
-    def as_settings_dict(self) -> ProviderSettingsDict:
+    def as_settings_dict(self) -> "ProviderSettingsDict":
         """Get the provider settings as a dictionary."""
+        from codeweaver.providers.config.providers import ProviderSettingsDict
+
         return ProviderSettingsDict(**{
             k: v for k, v in asdict(self.value).items() if k not in {"aliases", "description"}
         })

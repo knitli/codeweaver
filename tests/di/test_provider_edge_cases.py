@@ -2,7 +2,7 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
-"""Edge case and error handling tests for @provider decorator and auto-discovery.
+"""Edge case and error handling tests for @dependency_provider decorator and auto-discovery.
 
 Tests error conditions, edge cases, and boundary scenarios:
 - Invalid scope values
@@ -26,12 +26,12 @@ import pytest
 from codeweaver.core import (
     Container,
     Depends,
+    dependency_provider,
     get_all_provider_metadata,
     get_all_providers,
     get_provider,
     get_provider_metadata,
     is_provider_registered,
-    provider,
 )
 from codeweaver.core.exceptions import CircularDependencyError
 
@@ -77,7 +77,7 @@ def test_provider_with_invalid_scope_still_registers(clean_registry):
 
     # Note: Current implementation doesn't validate scope at decorator time
     # This test documents current behavior
-    @provider(ServiceA, scope="invalid")  # type: ignore
+    @dependency_provider(ServiceA, scope="invalid")  # type: ignore
     def create() -> ServiceA:
         return ServiceA()
 
@@ -99,13 +99,13 @@ def test_duplicate_provider_registration_overwrites(clean_registry):
     first_called = False
     second_called = False
 
-    @provider(ServiceA, scope="singleton", module="first")
+    @dependency_provider(ServiceA, scope="singleton", module="first")
     def first_factory() -> ServiceA:
         nonlocal first_called
         first_called = True
         return ServiceA(value=1)
 
-    @provider(ServiceA, scope="request", module="second")
+    @dependency_provider(ServiceA, scope="request", module="second")
     def second_factory() -> ServiceA:
         nonlocal second_called
         second_called = True
@@ -125,11 +125,11 @@ def test_duplicate_provider_registration_overwrites(clean_registry):
 async def test_duplicate_registration_container_behavior(clean_registry):
     """Test Container behavior with duplicate registrations."""
 
-    @provider(ServiceA, scope="singleton")
+    @dependency_provider(ServiceA, scope="singleton")
     def first_factory() -> ServiceA:
         return ServiceA(value=1)
 
-    @provider(ServiceA, scope="singleton")
+    @dependency_provider(ServiceA, scope="singleton")
     def second_factory() -> ServiceA:
         return ServiceA(value=2)
 
@@ -156,7 +156,7 @@ def test_provider_with_generic_type(clean_registry):
             self.value = value
 
     # Register with concrete generic type
-    @provider(GenericService, scope="singleton")
+    @dependency_provider(GenericService, scope="singleton")
     def create() -> GenericService[int]:
         return GenericService(value=42)
 
@@ -168,7 +168,7 @@ def test_provider_with_union_type(clean_registry):
 
     UnionType = ServiceA | ServiceB
 
-    @provider(UnionType, scope="singleton")  # type: ignore
+    @dependency_provider(UnionType, scope="singleton")  # type: ignore
     def create() -> ServiceA:
         return ServiceA()
 
@@ -181,7 +181,7 @@ def test_provider_with_optional_type(clean_registry):
 
     OptionalType = ServiceA | None
 
-    @provider(OptionalType, scope="singleton")  # type: ignore
+    @dependency_provider(OptionalType, scope="singleton")  # type: ignore
     def create() -> ServiceA | None:
         return ServiceA()
 
@@ -197,7 +197,7 @@ def test_provider_generator_that_raises(clean_registry):
     # sourcery skip: remove-unreachable-code
     """Test generator provider that raises during setup."""
 
-    @provider(ServiceA, scope="singleton")
+    @dependency_provider(ServiceA, scope="singleton")
     def create_with_error() -> Iterator[ServiceA]:
         raise RuntimeError("Setup failed")
         yield ServiceA()  # Never reached
@@ -213,7 +213,7 @@ async def test_provider_async_generator_that_raises(clean_registry):
     # sourcery skip: remove-unreachable-code
     """Test async generator provider that raises during setup."""
 
-    @provider(ServiceA, scope="singleton")
+    @dependency_provider(ServiceA, scope="singleton")
     async def create_with_error() -> AsyncIterator[ServiceA]:
         raise RuntimeError("Async setup failed")
         yield ServiceA()  # Never reached
@@ -227,7 +227,7 @@ async def test_provider_async_generator_that_raises(clean_registry):
 def test_provider_generator_that_yields_none(clean_registry):
     """Test generator that yields None."""
 
-    @provider(ServiceA, scope="singleton")
+    @dependency_provider(ServiceA, scope="singleton")
     def create_none() -> Iterator[ServiceA]:
         yield None  # type: ignore
 
@@ -251,11 +251,11 @@ async def test_circular_dependency_detection_with_auto_discovery(clean_registry)
         def __init__(self, service_x: ServiceX) -> None:
             self.service_x = service_x
 
-    @provider(ServiceX, scope="singleton")
+    @dependency_provider(ServiceX, scope="singleton")
     def create_x(service_y: Annotated[ServiceY, Depends()]) -> ServiceX:
         return ServiceX(service_y=service_y)
 
-    @provider(ServiceY, scope="singleton")
+    @dependency_provider(ServiceY, scope="singleton")
     def create_y(service_x: Annotated[ServiceX, Depends()]) -> ServiceY:
         return ServiceY(service_x=service_x)
 
@@ -274,7 +274,7 @@ async def test_circular_dependency_detection_with_auto_discovery(clean_registry)
 def test_provider_with_none_module(clean_registry):
     """Test that None module is handled correctly."""
 
-    @provider(ServiceA, scope="singleton", module=None)
+    @dependency_provider(ServiceA, scope="singleton", module=None)
     def create() -> ServiceA:
         return ServiceA()
 
@@ -286,7 +286,7 @@ def test_provider_with_none_module(clean_registry):
 def test_provider_with_empty_string_module(clean_registry):
     """Test that empty string module is handled correctly."""
 
-    @provider(ServiceA, scope="singleton", module="")
+    @dependency_provider(ServiceA, scope="singleton", module="")
     def create() -> ServiceA:
         return ServiceA()
 
@@ -303,7 +303,7 @@ def test_provider_with_empty_string_module(clean_registry):
 async def test_container_state_after_failed_resolution(clean_registry):
     """Test that container state is consistent after failed resolution."""
 
-    @provider(ServiceA, scope="singleton")
+    @dependency_provider(ServiceA, scope="singleton")
     def create_failing() -> ServiceA:
         raise RuntimeError("Factory failed")
 
@@ -325,7 +325,7 @@ async def test_container_request_cache_state_after_error(clean_registry):
 
     call_count = 0
 
-    @provider(ServiceA, scope="request")
+    @dependency_provider(ServiceA, scope="request")
     def create_sometimes_failing() -> ServiceA:
         nonlocal call_count
         call_count += 1
@@ -363,7 +363,7 @@ def test_registry_thread_safety_under_exception(clean_registry):
     def register_and_fail():
         try:
 
-            @provider(ServiceA, scope="singleton")
+            @dependency_provider(ServiceA, scope="singleton")
             def create() -> ServiceA:
                 return ServiceA()
 
@@ -394,12 +394,12 @@ async def test_mixed_function_and_class_registration(clean_registry):
     """Test mixing function and class self-registration."""
 
     # Function registration
-    @provider(ServiceA, scope="singleton")
+    @dependency_provider(ServiceA, scope="singleton")
     def create_a() -> ServiceA:
         return ServiceA(value=1)
 
     # Class self-registration
-    @provider(scope="request")
+    @dependency_provider(scope="request")
     class ServiceB:
         def __init__(self) -> None:
             self.name = "class-registered"
@@ -441,7 +441,7 @@ def test_get_all_metadata_when_empty(clean_registry):
 def test_provider_with_no_return_annotation(clean_registry):
     """Test provider without return type annotation."""
 
-    @provider(ServiceA, scope="singleton")
+    @dependency_provider(ServiceA, scope="singleton")
     def create_no_annotation():  # type: ignore
         return ServiceA()
 
@@ -452,7 +452,7 @@ def test_provider_with_no_return_annotation(clean_registry):
 def test_provider_with_args_and_kwargs(clean_registry):
     """Test provider that accepts *args and **kwargs."""
 
-    @provider(ServiceA, scope="singleton")
+    @dependency_provider(ServiceA, scope="singleton")
     def create_with_varargs(*args, **kwargs) -> ServiceA:
         return ServiceA(value=kwargs.get("value", 1))
 
@@ -467,7 +467,7 @@ def test_provider_with_args_and_kwargs(clean_registry):
 async def test_container_with_providers_registered_after_first_load(clean_registry):
     """Test that providers registered after first load are not picked up."""
 
-    @provider(ServiceA, scope="singleton")
+    @dependency_provider(ServiceA, scope="singleton")
     def create_a() -> ServiceA:
         return ServiceA()
 
@@ -478,7 +478,7 @@ async def test_container_with_providers_registered_after_first_load(clean_regist
     assert container._providers_loaded
 
     # Register new provider after loading
-    @provider(ServiceB, scope="singleton")
+    @dependency_provider(ServiceB, scope="singleton")
     def create_b() -> ServiceB:
         return ServiceB()
 
@@ -490,7 +490,7 @@ async def test_container_with_providers_registered_after_first_load(clean_regist
 async def test_container_clear_and_reload_picks_up_new_providers(clean_registry):
     """Test that clearing container and reloading picks up new providers."""
 
-    @provider(ServiceA, scope="singleton")
+    @dependency_provider(ServiceA, scope="singleton")
     def create_a() -> ServiceA:
         return ServiceA(value=1)
 
@@ -500,7 +500,7 @@ async def test_container_clear_and_reload_picks_up_new_providers(clean_registry)
     # Clear and register new provider
     container.clear()
 
-    @provider(ServiceB, scope="singleton")
+    @dependency_provider(ServiceB, scope="singleton")
     def create_b() -> ServiceB:
         return ServiceB()
 
@@ -549,7 +549,7 @@ async def test_unknown_scope_defaults_to_singleton(clean_registry):
 def test_provider_overwrite_maintains_registry_consistency(clean_registry):
     """Test that overwriting a provider maintains registry consistency."""
 
-    @provider(ServiceA, scope="singleton")
+    @dependency_provider(ServiceA, scope="singleton")
     def first() -> ServiceA:
         return ServiceA(value=1)
 
@@ -557,7 +557,7 @@ def test_provider_overwrite_maintains_registry_consistency(clean_registry):
     factory1 = get_provider(ServiceA)
     metadata1 = get_provider_metadata(ServiceA)
 
-    @provider(ServiceA, scope="request")
+    @dependency_provider(ServiceA, scope="request")
     def second() -> ServiceA:
         return ServiceA(value=2)
 
@@ -581,7 +581,7 @@ def test_provider_with_very_long_module_path(clean_registry):
 
     long_module = "very.long.module.path." * 10 + "end"
 
-    @provider(ServiceA, scope="singleton", module=long_module)
+    @dependency_provider(ServiceA, scope="singleton", module=long_module)
     def create() -> ServiceA:
         return ServiceA()
 
@@ -593,7 +593,7 @@ def test_provider_with_very_long_module_path(clean_registry):
 def test_provider_with_special_characters_in_module(clean_registry):
     """Test provider with special characters in module name."""
 
-    @provider(ServiceA, scope="singleton", module="module-with-dashes")
+    @dependency_provider(ServiceA, scope="singleton", module="module-with-dashes")
     def create() -> ServiceA:
         return ServiceA()
 
@@ -610,7 +610,7 @@ def test_provider_with_special_characters_in_module(clean_registry):
 def test_provider_with_lambda(clean_registry):
     """Test provider using lambda function."""
 
-    @provider(ServiceA, scope="singleton")
+    @dependency_provider(ServiceA, scope="singleton")
     def wrapper() -> ServiceA:
         factory = lambda: ServiceA(value=99)  # noqa: E731
         return factory()

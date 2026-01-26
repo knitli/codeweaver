@@ -5,7 +5,7 @@
 
 """Test provider auto-discovery integration with Container.
 
-Tests that the @provider decorator integrates with Container to automatically
+Tests that the @dependency_provider decorator integrates with Container to automatically
 register providers without manual registration calls.
 """
 
@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import pytest
 
-from codeweaver.core import Container, get_all_providers, provider
+from codeweaver.core import Container, dependency_provider, get_all_providers
 
 
 # Test fixtures
@@ -50,9 +50,9 @@ def clean_registry():
 
 
 def test_provider_decorator_registers_in_utils_registry(clean_registry):
-    """Test that @provider decorator adds providers to utils registry."""
+    """Test that @dependency_provider decorator adds providers to utils registry."""
 
-    @provider(SimpleService, scope="singleton")
+    @dependency_provider(SimpleService, scope="singleton")
     def create_simple() -> SimpleService:
         return SimpleService()
 
@@ -65,7 +65,7 @@ def test_provider_decorator_registers_in_utils_registry(clean_registry):
 async def test_container_loads_providers_on_first_resolve(clean_registry):
     """Test that Container loads providers from registry on first resolve."""
 
-    @provider(SimpleService, scope="singleton")
+    @dependency_provider(SimpleService, scope="singleton")
     def create_simple() -> SimpleService:
         return SimpleService()
 
@@ -88,7 +88,7 @@ async def test_provider_scope_respected_by_container(clean_registry):
 
     call_count = 0
 
-    @provider(SimpleService, scope="singleton")
+    @dependency_provider(SimpleService, scope="singleton")
     def create_simple() -> SimpleService:
         nonlocal call_count
         call_count += 1
@@ -108,7 +108,7 @@ def test_provider_metadata_stored_correctly(clean_registry):
     """Test that provider metadata is stored with correct attributes."""
     from codeweaver.core import get_provider_metadata
 
-    @provider(SimpleService, scope="request", module="test_module")
+    @dependency_provider(SimpleService, scope="request", module="test_module")
     def create_simple() -> SimpleService:
         return SimpleService()
 
@@ -126,7 +126,7 @@ def test_provider_generator_detection(clean_registry):
 
     from codeweaver.core import get_provider_metadata
 
-    @provider(SimpleService, scope="singleton")
+    @dependency_provider(SimpleService, scope="singleton")
     async def create_simple() -> AsyncIterator[SimpleService]:
         service = SimpleService()
         yield service
@@ -154,7 +154,7 @@ def test_container_clear_resets_provider_loading_flag():
 async def test_multiple_containers_each_load_providers(clean_registry):
     """Test that each Container instance loads providers independently."""
 
-    @provider(SimpleService, scope="singleton")
+    @dependency_provider(SimpleService, scope="singleton")
     def create_simple() -> SimpleService:
         return SimpleService()
 
@@ -173,9 +173,9 @@ async def test_multiple_containers_each_load_providers(clean_registry):
 
 
 async def test_provider_without_explicit_type(clean_registry):
-    """Test @provider decorator with class self-registration."""
+    """Test @dependency_provider decorator with class self-registration."""
 
-    @provider(scope="singleton")
+    @dependency_provider(scope="singleton")
     class AutoService:
         def __init__(self) -> None:
             self.auto = True
@@ -207,7 +207,7 @@ def test_provider_registration_is_thread_safe(clean_registry):
     results = []
 
     def register_provider():
-        @provider(SimpleService, scope="singleton")
+        @dependency_provider(SimpleService, scope="singleton")
         def create_simple() -> SimpleService:
             return SimpleService()
 

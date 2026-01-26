@@ -57,6 +57,10 @@ class FailoverSettings(BasedModel):
         ),
     ] = MAX_RAM_MB
 
+    def _telemetry_keys(self) -> None:
+        """No telemetry keys for failover settings."""
+        return None
+
 
 class FailoverSettingsDict(TypedDict, total=False):
     """TypedDict for failover settings."""

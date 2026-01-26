@@ -26,6 +26,7 @@ import importlib
 import importlib.util
 import json
 import re
+import shutil
 import subprocess
 import sys
 import warnings
@@ -289,8 +290,9 @@ def save_config(config: dict) -> None:
 def format_code(code: str) -> str:
     """Format code using black."""
     try:
-        result = subprocess.run(
-            ["black", "-q", "-"], input=code, capture_output=True, text=True, check=True
+        black_exe = shutil.which("black") or "black"
+        result = subprocess.run(  # noqa: S603
+            [black_exe, "-q", "-"], input=code, capture_output=True, text=True, check=True
         )
     except Exception as e:
         console.print(f"[yellow]Warning: Could not format code with black: {e}[/yellow]")
@@ -1114,7 +1116,7 @@ def main():
         for e in f_errors:
             console.print(f"[red]ERROR[/red] {e.file_ref}: {e.status} ({e.module}.{e.obj})")
 
-    p_errors, p_warnings, p_info = validate_package_level_imports()
+    p_errors, p_warnings, _p_info = validate_package_level_imports()
     for e in p_errors:
         console.print(f"[red]ERROR[/red] {e.module_name}: {e.message}")
     for w in p_warnings:

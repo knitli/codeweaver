@@ -4,6 +4,7 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 """Tests for VectorNames mapping between intents and physical vector names."""
 
+import pytest
 
 from codeweaver.core.types.strategy import EmbeddingStrategy, VectorStrategy
 from codeweaver.providers.vector_stores.vector_names import VectorNames
@@ -16,11 +17,7 @@ class TestVectorNames:
     def test_resolve_mapped_intent(self):
         """Test resolving an intent with explicit mapping."""
         names = VectorNames(
-            mapping={
-                "primary": "voyage_large_2",
-                "sparse": "bm25_sparse",
-                "backup": "jina_v3",
-            }
+            mapping={"primary": "voyage_large_2", "sparse": "bm25_sparse", "backup": "jina_v3"}
         )
 
         assert names.resolve("primary") == "voyage_large_2"
@@ -112,12 +109,7 @@ class TestVectorNames:
 
     def test_explicit_mapping_overrides(self):
         """Test that explicit mapping takes precedence."""
-        names = VectorNames(
-            mapping={
-                "primary": "custom_vector_name",
-                "sparse": "my_sparse",
-            }
-        )
+        names = VectorNames(mapping={"primary": "custom_vector_name", "sparse": "my_sparse"})
 
         assert names.resolve("primary") == "custom_vector_name"
         assert names.resolve("sparse") == "my_sparse"

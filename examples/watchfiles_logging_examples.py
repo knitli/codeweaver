@@ -15,6 +15,8 @@ import asyncio
 import logging
 import re
 
+from typing import Any
+
 import watchfiles
 
 from fastmcp import Context
@@ -25,16 +27,19 @@ from codeweaver.engine.watcher import WatchfilesLogManager
 class FileWatcher:
     """Shim class for demonstration purposes."""
 
-    def __init__(self, path: str, capture_watchfiles_output: bool = True, **kwargs):
+    def __init__(self, path: str, *, capture_watchfiles_output: bool = True, **kwargs: Any):
+        """Initialize the file watcher."""
         self.path = path
         if capture_watchfiles_output:
             self.log_manager = WatchfilesLogManager(**kwargs)
 
-    async def run(self):
-        async for changes in watchfiles.awatch(self.path):
+    async def run(self) -> None:
+        """Run the file watcher asynchronously."""
+        async for _changes in watchfiles.awatch(self.path):
             pass
 
-    def update_logging(self, **kwargs):
+    def update_logging(self, **kwargs: Any) -> None:
+        """Update the logging configuration for the file watcher."""
         if hasattr(self, "log_manager"):
             if "level" in kwargs:
                 self.log_manager.set_level(kwargs["level"])

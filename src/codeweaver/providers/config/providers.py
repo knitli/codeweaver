@@ -19,7 +19,7 @@ import importlib
 import logging
 import os
 
-from typing import Annotated, Any, Literal, NamedTuple, NotRequired, TypedDict, cast, is_typeddict
+from typing import TYPE_CHECKING, Annotated, Any, Literal, NamedTuple, NotRequired, TypedDict, cast, is_typeddict
 
 from pydantic import Discriminator, Field, SecretStr, Tag, computed_field, model_validator
 from pydantic_ai.settings import ModelSettings as AgentModelSettings
@@ -34,7 +34,8 @@ from codeweaver.core import (
     Unset,
 )
 from codeweaver.core.types import ModelName, ModelNameT
-from codeweaver.providers.config import ProviderProfile
+if TYPE_CHECKING:
+    from codeweaver.providers.config import ProviderProfile
 from codeweaver.providers.config.clients import QdrantClientOptions
 from codeweaver.providers.config.embedding import (
     EmbeddingConfigT,
@@ -189,11 +190,13 @@ def merge_agent_model_settings(
     return merge_model_settings(base, override)
 
 
-DefaultDataProviderSettings = (
-    DataProviderSettings(provider=Provider.TAVILY),
-    # DuckDuckGo
-    DataProviderSettings(provider=Provider.DUCKDUCKGO),
-)
+def _create_default_data_provider_settings() -> tuple[DataProviderSettings, ...]:
+    """Create default data provider settings (delayed initialization)."""
+    return (
+        DataProviderSettings(provider=Provider.TAVILY),
+        # DuckDuckGo
+        DataProviderSettings(provider=Provider.DUCKDUCKGO),
+    )
 
 
 class DeterminedDefaults(NamedTuple):
@@ -266,8 +269,11 @@ def _create_embedding_config(provider: Provider, model: ModelNameT) -> Embedding
     raise ValueError(f"Unknown embedding provider: {provider}")
 
 
-DefaultEmbeddingProviderSettings = (
-    (
+def _get_default_embedding_provider_settings() -> tuple[EmbeddingProviderSettings, ...] | None:
+    """Get default embedding provider settings (delayed instantiation)."""
+    if _embedding_defaults.provider == Provider.NOT_SET:
+        return None
+    return (
         EmbeddingProviderSettings(
             provider=_embedding_defaults.provider,
             model_name=_embedding_defaults.model,  # ty:ignore[invalid-argument-type]
@@ -277,9 +283,9 @@ DefaultEmbeddingProviderSettings = (
             ),
         ),
     )
-    if _embedding_defaults.provider != Provider.NOT_SET
-    else None  # type: ignore[assignment]
-)
+
+
+DefaultEmbeddingProviderSettings: tuple[EmbeddingProviderSettings, ...] | None = None  # Will be lazy-initialized
 
 
 def _get_default_sparse_embedding_settings() -> DeterminedDefaults:
@@ -319,16 +325,21 @@ def _create_sparse_embedding_config(
     raise ValueError(f"Unknown sparse embedding provider: {provider}")
 
 
-DefaultSparseEmbeddingProviderSettings = (
-    SparseEmbeddingProviderSettings(
-        provider=_sparse_embedding_defaults.provider,
-        model_name=_sparse_embedding_defaults.model,  # ty:ignore[invalid-argument-type]
-        sparse_embedding_config=_create_sparse_embedding_config(
-            _sparse_embedding_defaults.provider,
-            _sparse_embedding_defaults.model,  # ty:ignore[invalid-argument-type]
+def _get_default_sparse_embedding_provider_settings() -> tuple[SparseEmbeddingProviderSettings, ...]:
+    """Get default sparse embedding provider settings (delayed instantiation)."""
+    return (
+        SparseEmbeddingProviderSettings(
+            provider=_sparse_embedding_defaults.provider,
+            model_name=_sparse_embedding_defaults.model,  # ty:ignore[invalid-argument-type]
+            sparse_embedding_config=_create_sparse_embedding_config(
+                _sparse_embedding_defaults.provider,
+                _sparse_embedding_defaults.model,  # ty:ignore[invalid-argument-type]
+            ),
         ),
-    ),
-)
+    )
+
+
+DefaultSparseEmbeddingProviderSettings: tuple[SparseEmbeddingProviderSettings, ...] | None = None  # Will be lazy-initialized
 
 
 def _get_default_reranking_settings() -> DeterminedDefaults:
@@ -382,8 +393,11 @@ def _create_reranking_config(provider: Provider, model: ModelNameT) -> Reranking
     raise ValueError(f"Unknown reranking provider: {provider}")
 
 
-DefaultRerankingProviderSettings = (
-    (
+def _get_default_reranking_provider_settings() -> tuple[RerankingProviderSettings, ...] | None:
+    """Get default reranking provider settings (delayed instantiation)."""
+    if _reranking_defaults.provider == Provider.NOT_SET:
+        return None
+    return (
         RerankingProviderSettings(
             provider=_reranking_defaults.provider,
             model_name=_reranking_defaults.model,  # ty:ignore[invalid-argument-type]
@@ -393,33 +407,45 @@ DefaultRerankingProviderSettings = (
             ),
         ),
     )
-    if _reranking_defaults.provider != Provider.NOT_SET
-    else None  # type: ignore[assignment]
-)
+
+
+DefaultRerankingProviderSettings: tuple[RerankingProviderSettings, ...] | None = None  # Will be lazy-initialized
 
 HAS_ANTHROPIC = (
     importlib.util.find_spec("anthropic") or importlib.util.find_spec("claude-agent-sdk")
 ) is not None
-DefaultAgentProviderSettings = (
-    (
+
+
+def _get_default_agent_provider_settings() -> tuple[AgentProviderSettings, ...] | None:
+    """Get default agent provider settings (delayed instantiation)."""
+    if not HAS_ANTHROPIC:
+        return None
+    from pydantic_ai.settings import ModelSettings as AgentModelSettings
+
+    return (
         AgentProviderSettings(
             provider=Provider.ANTHROPIC,
             model="claude-haiku-4.5-latest",
             model_options=AgentModelSettings(),
         ),
     )
-    if HAS_ANTHROPIC
-    else None
-)
 
 
-DefaultVectorStoreProviderSettings = (
-    QdrantVectorStoreProviderSettings(
-        provider=Provider.QDRANT,
-        client_options=QdrantClientOptions(host="127.0.0.1"),
-        collection=CollectionConfig(),
-    ),
-)
+DefaultAgentProviderSettings: tuple[AgentProviderSettings, ...] | None = None  # Will be lazy-initialized
+
+
+def _get_default_vector_store_provider_settings() -> tuple[QdrantVectorStoreProviderSettings, ...]:
+    """Get default vector store provider settings (delayed instantiation)."""
+    return (
+        QdrantVectorStoreProviderSettings(
+            provider=Provider.QDRANT,
+            client_options=QdrantClientOptions(host="127.0.0.1"),
+            collection=CollectionConfig(),
+        ),
+    )
+
+
+DefaultVectorStoreProviderSettings: tuple[QdrantVectorStoreProviderSettings, ...] | None = None  # Will be lazy-initialized
 
 type ProviderField = Literal[
     "data", "embedding", "sparse_embedding", "reranking", "vector_store", "agent"
@@ -443,7 +469,7 @@ class ProviderSettings(BasedModel):
     data: Annotated[
         tuple[DataProviderSettings, ...] | None,
         Field(description="""Data provider configuration"""),
-    ] = DefaultDataProviderSettings
+    ] = None  # TODO: Add default_factory after fixing model_rebuild issue
 
     embedding: Annotated[
         tuple[EmbeddingProviderSettingsType, ...] | None,
@@ -451,39 +477,43 @@ class ProviderSettings(BasedModel):
             description="""Embedding provider configuration.
 
             We will only use the first provider you configure here. We may add support for multiple embedding providers in the future.
-            """
+            """,
+            default_factory=_get_default_embedding_provider_settings,
         ),
-    ] = DefaultEmbeddingProviderSettings
+    ] = None
 
     sparse_embedding: Annotated[
         tuple[SparseEmbeddingProviderSettingsType, ...] | None,
         Field(
             description="""Sparse embedding provider configuration.
 
-            We will only use the first provider you configure here. We may add support for multiple sparse embedding providers in the future."""
+            We will only use the first provider you configure here. We may add support for multiple sparse embedding providers in the future.""",
+            default_factory=_get_default_sparse_embedding_provider_settings,
         ),
-    ] = DefaultSparseEmbeddingProviderSettings
+    ] = None
 
     reranking: Annotated[
         tuple[RerankingProviderSettingsType, ...] | None,
         Field(
             description="""Reranking provider configuration.
 
-            We will only use the first provider you configure here. We may add support for multiple reranking providers in the future."""
+            We will only use the first provider you configure here. We may add support for multiple reranking providers in the future.""",
+            default_factory=_get_default_reranking_provider_settings,
         ),
-    ] = DefaultRerankingProviderSettings
+    ] = None
 
     vector_store: Annotated[
         tuple[VectorStoreProviderSettingsType, ...] | None,
         Field(
-            description="""Vector store provider configuration (Qdrant or in-memory), defaults to a local Qdrant instance."""
+            description="""Vector store provider configuration (Qdrant or in-memory), defaults to a local Qdrant instance.""",
+            default_factory=_get_default_vector_store_provider_settings,
         ),
-    ] = DefaultVectorStoreProviderSettings
+    ] = None
 
     agent: Annotated[
         tuple[AgentProviderSettings, ...] | None,
-        Field(description="""Agent provider configuration"""),
-    ] = DefaultAgentProviderSettings
+        Field(description="""Agent provider configuration""", default_factory=_get_default_agent_provider_settings),
+    ] = None
 
     disable_backup_system: Annotated[
         bool,
@@ -533,7 +563,9 @@ class ProviderSettings(BasedModel):
     @property
     def _backup_profile(
         self,
-    ) -> Literal[ProviderProfile.TESTING, ProviderProfile.TESTING_DB] | None:
+    ) -> "Literal[ProviderProfile.TESTING, ProviderProfile.TESTING_DB] | None":
+        from codeweaver.providers.config import ProviderProfile
+
         if self.disable_backup_system:
             return None
         if (
@@ -760,13 +792,20 @@ class ProviderSettings(BasedModel):
         """
 
 
-AllDefaultProviderSettings = ProviderSettingsDict(
-    data=DefaultDataProviderSettings,
-    embedding=DefaultEmbeddingProviderSettings,
-    sparse_embedding=DefaultSparseEmbeddingProviderSettings,
-    reranking=DefaultRerankingProviderSettings,
-    agent=DefaultAgentProviderSettings,
-)
+def _get_all_default_provider_settings() -> "ProviderSettingsDict":
+    """Get all default provider settings (delayed initialization)."""
+    from codeweaver.providers.config.providers import ProviderSettingsDict
+
+    return ProviderSettingsDict(
+        data=_create_default_data_provider_settings(),
+        embedding=DefaultEmbeddingProviderSettings,
+        sparse_embedding=DefaultSparseEmbeddingProviderSettings,
+        reranking=DefaultRerankingProviderSettings,
+        agent=DefaultAgentProviderSettings,
+    )
+
+
+AllDefaultProviderSettings = None  # Will be lazy-initialized on first access
 
 
 __all__ = (

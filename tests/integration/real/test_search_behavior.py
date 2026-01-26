@@ -53,7 +53,7 @@ async def test_search_finds_authentication_code(indexed_test_project):
     Mocks return hardcoded results - they'll pass even if the embedding
     model returns random noise or the vector store can't do similarity search.
     """
-    from codeweaver.agent_api import IntentType, find_code
+    from codeweaver.server.agent_api import IntentType, find_code
 
     # Search for authentication functionality
     response = await find_code(
@@ -87,7 +87,7 @@ async def test_search_finds_database_code(indexed_test_project):
     - Vector search favors unrelated code
     - Chunking misses database connection functions
     """
-    from codeweaver.agent_api import IntentType, find_code
+    from codeweaver.server.agent_api import IntentType, find_code
 
     response = await find_code(
         query="database connection query execution SQL", intent=IntentType.UNDERSTAND
@@ -117,7 +117,7 @@ async def test_search_finds_api_endpoints(indexed_test_project):
     - Search confuses API code with other interfaces
     - Ranking doesn't prioritize endpoint handlers
     """
-    from codeweaver.agent_api import IntentType, find_code
+    from codeweaver.server.agent_api import IntentType, find_code
 
     response = await find_code(
         query="REST API endpoints HTTP routing handlers", intent=IntentType.UNDERSTAND
@@ -150,7 +150,7 @@ async def test_search_distinguishes_different_concepts(indexed_test_project):
     - Vector store returns same results regardless of query
     - Ranking algorithm ignores semantic differences
     """
-    from codeweaver.agent_api import IntentType, find_code
+    from codeweaver.server.agent_api import IntentType, find_code
 
     # Query 1: Authentication
     auth_response = await find_code(query="user authentication login", intent=IntentType.UNDERSTAND)
@@ -189,7 +189,7 @@ async def test_search_returns_relevant_code_chunks(indexed_test_project):
     - Content not stored in vector store
     - Search returns metadata without code
     """
-    from codeweaver.agent_api import IntentType, find_code
+    from codeweaver.server.agent_api import IntentType, find_code
 
     response = await find_code(query="password hashing", intent=IntentType.UNDERSTAND)
 
@@ -228,7 +228,7 @@ async def test_search_respects_file_types(indexed_test_project):
     - Search returns documentation instead of code
     - File filtering is broken
     """
-    from codeweaver.agent_api import IntentType, find_code
+    from codeweaver.server.agent_api import IntentType, find_code
 
     response = await find_code(query="function definition", intent=IntentType.UNDERSTAND)
 
@@ -261,7 +261,7 @@ async def test_search_handles_no_matches_gracefully(indexed_test_project):
     - Returns high-confidence scores for poor matches
     - Ranking algorithm misbehaves with no clear winner
     """
-    from codeweaver.agent_api import IntentType, find_code
+    from codeweaver.server.agent_api import IntentType, find_code
 
     # Query for something not in the codebase
     response = await find_code(
@@ -290,7 +290,7 @@ async def test_search_handles_empty_codebase(tmp_path, clean_container):
     - Search doesn't crash with no indexed content
     - Error messages are clear
     """
-    from codeweaver.agent_api import IntentType, find_code
+    from codeweaver.server.agent_api import IntentType, find_code
 
     from codeweaver.engine import IndexingService
     from codeweaver.server import CodeWeaverSettings, get_settings
@@ -343,7 +343,7 @@ async def test_search_with_very_long_query(indexed_test_project):
     - Silent truncation losing query intent
     - Performance degradation with query length
     """
-    from codeweaver.agent_api import IntentType, find_code
+    from codeweaver.server.agent_api import IntentType, find_code
 
     # Create a long but meaningful query
     long_query = "I'm looking for code that handles user authentication including login functionality, password validation, session management, and logout procedures. The code should validate credentials against a database and create session tokens for authenticated users."

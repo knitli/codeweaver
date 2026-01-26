@@ -2,7 +2,7 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
-"""Comprehensive tests for @provider decorator functionality.
+"""Comprehensive tests for @dependency_provider decorator functionality.
 
 Tests the decorator's core functionality including:
 - Function registration with explicit types
@@ -26,12 +26,12 @@ import pytest
 
 from codeweaver.core import (
     ProviderMetadata,
+    dependency_provider,
     get_all_provider_metadata,
     get_all_providers,
     get_provider,
     get_provider_metadata,
     is_provider_registered,
-    provider,
 )
 
 
@@ -78,9 +78,9 @@ def clean_registry():
 
 
 def test_provider_function_registration_explicit_type(clean_registry):
-    """Test @provider decorator with function and explicit type."""
+    """Test @dependency_provider decorator with function and explicit type."""
 
-    @provider(ServiceA, scope="singleton")
+    @dependency_provider(ServiceA, scope="singleton")
     def create_service() -> ServiceA:
         return ServiceA(value=42)
 
@@ -98,9 +98,9 @@ def test_provider_function_registration_explicit_type(clean_registry):
 
 
 def test_provider_async_function_registration(clean_registry):
-    """Test @provider decorator with async function."""
+    """Test @dependency_provider decorator with async function."""
 
-    @provider(ServiceA, scope="request")
+    @dependency_provider(ServiceA, scope="request")
     async def create_service_async() -> ServiceA:
         await asyncio.sleep(0)  # Simulate async work
         return ServiceA(value=100)
@@ -119,9 +119,9 @@ def test_provider_async_function_registration(clean_registry):
 
 
 def test_provider_function_with_module_metadata(clean_registry):
-    """Test @provider decorator with module metadata."""
+    """Test @dependency_provider decorator with module metadata."""
 
-    @provider(ServiceA, scope="function", module="test.module")
+    @dependency_provider(ServiceA, scope="function", module="test.module")
     def create_service() -> ServiceA:
         return ServiceA()
 
@@ -138,9 +138,9 @@ def test_provider_function_with_module_metadata(clean_registry):
 
 
 def test_provider_class_self_registration_no_type_arg(clean_registry):
-    """Test @provider decorator on class without explicit type argument."""
+    """Test @dependency_provider decorator on class without explicit type argument."""
 
-    @provider(scope="singleton")
+    @dependency_provider(scope="singleton")
     class AutoService:
         def __init__(self) -> None:
             self.auto = True
@@ -157,9 +157,9 @@ def test_provider_class_self_registration_no_type_arg(clean_registry):
 
 
 def test_provider_class_self_registration_with_type_arg(clean_registry):
-    """Test @provider decorator on class with explicit type argument."""
+    """Test @dependency_provider decorator on class with explicit type argument."""
 
-    @provider(ServiceA, scope="request")
+    @dependency_provider(ServiceA, scope="request")
     class ServiceAImpl:
         """Implementation of ServiceA interface."""
 
@@ -178,9 +178,9 @@ def test_provider_class_self_registration_with_type_arg(clean_registry):
 
 
 def test_provider_class_with_dependencies(clean_registry):
-    """Test @provider decorator on class that has dependencies."""
+    """Test @dependency_provider decorator on class that has dependencies."""
 
-    @provider(scope="singleton")
+    @dependency_provider(scope="singleton")
     class ComplexService:
         def __init__(self, value: int = 42, name: str = "test") -> None:
             self.value = value
@@ -201,7 +201,7 @@ def test_provider_class_with_dependencies(clean_registry):
 def test_provider_singleton_scope(clean_registry):
     """Test provider with singleton scope."""
 
-    @provider(ServiceA, scope="singleton")
+    @dependency_provider(ServiceA, scope="singleton")
     def create_singleton() -> ServiceA:
         return ServiceA()
 
@@ -213,7 +213,7 @@ def test_provider_singleton_scope(clean_registry):
 def test_provider_request_scope(clean_registry):
     """Test provider with request scope."""
 
-    @provider(ServiceB, scope="request")
+    @dependency_provider(ServiceB, scope="request")
     def create_request_scoped() -> ServiceB:
         return ServiceB()
 
@@ -225,7 +225,7 @@ def test_provider_request_scope(clean_registry):
 def test_provider_function_scope(clean_registry):
     """Test provider with function scope."""
 
-    @provider(ServiceA, scope="function")
+    @dependency_provider(ServiceA, scope="function")
     def create_function_scoped() -> ServiceA:
         return ServiceA()
 
@@ -237,7 +237,7 @@ def test_provider_function_scope(clean_registry):
 def test_provider_default_scope_is_singleton(clean_registry):
     """Test that default scope is singleton when not specified."""
 
-    @provider(ServiceA)
+    @dependency_provider(ServiceA)
     def create_default() -> ServiceA:
         return ServiceA()
 
@@ -254,7 +254,7 @@ def test_provider_default_scope_is_singleton(clean_registry):
 def test_provider_sync_generator_detection(clean_registry):
     """Test detection of synchronous generator functions."""
 
-    @provider(ServiceA, scope="singleton")
+    @dependency_provider(ServiceA, scope="singleton")
     def create_with_cleanup() -> Iterator[ServiceA]:
         service = ServiceA()
         yield service
@@ -269,7 +269,7 @@ def test_provider_sync_generator_detection(clean_registry):
 def test_provider_async_generator_detection(clean_registry):
     """Test detection of asynchronous generator functions."""
 
-    @provider(ServiceB, scope="singleton")
+    @dependency_provider(ServiceB, scope="singleton")
     async def create_with_async_cleanup() -> AsyncIterator[ServiceB]:
         service = ServiceB()
         yield service
@@ -285,7 +285,7 @@ def test_provider_async_generator_detection(clean_registry):
 def test_provider_regular_function_not_generator(clean_registry):
     """Test that regular functions are not marked as generators."""
 
-    @provider(ServiceA, scope="function")
+    @dependency_provider(ServiceA, scope="function")
     def create_regular() -> ServiceA:
         return ServiceA()
 
@@ -303,7 +303,7 @@ def test_provider_regular_function_not_generator(clean_registry):
 def test_get_provider_metadata_returns_correct_data(clean_registry):
     """Test that get_provider_metadata returns complete and correct data."""
 
-    @provider(ServiceA, scope="request", module="my.module")
+    @dependency_provider(ServiceA, scope="request", module="my.module")
     async def create() -> AsyncIterator[ServiceA]:
         yield ServiceA()
 
@@ -328,11 +328,11 @@ def test_get_provider_metadata_returns_none_for_unregistered(clean_registry):
 def test_get_all_provider_metadata_returns_all(clean_registry):
     """Test that get_all_provider_metadata returns all registered metadata."""
 
-    @provider(ServiceA, scope="singleton")
+    @dependency_provider(ServiceA, scope="singleton")
     def create_a() -> ServiceA:
         return ServiceA()
 
-    @provider(ServiceB, scope="request")
+    @dependency_provider(ServiceB, scope="request")
     def create_b() -> ServiceB:
         return ServiceB()
 
@@ -357,7 +357,7 @@ def test_provider_registration_is_thread_safe(clean_registry):
     def register_provider(service_type: type, value: int):
         try:
 
-            @provider(service_type, scope="singleton")
+            @dependency_provider(service_type, scope="singleton")
             def create() -> type:
                 return service_type(value=value)
 
@@ -390,7 +390,7 @@ def test_provider_registration_is_thread_safe(clean_registry):
 def test_provider_metadata_retrieval_is_thread_safe(clean_registry):
     """Test that concurrent metadata retrieval is thread-safe."""
 
-    @provider(ServiceA, scope="singleton")
+    @dependency_provider(ServiceA, scope="singleton")
     def create() -> ServiceA:
         return ServiceA()
 
@@ -444,11 +444,11 @@ def test_is_provider_registered_returns_false_for_unregistered(clean_registry):
 def test_provider_overwrites_existing_registration(clean_registry):
     """Test that registering a provider twice overwrites the first."""
 
-    @provider(ServiceA, scope="singleton")
+    @dependency_provider(ServiceA, scope="singleton")
     def first_factory() -> ServiceA:
         return ServiceA(value=1)
 
-    @provider(ServiceA, scope="request")
+    @dependency_provider(ServiceA, scope="request")
     def second_factory() -> ServiceA:
         return ServiceA(value=2)
 
@@ -464,7 +464,7 @@ def test_provider_overwrites_existing_registration(clean_registry):
 def test_provider_with_none_module_metadata(clean_registry):
     """Test provider with None module (default)."""
 
-    @provider(ServiceA)
+    @dependency_provider(ServiceA)
     def create() -> ServiceA:
         return ServiceA()
 
@@ -481,11 +481,11 @@ def test_provider_with_none_module_metadata(clean_registry):
 def test_multiple_providers_different_types(clean_registry):
     """Test registering multiple providers for different types."""
 
-    @provider(ServiceA, scope="singleton")
+    @dependency_provider(ServiceA, scope="singleton")
     def create_a() -> ServiceA:
         return ServiceA()
 
-    @provider(ServiceB, scope="request")
+    @dependency_provider(ServiceB, scope="request")
     def create_b() -> ServiceB:
         return ServiceB()
 
@@ -510,11 +510,11 @@ def test_multiple_providers_different_types(clean_registry):
 def test_get_all_providers_returns_dict(clean_registry):
     """Test that get_all_providers returns a dictionary."""
 
-    @provider(ServiceA)
+    @dependency_provider(ServiceA)
     def create_a() -> ServiceA:
         return ServiceA()
 
-    @provider(ServiceB)
+    @dependency_provider(ServiceB)
     def create_b() -> ServiceB:
         return ServiceB()
 
@@ -528,7 +528,7 @@ def test_get_all_providers_returns_dict(clean_registry):
 def test_get_all_providers_returns_copy(clean_registry):
     """Test that get_all_providers returns a copy (not direct reference)."""
 
-    @provider(ServiceA)
+    @dependency_provider(ServiceA)
     def create() -> ServiceA:
         return ServiceA()
 
@@ -550,7 +550,7 @@ def test_get_all_providers_returns_copy(clean_registry):
 
 
 def test_provider_decorator_returns_original_function(clean_registry):
-    """Test that @provider returns the original function unchanged."""
+    """Test that @dependency_provider returns the original function unchanged."""
 
     def original_func() -> ServiceA:
         return ServiceA()
@@ -562,7 +562,7 @@ def test_provider_decorator_returns_original_function(clean_registry):
 
 
 def test_provider_decorator_returns_original_class(clean_registry):
-    """Test that @provider returns the original class unchanged."""
+    """Test that @dependency_provider returns the original class unchanged."""
 
     class OriginalClass:
         pass
@@ -582,7 +582,7 @@ def test_provider_decorator_returns_original_class(clean_registry):
 def test_provider_with_complex_return_type(clean_registry):
     """Test provider with complex return types (generators, etc.)."""
 
-    @provider(ServiceA, scope="singleton")
+    @dependency_provider(ServiceA, scope="singleton")
     async def complex_provider() -> AsyncIterator[ServiceA]:
         # Setup
         service = ServiceA(value=100)
@@ -601,11 +601,11 @@ def test_provider_with_complex_return_type(clean_registry):
 def test_provider_registration_order_independence(clean_registry):
     """Test that registration order doesn't affect retrieval."""
 
-    @provider(ServiceB, scope="request")
+    @dependency_provider(ServiceB, scope="request")
     def create_b() -> ServiceB:
         return ServiceB()
 
-    @provider(ServiceA, scope="singleton")
+    @dependency_provider(ServiceA, scope="singleton")
     def create_a() -> ServiceA:
         return ServiceA()
 

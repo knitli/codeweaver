@@ -4,6 +4,7 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 """Tests for EmbeddingStrategy and VectorStrategy types."""
 
+import pytest
 
 from codeweaver.core.types import EmbeddingKind
 from codeweaver.core.types.strategy import EmbeddingStrategy, VectorStrategy
@@ -160,7 +161,9 @@ class TestEmbeddingStrategy:
         )
 
         assert len(strategy.intents) == 3
-        assert all(strategy.get_strategy(intent).kind == EmbeddingKind.DENSE for intent in strategy.intents)
+        assert all(
+            strategy.get_strategy(intent).kind == EmbeddingKind.DENSE for intent in strategy.intents
+        )
 
     def test_empty_strategy(self):
         """Test that empty strategy is technically valid but useless."""

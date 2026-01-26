@@ -9,12 +9,12 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 
 ## Overview
 
-This document summarizes the comprehensive test suite created for Phase 2.4, covering the `@provider` decorator and Container auto-discovery integration.
+This document summarizes the comprehensive test suite created for Phase 2.4, covering the `@dependency_provider` decorator and Container auto-discovery integration.
 
 ## Test Files Created
 
 ### 1. `test_provider_decorator.py` (563 lines)
-**Purpose**: Comprehensive tests for the @provider decorator core functionality.
+**Purpose**: Comprehensive tests for the @dependency_provider decorator core functionality.
 
 **Coverage**:
 - **Function Registration Tests** (3 tests)
@@ -125,7 +125,7 @@ This document summarizes the comprehensive test suite created for Phase 2.4, cov
 ---
 
 ### 3. `test_container_integration.py` (648 lines)
-**Purpose**: Integration tests for Container with @provider auto-discovery.
+**Purpose**: Integration tests for Container with @dependency_provider auto-discovery.
 
 **Coverage**:
 - **Basic Auto-Discovery Tests** (3 tests)
@@ -174,7 +174,7 @@ This document summarizes the comprehensive test suite created for Phase 2.4, cov
 ---
 
 ### 4. `test_provider_edge_cases.py** (550 lines)
-**Purpose**: Edge cases and error handling for @provider and auto-discovery.
+**Purpose**: Edge cases and error handling for @dependency_provider and auto-discovery.
 
 **Coverage**:
 - **Scope Validation Tests** (1 test)
@@ -389,7 +389,7 @@ The new tests expand coverage with:
 
 Phase 2.4 test implementation is **complete and comprehensive**, with:
 - 109 new test cases across 4 test files
-- Coverage of all @provider decorator features
+- Coverage of all @dependency_provider decorator features
 - Coverage of all API functions
 - Integration testing with Container auto-discovery
 - Extensive edge case and error handling tests

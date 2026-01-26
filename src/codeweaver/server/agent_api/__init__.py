@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
+    "CodeMatch": (__spec__.parent, "find_code.types"),
     "FindCodeResponseSummary": (__spec__.parent, "find_code"),
     "IntentType": (__spec__.parent, "find_code"),
     "find_code": (__spec__.parent, "find_code"),
@@ -36,7 +37,7 @@ def get_user_agent() -> str:
     return f"CodeWeaver/{__version__}"
 
 
-__all__ = ("FindCodeResponseSummary", "IntentType", "find_code", "get_user_agent")
+__all__ = ("CodeMatch", "FindCodeResponseSummary", "IntentType", "find_code", "get_user_agent")
 
 
 def __dir__() -> list[str]:

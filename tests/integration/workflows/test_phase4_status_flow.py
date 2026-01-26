@@ -22,7 +22,7 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 import pytest_asyncio
 
-from codeweaver.agent_api import FindCodeResponseSummary
+from codeweaver.server.agent_api import FindCodeResponseSummary
 from pydantic_core import to_json
 
 from codeweaver.core import FailoverStats, ProviderRegistry, get_session_statistics
@@ -270,7 +270,7 @@ class TestPhase4StatusFlow:
     ) -> None:
         """Test that find_code responses can include failover metadata."""
         # Create a mock FindCodeResponseSummary
-        from codeweaver.agent_api import IntentType
+        from codeweaver.server.agent_api import IntentType
 
         from codeweaver.core import SearchStrategy
 

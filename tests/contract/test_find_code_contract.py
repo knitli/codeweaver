@@ -25,7 +25,7 @@ import pytest
 
 from pydantic import ValidationError
 
-from codeweaver.agent_api import (
+from codeweaver.server.agent_api import (
     CodeMatch,
     CodeMatchType,
     FindCodeResponseSummary,

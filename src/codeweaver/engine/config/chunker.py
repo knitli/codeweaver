@@ -250,10 +250,10 @@ class ChunkerSettings(BasedModel):
         PositiveInt | None,
         Field(
             default=None,
-            description="""Override the computed optimal chunk size for retrieval. If set, this 
-            value is used instead of the logarithmically-scaled default based on the embedding 
-            model's context window. Based on LongEmbed benchmarks, retrieval quality peaks around 
-            500-800 tokens regardless of model context window. Must not exceed the embedding 
+            description="""Override the computed optimal chunk size for retrieval. If set, this
+            value is used instead of the logarithmically-scaled default based on the embedding
+            model's context window. Based on LongEmbed benchmarks, retrieval quality peaks around
+            500-800 tokens regardless of model context window. Must not exceed the embedding
             model's context window. Leave as None to use the computed optimal size.""",
         ),
     ] = None

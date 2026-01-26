@@ -48,7 +48,6 @@ from pydantic import (
     computed_field,
     model_validator,
 )
-from pydantic_ai.settings import ModelSettings as AgentModelSettings
 from qdrant_client.models import (
     BinaryQuantization,
     CollectionParams,
@@ -105,6 +104,8 @@ from codeweaver.providers.config.utils import (
 
 
 if TYPE_CHECKING:
+    from pydantic_ai.settings import ModelSettings as AgentModelSettings
+
     from codeweaver.providers.dependencies import EmbeddingCapabilityGroupDep
     from codeweaver.providers.types import EmbeddingCapabilityGroup
     from codeweaver.providers.vector_stores.metadata import CollectionMetadata
@@ -1183,7 +1184,7 @@ class AgentProviderSettings(BaseProviderSettings):
     """Settings for agent models."""
 
     model: ModelString
-    model_options: AgentModelSettings | None
+    model_options: "AgentModelSettings | None"
     """Settings for the agent model(s)."""
 
     @computed_field
@@ -1224,3 +1225,7 @@ __all__ = (
     "SparseEmbeddingProviderSettings",
     "VectorStoreProviderSettings",
 )
+
+# TODO: Rebuild models to resolve forward references after fixing Request issue
+# DataProviderSettings.model_rebuild()
+# AgentProviderSettings.model_rebuild()
