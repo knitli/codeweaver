@@ -1,4 +1,4 @@
-# sourcery skip: no-complex-if-expressions
+# sourcery skip: lambdas-should-be-short, no-complex-if-expressions
 # SPDX-FileCopyrightText: 2026 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
@@ -122,8 +122,6 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
             "collection_name": self.collection_name,
             "dense_model": self.embedding_capabilities.dense_model,
             "sparse_model": self.embedding_capabilities.sparse_model,
-            # TODO: Add backup model property here once added
-            "backup_enabled": self.config.as_backup,
         })
 
     async def _initialize(self) -> None:
@@ -272,7 +270,9 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
                 if isinstance(vector_config, VectorParams):
                     actual_dense = vector_config
                     # Try to find matching expected vector
-                    expected_dense = (await self.config.collection.params()).vectors.get(vector_name)
+                    expected_dense = (await self.config.collection.params()).vectors.get(
+                        vector_name
+                    )
                     if expected_dense:
                         break
             # We flatten the vector configs to make sure ours matches the existing collection's config

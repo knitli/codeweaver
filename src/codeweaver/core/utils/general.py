@@ -21,11 +21,11 @@ from codeweaver.core.types.aliases import CategoryName, LiteralStringT
 
 @cache
 def generate_collection_name(
-    *, is_backup: bool = False, project_name: str | None = None, project_path: Path | None = None
+    *, project_name: str | None = None, project_path: Path | None = None
 ) -> str:
-    """Generate a collection name based on whether it's for backup embeddings."""
+    """Generate a collection name for the project."""
     project_name = project_name or _get_project_name()
-    collection_suffix = "-backup" if is_backup else ""
+    collection_suffix = ""
     if not project_path:
         from codeweaver.core.utils import get_project_path
 

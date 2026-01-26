@@ -187,10 +187,10 @@ async def _ensure_index_ready(
     # This is more robust than relying on manifest which might be out of sync
     if indexer._vector_store:
         try:
-            # Prime the index if no collections exist or if current is empty
-            # prime_index handles incremental indexing via manifest
+            # Index the project if no collections exist or if current is empty
+            # index_project handles incremental indexing via manifest
             # We enable reconciliation by default to fix any partial indexes
-            await indexer.prime_index(add_dense=True, add_sparse=True)
+            await indexer.index_project(add_dense=True, add_sparse=True)
         except Exception as e:
             logger.warning("Auto-indexing failed: %s", e)
 

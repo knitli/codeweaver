@@ -5,12 +5,15 @@
 """Tests for provider registry API functions.
 
 Tests all public API functions from codeweaver.core:
+- dependency_provider() decorator
 - get_provider()
 - get_provider_metadata()
 - is_provider_registered()
 - get_all_providers()
 - get_all_provider_metadata()
-- create_provider_factory()
+
+The DI system uses @dependency_provider to register factories,
+and the Container automatically loads and resolves them.
 """
 
 from __future__ import annotations
@@ -18,7 +21,6 @@ from __future__ import annotations
 import pytest
 
 from codeweaver.core import (
-    create_provider_factory,
     dependency_provider,
     get_all_provider_metadata,
     get_all_providers,
@@ -50,7 +52,7 @@ class ServiceC:
 @pytest.fixture
 def clean_registry():
     """Clean the provider registry before and after each test."""
-    from codeweaver.core import utils
+    from codeweaver.core.di import utils
 
     original_providers = utils._providers.copy()
     original_metadata = utils._provider_metadata.copy()
@@ -335,64 +337,91 @@ def test_get_all_provider_metadata_returns_copy(clean_registry):
 
 
 # ==============================================================================
-# create_provider_factory() Tests
+# Container Resolution Tests (replaces create_provider_factory)
 # ==============================================================================
 
 
-def test_create_provider_factory_returns_callable(clean_registry):
-    """Test that create_provider_factory returns a callable."""
+@pytest.mark.asyncio
+async def test_container_resolves_registered_provider(clean_registry):
+    """Test that container can resolve a registered provider."""
+    from codeweaver.core import Container
 
     @dependency_provider(ServiceA)
     def create() -> ServiceA:
         return ServiceA(value=100)
 
-    factory_getter = create_provider_factory(ServiceA)
-    assert callable(factory_getter)
-
-
-def test_create_provider_factory_callable_returns_instance(clean_registry):
-    """Test that the factory getter returns an instance."""
-
-    @dependency_provider(ServiceA)
-    def create() -> ServiceA:
-        return ServiceA(value=100)
-
-    factory_getter = create_provider_factory(ServiceA)
-    instance = factory_getter()
+    container = Container()
+    instance = await container.resolve(ServiceA)
     assert isinstance(instance, ServiceA)
     assert instance.value == 100
 
 
-def test_create_provider_factory_callable_has_correct_metadata(clean_registry):
-    """Test that factory getter has correct metadata."""
+@pytest.mark.asyncio
+async def test_container_resolves_self_registered_class(clean_registry):
+    """Test that container resolves self-registered classes."""
+    from codeweaver.core import Container
 
-    @dependency_provider(ServiceA)
+    @dependency_provider(scope="singleton")
+    class SelfRegisteredService:
+        def __init__(self):
+            self.value = 42
+
+    container = Container()
+    instance = await container.resolve(SelfRegisteredService)
+    assert isinstance(instance, SelfRegisteredService)
+    assert instance.value == 42
+
+
+@pytest.mark.asyncio
+async def test_container_caches_singletons(clean_registry):
+    """Test that singleton scope caches instances."""
+    from codeweaver.core import Container
+
+    call_count = 0
+
+    @dependency_provider(ServiceA, scope="singleton")
     def create() -> ServiceA:
-        return ServiceA()
+        nonlocal call_count
+        call_count += 1
+        return ServiceA(value=call_count)
 
-    factory_getter = create_provider_factory(ServiceA)
+    container = Container()
+    instance1 = await container.resolve(ServiceA)
+    instance2 = await container.resolve(ServiceA)
 
-    # Check function metadata
-    assert factory_getter.__name__ == "get_ServiceA_provider"
-    assert factory_getter.__doc__ is not None and "ServiceA" in factory_getter.__doc__
-    assert factory_getter.__annotations__["return"] == ServiceA
-
-
-def test_create_provider_factory_raises_if_not_registered(clean_registry):
-    """Test that create_provider_factory raises if provider not registered."""
-
-    class UnregisteredService:
-        pass
-
-    factory_getter = create_provider_factory(UnregisteredService)
-
-    # Should raise when called, not when created
-    with pytest.raises(KeyError):
-        factory_getter()
+    # Should be the same instance
+    assert instance1 is instance2
+    assert call_count == 1  # Factory called only once
 
 
-def test_create_provider_factory_for_different_types(clean_registry):
-    """Test create_provider_factory for multiple types."""
+@pytest.mark.asyncio
+async def test_container_respects_function_scope(clean_registry):
+    """Test that function scope creates new instances each time."""
+    from codeweaver.core import Container
+
+    call_count = 0
+
+    @dependency_provider(ServiceA, scope="function")
+    def create() -> ServiceA:
+        nonlocal call_count
+        call_count += 1
+        return ServiceA(value=call_count)
+
+    container = Container()
+    instance1 = await container.resolve(ServiceA)
+    instance2 = await container.resolve(ServiceA)
+
+    # Should be different instances
+    assert instance1 is not instance2
+    assert call_count == 2  # Factory called twice
+    assert instance1.value == 1
+    assert instance2.value == 2
+
+
+@pytest.mark.asyncio
+async def test_container_resolves_multiple_types(clean_registry):
+    """Test container with multiple registered providers."""
+    from codeweaver.core import Container
 
     @dependency_provider(ServiceA)
     def create_a() -> ServiceA:
@@ -402,12 +431,9 @@ def test_create_provider_factory_for_different_types(clean_registry):
     def create_b() -> ServiceB:
         return ServiceB(name="test")
 
-    getter_a = create_provider_factory(ServiceA)
-    getter_b = create_provider_factory(ServiceB)
-
-    # Should create different instances
-    instance_a = getter_a()
-    instance_b = getter_b()
+    container = Container()
+    instance_a = await container.resolve(ServiceA)
+    instance_b = await container.resolve(ServiceB)
 
     assert isinstance(instance_a, ServiceA)
     assert isinstance(instance_b, ServiceB)
@@ -501,8 +527,10 @@ def test_api_functions_with_none_type():
 # ==============================================================================
 
 
-def test_full_workflow_register_and_retrieve(clean_registry):
+@pytest.mark.asyncio
+async def test_full_workflow_register_and_retrieve(clean_registry):
     """Test complete workflow: register provider and use all API functions."""
+    from codeweaver.core import Container
 
     # Step 1: Register provider
     @dependency_provider(ServiceA, scope="singleton", module="integration.test")
@@ -522,9 +550,9 @@ def test_full_workflow_register_and_retrieve(clean_registry):
     assert metadata.scope == "singleton"
     assert metadata.module == "integration.test"
 
-    # Step 5: Create factory getter
-    getter = create_provider_factory(ServiceA)
-    instance = getter()
+    # Step 5: Resolve via container
+    container = Container()
+    instance = await container.resolve(ServiceA)
     assert isinstance(instance, ServiceA)
     assert instance.value == 999
 

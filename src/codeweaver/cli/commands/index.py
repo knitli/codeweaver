@@ -29,7 +29,7 @@ from codeweaver.providers import VectorStoreProvider
 
 
 if TYPE_CHECKING:
-    from codeweaver.server import CodeWeaverSettings
+    from codeweaver.engine.config.root_settings import CodeWeaverEngineSettings
 
 _display: StatusDisplay = get_display()
 
@@ -59,7 +59,7 @@ async def _check_server_health() -> bool:
 
 
 async def _derive_collection_name(
-    settings: CodeWeaverSettings, project_path: Path, checkpoint_mgr: CheckpointManager
+    settings: CodeWeaverEngineSettings, project_path: Path, checkpoint_mgr: CheckpointManager
 ) -> str:
     """Derive collection name from settings or checkpoint.
 
@@ -97,7 +97,7 @@ async def _derive_collection_name(
 
 
 async def _perform_clear_operation(
-    settings: CodeWeaverSettings, project_path: Path, *, yes: bool, display: StatusDisplay
+    settings: CodeWeaverEngineSettings, project_path: Path, *, yes: bool, display: StatusDisplay
 ) -> None:
     """Clear vector store and checkpoints.
 
@@ -233,7 +233,7 @@ def _check_and_print_server_status(display: StatusDisplay):
 
 
 async def _run_standalone_indexing(
-    settings: CodeWeaverSettings, *, force_reindex: bool, display: StatusDisplay
+    settings: CodeWeaverEngineSettings, *, force_reindex: bool, display: StatusDisplay
 ) -> None:
     """Run standalone indexing operation.
 
@@ -409,9 +409,9 @@ async def index(
         container = setup_cli_di(config_file, project_path, verbose=verbose)
 
         # We need to retrieve settings from the container now
-        from codeweaver.core.dependencies import CodeWeaverSettingsType
+        from codeweaver.core.dependencies import CodeWeaverEngineSettings
 
-        settings = await container.resolve(CodeWeaverSettingsType)
+        settings = await container.resolve(CodeWeaverEngineSettings)
 
         # Handle --clear flag
         if clear:

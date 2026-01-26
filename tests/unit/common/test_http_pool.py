@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock
 import httpx
 import pytest
 
-from codeweaver.core import (
+from codeweaver.providers.http_pool import (
     HttpClientPool,
     PoolLimits,
     PoolTimeouts,

@@ -110,10 +110,6 @@ class SettingsEnvVars:
     CODEWEAVER_DISABLE_BACKUP_SYSTEM: EnvVarInfo
     """Environment variable to disable CodeWeaver's failsafe/backup system. Not recommended if you want to ever use CodeWeaver offline or when a cloud provider is unreachable. The backup system uses extremely lightweight local models to provide basic functionality when your main provider is unavailable (well, it is still probably better than most alternatives)."""
 
-    def __post_init__(self) -> None:
-        """Post-initialization to validate default values."""
-        self.register_values()
-
     @classmethod
     def from_defaults(cls) -> SettingsEnvVars:
         """Create SettingsEnvVars with built-in defaults."""
@@ -419,25 +415,6 @@ class SettingsEnvVars:
             for key, var_info in mapped_self.items()
             if var_info.env in os.environ
         }
-
-    def register_values(self) -> None:
-        """Register the environment variables in the OS environment."""
-        from codeweaver.core.config.registry import (
-            create_configuration_value,
-            register_configurable,
-        )
-
-        if resolved := self.resolved_values():
-            for key, value in resolved.items():
-                info = getattr(self, key)
-                register_configurable(
-                    create_configuration_value(
-                        resolver_key=info.resolver_key,
-                        value=value,
-                        source="env",
-                        tagged=info.resolver_key.startswith("primary."),
-                    )
-                )
 
 
 def _providers_for_kind(kind: LiteralProviderKindType) -> set[str]:

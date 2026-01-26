@@ -626,7 +626,7 @@ def test_provider_with_class_method(clean_registry):
         def create() -> ServiceA:
             return ServiceA(value=100)
 
-    provider(ServiceA, scope="singleton")(Factory.create)
+    dependency_provider(ServiceA, scope="singleton")(Factory.create)
 
     assert is_provider_registered(ServiceA)
     factory = get_provider(ServiceA)

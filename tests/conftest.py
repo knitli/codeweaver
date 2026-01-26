@@ -3,15 +3,15 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
-
+# sourcery skip: require-parameter-annotation
 """Global pytest configuration and fixtures for CodeWeaver tests."""
 
 import contextlib
 
-from collections.abc import Sequence
+from collections.abc import Generator, Sequence
 from pathlib import Path
-from types import AsyncGeneratorType, GeneratorType
-from typing import Any, cast
+from types import AsyncGeneratorType
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
@@ -21,9 +21,15 @@ from pydantic.types import UUID7
 from qdrant_client import AsyncQdrantClient
 
 from codeweaver.core import ChunkKind, CodeChunk, ConfigLanguage, ExtKind, SemanticSearchLanguage
+from codeweaver.core.dependencies import SettingsDep
+from codeweaver.core.di.depends import INJECTED
 
 from .qdrant_test_manager import QdrantTestManager
 
+
+if TYPE_CHECKING:
+    from codeweaver.core.dependencies import CodeWeaverSettingsType
+    from codeweaver.core.di.container import Container
 
 # ===========================================================================
 # *                    Mock Tokenizer for Network-Isolated Tests
@@ -211,7 +217,7 @@ def mock_tokenizer_for_unit_tests(
 
 
 @pytest.fixture
-def initialize_test_settings() -> GeneratorType:
+def initialize_test_settings() -> Generator[None, None, None]:
     """Initialize settings for test environment.
 
     This fixture ensures that the global settings are properly initialized
@@ -265,7 +271,7 @@ def temp_test_file(tmp_path: Path) -> Path:
 
 
 @pytest.fixture(autouse=True)
-def clear_collection_name_cache() -> GeneratorType:
+def clear_collection_name_cache() -> Generator[None, None, None]:
     """Clear all class-level deduplication stores before each test.
 
     This prevents test interference where chunks or embeddings from one test are
@@ -666,29 +672,40 @@ def cli_api_keys(monkeypatch: pytest.MonkeyPatch) -> dict[str, str]:
     return keys
 
 
+def _get_settings(settings: SettingsDep = INJECTED) -> CodeWeaverSettingsType:
+    return settings
+
+
 @pytest.fixture(autouse=True)
-def reset_cli_settings_cache() -> GeneratorType:
+def reset_cli_settings_cache() -> None:
     """Reset settings cache between CLI tests.
 
     Note: Settings are now managed through DI container, which is reset
     by the reset_di_container fixture. This fixture is kept for compatibility
     but no longer performs any action.
     """
-    return
+    if _get_settings():
+        from codeweaver.core.di.container import get_container
+
+        container = get_container()
+        container.clear_request_cache()
+        container.clear_overrides()
+    reset_di_container()
 
 
 @pytest.fixture(autouse=True)
-def reset_di_container() -> GeneratorType:
+def reset_di_container() -> Generator[None, None, None]:
     """Reset DI container between tests to ensure isolation."""
     from codeweaver.core import reset_container
 
     reset_container()
     yield
     reset_container()
+    reset_container()
 
 
 @pytest.fixture
-def clean_container():
+def clean_container() -> Generator["Container", None, None]:
     """Provides a fresh DI container with all overrides cleared.
 
     Usage:

@@ -9,78 +9,74 @@ Provides a FastAPI-inspired declarative injection system.
 
 ## Registering Providers
 
-To register a provider function or class with the DI container, you can use the provider decorator from
-the `codeweaver.core.di` module:
+To register a provider function or class with the DI container, use the `@dependency_provider` decorator:
 
-```python "Registering a Provider"
-from codeweaver.core.di import provider
-
-
-dependency_provider
+```python "Registering a Provider Function"
+from codeweaver.core.di import dependency_provider
 
 
+@dependency_provider(ServiceProvider)
 def service_factory() -> ServiceProvider:
     return ServiceProvider()
 ```
 
-## Creating a Dependency factory
+```python "Registering a Provider Class (Self-Registration)"
+from codeweaver.core.di import dependency_provider
 
-You can create a factory for your dependencies using the `create_provider_factory` function:
 
-```python "Creating a Dependency Factory"
-# ⚠️ Important: Your must register your provider before calling this function. Order matters! ⚠️
-
-from codeweaver.core.di import create_provider_factory
-
-service_factory_provider = create_provider_factory(ServiceProvider)
+@dependency_provider(scope="singleton")
+class ServiceProvider:
+    def __init__(self):
+        self.value = 42
 ```
 
-## Creating a Dependency Marker
+The `@dependency_provider` decorator automatically registers your factory with the global DI container.
+No additional setup needed - just decorate and inject!
 
-You can create a dependency marker using the `depends` helper function:
+## Creating a Type Alias for Dependency Injection
 
-```python "Creating a Dependency Marker"
-from codeweaver.core.di import depends
+Create a type alias for cleaner, more maintainable code:
 
-service_dependency = depends(service_factory_provider, use_cache=True)
-```
-
-## Create a Type Alias for Dependency Injection
-
-Calling a function in a function signature is a bit sloppy. Create a type alias for cleaner code:
-
-```python "Creating a Type Alias for Dependency Injection"
+```python "Creating a Type Alias"
 from typing import TYPE_CHECKING, Annotated
 
-from codeweaver.core.di import depends
+from codeweaver.core.di import INJECTED
 
 if TYPE_CHECKING:
     from someplace import ServiceProvider
 
-type ServiceDep = Annotated[ServiceProvider, depends(service_factory_provider)]
+# Simple type alias (relies on auto-resolution)
+type ServiceDep = ServiceProvider
 
-# or if you created your own depends variable already:
+# Or with explicit Depends marker for custom behavior
+from codeweaver.core.di import depends
 
-type ServiceDep = Annotated[ServiceProvider, service_dependency]
+type ServiceDepWithScope = Annotated[ServiceProvider, depends(scope="request")]
 ```
 
 ## Using Your Dependency in Functions
 
-Now you can use your dependency type alias in function signatures:
+Use the `INJECTED` sentinel to mark parameters for dependency injection:
 
-```python "Using Your Dependency in Functions"
+```python "Using Dependencies"
 from typing import TYPE_CHECKING
 from codeweaver.core.di import INJECTED
-from wherever import ServiceDep
 
 if TYPE_CHECKING:
     from someplace import ServiceProvider
 
 
-def my_function(service: ServiceDep = INJECTED) -> None:
-    # service will be injected by the DI container
+async def my_function(service: ServiceProvider = INJECTED) -> None:
+    # service will be injected automatically by the DI container
+    # The type annotation tells the container what to inject
     ...
 ```
+
+The container automatically:
+1. Discovers all `@dependency_provider` registrations
+2. Resolves dependencies recursively
+3. Manages singleton/request/function scopes
+4. Handles async factories and generators
 """
 
 from __future__ import annotations

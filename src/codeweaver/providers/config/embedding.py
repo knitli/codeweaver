@@ -212,12 +212,6 @@ class BaseEmbeddingConfig(BasedModel):
         if (caps := self.capabilities) and (dim := getattr(caps, "default_dimension", None)):
             return dim
 
-        # 3. User-registered defaults
-        from codeweaver.core.config.defaults import get_default
-
-        if user_default := get_default("primary.embedding.dimension"):
-            return user_default
-
         raise ConfigurationError(
             "Could not resolve embedding dimension from config, capabilities, or registered defaults. You need to specify it explicitly, for best results, register an `EmbeddingModelCapabilities` subclass with the capability resolver."
         )
@@ -228,8 +222,7 @@ class BaseEmbeddingConfig(BasedModel):
         Resolution order:
         1. Explicit config
         2. Model capabilities
-        3. User-registered defaults
-        4. Provider-specific defaults
+        3. Provider-specific defaults
 
         Returns:
             Resolved datatype or None
@@ -245,12 +238,7 @@ class BaseEmbeddingConfig(BasedModel):
         if (caps := self.capabilities) and (dtype := getattr(caps, "default_datatype", None)):
             return dtype
 
-        # 3. User-registered defaults
-        from codeweaver.core.config.defaults import get_default
-
-        if user_default := get_default("primary.embedding.datatype"):
-            return user_default
-        # 4. Provider-specific defaults
+        # 3. Provider-specific defaults
         if output_default := next(
             (f for f in DATATYPE_FIELDS if f in self._defaults.get("embedding", {})), None
         ):

@@ -45,7 +45,7 @@ async def _perform_indexing(
     # Define simple callback wrapper
     callback = partial(_progress_callback, progress_reporter)
 
-    await state.indexer.prime_index(force_reindex=False, progress_callback=callback)
+    await state.indexer.index_project(force_reindex=False, progress_callback=callback)
     progress_reporter.complete_operation("indexing")
 
 

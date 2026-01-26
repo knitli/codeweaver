@@ -25,7 +25,8 @@ import pytest
 from pydantic import AnyUrl
 from qdrant_client import AsyncQdrantClient
 
-from codeweaver.core import CodeChunk, SearchStrategy, Span, StrategizedQuery
+from codeweaver.core import CodeChunk, Span
+from codeweaver.core.types import Provider, SearchStrategy, StrategizedQuery
 from codeweaver.providers import (
     CollectionConfig,
     ConfiguredCapability,
@@ -33,7 +34,6 @@ from codeweaver.providers import (
     EmbeddingConfig,
     EmbeddingModelCapabilities,
     EmbeddingProviderSettings,
-    Provider,
     QdrantClientOptions,
     QdrantVectorStoreProvider,
     QdrantVectorStoreProviderSettings,

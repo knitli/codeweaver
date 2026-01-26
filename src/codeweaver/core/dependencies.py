@@ -40,6 +40,7 @@ from codeweaver.core.utils.filesystem import get_git_branch, get_project_path
 if TYPE_CHECKING:
     # Settings types only needed for type checking - actual type resolved at runtime
     from codeweaver.core.config.core_settings import CodeWeaverCoreSettings
+    from codeweaver.core.telemetry.client import TelemetryService
     from codeweaver.engine.config.root_settings import CodeWeaverEngineSettings
     from codeweaver.providers.config.root_settings import CodeWeaverProviderSettings
     from codeweaver.server.config.settings import CodeWeaverSettings
@@ -72,8 +73,7 @@ async def bootstrap_settings(config_file: Path | None = None) -> CodeWeaverSetti
     Returns:
         The appropriate settings instance for the current installation
     """
-    from codeweaver.core.config.loader import get_settings  # noqa: I001
-    from codeweaver.core.config.envs import SettingsEnvVars
+    from codeweaver.core.config.loader import get_settings
 
     await asyncio.sleep(0)
     config_file = (
@@ -89,7 +89,6 @@ async def bootstrap_settings(config_file: Path | None = None) -> CodeWeaverSetti
     ):
         # let pydantic_settings handle loading from the file if it's in a standard location
         config_file = None
-    SettingsEnvVars.from_defaults().register_values()
 
     config_file = config_file if config_file and config_file.exists() else _resolve_config_file()
     return await asyncio.to_thread(get_settings, config_file=config_file)  # ty:ignore[invalid-return-type]

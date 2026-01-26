@@ -22,11 +22,20 @@ class DependsPlaceholder(Sentinel): ...
 
 class Depends:
     def __init__(
-        self, dependency: object | None = None, *, use_cache: bool = True, scope: str | None = None
+        self,
+        dependency: object | None = None,
+        *,
+        use_cache: bool = True,
+        scope: str | None = None,
+        tags: set[str] | None = None,
     ) -> None: ...
 
 def depends(
-    dependency: object | None = None, *, use_cache: bool = True, scope: str | None = None
+    dependency: object | None = None,
+    *,
+    use_cache: bool = True,
+    scope: str | None = None,
+    tags: set[str] | None = None,
 ) -> Depends: ...
 def is_depends_marker(value: Any) -> bool: ...
 

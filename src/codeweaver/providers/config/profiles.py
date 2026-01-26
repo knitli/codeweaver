@@ -55,6 +55,7 @@ from codeweaver.providers.config.kinds import (
     SparseEmbeddingProviderSettings,
 )
 
+
 if TYPE_CHECKING:
     from codeweaver.providers.config.providers import ProviderSettingsDict
 
@@ -80,12 +81,12 @@ def _default_remote_vector_client_options(url: AnyHttpUrl) -> QdrantClientOption
 
 
 def _default_collection_options(
-    *, as_backup: bool = False, project_path: Path | None = None, project_name: str | None = None
+    *, project_path: Path | None = None, project_name: str | None = None
 ) -> CollectionConfig:
     """Default collection configuration for Qdrant."""
     return CollectionConfig(
         collection_name=generate_collection_name(
-            is_backup=as_backup, project_name=project_name, project_path=project_path
+            project_name=project_name, project_path=project_path
         ),
         vectors_config={"dense": VectorParams()},
         sparse_vectors_config={"sparse": SparseVectorParams()},
@@ -110,7 +111,7 @@ def _get_profile(
     url: AnyHttpUrl | None = None,
     project_name: str | None = None,
     project_path: Path | None = None,
-) -> "ProviderSettingsDict": ...
+) -> ProviderSettingsDict: ...
 @overload
 def _get_profile(
     profile: Literal["recommended", "quickstart", "testing"],
@@ -119,7 +120,7 @@ def _get_profile(
     url: AnyHttpUrl,
     project_name: str | None = None,
     project_path: Path | None = None,
-) -> "ProviderSettingsDict": ...
+) -> ProviderSettingsDict: ...
 def _get_profile(
     profile: Literal["recommended", "quickstart", "testing"],
     vector_deployment: Literal["cloud", "local"],
@@ -127,7 +128,7 @@ def _get_profile(
     project_name: str | None = None,
     project_path: Path | None = None,
     url: AnyHttpUrl | None = None,
-) -> "ProviderSettingsDict":
+) -> ProviderSettingsDict:
     """Get the default provider settings profile.
 
     Args:
@@ -174,7 +175,7 @@ def _recommended_default(
     url: AnyHttpUrl | None = None,
     project_name: str | None = None,
     project_path: Path | None = None,
-) -> "ProviderSettingsDict":
+) -> ProviderSettingsDict:
     """Recommended default settings profile.
 
     This profile leans towards high-quality providers, but without excessive cost or setup. It uses Voyage AI for embeddings and rerankings, which has a generous free tier and class-leading performance. Qdrant can be deployed locally for free or as a cloud service with a generous free tier. Anthropic Claude Haiku is used for agents, which has a strong balance of cost and performance.
@@ -237,7 +238,7 @@ def _quickstart_default(
     url: AnyHttpUrl | None = None,
     project_name: str | None = None,
     project_path: Path | None = None,
-) -> "ProviderSettingsDict":
+) -> ProviderSettingsDict:
     """Quickstart default settings profile.
 
     This profile uses free-tier or open-source providers to allow for immediate use without cost.
@@ -319,10 +320,9 @@ def _quickstart_default(
 def _backup_profile(
     *,
     use_local: bool = False,
-    as_backup: bool = True,
     project_name: str | None = None,
     project_path: Path | None = None,
-) -> "ProviderSettingsDict":
+) -> ProviderSettingsDict:
     """Backup profile for local development with backup vector store.
 
     Exposed through the CLI as the "testing" profile. We choose the lightest models available for either FastEmbed or Sentence Transformers, depending on availability.
@@ -331,7 +331,6 @@ def _backup_profile(
 
     Args:
         use_local: Whether to use a local Qdrant vector store instead of in-memory.
-        as_backup: Whether this profile is being used as a backup profile (or just for local testing).
         project_name: The name of the project, used for generating collection names.
         project_path: The path to the project, used for generating collection names.
     """
@@ -343,7 +342,7 @@ def _backup_profile(
     embedding_model = "minishlab/potion-base-8M" if HAS_ST else "jinaai/jina-embeddings-v2-small-en"
     reranking_model = "jinaai/jina-reranker-v1-tiny-en"
     default_collection = _default_collection_options(
-        as_backup=as_backup, project_name=project_name, project_path=project_path
+        project_name=project_name, project_path=project_path
     )
 
     backup_settings = _quickstart_default("local") | {
@@ -353,7 +352,6 @@ def _backup_profile(
             sparse_embedding_config=FastEmbedSparseEmbeddingConfig(
                 model_name=ModelName("qdrant/bm25")
             ),
-            as_backup=as_backup,
         ),
         # For the dense embeddings, we essentially choose the lightest available model
         # potion-base-8M is a static embedding model, which again loses some quality, but is extremely light weight and virtually instant
@@ -365,7 +363,6 @@ def _backup_profile(
                 if HAS_ST
                 else FastEmbedEmbeddingConfig(model_name=ModelName(embedding_model))
             ),
-            as_backup=as_backup,
         ),
     }
 
@@ -378,7 +375,6 @@ def _backup_profile(
                 if HAS_FASTEMBED
                 else SentenceTransformersRerankingConfig(model_name=ModelName(reranking_model))
             ),
-            as_backup=as_backup,
         ),
     )
     if use_local:
@@ -387,8 +383,7 @@ def _backup_profile(
                 provider=Provider.QDRANT,
                 collection=default_collection,
                 client_options=_default_local_vector_client_options(),
-                as_backup=as_backup,
-            ),
+                ),
         )
     else:
         backup_settings["vector_store"] = QdrantVectorStoreProviderSettings(
@@ -397,7 +392,6 @@ def _backup_profile(
                 path=str(get_user_data_dir() / f"backup-{project_name}")
             ),
             collection=default_collection,
-            as_backup=as_backup,
         )
 
     return ProviderSettingsDict(**backup_settings)
@@ -498,7 +492,7 @@ class ProviderProfile(ProviderConfigProfile, BaseDataclassEnum):
             )
         return provider
 
-    def as_settings_dict(self) -> "ProviderSettingsDict":
+    def as_settings_dict(self) -> ProviderSettingsDict:
         """Get the provider settings as a dictionary."""
         from codeweaver.providers.config.providers import ProviderSettingsDict
 

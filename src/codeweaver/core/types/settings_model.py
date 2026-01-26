@@ -613,34 +613,22 @@ class BaseCodeWeaverSettings(BaseSettings):
         _ = path.write_text(data, encoding="utf-8")
 
     async def finalize(self) -> Self:
-        """Finalize settings with config resolution.
+        """Finalize settings after loading.
 
-        This should be called after all configs are loaded but before
-        the application starts. It resolves all interdependencies between
-        configuration objects.
+        This method exists for backwards compatibility and may be used for future
+        settings post-processing if needed.
 
         Returns:
             Self for chaining
 
         Note:
             This method is idempotent - calling it multiple times is safe.
-            It will only perform resolution once.
         """
         if self._resolution_complete:
             return self
 
-        try:
-            from codeweaver.core.config.resolver import resolve_all_configs
-
-            # Trigger config resolution across all registered components
-            await resolve_all_configs()
-
-            self._resolution_complete = True
-        except ImportError:
-            # Config resolution not available (minimal core install)
-            logger.debug("Config resolution module not available - skipping")
-        except Exception as e:
-            logger.warning("Config resolution failed: %s", e)
+        # Mark as finalized
+        self._resolution_complete = True
 
         return self
 

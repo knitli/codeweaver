@@ -63,6 +63,16 @@ from codeweaver.core import (
 )
 from codeweaver.core.types import ModelName
 from codeweaver.providers import AllDefaultProviderSettings, EmbeddingCapabilityGroup
+from codeweaver.providers.config import (  # All needed at runtime for decorators/backup classes
+    AgentProviderSettings,
+    DataProviderSettings,
+    EmbeddingProviderSettings,
+    MemoryVectorStoreProviderSettings,
+    ProviderSettings,
+    QdrantVectorStoreProviderSettings,
+    RerankingProviderSettings,
+    SparseEmbeddingProviderSettings,
+)
 from codeweaver.providers.embedding.capabilities.resolver import (
     EmbeddingCapabilityResolver,
     SparseEmbeddingCapabilityResolver,
@@ -74,17 +84,10 @@ from codeweaver.providers.reranking.capabilities.resolver import RerankingCapabi
 if TYPE_CHECKING:
     from codeweaver.core import LazyImport
     from codeweaver.providers.config import (
-        AgentProviderSettings,
+        # Most settings classes imported at runtime above
         CodeWeaverProviderSettings,
-        DataProviderSettings,
         EmbeddingConfigT,
-        EmbeddingProviderSettings,
-        MemoryVectorStoreProviderSettings,
-        ProviderSettings,
-        QdrantVectorStoreProviderSettings,
         RerankingConfigT,
-        RerankingProviderSettings,
-        SparseEmbeddingProviderSettings,
         VectorStoreProviderSettings,
     )
     from codeweaver.providers.config.kinds import _BaseQdrantVectorStoreProviderSettings
@@ -143,8 +146,6 @@ def _get_settings(settings: SettingsDep = INJECTED) -> CodeWeaverProviderSetting
 @dependency_provider(ProviderSettings, scope="singleton")
 def _get_provider_settings(settings: SettingsDep = INJECTED) -> ProviderSettings:
     """Factory for creating root provider settings from configuration."""
-    from codeweaver.providers.config import ProviderSettings
-
     return cast(
         ProviderSettings,
         ProviderSettings.model_validate(AllDefaultProviderSettings)
@@ -307,20 +308,6 @@ type VectorStoreClientDep[T] = Annotated[T, depends(_create_vector_client, scope
 # ===========================================================================
 # *              Provider Kinds Factories - DI TYPE ALIASES
 # ===========================================================================
-# --- Provider Settings Backup classes ---
-BackupEmbeddingProviderSettings = create_backup_class(EmbeddingProviderSettings)
-BackupSparseEmbeddingProviderSettings = create_backup_class(SparseEmbeddingProviderSettings)
-BackupRerankingProviderSettings = create_backup_class(RerankingProviderSettings)
-BackupVectorStoreProviderSettings = create_backup_class(QdrantVectorStoreProviderSettings)
-
-BackupMemoryVectorStoreProviderSettings = create_backup_class(MemoryVectorStoreProviderSettings)
-BackupAgentProviderSettings = create_backup_class(AgentProviderSettings)
-BackupDataProviderSettings = create_backup_class(DataProviderSettings)
-
-# --- Resolver Backup classes ---
-BackupEmbeddingCapabilityResolver = create_backup_class(EmbeddingCapabilityResolver)
-BackupSparseEmbeddingCapabilityResolver = create_backup_class(SparseEmbeddingCapabilityResolver)
-BackupRerankingCapabilityResolver = create_backup_class(RerankingCapabilityResolver)
 
 
 def _get_primary_provider_config_for[
@@ -332,28 +319,12 @@ def _get_primary_provider_config_for[
     | DataProviderSettings
 ](settings: Sequence[T]) -> T:
     """Helper to get the primary provider config from a sequence of configs."""
-    if primary_config := next((s for s in settings if not s.as_backup), None):
-        return primary_config
+    # Just return the first config - no more backup/primary distinction
+    if settings:
+        return settings[0]
     raise ConfigurationError(
-        "No primary provider configuration found",
-        suggestions=["Ensure at least one provider is configured as primary in settings"],
-    )
-
-
-def _get_backup_provider_config_for[
-    T: BackupEmbeddingProviderSettings
-    | BackupSparseEmbeddingProviderSettings
-    | BackupRerankingProviderSettings
-    | _BaseQdrantVectorStoreProviderSettings
-    | BackupAgentProviderSettings
-    | BackupDataProviderSettings
-](settings: Sequence[T]) -> T:
-    """Helper to get the backup provider config from a sequence of configs."""
-    if backup_config := next((s for s in settings if s.as_backup), None):
-        return backup_config
-    raise ConfigurationError(
-        "No backup provider configuration found",
-        suggestions=["Ensure at least one provider is configured as backup in settings"],
+        "No provider configuration found",
+        suggestions=["Ensure at least one provider is configured in settings"],
     )
 
 
@@ -387,14 +358,6 @@ def _create_primary_embedding_config(
     return _get_primary_provider_config_for(configs)
 
 
-@dependency_provider(BackupEmbeddingProviderSettings, scope="singleton")
-def _create_backup_embedding_config(
-    configs: AllEmbeddingConfigsDep = INJECTED,
-) -> EmbeddingProviderSettings:
-    """Factory for creating BACKUP embedding config from settings."""
-    return _get_backup_provider_config_for(configs)
-
-
 @dependency_provider(SparseEmbeddingProviderSettings, scope="singleton", collection=True)
 def _create_all_sparse_embedding_configs(
     provider_settings: ProviderSettingsDep = INJECTED,
@@ -422,14 +385,6 @@ def _create_primary_sparse_embedding_config(
 ) -> SparseEmbeddingProviderSettings:
     """Factory for creating PRIMARY sparse embedding config from settings."""
     return _get_primary_provider_config_for(configs)
-
-
-@dependency_provider(BackupSparseEmbeddingProviderSettings, scope="singleton")
-def _create_backup_sparse_embedding_config(
-    configs: AllSparseEmbeddingConfigsDep = INJECTED,
-) -> SparseEmbeddingProviderSettings:
-    """Factory for creating BACKUP sparse embedding config from settings."""
-    return _get_backup_provider_config_for(configs)
 
 
 type AllSparseEmbeddingConfigsDep = Annotated[
@@ -461,14 +416,6 @@ def _create_primary_reranking_config(
     return _get_primary_provider_config_for(configs)
 
 
-@dependency_provider(BackupRerankingProviderSettings, scope="singleton")
-def _create_backup_reranking_config(
-    configs: AllRerankingConfigsDep = INJECTED,
-) -> BackupRerankingProviderSettings:
-    """Factory for creating BACKUP reranking config from settings."""
-    return _get_backup_provider_config_for(configs)
-
-
 type AllRerankingConfigsDep = Annotated[
     Sequence[RerankingProviderSettings],  # type: ignore[name-defined]
     depends(_create_all_reranking_configs, use_cache=False),
@@ -497,14 +444,6 @@ def _create_primary_vector_store_config(
 ) -> QdrantVectorStoreProviderSettings | MemoryVectorStoreProviderSettings:
     """Factory for creating PRIMARY vector store config from settings."""
     return _get_primary_provider_config_for(configs)
-
-
-@dependency_provider(BackupVectorStoreProviderSettings, scope="singleton")
-def _create_backup_vector_store_config(
-    configs: AllVectorStoreConfigsDep = INJECTED,
-) -> BackupVectorStoreProviderSettings:
-    """Factory for creating BACKUP vector store config from settings."""
-    return _get_backup_provider_config_for(configs)
 
 
 type AllVectorStoreConfigsDep = Annotated[
@@ -583,20 +522,10 @@ type EmbeddingProviderSettingsDep = Annotated[
 ]
 """Type alias for DI injection of PRIMARY embedding provider settings."""
 
-type BackupEmbeddingProviderSettingsDep = Annotated[
-    EmbeddingProviderSettings, depends(_create_backup_embedding_config, use_cache=False)
-]
-
-
 type SparseEmbeddingProviderSettingsDep = Annotated[
     SparseEmbeddingProviderSettings,
     depends(_create_primary_sparse_embedding_config, use_cache=False),
 ]
-type BackupSparseEmbeddingProviderSettingsDep = Annotated[
-    BackupSparseEmbeddingProviderSettings,
-    depends(_create_backup_sparse_embedding_config, use_cache=False),
-]
-
 type SparseCapabilityResolverDep = Annotated[
     SparseEmbeddingCapabilityResolver, depends(SparseEmbeddingCapabilityResolver)
 ]
@@ -607,22 +536,10 @@ type RerankingProviderSettingsDep = Annotated[
 ]
 """Type alias for DI injection of reranking provider settings."""
 
-type BackupRerankingProviderSettingsDep = Annotated[
-    BackupRerankingProviderSettings,  # type: ignore[name-defined]
-    depends(_create_backup_reranking_config, use_cache=False),
-]
-"""Type alias for DI injection of backup reranking provider settings."""
-
 type VectorStoreProviderSettingsDep = Annotated[
     VectorStoreProviderSettings, depends(_create_primary_vector_store_config, use_cache=False)
 ]
 """Type alias for DI injection of vector store provider settings."""
-
-type BackupVectorStoreProviderSettingsDep = Annotated[
-    BackupVectorStoreProviderSettings, depends(_create_backup_vector_store_config, use_cache=False)
-]
-"""Type alias for DI injection of vector store provider settings."""
-
 
 # --- Resolvers ---
 
@@ -636,14 +553,6 @@ type SparseEmbeddingCapabilityResolverDep = Annotated[
 ]
 """Type alias for DI injection of sparse embedding capability resolver."""
 
-
-type BackupEmbeddingCapabilityResolverDep = Annotated[
-    BackupEmbeddingCapabilityResolver, depends(BackupEmbeddingCapabilityResolver)
-]
-
-type BackupSparseEmbeddingCapabilityResolverDep = Annotated[
-    BackupSparseEmbeddingCapabilityResolver, depends(BackupSparseEmbeddingCapabilityResolver)
-]
 
 type RerankingCapabilityResolverDep = Annotated[
     RerankingCapabilityResolver, depends(RerankingCapabilityResolver)
@@ -1360,30 +1269,6 @@ __all__ = (
     "AllRerankingConfigsDep",
     "AllSparseEmbeddingConfigsDep",
     "AllVectorStoreConfigsDep",
-    "BackupConfiguredCapabilitiesDep",
-    "BackupEmbeddingCapabilityResolver",
-    "BackupEmbeddingProvider",
-    "BackupEmbeddingProviderDep",
-    "BackupEmbeddingProviderSettings",
-    "BackupEmbeddingProviderSettingsDep",
-    "BackupEmbeddingRegistryDep",
-    "BackupQdrantVectorStoreProvider",
-    "BackupQdrantVectorStoreProviderDep",
-    "BackupRerankingCapabilityResolver",
-    "BackupRerankingCapabilityResolverDep",
-    "BackupRerankingProvider",
-    "BackupRerankingProviderDep",
-    "BackupRerankingProviderSettings",
-    "BackupRerankingProviderSettingsDep",
-    "BackupSparseEmbeddingCapabilityResolver",
-    "BackupSparseEmbeddingProvider",
-    "BackupSparseEmbeddingProviderDep",
-    "BackupSparseEmbeddingProviderSettings",
-    "BackupSparseEmbeddingProviderSettingsDep",
-    "BackupTokenizer",
-    "BackupTokenizerDep",
-    "BackupVectorStoreProviderSettings",
-    "BackupVectorStoreProviderSettingsDep",
     "ConfiguredCapabilitiesDep",
     "EmbeddingCapabilityGroupDep",
     "EmbeddingCapabilityResolverDep",

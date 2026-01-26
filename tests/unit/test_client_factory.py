@@ -14,7 +14,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from codeweaver.providers import Provider, ProviderKind
+from codeweaver.core import Provider, ProviderKind
 
 
 pytestmark = [pytest.mark.unit]

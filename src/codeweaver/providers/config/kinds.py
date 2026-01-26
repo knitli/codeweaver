@@ -16,7 +16,6 @@ The overall pattern:
 from __future__ import annotations
 
 import contextlib
-import importlib
 import logging
 
 from abc import ABC, abstractmethod
@@ -184,13 +183,6 @@ class BaseProviderSettings(BasedModel, ABC):
         ClientOptions | None, Field(description="Client options for the provider's client.")
     ] = None
 
-    as_backup: Annotated[
-        bool,
-        Field(
-            description="Use this provider as a backup/failsafe. Overrides CodeWeaver's defaults for backup providers."
-        ),
-    ] = False
-
     def __init__(self, **data: Any) -> None:
         """Initialize base provider settings."""
         from codeweaver.core.di import get_container
@@ -204,17 +196,17 @@ class BaseProviderSettings(BasedModel, ABC):
                 "Dependency injection container not available, skipping registration of ProviderSettings: %s",
                 e,
             )
+        # Remove backup-related data if present (for backward compatibility)
+        data.pop("as_backup", None)
+        data.pop("_as_backup", None)
+
         if "tag" not in data:
             data["tag"] = data.get("provider").variable
         object.__setattr__(self, "tag", data["tag"])
         object.__setattr__(self, "client_options", data.get("client_options"))
-        object.__setattr__(self, "as_backup", data.get("as_backup", False))
-        if self.as_backup and not hasattr(self, "is_provider_backup"):
-            self = self._return_as_backup()
         data |= {
             "tag": self.tag,
             "client_options": self.client_options,
-            "as_backup": self.as_backup,
         }
         if (
             "model_name" in type(self).model_fields
@@ -245,40 +237,9 @@ class BaseProviderSettings(BasedModel, ABC):
             object.__setattr__(self, "model_name", ModelName(model_name))
         super().__init__()
 
-    @staticmethod
-    def _handle_backup_client_options(client_options: ClientOptions | None) -> ClientOptions | None:
-        """Handle client options for backup providers."""
-        if client_options is None:
-            return None
-        if hasattr(client_options, "is_provider_backup"):
-            return client_options
-        from codeweaver.providers.config.utils import create_backup_class
-
-        backup_cls = create_backup_class(
-            type(client_options),
-            namespace=importlib.import_module(client_options.__module__).__dict__,
-        )
-
-        return backup_cls.model_copy(update=(client_options.model_dump() | {"_as_backup": True}))
-
-    def _return_as_backup(self) -> Self:
-        """Return a copy of self with as_backup set to True."""
-        from codeweaver.providers.config.utils import create_backup_class
-
-        backup_cls = create_backup_class(type(self), namespace=globals())
-        instance_settings = {
-            k: v if k != "client_options" else self._handle_backup_client_options(v)
-            for k, v in self.model_dump().items()
-        }
-        return backup_cls.model_copy(update=instance_settings)
-
     def __model_post_init__(self) -> None:
         """Post-initialization to register in DI container and config registry."""
         # Register self in DI container as singleton
-        if self.as_backup and not getattr(self.client_options, "is_provider_backup", False):
-            object.__setattr__(
-                self, "client_options", self._handle_backup_client_options(self.client_options)
-            )
         try:
             from codeweaver.core.di import get_container
 
@@ -289,8 +250,6 @@ class BaseProviderSettings(BasedModel, ABC):
             logger.debug(
                 "Failed to register %s in DI container (monorepo mode): %s", type(self).__name__, e
             )
-
-        self._register_configurables()
 
     @model_validator(mode="after")
     def _ensure_endpoint_version(self) -> Self:
@@ -314,9 +273,6 @@ class BaseProviderSettings(BasedModel, ABC):
                 ),
             )
         return self
-
-    def _register_configurables(self) -> None:
-        """Register self for config resolution. Classes may optionally implement this class method to register themselves for config resolution."""
 
     def _telemetry_keys(self) -> None:
         return None
@@ -371,7 +327,6 @@ class BaseProviderSettingsDict(TypedDict, total=False):
     connection: NotRequired[ConnectionConfiguration | None]
     tag: NotRequired[ProviderLiteral]
     client_options: NotRequired[ClientOptions | None]
-    as_backup: NotRequired[bool]
 
 
 # ===========================================================================
@@ -640,7 +595,6 @@ class _BaseQdrantVectorStoreProviderSettings(VectorStoreProviderSettings):
         *,
         project_name: str | None = None,
         project_path: Path | None = None,
-        as_backup: bool | None = None,
     ) -> None:
         """Initialize Qdrant vector store provider settings.
 
@@ -650,7 +604,6 @@ class _BaseQdrantVectorStoreProviderSettings(VectorStoreProviderSettings):
             client_options: Client options for the provider's client.
             collection: Collection configuration for the vector store.
             batch_size: Batch size for bulk upsert operations.
-            as_backup: Whether this provider is a backup provider.
             project_name: The name of the project.
             project_path: The path to the project.
         """
@@ -668,7 +621,6 @@ class _BaseQdrantVectorStoreProviderSettings(VectorStoreProviderSettings):
                 )
             ),
         )
-        object.__setattr__(self, "as_backup", as_backup)
         super().__setattr__("provider", provider)
         super().__setattr__("connection", connection)
         super().__setattr__("batch_size", batch_size)
@@ -686,7 +638,7 @@ class _BaseQdrantVectorStoreProviderSettings(VectorStoreProviderSettings):
 
         return CollectionConfig(
             collection_name=generate_collection_name(
-                is_backup=self.as_backup, project_name=project_name, project_path=project_path
+                project_name=project_name, project_path=project_path
             ),
             vectors_config={"dense": VectorParams()},
             sparse_vectors_config={"sparse": SparseVectorParams()},
@@ -705,7 +657,7 @@ class _BaseQdrantVectorStoreProviderSettings(VectorStoreProviderSettings):
             self.in_memory_config = self.in_memory_config or getattr(
                 self,
                 "_default_memory_config",
-                lambda _x: {"collection_name": generate_collection_name(is_backup=self.as_backup)},
+                lambda _x: {"collection_name": generate_collection_name()},
             )(self.collection.get("collection_name"))
         # we'll handle collection config later too -- when models are getting instantiated it's much less painful to wait until the dust settles for inter-model dependencies
 
@@ -722,61 +674,6 @@ class _BaseQdrantVectorStoreProviderSettings(VectorStoreProviderSettings):
             )
 
         return self
-
-    def _register_configurables(self) -> None:
-        """Register self for config resolution."""
-        try:
-            from codeweaver.core.config.registry import register_configurable
-
-            register_configurable(self)
-        except Exception as e:
-            # Log if config system not available (monorepo compatibility)
-            logger.debug(
-                "Failed to register %s for config resolution (monorepo mode): %s",
-                type(self).__name__,
-                e,
-            )
-
-    def config_dependencies(self) -> dict[str, type]:
-        """Vector store needs embedding config for dimension/datatype."""
-        # Import here to avoid circular dependencies
-
-        return {
-            "provider.embedding": EmbeddingProviderSettings,
-            "provider.sparse_embedding": SparseEmbeddingProviderSettings,
-        }
-
-    async def apply_resolved_config(self, **resolved: Any) -> None:
-        """Apply dimension and datatype from embedding config.
-
-        Args:
-            **resolved: Should contain "provider.embedding" key with embedding config instance
-        """
-        config = self.collection.get("vector_config", ())
-        dense_key, dense_config = (
-            next((k, v) for k, v in config.items() if isinstance(v, VectorParams)),
-            ("dense", None),
-        )
-        self.collection = self.collection or CollectionConfig(vectors_config={})
-        if (embedding_settings := resolved.get("provider.embedding")) is not None:
-            dense_params = embedding_settings.embedding_config.as_vector_params()
-            self._resolved_dimension = dense_params.size
-            self._resolved_datatype = dense_params.datatype
-            if dense_config:
-                dense_key = dense_key or "dense"
-                self.collection["vectors_config"][dense_key] = dense_params  # ty:ignore[invalid-assignment]
-        if (sparse_embedding_settings := resolved.get("provider.sparse_embedding")) is not None:
-            sparse_config = self.collection.get("vectors_config", ())
-            sparse_key, sparse_params = (
-                next((k, v) for k, v in sparse_config.items() if isinstance(v, SparseVectorParams)),
-                None,
-            )
-            sparse_vector_params = (
-                sparse_embedding_settings.embedding_config.as_sparse_vector_params()
-            )
-            if sparse_params:
-                sparse_key = sparse_key or "sparse"
-                self.collection["vectors_config"][sparse_key] = sparse_vector_params  # ty:ignore[invalid-assignment]
 
     def is_cloud(self) -> bool:
         """Return True if the provider settings are for a cloud deployment."""
@@ -1184,7 +1081,7 @@ class AgentProviderSettings(BaseProviderSettings):
     """Settings for agent models."""
 
     model: ModelString
-    model_options: "AgentModelSettings | None"
+    model_options: AgentModelSettings | None
     """Settings for the agent model(s)."""
 
     @computed_field

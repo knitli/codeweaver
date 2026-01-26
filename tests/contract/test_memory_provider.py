@@ -17,8 +17,8 @@ import pytest
 
 from qdrant_client import AsyncQdrantClient
 
-from codeweaver.core import CodeChunk, SearchStrategy, Span, StrategizedQuery
-from codeweaver.core import SemanticSearchLanguage as Language
+from codeweaver.core import CodeChunk, SemanticSearchLanguage, Span
+from codeweaver.core.types import Provider, SearchStrategy, StrategizedQuery
 from codeweaver.providers import (
     ConfiguredCapability,
     EmbeddingCapabilityGroup,
@@ -27,7 +27,6 @@ from codeweaver.providers import (
     EmbeddingProviderSettings,
     MemoryVectorStoreProvider,
     MemoryVectorStoreProviderSettings,
-    Provider,
 )
 
 
@@ -108,8 +107,8 @@ def sample_chunk():
         chunk_id=chunk_id,
         chunk_name="memory_test.py:test_func",
         file_path=Path("memory_test.py"),
-        language=Language.PYTHON,
-        ext_kind=ExtKind.from_language(Language.PYTHON, ChunkKind.CODE),
+        language=SemanticSearchLanguage.PYTHON,
+        ext_kind=ExtKind.from_language(SemanticSearchLanguage.PYTHON, ChunkKind.CODE),
         content="def test_func():\n    return True",
         line_range=Span(start=1, end=2, source_id=chunk_id),
     )
@@ -263,11 +262,11 @@ class TestMemoryProviderContract:
         # but in_memory_config is a dict inside.
 
         # Easiest way is to create a new settings object
-        new_config_dict = memory_config.in_memory_config.copy()
-        new_config_dict["auto_persist"] = True
+        new_config = memory_config.in_memory_config.copy()
+        new_config["auto_persist"] = True
 
         config_with_auto = MemoryVectorStoreProviderSettings(
-            provider=Provider.MEMORY, in_memory_config=new_config_dict
+            provider=Provider.MEMORY, in_memory_config=new_config
         )
 
         client = AsyncQdrantClient(location=":memory:")

@@ -20,9 +20,7 @@ from urllib.parse import urlparse
 import pytest
 
 from codeweaver.cli import app as doctor_app
-from codeweaver.core import SentinelName, Unset
-from codeweaver.providers import Provider
-from codeweaver.server import CodeWeaverSettings
+from codeweaver.core import CodeWeaverCoreSettings, Provider, SentinelName, Unset
 
 
 @pytest.fixture
@@ -51,7 +49,8 @@ class TestDoctorUnsetHandling:
 
     def test_project_path_auto_detection(self) -> None:
         """Test project_path is auto-detected from git root."""
-        settings = CodeWeaverSettings(
+
+        settings = CodeWeaverCoreSettings(
             project_path=temp_project, project_name=temp_project.name, config_file=None
         )
 
@@ -80,7 +79,7 @@ class TestDoctorUnsetHandling:
         project_path = temp_project
         project_name = temp_project.name
         # Create minimal settings
-        settings = CodeWeaverSettings(
+        settings = CodeWeaverCoreSettings(
             project_path=project_path, project_name=project_name, config_file=None
         )
 

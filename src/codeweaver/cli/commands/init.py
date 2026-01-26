@@ -36,7 +36,7 @@ from codeweaver.providers.config.profiles import ProviderProfile
 if TYPE_CHECKING:
     from codeweaver.cli.ui import StatusDisplay
     from codeweaver.core.dependencies import CodeWeaverSettingsType, SettingsDep
-    from codeweaver.server import CodeWeaverMCPConfig, StdioCodeWeaverConfig
+    from codeweaver.server.config import CodeWeaverMCPConfig, StdioCodeWeaverConfig
 
 
 type MCPClient = Literal[

@@ -14,11 +14,12 @@ from typing import TYPE_CHECKING
 
 from codeweaver.core import dependency_provider
 from codeweaver.providers import EmbeddingModelCapabilities
+from codeweaver.providers.embedding.capabilities.base import SparseEmbeddingModelCapabilities
 from codeweaver.providers.types import BaseCapabilityResolver, EmbeddingCapabilityType
 
 
 if TYPE_CHECKING:
-    from codeweaver.providers.embedding.capabilities.base import SparseEmbeddingModelCapabilities
+    pass  # Keep for consistency
 
 
 @dependency_provider(scope="singleton")

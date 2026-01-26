@@ -297,8 +297,8 @@ async def actual_vector_store() -> MemoryVectorStoreProvider:
     Uses a singleton instance and a FIXED collection name to ensure that
     different components (e.g., Indexer and Search) share the same in-memory data.
     """
-    from codeweaver.core import get_container
-    from codeweaver.providers import MemoryVectorStoreProvider, Provider, VectorStoreProvider
+    from codeweaver.core import Provider, get_container
+    from codeweaver.providers import MemoryVectorStoreProvider, VectorStoreProvider
 
     global _shared_memory_vector_store
     if _shared_memory_vector_store is None:

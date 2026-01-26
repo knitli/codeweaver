@@ -374,23 +374,25 @@ class IndexingService:
         logger.info("Starting reconciliation from backup store...")
         self._progress_tracker.update_phase("reconciliation")
 
-        # 1. Get Metadata
+        # 1. Get model information directly from vector store properties
         try:
-            primary_meta = await self._vector_store.get_metadata()
-            backup_meta = await backup_store.get_metadata()
+            primary_dense = self._vector_store.dense_model
+            primary_sparse = self._vector_store.sparse_model
+            backup_dense = backup_store.dense_model
+            backup_sparse = backup_store.sparse_model
         except Exception:
             logger.warning(
-                "Could not compare collection metadata, assuming incompatible models.",
+                "Could not compare collection models, assuming incompatible.",
                 exc_info=True,
             )
             # Fallback: force re-index via standard mechanism
             return
 
         models_match = (
-            primary_meta.dense_model == backup_meta.dense_model
-            and primary_meta.sparse_model == backup_meta.sparse_model
+            primary_dense == backup_dense
+            and primary_sparse == backup_sparse
         )
-        sparse_match = primary_meta.sparse_model == backup_meta.sparse_model
+        sparse_match = primary_sparse == backup_sparse
 
         # 2. Iterate Backup Content
         offset = None
