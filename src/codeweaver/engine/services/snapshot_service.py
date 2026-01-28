@@ -112,7 +112,9 @@ class QdrantSnapshotBackupService:
             return snapshot_name
 
         except Exception as e:
-            logger.exception("Failed to create snapshot for collection %s: %s", self.collection_name, e)
+            logger.exception(
+                "Failed to create snapshot for collection %s: %s", self.collection_name, e
+            )
             return None
 
     async def _wait_for_snapshot(self, snapshot_name: str, timeout: int = 60) -> bool:

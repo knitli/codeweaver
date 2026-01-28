@@ -443,9 +443,7 @@ class TestSnapshotAndCleanup:
         with patch.object(
             snapshot_service, "create_snapshot", return_value="snapshot"
         ) as mock_create:
-            with patch.object(
-                snapshot_service, "cleanup_old_snapshots", return_value={}
-            ):
+            with patch.object(snapshot_service, "cleanup_old_snapshots", return_value={}):
                 await snapshot_service.snapshot_and_cleanup(wait=True)
 
         mock_create.assert_called_once_with(wait=True)

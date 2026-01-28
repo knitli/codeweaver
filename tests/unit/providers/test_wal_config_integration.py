@@ -30,6 +30,11 @@ def wal_config():
     )
 
 
+@pytest.mark.async_test
+@pytest.mark.external_api
+@pytest.mark.mock_only
+@pytest.mark.qdrant
+@pytest.mark.unit
 class TestWalConfigIntegration:
     """Integration tests for WalConfig merging when backup system is enabled."""
 

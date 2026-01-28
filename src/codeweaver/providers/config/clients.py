@@ -21,7 +21,7 @@ import os
 
 from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
-from typing import Annotated, Any, Literal, NotRequired, Required, Self, TypedDict
+from typing import Annotated, Any, Literal, NotRequired, Required, Self, TypedDict, cast
 
 import httpx
 
@@ -505,8 +505,11 @@ class QdrantClientOptions(ClientOptions):
             and not self._is_local_url(self.url or self.host or "")
         ):
             # GRPC over http requires http2
-            self.advanced_http_options = HttpxClientParams(
-                **((self.advanced_http_options or {}) | {"http2": True, "http1": False})
+            self.advanced_http_options = cast(
+                dict[str, Any],
+                HttpxClientParams(
+                    **((self.advanced_http_options or {}) | {"http2": True, "http1": False})
+                ),
             )
         if self.url and not self._is_local_url(self.url) and self.https is None:
             self.https = True

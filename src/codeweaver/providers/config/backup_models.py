@@ -16,6 +16,8 @@ Models:
 
 from __future__ import annotations
 
+import importlib
+
 import logging
 
 from typing import TYPE_CHECKING
@@ -37,12 +39,7 @@ def _check_sentence_transformers_available() -> bool:
     Returns:
         True if sentence-transformers is available, False otherwise
     """
-    try:
-        import sentence_transformers  # noqa: F401
-
-        return True
-    except ImportError:
-        return False
+    return importlib.util.find_spec("sentence_transformers") is not None
 
 
 def _check_fastembed_available() -> bool:
@@ -51,12 +48,10 @@ def _check_fastembed_available() -> bool:
     Returns:
         True if fastembed is available, False otherwise
     """
-    try:
-        import fastembed  # noqa: F401
-
-        return True
-    except ImportError:
-        return False
+    return (
+        importlib.util.find_spec("fastembed") is not None
+        and importlib.util.find_spec("fastembed_gpu") is not None
+    )
 
 
 async def get_backup_embedding_provider() -> EmbeddingProvider | None:
@@ -80,11 +75,12 @@ async def get_backup_embedding_provider() -> EmbeddingProvider | None:
                 BACKUP_MODEL_PRIMARY,
             )
             from codeweaver.providers.embedding.providers.sentence_transformers import (
-                SentenceTransformersProvider,
+                SentenceTransformersEmbeddingProvider,
             )
+            from codeweaver.providers.config.clients import SentenceTransformersClientOptions
 
             # Create provider with minimal configuration
-            provider = SentenceTransformersProvider(
+            provider = SentenceTransformersEmbeddingProvider(
                 client=None,  # Will be created internally
                 config={
                     "model_name": BACKUP_MODEL_PRIMARY,
@@ -101,12 +97,12 @@ async def get_backup_embedding_provider() -> EmbeddingProvider | None:
                 "Successfully created backup embedding provider: sentence-transformers/%s",
                 BACKUP_MODEL_PRIMARY,
             )
-            return provider
-
         except Exception as e:
             logger.warning(
                 "Failed to create sentence-transformers backup provider: %s. Trying fallback.", e
             )
+        else:
+            return provider
 
     # Try fastembed as fallback
     if _check_fastembed_available():
@@ -114,7 +110,10 @@ async def get_backup_embedding_provider() -> EmbeddingProvider | None:
             logger.info(
                 "Creating backup embedding provider with fastembed: %s", BACKUP_MODEL_FALLBACK
             )
-            from codeweaver.providers.embedding.providers.fastembed import FastEmbedProvider
+            from codeweaver.providers.embedding.providers.fastembed import (
+                FastEmbedEmbeddingProvider,
+            )
+            from codeweaver.providers.config.clients import FastEmbedClientOptions
 
             # Create provider with minimal configuration
             provider = FastEmbedProvider(
@@ -173,7 +172,6 @@ async def create_backup_embeddings(text: str | list[str]) -> list[list[float]] |
 
         # Generate embeddings
         return await provider.embed_batch(texts)
-
 
     except Exception as e:
         logger.exception("Failed to create backup embeddings: %s", e)
