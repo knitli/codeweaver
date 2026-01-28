@@ -270,7 +270,9 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         # Note: We need to check the type after initialization to determine if sparse
         # For now, we'll set a placeholder and update it after _initialize
         provider_id = config.provider.variable if config.provider else "unknown"
-        object.__setattr__(self, "_namespace", f"{provider_id}.dense")  # Default to dense, may be updated
+        object.__setattr__(
+            self, "_namespace", f"{provider_id}.dense"
+        )  # Default to dense, may be updated
 
         self._initialize(impl_deps, custom_deps)
         object.__setattr__(self, "caps", caps)
@@ -281,7 +283,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             caps=caps,
             registry=registry,
             cache_manager=cache_manager,
-            **defaults
+            **defaults,
         )
 
     def _update_namespace_for_sparse(self) -> None:
@@ -997,9 +999,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         # Register each chunk using cache manager
         for i, info in enumerate(chunk_infos):
             await self.cache_manager.register_embeddings(
-                chunk_id=info.chunk_id,
-                embedding_info=info,
-                chunk=chunks[i],
+                chunk_id=info.chunk_id, embedding_info=info, chunk=chunks[i]
             )
 
     async def _process_input(

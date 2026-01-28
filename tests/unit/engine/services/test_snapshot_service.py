@@ -57,9 +57,7 @@ class TestQdrantSnapshotBackupServiceInitialization:
 
         custom_path = tmp_path / "custom_snapshots"
         service = QdrantSnapshotBackupService(
-            vector_store=mock_vector_store,
-            storage_path=custom_path,
-            retention_count=5,
+            vector_store=mock_vector_store, storage_path=custom_path, retention_count=5
         )
 
         assert service.storage_path == custom_path
@@ -70,10 +68,7 @@ class TestQdrantSnapshotBackupServiceInitialization:
         """Test initialization with default storage path."""
         from codeweaver.engine.services.snapshot_service import QdrantSnapshotBackupService
 
-        service = QdrantSnapshotBackupService(
-            vector_store=mock_vector_store,
-            retention_count=12,
-        )
+        service = QdrantSnapshotBackupService(vector_store=mock_vector_store, retention_count=12)
 
         # Should use user state directory
         assert "snapshots" in str(service.storage_path)
@@ -86,10 +81,7 @@ class TestQdrantSnapshotBackupServiceInitialization:
         storage_path = tmp_path / "new_snapshots" / "nested"
         assert not storage_path.exists()
 
-        QdrantSnapshotBackupService(
-            vector_store=mock_vector_store,
-            storage_path=storage_path,
-        )
+        QdrantSnapshotBackupService(vector_store=mock_vector_store, storage_path=storage_path)
 
         assert storage_path.exists()
 
@@ -100,10 +92,7 @@ class TestQdrantSnapshotBackupServiceInitialization:
         store = Mock()
         store.collection_name = "custom_collection"
 
-        service = QdrantSnapshotBackupService(
-            vector_store=store,
-            storage_path=tmp_path,
-        )
+        service = QdrantSnapshotBackupService(vector_store=store, storage_path=tmp_path)
 
         assert service.collection_name == "custom_collection"
 
@@ -147,9 +136,7 @@ class TestSnapshotCreation:
         """Test that snapshot name includes timestamp."""
         mock_vector_store.client.create_snapshot = Mock(return_value=Mock())
 
-        with patch(
-            "codeweaver.engine.services.snapshot_service.datetime"
-        ) as mock_datetime:
+        with patch("codeweaver.engine.services.snapshot_service.datetime") as mock_datetime:
             mock_now = Mock()
             mock_now.strftime = Mock(return_value="20250127_153045")
             mock_datetime.now = Mock(return_value=mock_now)
@@ -210,7 +197,9 @@ class TestSnapshotListing:
         mock_snapshot2.size = 2000
         mock_snapshot2.creation_time = "2025-01-27T13:00:00Z"
 
-        mock_vector_store.client.list_snapshots = Mock(return_value=[mock_snapshot1, mock_snapshot2])
+        mock_vector_store.client.list_snapshots = Mock(
+            return_value=[mock_snapshot1, mock_snapshot2]
+        )
 
         snapshots = await snapshot_service.list_snapshots()
 
@@ -251,8 +240,7 @@ class TestSnapshotDeletion:
 
         assert result is True
         mock_vector_store.client.delete_snapshot.assert_called_once_with(
-            collection_name="test_collection",
-            snapshot_name="snapshot_to_delete",
+            collection_name="test_collection", snapshot_name="snapshot_to_delete"
         )
 
     @pytest.mark.asyncio
@@ -275,12 +263,14 @@ class TestSnapshotCleanup:
         """Test that cleanup keeps the most recent N snapshots."""
         # Create 5 snapshots, retention is 3
         snapshots = [
-            {"name": f"snapshot_{i}", "created_at": f"2025-01-27T{10+i:02d}:00:00Z"}
+            {"name": f"snapshot_{i}", "created_at": f"2025-01-27T{10 + i:02d}:00:00Z"}
             for i in range(5)
         ]
 
         with patch.object(snapshot_service, "list_snapshots", return_value=snapshots):
-            with patch.object(snapshot_service, "delete_snapshot", return_value=True) as mock_delete:
+            with patch.object(
+                snapshot_service, "delete_snapshot", return_value=True
+            ) as mock_delete:
                 stats = await snapshot_service.cleanup_old_snapshots()
 
         assert stats["total"] == 5
@@ -318,7 +308,7 @@ class TestSnapshotCleanup:
     ):
         """Test that cleanup tracks deletion failures."""
         snapshots = [
-            {"name": f"snapshot_{i}", "created_at": f"2025-01-27T{10+i:02d}:00:00Z"}
+            {"name": f"snapshot_{i}", "created_at": f"2025-01-27T{10 + i:02d}:00:00Z"}
             for i in range(5)
         ]
 
@@ -343,9 +333,7 @@ class TestSnapshotCleanup:
         self, snapshot_service, mock_vector_store: Mock
     ):
         """Test that cleanup returns zero stats on failure."""
-        with patch.object(
-            snapshot_service, "list_snapshots", side_effect=Exception("List failed")
-        ):
+        with patch.object(snapshot_service, "list_snapshots", side_effect=Exception("List failed")):
             stats = await snapshot_service.cleanup_old_snapshots()
 
         assert stats == {"total": 0, "kept": 0, "deleted": 0, "failed": 0}
@@ -363,9 +351,7 @@ class TestSnapshotRestoration:
 
         assert result is True
         mock_vector_store.client.recover_snapshot.assert_called_once_with(
-            collection_name="test_collection",
-            snapshot_name="snapshot_to_restore",
-            wait=True,
+            collection_name="test_collection", snapshot_name="snapshot_to_restore", wait=True
         )
 
     @pytest.mark.asyncio
@@ -454,10 +440,12 @@ class TestSnapshotAndCleanup:
     @pytest.mark.asyncio
     async def test_snapshot_and_cleanup_with_wait(self, snapshot_service):
         """Test snapshot_and_cleanup with wait parameter."""
-        with patch.object(snapshot_service, "create_snapshot", return_value="snapshot") as mock_create:
+        with patch.object(
+            snapshot_service, "create_snapshot", return_value="snapshot"
+        ) as mock_create:
             with patch.object(
                 snapshot_service, "cleanup_old_snapshots", return_value={}
-            ) as mock_cleanup:
+            ):
                 await snapshot_service.snapshot_and_cleanup(wait=True)
 
         mock_create.assert_called_once_with(wait=True)

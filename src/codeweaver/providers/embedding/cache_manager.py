@@ -68,10 +68,7 @@ class EmbeddingCacheManager(BasedModel):
         validate_assignment=False,
     )
 
-    registry: EmbeddingRegistry = Field(
-        ...,
-        description="Global embedding registry instance",
-    )
+    registry: EmbeddingRegistry = Field(..., description="Global embedding registry instance")
 
     # Namespace-isolated stores (namespace = "{provider_id}.{embedding_kind}")
     # Use PrivateAttr for internal state that shouldn't be part of the model
@@ -148,18 +145,10 @@ class EmbeddingCacheManager(BasedModel):
     def _init_stats(self, namespace: str) -> None:
         """Initialize statistics for namespace if not exists."""
         if namespace not in self._stats:
-            self._stats[namespace] = {
-                "hits": 0,
-                "misses": 0,
-                "unique_chunks": 0,
-                "total_chunks": 0,
-            }
+            self._stats[namespace] = {"hits": 0, "misses": 0, "unique_chunks": 0, "total_chunks": 0}
 
     async def deduplicate(
-        self,
-        chunks: list[CodeChunk],
-        namespace: str,
-        batch_id: UUID7,
+        self, chunks: list[CodeChunk], namespace: str, batch_id: UUID7
     ) -> tuple[list[CodeChunk], dict[int, BlakeHashKey]]:
         """Deduplicate chunks using namespace-isolated hash store.
 
@@ -187,9 +176,7 @@ class EmbeddingCacheManager(BasedModel):
             hash_mapping: dict[int, BlakeHashKey] = {}
 
             # Compute hashes for all chunks
-            chunk_hashes = [
-                get_blake_hash(chunk.content.encode("utf-8")) for chunk in chunks
-            ]
+            chunk_hashes = [get_blake_hash(chunk.content.encode("utf-8")) for chunk in chunks]
 
             # Check each chunk for duplicates
             for idx, (chunk, chunk_hash) in enumerate(zip(chunks, chunk_hashes, strict=False)):
@@ -209,12 +196,7 @@ class EmbeddingCacheManager(BasedModel):
             self._stats[namespace]["total_chunks"] += len(chunks)
             return unique_chunks, hash_mapping
 
-    async def store_batch(
-        self,
-        chunks: list[CodeChunk],
-        batch_id: UUID7,
-        namespace: str,
-    ) -> None:
+    async def store_batch(self, chunks: list[CodeChunk], batch_id: UUID7, namespace: str) -> None:
         """Store batch for potential reprocessing.
 
         Stores the final chunk list (after deduplication) for this batch.
@@ -233,10 +215,7 @@ class EmbeddingCacheManager(BasedModel):
             batch_store[batch_id] = chunks
 
     async def register_embeddings(
-        self,
-        chunk_id: UUID7,
-        embedding_info: EmbeddingBatchInfo,
-        chunk: CodeChunk,
+        self, chunk_id: UUID7, embedding_info: EmbeddingBatchInfo, chunk: CodeChunk
     ) -> None:
         """Register embeddings in global registry.
 

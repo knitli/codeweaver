@@ -136,7 +136,7 @@ class VectorReconciliationService:
             return missing_ids
 
         except Exception as e:
-            logger.error("Error detecting missing vectors: %s", e)
+            logger.exception("Error detecting missing vectors: %s", e)
             raise
 
     def _has_backup_vector(self, point: qmodels.Record) -> bool:
@@ -281,7 +281,7 @@ class VectorReconciliationService:
                 backup_embeddings = await backup_provider.embed_batch(texts)
             except Exception as e:
                 error_msg = f"Failed to generate backup embeddings: {e}"
-                logger.error(error_msg)
+                logger.exception(error_msg)
                 batch_stats["failed"] += len(texts)
                 batch_stats["errors"].append(error_msg)
                 return batch_stats
@@ -304,7 +304,7 @@ class VectorReconciliationService:
 
         except Exception as e:
             error_msg = f"Batch repair failed: {e}"
-            logger.error(error_msg)
+            logger.exception(error_msg)
             batch_stats["failed"] = len(point_ids)
             batch_stats["errors"].append(error_msg)
 

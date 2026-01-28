@@ -665,7 +665,11 @@ def _get_embedding_provider_for_config(
             config=config,  # ty:ignore[invalid-argument-type]
         )  # ty:ignore[invalid-return-type]
     return resolved_provider(
-        client=client, registry=registry, cache_manager=cache_manager, caps=capabilities, config=config
+        client=client,
+        registry=registry,
+        cache_manager=cache_manager,
+        caps=capabilities,
+        config=config,
     )
 
 
@@ -695,7 +699,11 @@ def _get_sparse_embedding_provider_for_config(
         ) from e
     client = config.get_client()
     return resolved_provider(
-        client=client, registry=registry, cache_manager=cache_manager, caps=capabilities, config=config
+        client=client,
+        registry=registry,
+        cache_manager=cache_manager,
+        caps=capabilities,
+        config=config,
     )
 
 

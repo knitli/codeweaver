@@ -431,9 +431,7 @@ class QdrantClientOptions(ClientOptions):
 
         Example:
             >>> options = QdrantClientOptions(
-            ...     url="https://qdrant.example.com",
-            ...     api_key="secret-key",
-            ...     timeout=30.0,
+            ...     url="https://qdrant.example.com", api_key="secret-key", timeout=30.0
             ... )
             >>> params = options.to_qdrant_params()
             >>> client = AsyncQdrantClient(**params)

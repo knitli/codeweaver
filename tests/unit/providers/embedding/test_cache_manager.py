@@ -20,7 +20,6 @@ import asyncio
 
 from pathlib import Path
 from typing import Any
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -295,9 +294,7 @@ class TestAsyncSafeLocking:
 
         async def deduplicate_batch(batch_num: int):
             batch_id = uuid7()
-            unique, _ = await cache_manager.deduplicate(
-                sample_chunks, namespace, batch_id
-            )
+            unique, _ = await cache_manager.deduplicate(sample_chunks, namespace, batch_id)
             return len(list(unique))
 
         # Run 10 concurrent deduplication operations

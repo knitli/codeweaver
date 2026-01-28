@@ -98,7 +98,7 @@ class QdrantSnapshotBackupService:
 
             # Create snapshot using Qdrant client
             # Note: Qdrant's create_snapshot returns immediately, snapshot is created async
-            result = await asyncio.to_thread(
+            await asyncio.to_thread(
                 self.vector_store.client.create_snapshot,
                 collection_name=self.collection_name,
                 snapshot_name=snapshot_name,
@@ -112,7 +112,7 @@ class QdrantSnapshotBackupService:
             return snapshot_name
 
         except Exception as e:
-            logger.error("Failed to create snapshot for collection %s: %s", self.collection_name, e)
+            logger.exception("Failed to create snapshot for collection %s: %s", self.collection_name, e)
             return None
 
     async def _wait_for_snapshot(self, snapshot_name: str, timeout: int = 60) -> bool:
@@ -169,7 +169,7 @@ class QdrantSnapshotBackupService:
             ]
 
         except Exception as e:
-            logger.error("Failed to list snapshots: %s", e)
+            logger.exception("Failed to list snapshots: %s", e)
             return []
 
     async def delete_snapshot(self, snapshot_name: str) -> bool:
@@ -283,7 +283,7 @@ class QdrantSnapshotBackupService:
             )
 
             # Restore snapshot
-            result = await asyncio.to_thread(
+            await asyncio.to_thread(
                 self.vector_store.client.recover_snapshot,
                 collection_name=self.collection_name,
                 snapshot_name=snapshot_name,

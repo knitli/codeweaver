@@ -544,9 +544,7 @@ class CollectionConfig(BasedModel):
         """Return telemetry keys for privacy-first data collection."""
         from codeweaver.core.types import AnonymityConversion, FilteredKey
 
-        return {
-            FilteredKey("collection_name"): AnonymityConversion.HASH,
-        }
+        return {FilteredKey("collection_name"): AnonymityConversion.HASH}
 
     async def params(self) -> CollectionParams:
         """Return the Qdrant collection parameters for this configuration."""
@@ -623,7 +621,9 @@ class _BaseQdrantVectorStoreProviderSettings(VectorStoreProviderSettings):
             project_path: The path to the project.
         """
         # Prepare client_options
-        prepared_client_options = client_options if client_options is not None else QdrantClientOptions()
+        prepared_client_options = (
+            client_options if client_options is not None else QdrantClientOptions()
+        )
 
         # Handle collection parameter - can be CollectionConfig, dict, or None
         if collection is None:
@@ -1221,7 +1221,6 @@ class AgentProviderSettings(BaseProviderSettings):
 
 # Rebuild models to resolve forward references from httpx after all classes are defined
 try:
-
     # Rebuild client options and provider settings models
     from codeweaver.providers.config.clients import QdrantClientOptions
 

@@ -194,7 +194,7 @@ class TestRerankResultsFallback:
         mock_provider2.rerank.return_value = [mock_reranking_result]
 
         # Execute
-        results, strategy = await rerank_results(
+        results, _strategy = await rerank_results(
             query="test query",
             candidates=mock_candidates,
             context=None,

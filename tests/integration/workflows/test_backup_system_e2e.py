@@ -101,8 +101,6 @@ class TestCompleteBackupMaintenanceCycle:
         operations_executed = []
 
         # Mock the operations to track execution
-        original_run_reconciliation = service._run_reconciliation
-        original_run_snapshot = service._run_snapshot_maintenance
 
         async def track_reconciliation():
             operations_executed.append("reconciliation")
@@ -116,7 +114,7 @@ class TestCompleteBackupMaintenanceCycle:
         service._run_snapshot_maintenance = track_snapshot
 
         # Simulate multiple maintenance cycles
-        for cycle in range(6):
+        for _cycle in range(6):
             # Backup indexing
             await mock_indexing.index_project()
 
@@ -125,7 +123,10 @@ class TestCompleteBackupMaintenanceCycle:
             service._snapshot_cycle_count += 1
 
             # Reconciliation (every 2 cycles)
-            if service._maintenance_cycle_count >= backup_system_settings.reconciliation_interval_cycles:
+            if (
+                service._maintenance_cycle_count
+                >= backup_system_settings.reconciliation_interval_cycles
+            ):
                 await service._run_reconciliation()
                 service._maintenance_cycle_count = 0
 
@@ -145,10 +146,7 @@ class TestCompleteBackupMaintenanceCycle:
 
     @pytest.mark.asyncio
     async def test_backup_indexing_runs_first_in_cycle(
-        self,
-        backup_system_settings,
-        mock_primary_qdrant_store,
-        mock_backup_qdrant_store,
+        self, backup_system_settings, mock_primary_qdrant_store, mock_backup_qdrant_store
     ):
         """Test that backup indexing always runs first in maintenance cycle."""
         from codeweaver.engine.services.failover_service import FailoverService
@@ -184,7 +182,10 @@ class TestCompleteBackupMaintenanceCycle:
         service._maintenance_cycle_count = 2  # Trigger reconciliation
         service._snapshot_cycle_count = 3  # Trigger snapshot
 
-        if service._maintenance_cycle_count >= backup_system_settings.reconciliation_interval_cycles:
+        if (
+            service._maintenance_cycle_count
+            >= backup_system_settings.reconciliation_interval_cycles
+        ):
             await service._run_reconciliation()
 
         if service._snapshot_cycle_count >= backup_system_settings.snapshot_interval_cycles:
@@ -195,10 +196,7 @@ class TestCompleteBackupMaintenanceCycle:
 
     @pytest.mark.asyncio
     async def test_maintenance_continues_after_operation_failure(
-        self,
-        backup_system_settings,
-        mock_primary_qdrant_store,
-        mock_backup_qdrant_store,
+        self, backup_system_settings, mock_primary_qdrant_store, mock_backup_qdrant_store
     ):
         """Test that maintenance loop continues even if one operation fails."""
         from codeweaver.engine.services.failover_service import FailoverService
@@ -254,10 +252,7 @@ class TestSnapshotCreationDuringNormalOperation:
 
     @pytest.mark.asyncio
     async def test_snapshots_created_on_schedule(
-        self,
-        backup_system_settings,
-        mock_primary_qdrant_store,
-        tmp_path: Path,
+        self, backup_system_settings, mock_primary_qdrant_store, tmp_path: Path
     ):
         """Test that snapshots are created on the configured schedule."""
         from codeweaver.engine.services.failover_service import FailoverService
@@ -292,7 +287,7 @@ class TestSnapshotCreationDuringNormalOperation:
             mock_service_class.return_value = mock_service
 
             # Run 9 cycles (should create 3 snapshots at cycles 3, 6, 9)
-            for cycle in range(9):
+            for _cycle in range(9):
                 service._snapshot_cycle_count += 1
 
                 if service._snapshot_cycle_count >= backup_system_settings.snapshot_interval_cycles:
@@ -304,10 +299,7 @@ class TestSnapshotCreationDuringNormalOperation:
 
     @pytest.mark.asyncio
     async def test_snapshot_retention_enforced(
-        self,
-        backup_system_settings,
-        mock_primary_qdrant_store,
-        tmp_path: Path,
+        self, backup_system_settings, mock_primary_qdrant_store, tmp_path: Path
     ):
         """Test that snapshot retention is enforced during cleanup."""
         from codeweaver.engine.services.snapshot_service import QdrantSnapshotBackupService
@@ -321,7 +313,7 @@ class TestSnapshotCreationDuringNormalOperation:
 
         # Mock list_snapshots to return 6 snapshots
         old_snapshots = [
-            {"name": f"snapshot_{i}", "created_at": f"2025-01-27T{10+i:02d}:00:00Z"}
+            {"name": f"snapshot_{i}", "created_at": f"2025-01-27T{10 + i:02d}:00:00Z"}
             for i in range(6)
         ]
 
@@ -351,11 +343,7 @@ class TestDisasterRecoveryFromSnapshot:
     """Tests for disaster recovery using snapshots."""
 
     @pytest.mark.asyncio
-    async def test_snapshot_restoration_workflow(
-        self,
-        mock_primary_qdrant_store,
-        tmp_path: Path,
-    ):
+    async def test_snapshot_restoration_workflow(self, mock_primary_qdrant_store, tmp_path: Path):
         """Test the complete snapshot restoration workflow."""
         from codeweaver.engine.services.snapshot_service import QdrantSnapshotBackupService
 
@@ -389,9 +377,7 @@ class TestDisasterRecoveryFromSnapshot:
 
     @pytest.mark.asyncio
     async def test_get_latest_snapshot_for_recovery(
-        self,
-        mock_primary_qdrant_store,
-        tmp_path: Path,
+        self, mock_primary_qdrant_store, tmp_path: Path
     ):
         """Test getting the latest snapshot for disaster recovery."""
         from codeweaver.engine.services.snapshot_service import QdrantSnapshotBackupService
@@ -457,10 +443,7 @@ class TestBackupSystemDisabled:
 
         mock_indexing = AsyncMock()
         service = FailoverService(
-            primary_store=None,
-            backup_store=None,
-            indexing_service=mock_indexing,
-            settings=settings,
+            primary_store=None, backup_store=None, indexing_service=mock_indexing, settings=settings
         )
 
         with patch(

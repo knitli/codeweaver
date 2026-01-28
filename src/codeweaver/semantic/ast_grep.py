@@ -880,6 +880,7 @@ __all__ = (
     "rebuild_models_for_tests",
 )
 
+
 # Rebuild models to resolve forward references
 def _rebuild_models_with_ast_thing() -> None:
     """Rebuild Pydantic models that have forward references to AstThing.
@@ -933,10 +934,7 @@ def _rebuild_models_with_ast_thing() -> None:
                     logger.debug("Model %s rebuilt successfully in ast_grep.py", model.__name__)
             except Exception as e:
                 logger.warning(
-                    "Error rebuilding model %s in ast_grep.py: %s",
-                    model.__name__,
-                    e,
-                    exc_info=True,
+                    "Error rebuilding model %s in ast_grep.py: %s", model.__name__, e, exc_info=True
                 )
     except ImportError as e:
         logger.debug("Could not import models for rebuild (expected during early import): %s", e)

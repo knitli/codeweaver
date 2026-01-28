@@ -87,9 +87,7 @@ class QdrantVectorStoreService:
         self.failover_settings = failover_settings
         self.failover_detector = failover_detector
 
-    async def get_collection_config(
-        self, metadata: CollectionMetadata
-    ) -> QdrantCollectionConfig:
+    async def get_collection_config(self, metadata: CollectionMetadata) -> QdrantCollectionConfig:
         """Get collection configuration, merging failover WalConfig if backup system is enabled.
 
         When the backup system is active, failover WalConfig settings take precedence over

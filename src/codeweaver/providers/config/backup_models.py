@@ -172,12 +172,11 @@ async def create_backup_embeddings(text: str | list[str]) -> list[list[float]] |
         texts = [text] if isinstance(text, str) else text
 
         # Generate embeddings
-        embeddings = await provider.embed_batch(texts)
+        return await provider.embed_batch(texts)
 
-        return embeddings
 
     except Exception as e:
-        logger.error("Failed to create backup embeddings: %s", e)
+        logger.exception("Failed to create backup embeddings: %s", e)
         return None
 
     finally:

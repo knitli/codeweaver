@@ -66,10 +66,7 @@ def failover_settings(tmp_path: Path):
 
 @pytest.fixture
 def failover_service(
-    mock_primary_store,
-    mock_backup_store,
-    mock_indexing_service,
-    failover_settings,
+    mock_primary_store, mock_backup_store, mock_indexing_service, failover_settings
 ):
     """Create a FailoverService instance for testing.
 
@@ -89,7 +86,9 @@ def failover_service(
 class TestSnapshotCycleManagement:
     """Tests for snapshot cycle counting and scheduling."""
 
-    @pytest.mark.skip(reason="Phase 2: Cycle counters removed - maintenance now in indexing service")
+    @pytest.mark.skip(
+        reason="Phase 2: Cycle counters removed - maintenance now in indexing service"
+    )
     @pytest.mark.asyncio
     async def test_snapshot_cycle_counter_increments(self, failover_service):
         """Test that snapshot cycle counter increments on each maintenance run.
@@ -210,11 +209,7 @@ class TestSnapshotErrorHandling:
         ) as mock_service_class:
             mock_service = Mock()
             mock_service.snapshot_and_cleanup = AsyncMock(
-                return_value={
-                    "snapshot_created": False,
-                    "snapshot_name": None,
-                    "cleanup_stats": {},
-                }
+                return_value={"snapshot_created": False, "snapshot_name": None, "cleanup_stats": {}}
             )
             mock_service_class.return_value = mock_service
 
@@ -222,7 +217,9 @@ class TestSnapshotErrorHandling:
                 await failover_service._run_snapshot_maintenance()
 
                 # Verify warning was logged
-                assert any("failed" in str(call).lower() for call in mock_logger.warning.call_args_list)
+                assert any(
+                    "failed" in str(call).lower() for call in mock_logger.warning.call_args_list
+                )
 
 
 class TestMaintenanceLoopIntegration:
@@ -286,7 +283,10 @@ class TestSnapshotConfiguration:
 
             # Verify retention_count matches settings
             call_args = mock_service_class.call_args
-            assert call_args[1]["retention_count"] == failover_service.settings.snapshot_retention_count
+            assert (
+                call_args[1]["retention_count"]
+                == failover_service.settings.snapshot_retention_count
+            )
 
     def test_snapshot_service_uses_correct_storage_path(self, failover_service):
         """Test that snapshot service is created with correct storage path."""
