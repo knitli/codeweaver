@@ -20,24 +20,20 @@ from codeweaver.providers import EmbeddingErrorInfo, EmbeddingModelCapabilities
 
 @pytest.fixture(autouse=True)
 def reset_embedding_registry():
-    """Reset the global embedding registry and hash stores between tests to avoid state pollution."""
-    import codeweaver.providers as registry_module
+    """Reset the global embedding registry between tests to avoid state pollution.
 
-    from codeweaver.providers import EmbeddingProvider
+    Note: EmbeddingCacheManager is now responsible for hash stores and deduplication.
+    This fixture only needs to reset the global registry singleton.
+    """
+    import codeweaver.providers as registry_module
 
     # Reset the global singleton registry
     registry_module._embedding_registry = None
-
-    # Reset the class-level hash stores that handle deduplication
-    EmbeddingProvider._hash_store.clear()
-    EmbeddingProvider._backup_hash_store.clear()
 
     yield
 
     # Clean up after test
     registry_module._embedding_registry = None
-    EmbeddingProvider._hash_store.clear()
-    EmbeddingProvider._backup_hash_store.clear()
 
 
 @pytest.fixture

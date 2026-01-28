@@ -26,11 +26,11 @@ import asyncio
 
 from typing import TYPE_CHECKING, ClassVar
 
-from pydantic import ConfigDict, Field
+from pydantic import UUID7, ConfigDict, Field, PrivateAttr
 
 from codeweaver.core import BlakeHashKey, CodeChunk
 from codeweaver.core.stores import BlakeStore, UUIDStore, make_blake_store, make_uuid_store
-from codeweaver.core.types import UUID7, BasedModel
+from codeweaver.core.types import BasedModel
 from codeweaver.core.utils import get_blake_hash
 
 
@@ -68,26 +68,11 @@ class EmbeddingCacheManager(BasedModel):
     )
 
     # Namespace-isolated stores (namespace = "{provider_id}.{embedding_kind}")
-    _batch_stores: dict[str, UUIDStore[list]] = Field(
-        default_factory=dict,
-        description="UUID stores for batches, keyed by namespace",
-        exclude=True,
-    )
-    _hash_stores: dict[str, BlakeStore[UUID7]] = Field(
-        default_factory=dict,
-        description="Blake hash stores for deduplication, keyed by namespace",
-        exclude=True,
-    )
-    _locks: dict[str, asyncio.Lock] = Field(
-        default_factory=dict,
-        description="Async locks per namespace",
-        exclude=True,
-    )
-    _stats: dict[str, dict[str, int]] = Field(
-        default_factory=dict,
-        description="Statistics per namespace (hits, misses, unique_chunks)",
-        exclude=True,
-    )
+    # Use PrivateAttr for internal state that shouldn't be part of the model
+    _batch_stores: dict[str, UUIDStore[list]] = PrivateAttr(default_factory=dict)
+    _hash_stores: dict[str, BlakeStore[UUID7]] = PrivateAttr(default_factory=dict)
+    _locks: dict[str, asyncio.Lock] = PrivateAttr(default_factory=dict)
+    _stats: dict[str, dict[str, int]] = PrivateAttr(default_factory=dict)
 
     def _get_namespace(self, provider_id: str, embedding_kind: str) -> str:
         """Generate namespace key for store isolation.
