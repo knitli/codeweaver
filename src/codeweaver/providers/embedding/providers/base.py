@@ -26,7 +26,6 @@ from typing import (
     overload,
     override,
 )
-from uuid import UUID
 
 import numpy as np
 
@@ -47,7 +46,6 @@ from codeweaver.core import (
     AnonymityConversion,
     BasedModel,
     BatchKeys,
-    BlakeStore,
     ChunkEmbeddings,
     EmbeddingBatchInfo,
     LiteralProvider,
@@ -57,11 +55,9 @@ from codeweaver.core import (
     ProviderError,
     SparseEmbedding,
     StatisticsDep,
-    UUIDStore,
     depends,
     get_blake_hash,
     log_to_client_or_fallback,
-    make_blake_store,
     make_uuid_store,
     uuid7,
 )
@@ -198,26 +194,29 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         ),
     ] = None
 
+    cache_manager: Annotated[
+        Any,  # EmbeddingCacheManager - avoiding circular import
+        Field(
+            description="Centralized cache manager for deduplication and batch storage with namespace isolation",
+            exclude=True,
+        ),
+    ]
+
+    _namespace: Annotated[
+        str,
+        Field(
+            description="Namespace for cache isolation (computed from provider_id.embedding_kind)",
+            exclude=True,
+            default="",
+        ),
+    ] = ""
+
     _provider: ClassVar[LiteralProvider] = cast(LiteralProvider, Provider.NOT_SET)
     _max_tokens: ClassVar[PositiveInt] = DEFAULT_MAX_TOKENS
     _input_transformer: Callable[[StructuredDataInput], Any] = default_input_transformer
     _output_transformer: Callable[[Any], list[list[float]] | list[list[int]]] = (
         default_output_transformer
     )
-
-    # Typing note: we can't type this properly because: 1) Ty wants us to define the subtype for `list` and 2) pydantic does not support parameterized subtypes for generics.
-    _store: UUIDStore[list] = make_uuid_store(  # type: ignore
-        value_type=list, size_limit=ONE_MB * 3
-    )
-    """The store for embedding documents, keyed by batch ID (UUID7) and stored as a batch of CodeChunks."""
-
-    _hash_store: BlakeStore[UUID7] = make_blake_store(
-        value_type=UUID, size_limit=ONE_KB * 256
-    )  # 256kb limit -- we're just storing hashes
-    """A store for deduplicating CodeChunks based on their content hash. The keys are each CodeChunk's content hash, the values are their batch IDs.
-
-    Note that we're only storing the hash keys and batch ID values, not the full CodeChunk objects. This keeps the store size small. We can lookup by batch ID in the main `_store` if needed, or if it has been ejected, in the `_store`'s `_trash_heap`. `SimpleTypedStore`, the parent class, handles that for us with a simple "get" method.
-    """
     # Circuit breaker state tracking
     _circuit_state: CircuitBreakerState = CircuitBreakerState.CLOSED
     _failure_count: int = 0
@@ -229,12 +228,24 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         client: EmbeddingClient,
         config: EmbeddingProviderSettings,
         registry: EmbeddingRegistry,
+        cache_manager: Any,  # EmbeddingCacheManager - avoiding circular import
         caps: EmbeddingModelCapabilities | None = None,
         impl_deps: EmbeddingImplementationDeps = None,
         custom_deps: EmbeddingCustomDeps = None,
         **kwargs: Any,
     ) -> None:
-        """Initialize the embedding provider."""
+        """Initialize the embedding provider with centralized cache manager.
+
+        Args:
+            client: SDK client for the embedding provider
+            config: Provider configuration settings
+            registry: Global embedding registry
+            cache_manager: Centralized cache manager for deduplication (singleton)
+            caps: Model capabilities metadata
+            impl_deps: Implementation-specific dependencies
+            custom_deps: Custom dependencies
+            **kwargs: Additional keyword arguments
+        """
         defaults = getattr(self, "_defaults", {})
         object.__setattr__(self, "_model_dump_json", super().model_dump_json)
         object.__setattr__(self, "_circuit_state", CircuitBreakerState.CLOSED)
@@ -252,16 +263,35 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             self, "embed_options", config.embedding if config and config.embedding else {}
         )
         object.__setattr__(self, "model_options", config.model if config and config.model else {})
-        store_kwargs = kwargs.get("store_kwargs", {"value_type": list, "size_limit": ONE_MB * 3})
-        object.__setattr__(self, "_store", make_uuid_store(**store_kwargs))
-        hash_store_kwargs = kwargs.get(
-            "hash_store_kwargs", {"value_type": UUID, "size_limit": ONE_KB * 256}
-        )
-        object.__setattr__(self, "_hash_store", make_blake_store(**hash_store_kwargs))
+
+        # Phase 4: Use centralized cache manager instead of per-instance stores
+        object.__setattr__(self, "cache_manager", cache_manager)
+
+        # Compute namespace from provider ID + embedding kind
+        # Note: We need to check the type after initialization to determine if sparse
+        # For now, we'll set a placeholder and update it after _initialize
+        provider_id = config.provider.variable if config.provider else "unknown"
+        object.__setattr__(self, "_namespace", f"{provider_id}.dense")  # Default to dense, may be updated
+
         self._initialize(impl_deps, custom_deps)
         object.__setattr__(self, "caps", caps)
         object.__setattr__(self, "registry", registry)
-        super().__init__(client=client, config=config, caps=caps, **defaults)
+        super().__init__(
+            client=client,
+            config=config,
+            caps=caps,
+            registry=registry,
+            cache_manager=cache_manager,
+            **defaults
+        )
+
+    def _update_namespace_for_sparse(self) -> None:
+        """Update namespace if this is a sparse embedding provider.
+
+        Called by SparseEmbeddingProvider to set the correct namespace after initialization.
+        """
+        provider_id = self.config.provider.variable if self.config.provider else "unknown"
+        object.__setattr__(self, "_namespace", f"{provider_id}.sparse")
 
     @abstractmethod
     def _initialize(
@@ -279,12 +309,12 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         """
 
     def clear_deduplication_stores(self) -> None:
-        """Clear class-level deduplication stores.
+        """Clear namespace-isolated deduplication stores.
 
         This is primarily useful for testing to ensure clean state between test runs.
+        Uses the centralized cache manager to clear only this provider's namespace.
         """
-        self._store = make_uuid_store(value_type=list, size_limit=ONE_MB * 3)
-        self._hash_store = make_blake_store(value_type=UUID, size_limit=ONE_KB * 256)
+        self.cache_manager.clear_namespace(self._namespace)
 
     async def initialize_async(self) -> None:
         """Perform asynchronous initialization of the provider.
@@ -1099,14 +1129,34 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
 class SparseEmbeddingProvider[SparseClient](EmbeddingProvider[SparseClient], ABC):
     """Abstract class for sparse embedding providers.
 
-    Overrides hash stores to prevent collision with dense embedding deduplication.
-    Dense and sparse embeddings should deduplicate independently.
+    Uses namespace isolation (provider_id.sparse) to prevent collision with dense embeddings.
+    Dense and sparse embeddings deduplicate independently via separate namespaces.
     """
 
-    @classmethod
-    def clear_deduplication_stores(cls) -> None:
-        """Clear class-level deduplication stores for sparse embeddings."""
-        cls._hash_store = make_blake_store(value_type=UUID, size_limit=ONE_KB * 256)
+    def __init__(
+        self,
+        client: SparseClient,
+        config: EmbeddingProviderSettings,
+        registry: Any,  # EmbeddingRegistry
+        cache_manager: Any,  # EmbeddingCacheManager
+        caps: Any = None,  # EmbeddingModelCapabilities
+        impl_deps: EmbeddingImplementationDeps = None,
+        custom_deps: EmbeddingCustomDeps = None,
+        **kwargs: Any,
+    ) -> None:
+        """Initialize sparse embedding provider with correct namespace."""
+        super().__init__(
+            client=client,
+            config=config,
+            registry=registry,
+            cache_manager=cache_manager,
+            caps=caps,
+            impl_deps=impl_deps,
+            custom_deps=custom_deps,
+            **kwargs,
+        )
+        # Update namespace to use .sparse instead of .dense
+        self._update_namespace_for_sparse()
 
     def _batch_and_key(
         self, chunk_list: Sequence[CodeChunk], *, skip_deduplication: bool

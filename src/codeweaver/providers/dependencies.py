@@ -96,6 +96,7 @@ if TYPE_CHECKING:
         EmbeddingConfigT,
         RerankingConfigT,
     )
+    from codeweaver.providers.embedding.cache_manager import EmbeddingCacheManager
     from codeweaver.providers.types import (
         ConfiguredCapability,
         EmbeddingCapabilityGroup,
@@ -585,6 +586,34 @@ type EmbeddingRegistryDep = Annotated[
 
 
 # ===========================================================================
+# *              Embedding Cache Manager
+# ===========================================================================
+
+
+@dependency_provider(scope="singleton")
+def _get_cache_manager(registry: EmbeddingRegistryDep = INJECTED):
+    """Get singleton cache manager with namespace isolation.
+
+    The cache manager provides centralized caching with:
+    - Namespace isolation (dense vs sparse, different providers)
+    - Async-safe locking per namespace
+    - True cross-instance deduplication
+    - Statistics tracking per namespace
+
+    This replaces per-instance _store and _hash_store ClassVar registries.
+    """
+    from codeweaver.providers.embedding.cache_manager import EmbeddingCacheManager
+
+    return EmbeddingCacheManager(registry=registry)
+
+
+type CacheManagerDep = Annotated[
+    "EmbeddingCacheManager", depends(_get_cache_manager, use_cache=True, scope="singleton")
+]
+"""Type alias for DI injection of embedding cache manager."""
+
+
+# ===========================================================================
 # *              Embedding and Sparse Embedding Providers
 # ===========================================================================
 
@@ -970,6 +999,7 @@ __all__ = (
     "AllRerankingConfigsDep",
     "AllSparseEmbeddingConfigsDep",
     "AllVectorStoreConfigsDep",
+    "CacheManagerDep",
     "ConfiguredCapabilitiesDep",
     "EmbeddingCapabilityGroupDep",
     "EmbeddingCapabilityResolverDep",
