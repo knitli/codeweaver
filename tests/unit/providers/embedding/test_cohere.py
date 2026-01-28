@@ -14,8 +14,8 @@ import pytest
 # Skip this entire module if the cohere package is not installed
 pytest.importorskip("cohere", reason="cohere package is required for these tests")
 
-from codeweaver.core import CodeChunk
-from codeweaver.providers import EmbeddingErrorInfo, EmbeddingModelCapabilities, Provider
+from codeweaver.core import CodeChunk, Provider
+from codeweaver.providers import EmbeddingErrorInfo, EmbeddingModelCapabilities
 
 
 @pytest.fixture(autouse=True)

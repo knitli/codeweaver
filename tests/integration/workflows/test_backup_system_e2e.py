@@ -95,7 +95,6 @@ class TestCompleteBackupMaintenanceCycle:
             primary_store=mock_primary_qdrant_store,
             backup_store=mock_backup_qdrant_store,
             indexing_service=mock_indexing,
-            backup_indexing_service=mock_indexing,
             settings=backup_system_settings,
         )
 
@@ -168,7 +167,6 @@ class TestCompleteBackupMaintenanceCycle:
             primary_store=mock_primary_qdrant_store,
             backup_store=mock_backup_qdrant_store,
             indexing_service=mock_indexing,
-            backup_indexing_service=mock_indexing,
             settings=backup_system_settings,
         )
 
@@ -214,7 +212,6 @@ class TestCompleteBackupMaintenanceCycle:
             primary_store=mock_primary_qdrant_store,
             backup_store=mock_backup_qdrant_store,
             indexing_service=mock_indexing,
-            backup_indexing_service=mock_indexing,
             settings=backup_system_settings,
         )
 
@@ -272,7 +269,6 @@ class TestSnapshotCreationDuringNormalOperation:
             primary_store=mock_primary_qdrant_store,
             backup_store=None,  # No backup store for snapshot-only testing
             indexing_service=mock_indexing,
-            backup_indexing_service=mock_indexing,
             settings=backup_system_settings,
         )
 
@@ -464,7 +460,6 @@ class TestBackupSystemDisabled:
             primary_store=None,
             backup_store=None,
             indexing_service=mock_indexing,
-            backup_indexing_service=mock_indexing,
             settings=settings,
         )
 

@@ -73,14 +73,17 @@ def failover_service(
     mock_indexing_service,
     failover_settings,
 ):
-    """Create a FailoverService instance for testing."""
+    """Create a FailoverService instance for testing.
+
+    Note: backup_indexing_service removed in Phase 2 - new multi-vector approach
+    stores backup embeddings as additional vectors on same points.
+    """
     from codeweaver.engine.services.failover_service import FailoverService
 
     return FailoverService(
         primary_store=mock_primary_store,
         backup_store=mock_backup_store,
         indexing_service=mock_indexing_service,
-        backup_indexing_service=mock_indexing_service,
         settings=failover_settings,
     )
 
@@ -88,60 +91,35 @@ def failover_service(
 class TestSnapshotCycleManagement:
     """Tests for snapshot cycle counting and scheduling."""
 
+    @pytest.mark.skip(reason="Phase 2: Cycle counters removed - maintenance now in indexing service")
     @pytest.mark.asyncio
     async def test_snapshot_cycle_counter_increments(self, failover_service):
-        """Test that snapshot cycle counter increments on each maintenance run."""
-        assert failover_service._snapshot_cycle_count == 0
+        """Test that snapshot cycle counter increments on each maintenance run.
 
-        # Mock the maintenance operations
-        with patch.object(
-            failover_service.backup_indexing_service, "index_project", new=AsyncMock()
-        ):
-            with patch.object(failover_service, "_run_reconciliation", new=AsyncMock()):
-                with patch.object(failover_service, "_run_snapshot_maintenance", new=AsyncMock()):
-                    # Simulate one maintenance cycle
-                    await failover_service.backup_indexing_service.index_project()
-                    failover_service._snapshot_cycle_count += 1
+        Note: This test is obsolete after Phase 2 refactor. Cycle counting moved to
+        indexing service's three-phase maintenance loop.
+        """
+        pass
 
-        assert failover_service._snapshot_cycle_count == 1
-
+    @pytest.mark.skip(reason="Phase 2: Cycle-based scheduling moved to indexing service")
     @pytest.mark.asyncio
     async def test_snapshot_maintenance_runs_on_schedule(self, failover_service):
-        """Test that snapshot maintenance runs every N cycles as configured."""
-        # Set interval to 2 cycles for testing
-        failover_service.settings.snapshot_interval_cycles = 2
+        """Test that snapshot maintenance runs every N cycles as configured.
 
-        with patch.object(
-            failover_service, "_run_snapshot_maintenance", new=AsyncMock()
-        ) as mock_snapshot:
-            # Simulate 5 maintenance cycles
-            for i in range(5):
-                failover_service._snapshot_cycle_count += 1
+        Note: This test is obsolete after Phase 2 refactor. Scheduling logic moved to
+        indexing service's three-phase maintenance loop.
+        """
+        pass
 
-                if failover_service._snapshot_cycle_count >= failover_service.settings.snapshot_interval_cycles:
-                    await failover_service._run_snapshot_maintenance()
-                    failover_service._snapshot_cycle_count = 0
-
-        # Should have been called 2 times (cycles 2 and 4)
-        assert mock_snapshot.call_count == 2
-
+    @pytest.mark.skip(reason="Phase 2: Cycle counter fields removed")
     @pytest.mark.asyncio
     async def test_snapshot_cycle_counter_resets_after_threshold(self, failover_service):
-        """Test that snapshot cycle counter resets after reaching threshold."""
-        failover_service.settings.snapshot_interval_cycles = 3
+        """Test that snapshot cycle counter resets after reaching threshold.
 
-        # Increment to threshold
-        for i in range(3):
-            failover_service._snapshot_cycle_count += 1
-
-        assert failover_service._snapshot_cycle_count == 3
-
-        # Simulate snapshot maintenance and reset
-        with patch.object(failover_service, "_run_snapshot_maintenance", new=AsyncMock()):
-            await failover_service._run_snapshot_maintenance()
-            failover_service._snapshot_cycle_count = 0
-
-        assert failover_service._snapshot_cycle_count == 0
+        Note: This test is obsolete after Phase 2 refactor. Cycle counting moved to
+        indexing service's three-phase maintenance loop.
+        """
+        pass
 
 
 class TestSnapshotCreation:
@@ -255,38 +233,17 @@ class TestSnapshotErrorHandling:
 class TestMaintenanceLoopIntegration:
     """Tests for snapshot integration with full maintenance loop."""
 
+    @pytest.mark.skip(reason="Phase 2: Maintenance loop removed from FailoverService")
     @pytest.mark.asyncio
     async def test_maintenance_loop_order(self, failover_service):
-        """Test that maintenance operations run in correct order."""
-        operations_order = []
+        """Test that maintenance operations run in correct order.
 
-        async def track_backup_index():
-            operations_order.append("backup_index")
-
-        async def track_reconciliation():
-            operations_order.append("reconciliation")
-
-        async def track_snapshot():
-            operations_order.append("snapshot")
-
-        with patch.object(
-            failover_service.backup_indexing_service, "index_project", new=track_backup_index
-        ):
-            with patch.object(failover_service, "_run_reconciliation", new=track_reconciliation):
-                with patch.object(failover_service, "_run_snapshot_maintenance", new=track_snapshot):
-                    # Simulate one maintenance cycle with all operations
-                    await failover_service.backup_indexing_service.index_project()
-                    failover_service._maintenance_cycle_count = 2  # Trigger reconciliation
-                    failover_service._snapshot_cycle_count = 3  # Trigger snapshot
-
-                    if failover_service._maintenance_cycle_count >= failover_service.settings.reconciliation_interval_cycles:
-                        await failover_service._run_reconciliation()
-
-                    if failover_service._snapshot_cycle_count >= failover_service.settings.snapshot_interval_cycles:
-                        await failover_service._run_snapshot_maintenance()
-
-        # Verify order: backup → reconciliation → snapshot
-        assert operations_order == ["backup_index", "reconciliation", "snapshot"]
+        Note: This test is obsolete after Phase 2 refactor. The three-phase maintenance loop
+        (backup indexing, reconciliation, snapshot) is now handled by the indexing service,
+        not the failover service. FailoverService now only handles health monitoring and
+        failover activation.
+        """
+        pass
 
     @pytest.mark.asyncio
     async def test_snapshot_skipped_during_failover(self, failover_service):
@@ -303,38 +260,16 @@ class TestMaintenanceLoopIntegration:
         # Snapshot should not be called during active failover
         mock_snapshot.assert_not_called()
 
+    @pytest.mark.skip(reason="Phase 2: backup_indexing_service removed")
     @pytest.mark.asyncio
     async def test_concurrent_maintenance_operations(self, failover_service):
-        """Test that maintenance operations can run concurrently if needed."""
-        # This test validates the maintenance loop structure supports async ops
+        """Test that maintenance operations can run concurrently if needed.
 
-        async def slow_backup_index():
-            await asyncio.sleep(0.1)
-            return 0
-
-        async def slow_reconciliation():
-            await asyncio.sleep(0.1)
-
-        async def slow_snapshot():
-            await asyncio.sleep(0.1)
-
-        with patch.object(
-            failover_service.backup_indexing_service, "index_project", new=slow_backup_index
-        ):
-            with patch.object(failover_service, "_run_reconciliation", new=slow_reconciliation):
-                with patch.object(
-                    failover_service, "_run_snapshot_maintenance", new=slow_snapshot
-                ):
-                    # Run operations in sequence (current implementation)
-                    # but verify they're all async
-                    start = asyncio.get_event_loop().time()
-                    await failover_service.backup_indexing_service.index_project()
-                    await failover_service._run_reconciliation()
-                    await failover_service._run_snapshot_maintenance()
-                    duration = asyncio.get_event_loop().time() - start
-
-                    # Should take ~0.3 seconds (sequential)
-                    assert duration >= 0.3
+        Note: This test is obsolete after Phase 2 refactor. Backup indexing is now
+        handled by the indexing service as part of the three-phase maintenance loop,
+        not the failover service.
+        """
+        pass
 
 
 class TestSnapshotConfiguration:
