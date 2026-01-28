@@ -417,105 +417,135 @@ class IndexingService:
         registry: EmbeddingRegistryDep = INJECTED,
     ) -> None:
         """Process a single batch of backup content for reconciliation."""
-        from codeweaver.core import (
-            ChunkEmbeddings,
-            EmbeddingBatchInfo,
-            ModelName,
-            SparseEmbedding,
-            uuid7,
-        )
         from codeweaver.providers import get_embedding_registry
 
-        # Extract chunks from payloads
-        chunks: list[CodeChunk] = []
-        sparse_vectors: dict[str, Any] = {}
-
-        # Actually, let's just stick to the 'models_match' flag for simplicity for now
-        # or rely on the fact that if we inject sparse, it skips sparse regen.
-
-        for point in batch:
-            if hasattr(point.payload, "chunk"):
-                chunk = point.payload.chunk
-                # Deserialize if needed
-                if isinstance(chunk, dict):
-                    from codeweaver.core import CodeChunk
-
-                    chunk = CodeChunk.model_validate(chunk)
-                chunks.append(chunk)
-
-                # Extract sparse vector if available and structure matches
-                # point.vector is typically {'dense': ..., 'sparse': ...}
-                if (
-                    hasattr(point, "vector")
-                    and isinstance(point.vector, dict)
-                    and (sparse_vec := point.vector.get("sparse"))
-                ):
-                    sparse_vectors[str(chunk.chunk_id)] = sparse_vec
-
+        # Extract chunks and sparse vectors from batch
+        chunks, sparse_vectors = self._extract_chunks_from_batch(batch)
         if not chunks:
             return
 
         registry = get_embedding_registry()
 
-        # If we have sparse vectors and want to reuse them (assuming match for now, or we'd verify)
-        # We inject them into the registry.
-        # Note: We really should verify models match before injecting.
-        # But _process_backup_batch doesn't know about backup_meta.
-        # Let's assume the caller handled the "match" check logic and we only implement
-        # the injection if we decide to support it.
-
-        # IMPLEMENTATION: Inject sparse vectors if available and model matches
+        # Inject sparse vectors if available and model matches
         if sparse_match and sparse_vectors:
-            # We create a virtual batch ID for this migration
-            migration_batch_id = uuid7()
+            self._inject_sparse_vectors(chunks, sparse_vectors, registry)
 
-            for i, chunk in enumerate(chunks):
-                if s_vec := sparse_vectors.get(str(chunk.chunk_id)):
-                    # s_vec from qdrant is likely SparseVector(indices=..., values=...)
-                    # We need to convert to our SparseEmbedding
-                    try:
-                        # Handle Qdrant SparseVector object or dict
-                        indices = getattr(s_vec, "indices", None) or s_vec.get("indices")
-                        values = getattr(s_vec, "values", None) or s_vec.get("values")
+        # Index compatible chunks
+        await self._index_compatible_chunks(chunks)
 
-                        sparse_emb = SparseEmbedding(indices=indices, values=values)
+    def _extract_chunks_from_batch(
+        self, batch: list[Any]
+    ) -> tuple[list[CodeChunk], dict[str, Any]]:
+        """Extract chunks and sparse vectors from batch points.
 
-                        # Create info
-                        info = EmbeddingBatchInfo.create_sparse(
-                            batch_id=migration_batch_id,
-                            batch_index=i,
-                            chunk_id=chunk.chunk_id,
-                            # We use the CURRENT sparse provider model name because we are claiming
-                            # these vectors are valid for it.
-                            model=ModelName(self._sparse_provider.model_name)
-                            if self._sparse_provider
-                            else ModelName("unknown"),
-                            embeddings=sparse_emb,
-                            dtype="float32",  # Assumption, or get from provider
-                        )
+        Returns tuple of (chunks, sparse_vectors) where sparse_vectors maps
+        chunk_id to sparse vector data.
+        """
+        chunks: list[CodeChunk] = []
+        sparse_vectors: dict[str, Any] = {}
 
-                        # Register
-                        if chunk.chunk_id in registry:
-                            registry[chunk.chunk_id] = registry[chunk.chunk_id].add(info)
-                        else:
-                            registry[chunk.chunk_id] = ChunkEmbeddings(chunk=chunk).add(info)
-                    except Exception:
-                        # If conversion fails, just skip injection (will regenerate)
-                        logger.debug(
-                            "Failed to inject sparse vector for chunk %s",
-                            chunk.chunk_id,
-                            exc_info=True,
-                        )
+        for point in batch:
+            if not hasattr(point.payload, "chunk"):
+                continue
 
-        # Check compatibility via ChunkingService
-        if self._chunking_service.can_reuse_chunks(chunks):
-            # Reuse text, regen vectors
-            if self._embedding_provider or self._sparse_provider:
-                await self._embed_chunks(chunks)
+            chunk = self._deserialize_chunk(point.payload.chunk)
+            chunks.append(chunk)
 
-            if self._vector_store:
-                await self._vector_store.upsert(chunks)
-                self.stats.chunks_indexed += len(chunks)
+            # Extract sparse vector if available
+            sparse_vec = self._extract_sparse_vector(point)
+            if sparse_vec is not None:
+                sparse_vectors[str(chunk.chunk_id)] = sparse_vec
+
+        return chunks, sparse_vectors
+
+    def _deserialize_chunk(self, chunk: Any) -> CodeChunk:
+        """Deserialize chunk from payload if needed."""
+        from codeweaver.core import CodeChunk
+
+        if isinstance(chunk, dict):
+            return CodeChunk.model_validate(chunk)
+        return chunk
+
+    def _extract_sparse_vector(self, point: Any) -> Any | None:
+        """Extract sparse vector from point if available."""
+        if not hasattr(point, "vector"):
+            return None
+
+        vector = point.vector
+        if not isinstance(vector, dict):
+            return None
+
+        return vector.get("sparse")
+
+    def _inject_sparse_vectors(
+        self, chunks: list[CodeChunk], sparse_vectors: dict[str, Any], registry: Any
+    ) -> None:
+        """Inject sparse vectors into embedding registry.
+
+        Converts Qdrant sparse vectors to SparseEmbedding format and registers
+        them for reuse during reconciliation.
+        """
+        from codeweaver.core import uuid7
+
+        migration_batch_id = uuid7()
+
+        for i, chunk in enumerate(chunks):
+            sparse_vec = sparse_vectors.get(str(chunk.chunk_id))
+            if sparse_vec is None:
+                continue
+
+            try:
+                self._register_sparse_embedding(chunk, sparse_vec, migration_batch_id, i, registry)
+            except Exception:
+                logger.debug(
+                    "Failed to inject sparse vector for chunk %s", chunk.chunk_id, exc_info=True
+                )
+
+    def _register_sparse_embedding(
+        self, chunk: CodeChunk, sparse_vec: Any, batch_id: Any, batch_index: int, registry: Any
+    ) -> None:
+        """Register a single sparse embedding in the registry."""
+        from codeweaver.core import ChunkEmbeddings, EmbeddingBatchInfo, ModelName, SparseEmbedding
+
+        # Convert Qdrant SparseVector to SparseEmbedding
+        indices = getattr(sparse_vec, "indices", None) or sparse_vec.get("indices")
+        values = getattr(sparse_vec, "values", None) or sparse_vec.get("values")
+        sparse_emb = SparseEmbedding(indices=indices, values=values)
+
+        # Create embedding info with current sparse provider model
+        model = (
+            ModelName(self._sparse_provider.model_name)
+            if self._sparse_provider
+            else ModelName("unknown")
+        )
+        info = EmbeddingBatchInfo.create_sparse(
+            batch_id=batch_id,
+            batch_index=batch_index,
+            chunk_id=chunk.chunk_id,
+            model=model,
+            embeddings=sparse_emb,
+            dtype="float32",
+        )
+
+        # Add to registry
+        if chunk.chunk_id in registry:
+            registry[chunk.chunk_id] = registry[chunk.chunk_id].add(info)
+        else:
+            registry[chunk.chunk_id] = ChunkEmbeddings(chunk=chunk).add(info)
+
+    async def _index_compatible_chunks(self, chunks: list[CodeChunk]) -> None:
+        """Index chunks if compatible with current chunking configuration."""
+        if not self._chunking_service.can_reuse_chunks(chunks):
+            return
+
+        # Generate embeddings if providers available
+        if self._embedding_provider or self._sparse_provider:
+            await self._embed_chunks(chunks)
+
+        # Upsert to vector store
+        if self._vector_store:
+            await self._vector_store.upsert(chunks)
+            self.stats.chunks_indexed += len(chunks)
 
     def _get_current_embedding_models(self) -> dict[str, str | None]:
         """Helper to get model info for manifest updates."""

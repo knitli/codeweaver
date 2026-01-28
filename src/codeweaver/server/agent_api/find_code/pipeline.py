@@ -185,6 +185,85 @@ async def _embed_sparse(
     return None
 
 
+def _normalize_dense_embedding(embedding: Any) -> RawEmbeddingVectors | None:
+    """Normalize dense embedding to list[list[float]] format.
+
+    Args:
+        embedding: Raw embedding from provider
+
+    Returns:
+        Normalized embedding or None if invalid
+    """
+    if not embedding:
+        return None
+
+    # Already in correct format: list[list[float]]
+    if isinstance(embedding, list) and len(embedding) > 0 and isinstance(embedding[0], list):
+        return embedding  # type: ignore[return-value]
+
+    # Single embedding: list[float] → wrap in list
+    return [embedding]  # type: ignore[return-value]
+
+
+def _normalize_sparse_embedding(result: Any) -> SparseEmbedding | None:
+    """Normalize sparse embedding result to SparseEmbedding format.
+
+    Handles multiple provider return formats:
+    - SparseEmbedding object
+    - list[SparseEmbedding]
+    - dict with indices/values
+    - list[dict] with indices/values
+    - list[list, list] tuple format
+
+    Args:
+        result: Raw result from sparse provider
+
+    Returns:
+        Normalized SparseEmbedding or None if invalid format
+    """
+    if isinstance(result, SparseEmbedding):
+        return result
+
+    if isinstance(result, list) and len(result) > 0:
+        item = result[0]
+        if isinstance(item, SparseEmbedding):
+            return item
+        if isinstance(item, dict) and "indices" in item and "values" in item:
+            return SparseEmbedding(**item)
+        # Handle tuple format: ([indices], [values])
+        if isinstance(item, list) and len(result) == 2 and isinstance(result[1], list):
+            return SparseEmbedding(indices=result[0], values=result[1])  # ty: ignore[invalid-argument-type]
+
+        logger.warning("Unexpected sparse embedding format in list: %s", type(item))
+        return None
+
+    if isinstance(result, dict) and "indices" in result and "values" in result:
+        return SparseEmbedding(**result)
+
+    logger.warning("Unexpected sparse embedding format: %s", type(result))
+    return None
+
+
+def _build_vectors_dict(
+    dense_embedding: RawEmbeddingVectors | None, sparse_embedding: SparseEmbedding | None
+) -> dict[str, Any]:
+    """Build vectors dictionary from embeddings.
+
+    Args:
+        dense_embedding: Normalized dense embedding
+        sparse_embedding: Normalized sparse embedding
+
+    Returns:
+        Dictionary with intent-based keys for available embeddings
+    """
+    vectors = {}
+    if dense_embedding is not None:
+        vectors["primary"] = dense_embedding
+    if sparse_embedding is not None:
+        vectors["sparse"] = sparse_embedding
+    return vectors
+
+
 async def embed_query(
     query: str,
     context: Any = None,
@@ -212,18 +291,12 @@ async def embed_query(
 
     _query_cv.set(query.strip())
 
+    # Attempt dense embedding
     dense_query_embedding = None
     if dense_provider:
         try:
-            dense_query_embedding = await dense_provider.embed_query(query)
-            if (
-                isinstance(dense_query_embedding, list)
-                and len(dense_query_embedding) > 0
-                and isinstance(dense_query_embedding[0], list)
-            ):
-                pass
-            elif dense_query_embedding:
-                dense_query_embedding = [dense_query_embedding]
+            raw_embedding = await dense_provider.embed_query(query)
+            dense_query_embedding = _normalize_dense_embedding(raw_embedding)
         except Exception as e:
             await log_to_client_or_fallback(
                 context,
@@ -237,32 +310,13 @@ async def embed_query(
                     },
                 },
             )
-            dense_query_embedding = None
 
+    # Attempt sparse embedding
     sparse_query_embedding = None
     if sparse_provider:
         try:
             result = await sparse_provider.embed_query(query)
-
-            # Standardize sparse embedding format
-            from codeweaver.core import SparseEmbedding
-
-            if isinstance(result, SparseEmbedding):
-                sparse_query_embedding = result
-            elif isinstance(result, list) and len(result) > 0:
-                # Handle list[SparseEmbedding] or list[dict]
-                item = result[0]
-                if isinstance(item, SparseEmbedding):
-                    sparse_query_embedding = item
-                elif isinstance(item, dict) and "indices" in item and "values" in item:
-                    sparse_query_embedding = SparseEmbedding(**item)
-                else:
-                    logger.warning("Unexpected sparse embedding format in list: %s", type(item))
-            elif isinstance(result, dict) and "indices" in result and "values" in result:
-                sparse_query_embedding = SparseEmbedding(**result)
-            else:
-                logger.warning("Unexpected sparse embedding format: %s", type(result))
-
+            sparse_query_embedding = _normalize_sparse_embedding(result)
         except Exception as e:
             await log_to_client_or_fallback(
                 context,
@@ -272,19 +326,13 @@ async def embed_query(
                     "extra": {"phase": "query_embedding", "error": str(e)},
                 },
             )
-            sparse_query_embedding = None
 
     # Validate at least one succeeded
     if dense_query_embedding is None and sparse_query_embedding is None:
         return raise_value_error("Both dense and sparse embedding failed")
 
     # Build vectors dict with intent-based keys
-    vectors = {}
-    if dense_query_embedding is not None:
-        vectors["primary"] = dense_query_embedding
-    if sparse_query_embedding is not None:
-        vectors["sparse"] = sparse_query_embedding
-
+    vectors = _build_vectors_dict(dense_query_embedding, sparse_query_embedding)
     return QueryResult(vectors=vectors)
 
 
@@ -604,6 +652,9 @@ async def rerank_results(
 
 
 __all__ = (
+    "_build_vectors_dict",
+    "_normalize_dense_embedding",
+    "_normalize_sparse_embedding",
     "build_query_vector",
     "embed_query",
     "execute_vector_search",

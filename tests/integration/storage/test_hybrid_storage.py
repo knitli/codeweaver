@@ -13,9 +13,9 @@ from typing import Any
 
 import pytest
 
-from codeweaver.core import SearchStrategy, StrategizedQuery, uuid7
+from codeweaver.core import SearchStrategy, SparseEmbedding, StrategizedQuery, uuid7
 from codeweaver.core import SemanticSearchLanguage as Language
-from codeweaver.providers import QdrantVectorStoreProvider, SparseEmbedding
+from codeweaver.providers import QdrantVectorStoreProvider
 
 # sourcery skip: dont-import-test-modules
 from tests.conftest import create_test_chunk_with_embeddings

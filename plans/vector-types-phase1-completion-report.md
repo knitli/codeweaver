@@ -1,3 +1,10 @@
+<!--
+SPDX-FileCopyrightText: 2026 Knitli Inc.
+SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+
+SPDX-License-Identifier: MIT OR Apache-2.0
+-->
+
 # Vector Types Refactor - Phase 1 Completion Report
 
 **Date**: 2026-01-27

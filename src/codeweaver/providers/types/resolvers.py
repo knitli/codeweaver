@@ -1,3 +1,8 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 """Base capability resolvers."""
 
 from __future__ import annotations

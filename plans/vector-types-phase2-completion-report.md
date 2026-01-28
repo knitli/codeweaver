@@ -1,3 +1,10 @@
+<!--
+SPDX-FileCopyrightText: 2026 Knitli Inc.
+SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+
+SPDX-License-Identifier: MIT OR Apache-2.0
+-->
+
 # Vector Types Phase 2 - Consumer Migration Completion Report
 
 **Date**: 2026-01-27

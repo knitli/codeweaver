@@ -214,6 +214,132 @@ async def _build_search_package(package: SearchPackageDep) -> SearchPackage:
     return package
 
 
+async def _handle_intent_detection(
+    query: str, intent: IntentType | None
+) -> tuple[IntentType, AgentTask]:
+    """Detect or use provided intent and map to agent task.
+
+    Args:
+        query: Search query
+        intent: Optional explicit intent override
+
+    Returns:
+        Tuple of (intent_type, agent_task)
+    """
+    if intent is not None:
+        intent_type = intent
+        confidence = 1.0
+    else:
+        query_intent_obj = detect_intent(query)
+        intent_type = query_intent_obj.intent_type
+        confidence = query_intent_obj.confidence
+
+    raw_agent_task = INTENT_TO_AGENT_TASK.get(intent_type, "DEFAULT")
+    agent_task = AgentTask[raw_agent_task]
+
+    logger.info("Query intent detected: %s (confidence: %.2f)", intent_type, confidence)
+    return intent_type, agent_task
+
+
+async def _process_and_score_candidates(
+    query: str,
+    candidates: list,
+    intent_type: IntentType,
+    agent_task: AgentTask,
+    context: Context | None,
+    reranking_provider,
+) -> tuple[list, list[SearchStrategy]]:
+    """Apply reranking and semantic scoring to search candidates.
+
+    Args:
+        query: Search query
+        candidates: Initial search candidates
+        intent_type: Detected query intent
+        agent_task: Mapped agent task
+        context: Optional MCP context
+        reranking_provider: Optional reranking provider
+
+    Returns:
+        Tuple of (scored_candidates, strategies_used)
+    """
+    strategies_used: list[SearchStrategy] = []
+
+    # Rerank if provider configured
+    reranked_results, rerank_strategy = await rerank_results(
+        query, candidates, context=context, reranking=reranking_provider
+    )
+    if rerank_strategy:
+        strategies_used.append(rerank_strategy)
+
+    # Apply semantic weights
+    if reranked_results:
+        scored_candidates = process_reranked_results(
+            reranked_results, candidates, intent_type, agent_task
+        )
+    else:
+        scored_candidates = process_unranked_results(candidates, intent_type, agent_task)
+
+    return scored_candidates, strategies_used
+
+
+async def _finalize_response(
+    code_matches: list[CodeMatch],
+    query: str,
+    intent_type: IntentType,
+    total_candidates: int,
+    token_limit: int,
+    execution_time_ms: float,
+    strategies_used: list[SearchStrategy],
+    telemetry_settings,
+    telemetry,
+) -> FindCodeResponseSummary:
+    """Build final response and capture telemetry.
+
+    Args:
+        code_matches: Converted search results
+        query: Original search query
+        intent_type: Detected intent
+        total_candidates: Total number of candidates
+        token_limit: Token limit for response
+        execution_time_ms: Execution time in milliseconds
+        strategies_used: List of search strategies used
+        telemetry_settings: Telemetry configuration
+        telemetry: Telemetry service
+
+    Returns:
+        Final response summary
+    """
+    response = build_success_response(
+        code_matches=code_matches,
+        query=query,
+        intent_type=intent_type,
+        total_candidates=total_candidates,
+        token_limit=token_limit,
+        execution_time_ms=execution_time_ms,
+        strategies_used=strategies_used,
+    )
+
+    if telemetry_settings.tools_over_privacy:
+        feature_flags = {
+            "search-ranking-v2": telemetry.client.get_feature_flag("search-ranking-v2"),  # ty:ignore[unresolved-attribute]
+            "rerank-strategy": telemetry.client.get_feature_flag("rerank-strategy"),  # ty:ignore[unresolved-attribute]
+        }
+        try:
+            capture_search_event(
+                response=response,
+                query=query,
+                intent_type=intent_type,
+                strategies=strategies_used,
+                execution_time_ms=execution_time_ms,
+                tools_over_privacy=telemetry_settings.tools_over_privacy,
+                feature_flags=feature_flags,
+            )
+        except Exception:
+            logger.debug("Failed to capture search telemetry")
+
+    return response
+
+
 async def find_code(
     query: str,
     *,
@@ -263,18 +389,7 @@ async def find_code(
             await _ensure_index_ready(context, vector_store=search_package.vector_store)
 
         # Step 1: Intent detection
-        if intent is not None:
-            intent_type = intent
-            confidence = 1.0
-        else:
-            query_intent_obj = detect_intent(query)
-            intent_type = query_intent_obj.intent_type
-            confidence = query_intent_obj.confidence
-
-        raw_agent_task = INTENT_TO_AGENT_TASK.get(intent_type, "DEFAULT")
-        agent_task = AgentTask[raw_agent_task]
-
-        logger.info("Query intent detected: %s (confidence: %.2f)", intent_type, confidence)
+        intent_type, agent_task = await _handle_intent_detection(query, intent)
 
         # Step 2: Embed query (dense + sparse)
         embeddings = await embed_query(
@@ -302,29 +417,20 @@ async def find_code(
 
         logger.info("Vector search returned %d candidates after filtering", len(candidates))
 
-        # Step 7: Rerank (optional, if provider configured)
-        reranked_results, rerank_strategy = await rerank_results(
-            query, candidates, context=context, reranking=search_package.reranking
+        # Step 6: Rerank and score
+        scored_candidates, rerank_strategies = await _process_and_score_candidates(
+            query, candidates, intent_type, agent_task, context, search_package.reranking
         )
-        if rerank_strategy:
-            strategies_used.append(rerank_strategy)
+        strategies_used.extend(rerank_strategies)
 
-        # Step 8: Rescore with semantic weights
-        if reranked_results:
-            scored_candidates = process_reranked_results(
-                reranked_results, candidates, intent_type, agent_task
-            )
-        else:
-            scored_candidates = process_unranked_results(candidates, intent_type, agent_task)
-
-        # Step 9: Sort and limit
+        # Step 7: Sort and limit
         scored_candidates.sort(
             key=lambda x: x.relevance_score if x.relevance_score is not None else x.score,
             reverse=True,
         )
         search_results = scored_candidates[:max_results]
 
-        # Step 10: Convert to CodeMatch objects for response
+        # Step 8: Convert to CodeMatch objects for response
         code_matches: list[CodeMatch] = []
         for result in search_results:
             try:
@@ -334,36 +440,19 @@ async def find_code(
                 logger.warning("Failed to convert search result to code match: %s", e)
                 continue
 
-        # Step 11: Build response
+        # Step 9: Build response and capture telemetry
         execution_time_ms = (time.monotonic() - start_time) * 1000
-
-        response = build_success_response(
-            code_matches=code_matches,
-            query=query,
-            intent_type=intent_type,
-            total_candidates=len(scored_candidates),
-            token_limit=token_limit,
-            execution_time_ms=execution_time_ms,
-            strategies_used=strategies_used,
+        response = await _finalize_response(
+            code_matches,
+            query,
+            intent_type,
+            len(scored_candidates),
+            token_limit,
+            execution_time_ms,
+            strategies_used,
+            telemetry_settings,
+            telemetry,
         )
-
-        if telemetry_settings.tools_over_privacy:
-            feature_flags = {
-                "search-ranking-v2": telemetry.client.get_feature_flag("search-ranking-v2"),  # ty:ignore[unresolved-attribute]
-                "rerank-strategy": telemetry.client.get_feature_flag("rerank-strategy"),  # ty:ignore[unresolved-attribute]
-            }
-            try:
-                capture_search_event(
-                    response=response,
-                    query=query,
-                    intent_type=intent_type,
-                    strategies=strategies_used,
-                    execution_time_ms=execution_time_ms,
-                    tools_over_privacy=telemetry_settings.tools_over_privacy,
-                    feature_flags=feature_flags,
-                )
-            except Exception:
-                logger.debug("Failed to capture search telemetry")
 
     except Exception as e:
         logger.warning("find_code failed: %s", e, exc_info=True)

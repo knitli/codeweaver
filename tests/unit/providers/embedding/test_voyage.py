@@ -9,11 +9,10 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from codeweaver.core import CodeChunk, SemanticSearchLanguage
+from codeweaver.core import CodeChunk, Provider, SemanticSearchLanguage
 from codeweaver.providers import (
     EmbeddingErrorInfo,
     EmbeddingModelCapabilities,
-    Provider,
     VoyageEmbeddingProvider,
 )
 

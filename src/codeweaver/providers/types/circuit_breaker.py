@@ -1,3 +1,8 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 """We separate circuit breaker here because this keeps the universe from imploding. Or, circular imports, at least."""
 
 from __future__ import annotations

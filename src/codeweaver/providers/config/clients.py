@@ -420,6 +420,56 @@ class QdrantClientOptions(ClientOptions):
             or (self.host and self._is_local_url(self.host))
         )
 
+    def _add_connection_params(self, params: dict[str, Any]) -> None:
+        """Add connection-related parameters to params dict."""
+        if self.location is not None:
+            params["location"] = self.location
+        if self.url is not None:
+            params["url"] = str(self.url) if isinstance(self.url, AnyUrl) else self.url
+        if self.host is not None:
+            params["host"] = str(self.host) if isinstance(self.host, AnyUrl) else self.host
+        if self.path is not None:
+            params["path"] = self.path
+        if self.port is not None:
+            params["port"] = self.port
+        if self.grpc_port is not None:
+            params["grpc_port"] = self.grpc_port
+        if self.https is not None:
+            params["https"] = self.https
+
+    def _add_auth_params(self, params: dict[str, Any]) -> None:
+        """Add authentication parameters to params dict."""
+        if self.api_key is not None:
+            params["api_key"] = self.api_key
+        if self.auth_token_provider is not None:
+            params["auth_token_provider"] = self.auth_token_provider
+
+    def _add_preference_params(self, params: dict[str, Any]) -> None:
+        """Add preference parameters to params dict."""
+        params["prefer_grpc"] = self.prefer_grpc
+        if self.prefix is not None:
+            params["prefix"] = self.prefix
+        if self.timeout is not None:
+            params["timeout"] = self.timeout
+
+    def _add_advanced_params(self, params: dict[str, Any]) -> None:
+        """Add advanced configuration parameters to params dict."""
+        params["force_disable_check_same_thread"] = self.force_disable_check_same_thread
+        if self.grpc_options is not None:
+            params["grpc_options"] = self.grpc_options
+        params["cloud_inference"] = self.cloud_inference
+        if self.local_inference_batch_size is not None:
+            params["local_inference_batch_size"] = self.local_inference_batch_size
+        params["check_compatibility"] = self.check_compatibility
+        if self.pool_size is not None:
+            params["pool_size"] = self.pool_size
+
+    def _add_http_params(self, params: dict[str, Any]) -> None:
+        """Add advanced HTTP options to params dict."""
+        if self.advanced_http_options is not None:
+            # These are passed through to httpx.AsyncClient
+            params["kwargs"] = self.advanced_http_options
+
     def to_qdrant_params(self) -> dict[str, Any]:
         """Convert client options to qdrant_client constructor parameters.
 
@@ -438,50 +488,11 @@ class QdrantClientOptions(ClientOptions):
         """
         params: dict[str, Any] = {}
 
-        # Connection parameters
-        if self.location is not None:
-            params["location"] = self.location
-        if self.url is not None:
-            params["url"] = str(self.url) if isinstance(self.url, AnyUrl) else self.url
-        if self.host is not None:
-            params["host"] = str(self.host) if isinstance(self.host, AnyUrl) else self.host
-        if self.path is not None:
-            params["path"] = self.path
-        if self.port is not None:
-            params["port"] = self.port
-        if self.grpc_port is not None:
-            params["grpc_port"] = self.grpc_port
-        if self.https is not None:
-            params["https"] = self.https
-
-        # Authentication
-        if self.api_key is not None:
-            params["api_key"] = self.api_key
-        if self.auth_token_provider is not None:
-            params["auth_token_provider"] = self.auth_token_provider
-
-        # Preferences
-        params["prefer_grpc"] = self.prefer_grpc
-        if self.prefix is not None:
-            params["prefix"] = self.prefix
-        if self.timeout is not None:
-            params["timeout"] = self.timeout
-
-        # Advanced options
-        params["force_disable_check_same_thread"] = self.force_disable_check_same_thread
-        if self.grpc_options is not None:
-            params["grpc_options"] = self.grpc_options
-        params["cloud_inference"] = self.cloud_inference
-        if self.local_inference_batch_size is not None:
-            params["local_inference_batch_size"] = self.local_inference_batch_size
-        params["check_compatibility"] = self.check_compatibility
-        if self.pool_size is not None:
-            params["pool_size"] = self.pool_size
-
-        # Advanced HTTP options (power users)
-        if self.advanced_http_options is not None:
-            # These are passed through to httpx.AsyncClient
-            params["kwargs"] = self.advanced_http_options
+        self._add_connection_params(params)
+        self._add_auth_params(params)
+        self._add_preference_params(params)
+        self._add_advanced_params(params)
+        self._add_http_params(params)
 
         return params
 

@@ -240,6 +240,171 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         else:
             return
 
+    def _raise_dimension_error(
+        self,
+        collection_name: str,
+        actual_dense: VectorParams | None,
+        expected_dense: VectorParams | None,
+    ) -> NoReturn:
+        """Raise dimension mismatch error with detailed diagnostics."""
+        from codeweaver.core import DimensionMismatchError
+
+        actual_dim = actual_dense.size if actual_dense else "unknown"
+        expected_dim = expected_dense.size if expected_dense else "unknown"
+
+        raise DimensionMismatchError(
+            dedent(
+                f"                Collection '{collection_name}' has {actual_dim}-dimensional vectors but current configuration specifies {expected_dim} dimensions.\n\n                This typically happens when:\n\n                    • The embedding model changed (e.g., switched providers or model versions)\n                    • The embedding configuration changed\n                    • The collection was created with different settings\n                "
+            ),
+            details={
+                "collection": collection_name,
+                "actual_dimension": actual_dim if actual_dense else None,
+                "expected_dimension": expected_dim if expected_dense else None,
+                "resolution_command": "cw index --force --clear",
+            },
+            suggestions=[
+                "  1. Rebuild the collection: cw index --force --clear",
+                "  2. Or revert to the embedding model and settings that created this collection",
+            ],
+        )
+
+    def _validate_collection_name(self, collection_name: str) -> None:
+        """Validate collection name matches configuration."""
+        if collection_name != self.config.collection.collection_name:
+            raise ConfigurationError(
+                f"Collection name '{collection_name}' does not match the configured collection name '{self.config.collection.collection_name}'"
+            )
+
+    def _handle_missing_vector(
+        self, key: str, value: VectorParams | SparseVectorParams, collection_name: str
+    ) -> None:
+        """Handle missing vector configuration by adding to current config."""
+        logger.warning(
+            "Vector config for key '%s' in collection '%s' is missing in current config",
+            key,
+            collection_name,
+        )
+        if isinstance(value, VectorParams):
+            self.config.collection.vectors_config[key] = value  # ty:ignore[invalid-assignment]
+        else:
+            self.config.collection.sparse_vectors_config[key] = value  # ty:ignore[invalid-assignment]
+
+    def _validate_dense_vector(
+        self,
+        key: str,
+        value: VectorParams,
+        ours: VectorParams,
+        collection_name: str,
+        actual_dense: VectorParams | None,
+        expected_dense: VectorParams | None,
+    ) -> None:
+        """Validate dense vector parameters match configuration."""
+        # Check if critical parameters match
+        if all(
+            (k, v)
+            for k, v in value.model_dump().items()
+            if k in ("size", "datatype") and v == getattr(ours, k, None)
+        ):
+            return
+
+        # Validate size matches
+        if getattr(value, "size", None) != getattr(ours, "size", None):
+            self._raise_dimension_error(collection_name, actual_dense, expected_dense)
+
+        # Validate datatype matches
+        if getattr(value, "datatype", None) != getattr(ours, "datatype", None):
+            raise ConfigurationError(
+                f"Collection '{collection_name}' has a vector config for key '{key}' with datatype '{value.datatype}' that does not match the current config datatype '{ours.datatype}'",
+                suggestions=[
+                    "You need to update your vector config's datatype to match the existing collection's config",
+                    "You may also force a reindex of the collection to apply the new config with `cw index --force --clear`",
+                    "Finally, you can preserve your collection and index with new settings by setting a new collection name in your config.",
+                ],
+            )
+
+    def _validate_sparse_vector(
+        self, key: str, value: SparseVectorParams, collection_name: str
+    ) -> None:
+        """Validate sparse vector parameters match configuration."""
+        ours = self.config.collection.sparse_vectors_config.get(key)
+
+        if not ours:
+            # Handle missing sparse vector by syncing with collection
+            if value in self.config.collection.sparse_vectors_config.values():
+                old_key = next(
+                    k for k, v in self.config.collection.sparse_vectors_config.items() if value == v
+                )
+                cast(dict, self.config.collection.sparse_vectors_config)[key] = cast(
+                    dict, self.config.collection.sparse_vectors_config
+                ).pop(old_key)
+            else:
+                self.config.collection.sparse_vectors_config[key] = value  # ty:ignore[invalid-assignment]
+            return
+
+        # Validate datatype matches
+        if ours.datatype != value.datatype:
+            raise ConfigurationError(
+                f"Collection '{collection_name}' has a sparse vector config for key '{key}' with datatype '{value.datatype}' that does not match the current config datatype '{ours.datatype}'",
+                suggestions=[
+                    "You need to update your sparse vector config's datatype to match the existing collection's config",
+                    "You may also force a reindex of the collection to apply the new config with `cw index --force --clear`",
+                    "Finally, you can preserve your collection and index with new settings by setting a new collection name in your config.",
+                ],
+            )
+
+    def _validate_vector_problem(
+        self,
+        key: str,
+        value: VectorParams | SparseVectorParams,
+        our_flattened_params: dict[str, Any],
+        collection_name: str,
+        actual_dense: VectorParams | None,
+        expected_dense: VectorParams | None,
+    ) -> None:
+        """Validate a single vector configuration problem."""
+        logger.debug(
+            "Vector config mismatch for collection '%s': %s in collection %s vs %s in current config",
+            key,
+            value,
+            collection_name,
+            our_flattened_params.get(key),
+        )
+
+        ours = our_flattened_params.get(key)
+
+        if not ours:
+            self._handle_missing_vector(key, value, collection_name)
+        elif isinstance(value, VectorParams):
+            self._validate_dense_vector(
+                key, value, ours, collection_name, actual_dense, expected_dense
+            )
+        elif isinstance(value, SparseVectorParams):
+            self._validate_sparse_vector(key, value, collection_name)
+
+    async def _find_dense_vectors(
+        self, store_params: Any
+    ) -> tuple[VectorParams | None, VectorParams | None]:
+        """Find actual and expected dense vectors for dimension validation."""
+        actual_dense = None
+        expected_dense = None
+        expected_vectors = (await self.config.collection.params()).vectors
+
+        for vector_name, vector_config in store_params.vectors.items():
+            if isinstance(vector_config, VectorParams):
+                actual_dense = vector_config
+                expected_dense = expected_vectors.get(vector_name)
+                if expected_dense:
+                    break
+
+        return actual_dense, expected_dense
+
+    async def _get_flattened_params(self) -> dict[str, Any]:
+        """Get flattened vector and sparse vector parameters for comparison."""
+        collection_params = await self.config.collection.params()
+        return cast(dict[str, Any], collection_params.vectors) | cast(
+            dict[str, Any], collection_params.sparse_vectors
+        )
+
     async def _validate_collection_config(self, collection_name: str) -> None:
         """Validate that existing collection configuration matches current provider settings.
 
@@ -251,145 +416,32 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         Raises:
             DimensionMismatchError: Collection dimension doesn't match configured dimension.
         """
-
-        def _raise_dimension_error() -> NoReturn:
-            from codeweaver.core import DimensionMismatchError
-
-            if actual_dense and expected_dense:
-                actual_dim = actual_dense.size
-                expected_dim = expected_dense.size
-            else:
-                actual_dim = "unknown"
-                expected_dim = "unknown"
-
-            raise DimensionMismatchError(
-                dedent(
-                    f"                Collection '{collection_name}' has {actual_dim}-dimensional vectors but current configuration specifies {expected_dim} dimensions.\n\n                This typically happens when:\n\n                    • The embedding model changed (e.g., switched providers or model versions)\n                    • The embedding configuration changed\n                    • The collection was created with different settings\n                "
-                ),
-                details={
-                    "collection": collection_name,
-                    "actual_dimension": actual_dim if actual_dense else None,
-                    "expected_dimension": expected_dim if expected_dense else None,
-                    "resolution_command": "cw index --force --clear",
-                },
-                suggestions=[
-                    "  1. Rebuild the collection: cw index --force --clear",
-                    "  2. Or revert to the embedding model and settings that created this collection",
-                ],
-            )
-
-        def _raise_configuration_error(
-            message: str, suggestions: list[str] | None = None
-        ) -> NoReturn:
-            raise ConfigurationError(message, suggestions=suggestions)
-
         try:
             collection_info = await self.client.get_collection(collection_name)
-            if collection_name != self.config.collection.collection_name:
-                _raise_configuration_error(
-                    f"Collection name '{collection_name}' does not match the configured collection name '{self.config.collection.collection_name}'"
-                )
-            store_config = collection_info.config
-            store_params = store_config.params
+            self._validate_collection_name(collection_name)
 
-            # Check for any dense vector (primary, dense, backup, etc.) for dimension validation
-            # Get the first dense vector we can find for comparison
-            actual_dense = None
-            expected_dense = None
-            for vector_name, vector_config in store_params.vectors.items():
-                if isinstance(vector_config, VectorParams):
-                    actual_dense = vector_config
-                    # Try to find matching expected vector
-                    expected_dense = (await self.config.collection.params()).vectors.get(
-                        vector_name
-                    )
-                    if expected_dense:
-                        break
-            # We flatten the vector configs to make sure ours matches the existing collection's config
-            # This is the quick route -- there are some config changes that aren't problems
+            store_params = collection_info.config.params
+            actual_dense, expected_dense = await self._find_dense_vectors(store_params)
+
+            # Flatten vector configs for comparison
             flattened_params = cast(dict[str, Any], store_params.vectors) | cast(
                 dict[str, Any], store_params.sparse_vectors
             )
-            our_flattened_params = cast(
-                dict[str, Any], (await self.config.collection.params()).vectors
-            ) | cast(dict[str, Any], (await self.config.collection.params()).sparse_vectors)
-            # if all vector configs are the same then we can skip further validation
+            our_flattened_params = await self._get_flattened_params()
+
+            # Early return if all configs match
             if all(item for item in flattened_params.items() if item in our_flattened_params):
                 return
+
+            # Validate each mismatched configuration
             problems = tuple(
                 item for item in flattened_params.items() if item not in our_flattened_params
             )
             for key, value in problems:
-                logger.debug(
-                    "Vector config mismatch for collection '%s': %s in collection %s vs %s in current config",
-                    key,
-                    value,
-                    collection_name,
-                    our_flattened_params.get(key),
+                self._validate_vector_problem(
+                    key, value, our_flattened_params, collection_name, actual_dense, expected_dense
                 )
-                if not (ours := our_flattened_params.get(key)):
-                    # a missing vector is not necessarily a problem, but we log a warning
-                    logger.warning(
-                        "Vector config for key '%s' in collection '%s' is missing in current config",
-                        key,
-                        collection_name,
-                    )
-                    # we can add the missing vector to our config if needed
-                    if isinstance(value, VectorParams):
-                        self.config.collection.vectors_config[key] = value  # ty:ignore[invalid-assignment]
-                    else:
-                        self.config.collection.sparse_vectors_config[key] = value  # ty:ignore[invalid-assignment]
-                        continue
-                elif isinstance(value, VectorParams) and all(
-                    (k, v)
-                    for k, v in value.model_dump().items()
-                    if k in ("size", "datatype") and v == getattr(ours, k, None)
-                ):
-                    # these are the important keys that need to match up
-                    # since they do match, we can skip further validation
-                    continue
-                elif isinstance(value, VectorParams):
-                    if getattr(value, "size", None) != getattr(ours, "size", None):
-                        _raise_dimension_error()
-                    if getattr(value, "datatype", None) != getattr(ours, "datatype", None):
-                        _raise_configuration_error(
-                            f"Collection '{collection_name}' has a vector config for key '{key}' with datatype '{value.datatype}' that does not match the current config datatype '{ours.datatype}'",
-                            suggestions=[
-                                "You need to update your vector config's datatype to match the existing collection's config",
-                                "You may also force a reindex of the collection to apply the new config with `cw index --force --clear`",
-                                "Finally, you can preserve your collection and index with new settings by setting a new collection name in your config.",
-                            ],
-                        )
-                elif isinstance(value, SparseVectorParams) and (
-                    ours := self.config.collection.sparse_vectors_config.get(key)
-                ):
-                    if ours.datatype == value.datatype:
-                        continue
-                    _raise_configuration_error(
-                        f"Collection '{collection_name}' has a sparse vector config for key '{key}' with datatype '{value.datatype}' that does not match the current config datatype '{ours.datatype}'",
-                        suggestions=[
-                            "You need to update your sparse vector config's datatype to match the existing collection's config",
-                            "You may also force a reindex of the collection to apply the new config with `cw index --force --clear`",
-                            "Finally, you can preserve your collection and index with new settings by setting a new collection name in your config.",
-                        ],
-                    )
-                    continue
-                if isinstance(value, SparseVectorParams) and not (
-                    ours := self.config.collection.sparse_vectors_config.get(key)
-                ):
-                    # The collection is the source of truth here; if the configs match with different keys, we use the collection's key
-                    if value in self.config.collection.sparse_vectors_config.values():
-                        cast(dict, self.config.collection.sparse_vectors_config)[key] = cast(
-                            dict, self.config.collection.sparse_vectors_config
-                        ).pop(
-                            next(
-                                k
-                                for k, v in self.config.collection.sparse_vectors_config.items()
-                                if value == v
-                            )
-                        )
-                    self.config.collection.sparse_vectors_config[key] = value  # ty:ignore[invalid-assignment]
-                    continue
+
         except Exception as e:
             logger.debug(
                 "Could not validate collection config for '%s'", collection_name, exc_info=e

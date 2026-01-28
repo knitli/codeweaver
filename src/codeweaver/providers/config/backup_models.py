@@ -21,8 +21,11 @@ import logging
 
 from typing import TYPE_CHECKING, Literal
 
+from codeweaver.core.types import ModelName
+
 
 if TYPE_CHECKING:
+    from codeweaver.providers.config import EmbeddingProviderSettings
     from codeweaver.providers.embedding.providers.base import EmbeddingProvider
 
 logger = logging.getLogger(__name__)
@@ -170,6 +173,9 @@ async def get_backup_embedding_provider() -> EmbeddingProvider | None:
             from codeweaver.providers.embedding.capabilities.jinaai import (
                 get_jinaai_embedding_capabilities,
             )
+            from codeweaver.providers.embedding.providers.fastembed import (
+                FastEmbedEmbeddingProvider,
+            )
 
             # create the config
             config = await get_backup_embedding_config("fastembed")
@@ -194,11 +200,11 @@ async def get_backup_embedding_provider() -> EmbeddingProvider | None:
                 "Successfully created backup embedding provider: fastembed/%s",
                 BACKUP_MODEL_FALLBACK,
             )
-            return provider
 
         except Exception as e:
             logger.warning("Failed to create fastembed backup provider: %s", e)
-
+        else:
+            return provider
     # No backup provider available
     logger.warning(
         "No backup embedding provider available. Install sentence-transformers or fastembed."

@@ -1,3 +1,10 @@
+<!--
+SPDX-FileCopyrightText: 2026 Knitli Inc.
+SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+
+SPDX-License-Identifier: MIT OR Apache-2.0
+-->
+
 # Phase 2 Completion Report: Vector Reconciliation
 
 **Date**: 2026-01-27

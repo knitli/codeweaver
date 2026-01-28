@@ -31,7 +31,6 @@ from codeweaver.providers import (
     CollectionConfig,
     ConfiguredCapability,
     EmbeddingCapabilityGroup,
-    EmbeddingConfig,
     EmbeddingModelCapabilities,
     EmbeddingProviderSettings,
     QdrantClientOptions,
@@ -70,7 +69,7 @@ async def qdrant_provider(qdrant_test_manager):
     mock_settings = EmbeddingProviderSettings(
         provider=Provider.OPENAI,
         model_name="test-dense-model",
-        embedding_config=EmbeddingConfig(model_name="test-dense-model"),
+        embedding_config=EmbeddingProviderSettings(model_name="test-dense-model"),
     )
 
     configured_dense = ConfiguredCapability(capability=dense_caps, config=mock_settings)

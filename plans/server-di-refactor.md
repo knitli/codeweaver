@@ -1,3 +1,10 @@
+<!--
+SPDX-FileCopyrightText: 2026 Knitli Inc.
+SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+
+SPDX-License-Identifier: MIT OR Apache-2.0
+-->
+
 # Detailed Refactoring Plan for `codeweaver.server`
 
 This document outlines the step-by-step plan to refactor the server package (`src/codeweaver/server/`) to align with the new Dependency Injection (DI) architecture, `pydantic-settings` configuration system, and the updated engine services pattern.

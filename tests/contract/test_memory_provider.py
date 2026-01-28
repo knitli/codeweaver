@@ -22,7 +22,6 @@ from codeweaver.core.types import Provider, SearchStrategy, StrategizedQuery
 from codeweaver.providers import (
     ConfiguredCapability,
     EmbeddingCapabilityGroup,
-    EmbeddingConfig,
     EmbeddingModelCapabilities,
     EmbeddingProviderSettings,
     MemoryVectorStoreProvider,
@@ -73,7 +72,7 @@ async def test_embedding_caps():
     mock_settings = EmbeddingProviderSettings(
         provider=Provider.OPENAI,  # Dummy provider
         model_name="test-dense-model",
-        embedding_config=EmbeddingConfig(model_name="test-dense-model"),
+        embedding_config=EmbeddingProviderSettings(model_name="test-dense-model"),
     )
 
     configured_dense = ConfiguredCapability(capability=dense_caps, config=mock_settings)

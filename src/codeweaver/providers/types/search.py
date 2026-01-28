@@ -1,3 +1,8 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 """Search-related types and classes for provider systems.
 
 The primary type defined here is `SearchPackage`, which encapsulates the components necessary for performing a search operation, including the embedding models, reranking models, and vector stores.

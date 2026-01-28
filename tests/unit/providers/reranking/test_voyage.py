@@ -11,8 +11,16 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from codeweaver.core import ChunkKind, CodeChunk, ExtKind, SemanticSearchLanguage, Span, uuid7
-from codeweaver.providers import Provider, RerankingModelCapabilities, VoyageRerankingProvider
+from codeweaver.core import (
+    ChunkKind,
+    CodeChunk,
+    ExtKind,
+    Provider,
+    SemanticSearchLanguage,
+    Span,
+    uuid7,
+)
+from codeweaver.providers import RerankingModelCapabilities, VoyageRerankingProvider
 
 
 pytestmark = [pytest.mark.unit]

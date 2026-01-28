@@ -8,8 +8,7 @@ import pytest
 
 from uuid_extensions import uuid7
 
-from codeweaver.core.types import EmbeddingBatchInfo, EmbeddingKind
-from codeweaver.providers import SparseEmbedding
+from codeweaver.core.types import EmbeddingBatchInfo, EmbeddingKind, SparseEmbedding
 
 
 @pytest.mark.unit

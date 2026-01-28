@@ -25,12 +25,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from codeweaver.providers import (
-    CircuitBreakerOpenError,
-    CircuitBreakerState,
-    EmbeddingProvider,
-    Provider,
-)
+from codeweaver.core import Provider
+from codeweaver.providers import CircuitBreakerOpenError, CircuitBreakerState, EmbeddingProvider
 
 
 # Mock provider factory functions to avoid Pydantic v2 private attribute initialization issues
@@ -536,7 +532,9 @@ async def test_retry_with_exponential_backoff():
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_graceful_shutdown_with_checkpoint(initialize_test_settings, clean_container, tmp_path: Path):
+async def test_graceful_shutdown_with_checkpoint(
+    initialize_test_settings, clean_container, tmp_path: Path
+):
     """T013: Server saves checkpoint on graceful shutdown.
 
     Given: Indexing in progress
@@ -544,7 +542,6 @@ async def test_graceful_shutdown_with_checkpoint(initialize_test_settings, clean
     Then: Checkpoint saved before exit
     """
     # Create test project
-    import tempfile
 
     from codeweaver.engine import CheckpointManager, IndexingService
     from codeweaver.server import CodeWeaverSettings

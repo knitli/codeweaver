@@ -32,17 +32,13 @@ from codeweaver.core import (
     ChunkKind,
     CodeChunk,
     ExtKind,
+    Provider,
     SearchStrategy,
     SemanticSearchLanguage,
     Span,
     StrategizedQuery,
 )
-from codeweaver.providers import (
-    MemoryConfig,
-    MemoryVectorStoreProvider,
-    Provider,
-    QdrantVectorStoreProvider,
-)
+from codeweaver.providers import MemoryConfig, MemoryVectorStoreProvider, QdrantVectorStoreProvider
 
 
 pytestmark = [pytest.mark.async_test, pytest.mark.performance, pytest.mark.slow]
@@ -258,7 +254,7 @@ async def test_qdrant_delete_by_file_performance(
 @pytest.mark.asyncio
 @pytest.mark.skip_ci  # Timing requirements are too strict for CI environments
 @pytest.mark.parametrize("chunk_count", [1000, 5000, 10000])
-async def test_memory_persistence_performance(chunk_count: int) -> None:
+async def test_memory_persistence_performance(chunk_count: int, vector_store_factory) -> None:
     """Test in-memory persistence meets 1-3.5s requirement for 10k chunks.
 
     Contract requirement: 1-3.5s for 10k chunks persist (relaxed for CI/WSL environments).

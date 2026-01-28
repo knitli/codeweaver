@@ -14,8 +14,16 @@ import pytest
 # Skip this entire module if the cohere package is not installed
 pytest.importorskip("cohere", reason="cohere package is required for these tests")
 
-from codeweaver.core import ChunkKind, CodeChunk, ExtKind, SemanticSearchLanguage, Span, uuid7
-from codeweaver.providers import Provider, RerankingModelCapabilities
+from codeweaver.core import (
+    ChunkKind,
+    CodeChunk,
+    ExtKind,
+    Provider,
+    SemanticSearchLanguage,
+    Span,
+    uuid7,
+)
+from codeweaver.providers import RerankingModelCapabilities
 
 
 def make_test_chunk(content: str, index: int = 0) -> CodeChunk:

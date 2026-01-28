@@ -374,6 +374,43 @@ class Container[T]:
                 _resolution_stack.pop()
         return cast(T, override)
 
+    def _get_cached_singleton(self, interface: type[T], tag_set: frozenset[str] | None) -> T | None:
+        """Retrieve a cached singleton instance if available.
+
+        Args:
+            interface: The type to retrieve from cache.
+            tag_set: Optional tags to identify tagged singletons.
+
+        Returns:
+            The cached singleton instance, or None if not cached or not marked as singleton.
+        """
+        if not self._is_singleton.get(interface):
+            return None
+
+        if tag_set:
+            tagged_key = (interface, tag_set)
+            return cast(T | None, self._tagged_singletons.get(tagged_key))
+
+        return cast(T | None, self._singletons.get(interface))
+
+    def _cache_singleton(
+        self, interface: type[T], instance: T, tag_set: frozenset[str] | None
+    ) -> None:
+        """Cache a singleton instance if the interface is marked as singleton.
+
+        Args:
+            interface: The type being cached.
+            instance: The instance to cache.
+            tag_set: Optional tags to identify tagged singletons.
+        """
+        if not self._is_singleton.get(interface, True):
+            return
+
+        if tag_set:
+            self._tagged_singletons[(interface, tag_set)] = instance
+        else:
+            self._singletons[interface] = instance
+
     async def resolve(
         self,
         interface: type[T] | TypeAliasType[T],
@@ -420,13 +457,8 @@ class Container[T]:
             return override_result
 
         # 2. Check singleton cache
-        if self._is_singleton.get(interface):
-            if tag_set:
-                tagged_key = (interface, tag_set)
-                if tagged_key in self._tagged_singletons:
-                    return cast(T, self._tagged_singletons[tagged_key])
-            elif interface in self._singletons:
-                return cast(T, self._singletons[interface])
+        if cached_instance := self._get_cached_singleton(interface, tag_set):
+            return cached_instance
 
         # 3. Find factory with tag filtering
         factory = self._get_factory(interface, tag_set)
@@ -439,11 +471,7 @@ class Container[T]:
             _resolution_stack.pop()
 
         # 5. Cache if singleton
-        if self._is_singleton.get(interface, True):
-            if tag_set:
-                self._tagged_singletons[(interface, tag_set)] = instance
-            else:
-                self._singletons[interface] = instance
+        self._cache_singleton(interface, instance, tag_set)
 
         return cast(T, instance)
 
