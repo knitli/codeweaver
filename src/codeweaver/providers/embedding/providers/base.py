@@ -1014,14 +1014,20 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         # SparseEmbeddingProvider is defined in this same module after EmbeddingProvider
         is_sparse_provider = isinstance(self, SparseEmbeddingProvider)
 
+        # Pre-build lookup dict for O(1) index access (fixes O(n²) bug)
+        chunk_to_idx = {id(chunk): idx for idx, chunk in enumerate(chunk_list)}
+
         # Add NEW chunks with batch keys and add their hashes to store
         for i, chunk in enumerate(starter_chunks):
-            # Find the original index in chunk_list to get correct hash
-            original_idx = chunk_list.index(chunk)
+            # Find the original index in chunk_list to get correct hash (O(1) lookup)
+            original_idx = chunk_to_idx[id(chunk)]
             batch_keys = BatchKeys(id=key, idx=i, sparse=is_sparse_provider)
             final_chunks.append(chunk.set_batch_keys(batch_keys))
             # Now add the hash to store, mapping it to this batch key
             self._hash_store[hashes[original_idx]] = key
+
+        # Store final chunks ONCE after loop completes (fixes O(n) write bug)
+        if final_chunks:
             if not self._store:
                 self._store = make_uuid_store(value_type=list, size_limit=1024 * 1024 * 3)  # type: ignore
             self._store[key] = final_chunks  # type: ignore

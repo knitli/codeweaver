@@ -232,6 +232,30 @@ def _create_indexing_service(
     )
 
 
+@dependency_provider(FailoverService, scope="singleton")
+def _create_failover_service(
+    primary_store: VectorStoreProviderDep = INJECTED,
+    backup_store: VectorStoreProviderDep | None = None,
+    indexing_service: IndexingServiceDep = INJECTED,
+    backup_indexing_service: IndexingServiceDep = INJECTED,
+    settings: FailoverSettingsDep = INJECTED,
+) -> FailoverService:
+    """Create FailoverService with dependencies.
+
+    Note: backup_indexing_service will be removed in Phase 2 when we migrate
+    to the new multi-vector approach. For now, matching current constructor.
+    """
+    from codeweaver.engine.services.failover_service import FailoverService
+
+    return FailoverService(
+        primary_store=primary_store,
+        backup_store=backup_store,
+        indexing_service=indexing_service,
+        backup_indexing_service=backup_indexing_service,
+        settings=settings,
+    )
+
+
 type ChunkingServiceDep = Annotated[
     "ChunkingService", depends(_create_chunking_service, scope="singleton")
 ]
