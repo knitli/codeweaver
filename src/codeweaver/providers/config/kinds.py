@@ -204,10 +204,7 @@ class BaseProviderSettings(BasedModel, ABC):
             data["tag"] = data.get("provider").variable
         object.__setattr__(self, "tag", data["tag"])
         object.__setattr__(self, "client_options", data.get("client_options"))
-        data |= {
-            "tag": self.tag,
-            "client_options": self.client_options,
-        }
+        data |= {"tag": self.tag, "client_options": self.client_options}
         if (
             "model_name" in type(self).model_fields
             and "model_name" not in data
@@ -235,7 +232,11 @@ class BaseProviderSettings(BasedModel, ABC):
             )
         ):
             object.__setattr__(self, "model_name", ModelName(model_name))
+        self._initialize()
         super().__init__()
+
+    def _initialize(self) -> None:
+        """Perform any additional initialization steps. Happens before pydantic initialization and the model's post_init."""
 
     def __model_post_init__(self) -> None:
         """Post-initialization to register in DI container and config registry."""
@@ -443,7 +444,7 @@ class VectorStoreProviderSettings(BaseProviderSettings):
     batch_size: Annotated[
         PositiveInt | None,
         Field(description="Batch size for bulk upsert operations. Defaults to 64."),
-    ] = 96
+    ] = 64
 
 
 class _Bm25Config(QdrantBm25Config):
@@ -549,7 +550,8 @@ class CollectionConfig(BasedModel):
         """Assemble the vector parameters for the collection."""
         embedding_group = embedding_group or _get_embedding_group()
         params = await embedding_group.as_vector_params()
-        # TODO: Our merge here assumes they're using 'dense' and 'sparse' for the vector names, which may not always be the case.
+        # NOTE: With role-based architecture, vector names are 'primary', 'backup', 'sparse' etc.
+        # The merge assumes role-based naming convention.
         self.vectors_config = _deep_merge(
             dict(self.vectors_config or {}),
             cast(dict[str, VectorParams], params.vectors.model_dump()),
@@ -640,8 +642,10 @@ class _BaseQdrantVectorStoreProviderSettings(VectorStoreProviderSettings):
             collection_name=generate_collection_name(
                 project_name=project_name, project_path=project_path
             ),
-            vectors_config={"dense": VectorParams()},
-            sparse_vectors_config={"sparse": SparseVectorParams()},
+            vectors_config={"primary": VectorParams()},  # Role-based name: primary dense vector
+            sparse_vectors_config={
+                "sparse": SparseVectorParams()
+            },  # Role-based name: sparse vector
         )
 
     @model_validator(mode="after")

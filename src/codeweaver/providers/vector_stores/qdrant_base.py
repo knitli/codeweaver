@@ -15,9 +15,9 @@ from collections.abc import Iterable
 from datetime import UTC, datetime
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, ClassVar, Literal, NoReturn, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, NoReturn, cast
 
-from pydantic import UUID7, Field
+from pydantic import UUID7
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.http.exceptions import UnexpectedResponse
 from qdrant_client.models import (
@@ -47,10 +47,12 @@ from codeweaver.providers.types import EmbeddingCapabilityGroup
 from codeweaver.providers.vector_stores.base import MixedQueryInput, VectorStoreProvider
 from codeweaver.providers.vector_stores.metadata import CollectionMetadata, HybridVectorPayload
 from codeweaver.providers.vector_stores.search import Filter
-from codeweaver.providers.vector_stores.vector_names import VectorNames
 
 
 logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from codeweaver.providers.embedding.registry import EmbeddingRegistry
 
 
 def _project_name(name: ResolvedProjectNameDep = INJECTED) -> str:
@@ -64,16 +66,6 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
     client: AsyncQdrantClient
     caps: EmbeddingCapabilityGroup
     config: QdrantVectorStoreProviderSettings
-    vector_names: VectorNames = Field(
-        default_factory=lambda: VectorNames(
-            mapping={
-                "primary": "dense",  # Map "primary" intent to "dense" vector name
-                "sparse": "sparse",  # Map "sparse" intent to "sparse" vector name
-                "backup": "backup_dense",  # Map "backup" intent to "backup_dense" vector name
-            }
-        ),
-        description="Mapping from logical intent names to physical Qdrant vector names",
-    )
     _provider: ClassVar[Literal[Provider.QDRANT, Provider.MEMORY]]
 
     @property
@@ -517,11 +509,19 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
             search_results.append(search_result)
         return search_results
 
-    def _prepare_vectors(self, chunk: CodeChunk) -> dict[str, Any]:
+    async def _get_registry(self) -> EmbeddingRegistry:
+        """Retrieve the EmbeddingRegistry from the DI container."""
+        from codeweaver.core.di.container import get_container
+        from codeweaver.providers.embedding.registry import EmbeddingRegistry
+
+        container = get_container()
+        return await container.resolve(EmbeddingRegistry)
+
+    async def _prepare_vectors(self, chunk: CodeChunk) -> dict[str, Any]:
         """Prepare vector dictionary for a code chunk.
 
-        Dynamically iterates over all embeddings in the chunk and maps them to physical
-        vector names using the configured VectorNames mapping.
+        With role-based architecture, intent names (e.g., "primary", "sparse", "backup")
+        are used directly as physical Qdrant vector names. No mapping needed.
 
         Args:
             chunk: Code chunk with embeddings.
@@ -531,18 +531,18 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         """
         from qdrant_client.http.models import SparseVector
 
-        from codeweaver.providers.embedding.registry import embedding_registry
-
         vectors: dict[str, Any] = {}
         has_sparse = False
+
+        embedding_registry = await self._get_registry()
 
         # Iterate over all embeddings in the chunk
         for intent, batch_keys in chunk.embeddings.items():
             # Get the actual embedding data from the registry
             embedding_info = embedding_registry.get(batch_keys)
 
-            # Resolve physical vector name from intent
-            vector_name = self.vector_names.resolve(intent)
+            # Use intent name directly as physical vector name (role-based architecture)
+            vector_name = intent
 
             # Prepare vector data based on embedding kind
             if embedding_info.is_dense:
@@ -719,7 +719,7 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         )
         await self.handle_persistence()
 
-    def _chunks_to_points(self, chunks: list[CodeChunk]) -> list[PointStruct]:
+    async def _chunks_to_points(self, chunks: list[CodeChunk]) -> list[PointStruct]:
         """Convert code chunks to Qdrant points.
 
         Args:
@@ -730,7 +730,7 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         """
         points: list[PointStruct] = []
         for chunk in chunks:
-            vectors = self._prepare_vectors(chunk)
+            vectors = await self._prepare_vectors(chunk)
             payload = self._create_payload(chunk)
             serialized_payload = payload.model_dump(mode="json", exclude_none=True, round_trip=True)
             points.append(
@@ -754,7 +754,7 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         collection_name = self.collection_name
         if not collection_name:
             raise ProviderError("No collection configured")
-        points = self._chunks_to_points(chunks)
+        points = await self._chunks_to_points(chunks)
         _result = await self.client.upsert(collection_name=collection_name, points=points)
         await self.handle_persistence()
 

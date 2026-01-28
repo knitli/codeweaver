@@ -58,15 +58,18 @@ class Container[T]:
 
     def __init__(self) -> None:
         """Initialize the container."""
-        self._factories: dict[type[Any], Callable[..., Any]] = {}
+        # Store multiple providers per type with their tags
+        self._factories: dict[type[Any], list[tuple[Callable[..., Any], frozenset[str]]]] = {}
         self._singletons: dict[type[Any], Any] = {}
+        # Separate cache for tagged singletons: (type, frozenset[tags]) -> instance
+        self._tagged_singletons: dict[tuple[type[Any], frozenset[str]], Any] = {}
         self._overrides: dict[type[Any], Any] = {}
         self._is_singleton: dict[type[Any], bool] = {}
         self._startup_hooks: list[Callable[..., Any]] = []
         self._shutdown_hooks: list[Callable[..., Any]] = []
         self._cleanup_stack: AsyncExitStack | None = None
         self._request_cache: dict[Any, Any] = {}  # Keys can be types or callables
-        self._providers_loaded: bool = False  # Track if auto-discovery has run
+        self._providers_loaded: bool = False  # Track if auto-discovery has run  # Track if auto-discovery has run  # Track if auto-discovery has run
 
     @staticmethod
     def _unwrap_annotated(annotation: Any) -> Any:
@@ -130,40 +133,34 @@ class Container[T]:
         if self._providers_loaded:
             return
 
-        from codeweaver.core.di.utils import get_all_provider_metadata, get_all_providers
+        from codeweaver.core.di.utils import get_all_providers
 
-        providers = get_all_providers()
-        metadata_map = get_all_provider_metadata()
+        # New API returns dict[type, list[tuple[Callable, ProviderMetadata]]]
+        providers_map = get_all_providers()
 
-        for interface, factory in providers.items():
-            metadata = metadata_map.get(interface)
-            if not metadata:
-                # Fallback to singleton if no metadata (shouldn't happen)
-                self.register(interface, factory, singleton=True)
-                logger.warning(
-                    "Provider %s has no metadata, defaulting to singleton", interface.__name__
+        for interface, providers_list in providers_map.items():
+            for factory, metadata in providers_list:
+                # Map scope to singleton flag
+                # - "singleton" -> singleton=True (app lifetime cache)
+                # - "request" -> singleton=False (request-scoped, managed by Container._request_cache)
+                # - "function" -> singleton=False (no caching at all)
+                is_singleton = metadata.scope == "singleton"
+
+                # Register with tags
+                self.register(interface, factory, singleton=is_singleton, tags=metadata.tags)
+
+                logger.debug(
+                    "Auto-discovered provider: %s -> %s (scope=%s, tags=%s, is_generator=%s, is_async_generator=%s)",
+                    interface.__name__,
+                    factory.__name__ if hasattr(factory, "__name__") else factory,
+                    metadata.scope,
+                    metadata.tags,
+                    metadata.is_generator,
+                    metadata.is_async_generator,
                 )
-                continue
-
-            # Map scope to singleton flag
-            # - "singleton" -> singleton=True (app lifetime cache)
-            # - "request" -> singleton=False (request-scoped, managed by Container._request_cache)
-            # - "function" -> singleton=False (no caching at all)
-            is_singleton = metadata.scope == "singleton"
-
-            self.register(interface, factory, singleton=is_singleton)
-
-            logger.debug(
-                "Auto-discovered provider: %s -> %s (scope=%s, is_generator=%s, is_async_generator=%s)",
-                interface.__name__,
-                factory.__name__ if hasattr(factory, "__name__") else factory,
-                metadata.scope,
-                metadata.is_generator,
-                metadata.is_async_generator,
-            )
 
         self._providers_loaded = True
-        logger.debug("Loaded %d providers from registry", len(providers))
+        logger.debug("Loaded providers from registry (total interfaces: %d)", len(providers_map))
 
     def register(
         self,
@@ -171,7 +168,7 @@ class Container[T]:
         factory: Callable[..., T] | None = None,
         *,
         singleton: bool = True,
-        stale_while_revalidate: bool = False,
+        tags: frozenset[str] | set[str] | None = None,
     ) -> None:
         """Register a dependency.
 
@@ -179,17 +176,23 @@ class Container[T]:
             interface: The type or interface to register.
             factory: The factory function or class. If None, the interface itself is used.
             singleton: Whether to cache the instance.
-            stale_while_revalidate: Whether to use stale-while-revalidate caching strategy.
+            tags: Optional tags to categorize this provider.
         """
         target = factory or interface
-        self._factories[interface] = target
+        tag_set = frozenset(tags) if tags else frozenset()
+
+        # Store as list to support multiple providers per type
+        if interface not in self._factories:
+            self._factories[interface] = []
+        self._factories[interface].append((target, tag_set))
+
         self._is_singleton[interface] = singleton
         logger.debug(
-            "Registered %s -> %s (singleton=%s, stale_while_revalidate=%s)",
+            "Registered %s -> %s (singleton=%s, tags=%s)",
             interface.__name__,
             target,
             singleton,
-            stale_while_revalidate,
+            tag_set,
         )
 
     def override(self, interface: type[T] | TypeAliasType[T], instance: Any) -> None:
@@ -308,8 +311,74 @@ class Container[T]:
 
         raise ValueError(f"Could not resolve any type from union: {union_args}")
 
+    def _get_factory(
+        self, interface: type[T], tags: frozenset[str] | set[str] | None = None
+    ) -> Callable[..., T]:
+        """Get a factory for the given interface, optionally filtered by tags.
+
+        Args:
+            interface: The type to get a factory for.
+            tags: Optional tags to filter factories. If provided, returns the factory
+                  that has ALL specified tags.
+
+        Returns:
+            The factory function or class for the interface.
+
+        Raises:
+            KeyError: If no factory is registered or no factory matches the tags.
+        """
+        if interface not in self._factories:
+            # Fall back to the interface itself (might be a class)
+            return interface  # type: ignore
+
+        factories_list = self._factories[interface]
+
+        # If no tags specified, return the last (most recently registered) factory
+        if not tags:
+            return factories_list[-1][0]  # type: ignore
+
+        # Filter by tags - factory must have ALL specified tags
+        tag_set = frozenset(tags) if isinstance(tags, set) else tags
+        for factory, factory_tags in reversed(factories_list):  # Check most recent first
+            if tag_set.issubset(factory_tags):
+                return factory  # type: ignore
+
+        raise KeyError(f"No factory registered for type {interface} with tags {tag_set}")
+
+    async def _resolve_union_interface(
+        self, interface: Any, cache_key: str, _resolution_stack: list[str]
+    ) -> Any:
+        """Resolve a Union-annotated interface with proper stack handling."""
+        _resolution_stack.append(cache_key)
+        try:
+            return await self._resolve_union_dependency(interface, _resolution_stack)
+        finally:
+            _resolution_stack.pop()
+
+    async def _resolve_override(
+        self, interface: type[T] | TypeAliasType[T], cache_key: str, _resolution_stack: list[str]
+    ) -> T | None:
+        """Resolve an override for the given interface if one exists.
+
+        Returns the resolved override instance, or None if no override applies.
+        """
+        if interface not in self._overrides:
+            return None
+
+        override = self._overrides[interface]
+        if callable(override) and not isinstance(override, type):
+            _resolution_stack.append(cache_key)
+            try:
+                return cast(T, await self._call_with_injection(override, _resolution_stack))
+            finally:
+                _resolution_stack.pop()
+        return cast(T, override)
+
     async def resolve(
-        self, interface: type[T] | TypeAliasType[T], _resolution_stack: list[str] | None = None
+        self,
+        interface: type[T] | TypeAliasType[T],
+        _resolution_stack: list[str] | None = None,
+        tags: frozenset[str] | set[str] | None = None,
     ) -> T:
         """Resolve a dependency with circular dependency detection.
 
@@ -317,6 +386,8 @@ class Container[T]:
             interface: The type to resolve.
             _resolution_stack: Internal parameter for tracking resolution chain.
                 DO NOT pass this manually - it's managed automatically.
+            tags: Optional tags to filter providers. If provided, resolves the provider
+                  that has ALL specified tags.
 
         Returns:
             The resolved instance.
@@ -326,61 +397,53 @@ class Container[T]:
         """
         from codeweaver.core.exceptions import CircularDependencyError
 
-        # Initialize resolution stack on first call
         if _resolution_stack is None:
             _resolution_stack = []
 
-        # Load providers from registry on first resolve call
         self._load_providers()
 
-        # Create stable cache key using pydantic's get_type_ref
         cache_key = self._create_cache_key(interface)
+        tag_set = frozenset(tags) if tags else None
 
-        # Detect circular dependency
         if cache_key in _resolution_stack:
             cycle = " -> ".join([*_resolution_stack, cache_key])
             raise CircularDependencyError(cycle=cycle)
 
-        # Handle Union types - try to resolve from union members
         if self._is_union_type(interface):
-            _resolution_stack.append(cache_key)
-            try:
-                instance = await self._resolve_union_dependency(interface, _resolution_stack)
-            finally:
-                _resolution_stack.pop()
-            return instance  # type: ignore
+            instance = await self._resolve_union_interface(interface, cache_key, _resolution_stack)
+            return cast(T, instance)
 
-        # 1. Check overrides first
-        if interface in self._overrides:
-            override = self._overrides[interface]
-            if callable(override) and not isinstance(override, type):
-                # Add to resolution stack before resolving override
-                _resolution_stack.append(cache_key)
-                try:
-                    # collect_errors=False by default, so this won't return ResolutionResult
-                    return cast(T, await self._call_with_injection(override, _resolution_stack))
-                finally:
-                    _resolution_stack.pop()
-            return cast(T, override)
+        # 1. Check overrides first (only for untagged resolution)
+        if not tag_set and (
+            override_result := await self._resolve_override(interface, cache_key, _resolution_stack)
+        ):
+            return override_result
 
         # 2. Check singleton cache
-        if self._is_singleton.get(interface) and interface in self._singletons:
-            return cast(T, self._singletons[interface])
+        if self._is_singleton.get(interface):
+            if tag_set:
+                tagged_key = (interface, tag_set)
+                if tagged_key in self._tagged_singletons:
+                    return cast(T, self._tagged_singletons[tagged_key])
+            elif interface in self._singletons:
+                return cast(T, self._singletons[interface])
 
-        # 3. Find factory
-        factory = self._factories.get(interface, interface)
+        # 3. Find factory with tag filtering
+        factory = self._get_factory(interface, tag_set)
 
         # 4. Create instance with circular dependency tracking
         _resolution_stack.append(cache_key)
         try:
-            # collect_errors=False by default, so this won't return ResolutionResult
             instance = await self._call_with_injection(factory, _resolution_stack)
         finally:
             _resolution_stack.pop()
 
         # 5. Cache if singleton
         if self._is_singleton.get(interface, True):
-            self._singletons[interface] = instance
+            if tag_set:
+                self._tagged_singletons[(interface, tag_set)] = instance
+            else:
+                self._singletons[interface] = instance
 
         return cast(T, instance)
 
@@ -742,6 +805,10 @@ class Container[T]:
         # Determine scope (default to singleton if use_cache=True)
         scope = marker.scope or ("singleton" if marker.use_cache else "function")  # ty:ignore[unresolved-attribute]
 
+        # Extract tags from marker
+        tags = getattr(marker, "tags", None)
+        tag_set = frozenset(tags) if tags else None
+
         # Get target type for caching
         target_type = annotation or param.annotation
         if isinstance(target_type, str):
@@ -754,7 +821,11 @@ class Container[T]:
             raise ValueError(f"Parameter {name} has Depends() but no type hint.")
 
         # Use marker.dependency if provided, otherwise use target_type
-        cache_key = marker.dependency or target_type  # ty:ignore[unresolved-attribute]
+        dependency_target = marker.dependency or target_type  # ty:ignore[unresolved-attribute]
+
+        # Create cache key for request/function scopes
+        # Include tags in cache key to differentiate tagged dependencies
+        cache_key = (dependency_target, tag_set) if tag_set else dependency_target
 
         # Function scope - always create new instance
         if scope == "function" or not marker.use_cache:  # ty:ignore[unresolved-attribute]
@@ -762,7 +833,7 @@ class Container[T]:
             if marker.dependency:  # ty:ignore[unresolved-attribute]
                 return await self._call_with_injection(marker.dependency, _resolution_stack)  # ty:ignore[unresolved-attribute]
             # Resolve from annotation without caching
-            factory = self._factories.get(target_type, target_type)
+            factory = self._get_factory(target_type, tag_set)
             return await self._call_with_injection(factory, _resolution_stack)
 
         # Request scope - check request cache
@@ -772,9 +843,9 @@ class Container[T]:
 
             # Create and cache in request scope
             if marker.dependency:  # ty:ignore[unresolved-attribute]
-                instance = await self.resolve(marker.dependency, _resolution_stack)  # ty:ignore[unresolved-attribute]
+                instance = await self.resolve(marker.dependency, _resolution_stack, tags=tag_set)  # ty:ignore[unresolved-attribute]
             else:
-                instance = await self.resolve(target_type, _resolution_stack)
+                instance = await self.resolve(target_type, _resolution_stack, tags=tag_set)
 
             self._request_cache[cache_key] = instance
             return instance
@@ -782,9 +853,9 @@ class Container[T]:
         # Singleton scope - use normal container resolution (default behavior)
         if marker.dependency:  # ty:ignore[unresolved-attribute]
             # Resolve via container to support registration, singletons, and overrides
-            return await self.resolve(marker.dependency, _resolution_stack)  # ty:ignore[unresolved-attribute]
+            return await self.resolve(marker.dependency, _resolution_stack, tags=tag_set)  # ty:ignore[unresolved-attribute]
 
-        return await self.resolve(target_type, _resolution_stack)
+        return await self.resolve(target_type, _resolution_stack, tags=tag_set)
 
     @asynccontextmanager
     async def lifespan(self) -> AsyncIterator[Container]:

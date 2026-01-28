@@ -20,7 +20,6 @@ import asyncio
 import threading
 
 from collections.abc import AsyncIterator, Iterator
-from typing import TYPE_CHECKING
 
 import pytest
 
@@ -33,10 +32,6 @@ from codeweaver.core import (
     get_provider_metadata,
     is_provider_registered,
 )
-
-
-if TYPE_CHECKING:
-    pass
 
 
 # Test fixtures
@@ -555,7 +550,7 @@ def test_provider_decorator_returns_original_function(clean_registry):
     def original_func() -> ServiceA:
         return ServiceA()
 
-    decorated = provider(ServiceA)(original_func)
+    decorated = dependency_provider(ServiceA)(original_func)
 
     # Should return the same function object
     assert decorated is original_func
@@ -568,7 +563,7 @@ def test_provider_decorator_returns_original_class(clean_registry):
         pass
 
     # Class self-registration
-    decorated = provider(scope="singleton")(OriginalClass)
+    decorated = dependency_provider(scope="singleton")(OriginalClass)
 
     # Should return the same class object
     assert decorated is OriginalClass

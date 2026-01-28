@@ -41,10 +41,9 @@ async def test_full_pipeline_index_then_search(
     indexed_test_project, actual_vector_store, clean_container
 ):
     """Validate complete workflow: index fresh codebase, then search it."""
-    from codeweaver.server.agent_api import IntentType, find_code
-
     from codeweaver.providers import VectorStoreProvider
     from codeweaver.server import CodeWeaverSettings, get_settings
+    from codeweaver.server.agent_api import IntentType, find_code
 
     # Override settings and vector store in container
     settings = get_settings()
@@ -77,11 +76,10 @@ async def test_incremental_indexing_updates_search_results(
     indexed_test_project, actual_vector_store, clean_container
 ):
     """Validate that adding new files updates search results."""
-    from codeweaver.server.agent_api import IntentType, find_code
-
     from codeweaver.engine import IndexingService
     from codeweaver.providers import VectorStoreProvider
     from codeweaver.server import CodeWeaverSettings, get_settings
+    from codeweaver.server.agent_api import IntentType, find_code
 
     # Add a new file with distinct content
     new_file = Path(indexed_test_project) / "payments.py"
@@ -128,11 +126,10 @@ async def test_pipeline_handles_large_codebase(tmp_path, actual_vector_store, cl
     """Validate pipeline handles larger codebase (~20 files) efficiently."""
     import time
 
-    from codeweaver.server.agent_api import IntentType, find_code
-
     from codeweaver.engine import IndexingService
     from codeweaver.providers import VectorStoreProvider
     from codeweaver.server import CodeWeaverSettings, get_settings
+    from codeweaver.server.agent_api import IntentType, find_code
 
     # Create a larger test codebase
     large_codebase = tmp_path / "large_codebase"
@@ -175,11 +172,10 @@ async def test_pipeline_handles_file_updates(
     indexed_test_project, actual_vector_store, clean_container
 ):
     """Validate that modifying files updates their embeddings."""
-    from codeweaver.server.agent_api import IntentType, find_code
-
     from codeweaver.engine import IndexingService
     from codeweaver.providers import VectorStoreProvider
     from codeweaver.server import CodeWeaverSettings, get_settings
+    from codeweaver.server.agent_api import IntentType, find_code
 
     # Modify auth.py significantly
     auth_file = Path(indexed_test_project) / "auth.py"
@@ -212,11 +208,10 @@ async def test_pipeline_handles_file_updates(
 @pytest.mark.timeout(600)  # 10 minutes for real embedding generation + indexing
 async def test_pipeline_coordination_with_errors(tmp_path, actual_vector_store, clean_container):
     """Validate pipeline handles partial failures gracefully."""
-    from codeweaver.server.agent_api import IntentType, find_code
-
     from codeweaver.engine import IndexingService
     from codeweaver.providers import VectorStoreProvider
     from codeweaver.server import CodeWeaverSettings, get_settings
+    from codeweaver.server.agent_api import IntentType, find_code
 
     # Create codebase with mix of good and problematic files
     mixed_codebase = tmp_path / "mixed_codebase"
@@ -260,10 +255,9 @@ async def test_search_performance_with_real_providers(
     """Validate search performance meets requirements with real providers."""
     import time
 
-    from codeweaver.server.agent_api import IntentType, find_code
-
     from codeweaver.providers import VectorStoreProvider
     from codeweaver.server import CodeWeaverSettings, get_settings
+    from codeweaver.server.agent_api import IntentType, find_code
 
     # Configure settings
     settings = get_settings()
@@ -297,11 +291,10 @@ async def test_indexing_performance_with_real_providers(
     """Validate indexing performance is acceptable for real-world usage."""
     import time
 
-    from codeweaver.server.agent_api import IntentType, find_code
-
     from codeweaver.engine import IndexingService
     from codeweaver.providers import VectorStoreProvider
     from codeweaver.server import CodeWeaverSettings, get_settings
+    from codeweaver.server.agent_api import IntentType, find_code
 
     # Create 50-file codebase
     perf_codebase = tmp_path / "perf_codebase"

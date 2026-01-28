@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 import rignore
 
 from codeweaver.core import INJECTED, DiscoveredFile, get_blake_hash, set_relative_path
-from codeweaver.providers import BackupEmbeddingRegistryDep, EmbeddingRegistryDep
+from codeweaver.providers import EmbeddingRegistryDep
 
 
 if TYPE_CHECKING:
@@ -382,16 +382,12 @@ class IndexingService:
             backup_sparse = backup_store.sparse_model
         except Exception:
             logger.warning(
-                "Could not compare collection models, assuming incompatible.",
-                exc_info=True,
+                "Could not compare collection models, assuming incompatible.", exc_info=True
             )
             # Fallback: force re-index via standard mechanism
             return
 
-        models_match = (
-            primary_dense == backup_dense
-            and primary_sparse == backup_sparse
-        )
+        models_match = primary_dense == backup_dense and primary_sparse == backup_sparse
         sparse_match = primary_sparse == backup_sparse
 
         # 2. Iterate Backup Content
@@ -419,7 +415,6 @@ class IndexingService:
         models_match: bool,
         sparse_match: bool = False,
         registry: EmbeddingRegistryDep = INJECTED,
-        backup_registry: BackupEmbeddingRegistryDep = INJECTED,
     ) -> None:
         """Process a single batch of backup content for reconciliation."""
         from codeweaver.core import (
@@ -534,7 +529,9 @@ class IndexingService:
             "sparse_provider": self._sparse_provider.name.variable
             if self._sparse_provider
             else None,
-            "sparse_model": str(self._sparse_provider.model_name) if self._sparse_provider else None,
+            "sparse_model": str(self._sparse_provider.model_name)
+            if self._sparse_provider
+            else None,
         }
 
 

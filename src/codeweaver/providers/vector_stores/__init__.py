@@ -17,7 +17,6 @@ if TYPE_CHECKING:
     from codeweaver.providers.vector_stores.inmemory import MemoryVectorStoreProvider
     from codeweaver.providers.vector_stores.metadata import CollectionMetadata, HybridVectorPayload
     from codeweaver.providers.vector_stores.qdrant import QdrantVectorStoreProvider
-    from codeweaver.providers.vector_stores.vector_names import VectorNames
 
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
@@ -26,7 +25,6 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "VectorStoreProvider": (__spec__.parent, "base"),
     "HybridVectorPayload": (__spec__.parent, "metadata"),
     "CollectionMetadata": (__spec__.parent, "metadata"),
-    "VectorNames": (__spec__.parent, "vector_names"),
     "resolve_dimensions": (__spec__.parent, "utils"),
 })
 
@@ -38,7 +36,6 @@ __all__ = (
     "HybridVectorPayload",
     "MemoryVectorStoreProvider",
     "QdrantVectorStoreProvider",
-    "VectorNames",
     "VectorStoreProvider",
     "get_vector_store_provider",
     "resolve_dimensions",

@@ -4,6 +4,8 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 """Tests for EmbeddingBatchInfo with required intent field."""
 
+import pytest
+
 from uuid_extensions import uuid7
 
 from codeweaver.core.types import EmbeddingBatchInfo, EmbeddingKind

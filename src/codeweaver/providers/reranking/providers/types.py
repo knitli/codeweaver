@@ -2,6 +2,9 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
+"""
+Reranking result types for CodeWeaver.
+"""
 
 from typing import Annotated, NamedTuple
 

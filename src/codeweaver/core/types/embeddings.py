@@ -307,9 +307,7 @@ class ChunkEmbeddings(BasedModel):
                 f"Embeddings are already set for intent '{intent}' in chunk {embedding_info.chunk_id}."
             )
 
-        new_embeddings = dict(self.embeddings)
-        new_embeddings[intent] = embedding_info
-        return self.model_copy(update={"embeddings": new_embeddings})
+        return self._set_intent_embedding(embedding_info, intent)
 
     def update(self, embedding_info: EmbeddingBatchInfo) -> ChunkEmbeddings:
         """Update or replace an EmbeddingBatchInfo in the ChunkEmbeddings.
@@ -333,6 +331,9 @@ class ChunkEmbeddings(BasedModel):
 
         intent = embedding_info.intent
 
+        return self._set_intent_embedding(embedding_info, intent)
+
+    def _set_intent_embedding(self, embedding_info, intent):
         new_embeddings = dict(self.embeddings)
         new_embeddings[intent] = embedding_info
         return self.model_copy(update={"embeddings": new_embeddings})
@@ -356,15 +357,6 @@ class ChunkEmbeddings(BasedModel):
     def backup_dense_model(self) -> ModelNameT | None:
         """Get the model name used for backup dense embeddings, if any."""
         return self.embeddings.get("backup").model if "backup" in self.embeddings else None
-
-    @property
-    def backup_sparse_model(self) -> ModelNameT | None:
-        """Get the model name used for backup sparse embeddings, if any (typically not used)."""
-        return (
-            self.embeddings.get("backup_sparse").model
-            if "backup_sparse" in self.embeddings
-            else None
-        )
 
     @property
     def has_dense(self) -> bool:

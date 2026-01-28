@@ -40,8 +40,6 @@ from codeweaver.engine.config import (
     IndexerSettings,
 )
 from codeweaver.providers import (
-    BackupEmbeddingProviderDep,
-    BackupTokenizerDep,
     EmbeddingProviderDep,
     SparseEmbeddingProviderDep,
     TokenizerDep,
@@ -192,22 +190,6 @@ type ChunkGovernorDep = Annotated[
 ]
 
 
-@dependency_provider(ChunkGovernor, scope="singleton", tags=["backup"])
-def _create_backup_chunk_governor(settings: ChunkerSettingsDep = INJECTED) -> ChunkGovernor:
-    """Factory for backup chunk governor."""
-    from codeweaver.engine.chunker import ChunkGovernor
-    from codeweaver.providers.config import ProviderProfile
-
-    # Use the backup profile to determine capabilities
-    backup_profile = ProviderProfile.TESTING_DB
-    return ChunkGovernor.from_backup_profile(backup_profile.as_settings_dict(), settings)
-
-
-type BackupChunkGovernorDep = Annotated[
-    "ChunkGovernor", depends(_create_backup_chunk_governor, scope="singleton")
-]
-
-
 @dependency_provider(ChunkingService, scope="singleton")
 def _create_chunking_service(
     governor: ChunkGovernorDep = INJECTED,
@@ -215,18 +197,6 @@ def _create_chunking_service(
     settings: ChunkerSettingsDep = INJECTED,
 ) -> ChunkingService:
     """Factory for primary chunking service."""
-    from codeweaver.engine.services.chunking_service import ChunkingService
-
-    return ChunkingService(governor=governor, tokenizer=tokenizer, settings=settings)
-
-
-@dependency_provider(ChunkingService, scope="singleton", tags=["backup"])
-def _create_backup_chunking_service(
-    governor: BackupChunkGovernorDep = INJECTED,
-    tokenizer: BackupTokenizerDep = INJECTED,
-    settings: ChunkerSettingsDep = INJECTED,
-) -> ChunkingService:
-    """Factory for backup chunking service."""
     from codeweaver.engine.services.chunking_service import ChunkingService
 
     return ChunkingService(governor=governor, tokenizer=tokenizer, settings=settings)
@@ -262,37 +232,12 @@ def _create_indexing_service(
     )
 
 
-@dependency_provider(FailoverService, scope="singleton")
-def _create_failover_service(
-    primary_vector_store: VectorStoreProviderDep = INJECTED,
-    backup_vector_store: BackupVectorStoreProviderDep = INJECTED,
-    indexing_service: IndexingServiceDep = INJECTED,
-    backup_indexing_service: BackupIndexingServiceDep = INJECTED,
-    settings: FailoverSettingsDep = INJECTED,
-) -> FailoverService:
-    """Factory for failover service."""
-    from codeweaver.engine.services.failover_service import FailoverService
-
-    return FailoverService(
-        primary_store=primary_vector_store,
-        backup_store=backup_vector_store,
-        indexing_service=indexing_service,
-        backup_indexing_service=backup_indexing_service,
-        settings=settings,
-    )
-
-
 type ChunkingServiceDep = Annotated[
     "ChunkingService", depends(_create_chunking_service, scope="singleton")
 ]
-type BackupChunkingServiceDep = Annotated[
-    "ChunkingService", depends(_create_backup_chunking_service, scope="singleton")
-]
+
 type IndexingServiceDep = Annotated[
     "IndexingService", depends(_create_indexing_service, scope="singleton")
-]
-type BackupIndexingServiceDep = Annotated[
-    "IndexingService", depends(_create_backup_indexing_service, scope="singleton")
 ]
 type FailoverServiceDep = Annotated[
     "FailoverService", depends(_create_failover_service, scope="singleton")
@@ -320,41 +265,6 @@ def _create_watching_service(
 
 type FileWatchingServiceDep = Annotated[
     "FileWatchingService", depends(_create_watching_service, scope="singleton")
-]
-
-
-@dependency_provider(IndexingService, scope="singleton", tags=["backup"])
-def _create_backup_indexing_service(
-    chunking_service: BackupChunkingServiceDep = INJECTED,
-    embedding_provider: BackupEmbeddingProviderDep = INJECTED,
-    sparse_provider: SparseEmbeddingProviderDep = INJECTED,
-    vector_store: BackupVectorStoreProviderDep = INJECTED,
-    settings: IndexerSettingsDep = INJECTED,
-    progress_reporter: ProgressReporterDep = INJECTED,
-    progress_tracker: ProgressTrackerDep = INJECTED,
-    checkpoint_manager: CheckpointManagerDep = INJECTED,
-    manifest_manager: ManifestManagerDep = INJECTED,
-    project_path: ResolvedProjectPathDep = INJECTED,
-) -> IndexingService:
-    """Factory for backup indexing service."""
-    from codeweaver.engine.services.indexing_service import IndexingService
-
-    return IndexingService(
-        chunking_service=chunking_service,
-        embedding_provider=embedding_provider,
-        sparse_provider=sparse_provider,
-        vector_store=vector_store,
-        settings=settings,
-        progress_reporter=progress_reporter,
-        progress_tracker=progress_tracker,
-        checkpoint_manager=checkpoint_manager,
-        manifest_manager=manifest_manager,
-        project_path=project_path,
-    )
-
-
-type BackupIndexingServiceDep = Annotated[
-    "IndexingService", depends(_create_backup_indexing_service, scope="singleton")
 ]
 
 
@@ -397,8 +307,6 @@ type SourceIdRegistryDep = Annotated[
 
 
 __all__ = (
-    "BackupChunkingServiceDep",
-    "BackupIndexingServiceDep",
     "CheckpointManagerDep",
     "ChunkerSettingsDep",
     "ChunkingServiceDep",

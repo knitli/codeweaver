@@ -23,8 +23,8 @@ T = TypeVar("T")
 
 _registry_lock = Lock()
 
-_providers: dict[type, Callable[..., Any]] = {}
-_provider_metadata: dict[type, ProviderMetadata] = {}
+# Storage: type -> list of (factory, metadata) tuples to support multiple providers per type
+_providers: dict[type, list[tuple[Callable[..., Any], ProviderMetadata]]] = {}
 
 
 class ProviderMetadata(NamedTuple):
@@ -289,74 +289,129 @@ def _register_provider[T](
         tags=frozenset(tags) if tags else frozenset(),
     )
 
-    # Thread-safe registration
+    # Thread-safe registration - append to list to support multiple providers per type
     with _registry_lock:
-        _providers[interface] = factory
-        _provider_metadata[interface] = metadata
+        if interface not in _providers:
+            _providers[interface] = []
+        _providers[interface].append((factory, metadata))
 
 
-def is_provider_registered(cls: type[Any]) -> bool:
-    """Check if a provider is registered for a specific type.
+def is_provider_registered(cls: type[Any], tags: frozenset[str] | set[str] | None = None) -> bool:
+    """Check if a provider is registered for a specific type, optionally filtered by tags.
 
     Args:
         cls: The type to check for a registered provider.
+        tags: Optional set of tags to filter providers. If provided, checks if any
+              provider has ALL specified tags.
 
     Returns:
-        True if a provider is registered for the given type, False otherwise.
+        True if a provider is registered for the given type (and matches tags if specified),
+        False otherwise.
     """
-    return cls in _providers
+    if cls not in _providers:
+        return False
+
+    if not tags:
+        return True
+
+    # Check if any provider has all specified tags
+    tag_set = frozenset(tags) if isinstance(tags, set) else tags
+    return any(tag_set.issubset(metadata.tags) for _, metadata in _providers[cls])
 
 
-def get_provider[T](cls: type[T]) -> Callable[..., T]:
-    """Retrieve the registered provider function for a specific type.
+def get_provider[T](
+    cls: type[T], tags: frozenset[str] | set[str] | None = None
+) -> Callable[..., T]:
+    """Retrieve a registered provider function for a specific type, optionally filtered by tags.
 
     Args:
         cls: The type for which to retrieve the provider.
+        tags: Optional set of tags to filter providers. If provided, only returns
+              providers that have ALL specified tags.
 
     Returns:
         The callable (factory function or class) registered to provide instances
-        of `cls`.
+        of `cls`. If multiple providers match the tags, returns the last registered one.
 
     Raises:
-        KeyError: If no provider has been registered for the given type.
+        KeyError: If no provider has been registered for the given type, or no provider
+                  matches the specified tags.
     """
     with _registry_lock:
         if cls not in _providers:
             raise KeyError(f"No provider registered for type {cls}")
-        return cast(Callable[..., T], _providers[cls])
+
+        providers_list = _providers[cls]
+
+        # If no tags specified, return the last (most recently registered) provider
+        if not tags:
+            return cast(Callable[..., T], providers_list[-1][0])
+
+        # Filter by tags - provider must have ALL specified tags
+        tag_set = frozenset(tags) if isinstance(tags, set) else tags
+        for factory, metadata in reversed(providers_list):  # Check most recent first
+            if tag_set.issubset(metadata.tags):
+                return cast(Callable[..., T], factory)
+
+        raise KeyError(f"No provider registered for type {cls} with tags {tag_set}")
 
 
-def get_provider_metadata(cls: type[Any]) -> ProviderMetadata | None:
-    """Retrieve the metadata for a registered provider.
+def get_provider_metadata(
+    cls: type[Any], tags: frozenset[str] | set[str] | None = None
+) -> ProviderMetadata | None:
+    """Retrieve metadata for a registered provider, optionally filtered by tags.
 
     Args:
         cls: The type for which to retrieve metadata.
+        tags: Optional set of tags to filter providers. If provided, returns metadata
+              for the provider that has ALL specified tags.
 
     Returns:
-        The provider metadata if registered, None otherwise.
+        The ProviderMetadata for the given type, or None if not registered.
+        If multiple providers match the tags, returns the last registered one.
     """
     with _registry_lock:
-        return _provider_metadata.get(cls)
+        if cls not in _providers:
+            return None
+
+        providers_list = _providers[cls]
+
+        # If no tags specified, return the last (most recently registered) provider's metadata
+        if not tags:
+            return providers_list[-1][1]
+
+        # Filter by tags - provider must have ALL specified tags
+        tag_set = frozenset(tags) if isinstance(tags, set) else tags
+        for _, metadata in reversed(providers_list):  # Check most recent first
+            if tag_set.issubset(metadata.tags):
+                return metadata
+
+        return None
 
 
-def get_all_providers() -> dict[type, Callable[..., Any]]:
-    """Retrieve all registered providers.
+def get_all_providers() -> dict[type, list[tuple[Callable[..., Any], ProviderMetadata]]]:
+    """Retrieve all registered providers with their metadata.
 
     Returns:
-        A dictionary mapping types to their provider callables.
+        A dictionary mapping types to lists of (factory, metadata) tuples.
+        Each type may have multiple providers registered with different tags.
     """
     with _registry_lock:
-        return _providers.copy()
+        return {k: list(v) for k, v in _providers.items()}
 
 
-def get_all_provider_metadata() -> dict[type, ProviderMetadata]:
+def get_all_provider_metadata() -> dict[type, list[ProviderMetadata]]:
     """Retrieve metadata for all registered providers.
 
     Returns:
-        A dictionary mapping types to their provider metadata.
+        A dictionary mapping types to lists of ProviderMetadata.
+        Each type may have multiple providers registered with different tags.
     """
     with _registry_lock:
-        return _provider_metadata.copy()
+        return {
+            interface: [metadata for _, metadata in providers_list]
+            for interface, providers_list in _providers.items()
+        }
 
 
 __all__ = (

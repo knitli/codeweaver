@@ -1301,7 +1301,13 @@ class SessionStatistics(BasedModel):
             self.index_statistics = FileStatistics()
         self.index_statistics.add_other_files(*files)
 
-    def update_failover_stats(
+    def _ensure_failover_stats(self) -> FailoverStats:
+        """Ensure failover_statistics is initialized and return it."""
+        if not self.failover_statistics:
+            self.failover_statistics = FailoverStats()
+        return self.failover_statistics
+
+    def update_failover_stats(  # noqa: C901
         self,
         *,
         failover_active: bool | None = None,
@@ -1333,10 +1339,7 @@ class SessionStatistics(BasedModel):
             backup_file_size_bytes: Set backup file size
             chunks_in_failover: Set number of chunks in failover
         """
-        if not self.failover_statistics:
-            self.failover_statistics = FailoverStats()
-
-        stats = self.failover_statistics
+        stats = self._ensure_failover_stats()
 
         if failover_active is not None:
             stats.failover_active = failover_active

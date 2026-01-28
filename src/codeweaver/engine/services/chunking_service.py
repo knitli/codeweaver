@@ -98,10 +98,6 @@ class ChunkingService:
         max_tokens = self.governor.max_chunk_tokens
         return all(self.tokenizer.count_tokens(chunk.content) <= max_tokens for chunk in chunks)
 
-    def _is_backup_service(self) -> bool:
-        """Check if this is a backup variant."""
-        return getattr(self, "is_provider_backup", False)
-
     def _chunk_sequential(
         self, files: list[DiscoveredFile]
     ) -> Iterator[tuple[Path, list[CodeChunk]]]:

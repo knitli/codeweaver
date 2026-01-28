@@ -141,8 +141,6 @@ async def test_sparse_only_fallback(initialize_test_settings, clean_container):
     When: Search query submitted
     Then: Falls back to sparse-only search, warns user
     """
-    from codeweaver.server.agent_api import find_code
-
     from codeweaver.core import SearchStrategy
     from codeweaver.providers import (
         EmbeddingProvider,
@@ -150,6 +148,7 @@ async def test_sparse_only_fallback(initialize_test_settings, clean_container):
         SparseEmbeddingProvider,
         VectorStoreProvider,
     )
+    from codeweaver.server.agent_api import find_code
 
     # Dense embedding fails
     mock_dense_provider = AsyncMock(spec=EmbeddingProvider)

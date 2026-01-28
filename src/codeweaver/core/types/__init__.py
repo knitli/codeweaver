@@ -129,7 +129,6 @@ if TYPE_CHECKING:
         TimingStatisticsDict,
         ToolOrPromptName,
     )
-    from codeweaver.core.types.strategy import EmbeddingStrategy, VectorStrategy
     from codeweaver.core.types.utils import (
         clean_sentinel_from_schema,
         generate_field_title,
@@ -171,7 +170,6 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "EmbeddingBatchInfo": (__spec__.parent, "embeddings"),
     "EmbeddingKind": (__spec__.parent, "embeddings"),
     "EmbeddingModelName": (__spec__.parent, "aliases"),
-    "EmbeddingStrategy": (__spec__.parent, "strategy"),
     "EmbeddingModelNameT": (__spec__.parent, "aliases"),
     "EnvFormat": (__spec__.parent, "env"),
     "EnvVarInfo": (__spec__.parent, "env"),
@@ -233,7 +231,6 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "StoredEmbeddingVectors": (__spec__.parent, "embeddings"),
     "StrategizedQuery": (__spec__.parent, "search"),
     "SummaryKey": (__spec__.parent, "statistics"),
-    "VectorStrategy": (__spec__.parent, "strategy"),
     "ThingName": (__spec__.parent, "aliases"),
     "ThingNameT": (__spec__.parent, "aliases"),
     "ThingOrCategoryNameT": (__spec__.parent, "aliases"),
@@ -293,7 +290,6 @@ __all__ = (
     "EmbeddingKind",
     "EmbeddingModelName",
     "EmbeddingModelNameT",
-    "EmbeddingStrategy",
     "EnvFormat",
     "EnvVarInfo",
     "FileExt",
@@ -359,7 +355,6 @@ __all__ = (
     "UUID7Hex",
     "UUID7HexT",
     "Unset",
-    "VectorStrategy",
     "clean_sentinel_from_schema",
     "generate_field_title",
     "generate_title",

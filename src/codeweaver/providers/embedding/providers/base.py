@@ -973,7 +973,9 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
 
                 if registered.chunk != chunks[i]:
                     # because we create new CodeChunk instances during processing, we need to update the chunk reference
-                    registry[info.chunk_id] = registry[info.chunk_id].model_copy(update={"chunk": chunks[i]})
+                    registry[info.chunk_id] = registry[info.chunk_id].model_copy(
+                        update={"chunk": chunks[i]}
+                    )
             else:
                 # Create new ChunkEmbeddings with the chunk, then add the embedding
                 registry[info.chunk_id] = ChunkEmbeddings(chunk=chunks[i]).add(info)

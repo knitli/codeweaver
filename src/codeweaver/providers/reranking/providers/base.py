@@ -371,15 +371,15 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         return ModelName(self.config.model_name)
 
     @property
-    def model_capabilities(self) -> RerankingModelCapabilities:
+    def capabilities(self) -> RerankingModelCapabilities:
         """Get the model capabilities for the reranking provider."""
         return self.caps
 
     def _tokenizer(self) -> Tokenizer[Any]:
         """Retrieves the tokenizer associated with the reranking model."""
-        if tokenizer := self.model_capabilities.tokenizer:
+        if tokenizer := self.capabilities.tokenizer:
             return get_tokenizer(
-                tokenizer, self.model_capabilities.tokenizer_model or self.model_capabilities.name
+                tokenizer, self.capabilities.tokenizer_model or self.capabilities.name
             )
         return get_tokenizer("tiktoken", "o200k_base")
 

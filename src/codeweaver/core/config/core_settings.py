@@ -17,9 +17,6 @@ from typing import Any
 from codeweaver.core.types.settings_model import BaseCodeWeaverSettings
 
 
-SCHEMA_VERSION = "1.2.0"
-
-
 class CodeWeaverCoreSettings(BaseCodeWeaverSettings):
     """Root settings wrapper for core-only installation.
 

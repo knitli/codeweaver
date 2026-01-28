@@ -25,6 +25,7 @@ import pytest
 
 from pydantic import ValidationError
 
+from codeweaver.core import ChunkKind, SemanticSearchLanguage
 from codeweaver.server.agent_api import (
     CodeMatch,
     CodeMatchType,
@@ -33,7 +34,6 @@ from codeweaver.server.agent_api import (
     SearchStrategy,
     find_code,
 )
-from codeweaver.core import ChunkKind, SemanticSearchLanguage
 
 
 pytestmark = [pytest.mark.validation]

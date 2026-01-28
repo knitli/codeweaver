@@ -58,8 +58,6 @@ if TYPE_CHECKING:
         RignoreSettings,
     )
     from codeweaver.engine.dependencies import (
-        BackupChunkingServiceDep,
-        BackupIndexingServiceDep,
         CheckpointManagerDep,
         ChunkerSettingsDep,
         ChunkingServiceDep,
@@ -105,8 +103,6 @@ parent = __spec__.parent or "codeweaver.engine"
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "ASTDepthExceededError": (f"{parent}.chunker", "exceptions"),
-    "BackupChunkingServiceDep": (parent, "dependencies"),
-    "BackupIndexingServiceDep": (parent, "dependencies"),
     "BinaryFileError": (parent, "chunker"),
     "Boundary": (parent, "chunker"),
     "CheckpointManager": (parent, "managers"),
@@ -192,8 +188,6 @@ __all__ = (
     "ASTDepthExceededError",
     "AnyVariants",
     "ArbitraryFilter",
-    "BackupChunkingServiceDep",
-    "BackupIndexingServiceDep",
     "BinaryFileError",
     "Boundary",
     "CheckpointManager",

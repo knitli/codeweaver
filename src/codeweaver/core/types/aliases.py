@@ -172,10 +172,10 @@ ModelName = NewType("ModelName", LiteralStringT)
 type ModelNameT = Annotated[
     ModelName,
     Field(
-        description="""The name of a model as the `ModelName` NewType, e.g. 'gpt-4', 'bert-base-uncased'.""",
-        pattern=r"^[A-Za-z0-9_+-]+$",
+        description="""The name of a model as the `ModelName` NewType, e.g. 'gpt-4', 'bert-base-uncased', 'org/model-name'.""",
+        pattern=r"^[A-Za-z0-9_+:./-]+$",  # Support org/model, provider:org/model, and version numbers (dots)
         min_length=1,
-        max_length=50,
+        max_length=100,  # Increased to accommodate longer org/model names
     ),
 ]
 

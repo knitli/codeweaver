@@ -1,148 +1,24 @@
-# SPDX-FileCopyrightText: 2025 Knitli Inc.
-# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
-#
-# SPDX-License-Identifier: MIT OR Apache-2.0
-"""Shared types and base classes for provider systems."""
+# sourcery skip: no-complex-if-expressions
+"""Embedding-related types and classes for provider systems."""
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 from collections.abc import Sequence
-from functools import cache
-from threading import Lock
-from types import MappingProxyType
-from typing import TYPE_CHECKING, Any, Literal, NamedTuple, TypedDict
+from typing import Any, Literal, NamedTuple, Self
 
 from pydantic import PositiveInt
 from qdrant_client.models import CollectionParams
 
-from codeweaver.core import BaseEnum, InvalidEmbeddingModelError, ModelName, ModelNameT
-from codeweaver.providers.config import EmbeddingProviderSettings, SparseEmbeddingProviderSettings
+from codeweaver.core.exceptions import InvalidEmbeddingModelError
+from codeweaver.core.types import ModelName, ModelNameT
+from codeweaver.providers.config.kinds import (
+    EmbeddingProviderSettings,
+    SparseEmbeddingProviderSettings,
+)
 from codeweaver.providers.embedding.capabilities.base import (
     EmbeddingModelCapabilities,
     SparseEmbeddingModelCapabilities,
 )
-from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
-
-if TYPE_CHECKING:
-    from codeweaver.providers.embedding.providers.base import EmbeddingProvider, SparseEmbeddingProvider
-    from codeweaver.providers.reranking.providers.base import RerankingProvider
-    from codeweaver.providers.vector_stores.base import VectorStoreProvider
-
-
-type EmbeddingCapabilityType = EmbeddingModelCapabilities | SparseEmbeddingModelCapabilities
-type RerankingCapabilityType = RerankingModelCapabilities
-
-
-class CircuitBreakerState(BaseEnum):
-    """Circuit breaker states for provider resilience."""
-
-    CLOSED = "closed"  # Normal operation
-    OPEN = "open"  # Failing, rejecting requests
-    HALF_OPEN = "half_open"  # Testing if service recovered
-
-
-class BaseCapabilityResolver[Capability: (EmbeddingCapabilityType | RerankingCapabilityType)](ABC):
-    """Base class for capability resolvers.
-
-    Provides a generic pattern for lazy-loading and resolving model capabilities
-    by name. Subclasses must implement `_ensure_loaded()` to populate the
-    capabilities registry.
-
-    Type parameter Capability should be the capability model type (e.g., EmbeddingModelCapabilities).
-    """
-
-    def __init__(self) -> None:
-        """Initialize the capability resolver with empty cache."""
-        self._lock = Lock()
-        self._capabilities_by_name: MappingProxyType[str, Capability] = MappingProxyType({})
-        self._loaded = False
-
-    @abstractmethod
-    def _ensure_loaded(self) -> None:
-        """Load all capabilities into the registry.
-
-        Subclasses must implement this to:
-        1. Import all capability getter functions
-        2. Call each getter and populate self._capabilities_by_name
-        3. Set self._loaded = True
-
-        This method should be idempotent - calling multiple times should be safe.
-        """
-        ...
-
-    def resolve(self, model_name: str) -> Capability | None:
-        """Get capabilities for a specific model name.
-
-        Args:
-            model_name: The name of the model.
-
-        Returns:
-            The capabilities for the specified model, or None if not found.
-        """
-        with self._lock:
-            self._ensure_loaded()
-        return self._capabilities_by_name.get(model_name)
-
-    def all_capabilities(self) -> Sequence[Capability]:
-        """Get all registered model capabilities.
-
-        Returns:
-            A sequence of all registered capabilities.
-        """
-        with self._lock:
-            self._ensure_loaded()
-        return tuple(self._capabilities_by_name.values())
-
-    def all_model_names(self) -> Sequence[str]:
-        """Get all registered model names.
-
-        Returns:
-            A sequence of all registered model names.
-        """
-        with self._lock:
-            self._ensure_loaded()
-        return tuple(self._capabilities_by_name.keys())
-
-
-class BaseRerankingCapabilityResolver(BaseCapabilityResolver[RerankingCapabilityType]):
-    """A capability resolver for reranking models."""
-
-
-class BaseEmbeddingCapabilityResolver(BaseCapabilityResolver[EmbeddingModelCapabilities]):
-    """A capability resolver for embedding models."""
-
-
-class BaseSparseEmbeddingCapabilityResolver(
-    BaseCapabilityResolver[SparseEmbeddingModelCapabilities]
-):
-    """A capability resolver for sparse embedding models."""
-
-
-@cache
-def get_all_provider_config_types() -> tuple[type, ...]:
-    """Get all defined provider types.
-
-    Returns:
-        A tuple of all provider type classes.
-    """
-    import textcase
-
-    import codeweaver.providers.config
-
-    cls_names = [
-        cls_name
-        for cls_name in codeweaver.providers.config.__all__
-        if textcase.pascal.match(cls_name)
-        and not cls_name.startswith("Base")
-        and not cls_name.endswith(("T", "Type"))
-        and any(
-            name
-            for name in ("Client", "Embedding", "Reranking", "Settings", "Qdrant", "VectorStore")
-            if name in cls_name
-        )
-    ]
-    return tuple(getattr(codeweaver.providers.config, cls_name) for cls_name in cls_names)
 
 
 class ConfiguredCapability(NamedTuple):
@@ -157,6 +33,7 @@ class ConfiguredCapability(NamedTuple):
 
     @property
     def model_name(self) -> ModelNameT:
+        """Get the model name associated with this capability."""
         return ModelName(
             self.config.model_name
             or self.config.embedding_config.model_name
@@ -164,9 +41,11 @@ class ConfiguredCapability(NamedTuple):
         )
 
     async def datatype(self) -> str | None:
+        """Get the data type of the embedding vectors for this capability."""
         return await self.config.embedding_config.get_datatype()
 
     async def distance(self) -> Literal["Cosine", "Dot", "Euclidean", "Manhattan"] | None:
+        """Get the preferred distance metric for this capability."""
         if self.is_sparse or self.is_idf:
             return None
         if self.capability:
@@ -181,6 +60,7 @@ class ConfiguredCapability(NamedTuple):
         return "Cosine"
 
     async def dimension(self) -> PositiveInt | None:
+        """Get the dimensionality of the embedding vectors for this capability."""
         if isinstance(self.capability, SparseEmbeddingModelCapabilities) or isinstance(
             self.config, SparseEmbeddingProviderSettings
         ):
@@ -212,18 +92,21 @@ class ConfiguredCapability(NamedTuple):
 
     @property
     def is_dense(self) -> bool:
+        """Check if this capability represents a dense embedding model."""
         return self.capability is not None and not isinstance(
             self.capability, SparseEmbeddingModelCapabilities
         )
 
     @property
     def is_sparse(self) -> bool:
+        """Check if this capability represents a sparse embedding model."""
         return self.capability is not None and isinstance(
             self.capability, SparseEmbeddingModelCapabilities
         )
 
     @property
     def is_idf(self) -> bool:
+        """Check if this capability represents an IDF (BM25) embedding model."""
         return (
             self.is_sparse
             and self.capability is not None
@@ -245,7 +128,7 @@ class EmbeddingCapabilityGroup(NamedTuple):
     sparse: ConfiguredCapability | None = None
     """Configured sparse embedding model capabilities that **are not** generic idf type indexes. These are models like Splade.
 
-    True sparse models, also known as "bag-of-words" models, are typically derived from dense models, and in most cases create sparse vectors *from* dense vectors. This has the advantage of adding *some* semantic meaning to the results, so long as it's within the model's set vocabulary. Sparse models are actually *slower* to generate embeddings than dense models, but once they are generated, are significantly faster at inference (i.e. search) [^1]. So you trade time up front for efficiency when searching. Data show combining sparse and dense models improves search result accuracy in nearly every case, often by 15% or more.
+    True sparse models, also known as "bag-of-words" models, are typically derived from dense models, and in most cases create sparse vectors *from* dense vectors. This has the advantage of adding *some* semantic meaning to the results, so long as it's within the model's set vocabulary. Sparse models are actually *slower* to generate embeddings than equivalent dense models, but once they are generated, are significantly faster at inference (i.e. search) [^1]. So you trade time up front for efficiency when searching. Data show combining sparse and dense models improves search result accuracy in nearly every case, often by 15% or more.
 
     CodeWeaver defaults to hybrid search using dense *and* sparse models.
 
@@ -262,7 +145,7 @@ class EmbeddingCapabilityGroup(NamedTuple):
     """CodeWeaver doesn't currently implement late_interaction model (i.e. colBERT) handling, but we hope to soon. This is a placeholder for when that happens."""
 
     @classmethod
-    def from_capabilities(cls, capabilities: Sequence[ConfiguredCapability]):
+    def from_capabilities(cls, capabilities: Sequence[ConfiguredCapability]) -> Self:
         """Creates an EmbeddingCapabilityGroup from a sequence of model capabilities."""
         values = dict.fromkeys(("dense", "sparse", "idf", "late_interaction"))
 
@@ -282,6 +165,7 @@ class EmbeddingCapabilityGroup(NamedTuple):
                 values["sparse"] = values["sparse"] or capability
             else:
                 values["dense"] = values["dense"] or capability
+        return cls(**values)
 
     @property
     def dense_model(self) -> ModelNameT | None:
@@ -324,70 +208,4 @@ class EmbeddingCapabilityGroup(NamedTuple):
         return CollectionParams.model_construct(**params)
 
 
-class ModelNameDict(TypedDict, total=False):
-    dense: ModelNameT | None
-    sparse: ModelNameT | None
-    reranking: ModelNameT | None
-
-
-class ModelCapDict(TypedDict, total=False):
-    dense: EmbeddingModelCapabilities | None
-    sparse: SparseEmbeddingModelCapabilities | None
-    reranking: RerankingModelCapabilities | None
-
-
-class SearchPackage:
-    """Represents a complete package of CodeWeaver providers."""
-
-    embedding: "EmbeddingProvider"
-
-    sparse_embedding: "SparseEmbeddingProvider"
-
-    reranking: "RerankingProvider"
-
-    vector_store: "VectorStoreProvider"
-
-    capabilities: EmbeddingCapabilityGroup
-
-    def __init__(
-        self,
-        embedding: "EmbeddingProvider",
-        sparse_embedding: "SparseEmbeddingProvider",
-        reranking: "RerankingProvider",
-        vector_store: "VectorStoreProvider",
-        capabilities: EmbeddingCapabilityGroup,
-    ):
-        """Initializes a SearchPackage with the given providers and capabilities."""
-        self.embedding = embedding
-        self.sparse_embedding = sparse_embedding
-        self.reranking = reranking
-        self.vector_store = vector_store
-        self.capabilities = capabilities
-
-    @property
-    def model_names(self) -> ModelNameDict:
-        """Get the names of the models used in this search package."""
-        return ModelNameDict(
-            dense=self.capabilities.dense_model,
-            sparse=self.capabilities.sparse_model or self.capabilities.idf_model,
-            reranking=ModelName(self.reranking.model_name or self.reranking.config.model_name),
-        )
-
-    @property
-    def caps(self) -> ModelCapDict:
-        """Get the capabilities of the models used in this search package."""
-        return ModelCapDict(
-            dense=self.capabilities.dense.capability if self.capabilities.dense else None,  # ty:ignore[invalid-argument-type]
-            sparse=self.capabilities.sparse.capability if self.capabilities.sparse else None,  # ty:ignore[invalid-argument-type]
-            reranking=self.reranking.caps,
-        )
-
-
-__all__ = (
-    "BaseEmbeddingCapabilityResolver",
-    "BaseRerankingCapabilityResolver",
-    "BaseSparseEmbeddingCapabilityResolver",
-    "CircuitBreakerState",
-    "EmbeddingCapabilityGroup",
-    "SearchPackage",
-)
+__all__ = ("ConfiguredCapability", "EmbeddingCapabilityGroup")

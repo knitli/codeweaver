@@ -34,9 +34,9 @@ class SourceIdRegistry(UUIDStore["DiscoveredFile"]):
     This registry ensures that all spans from the same file share the same source_id, enabling set-like span operations and clean merging/splitting.
     """
 
-    store: dict[UUID7, "DiscoveredFile"]
+    store: dict[UUID7, DiscoveredFile]
 
-    _trash_heap: WeakValueDictionary[UUID7, "DiscoveredFile"]
+    _trash_heap: WeakValueDictionary[UUID7, DiscoveredFile]
 
     def __init__(self) -> None:
         """Initialize the registry."""
@@ -72,14 +72,14 @@ class SourceIdRegistry(UUIDStore["DiscoveredFile"]):
         """Mapping from file paths to their corresponding source IDs."""
         return MappingProxyType({file.path: file.source_id for file in self.store.values()})
 
-    def file_from_path(self, path: Path) -> "DiscoveredFile | None":
+    def file_from_path(self, path: Path) -> DiscoveredFile | None:
         """Get the DiscoveredFile instance for a given file path."""
         # first we need to normalize the path
         path = path.resolve()
         source_id = self.path_mapping.get(path)
         return None if source_id is None else self.store.get(source_id)
 
-    def source_id_for(self, file: "DiscoveredFile") -> UUID7HexT:
+    def source_id_for(self, file: DiscoveredFile) -> UUID7HexT:
         """Get or create a source ID for the given file.
 
         Uses the DiscoveredFile's existing source_id instead of generating a new one.
@@ -104,7 +104,7 @@ class SourceIdRegistry(UUIDStore["DiscoveredFile"]):
         self.store.clear()
         self._trash_heap.clear()
 
-    def remove(self, value: UUID7 | "DiscoveredFile") -> bool:
+    def remove(self, value: UUID7 | DiscoveredFile) -> bool:
         """Remove a file from the registry.
 
         Args:

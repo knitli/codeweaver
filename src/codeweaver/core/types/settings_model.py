@@ -56,7 +56,7 @@ if TYPE_CHECKING:
     from codeweaver.core.config.types import CodeWeaverSettingsDict
 
 
-SCHEMA_VERSION = "1.2.0"
+SCHEMA_VERSION = "1.2.1"
 
 
 SUPPORTED_CONFIG_FILE_EXTENSIONS = MappingProxyType({

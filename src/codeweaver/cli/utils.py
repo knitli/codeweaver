@@ -26,13 +26,7 @@ def check_provider_package_available(provider: Provider, kind: ProviderKind) -> 
     sdk_clients = SDK_MAP.get((provider, kind))
     if not sdk_clients:
         # Fallback to defaults or assume available (e.g. Memory)
-        if provider.value == "memory":
-            return True
-        # If no SDK mapped, assume it might be available if not strictly required?
-        # Or return False?
-        # For "not_set" or others, False is safer.
-        return False
-
+        return provider.value == "memory"
     # Normalize to tuple
     if not isinstance(sdk_clients, tuple):
         sdk_clients = (sdk_clients,)

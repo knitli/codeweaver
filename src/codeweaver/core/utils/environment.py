@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import importlib
 import logging
 import os
@@ -15,7 +16,7 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
-from pydantic import NonNegativeInt
+from pydantic import NonNegativeInt, PositiveInt
 
 from codeweaver.core.types.provider import Provider
 from codeweaver.core.utils.lazy_importer import LazyImport, lazy_import
@@ -192,10 +193,62 @@ def settings_type_for_root_package(
             return CodeWeaverCoreSettings
 
 
-CODEWEAVER_PREFIX = """[CodeWeaver]"""
+async def _check_ports(port_search: tuple[int, ...]) -> int | None:
+    async def _endpoint(port: int):
+        return f"http://127.0.0.1:{port}/healthz"
+
+    import httpx
+
+    client_pool = httpx.AsyncClient()
+    async with client_pool as client:
+        for port in port_search:
+            try:
+                response = await client.get(_endpoint(port), timeout=0.2)
+                if response.status_code == 200:
+                    return port
+            except httpx.RequestError:
+                continue
+    return None
+
+
+async def _try_qdrant_client(port: int) -> bool:
+    from qdrant_client import AsyncQdrantClient
+
+    response = None
+    with contextlib.suppress(Exception):
+        client = AsyncQdrantClient(url=f"http://127.0.0.1:{port}")
+        response = await client.get_collections()
+    return bool(response)
+
+
+async def find_qdrant_instance(port_search: tuple[int, ...] | None = None) -> PositiveInt | None:
+    """Attempt to find the port of a local qdrant instance."""
+    port_search = port_search or (
+        6333,
+        6334,
+        6335,
+        6336,
+        8080,
+        8000,
+        4321,
+        *range(3000, 6333),
+        *range(6337, 9000),
+    )
+    if (found_port := await _check_ports(port_search)) and await _try_qdrant_client(found_port):
+        return found_port
+    if (idx := port_search.index(found_port)) + 1 < len(port_search):
+        return await find_qdrant_instance(port_search=port_search[idx + 1 :])
+    return None
+
+
+async def qdrant_instance_live_at_port(port: int) -> bool:
+    """Check if a Qdrant instance is live at the given port."""
+    return await _try_qdrant_client(port)
+
 
 __all__ = (
     "detect_root_package",
+    "find_qdrant_instance",
     "format_file_link",
     "get_codeweaver_config_paths",
     "get_possible_env_vars",
@@ -203,6 +256,7 @@ __all__ = (
     "in_ide",
     "is_codeweaver_config_path",
     "is_tty",
+    "qdrant_instance_live_at_port",
     "settings_type_for_root_package",
     "we_are_in_jetbrains",
     "we_are_in_vscode",

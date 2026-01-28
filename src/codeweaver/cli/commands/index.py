@@ -19,7 +19,7 @@ from pydantic import FilePath
 
 from codeweaver.cli.dependencies import setup_cli_di
 from codeweaver.cli.ui import CLIErrorHandler, IndexingProgress, StatusDisplay, get_display
-from codeweaver.core import CodeWeaverError, SettingsMapDep, Unset, get_user_config_dir
+from codeweaver.core import CodeWeaverError, SettingsMapDep, Unset
 from codeweaver.core.config.types import CodeWeaverSettingsDict
 from codeweaver.core.di.depends import INJECTED
 from codeweaver.core.types.dictview import DictView
@@ -111,7 +111,6 @@ async def _perform_clear_operation(
         CodeWeaverError: If operation fails
     """
     from codeweaver.core import get_container
-    from codeweaver.engine import IndexerSettings
 
     if not yes:
         display.print_warning("⚠ Warning: Destructive Operation")
@@ -159,20 +158,6 @@ async def _perform_clear_operation(
 
     display.print_success("Clear operation complete")
     display.console.print()
-
-    # Clean up local backup files if they exist
-    indexes_dir = (
-        settings.indexer.cache_dir
-        if settings.indexer is not Unset and isinstance(settings.indexer, IndexerSettings)
-        else get_user_config_dir() / ".indexes"
-    )
-    backups_dir = indexes_dir.parent / ".vectors" / "backups"
-    if backups_dir.exists() and (files := list(backups_dir.iterdir())):
-        for file in files:
-            file.unlink()
-        display.print_success(
-            f"Deleted {len(files)} files for the failsafe vector store from '{backups_dir}'"
-        )
 
 
 async def _handle_server_status(*, standalone: bool, display: StatusDisplay) -> bool:

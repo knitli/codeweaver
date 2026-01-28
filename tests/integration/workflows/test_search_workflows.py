@@ -213,9 +213,8 @@ async def test_mcp_find_code_tool(test_project_path: Path, initialized_cw_state,
 
     Reference: specs/003-our-aim-to/contracts/find_code_mcp_tool.json
     """
-    from codeweaver.server.agent_api import CodeMatchType, IntentType
-
     from codeweaver.server import find_code_tool
+    from codeweaver.server.agent_api import CodeMatchType, IntentType
 
     # Invoke MCP tool
     response = await find_code_tool(
@@ -312,9 +311,8 @@ async def test_search_with_intent_parameter(initialized_cw_state, di_overrides):
     When: find_code called with different intents
     Then: Intent reflected in response
     """
-    from codeweaver.server.agent_api import IntentType
-
     from codeweaver.server import find_code_tool
+    from codeweaver.server.agent_api import IntentType
 
     intents_to_test = [
         IntentType.UNDERSTAND,
@@ -544,9 +542,8 @@ async def test_search_strategy_reporting(test_project_path: Path, initialized_cw
     When: Hybrid search executed
     Then: search_strategy reports HYBRID_SEARCH and SEMANTIC_RERANK
     """
-    from codeweaver.server.agent_api import IntentType, find_code
-
     from codeweaver.core import SearchStrategy
+    from codeweaver.server.agent_api import IntentType, find_code
 
     response = await find_code(
         query="how does authentication work",

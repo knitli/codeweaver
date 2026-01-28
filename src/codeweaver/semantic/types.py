@@ -277,6 +277,7 @@ class SemanticMetadata(BasedModel):
     ] = False
 
     def __init__(self, **data: Any) -> None:
+        """Initialize SemanticMetadata with optional symbol setting."""
         if not data.get("symbol"):
             data["symbol"] = _set_symbol(data)
         super().__init__(**data)

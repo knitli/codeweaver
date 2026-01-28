@@ -557,7 +557,6 @@ class ProviderSettings(BasedModel):
 
     def __init__(self, **data: Any) -> None:
         """Initialize ProviderSettings and register with DI container if available."""
-        super().__init__(**data)
         try:
             from codeweaver.core.di import get_container
 
@@ -570,7 +569,6 @@ class ProviderSettings(BasedModel):
                 e,
             )
         super().__init__(**data)
-
 
     @model_validator(mode="after")
     def validate_and_normalize_providers(self) -> ProviderSettings:
@@ -737,7 +735,6 @@ class ProviderSettings(BasedModel):
         if backup:
             return setting[1] if isinstance(setting, tuple) and len(setting) > 1 else None
         return setting
-
 
     def apply_profile(self, profile: Literal["recommended", "quickstart", "testing"]) -> None:
         """Apply a premade provider profile to the settings.

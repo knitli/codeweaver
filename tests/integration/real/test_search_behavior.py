@@ -290,10 +290,9 @@ async def test_search_handles_empty_codebase(tmp_path, clean_container):
     - Search doesn't crash with no indexed content
     - Error messages are clear
     """
-    from codeweaver.server.agent_api import IntentType, find_code
-
     from codeweaver.engine import IndexingService
     from codeweaver.server import CodeWeaverSettings, get_settings
+    from codeweaver.server.agent_api import IntentType, find_code
 
     empty_dir = tmp_path / "empty_codebase"
     empty_dir.mkdir()

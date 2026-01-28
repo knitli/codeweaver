@@ -161,13 +161,13 @@ class ChunkGovernor(BasedModel):
             and (target := getattr(self.settings, "target_chunk_tokens", None)) is not None
         ):
             # Respect override but cap at context window
-            return (min(target, self.chunk_limit))
+            return min(target, self.chunk_limit)
 
         context = self.chunk_limit
 
         if context <= TRANSITION_POINT:
             # Small models: use 80% of available context
-            return (max(MIN_VIABLE_CHUNK, int(context * SMALL_MODEL_RATIO)))
+            return max(MIN_VIABLE_CHUNK, int(context * SMALL_MODEL_RATIO))
 
         # Logarithmic transition from 410 (512*0.8) to 600
         # log2(1024/512) = 1, log2(8192/512) = 4
@@ -179,7 +179,7 @@ class ChunkGovernor(BasedModel):
 
         scaled = base + headroom * min(1.0, log_factor / 4)
 
-        return (min(int(scaled), RETRIEVAL_OPTIMAL))
+        return min(int(scaled), RETRIEVAL_OPTIMAL)
 
     @computed_field
     @cached_property
@@ -189,7 +189,7 @@ class ChunkGovernor(BasedModel):
         Chunks smaller than this are likely noise and should be merged with
         neighbors. Calculated as ~15% of optimal, with a minimum of 50 tokens.
         """
-        return (max(MIN_FLOOR, int(self.optimal_chunk_tokens * FLOOR_RATIO)))
+        return max(MIN_FLOOR, int(self.optimal_chunk_tokens * FLOOR_RATIO))
 
     @computed_field
     @cached_property
@@ -202,9 +202,7 @@ class ChunkGovernor(BasedModel):
         The 1.67x ratio allows capturing complete "context units" (e.g., a function
         that's slightly larger than optimal) without forcing unnecessary splits.
         """
-        return (
-            min(int(self.optimal_chunk_tokens * ACCEPTABLE_OVERAGE_RATIO), self.chunk_limit)
-        )
+        return min(int(self.optimal_chunk_tokens * ACCEPTABLE_OVERAGE_RATIO), self.chunk_limit)
 
     def classify_chunk_size(self, tokens: int) -> AdaptiveChunkBehavior:
         """Determine what action to take for a chunk of given size.

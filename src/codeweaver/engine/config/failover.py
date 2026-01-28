@@ -7,11 +7,19 @@
 
 from __future__ import annotations
 
-from typing import Annotated, NotRequired, TypedDict
+import os
+
+from typing import TYPE_CHECKING, Annotated, NotRequired, TypedDict
 
 from pydantic import Field, PositiveInt
 
-from codeweaver.core import BasedModel
+from codeweaver.core.di import INJECTED
+from codeweaver.core.types import BasedModel
+from codeweaver.providers import ProviderSettingsDep
+
+
+if TYPE_CHECKING:
+    from codeweaver.providers.config.providers import ProviderSettings
 
 
 MAX_RAM_MB = 2048
@@ -19,18 +27,23 @@ MAX_RAM_MB = 2048
 FIVE_MINUTES_IN_SECONDS = 300
 
 
+def _get_provider_settings(settings: ProviderSettingsDep = INJECTED) -> ProviderSettings:
+    return settings
+
+
 class FailoverSettings(BasedModel):
     """Settings for vector store failover and service resilience.
 
-    CodeWeaver's failover system uses the lightest weight models possible to create a backup vector store that can take over in the case of primary store failure -- usually because you are offline or have a poor connection to a cloud provider. By default, if you are using an on-system Qdrant instance as your primary vector store, CodeWeaver will create a second backup collection in that store to use as a failover (using local models for embeddings). If you are using qdrant cloud, then the backup is in-memory only but persists to disk between sessions.
+    CodeWeaver's backup system is intelligent in that it only activates if you may need it. It is automatically disabled if:
+      - Your configured embedding provider is local.
+      - Your vector store provider is local.
 
-    CodeWeaver creates this secondary backup automatically when your system is idle and keeps it up to date at regular PositiveIntervals. If one of your primary embedding or vector store providers become unreachable, CodeWeaver will automatically switch to the backup store to maPositiveIntain service continuity. When the primary store becomes reachable again, CodeWeaver can automatically restore it as the primary store after a short delay. (We switch on embedding failures because we don't want codeweaver to *ever* become stale -- even if the vector store is reachable, if we can't get new embeddings then the system can't learn new information.)
+    ## Features
 
-    When the primary returns to health, CodeWeaver will wait until the main providers are reachable *and caught up with changes from while they were offline* before switching back. This ensures that you don't lose any data or context during failover events.
-
-    We designed the backup system to be very lightweight so that it can run on most systems without significant resource overhead. However, if you are running on a very constrained system or have specific requirements, you can adjust the settings below to better suit your needs. You may also want to disable the failover system if you are using all local providers as your primary providers.
-
-    Importantly, while the system is lightweight, it's still extremely capable -- our backup is more robust than most search tools' primary systems. It has full hybrid multivector search and reranking support, ensuring that your search experience remains seamless even during failover events.
+    - **Reranking**. Automatically injects a backup local reranking model, which is simply accessed at query time if the primary model is unavailable. This is *always* on.
+    - **Backup Vectors**. If your embedding provider is remote, and your vector store is local, the system will add a backup vector to each stored point using the backup local model, ensuring that queries can still be served even if the primary embedding provider is unavailable. The system will automatically manage the synchronization of these backup vectors (it simply checks if all expected vectors are on all points and adds any missing ones).
+    - **Write-Ahead Logging (WAL)**. If your embedding provider is remote, it uses write-ahead-logging (WAL) to store a local copy of the vectors each time it writes to the primary store. This uses Qdrant's built-in ability to use vectors stored in a directory using RocksDB. When the primary returns, the system will reconcile the local WAL with the primary store to ensure consistency.
+    - **Resolves Asymmetric Models**. If your embedding model is capable of asymmetric retrieval (currently only `voyage-4` series models), the system will automatically switch from your primary to a locally compatible model (for voyage-4 series, `voyage-4-nano`). Since embeddings are compatible across these models, you can continue to retrieve and generate new embeddings without interruption, albeit at a slight loss of accuracy for generated embeddings assuming your primary is `voyage-4-large` (about 6 points on RTEB-Code from 86 to 80, which is still better than any other currently available alternative). The advantage here is that you don't need to generate and keep a third set of embeddings for the local model (the second being your sparse embeddings).
     """
 
     disable_failover: Annotated[
@@ -38,7 +51,7 @@ class FailoverSettings(BasedModel):
         Field(
             description="Whether to disable automatic failover to backup vector store. If true, the system will not switch to the backup store on primary failure or keep it ready for failover."
         ),
-    ] = False
+    ] = os.environ.get("CODEWEAVER_DISABLE_BACKUP_SYSTEM", "0") in ("1", "true", "True")
 
     backup_sync: Annotated[
         PositiveInt,
@@ -59,7 +72,19 @@ class FailoverSettings(BasedModel):
 
     def _telemetry_keys(self) -> None:
         """No telemetry keys for failover settings."""
-        return None
+        return
+
+    @property
+    def is_disabled(self) -> bool:
+        """Check if failover is disabled."""
+        return self._resolve_status_from_config()
+
+    def _resolve_status_from_config(self, settings: ProviderSettings | None = None) -> bool:
+        """Resolve the failover status from the current configuration."""
+        if self.disable_failover:
+            return True
+        settings = settings or _get_provider_settings()
+        return settings.embedding[0].is_local if settings.embedding else False
 
 
 class FailoverSettingsDict(TypedDict, total=False):

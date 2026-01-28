@@ -8,9 +8,8 @@
 
 from __future__ import annotations
 
-from enum import StrEnum
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, Literal
 
 import cyclopts
 
@@ -22,17 +21,8 @@ from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
 from codeweaver.core.config.types import CodeWeaverSettingsDict
 from codeweaver.core.dependencies import CodeWeaverSettingsType, ResolvedProjectPathDep, SettingsDep
 from codeweaver.core.di import INJECTED
-from codeweaver.core.utils import is_codeweaver_config_path
-from codeweaver.providers import ProviderSettingsDep
-
-
-class ConfigProfile(StrEnum):
-    """Available configuration profiles for CodeWeaver setup."""
-
-    RECOMMENDED = "recommended"
-    QUICKSTART = "quickstart"
-    BACKUP = "backup"
-    TEST = "test"
+from codeweaver.core.utils import detect_root_package, is_codeweaver_config_path
+from codeweaver.providers import ProviderSettings, ProviderSettingsDep
 
 
 if TYPE_CHECKING:
@@ -128,31 +118,62 @@ def _show_config(settings: DictView[CodeWeaverSettingsDict]) -> None:
         _show_provider_config(provider_settings)
 
 
+def _normalize_provider_configs(
+    configs: ProviderSettings | tuple[ProviderSettings, ...],
+    field: Literal["vector_store", "reranking", "embedding", "sparse_embedding", "agent", "data"],
+) -> tuple[ProviderSettings, ...]:
+    """Normalize provider configs to a tuple of valid config dicts."""
+    from codeweaver.core.types import Unset
+
+    if isinstance(configs, tuple):
+        return configs
+    if configs is None or isinstance(configs, Unset):
+        if detect_root_package() == "core":
+            return ()
+        from codeweaver.providers.config.profiles import ProviderProfile
+
+        profile = ProviderProfile.RECOMMENDED
+        return getattr(profile.value, field, ())
+    return (configs,)
+
+
+def _build_provider_details(config) -> str:
+    """Build a human-readable details string for a provider config."""
+    details: list[str] = []
+
+    if (model_settings := config.get("model_settings")) and (model := model_settings.get("model")):
+        details.append(f"Model: {model}")
+
+    if provider_settings_dict := config.get("provider_settings"):
+        if url := provider_settings_dict.get("url"):
+            url_display = url if len(url) < 50 else f"{url[:47]}..."
+            details.append(f"URL: {url_display}")
+        if collection := provider_settings_dict.get("collection_name"):
+            details.append(f"Collection: {collection}")
+        if path := provider_settings_dict.get("persistence_path"):
+            details.append(f"Path: {path}")
+
+    return " | ".join(details) if details else "Default settings"
+
+
 def _show_provider_config(provider_settings: ProviderSettingsDep = INJECTED) -> None:
     """Display provider configuration details."""
     from codeweaver.core import Unset
 
     display.print_section("Provider Configuration")
 
-    # provider_settings dict directly contains the configs by kind
     if not provider_settings or isinstance(provider_settings, Unset):
         display.print_warning("No providers configured")
         return
 
-    # Group by provider kind - filter to only config dicts/tuples
     valid_kinds = ("data", "embedding", "sparse_embedding", "reranking", "vector_store", "agent")
+
     for kind, configs in provider_settings.items():
         if kind not in valid_kinds or not configs or isinstance(configs, Unset):
             continue
 
-        # Normalize to tuple and filter out invalid elements
-        if isinstance(configs, tuple):
-            config_list = tuple(c for c in configs if c is not None and not isinstance(c, Unset))
-        else:
-            config_list = (
-                (configs,) if configs is not None and not isinstance(configs, Unset) else ()
-            )
-        # Create table for this kind
+        config_list = _normalize_provider_configs(configs, field=kind)  # ty:ignore[invalid-argument-type]
+
         table = Table(
             title=f"{kind.replace('_', ' ').title()}", show_header=True, header_style="bold cyan"
         )
@@ -163,30 +184,11 @@ def _show_provider_config(provider_settings: ProviderSettingsDep = INJECTED) -> 
         for config in config_list:
             if config is None or isinstance(config, Unset):
                 continue
+
             provider = config.get("provider")
             enabled = config.get("enabled", True)
-
-            # Get status with icon
             status = "✅ Enabled" if enabled else "⚠️ Disabled"
-
-            # Build details string
-            details = []
-            if (model_settings := config.get("model_settings")) and (
-                model := model_settings.get("model")
-            ):
-                details.append(f"Model: {model}")
-            if provider_settings_dict := config.get("provider_settings"):
-                # Show key provider-specific settings
-                if url := provider_settings_dict.get("url"):
-                    # Truncate long URLs
-                    url_display = url if len(url) < 50 else f"{url[:47]}..."
-                    details.append(f"URL: {url_display}")
-                if collection := provider_settings_dict.get("collection_name"):
-                    details.append(f"Collection: {collection}")
-                if path := provider_settings_dict.get("persistence_path"):
-                    details.append(f"Path: {path}")
-
-            details_str = " | ".join(details) if details else "Default settings"
+            details_str = _build_provider_details(config)
 
             table.add_row(
                 provider.as_title if hasattr(provider, "as_title") else str(provider),
@@ -195,7 +197,7 @@ def _show_provider_config(provider_settings: ProviderSettingsDep = INJECTED) -> 
             )
 
         display.print_table(table)
-        display.console.print()  # Add spacing between tables
+        display.console.print()
 
 
 def main() -> None:

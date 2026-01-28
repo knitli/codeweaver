@@ -88,8 +88,8 @@ def _default_collection_options(
         collection_name=generate_collection_name(
             project_name=project_name, project_path=project_path
         ),
-        vectors_config={"dense": VectorParams()},
-        sparse_vectors_config={"sparse": SparseVectorParams()},
+        vectors_config={"primary": VectorParams()},  # Role-based name: primary dense vector
+        sparse_vectors_config={"sparse": SparseVectorParams()},  # Role-based name: sparse vector
     )
 
 
@@ -142,7 +142,7 @@ def _get_profile(
         The provider settings dictionary for the specified profile.
     """
     if profile == "testing":
-        return _backup_profile()
+        return _testing_profile()
     if profile == "recommended":
         return _recommended_default(
             vector_deployment, url=url, project_name=project_name, project_path=project_path
@@ -186,8 +186,8 @@ def _recommended_default(
     return ProviderSettingsDict(
         embedding=(
             EmbeddingProviderSettings(
-                model_name=ModelName("voyage-code-3"),
-                embedding_config=VoyageEmbeddingConfig(model_name=ModelName("voyage-code-3")),
+                model_name=ModelName("voyage-code-4-large"),
+                embedding_config=VoyageEmbeddingConfig(model_name=ModelName("voyage-code-4-large")),
                 provider=Provider.VOYAGE,
             ),
         ),
@@ -247,20 +247,14 @@ def _quickstart_default(
     from codeweaver.providers.config.providers import ProviderSettingsDict
 
     embedding_model = (
-        ModelName("ibm-granite/granite-embedding-small-english-r2")
-        if HAS_ST
-        else ModelName("BAAI/bge-small-en-v1.5")
+        ModelName("voyageai/voyage-4-nano") if HAS_ST else ModelName("BAAI/bge-small-en-v1.5")
     )
     sparse_model = (
         ModelName("opensearch/opensearch-neural-sparse-encoding-doc-v3-gte")
         if HAS_ST
         else ModelName("prithivida/Splade_PP_en_v1")
     )
-    reranking_model = (
-        ModelName("BAAI/bge-reranking-v2-m3")
-        if HAS_ST
-        else ModelName("jinaai/jina-reranking-v2-base-multilingual")
-    )
+    reranking_model = ModelName("jinaai/jina-reranker-v1-en-")
 
     return ProviderSettingsDict(
         embedding=(
@@ -317,11 +311,8 @@ def _quickstart_default(
     )
 
 
-def _backup_profile(
-    *,
-    use_local: bool = False,
-    project_name: str | None = None,
-    project_path: Path | None = None,
+def _testing_profile(
+    *, use_local: bool = False, project_name: str | None = None, project_path: Path | None = None
 ) -> ProviderSettingsDict:
     """Backup profile for local development with backup vector store.
 
@@ -354,7 +345,7 @@ def _backup_profile(
             ),
         ),
         # For the dense embeddings, we essentially choose the lightest available model
-        # potion-base-8M is a static embedding model, which again loses some quality, but is extremely light weight and virtually instant
+        # potion-base-8M is a static embedding model, which loses some quality, but is extremely light weight and virtually instant
         "embedding": EmbeddingProviderSettings(
             provider=Provider.SENTENCE_TRANSFORMERS if HAS_ST else Provider.FASTEMBED,
             model_name=ModelName(embedding_model),
@@ -383,7 +374,7 @@ def _backup_profile(
                 provider=Provider.QDRANT,
                 collection=default_collection,
                 client_options=_default_local_vector_client_options(),
-                ),
+            ),
         )
     else:
         backup_settings["vector_store"] = QdrantVectorStoreProviderSettings(
@@ -409,6 +400,14 @@ class ProviderConfigProfile(BaseDataclassEnum):
 
     def _telemetry_keys(self) -> None:
         return None
+
+    def _register_self(self, name: str) -> None:
+        from codeweaver.core.di.container import get_container
+
+        container = get_container()
+        container.register(
+            type(self), lambda: self, singleton=True, tags=frozenset({name, "profile"})
+        )
 
     def __and__(self, other: ProviderConfigProfile) -> ProviderConfigProfile:
         """Combine two provider config profiles."""
@@ -448,7 +447,7 @@ class ProviderProfile(ProviderConfigProfile, BaseDataclassEnum):
     )
     TESTING = ProviderConfigProfile(
         _get_profile("testing", vector_deployment="local"),
-        ("testing", "backup", "development", "lightweight", "dev"),
+        ("testing", "development", "lightweight", "dev"),
         "Optimized for testing and local development. Uses the lightest weight local models available, and an in-memory vector store with on-disk persistence. This profile is also used as CodeWeaver's backup when cloud providers are unavailable, ensuring reliable operation regardless of external service status with minimal resource usage.",
     )
     TESTING_DB = ProviderConfigProfile(
@@ -462,6 +461,11 @@ class ProviderProfile(ProviderConfigProfile, BaseDataclassEnum):
         },
         ("testing-db", "backup-db", "development-db", "lightweight-db", "dev-db"),
         "Testing profile with on-disk vector database. Similar to the testing profile, but uses a normal on-disk Qdrant vector store instead of an in-memory store. This allows for larger datasets and more persistent storage while still using lightweight local models for embeddings and rerankings.",
+    )
+    BACKUP = (
+        ProviderConfigProfile({**_get_profile("testing", vector_deployment="local")}),
+        ("backup", "local"),
+        "Backup provider settings profile. Uses the testing profile with local vector store as a fallback when other profiles are unavailable.",
     )
 
     @classmethod

@@ -108,10 +108,12 @@ class Depends:
     ```python "Simple Auto-Resolution"
     from codeweaver.core.di import INJECTED, dependency_provider
 
+
     @dependency_provider(scope="singleton")
     class ServiceProvider:
         def __init__(self):
             self.value = 42
+
 
     async def my_function(service: ServiceProvider = INJECTED) -> None:
         # service is automatically injected based on the type annotation
@@ -126,13 +128,15 @@ class Depends:
     from typing import Annotated
     from codeweaver.core.di import Depends, INJECTED, dependency_provider
 
+
     @dependency_provider(ServiceProvider)
     async def service_factory() -> ServiceProvider:
         # Custom initialization logic here
         return ServiceProvider()
 
+
     async def my_function(
-        service: Annotated[ServiceProvider, Depends(service_factory)] = INJECTED
+        service: Annotated[ServiceProvider, Depends(service_factory)] = INJECTED,
     ) -> None:
         print(service.value)
     ```
@@ -154,12 +158,12 @@ class Depends:
     # Function: new instance every time (no caching)
     type FunctionService = Annotated[Service, depends(scope="function")]
 
+
     async def handler(
         singleton: SingletonService = INJECTED,
         request: RequestService = INJECTED,
         fresh: FunctionService = INJECTED,
-    ) -> None:
-        ...
+    ) -> None: ...
     ```
 
     ## Type Aliases for Clean Code
@@ -178,6 +182,7 @@ class Depends:
 
     # Or with explicit behavior
     type RequestScopedService = Annotated[ServiceProvider, depends(scope="request")]
+
 
     async def my_function(service: RequestScopedService = INJECTED) -> None:
         # service will be injected with request scope

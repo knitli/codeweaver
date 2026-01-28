@@ -67,7 +67,6 @@ def get_checkpoint_settings_map(
     Note: This is a helper for the manager/checkpoint to use.
     It still needs access to the global settings to compute the hash.
 
-    # TODO: We're invalidating all checkpoints on any change in providers. If someone changes backup providers only, we're invalidating the primary too, and vice versa.
     # We could also consider vector store changes more carefully -- we can migrate vector stores without reindexing if needed.
     """
     from codeweaver.core import get_settings
