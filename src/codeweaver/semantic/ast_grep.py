@@ -114,6 +114,7 @@ from codeweaver.semantic.dependencies import ThingRegistryDep
 # Runtime imports needed for cast operations and type checking
 from codeweaver.semantic.grammar import Category, CompositeThing, Token
 
+
 # type-only imports
 if TYPE_CHECKING:
     from codeweaver.core import AnonymityConversion, DiscoveredFile, FilteredKey
@@ -289,7 +290,7 @@ class FileThing[SgRoot: (AstGrepRoot)](BasedModel):
         return Path(self._root.filename())
 
     @staticmethod
-    def _file_registry(registry: "SourceIdRegistryDep" = INJECTED) -> "SourceIdRegistry | None":  # type: ignore[name-defined]
+    def _file_registry(registry: SourceIdRegistryDep = INJECTED) -> SourceIdRegistry | None:  # type: ignore[name-defined]
         return registry
 
     @property
@@ -883,22 +884,41 @@ __all__ = (
 def _rebuild_models_with_ast_thing() -> None:
     """Rebuild Pydantic models that have forward references to AstThing.
 
-    This ensures that SemanticMetadata, CodeChunk, and related models can properly
-    validate their AstThing fields. Called automatically on module import.
+    This ensures that SemanticMetadata, CodeChunk, ChunkEmbeddings, and related models
+    can properly validate their AstThing fields. Called automatically on module import.
     """
     try:
+        from ast_grep_py import SgNode
+
         from codeweaver.core import CodeChunk
+        from codeweaver.core.types.embeddings import ChunkEmbeddings
         from codeweaver.semantic.types import SemanticMetadata
 
-        # Create namespace with all necessary types for forward reference resolution
+        # Import type annotations that AstThing uses (for computed fields)
+        try:
+            from codeweaver.semantic.classifications import AgentTask, ImportanceScores, ThingClass
+        except ImportError:
+            # These might not be available yet
+            AgentTask = None  # type: ignore
+            ImportanceScores = None  # type: ignore
+            ThingClass = None  # type: ignore
+
+        # Create comprehensive namespace with all types for forward reference resolution
         namespace = {
             "AstThing": AstThing,
             "FileThing": FileThing,
             "SemanticMetadata": SemanticMetadata,
             "CodeChunk": CodeChunk,
+            "ChunkEmbeddings": ChunkEmbeddings,
+            "SgNode": SgNode,
+            # Types used by AstThing computed fields
+            "ThingClass": ThingClass,
+            "ImportanceScores": ImportanceScores,
+            "AgentTask": AgentTask,
         }
 
-        for model in (FileThing, AstThing, SemanticMetadata, CodeChunk):
+        # Rebuild in dependency order: AstThing first, then dependent models
+        for model in (FileThing, AstThing, SemanticMetadata, CodeChunk, ChunkEmbeddings):
             try:
                 if model.__pydantic_complete__:
                     logger.debug("Model %s already complete, skipping rebuild", model.__name__)
@@ -916,7 +936,7 @@ def _rebuild_models_with_ast_thing() -> None:
                     "Error rebuilding model %s in ast_grep.py: %s",
                     model.__name__,
                     e,
-                    exc_info=True
+                    exc_info=True,
                 )
     except ImportError as e:
         logger.debug("Could not import models for rebuild (expected during early import): %s", e)

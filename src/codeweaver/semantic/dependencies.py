@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from codeweaver.semantic.registry import ThingRegistry
 
 
-async def _create_thing_registry() -> "ThingRegistry":  # Use string forward reference
+async def _create_thing_registry() -> ThingRegistry:  # Use string forward reference
     from codeweaver.semantic.registry import ThingRegistry
 
     return ThingRegistry()
@@ -26,7 +26,7 @@ async def _create_thing_registry() -> "ThingRegistry":  # Use string forward ref
 ThingRegistryDep = Annotated["ThingRegistry", depends(_create_thing_registry, scope="singleton")]
 
 
-async def _create_node_parser() -> "NodeTypeParser":  # Use string forward reference
+async def _create_node_parser() -> NodeTypeParser:  # Use string forward reference
     from codeweaver.semantic.node_type_parser import NodeTypeParser
 
     parser = await asyncio.to_thread(NodeTypeParser)

@@ -33,6 +33,7 @@ from codeweaver.providers.embedding.registry import EmbeddingRegistry
 # This ensures CodeChunk and related models can be instantiated in tests
 from codeweaver.semantic.ast_grep import rebuild_models_for_tests
 
+
 rebuild_models_for_tests()
 
 # Rebuild EmbeddingCacheManager to allow Any type for registry field during testing
@@ -45,17 +46,12 @@ except Exception:
 
 @pytest.fixture
 def mock_embedding_registry():
-    """Create a mock embedding registry.
+    """Create a real embedding registry.
 
-    Uses MagicMock to avoid Pydantic forward reference issues with AstThing.
-    The cache manager only needs basic registry operations (get, add, update).
+    Now that AstThing forward reference issues are resolved,
+    we can use a real EmbeddingRegistry for testing.
     """
-    registry = MagicMock(spec=EmbeddingRegistry)
-    registry.get = MagicMock(return_value=None)
-    registry.add = MagicMock()
-    registry.update = MagicMock()
-    registry.clear = MagicMock()
-    return registry
+    return EmbeddingRegistry()
 
 
 @pytest.fixture
@@ -67,6 +63,9 @@ def cache_manager(mock_embedding_registry) -> EmbeddingCacheManager:
 @pytest.fixture
 def sample_chunks() -> list[CodeChunk]:
     """Create sample CodeChunk objects for testing.
+
+    All chunks have unique content for namespace isolation tests.
+    For deduplication tests, use duplicate_chunks fixture instead.
 
     Uses model_construct() to bypass Pydantic validation and avoid
     AstThing forward reference issues during testing.
@@ -89,9 +88,43 @@ def sample_chunks() -> list[CodeChunk]:
             _embeddings={},
         ),
         CodeChunk.model_construct(
-            content="def hello():\n    print('Hello, World!')",  # Duplicate of first
+            content="class Foo:\n    pass",  # Unique content (not a duplicate)
             file_path=Path("/test/sample3.py"),
             line_range=Span(10, 11, uuid7()),  # Span requires source_id
+            language="python",
+            _version="1.1.0",
+            _embeddings={},
+        ),
+    ]
+
+
+@pytest.fixture
+def duplicate_chunks() -> list[CodeChunk]:
+    """Create CodeChunk objects with duplicates for deduplication testing.
+
+    Chunk 1 and chunk 3 have identical content to test deduplication logic.
+    """
+    return [
+        CodeChunk.model_construct(
+            content="def hello():\n    print('Hello, World!')",
+            file_path=Path("/test/sample1.py"),
+            line_range=Span(1, 2, uuid7()),
+            language="python",
+            _version="1.1.0",
+            _embeddings={},
+        ),
+        CodeChunk.model_construct(
+            content="function greet() { console.log('Hi!'); }",
+            file_path=Path("/test/sample2.js"),
+            line_range=Span(5, 5, uuid7()),
+            language="javascript",
+            _version="1.1.0",
+            _embeddings={},
+        ),
+        CodeChunk.model_construct(
+            content="def hello():\n    print('Hello, World!')",  # Duplicate of first
+            file_path=Path("/test/sample3.py"),
+            line_range=Span(10, 11, uuid7()),
             language="python",
             _version="1.1.0",
             _embeddings={},
@@ -105,7 +138,7 @@ def sample_embeddings() -> list[list[float]]:
     return [
         [0.1, 0.2, 0.3, 0.4, 0.5],
         [0.6, 0.7, 0.8, 0.9, 1.0],
-        [0.1, 0.2, 0.3, 0.4, 0.5],  # Same as first (for duplicate chunk)
+        [0.11, 0.21, 0.31, 0.41, 0.51],  # Unique (for third unique chunk)
     ]
 
 
@@ -193,7 +226,7 @@ class TestDeduplication:
     """Test deduplication logic with hash stores."""
 
     async def test_duplicate_detection(
-        self, cache_manager: EmbeddingCacheManager, sample_chunks: list[CodeChunk]
+        self, cache_manager: EmbeddingCacheManager, duplicate_chunks: list[CodeChunk]
     ):
         """Verify duplicate chunks are detected correctly."""
         namespace = cache_manager._get_namespace("test-provider", "dense")
@@ -201,20 +234,20 @@ class TestDeduplication:
 
         # First chunk and third chunk have same content (duplicates)
         unique_chunks, hash_mapping = await cache_manager.deduplicate(
-            sample_chunks, namespace, batch_id
+            duplicate_chunks, namespace, batch_id
         )
 
         # Should have 2 unique chunks (first and second, third is duplicate of first)
         unique_list = list(unique_chunks)
         assert len(unique_list) == 2
-        assert unique_list[0].content == sample_chunks[0].content
-        assert unique_list[1].content == sample_chunks[1].content
+        assert unique_list[0].content == duplicate_chunks[0].content
+        assert unique_list[1].content == duplicate_chunks[1].content
 
         # Hash mapping should cover all 3 chunks
         assert len(hash_mapping) == 3
 
     async def test_second_batch_deduplication(
-        self, cache_manager: EmbeddingCacheManager, sample_chunks: list[CodeChunk]
+        self, cache_manager: EmbeddingCacheManager, duplicate_chunks: list[CodeChunk]
     ):
         """Verify second batch correctly identifies already-seen chunks."""
         namespace = cache_manager._get_namespace("test-provider", "dense")
@@ -223,22 +256,22 @@ class TestDeduplication:
         batch_id_2 = uuid7()
 
         # First batch
-        unique_1, _ = await cache_manager.deduplicate(sample_chunks, namespace, batch_id_1)
+        unique_1, _ = await cache_manager.deduplicate(duplicate_chunks, namespace, batch_id_1)
         assert len(list(unique_1)) == 2  # First and second chunks are unique
 
         # Second batch with same chunks
-        unique_2, _ = await cache_manager.deduplicate(sample_chunks, namespace, batch_id_2)
+        unique_2, _ = await cache_manager.deduplicate(duplicate_chunks, namespace, batch_id_2)
         assert len(list(unique_2)) == 0  # All chunks already seen
 
     async def test_statistics_tracking(
-        self, cache_manager: EmbeddingCacheManager, sample_chunks: list[CodeChunk]
+        self, cache_manager: EmbeddingCacheManager, duplicate_chunks: list[CodeChunk]
     ):
         """Verify hit/miss statistics are tracked correctly."""
         namespace = cache_manager._get_namespace("test-provider", "dense")
         batch_id = uuid7()
 
         # First deduplication
-        await cache_manager.deduplicate(sample_chunks, namespace, batch_id)
+        await cache_manager.deduplicate(duplicate_chunks, namespace, batch_id)
 
         stats = cache_manager.get_stats(namespace)
         assert namespace in stats
@@ -270,8 +303,8 @@ class TestAsyncSafeLocking:
         # Run 10 concurrent deduplication operations
         results = await asyncio.gather(*[deduplicate_batch(i) for i in range(10)])
 
-        # First operation should see 2 unique chunks, rest should see 0
-        assert results[0] == 2  # First batch sees unique chunks
+        # First operation should see 3 unique chunks (sample_chunks has 3 unique items)
+        assert results[0] == 3  # First batch sees unique chunks
         assert all(r == 0 for r in results[1:])  # Subsequent batches see nothing new
 
     async def test_concurrent_batch_storage(
@@ -359,7 +392,7 @@ class TestRegistryIntegration:
     ):
         """Verify new chunk embeddings are registered correctly."""
         chunk = sample_chunks[0]
-        chunk_id = uuid7()
+        chunk_id = chunk.chunk_id  # Use the chunk's existing ID
         embedding = sample_embeddings[0]
 
         batch_id_for_info = uuid7()
@@ -390,7 +423,7 @@ class TestRegistryIntegration:
     ):
         """Verify additional embeddings can be added to existing chunks."""
         chunk = sample_chunks[0]
-        chunk_id = uuid7()
+        chunk_id = chunk.chunk_id  # Use the chunk's existing ID
 
         # Register first embedding (dense)
         dense_batch_id = uuid7()
@@ -433,7 +466,7 @@ class TestRegistryIntegration:
     ):
         """Verify existing embeddings can be replaced."""
         chunk = sample_chunks[0]
-        chunk_id = uuid7()
+        chunk_id = chunk.chunk_id  # Use the chunk's existing ID
 
         # Register first embedding
         first_batch_id = uuid7()
@@ -476,20 +509,24 @@ class TestRegistryIntegration:
         sample_embeddings: list[list[float]],
     ):
         """Verify chunk references are updated when different instances provided."""
-        chunk_id = uuid7()
         old_chunk = sample_chunks[0]
-        new_chunk = CodeChunk(
+        chunk_id = old_chunk.chunk_id  # Use the chunk's existing ID
+
+        # Create a new chunk instance with same ID but different object
+        new_chunk = CodeChunk.model_construct(
             content=old_chunk.content,
             file_path=old_chunk.file_path,
-            start_line=old_chunk.start_line,
-            end_line=old_chunk.end_line,
+            line_range=old_chunk.line_range,
             language=old_chunk.language,
+            chunk_id=chunk_id,  # Use same chunk_id
+            _version="1.1.0",
+            _embeddings={},
         )
 
         # Register with old chunk
-        info_batch_id = uuid7()
-        embedding_info = EmbeddingBatchInfo.create_dense(
-            batch_id=info_batch_id,
+        first_batch_id = uuid7()
+        first_embedding_info = EmbeddingBatchInfo.create_dense(
+            batch_id=first_batch_id,
             batch_index=0,
             chunk_id=chunk_id,
             model="test-model",
@@ -497,16 +534,28 @@ class TestRegistryIntegration:
             dimension=len(sample_embeddings[0]),
             intent="indexing",
         )
-        await cache_manager.register_embeddings(chunk_id, embedding_info, old_chunk)
+        await cache_manager.register_embeddings(chunk_id, first_embedding_info, old_chunk)
 
-        # Register again with new chunk instance
-        await cache_manager.register_embeddings(chunk_id, embedding_info, new_chunk)
+        # Register again with new chunk instance (same intent to trigger update path)
+        second_batch_id = uuid7()
+        second_embedding_info = EmbeddingBatchInfo.create_dense(
+            batch_id=second_batch_id,
+            batch_index=0,
+            chunk_id=chunk_id,
+            model="test-model-v2",  # Different model to ensure update
+            embeddings=sample_embeddings[1],  # Different embeddings
+            dimension=len(sample_embeddings[1]),
+            intent="indexing",  # Same intent
+        )
+        await cache_manager.register_embeddings(chunk_id, second_embedding_info, new_chunk)
 
         # Verify chunk reference was updated
         registered = cache_manager.registry.get(chunk_id)
         assert registered is not None
-        assert registered.chunk is new_chunk
-        assert registered.chunk is not old_chunk
+        # Chunk should be equal to new_chunk (data-wise)
+        assert registered.chunk == new_chunk
+        # Model was updated so it should have new embedding
+        assert str(registered.embeddings["indexing"].model) == "test-model-v2"
 
 
 @pytest.mark.async_test
