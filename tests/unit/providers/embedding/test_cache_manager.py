@@ -5,39 +5,35 @@
 
 """Comprehensive unit tests for EmbeddingCacheManager.
 
-NOTE: Tests are currently SKIPPED due to Pydantic forward reference issues.
-
-The entire test suite is blocked by a fundamental Pydantic model rebuild issue:
-- CodeChunk has a SemanticMetadata field
-- SemanticMetadata has an AstThing forward reference
-- Pydantic requires AstThing to be defined before instantiating CodeChunk
-- The model_rebuild() approach doesn't work because validation happens during __init__
-- Using model_construct() bypasses validation but encounters other issues (default factories)
-
-Resolution Required:
-1. Fix AstThing forward reference at the source (semantic module)
-2. Ensure all models properly rebuild with AstThing in namespace
-3. Alternative: Restructure to avoid forward references
-
-Related Issue:
-- src/codeweaver/core/chunks.py:185 has typo: `_source_id` should be `source_id`
-
-Once the forward reference issue is resolved, these tests can be uncommented and run.
+Tests cover all cache manager functionality:
+- Namespace isolation (dense/sparse, multiple providers)
+- Async-safe locking and concurrent operations
+- Deduplication logic with hash stores
+- Batch storage and retrieval
+- Registry integration (add, update, replace)
+- Statistics tracking
+- Namespace clearing
+- Edge cases (empty lists, single chunk)
 """
 
 import asyncio
+
 from pathlib import Path
-
-import pytest
-from pydantic import UUID7
-
 from typing import Any
 from unittest.mock import MagicMock
 
-from codeweaver.core import ChunkEmbeddings, CodeChunk, EmbeddingBatchInfo, uuid7
+import pytest
+
+from codeweaver.core import CodeChunk, EmbeddingBatchInfo, uuid7
 from codeweaver.core.spans import Span
 from codeweaver.providers.embedding.cache_manager import EmbeddingCacheManager
 from codeweaver.providers.embedding.registry import EmbeddingRegistry
+
+# Rebuild models to resolve AstThing forward references
+# This ensures CodeChunk and related models can be instantiated in tests
+from codeweaver.semantic.ast_grep import rebuild_models_for_tests
+
+rebuild_models_for_tests()
 
 # Rebuild EmbeddingCacheManager to allow Any type for registry field during testing
 # This lets us use Mock objects without Pydantic validation errors
@@ -45,9 +41,6 @@ try:
     EmbeddingCacheManager.model_rebuild(_types_namespace={"EmbeddingRegistry": Any})
 except Exception:
     pass  # Ignore rebuild errors in tests
-
-# Skip all tests in this module until AstThing forward reference is resolved
-pytestmark = pytest.mark.skip(reason="Blocked by AstThing forward reference issue in Pydantic models")
 
 
 @pytest.fixture
@@ -116,6 +109,9 @@ def sample_embeddings() -> list[list[float]]:
     ]
 
 
+@pytest.mark.async_test
+@pytest.mark.mock_only
+@pytest.mark.unit
 class TestNamespaceIsolation:
     """Test namespace isolation between different providers and embedding kinds."""
 
@@ -190,6 +186,9 @@ class TestNamespaceIsolation:
         assert stats[ns2]["total_chunks"] == 3
 
 
+@pytest.mark.async_test
+@pytest.mark.mock_only
+@pytest.mark.unit
 class TestDeduplication:
     """Test deduplication logic with hash stores."""
 
@@ -249,6 +248,9 @@ class TestDeduplication:
         assert stats[namespace]["total_chunks"] == 3
 
 
+@pytest.mark.async_test
+@pytest.mark.mock_only
+@pytest.mark.unit
 class TestAsyncSafeLocking:
     """Test async-safe locking behavior during concurrent operations."""
 
@@ -293,6 +295,9 @@ class TestAsyncSafeLocking:
             assert len(retrieved) == 2
 
 
+@pytest.mark.async_test
+@pytest.mark.mock_only
+@pytest.mark.unit
 class TestBatchStorage:
     """Test batch storage and retrieval functionality."""
 
@@ -340,6 +345,9 @@ class TestBatchStorage:
         assert retrieved_ns1 is not None
 
 
+@pytest.mark.async_test
+@pytest.mark.mock_only
+@pytest.mark.unit
 class TestRegistryIntegration:
     """Test integration with global embedding registry."""
 
@@ -501,6 +509,9 @@ class TestRegistryIntegration:
         assert registered.chunk is not old_chunk
 
 
+@pytest.mark.async_test
+@pytest.mark.mock_only
+@pytest.mark.unit
 class TestStatistics:
     """Test statistics tracking functionality."""
 
@@ -537,6 +548,9 @@ class TestStatistics:
         assert ns2 not in ns1_stats
 
 
+@pytest.mark.async_test
+@pytest.mark.mock_only
+@pytest.mark.unit
 class TestNamespaceClearing:
     """Test clear_namespace functionality."""
 
@@ -588,6 +602,9 @@ class TestNamespaceClearing:
         assert cache_manager.get_batch(batch_id_2, ns2) is not None
 
 
+@pytest.mark.async_test
+@pytest.mark.mock_only
+@pytest.mark.unit
 class TestEdgeCases:
     """Test edge cases and error conditions."""
 

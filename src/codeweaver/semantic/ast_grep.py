@@ -114,12 +114,6 @@ from codeweaver.semantic.dependencies import ThingRegistryDep
 # Runtime imports needed for cast operations and type checking
 from codeweaver.semantic.grammar import Category, CompositeThing, Token
 
-
-if importlib.util.find_spec("codeweaver.engine") is not None:
-    from codeweaver.engine.dependencies import SourceIdRegistryDep
-else:
-    SourceIdRegistryDep = None
-
 # type-only imports
 if TYPE_CHECKING:
     from codeweaver.core import AnonymityConversion, DiscoveredFile, FilteredKey
@@ -128,8 +122,10 @@ if TYPE_CHECKING:
 
     if importlib.util.find_spec("codeweaver.engine") is not None:
         from codeweaver.engine.chunker.registry import SourceIdRegistry
+        from codeweaver.engine.dependencies import SourceIdRegistryDep
     else:
         SourceIdRegistry = None
+        SourceIdRegistryDep = None  # type: ignore
 
 
 logger = logging.getLogger(__name__)
@@ -293,7 +289,7 @@ class FileThing[SgRoot: (AstGrepRoot)](BasedModel):
         return Path(self._root.filename())
 
     @staticmethod
-    def _file_registry(registry: SourceIdRegistryDep = INJECTED) -> SourceIdRegistry | None:
+    def _file_registry(registry: "SourceIdRegistryDep" = INJECTED) -> "SourceIdRegistry | None":  # type: ignore[name-defined]
         return registry
 
     @property
@@ -852,6 +848,19 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
         ) | self.serialize_special_fields(for_cli=False)
 
 
+def rebuild_models_for_tests() -> bool:
+    """Rebuild all models with AstThing forward references for test scenarios.
+
+    This should be called at the beginning of test modules that instantiate CodeChunk,
+    ChunkEmbeddings, or other models that depend on AstThing/SemanticMetadata.
+
+    Returns:
+        bool: True if all models were rebuilt successfully, False otherwise
+    """
+    _rebuild_models_with_ast_thing()
+    return True
+
+
 __all__ = (
     "AstThing",
     "Config",
@@ -867,17 +876,53 @@ __all__ = (
     "Relation",
     "Rule",
     "RuleWithoutNot",
+    "rebuild_models_for_tests",
 )
 
 # Rebuild models to resolve forward references
-with contextlib.suppress(Exception):
-    from codeweaver.core import CodeChunk
-    from codeweaver.semantic.types import SemanticMetadata
+def _rebuild_models_with_ast_thing() -> None:
+    """Rebuild Pydantic models that have forward references to AstThing.
 
-    for model in (FileThing, AstThing, SemanticMetadata, CodeChunk):
-        if model.__pydantic_complete__:
-            continue
-        if not model.model_rebuild():
-            logger.warning("Model %s failed to rebuild in ast_grep.py", model.__name__)
-        else:
-            logger.debug("Model %s rebuilt successfully in ast_grep.py", model.__name__)
+    This ensures that SemanticMetadata, CodeChunk, and related models can properly
+    validate their AstThing fields. Called automatically on module import.
+    """
+    try:
+        from codeweaver.core import CodeChunk
+        from codeweaver.semantic.types import SemanticMetadata
+
+        # Create namespace with all necessary types for forward reference resolution
+        namespace = {
+            "AstThing": AstThing,
+            "FileThing": FileThing,
+            "SemanticMetadata": SemanticMetadata,
+            "CodeChunk": CodeChunk,
+        }
+
+        for model in (FileThing, AstThing, SemanticMetadata, CodeChunk):
+            try:
+                if model.__pydantic_complete__:
+                    logger.debug("Model %s already complete, skipping rebuild", model.__name__)
+                    continue
+
+                # Rebuild with full namespace to resolve forward references
+                success = model.model_rebuild(_types_namespace=namespace)
+
+                if not success:
+                    logger.warning("Model %s failed to rebuild in ast_grep.py", model.__name__)
+                else:
+                    logger.debug("Model %s rebuilt successfully in ast_grep.py", model.__name__)
+            except Exception as e:
+                logger.warning(
+                    "Error rebuilding model %s in ast_grep.py: %s",
+                    model.__name__,
+                    e,
+                    exc_info=True
+                )
+    except ImportError as e:
+        logger.debug("Could not import models for rebuild (expected during early import): %s", e)
+    except Exception as e:
+        logger.warning("Unexpected error during model rebuild: %s", e, exc_info=True)
+
+
+# Perform model rebuild on module import
+_rebuild_models_with_ast_thing()

@@ -261,7 +261,9 @@ class SemanticMetadata(BasedModel):
         SemanticSearchLanguage | LanguageNameT,
         Field(description="""The programming language of the code chunk"""),
     ]
-    thing: AstThing[SgNode]
+    # Use string forward reference to avoid circular import issues
+    # This will be resolved during model_rebuild() with proper namespace
+    thing: "AstThing[SgNode]"  # type: ignore[name-defined]
     positional_connections: Any = ()  # tuple[AstThing[SgNode], ...]
     symbol: Annotated[
         str | None,

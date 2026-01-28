@@ -249,7 +249,7 @@ class EmbeddingCacheManager(BasedModel):
             embedding_info: Batch information with embeddings
             chunk: The CodeChunk object to store
         """
-        from codeweaver.providers.embedding.types import ChunkEmbeddings
+        from codeweaver.core.types.embeddings import ChunkEmbeddings
 
         # Registry is dict-like, handles its own locking
         if (registered := self.registry.get(chunk_id)) is not None:

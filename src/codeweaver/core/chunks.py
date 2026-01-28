@@ -182,7 +182,7 @@ class CodeChunk(BasedModel):
     )
 
     parent_id: UUID7 | None = Field(
-        default_factory=lambda data: data["line_range"]._source_id,
+        default_factory=lambda data: data["line_range"].source_id,
         description="The source ID of the parent file or chunk.",
     )
     # Vector storage fields
