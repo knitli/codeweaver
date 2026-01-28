@@ -536,7 +536,7 @@ async def test_retry_with_exponential_backoff():
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_graceful_shutdown_with_checkpoint(initialize_test_settings, clean_container):
+async def test_graceful_shutdown_with_checkpoint(initialize_test_settings, clean_container, tmp_path: Path):
     """T013: Server saves checkpoint on graceful shutdown.
 
     Given: Indexing in progress
@@ -549,44 +549,43 @@ async def test_graceful_shutdown_with_checkpoint(initialize_test_settings, clean
     from codeweaver.engine import CheckpointManager, IndexingService
     from codeweaver.server import CodeWeaverSettings
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        project_root = Path(tmpdir)
-        (project_root / "test.py").write_text("def test(): pass")
+    project_root = tmp_path / "test_project"
+    (project_root / "test.py").write_text("def test(): pass")
 
-        # Configure settings for this test
-        async def get_test_settings() -> CodeWeaverSettings:
-            from codeweaver.server import get_settings
+    # Configure settings for this test
+    async def get_test_settings() -> CodeWeaverSettings:
+        from codeweaver.server import get_settings
 
-            settings = get_settings()
-            settings.project_path = project_root
-            return settings
+        settings = get_settings()
+        settings.project_path = project_root
+        return settings
 
-        clean_container.override(CodeWeaverSettings, get_test_settings)
+    clean_container.override(CodeWeaverSettings, get_test_settings)
 
-        # Resolve Indexer via DI
-        indexer = await clean_container.resolve(IndexingService)
-        # indexer._providers_initialized = True
+    # Resolve Indexer via DI
+    indexer = await clean_container.resolve(IndexingService)
+    # indexer._providers_initialized = True
 
-        # Start indexing
-        # Note: we need to ensure walker settings are present on the indexer instance
-        # indexer._walker_settings = {"path": str(project_root)}
+    # Start indexing
+    # Note: we need to ensure walker settings are present on the indexer instance
+    # indexer._walker_settings = {"path": str(project_root)}
 
-        await indexer.index_project(force_reindex=True)
+    await indexer.index_project(force_reindex=True)
 
-        # Simulate SIGTERM by calling signal handler
-        # Note: Actual signal testing requires special setup
-        # if hasattr(indexer, "_handle_shutdown") and callable(indexer._handle_shutdown):
-        #     indexer._handle_shutdown()
-        checkpoint_dir = tmp_path / ".checkpoints"
-        # Verify checkpoint exists
-        checkpoint_mgr = CheckpointManager(
-            project_path=project_root, checkpoint_dir=checkpoint_dir, project_name="test_project"
-        )
-        checkpoint_file = checkpoint_mgr.checkpoint_file
+    # Simulate SIGTERM by calling signal handler
+    # Note: Actual signal testing requires special setup
+    # if hasattr(indexer, "_handle_shutdown") and callable(indexer._handle_shutdown):
+    #     indexer._handle_shutdown()
+    checkpoint_dir = tmp_path / ".checkpoints"
+    # Verify checkpoint exists
+    checkpoint_mgr = CheckpointManager(
+        project_path=project_root, checkpoint_dir=checkpoint_dir, project_name="test_project"
+    )
+    checkpoint_file = checkpoint_mgr.checkpoint_file
 
-        # Note: Checkpoint may not exist if indexing completed
-        # This test validates the mechanism exists
-        assert checkpoint_file.parent.exists()
+    # Note: Checkpoint may not exist if indexing completed
+    # This test validates the mechanism exists
+    assert checkpoint_file.parent.exists()
 
 
 @pytest.mark.integration

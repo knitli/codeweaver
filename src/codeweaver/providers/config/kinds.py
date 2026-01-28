@@ -1220,16 +1220,14 @@ class AgentProviderSettings(BaseProviderSettings):
 
 
 # Rebuild models to resolve forward references from httpx after all classes are defined
-try:
+with contextlib.suppress(Exception):
     # Rebuild client options and provider settings models
     from codeweaver.providers.config.clients import QdrantClientOptions
 
     QdrantClientOptions.model_rebuild()
     # Note: Don't rebuild QdrantVectorStoreProviderSettings here as it may not work
     # The initialization will handle validation
-except Exception:
-    # Forward reference resolution may fail in some contexts, that's OK
-    pass
+
 
 __all__ = (
     "AgentProviderSettings",

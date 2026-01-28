@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 
 from abc import ABC, abstractmethod
@@ -86,19 +87,14 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
             # Try to get failover settings from DI container
             failover_settings = None
             failover_detector = None
-            try:
+            with contextlib.suppress(Exception):
                 from codeweaver.core.di import get_container
                 from codeweaver.engine.config import FailoverSettings
                 from codeweaver.engine.config.failover_detector import FailoverDetector
 
                 container = get_container()
                 failover_settings = container.resolve_sync(FailoverSettings)
-                try:
-                    failover_detector = container.resolve_sync(FailoverDetector)
-                except Exception:
-                    pass  # Detector is optional
-            except Exception:
-                pass  # DI not available, use None
+                failover_detector = container.resolve_sync(FailoverDetector)
 
             self._service = QdrantVectorStoreService(
                 settings=self.config,

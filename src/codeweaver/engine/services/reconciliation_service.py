@@ -133,11 +133,12 @@ class VectorReconciliationService:
             logger.info(
                 "Detection complete: found %d points missing backup vectors", len(missing_ids)
             )
-            return missing_ids
 
         except Exception as e:
-            logger.exception("Error detecting missing vectors: %s", e)
+            logger.warning("Error detecting missing vectors: %s", e)
             raise
+        else:
+            return missing_ids
 
     def _has_backup_vector(self, point: qmodels.Record) -> bool:
         """Check if a point has a backup vector.
@@ -311,7 +312,7 @@ class VectorReconciliationService:
         return batch_stats
 
     async def reconcile(
-        self, collection_name: str, auto_repair: bool = True, detection_limit: int | None = None
+        self, collection_name: str, *, auto_repair: bool = True, detection_limit: int | None = None
     ) -> dict[str, Any]:
         """Perform full reconciliation: detect and optionally repair missing vectors.
 

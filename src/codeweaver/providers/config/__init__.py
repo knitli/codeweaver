@@ -9,6 +9,11 @@ from codeweaver.core.utils.lazy_importer import create_lazy_getattr
 
 
 if TYPE_CHECKING:
+    from codeweaver.providers.config.backup_models import (
+        BACKUP_MODEL_FALLBACK,
+        BACKUP_MODEL_PRIMARY,
+        get_backup_embedding_provider,
+    )
     from codeweaver.providers.config.clients import (
         BedrockClientOptions,
         ClientOptions,
@@ -107,6 +112,8 @@ if TYPE_CHECKING:
     from codeweaver.providers.config.types import CohereRequestOptionsDict, HttpxClientParams
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
+    "BACKUP_MODEL_PRIMARY": (__spec__.parent, "backup_models"),
+    "BACKUP_MODEL_FALLBACK": (__spec__.parent, "backup_models"),
     "DATATYPE_FIELDS": (__spec__.parent, "embedding"),
     "DIMENSION_FIELDS": (__spec__.parent, "embedding"),
     "HAS_ANTHROPIC": (__spec__.parent, "providers"),
@@ -195,12 +202,15 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "VoyageRerankingConfig": (__spec__.parent, "reranking"),
     "VoyageRerankingOptionsDict": (__spec__.parent, "reranking"),
     "discriminate_azure_embedding_client_options": (__spec__.parent, "clients"),
+    "get_backup_embedding_provider": (__spec__.parent, "backup_models"),
     "merge_agent_model_settings": (__spec__.parent, "providers"),
 })
 
 __getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
 
 __all__ = (
+    "BACKUP_MODEL_FALLBACK",
+    "BACKUP_MODEL_PRIMARY",
     "DATATYPE_FIELDS",
     "DIMENSION_FIELDS",
     "HAS_ANTHROPIC",
@@ -290,6 +300,7 @@ __all__ = (
     "VoyageRerankingConfig",
     "VoyageRerankingOptionsDict",
     "discriminate_azure_embedding_client_options",
+    "get_backup_embedding_provider",
     "merge_agent_model_settings",
 )
 

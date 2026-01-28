@@ -3,6 +3,7 @@
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
 # sourcery skip: comment:docstrings-for-functions
+# ruff: noqa: N806
 """Custom wrappers around ast-grep's core types to add functionality and serialization.
 
 Like the rest of CodeWeaver, we use our specific vocabulary for concepts to make roles and relationships more clear. See [codeweaver.semantic.grammar_things] for more details.

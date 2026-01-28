@@ -216,7 +216,7 @@ class TestCompleteBackupMaintenanceCycle:
         # Make reconciliation fail
         async def failing_reconciliation():
             operations_completed.append("reconciliation_attempted")
-            raise Exception("Reconciliation failed")
+            raise Exception("Reconciliation failed")  # noqa: TRY002
 
         async def track_snapshot():
             operations_completed.append("snapshot")

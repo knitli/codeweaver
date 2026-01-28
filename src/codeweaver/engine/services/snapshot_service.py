@@ -75,7 +75,7 @@ class QdrantSnapshotBackupService:
         # Ensure storage directory exists
         self.storage_path.mkdir(parents=True, exist_ok=True)
 
-    async def create_snapshot(self, wait: bool = True) -> str | None:
+    async def create_snapshot(self, *, wait: bool = True) -> str | None:
         """Create a new snapshot of the collection.
 
         Args:
@@ -109,26 +109,27 @@ class QdrantSnapshotBackupService:
                 await self._wait_for_snapshot(snapshot_name)
 
             logger.info("Successfully created snapshot: %s", snapshot_name)
-            return snapshot_name
 
         except Exception as e:
-            logger.exception(
+            logger.warning(
                 "Failed to create snapshot for collection %s: %s", self.collection_name, e
             )
             return None
+        else:
+            return snapshot_name
 
-    async def _wait_for_snapshot(self, snapshot_name: str, timeout: int = 60) -> bool:
+    async def _wait_for_snapshot(self, snapshot_name: str, timeout_seconds: int = 60) -> bool:
         """Wait for snapshot creation to complete.
 
         Args:
             snapshot_name: Name of the snapshot to wait for
-            timeout: Maximum wait time in seconds
+            timeout_seconds: Maximum wait time in seconds
 
         Returns:
             True if snapshot is ready, False if timeout or error
         """
         start_time = datetime.now(UTC)
-        while (datetime.now(UTC) - start_time).total_seconds() < timeout:
+        while (datetime.now(UTC) - start_time).total_seconds() < timeout_seconds:
             try:
                 # Check if snapshot exists by listing snapshots
                 snapshots = await asyncio.to_thread(
@@ -171,7 +172,7 @@ class QdrantSnapshotBackupService:
             ]
 
         except Exception as e:
-            logger.exception("Failed to list snapshots: %s", e)
+            logger.warning("Failed to list snapshots: %s", e)
             return []
 
     async def delete_snapshot(self, snapshot_name: str) -> bool:
@@ -190,11 +191,11 @@ class QdrantSnapshotBackupService:
                 snapshot_name=snapshot_name,
             )
             logger.info("Deleted snapshot: %s", snapshot_name)
-            return True
-
         except Exception as e:
             logger.warning("Failed to delete snapshot %s: %s", snapshot_name, e)
             return False
+        else:
+            return True
 
     async def cleanup_old_snapshots(self) -> dict[str, Any]:
         """Delete old snapshots beyond retention count.
@@ -256,13 +257,13 @@ class QdrantSnapshotBackupService:
                 stats["failed"],
             )
 
+        except Exception as e:
+            logger.warning("Snapshot cleanup failed: %s", e, exc_info=True)
+            return {"total": 0, "kept": 0, "deleted": 0, "failed": 0}
+        else:
             return stats
 
-        except Exception as e:
-            logger.error("Snapshot cleanup failed: %s", e, exc_info=True)
-            return {"total": 0, "kept": 0, "deleted": 0, "failed": 0}
-
-    async def restore_snapshot(self, snapshot_name: str, wait: bool = True) -> bool:
+    async def restore_snapshot(self, snapshot_name: str, *, wait: bool = True) -> bool:
         """Restore the collection from a snapshot.
 
         WARNING: This operation replaces the entire collection with the snapshot state.
@@ -297,10 +298,9 @@ class QdrantSnapshotBackupService:
                 self.collection_name,
                 snapshot_name,
             )
-            return True
 
         except Exception as e:
-            logger.error(
+            logger.warning(
                 "Failed to restore snapshot %s for collection %s: %s",
                 snapshot_name,
                 self.collection_name,
@@ -308,6 +308,8 @@ class QdrantSnapshotBackupService:
                 exc_info=True,
             )
             return False
+        else:
+            return True
 
     async def get_latest_snapshot(self) -> dict[str, Any] | None:
         """Get metadata for the most recent snapshot.
@@ -322,7 +324,7 @@ class QdrantSnapshotBackupService:
         # Sort by creation time and return the newest
         return max(snapshots, key=lambda s: s.get("created_at", ""))
 
-    async def snapshot_and_cleanup(self, wait: bool = False) -> dict[str, Any]:
+    async def snapshot_and_cleanup(self, *, wait: bool = False) -> dict[str, Any]:
         """Create a new snapshot and clean up old ones.
 
         This is the main method for periodic snapshot maintenance.

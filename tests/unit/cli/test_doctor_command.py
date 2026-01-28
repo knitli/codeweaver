@@ -21,6 +21,7 @@ import pytest
 
 from codeweaver.cli import app as doctor_app
 from codeweaver.core import CodeWeaverCoreSettings, Provider, SentinelName, Unset
+from codeweaver.server.config import CodeWeaverSettings
 
 
 @pytest.fixture
