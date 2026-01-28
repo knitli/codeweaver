@@ -51,13 +51,8 @@ class ChunkingService:
         force_parallel: bool = False,
         source_chunks: dict[Path, list[CodeChunk]] | None = None,
     ) -> Iterator[tuple[Path, list[CodeChunk]]]:
-        """Chunk multiple files with optional smart reuse for backup scenarios."""
+        """Chunk multiple files with optional parallel processing."""
         if not files:
-            return
-
-        # If backup and source chunks provided, attempt smart reuse
-        if source_chunks and self._is_backup_service():
-            yield from self._chunk_with_reuse(files, source_chunks)
             return
 
         # Normal chunking logic
@@ -73,30 +68,6 @@ class ChunkingService:
             )
         else:
             yield from self._chunk_sequential(files)
-
-    def _chunk_with_reuse(
-        self, files: list[DiscoveredFile], source_chunks: dict[Path, list[CodeChunk]]
-    ) -> Iterator[tuple[Path, list[CodeChunk]]]:
-        """Smart reuse logic for backup scenarios."""
-        for file in files:
-            chunks = source_chunks.get(file.path)
-            if self._can_reuse_chunks(chunks):
-                logger.debug("Reusing chunks for %s", file.path)
-                yield (file.path, chunks)  # type: ignore
-            else:
-                yield from self._chunk_sequential([file])
-
-    def can_reuse_chunks(self, chunks: list[CodeChunk] | None) -> bool:
-        """Check if existing chunks fit in backup model context (public API)."""
-        return self._can_reuse_chunks(chunks)
-
-    def _can_reuse_chunks(self, chunks: list[CodeChunk] | None) -> bool:
-        """Check if existing chunks fit in backup model context."""
-        if not chunks:
-            return False
-
-        max_tokens = self.governor.max_chunk_tokens
-        return all(self.tokenizer.count_tokens(chunk.content) <= max_tokens for chunk in chunks)
 
     def _chunk_sequential(
         self, files: list[DiscoveredFile]

@@ -41,39 +41,37 @@ class FailoverService:
         primary_store: VectorStoreProvider | None,
         backup_store: VectorStoreProvider | None,
         indexing_service: IndexingService,
-        backup_indexing_service: IndexingService,
         settings: FailoverSettings,
     ):
-        """Initialize failover service with required dependencies."""
+        """Initialize failover service with required dependencies.
+
+        Note: backup_indexing_service removed in Phase 2 - new multi-vector approach
+        handles backup embeddings as additional vectors on same points.
+        """
         self.primary_store = primary_store
         self.backup_store = backup_store
         self.indexing_service = indexing_service
-        self.backup_indexing_service = backup_indexing_service
         self.settings = settings
 
         # State
         self._active_store: VectorStoreProvider | None = primary_store
         self._failover_active = False
         self._monitor_task: asyncio.Task | None = None
-        self._backup_maintenance_task: asyncio.Task | None = None
         self._failover_time: datetime | None = None
-        self._maintenance_cycle_count = 0  # Track cycles for reconciliation
-        self._snapshot_cycle_count = (
-            0  # Track cycles for snapshot creation  # Track cycles for reconciliation
-        )
 
     async def start_monitoring(self) -> None:
-        """Start health monitoring, automatic failover, and backup maintenance."""
+        """Start health monitoring and automatic failover.
+
+        Note: Backup maintenance removed in Phase 2 - new three-phase maintenance loop
+        (in indexing service) handles vector reconciliation and snapshots.
+        """
         if self.settings.disable_failover or not self.primary_store:
             return
 
         self._monitor_task = asyncio.create_task(
             self._monitor_health(), name="failover_health_monitor"
         )
-        self._backup_maintenance_task = asyncio.create_task(
-            self._maintain_backup_loop(), name="backup_maintenance_loop"
-        )
-        logger.info("Failover health monitoring and backup maintenance started")
+        logger.info("Failover health monitoring started")
 
     async def _monitor_health(self) -> None:
         """Monitor primary store health."""
@@ -96,52 +94,6 @@ class FailoverService:
                 break
             except Exception:
                 logger.warning("Error in failover health monitor", exc_info=True)
-
-    async def _maintain_backup_loop(self) -> None:
-        """Periodically sync the backup store, run vector reconciliation, and create snapshots.
-
-        This method runs on a regular interval (backup_sync) and performs three main tasks:
-        1. Backup indexing - sync primary state to backup store
-        2. Vector reconciliation - ensure all points have backup vectors (every N cycles)
-        3. Snapshot creation - create and manage snapshots for disaster recovery (every M cycles)
-        """
-        while True:
-            try:
-                # Sync interval from settings (default 5 mins)
-                await asyncio.sleep(self.settings.backup_sync)
-
-                # Only run if not currently failing over (if failover is active, backup is live anyway)
-                if not self._failover_active and self.backup_store:
-                    # Use very low priority for background maintenance
-                    with very_low_priority():
-                        # 1. Regular backup indexing
-                        # We use index_project() on the backup service.
-                        # It respects the shared file manifest, so it only indexes what needs indexing.
-                        # Since it uses backup embedding models (via its own dependencies),
-                        # it creates backup-compatible chunks/embeddings.
-                        await self.backup_indexing_service.index_project()
-
-                        # Increment cycle counters
-                        self._maintenance_cycle_count += 1
-                        self._snapshot_cycle_count += 1
-
-                        # 2. Vector reconciliation (every N cycles)
-                        if (
-                            self._maintenance_cycle_count
-                            >= self.settings.reconciliation_interval_cycles
-                        ):
-                            await self._run_reconciliation()
-                            self._maintenance_cycle_count = 0  # Reset counter
-
-                        # 3. Snapshot creation (every M cycles)
-                        if self._snapshot_cycle_count >= self.settings.snapshot_interval_cycles:
-                            await self._run_snapshot_maintenance()
-                            self._snapshot_cycle_count = 0  # Reset counter
-
-            except asyncio.CancelledError:
-                break
-            except Exception:
-                logger.warning("Error in backup maintenance loop", exc_info=True)
 
     async def _run_reconciliation(self) -> None:
         """Run vector reconciliation to ensure all points have backup vectors.

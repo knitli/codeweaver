@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 
-from typing import Literal, cast, overload
+from typing import cast
 
 from pydantic import UUID7
 
@@ -43,10 +43,7 @@ class EmbeddingRegistry(UUIDStore[ChunkEmbeddings]):
 
     """
 
-    is_backup_provider: bool = False
-    """Indicates whether this registry is for a backup embedding provider."""
-
-    def __init__(self, *, size_limit: int = 100 * ONE_MB, is_backup_provider: bool = False) -> None:
+    def __init__(self, *, size_limit: int = 100 * ONE_MB) -> None:
         """Initialize the EmbeddingRegistry with a size limit.
 
         Args:
@@ -59,7 +56,6 @@ class EmbeddingRegistry(UUIDStore[ChunkEmbeddings]):
             container.register(type(self), lambda: self, singleton=True)
         except Exception as e:
             logger.warning("Failed to get DI container: %s", e)
-        self.is_backup_provider = is_backup_provider
         super().__init__(size_limit=size_limit, _value_type=ChunkEmbeddings)
 
     @property
@@ -143,20 +139,7 @@ class EmbeddingRegistry(UUIDStore[ChunkEmbeddings]):
             ) from e
 
 
-class BackupEmbeddingRegistry(EmbeddingRegistry):
-    """
-    A backup embedding registry for use with backup embedding providers.
-
-    This class is identical to `EmbeddingRegistry` but is used to differentiate between primary and backup embedding stores.
-    """
-
-    def __init__(
-        self, *, size_limit: int = 100 * ONE_MB, is_backup_provider: Literal[True] = True
-    ) -> None:
-        super().__init__(size_limit=size_limit, is_backup_provider=is_backup_provider)
-
-
-def _rebuild_store(store: type[EmbeddingRegistry | BackupEmbeddingRegistry]) -> None:
+def _rebuild_store(store: type[EmbeddingRegistry]) -> None:
     """Rebuild the given UUIDStore to ensure proper initialization after model changes."""
     if not store.__pydantic_complete__:
         # We need CodeChunk in the namespace for the rebuild
@@ -165,34 +148,26 @@ def _rebuild_store(store: type[EmbeddingRegistry | BackupEmbeddingRegistry]) -> 
         store.model_rebuild()
 
 
-@overload
-def get_embedding_registry(*, backup: bool = False) -> EmbeddingRegistry: ...
+def get_embedding_registry(*, backup: bool = False) -> EmbeddingRegistry:
+    """Get the global EmbeddingRegistry instance, creating it if it doesn't exist.
 
-
-@overload
-def get_embedding_registry(*, backup: Literal[True]) -> BackupEmbeddingRegistry: ...
-
-
-def get_embedding_registry(*, backup: bool = False) -> EmbeddingRegistry | BackupEmbeddingRegistry:
-    """Get the global EmbeddingRegistry instance, creating it if it doesn't exist."""
-    _rebuild_store(BackupEmbeddingRegistry if backup else EmbeddingRegistry)
-    return (
-        BackupEmbeddingRegistry(is_backup_provider=True)
-        if backup
-        else EmbeddingRegistry(is_backup_provider=False)
-    )
+    Note: The backup parameter is now deprecated and ignored. With the new multi-vector
+    approach, backup embeddings are stored as additional vectors on the same points.
+    This function always returns the main registry.
+    """
+    if backup:
+        logger.warning(
+            "backup parameter is deprecated - new system uses multi-vector approach. "
+            "Returning main registry."
+        )
+    _rebuild_store(EmbeddingRegistry)
+    return EmbeddingRegistry()
 
 
 @dependency_provider(EmbeddingRegistry, scope="singleton", module=__name__)
 def _get_main_registry() -> EmbeddingRegistry:
     """Get the main EmbeddingRegistry instance."""
     return get_embedding_registry(backup=False)
-
-
-@dependency_provider(BackupEmbeddingRegistry, scope="singleton", module=__name__)
-def _get_backup_registry() -> BackupEmbeddingRegistry:
-    """Get the backup EmbeddingRegistry instance."""
-    return get_embedding_registry(backup=True)  # ty:ignore[invalid-return-type]
 
 
 __all__ = ("EmbeddingRegistry", "get_embedding_registry")
