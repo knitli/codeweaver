@@ -538,7 +538,7 @@ class BedrockEmbeddingProvider(EmbeddingProvider[BedrockRuntimeClient]):
             else [],
         )
 
-    def _create_cohere_request(
+    async def _create_cohere_request(
         self,
         inputs: Sequence[CodeChunk] | Sequence[str],
         kind: Literal["documents", "query"],
@@ -551,7 +551,7 @@ class BedrockEmbeddingProvider(EmbeddingProvider[BedrockRuntimeClient]):
             else {}
         ) | (cast(dict[str, Any], kwargs).get("body", {}) if kwargs else {})
         if kind == "documents":
-            texts = [self._process_input(doc)[0] for doc in inputs]
+            texts = [(await self._process_input(doc))[0] for doc in inputs]
             texts = self.chunks_to_strings([subitem for item in texts for subitem in item])
         else:
             texts = inputs
@@ -567,7 +567,7 @@ class BedrockEmbeddingProvider(EmbeddingProvider[BedrockRuntimeClient]):
         })
         return InvokeRequestDict(**dict(request.model_dump(by_alias=True)))  # ty: ignore[missing-typed-dict-key]
 
-    def _create_titan_request(
+    async def _create_titan_request(
         self,
         inputs: Sequence[CodeChunk] | Sequence[str],
         kind: Literal["documents", "query"],
@@ -586,7 +586,7 @@ class BedrockEmbeddingProvider(EmbeddingProvider[BedrockRuntimeClient]):
             else {}
         ) | (cast(dict[str, Any], kwargs).get("body", {}) if kwargs else {})
         if kind == "documents":
-            text = self._process_input(inputs)
+            text = await self._process_input(inputs)
             processed = CodeChunk.dechunkify(text[0])
         else:
             processed = cast(Sequence[str], inputs)
@@ -623,7 +623,7 @@ class BedrockEmbeddingProvider(EmbeddingProvider[BedrockRuntimeClient]):
             ])
         return [InvokeRequestDict(**dict(req.model_dump(by_alias=True))) for req in requests]  # ty: ignore[missing-typed-dict-key]
 
-    def _create_request(
+    async def _create_request(
         self,
         inputs: Sequence[CodeChunk] | Sequence[str],
         kind: Literal["documents", "query"],
@@ -631,8 +631,8 @@ class BedrockEmbeddingProvider(EmbeddingProvider[BedrockRuntimeClient]):
     ) -> list[InvokeRequestDict] | InvokeRequestDict:
         """Create the Bedrock embedding request."""
         if "cohere" in self.config.model_name.lower():
-            return self._create_cohere_request(inputs, kind, **kwargs)
-        return self._create_titan_request(inputs, kind, **kwargs)
+            return await self._create_cohere_request(inputs, kind, **kwargs)
+        return await self._create_titan_request(inputs, kind, **kwargs)
 
     async def _get_vectors(
         self, requests: list[InvokeRequestDict]
@@ -649,7 +649,7 @@ class BedrockEmbeddingProvider(EmbeddingProvider[BedrockRuntimeClient]):
     ) -> list[list[float]] | list[list[int]]:
         """Embed a batch of documents using the Bedrock API."""
         kwargs = kwargs or {}
-        requests = self._create_request(documents, kind="documents", **kwargs)  # type: ignore
+        requests = await self._create_request(documents, kind="documents", **kwargs)  # type: ignore
         responses = await self._get_vectors(requests if isinstance(requests, list) else [requests])
         if "cohere" in self.config.model_name.lower():
             return self._output_transformer(responses[0], documents)  # type: ignore
@@ -663,7 +663,7 @@ class BedrockEmbeddingProvider(EmbeddingProvider[BedrockRuntimeClient]):
     ) -> list[list[float]] | list[list[int]]:
         """Embed a batch of queries using the Bedrock API."""
         kwargs = kwargs or {}
-        requests = self._create_request(query, kind="query", **kwargs)  # type: ignore
+        requests = await self._create_request(query, kind="query", **kwargs)  # type: ignore
         responses: list[BedrockInvokeEmbeddingResponse] = await self._get_vectors(
             requests if isinstance(requests, list) else [requests]
         )

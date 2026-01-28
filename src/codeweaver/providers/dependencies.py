@@ -634,7 +634,9 @@ type EmbeddingCapabilityGroupDep = Annotated[
 
 
 def _get_embedding_provider_for_config(
-    config: EmbeddingProviderSettings, registry: EmbeddingRegistryDep = INJECTED
+    config: EmbeddingProviderSettings,
+    registry: EmbeddingRegistryDep = INJECTED,
+    cache_manager: CacheManagerDep = INJECTED,
 ) -> EmbeddingProvider:
     """Helper to get the embedding provider settings from config."""
     capabilities = config.embedding_config.capabilities
@@ -658,10 +660,13 @@ def _get_embedding_provider_for_config(
             client=client,
             provider=config.provider,
             registry=registry,
+            cache_manager=cache_manager,
             caps=capabilities,  # ty:ignore[invalid-argument-type]
             config=config,  # ty:ignore[invalid-argument-type]
         )  # ty:ignore[invalid-return-type]
-    return resolved_provider(client=client, registry=registry, caps=capabilities, config=config)
+    return resolved_provider(
+        client=client, registry=registry, cache_manager=cache_manager, caps=capabilities, config=config
+    )
 
 
 type EmbeddingProviderDep = Annotated[
@@ -671,7 +676,9 @@ type EmbeddingProviderDep = Annotated[
 
 
 def _get_sparse_embedding_provider_for_config(
-    config: SparseEmbeddingProviderSettings, registry: EmbeddingRegistryDep = INJECTED
+    config: SparseEmbeddingProviderSettings,
+    registry: EmbeddingRegistryDep = INJECTED,
+    cache_manager: CacheManagerDep = INJECTED,
 ) -> SparseEmbeddingProvider:
     """Helper to get the sparse embedding provider settings from config."""
     capabilities = config.sparse_embedding_config.capabilities
@@ -687,7 +694,9 @@ def _get_sparse_embedding_provider_for_config(
             ],
         ) from e
     client = config.get_client()
-    return resolved_provider(client=client, registry=registry, caps=capabilities, config=config)
+    return resolved_provider(
+        client=client, registry=registry, cache_manager=cache_manager, caps=capabilities, config=config
+    )
 
 
 type SparseEmbeddingProviderDep = Annotated[

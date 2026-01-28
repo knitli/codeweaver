@@ -13,7 +13,6 @@ import logging
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from codeweaver.core.utils.procs import very_low_priority
 from codeweaver.providers import CircuitBreakerState
 
 
@@ -143,8 +142,8 @@ class FailoverService:
             # Cleanup
             await reconciliation_service.cleanup()
 
-        except Exception as e:
-            logger.error("Vector reconciliation failed: %s", e, exc_info=True)
+        except Exception:
+            logger.exception("Vector reconciliation failed")
 
     async def _run_snapshot_maintenance(self) -> None:
         """Run snapshot creation and cleanup for disaster recovery.
@@ -181,8 +180,8 @@ class FailoverService:
             else:
                 logger.warning("Snapshot creation failed")
 
-        except Exception as e:
-            logger.error("Snapshot maintenance failed: %s", e, exc_info=True)
+        except Exception:
+            logger.exception("Snapshot maintenance failed")
 
     async def _activate_failover(self) -> None:
         """Activate backup store."""

@@ -46,7 +46,6 @@ from codeweaver.core import (
     AnonymityConversion,
     BasedModel,
     BatchKeys,
-    ChunkEmbeddings,
     EmbeddingBatchInfo,
     LiteralProvider,
     LiteralStringT,
@@ -532,10 +531,13 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         Optionally takes a `batch_id` parameter to reprocess a specific batch of documents.
         """
         is_old_batch = False
-        if batch_id and self._store and batch_id in self._store:
-            documents: Sequence[CodeChunk] = self._store[batch_id]  # type: ignore
-            is_old_batch = True
-        chunks_iter, cache_key = self._process_input(
+        if batch_id:
+            # Try to get batch from cache manager
+            cached_batch = self.cache_manager.get_batch(batch_id, self._namespace)
+            if cached_batch:
+                documents = cached_batch
+                is_old_batch = True
+        chunks_iter, cache_key = await self._process_input(
             documents, is_old_batch=is_old_batch, skip_deduplication=skip_deduplication
         )  # type: ignore
 
@@ -662,7 +664,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                     for result in results
                 ]
             if not is_old_batch:
-                self._register_chunks(
+                await self._register_chunks(
                     chunks=chunks,  # Already a tuple, no need to convert again
                     batch_id=cast(UUID7, batch_id or cache_key),
                     embeddings=results,  # ty: ignore[invalid-argument-type]
@@ -915,14 +917,16 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             if chunk
         ]
 
-    def _register_chunks(
+    async def _register_chunks(
         self,
         chunks: Sequence[CodeChunk],
         batch_id: UUID7,
         embeddings: Sequence[Sequence[float]] | Sequence[Sequence[int]] | Sequence[SparseEmbedding],
     ) -> None:  # sourcery skip: low-code-quality
-        """Register chunks in the embedding registry."""
-        registry = self.registry
+        """Register chunks in the embedding registry.
+
+        Now uses centralized EmbeddingCacheManager for registry operations.
+        """
         is_sparse = self._is_sparse
         attr = "sparse" if is_sparse else "dense"
 
@@ -960,6 +964,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                         ],
                     )
 
+        # Create embedding batch infos for all chunks
         chunk_infos: list[EmbeddingBatchInfo] = []
         for i, (chunk, embedding) in enumerate(zip(chunks, embeddings, strict=True)):
             if attr == "sparse" and isinstance(embedding, dict):
@@ -989,80 +994,56 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                 )
             chunk_infos.append(chunk_info)
 
+        # Register each chunk using cache manager
         for i, info in enumerate(chunk_infos):
-            if (registered := registry.get(info.chunk_id)) is not None:
-                # Check if we already have an embedding with this intent
-                has_existing = info.intent in registered.embeddings
+            await self.cache_manager.register_embeddings(
+                chunk_id=info.chunk_id,
+                embedding_info=info,
+                chunk=chunks[i],
+            )
 
-                if has_existing:
-                    # Replace existing embedding (e.g., during re-embedding with skip_deduplication=True)
-                    registry[info.chunk_id] = registered.update(info)
-                else:
-                    # Add new embedding kind to existing entry
-                    registry[info.chunk_id] = registered.add(info)
-
-                if registered.chunk != chunks[i]:
-                    # because we create new CodeChunk instances during processing, we need to update the chunk reference
-                    registry[info.chunk_id] = registry[info.chunk_id].model_copy(
-                        update={"chunk": chunks[i]}
-                    )
-            else:
-                # Create new ChunkEmbeddings with the chunk, then add the embedding
-                registry[info.chunk_id] = ChunkEmbeddings(chunk=chunks[i]).add(info)
-
-    def _process_input(
+    async def _process_input(
         self,
         input_data: StructuredDataInput,
         *,
         is_old_batch: bool = False,
         skip_deduplication: bool = False,
     ) -> tuple[Iterator[CodeChunk], UUID7 | None]:
-        """Process input data for embedding."""
+        """Process input data for embedding.
+
+        Now uses centralized EmbeddingCacheManager for deduplication and storage.
+        """
         processed_chunks = default_input_transformer(input_data)
         if is_old_batch:
             return processed_chunks, None
 
-        key = uuid7()
+        batch_id = uuid7()
         # Convert iterator to list to avoid exhaustion when used multiple times
         chunk_list = list(processed_chunks)
-        final_chunks: list[CodeChunk] = []
 
-        hashes = [get_blake_hash(chunk.content.encode("utf-8")) for chunk in chunk_list]
-
-        # Check which chunks are NEW (hash not in store)
-        # When skip_deduplication is True, include all chunks regardless of hash store
+        # Use cache manager for deduplication if not skipping
         if skip_deduplication:
-            starter_chunks = chunk_list
+            unique_chunks = chunk_list
         else:
-            starter_chunks = [
-                chunk
-                for i, chunk in enumerate(chunk_list)
-                if chunk and hashes[i] not in self._hash_store
-            ]
+            unique_chunks, _hash_mapping = await self.cache_manager.deduplicate(
+                chunk_list, self._namespace, batch_id
+            )
 
         # Detect if this is a sparse embedding provider using type checking
         # SparseEmbeddingProvider is defined in this same module after EmbeddingProvider
         is_sparse_provider = isinstance(self, SparseEmbeddingProvider)
 
-        # Pre-build lookup dict for O(1) index access (fixes O(n²) bug)
-        chunk_to_idx = {id(chunk): idx for idx, chunk in enumerate(chunk_list)}
-
-        # Add NEW chunks with batch keys and add their hashes to store
-        for i, chunk in enumerate(starter_chunks):
-            # Find the original index in chunk_list to get correct hash (O(1) lookup)
-            original_idx = chunk_to_idx[id(chunk)]
-            batch_keys = BatchKeys(id=key, idx=i, sparse=is_sparse_provider)
+        # Add batch keys to unique chunks
+        final_chunks: list[CodeChunk] = []
+        for i, chunk in enumerate(unique_chunks):
+            batch_keys = BatchKeys(id=batch_id, idx=i, sparse=is_sparse_provider)
             final_chunks.append(chunk.set_batch_keys(batch_keys))
-            # Now add the hash to store, mapping it to this batch key
-            self._hash_store[hashes[original_idx]] = key
 
-        # Store final chunks ONCE after loop completes (fixes O(n) write bug)
+        # Store final chunks using cache manager
         if final_chunks:
-            if not self._store:
-                self._store = make_uuid_store(value_type=list, size_limit=1024 * 1024 * 3)  # type: ignore
-            self._store[key] = final_chunks  # type: ignore
+            await self.cache_manager.store_batch(final_chunks, batch_id, self._namespace)
 
-        return iter(final_chunks), key
+        return iter(final_chunks), batch_id
 
     def _process_output(self, output_data: Any) -> list[list[float]] | list[list[int]]:
         """Handle output data from embedding."""
@@ -1084,8 +1065,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         from codeweaver.core import AnonymityConversion, FilteredKey
 
         return {
-            FilteredKey("_store"): AnonymityConversion.COUNT,
-            FilteredKey("_hash_store"): AnonymityConversion.COUNT,
+            FilteredKey("cache_manager"): AnonymityConversion.FORBIDDEN,
             FilteredKey("client"): AnonymityConversion.FORBIDDEN,
             FilteredKey("_input_transformer"): AnonymityConversion.FORBIDDEN,
             FilteredKey("_output_transformer"): AnonymityConversion.FORBIDDEN,

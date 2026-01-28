@@ -245,19 +245,54 @@ class EmbeddingCacheManager(BasedModel):
         self,
         chunk_id: UUID7,
         embedding_info: EmbeddingBatchInfo,
+        chunk: CodeChunk,
     ) -> None:
         """Register embeddings in global registry.
 
-        Delegates to the global EmbeddingRegistry for cross-provider coordination.
+        Handles updating existing entries or creating new ones in the registry.
         This is NOT namespace-isolated - the registry maintains embeddings for all
         chunks regardless of which provider created them.
 
         Args:
             chunk_id: UUID of the chunk
             embedding_info: Batch information with embeddings
+            chunk: The CodeChunk object to store
         """
-        # Registry handles its own locking
-        self.registry.register_chunk_embedding(chunk_id, embedding_info)
+        from codeweaver.providers.embedding.types import ChunkEmbeddings
+
+        # Registry is dict-like, handles its own locking
+        if (registered := self.registry.get(chunk_id)) is not None:
+            # Check if we already have an embedding with this intent
+            has_existing = embedding_info.intent in registered.embeddings
+
+            if has_existing:
+                # Replace existing embedding (e.g., during re-embedding with skip_deduplication=True)
+                self.registry[chunk_id] = registered.update(embedding_info)
+            else:
+                # Add new embedding kind to existing entry
+                self.registry[chunk_id] = registered.add(embedding_info)
+
+            if registered.chunk != chunk:
+                # because we create new CodeChunk instances during processing, we need to update the chunk reference
+                self.registry[chunk_id] = self.registry[chunk_id].model_copy(
+                    update={"chunk": chunk}
+                )
+        else:
+            # Create new ChunkEmbeddings with the chunk, then add the embedding
+            self.registry[chunk_id] = ChunkEmbeddings(chunk=chunk).add(embedding_info)
+
+    def get_batch(self, batch_id: UUID7, namespace: str) -> list[CodeChunk] | None:
+        """Get batch by ID from namespace-isolated store.
+
+        Args:
+            batch_id: UUID of the batch
+            namespace: Namespace key
+
+        Returns:
+            List of chunks if batch exists, None otherwise
+        """
+        batch_store = self._get_batch_store(namespace)
+        return batch_store.get(batch_id)
 
     def get_stats(self, namespace: str | None = None) -> dict[str, dict[str, int]]:
         """Get deduplication statistics.

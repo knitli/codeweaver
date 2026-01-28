@@ -14,8 +14,6 @@ including:
 
 from __future__ import annotations
 
-import asyncio
-
 from pathlib import Path
 from unittest.mock import AsyncMock, Mock, patch
 
@@ -99,7 +97,6 @@ class TestSnapshotCycleManagement:
         Note: This test is obsolete after Phase 2 refactor. Cycle counting moved to
         indexing service's three-phase maintenance loop.
         """
-        pass
 
     @pytest.mark.skip(reason="Phase 2: Cycle-based scheduling moved to indexing service")
     @pytest.mark.asyncio
@@ -109,7 +106,6 @@ class TestSnapshotCycleManagement:
         Note: This test is obsolete after Phase 2 refactor. Scheduling logic moved to
         indexing service's three-phase maintenance loop.
         """
-        pass
 
     @pytest.mark.skip(reason="Phase 2: Cycle counter fields removed")
     @pytest.mark.asyncio
@@ -119,7 +115,6 @@ class TestSnapshotCycleManagement:
         Note: This test is obsolete after Phase 2 refactor. Cycle counting moved to
         indexing service's three-phase maintenance loop.
         """
-        pass
 
 
 class TestSnapshotCreation:
@@ -243,7 +238,6 @@ class TestMaintenanceLoopIntegration:
         not the failover service. FailoverService now only handles health monitoring and
         failover activation.
         """
-        pass
 
     @pytest.mark.asyncio
     async def test_snapshot_skipped_during_failover(self, failover_service):
@@ -269,7 +263,6 @@ class TestMaintenanceLoopIntegration:
         handled by the indexing service as part of the three-phase maintenance loop,
         not the failover service.
         """
-        pass
 
 
 class TestSnapshotConfiguration:

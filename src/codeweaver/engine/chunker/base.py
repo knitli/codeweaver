@@ -34,11 +34,7 @@ if TYPE_CHECKING:
     from codeweaver.core import DiscoveredFile
     from codeweaver.engine.config import ChunkerSettings
 
-from codeweaver.providers import (
-    EmbeddingModelCapabilities,
-    ProviderSettingsDict,
-    RerankingModelCapabilities,
-)
+from codeweaver.providers import EmbeddingModelCapabilities, RerankingModelCapabilities
 
 
 logger = logging.getLogger(__name__)
