@@ -57,6 +57,10 @@ class FailoverService:
         self._monitor_task: asyncio.Task | None = None
         self._backup_maintenance_task: asyncio.Task | None = None
         self._failover_time: datetime | None = None
+        self._maintenance_cycle_count = 0  # Track cycles for reconciliation
+        self._snapshot_cycle_count = (
+            0  # Track cycles for snapshot creation  # Track cycles for reconciliation
+        )
 
     async def start_monitoring(self) -> None:
         """Start health monitoring, automatic failover, and backup maintenance."""
@@ -94,26 +98,139 @@ class FailoverService:
                 logger.warning("Error in failover health monitor", exc_info=True)
 
     async def _maintain_backup_loop(self) -> None:
-        """Periodically sync the backup store using the backup indexing service."""
+        """Periodically sync the backup store, run vector reconciliation, and create snapshots.
+
+        This method runs on a regular interval (backup_sync) and performs three main tasks:
+        1. Backup indexing - sync primary state to backup store
+        2. Vector reconciliation - ensure all points have backup vectors (every N cycles)
+        3. Snapshot creation - create and manage snapshots for disaster recovery (every M cycles)
+        """
         while True:
             try:
                 # Sync interval from settings (default 5 mins)
-                await asyncio.sleep(self.settings.backup_sync_interval)
+                await asyncio.sleep(self.settings.backup_sync)
 
                 # Only run if not currently failing over (if failover is active, backup is live anyway)
                 if not self._failover_active and self.backup_store:
                     # Use very low priority for background maintenance
                     with very_low_priority():
+                        # 1. Regular backup indexing
                         # We use index_project() on the backup service.
                         # It respects the shared file manifest, so it only indexes what needs indexing.
                         # Since it uses backup embedding models (via its own dependencies),
                         # it creates backup-compatible chunks/embeddings.
                         await self.backup_indexing_service.index_project()
 
+                        # Increment cycle counters
+                        self._maintenance_cycle_count += 1
+                        self._snapshot_cycle_count += 1
+
+                        # 2. Vector reconciliation (every N cycles)
+                        if (
+                            self._maintenance_cycle_count
+                            >= self.settings.reconciliation_interval_cycles
+                        ):
+                            await self._run_reconciliation()
+                            self._maintenance_cycle_count = 0  # Reset counter
+
+                        # 3. Snapshot creation (every M cycles)
+                        if self._snapshot_cycle_count >= self.settings.snapshot_interval_cycles:
+                            await self._run_snapshot_maintenance()
+                            self._snapshot_cycle_count = 0  # Reset counter
+
             except asyncio.CancelledError:
                 break
             except Exception:
                 logger.warning("Error in backup maintenance loop", exc_info=True)
+
+    async def _run_reconciliation(self) -> None:
+        """Run vector reconciliation to ensure all points have backup vectors.
+
+        This method creates a reconciliation service and runs it against the primary
+        vector store to detect and repair any missing backup vectors.
+        """
+        if not self.primary_store:
+            logger.debug("No primary store available for reconciliation")
+            return
+
+        logger.info("Starting vector reconciliation")
+
+        try:
+            from codeweaver.engine.services.reconciliation_service import (
+                VectorReconciliationService,
+            )
+
+            # Create reconciliation service
+            reconciliation_service = VectorReconciliationService(
+                vector_store=self.primary_store,
+                backup_vector_name="backup",
+                batch_size=self.settings.reconciliation_batch_size,
+            )
+
+            # Get collection name from primary store
+            collection_name = getattr(self.primary_store, "collection_name", "codeweaver_vectors")
+
+            # Run reconciliation with auto-repair enabled
+            result = await reconciliation_service.reconcile(
+                collection_name=collection_name,
+                auto_repair=True,
+                detection_limit=self.settings.reconciliation_detection_limit,
+            )
+
+            # Log results
+            if result["detected"] > 0:
+                logger.info(
+                    "Reconciliation complete: detected=%d, repaired=%d, failed=%d",
+                    result["detected"],
+                    result["repaired"],
+                    result["failed"],
+                )
+            else:
+                logger.debug("Reconciliation complete: no missing vectors detected")
+
+            # Cleanup
+            await reconciliation_service.cleanup()
+
+        except Exception as e:
+            logger.error("Vector reconciliation failed: %s", e, exc_info=True)
+
+    async def _run_snapshot_maintenance(self) -> None:
+        """Run snapshot creation and cleanup for disaster recovery.
+
+        This method creates a new snapshot of the primary vector store and
+        manages retention by cleaning up old snapshots.
+        """
+        if not self.primary_store:
+            logger.debug("No primary store available for snapshot creation")
+            return
+
+        logger.info("Starting snapshot maintenance")
+
+        try:
+            from codeweaver.engine.services.snapshot_service import QdrantSnapshotBackupService
+
+            # Create snapshot service
+            snapshot_service = QdrantSnapshotBackupService(
+                vector_store=self.primary_store,
+                storage_path=self.settings.snapshot_storage_path,
+                retention_count=self.settings.snapshot_retention_count,
+            )
+
+            # Create snapshot and cleanup old ones
+            result = await snapshot_service.snapshot_and_cleanup(wait=False)
+
+            # Log results
+            if result["snapshot_created"]:
+                logger.info(
+                    "Snapshot maintenance complete: created=%s, cleaned_up=%d old snapshots",
+                    result["snapshot_name"],
+                    result["cleanup_stats"].get("deleted", 0),
+                )
+            else:
+                logger.warning("Snapshot creation failed")
+
+        except Exception as e:
+            logger.error("Snapshot maintenance failed: %s", e, exc_info=True)
 
     async def _activate_failover(self) -> None:
         """Activate backup store."""

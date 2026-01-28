@@ -400,22 +400,27 @@ async def rerank_results(
     query: str,
     candidates: list[SearchResult],
     context: Any = None,
-    reranking: RerankingProviderDep = INJECTED,
+    reranking: tuple[RerankingProviderDep, ...] | RerankingProviderDep | None = INJECTED,
 ) -> tuple[list[Any] | None, SearchStrategy | None]:
-    """Rerank search results using configured reranking provider.
+    """Rerank search results using configured reranking provider(s) with cascading fallback.
+
+    This function implements a cascading fallback mechanism through multiple reranking providers.
+    It will try each provider in sequence until one succeeds, handling circuit breaker states
+    and provider failures gracefully.
 
     Args:
         query: Original search query
         candidates: Initial search results to rerank
         context: Optional FastMCP context for structured logging
-        reranking: Injected reranking provider
+        reranking: Injected reranking provider(s) - single provider or tuple for fallback chain
 
     Returns:
         Tuple of (reranked_results, strategy) where:
-        - reranked_results is None if reranking unavailable or fails
-        - strategy is SEMANTIC_RERANK if successful, None otherwise
+        - reranked_results is None if all providers unavailable or all fail
+        - strategy is SEMANTIC_RERANK if any provider successful, None otherwise
     """
     from codeweaver.core import log_to_client_or_fallback
+    from codeweaver.providers.exceptions import CircuitBreakerOpenError
 
     # Manually resolve provider if not injected (DI fallback)
     if reranking is None or hasattr(reranking, "__pydantic_serializer__"):
@@ -427,7 +432,10 @@ async def rerank_results(
         except Exception as e:
             logger.warning("Failed to resolve reranking provider: %s", e)
 
-    if not reranking or not candidates:
+    # Normalize to tuple for uniform handling
+    providers = reranking if isinstance(reranking, tuple) else (reranking,) if reranking else ()
+
+    if not providers or not candidates:
         await log_to_client_or_fallback(
             context,
             "debug",
@@ -435,7 +443,7 @@ async def rerank_results(
                 "msg": "Reranking skipped",
                 "extra": {
                     "phase": "reranking",
-                    "reason": "no_candidates" if reranking else "no_provider",
+                    "reason": "no_candidates" if providers else "no_provider",
                     "candidates_count": len(candidates) if candidates else 0,
                 },
             },
@@ -446,75 +454,153 @@ async def rerank_results(
         context,
         "info",
         {
-            "msg": "Starting reranking",
-            "extra": {"phase": "reranking", "candidates_count": len(candidates)},
+            "msg": "Starting reranking with fallback chain",
+            "extra": {
+                "phase": "reranking",
+                "candidates_count": len(candidates),
+                "provider_count": len(providers),
+            },
         },
     )
 
-    try:
-        # Create mapping to preserve search metadata through reranking
-        metadata_map: dict[str, SearchResult] = {str(c.content.chunk_id): c for c in candidates}
+    # Prepare reranking data once (used for all providers)
+    metadata_map: dict[str, SearchResult] = {str(c.content.chunk_id): c for c in candidates}
+    chunks_for_reranking = [c.content for c in candidates]
 
-        chunks_for_reranking = [c.content for c in candidates]
-
-        if not chunks_for_reranking:
-            logger.warning("No CodeChunk objects available for reranking, skipping")
-            return None, None
-
-        reranked_results = await reranking.rerank(query, chunks_for_reranking)
-
-        # Enrich reranked results with preserved search metadata
-        from codeweaver.providers import RerankingResult
-
-        enriched_results = [
-            RerankingResult(
-                original_index=r.original_index,
-                batch_rank=r.batch_rank,
-                score=r.score,
-                chunk=r.chunk,
-                original_score=metadata_map[str(r.chunk.chunk_id)].score
-                if str(r.chunk.chunk_id) in metadata_map
-                else None,
-                dense_score=metadata_map[str(r.chunk.chunk_id)].dense_score
-                if str(r.chunk.chunk_id) in metadata_map
-                else None,
-                sparse_score=metadata_map[str(r.chunk.chunk_id)].sparse_score
-                if str(r.chunk.chunk_id) in metadata_map
-                else None,
-            )
-            for r in reranked_results
-        ]
-        reranked_results = enriched_results
-
-        await log_to_client_or_fallback(
-            context,
-            "info",
-            {
-                "msg": "Reranking complete",
-                "extra": {
-                    "phase": "reranking",
-                    "reranked_count": len(reranked_results) if reranked_results else 0,
-                },
-            },
-        )
-
-    except Exception as e:
-        await log_to_client_or_fallback(
-            context,
-            "warning",
-            {
-                "msg": "Reranking failed",
-                "extra": {
-                    "phase": "reranking",
-                    "error": str(e),
-                    "error_type": type(e).__name__,
-                    "fallback": "using_unranked_results",
-                },
-            },
-        )
+    if not chunks_for_reranking:
+        logger.warning("No CodeChunk objects available for reranking, skipping")
         return None, None
-    else:
-        return list(reranked_results), SearchStrategy.SEMANTIC_RERANK
+
+    # Try each provider in sequence until one succeeds
+    last_error: Exception | None = None
+    for idx, provider in enumerate(providers):
+        provider_name = type(provider).__name__
+        try:
+            await log_to_client_or_fallback(
+                context,
+                "debug",
+                {
+                    "msg": f"Attempting reranking with provider {idx + 1}/{len(providers)}",
+                    "extra": {
+                        "phase": "reranking",
+                        "provider_name": provider_name,
+                        "provider_index": idx,
+                    },
+                },
+            )
+
+            reranked_results = await provider.rerank(query, chunks_for_reranking)
+
+            if not reranked_results:
+                await log_to_client_or_fallback(
+                    context,
+                    "warning",
+                    {
+                        "msg": f"Provider {provider_name} returned no results",
+                        "extra": {
+                            "phase": "reranking",
+                            "provider_name": provider_name,
+                            "provider_index": idx,
+                            "trying_next": idx < len(providers) - 1,
+                        },
+                    },
+                )
+                continue
+
+            # Enrich reranked results with preserved search metadata
+            from codeweaver.providers import RerankingResult
+
+            enriched_results = [
+                RerankingResult(
+                    original_index=r.original_index,
+                    batch_rank=r.batch_rank,
+                    score=r.score,
+                    chunk=r.chunk,
+                    original_score=metadata_map[str(r.chunk.chunk_id)].score
+                    if str(r.chunk.chunk_id) in metadata_map
+                    else None,
+                    dense_score=metadata_map[str(r.chunk.chunk_id)].dense_score
+                    if str(r.chunk.chunk_id) in metadata_map
+                    else None,
+                    sparse_score=metadata_map[str(r.chunk.chunk_id)].sparse_score
+                    if str(r.chunk.chunk_id) in metadata_map
+                    else None,
+                )
+                for r in reranked_results
+            ]
+
+            await log_to_client_or_fallback(
+                context,
+                "info",
+                {
+                    "msg": f"Reranking successful with {provider_name}",
+                    "extra": {
+                        "phase": "reranking",
+                        "provider_name": provider_name,
+                        "provider_index": idx,
+                        "reranked_count": len(enriched_results),
+                        "used_fallback": idx > 0,
+                    },
+                },
+            )
+
+            return list(enriched_results), SearchStrategy.SEMANTIC_RERANK
+
+        except CircuitBreakerOpenError as e:
+            # Circuit breaker is open - provider temporarily unavailable
+            await log_to_client_or_fallback(
+                context,
+                "warning",
+                {
+                    "msg": f"Provider {provider_name} circuit breaker open",
+                    "extra": {
+                        "phase": "reranking",
+                        "provider_name": provider_name,
+                        "provider_index": idx,
+                        "error_type": "CircuitBreakerOpen",
+                        "trying_next": idx < len(providers) - 1,
+                    },
+                },
+            )
+            last_error = e
+            continue
+
+        except Exception as e:
+            # General provider failure - try next provider
+            await log_to_client_or_fallback(
+                context,
+                "warning",
+                {
+                    "msg": f"Provider {provider_name} failed",
+                    "extra": {
+                        "phase": "reranking",
+                        "provider_name": provider_name,
+                        "provider_index": idx,
+                        "error": str(e),
+                        "error_type": type(e).__name__,
+                        "trying_next": idx < len(providers) - 1,
+                    },
+                },
+            )
+            last_error = e
+            continue
+
+    # All providers failed
+    await log_to_client_or_fallback(
+        context,
+        "warning",
+        {
+            "msg": "All reranking providers failed",
+            "extra": {
+                "phase": "reranking",
+                "provider_count": len(providers),
+                "fallback": "using_unranked_results",
+                "last_error": str(last_error) if last_error else "no_results",
+                "last_error_type": type(last_error).__name__ if last_error else None,
+            },
+        },
+    )
+    return None, None
 
 
 __all__ = (

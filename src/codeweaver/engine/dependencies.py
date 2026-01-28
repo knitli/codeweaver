@@ -91,7 +91,7 @@ def _get_failover_settings(settings: SettingsDep = INJECTED) -> FailoverSettings
     """Factory for failover service settings."""
     if settings.failover is not Unset:  # ty:ignore[unresolved-attribute]
         return settings.failover  # type: ignore
-    return FailoverSettings.model_validate(DefaultFailoverSettings)
+    return FailoverSettings.model_validate(DefaultFailoverSettings())
 
 
 type IndexerSettingsDep = Annotated[

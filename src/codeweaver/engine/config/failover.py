@@ -7,28 +7,23 @@
 
 from __future__ import annotations
 
+import functools
 import os
 
 from typing import TYPE_CHECKING, Annotated, NotRequired, TypedDict
 
 from pydantic import Field, PositiveInt
 
-from codeweaver.core.di import INJECTED
 from codeweaver.core.types import BasedModel
-from codeweaver.providers import ProviderSettingsDep
 
 
 if TYPE_CHECKING:
-    from codeweaver.providers.config.providers import ProviderSettings
+    from codeweaver.engine.config.failover_detector import FailoverDetector
 
 
 MAX_RAM_MB = 2048
 
 FIVE_MINUTES_IN_SECONDS = 300
-
-
-def _get_provider_settings(settings: ProviderSettingsDep = INJECTED) -> ProviderSettings:
-    return settings
 
 
 class FailoverSettings(BasedModel):
@@ -70,21 +65,110 @@ class FailoverSettings(BasedModel):
         ),
     ] = MAX_RAM_MB
 
+    reconciliation_interval_cycles: Annotated[
+        PositiveInt,
+        Field(
+            description="Number of backup sync cycles between vector reconciliation runs. "
+            "Reconciliation ensures all points have backup vectors. "
+            "Default is 2 cycles (10 minutes with 5-minute backup_sync)."
+        ),
+    ] = 2
+
+    reconciliation_batch_size: Annotated[
+        PositiveInt,
+        Field(description="Number of points to process per batch during reconciliation"),
+    ] = 100
+
+    reconciliation_detection_limit: Annotated[
+        PositiveInt | None,
+        Field(
+            description="Maximum number of missing vectors to detect per reconciliation run. "
+            "None means detect all missing vectors. Use a limit to avoid long detection times."
+        ),
+    ] = None
+
+    # Snapshot configuration
+    snapshot_interval_cycles: Annotated[
+        PositiveInt,
+        Field(
+            description="Number of backup sync cycles between snapshot creation runs. "
+            "Default is 1 cycle (5 minutes with 5-minute backup_sync)."
+        ),
+    ] = 1
+
+    snapshot_retention_count: Annotated[
+        PositiveInt,
+        Field(
+            description="Number of snapshots to retain. Older snapshots are automatically deleted. "
+            "Default is 12 (1 hour of snapshots with 5-minute intervals)."
+        ),
+    ] = 12
+
+    snapshot_storage_path: Annotated[
+        str | None,
+        Field(
+            description="Path for local snapshot storage. If None, uses default path in user state directory. "
+            "For cloud storage, configure through Qdrant settings."
+        ),
+    ] = None
+
+    # WAL configuration for backup system
+    wal_capacity_mb: Annotated[
+        PositiveInt,
+        Field(
+            description="Write-ahead log capacity in MB. Controls maximum WAL size before rotation. "
+            "Default is 256 MB. Increase for high-throughput scenarios."
+        ),
+    ] = 256
+
+    wal_segments_ahead: Annotated[
+        PositiveInt,
+        Field(
+            description="Number of WAL segments to keep ahead for recovery. "
+            "Default is 2. Higher values provide more recovery history."
+        ),
+    ] = 2
+
+    wal_retain_closed: Annotated[
+        bool,
+        Field(
+            description="Whether to retain closed WAL segments for point-in-time recovery. "
+            "Default is True to support snapshot restoration."
+        ),
+    ] = True
+
     def _telemetry_keys(self) -> None:
         """No telemetry keys for failover settings."""
         return
 
     @property
     def is_disabled(self) -> bool:
-        """Check if failover is disabled."""
-        return self._resolve_status_from_config()
+        """Check if failover is explicitly disabled.
 
-    def _resolve_status_from_config(self, settings: ProviderSettings | None = None) -> bool:
-        """Resolve the failover status from the current configuration."""
+        Note: This only checks the explicit disable_failover flag. For automatic
+        detection based on provider configuration, callers should use
+        _resolve_status_from_config() with a FailoverDetector instance.
+
+        Returns:
+            True if failover is explicitly disabled via disable_failover flag.
+        """
+        return self.disable_failover
+
+    def _resolve_status_from_config(self, detector: FailoverDetector | None = None) -> bool:
+        """Resolve the failover status from the current configuration.
+
+        Args:
+            detector: Optional detector to check if failover should be disabled.
+                     If None, failover remains enabled (unless explicitly disabled).
+
+        Returns:
+            True if failover is disabled, False if enabled.
+        """
         if self.disable_failover:
             return True
-        settings = settings or _get_provider_settings()
-        return settings.embedding[0].is_local if settings.embedding else False
+        if detector is None:
+            return False
+        return detector.should_disable_failover()
 
 
 class FailoverSettingsDict(TypedDict, total=False):
@@ -95,9 +179,38 @@ class FailoverSettingsDict(TypedDict, total=False):
     auto_restore: NotRequired[bool]
     recovery_window_sec: NotRequired[PositiveInt]
     max_memory_mb: NotRequired[PositiveInt]
+    reconciliation_interval_cycles: NotRequired[PositiveInt]
+    reconciliation_batch_size: NotRequired[PositiveInt]
+    reconciliation_detection_limit: NotRequired[PositiveInt | None]
+    snapshot_interval_cycles: NotRequired[PositiveInt]
+    snapshot_retention_count: NotRequired[PositiveInt]
+    snapshot_storage_path: NotRequired[str | None]
+    wal_capacity_mb: NotRequired[PositiveInt]
+    wal_segments_ahead: NotRequired[PositiveInt]
+    wal_retain_closed: NotRequired[bool]
 
 
-DefaultFailoverSettings: FailoverSettingsDict = FailoverSettings().model_dump()
+@functools.cache
+def get_default_failover_settings() -> FailoverSettingsDict:
+    """Get default failover settings (cached lazy initialization).
+
+    This function lazily initializes default failover settings only when first
+    accessed, avoiding the circular import issue from module-level instantiation.
+
+    Returns:
+        Dictionary containing default failover settings.
+    """
+    return FailoverSettings().model_dump()
 
 
-__all__ = ("DefaultFailoverSettings", "FailoverSettings", "FailoverSettingsDict")
+# Backward compatibility: Use function as constant
+# This defers initialization until first access
+DefaultFailoverSettings = get_default_failover_settings
+
+
+__all__ = (
+    "DefaultFailoverSettings",
+    "FailoverSettings",
+    "FailoverSettingsDict",
+    "get_default_failover_settings",
+)

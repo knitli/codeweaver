@@ -21,7 +21,7 @@ from codeweaver.core.utils.lazy_importer import LazyImport, lazy_import
 
 if TYPE_CHECKING:
     from codeweaver.core.types.env import EnvVarInfo as ProviderEnvVarInfo
-    from codeweaver.core.types.env import ProviderEnvVars, VariableInfo
+    from codeweaver.core.types.env import ProviderEnvVars
 
 if TYPE_CHECKING and importlib.util.find_spec("sentence-transformers") is not None:
     from sentence_transformers import CrossEncoder, SentenceTransformer, SparseEncoder
@@ -291,7 +291,7 @@ class Provider(BaseEnum):
         self,
     ) -> tuple[ProviderEnvVars, ...] | None:
         """Get the environment variables used by the provider's client that are not part of CodeWeaver's settings."""
-        from codeweaver.core.types.env import EnvFormat
+        from codeweaver.core.types.env import EnvFormat, VariableInfo
         from codeweaver.core.types.env import EnvVarInfo as ProviderEnvVarInfo
 
         httpx_env_vars = {

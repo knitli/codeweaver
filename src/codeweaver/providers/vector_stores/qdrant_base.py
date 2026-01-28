@@ -53,6 +53,7 @@ logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from codeweaver.providers.embedding.registry import EmbeddingRegistry
+    from codeweaver.providers.vector_stores.qdrant_service import QdrantVectorStoreService
 
 
 def _project_name(name: ResolvedProjectNameDep = INJECTED) -> str:
@@ -67,6 +68,46 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
     caps: EmbeddingCapabilityGroup
     config: QdrantVectorStoreProviderSettings
     _provider: ClassVar[Literal[Provider.QDRANT, Provider.MEMORY]]
+    _service: QdrantVectorStoreService | None = None
+
+    @property
+    def service(self) -> QdrantVectorStoreService:
+        """Get the QdrantVectorStoreService for this provider.
+
+        Lazy-initialized on first access. Uses existing config and caps.
+        For failover settings, attempts to resolve from DI container.
+
+        Returns:
+            QdrantVectorStoreService instance
+        """
+        if self._service is None:
+            from codeweaver.providers.vector_stores.qdrant_service import QdrantVectorStoreService
+
+            # Try to get failover settings from DI container
+            failover_settings = None
+            failover_detector = None
+            try:
+                from codeweaver.core.di import get_container
+                from codeweaver.engine.config import FailoverSettings
+                from codeweaver.engine.config.failover_detector import FailoverDetector
+
+                container = get_container()
+                failover_settings = container.resolve_sync(FailoverSettings)
+                try:
+                    failover_detector = container.resolve_sync(FailoverDetector)
+                except Exception:
+                    pass  # Detector is optional
+            except Exception:
+                pass  # DI not available, use None
+
+            self._service = QdrantVectorStoreService(
+                settings=self.config,
+                embedding_group=self.caps,
+                failover_settings=failover_settings,
+                failover_detector=failover_detector,
+            )
+
+        return self._service
 
     @property
     def base_url(self) -> str | None:
@@ -191,9 +232,10 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
 
             # Create new collection from config.collection (source of truth)
             metadata = self._create_metadata_from_config()
-            await self.client.create_collection(**{
-                await self.config.get_collection_config(metadata=metadata)
-            })
+
+            # Use service to get collection config (handles WalConfig merging, etc.)
+            collection_config = await self.service.get_collection_config(metadata=metadata)
+            await self.client.create_collection(**collection_config.model_dump())
             self._known_collections.add(collection_name)
         except UnexpectedResponse as e:
             raise ProviderError(

@@ -70,13 +70,22 @@ from codeweaver.providers.config import (
     QdrantVectorStoreProviderSettings,
     RerankingProviderSettings,
     SparseEmbeddingProviderSettings,
+    VectorStoreProviderSettings,
 )
+from codeweaver.providers.config.kinds import _BaseQdrantVectorStoreProviderSettings
+from codeweaver.providers.embedding import EmbeddingProvider, SparseEmbeddingProvider
 from codeweaver.providers.embedding.capabilities.resolver import (
     EmbeddingCapabilityResolver,
     SparseEmbeddingCapabilityResolver,
 )
 from codeweaver.providers.embedding.registry import EmbeddingRegistry
+from codeweaver.providers.reranking import RerankingProvider
 from codeweaver.providers.reranking.capabilities.resolver import RerankingCapabilityResolver
+from codeweaver.providers.vector_stores import (
+    MemoryVectorStoreProvider,
+    QdrantVectorStoreProvider,
+    VectorStoreProvider,
+)
 
 
 if TYPE_CHECKING:
@@ -86,20 +95,11 @@ if TYPE_CHECKING:
         CodeWeaverProviderSettings,
         EmbeddingConfigT,
         RerankingConfigT,
-        VectorStoreProviderSettings,
     )
-    from codeweaver.providers.config.kinds import _BaseQdrantVectorStoreProviderSettings
-    from codeweaver.providers.embedding import EmbeddingProvider, SparseEmbeddingProvider
-    from codeweaver.providers.reranking import RerankingProvider
     from codeweaver.providers.types import (
         ConfiguredCapability,
         EmbeddingCapabilityGroup,
         SearchPackage,
-    )
-    from codeweaver.providers.vector_stores import (
-        MemoryVectorStoreProvider,
-        QdrantVectorStoreProvider,
-        VectorStoreProvider,
     )
 
 

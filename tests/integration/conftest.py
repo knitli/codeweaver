@@ -82,11 +82,11 @@ def _set_settings() -> DictView[CodeWeaverSettingsDict]:
 
     No manual loading needed - the config system handles it automatically.
     """
-    from codeweaver.server import get_settings_map
+    from codeweaver.cli.commands.start import _get_settings_map
 
     # Just return the settings map - config system already loaded codeweaver.test.toml
     # because CODEWEAVER_TEST_MODE="true" (set at top of this file)
-    return get_settings_map()
+    return _get_settings_map()
 
 
 _settings: DictView[CodeWeaverSettingsDict] = _set_settings()
@@ -99,12 +99,14 @@ def _get_configs(
     *, sparse: bool = False, rerank: bool = False
 ) -> EmbeddingProviderSettings | SparseEmbeddingProviderSettings | RerankingProviderSettings:
     """Get the model name for testing based on available libraries."""
-    from codeweaver.server import get_profile
-
-    profile = get_profile("backup", vector_deployment="local")
-    if rerank:
-        return profile["reranking"][0]
-    return profile["sparse_embedding"] if sparse else profile["embedding"]
+    # TODO: Fix this - get_profile doesn't exist in codeweaver.server
+    # from codeweaver.server import get_profile
+    #
+    # profile = get_profile("backup", vector_deployment="local")
+    # if rerank:
+    #     return profile["reranking"][0]
+    # return profile["sparse_embedding"] if sparse else profile["embedding"]
+    raise NotImplementedError("_get_configs needs to be fixed - get_profile doesn't exist")
 
 
 @pytest.fixture

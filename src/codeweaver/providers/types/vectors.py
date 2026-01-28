@@ -4,7 +4,7 @@ Vector configuration types for Qdrant integration.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, cast
 
 from pydantic import Field
 from qdrant_client.models import SparseVectorParams, VectorParams
@@ -237,7 +237,7 @@ class VectorSet(BasedModel, frozen=True):
                 "Each vector must have a unique physical name in Qdrant."
             )
 
-    def _telemetry_keys(self):
+    def _telemetry_keys(self) -> None:
         """Return telemetry keys for privacy-aware serialization.
 
         VectorSet contains no user-identifying information, all fields are safe.
@@ -262,11 +262,11 @@ class VectorSet(BasedModel, frozen=True):
             >>> primaries = vector_set.by_role(VectorRole.PRIMARY)
             >>> backups = vector_set.by_role("backup")
         """
-        role_str = role.variable if isinstance(role, VectorRole) else role
+        role_name = role.variable if isinstance(role, VectorRole) else role
         return [
             v
             for v in self.vectors.values()
-            if (v.role.variable if isinstance(v.role, VectorRole) else v.role) == role_str
+            if (v.role.variable if isinstance(v.role, VectorRole) else v.role) == role_name
         ]
 
     def by_name(self, name: str) -> VectorConfig | None:
@@ -345,7 +345,9 @@ class VectorSet(BasedModel, frozen=True):
         Example:
             >>> config = CollectionParams(vectors_config=vector_set.to_qdrant_vectors_config())
         """
-        return {v.name: v.params for v in self.vectors.values() if v.is_dense}
+        return cast(
+            dict[str, VectorParams], {v.name: v.params for v in self.vectors.values() if v.is_dense}
+        )
 
     def to_qdrant_sparse_vectors_config(self) -> dict[str, SparseVectorParams]:
         """Generate Qdrant sparse_vectors_config dict for sparse vectors.
@@ -359,7 +361,10 @@ class VectorSet(BasedModel, frozen=True):
             ...     sparse_vectors_config=vector_set.to_qdrant_sparse_vectors_config()
             ... )
         """
-        return {v.name: v.params for v in self.vectors.values() if v.is_sparse}
+        return cast(
+            dict[str, SparseVectorParams],
+            {v.name: v.params for v in self.vectors.values() if v.is_sparse},
+        )
 
     # Factory methods
 
@@ -424,3 +429,6 @@ class VectorSet(BasedModel, frozen=True):
         from codeweaver.providers.config.profiles import ProviderProfile
 
         return await cls.from_profile(ProviderProfile.RECOMMENDED)
+
+
+__all__ = ("SparseVectorParams", "VectorConfig", "VectorParams", "VectorRole", "VectorSet")

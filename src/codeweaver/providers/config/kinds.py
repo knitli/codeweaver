@@ -105,6 +105,8 @@ from codeweaver.providers.config.utils import (
 if TYPE_CHECKING:
     from pydantic_ai.settings import ModelSettings as AgentModelSettings
 
+    from codeweaver.engine.config import FailoverSettings
+    from codeweaver.engine.config.failover_detector import FailoverDetector
     from codeweaver.providers.dependencies import EmbeddingCapabilityGroupDep
     from codeweaver.providers.types import EmbeddingCapabilityGroup
     from codeweaver.providers.vector_stores.metadata import CollectionMetadata
@@ -530,11 +532,21 @@ class CollectionConfig(BasedModel):
     """Configuration for optimizers used in the collection. No default configuration. Optimizing segments can increase throughput/concurrency at the cost of additional memory usage.  See https://qdrant.tech/documentation/concepts/optimizer/"""
 
     hnsw_config: HnswConfig | None = Field(
-        default_factory=lambda: HnswConfig(m=24, ef_construct=130, payload_m=120)
+        default_factory=lambda: HnswConfig(
+            m=24, ef_construct=130, payload_m=120, full_scan_threshold=10000
+        )
     )
     """Configuration for HNSW (Hierarchical Navigable Small World) index used for approximate nearest neighbor search. We generally recommend you keep our defaults here, which we will tweak and fine-tune over time to get optimal performance for code search."""
 
     _vectors_set: bool = PrivateAttr(default=False)
+
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion] | None:
+        """Return telemetry keys for privacy-first data collection."""
+        from codeweaver.core.types import AnonymityConversion, FilteredKey
+
+        return {
+            FilteredKey("collection_name"): AnonymityConversion.HASH,
+        }
 
     async def params(self) -> CollectionParams:
         """Return the Qdrant collection parameters for this configuration."""
@@ -564,13 +576,14 @@ class CollectionConfig(BasedModel):
 
     async def as_qdrant_config(self, metadata: CollectionMetadata) -> QdrantCollectionConfig:
         """Convert the collection configuration to a QdrantCollectionConfig object."""
-        return QdrantCollectionConfig.model_validate({
-            "params": await self.params(),
-            "hnsw_config": self.hnsw_config,
-            "optimizer_config": self.optimizer_config,
-            "wal_config": self.wal_config,
-            "metadata": metadata,
-        })
+        # Use model_construct to bypass validation - qdrant_client expects all fields
+        return QdrantCollectionConfig.model_construct(
+            params=await self.params(),
+            hnsw_config=self.hnsw_config,
+            optimizer_config=self.optimizer_config,
+            wal_config=self.wal_config,
+            metadata=metadata.model_dump(),
+        )
 
 
 class _BaseQdrantVectorStoreProviderSettings(VectorStoreProviderSettings):
@@ -609,24 +622,39 @@ class _BaseQdrantVectorStoreProviderSettings(VectorStoreProviderSettings):
             project_name: The name of the project.
             project_path: The path to the project.
         """
-        object.__setattr__(self, "client_options", client_options or QdrantClientOptions())
-        object.__setattr__(
-            self,
-            "collection",
-            CollectionConfig.model_validate(
-                **(
-                    self._default_collection(
-                        project_name=project_name, project_path=project_path
-                    ).model_dump()
-                    | collection
-                    or {}
-                )
-            ),
+        # Prepare client_options
+        prepared_client_options = client_options if client_options is not None else QdrantClientOptions()
+
+        # Handle collection parameter - can be CollectionConfig, dict, or None
+        if collection is None:
+            collection_dict = {}
+        elif isinstance(collection, CollectionConfig):
+            collection_dict = collection.model_dump(exclude_none=True)
+        else:
+            collection_dict = collection
+
+        # Merge with defaults and validate
+        prepared_collection = CollectionConfig.model_validate(
+            self._default_collection(
+                project_name=project_name, project_path=project_path
+            ).model_dump()
+            | collection_dict
         )
-        super().__setattr__("provider", provider)
-        super().__setattr__("connection", connection)
-        super().__setattr__("batch_size", batch_size)
-        super().__init__(provider=provider, connection=connection, batch_size=batch_size)
+
+        # Use model_construct to bypass pydantic validation and forward reference issues
+        # This is safe because we've already validated the collection config above
+        constructed = self.__class__.model_construct(
+            provider=provider,
+            tag=provider.variable,  # Explicitly set tag since default_factory won't run
+            connection=connection,
+            client_options=prepared_client_options,
+            collection=prepared_collection,
+            batch_size=batch_size,
+        )
+
+        # Copy all fields from constructed instance to self
+        for field_name in constructed.model_fields:
+            object.__setattr__(self, field_name, getattr(constructed, field_name))
 
     # Track resolved values
     _resolved_dimension: int | None = PrivateAttr(default=None)
@@ -635,17 +663,20 @@ class _BaseQdrantVectorStoreProviderSettings(VectorStoreProviderSettings):
     def _default_collection(
         self, *, project_name: str | None = None, project_path: Path | None = None
     ) -> CollectionConfig:
-        """Return the default collection config."""
+        """Return the default collection config.
+
+        Note: Vector configs are intentionally left as None and will be populated
+        later by set_vector_params() based on the embedding configuration.
+        """
         from codeweaver.core import generate_collection_name
 
         return CollectionConfig(
             collection_name=generate_collection_name(
                 project_name=project_name, project_path=project_path
             ),
-            vectors_config={"primary": VectorParams()},  # Role-based name: primary dense vector
-            sparse_vectors_config={
-                "sparse": SparseVectorParams()
-            },  # Role-based name: sparse vector
+            # Vector configs will be set by set_vector_params() based on embedding config
+            vectors_config=None,
+            sparse_vectors_config=None,
         )
 
     @model_validator(mode="after")
@@ -695,8 +726,97 @@ class _BaseQdrantVectorStoreProviderSettings(VectorStoreProviderSettings):
         """Return the Qdrant SDKClient enum member."""
         return SDKClient.QDRANT
 
-    async def get_collection_config(self, metadata: CollectionMetadata) -> QdrantCollectionConfig:
-        return await self.collection.as_qdrant_config(metadata=metadata)
+    async def get_collection_config(
+        self,
+        metadata: CollectionMetadata,
+        *,
+        embedding_group: EmbeddingCapabilityGroup | None = None,
+        failover_settings: FailoverSettings | None = None,
+        failover_detector: FailoverDetector | None = None,
+    ) -> QdrantCollectionConfig:
+        """Get collection configuration, merging failover WalConfig if backup system is enabled.
+
+        This is a convenience method that delegates to QdrantVectorStoreService.
+        For better testability, instantiate the service directly with explicit dependencies.
+
+        When the backup system is active, failover WalConfig settings take precedence over
+        user-configured settings to ensure proper snapshot and recovery functionality.
+
+        Args:
+            metadata: Collection metadata
+            embedding_group: Optional embedding capability group (for testing)
+            failover_settings: Optional failover settings (for testing)
+            failover_detector: Optional failover detector (for testing)
+
+        Returns:
+            QdrantCollectionConfig with merged WalConfig settings
+
+        Example:
+            # Production (uses DI):
+            config = await settings.get_collection_config(metadata)
+
+            # Testing (explicit dependencies):
+            config = await settings.get_collection_config(
+                metadata,
+                embedding_group=mock_embedding_group,
+                failover_settings=mock_failover,
+            )
+
+            # Better testing (use service directly):
+            from codeweaver.providers.vector_stores.qdrant_service import QdrantVectorStoreService
+            service = QdrantVectorStoreService(settings, mock_embedding_group, mock_failover)
+            config = await service.get_collection_config(metadata)
+        """
+        # If explicit dependencies provided, use them directly (testing path)
+        if embedding_group is not None:
+            from codeweaver.providers.vector_stores.qdrant_service import QdrantVectorStoreService
+
+            service = QdrantVectorStoreService(
+                settings=self,
+                embedding_group=embedding_group,
+                failover_settings=failover_settings,
+                failover_detector=failover_detector,
+            )
+            return await service.get_collection_config(metadata)
+
+        # Otherwise, resolve from DI container (production path)
+        try:
+            from codeweaver.core.di import get_container
+            from codeweaver.engine.config import FailoverSettings
+            from codeweaver.engine.config.failover_detector import FailoverDetector
+            from codeweaver.providers.vector_stores.qdrant_service import QdrantVectorStoreService
+
+            container = get_container()
+
+            # Resolve dependencies from container
+            embedding_group = await container.resolve(EmbeddingCapabilityGroup)
+            failover_settings = await container.resolve(FailoverSettings)
+
+            try:
+                failover_detector = await container.resolve(FailoverDetector)
+            except Exception:
+                failover_detector = None
+
+            # Create service and delegate
+            service = QdrantVectorStoreService(
+                settings=self,
+                embedding_group=embedding_group,
+                failover_settings=failover_settings,
+                failover_detector=failover_detector,
+            )
+            return await service.get_collection_config(metadata)
+
+        except Exception as e:
+            # DI not available - fall back to basic config without failover
+            logger.debug("DI container not available, using basic config: %s", e)
+
+            # Set vector params with provided or resolved embedding group
+            if not self.collection._vectors_set:
+                if embedding_group is None:
+                    embedding_group = _get_embedding_group()
+                await self.collection.set_vector_params(embedding_group)
+
+            return await self.collection.as_qdrant_config(metadata=metadata)
 
 
 class QdrantVectorStoreProviderSettings(_BaseQdrantVectorStoreProviderSettings):
@@ -1098,6 +1218,19 @@ class AgentProviderSettings(BaseProviderSettings):
         """Return True if the provider is a cloud provider, False otherwise."""
         return _is_cloud_provider(self)
 
+
+# Rebuild models to resolve forward references from httpx after all classes are defined
+try:
+
+    # Rebuild client options and provider settings models
+    from codeweaver.providers.config.clients import QdrantClientOptions
+
+    QdrantClientOptions.model_rebuild()
+    # Note: Don't rebuild QdrantVectorStoreProviderSettings here as it may not work
+    # The initialization will handle validation
+except Exception:
+    # Forward reference resolution may fail in some contexts, that's OK
+    pass
 
 __all__ = (
     "AgentProviderSettings",

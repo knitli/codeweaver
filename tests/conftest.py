@@ -672,7 +672,7 @@ def cli_api_keys(monkeypatch: pytest.MonkeyPatch) -> dict[str, str]:
     return keys
 
 
-def _get_settings(settings: SettingsDep = INJECTED) -> CodeWeaverSettingsType:
+def _get_settings(settings: SettingsDep = INJECTED) -> "CodeWeaverSettingsType":
     return settings
 
 
@@ -682,7 +682,7 @@ def reset_cli_settings_cache() -> None:
 
     Note: Settings are now managed through DI container, which is reset
     by the reset_di_container fixture. This fixture is kept for compatibility
-    but no longer performs any action.
+    and performs minimal cache clearing.
     """
     if _get_settings():
         from codeweaver.core.di.container import get_container
@@ -690,7 +690,7 @@ def reset_cli_settings_cache() -> None:
         container = get_container()
         container.clear_request_cache()
         container.clear_overrides()
-    reset_di_container()
+    # reset_di_container is already an autouse fixture - no need to call it
 
 
 @pytest.fixture(autouse=True)

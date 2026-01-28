@@ -98,10 +98,10 @@ class CodeWeaverEngineSettings(CodeWeaverProviderSettings):
                 self._resolve_default_and_provided(DefaultChunkerSettings, kwargs["chunker"])  # ty:ignore[invalid-argument-type]
             )
         if kwargs.get("failover") is UNSET:
-            kwargs["failover"] = FailoverSettings.model_construct(**DefaultFailoverSettings)
+            kwargs["failover"] = FailoverSettings.model_construct(**DefaultFailoverSettings())
         else:
             kwargs["failover"] = FailoverSettings.model_validate(
-                self._resolve_default_and_provided(DefaultFailoverSettings, kwargs["failover"])  # ty:ignore[invalid-argument-type]
+                self._resolve_default_and_provided(DefaultFailoverSettings(), kwargs["failover"])  # ty:ignore[invalid-argument-type]
             )
         kwargs |= super()._initialize(**kwargs)
         return kwargs

@@ -53,6 +53,13 @@ from codeweaver.providers.config.types import HttpxClientParams
 
 logger = logging.getLogger(__name__)
 
+
+# Note: Previously we had a _ensure_qdrant_model_rebuilt() function here to handle
+# httpx forward references, but we've simplified QdrantClientOptions.advanced_http_options to use
+# dict[str, Any] instead of HttpxClientParams to avoid the forward reference issue.
+# The actual type validation is deferred to the qdrant_client library.
+
+
 # ===========================================================================
 # *                           Client Options
 # ===========================================================================
@@ -175,7 +182,15 @@ class ClientOptions(BasedModel):
     @classmethod
     def _client_env_vars(cls) -> dict[str, tuple[str, ...] | dict[str, Any]]:
         """Return a dictionary of environment variables for the client options, mapping client variable names to the environment variable name."""
-        env_vars = cls._core_provider.all_envs_for_client(cls._core_provider.variable)  # ty:ignore[invalid-argument-type]
+        # Access _core_provider from class __dict__ to avoid pydantic descriptor issues
+        core_provider = cls.__dict__.get("_core_provider", Provider.NOT_SET)
+        if core_provider == Provider.NOT_SET:
+            # Fallback to parent class if not set in current class
+            for base in cls.__mro__[1:]:
+                if "_core_provider" in base.__dict__:
+                    core_provider = base.__dict__["_core_provider"]
+                    break
+        env_vars = core_provider.all_envs_for_client(core_provider.variable)  # ty:ignore[invalid-argument-type]
         mapped_vars = {}
         fields = tuple(cls.model_fields)
         for env_var in env_vars:
@@ -305,7 +320,15 @@ class QdrantClientOptions(ClientOptions):
     local_inference_batch_size: PositiveInt | None = None
     check_compatibility: bool = True
     pool_size: PositiveInt | None = None  # (httpx pool size, default 100)
-    kwargs: HttpxClientParams | GrpcParams | None = None
+
+    # Advanced options (escape hatches for power users)
+    advanced_http_options: dict[str, Any] | None = Field(
+        default=None,
+        description="Advanced httpx.AsyncClient parameters for power users. "
+        "Common options are available as explicit fields above. "
+        "Use this for specialized httpx configuration (custom auth, headers, proxies, etc.). "
+        "See httpx documentation for available options.",
+    )
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         # Location isn't sensitive because after `finalize_settings` it will only be `:memory:` or None
@@ -397,6 +420,73 @@ class QdrantClientOptions(ClientOptions):
             or (self.host and self._is_local_url(self.host))
         )
 
+    def to_qdrant_params(self) -> dict[str, Any]:
+        """Convert client options to qdrant_client constructor parameters.
+
+        Maps CodeWeaver's simplified interface to qdrant_client's expected format.
+        Handles both common cases (explicit fields) and advanced cases (escape hatches).
+
+        Returns:
+            Dictionary suitable for passing to AsyncQdrantClient constructor
+
+        Example:
+            >>> options = QdrantClientOptions(
+            ...     url="https://qdrant.example.com",
+            ...     api_key="secret-key",
+            ...     timeout=30.0,
+            ... )
+            >>> params = options.to_qdrant_params()
+            >>> client = AsyncQdrantClient(**params)
+        """
+        params: dict[str, Any] = {}
+
+        # Connection parameters
+        if self.location is not None:
+            params["location"] = self.location
+        if self.url is not None:
+            params["url"] = str(self.url) if isinstance(self.url, AnyUrl) else self.url
+        if self.host is not None:
+            params["host"] = str(self.host) if isinstance(self.host, AnyUrl) else self.host
+        if self.path is not None:
+            params["path"] = self.path
+        if self.port is not None:
+            params["port"] = self.port
+        if self.grpc_port is not None:
+            params["grpc_port"] = self.grpc_port
+        if self.https is not None:
+            params["https"] = self.https
+
+        # Authentication
+        if self.api_key is not None:
+            params["api_key"] = self.api_key
+        if self.auth_token_provider is not None:
+            params["auth_token_provider"] = self.auth_token_provider
+
+        # Preferences
+        params["prefer_grpc"] = self.prefer_grpc
+        if self.prefix is not None:
+            params["prefix"] = self.prefix
+        if self.timeout is not None:
+            params["timeout"] = self.timeout
+
+        # Advanced options
+        params["force_disable_check_same_thread"] = self.force_disable_check_same_thread
+        if self.grpc_options is not None:
+            params["grpc_options"] = self.grpc_options
+        params["cloud_inference"] = self.cloud_inference
+        if self.local_inference_batch_size is not None:
+            params["local_inference_batch_size"] = self.local_inference_batch_size
+        params["check_compatibility"] = self.check_compatibility
+        if self.pool_size is not None:
+            params["pool_size"] = self.pool_size
+
+        # Advanced HTTP options (power users)
+        if self.advanced_http_options is not None:
+            # These are passed through to httpx.AsyncClient
+            params["kwargs"] = self.advanced_http_options
+
+        return params
+
     @model_validator(mode="after")
     def finalize_settings(self) -> Self:
         """Validate that either location or url is provided.
@@ -417,8 +507,8 @@ class QdrantClientOptions(ClientOptions):
             and not self._is_local_url(self.url or self.host or "")
         ):
             # GRPC over http requires http2
-            self.kwargs = HttpxClientParams(
-                **((self.kwargs or {}) | {"http2": True, "http1": False})
+            self.advanced_http_options = HttpxClientParams(
+                **((self.advanced_http_options or {}) | {"http2": True, "http1": False})
             )
         if self.url and not self._is_local_url(self.url) and self.https is None:
             self.https = True
