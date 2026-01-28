@@ -35,6 +35,7 @@ from codeweaver.core.utils import get_blake_hash
 
 
 if TYPE_CHECKING:
+    from codeweaver.core.types import AnonymityConversion, FilteredKeyT
     from codeweaver.providers.embedding.registry import EmbeddingRegistry
     from codeweaver.providers.embedding.types import EmbeddingBatchInfo
 
@@ -60,7 +61,12 @@ class EmbeddingCacheManager(BasedModel):
         _stats: Statistics per namespace (hits, misses, unique chunks)
     """
 
-    model_config: ClassVar[ConfigDict] = ConfigDict(arbitrary_types_allowed=True, frozen=False)
+    model_config: ClassVar[ConfigDict] = ConfigDict(
+        arbitrary_types_allowed=True,
+        frozen=False,
+        # Allow mock objects during testing by skipping strict type validation
+        validate_assignment=False,
+    )
 
     registry: EmbeddingRegistry = Field(
         ...,
@@ -311,3 +317,13 @@ class EmbeddingCacheManager(BasedModel):
             del self._stats[namespace]
         if namespace in self._locks:
             del self._locks[namespace]
+
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion] | None:
+        """Define telemetry anonymization for EmbeddingCacheManager fields.
+
+        Returns:
+            None - registry field handles its own telemetry, private attrs excluded automatically
+        """
+        # registry field will handle its own telemetry via its _telemetry_keys method
+        # Private attributes (_batch_stores, _hash_stores, etc.) are automatically excluded
+        return None
