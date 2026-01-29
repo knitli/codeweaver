@@ -47,21 +47,37 @@ class ModelFamily(BasedModel):
     """
 
     family_id: Annotated[
-        str, Field(
-            min_length=3, description="Unique identifier for the model family.")
+        str, Field(min_length=3, description="Unique identifier for the model family.")
     ]
     vector_space_dimension: Annotated[
         PositiveInt,
-        Field(
-            description="Dimensionality of the embedding vectors produced by this family."),
+        Field(description="Dimensionality of the embedding vectors produced by this family."),
     ]
+    member_models: Annotated[
+        frozenset[str],
+        Field(
+            description="Set of model names that belong to this family and share the same vector space."
+        ),
+    ]
+    asymmetric_query_models: Annotated[
+        frozenset[str] | None,
+        Field(description="Optional set of specialized models designed for query-time use only."),
+    ] = None
+    vector_space_dimension: Annotated[
+        PositiveInt,
+        Field(description="Dimensionality of the embedding vectors produced by this family."),
+    ]
+    cross_provider_compatible: Annotated[
+        bool,
+        Field(
+            description="Whether this family maintains compatibility across different providers."
+        ),
+    ] = False
     vector_space_datatype: Annotated[
-        str, Field(
-            description="Data type of vector components (e.g., 'float', 'int8').")
-    ] = "float"
+        str, Field(description="Data type of vector components (e.g., 'float', 'int8').")
+    ] = "float16"
     is_normalized: Annotated[
-        bool, Field(
-            description="Whether embeddings are normalized to unit length.")
+        bool, Field(description="Whether embeddings are normalized to unit length.")
     ] = False
     preferred_metrics: Annotated[
         tuple[str, ...],
@@ -75,62 +91,6 @@ class ModelFamily(BasedModel):
             description="Set of model names that belong to this family and share the same vector space."
         ),
     ]
-    asymmetric_query_models: Annotated[
-        frozenset[str] | None,
-        Field(description="Optional set of specialized models designed for query-time use only."),
-    ] = None
-    cross_provider_compatible: Annotated[
-        bool,
-        Field(
-            description="Whether this family maintains compatibility across different providers."
-        str,
-        Field(
-            min_length=3,
-            description="Unique identifier for the model family.",
-        ),
-    ]
-    vector_space_dimension: Annotated[
-        PositiveInt,
-        Field(
-            description="Dimensionality of the embedding vectors produced by this family.",
-        ),
-    ]
-    vector_space_datatype: Annotated[
-        str,
-        Field(
-            description="Data type of vector components (e.g., 'float', 'int8').",
-        ),
-    ] = "float"
-    is_normalized: Annotated[
-        bool,
-        Field(
-            description="Whether embeddings are normalized to unit length.",
-        ),
-    ] = False
-    preferred_metrics: Annotated[
-        tuple[str, ...],
-        Field(
-            description="Preferred distance metrics for comparing embeddings, in order of suitability.",
-        ),
-    ] = ("cosine", "dot", "euclidean")
-    member_models: Annotated[
-        frozenset[str],
-        Field(
-            description="Set of model names that belong to this family and share the same vector space.",
-        ),
-    ]
-    asymmetric_query_models: Annotated[
-        frozenset[str] | None,
-        Field(
-            description="Optional set of specialized models designed for query-time use only.",
-        ),
-    ] = None
-    cross_provider_compatible: Annotated[
-        bool,
-        Field(
-            description="Whether this family maintains compatibility across different providers.",
-        ),
-    ] = False
 
     def is_compatible(self, embed_model: str, query_model: str) -> bool:
         """Check if two models are compatible within this family.
@@ -163,22 +123,19 @@ class ModelFamily(BasedModel):
         if embed_dim != expected:
             return (
                 False,
-                f"Embedding dimension {
-                    embed_dim} does not match family dimension {expected}",
+                f"Embedding dimension {embed_dim} does not match family dimension {expected}",
             )
 
         if query_dim != expected:
             return (
                 False,
-                f"Query dimension {
-                    query_dim} does not match family dimension {expected}",
+                f"Query dimension {query_dim} does not match family dimension {expected}",
             )
 
         if embed_dim != query_dim:
             return (
                 False,
-                f"Embedding dimension {
-                    embed_dim} does not match query dimension {query_dim}",
+                f"Embedding dimension {embed_dim} does not match query dimension {query_dim}",
             )
 
         return (True, None)
@@ -193,8 +150,7 @@ class EmbeddingModelCapabilities(BasedModel):
     model_config = BASEDMODEL_CONFIG | ConfigDict(extra="allow")
 
     name: Annotated[
-        str, Field(
-            min_length=3, description="""The name of the model or family of models.""")
+        str, Field(min_length=3, description="""The name of the model or family of models.""")
     ] = ""
     provider: Annotated[
         Provider,
@@ -233,9 +189,7 @@ class EmbeddingModelCapabilities(BasedModel):
     is_normalized: bool = False
     model_family: Annotated[
         ModelFamily | None,
-        Field(
-            description="Optional model family specification for cross-model compatibility.",
-        ),
+        Field(description="Optional model family specification for cross-model compatibility."),
     ] = None
     context_window: Annotated[PositiveInt, Field(ge=256)] = 512
     max_batch_tokens: PositiveInt = Field(
@@ -254,8 +208,7 @@ class EmbeddingModelCapabilities(BasedModel):
         ),
     ] = None
     preferred_metrics: Annotated[
-        tuple[Literal["dot", "cosine", "euclidean",
-            "manhattan", "hamming", "chebyshev"], ...],
+        tuple[Literal["dot", "cosine", "euclidean", "manhattan", "hamming", "chebyshev"], ...],
         Field(
             description="""A tuple of preferred metrics for comparing embeddings.""",
             examples=[
@@ -286,22 +239,22 @@ class EmbeddingModelCapabilities(BasedModel):
         ),
     ] = False
 
-    @ classmethod
+    @classmethod
     def default(cls) -> Self:
         """Create a default instance of the model profile."""
         return cls()
 
-    @ property
+    @property
     def schema_version(self) -> str:
         """Get the schema version of the capabilities."""
         return self._version
 
-    @ classmethod
+    @classmethod
     def from_capabilities(cls, capabilities: EmbeddingCapabilitiesDict) -> Self:
         """Create an instance from a dictionary of capabilities."""
         return cls.model_validate(capabilities)
 
-    @ property
+    @property
     def available(self) -> bool:
         """Check if the model is available."""
         return self._available
@@ -333,8 +286,7 @@ class SparseEmbeddingModelCapabilities(BasedModel):
     name: Annotated[str, Field(description="""The name of the model.""")]
     multilingual: bool = False
     provider: Annotated[
-        Literal[Provider.FASTEMBED,
-            Provider.SENTENCE_TRANSFORMERS, Provider.NOT_SET],
+        Literal[Provider.FASTEMBED, Provider.SENTENCE_TRANSFORMERS, Provider.NOT_SET],
         Field(
             description="""The provider of the model. We currently only support local providers for sparse embeddings. Since Sparse embedding tend to be very efficient and low resource, they are well-suited for deployment in resource-constrained environments."""
         ),
@@ -353,8 +305,7 @@ class SparseEmbeddingModelCapabilities(BasedModel):
     ] = None
     other: Annotated[
         dict[str, Any],
-        Field(description="""Extra model-specific settings.""",
-              default_factory=dict),
+        Field(description="""Extra model-specific settings.""", default_factory=dict),
     ]
     default_dtype: Annotated[
         Literal["float32", "float16", "int8"],
@@ -379,7 +330,7 @@ class SparseEmbeddingModelCapabilities(BasedModel):
         bool, Field(description="""Whether the model is available for use.""")
     ] = False
 
-    @ property
+    @property
     def available(self) -> bool:
         """Check if the model is available."""
         return self._available
@@ -392,7 +343,7 @@ class SparseCapabilities(SparseEmbeddingModelCapabilities):
     """Sparse embedding model capabilities for dependency injection."""
 
 
-@ dependency_provider(SparseCapabilities, scope="singleton", collection=True)
+@dependency_provider(SparseCapabilities, scope="singleton", collection=True)
 def get_sparse_caps() -> tuple[SparseCapabilities, ...]:
     """Get sparse embedding model capabilities."""
     caps = {  # type: ignore

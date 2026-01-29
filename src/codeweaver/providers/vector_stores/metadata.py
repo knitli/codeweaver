@@ -244,7 +244,7 @@ class CollectionMetadata(BasedModel):
             # Collection was indexed with a model family
             # Determine which model to validate based on configuration
             indexed_model = other.dense_model
-            
+
             # Priority: query_model if set (for asymmetric), otherwise dense_model
             current_model = self.query_model if self.query_model else self.dense_model
 
@@ -303,24 +303,23 @@ class CollectionMetadata(BasedModel):
                             "Asymmetric embedding requires both models to belong to the same family",
                         ],
                     )
-                else:
-                    # Dense model switch to non-family model
-                    raise ModelSwitchError(
-                        f"Your existing embedding collection was created with model '{indexed_model}' "
-                        f"(family: '{other.dense_model_family}'), but the current model '{current_model}' "
-                        f"does not belong to a model family. You can't switch to a non-family model.",
-                        suggestions=[
-                            f"Use a model from the '{other.dense_model_family}' family",
-                            f"Or re-index your codebase with the new model",
-                            "Asymmetric embedding requires both models to belong to the same family",
-                        ],
-                        details={
-                            "current_model": current_model,
-                            "indexed_model": indexed_model,
-                            "indexed_family": other.dense_model_family,
-                            "collection": self.project_name,
-                        },
-                    )
+                # Dense model switch to non-family model
+                raise ModelSwitchError(
+                    f"Your existing embedding collection was created with model '{indexed_model}' "
+                    f"(family: '{other.dense_model_family}'), but the current model '{current_model}' "
+                    f"does not belong to a model family. You can't switch to a non-family model.",
+                    suggestions=[
+                        f"Use a model from the '{other.dense_model_family}' family",
+                        "Or re-index your codebase with the new model",
+                        "Asymmetric embedding requires both models to belong to the same family",
+                    ],
+                    details={
+                        "current_model": current_model,
+                        "indexed_model": indexed_model,
+                        "indexed_family": other.dense_model_family,
+                        "collection": self.project_name,
+                    },
+                )
 
             current_family = current_caps.model_family  # ty:ignore[unresolved-attribute]
 

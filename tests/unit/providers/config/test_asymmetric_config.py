@@ -441,8 +441,7 @@ class TestErrorMessageQuality:
         # Suggestions should mention using models with family support
         suggestions_text = " ".join(exc_info.value.suggestions).lower()
         assert any(
-            keyword in suggestions_text
-            for keyword in ["use", "family", "compatible", "symmetric"]
+            keyword in suggestions_text for keyword in ["use", "family", "compatible", "symmetric"]
         )
 
     def test_error_includes_details_dict(

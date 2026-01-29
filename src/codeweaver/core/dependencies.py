@@ -63,7 +63,12 @@ def _resolve_config_file() -> Path | None:
 # Union type covering all possible settings types
 # Imports moved to TYPE_CHECKING block to avoid circular dependencies
 # Actual runtime type is resolved by bootstrap_settings -> get_settings()
-type CodeWeaverSettingsType = "CodeWeaverSettings" | "CodeWeaverEngineSettings" | "CodeWeaverProviderSettings" | "CodeWeaverCoreSettings"
+type CodeWeaverSettingsType = (
+    "CodeWeaverSettings"
+    | "CodeWeaverEngineSettings"
+    | "CodeWeaverProviderSettings"
+    | "CodeWeaverCoreSettings"
+)
 
 
 async def bootstrap_settings(config_file: Path | None = None) -> CodeWeaverSettingsType:

@@ -78,10 +78,7 @@ class TestCreateCollectionWithFamilyMetadata:
         Ensures that metadata without family fields (pre-v1.3.0 style) still works,
         with family fields defaulting to None.
         """
-        metadata = CollectionMetadata(
-            **base_metadata_kwargs,
-            dense_model="voyage-code-3",
-        )
+        metadata = CollectionMetadata(**base_metadata_kwargs, dense_model="voyage-code-3")
 
         assert metadata.dense_model == "voyage-code-3"
         assert metadata.dense_model_family is None
@@ -259,16 +256,12 @@ class TestBackwardCompatibilityDimensionOnly:
         """
         # Old metadata without family info
         old_meta = CollectionMetadata(
-            **base_metadata_kwargs,
-            dense_model="voyage-code-3",
-            version="1.2.0",
+            **base_metadata_kwargs, dense_model="voyage-code-3", version="1.2.0"
         )
 
         # New metadata also without family info but same model
         current_meta = CollectionMetadata(
-            **base_metadata_kwargs,
-            dense_model="voyage-code-3",
-            version="1.2.0",
+            **base_metadata_kwargs, dense_model="voyage-code-3", version="1.2.0"
         )
 
         # Should pass - same model
@@ -280,10 +273,7 @@ class TestBackwardCompatibilityDimensionOnly:
         Different models without family information should still fail validation
         based on model name mismatch.
         """
-        old_meta = CollectionMetadata(
-            **base_metadata_kwargs,
-            dense_model="voyage-code-3",
-        )
+        old_meta = CollectionMetadata(**base_metadata_kwargs, dense_model="voyage-code-3")
 
         current_meta = CollectionMetadata(
             **base_metadata_kwargs,
@@ -387,10 +377,7 @@ class TestErrorMessageSuggestsCompatibleModels:
             dense_model_family=VOYAGE_4_FAMILY.family_id,
         )
 
-        incompatible_meta = CollectionMetadata(
-            **base_metadata_kwargs,
-            dense_model="voyage-code-3",
-        )
+        incompatible_meta = CollectionMetadata(**base_metadata_kwargs, dense_model="voyage-code-3")
 
         with pytest.raises(ModelSwitchError) as exc_info:
             incompatible_meta.validate_compatibility(collection_meta)
@@ -455,9 +442,7 @@ class TestErrorMessageSuggestsCompatibleModels:
         )
 
         incompatible_meta = CollectionMetadata(
-            **base_metadata_kwargs,
-            dense_model="voyage-3-large",
-            dense_model_family=None,
+            **base_metadata_kwargs, dense_model="voyage-3-large", dense_model_family=None
         )
 
         with pytest.raises(ModelSwitchError) as exc_info:
