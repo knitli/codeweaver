@@ -101,10 +101,15 @@ type VectorStoreProviderSettingsType = Annotated[
 
 # Embedding Providers - flattened union for pydantic discrimination
 
+
 def _discriminate_embedding_provider(v: Any) -> str:
     """Identify the embedding provider settings type for discriminator field."""
     tag_value = v.get("tag") if isinstance(v, dict) else getattr(v, "tag", None)
-    if tag_value in {Provider.AZURE.variable, Provider.BEDROCK.variable, Provider.FASTEMBED.variable}:
+    if tag_value in {
+        Provider.AZURE.variable,
+        Provider.BEDROCK.variable,
+        Provider.FASTEMBED.variable,
+    }:
         return tag_value
     return "none"
 
@@ -129,6 +134,7 @@ type SparseEmbeddingProviderSettingsType = Annotated[
 ]
 
 # Reranking Providers - flattened union for pydantic discrimination
+
 
 def _discriminate_reranking_provider(v: Any) -> str:
     """Identify the reranking provider settings type for discriminator field."""
@@ -168,6 +174,7 @@ class ProviderSettingsDict(TypedDict, total=False):
     # we currently only support one each of embedding, reranking and vector store providers
     # but we use tuples to allow for future expansion for some less common use cases
     embedding: NotRequired[tuple[EmbeddingProviderSettingsType, ...] | None]
+    asymmetric_embedding: NotRequired[AsymmetricEmbeddingConfig | None]
     # rerank is probably the priority for multiple providers in the future, because they're vector agnostic, so you could have fallback providers, or use different ones for different tasks
     sparse_embedding: NotRequired[tuple[SparseEmbeddingProviderSettingsType, ...] | None]
     reranking: NotRequired[tuple[RerankingProviderSettingsType, ...] | None]
@@ -481,11 +488,67 @@ class ProviderSettings(BasedModel):
     embedding: Annotated[
         tuple[EmbeddingProviderSettingsType, ...] | None,
         Field(
-            description="""Embedding provider configuration.
+            description="""Embedding provider configuration (symmetric mode).
+
+            Symmetric mode uses the same model for both document and query embeddings.
+            This is the traditional approach where a single model handles all embedding tasks.
 
             We will only use the first provider you configure here. We may add support for multiple embedding providers in the future.
+
+            Note: Cannot be used simultaneously with 'asymmetric_embedding' field.
+            Choose one mode based on your requirements:
+              - Symmetric: Single model, simpler configuration
+              - Asymmetric: Different models for documents and queries, cost optimization
+
+            Example TOML configuration (symmetric):
+              [providers.embedding.0]
+              provider = "voyage"
+              model_name = "voyage-code-3"
             """,
             default_factory=_get_default_embedding_provider_settings,
+        ),
+    ]
+
+    asymmetric_embedding: Annotated[
+        AsymmetricEmbeddingConfig | None,
+        Field(
+            description="""Asymmetric embedding configuration (advanced mode).
+
+            Asymmetric mode allows using different models for document embedding and query
+            embedding while maintaining compatibility through shared vector spaces. This enables
+            cost optimization (e.g., API-based model for document indexing, local model for queries)
+            while preserving search accuracy.
+
+            Requirements:
+              - Both models must belong to the same model family (e.g., Voyage-4)
+              - Models must be explicitly marked as compatible for asymmetric use
+              - Embedding dimensions must match (validated automatically)
+
+            Benefits:
+              - Cost optimization: expensive models for documents, cheap for queries
+              - Performance: local models for queries, API for indexing
+              - Resource flexibility: different deployment strategies per model
+
+            Note: Cannot be used simultaneously with 'embedding' field.
+            Choose one mode based on your requirements:
+              - Symmetric: Single model, simpler configuration
+              - Asymmetric: Different models, cost/performance optimization
+
+            Example TOML configuration (asymmetric):
+              [providers.asymmetric_embedding]
+              validate_family_compatibility = true
+
+              [providers.asymmetric_embedding.embed_provider_settings]
+              provider = "voyage"
+              model_name = "voyage-code-3"
+
+              [providers.asymmetric_embedding.query_provider_settings]
+              provider = "voyage"
+              model_name = "voyage-code-3-lite"
+
+            See documentation: docs/configuration/asymmetric-embedding.md
+            """,
+            default=None,
         ),
     ]
 
@@ -568,6 +631,84 @@ class ProviderSettings(BasedModel):
             if not isinstance(value, tuple):
                 value = (value,)
                 setattr(self, key, value)
+        return self
+
+    @model_validator(mode="after")
+    def validate_embedding_mode_exclusivity(self) -> ProviderSettings:
+        """Validate that only one embedding mode is configured at a time.
+
+        Ensures mutual exclusivity between symmetric ('embedding') and asymmetric
+        ('asymmetric_embedding') embedding configurations to prevent ambiguous
+        provider selection and configuration conflicts.
+
+        Returns:
+            Self for method chaining.
+
+        Raises:
+            ConfigurationError: If both embedding modes are configured simultaneously.
+        """
+        from codeweaver.core.exceptions import ConfigurationError
+
+        has_symmetric = self.embedding is not None and self.embedding is not Unset
+        has_asymmetric = self.asymmetric_embedding is not None
+
+        if has_symmetric and has_asymmetric:
+            logger.error(
+                "Configuration conflict: Both 'embedding' and 'asymmetric_embedding' are set. "
+                "Only one embedding mode can be active at a time."
+            )
+            raise ConfigurationError(
+                "Cannot specify both 'embedding' and 'asymmetric_embedding' configuration. "
+                "Choose one mode:\n\n"
+                "  Symmetric mode (traditional):\n"
+                "    Use 'embedding' field for single model or fallback chain.\n"
+                "    Same model used for both document and query embeddings.\n"
+                "    Simpler configuration, works with any embedding model.\n\n"
+                "  Asymmetric mode (advanced):\n"
+                "    Use 'asymmetric_embedding' field for different models.\n"
+                "    Requires model family compatibility (e.g., Voyage-4).\n"
+                "    Optimizes for cost/performance trade-offs.\n"
+                "    Different models for indexing vs querying.\n",
+                details={
+                    "symmetric_configured": has_symmetric,
+                    "asymmetric_configured": has_asymmetric,
+                    "embedding_providers": (
+                        [str(s.provider) for s in self.embedding]  # ty:ignore[not-iterable]
+                        if has_symmetric and self.embedding
+                        else None
+                    ),
+                    "asymmetric_embed_provider": (
+                        str(self.asymmetric_embedding.embed_provider_settings.provider)
+                        if has_asymmetric and self.asymmetric_embedding
+                        else None
+                    ),
+                    "asymmetric_query_provider": (
+                        str(self.asymmetric_embedding.query_provider_settings.provider)
+                        if has_asymmetric and self.asymmetric_embedding
+                        else None
+                    ),
+                },
+                suggestions=[
+                    "Remove 'embedding' field to use asymmetric mode",
+                    "Remove 'asymmetric_embedding' field to use symmetric mode",
+                    "For most use cases, symmetric mode (embedding) is recommended",
+                    "Use asymmetric mode only if you need different models for documents and queries",
+                    "See documentation: docs/configuration/asymmetric-embedding.md",
+                ],
+            )
+
+        # Log the selected mode for debugging
+        if has_symmetric:
+            logger.debug("Using symmetric embedding mode with providers: %s", self.embedding)
+        elif has_asymmetric:
+            logger.debug(
+                "Using asymmetric embedding mode: embed=%s, query=%s",
+                self.asymmetric_embedding.embed_provider_settings.provider,
+                self.asymmetric_embedding.query_provider_settings.provider,
+            )
+        else:
+            logger.debug("No embedding configuration specified")
+
         return self
 
     def _telemetry_keys(self) -> None:
@@ -748,9 +889,213 @@ def _get_all_default_provider_settings() -> ProviderSettingsDict:
 AllDefaultProviderSettings = None  # Will be lazy-initialized on first access
 
 
+class AsymmetricEmbeddingConfigDict(TypedDict):
+    """Dictionary representation of asymmetric embedding configuration."""
+
+    embed_provider_settings: EmbeddingProviderSettingsType
+    query_provider_settings: EmbeddingProviderSettingsType
+    validate_family_compatibility: bool
+
+
+class AsymmetricEmbeddingConfig(BasedModel):
+    """Configuration for asymmetric embedding setup with separate embed and query models.
+
+    Asymmetric embedding allows using different models for document embedding and query
+    embedding while maintaining compatibility through shared vector spaces. This enables
+    cost optimization (e.g., API for embed, local for queries) while preserving accuracy.
+
+    Attributes:
+        embed_provider_settings: Provider settings for document embedding model.
+        query_provider_settings: Provider settings for query embedding model.
+        validate_family_compatibility: Whether to validate models belong to same family.
+    """
+
+    model_config = BasedModel.model_config
+
+    embed_provider_settings: Annotated[
+        EmbeddingProviderSettingsType,
+        Field(description="Provider settings for the document embedding model."),
+    ]
+    query_provider_settings: Annotated[
+        EmbeddingProviderSettingsType,
+        Field(description="Provider settings for the query embedding model."),
+    ]
+    validate_family_compatibility: Annotated[
+        bool,
+        Field(description="Whether to validate that both models belong to the same model family."),
+    ] = True
+
+    @model_validator(mode="after")
+    def validate_model_compatibility(self) -> AsymmetricEmbeddingConfig:
+        """Validate that embed and query models are compatible.
+
+        Validates:
+        - Both models have registered capabilities
+        - Both models belong to model families
+        - Both models belong to the same family
+        - Models are compatible within the family
+        - Embedding dimensions match
+
+        Returns:
+            Self for method chaining.
+
+        Raises:
+            ConfigurationError: If models are incompatible.
+        """
+        from codeweaver.core.exceptions import ConfigurationError
+        from codeweaver.providers.embedding.capabilities.resolver import EmbeddingCapabilityResolver
+
+        if not self.validate_family_compatibility:
+            logger.warning(
+                "Family compatibility validation disabled for asymmetric embedding config. "
+                "This may result in incompatible embeddings if models are from different families."
+            )
+            return self
+
+        # Resolve capabilities for both models
+        resolver = EmbeddingCapabilityResolver()
+        embed_model_name = str(self.embed_provider_settings.model_name)
+        query_model_name = str(self.query_provider_settings.model_name)
+
+        embed_caps = resolver.resolve(embed_model_name)
+        query_caps = resolver.resolve(query_model_name)
+
+        # Verify both models have capabilities registered
+        if not embed_caps:
+            raise ConfigurationError(
+                f"No capabilities found for embed model: {embed_model_name}",
+                details={
+                    "embed_model": embed_model_name,
+                    "query_model": query_model_name,
+                    "provider": self.embed_provider_settings.provider.value,
+                },
+                suggestions=[
+                    f"Ensure model '{embed_model_name}' is registered in the capabilities system",
+                    "Check that the model name is spelled correctly",
+                    "Verify the provider supports this model",
+                    "List available models with: codeweaver list models",
+                ],
+            )
+
+        if not query_caps:
+            raise ConfigurationError(
+                f"No capabilities found for query model: {query_model_name}",
+                details={
+                    "embed_model": embed_model_name,
+                    "query_model": query_model_name,
+                    "provider": self.query_provider_settings.provider.value,
+                },
+                suggestions=[
+                    f"Ensure model '{query_model_name}' is registered in the capabilities system",
+                    "Check that the model name is spelled correctly",
+                    "Verify the provider supports this model",
+                    "List available models with: codeweaver list models",
+                ],
+            )
+
+        # Verify both models belong to families
+        if not embed_caps.model_family:  # ty:ignore[unresolved-attribute]
+            raise ConfigurationError(
+                f"Embed model '{embed_model_name}' does not belong to a model family",
+                details={"embed_model": embed_model_name, "query_model": query_model_name},
+                suggestions=[
+                    "Asymmetric embedding requires both models to belong to a model family",
+                    "Use symmetric embedding configuration for models without family support",
+                    "Check if a newer version of the model has family support",
+                ],
+            )
+
+        if not query_caps.model_family:  # ty:ignore[unresolved-attribute]
+            raise ConfigurationError(
+                f"Query model '{query_model_name}' does not belong to a model family",
+                details={"embed_model": embed_model_name, "query_model": query_model_name},
+                suggestions=[
+                    "Asymmetric embedding requires both models to belong to a model family",
+                    "Use symmetric embedding configuration for models without family support",
+                    "Check if a newer version of the model has family support",
+                ],
+            )
+
+        # Verify same family ID
+        embed_family = embed_caps.model_family  # ty:ignore[unresolved-attribute]
+        query_family = query_caps.model_family  # ty:ignore[unresolved-attribute]
+
+        if embed_family.family_id != query_family.family_id:
+            raise ConfigurationError(
+                f"Models belong to different families: '{embed_family.family_id}' vs '{query_family.family_id}'",
+                details={
+                    "embed_model": embed_model_name,
+                    "embed_family": embed_family.family_id,
+                    "query_model": query_model_name,
+                    "query_family": query_family.family_id,
+                },
+                suggestions=[
+                    f"Use models from the same family (e.g., both from '{embed_family.family_id}')",
+                    f"Available members of '{embed_family.family_id}': {', '.join(sorted(embed_family.member_models))}",
+                    "Set validate_family_compatibility=False to bypass this check (not recommended)",
+                ],
+            )
+
+        # Verify models are compatible within family
+        if not embed_family.is_compatible(embed_model_name, query_model_name):
+            raise ConfigurationError(
+                f"Models are not compatible within family '{embed_family.family_id}'",
+                details={
+                    "embed_model": embed_model_name,
+                    "query_model": query_model_name,
+                    "family_id": embed_family.family_id,
+                    "family_members": sorted(embed_family.member_models),
+                },
+                suggestions=[
+                    "Ensure both models are listed as family members",
+                    f"Valid family members: {', '.join(sorted(embed_family.member_models))}",
+                    "Contact support if you believe this is an error",
+                ],
+            )
+
+        # Verify dimensions match
+        embed_dim = embed_caps.default_dimension
+        query_dim = query_caps.default_dimension
+
+        is_valid, error_msg = embed_family.validate_dimensions(embed_dim, query_dim)
+        if not is_valid:
+            raise ConfigurationError(
+                f"Dimension mismatch: {error_msg}",
+                details={
+                    "embed_model": embed_model_name,
+                    "embed_dimension": embed_dim,
+                    "query_model": query_model_name,
+                    "query_dimension": query_dim,
+                    "expected_dimension": embed_family.vector_space_dimension,
+                    "family_id": embed_family.family_id,
+                },
+                suggestions=[
+                    "Ensure both models use the same embedding dimension",
+                    f"Expected dimension for '{embed_family.family_id}': {embed_family.vector_space_dimension}",
+                    "Check model configurations and verify dimension settings",
+                ],
+            )
+
+        logger.info(
+            "Asymmetric embedding configuration validated successfully: "
+            "embed_model='%s', query_model='%s', family='%s', dimension=%d",
+            embed_model_name,
+            query_model_name,
+            embed_family.family_id,
+            embed_dim,
+        )
+
+        return self
+
+    def _telemetry_keys(self) -> None:
+        return None
+
+
 __all__ = (
     "AgentProviderSettingsType",
     "AllDefaultProviderSettings",
+    "AsymmetricEmbeddingConfig",
+    "AsymmetricEmbeddingConfigDict",
     "DataProviderSettingsType",
     "EmbeddingProviderSettingsType",
     "ProviderSettings",

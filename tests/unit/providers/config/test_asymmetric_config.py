@@ -129,6 +129,7 @@ def mock_voyage_4_family() -> ModelFamily:
 # ===========================================================================
 
 
+@pytest.mark.unit
 class TestAsymmetricConfigCreation:
     """Test successful creation of AsymmetricEmbeddingConfig."""
 
@@ -176,6 +177,7 @@ class TestAsymmetricConfigCreation:
         assert config.query_provider_settings.model_name == "voyage-4"
 
 
+@pytest.mark.unit
 class TestSameFamilyValidation:
     """Test validation passes for same-family models."""
 
@@ -221,6 +223,7 @@ class TestSameFamilyValidation:
         assert config is not None
 
 
+@pytest.mark.unit
 class TestValidationBypass:
     """Test validation bypass mechanism."""
 
@@ -251,6 +254,7 @@ class TestValidationBypass:
 # ===========================================================================
 
 
+@pytest.mark.unit
 class TestIncompatibleFamilyModels:
     """Test validation failures for incompatible model families."""
 
@@ -294,6 +298,7 @@ class TestIncompatibleFamilyModels:
             )
 
 
+@pytest.mark.unit
 class TestModelWithoutFamily:
     """Test validation for models without family assignments."""
 
@@ -324,6 +329,7 @@ class TestModelWithoutFamily:
             )
 
 
+@pytest.mark.unit
 class TestDimensionMismatch:
     """Test validation for dimension incompatibility."""
 
@@ -334,6 +340,7 @@ class TestDimensionMismatch:
         pytest.skip("Dimension validation test requires specific test fixtures")
 
 
+@pytest.mark.unit
 class TestUnknownModel:
     """Test validation for unknown/unregistered models."""
 
@@ -366,6 +373,7 @@ class TestUnknownModel:
 # ===========================================================================
 
 
+@pytest.mark.unit
 class TestErrorMessageQuality:
     """Test that error messages are helpful and actionable."""
 
@@ -465,6 +473,7 @@ class TestErrorMessageQuality:
 # ===========================================================================
 
 
+@pytest.mark.unit
 class TestCrossProviderFamilies:
     """Test cross-provider family linking."""
 
@@ -514,6 +523,7 @@ class TestCrossProviderFamilies:
 # ===========================================================================
 
 
+@pytest.mark.unit
 class TestEdgeCases:
     """Test edge cases and boundary conditions."""
 
@@ -568,6 +578,7 @@ class TestEdgeCases:
 # ===========================================================================
 
 
+@pytest.mark.unit
 class TestIntegrationReadiness:
     """Tests to verify readiness for integration with other components."""
 
