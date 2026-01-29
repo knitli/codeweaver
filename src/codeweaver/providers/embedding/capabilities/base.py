@@ -147,8 +147,6 @@ class ModelFamily(BasedModel):
 class EmbeddingModelCapabilities(BasedModel):
     """Describes the capabilities of an embedding model, such as the default dimension."""
 
-    model_config = BASEDMODEL_CONFIG | ConfigDict(extra="allow")
-
     name: Annotated[
         str, Field(min_length=3, description="""The name of the model or family of models.""")
     ] = ""
