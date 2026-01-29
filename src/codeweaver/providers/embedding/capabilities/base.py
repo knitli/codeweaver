@@ -27,6 +27,129 @@ def _determine_max_batch_tokens(fields: dict[str, Any]) -> PositiveInt:
     return 100_000
 
 
+class ModelFamily(BasedModel):
+    """Defines a family of embedding models with compatible vector spaces.
+
+    Model families group embedding models that produce compatible embeddings, meaning
+    their vectors can be directly compared and stored in the same vector space. This
+    enables cross-model operations like using different models for embedding vs querying,
+    or migrating between models within a family without re-embedding.
+
+    Attributes:
+        family_id: Unique identifier for the model family (e.g., "voyage-3", "cohere-v3").
+        vector_space_dimension: Dimensionality of the embedding vectors in this family.
+        vector_space_datatype: Data type of vector components (default: "float").
+        is_normalized: Whether embeddings are normalized to unit length.
+        preferred_metrics: Preferred distance metrics for this family, in order of suitability.
+        member_models: Set of model names belonging to this family.
+        asymmetric_query_models: Optional set of specialized query-only models.
+        cross_provider_compatible: Whether this family maintains compatibility across providers.
+    """
+
+    model_config = BASEDMODEL_CONFIG
+
+    family_id: Annotated[
+        str,
+        Field(
+            min_length=3,
+            description="Unique identifier for the model family.",
+        ),
+    ]
+    vector_space_dimension: Annotated[
+        PositiveInt,
+        Field(
+            description="Dimensionality of the embedding vectors produced by this family.",
+        ),
+    ]
+    vector_space_datatype: Annotated[
+        str,
+        Field(
+            description="Data type of vector components (e.g., 'float', 'int8').",
+        ),
+    ] = "float"
+    is_normalized: Annotated[
+        bool,
+        Field(
+            description="Whether embeddings are normalized to unit length.",
+        ),
+    ] = False
+    preferred_metrics: Annotated[
+        tuple[str, ...],
+        Field(
+            description="Preferred distance metrics for comparing embeddings, in order of suitability.",
+        ),
+    ] = ("cosine", "dot", "euclidean")
+    member_models: Annotated[
+        frozenset[str],
+        Field(
+            description="Set of model names that belong to this family and share the same vector space.",
+        ),
+    ]
+    asymmetric_query_models: Annotated[
+        frozenset[str] | None,
+        Field(
+            description="Optional set of specialized models designed for query-time use only.",
+        ),
+    ] = None
+    cross_provider_compatible: Annotated[
+        bool,
+        Field(
+            description="Whether this family maintains compatibility across different providers.",
+        ),
+    ] = False
+
+    def is_compatible(self, embed_model: str, query_model: str) -> bool:
+        """Check if two models are compatible within this family.
+
+        Models are compatible if both are members of the family, allowing their
+        embeddings to be directly compared in the same vector space.
+
+        Args:
+            embed_model: Name of the model used for embedding documents.
+            query_model: Name of the model used for queries.
+
+        Returns:
+            True if both models belong to this family's member models, False otherwise.
+        """
+        return embed_model in self.member_models and query_model in self.member_models
+
+    def validate_dimensions(self, embed_dim: int, query_dim: int) -> tuple[bool, str | None]:
+        """Validate that embedding dimensions match the family specification.
+
+        Args:
+            embed_dim: Dimension of the embedding model's output.
+            query_dim: Dimension of the query model's output.
+
+        Returns:
+            Tuple of (is_valid, error_message). If valid, error_message is None.
+            If invalid, error_message describes the dimension mismatch.
+        """
+        expected = self.vector_space_dimension
+
+        if embed_dim != expected:
+            return (
+                False,
+                f"Embedding dimension {embed_dim} does not match family dimension {expected}",
+            )
+
+        if query_dim != expected:
+            return (
+                False,
+                f"Query dimension {query_dim} does not match family dimension {expected}",
+            )
+
+        if embed_dim != query_dim:
+            return (
+                False,
+                f"Embedding dimension {embed_dim} does not match query dimension {query_dim}",
+            )
+
+        return (True, None)
+
+    def _telemetry_keys(self) -> None:
+        return None
+
+
 class EmbeddingModelCapabilities(BasedModel):
     """Describes the capabilities of an embedding model, such as the default dimension."""
 
@@ -70,6 +193,12 @@ class EmbeddingModelCapabilities(BasedModel):
         ),
     ] = None
     is_normalized: bool = False
+    model_family: Annotated[
+        ModelFamily | None,
+        Field(
+            description="Optional model family specification for cross-model compatibility.",
+        ),
+    ] = None
     context_window: Annotated[PositiveInt, Field(ge=256)] = 512
     max_batch_tokens: PositiveInt = Field(
         default_factory=_determine_max_batch_tokens,
@@ -304,6 +433,7 @@ def get_sparse_caps() -> tuple[SparseCapabilities, ...]:
 
 __all__ = (
     "EmbeddingModelCapabilities",
+    "ModelFamily",
     "SparseCapabilities",
     "SparseEmbeddingModelCapabilities",
     "get_sparse_caps",

@@ -14,6 +14,7 @@ from pydantic import PositiveFloat, PositiveInt
 
 if TYPE_CHECKING:
     from codeweaver.core import Provider
+    from codeweaver.providers.embedding.capabilities.base import ModelFamily
 
 
 class EmbeddingSettingsDict(TypedDict, total=False):
@@ -34,7 +35,9 @@ type PartialCapabilities = dict[
         "other",
         "is_normalized",
         "hf_name",
+        "max_batch_size",
         "max_batch_tokens",
+        "model_family",
         "name",
         "output_dimensions",
         "output_dtypes",
@@ -46,18 +49,7 @@ type PartialCapabilities = dict[
         "tokenizer_model",
         "version",
     ],
-    Literal[
-        "tokenizers", "tiktoken", "dot", "cosine", "euclidean", "manhattan", "hamming", "chebyshev"
-    ]
-    | str
-    | PositiveInt
-    | PositiveFloat
-    | bool
-    | Provider
-    | None
-    | dict[str, Any]
-    | tuple[str, ...]
-    | tuple[PositiveInt, ...],
+    Any,
 ]
 
 
@@ -76,7 +68,9 @@ class EmbeddingCapabilitiesDict(TypedDict, total=False):
     output_dtypes: NotRequired[tuple[str, ...] | None]
     is_normalized: NotRequired[bool]
     context_window: NotRequired[PositiveInt]
+    max_batch_size: NotRequired[PositiveInt]
     max_batch_tokens: NotRequired[PositiveInt]
+    model_family: NotRequired[ModelFamily | None]
     supports_context_chunk_embedding: NotRequired[bool]
     tokenizer: NotRequired[Literal["tokenizers", "tiktoken"]]
     tokenizer_model: NotRequired[str]
