@@ -620,6 +620,11 @@ class ProviderSettings(BasedModel):
     @model_validator(mode="after")
     def validate_and_normalize_providers(self) -> ProviderSettings:
         """Validate and normalize provider settings after initialization."""
+        # Lazy-initialize AllDefaultProviderSettings if needed
+        global AllDefaultProviderSettings
+        if AllDefaultProviderSettings is None:
+            AllDefaultProviderSettings = _get_all_default_provider_settings()
+
         for key in self._field_names:
             value = getattr(self, key)
             if value is None:

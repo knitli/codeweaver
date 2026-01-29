@@ -249,6 +249,9 @@ def config(
             case "user":
                 config_path = get_user_config_dir() / f"codeweaver.{config_extension}"
 
+    # Type narrowing: config_path is guaranteed to be set by the match statement above
+    assert config_path is not None, "config_path must be set by this point"
+
     # Handle existing configuration
     if (
         config_path.exists()

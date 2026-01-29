@@ -35,9 +35,8 @@ from codeweaver.core.utils import get_blake_hash
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.types import AnonymityConversion, FilteredKeyT
+    from codeweaver.core.types import AnonymityConversion, EmbeddingBatchInfo, FilteredKeyT
     from codeweaver.providers.embedding.registry import EmbeddingRegistry
-    from codeweaver.providers.embedding.types import EmbeddingBatchInfo
 
 
 class EmbeddingCacheManager(BasedModel):
@@ -137,7 +136,7 @@ class EmbeddingCacheManager(BasedModel):
         """
         if namespace not in self._hash_stores:
             # 10MB limit per namespace (same as original per-instance limit)
-            self._hash_stores[namespace] = make_blake_store(
+            self._hash_stores[namespace] = make_blake_store(  # ty:ignore[invalid-argument-type]
                 value_type=UUID7, size_limit=1024 * 1024 * 10
             )
         return self._hash_stores[namespace]

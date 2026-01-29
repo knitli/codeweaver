@@ -149,11 +149,11 @@ async def get_backup_embedding_provider() -> EmbeddingProvider | None:
                     if cap.name == BACKUP_MODEL_PRIMARY
                 ),
                 cache_manager=cache_manager,
-                registry=registry,
+                registry=await registry,
             )
 
             # Initialize the provider
-            await provider.initialize()
+            await provider.initialize_async()
 
             logger.info(
                 "Successfully created backup embedding provider: sentence-transformers/%s",
@@ -192,11 +192,11 @@ async def get_backup_embedding_provider() -> EmbeddingProvider | None:
                     if cap.name == BACKUP_MODEL_FALLBACK
                 ),
                 cache_manager=cache_manager,
-                registry=registry,
+                registry=await registry,
             )
 
             # Initialize the provider
-            await provider.initialize()
+            await provider.initialize_async()
 
             logger.info(
                 "Successfully created backup embedding provider: fastembed/%s",
@@ -241,7 +241,14 @@ async def create_backup_embeddings(text: str | list[str]) -> list[list[float]] |
         texts = [text] if isinstance(text, str) else text
 
         # Generate embeddings
-        return await provider.embed_batch(texts)
+        result = await provider.embed_query(texts)
+
+        # Handle potential error response
+        if isinstance(result, dict) and "error" in result:
+            logger.warning("Backup embedding failed: %s", result.get("error"))
+            return None
+
+        return result
 
     except Exception as e:
         logger.warning("Failed to create backup embeddings: %s", e)

@@ -1040,7 +1040,8 @@ async def indexed_test_project(known_test_codebase, clean_container):
         settings = get_settings()
         settings.project_path = project_path
         settings.project_name = f"test_real_{project_path.name}"
-        return settings
+        # get_settings() returns BaseCodeWeaverSettings, but in test mode it's actually CodeWeaverSettings
+        return settings  # type: ignore[return-value]
 
     # Apply overrides to container
     clean_container.override(CodeWeaverSettings, get_test_settings)

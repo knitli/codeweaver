@@ -24,7 +24,7 @@ from dataclasses import asdict
 from importlib import util
 from importlib.util import find_spec
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, overload
+from typing import TYPE_CHECKING, Any, Literal, overload
 
 from pydantic import AnyHttpUrl
 from pydantic_ai.settings import ModelSettings as AgentModelSettings

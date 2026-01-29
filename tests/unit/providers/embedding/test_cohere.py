@@ -90,6 +90,14 @@ def mock_embedding_registry():
     return registry
 
 
+@pytest.fixture
+def mock_cache_manager(mock_embedding_registry):
+    """Create a mock cache manager."""
+    from codeweaver.providers.embedding.cache_manager import EmbeddingCacheManager
+
+    return EmbeddingCacheManager(registry=mock_embedding_registry)
+
+
 @pytest.mark.async_test
 @pytest.mark.mock_only
 @pytest.mark.unit
@@ -97,15 +105,18 @@ class TestCohereEmbeddingProviderInitialization:
     """Test CohereEmbeddingProvider initialization."""
 
     @patch.dict("os.environ", {"COHERE_API_KEY": "test-api-key"})
-    def test_provider_initialization_with_env_api_key(self):
+    def test_provider_initialization_with_env_api_key(
+        self, mock_cohere_client, mock_cohere_config, mock_embedding_registry, mock_cache_manager, cohere_capabilities
+    ):
         """Test that provider initializes with API key from environment."""
         from codeweaver.providers import CohereEmbeddingProvider
 
         provider = CohereEmbeddingProvider(
-            caps=cohere_capabilities(),
-            client=mock_cohere_client(),
-            config=mock_cohere_config(),
-            registry=mock_embedding_registry(),
+            caps=cohere_capabilities,
+            client=mock_cohere_client,
+            config=mock_cohere_config,
+            registry=mock_embedding_registry,
+            cache_manager=mock_cache_manager,
         )
 
         assert provider.caps == cohere_capabilities
@@ -113,68 +124,74 @@ class TestCohereEmbeddingProviderInitialization:
         assert provider.name == Provider.COHERE
 
     @patch.dict("os.environ", {}, clear=True)
-    def test_provider_initialization_without_api_key_raises_error(self):
+    def test_provider_initialization_without_api_key_raises_error(
+        self, mock_cohere_client, mock_cohere_config, mock_embedding_registry, mock_cache_manager, cohere_capabilities
+    ):
         """Test that provider raises error without API key."""
         from codeweaver.core import ConfigurationError
         from codeweaver.providers import CohereEmbeddingProvider
 
         with pytest.raises(ConfigurationError) as exc_info:
             CohereEmbeddingProvider(
-                caps=cohere_capabilities(),
-                client=mock_cohere_client(),
-                config=mock_cohere_config(),
-                registry=mock_embedding_registry(),
+                caps=cohere_capabilities,
+                client=mock_cohere_client,
+                config=mock_cohere_config,
+                registry=mock_embedding_registry,
+                cache_manager=mock_cache_manager,
             )
 
         assert "API key not found" in str(exc_info.value)
 
     def test_provider_initialization_with_client(
-        self, mock_cohere_client, mock_cohere_config, mock_embedding_registry
+        self, mock_cohere_client, mock_cohere_config, mock_embedding_registry, mock_cache_manager, cohere_capabilities
     ):
         """Test that provider initializes correctly with a provided client."""
         from codeweaver.providers import CohereEmbeddingProvider
 
         provider = CohereEmbeddingProvider(
-            caps=cohere_capabilities(),
+            caps=cohere_capabilities,
             client=mock_cohere_client,
-            config=mock_cohere_config(),
-            registry=mock_embedding_registry(),
+            config=mock_cohere_config,
+            registry=mock_embedding_registry,
+            cache_manager=mock_cache_manager,
         )
 
         assert provider.client is mock_cohere_client
-        assert provider.caps == cohere_capabilities()
+        assert provider.caps == cohere_capabilities
 
     @patch.dict("os.environ", {"COHERE_API_KEY": "test-api-key"})
-    def test_provider_initialization_with_custom_kwargs(self):
+    def test_provider_initialization_with_custom_kwargs(self, mock_cohere_client, mock_cohere_config, mock_embedding_registry, mock_cache_manager, cohere_capabilities):
         """Test that custom kwargs are stored correctly."""
         from codeweaver.providers import CohereEmbeddingProvider
 
         provider = CohereEmbeddingProvider(
-            caps=cohere_capabilities(),
+            caps=cohere_capabilities,
             client=mock_cohere_client,
-            config=mock_cohere_config(),
-            registry=mock_embedding_registry(),
+            config=mock_cohere_config,
+            registry=mock_embedding_registry,
+            cache_manager=mock_cache_manager,
         )
 
         assert "custom_param" in provider.embed_options
         assert provider.embed_options["custom_param"] == "value"
 
     @patch.dict("os.environ", {"COHERE_API_KEY": "test-api-key"})
-    def test_provider_base_url_cohere(self):
+    def test_provider_base_url_cohere(self, mock_cohere_client, mock_cohere_config, mock_embedding_registry, mock_cache_manager, cohere_capabilities):
         """Test that base_url property returns correct value for Cohere."""
         from codeweaver.providers import CohereEmbeddingProvider
 
         provider = CohereEmbeddingProvider(
-            caps=cohere_capabilities(),
+            caps=cohere_capabilities,
             client=mock_cohere_client,
-            config=mock_cohere_config(),
-            registry=mock_embedding_registry(),
+            config=mock_cohere_config,
+            registry=mock_embedding_registry,
+            cache_manager=mock_cache_manager,
         )
 
         assert provider.base_url == "https://api.cohere.com"
 
     @patch.dict("os.environ", {"AZURE_COHERE_API_KEY": "test-api-key"})
-    def test_provider_initialization_azure_provider(self):
+    def test_provider_initialization_azure_provider(self, mock_cohere_client, mock_cohere_config, mock_embedding_registry, mock_cache_manager, cohere_capabilities):
         """Test that Azure provider is supported."""
         from codeweaver.providers import CohereEmbeddingProvider
 
@@ -189,8 +206,9 @@ class TestCohereEmbeddingProviderInitialization:
         provider = CohereEmbeddingProvider(
             caps=caps,
             client=mock_cohere_client,
-            config=mock_cohere_config(),
-            registry=mock_embedding_registry(),
+            config=mock_cohere_config,
+            registry=mock_embedding_registry,
+            cache_manager=mock_cache_manager,
         )
 
         assert provider.caps.provider == Provider.AZURE
@@ -226,10 +244,11 @@ class TestCohereEmbeddingProviderEmbedding:
         mock_cohere_client.embed.return_value = mock_response
 
         provider = CohereEmbeddingProvider(
-            caps=cohere_capabilities(),
+            caps=cohere_capabilities,
             client=mock_cohere_client,
-            config=mock_cohere_config(),
-            registry=mock_embedding_registry(),
+            config=mock_cohere_config,
+            registry=mock_embedding_registry,
+            cache_manager=mock_cache_manager,
         )
         from codeweaver.core import ChunkKind, ExtKind, SemanticSearchLanguage, Span, uuid7
 
@@ -296,6 +315,7 @@ class TestCohereEmbeddingProviderEmbedding:
             client=mock_cohere_client,
             config=mock_cohere_config,
             registry=mock_embedding_registry,
+            cache_manager=mock_cache_manager,
         )
 
         # Call embed_query
@@ -329,8 +349,9 @@ class TestCohereEmbeddingProviderEmbedding:
         provider = CohereEmbeddingProvider(
             caps=cohere_4_capabilities(),
             client=mock_cohere_client,
-            config=mock_cohere_config(),
-            registry=mock_embedding_registry(),
+            config=mock_cohere_config,
+            registry=mock_embedding_registry,
+            cache_manager=mock_cache_manager,
         )
         from pathlib import Path
 
@@ -381,6 +402,7 @@ class TestCohereEmbeddingProviderErrorHandling:
             client=mock_cohere_client,
             config=mock_cohere_config,
             registry=mock_embedding_registry,
+            cache_manager=mock_cache_manager,
         )
         from pathlib import Path
 

@@ -44,7 +44,7 @@ if TYPE_CHECKING:
         QdrantCollectionConfig,
         QdrantVectorStoreProviderSettings,
     )
-    from codeweaver.providers.embedding import EmbeddingCapabilityGroup
+    from codeweaver.providers.types import EmbeddingCapabilityGroup
 
 logger = logging.getLogger(__name__)
 
@@ -225,10 +225,11 @@ def create_qdrant_service(
     # Extract Qdrant-specific settings from provider settings
     # Assuming first vector_store is Qdrant (may need to filter by provider type)
     qdrant_settings = None
-    for vs_settings in settings_dep.vector_store:
-        if isinstance(vs_settings, QdrantVectorStoreProviderSettings):
-            qdrant_settings = vs_settings
-            break
+    if settings_dep.vector_store is not None:
+        for vs_settings in settings_dep.vector_store:
+            if isinstance(vs_settings, QdrantVectorStoreProviderSettings):
+                qdrant_settings = vs_settings
+                break
 
     if qdrant_settings is None:
         raise ValueError("No QdrantVectorStoreProviderSettings found in provider settings")

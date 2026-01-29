@@ -47,11 +47,11 @@ async def memory_config(temp_persist_path):
     """Provide test Memory configuration."""
     return MemoryVectorStoreProviderSettings(
         provider=Provider.MEMORY,
+        collection_name=f"test_memory_{uuid4().hex[:8]}",
         in_memory_config={
             "persist_path": str(temp_persist_path / "vector_store"),
             "auto_persist": True,
             "persist_interval": None,
-            "collection_name": f"test_memory_{uuid4().hex[:8]}",
         },
     )
 

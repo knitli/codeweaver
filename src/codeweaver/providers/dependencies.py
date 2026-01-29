@@ -591,7 +591,7 @@ type EmbeddingRegistryDep = Annotated[
 
 
 @dependency_provider(scope="singleton")
-def _get_cache_manager(registry: EmbeddingRegistryDep = INJECTED):
+def _get_cache_manager(registry: EmbeddingRegistryDep = INJECTED) -> EmbeddingCacheManager:
     """Get singleton cache manager with namespace isolation.
 
     The cache manager provides centralized caching with:
@@ -660,7 +660,7 @@ def _get_embedding_provider_for_config(
             client=client,
             provider=config.provider,
             registry=registry,
-            cache_manager=cache_manager,
+            cache_manager=cache_manager,  # ty:ignore[invalid-argument]
             caps=capabilities,  # ty:ignore[invalid-argument-type]
             config=config,  # ty:ignore[invalid-argument-type]
         )  # ty:ignore[invalid-return-type]
@@ -993,7 +993,7 @@ async def _get_search_package(
     return SearchPackage(
         embedding=embedding,
         sparse_embedding=sparse,
-        reranking=reranking,
+        reranking=(reranking,),  # Wrap single provider in tuple
         vector_store=vector_store,
         capabilities=capabilities,
     )

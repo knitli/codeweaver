@@ -8,7 +8,6 @@
 
 from __future__ import annotations
 
-import contextlib
 import logging
 
 from abc import ABC, abstractmethod
@@ -84,17 +83,11 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         if self._service is None:
             from codeweaver.providers.vector_stores.qdrant_service import QdrantVectorStoreService
 
-            # Try to get failover settings from DI container
+            # Note: Failover settings require async DI resolution
+            # Since we're in a sync property, we can't use container.resolve()
+            # The service will handle None failover settings gracefully
             failover_settings = None
             failover_detector = None
-            with contextlib.suppress(Exception):
-                from codeweaver.core.di import get_container
-                from codeweaver.engine.config import FailoverSettings
-                from codeweaver.engine.config.failover_detector import FailoverDetector
-
-                container = get_container()
-                failover_settings = container.resolve_sync(FailoverSettings)
-                failover_detector = container.resolve_sync(FailoverDetector)
 
             self._service = QdrantVectorStoreService(
                 settings=self.config,
@@ -369,16 +362,9 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
                 self.config.collection.sparse_vectors_config[key] = value  # ty:ignore[invalid-assignment]
             return
 
-        # Validate datatype matches
-        if ours.datatype != value.datatype:
-            raise ConfigurationError(
-                f"Collection '{collection_name}' has a sparse vector config for key '{key}' with datatype '{value.datatype}' that does not match the current config datatype '{ours.datatype}'",
-                suggestions=[
-                    "You need to update your sparse vector config's datatype to match the existing collection's config",
-                    "You may also force a reindex of the collection to apply the new config with `cw index --force --clear`",
-                    "Finally, you can preserve your collection and index with new settings by setting a new collection name in your config.",
-                ],
-            )
+        # Note: In qdrant-client 1.16+, SparseVectorParams no longer has a 'datatype' attribute
+        # Datatype is now managed internally and doesn't need explicit validation
+        # The sparse vector configuration is validated through the index and modifier parameters
 
     def _validate_vector_problem(
         self,

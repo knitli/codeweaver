@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import logging
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, TypedDict
 
 from codeweaver.core import CodeChunk
 from codeweaver.providers.config.backup_models import get_backup_embedding_provider
@@ -30,6 +30,23 @@ if TYPE_CHECKING:
     from codeweaver.providers.vector_stores.base import VectorStoreProvider
 
 logger = logging.getLogger(__name__)
+
+
+class RepairStats(TypedDict):
+    """Statistics for repair operations."""
+
+    repaired: int
+    failed: int
+    errors: list[str]
+
+
+class ReconciliationResult(TypedDict):
+    """Results from reconciliation operations."""
+
+    detected: int
+    repaired: int
+    failed: int
+    errors: list[str]
 
 
 class VectorReconciliationService:
@@ -162,13 +179,21 @@ class VectorReconciliationService:
 
         # Multi-vector format (dict of vectors)
         if isinstance(vectors, dict):
-            return self.backup_vector_name in vectors and vectors[self.backup_vector_name]
+            backup_vector = vectors.get(self.backup_vector_name)
+            # Check if backup vector exists and is non-empty
+            if backup_vector is None:
+                return False
+            # Handle both list and SparseVector types
+            if isinstance(backup_vector, list):
+                return len(backup_vector) > 0
+            # For SparseVector or other types, assume present means valid
+            return True
 
         return False
 
     async def repair_missing_vectors(
         self, collection_name: str, point_ids: list[str]
-    ) -> dict[str, Any]:
+    ) -> RepairStats:
         """Repair points by generating and adding missing backup vectors.
 
         This method retrieves the points, generates backup embeddings from their
@@ -191,7 +216,7 @@ class VectorReconciliationService:
         """
         if not point_ids:
             logger.info("No points to repair")
-            return {"repaired": 0, "failed": 0, "errors": []}
+            return RepairStats(repaired=0, failed=0, errors=[])
 
         logger.info("Starting repair of %d points", len(point_ids))
 
@@ -200,9 +225,9 @@ class VectorReconciliationService:
         if backup_provider is None:
             error_msg = "No backup embedding provider available"
             logger.error(error_msg)
-            return {"repaired": 0, "failed": len(point_ids), "errors": [error_msg]}
+            return RepairStats(repaired=0, failed=len(point_ids), errors=[error_msg])
 
-        stats = {"repaired": 0, "failed": 0, "errors": []}
+        stats: RepairStats = RepairStats(repaired=0, failed=0, errors=[])
 
         # Process in batches
         for i in range(0, len(point_ids), self.batch_size):
@@ -229,7 +254,7 @@ class VectorReconciliationService:
 
     async def _repair_batch(
         self, collection_name: str, point_ids: list[str], backup_provider: EmbeddingProvider
-    ) -> dict[str, Any]:
+    ) -> RepairStats:
         """Repair a batch of points.
 
         Args:
@@ -240,7 +265,7 @@ class VectorReconciliationService:
         Returns:
             Batch repair statistics
         """
-        batch_stats = {"repaired": 0, "failed": 0, "errors": []}
+        batch_stats: RepairStats = RepairStats(repaired=0, failed=0, errors=[])
 
         try:
             # Retrieve points with payload
@@ -258,15 +283,16 @@ class VectorReconciliationService:
                 batch_stats["errors"].append(error_msg)
                 return batch_stats
 
-            # Extract text content from payloads
-            texts: list[str] = []
+            # Extract CodeChunk objects from payloads
+            chunks: list[CodeChunk] = []
             point_map: dict[int, str] = {}  # index -> point_id
 
             for idx, point in enumerate(points):
                 try:
                     # Reconstruct CodeChunk from payload
-                    chunk = CodeChunk.from_dict(point.payload)
-                    texts.append(chunk.content)
+                    # CodeChunk is a pydantic model, use model_validate instead of from_dict
+                    chunk = CodeChunk.model_validate(point.payload)
+                    chunks.append(chunk)
                     point_map[idx] = str(point.id)
                 except Exception as e:
                     error_msg = f"Failed to extract content from point {point.id}: {e}"
@@ -274,16 +300,26 @@ class VectorReconciliationService:
                     batch_stats["failed"] += 1
                     batch_stats["errors"].append(error_msg)
 
-            if not texts:
+            if not chunks:
                 return batch_stats
 
             # Generate backup embeddings
             try:
-                backup_embeddings = await backup_provider.embed_batch(texts)
+                # EmbeddingProvider.embed_documents expects Sequence[CodeChunk]
+                embedding_result = await backup_provider.embed_documents(chunks)
+                # Handle potential error result
+                if isinstance(embedding_result, dict):
+                    # EmbeddingErrorInfo case - treat as failure
+                    error_msg = f"Embedding failed: {embedding_result.get('error', 'Unknown error')}"
+                    logger.exception(error_msg)
+                    batch_stats["failed"] += len(chunks)
+                    batch_stats["errors"].append(error_msg)
+                    return batch_stats
+                backup_embeddings = embedding_result
             except Exception as e:
                 error_msg = f"Failed to generate backup embeddings: {e}"
                 logger.exception(error_msg)
-                batch_stats["failed"] += len(texts)
+                batch_stats["failed"] += len(chunks)
                 batch_stats["errors"].append(error_msg)
                 return batch_stats
 
@@ -313,7 +349,7 @@ class VectorReconciliationService:
 
     async def reconcile(
         self, collection_name: str, *, auto_repair: bool = True, detection_limit: int | None = None
-    ) -> dict[str, Any]:
+    ) -> ReconciliationResult:
         """Perform full reconciliation: detect and optionally repair missing vectors.
 
         This is the main entry point for the reconciliation service. It detects
@@ -347,7 +383,9 @@ class VectorReconciliationService:
             collection_name=collection_name, limit=detection_limit
         )
 
-        result = {"detected": len(missing_ids), "repaired": 0, "failed": 0, "errors": []}
+        result: ReconciliationResult = ReconciliationResult(
+            detected=len(missing_ids), repaired=0, failed=0, errors=[]
+        )
 
         # Repair if enabled
         if auto_repair and missing_ids:
@@ -369,6 +407,12 @@ class VectorReconciliationService:
 
     async def cleanup(self) -> None:
         """Cleanup service resources."""
-        if self._backup_provider and hasattr(self._backup_provider, "cleanup"):
-            await self._backup_provider.cleanup()
+        if self._backup_provider is not None:
+            # Check if cleanup method exists and is callable
+            cleanup_method = getattr(self._backup_provider, "cleanup", None)
+            if cleanup_method is not None and callable(cleanup_method):
+                await cleanup_method()
             self._backup_provider = None
+
+
+__all__ = ("VectorReconciliationService",)

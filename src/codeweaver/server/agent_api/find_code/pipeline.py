@@ -1,8 +1,3 @@
-# SPDX-FileCopyrightText: 2025 Knitli Inc.
-# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
-#
-# SPDX-License-Identifier: MIT OR Apache-2.0
-
 """Search pipeline orchestration.
 
 This module handles the core search pipeline including:
@@ -10,7 +5,6 @@ This module handles the core search pipeline including:
 - Vector store search
 - Reranking (when provider available)
 """
-
 from __future__ import annotations
 
 import logging
@@ -38,152 +32,57 @@ from codeweaver.providers import (
 
 if TYPE_CHECKING:
     from codeweaver.core import SearchResult
-
-
 logger = logging.getLogger(__name__)
-
-_query_cv: ContextVar[str | None] = ContextVar("_query_cv", default=None)
-
+_query_cv: ContextVar[str | None] = ContextVar('_query_cv', default=None)
 
 def raise_value_error(message: str) -> NoReturn:
     """Raise QueryError with message including current query."""
-    q = _query_cv.get() or ""
-    raise QueryError(
-        f"{message}",
-        details={"query": q},
-        suggestions=[
-            "Verify embedding provider configuration",
-            "Check provider credentials and API keys",
-            "Review query format and content",
-        ],
-    )
+    q = _query_cv.get() or ''
+    raise QueryError(f'{message}', details={'query': q}, suggestions=['Verify embedding provider configuration', 'Check provider credentials and API keys', 'Review query format and content'])
 
-
-async def _embed_dense(
-    query: str, dense_provider: EmbeddingProviderDep, context: Any
-) -> RawEmbeddingVectors | None:
+async def _embed_dense(query: str, dense_provider: EmbeddingProviderDep, context: Any) -> RawEmbeddingVectors | None:
     """Attempt dense embedding, return None on failure."""
     from codeweaver.core import log_to_client_or_fallback
-
     try:
         result = await dense_provider.embed_query(query)
-
-        if isinstance(result, dict) and "error" in result:
-            await log_to_client_or_fallback(
-                context,
-                "warning",
-                {
-                    "msg": "Dense embedding returned error",
-                    "extra": {
-                        "phase": "query_embedding",
-                        "embedding_type": "dense",
-                        "error": result.get("error"),
-                    },
-                },
-            )
+        if isinstance(result, dict) and 'error' in result:
+            await log_to_client_or_fallback(context, 'warning', {'msg': 'Dense embedding returned error', 'extra': {'phase': 'query_embedding', 'embedding_type': 'dense', 'error': result.get('error')}})
             return None
-
-        await log_to_client_or_fallback(
-            context,
-            "debug",
-            {
-                "msg": "Dense embedding successful",
-                "extra": {
-                    "phase": "query_embedding",
-                    "embedding_type": "dense",
-                    "embedding_dim": len(result[0]) if result and len(result) > 0 else 0,
-                },
-            },
-        )
+        await log_to_client_or_fallback(context, 'debug', {'msg': 'Dense embedding successful', 'extra': {'phase': 'query_embedding', 'embedding_type': 'dense', 'embedding_dim': len(result[0]) if result and len(result) > 0 else 0}})
     except Exception as e:
-        await log_to_client_or_fallback(
-            context,
-            "warning",
-            {
-                "msg": "Dense embedding failed",
-                "extra": {
-                    "phase": "query_embedding",
-                    "embedding_type": "dense",
-                    "error": str(e),
-                    "error_type": type(e).__name__,
-                },
-            },
-        )
+        await log_to_client_or_fallback(context, 'warning', {'msg': 'Dense embedding failed', 'extra': {'phase': 'query_embedding', 'embedding_type': 'dense', 'error': str(e), 'error_type': type(e).__name__}})
         return None
     else:
         if not result:
             return None
         if isinstance(result, list) and len(result) > 0 and isinstance(result[0], list):
-            return result  # type: ignore[return-value]
-        return [result]  # type: ignore[return-value]
+            return result
+        return [result]
 
-
-async def _embed_sparse(
-    query: str, context: Any, sparse_provider: SparseEmbeddingProviderDep = INJECTED
-) -> SparseEmbedding | None:
+async def _embed_sparse(query: str, context: Any, sparse_provider: SparseEmbeddingProviderDep=INJECTED) -> SparseEmbedding | None:
     """Attempt sparse embedding, return None on failure."""
     from codeweaver.core import log_to_client_or_fallback
-
     try:
         result = await sparse_provider.embed_query(query)
-
-        if isinstance(result, dict) and "error" in result:
-            await log_to_client_or_fallback(
-                context,
-                "warning",
-                {
-                    "msg": "Sparse embedding returned error",
-                    "extra": {
-                        "phase": "query_embedding",
-                        "embedding_type": "sparse",
-                        "error": result.get("error"),
-                    },
-                },
-            )
+        if isinstance(result, dict) and 'error' in result:
+            await log_to_client_or_fallback(context, 'warning', {'msg': 'Sparse embedding returned error', 'extra': {'phase': 'query_embedding', 'embedding_type': 'sparse', 'error': result.get('error')}})
             return None
-
-        await log_to_client_or_fallback(
-            context,
-            "debug",
-            {
-                "msg": "Sparse embedding successful",
-                "extra": {"phase": "query_embedding", "embedding_type": "sparse"},
-            },
-        )
+        await log_to_client_or_fallback(context, 'debug', {'msg': 'Sparse embedding successful', 'extra': {'phase': 'query_embedding', 'embedding_type': 'sparse'}})
     except Exception as e:
-        await log_to_client_or_fallback(
-            context,
-            "warning",
-            {
-                "msg": "Sparse embedding failed",
-                "extra": {
-                    "phase": "query_embedding",
-                    "embedding_type": "sparse",
-                    "error": str(e),
-                    "error_type": type(e).__name__,
-                },
-            },
-        )
+        await log_to_client_or_fallback(context, 'warning', {'msg': 'Sparse embedding failed', 'extra': {'phase': 'query_embedding', 'embedding_type': 'sparse', 'error': str(e), 'error_type': type(e).__name__}})
         return None
     else:
         if isinstance(result, SparseEmbedding):
             return result
-        # Handle list[SparseEmbedding] from sparse provider's embed_query
         if isinstance(result, list) and len(result) > 0 and isinstance(result[0], SparseEmbedding):
             return result[0]
-        if isinstance(result, dict) and "indices" in result and "values" in result:
+        if isinstance(result, dict) and 'indices' in result and ('values' in result):
             return SparseEmbedding(**result)
         if isinstance(result, list) and len(result) > 0 and isinstance(result[0], dict):
             return SparseEmbedding(**result[0])
-        if (
-            isinstance(result, list)
-            and len(result) == 2
-            and isinstance(result[0], list)
-            and isinstance(result[1], list)
-        ):
-            return SparseEmbedding(indices=result[0], values=result[1])  # ty: ignore[invalid-argument-type]
+        if isinstance(result, list) and len(result) == 2 and isinstance(result[0], list) and isinstance(result[1], list):
+            return SparseEmbedding(indices=result[0], values=result[1])
     return None
-
 
 def _normalize_dense_embedding(embedding: Any) -> RawEmbeddingVectors | None:
     """Normalize dense embedding to list[list[float]] format.
@@ -196,14 +95,9 @@ def _normalize_dense_embedding(embedding: Any) -> RawEmbeddingVectors | None:
     """
     if not embedding:
         return None
-
-    # Already in correct format: list[list[float]]
     if isinstance(embedding, list) and len(embedding) > 0 and isinstance(embedding[0], list):
-        return embedding  # type: ignore[return-value]
-
-    # Single embedding: list[float] → wrap in list
-    return [embedding]  # type: ignore[return-value]
-
+        return embedding
+    return [embedding]
 
 def _normalize_sparse_embedding(result: Any) -> SparseEmbedding | None:
     """Normalize sparse embedding result to SparseEmbedding format.
@@ -223,30 +117,22 @@ def _normalize_sparse_embedding(result: Any) -> SparseEmbedding | None:
     """
     if isinstance(result, SparseEmbedding):
         return result
-
     if isinstance(result, list) and len(result) > 0:
         item = result[0]
         if isinstance(item, SparseEmbedding):
             return item
-        if isinstance(item, dict) and "indices" in item and "values" in item:
+        if isinstance(item, dict) and 'indices' in item and ('values' in item):
             return SparseEmbedding(**item)
-        # Handle tuple format: ([indices], [values])
         if isinstance(item, list) and len(result) == 2 and isinstance(result[1], list):
-            return SparseEmbedding(indices=result[0], values=result[1])  # ty: ignore[invalid-argument-type]
-
-        logger.warning("Unexpected sparse embedding format in list: %s", type(item))
+            return SparseEmbedding(indices=result[0], values=result[1])
+        logger.warning('Unexpected sparse embedding format in list: %s', type(item))
         return None
-
-    if isinstance(result, dict) and "indices" in result and "values" in result:
+    if isinstance(result, dict) and 'indices' in result and ('values' in result):
         return SparseEmbedding(**result)
-
-    logger.warning("Unexpected sparse embedding format: %s", type(result))
+    logger.warning('Unexpected sparse embedding format: %s', type(result))
     return None
 
-
-def _build_vectors_dict(
-    dense_embedding: RawEmbeddingVectors | None, sparse_embedding: SparseEmbedding | None
-) -> dict[str, Any]:
+def _build_vectors_dict(dense_embedding: RawEmbeddingVectors | None, sparse_embedding: SparseEmbedding | None) -> dict[str, Any]:
     """Build vectors dictionary from embeddings.
 
     Args:
@@ -258,18 +144,12 @@ def _build_vectors_dict(
     """
     vectors = {}
     if dense_embedding is not None:
-        vectors["primary"] = dense_embedding
+        vectors['primary'] = dense_embedding
     if sparse_embedding is not None:
-        vectors["sparse"] = sparse_embedding
+        vectors['sparse'] = sparse_embedding
     return vectors
 
-
-async def embed_query(
-    query: str,
-    context: Any = None,
-    dense_provider: EmbeddingProviderDep = INJECTED,
-    sparse_provider: SparseEmbeddingProviderDep = INJECTED,
-) -> QueryResult:
+async def embed_query(query: str, context: Any=None, dense_provider: EmbeddingProviderDep=INJECTED, sparse_provider: SparseEmbeddingProviderDep=INJECTED) -> QueryResult:
     """Embed query using configured embedding providers.
 
     Tries dense embedding first, then sparse. Returns result with whichever
@@ -288,53 +168,25 @@ async def embed_query(
         ValueError: If no embedding providers configured or both fail
     """
     from codeweaver.core import log_to_client_or_fallback
-
     _query_cv.set(query.strip())
-
-    # Attempt dense embedding
     dense_query_embedding = None
     if dense_provider:
         try:
             raw_embedding = await dense_provider.embed_query(query)
             dense_query_embedding = _normalize_dense_embedding(raw_embedding)
         except Exception as e:
-            await log_to_client_or_fallback(
-                context,
-                "warning",
-                {
-                    "msg": "Dense embedding failed",
-                    "extra": {
-                        "phase": "query_embedding",
-                        "error": str(e),
-                        "fallback": "attempting_sparse" if sparse_provider else "none",
-                    },
-                },
-            )
-
-    # Attempt sparse embedding
+            await log_to_client_or_fallback(context, 'warning', {'msg': 'Dense embedding failed', 'extra': {'phase': 'query_embedding', 'error': str(e), 'fallback': 'attempting_sparse' if sparse_provider else 'none'}})
     sparse_query_embedding = None
     if sparse_provider:
         try:
             result = await sparse_provider.embed_query(query)
             sparse_query_embedding = _normalize_sparse_embedding(result)
         except Exception as e:
-            await log_to_client_or_fallback(
-                context,
-                "warning",
-                {
-                    "msg": "Sparse embedding failed",
-                    "extra": {"phase": "query_embedding", "error": str(e)},
-                },
-            )
-
-    # Validate at least one succeeded
+            await log_to_client_or_fallback(context, 'warning', {'msg': 'Sparse embedding failed', 'extra': {'phase': 'query_embedding', 'error': str(e)}})
     if dense_query_embedding is None and sparse_query_embedding is None:
-        return raise_value_error("Both dense and sparse embedding failed")
-
-    # Build vectors dict with intent-based keys
+        return raise_value_error('Both dense and sparse embedding failed')
     vectors = _build_vectors_dict(dense_query_embedding, sparse_query_embedding)
     return QueryResult(vectors=vectors)
-
 
 def build_query_vector(query_result: QueryResult, query: str) -> StrategizedQuery:
     """Build query vector for search from embeddings.
@@ -349,50 +201,26 @@ def build_query_vector(query_result: QueryResult, query: str) -> StrategizedQuer
     Raises:
         ValueError: If both embeddings are None
     """
-    # Access embeddings by intent name
-    dense_embedding = query_result.get("primary")
-    sparse_embedding = query_result.get("sparse")
-
+    dense_embedding_raw = query_result.get('primary')
+    sparse_embedding_raw = query_result.get('sparse')
+    dense_embedding: RawEmbeddingVectors | None = None
+    if dense_embedding_raw is not None and (not isinstance(dense_embedding_raw, SparseEmbedding)):
+        dense_embedding = dense_embedding_raw
+    sparse_embedding: SparseEmbedding | None = None
+    if sparse_embedding_raw is not None and isinstance(sparse_embedding_raw, SparseEmbedding):
+        sparse_embedding = sparse_embedding_raw
     if dense_embedding:
-        # Unwrap batch results (embed_query returns list[list[float]], we need list[float])
-        dense_vector = (
-            dense_embedding[0] if isinstance(dense_embedding[0], list) else dense_embedding
-        )
-
+        dense_vector: RawEmbeddingVectors = dense_embedding[0] if isinstance(dense_embedding[0], list) else dense_embedding
         if sparse_embedding:
-            return StrategizedQuery(
-                query=query,
-                dense=dense_vector,
-                sparse=sparse_embedding,
-                strategy=SearchStrategy.HYBRID_SEARCH,
-            )
-        logger.warning("Using dense-only search (sparse embeddings unavailable)")
-        return StrategizedQuery(
-            query=query, dense=dense_vector, sparse=None, strategy=SearchStrategy.DENSE_ONLY
-        )
+            return StrategizedQuery(query=query, dense=dense_vector, sparse=sparse_embedding, strategy=SearchStrategy.HYBRID_SEARCH)
+        logger.warning('Using dense-only search (sparse embeddings unavailable)')
+        return StrategizedQuery(query=query, dense=dense_vector, sparse=None, strategy=SearchStrategy.DENSE_ONLY)
     if sparse_embedding:
-        logger.warning("Using sparse-only search (dense embeddings unavailable - degraded mode)")
-        # Unwrap batch results (take first element) and ensure float type
-        return StrategizedQuery(
-            query=query, dense=None, sparse=sparse_embedding, strategy=SearchStrategy.SPARSE_ONLY
-        )
-    # Both failed - should not reach here due to earlier validation
-    raise QueryError(
-        "Both dense and sparse embeddings are None",
-        details={"dense_embedding": None, "sparse_embedding": None, "query": query},
-        suggestions=[
-            "Check embedding provider logs for errors",
-            "Verify provider credentials are valid",
-            "Try with a different embedding provider",
-        ],
-    )
+        logger.warning('Using sparse-only search (dense embeddings unavailable - degraded mode)')
+        return StrategizedQuery(query=query, dense=None, sparse=sparse_embedding, strategy=SearchStrategy.SPARSE_ONLY)
+    raise QueryError('Both dense and sparse embeddings are None', details={'dense_embedding': None, 'sparse_embedding': None, 'query': query}, suggestions=['Check embedding provider logs for errors', 'Verify provider credentials are valid', 'Try with a different embedding provider'])
 
-
-async def execute_vector_search(
-    query_vector: StrategizedQuery,
-    context: Any = None,
-    vector_store: VectorStoreProviderDep = INJECTED,
-) -> list[SearchResult]:
+async def execute_vector_search(query_vector: StrategizedQuery, context: Any=None, vector_store: VectorStoreProviderDep=INJECTED) -> list[SearchResult]:
     """Execute vector search against configured vector store.
 
     Args:
@@ -407,49 +235,14 @@ async def execute_vector_search(
         ValueError: If no vector store provider configured
     """
     from codeweaver.core import log_to_client_or_fallback
-
-    await log_to_client_or_fallback(
-        context,
-        "info",
-        {
-            "msg": "Starting vector search",
-            "extra": {
-                "phase": "vector_search",
-                "search_strategy": query_vector.strategy.variable,
-                "has_dense": query_vector.dense is not None,
-                "has_sparse": query_vector.sparse is not None,
-            },
-        },
-    )
-
+    await log_to_client_or_fallback(context, 'info', {'msg': 'Starting vector search', 'extra': {'phase': 'vector_search', 'search_strategy': query_vector.strategy.variable, 'has_dense': query_vector.dense is not None, 'has_sparse': query_vector.sparse is not None}})
     if vector_store is None:
-        raise ConfigurationError("No vector store provider configured")
-
-    # Execute search (returns max 100 results)
+        raise ConfigurationError('No vector store provider configured')
     results = await vector_store.search(vector=query_vector, query_filter=None)
-
-    await log_to_client_or_fallback(
-        context,
-        "info",
-        {
-            "msg": "Vector search complete",
-            "extra": {
-                "phase": "vector_search",
-                "results_count": len(results),
-                "vector_store": type(vector_store).__name__,
-            },
-        },
-    )
-
+    await log_to_client_or_fallback(context, 'info', {'msg': 'Vector search complete', 'extra': {'phase': 'vector_search', 'results_count': len(results), 'vector_store': type(vector_store).__name__}})
     return results
 
-
-async def rerank_results(
-    query: str,
-    candidates: list[SearchResult],
-    context: Any = None,
-    reranking: tuple[RerankingProviderDep, ...] | RerankingProviderDep | None = INJECTED,
-) -> tuple[list[Any] | None, SearchStrategy | None]:
+async def rerank_results(query: str, candidates: list[SearchResult], context: Any=None, reranking: tuple[RerankingProviderDep, ...] | RerankingProviderDep | None=INJECTED) -> tuple[list[Any] | None, SearchStrategy | None]:
     """Rerank search results using configured reranking provider(s) with cascading fallback.
 
     This function implements a cascading fallback mechanism through multiple reranking providers.
@@ -469,195 +262,45 @@ async def rerank_results(
     """
     from codeweaver.core import log_to_client_or_fallback
     from codeweaver.providers.exceptions import CircuitBreakerOpenError
-
-    # Manually resolve provider if not injected (DI fallback)
-    if reranking is None or hasattr(reranking, "__pydantic_serializer__"):
+    if reranking is None or hasattr(reranking, '__pydantic_serializer__'):
         try:
             from codeweaver.core import get_container
             from codeweaver.providers import RerankingProvider
-
             reranking = await get_container().resolve(RerankingProvider)
         except Exception as e:
-            logger.warning("Failed to resolve reranking provider: %s", e)
-
-    # Normalize to tuple for uniform handling
+            logger.warning('Failed to resolve reranking provider: %s', e)
     providers = reranking if isinstance(reranking, tuple) else (reranking,) if reranking else ()
-
     if not providers or not candidates:
-        await log_to_client_or_fallback(
-            context,
-            "debug",
-            {
-                "msg": "Reranking skipped",
-                "extra": {
-                    "phase": "reranking",
-                    "reason": "no_candidates" if providers else "no_provider",
-                    "candidates_count": len(candidates) if candidates else 0,
-                },
-            },
-        )
-        return None, None
-
-    await log_to_client_or_fallback(
-        context,
-        "info",
-        {
-            "msg": "Starting reranking with fallback chain",
-            "extra": {
-                "phase": "reranking",
-                "candidates_count": len(candidates),
-                "provider_count": len(providers),
-            },
-        },
-    )
-
-    # Prepare reranking data once (used for all providers)
+        await log_to_client_or_fallback(context, 'debug', {'msg': 'Reranking skipped', 'extra': {'phase': 'reranking', 'reason': 'no_candidates' if providers else 'no_provider', 'candidates_count': len(candidates) if candidates else 0}})
+        return (None, None)
+    await log_to_client_or_fallback(context, 'info', {'msg': 'Starting reranking with fallback chain', 'extra': {'phase': 'reranking', 'candidates_count': len(candidates), 'provider_count': len(providers)}})
     metadata_map: dict[str, SearchResult] = {str(c.content.chunk_id): c for c in candidates}
     chunks_for_reranking = [c.content for c in candidates]
-
     if not chunks_for_reranking:
-        logger.warning("No CodeChunk objects available for reranking, skipping")
-        return None, None
-
-    # Try each provider in sequence until one succeeds
+        logger.warning('No CodeChunk objects available for reranking, skipping')
+        return (None, None)
     last_error: Exception | None = None
     for idx, provider in enumerate(providers):
         provider_name = type(provider).__name__
         try:
-            await log_to_client_or_fallback(
-                context,
-                "debug",
-                {
-                    "msg": f"Attempting reranking with provider {idx + 1}/{len(providers)}",
-                    "extra": {
-                        "phase": "reranking",
-                        "provider_name": provider_name,
-                        "provider_index": idx,
-                    },
-                },
-            )
-
+            await log_to_client_or_fallback(context, 'debug', {'msg': f'Attempting reranking with provider {idx + 1}/{len(providers)}', 'extra': {'phase': 'reranking', 'provider_name': provider_name, 'provider_index': idx}})
             reranked_results = await provider.rerank(query, chunks_for_reranking)
-
             if not reranked_results:
-                await log_to_client_or_fallback(
-                    context,
-                    "warning",
-                    {
-                        "msg": f"Provider {provider_name} returned no results",
-                        "extra": {
-                            "phase": "reranking",
-                            "provider_name": provider_name,
-                            "provider_index": idx,
-                            "trying_next": idx < len(providers) - 1,
-                        },
-                    },
-                )
+                await log_to_client_or_fallback(context, 'warning', {'msg': f'Provider {provider_name} returned no results', 'extra': {'phase': 'reranking', 'provider_name': provider_name, 'provider_index': idx, 'trying_next': idx < len(providers) - 1}})
                 continue
-
-            # Enrich reranked results with preserved search metadata
             from codeweaver.providers import RerankingResult
-
-            enriched_results = [
-                RerankingResult(
-                    original_index=r.original_index,
-                    batch_rank=r.batch_rank,
-                    score=r.score,
-                    chunk=r.chunk,
-                    original_score=metadata_map[str(r.chunk.chunk_id)].score
-                    if str(r.chunk.chunk_id) in metadata_map
-                    else None,
-                    dense_score=metadata_map[str(r.chunk.chunk_id)].dense_score
-                    if str(r.chunk.chunk_id) in metadata_map
-                    else None,
-                    sparse_score=metadata_map[str(r.chunk.chunk_id)].sparse_score
-                    if str(r.chunk.chunk_id) in metadata_map
-                    else None,
-                )
-                for r in reranked_results
-            ]
-
-            await log_to_client_or_fallback(
-                context,
-                "info",
-                {
-                    "msg": f"Reranking successful with {provider_name}",
-                    "extra": {
-                        "phase": "reranking",
-                        "provider_name": provider_name,
-                        "provider_index": idx,
-                        "reranked_count": len(enriched_results),
-                        "used_fallback": idx > 0,
-                    },
-                },
-            )
-
-            return list(enriched_results), SearchStrategy.SEMANTIC_RERANK
-
+            enriched_results = [RerankingResult(original_index=r.original_index, batch_rank=r.batch_rank, score=r.score, chunk=r.chunk, original_score=metadata_map[str(r.chunk.chunk_id)].score if str(r.chunk.chunk_id) in metadata_map else None, dense_score=metadata_map[str(r.chunk.chunk_id)].dense_score if str(r.chunk.chunk_id) in metadata_map else None, sparse_score=metadata_map[str(r.chunk.chunk_id)].sparse_score if str(r.chunk.chunk_id) in metadata_map else None) for r in reranked_results]
+            await log_to_client_or_fallback(context, 'info', {'msg': f'Reranking successful with {provider_name}', 'extra': {'phase': 'reranking', 'provider_name': provider_name, 'provider_index': idx, 'reranked_count': len(enriched_results), 'used_fallback': idx > 0}})
         except CircuitBreakerOpenError as e:
-            # Circuit breaker is open - provider temporarily unavailable
-            await log_to_client_or_fallback(
-                context,
-                "warning",
-                {
-                    "msg": f"Provider {provider_name} circuit breaker open",
-                    "extra": {
-                        "phase": "reranking",
-                        "provider_name": provider_name,
-                        "provider_index": idx,
-                        "error_type": "CircuitBreakerOpen",
-                        "trying_next": idx < len(providers) - 1,
-                    },
-                },
-            )
+            await log_to_client_or_fallback(context, 'warning', {'msg': f'Provider {provider_name} circuit breaker open', 'extra': {'phase': 'reranking', 'provider_name': provider_name, 'provider_index': idx, 'error_type': 'CircuitBreakerOpen', 'trying_next': idx < len(providers) - 1}})
             last_error = e
             continue
-
         except Exception as e:
-            # General provider failure - try next provider
-            await log_to_client_or_fallback(
-                context,
-                "warning",
-                {
-                    "msg": f"Provider {provider_name} failed",
-                    "extra": {
-                        "phase": "reranking",
-                        "provider_name": provider_name,
-                        "provider_index": idx,
-                        "error": str(e),
-                        "error_type": type(e).__name__,
-                        "trying_next": idx < len(providers) - 1,
-                    },
-                },
-            )
+            await log_to_client_or_fallback(context, 'warning', {'msg': f'Provider {provider_name} failed', 'extra': {'phase': 'reranking', 'provider_name': provider_name, 'provider_index': idx, 'error': str(e), 'error_type': type(e).__name__, 'trying_next': idx < len(providers) - 1}})
             last_error = e
             continue
-
-    # All providers failed
-    await log_to_client_or_fallback(
-        context,
-        "warning",
-        {
-            "msg": "All reranking providers failed",
-            "extra": {
-                "phase": "reranking",
-                "provider_count": len(providers),
-                "fallback": "using_unranked_results",
-                "last_error": str(last_error) if last_error else "no_results",
-                "last_error_type": type(last_error).__name__ if last_error else None,
-            },
-        },
-    )
-    return None, None
-
-
-__all__ = (
-    "_build_vectors_dict",
-    "_normalize_dense_embedding",
-    "_normalize_sparse_embedding",
-    "build_query_vector",
-    "embed_query",
-    "execute_vector_search",
-    "raise_value_error",
-    "rerank_results",
-)
+        else:
+            return (list(enriched_results), SearchStrategy.SEMANTIC_RERANK)
+    await log_to_client_or_fallback(context, 'warning', {'msg': 'All reranking providers failed', 'extra': {'phase': 'reranking', 'provider_count': len(providers), 'fallback': 'using_unranked_results', 'last_error': str(last_error) if last_error else 'no_results', 'last_error_type': type(last_error).__name__ if last_error else None}})
+    return (None, None)
+__all__ = ('_build_vectors_dict', '_normalize_dense_embedding', '_normalize_sparse_embedding', 'build_query_vector', 'embed_query', 'execute_vector_search', 'raise_value_error', 'rerank_results')

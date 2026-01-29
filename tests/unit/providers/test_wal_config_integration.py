@@ -82,8 +82,8 @@ class TestWalConfigIntegration:
             ),
         )
 
-        # Create metadata
-        metadata = CollectionMetadata(
+        # Create metadata (created_at has default_factory, so it's optional)
+        metadata = CollectionMetadata(  # ty: ignore[missing-argument]
             provider="test-provider",
             project_name="test-project",
             dense_vector_size=768,
@@ -148,8 +148,8 @@ class TestWalConfigIntegration:
             ),
         )
 
-        # Create metadata
-        metadata = CollectionMetadata(
+        # Create metadata (created_at has default_factory, so it's optional)
+        metadata = CollectionMetadata(  # ty: ignore[missing-argument]
             provider="test-provider",
             project_name="test-project",
             dense_vector_size=768,
@@ -212,8 +212,8 @@ class TestWalConfigIntegration:
             ),
         )
 
-        # Create metadata
-        metadata = CollectionMetadata(
+        # Create metadata (created_at has default_factory, so it's optional)
+        metadata = CollectionMetadata(  # ty: ignore[missing-argument]
             provider="test-provider",
             project_name="test-project",
             dense_vector_size=768,
@@ -273,8 +273,8 @@ class TestWalConfigIntegration:
             ),
         )
 
-        # Create metadata
-        metadata = CollectionMetadata(
+        # Create metadata (created_at has default_factory, so it's optional)
+        metadata = CollectionMetadata(  # ty: ignore[missing-argument]
             provider="test-provider",
             project_name="test-project",
             dense_vector_size=768,
@@ -338,8 +338,8 @@ class TestWalConfigIntegration:
             ),
         )
 
-        # Create metadata
-        metadata = CollectionMetadata(
+        # Create metadata (created_at has default_factory, so it's optional)
+        metadata = CollectionMetadata(  # ty: ignore[missing-argument]
             provider="test-provider",
             project_name="test-project",
             dense_vector_size=768,

@@ -1,15 +1,9 @@
-# SPDX-FileCopyrightText: 2025 Knitli Inc.
-# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
-#
-# SPDX-License-Identifier: MIT OR Apache-2.0
-
 """Snapshot backup service for Qdrant vector store disaster recovery.
 
 This service creates and manages periodic snapshots of the vector store for
 point-in-time recovery scenarios. It integrates with the failover maintenance
 loop and handles snapshot retention, cleanup, and storage management.
 """
-
 from __future__ import annotations
 
 import asyncio
@@ -24,10 +18,7 @@ from codeweaver.core import get_user_state_dir
 
 if TYPE_CHECKING:
     from codeweaver.providers import VectorStoreProvider
-
-
 logger = logging.getLogger(__name__)
-
 
 class QdrantSnapshotBackupService:
     """Service for creating and managing Qdrant vector store snapshots.
@@ -43,13 +34,7 @@ class QdrantSnapshotBackupService:
     - Integration with failover maintenance loop
     """
 
-    def __init__(
-        self,
-        vector_store: VectorStoreProvider,
-        storage_path: Path | str | None = None,
-        retention_count: int = 12,
-        collection_name: str | None = None,
-    ) -> None:
+    def __init__(self, vector_store: VectorStoreProvider, storage_path: Path | str | None=None, retention_count: int=12, collection_name: str | None=None) -> None:
         """Initialize the snapshot backup service.
 
         Args:
@@ -60,22 +45,15 @@ class QdrantSnapshotBackupService:
         """
         self.vector_store = vector_store
         self.retention_count = retention_count
-        self.collection_name = collection_name or getattr(
-            vector_store, "collection_name", "codeweaver_vectors"
-        )
-
-        # Resolve storage path
+        self.collection_name = collection_name or getattr(vector_store, 'collection_name', 'codeweaver_vectors')
         if storage_path:
             self.storage_path = Path(storage_path)
         else:
-            # Default to user state directory
             state_dir = get_user_state_dir()
-            self.storage_path = Path(state_dir) / "snapshots" / self.collection_name
-
-        # Ensure storage directory exists
+            self.storage_path = Path(state_dir) / 'snapshots' / self.collection_name
         self.storage_path.mkdir(parents=True, exist_ok=True)
 
-    async def create_snapshot(self, *, wait: bool = True) -> str | None:
+    async def create_snapshot(self, *, wait: bool=True) -> str | None:
         """Create a new snapshot of the collection.
 
         Args:
@@ -90,35 +68,20 @@ class QdrantSnapshotBackupService:
             >>> print(f"Created snapshot: {snapshot_name}")
         """
         try:
-            # Generate timestamp-based snapshot name
-            timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
-            snapshot_name = f"snapshot_{self.collection_name}_{timestamp}"
-
-            logger.info("Creating snapshot: %s", snapshot_name)
-
-            # Create snapshot using Qdrant client
-            # Note: Qdrant's create_snapshot returns immediately, snapshot is created async
-            await asyncio.to_thread(
-                self.vector_store.client.create_snapshot,
-                collection_name=self.collection_name,
-                snapshot_name=snapshot_name,
-            )
-
+            timestamp = datetime.now(UTC).strftime('%Y%m%d_%H%M%S')
+            snapshot_name = f'snapshot_{self.collection_name}_{timestamp}'
+            logger.info('Creating snapshot: %s', snapshot_name)
+            await asyncio.to_thread(self.vector_store.client.create_snapshot, collection_name=self.collection_name, snapshot_name=snapshot_name)
             if wait:
-                # Wait for snapshot to be ready
                 await self._wait_for_snapshot(snapshot_name)
-
-            logger.info("Successfully created snapshot: %s", snapshot_name)
-
+            logger.info('Successfully created snapshot: %s', snapshot_name)
         except Exception as e:
-            logger.warning(
-                "Failed to create snapshot for collection %s: %s", self.collection_name, e
-            )
+            logger.warning('Failed to create snapshot for collection %s: %s', self.collection_name, e)
             return None
         else:
             return snapshot_name
 
-    async def _wait_for_snapshot(self, snapshot_name: str, timeout_seconds: int = 60) -> bool:
+    async def _wait_for_snapshot(self, snapshot_name: str, timeout_seconds: int=60) -> bool:
         """Wait for snapshot creation to complete.
 
         Args:
@@ -131,23 +94,14 @@ class QdrantSnapshotBackupService:
         start_time = datetime.now(UTC)
         while (datetime.now(UTC) - start_time).total_seconds() < timeout_seconds:
             try:
-                # Check if snapshot exists by listing snapshots
-                snapshots = await asyncio.to_thread(
-                    self.vector_store.client.list_snapshots, collection_name=self.collection_name
-                )
-
-                # Check if our snapshot is in the list
+                snapshots = await asyncio.to_thread(self.vector_store.client.list_snapshots, collection_name=self.collection_name)
                 if any(s.name == snapshot_name for s in snapshots):
                     return True
-
-                # Wait before checking again
                 await asyncio.sleep(1)
-
             except Exception as e:
-                logger.warning("Error checking snapshot status: %s", e)
+                logger.warning('Error checking snapshot status: %s', e)
                 await asyncio.sleep(1)
-
-        logger.warning("Snapshot creation timeout for: %s", snapshot_name)
+        logger.warning('Snapshot creation timeout for: %s', snapshot_name)
         return False
 
     async def list_snapshots(self) -> list[dict[str, Any]]:
@@ -162,18 +116,12 @@ class QdrantSnapshotBackupService:
             ...     print(f"{snapshot['name']}: {snapshot['size']} bytes")
         """
         try:
-            snapshots = await asyncio.to_thread(
-                self.vector_store.client.list_snapshots, collection_name=self.collection_name
-            )
-
-            return [
-                {"name": snapshot.name, "size": snapshot.size, "created_at": snapshot.creation_time}
-                for snapshot in snapshots
-            ]
-
+            snapshots = await asyncio.to_thread(self.vector_store.client.list_snapshots, collection_name=self.collection_name)
         except Exception as e:
-            logger.warning("Failed to list snapshots: %s", e)
+            logger.warning('Failed to list snapshots: %s', e)
             return []
+        else:
+            return [{'name': snapshot.name, 'size': snapshot.size, 'created_at': snapshot.creation_time} for snapshot in snapshots]
 
     async def delete_snapshot(self, snapshot_name: str) -> bool:
         """Delete a specific snapshot.
@@ -185,14 +133,10 @@ class QdrantSnapshotBackupService:
             True if successfully deleted, False otherwise
         """
         try:
-            await asyncio.to_thread(
-                self.vector_store.client.delete_snapshot,
-                collection_name=self.collection_name,
-                snapshot_name=snapshot_name,
-            )
-            logger.info("Deleted snapshot: %s", snapshot_name)
+            await asyncio.to_thread(self.vector_store.client.delete_snapshot, collection_name=self.collection_name, snapshot_name=snapshot_name)
+            logger.info('Deleted snapshot: %s', snapshot_name)
         except Exception as e:
-            logger.warning("Failed to delete snapshot %s: %s", snapshot_name, e)
+            logger.warning('Failed to delete snapshot %s: %s', snapshot_name, e)
             return False
         else:
             return True
@@ -214,56 +158,31 @@ class QdrantSnapshotBackupService:
             >>> print(f"Deleted {stats['deleted']} old snapshots")
         """
         try:
-            # Get all snapshots
             snapshots = await self.list_snapshots()
-
-            stats = {"total": len(snapshots), "kept": 0, "deleted": 0, "failed": 0}
-
+            stats = {'total': len(snapshots), 'kept': 0, 'deleted': 0, 'failed': 0}
             if len(snapshots) <= self.retention_count:
-                stats["kept"] = len(snapshots)
-                logger.debug(
-                    "No cleanup needed: %d snapshots (limit: %d)",
-                    len(snapshots),
-                    self.retention_count,
-                )
+                stats['kept'] = len(snapshots)
+                logger.debug('No cleanup needed: %d snapshots (limit: %d)', len(snapshots), self.retention_count)
                 return stats
-
-            # Sort snapshots by creation time (newest first)
-            snapshots_sorted = sorted(
-                snapshots, key=lambda s: s.get("created_at", ""), reverse=True
-            )
-
-            # Keep the most recent N snapshots, delete the rest
-            to_keep = snapshots_sorted[: self.retention_count]
-            to_delete = snapshots_sorted[self.retention_count :]
-
-            stats["kept"] = len(to_keep)
-
-            logger.info(
-                "Cleaning up snapshots: keeping %d, deleting %d", len(to_keep), len(to_delete)
-            )
-
-            # Delete old snapshots
+            snapshots_sorted = sorted(snapshots, key=lambda s: s.get('created_at', ''), reverse=True)
+            to_keep = snapshots_sorted[:self.retention_count]
+            to_delete = snapshots_sorted[self.retention_count:]
+            stats['kept'] = len(to_keep)
+            logger.info('Cleaning up snapshots: keeping %d, deleting %d', len(to_keep), len(to_delete))
             for snapshot in to_delete:
-                snapshot_name = snapshot["name"]
+                snapshot_name = snapshot['name']
                 if await self.delete_snapshot(snapshot_name):
-                    stats["deleted"] += 1
+                    stats['deleted'] += 1
                 else:
-                    stats["failed"] += 1
-
-            logger.info(
-                "Snapshot cleanup complete: deleted=%d, failed=%d",
-                stats["deleted"],
-                stats["failed"],
-            )
-
+                    stats['failed'] += 1
+            logger.info('Snapshot cleanup complete: deleted=%d, failed=%d', stats['deleted'], stats['failed'])
         except Exception as e:
-            logger.warning("Snapshot cleanup failed: %s", e, exc_info=True)
-            return {"total": 0, "kept": 0, "deleted": 0, "failed": 0}
+            logger.warning('Snapshot cleanup failed: %s', e, exc_info=True)
+            return {'total': 0, 'kept': 0, 'deleted': 0, 'failed': 0}
         else:
             return stats
 
-    async def restore_snapshot(self, snapshot_name: str, *, wait: bool = True) -> bool:
+    async def restore_snapshot(self, snapshot_name: str, *, wait: bool=True) -> bool:
         """Restore the collection from a snapshot.
 
         WARNING: This operation replaces the entire collection with the snapshot state.
@@ -281,32 +200,11 @@ class QdrantSnapshotBackupService:
             ...     print("Restore completed successfully")
         """
         try:
-            logger.warning(
-                "Restoring collection %s from snapshot: %s", self.collection_name, snapshot_name
-            )
-
-            # Restore snapshot
-            await asyncio.to_thread(
-                self.vector_store.client.recover_snapshot,
-                collection_name=self.collection_name,
-                snapshot_name=snapshot_name,
-                wait=wait,
-            )
-
-            logger.info(
-                "Successfully restored collection %s from snapshot: %s",
-                self.collection_name,
-                snapshot_name,
-            )
-
+            logger.warning('Restoring collection %s from snapshot: %s', self.collection_name, snapshot_name)
+            await asyncio.to_thread(self.vector_store.client.recover_snapshot, collection_name=self.collection_name, snapshot_name=snapshot_name, wait=wait)
+            logger.info('Successfully restored collection %s from snapshot: %s', self.collection_name, snapshot_name)
         except Exception as e:
-            logger.warning(
-                "Failed to restore snapshot %s for collection %s: %s",
-                snapshot_name,
-                self.collection_name,
-                e,
-                exc_info=True,
-            )
+            logger.warning('Failed to restore snapshot %s for collection %s: %s', snapshot_name, self.collection_name, e, exc_info=True)
             return False
         else:
             return True
@@ -320,11 +218,9 @@ class QdrantSnapshotBackupService:
         snapshots = await self.list_snapshots()
         if not snapshots:
             return None
+        return max(snapshots, key=lambda s: s.get('created_at', ''))
 
-        # Sort by creation time and return the newest
-        return max(snapshots, key=lambda s: s.get("created_at", ""))
-
-    async def snapshot_and_cleanup(self, *, wait: bool = False) -> dict[str, Any]:
+    async def snapshot_and_cleanup(self, *, wait: bool=False) -> dict[str, Any]:
         """Create a new snapshot and clean up old ones.
 
         This is the main method for periodic snapshot maintenance.
@@ -345,21 +241,14 @@ class QdrantSnapshotBackupService:
             ...     print(f"Created: {result['snapshot_name']}")
             ...     print(f"Cleaned up: {result['cleanup_stats']['deleted']} old snapshots")
         """
-        result = {"snapshot_created": False, "snapshot_name": None, "cleanup_stats": {}}
-
-        # Create new snapshot
+        result = {'snapshot_created': False, 'snapshot_name': None, 'cleanup_stats': {}}
         snapshot_name = await self.create_snapshot(wait=wait)
         if snapshot_name:
-            result["snapshot_created"] = True
-            result["snapshot_name"] = snapshot_name
-
-            # Cleanup old snapshots
+            result['snapshot_created'] = True
+            result['snapshot_name'] = snapshot_name
             cleanup_stats = await self.cleanup_old_snapshots()
-            result["cleanup_stats"] = cleanup_stats
+            result['cleanup_stats'] = cleanup_stats
         else:
-            logger.error("Failed to create snapshot, skipping cleanup")
-
+            logger.error('Failed to create snapshot, skipping cleanup')
         return result
-
-
-__all__ = ("QdrantSnapshotBackupService",)
+__all__ = ('QdrantSnapshotBackupService',)

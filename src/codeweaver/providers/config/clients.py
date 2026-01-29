@@ -953,7 +953,8 @@ type GeneralRerankingClientOptionsType = Annotated[
 def _discriminate_embedding_clients(v: Any) -> str:
     """Identify the provider-specific settings type for discriminator field."""
     # Client options use tag field
-    return v.get("tag") if isinstance(v, dict) else getattr(v, "tag", None)
+    tag = v.get("tag") if isinstance(v, dict) else getattr(v, "tag", None)
+    return tag or ""  # Return empty string instead of None to match return type
 
 
 def discriminate_azure_embedding_client_options(v: Any) -> str:

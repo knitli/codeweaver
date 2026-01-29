@@ -32,11 +32,25 @@ if TYPE_CHECKING:
 @pytest.fixture
 def mock_candidates(sample_chunk: CodeChunk) -> list[SearchResult]:
     """Create mock search result candidates."""
+    from pathlib import Path
+
     from codeweaver.core import SearchResult
 
     return [
-        SearchResult(content=sample_chunk, score=0.9, dense_score=0.85, sparse_score=0.05),
-        SearchResult(content=sample_chunk, score=0.8, dense_score=0.75, sparse_score=0.05),
+        SearchResult(
+            content=sample_chunk,
+            file_path=Path("test/file.py"),
+            score=0.9,
+            dense_score=0.85,
+            sparse_score=0.05,
+        ),
+        SearchResult(
+            content=sample_chunk,
+            file_path=Path("test/file.py"),
+            score=0.8,
+            dense_score=0.75,
+            sparse_score=0.05,
+        ),
     ]
 
 
