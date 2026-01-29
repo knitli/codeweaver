@@ -316,7 +316,7 @@ async def actual_vector_store() -> MemoryVectorStoreProvider:
     Uses a singleton instance and a FIXED collection name to ensure that
     different components (e.g., Indexer and Search) share the same in-memory data.
     """
-    from codeweaver.core import Provider, get_container
+    from codeweaver.core import get_container
     from codeweaver.providers import MemoryVectorStoreProvider, VectorStoreProvider
 
     global _shared_memory_vector_store
@@ -339,6 +339,7 @@ async def actual_vector_store() -> MemoryVectorStoreProvider:
 
         # Create in-memory Qdrant client explicitly
         from qdrant_client import AsyncQdrantClient
+
         client = AsyncQdrantClient(location=":memory:")
 
         # Create collection config with test collection name
@@ -477,6 +478,40 @@ def configured_providers(
 # ===========================================================================
 # Settings Fixtures
 # ===========================================================================
+
+
+@pytest.fixture
+def reset_settings() -> Generator[None, None, None]:
+    """Reset DI container settings to defaults.
+
+    This fixture provides a clean settings state by resetting the DI container.
+    It's useful for tests that need to ensure settings isolation between test runs.
+
+    Usage:
+        def test_something(reset_settings):
+            # Test runs with fresh settings from codeweaver.test.toml
+            ...
+
+    The fixture:
+    1. Clears DI container overrides before test
+    2. Resets container to force new settings creation
+    3. Yields control to test
+    4. Clears overrides again after test
+    """
+    from codeweaver.core.di import get_container, reset_container
+
+    # Clear any existing overrides
+    container = get_container()
+    container.clear_overrides()
+
+    # Reset container to force new settings on next resolution
+    reset_container()
+
+    yield
+
+    # Cleanup: clear overrides after test
+    container = get_container()
+    container.clear_overrides()
 
 
 @pytest.fixture
@@ -944,44 +979,41 @@ async def initialized_cw_state(
     This fixture ensures CodeWeaverState is properly initialized via the DI
     container, allowing for consistent dependency resolution and overrides.
     """
+    # Ensure all dependencies are loaded
+    import codeweaver.core.dependencies
+    import codeweaver.server.dependencies  # noqa: F401 - ensures @dependency_provider decorators run
+
     from codeweaver.providers import VectorStoreProvider
-    from codeweaver.server import CodeWeaverSettings, CodeWeaverState, reset_settings
+    from codeweaver.server import CodeWeaverState
 
-    # Reset state to ensure isolation
-    reset_settings()
+    # Don't reset container here - clean_container fixture already handles it
+    # Force provider loading if not already done
+    clean_container._load_providers()
 
-    # Factory for test settings
-    async def get_test_settings() -> CodeWeaverSettings:
-        from codeweaver.server import get_settings
+    # Override only the vector store provider
+    clean_container.override(VectorStoreProvider, actual_vector_store)
 
-        # This properly initializes the singleton with defaults from codeweaver.test.toml
-        # including the "providers" dict
-        settings = get_settings()
-        settings.project_path = tmp_path
-        settings.project_name = f"test_workflow_{tmp_path.name}"
-        return settings
+    # Resolve state via container (this will trigger resolution of all deps including settings)
+    state = await clean_container.resolve(CodeWeaverState)
 
-    # Apply overrides using context manager
-    overrides = {
-        CodeWeaverSettings: get_test_settings,
-        VectorStoreProvider: lambda: actual_vector_store,
-    }
+    # Modify settings after creation to use test project path
+    if state.settings:
+        state.settings.project_path = tmp_path
+        state.settings.project_name = f"test_workflow_{tmp_path.name}"
+    state.project_path = tmp_path
 
-    with clean_container.use_overrides(overrides):
-        # Resolve state via container (this will trigger resolution of all deps)
-        state = await clean_container.resolve(CodeWeaverState)
+    # CRITICAL: Set the global state so get_state() works during tests
+    from codeweaver.server import server
 
-        # CRITICAL: Set the global state so get_state() works during tests
-        from codeweaver.server import server
+    server._state = state
 
-        server._state = state
+    yield state
 
-        yield state
-
-    # Cleanup: Reset global state
+    # Cleanup: Reset global state and clear overrides
     from codeweaver.server import server
 
     server._state = None
+    clean_container.clear_overrides()
 
 
 @pytest.fixture
@@ -995,8 +1027,9 @@ async def indexed_test_project(known_test_codebase, clean_container):
     4. Ensures global state is correctly initialized
     5. Yields the project path for tests
     """
+    from codeweaver.core.config.loader import get_settings
     from codeweaver.engine import IndexingService
-    from codeweaver.server import CodeWeaverSettings, CodeWeaverState, get_settings
+    from codeweaver.server import CodeWeaverSettings, CodeWeaverState
 
     # Ensure known_test_codebase is absolute
     project_path = known_test_codebase.resolve()

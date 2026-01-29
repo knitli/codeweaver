@@ -84,7 +84,7 @@ def _default_collection_options(
     *, project_path: Path | None = None, project_name: str | None = None
 ) -> CollectionConfig:
     """Default collection configuration for Qdrant.
-    
+
     Vector config is deferred - will be set from embedding config at runtime.
     """
     return CollectionConfig(
@@ -104,6 +104,7 @@ def _get_vector_client_options(
     if url is None:
         # Provide placeholder for cloud deployment - will need to be configured before use
         from pydantic import AnyHttpUrl
+
         url = AnyHttpUrl("https://qdrant.example.com")  # Placeholder URL
     return _default_remote_vector_client_options(url)
 
@@ -395,7 +396,7 @@ def _testing_profile(
 
 class ProviderConfigProfile(BaseEnumData):
     """Dataclass wrapper for provider settings profiles.
-    
+
     This is a frozen dataclass for use with BaseDataclassEnum.
     """
 
@@ -407,13 +408,10 @@ class ProviderConfigProfile(BaseEnumData):
     data: tuple[DataProviderSettings, ...] | None
 
     def __init__(
-        self,
-        settings_dict: ProviderSettingsDict | None = None,
-        *args: Any,
-        **kwargs: Any,
+        self, settings_dict: ProviderSettingsDict | None = None, *args: Any, **kwargs: Any
     ) -> None:
         """Initialize ProviderConfigProfile with provider settings.
-        
+
         Args:
             settings_dict: Dictionary containing provider settings
             *args: Additional positional args passed to BaseEnumData
@@ -485,11 +483,13 @@ class ProviderProfile(ProviderConfigProfile, BaseDataclassEnum):
     TESTING_DB = (
         {
             **_get_profile("testing", vector_deployment="local"),
-            "vector_store": (QdrantVectorStoreProviderSettings(
-                collection=_default_collection_options(),
-                provider=Provider.QDRANT,
-                client_options=_default_local_vector_client_options(),
-            ),),
+            "vector_store": (
+                QdrantVectorStoreProviderSettings(
+                    collection=_default_collection_options(),
+                    provider=Provider.QDRANT,
+                    client_options=_default_local_vector_client_options(),
+                ),
+            ),
         },
         ("testing-db", "backup-db", "development-db", "lightweight-db", "dev-db"),
         "Testing profile with on-disk vector database. Similar to the testing profile, but uses a normal on-disk Qdrant vector store instead of an in-memory store. This allows for larger datasets and more persistent storage while still using lightweight local models for embeddings and rerankings.",

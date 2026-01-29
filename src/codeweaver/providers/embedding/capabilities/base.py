@@ -49,52 +49,38 @@ class ModelFamily(BasedModel):
     model_config = BASEDMODEL_CONFIG
 
     family_id: Annotated[
-        str,
-        Field(
-            min_length=3,
-            description="Unique identifier for the model family.",
-        ),
+        str, Field(min_length=3, description="Unique identifier for the model family.")
     ]
     vector_space_dimension: Annotated[
         PositiveInt,
-        Field(
-            description="Dimensionality of the embedding vectors produced by this family.",
-        ),
+        Field(description="Dimensionality of the embedding vectors produced by this family."),
     ]
     vector_space_datatype: Annotated[
-        str,
-        Field(
-            description="Data type of vector components (e.g., 'float', 'int8').",
-        ),
+        str, Field(description="Data type of vector components (e.g., 'float', 'int8').")
     ] = "float"
     is_normalized: Annotated[
-        bool,
-        Field(
-            description="Whether embeddings are normalized to unit length.",
-        ),
+        bool, Field(description="Whether embeddings are normalized to unit length.")
     ] = False
     preferred_metrics: Annotated[
         tuple[str, ...],
         Field(
-            description="Preferred distance metrics for comparing embeddings, in order of suitability.",
+            description="Preferred distance metrics for comparing embeddings, in order of suitability."
         ),
     ] = ("cosine", "dot", "euclidean")
     member_models: Annotated[
         frozenset[str],
         Field(
-            description="Set of model names that belong to this family and share the same vector space.",
+            description="Set of model names that belong to this family and share the same vector space."
         ),
     ]
     asymmetric_query_models: Annotated[
         frozenset[str] | None,
-        Field(
-            description="Optional set of specialized models designed for query-time use only.",
-        ),
+        Field(description="Optional set of specialized models designed for query-time use only."),
     ] = None
     cross_provider_compatible: Annotated[
         bool,
         Field(
-            description="Whether this family maintains compatibility across different providers.",
+            description="Whether this family maintains compatibility across different providers."
         ),
     ] = False
 
@@ -195,9 +181,7 @@ class EmbeddingModelCapabilities(BasedModel):
     is_normalized: bool = False
     model_family: Annotated[
         ModelFamily | None,
-        Field(
-            description="Optional model family specification for cross-model compatibility.",
-        ),
+        Field(description="Optional model family specification for cross-model compatibility."),
     ] = None
     context_window: Annotated[PositiveInt, Field(ge=256)] = 512
     max_batch_tokens: PositiveInt = Field(

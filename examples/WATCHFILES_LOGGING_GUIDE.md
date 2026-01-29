@@ -181,7 +181,7 @@ watcher = FileWatcher(
 Use `WatchfilesLogManager` independently:
 
 ```python
-from codeweaver.engine.indexer import WatchfilesLogManager
+from codeweaver.engine import WatchfilesLogManager
 import logging
 
 # Create manager

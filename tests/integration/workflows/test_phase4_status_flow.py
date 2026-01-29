@@ -29,7 +29,9 @@ from codeweaver.core import FailoverStats  # , get_session_statistics
 
 
 # Mark all tests in this module as skipped until get_session_statistics is replaced with DI
-pytestmark = pytest.mark.skip(reason="Needs update to use DI system instead of obsolete get_session_statistics")
+pytestmark = pytest.mark.skip(
+    reason="Needs update to use DI system instead of obsolete get_session_statistics"
+)
 # from codeweaver.engine import VectorStoreFailoverManager  # Obsolete, removed during refactor
 # from codeweaver.server import FailoverInfo, HealthService  # Obsolete/moved, test needs update for DI
 from codeweaver.server.agent_api import FindCodeResponseSummary

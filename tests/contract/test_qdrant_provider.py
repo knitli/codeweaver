@@ -70,9 +70,7 @@ async def qdrant_provider(qdrant_test_manager):
 
     # Create proper embedding config for the provider settings
     embedding_config = FastEmbedEmbeddingConfig(
-        tag="fastembed",
-        provider=Provider.FASTEMBED,
-        model_name="test-dense-model",
+        tag="fastembed", provider=Provider.FASTEMBED, model_name="test-dense-model"
     )
 
     mock_settings = EmbeddingProviderSettings(

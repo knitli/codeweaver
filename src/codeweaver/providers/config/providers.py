@@ -101,10 +101,15 @@ type VectorStoreProviderSettingsType = Annotated[
 
 # Embedding Providers - flattened union for pydantic discrimination
 
+
 def _discriminate_embedding_provider(v: Any) -> str:
     """Identify the embedding provider settings type for discriminator field."""
     tag_value = v.get("tag") if isinstance(v, dict) else getattr(v, "tag", None)
-    if tag_value in {Provider.AZURE.variable, Provider.BEDROCK.variable, Provider.FASTEMBED.variable}:
+    if tag_value in {
+        Provider.AZURE.variable,
+        Provider.BEDROCK.variable,
+        Provider.FASTEMBED.variable,
+    }:
         return tag_value
     return "none"
 
@@ -129,6 +134,7 @@ type SparseEmbeddingProviderSettingsType = Annotated[
 ]
 
 # Reranking Providers - flattened union for pydantic discrimination
+
 
 def _discriminate_reranking_provider(v: Any) -> str:
     """Identify the reranking provider settings type for discriminator field."""

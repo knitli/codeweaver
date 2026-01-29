@@ -478,7 +478,7 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
     @staticmethod
     def _thing_registry(registry: ThingRegistryDep = INJECTED) -> ThingRegistry:
         """Get or create ThingRegistry instance.
-        
+
         When called through DI container, returns injected registry.
         When called directly (e.g. in tests), creates singleton instance.
         """

@@ -254,9 +254,7 @@ class TestVectorConfig:
 
         # Create proper embedding config
         embedding_config = VoyageEmbeddingConfig(
-            tag="voyage",
-            provider=Provider.VOYAGE,
-            model_name="voyage-large-2-instruct",
+            tag="voyage", provider=Provider.VOYAGE, model_name="voyage-large-2-instruct"
         )
 
         # Create provider settings with the proper embedding config
@@ -284,9 +282,7 @@ class TestVectorConfig:
 
         # Create proper sparse embedding config
         sparse_embedding_config = FastEmbedSparseEmbeddingConfig(
-            tag="fastembed",
-            provider=Provider.FASTEMBED,
-            model_name="Qdrant/bm25",
+            tag="fastembed", provider=Provider.FASTEMBED, model_name="Qdrant/bm25"
         )
 
         # Create sparse provider settings with the proper config
@@ -314,9 +310,7 @@ class TestVectorConfig:
 
         # Create proper embedding config
         embedding_config = VoyageEmbeddingConfig(
-            tag="voyage",
-            provider=Provider.VOYAGE,
-            model_name="voyage-large-2-instruct",
+            tag="voyage", provider=Provider.VOYAGE, model_name="voyage-large-2-instruct"
         )
 
         # Create provider settings with the proper embedding config

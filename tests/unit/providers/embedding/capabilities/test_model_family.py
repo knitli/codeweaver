@@ -23,6 +23,7 @@ from pydantic import ValidationError
 from codeweaver.providers.embedding.capabilities.base import ModelFamily
 
 
+@pytest.mark.unit
 class TestModelFamilyConstruction:
     """Test ModelFamily class construction and validation."""
 
@@ -51,7 +52,12 @@ class TestModelFamilyConstruction:
             vector_space_datatype="int8",
             is_normalized=True,
             preferred_metrics=("dot", "cosine"),
-            member_models=frozenset({"voyage-4-large", "voyage-4", "voyage-4-lite", "voyage-4-nano"}),
+            member_models=frozenset({
+                "voyage-4-large",
+                "voyage-4",
+                "voyage-4-lite",
+                "voyage-4-nano",
+            }),
             asymmetric_query_models=frozenset({"voyage-4-nano"}),
             cross_provider_compatible=True,
         )
@@ -123,6 +129,7 @@ class TestModelFamilyConstruction:
             pass
 
 
+@pytest.mark.unit
 class TestIsCompatible:
     """Test the is_compatible() method with various scenarios."""
 
@@ -142,7 +149,12 @@ class TestIsCompatible:
         family = ModelFamily(
             family_id="voyage-4",
             vector_space_dimension=2048,
-            member_models=frozenset({"voyage-4-large", "voyage-4", "voyage-4-lite", "voyage-4-nano"}),
+            member_models=frozenset({
+                "voyage-4-large",
+                "voyage-4",
+                "voyage-4-lite",
+                "voyage-4-nano",
+            }),
         )
 
         # Test all combinations of different models
@@ -204,6 +216,7 @@ class TestIsCompatible:
         assert family.is_compatible("MODEL-A", "MODEL-B") is False
 
 
+@pytest.mark.unit
 class TestValidateDimensions:
     """Test the validate_dimensions() method."""
 
@@ -296,6 +309,7 @@ class TestValidateDimensions:
             assert error is None
 
 
+@pytest.mark.unit
 class TestVoyage4FamilyDefinition:
     """Test VOYAGE_4_FAMILY definition (when available).
 
@@ -386,6 +400,7 @@ class TestVoyage4FamilyDefinition:
         assert error is not None
 
 
+@pytest.mark.unit
 class TestCrossProviderFamilyLinking:
     """Test cross-provider family compatibility.
 
@@ -466,6 +481,7 @@ class TestCrossProviderFamilyLinking:
         assert single_provider_family.is_compatible("model-a", "model-b") is True
 
 
+@pytest.mark.unit
 class TestAsymmetricQueryModels:
     """Test asymmetric query model specifications."""
 
@@ -515,6 +531,7 @@ class TestAsymmetricQueryModels:
         assert family.asymmetric_query_models is None
 
 
+@pytest.mark.unit
 class TestEdgeCases:
     """Test edge cases and boundary conditions."""
 
@@ -534,9 +551,7 @@ class TestEdgeCases:
         """Test family with many models."""
         models = frozenset({f"model-{i}" for i in range(100)})
         family = ModelFamily(
-            family_id="large-family",
-            vector_space_dimension=1024,
-            member_models=models,
+            family_id="large-family", vector_space_dimension=1024, member_models=models
         )
 
         assert len(family.member_models) == 100
@@ -566,9 +581,7 @@ class TestEdgeCases:
     def test_very_large_dimension(self) -> None:
         """Test family with very large dimension."""
         family = ModelFamily(
-            family_id="large-dim",
-            vector_space_dimension=8192,
-            member_models=frozenset({"model-a"}),
+            family_id="large-dim", vector_space_dimension=8192, member_models=frozenset({"model-a"})
         )
 
         is_valid, error = family.validate_dimensions(8192, 8192)

@@ -161,9 +161,7 @@ def create_lazy_getattr(
         try:
             dynamic_attr = dynamic_imports[attr_name]
         except KeyError as e:
-            raise AttributeError(
-                f"module '{module_name}' has no attribute '{attr_name}'"
-            ) from e
+            raise AttributeError(f"module '{module_name}' has no attribute '{attr_name}'") from e
 
         package, target_module = dynamic_attr
 

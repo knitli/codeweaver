@@ -94,7 +94,8 @@ class BaseFastMcpServerSettings(BasedModel):
 
     middleware: list[type[McpMiddleware]] = Field(
         default_factory=lambda: sorted(
-            DEFAULT_BASE_MIDDLEWARE, key=lambda mw: _sort_order.index(mw.split(".")[-1])
+            DEFAULT_BASE_MIDDLEWARE,
+            key=lambda mw: _sort_order.index(mw.split(".")[-1].removeprefix("mcp")),
         ),
         description="""Mcp Middleware classes (classes that subclass and implement `fastmcp.server.middleware.middleware.Middleware`). CodeWeaver includes several middleware by default, and always includes its own required middleware. Setting this field will override default (not required) middleware. Options are set in the `middleware` field of `CodeWeaverSettings`.""",
     )
@@ -183,7 +184,8 @@ class FastMcpHttpServerSettings(BaseFastMcpServerSettings):
 
     middleware: list[type[McpMiddleware]] = Field(
         default_factory=lambda: sorted(
-            DEFAULT_HTTP_MIDDLEWARE, key=lambda mw: _sort_order.index(mw.split(".")[-1])
+            DEFAULT_HTTP_MIDDLEWARE,
+            key=lambda mw: _sort_order.index(mw.split(".")[-1].removeprefix("mcp")),
         ),
         description="""Mcp Middleware classes (classes that subclass and implement `fastmcp.server.middleware.middleware.Middleware`). CodeWeaver includes several middlewares by default, and always includes its own required middlewares. Setting this field will override default (not required) middlewares.""",
     )

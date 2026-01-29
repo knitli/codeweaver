@@ -45,7 +45,15 @@ def get_user_agent() -> str:
     return f"CodeWeaver/{__version__}"
 
 
-__all__ = ("CodeMatch", "CodeMatchType", "FindCodeResponseSummary", "IntentType", "SearchStrategy", "find_code", "get_user_agent")
+__all__ = (
+    "CodeMatch",
+    "CodeMatchType",
+    "FindCodeResponseSummary",
+    "IntentType",
+    "SearchStrategy",
+    "find_code",
+    "get_user_agent",
+)
 
 
 def __dir__() -> list[str]:

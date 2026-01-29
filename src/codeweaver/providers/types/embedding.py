@@ -46,9 +46,7 @@ class ConfiguredCapability(NamedTuple):
             else self.config.embedding_config
         )
         return ModelName(
-            self.config.model_name
-            or embedding_config.model_name
-            or self.capability.name
+            self.config.model_name or embedding_config.model_name or self.capability.name
         )
 
     async def datatype(self) -> str | None:
@@ -89,9 +87,7 @@ class ConfiguredCapability(NamedTuple):
             if isinstance(self.config, SparseEmbeddingProviderSettings)
             else self.config.embedding_config
         )
-        configured_dimension = (
-            await embedding_config.get_dimension() or default_dimension
-        )
+        configured_dimension = await embedding_config.get_dimension() or default_dimension
         allowed_values = (
             self.capability.output_dimensions
             if self.capability and self.capability.output_dimensions

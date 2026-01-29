@@ -61,40 +61,32 @@ class CodeWeaverEngineSettings(CodeWeaverProviderSettings):
 
     indexer: Annotated[
         IndexerSettings | Unset,
-        Field(
-            description="Indexing configuration for code discovery and processing",
-        ),
+        Field(description="Indexing configuration for code discovery and processing"),
     ] = UNSET
 
     chunker: Annotated[
-        ChunkerSettings | Unset,
-        Field(
-            description="Chunking configuration for code segmentation",
-        ),
+        ChunkerSettings | Unset, Field(description="Chunking configuration for code segmentation")
     ] = UNSET
 
     failover: Annotated[
-        FailoverSettings | Unset,
-        Field(
-            description="Failover configuration for service resilience",
-        ),
+        FailoverSettings | Unset, Field(description="Failover configuration for service resilience")
     ] = UNSET
 
     def _initialize(self, **kwargs: Any) -> dict[str, Any]:  # ty:ignore[invalid-method-override]
         """Initialize engine settings - nothing special needed."""
-        if kwargs.get("indexer") is UNSET:
+        if "indexer" not in kwargs or kwargs.get("indexer") is UNSET:
             kwargs["indexer"] = IndexerSettings.model_construct(**DefaultIndexerSettings)
         else:
             kwargs["indexer"] = IndexerSettings(
                 **self._resolve_default_and_provided(DefaultIndexerSettings, kwargs["indexer"])  # ty:ignore[invalid-argument-type]
             )
-        if kwargs.get("chunker") is UNSET:
+        if "chunker" not in kwargs or kwargs.get("chunker") is UNSET:
             kwargs["chunker"] = ChunkerSettings.model_construct(**DefaultChunkerSettings)
         else:
             kwargs["chunker"] = ChunkerSettings.model_validate(
                 self._resolve_default_and_provided(DefaultChunkerSettings, kwargs["chunker"])  # ty:ignore[invalid-argument-type]
             )
-        if kwargs.get("failover") is UNSET:
+        if "failover" not in kwargs or kwargs.get("failover") is UNSET:
             kwargs["failover"] = FailoverSettings.model_construct(**DefaultFailoverSettings())
         else:
             kwargs["failover"] = FailoverSettings.model_validate(

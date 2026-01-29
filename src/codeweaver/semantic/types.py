@@ -30,7 +30,6 @@ from codeweaver.core import (
 
 
 if TYPE_CHECKING:
-
     pass
 
 

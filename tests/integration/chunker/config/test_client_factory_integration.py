@@ -17,7 +17,10 @@ import pytest
 from codeweaver.core import Provider, ProviderKind
 
 
-pytestmark = [pytest.mark.integration, pytest.mark.skip(reason="ProviderRegistry removed - functionality tested through DI container")]
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.skip(reason="ProviderRegistry removed - functionality tested through DI container"),
+]
 
 
 @pytest.mark.external_api

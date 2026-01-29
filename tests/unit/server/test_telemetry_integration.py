@@ -24,7 +24,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from codeweaver.core import TelemetryService, TelemetrySettings
-from codeweaver.server.config import CodeWeaverSettings
 
 
 pytestmark = [pytest.mark.unit, pytest.mark.server]

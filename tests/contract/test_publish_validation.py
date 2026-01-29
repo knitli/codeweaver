@@ -226,7 +226,7 @@ def test_local_installation():
     if not wheels:
         pytest.fail("No wheel found")
 
-    wheel_path = wheels[0]
+    wheels[0]
 
     # Test installation in temporary venv
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -241,15 +241,19 @@ def test_local_installation():
         pip = venv_path / "bin" / "pip"
         python = venv_path / "bin" / "python"
 
-        # Install from local wheel
-        # Use --find-links to allow pip to find other workspace member wheels in the dist directory
+        # Install all workspace wheels
+        # Use --find-links to allow pip to find other workspace member wheels
+        all_wheels = list(dist_dir.glob("*.whl"))
+
         result = subprocess.run(
-            [str(pip), "install", "--find-links", str(dist_dir), str(wheel_path)],
+            [str(pip), "install", "--find-links", str(dist_dir)] + [str(w) for w in all_wheels],
             capture_output=True,
             text=True,
             check=False,
         )
-        assert result.returncode == 0, f"Installation failed: {result.stderr}"
+        assert result.returncode == 0, (
+            f"Installation failed:\nSTDOUT: {result.stdout}\nSTDERR: {result.stderr}"
+        )
 
         # Verify importable
         result = subprocess.run(
@@ -258,7 +262,9 @@ def test_local_installation():
             text=True,
             check=False,
         )
-        assert result.returncode == 0, f"Import failed: {result.stderr}"
+        assert result.returncode == 0, (
+            f"Import failed:\nSTDOUT: {result.stdout}\nSTDERR: {result.stderr}"
+        )
         assert "OK" in result.stdout, "Package not properly imported"
 
     # Cleanup

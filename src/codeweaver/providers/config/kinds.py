@@ -104,7 +104,6 @@ from codeweaver.providers.config.utils import (
 
 
 if TYPE_CHECKING:
-
     from codeweaver.engine.config import FailoverSettings
     from codeweaver.engine.config.failover_detector import FailoverDetector
     from codeweaver.providers.dependencies import EmbeddingCapabilityGroupDep
@@ -563,10 +562,7 @@ class CollectionConfig(BasedModel):
         else:
             vectors_dict = {}
 
-        self.vectors_config = _deep_merge(
-            dict(self.vectors_config or {}),
-            vectors_dict,
-        )
+        self.vectors_config = _deep_merge(dict(self.vectors_config or {}), vectors_dict)
         self.sparse_vectors_config = _deep_merge(
             dict(self.sparse_vectors_config or {}),
             cast(dict[str, SparseVectorParams], params.sparse_vectors or {}),

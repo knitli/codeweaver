@@ -442,8 +442,7 @@ class TestHelperFunctions:
         self, temp_project: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
         """Test handle_output in print mode."""
-        from codeweaver.cli.commands.init import handle_output
-        from codeweaver.cli.commands.init import _create_stdio_config
+        from codeweaver.cli.commands.init import _create_stdio_config, handle_output
 
         config = _create_stdio_config()
 
@@ -462,8 +461,7 @@ class TestHelperFunctions:
 
     def test_handle_output_write_mode(self, temp_project: Path) -> None:
         """Test handle_output in write mode."""
-        from codeweaver.cli.commands.init import handle_output
-        from codeweaver.cli.commands.init import _create_stdio_config
+        from codeweaver.cli.commands.init import _create_stdio_config, handle_output
 
         config = _create_stdio_config()
 
@@ -489,8 +487,7 @@ class TestHelperFunctions:
 
     def test_handle_write_output_creates_parent_dirs(self, temp_project: Path) -> None:
         """Test _handle_write_output creates parent directories."""
-        from codeweaver.cli.commands.init import _handle_write_output
-        from codeweaver.cli.commands.init import _create_stdio_config
+        from codeweaver.cli.commands.init import _create_stdio_config, _handle_write_output
 
         config = _create_stdio_config()
 

@@ -377,15 +377,18 @@ class BaseCodeWeaverSettings(BaseSettings):
         **data: Any,
     ) -> None:
         """Initialize the BaseCodeWeaverSettings instance."""
-        if config_file is not UNSET and config_file.exists():
+        if config_file is not UNSET and config_file is not None and config_file.exists():
             self = type(self).from_config(
                 cast(Path, config_file),
                 project_path=cast(Path | None, project_path if project_path is not UNSET else None),
                 **data,
             )
+        # Collect unset fields before resolving defaults
+        unset_fields = set()
         for key in type(self).model_fields:
             if data.get(key) is UNSET or locals().get(key) is UNSET:
-                self._unset_fields.add(key)
+                unset_fields.add(key)
+
         if project_path is UNSET:
             project_path = Path(
                 os.getenv("CODEWEAVER_PROJECT_PATH", data.get("project_path", get_project_path()))
@@ -409,6 +412,8 @@ class BaseCodeWeaverSettings(BaseSettings):
         }
         data = self._initialize(**data)
         super().__init__(**data)
+        # Now that the parent is initialized, we can set the private attribute
+        self._unset_fields.update(unset_fields)
         if not type(self).__pydantic_complete__:
             type(self).model_rebuild()
 

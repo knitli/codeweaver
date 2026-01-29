@@ -61,9 +61,7 @@ class CodeWeaverProviderSettings(CodeWeaverCoreSettings):
 
     provider: Annotated[
         ProviderSettings | Unset,
-        Field(
-            description="Provider configuration for embedding, vector store, reranking, etc.",
-        ),
+        Field(description="Provider configuration for embedding, vector store, reranking, etc."),
     ] = UNSET
 
     profile: Annotated[
@@ -82,7 +80,9 @@ class CodeWeaverProviderSettings(CodeWeaverCoreSettings):
     def _initialize(self, **kwargs: Any) -> dict[str, Any]:  # ty:ignore[invalid-method-override]
         """Initialize provider settings."""
         profile_config = (
-            profile.as_settings_dict() if (profile := kwargs.get("profile")) is not Unset else {}
+            profile.as_settings_dict()
+            if (profile := kwargs.get("profile")) is not None and profile is not Unset
+            else {}
         )
         if provider_config := kwargs.get("provider"):
             provider = ProviderSettings.model_validate(

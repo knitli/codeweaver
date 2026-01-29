@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Literal, NotRequired, Required, TypedDict
 
-from pydantic import PositiveFloat, PositiveInt
+from pydantic import PositiveInt
 
 
 if TYPE_CHECKING:

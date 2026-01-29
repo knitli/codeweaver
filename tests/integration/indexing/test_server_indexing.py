@@ -31,7 +31,9 @@ from codeweaver.server import CodeWeaverSettings  # , reset_settings
 
 
 # Mark all tests in this module as skipped until reset_settings is replaced with DI
-pytestmark = pytest.mark.skip(reason="Needs update to use DI system (container.override) instead of obsolete reset_settings")
+pytestmark = pytest.mark.skip(
+    reason="Needs update to use DI system (container.override) instead of obsolete reset_settings"
+)
 
 
 # Test fixture: Small Python project

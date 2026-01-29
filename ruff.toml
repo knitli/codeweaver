@@ -246,7 +246,7 @@ convention = "google"
 "src/codeweaver/engine/failover.py" = [
   "C901",  # too complex - failover logic has many edge cases
 ]
-"src/codeweaver/engine/indexer/indexer.py" = [
+"src/codeweaver/engine/services/indexing_service.py" = [
   "C901",  # too complex - indexing orchestration is inherently complex
 ]
 "src/codeweaver/engine/resource_estimation.py" = [

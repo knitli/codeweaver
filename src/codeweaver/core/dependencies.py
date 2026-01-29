@@ -12,7 +12,7 @@ import logging
 import os
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, TypeAlias, Union
+from typing import TYPE_CHECKING, Annotated
 
 from pydantic import DirectoryPath
 
@@ -60,6 +60,12 @@ def _resolve_config_file() -> Path | None:
     return None
 
 
+# Union type covering all possible settings types
+# Imports moved to TYPE_CHECKING block to avoid circular dependencies
+# Actual runtime type is resolved by bootstrap_settings -> get_settings()
+type CodeWeaverSettingsType = "CodeWeaverSettings" | "CodeWeaverEngineSettings" | "CodeWeaverProviderSettings" | "CodeWeaverCoreSettings"
+
+
 async def bootstrap_settings(config_file: Path | None = None) -> CodeWeaverSettingsType:
     """Bootstrap global settings as DI root.
 
@@ -94,18 +100,7 @@ async def bootstrap_settings(config_file: Path | None = None) -> CodeWeaverSetti
     return await asyncio.to_thread(get_settings, config_file=config_file)  # ty:ignore[invalid-return-type]
 
 
-# Union type covering all possible settings types
-# Imports moved to TYPE_CHECKING block to avoid circular dependencies
-# Actual runtime type is resolved by bootstrap_settings -> get_settings()
-CodeWeaverSettingsType: TypeAlias = Union[
-    "CodeWeaverSettings",
-    "CodeWeaverEngineSettings",
-    "CodeWeaverProviderSettings",
-    "CodeWeaverCoreSettings",
-]
-
-
-type SettingsDep = Annotated[
+SettingsDep = Annotated[
     CodeWeaverSettingsType, depends(bootstrap_settings, scope="singleton", tags={"settings"})
 ]
 

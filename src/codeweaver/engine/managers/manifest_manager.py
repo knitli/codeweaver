@@ -192,10 +192,7 @@ class IndexFileManifest(BasedModel):
         return all_ids
 
     def get_files_by_embedding_config(
-        self,
-        *,
-        has_dense: bool | None = None,
-        has_sparse: bool | None = None,
+        self, *, has_dense: bool | None = None, has_sparse: bool | None = None
     ) -> set[Path]:
         """Get files matching embedding configuration criteria.
 
@@ -251,14 +248,12 @@ class IndexFileManifest(BasedModel):
         result: dict[str, set[Path]] = {"dense_only": set(), "sparse_only": set()}
 
         # If no providers configured, return empty sets
-        if not any(
-            [
-                current_dense_provider,
-                current_dense_model,
-                current_sparse_provider,
-                current_sparse_model,
-            ]
-        ):
+        if not any([
+            current_dense_provider,
+            current_dense_model,
+            current_sparse_provider,
+            current_sparse_model,
+        ]):
             return result
 
         for raw_path, entry in self.files.items():

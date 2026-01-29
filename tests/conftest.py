@@ -224,10 +224,11 @@ def initialize_test_settings() -> Generator[None, None, None]:
     with minimal required configuration for tests. It resets settings after
     the test to avoid cross-test contamination.
     """
-    from codeweaver.server import get_settings, reset_settings
+    from codeweaver.core.config.loader import get_settings
+    from codeweaver.core.di import reset_container
 
-    # Reset any existing settings
-    reset_settings()
+    # Reset container to force fresh settings
+    reset_container()
 
     # Initialize settings by calling get_settings() which will create
     # the global instance with defaults, including the "providers" key
@@ -236,8 +237,8 @@ def initialize_test_settings() -> Generator[None, None, None]:
 
     yield
 
-    # Cleanup: reset settings after test
-    reset_settings()
+    # Cleanup: reset container after test
+    reset_container()
 
 
 @pytest.fixture
@@ -416,7 +417,6 @@ def vector_store_factory(qdrant_test_manager) -> Any:
             CollectionConfig,
             ConfiguredCapability,
             EmbeddingCapabilityGroup,
-            EmbeddingConfig,
             EmbeddingModelCapabilities,
             EmbeddingProviderSettings,
             MemoryVectorStoreProvider,
@@ -441,9 +441,7 @@ def vector_store_factory(qdrant_test_manager) -> Any:
             )
             # Create proper embedding config for the provider settings
             embedding_config = FastEmbedEmbeddingConfig(
-                tag="fastembed",
-                provider=Provider.FASTEMBED,
-                model_name="test-dense-model",
+                tag="fastembed", provider=Provider.FASTEMBED, model_name="test-dense-model"
             )
             # Mock settings to satisfy ConfiguredCapability
             mock_settings = EmbeddingProviderSettings(

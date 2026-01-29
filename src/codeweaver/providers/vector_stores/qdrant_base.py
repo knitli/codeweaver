@@ -257,7 +257,8 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
                     create_params[key] = config_dict[key]
 
             await self.client.create_collection(
-                collection_name=collection_name, **{k: v for k, v in create_params.items() if v is not None}
+                collection_name=collection_name,
+                **{k: v for k, v in create_params.items() if v is not None},
             )
             self._known_collections.add(collection_name)
         except UnexpectedResponse as e:
@@ -662,7 +663,7 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
             )
 
         # Iterate over all embeddings in the chunk
-        for intent, batch_keys in chunk.embeddings.items():
+        for intent in chunk.embeddings:
             # Get the actual embedding data from the ChunkEmbeddings
             embedding_info = chunk_embeddings.embeddings.get(intent)
             if embedding_info is None:
