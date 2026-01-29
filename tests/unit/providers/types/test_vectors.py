@@ -248,14 +248,22 @@ class TestVectorConfig:
     @pytest.mark.asyncio
     async def test_from_provider_settings_dense(self):
         """Test factory method from_provider_settings for dense embeddings."""
+        from codeweaver.core import Provider
+        from codeweaver.providers.config.embedding import VoyageEmbeddingConfig
         from codeweaver.providers.config.kinds import EmbeddingProviderSettings
 
-        # Create a mock provider settings (simplified)
-        # This test assumes the settings structure from the actual codebase
-        settings = EmbeddingProviderSettings(
-            provider="voyage",
+        # Create proper embedding config
+        embedding_config = VoyageEmbeddingConfig(
+            tag="voyage",
+            provider=Provider.VOYAGE,
             model_name="voyage-large-2-instruct",
-            # Additional required fields would go here
+        )
+
+        # Create provider settings with the proper embedding config
+        settings = EmbeddingProviderSettings(
+            provider=Provider.VOYAGE,
+            model_name="voyage-large-2-instruct",
+            embedding_config=embedding_config,
         )
 
         config = await VectorConfig.from_provider_settings(
@@ -270,13 +278,22 @@ class TestVectorConfig:
     @pytest.mark.asyncio
     async def test_from_provider_settings_sparse(self):
         """Test factory method from_provider_settings for sparse embeddings."""
+        from codeweaver.core import Provider
+        from codeweaver.providers.config.embedding import FastEmbedSparseEmbeddingConfig
         from codeweaver.providers.config.kinds import SparseEmbeddingProviderSettings
 
-        # Create a mock sparse provider settings
+        # Create proper sparse embedding config
+        sparse_embedding_config = FastEmbedSparseEmbeddingConfig(
+            tag="fastembed",
+            provider=Provider.FASTEMBED,
+            model_name="Qdrant/bm25",
+        )
+
+        # Create sparse provider settings with the proper config
         settings = SparseEmbeddingProviderSettings(
-            provider="opensearch",
-            model_name="opensearch/sparse-encoding-v3",
-            # Additional required fields would go here
+            provider=Provider.FASTEMBED,
+            model_name="Qdrant/bm25",
+            sparse_embedding_config=sparse_embedding_config,
         )
 
         config = await VectorConfig.from_provider_settings(
@@ -284,17 +301,29 @@ class TestVectorConfig:
         )
 
         assert config.name == "sparse"
-        assert config.model_name == ModelName("opensearch/sparse-encoding-v3")
+        assert config.model_name == ModelName("Qdrant/bm25")
         assert config.role == VectorRole.SPARSE.variable
         assert isinstance(config.params, SparseVectorParams)
 
     @pytest.mark.asyncio
     async def test_from_provider_settings_role_defaults(self):
         """Test that from_provider_settings defaults role to name."""
+        from codeweaver.core import Provider
+        from codeweaver.providers.config.embedding import VoyageEmbeddingConfig
         from codeweaver.providers.config.kinds import EmbeddingProviderSettings
 
+        # Create proper embedding config
+        embedding_config = VoyageEmbeddingConfig(
+            tag="voyage",
+            provider=Provider.VOYAGE,
+            model_name="voyage-large-2-instruct",
+        )
+
+        # Create provider settings with the proper embedding config
         settings = EmbeddingProviderSettings(
-            provider="voyage", model_name="voyage-large-2-instruct"
+            provider=Provider.VOYAGE,
+            model_name="voyage-large-2-instruct",
+            embedding_config=embedding_config,
         )
 
         config = await VectorConfig.from_provider_settings(settings, name="custom_vector")

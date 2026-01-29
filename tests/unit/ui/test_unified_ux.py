@@ -224,7 +224,7 @@ class TestDoctorConsoleProxy:
     def test_console_proxy_delegates_to_current_display(self) -> None:
         """Test that doctor console proxy always uses current display."""
         # Import here to avoid circular dependencies
-        from codeweaver.cli import doctor
+        from codeweaver.cli.commands import doctor
 
         # Get initial display
         initial_display = doctor._get_display()
@@ -252,7 +252,7 @@ class TestDoctorConsoleProxy:
 
     def test_console_proxy_has_required_methods(self) -> None:
         """Test that console proxy has all required methods."""
-        from codeweaver.cli import doctor
+        from codeweaver.cli.commands import doctor
 
         # Verify proxy has the methods check functions use
         assert hasattr(doctor.console, "print"), "Console proxy should have print method"

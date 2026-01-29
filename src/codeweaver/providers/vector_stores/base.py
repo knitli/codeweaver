@@ -96,6 +96,8 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
             init_data["config"] = config
         if client is not None:
             init_data["client"] = client
+        if caps is not None:
+            init_data["caps"] = caps
 
         object.__setattr__(self, "caps", caps)
         object.__setattr__(self, "client", client)

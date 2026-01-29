@@ -59,6 +59,7 @@ async def memory_config(temp_persist_path):
 @pytest.fixture
 async def test_embedding_caps():
     """Provide test embedding capabilities with 768 dimensions."""
+    from codeweaver.providers.config.embedding import FastEmbedEmbeddingConfig
 
     dense_caps = EmbeddingModelCapabilities(
         name="test-dense-model",
@@ -67,12 +68,19 @@ async def test_embedding_caps():
         preferred_metrics=("cosine", "dot"),
     )
 
-    # We need a ConfiguredCapability for the group
-    # Mocking the settings to satisfy ConfiguredCapability
-    mock_settings = EmbeddingProviderSettings(
-        provider=Provider.OPENAI,  # Dummy provider
+    # Create proper embedding config with explicit dimension in embedding dict
+    embedding_config = FastEmbedEmbeddingConfig(
+        tag="fastembed",
+        provider=Provider.FASTEMBED,
         model_name="test-dense-model",
-        embedding_config=EmbeddingProviderSettings(model_name="test-dense-model"),
+        embedding={"dimensions": 768},  # Explicitly set dimension to avoid capability resolution
+    )
+
+    # Create provider settings with the proper embedding config
+    mock_settings = EmbeddingProviderSettings(
+        provider=Provider.FASTEMBED,
+        model_name="test-dense-model",
+        embedding_config=embedding_config,
     )
 
     configured_dense = ConfiguredCapability(capability=dense_caps, config=mock_settings)
@@ -97,7 +105,8 @@ async def memory_provider(memory_config, test_embedding_caps):
 def sample_chunk():
     """Create a sample CodeChunk for testing."""
     from codeweaver.core import BatchKeys, ChunkKind, ExtKind, uuid7
-    from codeweaver.providers import ChunkEmbeddings, EmbeddingBatchInfo, get_embedding_registry
+    from codeweaver.core.types import ChunkEmbeddings, EmbeddingBatchInfo
+    from codeweaver.providers.embedding import get_embedding_registry
 
     chunk_id = uuid7()
 
@@ -112,9 +121,6 @@ def sample_chunk():
         line_range=Span(start=1, end=2, source_id=chunk_id),
     )
 
-    # Register embeddings in the registry
-    registry = get_embedding_registry()
-
     # Create dense embeddings (768 dimensions to match default)
     dense_batch_id = uuid7()
     dense_info = EmbeddingBatchInfo.create_dense(
@@ -126,12 +132,13 @@ def sample_chunk():
         dimension=768,
     )
 
-    # Set batch key on chunk
+    # Set batch key on chunk BEFORE registering embeddings
     dense_batch_key = BatchKeys(id=dense_batch_id, idx=0, sparse=False)
-    chunk = chunk.set_batch_keys(dense_batch_key)
+    chunk = chunk.set_batch_keys(dense_batch_key, intent="dense")
 
-    # Register in the embedding registry
-    registry[chunk_id] = ChunkEmbeddings(chunk=chunk).add(dense_info)
+    # Register embeddings in the registry AFTER setting batch keys
+    registry = get_embedding_registry()
+    registry[chunk.chunk_id] = ChunkEmbeddings(chunk=chunk).add(dense_info)
 
     return chunk
 

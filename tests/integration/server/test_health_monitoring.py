@@ -39,6 +39,7 @@ from codeweaver.server import (
     HealthResponse,
     HealthService,
     IndexingInfo,
+    ResourceInfo,
     ServicesInfo,
     StatisticsInfo,
 )
@@ -101,74 +102,36 @@ def test_project_path(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def mock_provider_registry(mocker) -> MagicMock:
-    """Create mock provider registry."""
-    # Don't use spec= to allow mocking new unified API methods
-    registry = mocker.MagicMock()
-
-    # Mock vector store provider (old API)
+def mock_providers(mocker) -> dict:
+    """Create mock providers following new DI pattern."""
+    # Mock vector store provider
     vector_store = mocker.MagicMock()
-    registry.get_vector_store_provider_instance.return_value = vector_store
-
-    # Mock new unified API methods for vector store
-    vector_store_config = {"provider": mocker.MagicMock()}
-    registry.get_configured_provider_settings.return_value = vector_store_config
-    vector_store_enum = mocker.MagicMock()
-
-    # Setup get_provider_enum_for to return appropriate enums
-    def get_provider_enum_for(provider_type: str):
-        if provider_type == "vector_store":
-            return vector_store_enum
-        if provider_type == "embedding":
-            return embedding_provider_enum
-        if provider_type == "sparse_embedding":
-            return sparse_provider_enum
-        return reranking_provider_enum if provider_type == "reranking" else None
-
-    registry.get_provider_enum_for.side_effect = get_provider_enum_for
+    vector_store.__class__.__name__ = "MemoryVectorStoreProvider"
 
     # Mock embedding provider with circuit breaker
-    embedding_provider_enum = mocker.MagicMock()
     embedding_instance = mocker.MagicMock()
     embedding_instance.model_name = "voyage-code-3"
-    # FIX: Use .variable instead of .value to match BaseEnum interface
+    embedding_instance.__class__.__name__ = "VoyageEmbeddingProvider"
     embedding_instance.circuit_breaker_state = mocker.MagicMock()
     embedding_instance.circuit_breaker_state.variable = "closed"
-    registry.get_embedding_provider.return_value = embedding_provider_enum
-    registry.get_embedding_provider_instance.return_value = embedding_instance
 
     # Mock sparse embedding provider
-    sparse_provider_enum = mocker.MagicMock()
-    sparse_provider_enum.as_title = "FastEmbed_Local"
     sparse_instance = mocker.MagicMock()
-    registry.get_embedding_provider.side_effect = lambda sparse=False: (
-        sparse_provider_enum if sparse else embedding_provider_enum
-    )
-    registry.get_sparse_embedding_provider_instance.return_value = sparse_instance
+    sparse_instance.__class__.__name__ = "FastEmbed_Local"
 
     # Mock reranking provider with circuit breaker
-    reranking_provider_enum = mocker.MagicMock()
     reranking_instance = mocker.MagicMock()
     reranking_instance.model_name = "voyage-rerank-2.5"
-    # FIX: Use .variable instead of .value to match BaseEnum interface
+    reranking_instance.__class__.__name__ = "VoyageRerankingProvider"
     reranking_instance.circuit_breaker_state = mocker.MagicMock()
     reranking_instance.circuit_breaker_state.variable = "closed"
-    registry.get_reranking_provider.return_value = reranking_provider_enum
-    registry.get_reranking_provider_instance.return_value = reranking_instance
 
-    # Mock unified get_provider_instance to return the right instances
-    def get_provider_instance(enum_value, provider_type: str, singleton: bool = True):
-        if provider_type == "vector_store":
-            return vector_store
-        if provider_type == "embedding":
-            return embedding_instance
-        if provider_type == "sparse_embedding":
-            return sparse_instance
-        return reranking_instance if provider_type == "reranking" else None
-
-    registry.get_provider_instance.side_effect = get_provider_instance
-
-    return registry
+    return {
+        "embedding": (embedding_instance,),
+        "sparse_embedding": (sparse_instance,),
+        "reranking": (reranking_instance,),
+        "vector_store": (vector_store,),
+    }
 
 
 @pytest.fixture
@@ -197,15 +160,17 @@ def session_statistics() -> SessionStatistics:
 
 @pytest.fixture
 def health_service(
-    mock_provider_registry: MagicMock, session_statistics: SessionStatistics, mocker
+    mock_providers: dict, session_statistics: SessionStatistics, mocker
 ) -> HealthService:
-    """Create health service instance."""
+    """Create health service instance using new DI pattern."""
     mock_failover = mocker.MagicMock()
     mock_failover._failover_active = False
     mock_failover._primary_store = None
+    mock_failover.settings = mocker.MagicMock()
+    mock_failover.settings.disable_failover = False
 
     return HealthService(
-        provider_registry=mock_provider_registry,
+        providers=mock_providers,
         statistics=session_statistics,
         indexer=None,
         failover_manager=mock_failover,
@@ -372,9 +337,7 @@ async def test_health_status_degraded(health_service: HealthService, mocker):
     Then: Status is 'degraded' (sparse-only search still works)
     """
     # Mock embedding provider as down (circuit breaker open)
-    embedding_instance = (
-        health_service._provider_registry.get_embedding_provider_instance.return_value
-    )
+    embedding_instance = health_service._providers["embedding"][0]
     # FIX: Use .variable instead of .value to match BaseEnum interface
     embedding_instance.circuit_breaker_state.variable = "open"
 
@@ -398,36 +361,9 @@ async def test_health_status_unhealthy(health_service: HealthService, mocker):
     Then: Status is 'unhealthy' (no search functionality available)
     """
 
-    # Mock vector store as down using unified API
-    # Note: get_provider_instance is called with (enum, "string_type", singleton=True)
-    def failing_get_provider_instance(
-        provider_enum, provider_type: str, *, singleton: bool = False, **kwargs
-    ):
-        if provider_type == "vector_store":
-            raise RuntimeError("Vector store unavailable")
-        # Return other providers normally with proper mock objects
-        if provider_type == "embedding":
-            embedding_mock = mocker.MagicMock()
-            embedding_mock.model_name = "voyage-code-3"
-            embedding_mock.circuit_breaker_state = mocker.MagicMock()
-            # FIX: Use .variable instead of .value to match BaseEnum interface
-            embedding_mock.circuit_breaker_state.variable = "closed"
-            return embedding_mock
-        if provider_type == "sparse_embedding":
-            return mocker.MagicMock()
-        if provider_type == "reranking":
-            reranking_mock = mocker.MagicMock()
-            reranking_mock.model_name = "voyage-rerank-2.5"
-            reranking_mock.circuit_breaker_state = mocker.MagicMock()
-            # FIX: Use .variable instead of .value to match BaseEnum interface
-            reranking_mock.circuit_breaker_state.variable = "closed"
-            return reranking_mock
-        # Return a valid mock for any other case to avoid None
-        return mocker.MagicMock()
-
-    health_service._provider_registry.get_provider_instance.side_effect = (  # ty: ignore[invalid-assignment]
-        failing_get_provider_instance
-    )
+    # Mock vector store to raise an error to simulate unhealthy state
+    # Replace the vector store provider with an empty tuple to simulate "down"
+    health_service._providers["vector_store"] = ()
 
     response = await health_service.get_health_response()
 
@@ -534,9 +470,7 @@ async def test_health_circuit_breaker_exposure(health_service: HealthService, mo
     assert response.services.embedding_provider.circuit_breaker_state == "closed"
 
     # Test half_open state
-    embedding_instance = (
-        health_service._provider_registry.get_embedding_provider_instance.return_value
-    )
+    embedding_instance = health_service._providers["embedding"][0]
     # FIX: Use .variable instead of .value to match BaseEnum interface
     embedding_instance.circuit_breaker_state.variable = "half_open"
 

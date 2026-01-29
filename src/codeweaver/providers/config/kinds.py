@@ -551,13 +551,25 @@ class CollectionConfig(BasedModel):
         params = await embedding_group.as_vector_params()
         # NOTE: With role-based architecture, vector names are 'primary', 'backup', 'sparse' etc.
         # The merge assumes role-based naming convention.
+
+        # Handle both dict and VectorParams for params.vectors
+        vectors = params.vectors
+        if vectors is not None:
+            if isinstance(vectors, dict):
+                vectors_dict = cast(dict[str, VectorParams], vectors)
+            else:
+                # Single VectorParams object, convert to dict format
+                vectors_dict = cast(dict[str, VectorParams], vectors.model_dump())
+        else:
+            vectors_dict = {}
+
         self.vectors_config = _deep_merge(
             dict(self.vectors_config or {}),
-            cast(dict[str, VectorParams], params.vectors.model_dump()),
+            vectors_dict,
         )
         self.sparse_vectors_config = _deep_merge(
             dict(self.sparse_vectors_config or {}),
-            cast(dict[str, SparseVectorParams], params.sparse_vectors),
+            cast(dict[str, SparseVectorParams], params.sparse_vectors or {}),
         )
         self._vectors_set = True
 
@@ -678,11 +690,18 @@ class _BaseQdrantVectorStoreProviderSettings(VectorStoreProviderSettings):
             )
         if self.provider == Provider.MEMORY:
             # we'll resolve the project name later if the user didn't provide a path
+            # Extract collection_name from collection (can be dict or CollectionConfig)
+            collection_name = None
+            if isinstance(self.collection, dict):
+                collection_name = self.collection.get("collection_name")
+            elif hasattr(self.collection, "collection_name"):
+                collection_name = self.collection.collection_name
+
             self.in_memory_config = self.in_memory_config or getattr(
                 self,
                 "_default_memory_config",
                 lambda _x: {"collection_name": generate_collection_name()},
-            )(self.collection.get("collection_name"))
+            )(collection_name)
         # we'll handle collection config later too -- when models are getting instantiated it's much less painful to wait until the dust settles for inter-model dependencies
 
         # Register self in DI container as singleton
@@ -836,19 +855,70 @@ class MemoryVectorStoreProviderSettings(_BaseQdrantVectorStoreProviderSettings):
         MemoryConfig, Field(description="In-memory vector store configuration.")
     ]
 
-    def __init__(self, **data: Any) -> None:
+    def __init__(
+        self,
+        provider: Literal[Provider.MEMORY] = Provider.MEMORY,
+        connection: ConnectionConfiguration | None = None,
+        client_options: QdrantClientOptions | None = None,
+        collection: CollectionConfig | None = None,
+        batch_size: PositiveInt | None = 96,
+        in_memory_config: MemoryConfig | None = None,
+        *,
+        project_name: str | None = None,
+        project_path: Path | None = None,
+    ) -> None:
         """Initialize Memory vector store provider settings."""
-        object.__setattr__(
-            self,
-            "in_memory_config",
-            data.get("in_memory_config")
-            or self._default_memory_config(
-                collection_name=data.get("collection", {}).get("collection_name", None),
-                project_name=data.get("project_name"),
-                project_path=data.get("project_path"),
-            ),
+        # Prepare client_options
+        prepared_client_options = (
+            client_options if client_options is not None else QdrantClientOptions()
         )
-        super().__init__(**data)
+
+        # Handle collection parameter - can be CollectionConfig, dict, or None
+        if collection is None:
+            collection_dict = {}
+        elif isinstance(collection, CollectionConfig):
+            collection_dict = collection.model_dump(exclude_none=True)
+        else:
+            collection_dict = collection
+
+        # Get the parent's default collection method
+        parent_default_collection = super()._default_collection(
+            project_name=project_name, project_path=project_path
+        )
+
+        # Merge with defaults and validate
+        prepared_collection = CollectionConfig.model_validate(
+            parent_default_collection.model_dump() | collection_dict
+        )
+
+        # Extract collection_name for in_memory_config
+        collection_name = prepared_collection.collection_name
+
+        # Prepare in_memory_config
+        if in_memory_config is None:
+            in_memory_config = self._default_memory_config(
+                collection_name=collection_name,
+                project_name=project_name,
+                project_path=project_path,
+            )
+
+        # Use model_construct to create instance with all fields
+        constructed = self.__class__.model_construct(
+            provider=provider,
+            tag=provider.variable,
+            connection=connection,
+            client_options=prepared_client_options,
+            collection=prepared_collection,
+            batch_size=batch_size,
+            in_memory_config=in_memory_config,  # Include in_memory_config
+        )
+
+        # Copy all fields from constructed instance to self
+        for field_name in constructed.model_fields:
+            object.__setattr__(self, field_name, getattr(constructed, field_name))
+
+        # Initialize pydantic internal attributes
+        object.__setattr__(self, "__pydantic_fields_set__", set(constructed.model_fields.keys()))
 
     @staticmethod
     def _get_persist_path(
@@ -859,7 +929,7 @@ class MemoryVectorStoreProviderSettings(_BaseQdrantVectorStoreProviderSettings):
     ) -> Path:
         """Get the persist path from in_memory_config."""
         return Path(
-            f"{get_user_state_dir()}/vectors/{generate_collection_name(collection_name=collection_name, project_name=project_name, project_path=project_path)}"
+            f"{get_user_state_dir()}/vectors/{generate_collection_name(project_name=project_name, project_path=project_path)}"
         )
 
     @staticmethod

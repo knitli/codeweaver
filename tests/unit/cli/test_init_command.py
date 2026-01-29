@@ -119,7 +119,7 @@ class TestInitCommand:
         mock_confirm: MagicMock,
     ) -> None:
         """Test init creates both CodeWeaver config and MCP config."""
-        from codeweaver.cli import _get_client_config_path
+        from codeweaver.cli.commands.init import _get_client_config_path
 
         with pytest.raises(SystemExit) as exc_info:
             init_app(["--quickstart", "--client", "claude_code", "--project", str(temp_project)])
@@ -143,7 +143,7 @@ class TestInitCommand:
         mock_confirm: MagicMock,
     ) -> None:
         """Test --config-only creates only CodeWeaver config."""
-        from codeweaver.cli import _get_client_config_path
+        from codeweaver.cli.commands.init import _get_client_config_path
 
         with pytest.raises(SystemExit) as exc_info:
             init_app(["--quickstart", "--config-only", "--force", "--project", str(temp_project)])
@@ -167,7 +167,7 @@ class TestInitCommand:
         mock_confirm: MagicMock,
     ) -> None:
         """Test --mcp-only creates only MCP config."""
-        from codeweaver.cli import _get_client_config_path
+        from codeweaver.cli.commands.init import _get_client_config_path
 
         with pytest.raises(SystemExit) as exc_info:
             init_app(["--mcp-only", "--client", "claude_code", "--project", str(temp_project)])
@@ -190,7 +190,7 @@ class TestHttpStreamingArchitecture:
         self, temp_project: Path, temp_home: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
         """Test MCP config uses HTTP streaming, not STDIO."""
-        from codeweaver.cli import _get_client_config_path
+        from codeweaver.cli.commands.init import _get_client_config_path
 
         with pytest.raises(SystemExit) as exc_info:
             init_app(["--mcp-only", "--client", "claude_code", "--transport", "streamable-http"])
@@ -214,7 +214,7 @@ class TestHttpStreamingArchitecture:
         self, temp_project: Path, temp_home: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
         """Test HTTP streaming uses correct command structure."""
-        from codeweaver.cli import _get_client_config_path
+        from codeweaver.cli.commands.init import _get_client_config_path
 
         with pytest.raises(SystemExit) as exc_info:
             init_app(["--mcp-only", "--client", "claude_code", "--transport", "streamable-http"])
@@ -238,7 +238,7 @@ class TestHttpStreamingArchitecture:
         self, temp_project: Path, temp_home: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
         """Test STDIO transport is not used by default."""
-        from codeweaver.cli import _get_client_config_path
+        from codeweaver.cli.commands.init import _get_client_config_path
 
         with pytest.raises(SystemExit) as exc_info:
             init_app(["--mcp-only", "--client", "claude_code"])
@@ -266,7 +266,7 @@ class TestMcpClientSupport:
 
     def test_supported_clients(self, temp_project: Path) -> None:
         """Test all supported MCP clients are recognized."""
-        from codeweaver.cli import _get_client_config_path
+        from codeweaver.cli.commands.init import _get_client_config_path
 
         # Should support at least these clients
         expected_clients = ["claude_code", "cursor", "vscode", "mcpjson"]
@@ -287,7 +287,7 @@ class TestMcpClientSupport:
 
     def test_client_config_paths_correct(self, temp_home: Path, temp_project: Path) -> None:
         """Test client config paths are correct."""
-        from codeweaver.cli import _get_client_config_path
+        from codeweaver.cli.commands.init import _get_client_config_path
 
         # Test project-level configs
         test_cases = [
@@ -372,7 +372,7 @@ class TestHelperFunctions:
 
     def test_create_stdio_config_basic(self) -> None:
         """Test _create_stdio_config creates valid stdio config."""
-        from codeweaver.cli import _create_stdio_config
+        from codeweaver.cli.commands.init import _create_stdio_config
 
         config = _create_stdio_config()
 
@@ -383,7 +383,7 @@ class TestHelperFunctions:
 
     def test_create_stdio_config_with_custom_args(self) -> None:
         """Test _create_stdio_config with custom command and args."""
-        from codeweaver.cli import _create_stdio_config
+        from codeweaver.cli.commands.init import _create_stdio_config
 
         config = _create_stdio_config(
             cmd="uvx", args=["codeweaver", "server", "--transport", "stdio"]
@@ -395,7 +395,7 @@ class TestHelperFunctions:
 
     def test_create_stdio_config_with_env(self) -> None:
         """Test _create_stdio_config includes environment variables."""
-        from codeweaver.cli import _create_stdio_config
+        from codeweaver.cli.commands.init import _create_stdio_config
 
         env_vars = {"VOYAGE_API_KEY": "test-key", "DEBUG": "true"}
         config = _create_stdio_config(env=env_vars)
@@ -406,7 +406,7 @@ class TestHelperFunctions:
 
     def test_create_stdio_config_with_timeout(self) -> None:
         """Test _create_stdio_config with custom timeout."""
-        from codeweaver.cli import _create_stdio_config
+        from codeweaver.cli.commands.init import _create_stdio_config
 
         config = _create_stdio_config(timeout=300)
 
@@ -414,7 +414,7 @@ class TestHelperFunctions:
 
     def test_create_remote_config_basic(self) -> None:
         """Test _create_remote_config creates valid HTTP config."""
-        from codeweaver.cli import _create_remote_config
+        from codeweaver.cli.commands.init import _create_remote_config
 
         config = _create_remote_config()
 
@@ -424,7 +424,7 @@ class TestHelperFunctions:
 
     def test_create_remote_config_with_custom_host_port(self) -> None:
         """Test _create_remote_config with custom host and port."""
-        from codeweaver.cli import _create_remote_config
+        from codeweaver.cli.commands.init import _create_remote_config
 
         config = _create_remote_config(host="0.0.0.0", port=8000)
 
@@ -432,7 +432,7 @@ class TestHelperFunctions:
 
     def test_create_remote_config_with_timeout(self) -> None:
         """Test _create_remote_config with custom timeout."""
-        from codeweaver.cli import _create_remote_config
+        from codeweaver.cli.commands.init import _create_remote_config
 
         config = _create_remote_config(timeout=300)
 
@@ -442,7 +442,8 @@ class TestHelperFunctions:
         self, temp_project: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
         """Test handle_output in print mode."""
-        from codeweaver.cli import _create_stdio_config, handle_output
+        from codeweaver.cli.commands.init import handle_output
+        from codeweaver.cli.commands.init import _create_stdio_config
 
         config = _create_stdio_config()
 
@@ -461,7 +462,8 @@ class TestHelperFunctions:
 
     def test_handle_output_write_mode(self, temp_project: Path) -> None:
         """Test handle_output in write mode."""
-        from codeweaver.cli import _create_stdio_config, handle_output
+        from codeweaver.cli.commands.init import handle_output
+        from codeweaver.cli.commands.init import _create_stdio_config
 
         config = _create_stdio_config()
 
@@ -487,7 +489,8 @@ class TestHelperFunctions:
 
     def test_handle_write_output_creates_parent_dirs(self, temp_project: Path) -> None:
         """Test _handle_write_output creates parent directories."""
-        from codeweaver.cli import _create_stdio_config, _handle_write_output
+        from codeweaver.cli.commands.init import _handle_write_output
+        from codeweaver.cli.commands.init import _create_stdio_config
 
         config = _create_stdio_config()
 

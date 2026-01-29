@@ -166,7 +166,7 @@ class ClientOptions(BasedModel):
 
     def as_settings(self) -> dict[str, Any]:
         """Return the client options as a dictionary suitable for passing as settings to the client constructor."""
-        settings = self.model_dump(exclude={"_core_provider", "_providers"})
+        settings = self.model_dump(exclude={"_core_provider", "_providers", "tag", "advanced_http_options"})
         return {k: self._filter_values(v) for k, v in settings.items()}
 
     @property

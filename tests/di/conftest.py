@@ -16,17 +16,17 @@ def clean_registry():
     """Clean the provider registry before and after each test.
 
     This fixture is defined here to avoid duplication across test files.
-    """
-    from codeweaver.core import utils
 
-    # Store original state
-    original_providers = utils._providers.copy()
-    original_metadata = utils._provider_metadata.copy()
+    Note: The registry structure is now a dict mapping types to lists of
+    (factory, ProviderMetadata) tuples, stored in utils._providers.
+    """
+    from codeweaver.core.di import utils
+
+    # Store original state - deep copy to preserve the list structure
+    original_providers = {k: v.copy() for k, v in utils._providers.items()}
 
     yield
 
     # Restore original state
     utils._providers.clear()
     utils._providers.update(original_providers)
-    utils._provider_metadata.clear()
-    utils._provider_metadata.update(original_metadata)

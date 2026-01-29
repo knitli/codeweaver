@@ -231,7 +231,34 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
 
             # Use service to get collection config (handles WalConfig merging, etc.)
             collection_config = await self.service.get_collection_config(metadata=metadata)
-            await self.client.create_collection(**collection_config.model_dump())
+
+            # Convert CollectionConfig to create_collection parameters
+            # QdrantCollectionConfig has: params, hnsw_config, optimizer_config, wal_config
+            # create_collection expects: vectors_config, sparse_vectors_config, hnsw_config, optimizers_config, wal_config
+            config_dict = collection_config.model_dump(exclude_none=True)
+            params = config_dict.pop("params", None)
+
+            create_params = {}
+            if params:
+                create_params["vectors_config"] = params.get("vectors")
+                create_params["sparse_vectors_config"] = params.get("sparse_vectors")
+                create_params["shard_number"] = params.get("shard_number")
+                create_params["replication_factor"] = params.get("replication_factor")
+                create_params["write_consistency_factor"] = params.get("write_consistency_factor")
+                create_params["on_disk_payload"] = params.get("on_disk_payload")
+
+            # Map optimizer_config → optimizers_config (plural)
+            if "optimizer_config" in config_dict:
+                create_params["optimizers_config"] = config_dict.pop("optimizer_config")
+
+            # Add remaining configs
+            for key in ["hnsw_config", "wal_config", "quantization_config"]:
+                if key in config_dict:
+                    create_params[key] = config_dict[key]
+
+            await self.client.create_collection(
+                collection_name=collection_name, **{k: v for k, v in create_params.items() if v is not None}
+            )
             self._known_collections.add(collection_name)
         except UnexpectedResponse as e:
             raise ProviderError(
@@ -626,10 +653,22 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
 
         embedding_registry = await self._get_registry()
 
+        # Get the ChunkEmbeddings for this chunk from the registry
+        chunk_embeddings = embedding_registry.get(chunk.chunk_id)
+        if chunk_embeddings is None:
+            raise ProviderError(
+                f"No embeddings found in registry for chunk {chunk.chunk_id}. "
+                "Embeddings must be registered before upserting chunks."
+            )
+
         # Iterate over all embeddings in the chunk
         for intent, batch_keys in chunk.embeddings.items():
-            # Get the actual embedding data from the registry
-            embedding_info = embedding_registry.get(batch_keys)
+            # Get the actual embedding data from the ChunkEmbeddings
+            embedding_info = chunk_embeddings.embeddings.get(intent)
+            if embedding_info is None:
+                raise ProviderError(
+                    f"No embedding found for intent '{intent}' in chunk {chunk.chunk_id}"
+                )
 
             # Use intent name directly as physical vector name (role-based architecture)
             vector_name = intent

@@ -54,17 +54,16 @@ class ServiceB:
 @pytest.fixture
 def clean_registry():
     """Clean the provider registry before and after each test."""
-    from codeweaver.core import utils
+    from codeweaver.core.di import utils
 
-    original_providers = utils._providers.copy()
-    original_metadata = utils._provider_metadata.copy()
+    # Store original state - deep copy to preserve the list structure
+    original_providers = {k: v.copy() for k, v in utils._providers.items()}
 
     yield
 
+    # Restore original state
     utils._providers.clear()
     utils._providers.update(original_providers)
-    utils._provider_metadata.clear()
-    utils._provider_metadata.update(original_metadata)
 
 
 # ==============================================================================
@@ -518,7 +517,7 @@ async def test_unknown_scope_defaults_to_singleton(clean_registry):
     """Test that unknown scope in metadata defaults to singleton behavior."""
 
     # Manually register with unknown scope (bypassing type checking)
-    from codeweaver.core import utils
+    from codeweaver.core.di import utils
 
     def create() -> ServiceA:
         return ServiceA()
@@ -526,13 +525,13 @@ async def test_unknown_scope_defaults_to_singleton(clean_registry):
     # Manually register with invalid scope
     from codeweaver.core import ProviderMetadata
 
-    utils._providers[ServiceA] = create
-    utils._provider_metadata[ServiceA] = ProviderMetadata(
+    metadata = ProviderMetadata(
         scope="unknown",  # type: ignore
         is_generator=False,
         is_async_generator=False,
         module=None,
     )
+    utils._providers[ServiceA] = [(create, metadata)]
 
     container = Container()
     container._load_providers()

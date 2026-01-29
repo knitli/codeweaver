@@ -5,6 +5,9 @@
 """Integration tests for client factory with real provider instantiation.
 
 Tests the complete flow from settings to provider instance with client creation.
+
+NOTE: These tests are DEPRECATED and SKIPPED because ProviderRegistry was removed
+during the DI migration. Provider instantiation is now handled through the DI container.
 """
 
 from unittest.mock import Mock, patch
@@ -14,7 +17,7 @@ import pytest
 from codeweaver.core import Provider, ProviderKind
 
 
-pytestmark = [pytest.mark.integration]
+pytestmark = [pytest.mark.integration, pytest.mark.skip(reason="ProviderRegistry removed - functionality tested through DI container")]
 
 
 @pytest.mark.external_api

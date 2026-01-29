@@ -37,19 +37,11 @@ def mock_discovered_file():
     from codeweaver.core import uuid7
 
     def _make_file(path_str):
-        path = Path(path_str)
+        path = Path(path_str).resolve()  # Get absolute path
 
         # Create mock stat result
         mock_stat = Mock()
         mock_stat.st_size = 1024  # 1KB file size
-
-        # Create mock path with stat() method
-        # Use real Path for integration test since semantic chunker needs to parse the file
-        mock_path = path
-
-        # Override stat() to use mock if needed
-        # For integration tests, we want to use the real file path for parsing
-        # but may need to mock stat for files that don't exist yet
 
         # Create mock ExtKind
         from codeweaver.core import SemanticSearchLanguage
@@ -62,7 +54,8 @@ def mock_discovered_file():
 
         # Create mock DiscoveredFile
         file = Mock()
-        file.path = mock_path
+        file.path = path
+        file.absolute_path = path  # Add absolute_path attribute pointing to real path
         file.ext_kind = mock_ext_kind
         file.source_id = uuid7()  # Add source_id for Span validation (UUID7)
 

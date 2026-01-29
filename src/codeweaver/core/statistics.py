@@ -29,6 +29,7 @@ from pydantic import (
     NonNegativeFloat,
     NonNegativeInt,
     PositiveFloat,
+    PrivateAttr,
     SerializerFunctionWrapHandler,
     ValidatorFunctionWrapHandler,
     computed_field,
@@ -1004,18 +1005,10 @@ class SessionStatistics(BasedModel):
         ),
     ]
 
-    _successful_request_log: Annotated[
-        list[Identifier], Field(default_factory=list, init=False, repr=False)
-    ]
-    _failed_request_log: Annotated[
-        list[Identifier], Field(default_factory=list, init=False, repr=False)
-    ]
-    _successful_http_request_log: Annotated[
-        list[Identifier], Field(default_factory=list, init=False, repr=False)
-    ]
-    _failed_http_request_log: Annotated[
-        list[Identifier], Field(default_factory=list, init=False, repr=False)
-    ]
+    _successful_request_log: list[Identifier] = PrivateAttr(default_factory=list)
+    _failed_request_log: list[Identifier] = PrivateAttr(default_factory=list)
+    _successful_http_request_log: list[Identifier] = PrivateAttr(default_factory=list)
+    _failed_http_request_log: list[Identifier] = PrivateAttr(default_factory=list)
 
     def __init__(self, **data: Any) -> None:
         """Initialize the SessionStatistics object."""

@@ -49,6 +49,7 @@ if TYPE_CHECKING:
         IndexingInfo,
         IndexingProgressInfo,
         RerankingServiceInfo,
+        ResourceInfo,
         ServicesInfo,
         SparseEmbeddingServiceInfo,
         StatisticsInfo,

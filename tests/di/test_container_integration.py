@@ -61,17 +61,16 @@ class UserService:
 @pytest.fixture
 def clean_registry():
     """Clean the provider registry before and after each test."""
-    from codeweaver.core import utils
+    from codeweaver.core.di import utils
 
-    original_providers = utils._providers.copy()
-    original_metadata = utils._provider_metadata.copy()
+    # Store original state - deep copy to preserve the list structure
+    original_providers = {k: v.copy() for k, v in utils._providers.items()}
 
     yield
 
+    # Restore original state
     utils._providers.clear()
     utils._providers.update(original_providers)
-    utils._provider_metadata.clear()
-    utils._provider_metadata.update(original_metadata)
 
 
 # ==============================================================================

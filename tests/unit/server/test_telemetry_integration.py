@@ -118,34 +118,31 @@ class TestTelemetryIntegration:
 
     def test_from_settings_respects_disable_telemetry(self) -> None:
         """Test that from_settings respects disable_telemetry setting."""
-        # Create a mock settings object with telemetry disabled
-        mock_settings = MagicMock(spec=CodeWeaverSettings)
+        # Create a mock telemetry settings object with telemetry disabled
         mock_telemetry = MagicMock(spec=TelemetrySettings)
         mock_telemetry.enabled = False
         mock_telemetry.disable_telemetry = True
-        mock_settings.telemetry = mock_telemetry
 
-        with patch("codeweaver.server", return_value=mock_settings):
-            client = TelemetryService.from_settings()
+        # Pass settings directly instead of trying to patch
+        client = TelemetryService.from_settings(mock_telemetry)
 
-            assert client.enabled is False
-            assert client._client is None
+        assert client.enabled is False
+        assert client._client is None
 
     def test_from_settings_with_no_api_key(self) -> None:
         """Test that from_settings handles missing API key."""
-        mock_settings = MagicMock(spec=CodeWeaverSettings)
+        # Create a mock telemetry settings object with no API key
         mock_telemetry = MagicMock(spec=TelemetrySettings)
         mock_telemetry.enabled = True
         mock_telemetry.disable_telemetry = False
         mock_telemetry.posthog_project_key = None
         mock_telemetry.posthog_host = "https://us.i.posthog.com"
-        mock_settings.telemetry = mock_telemetry
 
-        with patch("codeweaver.server", return_value=mock_settings):
-            client = TelemetryService.from_settings()
+        # Pass settings directly instead of trying to patch
+        client = TelemetryService.from_settings(mock_telemetry)
 
-            assert client.enabled is False
-            assert client._client is None
+        assert client.enabled is False
+        assert client._client is None
 
     def test_shutdown_with_no_client(self) -> None:
         """Test that shutdown handles case when client is None."""
@@ -439,7 +436,8 @@ class TestConvenienceFunctions:
         """Test capture_session_event doesn't capture when disabled."""
         from codeweaver.core import capture_session_event
 
-        with patch("codeweaver.core") as mock_get_client:
+        # Patch get_telemetry_client at its definition location
+        with patch("codeweaver.core.telemetry.client.get_telemetry_client") as mock_get_client:
             mock_client = MagicMock()
             mock_client.enabled = False
             mock_get_client.return_value = mock_client
@@ -455,7 +453,8 @@ class TestConvenienceFunctions:
         from codeweaver.core import SearchStrategy, capture_search_event
         from codeweaver.server.agent_api import IntentType
 
-        with patch("codeweaver.core") as mock_get_client:
+        # Patch get_telemetry_client at its definition location
+        with patch("codeweaver.core.telemetry.client.get_telemetry_client") as mock_get_client:
             mock_client = MagicMock()
             mock_client.enabled = False
             mock_get_client.return_value = mock_client

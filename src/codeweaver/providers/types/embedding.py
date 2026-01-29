@@ -39,15 +39,27 @@ class ConfiguredCapability(NamedTuple):
     @property
     def model_name(self) -> ModelNameT:
         """Get the model name associated with this capability."""
+        # Get the embedding config - use sparse_embedding_config for sparse providers
+        embedding_config = (
+            self.config.sparse_embedding_config
+            if isinstance(self.config, SparseEmbeddingProviderSettings)
+            else self.config.embedding_config
+        )
         return ModelName(
             self.config.model_name
-            or self.config.embedding_config.model_name
+            or embedding_config.model_name
             or self.capability.name
         )
 
     async def datatype(self) -> str | None:
         """Get the data type of the embedding vectors for this capability."""
-        return await self.config.embedding_config.get_datatype()
+        # Get the embedding config - use sparse_embedding_config for sparse providers
+        embedding_config = (
+            self.config.sparse_embedding_config
+            if isinstance(self.config, SparseEmbeddingProviderSettings)
+            else self.config.embedding_config
+        )
+        return await embedding_config.get_datatype()
 
     async def distance(self) -> Literal["Cosine", "Dot", "Euclidean", "Manhattan"] | None:
         """Get the preferred distance metric for this capability."""
@@ -71,8 +83,14 @@ class ConfiguredCapability(NamedTuple):
         ):
             return None
         default_dimension = self.capability.default_dimension if self.capability else None
+        # Get the embedding config - use sparse_embedding_config for sparse providers
+        embedding_config = (
+            self.config.sparse_embedding_config
+            if isinstance(self.config, SparseEmbeddingProviderSettings)
+            else self.config.embedding_config
+        )
         configured_dimension = (
-            await self.config.embedding_config.get_dimension() or default_dimension
+            await embedding_config.get_dimension() or default_dimension
         )
         allowed_values = (
             self.capability.output_dimensions
@@ -180,7 +198,7 @@ class EmbeddingCapabilityGroup(NamedTuple):
     @property
     def sparse_model(self) -> ModelNameT | None:
         """Get the name of the sparse embedding model."""
-        return self.sparse.model_name
+        return self.sparse.model_name if self.sparse else None
 
     @property
     def idf_model(self) -> ModelNameT | None:

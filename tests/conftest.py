@@ -431,17 +431,25 @@ def vector_store_factory(qdrant_test_manager) -> Any:
 
         # Default caps if not provided
         if embedding_caps is None:
+            from codeweaver.providers.config.embedding import FastEmbedEmbeddingConfig
+
             dense_caps = EmbeddingModelCapabilities(
                 name="test-dense-model",
                 default_dimension=768,
                 default_dtype="float16",
                 preferred_metrics=("cosine", "dot"),
             )
+            # Create proper embedding config for the provider settings
+            embedding_config = FastEmbedEmbeddingConfig(
+                tag="fastembed",
+                provider=Provider.FASTEMBED,
+                model_name="test-dense-model",
+            )
             # Mock settings to satisfy ConfiguredCapability
             mock_settings = EmbeddingProviderSettings(
-                provider=Provider.OPENAI,  # Dummy provider
+                provider=Provider.FASTEMBED,
                 model_name="test-dense-model",
-                embedding_config=EmbeddingConfig(model_name="test-dense-model"),
+                embedding_config=embedding_config,
             )
             configured_dense = ConfiguredCapability(capability=dense_caps, config=mock_settings)
             embedding_caps = EmbeddingCapabilityGroup(dense=configured_dense, sparse=None)

@@ -66,10 +66,19 @@ async def qdrant_provider(qdrant_test_manager):
     )
 
     # Create capability group
-    mock_settings = EmbeddingProviderSettings(
-        provider=Provider.OPENAI,
+    from codeweaver.providers.config.embedding import FastEmbedEmbeddingConfig
+
+    # Create proper embedding config for the provider settings
+    embedding_config = FastEmbedEmbeddingConfig(
+        tag="fastembed",
+        provider=Provider.FASTEMBED,
         model_name="test-dense-model",
-        embedding_config=EmbeddingProviderSettings(model_name="test-dense-model"),
+    )
+
+    mock_settings = EmbeddingProviderSettings(
+        provider=Provider.FASTEMBED,
+        model_name="test-dense-model",
+        embedding_config=embedding_config,
     )
 
     configured_dense = ConfiguredCapability(capability=dense_caps, config=mock_settings)

@@ -156,15 +156,23 @@ def create_lazy_getattr(
     """Create a standardized __getattr__ function for package lazy imports."""
 
     def __getattr__(attr_name: str) -> object:  # noqa: N807
-        dynamic_attr = dynamic_imports[attr_name]
-        package, module_name = dynamic_attr
+        # Handle missing attributes with AttributeError (standard for __getattr__)
+        # This prevents KeyError when Python introspects for special attributes like __func__
+        try:
+            dynamic_attr = dynamic_imports[attr_name]
+        except KeyError as e:
+            raise AttributeError(
+                f"module '{module_name}' has no attribute '{attr_name}'"
+            ) from e
 
-        if module_name == "__module__":
+        package, target_module = dynamic_attr
+
+        if target_module == "__module__":
             result = import_module(f".{attr_name}", package=package)
             globals()[attr_name] = result._resolve() if isinstance(result, LazyImport) else result
             return result
 
-        module: ModuleType = import_module(f".{module_name}", package=package)
+        module: ModuleType = import_module(f".{target_module}", package=package)
         result = getattr(module, attr_name)
 
         # Cache only the requested attribute, not all attributes from the module

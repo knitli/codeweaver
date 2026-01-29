@@ -98,15 +98,32 @@ HAS_FASTEMBED = find_spec("fastembed") is not None or find_spec("fastembed-gpu")
 def _get_configs(
     *, sparse: bool = False, rerank: bool = False
 ) -> EmbeddingProviderSettings | SparseEmbeddingProviderSettings | RerankingProviderSettings:
-    """Get the model name for testing based on available libraries."""
-    # TODO: Fix this - get_profile doesn't exist in codeweaver.server
-    # from codeweaver.server import get_profile
-    #
-    # profile = get_profile("backup", vector_deployment="local")
-    # if rerank:
-    #     return profile["reranking"][0]
-    # return profile["sparse_embedding"] if sparse else profile["embedding"]
-    raise NotImplementedError("_get_configs needs to be fixed - get_profile doesn't exist")
+    """Get provider settings for testing based on available libraries.
+
+    Uses the TESTING profile (same as BACKUP) which provides lightweight local models
+    for development and testing.
+
+    Args:
+        sparse: If True, return sparse embedding settings
+        rerank: If True, return reranking settings
+
+    Returns:
+        Provider settings for the requested provider type
+    """
+    from codeweaver.providers.config.profiles import ProviderProfile
+
+    # Get the testing profile configuration
+    profile = ProviderProfile.TESTING.value
+
+    # Extract the appropriate settings based on parameters
+    if rerank:
+        # Reranking settings are stored as a tuple, get the first element
+        return profile.reranking[0]  # type: ignore[return-value]
+    if sparse:
+        # Sparse embedding settings
+        return profile.sparse_embedding  # type: ignore[return-value]
+    # Dense embedding settings (default)
+    return profile.embedding  # type: ignore[return-value]
 
 
 @pytest.fixture
@@ -319,17 +336,24 @@ async def actual_vector_store() -> MemoryVectorStoreProvider:
 
         # Create EmbeddingCapabilityGroup
         caps = EmbeddingCapabilityGroup.from_capabilities(capabilities)
-        config = MemoryVectorStoreProviderSettings(collection_name="codeweaver-test-collection")
-        # Pass collection_name in config so model_post_init uses it
+
+        # Create in-memory Qdrant client explicitly
+        from qdrant_client import AsyncQdrantClient
+        client = AsyncQdrantClient(location=":memory:")
+
+        # Create collection config with test collection name
+        from codeweaver.providers.config.kinds import CollectionConfig
+
+        collection = CollectionConfig(collection_name="codeweaver-test-collection")
+        config = MemoryVectorStoreProviderSettings(collection=collection)
+
+        # Create provider with explicit in-memory client
         _shared_memory_vector_store = MemoryVectorStoreProvider(
-            client=config.get_client(), config=config, _provider=Provider.MEMORY, caps=caps
+            client=client, config=config, caps=caps
         )
 
-    # ALWAYS ensure it's initialized and collection exists
-    if _shared_memory_vector_store._client is None:
+        # Initialize the provider (this sets up internal state)
         await _shared_memory_vector_store._initialize()
-    else:
-        await _shared_memory_vector_store._ensure_collection("codeweaver-test-collection")
 
     # Override in DI container
     get_container().override(VectorStoreProvider, _shared_memory_vector_store)
@@ -351,13 +375,16 @@ async def cleanup_shared_vector_store(
 ) -> AsyncGenerator[None, None]:
     """Automatically clean up the shared vector store after each test."""
     yield
-    # Use private attributes to check for initialization without raising ProviderError
-    if actual_vector_store and actual_vector_store._client and actual_vector_store._collection:
+    # Use public attributes to check for initialization without raising ProviderError
+    if actual_vector_store and actual_vector_store.client and actual_vector_store.collection_name:
         with contextlib.suppress(Exception):
-            await actual_vector_store._client.delete_collection(actual_vector_store._collection)
+            # Delete collection to start fresh
+            await actual_vector_store.client.delete_collection(actual_vector_store.collection_name)
             # Clear known collections cache
             if hasattr(actual_vector_store, "_known_collections"):
                 actual_vector_store._known_collections.clear()
+            # Recreate collection for next test
+            await actual_vector_store._ensure_collection(actual_vector_store.collection_name)
 
 
 @pytest.fixture

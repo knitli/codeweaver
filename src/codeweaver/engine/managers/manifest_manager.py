@@ -398,9 +398,9 @@ class FileManifestManager:
             project_name: Name of the project (for filename)
             manifest_dir: Directory for manifest files
         """
-        self.project_path = project_path.resolve()
+        self.project_path = Path(project_path).resolve()
         self.project_name = project_name
-        self.manifest_dir = manifest_dir.resolve()
+        self.manifest_dir = Path(manifest_dir).resolve()
 
         # Add path hash to filename to avoid collisions between projects with same name
         path_hash = get_blake_hash(str(self.project_path).encode("utf-8"))[:16]
