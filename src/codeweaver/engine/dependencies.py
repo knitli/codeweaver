@@ -31,6 +31,10 @@ from codeweaver.core import (
     dependency_provider,
     depends,
 )
+
+# Runtime imports needed for dependency_provider decorators
+from codeweaver.engine.chunker.base import ChunkGovernor
+from codeweaver.engine.chunker.registry import SourceIdRegistry
 from codeweaver.engine.config import (
     ChunkerSettings,
     DefaultChunkerSettings,
@@ -39,6 +43,14 @@ from codeweaver.engine.config import (
     FailoverSettings,
     IndexerSettings,
 )
+from codeweaver.engine.managers.checkpoint_manager import CheckpointManager
+from codeweaver.engine.managers.manifest_manager import FileManifestManager
+from codeweaver.engine.managers.progress_tracker import IndexingProgressTracker, IndexingStats
+from codeweaver.engine.services.chunking_service import ChunkingService
+from codeweaver.engine.services.failover_service import FailoverService
+from codeweaver.engine.services.indexing_service import IndexingService
+from codeweaver.engine.services.watching_service import FileWatchingService
+from codeweaver.engine.watcher.watch_filters import ExtensionFilter, IgnoreFilter
 from codeweaver.providers import (
     EmbeddingProviderDep,
     SparseEmbeddingProviderDep,
@@ -48,16 +60,7 @@ from codeweaver.providers import (
 
 
 if TYPE_CHECKING:
-    from codeweaver.engine.chunker.base import ChunkGovernor
-    from codeweaver.engine.chunker.registry import SourceIdRegistry
-    from codeweaver.engine.managers.checkpoint_manager import CheckpointManager
-    from codeweaver.engine.managers.manifest_manager import FileManifestManager
-    from codeweaver.engine.managers.progress_tracker import IndexingProgressTracker, IndexingStats
-    from codeweaver.engine.services.chunking_service import ChunkingService
-    from codeweaver.engine.services.failover_service import FailoverService
-    from codeweaver.engine.services.indexing_service import IndexingService
-    from codeweaver.engine.services.watching_service import FileWatchingService
-    from codeweaver.engine.watcher.watch_filters import ExtensionFilter, IgnoreFilter
+    pass
 
 
 # ===========================================================================
@@ -117,8 +120,6 @@ def _create_checkpoint_manager(
     project_name: ResolvedProjectNameDep = INJECTED,
 ) -> CheckpointManager:
     """Factory for checkpoint manager."""
-    from codeweaver.engine.managers.checkpoint_manager import CheckpointManager
-
     return CheckpointManager(
         project_path=project_path,
         project_name=project_name,
@@ -133,8 +134,6 @@ def _create_manifest_manager(
     settings: IndexerSettingsDep = INJECTED,
 ) -> FileManifestManager:
     """Factory for file manifest manager."""
-    from codeweaver.engine.managers.manifest_manager import FileManifestManager
-
     return FileManifestManager(
         project_path=project_path,
         project_name=project_name,
@@ -145,16 +144,12 @@ def _create_manifest_manager(
 @dependency_provider(IndexingStats, scope="function")
 def _create_indexing_stats() -> IndexingStats:
     """Factory for indexing stats."""
-    from codeweaver.engine.managers.progress_tracker import IndexingStats
-
     return IndexingStats()
 
 
 @dependency_provider(IndexingProgressTracker, scope="function")
 def _create_progress_tracker() -> IndexingProgressTracker:
     """Factory for progress tracker (function-scoped for per-operation tracking)."""
-    from codeweaver.engine.managers.progress_tracker import IndexingProgressTracker
-
     return IndexingProgressTracker()
 
 
@@ -180,8 +175,6 @@ type ProgressTrackerDep = Annotated[
 @dependency_provider(ChunkGovernor, scope="singleton")
 def _create_chunk_governor(settings: ChunkerSettingsDep = INJECTED) -> ChunkGovernor:
     """Factory for chunk governor."""
-    from codeweaver.engine.chunker import ChunkGovernor
-
     return ChunkGovernor.from_settings(settings)
 
 
@@ -197,8 +190,6 @@ def _create_chunking_service(
     settings: ChunkerSettingsDep = INJECTED,
 ) -> ChunkingService:
     """Factory for primary chunking service."""
-    from codeweaver.engine.services.chunking_service import ChunkingService
-
     return ChunkingService(governor=governor, tokenizer=tokenizer, settings=settings)
 
 
@@ -216,8 +207,6 @@ def _create_indexing_service(
     project_path: ResolvedProjectPathDep = INJECTED,
 ) -> IndexingService:
     """Factory for indexing service."""
-    from codeweaver.engine.services.indexing_service import IndexingService
-
     return IndexingService(
         chunking_service=chunking_service,
         embedding_provider=embedding_provider,
@@ -244,8 +233,6 @@ def _create_failover_service(
     Note: Phase 2 removed backup_indexing_service - new multi-vector approach
     stores backup embeddings as additional vectors on same points.
     """
-    from codeweaver.engine.services.failover_service import FailoverService
-
     return FailoverService(
         primary_store=primary_store,
         backup_store=backup_store,
@@ -275,8 +262,6 @@ def _create_watching_service(
     # Optional settings could be injected here if needed, or defaults used
 ) -> FileWatchingService:
     """Factory for file watching service."""
-    from codeweaver.engine.services.watching_service import FileWatchingService
-
     return FileWatchingService(
         indexer=indexer,
         progress_reporter=progress_reporter,
@@ -297,8 +282,6 @@ type FileWatchingServiceDep = Annotated[
 
 @dependency_provider(ExtensionFilter, scope="singleton")
 def _create_extension_filter() -> ExtensionFilter:
-    from codeweaver.engine.watcher import ExtensionFilter
-
     return ExtensionFilter(tuple(str(s) for s in DEFAULT_EXCLUDED_EXTENSIONS))
 
 
@@ -306,8 +289,6 @@ def _create_extension_filter() -> ExtensionFilter:
 def _create_ignore_filter(
     project_path: ResolvedProjectPathDep, indexer_settings: IndexerSettingsDep
 ) -> IgnoreFilter:
-    from codeweaver.engine.watcher import IgnoreFilter
-
     return IgnoreFilter(base_path=project_path, settings=indexer_settings)
 
 

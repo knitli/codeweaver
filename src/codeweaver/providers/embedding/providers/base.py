@@ -63,6 +63,8 @@ from codeweaver.core import (
 from codeweaver.core import ValidationError as CodeWeaverValidationError
 from codeweaver.core.types import ModelNameT
 from codeweaver.providers.config import EmbeddingConfigT, EmbeddingProviderSettings
+from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+from codeweaver.providers.embedding.registry import EmbeddingRegistry
 from codeweaver.providers.exceptions import CircuitBreakerOpenError
 from codeweaver.providers.types import CircuitBreakerState
 
@@ -75,8 +77,6 @@ if TYPE_CHECKING:
         SerializedStrOnlyCodeChunk,
         StructuredDataInput,
     )
-    from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
-    from codeweaver.providers.embedding.registry import EmbeddingRegistry
 
 
 ONE_KB = 1024

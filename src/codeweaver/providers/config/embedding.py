@@ -101,7 +101,7 @@ def _get_embedding_capabilities_for_model(
         resolver = getattr(resolver_module, "SparseEmbeddingCapabilityResolver", None)
     else:
         resolver = getattr(resolver_module, "EmbeddingCapabilityResolver", None)
-    return None if resolver is None else resolver.resolve(model_name)
+    return None if resolver is None else resolver().resolve(model_name)
 
 
 class SerializedEmbeddingOptionsDict(TypedDict, total=False):

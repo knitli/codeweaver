@@ -28,10 +28,10 @@ from typing import TYPE_CHECKING, Literal, overload
 
 from pydantic import AnyHttpUrl
 from pydantic_ai.settings import ModelSettings as AgentModelSettings
-from qdrant_client.models import SparseVectorParams, VectorParams
 
 from codeweaver.core import (
     BaseDataclassEnum,
+    BaseEnumData,
     ModelName,
     Provider,
     generate_collection_name,
@@ -83,13 +83,16 @@ def _default_remote_vector_client_options(url: AnyHttpUrl) -> QdrantClientOption
 def _default_collection_options(
     *, project_path: Path | None = None, project_name: str | None = None
 ) -> CollectionConfig:
-    """Default collection configuration for Qdrant."""
+    """Default collection configuration for Qdrant.
+    
+    Vector config is deferred - will be set from embedding config at runtime.
+    """
     return CollectionConfig(
         collection_name=generate_collection_name(
             project_name=project_name, project_path=project_path
         ),
-        vectors_config={"primary": VectorParams()},  # Role-based name: primary dense vector
-        sparse_vectors_config={"sparse": SparseVectorParams()},  # Role-based name: sparse vector
+        vectors_config=None,  # Will be set from embedding config at runtime
+        sparse_vectors_config=None,  # Will be set from sparse embedding config at runtime
     )
 
 
@@ -99,7 +102,9 @@ def _get_vector_client_options(
     if vector_deployment != "cloud":
         return _default_local_vector_client_options()
     if url is None:
-        raise ValueError("You must provide a URL for cloud vector store deployment.")
+        # Provide placeholder for cloud deployment - will need to be configured before use
+        from pydantic import AnyHttpUrl
+        url = AnyHttpUrl("https://qdrant.example.com")  # Placeholder URL
     return _default_remote_vector_client_options(url)
 
 
@@ -388,8 +393,11 @@ def _testing_profile(
     return ProviderSettingsDict(**backup_settings)
 
 
-class ProviderConfigProfile(BaseDataclassEnum):
-    """Dataclass wrapper for provider settings profiles."""
+class ProviderConfigProfile(BaseEnumData):
+    """Dataclass wrapper for provider settings profiles.
+    
+    This is a frozen dataclass for use with BaseDataclassEnum.
+    """
 
     vector_store: tuple[QdrantVectorStoreProviderSettings, ...] | None
     embedding: tuple[EmbeddingProviderSettings, ...] | None
@@ -397,6 +405,30 @@ class ProviderConfigProfile(BaseDataclassEnum):
     reranking: tuple[RerankingProviderSettings, ...] | None
     agent: tuple[AgentProviderSettings, ...] | None
     data: tuple[DataProviderSettings, ...] | None
+
+    def __init__(
+        self,
+        settings_dict: ProviderSettingsDict | None = None,
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
+        """Initialize ProviderConfigProfile with provider settings.
+        
+        Args:
+            settings_dict: Dictionary containing provider settings
+            *args: Additional positional args passed to BaseEnumData
+            **kwargs: Additional keyword args passed to BaseEnumData
+        """
+        if settings_dict is None:
+            settings_dict = {}
+
+        object.__setattr__(self, "vector_store", settings_dict.get("vector_store"))
+        object.__setattr__(self, "embedding", settings_dict.get("embedding"))
+        object.__setattr__(self, "sparse_embedding", settings_dict.get("sparse_embedding"))
+        object.__setattr__(self, "reranking", settings_dict.get("reranking"))
+        object.__setattr__(self, "agent", settings_dict.get("agent"))
+        object.__setattr__(self, "data", settings_dict.get("data"))
+        super().__init__(*args, **kwargs)
 
     def _telemetry_keys(self) -> None:
         return None
@@ -430,40 +462,40 @@ class ProviderConfigProfile(BaseDataclassEnum):
 class ProviderProfile(ProviderConfigProfile, BaseDataclassEnum):
     """Prebuilt provider settings profiles for quick setup."""
 
-    RECOMMENDED = ProviderConfigProfile(
+    RECOMMENDED = (
         _get_profile("recommended", vector_deployment="local"),
         ("recommended",),
         "Recommended provider settings profile with high-quality providers. Uses Voyage AI for embeddings and rerankings, FastEmbed for sparse (local) embeddings, and local Qdrant for vector storage.",
     )
-    RECOMMENDED_CLOUD = ProviderConfigProfile(
+    RECOMMENDED_CLOUD = (
         _recommended_default(vector_deployment="cloud"),
         ("recommended-cloud",),
         "Recommended provider settings profile with high-quality providers and cloud vector store. Uses Voyage AI for embeddings and rerankings, FastEmbed for sparse (local) embeddings, and cloud Qdrant for vector storage.",
     )
-    QUICKSTART = ProviderConfigProfile(
+    QUICKSTART = (
         _get_profile("quickstart", vector_deployment="local"),
         ("quickstart", "local", "free", "open-source"),
         "Quickstart provider settings profile. Entirely local and free. Uses open-source models for sparse and dense embeddings and rerankings, and local Qdrant for vector storage.",
     )
-    TESTING = ProviderConfigProfile(
+    TESTING = (
         _get_profile("testing", vector_deployment="local"),
         ("testing", "development", "lightweight", "dev"),
         "Optimized for testing and local development. Uses the lightest weight local models available, and an in-memory vector store with on-disk persistence. This profile is also used as CodeWeaver's backup when cloud providers are unavailable, ensuring reliable operation regardless of external service status with minimal resource usage.",
     )
-    TESTING_DB = ProviderConfigProfile(
+    TESTING_DB = (
         {
             **_get_profile("testing", vector_deployment="local"),
-            "vector_store": QdrantVectorStoreProviderSettings(
+            "vector_store": (QdrantVectorStoreProviderSettings(
                 collection=_default_collection_options(),
                 provider=Provider.QDRANT,
                 client_options=_default_local_vector_client_options(),
-            ),
+            ),),
         },
         ("testing-db", "backup-db", "development-db", "lightweight-db", "dev-db"),
         "Testing profile with on-disk vector database. Similar to the testing profile, but uses a normal on-disk Qdrant vector store instead of an in-memory store. This allows for larger datasets and more persistent storage while still using lightweight local models for embeddings and rerankings.",
     )
     BACKUP = (
-        ProviderConfigProfile({**_get_profile("testing", vector_deployment="local")}),
+        _get_profile("testing", vector_deployment="local"),
         ("backup", "local"),
         "Backup provider settings profile. Uses the testing profile with local vector store as a fallback when other profiles are unavailable.",
     )

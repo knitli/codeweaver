@@ -103,7 +103,7 @@ class DiscoveredFile(BasedModel):
         if (
             isinstance(data, dict)
             and ("ext_kind" not in data or data["ext_kind"] is None)
-            and (path := data["path"])
+            and (path := data.get("path"))
             and isinstance(path, (Path, str))
         ):
             data["ext_kind"] = ExtKind.from_file(path if isinstance(path, Path) else Path(path))
@@ -139,7 +139,7 @@ class DiscoveredFile(BasedModel):
         else:
             object.__setattr__(self, "_git_branch", Missing)
         object.__setattr__(self, "source_id", kwargs.get("source_id", uuid7()))
-        super().__init__(**kwargs)
+        # Don't call super().__init__() for frozen models with manual attribute setting
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         from codeweaver.core.types import AnonymityConversion, FilteredKey
@@ -166,13 +166,18 @@ class DiscoveredFile(BasedModel):
                     "Provided file_hash does not match computed hash for %s. Using computed hash.",
                     path,
                 )
-            final_path = set_relative_path(path, base_path=project_path) or path
+            # Convert INJECTED placeholder to actual path
+            from codeweaver.core.utils.filesystem import get_project_path
+
+            resolved_project_path = get_project_path() if project_path is INJECTED else project_path
+            base_path = None if project_path is INJECTED else project_path
+            final_path = set_relative_path(path, base_path=base_path) or path
             return cls(
                 path=final_path,
                 ext_kind=ext_kind,
                 file_hash=new_hash,
                 git_branch=cast(str, branch),
-                project_path=project_path,
+                project_path=resolved_project_path,
             )
         return None
 

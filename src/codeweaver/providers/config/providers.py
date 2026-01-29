@@ -99,28 +99,21 @@ type VectorStoreProviderSettingsType = Annotated[
 ]
 """Type alias for vector store provider settings type. Currently only Qdrant is supported, but we create this for consistency and future expansion."""
 
-# Embedding Providers
-
-type SpecialEmbeddingProviderSettingsType = Annotated[
-    Annotated[AzureEmbeddingProviderSettings, Tag(Provider.AZURE.variable)]
-    | Annotated[BedrockEmbeddingProviderSettings, Tag(Provider.BEDROCK.variable)]
-    | Annotated[FastEmbedEmbeddingProviderSettings, Tag(Provider.FASTEMBED.variable)],
-    Field(description="Special embedding provider settings type.", discriminator="tag"),
-]
-
+# Embedding Providers - flattened union for pydantic discrimination
 
 def _discriminate_embedding_provider(v: Any) -> str:
     """Identify the embedding provider settings type for discriminator field."""
-    return (
-        tag
-        if (tag := (v["tag"] if isinstance(v, dict) else v.tag))
-        in {Provider.AZURE.variable, Provider.BEDROCK.variable, Provider.FASTEMBED.variable}
-        else "none"
-    )
+    tag_value = v.get("tag") if isinstance(v, dict) else getattr(v, "tag", None)
+    if tag_value in {Provider.AZURE.variable, Provider.BEDROCK.variable, Provider.FASTEMBED.variable}:
+        return tag_value
+    return "none"
 
 
 type EmbeddingProviderSettingsType = Annotated[
-    Annotated[EmbeddingProviderSettings, Tag("none")] | SpecialEmbeddingProviderSettingsType,
+    Annotated[EmbeddingProviderSettings, Tag("none")]
+    | Annotated[AzureEmbeddingProviderSettings, Tag(Provider.AZURE.variable)]
+    | Annotated[BedrockEmbeddingProviderSettings, Tag(Provider.BEDROCK.variable)]
+    | Annotated[FastEmbedEmbeddingProviderSettings, Tag(Provider.FASTEMBED.variable)],
     Field(
         description="Embedding provider settings type.",
         discriminator=Discriminator(_discriminate_embedding_provider),
@@ -135,42 +128,33 @@ type SparseEmbeddingProviderSettingsType = Annotated[
     Field(description="Sparse embedding provider settings type.", discriminator="tag"),
 ]
 
-# Reranking Providers
-
+# Reranking Providers - flattened union for pydantic discrimination
 
 def _discriminate_reranking_provider(v: Any) -> str:
     """Identify the reranking provider settings type for discriminator field."""
-    return (
-        tag
-        if (tag := (v["tag"] if isinstance(v, dict) else v.tag))
-        in {Provider.FASTEMBED.variable, Provider.BEDROCK.variable}
-        else "none"
-    )
+    tag_value = v.get("tag") if isinstance(v, dict) else getattr(v, "tag", None)
+    if tag_value in {Provider.FASTEMBED.variable, Provider.BEDROCK.variable}:
+        return tag_value
+    return "none"
 
-
-type SpecialRerankingProviderSettingsType = Annotated[
-    Annotated[FastEmbedRerankingProviderSettings, Tag(Provider.FASTEMBED.variable)]
-    | Annotated[BedrockRerankingProviderSettings, Tag(Provider.BEDROCK.variable)],
-    Field(description="Special reranking provider settings type.", discriminator="tag"),
-]
 
 type RerankingProviderSettingsType = Annotated[
-    Annotated[RerankingProviderSettings, Tag("none")] | SpecialRerankingProviderSettingsType,
+    Annotated[RerankingProviderSettings, Tag("none")]
+    | Annotated[FastEmbedRerankingProviderSettings, Tag(Provider.FASTEMBED.variable)]
+    | Annotated[BedrockRerankingProviderSettings, Tag(Provider.BEDROCK.variable)],
     Field(
         description="Reranking provider settings type.",
         discriminator=Discriminator(_discriminate_reranking_provider),
     ),
 ]
 
-# ===== Data and Agent Providers just for consistency =====
+# ===== Data and Agent Providers (no discrimination needed) =====
 
-type DataProviderSettingsType = Annotated[
-    DataProviderSettings, Field(description="Data provider settings type.")
-]
+# Agent and Data providers use base classes without subclasses,
+# so they don't need discriminated unions. The tuple type is sufficient.
+type DataProviderSettingsType = DataProviderSettings
 
-type AgentProviderSettingsType = Annotated[
-    AgentProviderSettings, Field(description="Agent provider settings type.")
-]
+type AgentProviderSettingsType = AgentProviderSettings
 
 # ===========================================================================
 # *                    More TypedDict versions of Models

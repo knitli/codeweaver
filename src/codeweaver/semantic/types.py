@@ -16,7 +16,7 @@ import re
 from enum import Flag, auto
 from typing import TYPE_CHECKING, Annotated, Any, Literal, NamedTuple, TypedDict, cast
 
-from pydantic import ConfigDict, Field, PrivateAttr, computed_field
+from pydantic import ConfigDict, Field, PrivateAttr, SkipValidation, computed_field
 
 from codeweaver.core import (
     BasedModel,
@@ -30,9 +30,8 @@ from codeweaver.core import (
 
 
 if TYPE_CHECKING:
-    from ast_grep_py import SgNode
 
-    from codeweaver.semantic.ast_grep import AstThing
+    pass
 
 
 class SimpleNodeTypeDTO(TypedDict):
@@ -261,9 +260,9 @@ class SemanticMetadata(BasedModel):
         SemanticSearchLanguage | LanguageNameT,
         Field(description="""The programming language of the code chunk"""),
     ]
-    # Use string forward reference to avoid circular import issues
-    # This will be resolved during model_rebuild() with proper namespace
-    thing: AstThing[SgNode]  # type: ignore[name-defined]
+    # Use SkipValidation to avoid forward reference resolution issues at import time
+    # The actual validation will happen during model_rebuild() with proper namespace
+    thing: SkipValidation[Any]  # AstThing[SgNode] after model_rebuild()
     positional_connections: Any = ()  # tuple[AstThing[SgNode], ...]
     symbol: Annotated[
         str | None,

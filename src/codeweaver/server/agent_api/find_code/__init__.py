@@ -195,18 +195,9 @@ async def _ensure_index_ready(
             logger.warning("Auto-indexing failed: %s", e)
 
 
-_set_max = cast(
-    int,
-    token_limit
-    if (token_limit := cast(CodeWeaverSettings, _get_settings()).token_limit) is not Unset
-    else 15000,
-)
-_set_max_results = cast(
-    int,
-    max_results
-    if (max_results := cast(CodeWeaverSettings, _get_settings()).max_results) is not Unset
-    else 30,
-)
+# Default values - will be overridden by settings at runtime if configured
+_DEFAULT_TOKEN_LIMIT = 15000
+_DEFAULT_MAX_RESULTS = 30
 
 
 async def _build_search_package(package: SearchPackageDep) -> SearchPackage:
@@ -344,9 +335,9 @@ async def find_code(
     query: str,
     *,
     intent: IntentType | None = None,
-    token_limit: int = _set_max,
+    token_limit: int = _DEFAULT_TOKEN_LIMIT,
     focus_languages: tuple[str, ...] | None = None,
-    max_results: int = _set_max_results,
+    max_results: int = _DEFAULT_MAX_RESULTS,
     context: Context | None = None,
     search_package: SearchPackageDep = INJECTED,
     telemetry_settings: TelemetrySettingsDep = INJECTED,

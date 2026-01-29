@@ -36,6 +36,7 @@ from codeweaver.core import (
     ValidationError,
 )
 from codeweaver.core.types import ModelName, ModelNameT
+from codeweaver.providers.config import RerankingConfigT, RerankingProviderSettings
 from codeweaver.providers.exceptions import CircuitBreakerOpenError
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 from codeweaver.providers.reranking.providers.types import RerankingResult
@@ -50,7 +51,6 @@ if TYPE_CHECKING:
         SessionStatistics,
         StructuredDataInput,
     )
-    from codeweaver.providers.config import RerankingConfigT, RerankingProviderSettings
 
 logger = logging.getLogger(__name__)
 
@@ -116,7 +116,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
     ]
 
     config: Annotated[
-        RerankingConfigT,  # type: ignore[name-defined]
+        RerankingConfigT,
         Field(description="Configuration for the reranking model, including all request options."),
     ]
 
@@ -151,7 +151,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
     def __init__(
         self,
         client: RerankingClient,
-        config: RerankingProviderSettings,  # type: ignore[name-defined]
+        config: RerankingProviderSettings,
         caps: RerankingModelCapabilities,
         **kwargs: Any,
     ) -> None:

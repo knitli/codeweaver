@@ -165,6 +165,145 @@ class IndexFileManifest(BasedModel):
         """Get set of all file paths in the manifest."""
         return {Path(raw_path) for raw_path in self.files}
 
+    def get_chunk_ids_for_file(self, path: Path) -> list[str]:
+        """Get chunk IDs for a specific file.
+
+        Args:
+            path: Path to the file
+
+        Returns:
+            List of chunk IDs, empty list if file not found
+        """
+        if path is None:
+            raise ValueError("Path cannot be None")
+
+        entry = self.get_file(path)
+        return entry["chunk_ids"] if entry else []
+
+    def get_all_chunk_ids(self) -> set[str]:
+        """Get all chunk IDs from all files in the manifest.
+
+        Returns:
+            Set of all chunk IDs across all files
+        """
+        all_ids: set[str] = set()
+        for entry in self.files.values():
+            all_ids.update(entry["chunk_ids"])
+        return all_ids
+
+    def get_files_by_embedding_config(
+        self,
+        *,
+        has_dense: bool | None = None,
+        has_sparse: bool | None = None,
+    ) -> set[Path]:
+        """Get files matching embedding configuration criteria.
+
+        Args:
+            has_dense: Filter by dense embedding presence (None = don't filter)
+            has_sparse: Filter by sparse embedding presence (None = don't filter)
+
+        Returns:
+            Set of file paths matching the criteria
+        """
+        matching_files: set[Path] = set()
+
+        for raw_path, entry in self.files.items():
+            # Check dense embedding filter
+            if has_dense is not None:
+                entry_has_dense = entry.get("has_dense_embeddings", False)
+                if entry_has_dense != has_dense:
+                    continue
+
+            # Check sparse embedding filter
+            if has_sparse is not None:
+                entry_has_sparse = entry.get("has_sparse_embeddings", False)
+                if entry_has_sparse != has_sparse:
+                    continue
+
+            matching_files.add(Path(raw_path))
+
+        return matching_files
+
+    def get_files_needing_embeddings(
+        self,
+        *,
+        current_dense_provider: str | None = None,
+        current_dense_model: str | None = None,
+        current_sparse_provider: str | None = None,
+        current_sparse_model: str | None = None,
+    ) -> dict[str, set[Path]]:
+        """Get files that need embeddings added.
+
+        Categorizes files by what type of embeddings they need:
+        - dense_only: Files needing dense embeddings (processed first)
+        - sparse_only: Files needing sparse embeddings (but not dense)
+
+        Args:
+            current_dense_provider: Currently configured dense provider
+            current_dense_model: Currently configured dense model
+            current_sparse_provider: Currently configured sparse provider
+            current_sparse_model: Currently configured sparse model
+
+        Returns:
+            Dict with 'dense_only' and 'sparse_only' keys containing sets of file paths
+        """
+        result: dict[str, set[Path]] = {"dense_only": set(), "sparse_only": set()}
+
+        # If no providers configured, return empty sets
+        if not any(
+            [
+                current_dense_provider,
+                current_dense_model,
+                current_sparse_provider,
+                current_sparse_model,
+            ]
+        ):
+            return result
+
+        for raw_path, entry in self.files.items():
+            path = Path(raw_path)
+
+            # Check if dense embeddings are needed
+            if current_dense_provider or current_dense_model:
+                has_dense = entry.get("has_dense_embeddings", False)
+                if not has_dense:
+                    result["dense_only"].add(path)
+                    continue  # Dense takes priority, don't add to sparse_only
+
+            # Check if sparse embeddings are needed (only if not already in dense_only)
+            if current_sparse_provider or current_sparse_model:
+                has_sparse = entry.get("has_sparse_embeddings", False)
+                if not has_sparse:
+                    result["sparse_only"].add(path)
+
+        return result
+
+    def get_embedding_model_info(self, path: Path) -> dict[str, Any]:
+        """Get embedding model information for a file.
+
+        Args:
+            path: Path to the file
+
+        Returns:
+            Dict with embedding model info, empty dict if file not found
+        """
+        if path is None:
+            raise ValueError("Path cannot be None")
+
+        entry = self.get_file(path)
+        if entry is None:
+            return {}
+
+        return {
+            "dense_provider": entry.get("dense_embedding_provider"),
+            "dense_model": entry.get("dense_embedding_model"),
+            "sparse_provider": entry.get("sparse_embedding_provider"),
+            "sparse_model": entry.get("sparse_embedding_model"),
+            "has_dense": entry.get("has_dense_embeddings", False),
+            "has_sparse": entry.get("has_sparse_embeddings", False),
+        }
+
     def file_needs_reindexing(
         self,
         path: Path,

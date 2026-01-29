@@ -16,8 +16,8 @@ from codeweaver.core import CodeChunk, EmbeddingBatchInfo
 # This must happen after all imports to ensure all referenced types are available
 # Import types needed for forward reference resolution
 from codeweaver.engine import ChunkGovernor, DelimiterPattern, LanguageFamily, ResourceGovernor
+from codeweaver.engine.config import ChunkerSettings, PerformanceSettings
 from codeweaver.providers import EmbeddingModelCapabilities
-from codeweaver.server import ChunkerSettings, PerformanceSettings
 
 
 # Build namespace for Pydantic to resolve string annotations

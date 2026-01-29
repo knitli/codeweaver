@@ -39,6 +39,7 @@ from codeweaver_tokenizers import Tokenizer
 from pydantic import UUID7
 
 from codeweaver.core import (
+    INJECTED,
     BlakeHashKey,
     BlakeStore,
     ChunkSource,
@@ -48,6 +49,7 @@ from codeweaver.core import (
     SemanticSearchLanguage,
     SessionStatistics,
     Span,
+    StatisticsDep,
     UUIDStore,
     get_blake_hash,
     make_blake_store,
@@ -69,6 +71,15 @@ if TYPE_CHECKING:
 
 
 logger = logging.getLogger(__name__)
+
+# Import chunker logging functions for structured logging
+from codeweaver.engine.chunker._logging import (
+    log_chunking_deduplication,
+    log_chunking_edge_case,
+    log_chunking_failed,
+    log_chunking_fallback,
+)
+
 
 PERFORMANCE_THRESHOLD_MS = 1000.0  # 1 second
 ONE_MEGABYTE = 1024 * 1024
@@ -139,6 +150,7 @@ class SemanticChunker(BaseChunker):
         governor: ChunkGovernor,
         language: SemanticSearchLanguage,
         tokenizer: Tokenizer | None = None,
+        statistics: StatisticsDep = INJECTED,
     ) -> None:
         """Initialize semantic chunker with governor and language.
 
@@ -146,13 +158,21 @@ class SemanticChunker(BaseChunker):
             governor: Configuration for chunking behavior and resource limits
             language: Target semantic search language for parsing
             tokenizer: Optional tokenizer for accurate token counting
+            statistics: Session statistics tracker for metrics
         """
         super().__init__(governor)
         self.language = language
 
-        # Handle tokenizer injection
+        # Handle statistics injection - resolve placeholder in test environments
         from codeweaver.core import is_depends_marker
 
+        if is_depends_marker(statistics):
+            # No DI container active, create a simple SessionStatistics instance
+            self._statistics = SessionStatistics()
+        else:
+            self._statistics = statistics
+
+        # Handle tokenizer injection
         if tokenizer is None or is_depends_marker(tokenizer):
             try:
                 # Try to resolve from container if not provided
@@ -233,9 +253,7 @@ class SemanticChunker(BaseChunker):
                 )
 
                 # Log structured error event for observability
-                from codeweaver.engine.chunker import _logging as chunker_logging
-
-                chunker_logging.log_chunking_failed(
+                log_chunking_failed(
                     file_path=file_path or Path("<unknown>"),
                     chunker_type=self,
                     error_type=type(e).__name__,
@@ -429,9 +447,7 @@ class SemanticChunker(BaseChunker):
             logger.info("Empty file: %s, returning no chunks", file_path)
 
             # Log edge case for observability
-            from codeweaver.engine.chunker import _logging as chunker_logging
-
-            chunker_logging.log_chunking_edge_case(
+            log_chunking_edge_case(
                 file_path=file_path or Path("<unknown>"), edge_case_type="empty_file", chunk_count=0
             )
 
@@ -440,9 +456,7 @@ class SemanticChunker(BaseChunker):
         # Whitespace-only file
         if not content.strip():
             # Log edge case for observability
-            from codeweaver.engine.chunker import _logging as chunker_logging
-
-            chunker_logging.log_chunking_edge_case(
+            log_chunking_edge_case(
                 file_path=file_path or Path("<unknown>"),
                 edge_case_type="whitespace_only",
                 chunk_count=1,
@@ -479,9 +493,7 @@ class SemanticChunker(BaseChunker):
             total_lines = content.count("\n") + 1
 
             # Log edge case for observability
-            from codeweaver.engine.chunker import _logging as chunker_logging
-
-            chunker_logging.log_chunking_edge_case(
+            log_chunking_edge_case(
                 file_path=file_path or Path("<unknown>"),
                 edge_case_type="single_line",
                 chunk_count=1,
@@ -575,9 +587,7 @@ class SemanticChunker(BaseChunker):
             logger.warning("Failed to parse %s", file_path or "content", exc_info=True)
 
             # Log structured error event for observability
-            from codeweaver.engine.chunker import _logging as chunker_logging
-
-            chunker_logging.log_chunking_failed(
+            log_chunking_failed(
                 file_path=file_path or Path("<unknown>"),
                 chunker_type=self,
                 error_type=type(e).__name__,
@@ -849,9 +859,7 @@ class SemanticChunker(BaseChunker):
         )
 
         # Log fallback event for observability
-        from codeweaver.engine.chunker import _logging as chunker_logging
-
-        chunker_logging.log_chunking_fallback(
+        log_chunking_fallback(
             file_path=file_path or Path("<unknown>"),
             from_chunker=self,
             to_chunker=delimiter_chunker,
@@ -1001,9 +1009,7 @@ class SemanticChunker(BaseChunker):
 
         # Log deduplication statistics if any duplicates were found
         if len(chunks) > len(deduplicated):
-            from codeweaver.engine.chunker import _logging as chunker_logging
-
-            chunker_logging.log_chunking_deduplication(
+            log_chunking_deduplication(
                 file_path=Path("<batch>"),  # Batch-level dedup doesn't have single file
                 total_chunks=len(chunks),
                 duplicate_chunks=len(chunks) - len(deduplicated),

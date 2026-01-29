@@ -13,6 +13,7 @@ from codeweaver.core import create_lazy_getattr
 
 
 if TYPE_CHECKING:
+    from codeweaver.core.types.delimiter import DelimiterKind
     from codeweaver.engine.chunker import (
         ASTDepthExceededError,
         BinaryFileError,
@@ -38,6 +39,16 @@ if TYPE_CHECKING:
         chunk_files_parallel_dict,
         detect_language_family,
         expand_pattern,
+    )
+    from codeweaver.engine.chunker.delimiters.families import detect_family_characteristics
+    from codeweaver.engine.chunker.delimiters.patterns import (
+        ALL_PATTERNS,
+        CONDITIONAL_PATTERN,
+        FUNCTION_PATTERN,
+        HASH_COMMENT_PATTERN,
+        PARAGRAPH_PATTERN,
+        STRING_QUOTE_PATTERN,
+        matches_pattern,
     )
     from codeweaver.engine.config import (
         ChunkerSettings,
@@ -102,8 +113,14 @@ if TYPE_CHECKING:
 parent = __spec__.parent or "codeweaver.engine"
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
+    "ALL_PATTERNS": (f"{parent}.chunker.delimiters", "patterns"),
     "ASTDepthExceededError": (f"{parent}.chunker", "exceptions"),
     "BinaryFileError": (parent, "chunker"),
+    "CONDITIONAL_PATTERN": (f"{parent}.chunker.delimiters", "patterns"),
+    "FUNCTION_PATTERN": (f"{parent}.chunker.delimiters", "patterns"),
+    "HASH_COMMENT_PATTERN": (f"{parent}.chunker.delimiters", "patterns"),
+    "PARAGRAPH_PATTERN": (f"{parent}.chunker.delimiters", "patterns"),
+    "STRING_QUOTE_PATTERN": (f"{parent}.chunker.delimiters", "patterns"),
     "Boundary": (parent, "chunker"),
     "CheckpointManager": (parent, "managers"),
     "CheckpointManagerDep": (parent, "dependencies"),
@@ -132,8 +149,10 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "Delimiter": (parent, "chunker"),
     "DelimiterChunker": (parent, "chunker"),
     "DelimiterDict": (parent, "chunker"),
+    "DelimiterKind": ("codeweaver.core.types", "delimiter"),
     "DelimiterMatch": (parent, "chunker"),
     "DelimiterPattern": (parent, "chunker"),
+    "detect_family_characteristics": (f"{parent}.chunker.delimiters", "families"),
     "DocsFilter": (parent, "watcher"),
     "ExtensionFilter": (parent, "watcher"),
     "ExtensionFilterDep": (parent, "dependencies"),
@@ -161,6 +180,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "IndexingStatsDep": (parent, "dependencies"),
     "LanguageFamily": (parent, "chunker"),
     "ManifestManagerDep": (parent, "dependencies"),
+    "matches_pattern": (f"{parent}.chunker.delimiters", "patterns"),
     "OversizedChunkError": (parent, "chunker"),
     "ParseError": (parent, "chunker"),
     "PerformanceSettings": (parent, "indexer"),
@@ -185,6 +205,12 @@ __getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
 
 
 __all__ = (
+    "ALL_PATTERNS",
+    "CONDITIONAL_PATTERN",
+    "FUNCTION_PATTERN",
+    "HASH_COMMENT_PATTERN",
+    "PARAGRAPH_PATTERN",
+    "STRING_QUOTE_PATTERN",
     "ASTDepthExceededError",
     "AnyVariants",
     "ArbitraryFilter",
@@ -218,6 +244,7 @@ __all__ = (
     "Delimiter",
     "DelimiterChunker",
     "DelimiterDict",
+    "DelimiterKind",
     "DelimiterMatch",
     "DelimiterPattern",
     "DocsFilter",
@@ -289,9 +316,11 @@ __all__ = (
     "WatchfilesLogManager",
     "chunk_files_parallel",
     "chunk_files_parallel_dict",
+    "detect_family_characteristics",
     "detect_language_family",
     "expand_pattern",
     "make_partial_function",
+    "matches_pattern",
     "wrap_filters",
 )
 

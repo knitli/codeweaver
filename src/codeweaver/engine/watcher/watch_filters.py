@@ -12,7 +12,7 @@ import logging
 
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, ClassVar, Unpack, cast, overload
+from typing import TYPE_CHECKING, Any, ClassVar, Unpack, cast, overload
 
 import rignore
 import watchfiles
@@ -31,7 +31,10 @@ from codeweaver.core import (
     SemanticSearchLanguage,
 )
 from codeweaver.engine.config import RignoreSettings
-from codeweaver.engine.dependencies import IndexerSettingsDep
+
+
+if TYPE_CHECKING:
+    from codeweaver.engine.dependencies import IndexerSettingsDep
 
 
 logger = logging.getLogger(__name__)

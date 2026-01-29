@@ -265,6 +265,7 @@ class CohereClientOptions(ClientOptions):
 
     _core_provider: Provider = Provider.COHERE
     _providers: tuple[Provider, ...] = (Provider.COHERE, Provider.AZURE, Provider.HEROKU)
+    tag: Literal["cohere"] = "cohere"
 
     api_key: (
         Annotated[SecretStr | Callable[[], str], Field(description="Cohere API key.")] | None
@@ -299,6 +300,7 @@ class QdrantClientOptions(ClientOptions):
 
     _core_provider: Provider = Provider.QDRANT
     _providers: tuple[Provider, ...] = (Provider.QDRANT, Provider.MEMORY)
+    tag: Literal["qdrant"] = "qdrant"
 
     location: Literal[":memory:"] | AnyUrl | None = None
     url: AnyUrl | Literal[":memory:"] | None = None
@@ -536,6 +538,7 @@ class OpenAIClientOptions(ClientOptions):
     _providers: tuple[Provider, ...] = tuple(
         provider for provider in Provider if provider.uses_openai_api
     )
+    tag: Literal["openai"] = "openai"
 
     api_key: (
         SecretStr | Callable[[], str | SecretStr] | Callable[[], Awaitable[str | SecretStr]] | None
@@ -591,6 +594,7 @@ class BedrockClientOptions(ClientOptions):
 
     _core_provider: Provider = Provider.BEDROCK
     _providers: tuple[Provider, ...] = (Provider.BEDROCK,)
+    tag: Literal["bedrock"] = "bedrock"
 
     aws_access_key_id: str | None = None
     aws_secret_access_key: SecretStr | None = None
@@ -618,6 +622,7 @@ class GoogleClientOptions(ClientOptions):
 
     _core_provider: Provider = Provider.GOOGLE
     _providers: tuple[Provider, ...] = (Provider.GOOGLE,)
+    tag: Literal["google"] = "google"
 
     api_key: SecretStr | None = None
     vertex_ai: bool = False
@@ -639,6 +644,7 @@ class FastEmbedClientOptions(ClientOptions):
 
     _core_provider: Provider = Provider.FASTEMBED
     _providers: tuple[Provider, ...] = (Provider.FASTEMBED,)
+    tag: Literal["fastembed"] = "fastembed"
 
     model_name: str
     cache_dir: str | None = None
@@ -689,6 +695,7 @@ class SentenceTransformersClientOptions(ClientOptions):
 
     _core_provider: Provider = Provider.SENTENCE_TRANSFORMERS
     _providers: tuple[Provider, ...] = (Provider.SENTENCE_TRANSFORMERS,)
+    tag: Literal["sentence-transformers"] = "sentence-transformers"
 
     model_name_or_path: str | None = None
     modules: Iterable[Module] | None = None
@@ -797,6 +804,7 @@ class HFInferenceClientOptions(ClientOptions):
 
     _core_provider: Provider = Provider.HUGGINGFACE_INFERENCE
     _providers: tuple[Provider, ...] = (Provider.HUGGINGFACE_INFERENCE,)
+    tag: Literal["hf_inference"] = "hf_inference"
 
     model: str | None = None
     provider: str | None = None
@@ -825,6 +833,7 @@ class MistralClientOptions(ClientOptions):
 
     _core_provider: Provider = Provider.MISTRAL
     _providers: tuple[Provider, ...] = (Provider.MISTRAL,)
+    tag: Literal["mistral"] = "mistral"
 
     api_key: (
         SecretStr | Callable[[], str | SecretStr] | Callable[[], Awaitable[str | SecretStr]] | None
@@ -852,6 +861,7 @@ class VoyageClientOptions(ClientOptions):
 
     _core_provider: Provider = Provider.VOYAGE
     _providers: tuple[Provider, ...] = (Provider.VOYAGE,)
+    tag: Literal["voyage"] = "voyage"
 
     api_key: SecretStr | None = None
     max_retries: PositiveInt = 0
@@ -940,7 +950,8 @@ type GeneralRerankingClientOptionsType = Annotated[
 
 def _discriminate_embedding_clients(v: Any) -> str:
     """Identify the provider-specific settings type for discriminator field."""
-    return v["tag"] if isinstance(v, dict) else v.tag
+    # Client options use tag field
+    return v.get("tag") if isinstance(v, dict) else getattr(v, "tag", None)
 
 
 def discriminate_azure_embedding_client_options(v: Any) -> str:

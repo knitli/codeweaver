@@ -25,11 +25,14 @@ from codeweaver.core.di import INJECTED, dependency_provider, depends
 from codeweaver.engine.dependencies import FailoverServiceDep, IndexingServiceDep
 from codeweaver.providers import AllProviderSettingsDep
 
+# Runtime imports needed for dependency_provider decorators
+from codeweaver.server.health.health_service import HealthService
+from codeweaver.server.management import ManagementServer
+from codeweaver.server.server import CodeWeaverState
+
 
 if TYPE_CHECKING:
-    from codeweaver.server.health.health_service import HealthService
     from codeweaver.server.management import ManagementServer
-    from codeweaver.server.server import CodeWeaverState
 
 
 # ===========================================================================
@@ -45,8 +48,6 @@ def _create_health_service(
     providers: AllProviderSettingsDep = INJECTED,
 ) -> HealthService:
     """Factory for health service."""
-    from codeweaver.server.health.health_service import HealthService
-
     return HealthService(
         statistics=statistics,
         indexer=indexer,
@@ -73,8 +74,6 @@ async def _create_cw_state(
     telemetry: TelemetryServiceDep = INJECTED,
 ) -> CodeWeaverState:
     """Factory for application state."""
-    from codeweaver.server.server import CodeWeaverState
-
     return CodeWeaverState(
         initialized=False,
         project_path=project_path,
@@ -94,8 +93,6 @@ type CodeWeaverStateDep = Annotated[CodeWeaverState, depends(_create_cw_state, s
 @dependency_provider(ManagementServer, scope="singleton")
 def _create_management_server(state: CodeWeaverStateDep = INJECTED) -> ManagementServer:
     """Factory for management server."""
-    from codeweaver.server.management import ManagementServer
-
     return ManagementServer(background_state=state)
 
 

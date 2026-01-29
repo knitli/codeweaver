@@ -15,13 +15,21 @@ from codeweaver.core import create_lazy_getattr
 
 
 if TYPE_CHECKING:
-    from codeweaver.server.agent_api.find_code import FindCodeResponseSummary, IntentType, find_code
+    from codeweaver.core import SearchStrategy
+    from codeweaver.server.agent_api.find_code import IntentType, find_code
+    from codeweaver.server.agent_api.find_code.types import (
+        CodeMatch,
+        CodeMatchType,
+        FindCodeResponseSummary,
+    )
 
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "CodeMatch": (__spec__.parent, "find_code.types"),
-    "FindCodeResponseSummary": (__spec__.parent, "find_code"),
-    "IntentType": (__spec__.parent, "find_code"),
+    "CodeMatchType": (__spec__.parent, "find_code.types"),
+    "FindCodeResponseSummary": (__spec__.parent, "find_code.types"),
+    "IntentType": (__spec__.parent, "find_code.intent"),
+    "SearchStrategy": ("codeweaver.core", "types"),
     "find_code": (__spec__.parent, "find_code"),
 })
 
@@ -37,7 +45,7 @@ def get_user_agent() -> str:
     return f"CodeWeaver/{__version__}"
 
 
-__all__ = ("CodeMatch", "FindCodeResponseSummary", "IntentType", "find_code", "get_user_agent")
+__all__ = ("CodeMatch", "CodeMatchType", "FindCodeResponseSummary", "IntentType", "SearchStrategy", "find_code", "get_user_agent")
 
 
 def __dir__() -> list[str]:

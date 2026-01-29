@@ -62,7 +62,6 @@ class CodeWeaverProviderSettings(CodeWeaverCoreSettings):
     provider: Annotated[
         ProviderSettings | Unset,
         Field(
-            default_factory=ProviderSettings,
             description="Provider configuration for embedding, vector store, reranking, etc.",
         ),
     ] = UNSET

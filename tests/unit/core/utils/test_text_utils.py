@@ -10,13 +10,8 @@ import re
 
 import pytest
 
-from codeweaver.core import (
-    _NESTED_QUANTIFIER_RE,
-    MAX_REGEX_PATTERN_LENGTH,
-    ConfigurationError,
-    _walk_pattern,
-    validate_regex_pattern,
-)
+from codeweaver.core import MAX_REGEX_PATTERN_LENGTH, ConfigurationError, validate_regex_pattern
+from codeweaver.core.utils.text import _NESTED_QUANTIFIER_RE, _walk_pattern
 
 
 @pytest.mark.unit

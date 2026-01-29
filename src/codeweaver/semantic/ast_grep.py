@@ -133,6 +133,8 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _resolving_ast_thing: ContextVar[set[int] | None] = ContextVar("_resolving_ast_thing", default=None)
+_thing_registry_instance: ThingRegistry | None = None
+"""Module-level singleton for ThingRegistry when DI container is not active."""
 
 # re-export Ast Grep's rules and config types:
 AstGrepSearchTypes = (
@@ -475,6 +477,21 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
     # ================================================
     @staticmethod
     def _thing_registry(registry: ThingRegistryDep = INJECTED) -> ThingRegistry:
+        """Get or create ThingRegistry instance.
+        
+        When called through DI container, returns injected registry.
+        When called directly (e.g. in tests), creates singleton instance.
+        """
+        from codeweaver.core.di.depends import DependsPlaceholder, _InjectedProxy
+        from codeweaver.semantic.registry import ThingRegistry
+
+        # Check if registry is INJECTED placeholder (either proxy or sentinel)
+        if isinstance(registry, (_InjectedProxy, DependsPlaceholder)):
+            # No DI container active, create singleton registry
+            global _thing_registry_instance
+            if _thing_registry_instance is None:
+                _thing_registry_instance = ThingRegistry()
+            return _thing_registry_instance
         return registry
 
     @computed_field
@@ -483,7 +500,7 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
         """Get the grammar Thing that this node represents."""
         thing_name: ThingName = self.name  # type: ignore
         registry = self._thing_registry()
-        if thing := registry.get_registry().get_thing_by_name(thing_name, language=self.language):  # ty: ignore[unresolved-attribute]
+        if thing := registry.get_thing_by_name(thing_name, language=self.language):
             return cast(CompositeThing | Token | Category, thing)
         # Return None for unknown things rather than raising
         return None

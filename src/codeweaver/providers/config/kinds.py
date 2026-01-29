@@ -43,6 +43,7 @@ from pydantic import (
     PositiveInt,
     PrivateAttr,
     SecretStr,
+    SkipValidation,
     Tag,
     computed_field,
     model_validator,
@@ -103,7 +104,6 @@ from codeweaver.providers.config.utils import (
 
 
 if TYPE_CHECKING:
-    from pydantic_ai.settings import ModelSettings as AgentModelSettings
 
     from codeweaver.engine.config import FailoverSettings
     from codeweaver.engine.config.failover_detector import FailoverDetector
@@ -172,14 +172,6 @@ class BaseProviderSettings(BasedModel, ABC):
 
     provider: Provider
     connection: ConnectionConfiguration | None = None
-    tag: ProviderLiteral = Field(
-        default_factory=lambda data: (
-            data.get("provider").variable if isinstance(data, dict) else data.provider.variable
-        ),
-        exclude=True,
-        init=False,
-        description="Discriminator tag for the provider.",
-    )
 
     client_options: Annotated[
         ClientOptions | None, Field(description="Client options for the provider's client.")
@@ -202,11 +194,8 @@ class BaseProviderSettings(BasedModel, ABC):
         data.pop("as_backup", None)
         data.pop("_as_backup", None)
 
-        if "tag" not in data:
-            data["tag"] = data.get("provider").variable
-        object.__setattr__(self, "tag", data["tag"])
         object.__setattr__(self, "client_options", data.get("client_options"))
-        data |= {"tag": self.tag, "client_options": self.client_options}
+        data |= {"client_options": self.client_options}
         if (
             "model_name" in type(self).model_fields
             and "model_name" not in data
@@ -235,7 +224,7 @@ class BaseProviderSettings(BasedModel, ABC):
         ):
             object.__setattr__(self, "model_name", ModelName(model_name))
         self._initialize()
-        super().__init__()
+        super().__init__(**data)
 
     def _initialize(self) -> None:
         """Perform any additional initialization steps. Happens before pydantic initialization and the model's post_init."""
@@ -824,6 +813,8 @@ class QdrantVectorStoreProviderSettings(_BaseQdrantVectorStoreProviderSettings):
 
     provider: ClassVar[Literal[Provider.QDRANT]] = Provider.QDRANT
 
+    tag: Literal["qdrant"] = "qdrant"
+
 
 class MemoryConfig(TypedDict, total=False):
     """Configuration for in-memory vector store provider."""
@@ -989,16 +980,19 @@ class AzureEmbeddingProviderSettings(AzureProviderMixin, EmbeddingProviderSettin
     """Provider settings for Azure embedding models (Cohere or OpenAI)."""
 
     model_config = EmbeddingProviderSettings.model_config | ConfigDict(frozen=False)
+    tag: Literal["azure"] = "azure"
 
-    client_options: Annotated[
-        Annotated[CohereClientOptions, Tag(Provider.COHERE.variable)]
-        | Annotated[OpenAIClientOptions, Tag(Provider.OPENAI.variable)]
-        | None,
-        Field(
-            description="Client options for the provider's client.",
-            discriminator=Discriminator(discriminate_azure_embedding_client_options),
-        ),
-    ] = None
+    client_options: (
+        Annotated[
+            Annotated[CohereClientOptions, Tag(Provider.COHERE.variable)]
+            | Annotated[OpenAIClientOptions, Tag(Provider.OPENAI.variable)],
+            Field(
+                description="Client options for the provider's client.",
+                discriminator=Discriminator(discriminate_azure_embedding_client_options),
+            ),
+        ]
+        | None
+    ) = None
 
     @model_validator(mode="after")
     def _validate_client_options(self) -> Self:
@@ -1056,6 +1050,8 @@ class BedrockEmbeddingProviderSettings(BedrockProviderMixin, EmbeddingProviderSe
         BedrockClientOptions | None, Field(description="Client options for the provider's client.")
     ] = None
 
+    tag: Literal["bedrock"] = "bedrock"
+
 
 class FastEmbedEmbeddingProviderSettings(FastEmbedProviderMixin, EmbeddingProviderSettings):
     """Provider settings for FastEmbed embedding models."""
@@ -1064,6 +1060,8 @@ class FastEmbedEmbeddingProviderSettings(FastEmbedProviderMixin, EmbeddingProvid
         FastEmbedClientOptions | None,
         Field(description="Client options for the provider's client."),
     ] = None
+
+    tag: Literal["fastembed"] = "fastembed"
 
 
 # ===========================================================================
@@ -1092,6 +1090,12 @@ class SparseEmbeddingProviderSettings(BaseProviderSettings):
         """Return the sparse embedding SDKClient enum member."""
         return SDKClient.SENTENCE_TRANSFORMERS
 
+    def is_cloud(self) -> bool:
+        """Return True if the provider settings are for a cloud deployment."""
+        return _is_cloud_provider(self)
+
+    tag: Literal["sentence-transformers"] = "sentence-transformers"
+
 
 class FastEmbedSparseEmbeddingProviderSettings(
     FastEmbedProviderMixin, SparseEmbeddingProviderSettings
@@ -1108,6 +1112,8 @@ class FastEmbedSparseEmbeddingProviderSettings(
     def client(self) -> Literal[SDKClient.FASTEMBED]:
         """Return the sparse embedding SDKClient enum member."""
         return SDKClient.FASTEMBED
+
+    tag: Literal["fastembed"] = "fastembed"
 
 
 # ===========================================================================
@@ -1151,6 +1157,8 @@ class FastEmbedRerankingProviderSettings(FastEmbedProviderMixin, RerankingProvid
         Field(description="Client options for the SDK provider's client."),
     ] = None
 
+    tag: Literal["fastembed"] = "fastembed"
+
 
 class BedrockRerankingProviderSettings(BedrockProviderMixin, RerankingProviderSettings):
     """Provider settings for Bedrock reranking models."""
@@ -1159,6 +1167,8 @@ class BedrockRerankingProviderSettings(BedrockProviderMixin, RerankingProviderSe
         BedrockClientOptions | None,
         Field(description="Client options for the SDK provider's client."),
     ] = None
+
+    tag: Literal["bedrock"] = "bedrock"
 
 
 # NOTE: Data and Agent providers aren't yet fully integrated into the system, so their settings classes are defined here but not yet used. They are also likely to change as we integrate them more fully.
@@ -1175,7 +1185,7 @@ class DataProviderSettings(BaseProviderSettings):
         dict[str, Any] | None, Field(description="Other provider-specific settings.")
     ] = None
 
-    @computed_field
+    @computed_field(repr=False)
     @property
     def client(self) -> LiteralSDKClient:
         """Return the data SDKClient enum member."""
@@ -1205,10 +1215,10 @@ class AgentProviderSettings(BaseProviderSettings):
     """Settings for agent models."""
 
     model: ModelString
-    model_options: AgentModelSettings | None
+    model_options: SkipValidation[Any]  # AgentModelSettings | None at runtime
     """Settings for the agent model(s)."""
 
-    @computed_field
+    @computed_field(repr=False)
     @property
     def client(self) -> LiteralSDKClient:
         """Return the agent SDKClient enum member."""

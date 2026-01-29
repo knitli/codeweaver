@@ -22,20 +22,15 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from codeweaver.core import (
-    MISSING,
-    Missing,
+from codeweaver.core import MISSING, Missing, has_git, in_codeweaver_clone
+from codeweaver.core.utils.filesystem import (
     _get_branch_from_origin,
     _get_git_dir,
     _root_path_checks_out,
     _walk_up_to_git_root,
     get_git_branch,
     get_git_revision,
-    get_project_path,
-    has_git,
-    in_codeweaver_clone,
     is_git_dir,
-    set_relative_path,
     try_git_rev_parse,
 )
 

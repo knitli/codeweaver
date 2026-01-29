@@ -17,13 +17,14 @@ from __future__ import annotations
 import logging
 
 from pathlib import Path
-from typing import Any
-
-from codeweaver.engine.chunker.delimiter import DelimiterChunker
-from codeweaver.engine.chunker.semantic import SemanticChunker
+from typing import TYPE_CHECKING, Any
 
 
-type Chunker = SemanticChunker | DelimiterChunker
+if TYPE_CHECKING:
+    from codeweaver.engine.chunker.delimiter import DelimiterChunker
+    from codeweaver.engine.chunker.semantic import SemanticChunker
+
+    type Chunker = SemanticChunker | DelimiterChunker
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +38,9 @@ def get_name(chunker: Chunker) -> str:
     Returns:
         The name of the chunker type as a string
     """
+    # Import at runtime to avoid circular dependency
+    from codeweaver.engine.chunker.semantic import SemanticChunker
+
     return "SEMANTIC" if isinstance(chunker, SemanticChunker) else "DELIMITER"
 
 

@@ -8,33 +8,41 @@
 import ssl
 
 from collections.abc import Callable, Mapping
-from typing import Any, Literal, NotRequired, TypedDict
-
-import httpx
+from typing import TYPE_CHECKING, Any, Literal, NotRequired, TypedDict
 
 from pydantic import NonNegativeInt, PositiveInt
 
 
-class HttpxClientParams(TypedDict, total=False):
-    """Parameters for configuring an httpx client."""
+if TYPE_CHECKING:
+    pass
 
-    auth: NotRequired[httpx._types.AuthTypes]
-    params: NotRequired[httpx._types.QueryParamTypes]
-    headers: NotRequired[httpx._types.HeaderTypes]
-    cookies: NotRequired[httpx._types.CookieTypes]
+
+# Mirror types to avoid httpx dependency at module initialization
+# These will accept httpx types at runtime but don't require httpx import
+class HttpxClientParams(TypedDict, total=False):
+    """Parameters for configuring an httpx client.
+
+    Note: Type annotations use Any to avoid httpx import at initialization.
+    At runtime, these accept the corresponding httpx types.
+    """
+
+    auth: NotRequired[Any]  # httpx._types.AuthTypes
+    params: NotRequired[Any]  # httpx._types.QueryParamTypes
+    headers: NotRequired[Any]  # httpx._types.HeaderTypes
+    cookies: NotRequired[Any]  # httpx._types.CookieTypes
     verify: NotRequired[bool | ssl.SSLContext | str]
-    cert: NotRequired[httpx._types.CertTypes]
+    cert: NotRequired[Any]  # httpx._types.CertTypes
     http1: NotRequired[bool]
     http2: NotRequired[bool]
-    proxy: NotRequired[httpx._types.ProxyTypes]
-    mounts: NotRequired[Mapping[str, httpx._transports.AsyncBaseTransport]]
-    timeout: NotRequired[httpx._types.TimeoutTypes]
+    proxy: NotRequired[Any]  # httpx._types.ProxyTypes
+    mounts: NotRequired[Mapping[str, Any]]  # Mapping[str, httpx._transports.AsyncBaseTransport]
+    timeout: NotRequired[Any]  # httpx._types.TimeoutTypes
     follow_redirects: NotRequired[bool]
-    limits: NotRequired[httpx.Limits]
+    limits: NotRequired[Any]  # httpx.Limits
     max_redirects: NotRequired[NonNegativeInt]
     event_hooks: NotRequired[Mapping[str, list[Callable[..., Any]]]]
-    base_url: NotRequired[httpx.URL | str]
-    transport: NotRequired[httpx._transports.AsyncBaseTransport]
+    base_url: NotRequired[Any | str]  # httpx.URL | str
+    transport: NotRequired[Any]  # httpx._transports.AsyncBaseTransport
     trust_env: NotRequired[bool]
     default_encoding: NotRequired[
         Literal["utf-8", "utf-16", "utf-32"]

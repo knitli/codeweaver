@@ -12,8 +12,7 @@ from uuid_extensions import uuid7
 
 from codeweaver.core import CodeChunk, Span
 from codeweaver.core.metadata import ChunkKind, ExtKind
-from codeweaver.core.types import ChunkEmbeddings, EmbeddingBatchInfo
-from codeweaver.providers import SparseEmbedding
+from codeweaver.core.types import ChunkEmbeddings, EmbeddingBatchInfo, SparseEmbedding
 
 
 @pytest.fixture

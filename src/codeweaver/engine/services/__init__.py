@@ -16,10 +16,10 @@ if TYPE_CHECKING:
 
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
-    "ChunkingService": (__spec__.parent, "ChunkingService"),
-    "FailoverService": (__spec__.parent, "FailoverService"),
-    "IndexingService": (__spec__.parent, "IndexingService"),
-    "FileWatchingService": (__spec__.parent, "FileWatchingService"),
+    "ChunkingService": (__spec__.parent, "chunking_service"),
+    "FailoverService": (__spec__.parent, "failover_service"),
+    "IndexingService": (__spec__.parent, "indexing_service"),
+    "FileWatchingService": (__spec__.parent, "watching_service"),
 })
 
 __getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)

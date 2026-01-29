@@ -103,10 +103,15 @@ class VectorConfig(BasedModel, frozen=True):
     def __init__(self, **data):
         """Initialize VectorConfig with role defaulting to name."""
         super().__init__(**data)
-        # Default role to name if not provided
-        if self.role is None:
+        # Normalize role to string - convert enum to string if needed, default to name if None
+        role_value = self.role
+        if role_value is None:
             # Use object.__setattr__ because frozen=True
             object.__setattr__(self, "role", self.name)
+        elif isinstance(role_value, VectorRole):
+            # Convert enum to string using .variable property
+            object.__setattr__(self, "role", role_value.variable)
+        # else: already a string, keep as is
 
     def _telemetry_keys(self):
         """Return telemetry keys for privacy-aware serialization.

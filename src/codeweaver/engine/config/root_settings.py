@@ -62,7 +62,6 @@ class CodeWeaverEngineSettings(CodeWeaverProviderSettings):
     indexer: Annotated[
         IndexerSettings | Unset,
         Field(
-            default_factory=IndexerSettings,
             description="Indexing configuration for code discovery and processing",
         ),
     ] = UNSET
@@ -70,7 +69,6 @@ class CodeWeaverEngineSettings(CodeWeaverProviderSettings):
     chunker: Annotated[
         ChunkerSettings | Unset,
         Field(
-            default_factory=ChunkerSettings,
             description="Chunking configuration for code segmentation",
         ),
     ] = UNSET
@@ -78,7 +76,6 @@ class CodeWeaverEngineSettings(CodeWeaverProviderSettings):
     failover: Annotated[
         FailoverSettings | Unset,
         Field(
-            default_factory=FailoverSettings,
             description="Failover configuration for service resilience",
         ),
     ] = UNSET
