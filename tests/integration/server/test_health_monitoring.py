@@ -29,7 +29,6 @@ import time
 
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import pytest
 
@@ -43,10 +42,6 @@ from codeweaver.server import (
     ServicesInfo,
     StatisticsInfo,
 )
-
-
-if TYPE_CHECKING:
-    pass
 
 
 # Test fixture: Small test project for indexing

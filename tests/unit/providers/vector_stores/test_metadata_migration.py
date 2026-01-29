@@ -20,6 +20,9 @@ import pytest
 from codeweaver.providers.vector_stores.metadata import CollectionMetadata
 
 
+@pytest.mark.external_api
+@pytest.mark.qdrant
+@pytest.mark.unit
 class TestMetadataMigration:
     """Test migration from v1.2.x to v1.3.0."""
 
@@ -268,6 +271,9 @@ class TestMetadataMigration:
         assert explicit_dict == implicit_dict
 
 
+@pytest.mark.external_api
+@pytest.mark.qdrant
+@pytest.mark.unit
 class TestMetadataVersioning:
     """Test version field behavior across schema versions."""
 
@@ -312,6 +318,9 @@ class TestMetadataVersioning:
         assert metadata.version == "1.2.5"
 
 
+@pytest.mark.external_api
+@pytest.mark.qdrant
+@pytest.mark.unit
 class TestAsymmetricEmbeddingFields:
     """Test behavior of new asymmetric embedding fields."""
 
@@ -361,6 +370,9 @@ class TestAsymmetricEmbeddingFields:
 
 
 @pytest.mark.integration
+@pytest.mark.external_api
+@pytest.mark.qdrant
+@pytest.mark.unit
 class TestMetadataMigrationIntegration:
     """Integration tests for metadata migration scenarios."""
 
