@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: (c) 2025 Knitli Inc.
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+
 """Dependency injection type aliases and factories for semantic package."""
 
 # sourcery skip: docstrings-for-modules

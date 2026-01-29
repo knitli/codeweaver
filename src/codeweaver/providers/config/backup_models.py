@@ -21,7 +21,7 @@ import logging
 
 from typing import TYPE_CHECKING, Literal
 
-from codeweaver.core.types import ModelName
+from codeweaver.core.types import ModelName, Provider
 
 
 if TYPE_CHECKING:
@@ -78,13 +78,14 @@ async def get_backup_embedding_config(
         from codeweaver.providers.config.kinds import EmbeddingProviderSettings
 
         return EmbeddingProviderSettings(
+            provider=Provider.SENTENCE_TRANSFORMERS,
             model_name=ModelName(BACKUP_MODEL_PRIMARY),
             connection=None,
             embedding_config=SentenceTransformersEmbeddingConfig(
                 model_name=ModelName(BACKUP_MODEL_PRIMARY)
             ),
             client_options=SentenceTransformersClientOptions(
-                model_name=ModelName(BACKUP_MODEL_PRIMARY)
+                model_name_or_path=BACKUP_MODEL_PRIMARY
             ),
         )
     if config_provider == "fastembed":
@@ -93,10 +94,11 @@ async def get_backup_embedding_config(
         from codeweaver.providers.config.kinds import FastEmbedEmbeddingProviderSettings
 
         return FastEmbedEmbeddingProviderSettings(
+            provider=Provider.FASTEMBED,
             model_name=ModelName(BACKUP_MODEL_FALLBACK),
             connection=None,
             embedding_config=FastEmbedEmbeddingConfig(model_name=ModelName(BACKUP_MODEL_FALLBACK)),
-            client_options=FastEmbedClientOptions(model_name=ModelName(BACKUP_MODEL_FALLBACK)),
+            client_options=FastEmbedClientOptions(model_name=BACKUP_MODEL_FALLBACK),
         )
     raise ValueError(f"Unknown config provider: {config_provider}")
 
@@ -251,7 +253,7 @@ async def create_backup_embeddings(text: str | list[str]) -> list[list[float]] |
             await provider.cleanup()
 
 
-def get_backup_model_info() -> dict[str, str]:
+def get_backup_model_info() -> dict[str, str | bool]:
     """Get information about configured backup models.
 
     Returns:

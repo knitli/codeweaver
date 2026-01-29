@@ -52,7 +52,7 @@ VOYAGE_4_FAMILY = ModelFamily(
     is_normalized=True,
     preferred_metrics=("dot",),
     member_models=frozenset({"voyage-4-large", "voyage-4", "voyage-4-lite", "voyage-4-nano"}),
-    asymmetric_query_models=frozenset({"voyage-4-nano"}),
+    asymmetric_query_models=frozenset({"voyage-4-nano", "voyage-4-lite", "voyage-4"}),
     cross_provider_compatible=True,
 )
 """Voyage-4 model family specification.
