@@ -23,7 +23,7 @@ Nevertheless, because we use semantic chunking for most code, you're not likely 
 from __future__ import annotations
 
 from codeweaver.core import Provider, dependency_provider
-from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities, ModelFamily
 from codeweaver.providers.embedding.capabilities.types import PartialCapabilities
 
 
@@ -43,6 +43,41 @@ def _get_shared_capabilities() -> PartialCapabilities:
         "preferred_metrics": ("dot",),
         # All voyageai models are normalized to length 1, so dot product will produce identical results to cosine similarity or Euclidean distance -- but is faster to compute.
     }
+
+
+VOYAGE_4_FAMILY = ModelFamily(
+    family_id="voyage-4",
+    vector_space_dimension=1024,
+    vector_space_datatype="uint8",
+    is_normalized=True,
+    preferred_metrics=("dot",),
+    member_models=frozenset({
+        "voyage-4-large",
+        "voyage-4",
+        "voyage-4-lite",
+        "voyage-4-nano",
+    }),
+    asymmetric_query_models=frozenset({"voyage-4-nano"}),
+    cross_provider_compatible=True,
+)
+"""Voyage-4 model family specification.
+
+The Voyage-4 family represents the fourth generation of Voyage AI's embedding models,
+featuring a unified 1024-dimensional vector space optimized for int8 quantization.
+All models in this family produce embeddings that can be directly compared and stored
+together, enabling flexible model selection and migration strategies.
+
+Key characteristics:
+- Normalized embeddings (unit length) enable efficient dot product similarity
+- Native uint8 output reduces storage by 75% vs float32 with minimal quality loss
+- Cross-model compatibility allows mixing models (e.g., voyage-4-large for docs,
+  voyage-4-nano for queries)
+- voyage-4-nano is specialized for query-time use in asymmetric search scenarios
+
+The family's cross-provider compatibility flag indicates these embeddings maintain
+their properties even when accessed through different API providers (e.g., VoyageAI
+native API vs third-party providers).
+"""
 
 
 class VoyageEmbeddingCapabilities(EmbeddingModelCapabilities):
@@ -67,6 +102,11 @@ def get_voyage_embedding_capabilities() -> tuple[VoyageEmbeddingCapabilities, ..
         settings[i]["name"] = model
         settings[i]["version"] = "3" if "3.5" not in model else "3.5"
         settings[i]["tokenizer_model"] = f"{settings[i]['tokenizer_model']}{model}"
+
+        # Assign model family for voyage-4 models
+        if model.startswith("voyage-4"):
+            settings[i]["model_family"] = VOYAGE_4_FAMILY
+
     return tuple(VoyageEmbeddingCapabilities.model_validate({**s}) for s in settings)
 
 
