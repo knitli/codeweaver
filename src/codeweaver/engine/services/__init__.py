@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: (c) 2025 Knitli Inc.
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+
 """Entry point for engine services package."""
 
 from __future__ import annotations
