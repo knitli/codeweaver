@@ -125,7 +125,31 @@ class HybridVectorPayload(BasedModel):
 
 
 class CollectionMetadata(BasedModel):
-    """Metadata stored with collections for validation and compatibility checks."""
+    """Metadata stored with collections for validation and compatibility checks.
+
+    Version History:
+        - v1.2.0: Initial schema with dense_model, sparse_model
+        - v1.3.0: Added dense_model_family and query_model for asymmetric embedding support
+
+    Migration from v1.2.x to v1.3.0:
+        Collections created with v1.2.x are fully compatible with v1.3.0. The new fields
+        (dense_model_family, query_model) default to None, indicating single-model mode:
+
+        - dense_model_family=None: No model family tracking (backward compatible)
+        - query_model=None: Symmetric mode (query uses same model as dense_model)
+
+        Existing collections can be loaded, modified, and saved without requiring migration.
+        The pydantic validators handle missing fields gracefully via Field defaults.
+
+    Asymmetric Embedding Support (v1.3.0+):
+        When dense_model_family is set, the collection supports cross-model querying within
+        the same family (e.g., Voyage-4 family allows voyage-4-large for embedding and
+        voyage-4-nano for queries). This enables:
+
+        - Local query models (zero cost, instant latency)
+        - API embedding models (higher quality)
+        - 3-point retrieval improvement (per Voyage AI)
+    """
 
     provider: Annotated[str, Field(description="Provider name that created collection")]
     created_at: Annotated[datetime, Field(default_factory=lambda: datetime.now(UTC))]
@@ -133,6 +157,24 @@ class CollectionMetadata(BasedModel):
 
     dense_model: Annotated[
         str | None, Field(description="Name of the dense embedding model used.")
+    ] = None
+    dense_model_family: Annotated[
+        str | None,
+        Field(
+            description="Model family identifier for the dense embedding model. "
+            "Identifies compatible models that share the same vector space, enabling "
+            "asymmetric embedding configurations (e.g., using voyage-4-large for documents "
+            "and voyage-4-nano for queries)."
+        ),
+    ] = None
+    query_model: Annotated[
+        str | None,
+        Field(
+            description="Name of the query model used for asymmetric search. "
+            "When set, indicates this collection supports asymmetric embedding where "
+            "documents are embedded with dense_model and queries use this model. "
+            "Must be compatible with dense_model_family."
+        ),
     ] = None
     sparse_model: Annotated[
         str | None, Field(description="Name of the sparse embedding model used.")
@@ -145,7 +187,7 @@ class CollectionMetadata(BasedModel):
         Field(description="Name of the backup dense embedding model used for the collection"),
     ] = None
     collection_name: Annotated[str, Field(description="Name of the collection")] = ""
-    version: Annotated[str, Field(description="Metadata schema version")] = "1.2.0"
+    version: Annotated[str, Field(description="Metadata schema version")] = "1.3.0"
 
     def to_collection(self) -> dict[str, Any]:
         """Convert to a dictionary that is the argument for collection creation."""
@@ -161,16 +203,22 @@ class CollectionMetadata(BasedModel):
     def validate_compatibility(self, other: CollectionMetadata) -> None:
         """Validate collection metadata against current provider configuration.
 
+        Performs family-aware validation when dense_model_family is present,
+        allowing asymmetric embedding configurations where query models can differ
+        from embed models as long as they belong to the same model family.
+
         Args:
-            other: Other collection metadata to compare against
+            other: Other collection metadata to compare against (typically from existing collection)
 
         Raises:
-            ModelSwitchError: If embedding models don't match
-            DimensionMismatchError: If embedding dimensions don't match
+            ModelSwitchError: If embedding models don't match and family validation fails
+            ConfigurationError: If models are incompatible within their family
 
         Warnings:
             Logs warning if provider has changed (suggests reindexing)
         """
+        from codeweaver.core.exceptions import ConfigurationError
+
         # Warn on provider switch - suggests reindexing but doesn't block
         if self.provider != other.provider:
             logger.warning(
@@ -191,6 +239,169 @@ class CollectionMetadata(BasedModel):
                 },
             )
 
+        # Family-aware validation: Check if collection has family metadata
+        if other.dense_model_family:
+            # Collection was indexed with a model family
+            # Determine which model to validate based on configuration
+            indexed_model = other.dense_model
+            
+            # Priority: query_model if set (for asymmetric), otherwise dense_model
+            current_model = self.query_model if self.query_model else self.dense_model
+
+            if not current_model:
+                # No current model configured - backward compat case
+                return
+
+            # If models match exactly, no further validation needed
+            if current_model == indexed_model:
+                return
+
+            # Models differ - validate family compatibility
+            from codeweaver.providers.embedding.capabilities.resolver import (
+                EmbeddingCapabilityResolver,
+            )
+
+            resolver = EmbeddingCapabilityResolver()
+
+            # Resolve capabilities for current query model
+            current_caps = resolver.resolve(current_model)
+
+            if not current_caps:
+                raise ConfigurationError(
+                    f"No capabilities found for current model: {current_model}",
+                    details={
+                        "current_model": current_model,
+                        "indexed_model": indexed_model,
+                        "indexed_family": other.dense_model_family,
+                    },
+                    suggestions=[
+                        f"Ensure model '{current_model}' is registered in the capabilities system",
+                        "Check that the model name is spelled correctly",
+                        "List available models with: codeweaver list models",
+                        f"Or use the indexed model '{indexed_model}' for queries",
+                    ],
+                )
+
+            # Check if current model belongs to a family
+            if not current_caps.model_family:  # ty:ignore[unresolved-attribute]
+                # Current model lacks family support
+                # If we're validating query_model specifically, raise ConfigurationError
+                # If it's a dense_model switch, raise ModelSwitchError
+                if self.query_model and current_model == self.query_model:
+                    # Query model validation failure
+                    raise ConfigurationError(
+                        f"Query model '{current_model}' does not belong to a model family, "
+                        f"but collection was indexed with family '{other.dense_model_family}'",
+                        details={
+                            "query_model": current_model,
+                            "indexed_model": indexed_model,
+                            "indexed_family": other.dense_model_family,
+                        },
+                        suggestions=[
+                            f"Use a query model from the '{other.dense_model_family}' family",
+                            f"Or use the indexed model '{indexed_model}' for queries",
+                            "Asymmetric embedding requires both models to belong to the same family",
+                        ],
+                    )
+                else:
+                    # Dense model switch to non-family model
+                    raise ModelSwitchError(
+                        f"Your existing embedding collection was created with model '{indexed_model}' "
+                        f"(family: '{other.dense_model_family}'), but the current model '{current_model}' "
+                        f"does not belong to a model family. You can't switch to a non-family model.",
+                        suggestions=[
+                            f"Use a model from the '{other.dense_model_family}' family",
+                            f"Or re-index your codebase with the new model",
+                            "Asymmetric embedding requires both models to belong to the same family",
+                        ],
+                        details={
+                            "current_model": current_model,
+                            "indexed_model": indexed_model,
+                            "indexed_family": other.dense_model_family,
+                            "collection": self.project_name,
+                        },
+                    )
+
+            current_family = current_caps.model_family  # ty:ignore[unresolved-attribute]
+
+            # Verify same family ID
+            if current_family.family_id != other.dense_model_family:
+                # Get indexed model capabilities to show compatible alternatives
+                indexed_caps = resolver.resolve(indexed_model) if indexed_model else None
+                compatible_models = []
+                if indexed_caps and indexed_caps.model_family:  # ty:ignore[unresolved-attribute]
+                    compatible_models = sorted(indexed_caps.model_family.member_models)  # ty:ignore[unresolved-attribute]
+
+                raise ConfigurationError(
+                    f"Model family mismatch: collection indexed with '{other.dense_model_family}' family "
+                    f"but current model '{current_model}' belongs to '{current_family.family_id}' family",
+                    details={
+                        "current_model": current_model,
+                        "current_family": current_family.family_id,
+                        "indexed_model": indexed_model,
+                        "indexed_family": other.dense_model_family,
+                    },
+                    suggestions=[
+                        f"Use a model from the '{other.dense_model_family}' family",
+                        f"Compatible models: {', '.join(compatible_models)}"
+                        if compatible_models
+                        else f"Use the indexed model '{indexed_model}'",
+                        "Or re-index the collection with the new model family",
+                    ],
+                )
+
+            # Verify models are compatible within the family
+            if indexed_model and not current_family.is_compatible(indexed_model, current_model):
+                raise ConfigurationError(
+                    f"Models '{indexed_model}' and '{current_model}' are not compatible within family '{current_family.family_id}'",
+                    details={
+                        "current_model": current_model,
+                        "indexed_model": indexed_model,
+                        "family_id": current_family.family_id,
+                        "family_members": sorted(current_family.member_models),
+                    },
+                    suggestions=[
+                        "Ensure both models are listed as family members",
+                        f"Valid family members: {', '.join(sorted(current_family.member_models))}",
+                        "This may indicate a configuration error",
+                    ],
+                )
+
+            # Verify dimensions match (using family validation)
+            current_dim = current_caps.default_dimension
+            indexed_caps = resolver.resolve(indexed_model) if indexed_model else None
+            indexed_dim = indexed_caps.default_dimension if indexed_caps else None
+
+            if indexed_dim:
+                is_valid, error_msg = current_family.validate_dimensions(indexed_dim, current_dim)
+                if not is_valid:
+                    raise ConfigurationError(
+                        f"Dimension mismatch: {error_msg}",
+                        details={
+                            "current_model": current_model,
+                            "current_dimension": current_dim,
+                            "indexed_model": indexed_model,
+                            "indexed_dimension": indexed_dim,
+                            "expected_dimension": current_family.vector_space_dimension,
+                            "family_id": current_family.family_id,
+                        },
+                        suggestions=[
+                            "Ensure both models use the same embedding dimension",
+                            f"Expected dimension for '{current_family.family_id}': {current_family.vector_space_dimension}",
+                            "Check model configurations and verify dimension settings",
+                        ],
+                    )
+
+            # Family validation passed - asymmetric embedding is compatible
+            logger.info(
+                "Family-aware validation passed: query model '%s' is compatible with indexed model '%s' (family: %s)",
+                current_model,
+                indexed_model,
+                current_family.family_id,
+            )
+            return
+
+        # Legacy validation (no family metadata) - strict model matching
         # Error on model switch - this corrupts search results
         # Only raise if both have models and they differ (allow None for backwards compatibility)
         if self.dense_model and other.dense_model and self.dense_model != other.dense_model:
