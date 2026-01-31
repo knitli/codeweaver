@@ -74,6 +74,7 @@ from codeweaver.providers.config import (
 )
 from codeweaver.providers.config.kinds import _BaseQdrantVectorStoreProviderSettings
 from codeweaver.providers.embedding import EmbeddingProvider, SparseEmbeddingProvider
+from codeweaver.providers.embedding.cache_manager import EmbeddingCacheManager
 from codeweaver.providers.embedding.capabilities.resolver import (
     EmbeddingCapabilityResolver,
     SparseEmbeddingCapabilityResolver,
@@ -96,7 +97,6 @@ if TYPE_CHECKING:
         EmbeddingConfigT,
         RerankingConfigT,
     )
-    from codeweaver.providers.embedding.cache_manager import EmbeddingCacheManager
     from codeweaver.providers.types import (
         ConfiguredCapability,
         EmbeddingCapabilityGroup,
@@ -590,7 +590,7 @@ type EmbeddingRegistryDep = Annotated[
 # ===========================================================================
 
 
-@dependency_provider(scope="singleton")
+@dependency_provider(EmbeddingCacheManager, scope="singleton")
 def _get_cache_manager(registry: EmbeddingRegistryDep = INJECTED) -> EmbeddingCacheManager:
     """Get singleton cache manager with namespace isolation.
 
@@ -660,7 +660,7 @@ def _get_embedding_provider_for_config(
             client=client,
             provider=config.provider,
             registry=registry,
-            cache_manager=cache_manager,  # ty:ignore[invalid-argument]
+            cache_manager=cache_manager,  # ty:ignore[invalid-argument-type]
             caps=capabilities,  # ty:ignore[invalid-argument-type]
             config=config,  # ty:ignore[invalid-argument-type]
         )  # ty:ignore[invalid-return-type]

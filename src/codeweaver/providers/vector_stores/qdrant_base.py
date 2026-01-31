@@ -691,9 +691,12 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
                         "values": normed_values,
                     })
 
-        # Fallback: if no sparse vector exists, use BM25 document
+        # Fallback: if no sparse vector exists but sparse/IDF is configured, use BM25 document
+        # Only add BM25 if we have sparse or IDF capabilities configured in the embedding group
         if not has_sparse and "sparse" not in vectors:
-            vectors["sparse"] = Document(text=chunk.content, model="qdrant/bm25")
+            # Check if we have sparse or IDF configured
+            if self.caps.sparse is not None or self.caps.idf is not None:
+                vectors["sparse"] = Document(text=chunk.content, model="qdrant/bm25")
 
         return vectors
 

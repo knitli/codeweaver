@@ -154,6 +154,7 @@ if TYPE_CHECKING:
         SentenceTransformersSparseProvider,
         SparseEmbeddingCapabilityResolver,
         SparseEmbeddingModelCapabilities,
+        SparseEmbeddingProvider,
         VoyageEmbeddingProvider,
         get_embedding_registry,
     )
@@ -346,6 +347,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "SparseEmbeddingClientDep": (__spec__.parent, "dependencies"),
     "SparseEmbeddingConfigT": (__spec__.parent, "config"),
     "SparseEmbeddingModelCapabilities": (__spec__.parent, "embedding"),
+    "SparseEmbeddingProvider": (__spec__.parent, "embedding"),
     "SparseEmbeddingProviderDep": (__spec__.parent, "dependencies"),
     "SparseEmbeddingProviderSettings": (__spec__.parent, "config"),
     "SparseEmbeddingProviderSettingsDep": (__spec__.parent, "dependencies"),
@@ -544,6 +546,7 @@ __all__ = (
     "SparseEmbeddingClientDep",
     "SparseEmbeddingConfigT",
     "SparseEmbeddingModelCapabilities",
+    "SparseEmbeddingProvider",
     "SparseEmbeddingProviderDep",
     "SparseEmbeddingProviderSettings",
     "SparseEmbeddingProviderSettingsDep",

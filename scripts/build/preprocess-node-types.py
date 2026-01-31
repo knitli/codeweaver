@@ -44,7 +44,8 @@ def main() -> int:
     }
 
     # Write cache file
-    cache_file = repo_root / "src" / "codeweaver" / "data" / "node_types_cache.pkl"
+    cache_file = repo_root / "src" / "codeweaver" / \
+        "semantic" / "data" / "node_types_cache.pkl"
     print(f"Writing cache to {cache_file}...")
 
     with cache_file.open("wb") as f:

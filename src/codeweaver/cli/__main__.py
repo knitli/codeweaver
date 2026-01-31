@@ -87,9 +87,26 @@ def _handle_keyboard_interrupt():
 
 def main() -> None:
     """Main CLI entry point."""
-    # Override DI to use StatusDisplay instead of default RichConsoleProgressReporter
-    # This must happen before any commands are executed (which might resolve dependencies)
-    get_container().override(ProgressReporter, display)
+    import asyncio
+    from codeweaver.core.dependencies import bootstrap_settings
+
+    # Bootstrap settings and initialize DI container
+    # This must happen before any commands are executed
+    async def _init_di():
+        """Initialize dependency injection container with settings."""
+        # Bootstrap settings - this registers them in the DI container
+        await bootstrap_settings()
+        # Override DI to use StatusDisplay instead of default RichConsoleProgressReporter
+        get_container().override(ProgressReporter, display)
+
+    # Run async initialization
+    try:
+        asyncio.run(_init_di())
+    except Exception as e:
+        console.print(f"{CODEWEAVER_PREFIX} [bold red]Failed to initialize: {e}[/bold red]")
+        console.print("\n[red]Traceback:[/red]")
+        console.print_exception(max_frames=10)
+        sys.exit(1)
 
     try:
         app()

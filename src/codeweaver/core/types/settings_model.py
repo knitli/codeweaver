@@ -17,7 +17,7 @@ from collections.abc import Iterator
 from dataclasses import asdict
 from pathlib import Path
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Annotated, Any, ClassVar, Literal, Self, cast
+from typing import TYPE_CHECKING, Annotated, Any, ClassVar, Literal, Self, cast, overload
 
 from pydantic import BaseModel, DirectoryPath, Field, FilePath, HttpUrl, PrivateAttr, computed_field
 from pydantic_core import to_json
@@ -367,6 +367,29 @@ class BaseCodeWeaverSettings(BaseSettings):
 
     _env_prefix: ClassVar[str] = "CODEWEAVER_"
 
+    @overload
+    def __init__(
+        self,
+        config_file: FilePath,
+        project_path: DirectoryPath | Unset = UNSET,
+        project_name: str | Unset = UNSET,
+        logging: LoggingSettingsDict | Unset = UNSET,
+        telemetry: TelemetrySettings | Unset = UNSET,
+        **data: Any,
+    ) -> None:
+        ...
+    @overload
+    def __init__(
+        self,
+        *,
+        project_path: DirectoryPath,
+        project_name: str | Unset = UNSET,
+        config_file: FilePath | Unset = UNSET,
+        logging: LoggingSettingsDict | Unset = UNSET,
+        telemetry: TelemetrySettings | Unset = UNSET,
+        **data: Any,
+    ) -> None:
+        ...
     def __init__(
         self,
         project_path: DirectoryPath | Unset = UNSET,
@@ -376,19 +399,16 @@ class BaseCodeWeaverSettings(BaseSettings):
         telemetry: TelemetrySettings | Unset = UNSET,
         **data: Any,
     ) -> None:
-        """Initialize the BaseCodeWeaverSettings instance."""
-        if config_file is not UNSET and config_file is not None and config_file.exists():
-            self = type(self).from_config(
-                cast(Path, config_file),
-                project_path=cast(Path | None, project_path if project_path is not UNSET else None),
-                **data,
-            )
-        # Collect unset fields before resolving defaults
-        unset_fields = set()
-        for key in type(self).model_fields:
-            if data.get(key) is UNSET or locals().get(key) is UNSET:
-                unset_fields.add(key)
+        """Initialize the BaseCodeWeaverSettings instance.
 
+        Note: To load settings from a config file, use the `from_config` class method instead.
+        The __init__ method handles initialization from data, not file loading.
+        """
+        unset_fields = {
+            key
+            for key in type(self).model_fields
+            if data.get(key) is UNSET or locals().get(key) is UNSET
+        }
         if project_path is UNSET:
             project_path = Path(
                 os.getenv("CODEWEAVER_PROJECT_PATH", data.get("project_path", get_project_path()))
@@ -643,7 +663,7 @@ class BaseCodeWeaverSettings(BaseSettings):
 
         The file format is determined by the file extension (.toml, .yaml/.yml, .json).
         """
-        default_settings = cls()
+        default_settings = cls(project_path=_resolve_project_path())
         data = cls._to_serializable(default_settings, path=path)
         cls._write_config_file(path, data)
 
@@ -664,9 +684,9 @@ class BaseCodeWeaverSettings(BaseSettings):
             case _:
                 raise ValueError(f"Unsupported configuration file format: {extension}")
         return (
-            cls(project_path=project_path, **{**kwargs, "config_file": path})  # ty:ignore[invalid-argument-type]
+            cls(project_path=project_path, **{**kwargs, "config_file": path})  # ty:ignore[invalid-argument-type, no-matching-overload]
             if project_path
-            else cls(**{**kwargs, "config_file": path})  # ty:ignore[invalid-argument-type]
+            else cls(**{**kwargs, "config_file": path})  # ty:ignore[invalid-argument-type, no-matching-overload]
         )  # ty:ignore[invalid-argument-type]
 
     @computed_field

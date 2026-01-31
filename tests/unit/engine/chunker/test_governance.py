@@ -40,7 +40,7 @@ def test_timeout_enforcement():
     """Test that ChunkingTimeoutError is raised when timeout is exceeded."""
     settings = MockPerformanceSettings(chunk_timeout_seconds=1)
 
-    with patch("codeweaver.engine") as mock_time:
+    with patch("codeweaver.engine.chunker.governance.time") as mock_time:
         # Set up time progression: 0.0 at __enter__, 1.5 at check_timeout()
         mock_time.time.side_effect = [0.0, 1.5]
 

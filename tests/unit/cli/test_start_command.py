@@ -363,7 +363,7 @@ class TestStartPersistAlias:
         from codeweaver.cli.commands.start import persist
 
         # Patch the init_service function that persist should delegate to
-        with patch("codeweaver.cli") as mock_init_service:
+        with patch("codeweaver.cli.commands.init.service") as mock_init_service:
             # Call persist with some test arguments
             from tempfile import TemporaryDirectory
 

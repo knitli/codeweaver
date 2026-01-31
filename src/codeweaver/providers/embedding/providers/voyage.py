@@ -57,6 +57,39 @@ class VoyageEmbeddingProvider(EmbeddingProvider[AsyncClient]):
     )
     _is_context_model: Annotated[bool, PrivateAttr()] = False
 
+    def _initialize(
+        self, impl_deps: Any = None, custom_deps: Any = None
+    ) -> None:
+        """Initialize the Voyage provider.
+
+        Args:
+            impl_deps: Implementation-specific dependencies (unused).
+            custom_deps: Custom dependencies (unused).
+        """
+        # Nothing to initialize here - options are set in model_post_init
+        pass
+
+    def model_post_init(self, __context: Any) -> None:
+        """Post-initialization hook to detect context models and set options.
+
+        Args:
+            __context: Pydantic context (unused).
+        """
+        # Set model name, input type, and output parameters for embedding and query options
+        self.embed_options["model"] = self.model_name
+        self.embed_options["input_type"] = "document"
+        self.embed_options["output_dimension"] = self.caps.default_dimension
+        self.embed_options["output_dtype"] = self.caps.default_dtype
+
+        self.query_options["model"] = self.model_name
+        self.query_options["input_type"] = "query"
+        self.query_options["output_dimension"] = self.caps.default_dimension
+        self.query_options["output_dtype"] = self.caps.default_dtype
+
+        # Detect if this is a context model based on the model name
+        if self.caps and "context" in self.caps.name.lower():
+            object.__setattr__(self, "_is_context_model", True)
+
     def _process_output(self, output_data: Any) -> list[list[float]] | list[list[int]]:
         """Process output data using the appropriate transformer."""
         transformer = (

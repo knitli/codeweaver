@@ -345,7 +345,7 @@ class CollectionConfig(BasedModel):
         """Return the Qdrant collection parameters for this configuration."""
         if not self._vectors_set:
             await self.set_vector_params()
-        return CollectionParams.model_construct(values={'vectors': self.vectors_config, 'sparse_vectors': self.sparse_vectors_config})
+        return CollectionParams.model_construct(vectors=self.vectors_config, sparse_vectors=self.sparse_vectors_config)
 
     async def set_vector_params(self, embedding_group: EmbeddingCapabilityGroup | None=None) -> None:
         """Assemble the vector parameters for the collection."""
@@ -482,7 +482,7 @@ class _BaseQdrantVectorStoreProviderSettings(VectorStoreProviderSettings):
         """
         if embedding_group is not None:
             from codeweaver.providers.vector_stores.qdrant_service import QdrantVectorStoreService
-            service = QdrantVectorStoreService(settings=self, embedding_group=embedding_group, failover_settings=failover_settings, failover_detector=failover_detector)
+            service = QdrantVectorStoreService(settings=self, embedding_group=embedding_group, failover_settings=failover_settings, failover_detector=failover_detector)  # ty:ignore[invalid-argument-type]
             return await service.get_collection_config(metadata)
         try:
             from codeweaver.core.di import get_container
@@ -496,7 +496,7 @@ class _BaseQdrantVectorStoreProviderSettings(VectorStoreProviderSettings):
                 failover_detector = await container.resolve(FailoverDetector)
             except Exception:
                 failover_detector = None
-            service = QdrantVectorStoreService(settings=self, embedding_group=embedding_group, failover_settings=failover_settings, failover_detector=failover_detector)
+            service = QdrantVectorStoreService(settings=self, embedding_group=embedding_group, failover_settings=failover_settings, failover_detector=failover_detector)  # ty:ignore[invalid-argument-type]
         except Exception as e:
             logger.debug('DI container not available, using basic config: %s', e)
             if not self.collection._vectors_set:

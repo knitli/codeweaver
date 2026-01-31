@@ -104,8 +104,11 @@ class LazyImport[Import: Any]:
             try:
                 resolved = self._resolve()
             except AttributeError as e:
+                module_name = object.__getattribute__(self, "_module_name")
+                attrs = object.__getattribute__(self, "_attrs")
+                path = f"{module_name}.{'.'.join(attrs)}" if attrs else module_name
                 raise AttributeError(
-                    f"Attribute {name!r} not found in resolved object {resolved!r}"
+                    f"Attribute {name!r} not found during resolution of {path!r}"
                 ) from e
             else:
                 return getattr(resolved, name)

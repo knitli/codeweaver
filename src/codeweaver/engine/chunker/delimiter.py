@@ -134,6 +134,13 @@ class DelimiterChunker(BaseChunker):
 
         start_time = time.perf_counter()
 
+        with open("/tmp/chunk_debug.txt", "a") as f:
+            f.write(f"\n=== chunk() called ===\n")
+            f.write(f"Language: {self._language}\n")
+            f.write(f"File path: {file_path}\n")
+            f.write(f"Content length: {len(content)}\n")
+            f.write(f"Content preview: {content[:100]!r}\n")
+
         with ResourceGovernor(performance_settings) as governor:
             try:
                 source_id = UUID7Hex(file.source_id.hex) if file else uuid7()
@@ -142,6 +149,8 @@ class DelimiterChunker(BaseChunker):
                     context = {}
 
                 if matches := self._get_matches_with_fallback(content, governor, context):
+                    with open("/tmp/chunk_debug.txt", "a") as f:
+                        f.write(f"Matches found: {len(matches)}\n")
                     chunks, boundaries = self._process_matches_to_chunks(
                         matches, content, file_path, source_id, context, governor
                     )
@@ -177,6 +186,13 @@ class DelimiterChunker(BaseChunker):
                         threshold_ms=PERFORMANCE_THRESHOLD_MS,
                         extra_context={"chunk_count": len(chunks), "file_size_bytes": len(content)},
                     )
+
+                with open("/tmp/chunk_return_debug.txt", "w") as f:
+                    f.write(f"\n=== chunk() returning ===\n")
+                    f.write(f"Total chunks: {len(chunks)}\n")
+                    for idx, chunk in enumerate(chunks):
+                        kind = chunk.metadata.get("kind")
+                        f.write(f"Chunk {idx}: kind={kind}\n")
 
                 return chunks
 
@@ -312,6 +328,18 @@ class DelimiterChunker(BaseChunker):
         Returns:
             List of DelimiterMatch objects ordered by position
         """
+        # TEMPORARY DEBUG OUTPUT TO FILE
+        with open("/tmp/delimiter_debug.txt", "a") as f:
+            f.write(f"\n=== _find_delimiter_matches DEBUG ===\n")
+            f.write(f"Language: {self._language}\n")
+            f.write(f"Total delimiters loaded: {len(self._delimiters) if self._delimiters else 0}\n")
+            if self._delimiters:
+                # Show first few delimiters
+                for i, d in enumerate(self._delimiters[:10]):
+                    f.write(f"  {i}: start={d.start!r}, end={d.end!r}, kind={d.kind}\n")
+                if len(self._delimiters) > 10:
+                    f.write(f"  ... and {len(self._delimiters) - 10} more\n")
+
         if not self._delimiters:
             return []
 
@@ -319,13 +347,29 @@ class DelimiterChunker(BaseChunker):
         explicit_delimiters = [d for d in self._delimiters if not d.is_keyword_delimiter]
         keyword_delimiters = [d for d in self._delimiters if d.is_keyword_delimiter]
 
+        with open("/tmp/delimiter_debug.txt", "a") as f:
+            f.write(f"Explicit delimiters: {len(explicit_delimiters)}\n")
+            f.write(f"Keyword delimiters: {len(keyword_delimiters)}\n")
+            # Show def delimiter if present
+            def_delims = [d for d in keyword_delimiters if d.start == "def"]
+            f.write(f"Found 'def' keyword delimiters: {len(def_delims)}\n")
+
         matches: list[DelimiterMatch] = []
 
         # Phase 1: Handle explicit start/end pairs (existing logic)
-        matches.extend(self._match_explicit_delimiters(content, explicit_delimiters))
+        explicit_matches = self._match_explicit_delimiters(content, explicit_delimiters)
+        matches.extend(explicit_matches)
 
         # Phase 2: Handle keyword delimiters with empty ends
-        matches.extend(self._match_keyword_delimiters(content, keyword_delimiters))
+        keyword_matches = self._match_keyword_delimiters(content, keyword_delimiters)
+        matches.extend(keyword_matches)
+
+        with open("/tmp/delimiter_debug.txt", "a") as f:
+            f.write(f"Phase 1 explicit matches: {len(explicit_matches)}\n")
+            f.write(f"Phase 2 keyword matches: {len(keyword_matches)}\n")
+            for i, m in enumerate(keyword_matches):
+                f.write(f"  Keyword match {i}: delimiter={m.delimiter.kind}, start={m.start_pos}, end={m.end_pos}\n")
+            f.write(f"Total matches: {len(matches)}\n")
 
         return sorted(matches, key=lambda m: m.start_pos)
 
@@ -1173,6 +1217,17 @@ class DelimiterChunker(BaseChunker):
 
             chunks.append(chunk)
 
+        # DEBUG: Write chunk kinds to file
+        import sys
+        with open("/tmp/chunk_debug.txt", "a") as f:
+            f.write(f"\n=== BOUNDARIES TO CHUNKS: {len(chunks)} chunks created ===\n")
+            for idx, chunk in enumerate(chunks):
+                kind = chunk.metadata.get("kind")
+                f.write(f"  Chunk {idx}: kind={kind}, lines={chunk.line_range.start if chunk.line_range else '?'}-{chunk.line_range.end if chunk.line_range else '?'}, content_preview={chunk.content[:50]!r}\n")
+            f.flush()
+            sys.stderr.write(f"DEBUG: Wrote {len(chunks)} chunks to /tmp/chunk_debug.txt\n")
+            sys.stderr.flush()
+
         return chunks
 
     def _build_metadata(
@@ -1430,13 +1485,53 @@ class DelimiterChunker(BaseChunker):
         if not chunks:
             return chunks
 
+        from codeweaver.core.types.delimiter import DelimiterKind
+
+        # Define semantic boundaries that should never be merged
+        SEMANTIC_BOUNDARIES = {
+            DelimiterKind.FUNCTION,
+            DelimiterKind.CLASS,
+            DelimiterKind.METHOD,
+            DelimiterKind.INTERFACE,
+            DelimiterKind.STRUCT,
+            DelimiterKind.ENUM,
+            DelimiterKind.PARAGRAPH,
+            DelimiterKind.MODULE,
+            DelimiterKind.NAMESPACE,
+        }
+
         result: list[CodeChunk] = []
         i = 0
+
+        with open("/tmp/adaptive_sizing_debug.txt", "w") as f:
+            f.write(f"\n=== _apply_adaptive_sizing ===\n")
+            f.write(f"Total chunks to process: {len(chunks)}\n")
 
         while i < len(chunks):
             chunk = chunks[i]
             tokens = self._estimate_tokens(chunk.content)
             action = self.governor.classify_chunk_size(tokens)
+
+            # Don't merge semantic boundaries (functions, classes, paragraphs)
+            # even if they're undersized
+            chunk_kind = chunk.metadata.get("kind")
+
+            with open("/tmp/adaptive_sizing_debug.txt", "a") as f:
+                f.write(f"\nChunk {i}:\n")
+                f.write(f"  Tokens: {tokens}\n")
+                f.write(f"  Action: {action}\n")
+                f.write(f"  chunk_kind: {chunk_kind!r}\n")
+                f.write(f"  chunk_kind type: {type(chunk_kind)}\n")
+                f.write(f"  isinstance(chunk_kind, DelimiterKind): {isinstance(chunk_kind, DelimiterKind)}\n")
+                if isinstance(chunk_kind, DelimiterKind):
+                    f.write(f"  chunk_kind in SEMANTIC_BOUNDARIES: {chunk_kind in SEMANTIC_BOUNDARIES}\n")
+
+            if isinstance(chunk_kind, DelimiterKind) and chunk_kind in SEMANTIC_BOUNDARIES:
+                with open("/tmp/adaptive_sizing_debug.txt", "a") as f:
+                    f.write(f"  -> Keeping as semantic boundary (not merging)\n")
+                result.append(chunk)
+                i += 1
+                continue
 
             if action == AdaptiveChunkBehavior.MERGE:
                 # Try to merge with next chunk if available and compatible
@@ -1490,8 +1585,11 @@ class DelimiterChunker(BaseChunker):
         """Attempt to merge undersized chunk with following chunks.
 
         Merges chunks until the combined size reaches the floor threshold or
-        we run out of mergeable chunks. Only merges chunks that are adjacent
-        in the source content.
+        we run out of mergeable chunks. Only merges chunks that are truly
+        adjacent in the source content (no blank lines between them).
+
+        Note: Semantic boundaries (functions, classes, paragraphs) are filtered
+        out before reaching this function, so we only merge non-semantic chunks.
         """
         from codeweaver.core import ExtKind
 
@@ -1508,10 +1606,10 @@ class DelimiterChunker(BaseChunker):
         ):
             next_chunk = chunks[next_idx]
 
-            # Adjacency check using line numbers
+            # Adjacency check using line numbers - only merge truly adjacent chunks
             if current.line_range and next_chunk.line_range:
                 gap = next_chunk.line_range.start - merged_end_line
-                if not 0 <= gap <= 3:  # Stop if gap > 2 empty lines or chunks overlap
+                if gap != 1:  # Only merge adjacent chunks (no blank lines, no overlap)
                     break
 
                 # Handle gap padding from source content if necessary
@@ -1533,7 +1631,7 @@ class DelimiterChunker(BaseChunker):
 
         # Create merged chunk
         merged_metadata = self._build_merge_metadata(
-            merged_content, merged_start_line, merged_end_line, context
+            merged_content, merged_start_line, merged_end_line, context, content
         )
 
         merged_chunk = CodeChunk(
@@ -1547,7 +1645,7 @@ class DelimiterChunker(BaseChunker):
         return merged_chunk, next_idx
 
     def _build_merge_metadata(
-        self, content: str, start_line: int, end_line: int, context: dict[str, Any] | None
+        self, content: str, start_line: int, end_line: int, context: dict[str, Any] | None, full_content: str | None = None
     ) -> Metadata:
         """Build metadata for a merged chunk.
 
@@ -1556,6 +1654,7 @@ class DelimiterChunker(BaseChunker):
             start_line: Starting line number
             end_line: Ending line number
             context: Optional additional context
+            full_content: Full source content for calculating nesting level
 
         Returns:
             Metadata dictionary
@@ -1572,17 +1671,30 @@ class DelimiterChunker(BaseChunker):
         if context:
             chunk_context |= context
 
+        # Calculate nesting level from full content if available
+        nesting_level = 0
+        if full_content is not None:
+            # Find position of start_line in full content
+            lines = full_content.splitlines(keepends=True)
+            if 0 < start_line <= len(lines):
+                pos = sum(len(line) for line in lines[:start_line - 1])
+                nesting_level = self._calculate_nesting_level(full_content, pos)
+
         metadata: Metadata = {
             "chunk_id": uuid7(),
             "created_at": datetime.now(UTC).timestamp(),
             "name": f"Merged block at line {start_line}",
             "kind": DelimiterKind.GENERIC,
-            "nesting_level": 0,
+            "nesting_level": nesting_level,
             "priority": DelimiterKind.GENERIC.default_priority,
             "line_start": start_line,
             "line_end": end_line,
             "context": chunk_context,
         }
+
+        # Add fallback indicator at top level if present in context (same logic as _build_metadata)
+        if context and context.get("fallback_to_generic"):
+            metadata["fallback_to_generic"] = True  # type: ignore[typeddict-unknown-key]
 
         return metadata
 

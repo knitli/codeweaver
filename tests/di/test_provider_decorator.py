@@ -56,6 +56,9 @@ def clean_registry():
 
     # Store original state - deep copy to preserve the list structure
     original_providers = {k: v.copy() for k, v in utils._providers.items()}
+    
+    # Clear registry for test isolation
+    utils._providers.clear()
 
     yield
 
@@ -332,8 +335,11 @@ def test_get_all_provider_metadata_returns_all(clean_registry):
     assert len(all_metadata) == 2
     assert ServiceA in all_metadata
     assert ServiceB in all_metadata
-    assert all_metadata[ServiceA].scope == "singleton"
-    assert all_metadata[ServiceB].scope == "request"
+    # New API: metadata[Type] = [ProviderMetadata] list
+    assert len(all_metadata[ServiceA]) == 1
+    assert all_metadata[ServiceA][0].scope == "singleton"
+    assert len(all_metadata[ServiceB]) == 1
+    assert all_metadata[ServiceB][0].scope == "request"
 
 
 # ==============================================================================

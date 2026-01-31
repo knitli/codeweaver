@@ -53,11 +53,11 @@ def test_set_batch_keys_returns_new_instance(sample_chunk: CodeChunk) -> None:
     assert updated_chunk is not sample_chunk
 
     # New instance should have batch keys
-    assert updated_chunk._embedding_index is not None
-    assert batch_keys == updated_chunk._embedding_index.primary_dense
+    assert updated_chunk._embeddings is not None
+    assert batch_keys == updated_chunk._embeddings.get("primary")
 
     # Original should remain unchanged
-    assert sample_chunk._embedding_index is None
+    assert len(sample_chunk._embeddings) == 0
 
 
 def test_set_batch_keys_preserves_metadata(sample_chunk: CodeChunk) -> None:
@@ -93,9 +93,9 @@ def test_set_batch_keys_allows_multiple_batches(sample_chunk: CodeChunk) -> None
     updated_2 = updated_1.set_batch_keys(batch_keys_2)
 
     # Should have both batch keys
-    assert updated_2._embedding_index is not None
-    assert batch_keys_1 == updated_2._embedding_index.primary_dense
-    assert batch_keys_2 == updated_2._embedding_index.primary_sparse
+    assert updated_2._embeddings is not None
+    assert batch_keys_1 == updated_2._embeddings.get("primary")
+    assert batch_keys_2 == updated_2._embeddings.get("sparse")
 
 
 def test_metadata_isolation_after_set_batch_keys(sample_chunk: CodeChunk) -> None:

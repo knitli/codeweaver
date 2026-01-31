@@ -332,7 +332,7 @@ model_name = "voyage-4-nano"
         from codeweaver.server.config.settings import CodeWeaverSettings
 
         with pytest.raises(ConfigurationError) as exc_info:
-            CodeWeaverSettings(_env_file=None, _toml_file=toml_file)
+            CodeWeaverSettings(config_file=toml_file)  # ty:ignore[missing-argument]
 
         error_message = str(exc_info.value).lower()
         assert "cannot specify both" in error_message or "both" in error_message
@@ -367,7 +367,7 @@ model_name = "BAAI/bge-small-en-v1.5"
         from codeweaver.server.config.settings import CodeWeaverSettings
 
         with pytest.raises(ConfigurationError) as exc_info:
-            CodeWeaverSettings(_env_file=None, _toml_file=toml_file)
+            CodeWeaverSettings(config_file=toml_file)  # ty:ignore[missing-argument]
 
         error = exc_info.value
         assert hasattr(error, "message") or str(error)
@@ -404,7 +404,7 @@ model_name = "voyage-4-nano"
         from codeweaver.server.config.settings import CodeWeaverSettings
 
         with pytest.raises(ConfigurationError) as exc_info:
-            CodeWeaverSettings(_env_file=None, _toml_file=toml_file)
+            CodeWeaverSettings(config_file=toml_file)  # ty:ignore[missing-argument]
 
         error = exc_info.value
 
@@ -452,12 +452,10 @@ model_name = "voyage-4-nano"
         from codeweaver.server.config.settings import CodeWeaverSettings
 
         with pytest.raises(ConfigurationError) as exc_info:
-            CodeWeaverSettings(_env_file=None, _toml_file=toml_file)
+            CodeWeaverSettings(config_file=toml_file)  # ty:ignore[missing-argument]
 
         error_message = str(exc_info.value).lower()
-        assert any(
-            keyword in error_message for keyword in ["family", "incompatible", "different"]
-        )
+        assert any(keyword in error_message for keyword in ["family", "incompatible", "different"])
         # Check that model names are mentioned
         assert "voyage-code-3" in error_message or "voyage" in error_message
 
@@ -484,7 +482,7 @@ model_name = "text-embedding-3-large"
         from codeweaver.server.config.settings import CodeWeaverSettings
 
         with pytest.raises(ConfigurationError) as exc_info:
-            CodeWeaverSettings(_env_file=None, _toml_file=toml_file)
+            CodeWeaverSettings(config_file=toml_file)  # ty:ignore[missing-argument]
 
         error_message = str(exc_info.value).lower()
         assert "family" in error_message or "incompatible" in error_message
@@ -513,7 +511,7 @@ model_name = "voyage-4-nano"
         from codeweaver.server.config.settings import CodeWeaverSettings
 
         with pytest.raises(ConfigurationError) as exc_info:
-            CodeWeaverSettings(_env_file=None, _toml_file=toml_file)
+            CodeWeaverSettings(config_file=toml_file)  # ty:ignore[missing-argument]
 
         error_message = str(exc_info.value).lower()
         assert any(keyword in error_message for keyword in ["not found", "unknown", "capabilities"])
@@ -645,7 +643,9 @@ model_name = "voyage-4"
         toml_file, _ = create_toml_file(tmp_path, toml_content)
 
         # Set environment variable override
-        monkeypatch.setenv("CODEWEAVER_PROVIDER_ASYMMETRIC_EMBEDDING_VALIDATE_FAMILY_COMPATIBILITY", "false")
+        monkeypatch.setenv(
+            "CODEWEAVER_PROVIDER_ASYMMETRIC_EMBEDDING_VALIDATE_FAMILY_COMPATIBILITY", "false"
+        )
 
         settings = load_provider_settings_from_toml(toml_file)
 
@@ -683,7 +683,7 @@ model_name = "voyage-4-nano"
         from codeweaver.server.config.settings import CodeWeaverSettings
 
         with pytest.raises((ConfigurationError, ValueError)) as exc_info:
-            CodeWeaverSettings(_env_file=None, _toml_file=toml_file)
+            CodeWeaverSettings(config_file=toml_file)  # ty:ignore[missing-argument]
 
         # Should indicate missing required field
         assert exc_info.value is not None
@@ -707,7 +707,7 @@ model_name = "voyage-4-large"
         from codeweaver.server.config.settings import CodeWeaverSettings
 
         with pytest.raises((ConfigurationError, ValueError)) as exc_info:
-            CodeWeaverSettings(_env_file=None, _toml_file=toml_file)
+            CodeWeaverSettings(config_file=toml_file)  # ty:ignore[missing-argument]
 
         # Should indicate missing required field
         assert exc_info.value is not None
@@ -735,7 +735,7 @@ model_name = "voyage-4-nano"
         from codeweaver.server.config.settings import CodeWeaverSettings
 
         with pytest.raises((ConfigurationError, ValueError)) as exc_info:
-            CodeWeaverSettings(_env_file=None, _toml_file=toml_file)
+            CodeWeaverSettings(config_file=toml_file)  # ty:ignore[missing-argument]
 
         # Should indicate invalid provider
         assert exc_info.value is not None
@@ -862,11 +862,11 @@ model_name = "voyage-4"
         settings = load_provider_settings_from_toml(toml_file)
 
         # Serialize to dict
-        config_dict = settings.asymmetric_embedding.model_dump()
+        config = settings.asymmetric_embedding.model_dump()
 
-        assert "embed_provider_settings" in config_dict
-        assert "query_provider_settings" in config_dict
-        assert "validate_family_compatibility" in config_dict
+        assert "embed_provider_settings" in config
+        assert "query_provider_settings" in config
+        assert "validate_family_compatibility" in config
 
     def test_round_trip_serialization(self, tmp_path: Path):
         """Test that config can be serialized and deserialized.
@@ -893,11 +893,11 @@ model_name = "voyage-4-nano"
         original_config = settings.asymmetric_embedding
 
         # Serialize and deserialize
-        config_dict = original_config.model_dump()
+        config = original_config.model_dump()
         # Import from where AsymmetricEmbeddingConfig is defined
         from codeweaver.providers import AsymmetricEmbeddingConfig
 
-        restored_config = AsymmetricEmbeddingConfig.model_validate(config_dict)
+        restored_config = AsymmetricEmbeddingConfig.model_validate(config)
 
         # Verify equivalence
         assert str(restored_config.embed_provider_settings.model_name) == str(

@@ -59,6 +59,7 @@ if TYPE_CHECKING:
         get_all_grammars,
         get_grammar,
     )
+    from codeweaver.semantic.node_type_parser import NodeTypeParser
     from codeweaver.semantic.registry import ThingRegistry
     from codeweaver.semantic.scoring import SemanticScorer
     from codeweaver.semantic.types import (
@@ -86,6 +87,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "ImportanceScores": (__spec__.parent, "classifications"),
     "MetaVar": (__spec__.parent, "ast_grep"),
     "NodeParserDep": (__spec__.parent, "dependencies"),
+    "NodeTypeParser": (__spec__.parent, "node_type_parser"),
     "NthChild": (__spec__.parent, "ast_grep"),
     "Pattern": (__spec__.parent, "ast_grep"),
     "PosRule": (__spec__.parent, "ast_grep"),
@@ -135,6 +137,7 @@ __all__ = (
     "ImportanceScores",
     "MetaVar",
     "NodeParserDep",
+    "NodeTypeParser",
     "NthChild",
     "Pattern",
     "PosRule",

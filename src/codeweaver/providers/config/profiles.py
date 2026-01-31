@@ -192,8 +192,8 @@ def _recommended_default(
     return ProviderSettingsDict(
         embedding=(
             EmbeddingProviderSettings(
-                model_name=ModelName("voyage-code-4-large"),
-                embedding_config=VoyageEmbeddingConfig(model_name=ModelName("voyage-code-4-large")),
+                model_name=ModelName("voyage-4-large"),
+                embedding_config=VoyageEmbeddingConfig(model_name=ModelName("voyage-4-large")),
                 provider=Provider.VOYAGE,
             ),
         ),

@@ -40,7 +40,10 @@ if TYPE_CHECKING:
         detect_language_family,
         expand_pattern,
     )
-    from codeweaver.engine.chunker.delimiters.families import detect_family_characteristics
+    from codeweaver.engine.chunker.delimiters.families import (
+        detect_family_characteristics,
+        get_family_patterns,
+    )
     from codeweaver.engine.chunker.delimiters.patterns import (
         ALL_PATTERNS,
         CONDITIONAL_PATTERN,
@@ -153,6 +156,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "DelimiterMatch": (parent, "chunker"),
     "DelimiterPattern": (parent, "chunker"),
     "detect_family_characteristics": (f"{parent}.chunker.delimiters", "families"),
+    "get_family_patterns": (f"{parent}.chunker.delimiters", "families"),
     "DocsFilter": (parent, "watcher"),
     "ExtensionFilter": (parent, "watcher"),
     "ExtensionFilterDep": (parent, "dependencies"),
@@ -319,6 +323,7 @@ __all__ = (
     "detect_family_characteristics",
     "detect_language_family",
     "expand_pattern",
+    "get_family_patterns",
     "make_partial_function",
     "matches_pattern",
     "wrap_filters",

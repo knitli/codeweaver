@@ -52,6 +52,7 @@ class TestInitConfigCommand:
         """Test `init config --profile recommended` creates correct config."""
         with pytest.raises(SystemExit) as exc_info:
             init_app([
+                "init",
                 "config",
                 "--profile",
                 "recommended",
@@ -75,6 +76,7 @@ class TestInitConfigCommand:
         """Test `init config --profile quickstart` creates offline-capable config."""
         with pytest.raises(SystemExit) as exc_info:
             init_app([
+                "init",
                 "config",
                 "--profile",
                 "quickstart",
@@ -98,7 +100,7 @@ class TestInitConfigCommand:
     ) -> None:
         """Test `init config --quickstart` creates quickstart config."""
         with pytest.raises(SystemExit) as exc_info:
-            init_app(["config", "--quickstart", "--project", str(temp_project)])
+            init_app(["init", "config", "--quickstart", "--project", str(temp_project)])
         capsys.readouterr()
 
         assert exc_info.value.code == 0
@@ -122,7 +124,7 @@ class TestInitCommand:
         from codeweaver.cli.commands.init import _get_client_config_path
 
         with pytest.raises(SystemExit) as exc_info:
-            init_app(["--quickstart", "--client", "claude_code", "--project", str(temp_project)])
+            init_app(["init", "--quickstart", "--client", "claude_code", "--project", str(temp_project)])
         capsys.readouterr()
 
         assert exc_info.value.code == 0
@@ -146,7 +148,7 @@ class TestInitCommand:
         from codeweaver.cli.commands.init import _get_client_config_path
 
         with pytest.raises(SystemExit) as exc_info:
-            init_app(["--quickstart", "--config-only", "--force", "--project", str(temp_project)])
+            init_app(["init", "--quickstart", "--config-only", "--force", "--project", str(temp_project)])
         capsys.readouterr()
 
         assert exc_info.value.code == 0
@@ -170,7 +172,7 @@ class TestInitCommand:
         from codeweaver.cli.commands.init import _get_client_config_path
 
         with pytest.raises(SystemExit) as exc_info:
-            init_app(["--mcp-only", "--client", "claude_code", "--project", str(temp_project)])
+            init_app(["init", "--mcp-only", "--client", "claude_code", "--project", str(temp_project)])
         capsys.readouterr()
 
         assert exc_info.value.code == 0
@@ -193,7 +195,7 @@ class TestHttpStreamingArchitecture:
         from codeweaver.cli.commands.init import _get_client_config_path
 
         with pytest.raises(SystemExit) as exc_info:
-            init_app(["--mcp-only", "--client", "claude_code", "--transport", "streamable-http"])
+            init_app(["init", "--mcp-only", "--client", "claude_code", "--transport", "streamable-http"])
         capsys.readouterr()
 
         # If succeeded, check config
@@ -217,7 +219,7 @@ class TestHttpStreamingArchitecture:
         from codeweaver.cli.commands.init import _get_client_config_path
 
         with pytest.raises(SystemExit) as exc_info:
-            init_app(["--mcp-only", "--client", "claude_code", "--transport", "streamable-http"])
+            init_app(["init", "--mcp-only", "--client", "claude_code", "--transport", "streamable-http"])
         capsys.readouterr()
 
         if exc_info.value.code == 0:
@@ -241,7 +243,7 @@ class TestHttpStreamingArchitecture:
         from codeweaver.cli.commands.init import _get_client_config_path
 
         with pytest.raises(SystemExit) as exc_info:
-            init_app(["--mcp-only", "--client", "claude_code"])
+            init_app(["init", "--mcp-only", "--client", "claude_code"])
         capsys.readouterr()
 
         if exc_info.value.code == 0:
@@ -327,7 +329,7 @@ class TestInitIntegration:
         """Test init command integrates with config command."""
         # Init should create valid config
         with pytest.raises(SystemExit) as exc_info:
-            init_app(["--quickstart", "--project", str(temp_project)])
+            init_app(["init", "--quickstart", "--project", str(temp_project)])
         capsys.readouterr()
 
         assert exc_info.value.code == 0
@@ -356,7 +358,7 @@ provider = "fastembed"
 
         # Init should detect and handle existing config
         with pytest.raises(SystemExit) as exc_info:
-            init_app(["--quickstart", "--project", str(temp_project)])
+            init_app(["init", "--quickstart", "--project", str(temp_project)])
         capsys.readouterr()
 
         # Should succeed (with --force or confirmation mocked)
@@ -519,6 +521,7 @@ class TestHelperFunctions:
         # Call mcp subcommand via the app - need --output write to create file
         with pytest.raises(SystemExit) as exc_info:
             init_app([
+                "init",
                 "mcp",
                 "--output",
                 "write",
@@ -552,6 +555,7 @@ class TestHelperFunctions:
         # Call mcp subcommand via the app - need --output write to create file
         with pytest.raises(SystemExit) as exc_info:
             init_app([
+                "init",
                 "mcp",
                 "--output",
                 "write",

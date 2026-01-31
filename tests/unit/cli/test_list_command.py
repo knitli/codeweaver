@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import pytest
 
-from codeweaver.cli import app as list_app
+from codeweaver.cli.commands.list import app as list_app
 from codeweaver.core import ProviderKind
 from codeweaver.core.types.provider import PROVIDER_CAPABILITIES
 

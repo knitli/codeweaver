@@ -108,7 +108,7 @@ class BaseDataclassEnum(Enum):
         raise NotImplementedError("Subclasses must implement _telemetry_keys method.")
 
     @classmethod
-    def aliases(cls) -> MappingProxyType[str, Enum]:
+    def get_aliases(cls) -> MappingProxyType[str, Enum]:
         """Return a mapping of aliases to enum members."""
         values = {
             alias: member
@@ -116,8 +116,7 @@ class BaseDataclassEnum(Enum):
             for alias in {
                 alias
                 for name in (
-                    member.value._name,
-                    member.value._value,
+                    member.name,
                     *(
                         member.value.aliases
                         if hasattr(member.value, "aliases") and member.value.aliases is not None
@@ -134,7 +133,7 @@ class BaseDataclassEnum(Enum):
         """Convert a string to the corresponding enum member."""
         if value in cls.__members__:
             return cls.__members__[value]
-        if (aliases := cls.aliases()) and (found_member := aliases.get(value)):
+        if (aliases := cls.get_aliases()) and (found_member := aliases.get(value)):
             assert isinstance(found_member, cls)  # noqa: S101
             return found_member
         raise ValueError(f"{value} is not a valid {cls.__qualname__} member")

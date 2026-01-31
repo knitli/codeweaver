@@ -148,8 +148,9 @@ def config(
     *,
     project: Annotated[Path | None, cyclopts.Parameter(name=["--project", "-p"])] = None,
     profile: Annotated[
-        ProviderProfile, cyclopts.Parameter(name=["--profile"], help="Configuration profile to use")
-    ] = ProviderProfile.RECOMMENDED,
+        Literal["recommended", "recommended-cloud", "quickstart", "testing", "testing-db"],
+        cyclopts.Parameter(name=["--profile"], help="Configuration profile to use"),
+    ] = "recommended",
     quickstart: Annotated[
         bool,
         cyclopts.Parameter(
@@ -202,8 +203,11 @@ def config(
 
     display.print_command_header("init config", "Initialize CodeWeaver configuration file.")
 
+    # Convert string profile to enum
+    profile_enum = ProviderProfile.from_string(profile)
+
     if quickstart:
-        profile = ProviderProfile.QUICKSTART
+        profile_enum = ProviderProfile.QUICKSTART
 
     # Validate project path
     project_path = project or get_project_path()
@@ -232,9 +236,9 @@ def config(
 
     # Adjust profile for cloud deployment
     if vector_deployment == "cloud":
-        if profile == ProviderProfile.RECOMMENDED:
-            profile = ProviderProfile.RECOMMENDED_CLOUD
-        elif profile != ProviderProfile.RECOMMENDED_CLOUD:
+        if profile_enum == ProviderProfile.RECOMMENDED:
+            profile_enum = ProviderProfile.RECOMMENDED_CLOUD
+        elif profile_enum != ProviderProfile.RECOMMENDED_CLOUD:
             raise ConfigurationError(
                 "Cloud vector deployment requires the RECOMMENDED_CLOUD profile."
             )
@@ -266,7 +270,7 @@ def config(
 
     # Create the configuration
     created_path = _create_codeweaver_config(
-        project_path, profile=profile, vector_url=None, config_path=config_path
+        project_path, profile=profile_enum, vector_url=None, config_path=config_path
     )
     display.print_completion(f"Config created: {created_path}\n")
 
@@ -356,7 +360,7 @@ def _create_stdio_config(
     Returns:
         StdioCodeWeaverConfig instance
     """
-    from codeweaver.server import StdioCodeWeaverConfig
+    from codeweaver.server.config.mcp import StdioCodeWeaverConfig
 
     # Build the command - CodeWeaver doesn't need uv environment
     # Explicitly specify stdio transport to make configuration unambiguous
@@ -399,7 +403,7 @@ def _create_remote_config(
     Returns:
         CodeWeaverMCPConfig instance
     """
-    from codeweaver.server import CodeWeaverMCPConfig
+    from codeweaver.server.config.mcp import CodeWeaverMCPConfig
 
     # For HTTP transport, we just need the URL
     # No command execution needed - client connects directly to running server
@@ -436,7 +440,7 @@ def _handle_write_output(
     Raises:
         ValueError: If configuration is invalid or client doesn't support the config level
     """
-    from codeweaver.server import MCPConfig
+    from codeweaver.server.config.mcp import MCPConfig
 
     display = _display
     error_handler = CLIErrorHandler(display)
@@ -722,12 +726,12 @@ def init(
     mcp_only: Annotated[bool, cyclopts.Parameter(name=["--mcp-only"])] = False,
     quickstart: Annotated[bool, cyclopts.Parameter(name=["--quickstart", "-q"])] = False,
     profile: Annotated[
-        ProviderProfile,
+        Literal["recommended", "recommended-cloud", "quickstart", "testing", "testing-db"],
         cyclopts.Parameter(
             name=["--profile"],
             help="Configuration profile to use (recommended, quickstart, or test). Defaults to 'recommended' with --recommended.",
         ),
-    ] = ProviderProfile.RECOMMENDED,
+    ] = "recommended",
     vector_deployment: Annotated[
         Literal["local", "cloud"],
         cyclopts.Parameter(name=["--vector-deployment"], help="Vector store deployment type"),
@@ -832,8 +836,11 @@ def init(
         "init", "Create a CodeWeaver config and/or add CodeWeaver to your MCP clients."
     )
 
+    # Convert string profile to enum
+    profile_enum = ProviderProfile.from_string(profile)
+
     if quickstart:
-        profile = ProviderProfile.QUICKSTART
+        profile_enum = ProviderProfile.QUICKSTART
 
     # Determine project path
     project_path = (project or get_project_path()).resolve()
@@ -864,7 +871,7 @@ def init(
 
         config(
             project=project_path,
-            profile=profile,
+            profile=profile_enum.variable,
             quickstart=quickstart,
             vector_deployment=vector_deployment,
             vector_url=vector_url,

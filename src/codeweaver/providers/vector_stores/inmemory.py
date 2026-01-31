@@ -109,7 +109,13 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
     @property
     def persist_path(self) -> Path:
         """Get the persistence path for the in-memory store, if set."""
-        return self.config.in_memory_config["persist_path"]
+        path = self.config.in_memory_config["persist_path"]
+        return Path(path) if not isinstance(path, Path) else path
+
+    @property
+    def auto_persist(self) -> bool:
+        """Get whether auto-persistence is enabled."""
+        return self._auto_persist  # ty: ignore[unresolved-attribute]
 
     async def _persist_to_disk(self) -> None:
         """Persist in-memory state to Qdrant storage directory.

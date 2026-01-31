@@ -72,13 +72,21 @@ def voyage_context_capabilities():
 
 @pytest.fixture
 def mock_voyage_config():
-    """Create a mock config for Voyage embedding provider."""
-    config = MagicMock()
-    config.embedding_config = MagicMock()
-    config.embedding_config.as_options = MagicMock(
-        return_value={"model_name": "voyage-3", "embedding": {}, "query": {}}
+    """Create a config for Voyage embedding provider."""
+    from codeweaver.providers import EmbeddingProviderSettings
+    from codeweaver.providers.config.embedding import VoyageEmbeddingConfig
+
+    embedding_config = VoyageEmbeddingConfig(
+        tag="voyage",
+        provider=Provider.VOYAGE,
+        model_name="voyage-3",
     )
-    return config
+
+    return EmbeddingProviderSettings(
+        provider=Provider.VOYAGE,
+        model_name="voyage-3",
+        embedding_config=embedding_config,
+    )
 
 
 @pytest.fixture
@@ -310,7 +318,12 @@ class TestVoyageEmbeddingProviderEmbedding:
 
     @pytest.mark.asyncio
     async def test_context_model_uses_correct_transformer(
-        self, mock_cache_manager, mock_voyage_client, voyage_context_capabilities
+        self,
+        mock_cache_manager,
+        mock_voyage_client,
+        mock_voyage_config,
+        mock_embedding_registry,
+        voyage_context_capabilities,
     ):
         """Test that context models use the correct output transformer."""
         # Setup mock response for context model
@@ -326,7 +339,7 @@ class TestVoyageEmbeddingProviderEmbedding:
             return [[0.1] * 1024, [0.2] * 1024]
 
         # Monkey-patch the transformer for this test
-        import codeweaver.providers as voyage_module
+        from codeweaver.providers.embedding.providers import voyage as voyage_module
 
         original_transformer = voyage_module.voyage_context_output_transformer
         voyage_module.voyage_context_output_transformer = mock_transformer  # ty: ignore[invalid-assignment]
@@ -387,7 +400,7 @@ class TestVoyageEmbeddingProviderErrorHandling:
 
     @pytest.mark.asyncio
     async def test_embed_documents_handles_connection_error(
-        self, mock_cache_manager, mock_voyage_client, voyage_capabilities
+        self, mock_cache_manager, mock_voyage_client, mock_voyage_config, mock_embedding_registry, voyage_capabilities
     ):
         """Test that connection errors are handled with retry logic."""
         mock_voyage_client.embed.side_effect = ConnectionError("Connection failed")
@@ -458,7 +471,7 @@ class TestVoyageEmbeddingProviderDimension:
     """Test VoyageEmbeddingProvider dimension property."""
 
     def test_dimension_property_returns_correct_value(
-        self, mock_cache_manager, mock_voyage_client, voyage_capabilities
+        self, mock_cache_manager, mock_voyage_client, mock_voyage_config, mock_embedding_registry, voyage_capabilities
     ):
         """Test that dimension property returns the correct value."""
         provider = VoyageEmbeddingProvider(
@@ -471,7 +484,7 @@ class TestVoyageEmbeddingProviderDimension:
 
         assert provider.dimension == 1024
 
-    def test_dimension_property_with_custom_dimension(self, mock_voyage_client):
+    def test_dimension_property_with_custom_dimension(self, mock_voyage_client, mock_voyage_config, mock_embedding_registry, mock_cache_manager):
         """Test dimension property with custom output_dimension."""
         caps = EmbeddingModelCapabilities(
             name="voyage-3",

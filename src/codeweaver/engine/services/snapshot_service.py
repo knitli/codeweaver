@@ -81,18 +81,18 @@ class QdrantSnapshotBackupService:
         else:
             return snapshot_name
 
-    async def _wait_for_snapshot(self, snapshot_name: str, timeout_seconds: int=60) -> bool:
+    async def _wait_for_snapshot(self, snapshot_name: str, timeout: int=60) -> bool:
         """Wait for snapshot creation to complete.
 
         Args:
             snapshot_name: Name of the snapshot to wait for
-            timeout_seconds: Maximum wait time in seconds
+            timeout: Maximum wait time in seconds
 
         Returns:
             True if snapshot is ready, False if timeout or error
         """
         start_time = datetime.now(UTC)
-        while (datetime.now(UTC) - start_time).total_seconds() < timeout_seconds:
+        while (datetime.now(UTC) - start_time).total_seconds() < timeout:
             try:
                 snapshots = await asyncio.to_thread(self.vector_store.client.list_snapshots, collection_name=self.collection_name)
                 if any(s.name == snapshot_name for s in snapshots):

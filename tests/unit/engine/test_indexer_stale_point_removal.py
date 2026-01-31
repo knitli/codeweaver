@@ -17,26 +17,37 @@ pytestmark = [pytest.mark.unit]
 
 
 @pytest.fixture
-async def mock_indexer(tmp_path: Path, di_overrides, mock_vector_store):
-    """Create an indexer with mocked dependencies using DI."""
+async def mock_indexer(tmp_path: Path, mock_vector_store, monkeypatch: pytest.MonkeyPatch):
+    """Create an indexer with mocked dependencies for unit testing."""
+    from unittest.mock import AsyncMock, MagicMock
+
     from codeweaver.engine import IndexingService
 
-    # Resolve indexer from container with standard overrides already applied
-    indexer = await di_overrides.resolve(IndexingService)
+    # Change to tmp_path so relative paths work correctly
+    monkeypatch.chdir(tmp_path)
 
-    # Ensure project path matches tmp_path
+    # Create IndexingService directly with mocked dependencies
+    indexer = IndexingService.__new__(IndexingService)
     indexer._project_path = tmp_path
-    if indexer._checkpoint_manager:
-        indexer._checkpoint_manager.project_path = tmp_path
-    if indexer._manifest_manager:
-        indexer._manifest_manager.project_path = tmp_path
-
-    # Set up manifest
     indexer._file_manifest = IndexFileManifest(project_path=tmp_path)
-
-    # Manually set providers to avoid initialization overhead
     indexer._vector_store = mock_vector_store
-    # indexer._providers_initialized = True
+    indexer._checkpoint_manager = MagicMock()
+    indexer._checkpoint_manager.project_path = tmp_path
+    indexer._manifest_manager = MagicMock()
+    indexer._manifest_manager.project_path = tmp_path
+    indexer._embedding_provider = AsyncMock()
+    indexer._sparse_provider = AsyncMock()
+    indexer._chunking_service = MagicMock()
+    # chunk_files should return an iterable of (file, chunks) tuples
+    indexer._chunking_service.chunk_files = MagicMock(return_value=[])
+    indexer._progress_tracker = MagicMock()
+    indexer._progress_tracker.get_stats = MagicMock(return_value=MagicMock(files_processed=0))
+
+    # Create async lock mock
+    from asyncio import Lock
+    indexer._manifest_lock = Lock()
+
+    indexer._providers_initialized = True
 
     return indexer
 
@@ -70,8 +81,9 @@ class TestStalePointRemovalInBatchIndexing:
         # Verify delete_by_file was called only for modified_file
         # Note: IndexingService currently deletes for ALL files in batch to be safe
         # so both might be called. The implementation I added iterates all discovered files.
-        mock_indexer._vector_store.delete_by_file.assert_any_call(modified_file)
-        mock_indexer._vector_store.delete_by_file.assert_any_call(new_file)
+        # Note: Paths are relative when _index_files_batch uses DiscoveredFile
+        mock_indexer._vector_store.delete_by_file.assert_any_call(Path("modified.py"))
+        mock_indexer._vector_store.delete_by_file.assert_any_call(Path("new.py"))
 
     @pytest.mark.asyncio
     async def test_batch_deletes_multiple_modified_files(

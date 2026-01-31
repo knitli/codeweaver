@@ -66,13 +66,14 @@ def voyage_rerank_capabilities():
 
 @pytest.fixture
 def mock_voyage_rerank_config():
-    """Create a mock config for Voyage reranking provider."""
-    config = MagicMock()
-    config.reranking_config = MagicMock()
-    config.reranking_config._as_options = MagicMock(
-        return_value={"model_name": "rerank-2", "rerank": {}, "model": {}}
+    """Create a config for Voyage reranking provider."""
+    from codeweaver.providers.config.reranking import VoyageRerankingConfig
+
+    return VoyageRerankingConfig(
+        tag="voyage",
+        provider=Provider.VOYAGE,
+        model_name="rerank-2",
     )
-    return config
 
 
 class TestVoyageRerankingProviderInitialization:
@@ -103,7 +104,7 @@ class TestVoyageRerankingProviderInitialization:
         )
 
         # Verify _output_transformer is callable
-        assert callable(type(provider)._output_transformer)
+        assert callable(provider._output_transformer)
 
     def test_provider_initialization_with_top_n(
         self, mock_voyage_rerank_client, mock_voyage_rerank_config, voyage_rerank_capabilities

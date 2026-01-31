@@ -711,6 +711,15 @@ class NodeTypeParser:
 
     def _register_everything(self, registry: ThingRegistryDep = INJECTED) -> None:
         """Register all Things and Categories in the internal mapping."""
+        # Resolve the registry dependency
+        from codeweaver.core.di.depends import DependsPlaceholder, _InjectedProxy
+
+        if isinstance(registry, (_InjectedProxy, DependsPlaceholder)):
+            # No DI container active, get the singleton registry
+            from codeweaver.semantic.ast_grep import AstThing
+
+            registry = AstThing._thing_registry()
+
         if not type(self)._registration_cache:
             _ = self.parse_all_nodes()
 

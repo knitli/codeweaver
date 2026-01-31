@@ -65,6 +65,7 @@ class Container[T]:
         self._tagged_singletons: dict[tuple[type[Any], frozenset[str]], Any] = {}
         self._overrides: dict[type[Any], Any] = {}
         self._is_singleton: dict[type[Any], bool] = {}
+        self._scope: dict[type[Any], str] = {}  # Track scope: singleton, request, or function
         self._startup_hooks: list[Callable[..., Any]] = []
         self._shutdown_hooks: list[Callable[..., Any]] = []
         self._cleanup_stack: AsyncExitStack | None = None
@@ -112,11 +113,45 @@ class Container[T]:
         if not globalns:
             return None
 
-        # Try to evaluate the string as a type reference
+        # First, try to evaluate the string as a type reference
         # ruff: noqa: S307 - eval is necessary for type resolution, not literal evaluation
         with suppress(Exception):
-            return eval(type_str, globalns)
+            evaluated = eval(type_str, globalns)
+            return evaluated
+        
+        # If direct eval failed, check if it's an Annotated pattern like "Annotated[SomeType, ...]"
+        # In this case, try to resolve the base type from registered factories
+        if type_str.startswith("Annotated["):
+            # Extract the base type name (first argument to Annotated)
+            # Simple parsing: "Annotated[TypeName, ...]" -> "TypeName"
+            try:
+                # Find the first comma or closing bracket
+                start = len("Annotated[")
+                end = type_str.find(",", start)
+                if end == -1:
+                    end = type_str.find("]", start)
+                
+                if end > start:
+                    base_type_str = type_str[start:end].strip()
+                    
+                    # Try to find this type in registered factories
+                    for factory_type in self._factories:
+                        if factory_type.__name__ == base_type_str:
+                            # Reconstruct the Annotated type using the resolved base type
+                            # We need Annotated from typing
+                            from typing import Annotated, get_args
+                            
+                            # Try to eval the full annotation with the base type injected
+                            enhanced_globalns = globalns.copy()
+                            enhanced_globalns[base_type_str] = factory_type
+                            
+                            with suppress(Exception):
+                                return eval(type_str, enhanced_globalns)
+            except Exception:
+                # If anything goes wrong with parsing/resolution, fall through
+                pass
 
+        # Fallback: try to find a factory by matching type name
         return next(
             (factory_type for factory_type in self._factories if factory_type.__name__ == type_str),
             None,
@@ -146,8 +181,8 @@ class Container[T]:
                 # - "function" -> singleton=False (no caching at all)
                 is_singleton = metadata.scope == "singleton"
 
-                # Register with tags
-                self.register(interface, factory, singleton=is_singleton, tags=metadata.tags)
+                # Register with tags and scope
+                self.register(interface, factory, singleton=is_singleton, tags=metadata.tags, scope=metadata.scope)
 
                 logger.debug(
                     "Auto-discovered provider: %s -> %s (scope=%s, tags=%s, is_generator=%s, is_async_generator=%s)",
@@ -169,6 +204,7 @@ class Container[T]:
         *,
         singleton: bool = True,
         tags: frozenset[str] | set[str] | None = None,
+        scope: str | None = None,
     ) -> None:
         """Register a dependency.
 
@@ -177,6 +213,7 @@ class Container[T]:
             factory: The factory function or class. If None, the interface itself is used.
             singleton: Whether to cache the instance.
             tags: Optional tags to categorize this provider.
+            scope: Optional scope (singleton, request, function). If not provided, inferred from singleton flag.
         """
         target = factory or interface
         tag_set = frozenset(tags) if tags else frozenset()
@@ -187,11 +224,19 @@ class Container[T]:
         self._factories[interface].append((target, tag_set))
 
         self._is_singleton[interface] = singleton
+        
+        # Store scope - infer from singleton flag if not explicitly provided
+        if scope:
+            self._scope[interface] = scope
+        else:
+            self._scope[interface] = "singleton" if singleton else "function"
+        
         logger.debug(
-            "Registered %s -> %s (singleton=%s, tags=%s)",
+            "Registered %s -> %s (singleton=%s, scope=%s, tags=%s)",
             interface.__name__,
             target,
             singleton,
+            self._scope[interface],
             tag_set,
         )
 
@@ -239,6 +284,7 @@ class Container[T]:
         self._singletons.clear()
         self._overrides.clear()
         self._is_singleton.clear()
+        self._scope.clear()
         self._startup_hooks.clear()
         self._shutdown_hooks.clear()
         self._cleanup_stack = None
@@ -460,18 +506,31 @@ class Container[T]:
         if cached_instance := self._get_cached_singleton(interface, tag_set):
             return cached_instance
 
-        # 3. Find factory with tag filtering
+        # 3. Check request cache for request-scoped dependencies
+        scope = self._scope.get(interface, "singleton")
+        if scope == "request":
+            request_cache_key = (interface, tag_set) if tag_set else interface
+            if request_cache_key in self._request_cache:
+                return cast(T, self._request_cache[request_cache_key])
+
+        # 4. Find factory with tag filtering
         factory = self._get_factory(interface, tag_set)
 
-        # 4. Create instance with circular dependency tracking
+        # 5. Create instance with circular dependency tracking
         _resolution_stack.append(cache_key)
         try:
             instance = await self._call_with_injection(factory, _resolution_stack)
         finally:
             _resolution_stack.pop()
 
-        # 5. Cache if singleton
-        self._cache_singleton(interface, instance, tag_set)
+        # 6. Cache based on scope
+        if scope == "request":
+            # Cache in request scope
+            request_cache_key = (interface, tag_set) if tag_set else interface
+            self._request_cache[request_cache_key] = instance
+        else:
+            # Cache if singleton
+            self._cache_singleton(interface, instance, tag_set)
 
         return cast(T, instance)
 
@@ -513,7 +572,8 @@ class Container[T]:
 
         Args:
             obj: The callable or class to inspect.
-            globalns: The global namespace for type resolution.
+            globalns: The global namespace for type resolution. Will be modified to include
+                     Annotated if not present.
 
         Returns:
             Tuple of (signature, type_hints).
@@ -521,19 +581,35 @@ class Container[T]:
         Raises:
             ValueError: If signature inspection fails completely.
         """
+        # Inject Annotated if not present (needed for TYPE_CHECKING imports)
+        # We modify the original globalns here because:
+        # 1. Annotated should already be available in normal Python code
+        # 2. Adding it doesn't break anything
+        # 3. We need it available for later calls to _find_depends_marker, etc.
+        if "Annotated" not in globalns:
+            from typing import Annotated
+            globalns["Annotated"] = Annotated
+        
         try:
             signature = inspect.signature(obj)
-            # Use pydantic's function type hint getter which handles:
-            # - PEP 563 string annotations (from __future__ import annotations)
-            # - Forward references in TYPE_CHECKING blocks
-            # - Python 3.13+ annotation changes
-            # - functools.partial unwrapping
+        except (ValueError, TypeError):
+            raise ValueError(f"Cannot get signature for {obj}")
+        
+        # Try to get type hints with pydantic's robust resolver
+        try:
             type_hints = get_function_type_hints(obj, globalns=globalns)
         except NameError:
-            # NameError happens if a type hint cannot be resolved (e.g. forward ref in TYPE_CHECKING)
-            # Fallback to signature annotations which might be strings
-            signature = inspect.signature(obj)
+            # NameError happens when type hints reference types not in globalns
+            # (e.g., locally-defined classes in TYPE_CHECKING blocks)
+            # In this case, we'll use the raw annotations from the signature
+            # They'll be strings due to `from __future__ import annotations`
             type_hints = {}
+            
+            # Manually extract annotations from signature parameters
+            # These will be strings that we can try to evaluate later
+            for param_name, param in signature.parameters.items():
+                if param.annotation is not inspect.Parameter.empty:
+                    type_hints[param_name] = param.annotation
 
         return signature, type_hints
 
@@ -830,9 +906,6 @@ class Container[T]:
         Returns:
             The resolved dependency value.
         """
-        # Determine scope (default to singleton if use_cache=True)
-        scope = marker.scope or ("singleton" if marker.use_cache else "function")  # ty:ignore[unresolved-attribute]
-
         # Extract tags from marker
         tags = getattr(marker, "tags", None)
         tag_set = frozenset(tags) if tags else None
@@ -850,6 +923,14 @@ class Container[T]:
 
         # Use marker.dependency if provided, otherwise use target_type
         dependency_target = marker.dependency or target_type  # ty:ignore[unresolved-attribute]
+        
+        # Determine scope - use marker's scope if specified, otherwise look up from registration
+        if marker.scope:  # ty:ignore[unresolved-attribute]
+            scope = marker.scope  # ty:ignore[unresolved-attribute]
+        else:
+            # Fall back to registered scope, checking both dependency_target and target_type
+            # Use the dependency_target first (what we're actually resolving), then fall back to target_type
+            scope = self._scope.get(dependency_target, self._scope.get(target_type, "singleton" if marker.use_cache else "function"))  # ty:ignore[unresolved-attribute]
 
         # Create cache key for request/function scopes
         # Include tags in cache key to differentiate tagged dependencies

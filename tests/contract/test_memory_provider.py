@@ -45,9 +45,11 @@ def temp_persist_path():
 @pytest.fixture
 async def memory_config(temp_persist_path):
     """Provide test Memory configuration."""
+    from codeweaver.providers.config.kinds import CollectionConfig
+
     return MemoryVectorStoreProviderSettings(
         provider=Provider.MEMORY,
-        collection_name=f"test_memory_{uuid4().hex[:8]}",
+        collection=CollectionConfig(collection_name=f"test_memory_{uuid4().hex[:8]}"),
         in_memory_config={
             "persist_path": str(temp_persist_path / "vector_store"),
             "auto_persist": True,
@@ -131,12 +133,12 @@ async def sample_chunk(clean_container):
         model="test-dense-model",
         embeddings=[0.5] * 768,  # 768 dimensions
         dimension=768,
-        intent="dense",  # Match the intent used in set_batch_keys below
+        intent="primary",  # Use "primary" as the vector name (role-based architecture)
     )
 
     # Set batch key on chunk BEFORE registering embeddings
     dense_batch_key = BatchKeys(id=dense_batch_id, idx=0, sparse=False)
-    chunk = chunk.set_batch_keys(dense_batch_key, intent="dense")
+    chunk = chunk.set_batch_keys(dense_batch_key, intent="primary")
 
     # Register embeddings: resolve the registry from DI container (will create singleton if needed)
     registry = await clean_container.resolve(EmbeddingRegistry)
@@ -169,7 +171,14 @@ class TestMemoryProviderContract:
         """Test search functionality."""
         await memory_provider.upsert([sample_chunk])
 
-        results = await memory_provider.search(vector={"dense": [0.5] * 768})
+        results = await memory_provider.search(
+            vector=StrategizedQuery(
+                query="test search",
+                dense=[0.5] * 768,
+                sparse=None,
+                strategy=SearchStrategy.DENSE_ONLY,
+            )
+        )
 
         assert isinstance(results, list)
         if results:
@@ -180,7 +189,14 @@ class TestMemoryProviderContract:
         await memory_provider.upsert([sample_chunk])
 
         # Verify chunk can be retrieved
-        results = await memory_provider.search(vector={"dense": [0.5] * 768})
+        results = await memory_provider.search(
+            vector=StrategizedQuery(
+                query="test upsert",
+                dense=[0.5] * 768,
+                sparse=None,
+                strategy=SearchStrategy.DENSE_ONLY,
+            )
+        )
         assert len(results) > 0
 
     async def test_delete_by_file(self, memory_provider, sample_chunk):
@@ -188,7 +204,14 @@ class TestMemoryProviderContract:
         await memory_provider.upsert([sample_chunk])
         await memory_provider.delete_by_file(sample_chunk.file_path)
 
-        results = await memory_provider.search(vector={"dense": [0.5] * 768})
+        results = await memory_provider.search(
+            vector=StrategizedQuery(
+                query="test delete",
+                dense=[0.5] * 768,
+                sparse=None,
+                strategy=SearchStrategy.DENSE_ONLY,
+            )
+        )
         assert len(results) == 0 or all(
             r.chunk.file_path != sample_chunk.file_path for r in results
         )
@@ -198,7 +221,14 @@ class TestMemoryProviderContract:
         await memory_provider.upsert([sample_chunk])
         await memory_provider.delete_by_id([sample_chunk.chunk_id])
 
-        results = await memory_provider.search(vector={"dense": [0.5] * 768})
+        results = await memory_provider.search(
+            vector=StrategizedQuery(
+                query="test delete",
+                dense=[0.5] * 768,
+                sparse=None,
+                strategy=SearchStrategy.DENSE_ONLY,
+            )
+        )
         assert len(results) == 0 or all(r.chunk.chunk_id != sample_chunk.chunk_id for r in results)
 
     async def test_delete_by_name(self, memory_provider, sample_chunk):
@@ -206,7 +236,14 @@ class TestMemoryProviderContract:
         await memory_provider.upsert([sample_chunk])
         await memory_provider.delete_by_name([sample_chunk.chunk_name])
 
-        results = await memory_provider.search(vector={"dense": [0.5] * 768})
+        results = await memory_provider.search(
+            vector=StrategizedQuery(
+                query="test delete",
+                dense=[0.5] * 768,
+                sparse=None,
+                strategy=SearchStrategy.DENSE_ONLY,
+            )
+        )
         assert len(results) == 0 or all(
             r.chunk.chunk_name != sample_chunk.chunk_name for r in results
         )
@@ -241,6 +278,8 @@ class TestMemoryProviderContract:
             client=client2, config=memory_config, caps=test_embedding_caps
         )
         await provider2._initialize()
+        # Explicitly restore from disk (skipped in test mode by default)
+        await provider2._restore_from_disk()
 
         # Verify data was restored
 

@@ -12,7 +12,15 @@ from collections.abc import Sequence
 from typing import Any, Literal, NamedTuple, Self
 
 from pydantic import PositiveInt
-from qdrant_client.models import CollectionParams
+from qdrant_client.http.models import Datatype
+from qdrant_client.models import (
+    CollectionParams,
+    Modifier,
+    ScalarQuantization,
+    SparseIndexParams,
+    SparseVectorParams,
+    VectorParams,
+)
 
 from codeweaver.core.exceptions import InvalidEmbeddingModelError
 from codeweaver.core.types import ModelName, ModelNameT
@@ -202,27 +210,51 @@ class EmbeddingCapabilityGroup(NamedTuple):
         return self.idf.model_name if self.idf else None
 
     async def as_vector_params(self) -> CollectionParams:
-        """Convert the embedding capability group to Qdrant collection parameters."""
+        """Convert the embedding capability group to Qdrant collection parameters.
+
+        Uses role-based vector names: "primary" for dense, "sparse" for sparse/idf.
+        """
+        from qdrant_client.models import Distance
+
         params: dict[str, Any] = {}
         if self.dense:
-            size = await self.dense.dimension()
+            if not (size := await self.dense.dimension()) and size != 0:
+                raise InvalidEmbeddingModelError(
+                    "Cannot create vector params: dense embedding model dimension is not configured."
+                )
             datatype = await self.dense.datatype()
-            quantization = {"scalar": {"type": "uint8"}} if datatype == "uint8" else None
-            distance = await self.dense.distance()
+            distance_metric_name = await self.dense.distance()
+
+            # Create proper VectorParams object
             params["vectors"] = {
-                "dense": {
-                    "size": size,
-                    "distance": distance,
-                    "quantization": quantization,
-                    "datatype": datatype,
-                }
+                "primary": VectorParams(  # Changed from "dense" to "primary" (role-based architecture)
+                    size=size,
+                    distance=Distance(distance_metric_name.title())
+                    if isinstance(distance_metric_name, str)
+                    else distance_metric_name or Distance("Cosine"),
+                    on_disk=None,
+                    hnsw_config=None,
+                    quantization_config=ScalarQuantization.model_construct(scalar={"type": "uint8"})
+                    if datatype == "uint8"
+                    else None,
+                    datatype=Datatype(datatype) if datatype else Datatype.FLOAT16,
+                )
             }
         if self.sparse:
             datatype = await self.sparse.datatype()
-            params["sparse_vectors"] = {"sparse": {"datatype": datatype}}
+            params["sparse_vectors"] = {
+                "sparse": SparseVectorParams.model_construct(
+                    index=SparseIndexParams.model_construct(
+                        datatype=Datatype(datatype) if datatype else Datatype.FLOAT16
+                    ),
+                    modifier=None,
+                )
+            }
         if self.idf:
             datatype = await self.idf.datatype()
-            params["sparse_vectors"] = {"idf": {"datatype": datatype, "modifier": "idf"}}
+            params["sparse_vectors"] = {
+                "idf": SparseVectorParams(index=None, modifier=Modifier.IDF)
+            }
 
         return CollectionParams.model_construct(**params)
 

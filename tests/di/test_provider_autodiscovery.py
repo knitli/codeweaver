@@ -38,6 +38,9 @@ def clean_registry():
 
     # Store original state - deep copy to preserve the list structure
     original_providers = {k: v.copy() for k, v in utils._providers.items()}
+    
+    # Clear registry for test isolation
+    utils._providers.clear()
 
     yield
 
@@ -56,7 +59,9 @@ def test_provider_decorator_registers_in_utils_registry(clean_registry):
     # Verify provider is in the registry
     providers = get_all_providers()
     assert SimpleService in providers
-    assert providers[SimpleService] == create_simple
+    # New API: providers[Type] = [(factory, metadata)]
+    assert len(providers[SimpleService]) == 1
+    assert providers[SimpleService][0][0] == create_simple
 
 
 async def test_container_loads_providers_on_first_resolve(clean_registry):

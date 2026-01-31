@@ -178,7 +178,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
             else {}
         )
         _rerank_kwargs = dict(rerank_options) | kwargs
-        _top_n = _rerank_kwargs.get("top_n", 10)
+        _top_n = _rerank_kwargs.get("top_n", 40)
 
         logger.debug("RerankingProvider kwargs", extra=_rerank_kwargs)
         logger.debug("Initialized RerankingProvider with top_n=%d", _top_n)
@@ -200,6 +200,16 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
     def top_n(self) -> PositiveInt:
         """Get the top_n value."""
         return self._top_n
+
+    @property
+    def prompt(self) -> str | None:
+        """Get the prompt value if provided."""
+        return self.kwargs.get("prompt")
+
+    @property
+    def model_capabilities(self) -> RerankingModelCapabilities:
+        """Get the model capabilities for the reranking provider."""
+        return self.caps
 
     def _check_circuit_breaker(self) -> None:
         """Check circuit breaker state before making API calls.
@@ -406,6 +416,10 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
     ) -> None:
         """Update token statistics for the embedding provider."""
         statistics = _get_statistics()
+        # Skip if statistics not available (e.g., in test contexts)
+        if not hasattr(statistics, 'add_token_usage'):
+            return
+        
         if token_count is not None:
             statistics.add_token_usage(reranking_generated=token_count)
         elif from_docs and all(isinstance(doc, str) for doc in from_docs):
@@ -430,7 +444,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         from codeweaver.core import CodeChunk
 
         chunks = self._chunk_store or CodeChunk.chunkify(raw_docs)
-        return type(self)._output_transformer(results, iter(chunks))
+        return self._output_transformer(results, iter(chunks))
 
     @staticmethod
     def to_code_chunk(text: StructuredDataInput) -> Sequence[CodeChunk]:
@@ -445,6 +459,9 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         """Report token savings from the reranking process."""
         if (context_saved := self._calculate_context_saved(results, processed_chunks)) > 0:
             statistics = _get_statistics()
+            # Skip if statistics not available (e.g., in test contexts)
+            if not hasattr(statistics, 'add_token_usage'):
+                return
             # * Note: We aren't double counting tokens between here and `self.rerank`.
             # * This is for `saved_by_reranking`, while the other count in the pipeline is for `reranking_generated`.
             # * Put differently, `self.rerank` counts *spending* while this counts *savings*.

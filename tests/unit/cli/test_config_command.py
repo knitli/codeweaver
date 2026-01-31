@@ -49,7 +49,7 @@ class TestConfigShow:
         """Test config show displays current configuration."""
         # Create config first
         with pytest.raises(SystemExit) as init_exc:
-            init_app(["config", "--quickstart", "--project", str(temp_project)])
+            init_app(["init", "config", "--quickstart", "--project", str(temp_project)])
 
         assert init_exc.value.code == 0
 

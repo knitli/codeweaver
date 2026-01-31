@@ -18,10 +18,12 @@ from collections.abc import Callable, Sequence
 from typing import Any, ClassVar, Self, cast
 
 from pydantic import create_model
+from triton.runtime.cache import CacheManager
 
 from codeweaver.core import INJECTED, CodeChunk, ConfigurationError, Provider, ProviderError, TypeIs
 from codeweaver.core import ValidationError as CodeWeaverValidationError
 from codeweaver.core.types import ModelName
+from codeweaver.providers.config import EmbeddingProviderSettings
 from codeweaver.providers.config.embedding import OpenAIEmbeddingConfig
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.providers.base import (
@@ -70,9 +72,10 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
         cls,
         model_name: ModelName,
         provider: Provider,
-        config: OpenAIEmbeddingConfig,
+        config: EmbeddingProviderSettings,
         client: AsyncOpenAI,
         registry: EmbeddingRegistry,
+        cache_manager: CacheManager | None = None,
         caps: EmbeddingModelCapabilities | None = None,
     ) -> type[Self]:
         """
@@ -84,11 +87,12 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
             _base: type,
             _provider: Provider,
             _client: AsyncOpenAI,
-            _config: OpenAIEmbeddingConfig,
+            _config: EmbeddingProviderSettings,
             _registry: EmbeddingRegistry,
             _caps: EmbeddingModelCapabilities | None = None,
             _impl_deps: EmbeddingImplementationDeps = INJECTED,
             _custom_deps: EmbeddingCustomDeps = INJECTED,
+            _cache_manager: CacheManager | None = None,
         ) -> Callable[..., None]:
             """
             Construct an __init__ method for our newborn provider class.

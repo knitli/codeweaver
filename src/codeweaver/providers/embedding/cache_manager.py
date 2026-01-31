@@ -25,6 +25,7 @@ from __future__ import annotations
 import asyncio
 
 from typing import TYPE_CHECKING, ClassVar
+from uuid import UUID
 
 from pydantic import UUID7, ConfigDict, Field, PrivateAttr
 
@@ -32,11 +33,11 @@ from codeweaver.core import BlakeHashKey, CodeChunk
 from codeweaver.core.stores import BlakeStore, UUIDStore, make_blake_store, make_uuid_store
 from codeweaver.core.types import BasedModel
 from codeweaver.core.utils import get_blake_hash
+from codeweaver.providers.embedding.registry import EmbeddingRegistry
 
 
 if TYPE_CHECKING:
     from codeweaver.core.types import AnonymityConversion, EmbeddingBatchInfo, FilteredKeyT
-    from codeweaver.providers.embedding.registry import EmbeddingRegistry
 
 
 class EmbeddingCacheManager(BasedModel):
@@ -137,7 +138,7 @@ class EmbeddingCacheManager(BasedModel):
         if namespace not in self._hash_stores:
             # 10MB limit per namespace (same as original per-instance limit)
             self._hash_stores[namespace] = make_blake_store(  # ty:ignore[invalid-argument-type]
-                value_type=UUID7, size_limit=1024 * 1024 * 10
+                value_type=UUID, size_limit=1024 * 1024 * 10
             )
         return self._hash_stores[namespace]
 

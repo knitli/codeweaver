@@ -44,14 +44,26 @@ class CohereEmbeddingProvider(EmbeddingProvider[CohereClient]):
         self, impl_deps: EmbeddingImplementationDeps = None, custom_deps: EmbeddingCustomDeps = None
     ) -> None:
         """Initialize the provider."""
+        # Nothing to initialize here - options are set in model_post_init
+        pass
+
+    def model_post_init(self, __context: Any) -> None:
+        """Post-initialization hook to set embedding options.
+
+        Args:
+            __context: Pydantic context (unused).
+        """
         # We always embed with float but quantize based on the config when we store it
-        self.embed_options["embedding_types"] = "float"  # ty:ignore[unresolved-attribute]
-        self.query_options["embedding_types"] = "float"  # ty:ignore[unresolved-attribute]
+        # v4 models require embedding_types as a list, v3 and earlier use string
+        self.embed_options["embedding_types"] = ["float"]
+        self.query_options["embedding_types"] = ["float"]
 
     @property
     def base_url(self) -> str:
         """Get the base URL for the current provider."""
-        return self.client_options.get("base_url") or "https://api.cohere.com"  # ty:ignore[unresolved-attribute]
+        if self.config.client_options:
+            return self.config.client_options.get("base_url", "https://api.cohere.com")  # ty:ignore[unresolved-attribute]
+        return "https://api.cohere.com"
 
     async def _fetch_embeddings(
         self, texts: list[str], *, is_query: bool, **kwargs: Any

@@ -30,6 +30,25 @@ if TYPE_CHECKING:
 
 
 @pytest.fixture
+def sample_chunk():
+    """Create a sample CodeChunk for testing."""
+    from pathlib import Path
+
+    from codeweaver.core import ChunkKind, CodeChunk, ExtKind, Span, uuid7
+
+    chunk_id = uuid7()
+    return CodeChunk(
+        chunk_id=chunk_id,
+        ext_kind=ExtKind.from_language("python", ChunkKind.CODE),
+        chunk_name="test.py:func",
+        file_path=Path("test.py"),
+        language="python",
+        content="def test(): pass",
+        line_range=Span(start=1, end=1, source_id=chunk_id),
+    )
+
+
+@pytest.fixture
 def mock_candidates(sample_chunk: CodeChunk) -> list[SearchResult]:
     """Create mock search result candidates."""
     from pathlib import Path

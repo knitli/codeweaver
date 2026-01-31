@@ -21,7 +21,9 @@ from codeweaver.core.utils.lazy_importer import LazyImport, lazy_import
 
 if TYPE_CHECKING:
     from codeweaver.core.types.env import EnvVarInfo as ProviderEnvVarInfo
-    from codeweaver.core.types.env import ProviderEnvVars
+
+# Import at runtime since ProviderEnvVars is used in property methods
+from codeweaver.core.types.env import ProviderEnvVars
 
 if TYPE_CHECKING and importlib.util.find_spec("sentence-transformers") is not None:
     from sentence_transformers import CrossEncoder, SentenceTransformer, SparseEncoder

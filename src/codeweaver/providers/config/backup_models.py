@@ -247,12 +247,11 @@ async def create_backup_embeddings(text: str | list[str]) -> list[list[float]] |
         if isinstance(result, dict) and "error" in result:
             logger.warning("Backup embedding failed: %s", result.get("error"))
             return None
-
-        return result
-
     except Exception as e:
         logger.warning("Failed to create backup embeddings: %s", e)
         return None
+    else:
+        return result  # ty:ignore[invalid-return-type]
 
     finally:
         # Cleanup provider resources

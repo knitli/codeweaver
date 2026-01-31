@@ -15,6 +15,7 @@ from codeweaver.core import create_lazy_getattr
 if TYPE_CHECKING:
     # Import everything for IDE and type checker support
     # These imports are never executed at runtime, only during type checking
+    from codeweaver.server.config.helpers import get_settings, get_settings_map, update_settings
     from codeweaver.server.config.mcp import CodeWeaverMCPConfig, MCPConfig, StdioCodeWeaverConfig
     from codeweaver.server.config.middleware import (
         AVAILABLE_MIDDLEWARE,
@@ -79,6 +80,9 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "UvicornServerSettings": (__spec__.parent, "types"),
     "UvicornServerSettingsDict": (__spec__.parent, "types"),
     "default_for_transport": (__spec__.parent, "middleware"),
+    "get_settings": (__spec__.parent, "helpers"),
+    "get_settings_map": (__spec__.parent, "helpers"),
+    "update_settings": (__spec__.parent, "helpers"),
 })
 """Dynamically import submodules and classes for the config package.
 

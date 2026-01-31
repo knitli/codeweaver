@@ -34,6 +34,7 @@ members = [
 name = "aenum"
 version = "3.1.16"
 source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/09/7a/61ed58e8be9e30c3fe518899cc78c284896d246d51381bab59b5db11e1f3/aenum-3.1.16.tar.gz", hash = "sha256:bfaf9589bdb418ee3a986d85750c7318d9d2839c1b1a1d6fe8fc53ec201cf140", size = 137693, upload-time = "2026-01-12T22:34:38.819Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e3/52/6ad8f63ec8da1bf40f96996d25d5b650fdd38f5975f8c813732c47388f18/aenum-3.1.16-py3-none-any.whl", hash = "sha256:9035092855a98e41b66e3d0998bd7b96280e85ceb3a04cc035636138a1943eaf", size = 165627, upload-time = "2025-04-25T03:17:58.89Z" },
 ]
@@ -713,7 +714,6 @@ dependencies = [
     { name = "tenacity" },
     { name = "textcase" },
     { name = "tomli-w" },
-    { name = "types-boto3-custom" },
     { name = "typing-extensions" },
     { name = "uuid7", marker = "python_full_version < '3.14' or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'project-13-fastembed-gpu') or (extra == 'extra-11-code-weaver-full-gpu' and extra == 'project-9-fastembed') or (extra == 'extra-11-code-weaver-gpu-support' and extra == 'project-9-fastembed') or (extra == 'project-13-fastembed-gpu' and extra == 'project-9-fastembed')" },
     { name = "uvicorn", extra = ["standard"] },
@@ -941,7 +941,6 @@ requires-dist = [
     { name = "tokenizers", marker = "extra == 'recommended'" },
     { name = "tokenizers", marker = "extra == 'recommended-local-only'" },
     { name = "tomli-w", specifier = ">=1.2.0" },
-    { name = "types-boto3-custom", path = "vendored/types_boto3_custom-1.41.2-py3-none-any.whl" },
     { name = "types-boto3-custom", marker = "extra == 'bedrock'", path = "vendored/types_boto3_custom-1.41.2-py3-none-any.whl" },
     { name = "types-boto3-custom", marker = "extra == 'full'", path = "vendored/types_boto3_custom-1.41.2-py3-none-any.whl" },
     { name = "typing-extensions", specifier = ">=4.15.0" },

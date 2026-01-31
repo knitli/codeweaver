@@ -48,7 +48,7 @@ class TestHttpxLazyImport:
 
         try:
             # Import the status command module
-            from codeweaver.cli import status
+            from codeweaver.cli.commands import status
 
             # Verify httpx was NOT imported during module load
             assert "httpx" not in sys.modules, "httpx should not be imported at module load time"
@@ -74,7 +74,7 @@ class TestHttpxLazyImport:
 
         try:
             # Import the doctor command module
-            from codeweaver.cli import doctor
+            from codeweaver.cli.commands import doctor
 
             # Verify httpx was NOT imported during module load
             assert "httpx" not in sys.modules, "httpx should not be imported at module load time"
@@ -105,7 +105,7 @@ class TestHttpxLazyImport:
         # (import statements are inside functions, not at module level)
         import inspect
 
-        from codeweaver.cli import index, init
+        from codeweaver.cli.commands import index, init
 
         # Check index._check_server_health has lazy import
         source = inspect.getsource(index._check_server_health)
@@ -121,7 +121,7 @@ class TestHttpxLazyImport:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Test that httpx is imported when status command function is called."""
-        from codeweaver.cli import _query_server_status
+        from codeweaver.cli.commands.status import _query_server_status
 
         # Mock httpx to avoid actual network calls
         mock_httpx = MagicMock()
@@ -144,7 +144,7 @@ class TestHttpxLazyImport:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Test that httpx is imported when index command function is called."""
-        from codeweaver.cli import _check_server_health
+        from codeweaver.cli.commands.index import _check_server_health
 
         # Mock httpx to avoid actual network calls
         mock_httpx = MagicMock()

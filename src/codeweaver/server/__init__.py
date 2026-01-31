@@ -40,6 +40,9 @@ if TYPE_CHECKING:
         StdioCodeWeaverConfigDict,
         UvicornServerSettings,
         UvicornServerSettingsDict,
+        get_settings,
+        get_settings_map,
+        update_settings,
     )
     from codeweaver.server.dependencies import CodeWeaverStateDep
     from codeweaver.server.health import (
@@ -142,6 +145,8 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "find_code_tool": (__spec__.parent, "user_agent"),
     "find_code_tool_definition": (__spec__.parent, "tools"),
     "get_bulk_tool": (__spec__.parent, "tools"),
+    "get_settings": (__spec__.parent, "config"),
+    "get_settings_map": (__spec__.parent, "config"),
     "http_lifespan": (__spec__.parent, "lifespan"),
     "lifespan": (__spec__.parent, "server"),
     "register_tool": (__spec__.parent, "tools"),
@@ -213,6 +218,8 @@ __all__ = (
     "find_code_tool",
     "find_code_tool_definition",
     "get_bulk_tool",
+    "get_settings",
+    "get_settings_map",
     "http_lifespan",
     "lifespan",
     "register_tool",

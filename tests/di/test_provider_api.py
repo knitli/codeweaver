@@ -56,6 +56,9 @@ def clean_registry():
 
     # Store original state - deep copy to preserve the list structure
     original_providers = {k: v.copy() for k, v in utils._providers.items()}
+    
+    # Clear registry for test isolation
+    utils._providers.clear()
 
     yield
 
@@ -246,8 +249,11 @@ def test_get_all_providers_returns_all_registered(clean_registry):
     assert len(providers) == 2
     assert ServiceA in providers
     assert ServiceB in providers
-    assert providers[ServiceA] == create_a
-    assert providers[ServiceB] == create_b
+    # New API: providers[Type] = [(factory, metadata)]
+    assert len(providers[ServiceA]) == 1
+    assert providers[ServiceA][0][0] == create_a
+    assert len(providers[ServiceB]) == 1
+    assert providers[ServiceB][0][0] == create_b
 
 
 def test_get_all_providers_returns_copy_not_reference(clean_registry):
@@ -281,9 +287,11 @@ def test_get_all_providers_with_overwritten_registration(clean_registry):
         return ServiceA(value=2)
 
     providers = get_all_providers()
-    # Should have the latest registration only
+    # New API: list contains all registrations, latest is [-1]
     assert len(providers) == 1
-    assert providers[ServiceA] == second_factory
+    assert ServiceA in providers
+    assert len(providers[ServiceA]) == 2  # Both registrations in list
+    assert providers[ServiceA][-1][0] == second_factory  # Latest is last
 
 
 # ==============================================================================
@@ -314,11 +322,13 @@ def test_get_all_provider_metadata_returns_all_metadata(clean_registry):
     assert ServiceA in metadata
     assert ServiceB in metadata
 
-    # Verify metadata content
-    assert metadata[ServiceA].scope == "singleton"
-    assert metadata[ServiceA].module == "module.a"
-    assert metadata[ServiceB].scope == "request"
-    assert metadata[ServiceB].module == "module.b"
+    # New API: metadata[Type] = [ProviderMetadata] list
+    assert len(metadata[ServiceA]) == 1
+    assert metadata[ServiceA][0].scope == "singleton"
+    assert metadata[ServiceA][0].module == "module.a"
+    assert len(metadata[ServiceB]) == 1
+    assert metadata[ServiceB][0].scope == "request"
+    assert metadata[ServiceB][0].module == "module.b"
 
 
 def test_get_all_provider_metadata_returns_copy(clean_registry):
@@ -467,12 +477,16 @@ def test_api_functions_are_consistent(clean_registry):
     # get_all_providers should include it
     all_providers = get_all_providers()
     assert ServiceA in all_providers
-    assert all_providers[ServiceA] == create
+    # New API: providers[Type] = [(factory, metadata)]
+    assert len(all_providers[ServiceA]) == 1
+    assert all_providers[ServiceA][0][0] == create
 
     # get_all_provider_metadata should include it
     all_metadata = get_all_provider_metadata()
     assert ServiceA in all_metadata
-    assert all_metadata[ServiceA] == metadata
+    # New API: metadata[Type] = [ProviderMetadata]
+    assert len(all_metadata[ServiceA]) == 1
+    assert all_metadata[ServiceA][0] == metadata
 
 
 def test_api_functions_handle_empty_registry(clean_registry):
@@ -584,4 +598,6 @@ def test_api_functions_after_provider_overwrite(clean_registry):
     assert metadata.scope == "request"
 
     all_providers = get_all_providers()
-    assert all_providers[ServiceA] == second_factory
+    # New API: list contains all registrations, latest is [-1]
+    assert len(all_providers[ServiceA]) == 2
+    assert all_providers[ServiceA][-1][0] == second_factory

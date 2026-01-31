@@ -12,7 +12,7 @@ import logging
 import os
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, TypeAlias
 
 from pydantic import DirectoryPath
 
@@ -63,12 +63,7 @@ def _resolve_config_file() -> Path | None:
 # Union type covering all possible settings types
 # Imports moved to TYPE_CHECKING block to avoid circular dependencies
 # Actual runtime type is resolved by bootstrap_settings -> get_settings()
-type CodeWeaverSettingsType = (
-    "CodeWeaverSettings"
-    | "CodeWeaverEngineSettings"
-    | "CodeWeaverProviderSettings"
-    | "CodeWeaverCoreSettings"
-)
+CodeWeaverSettingsType: TypeAlias = "CodeWeaverSettings | CodeWeaverEngineSettings | CodeWeaverProviderSettings | CodeWeaverCoreSettings"
 
 
 async def bootstrap_settings(config_file: Path | None = None) -> CodeWeaverSettingsType:

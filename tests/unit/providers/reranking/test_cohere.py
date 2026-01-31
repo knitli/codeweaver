@@ -55,13 +55,14 @@ def cohere_rerank_capabilities():
 
 @pytest.fixture
 def mock_cohere_rerank_config():
-    """Create a mock config for Cohere reranking provider."""
-    config = MagicMock()
-    config.reranking_config = MagicMock()
-    config.reranking_config._as_options = MagicMock(
-        return_value={"model_name": "rerank-english-v3.0", "rerank": {}, "model": {}}
+    """Create a config for Cohere reranking provider."""
+    from codeweaver.providers.config.reranking import CohereRerankingConfig
+
+    return CohereRerankingConfig(
+        tag="cohere",
+        provider=Provider.COHERE,
+        model_name="rerank-english-v3.0",
     )
-    return config
 
 
 @pytest.mark.async_test

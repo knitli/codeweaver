@@ -147,6 +147,11 @@ class BaseEmbeddingConfig(BasedModel):
         ),
     ] = None
 
+    model: Annotated[
+        dict[str, Any] | None,
+        Field(description="Parameters for model-level configuration (separate from embedding/query options).")
+    ] = None
+
     def __init__(self, **data: Any) -> None:
         """Initialize the embedding configuration."""
         from codeweaver.core.di import get_container
@@ -175,6 +180,8 @@ class BaseEmbeddingConfig(BasedModel):
             data["embedding"] = {}
         if not query:
             data["query"] = {}
+        if "model" not in data or not data.get("model"):
+            data["model"] = {}
         object.__setattr__(self, "_is_sparse", data.pop("_is_sparse", False))
         super().__init__(**data)
 
@@ -299,9 +306,8 @@ class BaseEmbeddingConfig(BasedModel):
         )
         return VectorParams(
             size=dimension,
-            distance=Distance(
-                (metric or "cosine").title(), datatype=VectorStorageDatatype(datatype or "float16")
-            ),
+            distance=Distance((metric or "cosine").title()),
+            datatype=VectorStorageDatatype(datatype or "float16") if datatype else None,
             quantization_config=quantization,
         )
 
@@ -889,6 +895,7 @@ class FastEmbedSparseEmbeddingConfig(FastEmbedEmbeddingConfig):
 
 EmbeddingConfigT = Annotated[
     BedrockEmbeddingConfig
+    | CohereEmbeddingConfig
     | FastEmbedEmbeddingConfig
     | GoogleEmbeddingConfig
     | HuggingFaceEmbeddingConfig

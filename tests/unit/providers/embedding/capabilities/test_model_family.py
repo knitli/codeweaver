@@ -36,7 +36,7 @@ class TestModelFamilyConstruction:
 
         assert family.family_id == "test-family"
         assert family.vector_space_dimension == 1024
-        assert family.vector_space_datatype == "float"
+        assert family.vector_space_datatype == "float16"
         assert family.is_normalized is False
         assert family.preferred_metrics == ("cosine", "dot", "euclidean")
         assert family.member_models == frozenset({"model-a", "model-b"})

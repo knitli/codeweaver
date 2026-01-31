@@ -143,7 +143,7 @@ class StrategizedQuery(NamedTuple):
         return {
             "query": RrfQuery(rrf=Rrf(k=2)),
             "prefetch": [
-                Prefetch(query=list(self.dense), using="dense", **prefetch_params),
+                Prefetch(query=list(self.dense), using="primary", **prefetch_params),
                 Prefetch(query=sparse_vector, using="sparse", **prefetch_params),
             ],
             **top_level_params,
@@ -175,7 +175,7 @@ class StrategizedQuery(NamedTuple):
         if self.has_dense():
             # Dense-only
             assert self.dense is not None  # noqa: S101
-            return {"query": list(self.dense), "using": "dense", **kwargs}
+            return {"query": list(self.dense), "using": "primary", **kwargs}
 
         # Sparse-only
         assert self.sparse is not None  # noqa: S101

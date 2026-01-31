@@ -481,6 +481,7 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
 
         When called through DI container, returns injected registry.
         When called directly (e.g. in tests), creates singleton instance.
+        Ensures registry is populated on first access via lazy loading.
         """
         from codeweaver.core.di.depends import DependsPlaceholder, _InjectedProxy
         from codeweaver.semantic.registry import ThingRegistry
@@ -491,6 +492,11 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
             global _thing_registry_instance
             if _thing_registry_instance is None:
                 _thing_registry_instance = ThingRegistry()
+                # Populate registry on first access via lazy loading
+                # This loads the pickle cache and registers all Things and Categories
+                from codeweaver.semantic.node_type_parser import get_things
+
+                _ = get_things()  # Calls parse_languages → _register_everything
             return _thing_registry_instance
         return registry
 

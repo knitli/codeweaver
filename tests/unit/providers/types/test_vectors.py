@@ -96,7 +96,7 @@ class TestVectorConfig:
         """Provide a standard primary dense vector configuration."""
         return VectorConfig(
             name="primary",
-            model_name=ModelName("voyage-large-2-instruct"),
+            model_name=ModelName("voyage-3-large"),
             params=dense_params,
             role=VectorRole.PRIMARY,
         )
@@ -254,13 +254,13 @@ class TestVectorConfig:
 
         # Create proper embedding config
         embedding_config = VoyageEmbeddingConfig(
-            tag="voyage", provider=Provider.VOYAGE, model_name="voyage-large-2-instruct"
+            tag="voyage", provider=Provider.VOYAGE, model_name="voyage-3-large"
         )
 
         # Create provider settings with the proper embedding config
         settings = EmbeddingProviderSettings(
             provider=Provider.VOYAGE,
-            model_name="voyage-large-2-instruct",
+            model_name="voyage-3-large",
             embedding_config=embedding_config,
         )
 
@@ -269,7 +269,7 @@ class TestVectorConfig:
         )
 
         assert config.name == "primary"
-        assert config.model_name == ModelName("voyage-large-2-instruct")
+        assert config.model_name == ModelName("voyage-3-large")
         assert config.role == VectorRole.PRIMARY.variable
         assert isinstance(config.params, VectorParams)
 
@@ -310,13 +310,13 @@ class TestVectorConfig:
 
         # Create proper embedding config
         embedding_config = VoyageEmbeddingConfig(
-            tag="voyage", provider=Provider.VOYAGE, model_name="voyage-large-2-instruct"
+            tag="voyage", provider=Provider.VOYAGE, model_name="voyage-3-large"
         )
 
         # Create provider settings with the proper embedding config
         settings = EmbeddingProviderSettings(
             provider=Provider.VOYAGE,
-            model_name="voyage-large-2-instruct",
+            model_name="voyage-3-large",
             embedding_config=embedding_config,
         )
 
@@ -338,7 +338,7 @@ class TestVectorSet:
         """Provide primary dense vector config."""
         return VectorConfig(
             name="primary",
-            model_name=ModelName("voyage-large-2-instruct"),
+            model_name=ModelName("voyage-3-large"),
             params=VectorParams(size=1024, distance=Distance.COSINE),
             role=VectorRole.PRIMARY,
         )
@@ -690,8 +690,8 @@ class TestVectorSetIntegration:
 
     @pytest.mark.asyncio
     async def test_create_qdrant_collection_config(self):
-        """Test creating Qdrant collection configuration from VectorSet."""
-        from qdrant_client.models import CollectionConfig
+        """Test creating Qdrant collection parameters from VectorSet."""
+        from qdrant_client.models import CollectionParams
 
         # Create vector set
         vector_set = VectorSet(
@@ -711,15 +711,18 @@ class TestVectorSetIntegration:
             }
         )
 
-        # Create Qdrant collection config - should be trivial
-        config = CollectionConfig(
-            vectors_config=vector_set.to_qdrant_vectors_config(),
-            sparse_vectors_config=vector_set.to_qdrant_sparse_vectors_config(),
+        # Create Qdrant collection params - this is what's used for creating collections
+        params = CollectionParams(
+            vectors=vector_set.to_qdrant_vectors_config(),
+            sparse_vectors=vector_set.to_qdrant_sparse_vectors_config(),
         )
 
-        assert config is not None
-        assert "primary" in config.vectors_config
-        assert "sparse" in config.sparse_vectors_config
+        # Verify the params are correctly structured
+        assert params is not None
+        assert params.vectors is not None
+        assert "primary" in params.vectors
+        assert params.sparse_vectors is not None
+        assert "sparse" in params.sparse_vectors
 
 
 @pytest.mark.unit

@@ -30,7 +30,7 @@ from typing import (
 import numpy as np
 
 from codeweaver_tokenizers import Tokenizer, get_tokenizer
-from pydantic import UUID7, ConfigDict, Field, SkipValidation
+from pydantic import UUID7, ConfigDict, Field, PrivateAttr, SkipValidation
 from pydantic.main import IncEx
 from pydantic.types import PositiveInt
 from tenacity import (
@@ -46,6 +46,7 @@ from codeweaver.core import (
     AnonymityConversion,
     BasedModel,
     BatchKeys,
+    CodeChunk,
     EmbeddingBatchInfo,
     LiteralProvider,
     LiteralStringT,
@@ -62,7 +63,7 @@ from codeweaver.core import (
 )
 from codeweaver.core import ValidationError as CodeWeaverValidationError
 from codeweaver.core.types import ModelNameT
-from codeweaver.providers.config import EmbeddingConfigT, EmbeddingProviderSettings
+from codeweaver.providers.config import EmbeddingProviderSettings
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.registry import EmbeddingRegistry
 from codeweaver.providers.exceptions import CircuitBreakerOpenError
@@ -71,8 +72,6 @@ from codeweaver.providers.types import CircuitBreakerState
 
 if TYPE_CHECKING:
     from codeweaver.core import (
-        AnonymityConversion,
-        CodeChunk,
         FilteredKeyT,
         SerializedStrOnlyCodeChunk,
         StructuredDataInput,
@@ -175,7 +174,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
     ]
 
     config: Annotated[
-        EmbeddingConfigT,
+        EmbeddingProviderSettings,
         Field(description="Configuration for the embedding model, including all request options."),
     ]
 
@@ -209,6 +208,11 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             default="",
         ),
     ] = ""
+
+    # Embedding request options populated from config
+    query_options: Annotated[dict[str, Any], Field(default_factory=dict, exclude=True)]
+    embed_options: Annotated[dict[str, Any], Field(default_factory=dict, exclude=True)]
+    model_options: Annotated[dict[str, Any], Field(default_factory=dict, exclude=True)]
 
     _provider: ClassVar[LiteralProvider] = cast(LiteralProvider, Provider.NOT_SET)
     _max_tokens: ClassVar[PositiveInt] = DEFAULT_MAX_TOKENS
@@ -255,13 +259,15 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             "_circuit_open_duration",
             kwargs.get("circuit_open_duration", OPEN_CIRCUIT_DURATION),
         )
+        # Set required fields
         object.__setattr__(self, "client", client)
         object.__setattr__(self, "config", config)
-        object.__setattr__(self, "query_options", config.query if config and config.query else {})
-        object.__setattr__(
-            self, "embed_options", config.embedding if config and config.embedding else {}
-        )
-        object.__setattr__(self, "model_options", config.model if config and config.model else {})
+
+        # Access embedding options through config.embedding_config
+        embedding_config = config.embedding_config if config else None
+        object.__setattr__(self, "query_options", embedding_config.query if embedding_config and embedding_config.query else {})
+        object.__setattr__(self, "embed_options", embedding_config.embedding if embedding_config and embedding_config.embedding else {})
+        object.__setattr__(self, "model_options", embedding_config.model if embedding_config and embedding_config.model else {})
 
         # Phase 4: Use centralized cache manager instead of per-instance stores
         object.__setattr__(self, "cache_manager", cache_manager)
@@ -929,7 +935,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
 
         Now uses centralized EmbeddingCacheManager for registry operations.
         """
-        is_sparse = self._is_sparse
+        is_sparse = isinstance(self, SparseEmbeddingProvider)
         attr = "sparse" if is_sparse else "dense"
 
         # Validate embedding dimensions for dense embeddings
