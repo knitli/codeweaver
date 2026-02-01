@@ -15,8 +15,8 @@ from codeweaver.core.config.loader import get_settings as _get_settings
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.types.settings_model import BaseCodeWeaverSettings
     from codeweaver.core.types import DictView
+    from codeweaver.core.types.settings_model import BaseCodeWeaverSettings
     from codeweaver.server.config.settings import CodeWeaverSettingsDict
 
 
@@ -45,7 +45,7 @@ def get_settings_map(config_file: str | None = None) -> DictView[CodeWeaverSetti
         Dictionary view of settings
     """
     settings = get_settings(config_file=config_file)
-    return settings.model_dump_as_view()
+    return settings.view  # ty:ignore[invalid-return-type]
 
 
 def update_settings(**kwargs) -> BaseCodeWeaverSettings:
@@ -60,7 +60,7 @@ def update_settings(**kwargs) -> BaseCodeWeaverSettings:
     settings = get_settings()
     # Create a new settings instance with updated values
     updated_data = settings.model_dump()
-    updated_data.update(kwargs)
+    updated_data |= kwargs
     return type(settings)(**updated_data)
 
 

@@ -220,7 +220,7 @@ def _recommended_default(
         agent=(
             AgentProviderSettings(
                 provider=Provider.ANTHROPIC,
-                model="claude-haiku-4.5",
+                model_name="claude-haiku-4.5",
                 model_options=AgentModelSettings(),
             ),
         ),
@@ -299,7 +299,7 @@ def _quickstart_default(
         agent=(
             AgentProviderSettings(
                 provider=Provider.ANTHROPIC,
-                model="claude-haiku-4.5",
+                model_name="claude-haiku-4.5",
                 model_options=AgentModelSettings(),
             ),
         ),

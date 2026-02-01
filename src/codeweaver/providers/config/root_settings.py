@@ -91,7 +91,28 @@ class CodeWeaverProviderSettings(CodeWeaverCoreSettings):
         else:
             provider = ProviderSettings.model_construct(**profile_config)
         kwargs["provider"] = provider
+        if (profile := kwargs.get("profile")) is not None and profile is not Unset:
+            kwargs["profile"] = profile
+            provider = ProviderSettings.model_validate(
+                **(
+                    self._resolve_default_and_provided(
+                        profile.as_settings_dict(), provider.model_dump()
+                    )
+                )
+            )
+            kwargs["provider"] = provider
         kwargs["profile"] = kwargs.get("profile")
+        if not kwargs["provider"] or kwargs["provider"] is Unset:
+            from codeweaver.core.utils import is_test_environment
+
+            if is_test_environment():
+                kwargs["provider"] = ProviderSettings.model_construct(
+                    **(ProviderProfile.TESTING.as_settings_dict())
+                )
+            else:
+                kwargs["provider"] = ProviderSettings.model_construct(
+                    **(ProviderProfile.RECOMMENDED.as_settings_dict())
+                )
         kwargs |= super()._initialize(**(kwargs or {}))
         return kwargs
 

@@ -21,7 +21,17 @@ import os
 
 from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
-from typing import Annotated, Any, Literal, NotRequired, Required, Self, TypedDict, cast
+from typing import (
+    TYPE_CHECKING,
+    Annotated,
+    Any,
+    Literal,
+    NotRequired,
+    Required,
+    Self,
+    TypedDict,
+    cast,
+)
 
 import httpx
 
@@ -52,6 +62,11 @@ from codeweaver.providers.config.types import HttpxClientParams
 
 
 logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING and importlib.util.find_spec("google") is not None:
+    from google.auth.credentials import Credentials as GoogleCredentials
+else:
+    GoogleCredentials = Any
 
 
 # Note: Previously we had a _ensure_qdrant_model_rebuilt() function here to handle
@@ -183,6 +198,7 @@ class ClientOptions(BasedModel):
 
     @classmethod
     def _client_env_vars(cls) -> dict[str, tuple[str, ...] | dict[str, Any]]:
+        # sourcery skip: low-code-quality
         """Return a dictionary of environment variables for the client options, mapping client variable names to the environment variable name."""
         # Access _core_provider from class __dict__ to avoid pydantic descriptor issues
         core_provider = cls.__dict__.get("_core_provider", Provider.NOT_SET)
@@ -981,6 +997,238 @@ type GeneralEmbeddingClientOptionsType = Annotated[
         discriminator=Discriminator(_discriminate_embedding_clients),
     ),
 ]
+
+
+class BaseAnthropicClientOptions(ClientOptions):
+    """Base client options for Anthropic-based providers."""
+
+    _core_provider: Literal[
+        Provider.ANTHROPIC, Provider.BEDROCK, Provider.AZURE, Provider.GOOGLE, Provider.GROQ
+    ]
+    _providers: tuple[Provider, ...] = (
+        Provider.ANTHROPIC,
+        Provider.BEDROCK,
+        Provider.AZURE,
+        Provider.GOOGLE,
+        Provider.GROQ,
+    )
+    tag: Literal["anthropic", "anthropic-bedrock", "anthropic-azure", "anthropic-google", "groq"]
+
+    base_url: AnyUrl | None = None
+    timeout: PositiveFloat | httpx.Timeout | None = None
+    max_retries: PositiveInt | None = None
+    default_headers: Mapping[str, str] | None = None
+    default_query: Mapping[str, object] | None = None
+    http_client: httpx.Client | None = None
+
+
+class AnthropicClientOptions(BaseAnthropicClientOptions):
+    """Client options for Anthropic-based embedding providers."""
+
+    _core_provider: Provider = Provider.ANTHROPIC
+    _providers: tuple[Provider, ...] = (Provider.ANTHROPIC,)
+    tag: Literal["anthropic"] = "anthropic"
+
+    api_key: SecretStr | None = None
+    auth_token: SecretStr | None = None
+
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
+        return {
+            FilteredKey(name): AnonymityConversion.BOOLEAN
+            for name in ("api_key", "http_client", "default_headers", "default_query")
+        } | {FilteredKey("base_url"): AnonymityConversion.HASH}
+
+
+class AnthropicBedrockClientOptions(BaseAnthropicClientOptions):
+    """Client options for Anthropic agents on Bedrock runtime."""
+
+    _core_provider: Provider = Provider.BEDROCK
+    _providers: tuple[Provider, ...] = (Provider.BEDROCK,)
+    tag: Literal["anthropic-bedrock"] = "anthropic-bedrock"
+
+    aws_secret_key: SecretStr | None = None
+    aws_access_key: SecretStr | None = None
+    aws_region: str | None = None
+    aws_profile: str | None = None
+    aws_session_token: SecretStr | None = None
+
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
+        return {
+            FilteredKey(name): AnonymityConversion.BOOLEAN
+            for name in (
+                "aws_secret_key",
+                "aws_access_key",
+                "aws_session_token",
+                "http_client",
+                "default_headers",
+                "default_query",
+            )
+        } | {
+            FilteredKey("base_url"): AnonymityConversion.HASH,
+            FilteredKey("aws_region"): AnonymityConversion.HASH,
+            FilteredKey("aws_profile"): AnonymityConversion.HASH,
+        }
+
+
+class AnthropicAzureClientOptions(BaseAnthropicClientOptions):
+    """Client options for Anthropic agents on Azure Foundry."""
+
+    _core_provider: Provider = Provider.AZURE
+    _providers: tuple[Provider, ...] = (Provider.AZURE,)
+    tag: Literal["anthropic-azure"] = "anthropic-azure"
+
+    resource: str | None = None
+    api_key: SecretStr | None = None
+    azure_ad_token_provider: Callable[[], Awaitable[str]] | None = None
+
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
+        return {
+            FilteredKey(name): AnonymityConversion.BOOLEAN
+            for name in (
+                "api_key",
+                "azure_ad_token_provider",
+                "http_client",
+                "default_headers",
+                "default_query",
+            )
+        } | {FilteredKey(name): AnonymityConversion.HASH for name in ("resource", "base_url")}
+
+
+class AnthropicGoogleVertexClientOptions(BaseAnthropicClientOptions):
+    """Client options for Anthropic agents on Google Vertex AI runtime."""
+
+    _core_provider: Provider = Provider.GOOGLE
+    _providers: tuple[Provider, ...] = (Provider.GOOGLE,)
+    tag: Literal["anthropic-google"] = "anthropic-google"
+
+    region: str | None = None
+    project_id: str | None = None
+    access_token: SecretStr | None = None
+    credentials: GoogleCredentials | None = None
+
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
+        return {
+            FilteredKey(name): AnonymityConversion.BOOLEAN
+            for name in (
+                "http_client",
+                "default_headers",
+                "default_query",
+                "credentials",
+                "access_token",
+            )
+        } | {FilteredKey("project_id"): AnonymityConversion.HASH}
+
+
+# Groq's client is a carbon copy of Anthropic's client, so we can just inherit from it.
+class GroqClientOptions(BaseAnthropicClientOptions):
+    """Client options for Groq-based agent providers."""
+
+    _core_provider: Provider = Provider.GROQ
+    _providers: tuple[Provider, ...] = (Provider.GROQ,)
+    tag: Literal["groq"] = "groq"
+
+    api_key: SecretStr | None = None
+
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
+        return {
+            FilteredKey(name): AnonymityConversion.BOOLEAN
+            for name in ("api_key", "http_client", "default_headers", "default_query")
+        } | {FilteredKey("base_url"): AnonymityConversion.HASH}
+
+
+class OpenAIAgentClientOptions(OpenAIClientOptions):
+    """Client options for OpenAI-based agent providers."""
+
+    _core_provider: Provider = Provider.OPENAI
+    _providers: tuple[Provider, ...] = tuple(
+        provider for provider in Provider if provider.uses_openai_api and provider != Provider.GROQ
+    )
+    tag: Literal["openai"] = "openai"
+
+
+def discriminate_anthropic_agent_client_options(v: Any) -> str:
+    """Identify the Anthropic agent provider settings type for discriminator field."""
+    fields = list(v if isinstance(v, dict) else type(v).model_fields)
+    if any(field in fields if "aws" in field else False for field in fields):
+        return "anthropic-bedrock"
+    if "resource" in fields or "azure_ad_token_provider" in fields:
+        return "anthropic-azure"
+    if any(field in fields for field in ("region", "project_id", "access_token", "credentials")):
+        return "anthropic-google"
+    if "auth_token" in fields:
+        return "anthropic"
+    if base_url := str(v.get("base_url") if isinstance(v, dict) else getattr(v, "base_url", None)):
+        if "groq.com" in base_url:
+            return "groq"
+        if "azure" in base_url:
+            return "anthropic-azure"
+        if "googleapis.com" in base_url:
+            return "anthropic-google"
+    return "anthropic"
+
+
+type AnthropicAgentClientOptionsType = Annotated[
+    Annotated[AnthropicClientOptions, Tag(Provider.ANTHROPIC.variable)]
+    | Annotated[AnthropicBedrockClientOptions, Tag(Provider.BEDROCK.variable)]
+    | Annotated[AnthropicAzureClientOptions, Tag(Provider.AZURE.variable)]
+    | Annotated[AnthropicGoogleVertexClientOptions, Tag(Provider.GOOGLE.variable)]
+    | Annotated[GroqClientOptions, Tag(Provider.GROQ.variable)],
+    Field(
+        description="Anthropic agent client options type.",
+        discriminator=Discriminator(discriminate_anthropic_agent_client_options),
+    ),
+]
+
+type GeneralAgentClientOptionsType = Annotated[
+    Annotated[CohereClientOptions, Tag(Provider.COHERE.variable)]
+    | Annotated[OpenAIClientOptions, Tag(Provider.OPENAI.variable)]
+    | Annotated[GoogleClientOptions, Tag(Provider.GOOGLE.variable)]
+    | Annotated[HFInferenceClientOptions, Tag(Provider.HUGGINGFACE_INFERENCE.variable)]
+    | Annotated[MistralClientOptions, Tag(Provider.MISTRAL.variable)],
+    | Annotated[AnthropicAgentClientOptionsType, Tag("anthropic_agent")],
+    Field(
+        description="Agent client options type.",
+        discriminator=Discriminator(_discriminate_embedding_clients),
+    ),
+]
+
+class TavilyClientOptions(ClientOptions):
+    """Client options for the Tavily data provider."""
+
+    _core_provider: Provider = Provider.TAVILY
+    _providers: tuple[Provider, ...] = (Provider.TAVILY,)
+    tag: Literal["tavily"] = "tavily"
+
+    api_key: SecretStr | None = None
+    company_info_tags: Sequence[str] | None = None
+    proxies: dict[str, str] | None = None
+    api_base_url: AnyUrl | None = None
+    timeout: PositiveFloat | None = None
+
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
+        return {
+            FilteredKey("api_key"): AnonymityConversion.BOOLEAN,
+            FilteredKey("proxies"): AnonymityConversion.BOOLEAN,
+            FilteredKey("api_base_url"): AnonymityConversion.HASH,
+        }
+
+class DuckDuckGoClientOptions(ClientOptions):
+    """Client options for the DuckDuckGo data provider."""
+
+    _core_provider: Provider = Provider.DUCKDUCKGO
+    _providers: tuple[Provider, ...] = (Provider.DUCKDUCKGO,)
+    tag: Literal["duckduckgo"] = "duckduckgo"
+
+    proxy: str | None = None
+    timeout: PositiveFloat | None = None
+    verify: bool = True
+
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
+        return {
+            FilteredKey("proxy"): AnonymityConversion.BOOLEAN,
+        }
+
+
 
 __all__ = (
     "BaseProviderSettings",

@@ -69,11 +69,7 @@ def mock_voyage_rerank_config():
     """Create a config for Voyage reranking provider."""
     from codeweaver.providers.config.reranking import VoyageRerankingConfig
 
-    return VoyageRerankingConfig(
-        tag="voyage",
-        provider=Provider.VOYAGE,
-        model_name="rerank-2",
-    )
+    return VoyageRerankingConfig(tag="voyage", provider=Provider.VOYAGE, model_name="rerank-2")
 
 
 class TestVoyageRerankingProviderInitialization:
@@ -122,14 +118,14 @@ class TestVoyageRerankingProviderInitialization:
     def test_provider_initialization_default_top_n(
         self, mock_voyage_rerank_client, mock_voyage_rerank_config, voyage_rerank_capabilities
     ):
-        """Test that default top_n is 40."""
+        """Test that default top_n is 10."""
         provider = VoyageRerankingProvider(
             client=mock_voyage_rerank_client,
             config=mock_voyage_rerank_config,
             caps=voyage_rerank_capabilities,
         )
 
-        assert provider.top_n == 40
+        assert provider.top_n == 10
 
     def test_provider_prompt_not_supported(
         self, mock_voyage_rerank_client, mock_voyage_rerank_config, voyage_rerank_capabilities

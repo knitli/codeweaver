@@ -27,8 +27,12 @@ from pydantic import SkipValidation
 from codeweaver.core import ConfigurationError, Provider, rpartial
 from codeweaver.core import SparseEmbedding as CodeWeaverSparseEmbedding
 from codeweaver.providers.embedding.capabilities.base import SparseEmbeddingModelCapabilities
-from codeweaver.providers.embedding.providers import EmbeddingProvider
-from codeweaver.providers.embedding.providers.base import SparseEmbeddingProvider
+from codeweaver.providers.embedding.providers.base import (
+    EmbeddingCustomDeps,
+    EmbeddingImplementationDeps,
+    EmbeddingProvider,
+    SparseEmbeddingProvider,
+)
 
 
 if TYPE_CHECKING:
@@ -96,6 +100,14 @@ class FastEmbedEmbeddingProvider(EmbeddingProvider[TextEmbedding]):
     _output_transformer: Callable[[Any], list[list[float]] | list[list[int]]] = (
         fastembed_output_transformer
     )
+
+    def _initialize(
+        self,
+        impl_deps: EmbeddingImplementationDeps = None,
+        custom_deps: EmbeddingCustomDeps = None,
+        **kwargs: Any,
+    ) -> None:
+        """Initialize the FastEmbed client."""
 
     @property
     def base_url(self) -> str | None:

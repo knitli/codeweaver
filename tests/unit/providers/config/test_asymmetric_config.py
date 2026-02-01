@@ -94,24 +94,10 @@ def openai_settings() -> EmbeddingProviderSettings:
 
 @pytest.fixture
 def mock_voyage_4_family() -> ModelFamily:
-    """Create a mock VOYAGE_4_FAMILY for testing.
+    """Returns the real VOYAGE_4_FAMILY model family instance."""
+    from codeweaver.embedding.capabilities.voyage import VOYAGE_4_FAMILY
 
-    This fixture is temporary - it will use the real ModelFamily
-    once Agent A implements it.
-    """
-    try:
-        from codeweaver.providers.embedding.capabilities.base import ModelFamily
-    except ImportError:
-        pytest.skip("ModelFamily not yet implemented by Agent A")
-    else:
-        return ModelFamily(
-            name="voyage-4",
-            family_id="voyage-4",
-            member_models=["voyage-4-large", "voyage-4", "voyage-4-lite", "voyage-4-nano"],
-            vector_space_dimension=1024,
-            default_dimension=1024,
-            datatype="uint8",
-        )
+    return VOYAGE_4_FAMILY
 
 
 @pytest.mark.unit

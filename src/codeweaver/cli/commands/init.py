@@ -17,7 +17,7 @@ import sys
 
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any, Literal
+from typing import TYPE_CHECKING, Annotated, Any, Literal, cast
 
 import cyclopts
 
@@ -30,6 +30,7 @@ from codeweaver.cli.ui import CLIErrorHandler, get_display
 from codeweaver.core import CodeWeaverError, get_project_path, get_user_config_dir
 from codeweaver.core.di.depends import INJECTED
 from codeweaver.core.exceptions import ConfigurationError
+from codeweaver.core.utils import TypeIs
 from codeweaver.providers.config.profiles import ProviderProfile
 
 
@@ -133,14 +134,29 @@ def _create_codeweaver_config(
 
     config_path.parent.mkdir(parents=True, exist_ok=True)
 
+    # Create settings from profile (don't use DI since container isn't initialized yet)
+    from codeweaver.providers.config.providers import ProviderSettings
+    from codeweaver.server.config.settings import CodeWeaverSettings
+
+    settings = CodeWeaverSettings(
+        project_path=project_path,
+        project_name=project_path.name,
+        config_file=config_path,
+        provider=ProviderSettings.model_construct(**(profile.as_settings_dict())),
+    )
+
     # Save to TOML file
-    _get_settings().save_to_file(config_path)
+    settings.save_to_file(config_path)
 
     display.print_success(f"Created configuration file: {config_path}")
     if profile:
         display.print_info(f"Profile: {profile}")
 
     return config_path
+
+
+def _is_config_path(path: Any) -> TypeIs[Path]:
+    return isinstance(path, Path) and path.suffix in {".toml", ".yaml", ".yml", ".json"}
 
 
 @app.command
@@ -253,8 +269,15 @@ def config(
             case "user":
                 config_path = get_user_config_dir() / f"codeweaver.{config_extension}"
 
-    # Type narrowing: config_path is guaranteed to be set by the match statement above
-    assert config_path is not None, "config_path must be set by this point"
+    if not (_is_config_path(config_path)):
+        error_handler.handle_error(
+            CodeWeaverError(
+                f"Invalid configuration file path: {config_path}. "
+                "Please provide a valid path ending in .toml, .yaml, .yml, or .json."
+            ),
+            "Configuration path validation",
+            exit_code=1,
+        )
 
     # Handle existing configuration
     if (
@@ -270,7 +293,7 @@ def config(
 
     # Create the configuration
     created_path = _create_codeweaver_config(
-        project_path, profile=profile_enum, vector_url=None, config_path=config_path
+        project_path, profile=profile_enum, vector_url=None, config_path=cast(Path, config_path)
     )
     display.print_completion(f"Config created: {created_path}\n")
 
@@ -871,7 +894,7 @@ def init(
 
         config(
             project=project_path,
-            profile=profile_enum.variable,
+            profile=profile_enum.variable,  # ty:ignore[invalid-argument-type]
             quickstart=quickstart,
             vector_deployment=vector_deployment,
             vector_url=vector_url,

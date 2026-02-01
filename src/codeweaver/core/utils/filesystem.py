@@ -178,8 +178,9 @@ def normalize_ext(ext: str) -> str:
     return ext.lower().strip() if ext.startswith(".") else f".{ext.lower().strip()}"
 
 
-def in_codeweaver_clone(path: Path) -> bool:
+def in_codeweaver_clone(path: Path | None = None) -> bool:
     """Check if the current repo is CodeWeaver."""
+    path = path or get_project_path()
     return (
         "codeweaver" in str(path).lower()
         or "code-weaver" in str(path).lower()

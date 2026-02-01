@@ -11,7 +11,11 @@ from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, cast
 
 from codeweaver.core import ConfigurationError, Provider
-from codeweaver.providers.embedding.providers.base import EmbeddingProvider
+from codeweaver.providers.embedding.providers.base import (
+    EmbeddingCustomDeps,
+    EmbeddingImplementationDeps,
+    EmbeddingProvider,
+)
 
 
 if TYPE_CHECKING:
@@ -31,6 +35,15 @@ class MistralEmbeddingProvider(EmbeddingProvider[Mistral]):
 
     client: Mistral
     _provider: ClassVar[Literal[Provider.MISTRAL]] = Provider.MISTRAL
+
+    def _initialize(
+        self,
+        impl_deps: EmbeddingImplementationDeps = None,
+        custom_deps: EmbeddingCustomDeps = None,
+        **kwargs: Any,
+    ) -> None:
+        """Initialize the Mistral client."""
+        # Nothing to initialize here - options are set in model_post_init
 
     @property
     def base_url(self) -> str | None:

@@ -7,12 +7,30 @@
 from __future__ import annotations
 
 import contextlib
+import importlib
 
+from typing import TYPE_CHECKING, Any
+
+from codeweaver.core.types import LiteralProviderType
 from codeweaver.core.types.provider import Provider
 
 
-def get_data_provider(provider: Provider) -> type | None:
+if TYPE_CHECKING and importlib.util.find_spec("pydantic_ai.common_tools.duckduckgo"):
+    from pydantic_ai.common_tools.duckduckgo import DuckDuckGoSearchTool as DuckDuckGoSearchTool
+else:
+    DuckDuckGoSearchTool = Any
+if TYPE_CHECKING and importlib.util.find_spec("pydantic_ai.common_tools.tavily"):
+    from pydantic_ai.common_tools.tavily import TavilySearchTool as TavilySearchTool
+else:
+    TavilySearchTool = Any
+
+type DataProviderType = DuckDuckGoSearchTool | TavilySearchTool
+
+
+def get_data_provider(provider: LiteralProviderType) -> DataProviderType | None:
     """Get available tools."""
+    if isinstance(provider, str):
+        provider: Provider = Provider.from_string(provider)
     if provider == Provider.DUCKDUCKGO:
         with contextlib.suppress(ImportError):
             from pydantic_ai.common_tools.duckduckgo import DuckDuckGoSearchTool
@@ -36,4 +54,4 @@ def load_default_data_providers() -> tuple[type, ...]:
     return tuple(providers)
 
 
-__all__ = ("get_data_provider", "load_default_data_providers")
+__all__ = ("DataProviderType", "get_data_provider", "load_default_data_providers")

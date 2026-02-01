@@ -139,7 +139,7 @@ def test_project_path(tmp_path: Path) -> Path:
 @pytest.fixture
 async def indexer(test_project_path: Path, clean_container) -> IndexingService:
     """Create indexer instance for test project using DI container."""
-    from codeweaver.server import get_settings
+    from codeweaver.server.config.helpers import get_settings, reset_settings
 
     # Define a factory that returns settings with the test project path
     async def get_test_settings() -> CodeWeaverSettings:
@@ -150,7 +150,7 @@ async def indexer(test_project_path: Path, clean_container) -> IndexingService:
         # Ensure we don't load existing config files that might point elsewhere
         settings.project_path = test_project_path
         settings.project_name = f"test_project_{test_project_path.name}"
-        return settings
+        return settings  # ty:ignore[invalid-return-type]
 
     # Override CodeWeaverSettings in the container
     clean_container.override(CodeWeaverSettings, get_test_settings)
@@ -279,7 +279,7 @@ async def test_indexing_error_recovery(test_project_path: Path):
     corrupted_file.write_bytes(b"\x00\x01\x02\xff\xfe\xfd")
 
     # Resolve indexer from container with overridden settings
-    from codeweaver.server import get_settings
+    from codeweaver.server.config.settings import get_settings, reset_settings
 
     reset_settings()
     container = get_container()

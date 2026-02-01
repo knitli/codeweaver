@@ -178,7 +178,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
             else {}
         )
         _rerank_kwargs = dict(rerank_options) | kwargs
-        _top_n = _rerank_kwargs.get("top_n", 40)
+        _top_n = _rerank_kwargs.get("top_n", 10)
 
         logger.debug("RerankingProvider kwargs", extra=_rerank_kwargs)
         logger.debug("Initialized RerankingProvider with top_n=%d", _top_n)
@@ -417,9 +417,9 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         """Update token statistics for the embedding provider."""
         statistics = _get_statistics()
         # Skip if statistics not available (e.g., in test contexts)
-        if not hasattr(statistics, 'add_token_usage'):
+        if not hasattr(statistics, "add_token_usage"):
             return
-        
+
         if token_count is not None:
             statistics.add_token_usage(reranking_generated=token_count)
         elif from_docs and all(isinstance(doc, str) for doc in from_docs):
@@ -460,7 +460,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         if (context_saved := self._calculate_context_saved(results, processed_chunks)) > 0:
             statistics = _get_statistics()
             # Skip if statistics not available (e.g., in test contexts)
-            if not hasattr(statistics, 'add_token_usage'):
+            if not hasattr(statistics, "add_token_usage"):
                 return
             # * Note: We aren't double counting tokens between here and `self.rerank`.
             # * This is for `saved_by_reranking`, while the other count in the pipeline is for `reranking_generated`.

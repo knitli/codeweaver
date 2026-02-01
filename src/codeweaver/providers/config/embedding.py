@@ -27,7 +27,6 @@ from typing import (
 
 from cyclopts.types import PositiveInt
 from pydantic import Discriminator, Field, Tag, computed_field
-from qdrant_client.http.api.aliases_api import VectorStorageDatatype
 from qdrant_client.models import (
     Datatype,
     Distance,
@@ -149,22 +148,13 @@ class BaseEmbeddingConfig(BasedModel):
 
     model: Annotated[
         dict[str, Any] | None,
-        Field(description="Parameters for model-level configuration (separate from embedding/query options).")
+        Field(
+            description="Parameters for model-level configuration (separate from embedding/query options)."
+        ),
     ] = None
 
     def __init__(self, **data: Any) -> None:
         """Initialize the embedding configuration."""
-        from codeweaver.core.di import get_container
-
-        try:
-            container = get_container()
-            container.register(type(self), lambda: self)
-        except Exception as e:
-            # Log if DI not available (monorepo compatibility)
-            logger.debug(
-                "Dependency injection container not available, skipping registration of EmbeddingConfig: %s",
-                e,
-            )
         embedding = data.get("embedding")
         query = data.get("query")
         if (
@@ -184,13 +174,68 @@ class BaseEmbeddingConfig(BasedModel):
             data["model"] = {}
         object.__setattr__(self, "_is_sparse", data.pop("_is_sparse", False))
         super().__init__(**data)
+        from codeweaver.core.di import get_container
 
-    def config_dependencies(self) -> dict[str, type]:
-        """Embedding configs don't depend on others - they provide values."""
-        return {}
+        try:
+            container = get_container()
+            container.register(type(self), lambda: self)
+        except Exception as e:
+            # Log if DI not available (monorepo compatibility)
+            logger.debug(
+                "Dependency injection container not available, skipping registration of EmbeddingConfig: %s",
+                e,
+            )
 
     async def apply_resolved_config(self, **resolved: Any) -> None:
         """Nothing to apply - we're a provider, not a consumer."""
+
+    def _get_dimension(self) -> int | None:
+        """Get explicitly configured dimension without fallbacks.
+        Optional field for subclasses to implement as a helper for get_dimension.
+
+        Returns:
+            Explicitly configured dimension or None
+        """
+        return
+
+    def _get_datatype(self) -> str | None:
+        """Get explicitly configured datatype without fallbacks.
+        Optional field for subclasses to implement as a helper for get_datatype.
+
+        Returns:
+            Explicitly configured datatype or None
+        """
+        return
+
+    def get_dimension_sync(self) -> int | Literal[0] | None:
+        """Synchronous version of get_dimension() for backward compatibility.
+
+        Note: This does not perform full resolution like the async version.
+        For full resolution, use get_dimension() directly.
+
+        Returns:
+            Resolved dimension or None
+        """
+        if type(self)._is_sparse:
+            return 0
+        if dimension := self._get_dimension():
+            return dimension
+        # 1. Explicit config
+        for field in ("embedding", "query"):
+            if (
+                (config := getattr(self, field, None))
+                and (found_field := next((f for f in DIMENSION_FIELDS if f in config), None))
+                and isinstance(config[found_field], int)
+            ):
+                return config[found_field]
+        if cap := self.capabilities:
+            if dim := getattr(cap, "default_dimension", None):
+                return dim
+            if cap.output_dimensions:
+                return cap.output_dimensions[0]
+        raise ConfigurationError(
+            "Could not resolve embedding dimension from config, capabilities, or registered defaults. You need to specify it explicitly, for best results, register an `EmbeddingModelCapabilities` subclass with the capability resolver."
+        )
 
     async def get_dimension(self) -> int | Literal[0]:
         """Get resolved dimension through fallback chain.
@@ -206,6 +251,8 @@ class BaseEmbeddingConfig(BasedModel):
         """
         if type(self)._is_sparse:
             return 0
+        if dimension := self._get_dimension():
+            return dimension
         # 1. Explicit config
         for field in ("embedding", "query"):
             if (
@@ -223,7 +270,7 @@ class BaseEmbeddingConfig(BasedModel):
             "Could not resolve embedding dimension from config, capabilities, or registered defaults. You need to specify it explicitly, for best results, register an `EmbeddingModelCapabilities` subclass with the capability resolver."
         )
 
-    async def get_datatype(self) -> str | None:
+    async def get_datatype(self) -> str:
         """Get resolved datatype through fallback chain.
 
         Resolution order:
@@ -234,6 +281,37 @@ class BaseEmbeddingConfig(BasedModel):
         Returns:
             Resolved datatype or None
         """
+        if datatype := self._get_datatype():
+            return datatype
+        # 1. Explicit config
+        for field in ("embedding", "query", "model"):
+            if (config := getattr(self, field, None)) and (
+                found_field := next((f for f in DATATYPE_FIELDS if f in config), None)
+            ):
+                return config[found_field]
+
+        # 2. Model capabilities
+        if (caps := self.capabilities) and (dtype := getattr(caps, "default_datatype", None)):
+            return dtype
+
+        # 3. Provider-specific defaults
+        if output_default := next(
+            (f for f in DATATYPE_FIELDS if f in self._defaults.get("embedding", {})), None
+        ):
+            return self._defaults.get("embedding", {}).get(output_default)
+        return "float16"
+
+    def get_datatype_sync(self) -> str:
+        """Synchronous version of get_datatype() for backward compatibility.
+
+        Note: This does not perform full resolution like the async version.
+        For full resolution, use get_datatype() directly.
+
+        Returns:
+            Resolved datatype
+        """
+        if datatype := self._get_datatype():
+            return datatype
         # 1. Explicit config
         for field in ("embedding", "query", "model"):
             if (config := getattr(self, field, None)) and (
@@ -307,7 +385,7 @@ class BaseEmbeddingConfig(BasedModel):
         return VectorParams(
             size=dimension,
             distance=Distance((metric or "cosine").title()),
-            datatype=VectorStorageDatatype(datatype or "float16") if datatype else None,
+            datatype=Datatype(datatype or "float16") if datatype else None,
             quantization_config=quantization,
         )
 
@@ -325,6 +403,7 @@ class BaseEmbeddingConfig(BasedModel):
 
     def _telemetry_keys(self) -> None:
         """Get the telemetry keys for the model."""
+        return
 
     @abstractmethod
     def _as_options(self) -> SerializedEmbeddingOptionsDict:
@@ -352,14 +431,17 @@ class BaseEmbeddingConfig(BasedModel):
         resolution, use get_dimension() directly. This property returns
         only explicitly configured values or None.
         """
-        for field in ("embedding", "query"):
-            if (
-                (config := getattr(self, field, None))
-                and (found_field := next((f for f in DIMENSION_FIELDS if f in config), None))
-                and isinstance(config[found_field], int)
-            ):
-                return config[found_field]
-        return None
+        return self.get_dimension_sync()
+
+    @property
+    def datatype(self) -> str | None:
+        """Get the embedding datatype (computed field for backward compatibility).
+
+        Note: This is synchronous but get_datatype() is async. For full
+        resolution, use get_datatype() directly. This property returns
+        only explicitly configured values or None.
+        """
+        return self.get_datatype_sync()
 
 
 class BedrockEmbeddingRequestParams(TypedDict, total=False):
@@ -430,6 +512,32 @@ class BedrockEmbeddingConfig(BaseEmbeddingConfig):
     embedding: BedrockEmbeddingRequestParams | None
     """Parameters for the embedding request to Bedrock."""
 
+    def _get_dimension(self) -> int | None:
+        """Get explicitly configured dimension without fallbacks.
+        Optional field for subclasses to implement as a helper for get_dimension.
+
+        Returns:
+            Explicitly configured dimension or None
+        """
+        if (model_settings := self.model) and (dimensions := model_settings.get("dimensions")):
+            return dimensions
+        if self.model_name and self.model_name.startswith("amazon.titan-embed-text-v2"):
+            return 1024
+        return None
+
+    def _get_datatype(self) -> str:
+        """Get explicitly configured datatype without fallbacks.
+        Optional field for subclasses to implement as a helper for get_datatype.
+
+        Returns:
+            Explicitly configured datatype or None
+        """
+        if (model_settings := self.model) and (
+            embedding_types := model_settings.get("embedding_types")
+        ):
+            return embedding_types
+        return "float"
+
     def _as_options(self) -> SerializedEmbeddingOptionsDict:
         """Convert the Bedrock embedding configuration to a dictionary of options."""
         model = self.model.copy()
@@ -494,6 +602,40 @@ class CohereEmbeddingConfig(BaseEmbeddingConfig):
     )
     """The Cohere embedding model to use."""
 
+    embedding: CohereEmbeddingOptionsDict | None = None
+
+    model: dict[str, Any] | None = None
+
+    def __init__(self, **data: Any) -> None:
+        """Initialize the Cohere embedding configuration."""
+        if "model" not in data or not data.get("model"):
+            data["model"] = {}
+        if (embedding_config := data.get("embedding")) and not embedding_config.get("model"):
+            data["embedding"]["model"] = data["model_name"]
+        super().__init__(**data)
+
+    def _get_dimension(self) -> int | None:
+        """Get explicitly configured dimension without fallbacks.
+        Optional field for subclasses to implement as a helper for get_dimension.
+
+        Returns:
+            Explicitly configured dimension or None
+        """
+        if self.embedding and (output_dimension := self.embedding.get("output_dimension")):
+            return output_dimension
+        return None
+
+    def _get_datatype(self) -> str:
+        """Get explicitly configured datatype without fallbacks.
+        Optional field for subclasses to implement as a helper for get_datatype.
+
+        Returns:
+            Explicitly configured datatype or None
+        """
+        if self.embedding and (embedding_types := self.embedding.get("embedding_types")):
+            return embedding_types
+        return "float"
+
     def _as_options(self) -> SerializedEmbeddingOptionsDict:
         """Convert the Cohere embedding configuration to a dictionary of options."""
         embedding_options = {"model": self.model_name} | (self.embedding or {})
@@ -536,6 +678,19 @@ class GoogleEmbeddingConfig(BaseEmbeddingConfig):
     """The Google embedding model to use."""
     embedding: GoogleEmbeddingRequestParams | None = None
     """Parameters for the embedding request to Google."""
+
+    def _get_dimension(self) -> int | None:
+        """Get explicitly configured dimension without fallbacks.
+        Optional field for subclasses to implement as a helper for get_dimension.
+
+        Returns:
+            Explicitly configured dimension or None
+        """
+        if self.embedding and (output_dimension := self.embedding.get("output_dimensionality")):
+            return output_dimension
+        if default := self._defaults.get("embedding", {}):
+            return default.get("output_dimensionality")
+        return None
 
     def _as_options(self) -> SerializedEmbeddingOptionsDict:
         """Convert the Google embedding configuration to a dictionary of options."""
@@ -628,6 +783,28 @@ class MistralEmbeddingConfig(BaseEmbeddingConfig):
             model={},
         )
 
+    def _get_dimension(self) -> int | None:
+        """Get explicitly configured dimension without fallbacks.
+        Optional field for subclasses to implement as a helper for get_dimension.
+
+        Returns:
+            Explicitly configured dimension or None
+        """
+        if self.embedding and (output_dimension := self.embedding.get("output_dimension")):
+            return output_dimension
+        return None
+
+    def _get_datatype(self) -> str:
+        """Get explicitly configured datatype without fallbacks.
+        Optional field for subclasses to implement as a helper for get_datatype.
+
+        Returns:
+            Explicitly configured datatype or None
+        """
+        if self.embedding and (output_dtype := self.embedding.get("output_dtype")):
+            return output_dtype
+        return "float"
+
 
 class OpenAIEmbeddingRequestParams(TypedDict, total=False):
     """Parameters for OpenAI-compatible embedding requests.
@@ -681,6 +858,17 @@ class OpenAIEmbeddingConfig(BaseEmbeddingConfig):
             query=cast(dict[str, Any], self.query or {}),
             model={},
         )
+
+    def _get_dimension(self) -> int | None:
+        """Get explicitly configured dimension without fallbacks.
+        Optional field for subclasses to implement as a helper for get_dimension.
+
+        Returns:
+            Explicitly configured dimension or None
+        """
+        if self.embedding and (dimensions := self.embedding.get("dimensions")):
+            return dimensions
+        return None
 
     @property
     def _defaults(self) -> dict[str, Any]:
@@ -775,6 +963,28 @@ class SentenceTransformersEmbeddingConfig(BaseEmbeddingConfig):
             model={},
         )
 
+    def _get_dimension(self) -> int | None:
+        """Get explicitly configured dimension without fallbacks.
+        Optional field for subclasses to implement as a helper for get_dimension.
+
+        Returns:
+            Explicitly configured dimension or None
+        """
+        if self.embedding and (output_dimension := self.embedding.get("truncate_dim")):
+            return output_dimension
+        return None
+
+    def _get_datatype(self) -> str:
+        """Get explicitly configured datatype without fallbacks.
+        Optional field for subclasses to implement as a helper for get_datatype.
+
+        Returns:
+            Explicitly configured datatype or None
+        """
+        if self.embedding and (precision := self.embedding.get("precision")):
+            return precision
+        return "float32"
+
     @property
     def _defaults(self) -> dict[str, Any]:
         """Return default values for the configuration."""
@@ -815,7 +1025,14 @@ class VoyageEmbeddingConfig(BaseEmbeddingConfig):
 
     model_name: (
         Literal[
-            "voyage-code-3", "voyage-3.5", "voyage-3.5-lite", "voyage-3-large", "voyage-context-3"
+            "voyage-code-3",
+            "voyage-3.5",
+            "voyage-3.5-lite",
+            "voyage-3-large",
+            "voyage-context-3",
+            "voyage-4",
+            "voyage-4-lite",
+            "voyage-4-large",
         ]
         | ModelNameT
     )
@@ -836,12 +1053,39 @@ class VoyageEmbeddingConfig(BaseEmbeddingConfig):
             model={},
         )
 
+    def _get_dimension(self) -> int:
+        """Get explicitly configured dimension without fallbacks.
+        Optional field for subclasses to implement as a helper for get_dimension.
+
+        Returns:
+            Explicitly configured dimension or None
+        """
+        if self.embedding and (output_dimension := self.embedding.get("output_dimension")):
+            return output_dimension
+        return 1024
+
+    def _get_datatype(self) -> str:
+        """Get explicitly configured datatype without fallbacks.
+        Optional field for subclasses to implement as a helper for get_datatype.
+
+        Returns:
+            Explicitly configured datatype or None
+        """
+        if self.embedding and (output_dtype := self.embedding.get("output_dtype")):
+            return output_dtype
+        return "uint8"
+
+    @property
+    def supports_asymmetric_queries(self) -> bool:
+        """Check if the model supports asymmetric query/document. These models can query each others' embeddings."""
+        return str(self.model_name).startswith("voyage-4")
+
     @property
     def _defaults(self) -> dict[str, Any]:
         """Return default values for the configuration."""
         return {
-            "embedding": {"input_type": "document", "truncation": True, "output_dtype": "float"},
-            "query": {"input_type": "query", "truncation": True, "output_dtype": "float"},
+            "embedding": {"input_type": "document", "truncation": True, "output_dtype": "uint8"},
+            "query": {"input_type": "query", "truncation": True, "output_dtype": "uint8"},
         }
 
 

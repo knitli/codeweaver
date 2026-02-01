@@ -48,31 +48,47 @@ def get_settings(**kwargs) -> BaseCodeWeaverSettings:
         await settings.finalize()
 
         # With custom config
-        settings = get_settings(project_path="/path/to/project")
+        settings = get_settings(config_file="/path/to/config.toml")
         ```
     """
     package = detect_root_package()
-
+    config_file = kwargs.get("config_file")
     match package:
         case "server":
             from codeweaver.server.config.settings import CodeWeaverSettings
 
-            return CodeWeaverSettings(**kwargs)
+            return (
+                CodeWeaverSettings.from_config(path=config_file)
+                if config_file
+                else CodeWeaverSettings(**kwargs)
+            )
 
         case "engine":
             from codeweaver.engine.config.root_settings import CodeWeaverEngineSettings
 
-            return CodeWeaverEngineSettings(**kwargs)
+            return (
+                CodeWeaverEngineSettings.from_config(path=config_file)
+                if config_file
+                else CodeWeaverEngineSettings(**kwargs)
+            )
 
         case "provider":
             from codeweaver.providers.config.root_settings import CodeWeaverProviderSettings
 
-            return CodeWeaverProviderSettings(**kwargs)
+            return (
+                CodeWeaverProviderSettings.from_config(path=config_file)
+                if config_file
+                else CodeWeaverProviderSettings(**kwargs)
+            )
 
         case "core":
             from codeweaver.core.config.core_settings import CodeWeaverCoreSettings
 
-            return CodeWeaverCoreSettings(**kwargs)
+            return (
+                CodeWeaverCoreSettings.from_config(path=config_file)
+                if config_file
+                else CodeWeaverCoreSettings(**kwargs)
+            )
 
         case _:
             raise ImportError(f"Unsupported package detected: {package}")

@@ -1,4 +1,4 @@
-# sourcery skip: docstrings-for-classes
+# sourcery skip: docstrings-for-classes, require-parameter-annotation, require-return-annotation
 # SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
@@ -119,11 +119,7 @@ def _get_configs(
     if rerank:
         # Reranking settings are stored as a tuple, get the first element
         return profile.reranking[0]  # type: ignore[return-value]
-    if sparse:
-        # Sparse embedding settings
-        return profile.sparse_embedding  # type: ignore[return-value]
-    # Dense embedding settings (default)
-    return profile.embedding  # type: ignore[return-value]
+    return profile.sparse_embedding if sparse else profile.embedding
 
 
 @pytest.fixture
@@ -212,6 +208,7 @@ async def actual_dense_embedding_provider() -> (
         registry=EmbeddingRegistry(),
         caps=caps,
         config=config,
+        cache_manager=None,
     )
 
 

@@ -311,11 +311,11 @@ async def test_indexing_continues_on_file_errors(
 
     # Configure settings for this test
     async def get_test_settings() -> CodeWeaverSettings:
-        from codeweaver.server import get_settings
+        from codeweaver.server.config.helpers import get_settings
 
         settings = get_settings()
         settings.project_path = test_project_path
-        return settings
+        return settings  # ty:ignore[invalid-return-type]
 
     overrides = {CodeWeaverSettings: get_test_settings}
 
@@ -375,11 +375,11 @@ async def test_warning_at_25_errors(initialize_test_settings, tmp_path: Path, cl
 
     # Configure settings for this test
     async def get_test_settings() -> CodeWeaverSettings:
-        from codeweaver.server import get_settings
+        from codeweaver.server.config.helpers import get_settings
 
         settings = get_settings()
         settings.project_path = project_root
-        return settings
+        return settings  # ty:ignore[invalid-return-type]
 
     clean_container.override(CodeWeaverSettings, get_test_settings)
 
@@ -551,11 +551,11 @@ async def test_graceful_shutdown_with_checkpoint(
 
     # Configure settings for this test
     async def get_test_settings() -> CodeWeaverSettings:
-        from codeweaver.server import get_settings
+        from codeweaver.server.config.helpers import get_settings
 
         settings = get_settings()
         settings.project_path = project_root
-        return settings
+        return settings  # ty:ignore[invalid-return-type]
 
     clean_container.override(CodeWeaverSettings, get_test_settings)
 
@@ -643,11 +643,11 @@ async def test_error_logging_structured(clean_container):
 
             # Configure settings for this test
             async def get_test_settings() -> CodeWeaverSettings:
-                from codeweaver.server import get_settings
+                from codeweaver.server.config.helpers import get_settings
 
                 settings = get_settings()
                 settings.project_path = test_path
-                return settings
+                return settings  # ty:ignore[invalid-return-type]
 
             clean_container.override(CodeWeaverSettings, get_test_settings)
 

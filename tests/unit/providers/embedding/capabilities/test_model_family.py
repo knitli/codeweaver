@@ -16,6 +16,8 @@ Tests cover:
 
 from __future__ import annotations
 
+import contextlib
+
 import pytest
 
 from pydantic import ValidationError
@@ -30,13 +32,14 @@ class TestModelFamilyConstruction:
         """Test construction with minimal required fields."""
         family = ModelFamily(
             family_id="test-family",
-            vector_space_dimension=1024,
+            default_dimension=1024,
+            output_dimensions=(256, 512, 1024),
             member_models=frozenset({"model-a", "model-b"}),
         )
 
         assert family.family_id == "test-family"
-        assert family.vector_space_dimension == 1024
-        assert family.vector_space_datatype == "float16"
+        assert family.default_dimension == 1024
+        assert family.default_dtype == "float16"
         assert family.is_normalized is False
         assert family.preferred_metrics == ("cosine", "dot", "euclidean")
         assert family.member_models == frozenset({"model-a", "model-b"})
@@ -47,8 +50,8 @@ class TestModelFamilyConstruction:
         """Test construction with all fields specified."""
         family = ModelFamily(
             family_id="voyage-4",
-            vector_space_dimension=2048,
-            vector_space_datatype="int8",
+            default_dimension=2048,
+            default_dtype="int8",
             is_normalized=True,
             preferred_metrics=("dot", "cosine"),
             member_models=frozenset({
@@ -62,8 +65,8 @@ class TestModelFamilyConstruction:
         )
 
         assert family.family_id == "voyage-4"
-        assert family.vector_space_dimension == 2048
-        assert family.vector_space_datatype == "int8"
+        assert family.default_dimension == 2048
+        assert family.default_dtype == "int8"
         assert family.is_normalized is True
         assert family.preferred_metrics == ("dot", "cosine")
         assert len(family.member_models) == 4
@@ -75,7 +78,7 @@ class TestModelFamilyConstruction:
         with pytest.raises(ValidationError) as exc_info:
             ModelFamily(
                 family_id="ab",  # Too short
-                vector_space_dimension=1024,
+                default_dimension=1024,
                 member_models=frozenset({"model-a"}),
             )
 
@@ -83,17 +86,17 @@ class TestModelFamilyConstruction:
         assert error["loc"] == ("family_id",)
         assert "at least 3 characters" in str(error["msg"]).lower()
 
-    def test_vector_space_dimension_must_be_positive(self) -> None:
-        """Test that vector_space_dimension must be positive."""
+    def test_default_dimension_must_be_positive(self) -> None:
+        """Test that default_dimension must be positive."""
         with pytest.raises(ValidationError) as exc_info:
             ModelFamily(
                 family_id="test-family",
-                vector_space_dimension=0,  # Invalid
+                default_dimension=0,  # Invalid
                 member_models=frozenset({"model-a"}),
             )
 
         error = exc_info.value.errors()[0]
-        assert error["loc"] == ("vector_space_dimension",)
+        assert error["loc"] == ("default_dimension",)
         assert "greater than 0" in str(error["msg"]).lower()
 
     def test_member_models_cannot_be_empty(self) -> None:
@@ -102,7 +105,7 @@ class TestModelFamilyConstruction:
         # but logically shouldn't be used in practice
         family = ModelFamily(
             family_id="test-family",
-            vector_space_dimension=1024,
+            default_dimension=1024,
             member_models=frozenset(),  # Empty set is technically valid
         )
         assert len(family.member_models) == 0
@@ -110,22 +113,17 @@ class TestModelFamilyConstruction:
     def test_frozen_model_immutability(self) -> None:
         """Test that model is frozen and cannot be modified after creation."""
         family = ModelFamily(
-            family_id="test-family",
-            vector_space_dimension=1024,
-            member_models=frozenset({"model-a"}),
+            family_id="test-family", default_dimension=1024, member_models=frozenset({"model-a"})
         )
 
         # Check if model is frozen (based on BASEDMODEL_CONFIG)
         # If frozen=True, should raise ValidationError or AttributeError
         # If not frozen, we just verify the model was created successfully
-        try:
+        with contextlib.suppress(ValidationError, AttributeError):
             family.family_id = "new-id"  # type: ignore[misc]
             # If we get here, model is not frozen, which is acceptable
             # Just verify the original instance is still valid
-            assert family.family_id in ("test-family", "new-id")
-        except (ValidationError, AttributeError):
-            # Model is frozen, which is the desired behavior
-            pass
+            assert family.family_id in {"test-family", "new-id"}
 
 
 class TestIsCompatible:
@@ -135,7 +133,7 @@ class TestIsCompatible:
         """Test that same model is compatible with itself."""
         family = ModelFamily(
             family_id="test-family",
-            vector_space_dimension=1024,
+            default_dimension=1024,
             member_models=frozenset({"model-a", "model-b"}),
         )
 
@@ -146,7 +144,7 @@ class TestIsCompatible:
         """Test that different models in the same family are compatible."""
         family = ModelFamily(
             family_id="voyage-4",
-            vector_space_dimension=2048,
+            default_dimension=2048,
             member_models=frozenset({
                 "voyage-4-large",
                 "voyage-4",
@@ -171,7 +169,7 @@ class TestIsCompatible:
         """Test that model not in family is incompatible (embed model)."""
         family = ModelFamily(
             family_id="test-family",
-            vector_space_dimension=1024,
+            default_dimension=1024,
             member_models=frozenset({"model-a", "model-b"}),
         )
 
@@ -182,7 +180,7 @@ class TestIsCompatible:
         """Test that model not in family is incompatible (query model)."""
         family = ModelFamily(
             family_id="test-family",
-            vector_space_dimension=1024,
+            default_dimension=1024,
             member_models=frozenset({"model-a", "model-b"}),
         )
 
@@ -193,7 +191,7 @@ class TestIsCompatible:
         """Test that both models not in family are incompatible."""
         family = ModelFamily(
             family_id="test-family",
-            vector_space_dimension=1024,
+            default_dimension=1024,
             member_models=frozenset({"model-a", "model-b"}),
         )
 
@@ -204,7 +202,7 @@ class TestIsCompatible:
         """Test that model name matching is case-sensitive."""
         family = ModelFamily(
             family_id="test-family",
-            vector_space_dimension=1024,
+            default_dimension=1024,
             member_models=frozenset({"model-a", "model-b"}),
         )
 
@@ -220,9 +218,7 @@ class TestValidateDimensions:
     def test_matching_dimensions_valid(self) -> None:
         """Test that matching dimensions pass validation."""
         family = ModelFamily(
-            family_id="test-family",
-            vector_space_dimension=1024,
-            member_models=frozenset({"model-a"}),
+            family_id="test-family", default_dimension=1024, member_models=frozenset({"model-a"})
         )
 
         is_valid, error = family.validate_dimensions(1024, 1024)
@@ -231,56 +227,40 @@ class TestValidateDimensions:
 
     def test_mismatched_embed_dimension(self) -> None:
         """Test that mismatched embed dimension fails validation."""
-        family = ModelFamily(
-            family_id="test-family",
-            vector_space_dimension=1024,
-            member_models=frozenset({"model-a"}),
+        self._check_family_dimension_validation(
+            512, 1024, "Embedding dimension 512 does not match query dimension 1024"
         )
-
-        is_valid, error = family.validate_dimensions(512, 1024)
-        assert is_valid is False
-        assert error is not None
-        assert "Embedding dimension 512 does not match family dimension 1024" in error
 
     def test_mismatched_query_dimension(self) -> None:
         """Test that mismatched query dimension fails validation."""
-        family = ModelFamily(
-            family_id="test-family",
-            vector_space_dimension=1024,
-            member_models=frozenset({"model-a"}),
+        self._check_family_dimension_validation(
+            1024, 512, "Embedding dimension 1024 does not match query dimension 512"
         )
-
-        is_valid, error = family.validate_dimensions(1024, 512)
-        assert is_valid is False
-        assert error is not None
-        assert "Query dimension 512 does not match family dimension 1024" in error
 
     def test_embed_and_query_dimensions_mismatch_each_other(self) -> None:
         """Test that embed and query dimensions must match each other."""
-        family = ModelFamily(
-            family_id="test-family",
-            vector_space_dimension=1024,
-            member_models=frozenset({"model-a"}),
+        self._check_family_dimension_validation(
+            768, 512, "Embedding dimension 768 does not match query dimension 512"
         )
-
-        is_valid, error = family.validate_dimensions(768, 512)
-        assert is_valid is False
-        assert error is not None
-        # Should fail on embed dimension check first
-        assert "Embedding dimension 768 does not match family dimension 1024" in error
 
     def test_both_dimensions_wrong_but_match_each_other(self) -> None:
         """Test that even if embed and query match, they must match family."""
-        family = ModelFamily(
-            family_id="test-family",
-            vector_space_dimension=1024,
-            member_models=frozenset({"model-a"}),
+        self._check_family_dimension_validation(
+            512, 512, "Embedding dimension 512 is not supported by this family; expected one of (2048, 1024)"
         )
 
-        is_valid, error = family.validate_dimensions(512, 512)
+    # TODO Rename this here and in `test_mismatched_embed_dimension`, `test_mismatched_query_dimension`, `test_embed_and_query_dimensions_mismatch_each_other` and `test_both_dimensions_wrong_but_match_each_other`
+    def _check_family_dimension_validation(self, arg0, arg1, arg2):
+        family = ModelFamily(
+            family_id="test-family",
+            default_dimension=1024,
+            output_dimensions=(2048, 1024),
+            member_models=frozenset({"model-a"}),
+        )
+        is_valid, error = family.validate_dimensions(arg0, arg1)
         assert is_valid is False
         assert error is not None
-        assert "Embedding dimension 512 does not match family dimension 1024" in error
+        assert arg2 in error
 
     def test_various_dimension_sizes(self) -> None:
         """Test validation with various common dimension sizes."""
@@ -297,7 +277,8 @@ class TestValidateDimensions:
         for expected_dim, test_dim in test_cases:
             family = ModelFamily(
                 family_id="test-family",
-                vector_space_dimension=expected_dim,
+                default_dimension=expected_dim,
+                output_dimensions=(expected_dim,),
                 member_models=frozenset({"model-a"}),
             )
 
@@ -322,8 +303,8 @@ class TestVoyage4FamilyDefinition:
         # Expected VOYAGE_4_FAMILY definition
         voyage_4_family = ModelFamily(
             family_id="voyage-4",
-            vector_space_dimension=2048,
-            vector_space_datatype="float",
+            default_dimension=2048,
+            default_dtype="float",
             is_normalized=True,
             preferred_metrics=("dot",),
             member_models=frozenset({
@@ -352,7 +333,7 @@ class TestVoyage4FamilyDefinition:
         assert voyage_4_family.cross_provider_compatible is True
 
         # Verify vector space properties
-        assert voyage_4_family.vector_space_dimension == 2048
+        assert voyage_4_family.default_dimension == 2048
         assert voyage_4_family.is_normalized is True
         assert voyage_4_family.preferred_metrics == ("dot",)
 
@@ -360,7 +341,7 @@ class TestVoyage4FamilyDefinition:
         """Test that all Voyage-4 models are compatible with each other."""
         voyage_4_family = ModelFamily(
             family_id="voyage-4",
-            vector_space_dimension=2048,
+            default_dimension=2048,
             member_models=frozenset({
                 "voyage-4-large",
                 "voyage-4",
@@ -381,7 +362,7 @@ class TestVoyage4FamilyDefinition:
         """Test dimension validation for Voyage-4 family."""
         voyage_4_family = ModelFamily(
             family_id="voyage-4",
-            vector_space_dimension=2048,
+            default_dimension=2048,
             member_models=frozenset({"voyage-4-large", "voyage-4-nano"}),
         )
 
@@ -407,7 +388,7 @@ class TestCrossProviderFamilyLinking:
         """Test that cross_provider_compatible flag enables linking."""
         family = ModelFamily(
             family_id="voyage-4",
-            vector_space_dimension=2048,
+            default_dimension=2048,
             member_models=frozenset({"voyage-4-large", "voyage-4-nano"}),
             cross_provider_compatible=True,
         )
@@ -423,7 +404,7 @@ class TestCrossProviderFamilyLinking:
         # Create family that spans both providers
         cross_provider_family = ModelFamily(
             family_id="voyage-4",
-            vector_space_dimension=2048,
+            default_dimension=2048,
             member_models=frozenset({
                 "voyage-4-large",  # Available via VOYAGE provider
                 "voyage-4",  # Available via VOYAGE provider
@@ -446,7 +427,7 @@ class TestCrossProviderFamilyLinking:
         """Test dimension validation works across providers."""
         cross_provider_family = ModelFamily(
             family_id="voyage-4",
-            vector_space_dimension=2048,
+            default_dimension=2048,
             member_models=frozenset({"voyage-4-large", "voyage-4-nano"}),
             cross_provider_compatible=True,
         )
@@ -460,13 +441,13 @@ class TestCrossProviderFamilyLinking:
         is_valid, error = cross_provider_family.validate_dimensions(2048, 1024)
         assert is_valid is False
         assert error is not None
-        assert "Query dimension 1024 does not match family dimension 2048" in error
+        assert "Embedding dimension 2048 does not match query dimension 1024" in error
 
     def test_non_cross_provider_family(self) -> None:
         """Test family that is not cross-provider compatible."""
         single_provider_family = ModelFamily(
             family_id="single-provider",
-            vector_space_dimension=1024,
+            default_dimension=1024,
             member_models=frozenset({"model-a", "model-b"}),
             cross_provider_compatible=False,  # Not cross-provider
         )
@@ -486,7 +467,7 @@ class TestAsymmetricQueryModels:
         """
         family = ModelFamily(
             family_id="test-family",
-            vector_space_dimension=1024,
+            default_dimension=1024,
             member_models=frozenset({"model-a", "model-b", "model-c"}),
             asymmetric_query_models=frozenset({"model-c"}),
         )
@@ -499,7 +480,7 @@ class TestAsymmetricQueryModels:
         """Test family with multiple specialized query models."""
         family = ModelFamily(
             family_id="test-family",
-            vector_space_dimension=1024,
+            default_dimension=1024,
             member_models=frozenset({"large", "medium", "small", "nano"}),
             asymmetric_query_models=frozenset({"small", "nano"}),
         )
@@ -517,7 +498,7 @@ class TestAsymmetricQueryModels:
         """Test family without specialized query models."""
         family = ModelFamily(
             family_id="test-family",
-            vector_space_dimension=1024,
+            default_dimension=1024,
             member_models=frozenset({"model-a", "model-b"}),
             asymmetric_query_models=None,
         )
@@ -532,7 +513,7 @@ class TestEdgeCases:
         """Test family with only one model."""
         family = ModelFamily(
             family_id="single-model",
-            vector_space_dimension=1024,
+            default_dimension=1024,
             member_models=frozenset({"only-model"}),
         )
 
@@ -543,9 +524,7 @@ class TestEdgeCases:
     def test_large_model_family(self) -> None:
         """Test family with many models."""
         models = frozenset({f"model-{i}" for i in range(100)})
-        family = ModelFamily(
-            family_id="large-family", vector_space_dimension=1024, member_models=models
-        )
+        family = ModelFamily(family_id="large-family", default_dimension=1024, member_models=models)
 
         assert len(family.member_models) == 100
         # Test a few combinations
@@ -557,7 +536,7 @@ class TestEdgeCases:
         """Test model names with various special characters."""
         family = ModelFamily(
             family_id="special-chars",
-            vector_space_dimension=1024,
+            default_dimension=1024,
             member_models=frozenset({
                 "model-with-dashes",
                 "model_with_underscores",
@@ -574,7 +553,7 @@ class TestEdgeCases:
     def test_very_large_dimension(self) -> None:
         """Test family with very large dimension."""
         family = ModelFamily(
-            family_id="large-dim", vector_space_dimension=8192, member_models=frozenset({"model-a"})
+            family_id="large-dim", default_dimension=8192, member_models=frozenset({"model-a"})
         )
 
         is_valid, error = family.validate_dimensions(8192, 8192)
@@ -585,7 +564,7 @@ class TestEdgeCases:
         """Test family with very small (but valid) dimension."""
         family = ModelFamily(
             family_id="small-dim",
-            vector_space_dimension=1,  # Minimum positive integer
+            default_dimension=1,  # Minimum positive integer
             member_models=frozenset({"model-a"}),
         )
 
@@ -596,9 +575,7 @@ class TestEdgeCases:
     def test_telemetry_keys_returns_none(self) -> None:
         """Test that _telemetry_keys() returns None (no sensitive data)."""
         family = ModelFamily(
-            family_id="test-family",
-            vector_space_dimension=1024,
-            member_models=frozenset({"model-a"}),
+            family_id="test-family", default_dimension=1024, member_models=frozenset({"model-a"})
         )
 
         assert family._telemetry_keys() is None

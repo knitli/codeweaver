@@ -381,12 +381,12 @@ class CollectionMetadata(BasedModel):
                             "current_dimension": current_dim,
                             "indexed_model": indexed_model,
                             "indexed_dimension": indexed_dim,
-                            "expected_dimension": current_family.vector_space_dimension,
+                            "expected_dimension": current_family.default_dimension,
                             "family_id": current_family.family_id,
                         },
                         suggestions=[
                             "Ensure both models use the same embedding dimension",
-                            f"Expected dimension for '{current_family.family_id}': {current_family.vector_space_dimension}",
+                            f"Expected dimension for '{current_family.family_id}': {current_family.default_dimension}",
                             "Check model configurations and verify dimension settings",
                         ],
                     )

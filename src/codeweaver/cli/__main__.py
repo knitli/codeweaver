@@ -14,6 +14,8 @@ import contextlib
 import sys
 import warnings
 
+from pathlib import Path
+
 
 # NOTE: google.genai emits a pydantic deprecation warning during module import
 # (before our code runs). To suppress it, set: PYTHONWARNINGS='ignore::pydantic.warnings.PydanticDeprecatedSince212'
@@ -23,14 +25,16 @@ with contextlib.suppress(Exception):
 
     warnings.simplefilter("ignore", PydanticDeprecatedSince212)
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NoReturn
 
 from cyclopts import App, Parameter
 
 from codeweaver import __version__
 from codeweaver.cli.ui import get_display
 from codeweaver.core import CODEWEAVER_PREFIX
-from codeweaver.core.di import get_container
+from codeweaver.core.di.container import (
+    get_container,  # ensure we're pulling in the container module
+)
 from codeweaver.core.ui_protocol import ProgressReporter
 from codeweaver.core.utils.environment import detect_root_package
 
@@ -85,42 +89,67 @@ def _handle_keyboard_interrupt():
     console.print("  [dim]discussions: https://github.com/knitli/codeweaver/discussions[/dim]")
 
 
-def main() -> None:
-    """Main CLI entry point."""
-    import asyncio
+async def _init_di(config_path: str | None = None) -> None:
+    """Initialize dependency injection container with settings."""
     from codeweaver.core.dependencies import bootstrap_settings
 
-    # Bootstrap settings and initialize DI container
-    # This must happen before any commands are executed
-    async def _init_di():
-        """Initialize dependency injection container with settings."""
-        # Bootstrap settings - this registers them in the DI container
-        await bootstrap_settings()
-        # Override DI to use StatusDisplay instead of default RichConsoleProgressReporter
-        get_container().override(ProgressReporter, display)
+    # Bootstrap settings - this registers them in the DI container
+    await bootstrap_settings(config_file=Path(config_path) if config_path else None)
+    # Override DI to use StatusDisplay instead of default RichConsoleProgressReporter
+    get_container().override(ProgressReporter, display)
 
-    # Run async initialization
+
+def _print_error_message(message: str, e: Exception) -> NoReturn:
+    console.print(f"{CODEWEAVER_PREFIX}{message}{e}[/bold red]")
+    console.print("\n[red]Traceback:[/red]")
+    console.print_exception(max_frames=10)
+    raise SystemExit(1) from e
+
+
+async def _config_in_args(args: list[str]) -> str | None:
+    """Check if a --config argument is provided in the CLI args."""
+    return next(
+        (
+            (arg.split("=", 1)[1] if "=" in arg else args[i + 1] if i + 1 < len(args) else None)
+            for i, arg in enumerate(args)
+            if arg.startswith(("--config", "-c"))
+        ),
+        None,
+    )
+
+
+async def _async_main() -> None:
+    """Async main CLI entry point with DI initialization."""
     try:
-        asyncio.run(_init_di())
+        await _init_di(config_path=await _config_in_args(sys.argv))
     except Exception as e:
-        console.print(f"{CODEWEAVER_PREFIX} [bold red]Failed to initialize: {e}[/bold red]")
-        console.print("\n[red]Traceback:[/red]")
-        console.print_exception(max_frames=10)
-        sys.exit(1)
-
+        _print_error_message(" [bold red]Fatal error during DI initialization: ", e)
     try:
         app()
     except KeyboardInterrupt:
         _handle_keyboard_interrupt()
     except Exception as e:
-        console.print(f"{CODEWEAVER_PREFIX} [bold red]Fatal error: {e}[/bold red]")
-        console.print("\n[red]Traceback:[/red]")
-        console.print_exception(max_frames=10)
-        sys.exit(1)
+        _print_error_message(" [bold red]Fatal error: ", e)
+
+
+def main() -> None:
+    """Main CLI entry point (sync wrapper for async logic)."""
+    from codeweaver.core.utils.procs import asyncio_or_uvloop
+
+    loop = asyncio_or_uvloop()
+    loop.run(_async_main())
 
 
 if __name__ == "__main__":
-    main()
+    console.print(f"{CODEWEAVER_PREFIX} Starting CodeWeaver CLI...", style="dim")
+    try:
+        main()
+        console.print("Settings initialized.", style="dim")
+    except Exception as e:
+        try:
+            _print_error_message(" [bold red]Fatal error during startup: ", e)
+        except Exception:
+            sys.exit(1)
 
 
 __all__ = ("app", "main")

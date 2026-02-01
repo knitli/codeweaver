@@ -33,12 +33,14 @@ class ModelFamily(BasedModel):
     Model families group embedding models that produce compatible embeddings, meaning
     their vectors can be directly compared and stored in the same vector space. This
     enables cross-model operations like using different models for embedding vs querying,
-    or migrating between models within a family without re-embedding.
+    or migrating between models within a family without re-embedding. All datatypes and dimensions must still match.
 
     Attributes:
         family_id: Unique identifier for the model family (e.g., "voyage-3", "cohere-v3").
-        vector_space_dimension: Dimensionality of the embedding vectors in this family.
-        vector_space_datatype: Data type of vector components (default: "float").
+        default_dimension: Dimensionality of the embedding vectors in this family.
+        output_dimensions: tuple of possible output dimensions for models in this family.
+        default_dtype: Data type of vector components (default: "float16").
+        output_dtypes: Accepted data types for model outputs within this family.
         is_normalized: Whether embeddings are normalized to unit length.
         preferred_metrics: Preferred distance metrics for this family, in order of suitability.
         member_models: Set of model names belonging to this family.
@@ -49,7 +51,7 @@ class ModelFamily(BasedModel):
     family_id: Annotated[
         str, Field(min_length=3, description="Unique identifier for the model family.")
     ]
-    vector_space_dimension: Annotated[
+    default_dimension: Annotated[
         PositiveInt,
         Field(description="Dimensionality of the embedding vectors produced by this family."),
     ]
@@ -63,19 +65,25 @@ class ModelFamily(BasedModel):
         frozenset[str] | None,
         Field(description="Optional set of specialized models designed for query-time use only."),
     ] = None
-    vector_space_dimension: Annotated[
-        PositiveInt,
-        Field(description="Dimensionality of the embedding vectors produced by this family."),
-    ]
+    output_dimensions: Annotated[
+        tuple[PositiveInt, ...] | None,
+        Field(description="Supported output dimensions for models in this family, if applicable."),
+    ] = None
     cross_provider_compatible: Annotated[
         bool,
         Field(
             description="Whether this family maintains compatibility across different providers."
         ),
     ] = False
-    vector_space_datatype: Annotated[
+    default_dtype: Annotated[
         str, Field(description="Data type of vector components (e.g., 'float', 'int8').")
     ] = "float16"
+    output_dtypes: Annotated[
+        tuple[str, ...] | None,
+        Field(
+            description="Accepted data types for model outputs within this family, if applicable."
+        ),
+    ] = None
     is_normalized: Annotated[
         bool, Field(description="Whether embeddings are normalized to unit length.")
     ] = False
@@ -118,24 +126,24 @@ class ModelFamily(BasedModel):
             Tuple of (is_valid, error_message). If valid, error_message is None.
             If invalid, error_message describes the dimension mismatch.
         """
-        expected = self.vector_space_dimension
-
-        if embed_dim != expected:
-            return (
-                False,
-                f"Embedding dimension {embed_dim} does not match family dimension {expected}",
-            )
-
-        if query_dim != expected:
-            return (
-                False,
-                f"Query dimension {query_dim} does not match family dimension {expected}",
-            )
+        allowed_dims = {self.default_dimension, *(self.output_dimensions or ())}
 
         if embed_dim != query_dim:
             return (
                 False,
                 f"Embedding dimension {embed_dim} does not match query dimension {query_dim}",
+            )
+
+        if embed_dim not in allowed_dims:
+            return (
+                False,
+                f"Embedding dimension {embed_dim} is not supported by this family; expected one of {self.output_dimensions}",
+            )
+
+        if query_dim not in allowed_dims:
+            return (
+                False,
+                f"Query dimension {query_dim} is not supported by this family; expected one of {self.output_dimensions}",
             )
 
         return (True, None)
@@ -180,7 +188,7 @@ class EmbeddingModelCapabilities(BasedModel):
         Field(
             description="""A list of accepted values for output data types, if the model/provider allows different output data types. When available, you can use this to reduce the size of the returned vectors, at the cost of some accuracy (depending on which you choose).""",
             examples=[
-                "VoyageAI: `('float', 'uint8', 'int8', 'binary', 'ubinary')` for the voyage 3-series models."
+                "VoyageAI: `('float', 'uint8', 'int8', 'binary', 'ubinary')` for the voyage 3 and 4-series models."
             ],
         ),
     ] = None

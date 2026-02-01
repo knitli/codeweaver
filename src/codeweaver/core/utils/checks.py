@@ -152,8 +152,10 @@ def is_test_environment() -> bool:
     pytest_loaded = "pytest" in sys.modules
     pytest_flagged = any(arg.startswith("-m") and "pytest" in arg for arg in sys.argv)
     pytest_current_test = bool(os.environ.get("PYTEST_CURRENT_TEST"))
+    # We don't want to force a testing profile if someone is debugging something else!
+    from codeweaver.core.utils.filesystem import in_codeweaver_clone
 
-    return pytest_loaded or (pytest_flagged and pytest_current_test)
+    return in_codeweaver_clone() and (pytest_loaded or (pytest_flagged and pytest_current_test))
 
 
 def is_wsl() -> bool:

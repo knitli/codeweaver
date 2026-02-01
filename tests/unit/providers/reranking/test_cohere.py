@@ -59,9 +59,7 @@ def mock_cohere_rerank_config():
     from codeweaver.providers.config.reranking import CohereRerankingConfig
 
     return CohereRerankingConfig(
-        tag="cohere",
-        provider=Provider.COHERE,
-        model_name="rerank-english-v3.0",
+        tag="cohere", provider=Provider.COHERE, model_name="rerank-english-v3.0"
     )
 
 
@@ -98,10 +96,10 @@ class TestCohereRerankingProviderInitialization:
             config=mock_cohere_rerank_config,
             caps=cohere_rerank_capabilities,
             _provider=Provider.COHERE,
-            top_n=25,
+            top_n=10,
         )
 
-        assert provider.top_n == 25
+        assert provider.top_n == 10
 
     def test_provider_base_url(
         self, mock_cohere_rerank_client, mock_cohere_rerank_config, cohere_rerank_capabilities

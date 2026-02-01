@@ -1071,12 +1071,12 @@ class AsymmetricEmbeddingConfig(BasedModel):
                     "embed_dimension": embed_dim,
                     "query_model": query_model_name,
                     "query_dimension": query_dim,
-                    "expected_dimension": embed_family.vector_space_dimension,
+                    "expected_dimension": embed_family.default_dimension,
                     "family_id": embed_family.family_id,
                 },
                 suggestions=[
                     "Ensure both models use the same embedding dimension",
-                    f"Expected dimension for '{embed_family.family_id}': {embed_family.vector_space_dimension}",
+                    f"Expected dimension for '{embed_family.family_id}': {embed_family.default_dimension}",
                     "Check model configurations and verify dimension settings",
                 ],
             )

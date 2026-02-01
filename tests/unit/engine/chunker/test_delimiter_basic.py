@@ -391,19 +391,7 @@ def another_function():
         from codeweaver.core import DiscoveredFile
 
         discovered_file = DiscoveredFile.from_path(test_file)
-
-        # DEBUG: Log chunker info
-        with open("/tmp/test_debug.txt", "w") as f:
-            f.write(f"Chunker type: {type(delimiter_chunker)}\n")
-            f.write(f"Chunker class: {delimiter_chunker.__class__.__name__}\n")
-            f.write(f"Has chunk method: {hasattr(delimiter_chunker, 'chunk')}\n")
-            f.write(f"Language: {getattr(delimiter_chunker, '_language', 'N/A')}\n")
-            f.write(f"Calling chunk()...\n")
-
         chunks = delimiter_chunker.chunk(code, file=discovered_file)
-
-        with open("/tmp/test_debug.txt", "a") as f:
-            f.write(f"chunk() returned {len(chunks)} chunks\n")
 
         # Should have chunks for both functions
         assert len(chunks) >= 2, "Should detect both function boundaries"

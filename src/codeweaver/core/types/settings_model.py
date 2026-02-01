@@ -1,4 +1,4 @@
-# sourcery skip: lambdas-should-be-short
+# sourcery skip: lambdas-should-be-short, no-complex-if-expressions
 # SPDX-FileCopyrightText: 2026 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
@@ -49,14 +49,14 @@ from codeweaver.core.types.utils import (
     generate_title,
 )
 from codeweaver.core.utils.checks import is_test_environment
-from codeweaver.core.utils.filesystem import get_project_path, get_user_config_dir
+from codeweaver.core.utils.filesystem import get_user_config_dir
 
 
 if TYPE_CHECKING:
     from codeweaver.core.config.types import CodeWeaverSettingsDict
 
 
-SCHEMA_VERSION = "1.2.1"
+SCHEMA_VERSION = "2.0.0"
 
 
 SUPPORTED_CONFIG_FILE_EXTENSIONS = MappingProxyType({
@@ -250,6 +250,17 @@ def google_secret_manager_configured(
     return False
 
 
+@overload
+def _set_or_unset(env_var: str, *, is_path: Literal[True]) -> Path | Unset: ...
+@overload
+def _set_or_unset(env_var: str, *, is_path: bool = False) -> str | Unset: ...
+def _set_or_unset(env_var: str, *, is_path: bool = False) -> str | Unset | Path:
+    """Get environment variable as Path or str, or UNSET if not set."""
+    if is_path:
+        return Path(resolved_path) if (resolved_path := os.getenv(env_var)) else UNSET
+    return os.getenv(env_var, UNSET)
+
+
 DEFAULT_BASE_SETTINGS_CONFIG = SettingsConfigDict(
     case_sensitive=False,
     cli_kebab_case=True,
@@ -295,35 +306,18 @@ class BaseCodeWeaverSettings(BaseSettings):
     # spellchecker:on
     model_config: SettingsConfigDict = DEFAULT_BASE_SETTINGS_CONFIG
 
-    project_path: Annotated[
-        DirectoryPath,
-        Field(
-            description="Path to the project root directory",
-            init=False,
-            exclude=CODEWEAVER_SETTINGS_AVAILABLE,
-            repr=True,
-        ),
-    ]
+    project_path: DirectoryPath | Unset = Field(
+        default=UNSET, description="Path to the project root directory.", repr=True
+    )
 
-    project_name: Annotated[
-        str,
-        Field(
-            description="Name of the project. Derived from the project directory name if not provided.",
-            init=False,
-            exclude=CODEWEAVER_SETTINGS_AVAILABLE,
-            repr=True,
-        ),
-    ]
+    project_name: str | Unset = Field(default=UNSET, description="Name of the project", repr=True)
 
-    config_file: Annotated[
-        FilePath | None,
-        Field(
-            description="Path to the configuration file used to load settings",
-            exclude=True,
-            init=False,
-            repr=True,
-        ),
-    ]
+    config_file: FilePath | Unset | None = Field(
+        default=UNSET,
+        description="Path to the configuration file used to load settings",
+        exclude=True,
+        repr=True,
+    )
 
     logging: Annotated[
         LoggingSettingsDict | Unset,
@@ -367,29 +361,6 @@ class BaseCodeWeaverSettings(BaseSettings):
 
     _env_prefix: ClassVar[str] = "CODEWEAVER_"
 
-    @overload
-    def __init__(
-        self,
-        config_file: FilePath,
-        project_path: DirectoryPath | Unset = UNSET,
-        project_name: str | Unset = UNSET,
-        logging: LoggingSettingsDict | Unset = UNSET,
-        telemetry: TelemetrySettings | Unset = UNSET,
-        **data: Any,
-    ) -> None:
-        ...
-    @overload
-    def __init__(
-        self,
-        *,
-        project_path: DirectoryPath,
-        project_name: str | Unset = UNSET,
-        config_file: FilePath | Unset = UNSET,
-        logging: LoggingSettingsDict | Unset = UNSET,
-        telemetry: TelemetrySettings | Unset = UNSET,
-        **data: Any,
-    ) -> None:
-        ...
     def __init__(
         self,
         project_path: DirectoryPath | Unset = UNSET,
@@ -409,20 +380,42 @@ class BaseCodeWeaverSettings(BaseSettings):
             for key in type(self).model_fields
             if data.get(key) is UNSET or locals().get(key) is UNSET
         }
-        if project_path is UNSET:
-            project_path = Path(
-                os.getenv("CODEWEAVER_PROJECT_PATH", data.get("project_path", get_project_path()))
+        if (
+            project_path is UNSET
+            and (
+                set_path := resolved
+                if (resolved := _set_or_unset("CODEWEAVER_PROJECT_PATH", is_path=True)) is not UNSET
+                else None
+            )
+            and resolved.exists()
+            and resolved.is_dir()
+        ):
+            project_path = cast(DirectoryPath, set_path).resolve()
+        else:
+            project_path = cast(
+                DirectoryPath,
+                _resolve_project_path()
+                if (project_path is UNSET or not project_path)
+                else project_path,
             )
         if config_file is UNSET:
+            config_file: Path | None = (
+                file
+                if (file := _set_or_unset("CODEWEAVER_CONFIG_FILE", is_path=True)) is not UNSET
+                and file.exists()
+                and file.is_file()
+                else None
+            )  # ty:ignore[invalid-assignment]
+        elif config_file is not None and config_file.exists() and config_file.is_file():
+            config_file = cast(Path, config_file)
+        else:
             config_file = None  # ty:ignore[invalid-assignment]
         if logging is UNSET:
             logging = data.get("logging", DefaultLoggingSettings)
         if telemetry is UNSET:
             telemetry = data.get("telemetry", TelemetrySettings(**DefaultTelemetrySettings))  # ty:ignore[invalid-argument-type]
         if project_name is UNSET:
-            project_name = data.get(
-                "project_name", os.getenv("CODEWEAVER_PROJECT_NAME", project_path.name)
-            )
+            project_name = _set_or_unset("CODEWEAVER_PROJECT_NAME") or project_path.name
         data |= {
             "logging": logging,
             "telemetry": telemetry,
@@ -433,7 +426,7 @@ class BaseCodeWeaverSettings(BaseSettings):
         data = self._initialize(**data)
         super().__init__(**data)
         # Now that the parent is initialized, we can set the private attribute
-        self._unset_fields.update(unset_fields)
+        self._unset_fields |= unset_fields
         if not type(self).__pydantic_complete__:
             type(self).model_rebuild()
 
@@ -763,6 +756,22 @@ class BaseCodeWeaverSettings(BaseSettings):
         This method is kept for runtime introspection and testing purposes.
         """
         return to_json(cls.python_json_schema(), indent=2).replace(b"schema_", b"$schema")
+
+    @classmethod
+    def write_json_schema(cls, path: Path | None = None) -> None:
+        """Write the JSON schema to a file.
+
+        If no path is provided, writes to 'codeweaver.schema.json' in the current directory.
+        """
+        from codeweaver.core.utils.filesystem import in_codeweaver_clone
+
+        if not path and in_codeweaver_clone():
+            schema_path = path or Path.cwd() / "schema" / SCHEMA_VERSION / "codeweaver.schema.json"
+        elif not path:
+            schema_path = Path.cwd() / "codeweaver.schema.json"
+        schema = cls.json_schema()
+        schema_path.parent.mkdir(parents=True, exist_ok=True)
+        _ = schema_path.write_bytes(schema)
 
     @property
     def view(self) -> DictView[CodeWeaverSettingsDict]:

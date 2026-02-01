@@ -184,11 +184,7 @@ class VectorReconciliationService:
             if backup_vector is None:
                 return False
             # Handle both list and SparseVector types
-            if isinstance(backup_vector, list):
-                return len(backup_vector) > 0
-            # For SparseVector or other types, assume present means valid
-            return True
-
+            return len(backup_vector) > 0 if isinstance(backup_vector, list) else True
         return False
 
     async def repair_missing_vectors(
@@ -310,7 +306,9 @@ class VectorReconciliationService:
                 # Handle potential error result
                 if isinstance(embedding_result, dict):
                     # EmbeddingErrorInfo case - treat as failure
-                    error_msg = f"Embedding failed: {embedding_result.get('error', 'Unknown error')}"
+                    error_msg = (
+                        f"Embedding failed: {embedding_result.get('error', 'Unknown error')}"
+                    )
                     logger.exception(error_msg)
                     batch_stats["failed"] += len(chunks)
                     batch_stats["errors"].append(error_msg)

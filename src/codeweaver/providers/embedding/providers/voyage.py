@@ -14,7 +14,11 @@ from pydantic import PrivateAttr, SkipValidation
 from voyageai.object.embeddings import EmbeddingsObject
 
 from codeweaver.core import CodeChunk, ConfigurationError, Provider
-from codeweaver.providers.embedding.providers import EmbeddingProvider
+from codeweaver.providers.embedding.providers.base import (
+    EmbeddingCustomDeps,
+    EmbeddingImplementationDeps,
+    EmbeddingProvider,
+)
 
 
 try:
@@ -58,34 +62,30 @@ class VoyageEmbeddingProvider(EmbeddingProvider[AsyncClient]):
     _is_context_model: Annotated[bool, PrivateAttr()] = False
 
     def _initialize(
-        self, impl_deps: Any = None, custom_deps: Any = None
+        self,
+        impl_deps: EmbeddingImplementationDeps = None,
+        custom_deps: EmbeddingCustomDeps = None,
+        **kwargs: Any,
     ) -> None:
-        """Initialize the Voyage provider.
+        """Initialize the VoyageAI client."""
 
-        Args:
-            impl_deps: Implementation-specific dependencies (unused).
-            custom_deps: Custom dependencies (unused).
-        """
-        # Nothing to initialize here - options are set in model_post_init
-        pass
-
-    def model_post_init(self, __context: Any) -> None:
+    def model_post_init(self, __context: Any, /) -> None:
         """Post-initialization hook to detect context models and set options.
 
         Args:
             __context: Pydantic context (unused).
         """
+        config = self.config.embedding_config
         # Set model name, input type, and output parameters for embedding and query options
         self.embed_options["model"] = self.model_name
         self.embed_options["input_type"] = "document"
-        self.embed_options["output_dimension"] = self.caps.default_dimension
-        self.embed_options["output_dtype"] = self.caps.default_dtype
+        self.embed_options["output_dimension"] = config.dimension or self.caps.default_dimension
+        self.embed_options["output_dtype"] = config.datatype or self.caps.default_dtype
 
         self.query_options["model"] = self.model_name
         self.query_options["input_type"] = "query"
-        self.query_options["output_dimension"] = self.caps.default_dimension
-        self.query_options["output_dtype"] = self.caps.default_dtype
-
+        self.query_options["output_dimension"] = config.dimension or self.caps.default_dimension
+        self.query_options["output_dtype"] = config.datatype or self.caps.default_dtype
         # Detect if this is a context model based on the model name
         if self.caps and "context" in self.caps.name.lower():
             object.__setattr__(self, "_is_context_model", True)

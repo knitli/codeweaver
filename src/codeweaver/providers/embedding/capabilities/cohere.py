@@ -24,7 +24,11 @@ MODEL_MAP: MappingProxyType[Provider, tuple[str, ...]] = MappingProxyType({
         "embed-v4.0",
     ),
     # Bedrock SDK:
-    Provider.BEDROCK: ("cohere.embed-english-v3.0", "cohere.embed-multilingual-v3.0"),
+    Provider.BEDROCK: (
+        "cohere.embed-english-v3.0",
+        "cohere.embed-multilingual-v3.0",
+        "cohere.embed-v4:0",
+    ),
     # OpenAI SDK:
     Provider.GITHUB: ("cohere/Cohere-embed-v3-english", "cohere/Cohere-embed-v3-multilingual"),
     Provider.HEROKU: ("cohere-embed-multilingual",),  # this is v3.0, they just don't say it.

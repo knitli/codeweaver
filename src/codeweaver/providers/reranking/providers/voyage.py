@@ -80,7 +80,7 @@ class VoyageRerankingProvider(RerankingProvider[AsyncClient]):
 
     def _initialize(self) -> None:
         """Initialize after Pydantic setup."""
-        self._output_transformer = rpartial(
+        self._output_transformer = rpartial(  # ty:ignore[invalid-assignment]
             voyage_reranking_output_transformer, _instance=self
         )
 

@@ -8,13 +8,9 @@
 import ssl
 
 from collections.abc import Callable, Mapping
-from typing import TYPE_CHECKING, Any, Literal, NotRequired, TypedDict
+from typing import Any, Literal, NotRequired, TypedDict
 
 from pydantic import NonNegativeInt, PositiveInt
-
-
-if TYPE_CHECKING:
-    pass
 
 
 # Mirror types to avoid httpx dependency at module initialization

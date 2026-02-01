@@ -30,7 +30,7 @@ from typing import (
 import numpy as np
 
 from codeweaver_tokenizers import Tokenizer, get_tokenizer
-from pydantic import UUID7, ConfigDict, Field, PrivateAttr, SkipValidation
+from pydantic import UUID7, ConfigDict, Field, SkipValidation
 from pydantic.main import IncEx
 from pydantic.types import PositiveInt
 from tenacity import (
@@ -63,7 +63,7 @@ from codeweaver.core import (
 )
 from codeweaver.core import ValidationError as CodeWeaverValidationError
 from codeweaver.core.types import ModelNameT
-from codeweaver.providers.config import EmbeddingProviderSettings
+from codeweaver.providers.config import EmbeddingConfigT, EmbeddingProviderSettings
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.registry import EmbeddingRegistry
 from codeweaver.providers.exceptions import CircuitBreakerOpenError
@@ -71,11 +71,7 @@ from codeweaver.providers.types import CircuitBreakerState
 
 
 if TYPE_CHECKING:
-    from codeweaver.core import (
-        FilteredKeyT,
-        SerializedStrOnlyCodeChunk,
-        StructuredDataInput,
-    )
+    from codeweaver.core import FilteredKeyT, SerializedStrOnlyCodeChunk, StructuredDataInput
 
 
 ONE_KB = 1024
@@ -210,9 +206,9 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
     ] = ""
 
     # Embedding request options populated from config
-    query_options: Annotated[dict[str, Any], Field(default_factory=dict, exclude=True)]
-    embed_options: Annotated[dict[str, Any], Field(default_factory=dict, exclude=True)]
-    model_options: Annotated[dict[str, Any], Field(default_factory=dict, exclude=True)]
+    query_options: dict[str, Any] = Field(default_factory=dict, exclude=True)
+    embed_options: dict[str, Any] = Field(default_factory=dict, exclude=True)
+    model_options: dict[str, Any] = Field(default_factory=dict, exclude=True)
 
     _provider: ClassVar[LiteralProvider] = cast(LiteralProvider, Provider.NOT_SET)
     _max_tokens: ClassVar[PositiveInt] = DEFAULT_MAX_TOKENS
@@ -229,7 +225,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
     def __init__(
         self,
         client: EmbeddingClient,
-        config: EmbeddingProviderSettings,
+        config: EmbeddingProviderSettings | EmbeddingConfigT,
         registry: EmbeddingRegistry,
         cache_manager: Any,  # EmbeddingCacheManager - avoiding circular import
         caps: EmbeddingModelCapabilities | None = None,
@@ -264,10 +260,24 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         object.__setattr__(self, "config", config)
 
         # Access embedding options through config.embedding_config
-        embedding_config = config.embedding_config if config else None
-        object.__setattr__(self, "query_options", embedding_config.query if embedding_config and embedding_config.query else {})
-        object.__setattr__(self, "embed_options", embedding_config.embedding if embedding_config and embedding_config.embedding else {})
-        object.__setattr__(self, "model_options", embedding_config.model if embedding_config and embedding_config.model else {})
+        embedding_config = (
+            config.embedding_config if isinstance(config, EmbeddingProviderSettings) else config
+        )
+        object.__setattr__(
+            self,
+            "query_options",
+            embedding_config.query if embedding_config and embedding_config.query else {},
+        )
+        object.__setattr__(
+            self,
+            "embed_options",
+            embedding_config.embedding if embedding_config and embedding_config.embedding else {},
+        )
+        object.__setattr__(
+            self,
+            "model_options",
+            embedding_config.model if embedding_config and embedding_config.model else {},
+        )
 
         # Phase 4: Use centralized cache manager instead of per-instance stores
         object.__setattr__(self, "cache_manager", cache_manager)
@@ -280,7 +290,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             self, "_namespace", f"{provider_id}.dense"
         )  # Default to dense, may be updated
 
-        self._initialize(impl_deps, custom_deps)
+        self._initialize(impl_deps, custom_deps, **kwargs)
         object.__setattr__(self, "caps", caps)
         object.__setattr__(self, "registry", registry)
         super().__init__(
@@ -302,7 +312,10 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
 
     @abstractmethod
     def _initialize(
-        self, impl_deps: EmbeddingImplementationDeps = None, custom_deps: EmbeddingCustomDeps = None
+        self,
+        impl_deps: EmbeddingImplementationDeps = None,
+        custom_deps: EmbeddingCustomDeps = None,
+        **kwargs: Any,
     ) -> None:
         """Initialize the embedding provider.
 
@@ -313,6 +326,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         Args:
             impl_deps: Any implementation-specific dependencies or parameters for initialization.
             custom_deps: Any custom dependencies or parameters for initialization.
+            kwargs: Additional keyword arguments passed from __init__.
         """
 
     def clear_deduplication_stores(self) -> None:
@@ -539,12 +553,9 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         Optionally takes a `batch_id` parameter to reprocess a specific batch of documents.
         """
         is_old_batch = False
-        if batch_id:
-            # Try to get batch from cache manager
-            cached_batch = self.cache_manager.get_batch(batch_id, self._namespace)
-            if cached_batch:
-                documents = cached_batch
-                is_old_batch = True
+        if batch_id and (cached_batch := self.cache_manager.get_batch(batch_id, self._namespace)):
+            documents = cached_batch
+            is_old_batch = True
         chunks_iter, cache_key = await self._process_input(
             documents, is_old_batch=is_old_batch, skip_deduplication=skip_deduplication
         )  # type: ignore

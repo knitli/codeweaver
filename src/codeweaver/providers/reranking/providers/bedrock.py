@@ -107,7 +107,7 @@ class RerankConfiguration(BaseBedrockModel):
     ] = "BEDROCK_RERANKING_MODEL"
 
     @classmethod
-    def from_arn(cls, arn: str, top_n: PositiveInt = 40) -> Self:
+    def from_arn(cls, arn: str, top_n: PositiveInt = 10) -> Self:
         """Create a RerankConfiguration from a Bedrock model ARN."""
         return cls.model_validate({
             "bedrock_reranking_configuration": {
@@ -330,7 +330,7 @@ class BedrockRerankingProvider(RerankingProvider[AgentsforBedrockRuntimeClient])
             if hasattr(config, "reranking_config")
             else {}
         )
-        top_n_value = rerank_opts.get("top_n", 40)
+        top_n_value = rerank_opts.get("top_n", 10)
 
         model_configuration = kwargs.pop("model_configuration", None) or (
             RerankConfiguration.from_arn(config.model_arn, top_n_value)

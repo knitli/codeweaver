@@ -106,7 +106,11 @@ if TYPE_CHECKING:
         VoyageEmbeddingOptionsDict,
         VoyageRerankingConfig,
     )
-    from codeweaver.providers.data import get_data_provider, load_default_data_providers
+    from codeweaver.providers.data import (
+        DataProviderType,
+        get_data_provider,
+        load_default_data_providers,
+    )
     from codeweaver.providers.dependencies import (
         AgentProviderSettingsDep,
         AllDataProviderConfigsDep,
@@ -254,6 +258,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "DIMENSION_FIELDS": (__spec__.parent, "config"),
     "DataProviderSettings": (__spec__.parent, "config"),
     "DataProviderSettingsType": (__spec__.parent, "config"),
+    "DataProviderType": (__spec__.parent, "data"),
     "DownloadedItem": (__spec__.parent, "agent"),
     "EmbeddingCapabilityGroup": (__spec__.parent, "types"),
     "EmbeddingCapabilityGroupDep": (__spec__.parent, "dependencies"),
@@ -447,6 +452,7 @@ __all__ = (
     "ConnectionRateLimitConfig",
     "DataProviderSettings",
     "DataProviderSettingsType",
+    "DataProviderType",
     "DownloadedItem",
     "EmbeddingBatchInfoEmbeddingConfig",
     "EmbeddingCapabilityGroup",

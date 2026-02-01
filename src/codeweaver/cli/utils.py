@@ -37,6 +37,7 @@ def check_provider_package_available(provider: Provider, kind: ProviderKind) -> 
         SDKClient.COHERE: "cohere",
         SDKClient.FASTEMBED: "fastembed",
         SDKClient.GOOGLE: "google.genai",
+        SDKClient.GROQ: "groq",
         SDKClient.HUGGINGFACE_INFERENCE: "huggingface_hub",
         SDKClient.MISTRAL: "mistralai",
         SDKClient.OPENAI: "openai",

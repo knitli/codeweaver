@@ -162,12 +162,14 @@ class TestVoyageEmbeddingProviderInitialization:
         assert provider.embed_options["model"] == "voyage-3"
         assert provider.embed_options["input_type"] == "document"
         assert provider.embed_options["output_dimension"] == 1024
-        assert provider.embed_options["output_dtype"] == "float"
+        # VoyageEmbeddingConfig._get_datatype() returns "uint8" as the default
+        assert provider.embed_options["output_dtype"] == "uint8"
 
         assert provider.query_options["model"] == "voyage-3"
         assert provider.query_options["input_type"] == "query"
         assert provider.query_options["output_dimension"] == 1024
-        assert provider.query_options["output_dtype"] == "float"
+        # VoyageEmbeddingConfig._get_datatype() returns "uint8" as the default
+        assert provider.query_options["output_dtype"] == "uint8"
 
     def test_provider_base_url(
         self, mock_cache_manager, mock_voyage_client, mock_voyage_config, mock_embedding_registry, voyage_capabilities
@@ -484,8 +486,11 @@ class TestVoyageEmbeddingProviderDimension:
 
         assert provider.dimension == 1024
 
-    def test_dimension_property_with_custom_dimension(self, mock_voyage_client, mock_voyage_config, mock_embedding_registry, mock_cache_manager):
+    def test_dimension_property_with_custom_dimension(self, mock_voyage_client, mock_embedding_registry, mock_cache_manager):
         """Test dimension property with custom output_dimension."""
+        from codeweaver.providers import EmbeddingProviderSettings
+        from codeweaver.providers.config.embedding import VoyageEmbeddingConfig
+
         caps = EmbeddingModelCapabilities(
             name="voyage-3",
             provider=Provider.VOYAGE,
@@ -494,9 +499,24 @@ class TestVoyageEmbeddingProviderDimension:
             tokenizer="tokenizers",
         )
 
+        # Create config with explicit dimension in embedding dict to override the 1024 default
+        embedding_config = VoyageEmbeddingConfig(
+            tag="voyage",
+            provider=Provider.VOYAGE,
+            model_name="voyage-3",
+            embedding={"output_dimension": 768},
+            query={"output_dimension": 768},
+        )
+
+        config = EmbeddingProviderSettings(
+            provider=Provider.VOYAGE,
+            model_name="voyage-3",
+            embedding_config=embedding_config,
+        )
+
         provider = VoyageEmbeddingProvider(
             client=mock_voyage_client,
-            config=mock_voyage_config,
+            config=config,
             registry=mock_embedding_registry,
             caps=caps,
             cache_manager=mock_cache_manager,

@@ -1,0 +1,1311 @@
+{
+  "$defs": {
+    "AuthSettings": {
+      "properties": {
+        "client_registration_options": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ClientRegistrationOptions"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "issuer_url": {
+          "description": "OAuth authorization server URL that issues tokens for this resource server.",
+          "format": "uri",
+          "minLength": 1,
+          "title": "Issuer Url",
+          "type": "string"
+        },
+        "required_scopes": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Required Scopes"
+        },
+        "resource_server_url": {
+          "anyOf": [
+            {
+              "format": "uri",
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The URL of the MCP server to be used as the resource identifier and base route to look up OAuth Protected Resource Metadata.",
+          "title": "Resource Server Url"
+        },
+        "revocation_options": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RevocationOptions"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "service_documentation_url": {
+          "anyOf": [
+            {
+              "format": "uri",
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Service Documentation Url"
+        }
+      },
+      "required": [
+        "issuer_url",
+        "resource_server_url"
+      ],
+      "title": "AuthSettings",
+      "type": "object"
+    },
+    "ClientRegistrationOptions": {
+      "properties": {
+        "client_secret_expiry_seconds": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Client Secret Expiry Seconds"
+        },
+        "default_scopes": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Default Scopes"
+        },
+        "enabled": {
+          "default": false,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "valid_scopes": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid Scopes"
+        }
+      },
+      "title": "ClientRegistrationOptions",
+      "type": "object"
+    },
+    "CodeWeaverMCPConfig": {
+      "additionalProperties": true,
+      "description": "Configuration model for CodeWeaver configuration in mcp.json files.",
+      "properties": {
+        "auth": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "const": "oauth",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Either a string representing a Bearer token, the literal \"oauth\" to use OAuth authentication, or an httpx.Auth instance for custom authentication.",
+          "title": "Auth"
+        },
+        "authentication": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Authentication"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "CodeWeaver advanced code search and understanding server.",
+          "title": "Description"
+        },
+        "headers": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Headers",
+          "type": "object"
+        },
+        "icon": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "https://raw.githubusercontent.com/knitli/codeweaver/main/docs/assets/codeweaver-primary.svg",
+          "title": "Icon"
+        },
+        "sse_read_timeout": {
+          "anyOf": [
+            {
+              "format": "duration",
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sse read timeout"
+        },
+        "timeout": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 120,
+          "title": "Timeout"
+        },
+        "transport": {
+          "anyOf": [
+            {
+              "enum": [
+                "http",
+                "streamable-http",
+                "sse"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Transport"
+        },
+        "url": {
+          "default": "http://127.0.0.1:9328/mcp",
+          "title": "Url",
+          "type": "string"
+        }
+      },
+      "title": "Code Weaver Mcp Config",
+      "type": "object"
+    },
+    "DirectoryNameT": {
+      "$ref": "#/$defs/LiteralStringT_________________",
+      "description": "A directory name string, e.g. 'src'."
+    },
+    "EndpointSettingsDict": {
+      "additionalProperties": true,
+      "description": "Defines enable/disable settings for various CodeWeaver HTTP endpoints.\n\nHealth and metrics are always enabled because they are used internally for monitoring and diagnostics (CodeWeaver is actually multiple servers which sometimes need to check in with each other).",
+      "properties": {
+        "enable_settings": {
+          "title": "Enable settings",
+          "type": "boolean"
+        },
+        "enable_state": {
+          "title": "Enable state",
+          "type": "boolean"
+        },
+        "enable_version": {
+          "title": "Enable version",
+          "type": "boolean"
+        }
+      },
+      "title": "EndpointSettingsDict",
+      "type": "object"
+    },
+    "FailoverSettings": {
+      "description": "Settings for vector store failover and service resilience.\n\nCodeWeaver's backup system is intelligent in that it only activates if you may need it. It is automatically disabled if:\n  - Your configured embedding provider is local.\n  - Your vector store provider is local.\n\n## Features\n\n- **Reranking**. Automatically injects a backup local reranking model, which is simply accessed at query time if the primary model is unavailable. This is *always* on.\n- **Backup Vectors**. If your embedding provider is remote, and your vector store is local, the system will add a backup vector to each stored point using the backup local model, ensuring that queries can still be served even if the primary embedding provider is unavailable. The system will automatically manage the synchronization of these backup vectors (it simply checks if all expected vectors are on all points and adds any missing ones).\n- **Write-Ahead Logging (WAL)**. If your embedding provider is remote, it uses write-ahead-logging (WAL) to store a local copy of the vectors each time it writes to the primary store. This uses Qdrant's built-in ability to use vectors stored in a directory using RocksDB. When the primary returns, the system will reconcile the local WAL with the primary store to ensure consistency.\n- **Resolves Asymmetric Models**. If your embedding model is capable of asymmetric retrieval (currently only `voyage-4` series models), the system will automatically switch from your primary to a locally compatible model (for voyage-4 series, `voyage-4-nano`). Since embeddings are compatible across these models, you can continue to retrieve and generate new embeddings without interruption, albeit at a slight loss of accuracy for generated embeddings assuming your primary is `voyage-4-large` (about 6 points on RTEB-Code from 86 to 80, which is still better than any other currently available alternative). The advantage here is that you don't need to generate and keep a third set of embeddings for the local model (the second being your sparse embeddings).",
+      "properties": {
+        "backup_sync": {
+          "default": 300,
+          "description": "PositiveInterval in seconds for syncing primary state to backup",
+          "exclusiveMinimum": 0,
+          "title": "Backup sync",
+          "type": "integer"
+        },
+        "disable_failover": {
+          "default": false,
+          "description": "Whether to disable automatic failover to backup vector store. If true, the system will not switch to the backup store on primary failure or keep it ready for failover.",
+          "title": "Disable failover",
+          "type": "boolean"
+        },
+        "max_memory_mb": {
+          "default": 2048,
+          "description": "Maximum memory usage in MB for backup store (only applies when using in-memory backup)",
+          "exclusiveMinimum": 0,
+          "title": "Max memory mb",
+          "type": "integer"
+        },
+        "reconciliation_batch_size": {
+          "default": 100,
+          "description": "Number of points to process per batch during reconciliation",
+          "exclusiveMinimum": 0,
+          "title": "Reconciliation batch size",
+          "type": "integer"
+        },
+        "reconciliation_detection_limit": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Maximum number of missing vectors to detect per reconciliation run. None means detect all missing vectors. Use a limit to avoid long detection times.",
+          "title": "Reconciliation detection limit"
+        },
+        "reconciliation_interval_cycles": {
+          "default": 2,
+          "description": "Number of backup sync cycles between vector reconciliation runs. Reconciliation ensures all points have backup vectors. Default is 2 cycles (10 minutes with 5-minute backup_sync).",
+          "exclusiveMinimum": 0,
+          "title": "Reconciliation interval cycles",
+          "type": "integer"
+        },
+        "recovery_window_sec": {
+          "default": 300,
+          "description": "Seconds to wait after primary becomes healthy before restoring",
+          "exclusiveMinimum": 0,
+          "title": "Recovery window sec",
+          "type": "integer"
+        },
+        "snapshot_interval_cycles": {
+          "default": 1,
+          "description": "Number of backup sync cycles between snapshot creation runs. Default is 1 cycle (5 minutes with 5-minute backup_sync).",
+          "exclusiveMinimum": 0,
+          "title": "Snapshot interval cycles",
+          "type": "integer"
+        },
+        "snapshot_retention_count": {
+          "default": 12,
+          "description": "Number of snapshots to retain. Older snapshots are automatically deleted. Default is 12 (1 hour of snapshots with 5-minute intervals).",
+          "exclusiveMinimum": 0,
+          "title": "Snapshot retention count",
+          "type": "integer"
+        },
+        "snapshot_storage_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Path for local snapshot storage. If None, uses default path in user state directory. For cloud storage, configure through Qdrant settings.",
+          "title": "Snapshot storage path"
+        },
+        "wal_capacity_mb": {
+          "default": 256,
+          "description": "Write-ahead log capacity in MB. Controls maximum WAL size before rotation. Default is 256 MB. Increase for high-throughput scenarios.",
+          "exclusiveMinimum": 0,
+          "title": "Wal capacity mb",
+          "type": "integer"
+        },
+        "wal_retain_closed": {
+          "default": true,
+          "description": "Whether to retain closed WAL segments for point-in-time recovery. Default is True to support snapshot restoration.",
+          "title": "Wal retain closed",
+          "type": "boolean"
+        },
+        "wal_segments_ahead": {
+          "default": 2,
+          "description": "Number of WAL segments to keep ahead for recovery. Default is 2. Higher values provide more recovery history.",
+          "exclusiveMinimum": 0,
+          "title": "Wal segments ahead",
+          "type": "integer"
+        }
+      },
+      "title": "Failover Settings",
+      "type": "object"
+    },
+    "FastMcpStdioServerSettings": {
+      "description": "Settings for FastMCP stdio server configurations.",
+      "properties": {
+        "auth": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AuthSettings"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Auth"
+        },
+        "middleware": {
+          "description": "Mcp Middleware classes (classes that subclass and implement `fastmcp.server.middleware.middleware.Middleware`). CodeWeaver includes several middleware by default, and always includes its own required middleware. Setting this field will override default (not required) middleware. Options are set in the `middleware` field of `CodeWeaverSettings`.",
+          "items": {},
+          "title": "Middleware",
+          "type": "array"
+        },
+        "on_duplicate_prompts": {
+          "anyOf": [
+            {
+              "enum": [
+                "warn",
+                "error",
+                "replace",
+                "ignore"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "replace",
+          "title": "On duplicate prompts"
+        },
+        "on_duplicate_resources": {
+          "anyOf": [
+            {
+              "enum": [
+                "warn",
+                "error",
+                "replace",
+                "ignore"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "replace",
+          "title": "On duplicate resources"
+        },
+        "on_duplicate_tools": {
+          "anyOf": [
+            {
+              "enum": [
+                "warn",
+                "error",
+                "replace",
+                "ignore"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "replace",
+          "title": "On duplicate tools"
+        },
+        "resource_prefix_format": {
+          "anyOf": [
+            {
+              "enum": [
+                "protocol",
+                "path"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Resource prefix format"
+        },
+        "transport": {
+          "const": "stdio",
+          "default": "stdio",
+          "title": "Transport",
+          "type": "string"
+        }
+      },
+      "title": "Fast Mcp Stdio Server Settings",
+      "type": "object"
+    },
+    "FileExtensionT": {
+      "$ref": "#/$defs/LiteralStringT_________________________________",
+      "description": "A file extension string as the `FileExt` NewType, including the leading dot. E.g. '.txt'. May also be an exact filename like 'Makefile' that has no extension."
+    },
+    "FileGlobT": {
+      "$ref": "#/$defs/LiteralStringT",
+      "description": "A file glob pattern string as the `FileGlob` NewType, e.g. '*.py' or 'src/**/*.js'."
+    },
+    "FiltersDict": {
+      "additionalProperties": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "type": "object"
+    },
+    "FormattersDict": {
+      "additionalProperties": true,
+      "description": "A dictionary of formatters for logging configuration.\n\nThis is used to define custom formatters for logging in a dictionary format.\nEach formatter can have a `format`, `date_format`, `style`, and other optional fields.\n\n[See the Python documentation for more details](https://docs.python.org/3/library/logging.html#logging.Formatter).",
+      "properties": {
+        "class_name": {
+          "description": "The class name of the formatter in the form of an import path, like `logging.Formatter` or `rich.logging.RichFormatter`.",
+          "title": "Class",
+          "type": "string"
+        },
+        "date_format": {
+          "title": "Date format",
+          "type": "string"
+        },
+        "defaults": {
+          "additionalProperties": true,
+          "description": "Default values for the formatter. [See the Python documentation for more details](https://docs.python.org/3/library/logging.html#logging.Formatter).",
+          "title": "Defaults",
+          "type": "object"
+        },
+        "format": {
+          "title": "Format",
+          "type": "string"
+        },
+        "style": {
+          "title": "Style",
+          "type": "string"
+        },
+        "validate": {
+          "title": "Validate",
+          "type": "boolean"
+        }
+      },
+      "title": "FormattersDict",
+      "type": "object"
+    },
+    "HandlersDict": {
+      "additionalProperties": true,
+      "description": "A dictionary of handlers for logging configuration.\n\nThis is used to define custom handlers for logging in a dictionary format.\nEach handler can have a `class_name`, `level`, and other optional fields.\n\n[See the Python documentation for more details](https://docs.python.org/3/library/logging.html#logging.Handler).",
+      "properties": {
+        "class_name": {
+          "description": "The class name of the handler in the form of an import path, like `logging.StreamHandler` or `rich.logging.RichHandler`.",
+          "title": "Class",
+          "type": "string"
+        },
+        "filters": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Filters",
+          "type": "array"
+        },
+        "formatter": {
+          "title": "Formatter",
+          "type": "string"
+        },
+        "level": {
+          "enum": [
+            0,
+            10,
+            20,
+            30,
+            40,
+            50
+          ],
+          "title": "Level",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "class_name"
+      ],
+      "title": "HandlersDict",
+      "type": "object"
+    },
+    "IndexerSettings": {
+      "description": "Settings for indexing and file filtering.\n\n## How File Filtering Works\n\nCodeWeaver uses the `rignore` library (a Python wrapper for Rust's `ignore` crate) to\nefficiently walk directories while respecting various ignore rules. The filtering\nhappens in this order:\n\n1. **Override patterns** (highest priority): Whitelist patterns for tooling dirs,\n   ignore patterns for excluded dirs (note: any positive whitelist here -- meaning not beginning with a `!` -- is treated as an *only* -- files not matching them will be ignored entirely.)\n2. **Ignore files**: .gitignore, .ignore, .git/info/exclude, global gitignore\n3. **Hidden files**: Files/dirs starting with . are ignored by default\n4. **Extension filter**: Only files with known extensions are included\n\n## Default Behavior\n\nWith default settings, CodeWeaver will:\n- Respect .gitignore files (including parent directories and global gitignore)\n- Ignore hidden files and directories\n- Include .github, .circleci, and common tooling dirs (.vscode, .claude, etc.)\n- Exclude common build/cache dirs (node_modules, __pycache__, .git, etc.)\n- Only index files with known extensions (~360 supported file types)\n\n## Key Settings\n\n- `use_gitignore`: Respect .gitignore rules (default: True)\n- `ignore_hidden`: Ignore hidden files/dirs (default: True)\n- `include_tooling_dirs`: Whitelist common tooling dirs despite ignore_hidden (default: True)\n- `excludes`: Additional directories to exclude (default: common build/cache dirs)\n- `excluded_extensions`: File extensions to exclude (default: binaries, media, etc.)\n\n## Path Resolution\n\nAll paths should be relative to the project root. CodeWeaver deconflicts paths:\n- Files in `forced_includes` are always included, even if they match excludes\n- Tooling directories are whitelisted via overrides, still respecting .gitignore\n- The `excludes` list is converted to ignore patterns",
+      "properties": {
+        "excluded_extensions": {
+          "default": [
+            ".local",
+            ".coverage",
+            ".rsp",
+            ".mp4",
+            ".rar",
+            ".7z",
+            ".dmg",
+            ".iobj",
+            ".snk",
+            ".zip",
+            ".svg",
+            ".webp",
+            ".avi",
+            ".class",
+            ".sig",
+            ".msi",
+            ".gz",
+            ".code-workspace",
+            ".cache",
+            ".lcov",
+            ".lock",
+            ".obj",
+            ".log",
+            ".vspec",
+            ".wav",
+            ".jpg",
+            ".swp",
+            ".jpeg",
+            ".ms",
+            ".pgd",
+            ".builds",
+            ".mp3",
+            ".tlog",
+            ".temp",
+            ".o",
+            "codeweaver.local.toml",
+            ".mov",
+            ".meta",
+            ".gif",
+            ".scc",
+            ".png",
+            ".tar",
+            ".tlb",
+            ".pgc",
+            ".pyo",
+            ".coverage.xml",
+            ".jar",
+            ".tmp",
+            ".tmp_proj",
+            "codeweaver.local.json",
+            ".mpg",
+            ".pch",
+            ".webm",
+            ".exe",
+            "codeweaver.local.yaml",
+            ".swo",
+            ".env",
+            ".so",
+            ".pyc",
+            ".dll",
+            ".mpeg",
+            ".avif",
+            ".pdb",
+            ".svclog",
+            ".bmp",
+            ".vssscc"
+          ],
+          "description": "File extensions to exclude from search and indexing",
+          "items": {
+            "$ref": "#/$defs/FileExtensionT"
+          },
+          "title": "Excluded extensions",
+          "type": "array",
+          "uniqueItems": true
+        },
+        "excludes": {
+          "default": [
+            "Releases",
+            ".tsbuildinfo",
+            ".htmlcov",
+            "__pycache__",
+            ".DS_Store",
+            "site",
+            "target",
+            ".venv",
+            "x64",
+            "arm",
+            ".temp",
+            "htmlcov",
+            "debug",
+            "log",
+            "releases",
+            "tmp",
+            "out",
+            "venv",
+            ".hg",
+            ".idea",
+            "arm64",
+            "node_modules",
+            ".git",
+            "__pytest_cache__",
+            "dist",
+            "release",
+            "Release",
+            ".svn",
+            "lib64",
+            ".cache",
+            ".tmp",
+            "obj",
+            "logs",
+            "vendor",
+            ".next",
+            ".eslintcache",
+            ".nuxt",
+            ".jj",
+            ".ruff_cache",
+            "temp",
+            ".vs",
+            "Thumbs.db",
+            "bower_components",
+            "win32",
+            "win64",
+            ".history",
+            "remote-debug-profile",
+            "x86",
+            "aarch64",
+            "Debug"
+          ],
+          "description": "Directories, files, or [glob patterns](https://docs.python.org/3/library/pathlib.html#pathlib-pattern-language) to exclude from search and indexing. This is a set of strings, so you can use glob patterns like `**/node_modules/**` or `**/*.log` to exclude directories or files (though both examples are excluded by default)",
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/DirectoryNameT"
+              },
+              {
+                "$ref": "#/$defs/FileGlobT"
+              },
+              {
+                "format": "path",
+                "type": "string"
+              }
+            ]
+          },
+          "title": "Excludes",
+          "type": "array",
+          "uniqueItems": true
+        },
+        "forced_includes": {
+          "description": "Directories, files, or [glob patterns](https://docs.python.org/3/library/pathlib.html#pathlib-pattern-language) to include in search and indexing. This is a set of strings, so you can use glob patterns like `**/src/**` or `**/*.py` to include directories or files.",
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/FileGlobT"
+              },
+              {
+                "format": "path",
+                "type": "string"
+              }
+            ]
+          },
+          "title": "Forced includes",
+          "type": "array",
+          "uniqueItems": true
+        },
+        "ignore_hidden": {
+          "default": true,
+          "description": "Whether to ignore hidden files (starting with .) for filtering",
+          "title": "Ignore hidden",
+          "type": "boolean"
+        },
+        "include_github_dir": {
+          "default": true,
+          "description": "Whether to include the .github directory in search and indexing. Because the .github directory is hidden, it wouldn't be included in default settings. Most people want to include it for work on GitHub Actions, workflows, and other GitHub-related files. Note: this setting will also include `.circleci` if present. Any subdirectories or files within `.github` or `.circleci` that are gitignored will still be excluded.",
+          "title": "Include github dir",
+          "type": "boolean"
+        },
+        "include_tooling_dirs": {
+          "default": true,
+          "description": "Whether to include common hidden tooling directories in search and indexing. This is enabled by default and recommended for most users. Still respects .gitignore rules, so any gitignored files will be excluded.",
+          "title": "Include tooling dirs",
+          "type": "boolean"
+        },
+        "only_index_on_command": {
+          "default": false,
+          "description": "Disabled by default and usually **not recommended**. This setting disables background indexing, requiring you to manually trigger indexing by command or program call. CodeWeaver uses background indexing to ensure it always has an accurate view of the codebase, so disabling this can severely impact the quality of results. We expose this setting for troubleshooting, debugging, and some isolated use cases where codeweaver may be orchestrated externally or supplied with data from other sources.",
+          "title": "Only index on command",
+          "type": "boolean"
+        },
+        "rignore_options": {
+          "description": "Other kwargs to pass to `rignore`. See <https://pypi.org/project/rignore/>. By default we set same_file_system to True.",
+          "title": "Rignore options"
+        },
+        "use_gitignore": {
+          "default": true,
+          "description": "Whether to use .gitignore for filtering. Enabled by default and strongly recommended. Disabling would cause CodeWeaver to index your entire git history, including all ignored files, which is usually not desired. We can't think of a use case where you'd want this disabled, but it's here if you need it.",
+          "title": "Use gitignore",
+          "type": "boolean"
+        },
+        "use_other_ignore_files": {
+          "default": true,
+          "description": "Whether to read any `.ignore` files (besides .gitignore) for filtering",
+          "title": "Use other ignore files",
+          "type": "boolean"
+        }
+      },
+      "title": "Indexer Settings",
+      "type": "object"
+    },
+    "LiteralStringT": {
+      "maxLength": 255,
+      "type": "string"
+    },
+    "LiteralStringT_________________": {
+      "maxLength": 100,
+      "pattern": "^[^<>:;,?*|\\\\]+$",
+      "type": "string"
+    },
+    "LiteralStringT_________________________________": {
+      "maxLength": 50,
+      "minLength": 2,
+      "pattern": "^(\\.[^<>:;,?*|\\\\]+|[^<>:;,?*|\\\\]+)$",
+      "type": "string"
+    },
+    "LoggersDict": {
+      "description": "A dictionary of loggers for logging configuration.\n\nThis is used to define custom loggers for logging in a dictionary format.\nEach logger can have a `level`, `handlers`, and other optional fields.\n\n[See the Python documentation for more details](https://docs.python.org/3/library/logging.html#logging.Logger).",
+      "properties": {
+        "filters": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Filters",
+          "type": "array"
+        },
+        "handlers": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Handlers",
+          "type": "array"
+        },
+        "level": {
+          "enum": [
+            0,
+            10,
+            20,
+            30,
+            40,
+            50
+          ],
+          "title": "Level",
+          "type": "integer"
+        },
+        "propagate": {
+          "title": "Propagate",
+          "type": "boolean"
+        }
+      },
+      "title": "LoggersDict",
+      "type": "object"
+    },
+    "LoggingConfigDict": {
+      "additionalProperties": true,
+      "description": "Logging configuration settings. You may optionally use this to customize logging in a very granular way.\n\n`LoggingConfigDict` is structured to match the format expected by Python's `logging.config.dictConfig` function. You can use this to define loggers, handlers, and formatters in a dictionary format -- either programmatically or in your CodeWeaver settings file.\n[See the Python documentation for more details](https://docs.python.org/3/library/logging.config.html).",
+      "properties": {
+        "disable_existing_loggers": {
+          "description": "Whether to disable all existing loggers when configuring logging. If not present, defaults to `True`.",
+          "title": "Disable existing loggers",
+          "type": "boolean"
+        },
+        "filters": {
+          "$ref": "#/$defs/FiltersDict",
+          "title": "Filters"
+        },
+        "formatters": {
+          "additionalProperties": {
+            "$ref": "#/$defs/FormattersDict"
+          },
+          "title": "Formatters",
+          "type": "object"
+        },
+        "handlers": {
+          "additionalProperties": {
+            "$ref": "#/$defs/HandlersDict"
+          },
+          "title": "Handlers",
+          "type": "object"
+        },
+        "incremental": {
+          "description": "Whether to apply this configuration incrementally or replace the existing configuration. [See the Python documentation for more details](https://docs.python.org/3/library/logging.config.html#logging-config-dict-incremental).",
+          "title": "Incremental",
+          "type": "boolean"
+        },
+        "loggers": {
+          "additionalProperties": {
+            "$ref": "#/$defs/LoggersDict"
+          },
+          "title": "Loggers",
+          "type": "object"
+        },
+        "root": {
+          "$ref": "#/$defs/LoggersDict",
+          "description": "The root logger configuration.",
+          "title": "Root"
+        },
+        "version": {
+          "const": 1,
+          "title": "Version",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "version"
+      ],
+      "title": "LoggingConfigDict",
+      "type": "object"
+    },
+    "LoggingSettingsDict": {
+      "additionalProperties": true,
+      "description": "Global logging settings.",
+      "properties": {
+        "dict_config": {
+          "$ref": "#/$defs/LoggingConfigDict",
+          "description": "Logging configuration in dictionary format that matches the format expected by [`logging.config.dictConfig`](https://docs.python.org/3/library/logging.config.html).",
+          "title": "Dict config"
+        },
+        "level": {
+          "enum": [
+            0,
+            10,
+            20,
+            30,
+            40,
+            50
+          ],
+          "title": "Level",
+          "type": "integer"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "rich_options": {
+          "additionalProperties": true,
+          "description": "Additional keyword arguments for the `rich` logging handler, [`rich.logging.RichHandler`], if enabled.",
+          "title": "Rich options",
+          "type": "object"
+        },
+        "use_rich": {
+          "title": "Use rich",
+          "type": "boolean"
+        }
+      },
+      "title": "LoggingSettingsDict",
+      "type": "object"
+    },
+    "MCPServerConfig": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/CodeWeaverMCPConfig"
+        },
+        {
+          "$ref": "#/$defs/StdioCodeWeaverConfig"
+        }
+      ]
+    },
+    "ProviderProfile": {
+      "description": "Prebuilt provider settings profiles for quick setup.",
+      "enum": [
+        {
+          "_description": "Recommended provider settings profile with high-quality providers. Uses Voyage AI for embeddings and rerankings, FastEmbed for sparse (local) embeddings, and local Qdrant for vector storage.",
+          "aliases": [
+            "recommended"
+          ]
+        },
+        {
+          "_description": "Recommended provider settings profile with high-quality providers and cloud vector store. Uses Voyage AI for embeddings and rerankings, FastEmbed for sparse (local) embeddings, and cloud Qdrant for vector storage.",
+          "aliases": [
+            "recommended-cloud"
+          ]
+        },
+        {
+          "_description": "Quickstart provider settings profile. Entirely local and free. Uses open-source models for sparse and dense embeddings and rerankings, and local Qdrant for vector storage.",
+          "aliases": [
+            "quickstart",
+            "local",
+            "free",
+            "open-source"
+          ]
+        },
+        {
+          "_description": "Optimized for testing and local development. Uses the lightest weight local models available, and an in-memory vector store with on-disk persistence. This profile is also used as CodeWeaver's backup when cloud providers are unavailable, ensuring reliable operation regardless of external service status with minimal resource usage.",
+          "aliases": [
+            "testing",
+            "development",
+            "lightweight",
+            "dev"
+          ]
+        },
+        {
+          "_description": "Testing profile with on-disk vector database. Similar to the testing profile, but uses a normal on-disk Qdrant vector store instead of an in-memory store. This allows for larger datasets and more persistent storage while still using lightweight local models for embeddings and rerankings.",
+          "aliases": [
+            "testing-db",
+            "backup-db",
+            "development-db",
+            "lightweight-db",
+            "dev-db"
+          ]
+        },
+        {
+          "_description": "Backup provider settings profile. Uses the testing profile with local vector store as a fallback when other profiles are unavailable.",
+          "aliases": [
+            "backup",
+            "local"
+          ]
+        }
+      ],
+      "title": "ProviderProfile"
+    },
+    "RevocationOptions": {
+      "properties": {
+        "enabled": {
+          "default": false,
+          "title": "Enabled",
+          "type": "boolean"
+        }
+      },
+      "title": "RevocationOptions",
+      "type": "object"
+    },
+    "StdioCodeWeaverConfig": {
+      "additionalProperties": true,
+      "description": "Configuration model for CodeWeaver mcp.json files using stdio communication (default).",
+      "properties": {
+        "args": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Args",
+          "type": "array"
+        },
+        "authentication": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Authentication"
+        },
+        "command": {
+          "default": "cw",
+          "title": "Command",
+          "type": "string"
+        },
+        "cwd": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cwd"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "CodeWeaver advanced code search and understanding server.",
+          "title": "Description"
+        },
+        "env": {
+          "additionalProperties": true,
+          "title": "Env",
+          "type": "object"
+        },
+        "icon": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "https://raw.githubusercontent.com/knitli/codeweaver/main/docs/assets/codeweaver-primary.svg",
+          "title": "Icon"
+        },
+        "timeout": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Timeout"
+        },
+        "transport": {
+          "const": "stdio",
+          "default": "stdio",
+          "title": "Transport",
+          "type": "string"
+        },
+        "type": {
+          "anyOf": [
+            {
+              "const": "stdio",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "stdio",
+          "title": "Type"
+        }
+      },
+      "title": "Stdio Code Weaver Config",
+      "type": "object"
+    },
+    "TelemetrySettings": {
+      "description": "Telemetry configuration settings.\n\nWe collect basic telemetry data **by default** to help us improve CodeWeaver. **We do not collect _any_ potentially identifying information.**\n        We **DO _NOT_ collect**:\n            - file paths and repository names (all hashed),\n            - potential secrets (explicitly not included in serialization),\n            - any queries or results content (unless you explicitly tell us we can, see `tools_over_privacy`).\n        If enabled, we **DO collect**:\n            - usage patterns,\n            - errors,\n            - performance metrics,\n            - settings usage (e.g., which providers you use, whether you explicitly set certain settings, etc).\n        This helps us make CodeWeaver better for everyone.  **We will never sell your data or show you ads. We only use it to improve CodeWeaver.**\nCodeWeaver implements a granular privacy-first approach to telemetry. *Every single serializable class must define its own `__telemetry_keys__` method to explicitly list which fields are safe to serialize for telemetry purposes.* This ensures that no potentially identifying information is ever collected.\n\nWe further screen data on ingest at Posthog to filter out any potential secrets or PII before we actually see and store it.",
+      "properties": {
+        "batch_interval_seconds": {
+          "description": "Maximum time in seconds to wait before sending batched events.",
+          "exclusiveMinimum": 0,
+          "title": "Batch interval seconds",
+          "type": "integer"
+        },
+        "batch_size": {
+          "description": "Number of events to batch before sending to PostHog.",
+          "exclusiveMinimum": 0,
+          "title": "Batch size",
+          "type": "integer"
+        },
+        "disable_telemetry": {
+          "description": "\n            hash file paths, repository names, and screen out potential secrets, and we don't collect any queries or results content (unless you explicitly tell us we can, see `tools_over_privacy`). We only collect data on usage patterns, errors, and performance. This helps us make CodeWeaver better for everyone.  **We will never sell your data or show you ads. We only use it to improve CodeWeaver.**\n\n            If you want to disable telemetry, you have several options:\n            1. set this setting to False in your codeweaver.toml/yaml/json file,\n            2. set the environment variable `CODEWEAVER__TELEMETRY__DISABLE_TELEMETRY` to `false`\n            3. Don't install the telemetry package (e.g., `code-weaver[no-telemetry]`).\n            4. Point the `CODEWEAVER__TELEMETRY__POSTHOG_PROJECT_KEY` environment variable to your own Posthog project (if you're a data nerd, or want to collect internal telemetry for your organization). If you disable telemetry, we won't collect any data at all.",
+          "title": "Disable telemetry",
+          "type": "boolean"
+        },
+        "posthog_host": {
+          "anyOf": [
+            {
+              "format": "uri",
+              "maxLength": 2083,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "https://us.i.posthog.com/",
+          "description": "PostHog host URL for telemetry events.",
+          "title": "Posthog host"
+        },
+        "posthog_project_key": {
+          "anyOf": [
+            {
+              "format": "password",
+              "type": "string",
+              "writeOnly": true
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "**********",
+          "description": "PostHog Project key for telemetry events. You'll see that the default is, of course, ours. This **is not an api_key**, but rather a write-only key. If you want to divert telemetry to your own posthog instance or cloud account, you can change this key. To override it with an environment variable, set `CODEWEAVER__TELEMETRY__POSTHOG_PROJECT_KEY`.",
+          "title": "Posthog project key"
+        },
+        "tools_over_privacy": {
+          "description": "Opt-in to allow us to collect anonymized query and result data. We want to make CodeWeaver great, and the best way to do that is for us to fully understand exactly how you use it -- particularly what you search for and how you interact with the results. Unlike with Google, we don't want to show you ads or sell your data, track you, or anything like that... and we don't think it's right to assume you're OK with us collecting search and result data.\n\n            So, you have the choice. Let us collect anonymized search and result interaction data to help make CodeWeaver better, or prioritize your privacy and not send us that data.\n\n            If you enable this setting, we will collect anonymized data about your searches and the results you interact with. Because of the nature of searches and results and codebases, we can't guarantee complete anonymity -- but we will do our best to filter out any potential secrets or PII, using multiple filters both in CodeWeaver and on ingest at Posthog. We will hash file paths and repository names, and we won't collect any raw queries or result content. This data will help us improve CodeWeaver's search algorithms, agent prompting, ranking, and overall user experience. If you care about making CodeWeaver better and are OK with us collecting this data, please enable this setting. If you value your privacy more than helping us improve CodeWeaver; that's cool too -- you can just leave this setting disabled.",
+          "title": "Tools over privacy",
+          "type": "boolean"
+        }
+      },
+      "title": "Telemetry Settings",
+      "type": "object"
+    }
+  },
+  "additionalProperties": true,
+  "description": "Main configuration model following pydantic-settings patterns.",
+  "properties": {
+    "$schema": {
+      "description": "URL to the CodeWeaver settings schema",
+      "format": "uri",
+      "maxLength": 2083,
+      "minLength": 1,
+      "title": "Schema",
+      "type": "string"
+    },
+    "chunker": {
+      "description": "Chunking configuration for code segmentation",
+      "title": "Chunker"
+    },
+    "config_file": {
+      "anyOf": [
+        {
+          "format": "file-path",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Path to the configuration file used to load settings",
+      "title": "Config file"
+    },
+    "default_mcp_config": {
+      "$ref": "#/$defs/MCPServerConfig",
+      "description": "Default MCP server configuration for mcp clients. Setting this makes it quick and easy to add codeweaver to any mcp.json file using `cw init`. Defaults to a stdio transport.",
+      "title": "Default mcp config"
+    },
+    "endpoints": {
+      "$ref": "#/$defs/EndpointSettingsDict",
+      "description": "Endpoint settings for optional endpoints.",
+      "title": "Endpoints"
+    },
+    "failover": {
+      "$ref": "#/$defs/FailoverSettings",
+      "description": "Failover configuration for service resilience",
+      "title": "Failover"
+    },
+    "indexer": {
+      "$ref": "#/$defs/IndexerSettings",
+      "description": "Indexing configuration for code discovery and processing",
+      "title": "Indexer"
+    },
+    "logging": {
+      "$ref": "#/$defs/LoggingSettingsDict",
+      "description": "Logging configuration for CodeWeaver",
+      "title": "Logging"
+    },
+    "management_host": {
+      "description": "Management server host (independent of MCP transport). Default is 127.0.0.1 (localhost).",
+      "title": "Management host",
+      "type": "string"
+    },
+    "management_port": {
+      "description": "Management server port (always HTTP, for health/stats/metrics). Default is 9329.",
+      "exclusiveMinimum": 0,
+      "title": "Management port",
+      "type": "integer"
+    },
+    "max_results": {
+      "description": "Maximum code matches to return. Because CodeWeaver primarily indexes ast-nodes, a page can return multiple matches per file, so this is not the same as the number of files returned. This is the maximum number of code matches returned in a single response. The default is 15.",
+      "exclusiveMinimum": 0,
+      "title": "Max results",
+      "type": "integer"
+    },
+    "mcp_server": {
+      "description": "Optionally customize server settings for the HTTP MCP server.",
+      "title": "Mcp server"
+    },
+    "middleware": {
+      "description": "MCP middleware settings",
+      "title": "Middleware"
+    },
+    "profile": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ProviderProfile"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Use a premade provider profile.  The recommended profile uses Voyage AI for top-quality embedding and reranking, but requires an API key. The quickstart profile is entirely free and local, and does not require any API key. It sacrifices some search quality and performance compared to the recommended profile. The testing profile is only recommended for testing -- it uses an in-memory vector store and very light weight local models. The testing profile is also CodeWeaver's backup system when a cloud embedding or vector store provider isn't available. Both the quickstart and recommended profiles default to a local qdrant instance for the vector store. If you want to use a cloud or remote instance (which we recommend) you must also provide a URL for it, either with the environment variable CODEWEAVER_VECTOR_STORE_URL or in your codeweaver config in the vector_store settings.",
+      "title": "Profile"
+    },
+    "project_name": {
+      "description": "Name of the project",
+      "title": "Project name",
+      "type": "string"
+    },
+    "project_path": {
+      "description": "Path to the project root directory.",
+      "format": "directory-path",
+      "title": "Project path",
+      "type": "string"
+    },
+    "provider": {
+      "description": "Provider configuration for embedding, vector store, reranking, etc.",
+      "title": "Provider"
+    },
+    "stdio_server": {
+      "$ref": "#/$defs/FastMcpStdioServerSettings",
+      "description": "Settings for stdio MCP servers.",
+      "title": "Stdio server"
+    },
+    "telemetry": {
+      "$ref": "#/$defs/TelemetrySettings",
+      "description": "Telemetry configuration for CodeWeaver",
+      "title": "Telemetry"
+    },
+    "token_limit": {
+      "description": "Maximum tokens per response",
+      "exclusiveMinimum": 0,
+      "title": "Token limit",
+      "type": "integer"
+    },
+    "uvicorn": {
+      "description": "\n        Settings for the Uvicorn management server. If you want to configure uvicorn settings for the mcp http server, pass them to `mcp_server.run_args.uvicorn_config`.\n\n        Example:\n        ```toml\n        # this will set uvicorn settings for the management server:\n        [uvicorn]\n        log_level = \"debug\"\n\n        # this will set uvicorn settings for the mcp http server:\n        [mcp_server.run_args.uvicorn_config]\n        log_level = \"debug\"\n        ```\n        ",
+      "title": "Uvicorn"
+    }
+  },
+  "title": "CodeWeaver Settings",
+  "type": "object"
+}

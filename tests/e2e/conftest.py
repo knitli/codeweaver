@@ -7,9 +7,15 @@
 
 from __future__ import annotations
 
+import os
+
 from unittest.mock import MagicMock
 
 import pytest
+
+
+# Enable test mode for settings loading
+os.environ["CODEWEAVER_TEST_MODE"] = "true"
 
 
 @pytest.fixture
@@ -27,7 +33,7 @@ def mock_confirm(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     mock.ask.return_value = True
 
     # Patch the module-level import in init.py (imported at line 27)
-    monkeypatch.setattr("codeweaver.cliConfirm", mock)
+    monkeypatch.setattr("codeweaver.cli.commands.init.Confirm", mock)
     # Also patch the base location to catch any other imports
     monkeypatch.setattr("rich.prompt.Confirm", mock)
 

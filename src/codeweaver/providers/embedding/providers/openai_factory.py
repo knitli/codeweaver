@@ -77,6 +77,16 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
         registry: EmbeddingRegistry,
         cache_manager: CacheManager | None = None,
         caps: EmbeddingModelCapabilities | None = None,
+        initialize_method: Callable[
+            [
+                OpenAIEmbeddingBase,
+                EmbeddingImplementationDeps | None,
+                EmbeddingCustomDeps | None,
+                Any,
+            ],
+            None,
+        ]
+        | None = None,
     ) -> type[Self]:
         """
         Create a new embedding provider class for the specified model and provider.
@@ -142,6 +152,8 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
                 cls, provider, _client=client, _config=config, _registry=registry, _caps=caps
             ),
         )
+        if initialize_method:
+            object.__setattr__(parent_cls, "_initialize", initialize_method)
 
         # Create the new provider class with proper field definitions
         new_class = create_model(
@@ -166,6 +178,15 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
 
     client: AsyncOpenAI
     provider: ClassVar[Provider]
+
+    def _initialize(
+        self,
+        impl_deps: EmbeddingImplementationDeps = None,
+        custom_deps: EmbeddingCustomDeps = None,
+        **kwargs: Any,
+    ) -> None:
+        """Initialize the OpenAI client."""
+        # Nothing to initialize here - options are set in model_post_init
 
     @property
     def base_url(self) -> str:

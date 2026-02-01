@@ -5,7 +5,7 @@
 Settings for Voyage AI embedding models.
 
 Voyage AI models are CodeWeaver's recommended embedding models. They're high quality, low latency, and cost-effective (first 200M tokens are free).
-Our default model is currently `voyage-code-3`, which is optimized for code embeddings.
+Our default model is currently `voyage-4-large`, which can be queried with `voyage-4-nano` (see `SentenceTransformersEmbeddingCapabilities` for voyage-4-nano information), as well as every other member of the Voyage-4 family.
 
 Voyage's models provide best-in-class performance, and even more interesting, they maintain that performance when heavily quantized. Performance when quantized to binary 256-dimensions still significantly exceeds openai's `text-embedding-3-large` at **1/384th** the storage size (and cost).
 
@@ -45,22 +45,39 @@ def _get_shared_capabilities() -> PartialCapabilities:
     }
 
 
-VOYAGE_4_FAMILY = ModelFamily(
-    family_id="voyage-4",
-    vector_space_dimension=1024,
-    vector_space_datatype="uint8",
-    is_normalized=True,
-    preferred_metrics=("dot",),
-    member_models=frozenset({"voyage-4-large", "voyage-4", "voyage-4-lite", "voyage-4-nano"}),
-    asymmetric_query_models=frozenset({"voyage-4-nano", "voyage-4-lite", "voyage-4"}),
-    cross_provider_compatible=True,
-)
+class Voyage4ModelFamily(ModelFamily):
+    """Voyage-4 model family specification."""
+
+    family_id: str = "voyage-4"
+    default_dimension: int = 1024
+    default_dtype: str = "uint8"
+    is_normalized: bool = True
+    preferred_metrics: tuple[str, ...] = ("dot",)
+    member_models: frozenset[str] = frozenset({
+        "voyage-4-large",
+        "voyage-4",
+        "voyage-4-lite",
+        "voyage-4-nano",
+    })
+    asymmetric_query_models: frozenset[str] = frozenset({
+        "voyage-4-nano",
+        "voyage-4-lite",
+        "voyage-4",
+    })
+    cross_provider_compatible: bool = True
+
+
+VOYAGE_4_FAMILY = Voyage4ModelFamily()
 """Voyage-4 model family specification.
 
 The Voyage-4 family represents the fourth generation of Voyage AI's embedding models,
-featuring a unified 1024-dimensional vector space optimized for int8 quantization.
+featuring a unified vector space. The models don't suffer a noticeable performance drop
+with uint8 quantization, so we default to that to save on storage and compute costs.
 All models in this family produce embeddings that can be directly compared and stored
 together, enabling flexible model selection and migration strategies.
+
+The most common strategy, which promotes excellent quality and cost savings, is to use `voyage-4-large` or `voyage-4` for embedding generation of your data (your codebase for CodeWeaver), and `voyage-4-nano`
+to query it locally for free.
 
 Key characteristics:
 - Normalized embeddings (unit length) enable efficient dot product similarity
@@ -97,7 +114,7 @@ def get_voyage_embedding_capabilities() -> tuple[VoyageEmbeddingCapabilities, ..
         settings[i]["name"] = model
         settings[i]["version"] = "3" if "3.5" not in model else "3.5"
         settings[i]["tokenizer_model"] = f"{settings[i]['tokenizer_model']}{model}"
-
+        settings[i]["version"] = "3" if "3" in model else "4"
         # Assign model family for voyage-4 models
         if model.startswith("voyage-4"):
             settings[i]["model_family"] = VOYAGE_4_FAMILY

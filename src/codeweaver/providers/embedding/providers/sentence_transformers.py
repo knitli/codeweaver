@@ -21,7 +21,12 @@ from codeweaver.providers.embedding.capabilities.base import (
     EmbeddingModelCapabilities,
     SparseEmbeddingModelCapabilities,
 )
-from codeweaver.providers.embedding.providers.base import EmbeddingProvider, SparseEmbeddingProvider
+from codeweaver.providers.embedding.providers.base import (
+    EmbeddingCustomDeps,
+    EmbeddingImplementationDeps,
+    EmbeddingProvider,
+    SparseEmbeddingProvider,
+)
 
 
 if TYPE_CHECKING:
@@ -64,24 +69,16 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
 
     client: SentenceTransformer
     provider: Provider = Provider.SENTENCE_TRANSFORMERS
-    caps: EmbeddingModelCapabilities
+    caps: EmbeddingModelCapabilities | None = None
 
-    def __init__(
+    def _initialize(
         self,
-        client: SentenceTransformer,
-        caps: EmbeddingModelCapabilities | None = None,
+        impl_deps: EmbeddingImplementationDeps = None,
+        custom_deps: EmbeddingCustomDeps = None,
         **kwargs: Any,
     ) -> None:
-        """Initialize the Sentence Transformers embedding provider.
-
-        Args:
-            caps: Model capabilities (matches base class parameter name)
-            client: Optional pre-initialized SentenceTransformer client
-            **kwargs: Additional keyword arguments
-        """
-        # Call super().__init__ with None for client if not provided
-        # We'll initialize it asynchronously in initialize_async
-        super().__init__(client=client, caps=caps, **kwargs)  # type: ignore
+        """Initialize the SentenceTransformer client."""
+        # Nothing to initialize here - options are set in initialize_async
 
     async def initialize_async(self) -> None:
         """Initialize the SentenceTransformer client asynchronously."""

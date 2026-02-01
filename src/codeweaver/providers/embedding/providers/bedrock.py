@@ -38,7 +38,7 @@ from types_boto3_bedrock_runtime.client import BedrockRuntimeClient
 
 from codeweaver.core import BasedModel, Provider, ProviderError
 from codeweaver.core import ValidationError as CodeWeaverValidationError
-from codeweaver.providers import BedrockEmbeddingConfig
+from codeweaver.providers.config import BedrockEmbeddingConfig, BedrockEmbeddingProviderSettings
 from codeweaver.providers.embedding.providers.base import (
     EmbeddingCustomDeps,
     EmbeddingImplementationDeps,
@@ -446,10 +446,13 @@ class BedrockEmbeddingProvider(EmbeddingProvider[BedrockRuntimeClient]):
     _provider: ClassVar[Provider] = Provider.BEDROCK
 
     client: BedrockRuntimeClient
-    config: BedrockEmbeddingConfig
+    config: BedrockEmbeddingConfig | BedrockEmbeddingProviderSettings
 
     def _initialize(
-        self, impl_deps: EmbeddingImplementationDeps = None, custom_deps: EmbeddingCustomDeps = None
+        self,
+        impl_deps: EmbeddingImplementationDeps = None,
+        custom_deps: EmbeddingCustomDeps = None,
+        **kwargs: Any,
     ) -> None:
 
         self._output_transformer: Callable[
@@ -465,7 +468,6 @@ class BedrockEmbeddingProvider(EmbeddingProvider[BedrockRuntimeClient]):
     @property
     def dimension(self) -> int:
         """Get the dimension of the embeddings."""
-        # TODO: Hook up config resolver to get authoritative dimensionality
         return self.embed_options.get("dimensions") or self.caps.default_dimension  # ty:ignore[unresolved-attribute]
 
     def _handle_response(

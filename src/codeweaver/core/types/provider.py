@@ -16,14 +16,12 @@ from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Literal, TypedDict, cast
 
 from codeweaver.core.types.enum import BaseEnum
+from codeweaver.core.types.env import ProviderEnvVars
 from codeweaver.core.utils.lazy_importer import LazyImport, lazy_import
 
 
 if TYPE_CHECKING:
     from codeweaver.core.types.env import EnvVarInfo as ProviderEnvVarInfo
-
-# Import at runtime since ProviderEnvVars is used in property methods
-from codeweaver.core.types.env import ProviderEnvVars
 
 if TYPE_CHECKING and importlib.util.find_spec("sentence-transformers") is not None:
     from sentence_transformers import CrossEncoder, SentenceTransformer, SparseEncoder
@@ -43,6 +41,19 @@ else:
     TextEmbedding = Any
     TextCrossEncoder = Any
     SparseTextEmbedding = Any
+
+if TYPE_CHECKING and (importlib.util.find_spec("anthropic") is not None):
+    from anthropic import (
+        AsyncAnthropic,
+        AsyncAnthropicBedrock,
+        AsyncAnthropicFoundry,
+        AsyncAnthropicVertex,
+    )
+else:
+    AsyncAnthropic = Any
+    AsyncAnthropicBedrock = Any
+    AsyncAnthropicFoundry = Any
+    AsyncAnthropicVertex = Any
 
 
 class LazyImportDict(TypedDict):
@@ -68,6 +79,15 @@ class SentenceTransformersLazyImportDict(LazyImportDict):
     reranking: LazyImport[CrossEncoder]
 
 
+class AnthropicAgentLazyImportDict(TypedDict):
+    """A typed dict for lazy imports for Anthropic clients by provider."""
+
+    anthropic: LazyImport[AsyncAnthropic]
+    azure: LazyImport[AsyncAnthropicFoundry]
+    bedrock: LazyImport[AsyncAnthropicBedrock]
+    google: LazyImport[AsyncAnthropicVertex]
+
+
 class ProviderKind(BaseEnum):
     """Enumeration of available provider kinds."""
 
@@ -87,27 +107,45 @@ class SDKClient(BaseEnum):
     use the same SDK client (like OpenAI, which has 10+ providers using their SDK, at least for agents).
     """
 
+    ANTHROPIC = "anthropic"
     BEDROCK = "bedrock"
     COHERE = "cohere"
+    DUCKDUCKGO = "duckduckgo"
     FASTEMBED = "fastembed"
     GOOGLE = "google"
+    GROQ = "groq"
     HUGGINGFACE_INFERENCE = "hf_inference"
     MISTRAL = "mistral"
     OPENAI = "openai"
     QDRANT = "qdrant"
     SENTENCE_TRANSFORMERS = "sentence-transformers"
+    TAVILY = "tavily"
     VOYAGE = "voyage"
 
     @property
     def client(  # noqa: C901
         self,
-    ) -> LazyImport[Any] | FastEmbedClientLazyImportDict | SentenceTransformersLazyImportDict:
+    ) -> (
+        LazyImport[Any]
+        | AnthropicAgentLazyImportDict
+        | FastEmbedClientLazyImportDict
+        | SentenceTransformersLazyImportDict
+    ):
         """Get a lazy import for the SDK client (not the provider class)."""
         match self:
+            case SDKClient.ANTHROPIC:
+                return AnthropicAgentLazyImportDict(
+                    anthropic=lazy_import("anthropic", "AsyncAnthropic"),
+                    azure=lazy_import("anthropic", "AsyncAnthropicFoundry"),
+                    bedrock=lazy_import("anthropic", "AsyncAnthropicBedrock"),
+                    google=lazy_import("anthropic", "AsyncAnthropicVertex"),
+                )
             case SDKClient.BEDROCK:
                 return lazy_import("boto3", "client")
             case SDKClient.COHERE:
                 return lazy_import("cohere", "AsyncClientV2")
+            case SDKClient.DUCKDUCKGO:
+                return lazy_import("ddgs.ddgs", "DDGS")
             case SDKClient.FASTEMBED:
                 return FastEmbedClientLazyImportDict(
                     embed=lazy_import(
@@ -120,6 +158,8 @@ class SDKClient(BaseEnum):
                 )
             case SDKClient.GOOGLE:
                 return lazy_import("google.genai", "Client")
+            case SDKClient.GROQ:
+                return lazy_import("groq", "AsyncGroq")
             case SDKClient.HUGGINGFACE_INFERENCE:
                 return lazy_import("huggingface_hub", "AsyncInferenceClient")
             case SDKClient.MISTRAL:
@@ -134,10 +174,32 @@ class SDKClient(BaseEnum):
                     sparse=lazy_import("sentence_transformers", "SparseEncoder"),
                     reranking=lazy_import("sentence_transformers", "CrossEncoder"),
                 )
+            case SDKClient.TAVILY:
+                return lazy_import("tavily", "AsyncTavilyClient")
             case SDKClient.VOYAGE:
                 return lazy_import("voyageai.client_async", "AsyncClient")
             case _:
                 raise ValueError(f"Unsupported SDK client: {self.value}")
+
+    @property
+    def agent_provider(self) -> LazyImport[Any] | None:
+        """Get the default agent provider for the SDK client."""
+        if importlib.util.find_spec("codeweaver.providers") is None:
+            return None
+        from codeweaver.providers.agent import get_agent_model_provider
+
+        return get_agent_model_provider(self.variable)  # ty:ignore[invalid-return-type, invalid-argument-type]
+
+    @property
+    def data_provider(self) -> LazyImport[Any] | None:
+        """Get the default data provider for the SDK client."""
+        match self:
+            case SDKClient.TAVILY:
+                return lazy_import("pydantic_ai.common_tools.tavily", "TavilySearchTool")
+            case SDKClient.DUCKDUCKGO:
+                return lazy_import("pydantic_ai.common_tools.duckduckgo", "DuckDuckGoSearchTool")
+            case _:
+                return None
 
     @property
     def embedding_provider(self) -> LazyImport[Any] | None:
@@ -247,6 +309,7 @@ class SDKClient(BaseEnum):
 class Provider(BaseEnum):
     """Enumeration of available providers."""
 
+    ALIBABA = "alibaba"
     ANTHROPIC = "anthropic"
     AZURE = "azure"
     BEDROCK = "bedrock"
@@ -265,11 +328,15 @@ class Provider(BaseEnum):
     MEMORY = "memory"
     MISTRAL = "mistral"
     MOONSHOT = "moonshot"
+    NEBIUS = "nebius"
     NOT_SET = "not_set"
     OLLAMA = "ollama"
     OPENAI = "openai"
     OPENROUTER = "openrouter"
+    OVHCLOUD = "ovhcloud"
+    # OUTLINES = "outlines"  # not implemented yet
     PERPLEXITY = "perplexity"
+    PYDANTIC_GATEWAY = "gateway"
     QDRANT = "qdrant"
     SENTENCE_TRANSFORMERS = "sentence-transformers"
     TAVILY = "tavily"
@@ -368,6 +435,33 @@ class Provider(BaseEnum):
                         **httpx_env_vars,
                     ),
                 )
+            case Provider.ANTHROPIC:
+                return (
+                    ProviderEnvVars(
+                        client=("anthropic",),
+                        api_key=ProviderEnvVarInfo(
+                            env="ANTHROPIC_API_KEY",
+                            is_secret=True,
+                            description="API key for Anthropic service",
+                            variable_name="api_key",
+                        ),
+                        host=ProviderEnvVarInfo(
+                            env="ANTHROPIC_BASE_URL",
+                            description="Host URL for Anthropic service",
+                            variable_name="base_url",
+                        ),
+                        **httpx_env_vars,
+                    ),
+                    ProviderEnvVars(
+                        client=("anthropic",),
+                        api_key=ProviderEnvVarInfo(
+                            env="ANTHROPIC_AUTH_TOKEN",
+                            is_secret=True,
+                            description="Auth token for Anthropic provider",
+                            variable_name="auth_token",
+                        ),
+                    ),
+                )
             case Provider.AZURE:
                 # Azure has env vars by model provider, so we return a tuple of them.
                 return (
@@ -418,6 +512,33 @@ class Provider(BaseEnum):
                             variable_name="region_name",
                         ),
                         **httpx_env_vars,
+                    ),
+                    ProviderEnvVars(
+                        client=("anthropic",),
+                        note="These variables are for the Azure Anthropic service.",
+                        api_key=ProviderEnvVarInfo(
+                            env="ANTHROPIC_FOUNDRY_API_KEY",
+                            is_secret=True,
+                            description="API key for Azure Anthropic service (Anthropic models on Azure)",
+                            variable_name="api_key",
+                        ),
+                        endpoint=ProviderEnvVarInfo(
+                            env="ANTHROPIC_FOUNDRY_BASE_URL",
+                            description="Endpoint for Azure Anthropic service (Anthropic models on Azure)",
+                            variable_name="base_url",
+                        ),
+                        region=ProviderEnvVarInfo(
+                            env="ANTHROPIC_FOUNDRY_REGION",
+                            description="Region for Azure Anthropic service",
+                            variable_name="region_name",
+                        ),
+                        other={
+                            "resource": ProviderEnvVarInfo(
+                                env="ANTHROPIC_FOUNDRY_RESOURCE",
+                                description="Resource name for Azure Anthropic service",
+                                variable_name="resource",
+                            )
+                        },
                     ),
                     cast(ProviderEnvVars, *type(self).OPENAI.other_env_vars),
                 )
@@ -503,18 +624,7 @@ class Provider(BaseEnum):
                     ),
                     cast(ProviderEnvVars, *type(self).OPENAI.other_env_vars),
                 )
-            case (
-                Provider.OPENAI
-                | Provider.FIREWORKS
-                | Provider.GITHUB
-                | Provider.X_AI
-                | Provider.GROQ
-                | Provider.MOONSHOT
-                | Provider.OLLAMA
-                | Provider.OPENROUTER
-                | Provider.PERPLEXITY
-                | Provider.CEREBRAS
-            ):
+            case Provider.OPENAI:
                 return (
                     ProviderEnvVars(
                         client=("openai",),
@@ -550,6 +660,40 @@ class Provider(BaseEnum):
                             ),
                         },
                     ),
+                )
+            case Provider.OPENROUTER:
+                return (
+                    ProviderEnvVars(
+                        client=("openai",),
+                        note="These variables are for the OpenRouter service.",
+                        api_key=ProviderEnvVarInfo(
+                            env="OPENROUTER_API_KEY",
+                            is_secret=True,
+                            description="API key for OpenRouter service",
+                            variable_name="api_key",
+                        ),
+                        other=httpx_env_vars,
+                    ),
+                    cast(ProviderEnvVars, *type(self).OPENAI.other_env_vars),
+                )
+            case Provider.CEREBRAS:
+                return (
+                    ProviderEnvVars(
+                        client=("cerebras",),
+                        api_key=ProviderEnvVarInfo(
+                            env="CEREBRAS_API_KEY",
+                            description="Your Cerebras API Key",
+                            is_secret=True,
+                            variable_name="api_key",
+                        ),
+                        host=ProviderEnvVarInfo(
+                            env="CEREBRAS_API_URL",
+                            description="Host URL for Cerebras service",
+                            variable_name="base_url",
+                        ),
+                        other=httpx_env_vars,
+                    ),
+                    cast(ProviderEnvVars, *type(self).OPENAI.other_env_vars),
                 )
             case Provider.HUGGINGFACE_INFERENCE:
                 return (
@@ -598,7 +742,13 @@ class Provider(BaseEnum):
                                     description="AWS Access Key ID for Bedrock service",
                                     is_secret=True,
                                     variable_name="aws_access_key_id",
-                                )
+                                ),
+                                "aws_bearer_token_bedrock": ProviderEnvVarInfo(
+                                    env="AWS_BEARER_TOKEN_BEDROCK",
+                                    description="AWS Bearer Token for Bedrock service",
+                                    is_secret=True,
+                                    variable_name="aws_bearer_token_bedrock",
+                                ),
                             },
                         )
                     ),
@@ -656,6 +806,26 @@ class Provider(BaseEnum):
                         ),
                     ),
                 )
+            case Provider.GROQ:
+                return (
+                    ProviderEnvVars(
+                        client=("groq",),
+                        api_key=ProviderEnvVarInfo(
+                            env="GROQ_API_KEY",
+                            description="Your Groq API Key",
+                            is_secret=True,
+                            variable_name="api_key",
+                        ),
+                        host=ProviderEnvVarInfo(
+                            env="GROQ_BASE_URL",
+                            default="https://api.groq.com",
+                            description="Host URL for Groq service",
+                            variable_name="base_url",
+                        ),
+                        other=httpx_env_vars,
+                    ),
+                    cast(ProviderEnvVars, *type(self).OPENAI.other_env_vars),
+                )
             case Provider.MISTRAL:
                 return (
                     ProviderEnvVars(
@@ -670,6 +840,8 @@ class Provider(BaseEnum):
                     ),
                 )
             case _:
+                if self.uses_openai_api:
+                    return cast(tuple[ProviderEnvVars, ...], *type(self).OPENAI.other_env_vars)
                 return None
 
     @cached_property
@@ -731,18 +903,22 @@ class Provider(BaseEnum):
     def uses_openai_api(self) -> bool:
         """Check if the provider uses the OpenAI API."""
         return self in {
+            Provider.ALIBABA,
             Provider.AZURE,
             Provider.CEREBRAS,
             Provider.DEEPSEEK,
             Provider.FIREWORKS,
             Provider.GITHUB,
+            Provider.GOOGLE,
             Provider.GROQ,
             Provider.HEROKU,
             Provider.LITELLM,
             Provider.MOONSHOT,
+            Provider.NEBIUS,
             Provider.OLLAMA,
             Provider.OPENAI,
             Provider.OPENROUTER,
+            Provider.OVHCLOUD,
             Provider.PERPLEXITY,
             Provider.TOGETHER,
             Provider.VERCEL,
@@ -911,11 +1087,20 @@ SDK_MAP: MappingProxyType[tuple[Provider, ProviderKind], SDKClient | tuple[SDKCl
         }
         | {(Provider.QDRANT, ProviderKind.VECTOR_STORE): SDKClient.QDRANT}
         | {(Provider.MEMORY, ProviderKind.VECTOR_STORE): SDKClient.QDRANT}
+        | {
+            (provider, ProviderKind.AGENT): SDKClient.OPENAI
+            for provider in Provider
+            if provider.uses_openai_api and provider != Provider.GROQ
+        }
+        | {(Provider.GROQ, ProviderKind.AGENT): SDKClient.GROQ}
+        | {(Provider.ANTHROPIC, ProviderKind.AGENT): SDKClient.ANTHROPIC}
     )
 )
 """Mapping of providers and their kinds to SDK clients. Currently only handles embedding/sparse_embedding/reranking/vector_store kinds."""
 
+
 PROVIDER_CAPABILITIES: MappingProxyType[Provider, tuple[ProviderKind, ...]] = MappingProxyType({
+    Provider.ALIBABA: (ProviderKind.AGENT,),
     Provider.ANTHROPIC: (ProviderKind.AGENT,),
     Provider.AZURE: (ProviderKind.AGENT, ProviderKind.EMBEDDING),
     Provider.BEDROCK: (ProviderKind.EMBEDDING, ProviderKind.RERANKING, ProviderKind.AGENT),
@@ -931,17 +1116,19 @@ PROVIDER_CAPABILITIES: MappingProxyType[Provider, tuple[ProviderKind, ...]] = Ma
     Provider.FIREWORKS: (ProviderKind.AGENT, ProviderKind.EMBEDDING),
     Provider.GITHUB: (ProviderKind.AGENT, ProviderKind.EMBEDDING),
     Provider.GOOGLE: (ProviderKind.AGENT, ProviderKind.EMBEDDING),
-    Provider.X_AI: (ProviderKind.AGENT,),
     Provider.GROQ: (ProviderKind.AGENT, ProviderKind.EMBEDDING),
     Provider.HEROKU: (ProviderKind.AGENT, ProviderKind.EMBEDDING),
     Provider.HUGGINGFACE_INFERENCE: (ProviderKind.AGENT, ProviderKind.EMBEDDING),
-    Provider.LITELLM: (ProviderKind.AGENT,),
+    Provider.LITELLM: (ProviderKind.AGENT,),  # supports embedding but not implemented yet
     Provider.MISTRAL: (ProviderKind.AGENT, ProviderKind.EMBEDDING),
     Provider.MEMORY: (ProviderKind.VECTOR_STORE,),
     Provider.MOONSHOT: (ProviderKind.AGENT,),
+    Provider.NEBIUS: (ProviderKind.AGENT,),
     Provider.OLLAMA: (ProviderKind.AGENT, ProviderKind.EMBEDDING),
     Provider.OPENAI: (ProviderKind.AGENT, ProviderKind.EMBEDDING),
-    Provider.OPENROUTER: (ProviderKind.AGENT,),
+    # Provider.OUTLINES: (ProviderKind.AGENT,),  # not implemented yet
+    Provider.OPENROUTER: (ProviderKind.AGENT,),  # supports embedding but not implemented yet
+    Provider.OVHCLOUD: (ProviderKind.AGENT,),
     Provider.PERPLEXITY: (ProviderKind.AGENT,),
     Provider.QDRANT: (ProviderKind.VECTOR_STORE,),
     Provider.SENTENCE_TRANSFORMERS: (
@@ -953,6 +1140,7 @@ PROVIDER_CAPABILITIES: MappingProxyType[Provider, tuple[ProviderKind, ...]] = Ma
     Provider.TOGETHER: (ProviderKind.AGENT, ProviderKind.EMBEDDING),
     Provider.VERCEL: (ProviderKind.AGENT, ProviderKind.EMBEDDING),
     Provider.VOYAGE: (ProviderKind.EMBEDDING, ProviderKind.RERANKING),
+    Provider.X_AI: (ProviderKind.AGENT,),
 })
 """Mapping of providers to their capabilities (the kind of provider).
 
@@ -980,6 +1168,7 @@ type LiteralProviderKind = Literal[
     ProviderKind.VECTOR_STORE,
 ]
 type LiteralProvider = Literal[
+    Provider.ALIBABA,
     Provider.ANTHROPIC,
     Provider.AZURE,
     Provider.BEDROCK,
@@ -997,10 +1186,15 @@ type LiteralProvider = Literal[
     Provider.LITELLM,
     Provider.MISTRAL,
     Provider.MOONSHOT,
+    Provider.MEMORY,
+    Provider.NEBIUS,
     Provider.OLLAMA,
     Provider.OPENAI,
     Provider.OPENROUTER,
+    Provider.OVHCLOUD,
+    # Provider.OUTLINES,
     Provider.PERPLEXITY,
+    Provider.PYDANTIC_GATEWAY,
     Provider.QDRANT,
     Provider.SENTENCE_TRANSFORMERS,
     Provider.TAVILY,
@@ -1015,6 +1209,7 @@ type ProviderKindLiteral = Literal[
 ]
 
 type ProviderLiteral = Literal[
+    "alibaba",
     "anthropic",
     "azure",
     "bedrock",
@@ -1024,6 +1219,7 @@ type ProviderLiteral = Literal[
     "duckduckgo",
     "fastembed",
     "fireworks",
+    "gateway",
     "github",
     "google",
     "groq",
@@ -1033,10 +1229,14 @@ type ProviderLiteral = Literal[
     "mistral",
     "memory",
     "moonshot",
+    "nebius",
     "ollama",
     "openai",
     "openrouter",
+    "ovhcloud",
+    # "outlines",
     "perplexity",
+    "pydantic_gateway",
     "qdrant",
     "sentence_transformers",
     "tavily",

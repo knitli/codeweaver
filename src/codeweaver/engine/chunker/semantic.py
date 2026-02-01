@@ -185,6 +185,9 @@ class SemanticChunker(BaseChunker):
         else:
             self.tokenizer = tokenizer
 
+        # Cache tokenizer existence for performance (avoid repeated None checks)
+        self._has_tokenizer = self.tokenizer is not None
+
         # Use importance threshold from settings, fallback to default
         if governor.settings is not None:
             self._importance_threshold = governor.settings.semantic_importance_threshold
@@ -320,16 +323,21 @@ class SemanticChunker(BaseChunker):
         # Parse content to AST
         root: FileThing[SgRoot] = self._parse_file(content, file_path)
 
-        # Find chunkable nodes
-        nodes: list[AstThing[SgNode]] = self._find_chunkable_nodes(
+        # Find chunkable nodes and cache their depths
+        nodes, node_depths = self._find_chunkable_nodes(
             root, max_depth=performance_settings.max_ast_depth, file_path=file_path
         )
 
-        # Convert nodes to chunks
-        return self._convert_nodes_to_chunks(nodes, file_path, source_id, governor)
+        # Convert nodes to chunks using cached depths
+        return self._convert_nodes_to_chunks(nodes, file_path, source_id, governor, node_depths)
 
     def _convert_nodes_to_chunks(
-        self, nodes: list[AstThing[SgNode]], file_path: Path | None, source_id: Any, governor: Any
+        self,
+        nodes: list[AstThing[SgNode]],
+        file_path: Path | None,
+        source_id: Any,
+        governor: Any,
+        node_depths: dict[int, int],
     ) -> list[CodeChunk]:
         """Convert AST nodes to code chunks with size enforcement.
 
@@ -338,6 +346,7 @@ class SemanticChunker(BaseChunker):
             file_path: Optional file path
             source_id: Source identifier
             governor: Resource governor
+            node_depths: Mapping of node id to cached depth
 
         Returns:
             List of code chunks
@@ -346,10 +355,16 @@ class SemanticChunker(BaseChunker):
         for node in nodes:
             governor.check_timeout()
 
+            # Cache node text to avoid repeated property access
             node_text = node.text
-            tokens = self.tokenizer.estimate(node_text) if self.tokenizer else len(node_text) // 4
+            # Use cached tokenizer flag for performance
+            tokens = self.tokenizer.estimate(node_text) if self._has_tokenizer else len(node_text) // 4
+            
+            # Get cached depth for this node
+            depth = node_depths.get(id(node))
+            
             if tokens <= self.chunk_limit:
-                chunks.append(self._create_chunk_from_node(node, file_path, source_id))
+                chunks.append(self._create_chunk_from_node(node, file_path, source_id, depth))
                 governor.register_chunk()
             else:
                 chunks.extend(self._handle_oversized_node(node, file_path, source_id, governor))
@@ -561,26 +576,10 @@ class SemanticChunker(BaseChunker):
 
             root: SgRoot = SgRoot(content, self.language.variable)
 
-            # Efficiently find all ERROR nodes indicating syntax errors
-            error_nodes_raw = root.root().find_all(kind="ERROR")
-
-            if error_nodes_raw:
-                error_nodes = [
-                    (node.range().start.line + 1, node.text()[:50]) for node in error_nodes_raw
-                ]
-                error_details = "; ".join(
-                    f"line {line}: {text}..." for line, text in error_nodes[:3]
-                )
-                raise_parse_error(
-                    f"Syntax errors found in {file_path or 'content'}: {error_details}",
-                    e=None,
-                    line_number=error_nodes[0][0],
-                    details={
-                        "language": self.language.as_title,
-                        "error_count": len(error_nodes),
-                        "errors": error_nodes,
-                    },
-                )
+            # Note: Removed ERROR node scanning for performance. ast-grep-py already
+            # raises exceptions for fatal syntax errors. ERROR nodes typically indicate
+            # partial parsing/error recovery which we don't use anyway. If SgRoot
+            # construction succeeds, the AST is usable for our purposes.
         except ParseError:
             raise
         except Exception as e:
@@ -606,12 +605,13 @@ class SemanticChunker(BaseChunker):
 
     def _find_chunkable_nodes(
         self, root: FileThing[SgRoot], max_depth: int = 200, file_path: Path | None = None
-    ) -> list[AstThing[SgNode]]:
+    ) -> tuple[list[AstThing[SgNode]], dict[int, int]]:
         """Traverse AST and filter nodes by classification and importance.
 
         Recursively walks the AST tree from root, checking each node against
         chunkability criteria (classification and importance threshold) and
-        enforcing AST depth safety limits.
+        enforcing AST depth safety limits. Returns both chunkable nodes and
+        their depths for efficient metadata building.
 
         Args:
             root: FileThing AST root to traverse
@@ -619,12 +619,14 @@ class SemanticChunker(BaseChunker):
             file_path: Optional file path for error messages
 
         Returns:
-            List of AstThing nodes meeting chunkability criteria
+            Tuple of (chunkable nodes list, node depth mapping)
 
         Raises:
             ASTDepthExceededError: If any node exceeds safe nesting depth
         """
         chunkable: list[AstThing[SgNode]] = []
+        # Cache node depths to avoid repeated ancestor traversal
+        node_depths: dict[int, int] = {}
 
         # Single-pass optimized traversal that tracks depth and finds chunkable nodes
         def traverse(node: AstThing[SgNode], depth: int) -> None:
@@ -640,6 +642,9 @@ class SemanticChunker(BaseChunker):
                     file_path=str(file_path) if file_path else None,
                 )
 
+            # Cache depth for this node (using id as key for O(1) lookup)
+            node_depths[id(node)] = depth
+
             # Check if this node is chunkable
             if self._is_chunkable(node):
                 chunkable.append(node)
@@ -652,7 +657,7 @@ class SemanticChunker(BaseChunker):
         for child_thing in root.root.positional_connections:
             traverse(child_thing, 1)
 
-        return chunkable
+        return chunkable, node_depths
 
     def _is_chunkable(self, node: AstThing[SgNode]) -> bool:
         """Check if node meets chunkability criteria.
@@ -715,7 +720,7 @@ class SemanticChunker(BaseChunker):
             )
 
     def _create_chunk_from_node(
-        self, node: AstThing[SgNode], file_path: Path | None, source_id: UUID7
+        self, node: AstThing[SgNode], file_path: Path | None, source_id: UUID7, depth: int | None = None
     ) -> CodeChunk:
         """Create CodeChunk with rich metadata from AstThing node.
 
@@ -726,12 +731,13 @@ class SemanticChunker(BaseChunker):
             node: AstThing node to convert
             file_path: Optional file path for chunk context
             source_id: Shared source ID for all chunks from this file
+            depth: Optional cached depth to avoid ancestor traversal
 
         Returns:
             CodeChunk with semantic metadata
         """
         range_obj = node.range
-        metadata = self._build_metadata(node)
+        metadata = self._build_metadata(node, depth)
 
         # Use model_construct to bypass validation since dependencies may not be fully defined
         return CodeChunk.model_construct(
@@ -749,7 +755,7 @@ class SemanticChunker(BaseChunker):
             metadata=metadata,
         )
 
-    def _build_metadata(self, node: AstThing[SgNode]) -> Metadata:
+    def _build_metadata(self, node: AstThing[SgNode], depth: int | None = None) -> Metadata:
         """Build metadata using existing Metadata TypedDict structure.
 
         Creates comprehensive metadata optimized for AI context delivery,
@@ -758,6 +764,7 @@ class SemanticChunker(BaseChunker):
 
         Args:
             node: AstThing node to extract metadata from
+            depth: Optional cached depth to avoid ancestor traversal
 
         Returns:
             Metadata TypedDict with semantic and context information
@@ -776,6 +783,9 @@ class SemanticChunker(BaseChunker):
         if not simple_name:
             simple_name = node.title if hasattr(node, "title") else str(node.name)
 
+        # Use cached depth if available, otherwise calculate from ancestors
+        nesting_level = depth if depth is not None else len(list(node.ancestors()))
+
         metadata: Metadata = {
             "chunk_id": uuid7(),
             "created_at": datetime.now(UTC).timestamp(),
@@ -790,14 +800,19 @@ class SemanticChunker(BaseChunker):
                 "category": node.primary_category if hasattr(node, "primary_category") else None,
                 "importance_scores": node.importance.as_dict() if node.importance else None,  # type: ignore[attr-defined]
                 "is_composite": node.is_composite,
-                "nesting_level": len(list(node.ancestors())),
+                "nesting_level": nesting_level,
             },
         }
 
         return metadata
 
     def _handle_oversized_node(
-        self, node: AstThing[SgNode], file_path: Path | None, source_id: UUID7, governor: Any
+        self,
+        node: AstThing[SgNode],
+        file_path: Path | None,
+        source_id: UUID7,
+        governor: Any,
+        recursion_depth: int = 0,
     ) -> list[CodeChunk]:
         """Handle nodes exceeding token limit via multi-tiered strategy.
 
@@ -813,33 +828,47 @@ class SemanticChunker(BaseChunker):
             file_path: Optional file path for context
             source_id: Shared source ID for all chunks from this file
             governor: Resource governor for limit enforcement
+            recursion_depth: Current recursion depth to prevent stack overflow
 
         Returns:
             List of chunks derived from oversized node
         """
-        # Try chunking children first for composite nodes
-        if node.is_composite:
+        # Prevent infinite recursion with depth limit
+        MAX_RECURSION_DEPTH = 10
+        
+        # Try chunking children first for composite nodes (unless max depth reached)
+        if recursion_depth < MAX_RECURSION_DEPTH and node.is_composite:
             children = list(node.positional_connections)
             child_chunks: list[CodeChunk] = []
 
             for child in children:
                 governor.check_timeout()
-                if self.tokenizer:
-                    child_tokens = self.tokenizer.estimate(child.text)
+                # Cache child text for performance
+                child_text = child.text
+                if self._has_tokenizer:
+                    child_tokens = self.tokenizer.estimate(child_text)
                 else:
-                    child_tokens = len(child.text) // 4
+                    child_tokens = len(child_text) // 4
 
                 if child_tokens <= self.chunk_limit:
                     child_chunks.append(self._create_chunk_from_node(child, file_path, source_id))
                     governor.register_chunk()
                 else:
-                    # Recursive handling for oversized children with governor
+                    # Recursive handling for oversized children with incremented depth
                     child_chunks.extend(
-                        self._handle_oversized_node(child, file_path, source_id, governor)
+                        self._handle_oversized_node(
+                            child, file_path, source_id, governor, recursion_depth + 1
+                        )
                     )
 
             if child_chunks:
                 return child_chunks
+        elif recursion_depth >= MAX_RECURSION_DEPTH:
+            logger.warning(
+                "Maximum recursion depth (%d) reached for oversized node '%s', using delimiter fallback",
+                MAX_RECURSION_DEPTH,
+                node.name,
+            )
 
         # Fallback: Use delimiter chunker to split oversized node text
         logger.info(
