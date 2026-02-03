@@ -18,7 +18,14 @@ from typing import TYPE_CHECKING, Literal
 
 from pydantic import NonNegativeInt, PositiveInt
 
+from codeweaver.core.constants import (
+    ENV_EXPLICIT_FALSE_VALUES,
+    ENV_JETBRAINS_INDICATOR,
+    ENV_VSCODE_INDICATORS,
+    LOCALHOST_URL,
+)
 from codeweaver.core.types.provider import Provider
+from codeweaver.core.utils.checks import has_package
 from codeweaver.core.utils.lazy_importer import LazyImport, lazy_import
 
 
@@ -47,8 +54,8 @@ def we_are_in_vscode() -> bool:
         any(
             v
             for k, v in env.items()
-            if k in {"VSCODE_GIT_IPC_HANDLE", "VSSCODE_INJECTION", "VSCODE_IPC_HOOK_CLI"}
-            if v and v not in {"0", "false", "False", ""}
+            if k in ENV_VSCODE_INDICATORS
+            if v and v not in ENV_EXPLICIT_FALSE_VALUES
         )
         or os.environ.get("TERM_PROGRAM") == "vscode"
     )
@@ -57,7 +64,7 @@ def we_are_in_vscode() -> bool:
 def we_are_in_jetbrains() -> bool:
     """Detect if we are running inside a JetBrains IDE."""
     env = os.environ
-    return env.get("TERMINAL_EMULATOR") == "JetBrains-JediTerm"
+    return env.get(ENV_JETBRAINS_INDICATOR) == "JetBrains-JediTerm"
 
 
 def in_ide() -> bool:
@@ -195,12 +202,18 @@ def settings_type_for_root_package(
 
 async def _check_ports(port_search: tuple[int, ...]) -> int | None:
     async def _endpoint(port: int):
-        return f"http://127.0.0.1:{port}/healthz"
+        return f"{LOCALHOST_URL}:{port}/healthz"
 
-    import httpx
+    if has_package("codeweaver.providers"):
+        from codeweaver.providers.http_pool import get_http_pool
 
-    client_pool = httpx.AsyncClient()
-    async with client_pool as client:
+        client = await get_http_pool().get_client("qdrant_probe")
+    else:
+        import httpx
+
+        client = httpx.AsyncClient()
+
+    async with client:
         for port in port_search:
             try:
                 response = await client.get(_endpoint(port), timeout=0.2)
@@ -216,7 +229,7 @@ async def _try_qdrant_client(port: int) -> bool:
 
     response = None
     with contextlib.suppress(Exception):
-        client = AsyncQdrantClient(url=f"http://127.0.0.1:{port}")
+        client = AsyncQdrantClient(url=f"{LOCALHOST_URL}:{port}")
         response = await client.get_collections()
     return bool(response)
 

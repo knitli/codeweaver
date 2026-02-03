@@ -14,6 +14,7 @@ from typing import Literal, cast, overload
 
 from pydantic import UUID7
 
+from codeweaver.core.constants import ONE_MILLISECOND_IN_MICROSECONDS
 from codeweaver.core.types.aliases import BlakeHashKey, BlakeKey
 
 
@@ -50,7 +51,7 @@ def uuid7_as_timestamp(
 
     uuid = uuid7(uuid) if isinstance(uuid, str | int) else uuid
     return (
-        datetime.datetime.fromtimestamp(uuid.time // 1_000, datetime.UTC)
+        datetime.datetime.fromtimestamp(uuid.time // ONE_MILLISECOND_IN_MICROSECONDS, datetime.UTC)
         if as_datetime
         else uuid.time
     )

@@ -17,7 +17,7 @@ Architecture:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Annotated
+from typing import Annotated
 
 from codeweaver.core import (
     DEFAULT_EXCLUDED_EXTENSIONS,
@@ -59,10 +59,6 @@ from codeweaver.providers import (
 )
 
 
-if TYPE_CHECKING:
-    pass
-
-
 # ===========================================================================
 # Configuration Providers
 # ===========================================================================
@@ -76,7 +72,7 @@ def _get_settings(settings: SettingsDep = INJECTED) -> CodeWeaverSettingsType:
 @dependency_provider(IndexerSettings, scope="singleton")
 def _get_indexer_settings(settings: SettingsDep = INJECTED) -> IndexerSettings:
     """Factory for indexing service settings."""
-    if settings.indexer is not Unset:  # ty:ignore[unresolved-attribute]
+    if settings.indexer is not Unset:
         return settings.indexer  # type: ignore
     return IndexerSettings.model_validate(DefaultIndexerSettings)
 
@@ -84,7 +80,7 @@ def _get_indexer_settings(settings: SettingsDep = INJECTED) -> IndexerSettings:
 @dependency_provider(ChunkerSettings, scope="singleton")
 def _get_chunker_settings(settings: SettingsDep = INJECTED) -> ChunkerSettings:
     """Factory for chunking service settings."""
-    if settings.chunker is not Unset:  # ty:ignore[unresolved-attribute]
+    if settings.chunker is not Unset:
         return settings.chunker  # type: ignore
     return ChunkerSettings.model_validate(DefaultChunkerSettings)
 
@@ -92,7 +88,7 @@ def _get_chunker_settings(settings: SettingsDep = INJECTED) -> ChunkerSettings:
 @dependency_provider(FailoverSettings, scope="singleton")
 def _get_failover_settings(settings: SettingsDep = INJECTED) -> FailoverSettings:
     """Factory for failover service settings."""
-    if settings.failover is not Unset:  # ty:ignore[unresolved-attribute]
+    if settings.failover is not Unset:
         return settings.failover  # type: ignore
     return FailoverSettings.model_validate(DefaultFailoverSettings())
 

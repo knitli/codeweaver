@@ -14,6 +14,7 @@ import platform
 import sys
 import urllib
 
+from functools import cache
 from importlib import metadata, util
 from pathlib import Path
 from typing import Any
@@ -78,13 +79,26 @@ def is_typeadapter(adapter: Any) -> TypeIs[TypeAdapter[Any] | type[TypeAdapter[A
     return hasattr(adapter, "pydantic_complete") and hasattr(adapter, "validate_python")
 
 
+@cache
 def has_package(package_name: str) -> bool:
-    """Check if a package is installed."""
+    """Check if a package is installed.
+
+    First checks via importlib.metadata to catch cases like `fastembed-gpu` which don't import under that name.
+    Then falls back to importlib.util.find_spec to catch packages that may not be registered in metadata.
+    """
+
+    def check_spec(name: str) -> bool:
+        return util.find_spec(name) is not None
+
     try:
-        if util.find_spec(package_name):
-            return True
+        metadata.distribution(package_name.replace("_", "-"))
     except metadata.PackageNotFoundError:
-        return False
+        if check_spec(package_name):
+            return True
+        if "-" in package_name and check_spec(package_name.replace("-", "_")):
+            return True
+    else:
+        return True
     return False
 
 

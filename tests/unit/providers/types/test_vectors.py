@@ -259,9 +259,7 @@ class TestVectorConfig:
 
         # Create provider settings with the proper embedding config
         settings = EmbeddingProviderSettings(
-            provider=Provider.VOYAGE,
-            model_name="voyage-3-large",
-            embedding_config=embedding_config,
+            provider=Provider.VOYAGE, model_name="voyage-3-large", embedding_config=embedding_config
         )
 
         config = await VectorConfig.from_provider_settings(
@@ -315,9 +313,7 @@ class TestVectorConfig:
 
         # Create provider settings with the proper embedding config
         settings = EmbeddingProviderSettings(
-            provider=Provider.VOYAGE,
-            model_name="voyage-3-large",
-            embedding_config=embedding_config,
+            provider=Provider.VOYAGE, model_name="voyage-3-large", embedding_config=embedding_config
         )
 
         config = await VectorConfig.from_provider_settings(settings, name="custom_vector")

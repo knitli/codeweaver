@@ -11,22 +11,23 @@ import importlib
 import logging
 
 from abc import abstractmethod
+from collections.abc import Hashable
 from typing import (
     TYPE_CHECKING,
     Annotated,
     Any,
     ClassVar,
     Literal,
-    LiteralString,
     NotRequired,
     Required,
+    Self,
     TypedDict,
     cast,
     overload,
+    override,
 )
 
-from cyclopts.types import PositiveInt
-from pydantic import Discriminator, Field, Tag, computed_field
+from pydantic import Discriminator, Field, PositiveInt, PrivateAttr, Tag, computed_field
 from qdrant_client.models import (
     Datatype,
     Distance,
@@ -46,6 +47,13 @@ from codeweaver.core import (
     ModelNameT,
     Provider,
 )
+from codeweaver.core.constants import (
+    DATATYPE_FIELDS,
+    DEFAULT_EMBEDDING_TIMEOUT,
+    DEFAULT_LOCAL_EMBEDDING_BATCH_SIZE,
+    DIMENSION_FIELDS,
+)
+from codeweaver.core.utils import deep_merge_dicts
 from codeweaver.providers.config.types import CohereRequestOptionsDict
 
 
@@ -57,20 +65,8 @@ if TYPE_CHECKING:
         SparseEmbeddingModelCapabilities,
     )
 
-DATATYPE_FIELDS = {"encoding_format", "output_dtype", "embedding_types", "precision"}
-"""Fields that specify the datatype of embeddings in provider configs."""
-
 INCOMPATIBLE_FIELDS = {"prompt_name", "prompt", "task"}
 """Fields that cannot be shared between query and embedding configs even if the types are the same."""
-
-DIMENSION_FIELDS = {
-    "dimension",
-    "dimensions",
-    "output_dimension",
-    "output_dimensions",
-    "output_dimensionality",
-    "truncate_dim",
-}
 
 
 @overload
@@ -120,6 +116,8 @@ class BaseEmbeddingConfig(BasedModel):
     """Base configuration for embedding models."""
 
     _is_sparse: ClassVar[bool] = False
+    _dimension: int | None = PrivateAttr(default=None)
+    _datatype: str | None = PrivateAttr(default=None)
 
     tag: LiteralProvider = Field(
         ...,
@@ -186,8 +184,57 @@ class BaseEmbeddingConfig(BasedModel):
                 e,
             )
 
-    async def apply_resolved_config(self, **resolved: Any) -> None:
-        """Nothing to apply - we're a provider, not a consumer."""
+    @abstractmethod
+    def set_dimension(self, dimension: int) -> Self:
+        """Set the embedding dimension explicitly in the embedding configuration.
+
+        Args:
+            dimension: The dimension to set.
+        """
+        raise NotImplementedError("Subclasses must implement set_dimension method.")
+
+    @abstractmethod
+    def set_datatype(self, datatype: str) -> Self:
+        """Set the embedding datatype explicitly in the embedding configuration."""
+        raise NotImplementedError("Subclasses must implement set_datatype method.")
+
+    @staticmethod
+    def _filter_and_merge(
+        first_dict: dict[str, Any], second_dict: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Filter out incompatible fields and merge two dictionaries."""
+        filtered_second = {k: v for k, v in second_dict.items() if k not in INCOMPATIBLE_FIELDS}
+        return cast(
+            dict[str, Any],
+            deep_merge_dicts(
+                cast(dict[Hashable, Any], first_dict), cast(dict[Hashable, Any], filtered_second)
+            ),
+        )
+
+    def mirror_settings(self, **updates: Any) -> Self:
+        """If the types for embedding and query are the same, mirrors settings between them with deep merge. If updates are provided, overrides resolved settings with the updates."""
+        if self._query_and_embedding_same_type():
+            new_embedding = self._filter_and_merge(self.embedding or {}, self.query or {})
+            new_embedding = self._filter_and_merge(new_embedding, updates or {})
+            return self.model_copy(update={"embedding": new_embedding, "query": new_embedding})
+        if all(
+            k
+            for k in updates
+            if k in {k for k in (self.embedding or {}) if k not in INCOMPATIBLE_FIELDS}
+        ):
+            new_embedding = self._filter_and_merge(self.embedding or {}, updates or {})
+            return self.model_copy(update={"embedding": new_embedding})
+        if all(
+            k
+            for k in updates
+            if k in {k for k in (self.query or {}) if k not in INCOMPATIBLE_FIELDS}
+        ):
+            new_query = self._filter_and_merge(self.query or {}, updates or {})
+            return self.model_copy(update={"query": new_query})
+        logger.warning(
+            "Could not mirror settings between embedding and query configs; they are of different types and we can't tell where to apply them."
+        )
+        return self
 
     def _get_dimension(self) -> int | None:
         """Get explicitly configured dimension without fallbacks.
@@ -216,9 +263,13 @@ class BaseEmbeddingConfig(BasedModel):
         Returns:
             Resolved dimension or None
         """
+        if self._dimension:
+            return self._dimension
         if type(self)._is_sparse:
+            object.__setattr__(self, "_dimension", 0)
             return 0
         if dimension := self._get_dimension():
+            object.__setattr__(self, "_dimension", dimension)
             return dimension
         # 1. Explicit config
         for field in ("embedding", "query"):
@@ -227,11 +278,14 @@ class BaseEmbeddingConfig(BasedModel):
                 and (found_field := next((f for f in DIMENSION_FIELDS if f in config), None))
                 and isinstance(config[found_field], int)
             ):
+                object.__setattr__(self, "_dimension", config[found_field])
                 return config[found_field]
         if cap := self.capabilities:
             if dim := getattr(cap, "default_dimension", None):
+                object.__setattr__(self, "_dimension", dim)
                 return dim
             if cap.output_dimensions:
+                object.__setattr__(self, "_dimension", cap.output_dimensions[0])
                 return cap.output_dimensions[0]
         raise ConfigurationError(
             "Could not resolve embedding dimension from config, capabilities, or registered defaults. You need to specify it explicitly, for best results, register an `EmbeddingModelCapabilities` subclass with the capability resolver."
@@ -249,9 +303,13 @@ class BaseEmbeddingConfig(BasedModel):
         Returns:
             Resolved dimension or 0 if sparse embeddings
         """
+        if self._dimension:
+            return self._dimension
         if type(self)._is_sparse:
+            object.__setattr__(self, "_dimension", 0)
             return 0
         if dimension := self._get_dimension():
+            object.__setattr__(self, "_dimension", dimension)
             return dimension
         # 1. Explicit config
         for field in ("embedding", "query"):
@@ -260,10 +318,12 @@ class BaseEmbeddingConfig(BasedModel):
                 and (found_field := next((f for f in DIMENSION_FIELDS if f in config), None))
                 and isinstance(config[found_field], int)
             ):
+                object.__setattr__(self, "_dimension", config[found_field])
                 return config[found_field]
 
         # 2. Model capabilities
         if (caps := self.capabilities) and (dim := getattr(caps, "default_dimension", None)):
+            object.__setattr__(self, "_dimension", dim)
             return dim
 
         raise ConfigurationError(
@@ -281,24 +341,33 @@ class BaseEmbeddingConfig(BasedModel):
         Returns:
             Resolved datatype or None
         """
+        if self._datatype:
+            return self._datatype
         if datatype := self._get_datatype():
+            object.__setattr__(self, "_datatype", datatype)
             return datatype
         # 1. Explicit config
         for field in ("embedding", "query", "model"):
             if (config := getattr(self, field, None)) and (
                 found_field := next((f for f in DATATYPE_FIELDS if f in config), None)
             ):
+                object.__setattr__(self, "_datatype", config[found_field])
                 return config[found_field]
 
         # 2. Model capabilities
         if (caps := self.capabilities) and (dtype := getattr(caps, "default_datatype", None)):
+            object.__setattr__(self, "_datatype", dtype)
             return dtype
 
         # 3. Provider-specific defaults
         if output_default := next(
             (f for f in DATATYPE_FIELDS if f in self._defaults.get("embedding", {})), None
         ):
+            object.__setattr__(
+                self, "_datatype", self._defaults.get("embedding", {}).get(output_default)
+            )
             return self._defaults.get("embedding", {}).get(output_default)
+        object.__setattr__(self, "_datatype", "float16")
         return "float16"
 
     def get_datatype_sync(self) -> str:
@@ -310,24 +379,33 @@ class BaseEmbeddingConfig(BasedModel):
         Returns:
             Resolved datatype
         """
+        if self._datatype:
+            return self._datatype
         if datatype := self._get_datatype():
+            object.__setattr__(self, "_datatype", datatype)
             return datatype
         # 1. Explicit config
         for field in ("embedding", "query", "model"):
             if (config := getattr(self, field, None)) and (
                 found_field := next((f for f in DATATYPE_FIELDS if f in config), None)
             ):
+                object.__setattr__(self, "_datatype", config[found_field])
                 return config[found_field]
 
         # 2. Model capabilities
         if (caps := self.capabilities) and (dtype := getattr(caps, "default_datatype", None)):
+            object.__setattr__(self, "_datatype", dtype)
             return dtype
 
         # 3. Provider-specific defaults
         if output_default := next(
             (f for f in DATATYPE_FIELDS if f in self._defaults.get("embedding", {})), None
         ):
+            object.__setattr__(
+                self, "_datatype", self._defaults.get("embedding", {}).get(output_default)
+            )
             return self._defaults.get("embedding", {}).get(output_default)
+        object.__setattr__(self, "_datatype", "float16")
         return "float16"
 
     @staticmethod
@@ -399,7 +477,17 @@ class BaseEmbeddingConfig(BasedModel):
         """Check if both query and embedding configurations are of the same type."""
         query_field_info = cls.model_fields.get("query")
         embedding_field_info = cls.model_fields.get("embedding")
-        return query_field_info.annotation == embedding_field_info.annotation
+        if (
+            query_field_info
+            and embedding_field_info
+            and query_field_info.annotation
+            and embedding_field_info.annotation
+        ):
+            return query_field_info.annotation == embedding_field_info.annotation
+        # ! IMPORTANT: Revisit if adding a provider.
+        # We're prepared for a situation where this isn't true, but with our current providers
+        # it is always true.
+        return True
 
     def _telemetry_keys(self) -> None:
         """Get the telemetry keys for the model."""
@@ -431,7 +519,7 @@ class BaseEmbeddingConfig(BasedModel):
         resolution, use get_dimension() directly. This property returns
         only explicitly configured values or None.
         """
-        return self.get_dimension_sync()
+        return self._dimension or self.get_dimension_sync()
 
     @property
     def datatype(self) -> str | None:
@@ -441,7 +529,7 @@ class BaseEmbeddingConfig(BasedModel):
         resolution, use get_datatype() directly. This property returns
         only explicitly configured values or None.
         """
-        return self.get_datatype_sync()
+        return self._datatype or self.get_datatype_sync()
 
 
 class BedrockEmbeddingRequestParams(TypedDict, total=False):
@@ -499,6 +587,7 @@ class BedrockEmbeddingConfig(BaseEmbeddingConfig):
             "amazon.titan-embed-text-v2:0",
             "cohere.embed-english-v3.0",
             "cohere.embed-multilingual-v3.0",
+            "cohere.embed-v4:0",
         ]
         | ModelNameT
     )
@@ -512,6 +601,49 @@ class BedrockEmbeddingConfig(BaseEmbeddingConfig):
     embedding: BedrockEmbeddingRequestParams | None
     """Parameters for the embedding request to Bedrock."""
 
+    query: BedrockEmbeddingRequestParams | None
+    """Parameters for the query request to Bedrock."""
+
+    def set_dimension(self, dimension: int) -> Self:
+        """Set the embedding dimension explicitly in the embedding configuration.
+
+        Args:
+            dimension: The dimension to set.
+        """
+        self.model = self.model or {}  # ty:ignore[invalid-assignment]
+        object.__setattr__(self, "_dimension", dimension)
+        if str(self.model_name).startswith("amazon.titan-embed-text-v2"):
+            self.model = BedrockTitanV2ConfigDict(**(self.model | {"dimensions": dimension}))
+        return self
+
+    def set_datatype(self, datatype: str) -> Self:
+        """Set the embedding datatype explicitly in the embedding configuration.
+
+        Args:
+            datatype: The datatype to set.
+        """
+        self.model = self.model or {}  # ty:ignore[invalid-assignment]
+        if str(self.model_name).startswith("amazon.titan-embed"):
+            datatype = "binary" if "binary" in datatype else "float"
+            self.model["embedding_types"] = datatype  # ty:ignore[invalid-assignment]
+        elif "cohere" in str(self.model_name):
+            datatype = (
+                "float"
+                if "float" in datatype
+                else "int8"
+                if "int8" in datatype
+                else "uint8"
+                if "uint8" in datatype
+                else "binary"
+                if "binary" in datatype
+                else "ubinary"
+                if "ubinary" in datatype
+                else "float"
+            )
+            self.model["embedding_types"] = datatype  # ty:ignore[invalid-assignment]
+        object.__setattr__(self, "_datatype", datatype)
+        return self
+
     def _get_dimension(self) -> int | None:
         """Get explicitly configured dimension without fallbacks.
         Optional field for subclasses to implement as a helper for get_dimension.
@@ -519,9 +651,11 @@ class BedrockEmbeddingConfig(BaseEmbeddingConfig):
         Returns:
             Explicitly configured dimension or None
         """
+        if (dim := self._dimension) is not None:
+            return dim
         if (model_settings := self.model) and (dimensions := model_settings.get("dimensions")):
             return dimensions
-        if self.model_name and self.model_name.startswith("amazon.titan-embed-text-v2"):
+        if self.model_name and str(self.model_name).startswith("amazon.titan-embed-text-v2"):
             return 1024
         return None
 
@@ -532,6 +666,8 @@ class BedrockEmbeddingConfig(BaseEmbeddingConfig):
         Returns:
             Explicitly configured datatype or None
         """
+        if self._datatype is not None:
+            return self._datatype
         if (model_settings := self.model) and (
             embedding_types := model_settings.get("embedding_types")
         ):
@@ -544,8 +680,8 @@ class BedrockEmbeddingConfig(BaseEmbeddingConfig):
         return SerializedEmbeddingOptionsDict(
             model_name=ModelName(self.model_name),
             model=model,  # ty:ignore[invalid-argument-type]
-            embedding=self.embedding or {},  # ty:ignore[invalid-argument-type]
-            query=self.embedding or {},  # ty:ignore[invalid-argument-type]
+            embedding=self.embedding or self.query or {},  # ty:ignore[invalid-argument-type]
+            query=self.query or self.embedding or {},  # ty:ignore[invalid-argument-type]
         )
 
     @property
@@ -565,9 +701,6 @@ class CohereEmbeddingOptionsDict(TypedDict, total=False):
 
     These parameters are passed to the embed() method.
     """
-
-    model: Required[LiteralString]
-    """The Cohere embedding model to use."""
 
     max_tokens: NotRequired[PositiveInt]
     """The maximum number of tokens to process. Will truncate inputs longer than this using the truncation strategy."""
@@ -604,26 +737,57 @@ class CohereEmbeddingConfig(BaseEmbeddingConfig):
 
     embedding: CohereEmbeddingOptionsDict | None = None
 
+    query: CohereEmbeddingOptionsDict | None = None
+
     model: dict[str, Any] | None = None
 
-    def __init__(self, **data: Any) -> None:
-        """Initialize the Cohere embedding configuration."""
-        if "model" not in data or not data.get("model"):
-            data["model"] = {}
-        if (embedding_config := data.get("embedding")) and not embedding_config.get("model"):
-            data["embedding"]["model"] = data["model_name"]
-        super().__init__(**data)
+    @override
+    def set_dimension(self, dimension: Literal[256, 512, 1024, 1536]) -> Self:  # ty:ignore[invalid-method-override]
+        """Set the embedding dimension explicitly in the embedding configuration.
 
-    def _get_dimension(self) -> int | None:
+        Args:
+            dimension: The dimension to set.
+        """
+        object.__setattr__(self, "_dimension", dimension)
+        if self.embedding:
+            self.embedding["output_dimension"] = dimension
+        if self.query:
+            self.query["output_dimension"] = dimension
+        return self
+
+    def set_datatype(self, datatype: str) -> Self:
+        """Set the embedding datatype explicitly in the embedding configuration.
+
+        Args:
+            datatype: The datatype to set.
+        """
+        datatype: Literal["float", "int8", "uint8", "binary", "ubinary"] = cast(
+            Literal["float", "int8", "uint8", "binary", "ubinary"],
+            "float"
+            if "float" in datatype
+            else (datatype if datatype in {"int8", "uint8", "binary", "ubinary"} else "float"),
+        )
+        object.__setattr__(self, "_datatype", datatype)
+        if self.embedding:
+            self.embedding["embedding_types"] = datatype
+        if self.query:
+            self.query["embedding_types"] = datatype
+        return self
+
+    def _get_dimension(self) -> int:
         """Get explicitly configured dimension without fallbacks.
         Optional field for subclasses to implement as a helper for get_dimension.
 
         Returns:
             Explicitly configured dimension or None
         """
+        if self._dimension is not None:
+            return self._dimension
         if self.embedding and (output_dimension := self.embedding.get("output_dimension")):
             return output_dimension
-        return None
+        if self.query and (output_dimension := self.query.get("output_dimension")):
+            return output_dimension
+        return 1536
 
     def _get_datatype(self) -> str:
         """Get explicitly configured datatype without fallbacks.
@@ -632,9 +796,31 @@ class CohereEmbeddingConfig(BaseEmbeddingConfig):
         Returns:
             Explicitly configured datatype or None
         """
+        if self._datatype is not None:
+            return self._datatype
         if self.embedding and (embedding_types := self.embedding.get("embedding_types")):
             return embedding_types
+        if self.query and (embedding_types := self.query.get("embedding_types")):
+            return embedding_types
         return "float"
+
+    @property
+    def _defaults(self) -> dict[str, Any]:
+        """Return default values for the configuration."""
+        return {
+            "embedding": {
+                "model": self.model_name,
+                "output_dimension": 1536,
+                "embedding_types": "float",
+                "truncate": "NONE",
+            },
+            "query": {
+                "model": self.model_name,
+                "output_dimension": 1536,
+                "embedding_types": "float",
+                "truncate": "NONE",
+            },
+        }
 
     def _as_options(self) -> SerializedEmbeddingOptionsDict:
         """Convert the Cohere embedding configuration to a dictionary of options."""
@@ -660,6 +846,24 @@ class FastEmbedEmbeddingConfig(BaseEmbeddingConfig):
             model_name=self.model_name, embedding={}, query={}, model={}
         )
 
+    def set_dimension(self, dimension: int) -> Self:
+        """Set the embedding dimension explicitly in the embedding configuration.
+
+        Args:
+            dimension: The dimension to set.
+        """
+        object.__setattr__(self, "_dimension", dimension)
+        return self
+
+    def set_datatype(self, datatype: str) -> Self:
+        """Set the embedding datatype explicitly in the embedding configuration.
+
+        Args:
+            datatype: The datatype to set.
+        """
+        object.__setattr__(self, "_datatype", datatype)
+        return self
+
 
 class GoogleEmbeddingRequestParams(TypedDict, total=False):
     """Parameters for Google embedding requests."""
@@ -679,7 +883,32 @@ class GoogleEmbeddingConfig(BaseEmbeddingConfig):
     embedding: GoogleEmbeddingRequestParams | None = None
     """Parameters for the embedding request to Google."""
 
-    def _get_dimension(self) -> int | None:
+    query: GoogleEmbeddingRequestParams | None = None
+    """Parameters for the query request to Google."""
+
+    def set_dimension(self, dimension: int) -> Self:
+        """Set the embedding dimension explicitly in the embedding configuration.
+
+        Args:
+            dimension: The dimension to set.
+        """
+        object.__setattr__(self, "_dimension", dimension)
+        if self.embedding:
+            self.embedding["output_dimensionality"] = dimension
+        if self.query:
+            self.query["output_dimensionality"] = dimension
+        return self
+
+    def set_datatype(self, datatype: str) -> Self:
+        """Set the embedding datatype explicitly in the embedding configuration.
+
+        Args:
+            datatype: The datatype to set.
+        """
+        object.__setattr__(self, "_datatype", datatype)
+        return self
+
+    def _get_dimension(self) -> int:
         """Get explicitly configured dimension without fallbacks.
         Optional field for subclasses to implement as a helper for get_dimension.
 
@@ -690,15 +919,27 @@ class GoogleEmbeddingConfig(BaseEmbeddingConfig):
             return output_dimension
         if default := self._defaults.get("embedding", {}):
             return default.get("output_dimensionality")
-        return None
+        return 768
+
+    def _get_datatype(self) -> Literal["float"]:
+        """Get explicitly configured datatype without fallbacks.
+        Optional field for subclasses to implement as a helper for get_datatype.
+
+        Returns:
+            Explicitly configured datatype or None
+        """
+        if not self._datatype:
+            object.__setattr__(self, "_datatype", "float")
+        return self._datatype  # type: ignore[return-value]
 
     def _as_options(self) -> SerializedEmbeddingOptionsDict:
         """Convert the Google embedding configuration to a dictionary of options."""
         embedding_options = {"model": self.model_name} | (self.embedding or {})
+        query_options = {"model": self.model_name} | (self.query or embedding_options)
         return SerializedEmbeddingOptionsDict(
             model_name=ModelName(self.model_name),
             embedding=embedding_options,
-            query=embedding_options,
+            query=query_options,
             model={},
         )
 
@@ -717,6 +958,42 @@ class HuggingFaceEmbeddingConfig(BaseEmbeddingConfig):
 
     tag: Literal["huggingface"] = "huggingface"
     provider: Literal[Provider.HUGGINGFACE_INFERENCE] = Provider.HUGGINGFACE_INFERENCE
+
+    def set_dimension(self, dimension: int) -> Self:
+        """Set the embedding dimension explicitly in the embedding configuration.
+
+        Args:
+            dimension: The dimension to set.
+        """
+        object.__setattr__(self, "_dimension", dimension)
+        return self
+
+    def set_datatype(self, datatype: str) -> Self:
+        """Set the embedding datatype explicitly in the embedding configuration.
+
+        Args:
+            datatype: The datatype to set.
+        """
+        object.__setattr__(self, "_datatype", datatype)
+        return self
+
+    def _get_dimension(self) -> int | None:
+        """Get explicitly configured dimension without fallbacks.
+        Optional field for subclasses to implement as a helper for get_dimension.
+
+        Returns:
+            Explicitly configured dimension or None
+        """
+        return self._dimension
+
+    def _get_datatype(self) -> str | None:
+        """Get explicitly configured datatype without fallbacks.
+        Optional field for subclasses to implement as a helper for get_datatype.
+
+        Returns:
+            Explicitly configured datatype or None
+        """
+        return self._datatype
 
     def _as_options(self) -> SerializedEmbeddingOptionsDict:
         """Convert the HuggingFace embedding configuration to a dictionary of options."""
@@ -783,6 +1060,34 @@ class MistralEmbeddingConfig(BaseEmbeddingConfig):
             model={},
         )
 
+    @property
+    def _defaults(self) -> dict[str, Any]:
+        """Return default values for the configuration."""
+        dimension = (
+            1024
+            if str(self.model_name) == "mistral-embed"
+            else 1536
+            if str(self.model_name) == "codestral-embed"
+            else None
+        )
+        return {
+            "embedding": {"output_dimension": dimension, "output_dtype": "float"},
+            "query": {"output_dimension": dimension, "output_dtype": "float"},
+        }
+
+    def set_dimension(self, dimension: int) -> Self:
+        """Set the embedding dimension explicitly in the embedding configuration.
+
+        Args:
+            dimension: The dimension to set.
+        """
+        object.__setattr__(self, "_dimension", dimension)
+        self.embedding = self.embedding or {}  # ty:ignore[invalid-assignment]
+        self.query = self.query or {}  # ty:ignore[invalid-assignment]
+        self.embedding["output_dimension"] = dimension  # ty:ignore[invalid-assignment]
+        self.query["output_dimension"] = dimension  # ty:ignore[invalid-assignment]
+        return self
+
     def _get_dimension(self) -> int | None:
         """Get explicitly configured dimension without fallbacks.
         Optional field for subclasses to implement as a helper for get_dimension.
@@ -792,7 +1097,13 @@ class MistralEmbeddingConfig(BaseEmbeddingConfig):
         """
         if self.embedding and (output_dimension := self.embedding.get("output_dimension")):
             return output_dimension
-        return None
+        return (
+            1024
+            if str(self.model_name) == "mistral-embed"
+            else 1536
+            if str(self.model_name) == "codestral-embed"
+            else None
+        )
 
     def _get_datatype(self) -> str:
         """Get explicitly configured datatype without fallbacks.
@@ -814,7 +1125,7 @@ class OpenAIEmbeddingRequestParams(TypedDict, total=False):
     """
 
     dimensions: NotRequired[int]
-    """Output dimensionality for the embeddings. Only supported by text-embedding-3-* models."""
+    """Output dimensionality for the embeddings. Only supported by text-embedding-3-* models for OpenAI, but can be used for other non-OpenAI providers."""
 
     user: NotRequired[str]
     """End-user identifier for abuse monitoring and tracking."""
@@ -859,6 +1170,28 @@ class OpenAIEmbeddingConfig(BaseEmbeddingConfig):
             model={},
         )
 
+    def set_dimension(self, dimension: int) -> Self:
+        """Set the embedding dimension explicitly in the embedding configuration.
+
+        Args:
+            dimension: The dimension to set.
+        """
+        object.__setattr__(self, "_dimension", dimension)
+        self.embedding = self.embedding or {}  # ty:ignore[invalid-assignment]
+        self.query = self.query or {}  # ty:ignore[invalid-assignment]
+        self.embedding["dimensions"] = dimension  # ty:ignore[invalid-assignment]
+        self.query["dimensions"] = dimension  # ty:ignore[invalid-assignment]
+        return self
+
+    def set_datatype(self, datatype: str) -> Self:
+        """Set the embedding datatype explicitly in the embedding configuration.
+
+        Args:
+            datatype: The datatype to set.
+        """
+        object.__setattr__(self, "_datatype", datatype)
+        return self
+
     def _get_dimension(self) -> int | None:
         """Get explicitly configured dimension without fallbacks.
         Optional field for subclasses to implement as a helper for get_dimension.
@@ -870,12 +1203,36 @@ class OpenAIEmbeddingConfig(BaseEmbeddingConfig):
             return dimensions
         return None
 
+    def _get_datatype(self) -> str:
+        """Get explicitly configured datatype without fallbacks.
+        Optional field for subclasses to implement as a helper for get_datatype.
+
+        Returns:
+            Explicitly configured datatype or None
+        """
+        return self._datatype if self._datatype is not None else "float"
+
     @property
     def _defaults(self) -> dict[str, Any]:
         """Return default values for the configuration."""
+        dimension = (
+            3072
+            if str(self.model_name) == "text-embedding-3-large"
+            else 1_536
+            if str(self.model_name) == "text-embedding-3-small"
+            else None
+        )
         return {
-            "embedding": {"encoding_format": "float", "timeout": 30.0},
-            "query": {"encoding_format": "float", "timeout": 30.0},
+            "embedding": {
+                "dimensions": dimension,
+                "encoding_format": "float",
+                "timeout": DEFAULT_EMBEDDING_TIMEOUT,
+            },
+            "query": {
+                "dimensions": dimension,
+                "encoding_format": "float",
+                "timeout": DEFAULT_EMBEDDING_TIMEOUT,
+            },
         }
 
     def _telemetry_handler(self, _serialized_self: dict[str, Any], /) -> dict[str, Any]:
@@ -963,6 +1320,32 @@ class SentenceTransformersEmbeddingConfig(BaseEmbeddingConfig):
             model={},
         )
 
+    def set_dimension(self, dimension: int) -> Self:
+        """Set the embedding dimension explicitly in the embedding configuration.
+
+        Args:
+            dimension: The dimension to set.
+        """
+        object.__setattr__(self, "_dimension", dimension)
+        self.embedding = self.embedding or {}  # ty:ignore[invalid-assignment]
+        self.embedding["truncate_dim"] = dimension  # ty:ignore[invalid-assignment]
+        self.query = self.query or {}  # ty:ignore[invalid-assignment]
+        self.query["truncate_dim"] = dimension  # ty:ignore[invalid-assignment]
+        return self
+
+    def set_datatype(self, datatype: str) -> Self:
+        """Set the embedding datatype explicitly in the embedding configuration.
+
+        Args:
+            datatype: The datatype to set.
+        """
+        object.__setattr__(self, "_datatype", datatype)
+        self.embedding = self.embedding or {}  # ty:ignore[invalid-assignment]
+        self.embedding["precision"] = datatype  # ty:ignore[invalid-assignment]
+        self.query = self.query or {}  # ty:ignore[invalid-assignment]
+        self.query["precision"] = datatype  # ty:ignore[invalid-assignment]
+        return self
+
     def _get_dimension(self) -> int | None:
         """Get explicitly configured dimension without fallbacks.
         Optional field for subclasses to implement as a helper for get_dimension.
@@ -992,13 +1375,13 @@ class SentenceTransformersEmbeddingConfig(BaseEmbeddingConfig):
             "embedding": {
                 "normalize_embeddings": True,
                 "convert_to_numpy": True,
-                "batch_size": 64,
+                "batch_size": DEFAULT_LOCAL_EMBEDDING_BATCH_SIZE,
                 "show_progress_bar": False,
             },
             "query": {
                 "normalize_embeddings": True,
                 "convert_to_numpy": True,
-                "batch_size": 64,
+                "batch_size": DEFAULT_LOCAL_EMBEDDING_BATCH_SIZE,
                 "show_progress_bar": False,
             },
         }

@@ -16,6 +16,7 @@ from typing import Literal, TypedDict, get_args
 
 from pydantic import AnyUrl, SecretStr
 
+from codeweaver.core.constants import DEFAULT_MANAGEMENT_PORT, DEFAULT_MCP_PORT, LOCALHOST_URL
 from codeweaver.core.types.dictview import DictView
 from codeweaver.core.types.env import EnvFormat, EnvVarInfo
 from codeweaver.core.types.provider import LiteralProviderKindType, Provider
@@ -157,7 +158,7 @@ class SettingsEnvVars:
                 is_required=False,
                 is_secret=False,
                 fmt=EnvFormat.NUMBER,
-                default="9329",
+                default=str(DEFAULT_MANAGEMENT_PORT),
                 variable_name="management_port",
                 resolver_key="management_port",
                 available_with="server",
@@ -168,7 +169,7 @@ class SettingsEnvVars:
                 is_required=False,
                 is_secret=False,
                 fmt=EnvFormat.NUMBER,
-                default="9328",
+                default=str(DEFAULT_MCP_PORT),
                 variable_name="mcp_port",
                 resolver_key="server.run_args.port",
                 available_with="server",
@@ -190,7 +191,7 @@ class SettingsEnvVars:
                 is_required=False,
                 is_secret=False,
                 variable_name="profile",
-                choices={"recommended", "quickstart", "testing"},
+                choices={"recommended", "recommended_cloud", "quickstart", "testing", "testing_db"},
                 resolver_key="profile",
                 available_with="providers",
             ),
@@ -219,7 +220,7 @@ class SettingsEnvVars:
                 description="Specify the URL for the vector store.",
                 is_required=False,
                 is_secret=False,
-                default="http://localhost",
+                default=LOCALHOST_URL,
                 variable_name="url",
                 resolver_key="primary.vector_store.url",
                 available_with="providers",
@@ -281,7 +282,7 @@ class SettingsEnvVars:
                 description="Specify the embedding model to use.",
                 is_required=False,
                 is_secret=False,
-                default="voyage-code-3",
+                default="voyage-4",
                 variable_name="model",
                 resolver_key="primary.primary.embedding.model_name",
                 available_with="providers",

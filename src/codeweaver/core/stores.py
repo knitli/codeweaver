@@ -24,7 +24,6 @@ from typing import (
     NotRequired,
     Required,
     TypedDict,
-    TypeGuard,
     TypeVar,
     cast,
     get_args,
@@ -44,6 +43,7 @@ from pydantic import (
     computed_field,
 )
 
+from codeweaver.core.constants import DEFAULT_BLAKE_STORE_MAX_SIZE, DEFAULT_UUID_STORE_MAX_SIZE
 from codeweaver.core.types.aliases import BlakeHashKey, BlakeKey
 from codeweaver.core.types.models import BasedModel
 from codeweaver.core.utils import TypeIs, get_blake_hash, get_blake_hash_generic, uuid7
@@ -126,8 +126,8 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
     _keygen: Callable[[], UUID7] | Callable[[str | bytes], BlakeHashKey] = to_uuid
 
     _size_limit: Annotated[PositiveInt | None, Field(repr=False, kw_only=True)] = (
-        3 * 1024 * 1024
-    )  # 3 MB default limit
+        DEFAULT_UUID_STORE_MAX_SIZE
+    )
 
     # Per-instance trash heap; avoid sharing weakrefs across instances (don't want to accidentally maintain pointers across instances)
     _trash_heap: WeakValueDictionary[KeyT, T] = PrivateAttr(
@@ -341,7 +341,7 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
         """Return the items in the store."""
         return self.store.items()
 
-    def _validate_value(self, value: Any) -> TypeGuard[T]:
+    def _validate_value(self, value: Any) -> TypeIs[T]:
         """Validate that the value is of the correct type."""
         return self._guard(value)
 
@@ -549,14 +549,14 @@ class BlakeStore[T](_SimpleTypedStore[BlakeHashKey, T]):
 
 
 def make_uuid_store[T](
-    *, value_type: type[T], size_limit: PositiveInt | None = None
+    *, value_type: type[T], size_limit: PositiveInt | None = DEFAULT_UUID_STORE_MAX_SIZE
 ) -> UUIDStore[T]:
     """Create a UUIDStore with the specified value type."""
     return UUIDStore[T](_value_type=value_type, store={}, _size_limit=size_limit)
 
 
 def make_blake_store[T](
-    *, value_type: type[T], size_limit: PositiveInt | None = None
+    *, value_type: type[T], size_limit: PositiveInt | None = DEFAULT_BLAKE_STORE_MAX_SIZE
 ) -> BlakeStore[T]:
     """Create a BlakeStore with the specified value type."""
     return BlakeStore[T](_value_type=value_type, store={}, _size_limit=size_limit)

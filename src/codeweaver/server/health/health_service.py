@@ -16,6 +16,14 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Literal, NoReturn, cast
 
 from codeweaver.core import INJECTED, ConfigurationError, StatisticsDep
+from codeweaver.core.constants import (
+    FLOAT_ZERO,
+    ONE_GIGABYTE,
+    ONE_HUNDRED,
+    ONE_KILOBYTE,
+    ONE_MEGABYTE,
+    ONE_MILLISECOND_IN_MICROSECONDS,
+)
 from codeweaver.engine.dependencies import FailoverServiceDep, IndexingServiceDep
 from codeweaver.engine.services.indexing_service import IndexingService
 from codeweaver.providers import AllProviderSettingsDep
@@ -181,7 +189,7 @@ class HealthService:
             start = time.time()
             # If the provider has a 'health' or 'ping' method, we could use it.
             # For now, just presence is "up".
-            latency_ms = (time.time() - start) * 1000
+            latency_ms = (time.time() - start) * ONE_MILLISECOND_IN_MICROSECONDS
         except Exception as e:
             logger.warning("Vector store health check failed: %s", e)
             return VectorStoreServiceInfo(status="down", latency_ms=0)
@@ -208,7 +216,7 @@ class HealthService:
                 )
                 model_name = getattr(embedding_provider_instance, "model_name", "unknown")
                 status = "down" if circuit_state == "open" else "up"
-                latency_ms = 200.0 if status == "up" else 0.0
+                latency_ms = 200.0 if status == "up" else FLOAT_ZERO
                 return EmbeddingProviderServiceInfo(
                     status=status,
                     model=model_name,
@@ -245,7 +253,7 @@ class HealthService:
                 )
                 model_name = getattr(reranking_instance, "model_name", "unknown")
                 status = "down" if circuit_state == "open" else "up"
-                latency_ms = 180.0 if status == "up" else 0.0
+                latency_ms = 180.0 if status == "up" else FLOAT_ZERO
                 return RerankingServiceInfo(status=status, model=model_name, latency_ms=latency_ms)
         except Exception as e:
             logger.warning("Reranking health check failed: %s", e)
@@ -290,7 +298,7 @@ class HealthService:
         if not timing_stats or "queries" not in timing_stats:
             return 0.0
         if query_timings := timing_stats["queries"]:
-            return sum(query_timings) / len(query_timings) * 1000
+            return sum(query_timings) / len(query_timings) * ONE_MILLISECOND_IN_MICROSECONDS
         return 0.0
 
     async def _get_statistics_info(self) -> StatisticsInfo:
@@ -322,7 +330,7 @@ class HealthService:
                 total_files = indexer_stats.files_processed
         avg_latency = self._calculate_avg_query_latency(stats)
         total_queries = stats.total_requests
-        index_size_mb = int(total_chunks * 1024 / (1024 * 1024))
+        index_size_mb = int(total_chunks * ONE_KILOBYTE / ONE_MEGABYTE)
         return StatisticsInfo(
             total_chunks_indexed=total_chunks,
             total_files_indexed=total_files,
@@ -345,7 +353,7 @@ class HealthService:
                 failover_enabled=not self._failover_manager.settings.disable_failover,
                 failover_active=False,
                 failover_count=0,
-                total_failover_time_seconds=0.0,
+                total_failover_time_seconds=FLOAT_ZERO,
                 backup_syncs_completed=0,
                 chunks_in_failover=0,
             )
@@ -375,7 +383,7 @@ class HealthService:
 
             process = psutil.Process(os.getpid())
             memory_info = process.memory_info()
-            memory_mb = memory_info.rss // (1024 * 1024)
+            memory_mb = memory_info.rss // ONE_MEGABYTE
             cpu_percent = process.cpu_percent(interval=0.1)
             from codeweaver.core import get_user_config_dir
 
@@ -391,7 +399,7 @@ class HealthService:
                 except OSError:
                     return 0
                 else:
-                    return total // (1024 * 1024)
+                    return total // ONE_MEGABYTE
 
             disk_index_mb = get_dir_size(index_dir)
             disk_cache_mb = get_dir_size(cache_dir)
@@ -432,7 +440,7 @@ class HealthService:
         ):
             return "degraded"
         if resources:
-            if resources.memory_mb > 2048:
+            if resources.memory_mb > 2 * ONE_GIGABYTE:
                 logger.warning("High memory usage: %d MB", resources.memory_mb)
                 return "degraded"
             if resources.cpu_percent > 80:
@@ -442,7 +450,9 @@ class HealthService:
                 resources.file_descriptors is not None
                 and resources.file_descriptors_limit is not None
             ):
-                fd_percent = resources.file_descriptors / resources.file_descriptors_limit * 100
+                fd_percent = (
+                    resources.file_descriptors / resources.file_descriptors_limit * ONE_HUNDRED
+                )
                 if fd_percent > 80:
                     logger.warning(
                         "High file descriptor usage: %d/%d (%.1f%%)",

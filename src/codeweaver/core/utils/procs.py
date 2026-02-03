@@ -15,11 +15,12 @@ import sys
 
 from contextlib import contextmanager
 from functools import cache
-from importlib.util import find_spec
 from types import ModuleType
 from typing import TYPE_CHECKING
 
 from pydantic import PositiveInt
+
+from codeweaver.core.utils.checks import has_package
 
 
 if TYPE_CHECKING:
@@ -59,7 +60,7 @@ def effective_cpu_count() -> PositiveInt:
     Returns:
         Effective number of CPUs as a positive integer
     """
-    if not find_spec("psutil"):
+    if not has_package("psutil"):
         return _wsl_count(get_cpu_count())
     import psutil
 
@@ -92,7 +93,7 @@ def asyncio_or_uvloop() -> ModuleType:
     if (
         sys.platform not in {"win32", "cygwin", "wasi", "ios"}
         and platform.python_implementation() == "CPython"
-        and find_spec("uvloop") is not None
+        and has_package("uvloop")
     ):
         import uvloop
 

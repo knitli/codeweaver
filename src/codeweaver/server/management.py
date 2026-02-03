@@ -30,6 +30,18 @@ from starlette.routing import Route
 from codeweaver.cli.commands.start import _get_settings_map
 from codeweaver.core import DictView, SettingsMapDep, StatisticsDep, timed_http
 from codeweaver.core.config.types import CodeWeaverSettingsDict
+from codeweaver.core.constants import (
+    DEFAULT_MANAGEMENT_PORT,
+    DEFAULT_SERVER_SHUTDOWN_TIMEOUT,
+    HEALTH_ENDPOINT,
+    LOCALHOST,
+    METRICS_ENDPOINT,
+    SETTINGS_ENDPOINT,
+    SHUTDOWN_ENDPOINT,
+    STATE_ENDPOINT,
+    STATUS_ENDPOINT,
+    VERSION_ENDPOINT,
+)
 from codeweaver.core.di import INJECTED
 
 
@@ -281,22 +293,22 @@ class ManagementServer:
         endpoint_settings = settings_map.get("endpoints", {})
         routes = [
             Route("/favicon.ico", favicon, methods=["GET"], include_in_schema=False),
-            Route("/health", health, methods=["GET"]),
-            Route("/status", status_info, methods=["GET"]),
-            Route("/metrics", stats_info, methods=["GET"]),
-            Route("/shutdown", shutdown_handler, methods=["POST"]),
+            Route(HEALTH_ENDPOINT, health, methods=["GET"]),
+            Route(STATUS_ENDPOINT, status_info, methods=["GET"]),
+            Route(METRICS_ENDPOINT, stats_info, methods=["GET"]),
+            Route(SHUTDOWN_ENDPOINT, shutdown_handler, methods=["POST"]),
         ]
         if endpoint_settings.get("enable_version", True):
-            routes.append(Route("/version", version_info, methods=["GET"]))
+            routes.append(Route(VERSION_ENDPOINT, version_info, methods=["GET"]))
         if endpoint_settings.get("enable_settings", True):
-            routes.append(Route("/settings", settings_info, methods=["GET"]))
+            routes.append(Route(SETTINGS_ENDPOINT, settings_info, methods=["GET"]))
         if endpoint_settings.get("enable_state", True):
-            routes.append(Route("/state", state_info, methods=["GET"]))
+            routes.append(Route(STATE_ENDPOINT, state_info, methods=["GET"]))
         app = Starlette(routes=routes)
         app.state.background = self.background_state
         return app
 
-    async def start(self, host: str = "127.0.0.1", port: int = 9329) -> None:
+    async def start(self, host: str = LOCALHOST, port: int = DEFAULT_MANAGEMENT_PORT) -> None:
         """
         Start management server.
 
@@ -318,9 +330,15 @@ class ManagementServer:
             self.server.should_exit = True
             if self.server_task:
                 try:
-                    await asyncio.wait_for(self.server_task, timeout=5.0)
+                    await asyncio.wait_for(
+                        self.server_task, timeout=DEFAULT_SERVER_SHUTDOWN_TIMEOUT
+                    )
                 except TimeoutError:
-                    logger.warning("Management server did not stop within 5 seconds")
+                    logger.warning(
+                        "Management server did not stop within %d seconds",
+                        DEFAULT_SERVER_SHUTDOWN_TIMEOUT,
+                        exc_info=True,
+                    )
             logger.info("Management server stopped")
 
 

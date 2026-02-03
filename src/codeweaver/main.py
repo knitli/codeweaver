@@ -29,6 +29,14 @@ from codeweaver.core import (
 )
 from codeweaver.core import Provider as Provider
 from codeweaver.core.config.types import CodeWeaverSettingsDict
+from codeweaver.core.constants import (
+    DEFAULT_DAEMON_STARTUP_CHECK_INTERVAL,
+    DEFAULT_DAEMON_STARTUP_WAIT,
+    DEFAULT_MANAGEMENT_PORT,
+    DEFAULT_MCP_PORT,
+    LOCALHOST,
+    ZERO,
+)
 from codeweaver.core.di.depends import INJECTED
 
 
@@ -71,7 +79,7 @@ def _setup_logging_filters(*, verbose: bool, debug: bool) -> None:
 
 def _setup_signal_handler() -> Any:
     """Setup force shutdown handler and return original handler."""
-    shutdown_count = [0]  # Use list to allow mutation in closure
+    shutdown_count = [ZERO]  # Use list to allow mutation in closure
     original_sigint_handler = None
 
     def force_shutdown_handler(signum: int, frame: Any) -> None:
@@ -95,9 +103,9 @@ async def _run_http_server(
     *,
     config_file: FilePath | None = None,
     project_path: Path | None = None,
-    host: str = "127.0.0.1",
-    mcp_port: int = 9328,
-    port: int = 9329,
+    host: str = LOCALHOST,
+    mcp_port: int = DEFAULT_MCP_PORT,
+    port: int = DEFAULT_MANAGEMENT_PORT,
     verbose: bool = False,
     debug: bool = False,
     _settings: SettingsDep = INJECTED,
@@ -143,15 +151,15 @@ async def _run_http_server(
 
     # Create MCP HTTP server state
     mcp_state: CwMcpHttpState = await create_http_server(
-        host=host, port=port, verbose=verbose, debug=debug
+        host=host, port=mcp_port, verbose=verbose, debug=debug
     )
 
     # Get statistics
     statistics = _statistics
 
     # Setup management server
-    mgmt_host = getattr(settings, "management_host", "127.0.0.1")
-    mgmt_port = getattr(settings, "management_port", 9329)
+    mgmt_host = getattr(settings, "management_host", LOCALHOST)
+    mgmt_port = getattr(settings, "management_port", DEFAULT_MANAGEMENT_PORT)
 
     # Setup signal handler for force shutdowns
     original_sigint_handler = _setup_signal_handler()
@@ -199,8 +207,8 @@ async def _run_stdio_server(
     *,
     config_file: FilePath | None = None,
     project_path: Path | None = None,
-    host: str = "127.0.0.1",
-    port: int = 9328,
+    host: str = LOCALHOST,
+    port: int = DEFAULT_MCP_PORT,
     verbose: bool = False,
     debug: bool = False,
 ) -> None:
@@ -221,9 +229,9 @@ async def _run_stdio_server(
     # The daemon includes both management server (9329) and MCP HTTP server (9328)
     daemon_ready = await start_daemon_if_needed(
         management_host=host,
-        management_port=9329,  # Management server port
-        max_wait_seconds=30.0,
-        check_interval=0.5,
+        management_port=DEFAULT_MANAGEMENT_PORT,  # Management server port
+        max_wait_seconds=DEFAULT_DAEMON_STARTUP_WAIT,
+        check_interval=DEFAULT_DAEMON_STARTUP_CHECK_INTERVAL,
     )
 
     if not daemon_ready:
@@ -290,8 +298,8 @@ async def run(
     *,
     config_file: FilePath | None = None,
     project_path: Path | None = None,
-    host: str = "127.0.0.1",
-    port: int = 9328,
+    host: str = LOCALHOST,
+    port: int = DEFAULT_MCP_PORT,
     transport: Literal["stdio", "streamable-http"] = "stdio",
     verbose: bool = False,
     debug: bool = False,

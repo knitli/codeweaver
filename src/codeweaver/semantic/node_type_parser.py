@@ -258,6 +258,8 @@ from pydantic import DirectoryPath, Field
 from pydantic_core import from_json
 
 from codeweaver.core import INJECTED, CategoryNameT, RootedRoot, SemanticSearchLanguage, ThingName
+from codeweaver.core.constants import ZERO
+from codeweaver.core.utils import has_package
 from codeweaver.semantic.dependencies import ThingRegistryDep
 from codeweaver.semantic.types import NodeTypeDTO
 
@@ -690,7 +692,7 @@ class NodeTypeParser:
         self._languages = frozenset(languages or iter(SemanticSearchLanguage)) | self._languages
         for language in languages or self._languages:
             # no tokens, no grammar
-            if len(self._registration_cache[language]["tokens"]) == 0 and (
+            if len(self._registration_cache[language]["tokens"]) == ZERO and (
                 array := self._loader.get_node(language)
             ):
                 _ = self._parse_node_array(array)
@@ -704,8 +706,8 @@ class NodeTypeParser:
     def cache_complete(self) -> bool:
         """Check if the internal cache is fully populated for all specified languages."""
         return all(
-            len(type(self)._registration_cache[lang]["tokens"]) > 0
-            and len(type(self)._registration_cache[lang]["composites"]) > 0
+            len(type(self)._registration_cache[lang]["tokens"]) > ZERO
+            and len(type(self)._registration_cache[lang]["composites"]) > ZERO
             for lang in self._languages
         )
 
@@ -840,7 +842,7 @@ class NodeTypeParser:
         from codeweaver.semantic.grammar import CompositeThing, Token
 
         for language in self._languages:
-            if len(self._registration_cache[language]["composites"]) > 0:
+            if len(self._registration_cache[language]["composites"]) > ZERO:
                 for thing in self._flattened_nodes_for_language(language):
                     if thing not in registry:
                         raise ValueError(f"Thing {thing.name} not registered in registry.")
@@ -886,9 +888,7 @@ def get_things(
 # sourcery skip: avoid-builtin-shadow
 if __name__ == "__main__":
     has_rich = False
-    from importlib.util import find_spec
-
-    if find_spec("rich"):
+    if has_package("rich"):
         from rich.console import Console
 
         console = Console(markup=True)

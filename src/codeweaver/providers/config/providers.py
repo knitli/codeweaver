@@ -15,40 +15,33 @@ The overall pattern:
 
 from __future__ import annotations
 
-import importlib
 import logging
 import os
 
-from typing import (
-    TYPE_CHECKING,
-    Annotated,
-    Any,
-    Literal,
-    NamedTuple,
-    NotRequired,
-    TypedDict,
-    cast,
-    is_typeddict,
-)
+from typing import Annotated, Any, Literal, NamedTuple, NotRequired, TypedDict, cast, is_typeddict
 
-from pydantic import Discriminator, Field, SecretStr, Tag, computed_field, model_validator
+from pydantic import Field, SecretStr, computed_field, model_validator
 from pydantic_ai.settings import ModelSettings as AgentModelSettings
 from pydantic_ai.settings import merge_model_settings
 
-from codeweaver.core import (
+from codeweaver.core.constants import ENV_EXPLICIT_TRUE_VALUES, LOCALHOST, ONE, ZERO
+from codeweaver.core.types import (
     BasedModel,
     DictView,
     LiteralProviderKindType,
+    ModelName,
+    ModelNameT,
     Provider,
     ProviderKind,
     Unset,
 )
-from codeweaver.core.types import ModelName, ModelNameT
-
-
-if TYPE_CHECKING:
-    pass
-from codeweaver.providers.config.clients import QdrantClientOptions
+from codeweaver.core.utils import has_package
+from codeweaver.providers import VoyageClientOptions
+from codeweaver.providers.config.asymmetric import AsymmetricEmbeddingConfig
+from codeweaver.providers.config.clients import (
+    QdrantClientOptions,
+    SentenceTransformersClientOptions,
+)
 from codeweaver.providers.config.embedding import (
     EmbeddingConfigT,
     FastEmbedEmbeddingConfig,
@@ -56,25 +49,28 @@ from codeweaver.providers.config.embedding import (
     GoogleEmbeddingConfig,
     MistralEmbeddingConfig,
     SentenceTransformersEmbeddingConfig,
+    SentenceTransformersEncodeDict,
     SentenceTransformersSparseEmbeddingConfig,
     SparseEmbeddingConfigT,
     VoyageEmbeddingConfig,
+    VoyageEmbeddingOptionsDict,
 )
 from codeweaver.providers.config.kinds import (
     AgentProviderSettings,
-    AzureEmbeddingProviderSettings,
+    AgentProviderSettingsType,
     BaseProviderSettings,
-    BedrockEmbeddingProviderSettings,
-    BedrockRerankingProviderSettings,
     CollectionConfig,
-    DataProviderSettings,
+    DataProviderSettingsType,
+    DuckDuckGoProviderSettings,
     EmbeddingProviderSettings,
-    FastEmbedEmbeddingProviderSettings,
-    FastEmbedRerankingProviderSettings,
-    FastEmbedSparseEmbeddingProviderSettings,
+    EmbeddingProviderSettingsType,
     QdrantVectorStoreProviderSettings,
     RerankingProviderSettings,
+    RerankingProviderSettingsType,
     SparseEmbeddingProviderSettings,
+    SparseEmbeddingProviderSettingsType,
+    TavilyProviderSettings,
+    VectorStoreProviderSettingsType,
 )
 from codeweaver.providers.config.reranking import (
     FastEmbedRerankingConfig,
@@ -88,81 +84,6 @@ logger = logging.getLogger(__name__)
 
 
 # ===========================================================================
-# *                    Settings Discriminators
-# ===========================================================================
-
-# Vector Stores
-
-type VectorStoreProviderSettingsType = Annotated[
-    Annotated[QdrantVectorStoreProviderSettings, Tag(Provider.QDRANT.variable)],
-    Field(description="Vector store provider settings type.", discriminator="tag"),
-]
-"""Type alias for vector store provider settings type. Currently only Qdrant is supported, but we create this for consistency and future expansion."""
-
-# Embedding Providers - flattened union for pydantic discrimination
-
-
-def _discriminate_embedding_provider(v: Any) -> str:
-    """Identify the embedding provider settings type for discriminator field."""
-    tag_value = v.get("tag") if isinstance(v, dict) else getattr(v, "tag", None)
-    if tag_value in {
-        Provider.AZURE.variable,
-        Provider.BEDROCK.variable,
-        Provider.FASTEMBED.variable,
-    }:
-        return tag_value
-    return "none"
-
-
-type EmbeddingProviderSettingsType = Annotated[
-    Annotated[EmbeddingProviderSettings, Tag("none")]
-    | Annotated[AzureEmbeddingProviderSettings, Tag(Provider.AZURE.variable)]
-    | Annotated[BedrockEmbeddingProviderSettings, Tag(Provider.BEDROCK.variable)]
-    | Annotated[FastEmbedEmbeddingProviderSettings, Tag(Provider.FASTEMBED.variable)],
-    Field(
-        description="Embedding provider settings type.",
-        discriminator=Discriminator(_discriminate_embedding_provider),
-    ),
-]
-
-# Sparse Embedding Providers
-
-type SparseEmbeddingProviderSettingsType = Annotated[
-    Annotated[SparseEmbeddingProviderSettings, Tag(Provider.SENTENCE_TRANSFORMERS.variable)]
-    | Annotated[FastEmbedSparseEmbeddingProviderSettings, Tag(Provider.FASTEMBED.variable)],
-    Field(description="Sparse embedding provider settings type.", discriminator="tag"),
-]
-
-# Reranking Providers - flattened union for pydantic discrimination
-
-
-def _discriminate_reranking_provider(v: Any) -> str:
-    """Identify the reranking provider settings type for discriminator field."""
-    tag_value = v.get("tag") if isinstance(v, dict) else getattr(v, "tag", None)
-    if tag_value in {Provider.FASTEMBED.variable, Provider.BEDROCK.variable}:
-        return tag_value
-    return "none"
-
-
-type RerankingProviderSettingsType = Annotated[
-    Annotated[RerankingProviderSettings, Tag("none")]
-    | Annotated[FastEmbedRerankingProviderSettings, Tag(Provider.FASTEMBED.variable)]
-    | Annotated[BedrockRerankingProviderSettings, Tag(Provider.BEDROCK.variable)],
-    Field(
-        description="Reranking provider settings type.",
-        discriminator=Discriminator(_discriminate_reranking_provider),
-    ),
-]
-
-# ===== Data and Agent Providers (no discrimination needed) =====
-
-# Agent and Data providers use base classes without subclasses,
-# so they don't need discriminated unions. The tuple type is sufficient.
-type DataProviderSettingsType = DataProviderSettings
-
-type AgentProviderSettingsType = AgentProviderSettings
-
-# ===========================================================================
 # *                    More TypedDict versions of Models
 # ===========================================================================
 
@@ -170,17 +91,20 @@ type AgentProviderSettingsType = AgentProviderSettings
 class ProviderSettingsDict(TypedDict, total=False):
     """A dictionary representation of provider settings."""
 
+    agent: NotRequired[tuple[AgentProviderSettingsType, ...] | None]
+
     data: NotRequired[tuple[DataProviderSettingsType, ...] | None]
     # we currently only support one each of embedding, reranking and vector store providers
     # but we use tuples to allow for future expansion for some less common use cases
-    embedding: NotRequired[tuple[EmbeddingProviderSettingsType, ...] | None]
-    asymmetric_embedding: NotRequired[AsymmetricEmbeddingConfig | None]
+    embedding: NotRequired[
+        tuple[EmbeddingProviderSettingsType | AsymmetricEmbeddingConfig, ...] | None
+    ]
+    """Embedding configuration. Can include symmetric (single-model) or asymmetric (dual-model) embedding configs. Asymmetric embedding allows using different models for document and query embeddings while maintaining compatibility through shared vector spaces."""
     # rerank is probably the priority for multiple providers in the future, because they're vector agnostic, so you could have fallback providers, or use different ones for different tasks
     sparse_embedding: NotRequired[tuple[SparseEmbeddingProviderSettingsType, ...] | None]
     reranking: NotRequired[tuple[RerankingProviderSettingsType, ...] | None]
 
     vector_store: NotRequired[tuple[VectorStoreProviderSettingsType, ...] | None]
-    agent: NotRequired[tuple[AgentProviderSettingsType, ...] | None]
 
 
 type ProviderSettingsView = DictView[ProviderSettingsDict]
@@ -193,13 +117,11 @@ def merge_agent_model_settings(
     return merge_model_settings(base, override)
 
 
-def _create_default_data_provider_settings() -> tuple[DataProviderSettings, ...]:
+def _create_default_data_provider_settings() -> tuple[DataProviderSettingsType, ...]:
     """Create default data provider settings (delayed initialization)."""
-    return (
-        DataProviderSettings(provider=Provider.TAVILY),
-        # DuckDuckGo
-        DataProviderSettings(provider=Provider.DUCKDUCKGO),
-    )
+    if has_package("tavily") and Provider.TAVILY.has_env_auth():
+        return (TavilyProviderSettings(),)
+    return (DuckDuckGoProviderSettings(),) if has_package("ddgs") else ()
 
 
 class DeterminedDefaults(NamedTuple):
@@ -216,36 +138,36 @@ def _get_default_embedding_settings() -> DeterminedDefaults:
         "voyageai",
         "mistral",
         "google",
-        "fastembed-gpu",
+        "sentence_transformers",
+        "fastembed_gpu",
         "fastembed",
-        "sentence-transformers",
     ):
-        if importlib.util.find_spec(lib) is not None:
+        if has_package(lib):
             # all three of the top defaults are extremely capable and finetuned for code tasks
-            if lib == "voyageai":
+            if lib == "voyageai" and Provider.VOYAGE.has_env_auth():
                 return DeterminedDefaults(
-                    provider=Provider.VOYAGE, model=ModelName("voyage-code-3"), enabled=True
+                    provider=Provider.VOYAGE, model=ModelName("voyage-4"), enabled=True
                 )
-            if lib == "mistral":
+            if lib == "mistral" and Provider.MISTRAL.has_env_auth():
                 return DeterminedDefaults(
                     provider=Provider.MISTRAL, model=ModelName("codestral-embed"), enabled=True
                 )
-            if lib == "google":
+            if lib == "google" and Provider.GOOGLE.has_env_auth():
                 return DeterminedDefaults(
                     provider=Provider.GOOGLE, model=ModelName("gemini-embedding-001"), enabled=True
                 )
-            if lib in {"fastembed-gpu", "fastembed"}:
+            if lib in {"fastembed_gpu", "fastembed"}:
                 return DeterminedDefaults(
                     provider=Provider.FASTEMBED,
                     model=ModelName("BAAI/bge-small-en-v1.5"),
                     enabled=True,
                 )
-            if lib == "sentence-transformers":
+            if lib == "sentence_transformers":
                 return DeterminedDefaults(
                     provider=Provider.SENTENCE_TRANSFORMERS,
                     # embedding-small-english-r2 is *very lightweight* and quite capable with a good context window (8192 tokens)
                     # Good upgrade from the likes of all-minilm-L6-v2 while still being very efficient
-                    model=ModelName("ibm-granite/granite-embedding-small-english-r2"),
+                    model=ModelName("voyageai/voyage-4-nano"),
                     enabled=True,
                 )
     logger.warning(
@@ -255,6 +177,47 @@ def _get_default_embedding_settings() -> DeterminedDefaults:
 
 
 _embedding_defaults = _get_default_embedding_settings()
+
+
+def _produce_voyage_family(provider: Provider, model: ModelNameT) -> AsymmetricEmbeddingConfig:
+    """Produce the Voyage4ModelFamily instance for the given provider and model."""
+    query_config = SentenceTransformersEmbeddingConfig(
+        model_name=ModelName("voyageai/voyage-4-nano"),
+        embedding=SentenceTransformersEncodeDict(precision="uint8", truncate_dim=1024),
+    )
+    if Provider.VOYAGE.has_env_auth() and str(model) in {
+        "voyage-4",
+        "voyage-4-lite",
+        "voyage-4-large",
+    }:
+        embed_config = VoyageEmbeddingConfig(
+            model_name=model,
+            embedding=VoyageEmbeddingOptionsDict(output_dimension=1024, output_dtype="uint8"),
+        )
+    else:
+        embed_config = query_config
+    query_settings = EmbeddingProviderSettings(
+        provider=Provider.SENTENCE_TRANSFORMERS,
+        model_name=query_config.model_name,
+        embedding_config=query_config,
+        client_options=SentenceTransformersClientOptions(
+            model_name_or_path=query_config.model_name, similarity_fn_name="dot", truncate_dim=1024
+        ),
+    )
+    if embed_config.provider != query_config.provider:
+        embed_settings = EmbeddingProviderSettings(
+            provider=provider,
+            model_name=model,
+            embedding_config=embed_config,
+            client_options=VoyageClientOptions(api_key=Provider.VOYAGE.get_env_api_key()),  # ty:ignore[invalid-argument-type]
+        )
+    else:
+        embed_settings = query_settings
+    return AsymmetricEmbeddingConfig(
+        embed_provider=embed_settings,
+        query_provider=query_settings,
+        validate_family_compatibility=True,
+    )
 
 
 def _create_embedding_config(provider: Provider, model: ModelNameT) -> EmbeddingConfigT:
@@ -295,15 +258,15 @@ DefaultEmbeddingProviderSettings: tuple[EmbeddingProviderSettings, ...] | None =
 
 def _get_default_sparse_embedding_settings() -> DeterminedDefaults:
     """Determine the default sparse embedding provider, model, and enabled status based on available libraries."""
-    for lib in ("sentence-transformers", "fastembed-gpu", "fastembed"):
-        if importlib.util.find_spec(lib) is not None:
-            if lib == "sentence-transformers":
+    for lib in ("sentence_transformers", "fastembed_gpu", "fastembed"):
+        if has_package(lib):
+            if lib == "sentence_transformers":
                 return DeterminedDefaults(
                     provider=Provider.SENTENCE_TRANSFORMERS,
                     model=ModelName("opensearch/opensearch-neural-sparse-encoding-doc-v3-gte"),
                     enabled=True,
                 )
-            if lib in {"fastembed-gpu", "fastembed"}:
+            if lib in {"fastembed_gpu", "fastembed"}:
                 return DeterminedDefaults(
                     provider=Provider.FASTEMBED,
                     model=ModelName("prithivida/Splade_PP_en_v1"),
@@ -353,8 +316,8 @@ DefaultSparseEmbeddingProviderSettings: tuple[SparseEmbeddingProviderSettings, .
 
 def _get_default_reranking_settings() -> DeterminedDefaults:
     """Determine the default reranking provider, model, and enabled status based on available libraries."""
-    for lib in ("voyageai", "fastembed-gpu", "fastembed", "sentence-transformers"):
-        if importlib.util.find_spec(lib) is not None:
+    for lib in ("voyageai", "fastembed_gpu", "fastembed", "sentence_transformers"):
+        if has_package(lib) is not None:
             if lib == "voyageai":
                 return DeterminedDefaults(
                     provider=Provider.VOYAGE, model=ModelName("voyage:rerank-2.5"), enabled=True
@@ -372,11 +335,7 @@ def _get_default_reranking_settings() -> DeterminedDefaults:
                     model=ModelName("sentence-transformers:BAAI/bge-reranking-v2-m3"),
                     enabled=True,
                 )
-    possible_libs = [
-        importlib.util.find_spec(lib)
-        for lib in ("boto3", "cohere")
-        if importlib.util.find_spec(lib) is not None
-    ]
+    possible_libs = [has_package(lib) for lib in ("boto3", "cohere") if has_package(lib)]
     logger.warning(
         "No default reranking provider libraries found. Reranking functionality will be disabled unless explicitly set in your config or environment variables. %s",
         (
@@ -422,9 +381,7 @@ DefaultRerankingProviderSettings: tuple[RerankingProviderSettings, ...] | None =
     None  # Will be lazy-initialized
 )
 
-HAS_ANTHROPIC = (
-    importlib.util.find_spec("anthropic") or importlib.util.find_spec("claude-agent-sdk")
-) is not None
+HAS_ANTHROPIC = (has_package("anthropic") or has_package("claude-agent-sdk")) is not None
 
 
 def _get_default_agent_provider_settings() -> tuple[AgentProviderSettings, ...] | None:
@@ -435,7 +392,7 @@ def _get_default_agent_provider_settings() -> tuple[AgentProviderSettings, ...] 
     return (
         AgentProviderSettings(
             provider=Provider.ANTHROPIC,
-            model="claude-haiku-4.5-latest",
+            model_name="claude-haiku-4.5-latest",
             model_options=None,  # Use None to avoid forward reference validation
         ),
     )
@@ -451,7 +408,7 @@ def _get_default_vector_store_provider_settings() -> tuple[QdrantVectorStoreProv
     return (
         QdrantVectorStoreProviderSettings(
             provider=Provider.QDRANT,
-            client_options=QdrantClientOptions(host="127.0.0.1"),
+            client_options=QdrantClientOptions(host=LOCALHOST),
             collection=CollectionConfig(),
         ),
     )
@@ -481,126 +438,114 @@ class ProviderSettings(BasedModel):
     """Settings for provider configuration."""
 
     data: Annotated[
-        tuple[DataProviderSettings, ...] | None,
+        tuple[DataProviderSettingsType, ...] | None,
         Field(description="""Data provider configuration"""),
-    ] = None  # TODO: Add default_factory after fixing model_rebuild issue
+    ] = None
 
     embedding: Annotated[
-        tuple[EmbeddingProviderSettingsType, ...] | None,
+        tuple[EmbeddingProviderSettingsType | AsymmetricEmbeddingConfig, ...] | None,
         Field(
-            description="""Embedding provider configuration (symmetric mode).
+            description="""Embedding provider configuration.
 
-            Symmetric mode uses the same model for both document and query embeddings.
-            This is the traditional approach where a single model handles all embedding tasks.
+            Supports both symmetric (single-model) and asymmetric (dual-model) embedding:
 
-            We will only use the first provider you configure here. We may add support for multiple embedding providers in the future.
+            **Symmetric Mode (EmbeddingProviderSettings)**:
+            - Uses the same model for both document and query embeddings
+            - Traditional approach where a single model handles all embedding tasks
+            - Simpler configuration, single provider setup
 
-            Note: Cannot be used simultaneously with 'asymmetric_embedding' field.
-            Choose one mode based on your requirements:
-              - Symmetric: Single model, simpler configuration
-              - Asymmetric: Different models for documents and queries, cost optimization
+            **Asymmetric Mode (AsymmetricEmbeddingConfig)**:
+            - Uses different models for document embedding and query embedding
+            - Enables cost/performance optimization (e.g., API model for docs, local for queries)
+            - Requires models from the same model family for compatibility
+            - Embedding dimensions validated automatically
+
+            Requirements for Asymmetric:
+              - Both models must belong to the same model family (e.g., Voyage-4)
+              - Models must be explicitly marked as compatible
+              - Embedding dimensions must match
+
+            Benefits of Asymmetric:
+              - Cost optimization: expensive models for documents, cheap for queries
+              - Performance: local models for queries, API for indexing
+              - Resource flexibility: different deployment strategies per model
+
+            We will only use the first provider you configure here. We may add support for
+            multiple embedding providers in the future.
 
             Example TOML configuration (symmetric):
               [providers.embedding.0]
               provider = "voyage"
               model_name = "voyage-code-3"
-            """,
-            default_factory=_get_default_embedding_provider_settings,
-        ),
-    ]
-
-    asymmetric_embedding: Annotated[
-        AsymmetricEmbeddingConfig | None,
-        Field(
-            description="""Asymmetric embedding configuration (advanced mode).
-
-            Asymmetric mode allows using different models for document embedding and query
-            embedding while maintaining compatibility through shared vector spaces. This enables
-            cost optimization (e.g., API-based model for document indexing, local model for queries)
-            while preserving search accuracy.
-
-            Requirements:
-              - Both models must belong to the same model family (e.g., Voyage-4)
-              - Models must be explicitly marked as compatible for asymmetric use
-              - Embedding dimensions must match (validated automatically)
-
-            Benefits:
-              - Cost optimization: expensive models for documents, cheap for queries
-              - Performance: local models for queries, API for indexing
-              - Resource flexibility: different deployment strategies per model
-
-            Note: Cannot be used simultaneously with 'embedding' field.
-            Choose one mode based on your requirements:
-              - Symmetric: Single model, simpler configuration
-              - Asymmetric: Different models, cost/performance optimization
 
             Example TOML configuration (asymmetric):
-              [providers.asymmetric_embedding]
+              [providers.embedding.0]
+              config_type = "asymmetric"
               validate_family_compatibility = true
 
-              [providers.asymmetric_embedding.embed_provider_settings]
+              [providers.embedding.0.embed_provider]
               provider = "voyage"
-              model_name = "voyage-code-3"
+              model_name = "voyage-4-large"
 
-              [providers.asymmetric_embedding.query_provider_settings]
-              provider = "voyage"
-              model_name = "voyage-code-3-lite"
+              [providers.embedding.0.query_provider]
+              provider = "sentence-transformers"
+              model_name = "voyageai/voyage-4-nano"
 
-            See documentation: docs/configuration/asymmetric-embedding.md
-            """,
-            default=None,
+            See documentation: docs/configuration/embedding.md
+            """
         ),
-    ]
+    ] = None
 
     sparse_embedding: Annotated[
         tuple[SparseEmbeddingProviderSettingsType, ...] | None,
         Field(
             description="""Sparse embedding provider configuration.
 
-            We will only use the first provider you configure here. We may add support for multiple sparse embedding providers in the future.""",
-            default_factory=_get_default_sparse_embedding_provider_settings,
+            We will only use the first provider you configure here. We may add support for multiple sparse embedding providers in the future."""
         ),
-    ]
+    ] = None
 
     reranking: Annotated[
         tuple[RerankingProviderSettingsType, ...] | None,
         Field(
             description="""Reranking provider configuration.
 
-            We will only use the first provider you configure here. We may add support for multiple reranking providers in the future.""",
-            default_factory=_get_default_reranking_provider_settings,
+            We will only use the first provider you configure here. We may add support for multiple reranking providers in the future."""
         ),
-    ]
+    ] = None
 
     vector_store: Annotated[
         tuple[VectorStoreProviderSettingsType, ...] | None,
         Field(
-            description="""Vector store provider configuration (Qdrant or in-memory), defaults to a local Qdrant instance.""",
-            default_factory=_get_default_vector_store_provider_settings,
+            description="""Vector store provider configuration (Qdrant or in-memory), defaults to a local Qdrant instance."""
         ),
-    ]
+    ] = None
 
     agent: Annotated[
         tuple[AgentProviderSettings, ...] | None,
-        Field(
-            description="""Agent provider configuration""",
-            default_factory=_get_default_agent_provider_settings,
-        ),
-    ]
+        Field(description="""Agent provider configuration"""),
+    ] = None
 
     disable_backup_system: Annotated[
         bool,
         Field(
             description="""Disable CodeWeaver's failsafe/backup system.
 
-            CodeWeaver's backup system uses extremely lightweight local models to provide basic functionality when your main provider is unavailable (well, it is still probably better than most alternatives). Specifically, it keeps an alternate local vector store collection and uses the smallest available embedding, sparse embedding, and reranking models to provide basic functionality when the main providers are unreachable. This system keeps a a low-resource, always-available fallback that can be used offline or when cloud providers are unreachable.
+            If embedding and vector store providers are local (not in the cloud), then the system is disabled by default and can't be switched on.
 
-            If you use a cloud vector store, the backup will be an in-memory vector store that is loaded and persisted from json. If you use a local vector store, the backup will be a separate collection in that vector store.
+            If you use a cloud provider for embeddings, then the backup system will use a lightweight local embedding model to keep embeddings stored on the same points in your vector store as your primary provider and sparse provider. Allowing CodeWeaver to simply switch to querying and updating the backup embeddings when your main provider is unreachable.
+
+            If you use a cloud vector store, the backup system will use regular snapshots and write-ahead-logging to keep a local backup of your vector store, switching to it when the cloud vector store is unreachable.
+
+            Sparse models are currently all local, so we don't backup sparse embeddings. Reranking models are interchangeable (mostly), so we fall back to local models if the primary is unavailable.
 
             If you set `disable_backup_system` to `True`, don't complain if CodeWeaver stops working when your main providers are unreachable!
             """
         ),
-    ] = os.environ.get("CODEWEAVER_DISABLE_BACKUP_SYSTEM", "false").lower() in ("1", "true", "yes")
+    ] = (
+        os.environ.get("CODEWEAVER_DISABLE_BACKUP_SYSTEM", "false").lower()
+        in ENV_EXPLICIT_TRUE_VALUES
+    )
 
     def __init__(self, **data: Any) -> None:
         """Initialize ProviderSettings and register with DI container if available."""
@@ -624,93 +569,39 @@ class ProviderSettings(BasedModel):
         global AllDefaultProviderSettings
         if AllDefaultProviderSettings is None:
             AllDefaultProviderSettings = _get_all_default_provider_settings()
-
         for key in self._field_names:
             value = getattr(self, key)
-            if value is None:
-                continue
+            if value is None and AllDefaultProviderSettings.get(key):
+                default_value = AllDefaultProviderSettings.get(key)
+                setattr(self, key, default_value)
+                value = default_value
             if value is Unset:
                 default_value = AllDefaultProviderSettings.get(key)
                 setattr(self, key, default_value)
                 value = default_value
-            if not isinstance(value, tuple):
+            if not isinstance(value, tuple) and key not in {"disable_backup_system"}:
                 value = (value,)
                 setattr(self, key, value)
         return self
 
     @model_validator(mode="after")
-    def validate_embedding_mode_exclusivity(self) -> ProviderSettings:
-        """Validate that only one embedding mode is configured at a time.
-
-        Ensures mutual exclusivity between symmetric ('embedding') and asymmetric
-        ('asymmetric_embedding') embedding configurations to prevent ambiguous
-        provider selection and configuration conflicts.
+    def validate_embedding_configuration(self) -> ProviderSettings:
+        """Validate embedding configuration and log the selected mode.
 
         Returns:
             Self for method chaining.
-
-        Raises:
-            ConfigurationError: If both embedding modes are configured simultaneously.
         """
-        from codeweaver.core.exceptions import ConfigurationError
-
-        has_symmetric = self.embedding is not None and self.embedding is not Unset
-        has_asymmetric = self.asymmetric_embedding is not None
-
-        if has_symmetric and has_asymmetric:
-            logger.error(
-                "Configuration conflict: Both 'embedding' and 'asymmetric_embedding' are set. "
-                "Only one embedding mode can be active at a time."
-            )
-            raise ConfigurationError(
-                "Cannot specify both 'embedding' and 'asymmetric_embedding' configuration. "
-                "Choose one mode:\n\n"
-                "  Symmetric mode (traditional):\n"
-                "    Use 'embedding' field for single model or fallback chain.\n"
-                "    Same model used for both document and query embeddings.\n"
-                "    Simpler configuration, works with any embedding model.\n\n"
-                "  Asymmetric mode (advanced):\n"
-                "    Use 'asymmetric_embedding' field for different models.\n"
-                "    Requires model family compatibility (e.g., Voyage-4).\n"
-                "    Optimizes for cost/performance trade-offs.\n"
-                "    Different models for indexing vs querying.\n",
-                details={
-                    "symmetric_configured": has_symmetric,
-                    "asymmetric_configured": has_asymmetric,
-                    "embedding_providers": (
-                        [str(s.provider) for s in self.embedding]  # ty:ignore[not-iterable]
-                        if has_symmetric and self.embedding
-                        else None
-                    ),
-                    "asymmetric_embed_provider": (
-                        str(self.asymmetric_embedding.embed_provider_settings.provider)
-                        if has_asymmetric and self.asymmetric_embedding
-                        else None
-                    ),
-                    "asymmetric_query_provider": (
-                        str(self.asymmetric_embedding.query_provider_settings.provider)
-                        if has_asymmetric and self.asymmetric_embedding
-                        else None
-                    ),
-                },
-                suggestions=[
-                    "Remove 'embedding' field to use asymmetric mode",
-                    "Remove 'asymmetric_embedding' field to use symmetric mode",
-                    "For most use cases, symmetric mode (embedding) is recommended",
-                    "Use asymmetric mode only if you need different models for documents and queries",
-                    "See documentation: docs/configuration/asymmetric-embedding.md",
-                ],
-            )
-
-        # Log the selected mode for debugging
-        if has_symmetric:
-            logger.debug("Using symmetric embedding mode with providers: %s", self.embedding)
-        elif has_asymmetric:
-            logger.debug(
-                "Using asymmetric embedding mode: embed=%s, query=%s",
-                self.asymmetric_embedding.embed_provider_settings.provider,
-                self.asymmetric_embedding.query_provider_settings.provider,
-            )
+        if self.embedding is not None and self.embedding is not Unset and self.embedding:
+            # Check if we have asymmetric or symmetric configs
+            first_config = self.embedding[0]
+            if isinstance(first_config, AsymmetricEmbeddingConfig):
+                logger.debug(
+                    "Using asymmetric embedding mode: embed=%s, query=%s",
+                    str(first_config.embed_provider.model_name),
+                    str(first_config.query_provider.model_name),
+                )
+            else:
+                logger.debug("Using symmetric embedding mode with providers: %s", self.embedding)
         else:
             logger.debug("No embedding configuration specified")
 
@@ -818,21 +709,51 @@ class ProviderSettings(BasedModel):
 
         return (
             all_settings[0]
-            if len(all_settings) == 1
+            if len(all_settings) == ONE
             else tuple(all_settings)
             if all_settings
             else None
         )
+
+    def _dig_for_secret_keys(self, settings: tuple[dict[str, Any], ...]) -> bool:
+        """Recursively check if any secret keys are present in the settings dictionary."""
+        properties = (
+            "api_key",
+            "token",
+            "credentials",
+            "access_token",
+            "secret_key",
+            "auth_token",
+            "bearer_token",
+            "azure_ad_token_provider",
+            "aws_secret_key",
+            "aws_access_key",
+            "aws_session_token",
+        )
+
+        def _recurse(current: dict[str, Any]) -> bool:
+            for key, value in current.items():
+                if key in properties and value is not None:
+                    return True
+                if isinstance(value, SecretStr):
+                    return True
+                if isinstance(value, dict):
+                    if _recurse(value):
+                        return True
+                elif isinstance(value, list | tuple | set):
+                    for item in value:
+                        if isinstance(item, dict) and _recurse(item):
+                            return True
+            return False
+
+        return any(_recurse(setting) for setting in settings)
 
     def has_auth_configured(self, provider: Provider) -> bool:
         """Check if API key or TLS certs are set for the provider through settings or environment."""
         if not (settings := self.settings_for_provider(provider)):
             return False
         settings = settings if isinstance(settings, tuple) else (settings,)
-        return next(
-            (True for setting in settings if isinstance(setting.get("api_key"), SecretStr)),
-            provider.has_env_auth,
-        )
+        return self._dig_for_secret_keys(tuple(c.model_dump() for c in settings))
 
     def settings_for_kind(
         self,
@@ -860,22 +781,11 @@ class ProviderSettings(BasedModel):
         if setting is Unset:
             setting = AllDefaultProviderSettings.get(setting_field)  # type: ignore
             setattr(self, setting_field, setting)  # type: ignore
-        if primary and isinstance(setting, tuple) and len(setting) > 0:
+        if primary and isinstance(setting, tuple) and len(setting) > ZERO:
             return setting[0]
         if backup:
-            return setting[1] if isinstance(setting, tuple) and len(setting) > 1 else None
+            return setting[1] if isinstance(setting, tuple) and len(setting) > ONE else None
         return setting
-
-    def apply_profile(self, profile: Literal["recommended", "quickstart", "testing"]) -> None:
-        """Apply a premade provider profile to the settings.
-
-        Profiles are predefined sets of provider configurations that can be applied
-        to quickly set up the environment for different use cases, and can be applied on top
-        of existing settings.
-
-        Args:
-            profile: The profile to apply.
-        """
 
 
 def _get_all_default_provider_settings() -> ProviderSettingsDict:
@@ -894,214 +804,8 @@ def _get_all_default_provider_settings() -> ProviderSettingsDict:
 AllDefaultProviderSettings = None  # Will be lazy-initialized on first access
 
 
-class AsymmetricEmbeddingConfigDict(TypedDict):
-    """Dictionary representation of asymmetric embedding configuration."""
-
-    embed_provider_settings: EmbeddingProviderSettingsType
-    query_provider_settings: EmbeddingProviderSettingsType
-    validate_family_compatibility: bool
-
-
-class AsymmetricEmbeddingConfig(BasedModel):
-    """Configuration for asymmetric embedding setup with separate embed and query models.
-
-    Asymmetric embedding allows using different models for document embedding and query
-    embedding while maintaining compatibility through shared vector spaces. This enables
-    cost optimization (e.g., API for embed, local for queries) while preserving accuracy.
-
-    Attributes:
-        embed_provider_settings: Provider settings for document embedding model.
-        query_provider_settings: Provider settings for query embedding model.
-        validate_family_compatibility: Whether to validate models belong to same family.
-    """
-
-    model_config = BasedModel.model_config
-
-    embed_provider_settings: Annotated[
-        EmbeddingProviderSettingsType,
-        Field(description="Provider settings for the document embedding model."),
-    ]
-    query_provider_settings: Annotated[
-        EmbeddingProviderSettingsType,
-        Field(description="Provider settings for the query embedding model."),
-    ]
-    validate_family_compatibility: Annotated[
-        bool,
-        Field(description="Whether to validate that both models belong to the same model family."),
-    ] = True
-
-    @model_validator(mode="after")
-    def validate_model_compatibility(self) -> AsymmetricEmbeddingConfig:
-        """Validate that embed and query models are compatible.
-
-        Validates:
-        - Both models have registered capabilities
-        - Both models belong to model families
-        - Both models belong to the same family
-        - Models are compatible within the family
-        - Embedding dimensions match
-
-        Returns:
-            Self for method chaining.
-
-        Raises:
-            ConfigurationError: If models are incompatible.
-        """
-        from codeweaver.core.exceptions import ConfigurationError
-        from codeweaver.providers.embedding.capabilities.resolver import EmbeddingCapabilityResolver
-
-        if not self.validate_family_compatibility:
-            logger.warning(
-                "Family compatibility validation disabled for asymmetric embedding config. "
-                "This may result in incompatible embeddings if models are from different families."
-            )
-            return self
-
-        # Resolve capabilities for both models
-        resolver = EmbeddingCapabilityResolver()
-        embed_model_name = str(self.embed_provider_settings.model_name)
-        query_model_name = str(self.query_provider_settings.model_name)
-
-        embed_caps = resolver.resolve(embed_model_name)
-        query_caps = resolver.resolve(query_model_name)
-
-        # Verify both models have capabilities registered
-        if not embed_caps:
-            raise ConfigurationError(
-                f"No capabilities found for embed model: {embed_model_name}",
-                details={
-                    "embed_model": embed_model_name,
-                    "query_model": query_model_name,
-                    "provider": self.embed_provider_settings.provider.value,
-                },
-                suggestions=[
-                    f"Ensure model '{embed_model_name}' is registered in the capabilities system",
-                    "Check that the model name is spelled correctly",
-                    "Verify the provider supports this model",
-                    "List available models with: codeweaver list models",
-                ],
-            )
-
-        if not query_caps:
-            raise ConfigurationError(
-                f"No capabilities found for query model: {query_model_name}",
-                details={
-                    "embed_model": embed_model_name,
-                    "query_model": query_model_name,
-                    "provider": self.query_provider_settings.provider.value,
-                },
-                suggestions=[
-                    f"Ensure model '{query_model_name}' is registered in the capabilities system",
-                    "Check that the model name is spelled correctly",
-                    "Verify the provider supports this model",
-                    "List available models with: codeweaver list models",
-                ],
-            )
-
-        # Verify both models belong to families
-        if not embed_caps.model_family:  # ty:ignore[unresolved-attribute]
-            raise ConfigurationError(
-                f"Embed model '{embed_model_name}' does not belong to a model family",
-                details={"embed_model": embed_model_name, "query_model": query_model_name},
-                suggestions=[
-                    "Asymmetric embedding requires both models to belong to a model family",
-                    "Use symmetric embedding configuration for models without family support",
-                    "Check if a newer version of the model has family support",
-                ],
-            )
-
-        if not query_caps.model_family:  # ty:ignore[unresolved-attribute]
-            raise ConfigurationError(
-                f"Query model '{query_model_name}' does not belong to a model family",
-                details={"embed_model": embed_model_name, "query_model": query_model_name},
-                suggestions=[
-                    "Asymmetric embedding requires both models to belong to a model family",
-                    "Use symmetric embedding configuration for models without family support",
-                    "Check if a newer version of the model has family support",
-                ],
-            )
-
-        # Verify same family ID
-        embed_family = embed_caps.model_family  # ty:ignore[unresolved-attribute]
-        query_family = query_caps.model_family  # ty:ignore[unresolved-attribute]
-
-        if embed_family.family_id != query_family.family_id:
-            raise ConfigurationError(
-                f"Models belong to different families: '{embed_family.family_id}' vs '{query_family.family_id}'",
-                details={
-                    "embed_model": embed_model_name,
-                    "embed_family": embed_family.family_id,
-                    "query_model": query_model_name,
-                    "query_family": query_family.family_id,
-                },
-                suggestions=[
-                    f"Use models from the same family (e.g., both from '{embed_family.family_id}')",
-                    f"Available members of '{embed_family.family_id}': {', '.join(sorted(embed_family.member_models))}",
-                    "Set validate_family_compatibility=False to bypass this check (not recommended)",
-                ],
-            )
-
-        # Verify models are compatible within family
-        if not embed_family.is_compatible(embed_model_name, query_model_name):
-            raise ConfigurationError(
-                f"Models are not compatible within family '{embed_family.family_id}'",
-                details={
-                    "embed_model": embed_model_name,
-                    "query_model": query_model_name,
-                    "family_id": embed_family.family_id,
-                    "family_members": sorted(embed_family.member_models),
-                },
-                suggestions=[
-                    "Ensure both models are listed as family members",
-                    f"Valid family members: {', '.join(sorted(embed_family.member_models))}",
-                    "Contact support if you believe this is an error",
-                ],
-            )
-
-        # Verify dimensions match
-        embed_dim = embed_caps.default_dimension
-        query_dim = query_caps.default_dimension
-
-        is_valid, error_msg = embed_family.validate_dimensions(embed_dim, query_dim)
-        if not is_valid:
-            raise ConfigurationError(
-                f"Dimension mismatch: {error_msg}",
-                details={
-                    "embed_model": embed_model_name,
-                    "embed_dimension": embed_dim,
-                    "query_model": query_model_name,
-                    "query_dimension": query_dim,
-                    "expected_dimension": embed_family.default_dimension,
-                    "family_id": embed_family.family_id,
-                },
-                suggestions=[
-                    "Ensure both models use the same embedding dimension",
-                    f"Expected dimension for '{embed_family.family_id}': {embed_family.default_dimension}",
-                    "Check model configurations and verify dimension settings",
-                ],
-            )
-
-        logger.info(
-            "Asymmetric embedding configuration validated successfully: "
-            "embed_model='%s', query_model='%s', family='%s', dimension=%d",
-            embed_model_name,
-            query_model_name,
-            embed_family.family_id,
-            embed_dim,
-        )
-
-        return self
-
-    def _telemetry_keys(self) -> None:
-        return None
-
-
 __all__ = (
-    "AgentProviderSettingsType",
     "AllDefaultProviderSettings",
-    "AsymmetricEmbeddingConfig",
-    "AsymmetricEmbeddingConfigDict",
-    "DataProviderSettingsType",
     "EmbeddingProviderSettingsType",
     "ProviderSettings",
     "ProviderSettingsDict",

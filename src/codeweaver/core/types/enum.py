@@ -17,17 +17,12 @@ from typing import TYPE_CHECKING, Any, Self, cast, override
 
 import textcase
 
-from aenum import extend_enum  # type: ignore
 from pydantic import computed_field
 
 
 if TYPE_CHECKING:
     from codeweaver.core.types.aliases import FilteredKeyT
     from codeweaver.core.types.dataclasses import BaseEnumData
-
-
-type EnumExtend = Callable[[Enum, str], Enum]
-extend_enum: EnumExtend = extend_enum
 
 
 # ================================================
@@ -188,16 +183,23 @@ class BaseDataclassEnum(Enum):
     @classmethod
     def add_member(cls, name: str, value: BaseEnumData) -> Self:
         """Dynamically add a new member to the enum."""
-        # The type stub signature is (cls, name, *args, **kwargs), but the function applies a tuple to single args (value -> (value,)). Bottom line: it works fine. This is much more clear.
-        extend_enum(cls, textcase.upper(name), value)  # ty: ignore[too-many-positional-arguments, invalid-argument-type]
+        from codeweaver.core.types.utils import add_enum_member
+
+        add_enum_member(cls, name, value)
         return cls(value)
+
+    def add_alias(self, alias_name: str) -> None:
+        """Add an alias to the enum member."""
+        from codeweaver.core.types.utils import add_enum_alias
+
+        add_enum_alias(self, alias_name)
 
 
 @unique
 class BaseEnum(Enum):
     """An enum class that provides common functionality for all enums in the CodeWeaver project. Enum members must be unique and either all strings or all integers.
 
-    `aenum.extend_enum` allows us to dynamically add members, such as for plugin systems.
+    `add_enum_member` allows us to dynamically add members, such as for plugin systems.
 
     BaseEnum provides convenience methods for converting between strings and enum members, checking membership, and retrieving members and members' values, and adding new members dynamically.
     """
@@ -450,11 +452,17 @@ class BaseEnum(Enum):
     def add_member(cls, name: str, value: str | int) -> Self:
         """Dynamically add a new member to the enum."""
         if isinstance(value, str):
-            name = cls._encode_name(name).upper()
-            value = name.lower()
-        # the signature here is (cls, name, *args, **kwargs), but the function applies a tuple to single args (value -> (value,)). Bottom line: it works fine. This is much more clear.
-        extend_enum(cls, name, value)  # ty: ignore[too-many-positional-arguments, invalid-argument-type]
+            name = name.upper().replace(" ", "_").replace("-", "_")
+        from codeweaver.core.types.utils import add_enum_member
+
+        add_enum_member(cls, name, value)
         return cls(value)
+
+    def add_alias(self, alias_name: str) -> None:
+        """Add an alias to the enum member."""
+        from codeweaver.core.types.utils import add_enum_alias
+
+        add_enum_alias(self, alias_name)
 
     def serialize_for_cli(self) -> str:
         """Serialize the enum member for CLI display."""

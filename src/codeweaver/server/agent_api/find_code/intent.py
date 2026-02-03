@@ -11,6 +11,7 @@ from typing import Annotated, Literal
 from pydantic import Field, NonNegativeFloat, NonNegativeInt
 
 from codeweaver.core import BasedModel, BaseEnum
+from codeweaver.core.constants import ONE_POINT_ZERO
 
 
 class QueryComplexity(BaseEnum):
@@ -54,7 +55,7 @@ class QueryIntent(BasedModel):
 
     intent_type: IntentType
 
-    confidence: Annotated[NonNegativeFloat, Field(le=1.0)]
+    confidence: Annotated[NonNegativeFloat, Field(le=ONE_POINT_ZERO)]
     reasoning: Annotated[str, Field(description="""Why this intent was detected""")]
 
     # Intent-specific parameters
@@ -89,13 +90,13 @@ class IntentResult(BasedModel):
 
     # Search strategy weights
     semantic_weight: Annotated[
-        NonNegativeFloat, Field(le=1.0, description="""Weight for semantic search""")
+        NonNegativeFloat, Field(le=ONE_POINT_ZERO, description="""Weight for semantic search""")
     ] = 0.6
     syntactic_weight: Annotated[
-        NonNegativeFloat, Field(le=1.0, description="""Weight for syntactic search""")
+        NonNegativeFloat, Field(le=ONE_POINT_ZERO, description="""Weight for syntactic search""")
     ] = 0.3
     keyword_weight: Annotated[
-        NonNegativeFloat, Field(le=1.0, description="""Weight for keyword search""")
+        NonNegativeFloat, Field(le=ONE_POINT_ZERO, description="""Weight for keyword search""")
     ] = 0.1
 
     # Response formatting preferences

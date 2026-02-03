@@ -9,7 +9,6 @@
 from __future__ import annotations
 
 import contextlib
-import importlib
 import re
 
 from collections.abc import Callable, Generator
@@ -27,9 +26,10 @@ from codeweaver.core.types.aliases import (
     LiteralStringT,
 )
 from codeweaver.core.types.enum import BaseEnum
+from codeweaver.core.utils import has_package
 
 
-if importlib.util.find_spec("codeweaver.semantic"):
+if has_package("codeweaver.semantic"):
     from codeweaver.semantic.types import SemanticMetadata as SemanticMetadata
 else:
     SemanticMetadata = Any
@@ -146,15 +146,15 @@ class ExtTestDef(NamedTuple):
         return False if extension != self.extension else self.test(content)
 
 
-BASH_SHEBANG = re.compile(
+BASH_SHEBANG_PATTERN = re.compile(
     r"^#!(/usr|/usr/local)?/bin/(ba|fi|da|k|z|c|tc)?sh|^#!/usr/bin/env ((/bin/|/usr/bin/|/usr/local/bin)?(ba|da|fi|k|z|c|tc)?sh).*",
     re.IGNORECASE | re.DOTALL,
 )
-PYTHON_SHEBANG = re.compile(
+PYTHON_SHEBANG_PATTERN = re.compile(
     r"^(#(/usr/bin/env (-S )?(/usr/bin/|/usr/local/bin/)?(python3?|uv (-s)?).*))",
     re.IGNORECASE | re.DOTALL,
 )
-PERL_SHEBANG = re.compile(
+PERL_SHEBANG_PATTERN = re.compile(
     r"^(#(/usr/bin/env (-S )?(/usr/bin/|/usr/local/bin/)?(perl).*))", re.IGNORECASE | re.DOTALL
 )
 
@@ -189,17 +189,17 @@ EXTENSION_TESTS: tuple[ExtTestDef, ...] = (
     ExtTestDef(
         extension=FileExt(""),
         language=LanguageName(cast(LiteralStringT, "bash")),
-        test=lambda content: bool(BASH_SHEBANG.match(content)),  # type: ignore
+        test=lambda content: bool(BASH_SHEBANG_PATTERN.match(content)),  # type: ignore
     ),
     ExtTestDef(
         extension=FileExt(""),
         language=LanguageName(cast(LiteralStringT, "python")),
-        test=lambda content: bool(PYTHON_SHEBANG.match(content)),  # type: ignore
+        test=lambda content: bool(PYTHON_SHEBANG_PATTERN.match(content)),  # type: ignore
     ),
     ExtTestDef(
         extension=FileExt(""),
         language=LanguageName(cast(LiteralStringT, "perl")),
-        test=lambda content: bool(PERL_SHEBANG.match(content)),  # type: ignore
+        test=lambda content: bool(PERL_SHEBANG_PATTERN.match(content)),  # type: ignore
     ),
 )
 

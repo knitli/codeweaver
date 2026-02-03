@@ -23,6 +23,7 @@ from codeweaver.core import (
     elapsed_time_to_human_readable,
 )
 from codeweaver.core.config.types import CodeWeaverSettingsDict
+from codeweaver.core.constants import DEFAULT_MCP_PORT, LOCALHOST
 from codeweaver.core.di.depends import INJECTED
 from codeweaver.core.types import BasedModel
 from codeweaver.server import FastMcpHttpServerSettings, FastMcpStdioServerSettings
@@ -125,14 +126,14 @@ class CwMcpHttpState(BasedModel):
     def port(self) -> int:
         """Get the port the server is running on, if available."""
         return self.run_args.get("port") or self.mcp_settings.get("uvicorn_config", {}).get(
-            "port", 9328
+            "port", DEFAULT_MCP_PORT
         )
 
     @property
     def host(self) -> str:
         """Get the host the server is running on, if available."""
         return self.run_args.get("host") or self.mcp_settings.get("uvicorn_config", {}).get(
-            "host", "127.0.0.1"
+            "host", LOCALHOST
         )
 
     @classmethod

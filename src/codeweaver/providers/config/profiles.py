@@ -37,6 +37,15 @@ from codeweaver.core import (
     generate_collection_name,
     get_user_data_dir,
 )
+from codeweaver.core.utils import has_package, uuid7
+from codeweaver.providers.config import (
+    AgentProviderSettingsType,
+    DataProviderSettingsType,
+    EmbeddingProviderSettingsType,
+    RerankingProviderSettingsType,
+    SparseEmbeddingProviderSettingsType,
+)
+from codeweaver.providers.config.agent import AnthropicAgentModelConfig
 from codeweaver.providers.config.clients import QdrantClientOptions
 from codeweaver.providers.config.embedding import (
     FastEmbedEmbeddingConfig,
@@ -47,13 +56,16 @@ from codeweaver.providers.config.embedding import (
 )
 from codeweaver.providers.config.kinds import (
     AgentProviderSettings,
+    AnthropicAgentProviderSettings,
     CollectionConfig,
-    DataProviderSettings,
+    DuckDuckGoProviderSettings,
     EmbeddingProviderSettings,
     QdrantVectorStoreProviderSettings,
     RerankingProviderSettings,
     SparseEmbeddingProviderSettings,
+    TavilyProviderSettings,
 )
+from codeweaver.providers.config.providers import AsymmetricEmbeddingConfig
 
 
 if TYPE_CHECKING:
@@ -191,10 +203,19 @@ def _recommended_default(
 
     return ProviderSettingsDict(
         embedding=(
-            EmbeddingProviderSettings(
-                model_name=ModelName("voyage-4-large"),
-                embedding_config=VoyageEmbeddingConfig(model_name=ModelName("voyage-4-large")),
-                provider=Provider.VOYAGE,
+            AsymmetricEmbeddingConfig(
+                embed_provider=EmbeddingProviderSettings(
+                    model_name=ModelName("voyage-4-large"),
+                    embedding_config=VoyageEmbeddingConfig(model_name=ModelName("voyage-4-large")),
+                    provider=Provider.VOYAGE,
+                ),
+                query_provider=EmbeddingProviderSettings(
+                    model_name=ModelName("voyage-4-nano"),
+                    provider=Provider.SENTENCE_TRANSFORMERS,
+                    embedding_config=SentenceTransformersEmbeddingConfig(
+                        model_name=ModelName("voyage-4-nano")
+                    ),
+                ),
             ),
         ),
         sparse_embedding=(
@@ -218,15 +239,22 @@ def _recommended_default(
             ),
         ),
         agent=(
-            AgentProviderSettings(
+            AnthropicAgentProviderSettings(
                 provider=Provider.ANTHROPIC,
                 model_name="claude-haiku-4.5",
-                model_options=AgentModelSettings(),
+                model_options=AnthropicAgentModelConfig(
+                    anthropic_metadata={"_user_id": f"cw-recommended-{uuid7().hex}"},
+                    model_name="claude-haiku-4.5",
+                    max_tokens=20_000,
+                    temperature=0.2,
+                    top_p=1.0,
+                ),
             ),
         ),
         data=(
-            DataProviderSettings(provider=Provider.TAVILY),
-            DataProviderSettings(provider=Provider.DUCKDUCKGO),
+            (TavilyProviderSettings(provider=Provider.TAVILY),)
+            if Provider.TAVILY.has_env_auth() and has_package("tavily")
+            else (DuckDuckGoProviderSettings(provider=Provider.DUCKDUCKGO),)
         ),
         vector_store=(
             QdrantVectorStoreProviderSettings(
@@ -304,8 +332,9 @@ def _quickstart_default(
             ),
         ),
         data=(
-            DataProviderSettings(provider=Provider.TAVILY),
-            DataProviderSettings(provider=Provider.DUCKDUCKGO),
+            TavilyProviderSettings(provider=Provider.TAVILY)
+            if has_package("tavily") and Provider.TAVILY.has_env_auth()
+            else DuckDuckGoProviderSettings(provider=Provider.DUCKDUCKGO),
         ),
         vector_store=(
             QdrantVectorStoreProviderSettings(
@@ -401,31 +430,30 @@ class ProviderConfigProfile(BaseEnumData):
     """
 
     vector_store: tuple[QdrantVectorStoreProviderSettings, ...] | None
-    embedding: tuple[EmbeddingProviderSettings, ...] | None
-    sparse_embedding: tuple[SparseEmbeddingProviderSettings, ...] | None
-    reranking: tuple[RerankingProviderSettings, ...] | None
-    agent: tuple[AgentProviderSettings, ...] | None
-    data: tuple[DataProviderSettings, ...] | None
+    embedding: tuple[EmbeddingProviderSettingsType, ...] | None
+    sparse_embedding: tuple[SparseEmbeddingProviderSettingsType, ...] | None
+    reranking: tuple[RerankingProviderSettingsType, ...] | None
+    agent: tuple[AgentProviderSettingsType, ...] | None
+    data: tuple[DataProviderSettingsType, ...] | None
 
     def __init__(
-        self, settings_dict: ProviderSettingsDict | None = None, *args: Any, **kwargs: Any
+        self, provider_settings: ProviderSettingsDict | None = None, *args: Any, **kwargs: Any
     ) -> None:
         """Initialize ProviderConfigProfile with provider settings.
 
         Args:
-            settings_dict: Dictionary containing provider settings
+            provider_settings: Dictionary containing provider settings
             *args: Additional positional args passed to BaseEnumData
             **kwargs: Additional keyword args passed to BaseEnumData
         """
-        if settings_dict is None:
-            settings_dict = {}
+        provider_settings = provider_settings or ProviderSettingsDict()
 
-        object.__setattr__(self, "vector_store", settings_dict.get("vector_store"))
-        object.__setattr__(self, "embedding", settings_dict.get("embedding"))
-        object.__setattr__(self, "sparse_embedding", settings_dict.get("sparse_embedding"))
-        object.__setattr__(self, "reranking", settings_dict.get("reranking"))
-        object.__setattr__(self, "agent", settings_dict.get("agent"))
-        object.__setattr__(self, "data", settings_dict.get("data"))
+        object.__setattr__(self, "vector_store", provider_settings.get("vector_store"))
+        object.__setattr__(self, "embedding", provider_settings.get("embedding"))
+        object.__setattr__(self, "sparse_embedding", provider_settings.get("sparse_embedding"))
+        object.__setattr__(self, "reranking", provider_settings.get("reranking"))
+        object.__setattr__(self, "agent", provider_settings.get("agent"))
+        object.__setattr__(self, "data", provider_settings.get("data"))
         super().__init__(*args, **kwargs)
 
     def _telemetry_keys(self) -> None:
@@ -494,11 +522,6 @@ class ProviderProfile(ProviderConfigProfile, BaseDataclassEnum):
         ("testing-db", "backup-db", "development-db", "lightweight-db", "dev-db"),
         "Testing profile with on-disk vector database. Similar to the testing profile, but uses a normal on-disk Qdrant vector store instead of an in-memory store. This allows for larger datasets and more persistent storage while still using lightweight local models for embeddings and rerankings.",
     )
-    BACKUP = (
-        _get_profile("testing", vector_deployment="local"),
-        ("backup", "local"),
-        "Backup provider settings profile. Uses the testing profile with local vector store as a fallback when other profiles are unavailable.",
-    )
 
     @classmethod
     def _get_profile(
@@ -528,7 +551,7 @@ class ProviderProfile(ProviderConfigProfile, BaseDataclassEnum):
             )
         return provider
 
-    def as_settings_dict(self) -> ProviderSettingsDict:
+    def as_provider_settings(self) -> ProviderSettingsDict:
         """Get the provider settings as a dictionary."""
         from codeweaver.providers.config.providers import ProviderSettingsDict
 

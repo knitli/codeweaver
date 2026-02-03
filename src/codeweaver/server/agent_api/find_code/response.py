@@ -1,3 +1,4 @@
+# sourcery skip: no-complex-if-expressions
 # SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
@@ -11,19 +12,17 @@ from search results, including summary generation and metadata calculation.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal
+from typing import Literal
 
 from codeweaver.core import ConfigLanguage, LanguageName, SearchStrategy, SemanticSearchLanguage
+from codeweaver.core.constants import ONE_HUNDRED, ZERO
 from codeweaver.core.di import INJECTED
 from codeweaver.providers.embedding.providers.base import EmbeddingProvider, SparseEmbeddingProvider
 from codeweaver.providers.reranking.providers.base import RerankingProvider
 from codeweaver.providers.vector_stores.base import VectorStoreProvider
 from codeweaver.server.agent_api.find_code.intent import IntentType
+from codeweaver.server.agent_api.find_code.types import CodeMatch, FindCodeResponseSummary
 from codeweaver.server.dependencies import CodeWeaverStateDep
-
-
-if TYPE_CHECKING:
-    from codeweaver.server.agent_api.find_code.types import CodeMatch, FindCodeResponseSummary
 
 
 def get_indexer_state_info(
@@ -44,10 +43,10 @@ def get_indexer_state_info(
     files_processed = stats.files_processed
 
     # Calculate coverage
-    coverage = files_processed / files_discovered * 100 if files_discovered > 0 else None
+    coverage = files_processed / files_discovered * ONE_HUNDRED if files_discovered > ZERO else None
 
     # Determine state
-    if files_discovered == 0:
+    if files_discovered == ZERO:
         indexing_state = "not_started"
     elif files_processed >= files_discovered:
         indexing_state = "complete"
@@ -141,8 +140,6 @@ def build_success_response(
     Returns:
         FindCodeResponseSummary with all fields populated
     """
-    from codeweaver.server.agent_api.find_code.types import FindCodeResponseSummary
-
     # Determine search mode from strategies
     search_mode = None
     if SearchStrategy.HYBRID_SEARCH in strategies_used:

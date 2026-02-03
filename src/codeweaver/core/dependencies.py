@@ -12,7 +12,7 @@ import logging
 import os
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, TypeAlias
+from typing import TYPE_CHECKING, Annotated
 
 from pydantic import DirectoryPath
 
@@ -63,7 +63,7 @@ def _resolve_config_file() -> Path | None:
 # Union type covering all possible settings types
 # Imports moved to TYPE_CHECKING block to avoid circular dependencies
 # Actual runtime type is resolved by bootstrap_settings -> get_settings()
-CodeWeaverSettingsType: TypeAlias = "CodeWeaverSettings | CodeWeaverEngineSettings | CodeWeaverProviderSettings | CodeWeaverCoreSettings"
+type CodeWeaverSettingsType = "CodeWeaverSettings | CodeWeaverEngineSettings | CodeWeaverProviderSettings | CodeWeaverCoreSettings"
 
 
 async def bootstrap_settings(config_file: Path | None = None) -> CodeWeaverSettingsType:
@@ -97,7 +97,7 @@ async def bootstrap_settings(config_file: Path | None = None) -> CodeWeaverSetti
         config_file = None
 
     config_file = config_file if config_file and config_file.exists() else _resolve_config_file()
-    return await asyncio.to_thread(get_settings, config_file=config_file)  # ty:ignore[invalid-return-type]
+    return await asyncio.to_thread(get_settings, config_file=config_file)
 
 
 SettingsDep = Annotated[
@@ -139,9 +139,7 @@ type StatisticsDep = Annotated[SessionStatistics, depends(_get_statistics)]
 def _get_telemetry_settings(settings: SettingsDep = INJECTED) -> TelemetrySettings:
     from codeweaver.core.config import TelemetrySettings
 
-    return (
-        settings.telemetry if settings.telemetry is not Unset else TelemetrySettings()  # ty:ignore[invalid-return-type]
-    )  # ty:ignore[invalid-return-type]
+    return settings.telemetry if settings.telemetry is not Unset else TelemetrySettings()
 
 
 type TelemetrySettingsDep = Annotated[TelemetrySettings, depends(_get_telemetry_settings)]
@@ -194,7 +192,7 @@ type ProgressReporterDep = Annotated[ProgressReporter, depends(_create_progress_
 async def _get_canonical_project_path(settings: SettingsDep = INJECTED) -> DirectoryPath:
     await asyncio.sleep(0)  # Yield control to the event loop
     return (
-        settings.project_path  # ty:ignore[invalid-return-type]
+        settings.project_path
         if settings.project_path is not Unset
         else await asyncio.to_thread(get_project_path)
     )
@@ -207,11 +205,7 @@ async def _get_canonical_project_name(
     settings: SettingsDep = INJECTED, project_path: ResolvedProjectPathDep = INJECTED
 ) -> str:
     await asyncio.sleep(0)  # Yield control to the event loop
-    return (
-        settings.project_name  # ty:ignore[invalid-return-type]
-        if settings.project_name is not Unset
-        else project_path.name
-    )
+    return settings.project_name if settings.project_name is not Unset else project_path.name
 
 
 type ResolvedProjectNameDep = Annotated[str, depends(_get_canonical_project_name)]
@@ -223,7 +217,7 @@ async def _get_resolved_project_path_hash(
     from codeweaver.core.utils import get_blake_hash
 
     await asyncio.sleep(0)  # Yield control to the event loop
-    return await asyncio.to_thread(get_blake_hash, str(project_path.absolute()))  # ty:ignore[invalid-argument-type]
+    return await asyncio.to_thread(get_blake_hash, str(project_path.absolute()))
 
 
 type ResolvedProjectPathHashDep = Annotated[BlakeKey, depends(_get_resolved_project_path_hash)]

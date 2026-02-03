@@ -13,6 +13,7 @@ import logging
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
+from codeweaver.core.constants import ONE_MINUTE
 from codeweaver.providers import CircuitBreakerState
 
 
@@ -76,7 +77,7 @@ class FailoverService:
         """Monitor primary store health."""
         while True:
             try:
-                await asyncio.sleep(60)  # check every minute
+                await asyncio.sleep(ONE_MINUTE)  # check every minute
 
                 if not self.primary_store:
                     continue

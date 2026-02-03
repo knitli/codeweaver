@@ -20,6 +20,10 @@ import logging
 from typing import TYPE_CHECKING, TypedDict
 
 from codeweaver.core import CodeChunk
+from codeweaver.core.constants import (
+    BACKUP_DENSE_VECTOR_NAME,
+    DEFAULT_RECONCILIATION_SERVICE_BATCH_SIZE,
+)
 from codeweaver.providers.config.backup_models import get_backup_embedding_provider
 
 
@@ -65,8 +69,8 @@ class VectorReconciliationService:
     def __init__(
         self,
         vector_store: VectorStoreProvider,
-        backup_vector_name: str = "backup",
-        batch_size: int = 100,
+        backup_vector_name: str = BACKUP_DENSE_VECTOR_NAME,
+        batch_size: int = DEFAULT_RECONCILIATION_SERVICE_BATCH_SIZE,
     ) -> None:
         """Initialize the reconciliation service.
 

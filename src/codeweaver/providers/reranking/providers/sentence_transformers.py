@@ -18,6 +18,7 @@ import numpy as np
 
 from codeweaver.core import Provider, rpartial
 from codeweaver.core import ValidationError as CodeWeaverValidationError
+from codeweaver.core.constants import DEFAULT_RERANKING_MAX_RESULTS
 from codeweaver.providers.reranking.providers.base import RerankingProvider
 
 
@@ -86,7 +87,12 @@ class SentenceTransformersRerankingProvider(RerankingProvider[CrossEncoder]):
             self._setup_qwen3()
 
     async def _execute_rerank(
-        self, query: str, documents: Sequence[str], *, top_n: int = 10, **kwargs: Any
+        self,
+        query: str,
+        documents: Sequence[str],
+        *,
+        top_n: int = DEFAULT_RERANKING_MAX_RESULTS,
+        **kwargs: Any,
     ) -> Any:
         """Execute the reranking process."""
         preprocessed = (

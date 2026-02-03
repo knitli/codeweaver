@@ -8,7 +8,6 @@
 from __future__ import annotations
 
 import contextlib
-import importlib
 import os
 
 from functools import cached_property
@@ -17,23 +16,21 @@ from typing import TYPE_CHECKING, Any, Literal, TypedDict, cast
 
 from codeweaver.core.types.enum import BaseEnum
 from codeweaver.core.types.env import ProviderEnvVars
+from codeweaver.core.utils import has_package
 from codeweaver.core.utils.lazy_importer import LazyImport, lazy_import
 
 
 if TYPE_CHECKING:
     from codeweaver.core.types.env import EnvVarInfo as ProviderEnvVarInfo
 
-if TYPE_CHECKING and importlib.util.find_spec("sentence-transformers") is not None:
+if TYPE_CHECKING and has_package("sentence_transformers"):
     from sentence_transformers import CrossEncoder, SentenceTransformer, SparseEncoder
 else:
     SentenceTransformer = Any
     CrossEncoder = Any
     SparseEncoder = Any
 
-if TYPE_CHECKING and (
-    importlib.util.find_spec("fastembed") is not None
-    or importlib.util.find_spec("fastembed-gpu") is not None
-):
+if TYPE_CHECKING and (has_package("fastembed") or has_package("fastembed-gpu")):
     from fastembed.rerank.cross_encoder import TextCrossEncoder
     from fastembed.sparse import SparseTextEmbedding
     from fastembed.text import TextEmbedding
@@ -42,7 +39,7 @@ else:
     TextCrossEncoder = Any
     SparseTextEmbedding = Any
 
-if TYPE_CHECKING and (importlib.util.find_spec("anthropic") is not None):
+if TYPE_CHECKING and has_package("anthropic"):
     from anthropic import (
         AsyncAnthropic,
         AsyncAnthropicBedrock,
@@ -117,6 +114,7 @@ class SDKClient(BaseEnum):
     HUGGINGFACE_INFERENCE = "hf_inference"
     MISTRAL = "mistral"
     OPENAI = "openai"
+    PYDANTIC_GATEWAY = "gateway"
     QDRANT = "qdrant"
     SENTENCE_TRANSFORMERS = "sentence-transformers"
     TAVILY = "tavily"
@@ -166,6 +164,9 @@ class SDKClient(BaseEnum):
                 return lazy_import("mistralai", "Mistral")
             case SDKClient.OPENAI:
                 return lazy_import("openai", "AsyncOpenAI")
+            case SDKClient.PYDANTIC_GATEWAY:
+                # Pydantic Gateway isn't a true client. It handles the machinery for multiple clients.
+                return lazy_import("pydantic_ai.providers.gateway", "gateway_provider")
             case SDKClient.QDRANT:
                 return lazy_import("qdrant_client", "AsyncQdrantClient")
             case SDKClient.SENTENCE_TRANSFORMERS:
@@ -184,11 +185,29 @@ class SDKClient(BaseEnum):
     @property
     def agent_provider(self) -> LazyImport[Any] | None:
         """Get the default agent provider for the SDK client."""
-        if importlib.util.find_spec("codeweaver.providers") is None:
-            return None
-        from codeweaver.providers.agent import get_agent_model_provider
-
-        return get_agent_model_provider(self.variable)  # ty:ignore[invalid-return-type, invalid-argument-type]
+        match self:
+            case SDKClient.ANTHROPIC:
+                return lazy_import("pydantic_ai.providers.anthropic", "AnthropicProvider")
+            case SDKClient.GOOGLE:
+                return lazy_import("pydantic_ai.providers.google", "GoogleProvider")
+            case SDKClient.BEDROCK:
+                return lazy_import("pydantic_ai.providers.bedrock", "BedrockProvider")
+            case SDKClient.COHERE:
+                return lazy_import("pydantic_ai.providers.cohere", "CohereProvider")
+            case SDKClient.GROQ:
+                return lazy_import("pydantic_ai.providers.groq", "GroqProvider")
+            case SDKClient.HUGGINGFACE_INFERENCE:
+                return lazy_import("pydantic_ai.providers.huggingface", "HuggingFaceProvider")
+            case SDKClient.MISTRAL:
+                return lazy_import("pydantic_ai.providers.mistral", "MistralProvider")
+            case SDKClient.OPENAI:
+                return lazy_import("pydantic_ai.providers.openai", "OpenAIProvider")
+            case SDKClient.PYDANTIC_GATEWAY:
+                # this actually returns based on the upstream provider
+                # for an openai model, for example, it returns OpenAIProvider
+                return lazy_import("pydantic_ai.providers.gateway", "gateway_provider")
+            case _:
+                return None
 
     @property
     def data_provider(self) -> LazyImport[Any] | None:
@@ -232,8 +251,10 @@ class SDKClient(BaseEnum):
                     "codeweaver.providers.embedding.providers.mistral", "MistralEmbeddingProvider"
                 )
             case SDKClient.OPENAI:
+                # because of the number of providers that use OpenAI, we have a factory method here
                 return lazy_import(
-                    "codeweaver.providers.embedding.providers.openai", "OpenAIEmbeddingProvider"
+                    "codeweaver.providers.embedding.providers.openai_factory.OpenAIEmbeddingBase",
+                    "get_provider_class",
                 )
             case SDKClient.SENTENCE_TRANSFORMERS:
                 return lazy_import(
@@ -328,6 +349,7 @@ class Provider(BaseEnum):
     MEMORY = "memory"
     MISTRAL = "mistral"
     MOONSHOT = "moonshot"
+    MORPH = "morph"
     NEBIUS = "nebius"
     NOT_SET = "not_set"
     OLLAMA = "ollama"
@@ -338,6 +360,7 @@ class Provider(BaseEnum):
     PERPLEXITY = "perplexity"
     PYDANTIC_GATEWAY = "gateway"
     QDRANT = "qdrant"
+    SAMBANOVA = "sambanova"
     SENTENCE_TRANSFORMERS = "sentence-transformers"
     TAVILY = "tavily"
     TOGETHER = "together"
@@ -548,7 +571,7 @@ class Provider(BaseEnum):
                         note="You may also use the OpenAI-compatible environment variables with Vercel, since it uses the OpenAI client.",
                         client=("openai",),
                         api_key=ProviderEnvVarInfo(
-                            env="AI_GATEWAY_API_KEY",
+                            env="VERCEL_AI_GATEWAY_API_KEY",
                             is_secret=True,
                             description="API key for Vercel service",
                             variable_name="api_key",
@@ -679,7 +702,7 @@ class Provider(BaseEnum):
             case Provider.CEREBRAS:
                 return (
                     ProviderEnvVars(
-                        client=("cerebras",),
+                        client=("cerebras", "openai"),
                         api_key=ProviderEnvVarInfo(
                             env="CEREBRAS_API_KEY",
                             description="Your Cerebras API Key",
@@ -689,6 +712,102 @@ class Provider(BaseEnum):
                         host=ProviderEnvVarInfo(
                             env="CEREBRAS_API_URL",
                             description="Host URL for Cerebras service",
+                            variable_name="base_url",
+                        ),
+                        other=httpx_env_vars,
+                    ),
+                    cast(ProviderEnvVars, *type(self).OPENAI.other_env_vars),
+                )
+            case Provider.FIREWORKS:
+                return (
+                    ProviderEnvVars(
+                        client=("openai",),
+                        api_key=ProviderEnvVarInfo(
+                            env="FIREWORKS_API_KEY",
+                            description="Your Fireworks API Key",
+                            is_secret=True,
+                            variable_name="api_key",
+                        ),
+                        host=ProviderEnvVarInfo(
+                            env="FIREWORKS_API_URL",
+                            description="Host URL for Fireworks service",
+                            variable_name="base_url",
+                        ),
+                        other=httpx_env_vars,
+                    ),
+                    cast(ProviderEnvVars, *type(self).OPENAI.other_env_vars),
+                )
+            case Provider.MORPH:
+                return (
+                    ProviderEnvVars(
+                        client=("openai",),
+                        api_key=ProviderEnvVarInfo(
+                            env="MORPH_API_KEY",
+                            description="Your Morph API Key",
+                            is_secret=True,
+                            variable_name="api_key",
+                        ),
+                        host=ProviderEnvVarInfo(
+                            env="MORPH_API_URL",
+                            default="https://api.morphllm.com/v1",
+                            description="Host URL for Morph service",
+                            variable_name="base_url",
+                        ),
+                        other=httpx_env_vars,
+                    ),
+                    cast(ProviderEnvVars, *type(self).OPENAI.other_env_vars),
+                )
+            case Provider.NEBIUS:
+                return (
+                    ProviderEnvVars(
+                        client=("openai",),
+                        api_key=ProviderEnvVarInfo(
+                            env="NEBIUS_API_KEY",
+                            description="Your Nebius API Key",
+                            is_secret=True,
+                            variable_name="api_key",
+                        ),
+                        host=ProviderEnvVarInfo(
+                            env="NEBIUS_API_URL",
+                            description="Host URL for Nebius service",
+                            variable_name="base_url",
+                        ),
+                        other=httpx_env_vars,
+                    ),
+                    cast(ProviderEnvVars, *type(self).OPENAI.other_env_vars),
+                )
+            case Provider.OVHCLOUD:
+                return (
+                    ProviderEnvVars(
+                        client=("openai",),
+                        api_key=ProviderEnvVarInfo(
+                            env="OVHCLOUD_API_KEY",
+                            description="Your OVHCloud API Key",
+                            is_secret=True,
+                            variable_name="api_key",
+                        ),
+                        host=ProviderEnvVarInfo(
+                            env="OVHCLOUD_API_URL",
+                            description="Host URL for OVHCloud service",
+                            variable_name="base_url",
+                        ),
+                        other=httpx_env_vars,
+                    ),
+                    cast(ProviderEnvVars, *type(self).OPENAI.other_env_vars),
+                )
+            case Provider.SAMBANOVA:
+                return (
+                    ProviderEnvVars(
+                        client=("openai",),
+                        api_key=ProviderEnvVarInfo(
+                            env="SAMBANOVA_API_KEY",
+                            description="Your SambaNova API Key",
+                            is_secret=True,
+                            variable_name="api_key",
+                        ),
+                        host=ProviderEnvVarInfo(
+                            env="SAMBANOVA_API_URL",
+                            description="Host URL for SambaNova service",
                             variable_name="base_url",
                         ),
                         other=httpx_env_vars,
@@ -718,7 +837,7 @@ class Provider(BaseEnum):
                 return (
                     (
                         ProviderEnvVars(
-                            client=("bedrock",),
+                            client=("bedrock", "anthropic"),
                             note="AWS allows for setting many configuration options by environment variable. See [the AWS documentation](https://boto3.amazonaws.com/v1/documentation/api/latest/guide/configuration.html#using-environment-variables) for more details. Because AWS has multiple authentication methods, and ways to configure settings, we don't provide them here. We'd just confuse people. Unlike other providers, we also don't check for AWS's environment variables, we just assume you're authorized to do what you need to do.",
                             region=ProviderEnvVarInfo(
                                 env="AWS_REGION",
@@ -809,7 +928,7 @@ class Provider(BaseEnum):
             case Provider.GROQ:
                 return (
                     ProviderEnvVars(
-                        client=("groq",),
+                        client=("groq", "openai"),
                         api_key=ProviderEnvVarInfo(
                             env="GROQ_API_KEY",
                             description="Your Groq API Key",
@@ -839,6 +958,34 @@ class Provider(BaseEnum):
                         other=httpx_env_vars,
                     ),
                 )
+            case Provider.PYDANTIC_GATEWAY:
+                return (
+                    ProviderEnvVars(
+                        client=("gateway",),
+                        api_key=ProviderEnvVarInfo(
+                            env="PYDANTIC_AI_GATEWAY_API_KEY",
+                            description="Your Pydantic AI Gateway API Key",
+                            is_secret=True,
+                            variable_name="api_key",
+                        ),
+                        other=httpx_env_vars,
+                    ),
+                )
+            case Provider.MOONSHOT:
+                return (
+                    ProviderEnvVars(
+                        client=("openai",),
+                        note="These variables are for the Moonshot service.",
+                        api_key=ProviderEnvVarInfo(
+                            env="MOONSHOTAI_API_KEY",
+                            is_secret=True,
+                            description="API key for Moonshot service",
+                            variable_name="api_key",
+                        ),
+                        other=httpx_env_vars,
+                    ),
+                    cast(ProviderEnvVars, *type(self).OPENAI.other_env_vars),
+                )
             case _:
                 if self.uses_openai_api:
                     return cast(tuple[ProviderEnvVars, ...], *type(self).OPENAI.other_env_vars)
@@ -859,7 +1006,7 @@ class Provider(BaseEnum):
     @property
     def is_local_provider(self) -> bool:
         """Check if the provider can be used as a local provider."""
-        return self.always_local or self in {Provider.OLLAMA, Provider.QDRANT}
+        return self.always_local or self in {Provider.OLLAMA, Provider.QDRANT, Provider.LITELLM}
 
     @property
     def is_cloud_provider(self) -> bool:
@@ -909,17 +1056,18 @@ class Provider(BaseEnum):
             Provider.DEEPSEEK,
             Provider.FIREWORKS,
             Provider.GITHUB,
-            Provider.GOOGLE,
             Provider.GROQ,
             Provider.HEROKU,
             Provider.LITELLM,
             Provider.MOONSHOT,
+            Provider.MORPH,
             Provider.NEBIUS,
             Provider.OLLAMA,
             Provider.OPENAI,
             Provider.OPENROUTER,
             Provider.OVHCLOUD,
             Provider.PERPLEXITY,
+            Provider.SAMBANOVA,
             Provider.TOGETHER,
             Provider.VERCEL,
             Provider.X_AI,
@@ -957,15 +1105,19 @@ class Provider(BaseEnum):
     def all_envs_for_client(
         self,
         client: Literal[
+            "anthropic",
             "bedrock",
             "cohere",
+            "duckduckgo",
             "fastembed",
             "google",
+            "groq",
             "hf_inference",
             "mistral",
             "openai",
             "qdrant",
-            "sentence-transformers",
+            "sentence_transformers",
+            "tavily",
         ],
     ) -> tuple[ProviderEnvVarInfo, ...]:
         """Get all environment variables used by this provider for a specific client."""
@@ -1028,14 +1180,14 @@ class Provider(BaseEnum):
         return self in {Provider.AZURE, Provider.MEMORY} | {
             provider
             for provider in type(self)
-            if (provider.uses_openai_api and provider != Provider.OPENAI)
+            if (provider.uses_openai_api and provider not in (Provider.OPENAI, Provider.GROQ))
         }
 
     @cached_property
     def only_uses_own_client(self) -> bool:
         """Check if the provider only uses its own SDK client. Importantly, this does not consider a provider's **models**. Cohere, for example, which makes models -- you can use Cohere models with many SDKs, but in CodeWeaver, Cohere, as a provider (someone you pay for a service), is only ever used with the Cohere SDK client."""
         return self not in (
-            {Provider.AZURE, Provider.HEROKU, Provider.MEMORY}
+            {Provider.AZURE, Provider.HEROKU, Provider.MEMORY, Provider.GOOGLE}
             | {
                 provider
                 for provider in type(self)
@@ -1049,15 +1201,11 @@ SDK_MAP: MappingProxyType[tuple[Provider, ProviderKind], SDKClient | tuple[SDKCl
         {
             (provider, ProviderKind.EMBEDDING): SDKClient.OPENAI
             for provider in (
-                Provider.FIREWORKS,
-                Provider.GITHUB,
-                Provider.GROQ,
-                Provider.LITELLM,
-                Provider.OLLAMA,
-                Provider.OPENAI,
-                Provider.OPENROUTER,
-                Provider.TOGETHER,
-                Provider.VERCEL,
+                p
+                for p in Provider
+                if p.uses_openai_api
+                and p not in (Provider.AZURE, Provider.HEROKU, Provider.GROQ)
+                and p.is_embedding_provider()
             )
         }
         | {
@@ -1090,10 +1238,30 @@ SDK_MAP: MappingProxyType[tuple[Provider, ProviderKind], SDKClient | tuple[SDKCl
         | {
             (provider, ProviderKind.AGENT): SDKClient.OPENAI
             for provider in Provider
-            if provider.uses_openai_api and provider != Provider.GROQ
+            if provider.uses_openai_api
+            and provider != Provider.GROQ
+            and provider.is_agent_provider()
         }
-        | {(Provider.GROQ, ProviderKind.AGENT): SDKClient.GROQ}
         | {(Provider.ANTHROPIC, ProviderKind.AGENT): SDKClient.ANTHROPIC}
+        | {(Provider.AZURE, ProviderKind.AGENT): (SDKClient.OPENAI, SDKClient.ANTHROPIC)}
+        | {(Provider.BEDROCK, ProviderKind.AGENT): (SDKClient.BEDROCK, SDKClient.ANTHROPIC)}
+        | {(Provider.COHERE, ProviderKind.AGENT): SDKClient.COHERE}
+        | {(Provider.GOOGLE, ProviderKind.AGENT): (SDKClient.GOOGLE, SDKClient.ANTHROPIC)}
+        | {(Provider.GROQ, ProviderKind.AGENT): SDKClient.GROQ}
+        | {(Provider.HUGGINGFACE_INFERENCE, ProviderKind.AGENT): SDKClient.HUGGINGFACE_INFERENCE}
+        | {(Provider.MISTRAL, ProviderKind.AGENT): SDKClient.MISTRAL}
+        | {
+            (provider, ProviderKind.AGENT): SDKClient.OPENAI
+            for provider in {
+                p
+                for p in Provider
+                if p.is_agent_provider()
+                and p.uses_openai_api
+                and p not in (Provider.AZURE, Provider.GROQ)
+            }
+        }
+        | {(Provider.DUCKDUCKGO, ProviderKind.DATA): SDKClient.DUCKDUCKGO}
+        | {(Provider.TAVILY, ProviderKind.DATA): SDKClient.TAVILY}
     )
 )
 """Mapping of providers and their kinds to SDK clients. Currently only handles embedding/sparse_embedding/reranking/vector_store kinds."""
@@ -1123,6 +1291,7 @@ PROVIDER_CAPABILITIES: MappingProxyType[Provider, tuple[ProviderKind, ...]] = Ma
     Provider.MISTRAL: (ProviderKind.AGENT, ProviderKind.EMBEDDING),
     Provider.MEMORY: (ProviderKind.VECTOR_STORE,),
     Provider.MOONSHOT: (ProviderKind.AGENT,),
+    Provider.MORPH: (ProviderKind.EMBEDDING,),  # supports agent but not implemented
     Provider.NEBIUS: (ProviderKind.AGENT,),
     Provider.OLLAMA: (ProviderKind.AGENT, ProviderKind.EMBEDDING),
     Provider.OPENAI: (ProviderKind.AGENT, ProviderKind.EMBEDDING),
@@ -1130,6 +1299,7 @@ PROVIDER_CAPABILITIES: MappingProxyType[Provider, tuple[ProviderKind, ...]] = Ma
     Provider.OPENROUTER: (ProviderKind.AGENT,),  # supports embedding but not implemented yet
     Provider.OVHCLOUD: (ProviderKind.AGENT,),
     Provider.PERPLEXITY: (ProviderKind.AGENT,),
+    Provider.PYDANTIC_GATEWAY: (ProviderKind.AGENT,),
     Provider.QDRANT: (ProviderKind.VECTOR_STORE,),
     Provider.SENTENCE_TRANSFORMERS: (
         ProviderKind.EMBEDDING,

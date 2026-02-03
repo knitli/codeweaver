@@ -23,18 +23,15 @@ with contextlib.suppress(Exception):
     os.environ["PYTHONWARNINGS"] = "ignore::pydantic.warnings.PydanticDeprecatedSince212"
 
 from collections.abc import Iterable, Sequence
-from typing import TYPE_CHECKING, Any, ClassVar, Literal, cast
+from typing import Any, ClassVar, Literal, cast
 
-from codeweaver.core import BaseEnum, ConfigurationError
+from codeweaver.core import BaseEnum, CodeChunk, ConfigurationError
 from codeweaver.providers.embedding.providers.base import (
     EmbeddingCustomDeps,
     EmbeddingImplementationDeps,
     EmbeddingProvider,
 )
 
-
-if TYPE_CHECKING:
-    from codeweaver.core import CodeChunk
 
 logger = logging.getLogger(__name__)
 

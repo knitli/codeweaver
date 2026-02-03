@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 """
 Models and TypedDict classes for providers by kind (embedding, sparse embedding, reranking, agent, vector store, data).
 
@@ -12,6 +16,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import re
 
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
@@ -45,17 +50,14 @@ from pydantic import (
 from qdrant_client.models import (
     BinaryQuantization,
     CollectionParams,
-    Document,
     HnswConfig,
     OptimizersConfig,
     ProductQuantization,
     ScalarQuantization,
     SparseVectorParams,
-    TokenizerType,
     VectorParams,
     WalConfig,
 )
-from qdrant_client.models import Bm25Config as QdrantBm25Config
 from qdrant_client.models import CollectionConfig as QdrantCollectionConfig
 
 from codeweaver.core import (
@@ -74,19 +76,50 @@ from codeweaver.core import (
     get_user_cache_dir,
     get_user_state_dir,
 )
+from codeweaver.core.constants import (
+    DEFAULT_PERSIST_INTERVAL,
+    DEFAULT_RERANKING_MAX_RESULTS,
+    DEFAULT_VECTOR_STORE_BATCH_SIZE,
+)
 from codeweaver.core.utils.checks import is_local_host
 from codeweaver.providers.agent.agent_models import AgentModelSettings
+from codeweaver.providers.config import (
+    AnthropicClientOptions,
+    GoogleAgentModelConfig,
+    HFInferenceClientOptions,
+)
+from codeweaver.providers.config.agent import (
+    AgentModelConfig,
+    AnthropicAgentModelConfig,
+    CerebrasAgentModelConfig,
+    CohereAgentModelConfig,
+    GroqAgentModelConfig,
+    HuggingFaceAgentModelConfig,
+    MistralAgentModelConfig,
+    OpenAIAgentModelConfig,
+    OpenRouterAgentModelConfig,
+)
 from codeweaver.providers.config.clients import (
+    AnthropicAzureClientOptions,
+    AnthropicBedrockClientOptions,
+    AnthropicGoogleVertexClientOptions,
     BedrockClientOptions,
     ClientOptions,
     CohereClientOptions,
+    DuckDuckGoClientOptions,
     FastEmbedClientOptions,
+    GeneralAgentClientOptionsType,
+    GeneralDataClientOptionsType,
     GeneralEmbeddingClientOptionsType,
     GeneralRerankingClientOptionsType,
+    GoogleClientOptions,
+    GroqClientOptions,
     HttpxClientParams,
     OpenAIClientOptions,
+    PydanticGatewayClientOptions,
     QdrantClientOptions,
     SentenceTransformersClientOptions,
+    TavilyClientOptions,
     discriminate_azure_embedding_client_options,
 )
 from codeweaver.providers.config.embedding import EmbeddingConfigT, SparseEmbeddingConfigT
@@ -96,6 +129,7 @@ from codeweaver.providers.config.utils import (
     ensure_endpoint_version,
     try_for_azure_endpoint,
 )
+from codeweaver.providers.embedding import MistralClientOptions
 
 
 if TYPE_CHECKING:
@@ -267,7 +301,7 @@ class BaseProviderSettings(BasedModel, ABC):
         """Return an SDKClient enum member corresponding to this provider settings instance.  Often this is the same as `self.provider`, but not always, and sometimes must be computed (e.g., Azure embedding models)."""
         raise NotImplementedError("client must be implemented by subclasses.")
 
-    def get_client(self) -> Any:
+    async def get_client(self) -> Any:
         """Construct and return the client instance based on the provider settings."""
         options = (
             self.client_options.as_settings()
@@ -276,17 +310,23 @@ class BaseProviderSettings(BasedModel, ABC):
         )
         client_import = cast(SDKClient, self.client).client
         kind = next(
-            (name for name in {"sparse", "embed", "rerank"} if name in type(self).__name__.lower()),
+            (
+                name
+                for name in {"agent", "data", "sparse", "embed", "rerank"}
+                if name in type(self).__name__.lower()
+            ),
             None,
         )
         if self.provider == Provider.BEDROCK:
             if not kind:
                 raise CodeWeaverDeveloperError(
-                    "Kind must be one of 'sparse', 'embed', or 'rerank' for Bedrock provider. File an issue. This is unexpected."
+                    "Kind must be one of 'agent', 'data', 'sparse', 'embed', or 'rerank' for Bedrock provider. File an issue. This is unexpected."
                 )
             return client_import._resolve()(
                 "bedrock-runtime" if kind == "embed" else "bedrock-agent-runtime", **options
             )
+        if self.provider in (Provider.SENTENCE_TRANSFORMERS, Provider.FASTEMBED):
+            return await client_import._resolve().initialize_async(**options)
         if not isinstance(client_import, dict):
             return client_import._resolve()(**options)
         client_class = client_import.get(kind)._resolve()
@@ -398,53 +438,7 @@ class VectorStoreProviderSettings(BaseProviderSettings):
     batch_size: Annotated[
         PositiveInt | None,
         Field(description="Batch size for bulk upsert operations. Defaults to 64."),
-    ] = 64
-
-
-class _Bm25Config(QdrantBm25Config):
-    """CodeWeaver's BM25 configuration for Qdrant vector store."""
-
-    k: float = 1.2
-    "Frequency term saturation. Higher values = more impact on term frequency."
-    b: float = 0.3
-    "Document length normalization (0 to 1) -- higher numbers penalize long documents. We set this low because document length is not well correlated to relevance for code."
-    avg_len: int = 512
-    "Average document length for BM25 normalization. This is a placeholder value, in practice it's computed from the text batch for embedding."
-    tokenizer: TokenizerType = TokenizerType.WORD
-    "Tokenizer type to use for BM25. WORD is currently the best available for code, though less than ideal. Trying to submit a code specific tokenizer upstream is on the to-do list."
-    language: Literal["none"] = "none"
-    "Language for the tokenizer and stemmer -- we disable it with 'none' because language normalization messes up code."
-    lowercase: bool = True
-    "Whether to lowercase tokens. Defaults to True."
-    ascii_folding: bool = False
-    "Whether to fold ASCII characters. Defaults to False."
-    stopwords: None = None
-    "Stopwords to remove. Set to None to avoid loss of keywords like 'as' 'is', 'with' that have significance in code."
-    stemmer: None = None
-    "Stemmer to use for tokens. Set to None to avoid stemming code tokens."
-    min_token_len: int = 1
-    "Minimum token length to include in the index."
-    max_token_len: int = 128
-    "Maximum token length to include in the index."
-
-    def serialize_for_upsert(self, avg_length: int) -> dict[str, Any]:
-        self.avg_len = avg_length
-        return self.model_dump()
-
-
-class _DocumentRepr(BasedModel):
-    """A shell representation of a `qdrant_client.models.Document`. Document itself requires text for embedding, and a model name, which in our case is always `Qdrant/Bm25`, but this representation only includes the fields necessary for configuration purposes.
-
-    We don't currently allow users to set these options directly -- we want to experiment and identify optimal configuration for general and specific code search use cases, so we need to control these settings internally.
-    """
-
-    model: Literal["Qdrant/Bm25"] = "Qdrant/Bm25"
-    options: _Bm25Config = Field(default_factory=_Bm25Config)
-
-    def serialize_for_upsert(self, texts: list[str]) -> list[Document]:
-        avg_length = int(sum(len(text.strip()) for text in texts) / len(texts)) if texts else 0
-        options = self.options.serialize_for_upsert(avg_length)
-        return [Document(text=text, model=self.model, options=options) for text in texts]
+    ] = DEFAULT_VECTOR_STORE_BATCH_SIZE
 
 
 def _deep_merge(dict1: dict[str, Any], dict2: dict[str, Any]) -> dict[str, Any]:
@@ -549,7 +543,7 @@ class _BaseQdrantVectorStoreProviderSettings(VectorStoreProviderSettings):
         connection: ConnectionConfiguration | None = None,
         client_options: QdrantClientOptions | None = None,
         collection: CollectionConfig | None = None,
-        batch_size: PositiveInt | None = 96,
+        batch_size: PositiveInt | None = DEFAULT_VECTOR_STORE_BATCH_SIZE,
         *,
         project_name: str | None = None,
         project_path: Path | None = None,
@@ -771,7 +765,7 @@ class MemoryVectorStoreProviderSettings(_BaseQdrantVectorStoreProviderSettings):
         connection: ConnectionConfiguration | None = None,
         client_options: QdrantClientOptions | None = None,
         collection: CollectionConfig | None = None,
-        batch_size: PositiveInt | None = 96,
+        batch_size: PositiveInt | None = DEFAULT_VECTOR_STORE_BATCH_SIZE,
         in_memory_config: MemoryConfig | None = None,
         *,
         project_name: str | None = None,
@@ -835,7 +829,7 @@ class MemoryVectorStoreProviderSettings(_BaseQdrantVectorStoreProviderSettings):
         """Return the default memory config."""
         return MemoryConfig(
             auto_persist=True,
-            persist_interval=300,
+            persist_interval=DEFAULT_PERSIST_INTERVAL,
             persist_path=persist_path
             or MemoryVectorStoreProviderSettings._get_persist_path(
                 collection_name=collection_name,
@@ -886,6 +880,11 @@ class BaseEmbeddingProviderSettings(BaseProviderSettings, ABC):
 
 class EmbeddingProviderSettings(BaseEmbeddingProviderSettings):
     """Settings for dense embedding models."""
+
+    config_type: Annotated[
+        Literal["symmetric"],
+        Field(default="symmetric", description="Discriminator for embedding config type."),
+    ] = "symmetric"
 
     model_name: Annotated[
         ModelNameT,
@@ -1072,7 +1071,7 @@ class RerankingProviderSettings(BaseProviderSettings):
     reranking_config: Annotated[
         RerankingConfigT, Field(description="Model configuration for reranking operations.")
     ]
-    top_n: PositiveInt | None = None
+    top_n: PositiveInt | None = DEFAULT_RERANKING_MAX_RESULTS
     client_options: (
         Annotated[
             GeneralRerankingClientOptionsType,
@@ -1112,22 +1111,70 @@ class BedrockRerankingProviderSettings(BedrockProviderMixin, RerankingProviderSe
     tag: Literal["bedrock"] = "bedrock"
 
 
-class DataProviderSettings(BaseProviderSettings):
+class BaseDataProviderSettings(BaseProviderSettings):
     """Settings for data providers."""
 
-    other: Annotated[
-        dict[str, Any] | None, Field(description="Other provider-specific settings.")
-    ] = None
+    provider: Literal[Provider.TAVILY, Provider.DUCKDUCKGO]
+    tag: Literal["tavily", "duckduckgo"]
+
+    client_options: GeneralDataClientOptionsType | None = None
 
     @computed_field(repr=False)
     @property
     def client(self) -> LiteralSDKClient:
         """Return the data SDKClient enum member."""
-        raise NotImplementedError("Data provider client resolution is not yet implemented.")
+        return SDKClient.from_string(self.tag)  # ty:ignore[invalid-return-type]
 
     def is_cloud(self) -> bool:
         """Return True if the provider is a cloud provider, False otherwise."""
         return _is_cloud_provider(self)
+
+
+class TavilyProviderSettings(BaseDataProviderSettings):
+    """Settings for Tavily data provider."""
+
+    provider: Literal[Provider.TAVILY] = Provider.TAVILY
+    tag: Literal["tavily"] = "tavily"
+
+    client_options: Annotated[
+        TavilyClientOptions | None, Field(description="Client options for the provider's client.")
+    ] = None
+
+    def __model_post_init__(self) -> None:
+        """Post-initialization to set default API key if not provided."""
+        if self.client_options is None or not self.client_options.api_key:
+            api_key = Provider.TAVILY.get_env_api_key()
+            self.client_options = (self.client_options or TavilyClientOptions()).model_copy(
+                update={"api_key": api_key}
+            )
+
+    @computed_field(repr=False)
+    @property
+    def client(self) -> Literal[SDKClient.TAVILY]:
+        """Return the data SDKClient enum member."""
+        return SDKClient.TAVILY
+
+
+class DuckDuckGoProviderSettings(BaseDataProviderSettings):
+    """Settings for DuckDuckGo data provider."""
+
+    provider: Literal[Provider.DUCKDUCKGO] = Provider.DUCKDUCKGO
+    tag: Literal["duckduckgo"] = "duckduckgo"
+
+    client_options: Annotated[
+        DuckDuckGoClientOptions | None,
+        Field(description="Client options for the provider's client."),
+    ] = None
+
+    def __model_post_init__(self) -> None:
+        """Ensure we have a config."""
+        self.client_options = self.client_options or DuckDuckGoClientOptions()
+
+    @computed_field(repr=False)
+    @property
+    def client(self) -> Literal[SDKClient.DUCKDUCKGO]:
+        """Return the data SDKClient enum member."""
+        return SDKClient.DUCKDUCKGO
 
 
 type ModelString = Annotated[
@@ -1143,7 +1190,8 @@ class AgentProviderSettings(BaseProviderSettings):
     model_options: AgentModelSettings | None = None
     "Settings for the agent model(s)."
     client_options: Annotated[
-        ClientOptions | None, Field(description="Client options for the provider's client.")
+        GeneralAgentClientOptionsType | None,
+        Field(description="Client options for the provider's client."),
     ] = None
 
     @computed_field(repr=False)
@@ -1157,14 +1205,14 @@ class AgentProviderSettings(BaseProviderSettings):
         return _is_cloud_provider(self)
 
 
-class OpenAIAgentProviderSettings(AgentProviderSettings):
-    """Settings for OpenAI agent models."""
+class OpenRouterAgentProviderSettings(AgentProviderSettings):
+    """Settings for OpenRouter agent models."""
 
-    tag: Literal["openai"] = "openai"
-    client_options: Annotated[
-        OpenAIClientOptions | None,
-        Field(description="Client options for the OpenAI provider's client."),
-    ] = None
+    provider: Literal[Provider.OPENROUTER] = Provider.OPENROUTER
+    tag: Literal["openrouter"] = "openrouter"
+
+    model_options: OpenRouterAgentModelConfig | None = None
+    client_options: OpenAIClientOptions | None = None
 
     @computed_field(repr=False)
     @property
@@ -1173,10 +1221,190 @@ class OpenAIAgentProviderSettings(AgentProviderSettings):
         return SDKClient.OPENAI
 
 
+class CerebrasAgentProviderSettings(AgentProviderSettings):
+    """Settings for Cerebras agent models."""
+
+    provider: Literal[Provider.CEREBRAS] = Provider.CEREBRAS
+    tag: Literal["cerebras"] = "cerebras"
+
+    model_options: CerebrasAgentModelConfig | None = None
+    client_options: OpenAIClientOptions | None = None
+
+    @computed_field(repr=False)
+    @property
+    def client(self) -> Literal[SDKClient.OPENAI]:
+        """Return the agent SDKClient enum member."""
+        return SDKClient.OPENAI
+
+
+class OpenAIAgentProviderSettings(AgentProviderSettings):
+    """Settings for OpenAI agent models."""
+
+    provider: Literal[
+        Provider.OPENAI,
+        Provider.ALIBABA,
+        Provider.AZURE,
+        Provider.DEEPSEEK,
+        Provider.FIREWORKS,
+        Provider.GITHUB,
+        Provider.HEROKU,
+        Provider.LITELLM,
+        Provider.MOONSHOT,
+        Provider.NEBIUS,
+        Provider.OLLAMA,
+        Provider.OVHCLOUD,
+        Provider.PERPLEXITY,
+        Provider.SAMBANOVA,
+        Provider.TOGETHER,
+        Provider.VERCEL,
+        Provider.X_AI,
+    ]
+    tag: Literal[
+        "openai",
+        "alibaba",
+        "azure",
+        "deepseek",
+        "fireworks",
+        "github",
+        "heroku",
+        "litellm",
+        "moonshot",
+        "nebius",
+        "ollama",
+        "ovhcloud",
+        "perplexity",
+        "sambanova",
+        "together",
+        "vercel",
+        "x_ai",
+    ]
+
+    model_options: OpenAIAgentModelConfig | None = None
+    client_options: OpenAIClientOptions | None = None
+
+    @computed_field(repr=False)
+    @property
+    def client(self) -> Literal[SDKClient.OPENAI]:
+        """Return the agent SDKClient enum member."""
+        return SDKClient.OPENAI
+
+
+_anthropic_model_pattern = r".*anthropic.*|.*claude.*|.*opus.*|.*sonnet.*|.*haiku.*"
+
+
+class BedrockAnthropicAgentProviderSettings(BedrockProviderMixin, AgentProviderSettings):
+    """Settings for Bedrock Anthropic agent models."""
+
+    provider: Literal[Provider.BEDROCK] = Provider.BEDROCK
+    tag: Literal["anthropic_bedrock"] = "anthropic_bedrock"
+
+    model_name: Annotated[
+        ModelString,
+        Field(
+            description="The model string for Bedrock Anthropic models.",
+            pattern=_anthropic_model_pattern,
+        ),
+    ]
+    model_options: AnthropicAgentModelConfig | None = None
+    client_options: Annotated[
+        AnthropicBedrockClientOptions | None,
+        Field(description="Client options for the provider's client."),
+    ] = None
+
+    @computed_field(repr=False)
+    @property
+    def client(self) -> Literal[SDKClient.ANTHROPIC]:
+        """Return the agent SDKClient enum member."""
+        return SDKClient.ANTHROPIC
+
+
+class AzureAnthropicAgentProviderSettings(AzureProviderMixin, AgentProviderSettings):
+    """Settings for Azure Anthropic agent models."""
+
+    provider: Literal[Provider.AZURE] = Provider.AZURE
+    tag: Literal["anthropic_azure"] = "anthropic_azure"
+
+    model_name: Annotated[
+        ModelString,
+        Field(
+            description="The model string for Azure Anthropic models.",
+            pattern=_anthropic_model_pattern,
+        ),
+    ]
+    model_options: AnthropicAgentModelConfig | None = None
+    client_options: Annotated[
+        AnthropicAzureClientOptions | None,
+        Field(description="Client options for the provider's client."),
+    ] = None
+
+    @computed_field(repr=False)
+    @property
+    def client(self) -> Literal[SDKClient.ANTHROPIC]:
+        """Return the agent SDKClient enum member."""
+        return SDKClient.ANTHROPIC
+
+
+class GoogleVertexAnthropicAgentProviderSettings(AgentProviderSettings):
+    """Settings for Google Vertex Anthropic agent models."""
+
+    provider: Literal[Provider.GOOGLE] = Provider.GOOGLE
+    tag: Literal["anthropic_google"] = "anthropic_google"
+
+    model_name: Annotated[
+        ModelString,
+        Field(
+            description="The model string for Google Vertex Anthropic models.",
+            pattern=_anthropic_model_pattern,
+        ),
+    ]
+    model_options: GoogleAgentModelConfig | None = None
+    client_options: Annotated[
+        AnthropicGoogleVertexClientOptions | None,
+        Field(description="Client options for the provider's client."),
+    ] = None
+
+    @computed_field(repr=False)
+    @property
+    def client(self) -> Literal[SDKClient.ANTHROPIC]:
+        """Return the agent SDKClient enum member."""
+        return SDKClient.ANTHROPIC
+
+
+class GroqAgentProviderSettings(AgentProviderSettings):
+    """Settings for Groq Anthropic agent models."""
+
+    provider: Literal[Provider.GROQ] = Provider.GROQ
+    tag: Literal["groq"] = "groq"
+
+    model_name: Annotated[
+        ModelString,
+        Field(
+            description="The model string for Groq Anthropic models.",
+            pattern=_anthropic_model_pattern,
+        ),
+    ]
+    model_options: GroqAgentModelConfig | None = None
+    client_options: Annotated[
+        GroqClientOptions | None, Field(description="Client options for the provider's client.")
+    ] = None
+
+    @computed_field(repr=False)
+    @property
+    def client(self) -> Literal[SDKClient.GROQ]:
+        """Return the agent SDKClient enum member."""
+        return SDKClient.GROQ
+
+
 class AnthropicAgentProviderSettings(AgentProviderSettings):
     """Settings for Anthropic agent models."""
 
     tag: Literal["anthropic"] = "anthropic"
+    model_name: Annotated[
+        ModelString,
+        Field(
+            description="The model string for Anthropic models.", pattern=_anthropic_model_pattern
+        ),
+    ]
     client_options: Annotated[
         AnthropicClientOptions | None,
         Field(description="Client options for the Anthropic provider's client."),
@@ -1189,14 +1417,264 @@ class AnthropicAgentProviderSettings(AgentProviderSettings):
         return SDKClient.ANTHROPIC
 
 
+class GoogleAgentProviderSettings(AgentProviderSettings):
+    """Settings for Google agent models."""
+
+    provider: Literal[Provider.GOOGLE] = Provider.GOOGLE
+    tag: Literal["google"] = "google"
+
+    model_options: GoogleAgentModelConfig | None = None
+    client_options: GoogleClientOptions | None = None
+
+    @computed_field(repr=False)
+    @property
+    def client(self) -> Literal[SDKClient.GOOGLE]:
+        """Return the agent SDKClient enum member."""
+        return SDKClient.GOOGLE
+
+
+class CohereAgentProviderSettings(AgentProviderSettings):
+    """Settings for Cohere agent models."""
+
+    provider: Literal[Provider.COHERE] = Provider.COHERE
+    tag: Literal["cohere"] = "cohere"
+
+    model_options: CohereAgentModelConfig | None = None
+    client_options: CohereClientOptions | None = None
+
+    @computed_field(repr=False)
+    @property
+    def client(self) -> Literal[SDKClient.COHERE]:
+        """Return the agent SDKClient enum member."""
+        return SDKClient.COHERE
+
+
+class HFInferenceAgentProviderSettings(AgentProviderSettings):
+    """Settings for Hugging Face Inference agent models."""
+
+    provider: Literal[Provider.HUGGINGFACE_INFERENCE] = Provider.HUGGINGFACE_INFERENCE
+    tag: Literal["hf_inference"] = "hf_inference"
+
+    model_options: HuggingFaceAgentModelConfig | None = None
+    client_options: HFInferenceClientOptions | None = None
+
+    @computed_field(repr=False)
+    @property
+    def client(self) -> Literal[SDKClient.HUGGINGFACE_INFERENCE]:
+        """Return the agent SDKClient enum member."""
+        return SDKClient.HUGGINGFACE_INFERENCE
+
+
+class MistralAgentProviderSettings(AgentProviderSettings):
+    """Settings for Mistral agent models."""
+
+    provider: Literal[Provider.MISTRAL] = Provider.MISTRAL
+    tag: Literal["mistral"] = "mistral"
+
+    model_options: MistralAgentModelConfig | None = None
+    client_options: MistralClientOptions | None = None
+
+    @computed_field(repr=False)
+    @property
+    def client(self) -> Literal[SDKClient.MISTRAL]:
+        """Return the agent SDKClient enum member."""
+        return SDKClient.MISTRAL
+
+
+class PydanticGatewayProviderSettings(AgentProviderSettings):
+    """Settings for Pydantic Gateway agent models."""
+
+    provider: Literal[Provider.PYDANTIC_GATEWAY] = Provider.PYDANTIC_GATEWAY
+    tag: Literal["pydantic_gateway"] = "pydantic_gateway"
+
+    model_options: AgentModelConfig | None = None
+    client_options: PydanticGatewayClientOptions | None = None
+
+    @computed_field(repr=False)
+    @property
+    def client(self) -> Literal[SDKClient.PYDANTIC_GATEWAY]:
+        """Return the agent SDKClient enum member."""
+        return SDKClient.PYDANTIC_GATEWAY
+
+
+# ===========================================================================
+# *                    Settings Discriminators
+# ===========================================================================
+
+type DataProviderSettingsType = Annotated[
+    DuckDuckGoProviderSettings | TavilyProviderSettings, Field(discriminator="tag")
+]
+
+
+def _discriminate_anthropic_agent_providers(
+    v: dict[str, Any], model_name: str, tag: str
+) -> str | None:
+    if (
+        re.match(_anthropic_model_pattern, model_name or "")
+        and tag
+        and tag
+        in {
+            "azure",
+            "bedrock",
+            "google",
+            "anthropic",
+            "anthropic_azure",
+            "anthropic_bedrock",
+            "anthropic_google",
+        }
+    ):
+        if tag in {"azure", "anthropic_azure"}:
+            return "anthropic_azure"
+        if tag in {"bedrock", "anthropic_bedrock"}:
+            return "anthropic_bedrock"
+        if tag in {"google", "anthropic_google"}:
+            return "anthropic_google"
+        return "anthropic"
+    return None
+
+
+def _discriminate_from_base_url(v: dict[str, Any]) -> str | None:
+    """Discriminate provider based on base_url in client options."""
+    url_keys = ("base_url", "endpoint", "url")
+    for key in url_keys:
+        if base_url := v.get("client_options", {}).get(key):
+            if found_url := next(
+                p.variable
+                for p in Provider
+                if p.variable.replace("_", "").replace("-", "") in base_url
+            ):
+                return found_url
+            if "huggingface" in base_url.lower():
+                return "hf_inference"
+            if is_local_host(base_url):
+                return "ollama"
+    return None
+
+
+def _discriminate_agent_settings(v: Any) -> str:
+    """Discriminate agent model settings based on provider."""
+    value = v if isinstance(v, dict) else v.model_dump()
+    tag = value.get("tag") or value.get("client_options", {}).get("tag")
+    if not tag and (provider := value.get("provider")):
+        tag = provider.variable
+    if tag and isinstance(tag, Provider):
+        tag = tag.variable
+    model_name = str(
+        value.get("model_name") if isinstance(value, dict) else getattr(value, "model_name", "")
+    )
+    if tag and tag not in {
+        "azure",
+        "bedrock",
+        "google",
+        "anthropic_azure",
+        "anthropic_bedrock",
+        "anthropic_google",
+    }:
+        return tag
+    if anthropic_tag := _discriminate_anthropic_agent_providers(v, model_name=model_name, tag=tag):
+        return anthropic_tag
+    if tag and tag in {"azure", "bedrock", "google"}:
+        return tag
+    if base_url_tag := _discriminate_from_base_url(value):
+        return base_url_tag
+    return "openai"
+
+
+type AgentProviderSettingsType = Annotated[
+    AgentProviderSettings
+    | AnthropicAgentProviderSettings
+    | AzureAnthropicAgentProviderSettings
+    | BedrockAnthropicAgentProviderSettings
+    | CerebrasAgentProviderSettings
+    | CohereAgentProviderSettings
+    | GoogleAgentProviderSettings
+    | GoogleVertexAnthropicAgentProviderSettings
+    | GroqAgentProviderSettings
+    | HFInferenceAgentProviderSettings
+    | MistralAgentProviderSettings
+    | OpenAIAgentProviderSettings
+    | OpenRouterAgentProviderSettings,
+    Field(discriminator="tag"),
+]
+
+
+# Vector Stores
+
+type VectorStoreProviderSettingsType = Annotated[
+    Annotated[QdrantVectorStoreProviderSettings, Tag(Provider.QDRANT.variable)],
+    Field(description="Vector store provider settings type.", discriminator="tag"),
+]
+"""Type alias for vector store provider settings type. Currently only Qdrant is supported, but we create this for consistency and future expansion."""
+
+# Embedding Providers - flattened union for pydantic discrimination
+
+
+def _discriminate_embedding_provider(v: Any) -> str:
+    """Identify the embedding provider settings type for discriminator field."""
+    tag_value = v.get("tag") if isinstance(v, dict) else getattr(v, "tag", None)
+    if tag_value in {
+        Provider.AZURE.variable,
+        Provider.BEDROCK.variable,
+        Provider.FASTEMBED.variable,
+    }:
+        return tag_value
+    return "none"
+
+
+type EmbeddingProviderSettingsType = Annotated[
+    Annotated[EmbeddingProviderSettings, Field(discriminator="tag"), Tag("none")]
+    | Annotated[AzureEmbeddingProviderSettings, Tag(Provider.AZURE.variable)]
+    | Annotated[BedrockEmbeddingProviderSettings, Tag(Provider.BEDROCK.variable)]
+    | Annotated[FastEmbedEmbeddingProviderSettings, Tag(Provider.FASTEMBED.variable)],
+    Field(
+        description="Embedding provider settings type.",
+        discriminator=Discriminator(_discriminate_embedding_provider),
+    ),
+]
+
+# Sparse Embedding Providers
+
+type SparseEmbeddingProviderSettingsType = Annotated[
+    Annotated[SparseEmbeddingProviderSettings, Tag(Provider.SENTENCE_TRANSFORMERS.variable)]
+    | Annotated[FastEmbedSparseEmbeddingProviderSettings, Tag(Provider.FASTEMBED.variable)],
+    Field(description="Sparse embedding provider settings type.", discriminator="tag"),
+]
+
+# Reranking Providers - flattened union for pydantic discrimination
+
+
+def _discriminate_reranking_provider(v: Any) -> str:
+    """Identify the reranking provider settings type for discriminator field."""
+    tag_value = v.get("tag") if isinstance(v, dict) else getattr(v, "tag", None)
+    if tag_value in {Provider.FASTEMBED.variable, Provider.BEDROCK.variable}:
+        return tag_value
+    return "none"
+
+
+type RerankingProviderSettingsType = Annotated[
+    Annotated[RerankingProviderSettings, Tag("none")]
+    | Annotated[FastEmbedRerankingProviderSettings, Tag(Provider.FASTEMBED.variable)]
+    | Annotated[BedrockRerankingProviderSettings, Tag(Provider.BEDROCK.variable)],
+    Field(
+        description="Reranking provider settings type.",
+        discriminator=Discriminator(_discriminate_reranking_provider),
+    ),
+]
+
+
 with contextlib.suppress(Exception):
     from codeweaver.providers.config.clients import QdrantClientOptions
 
-    QdrantClientOptions.model_rebuild()
+    if not QdrantClientOptions.__pydantic_complete__:
+        QdrantClientOptions.model_rebuild()
+
+
 __all__ = (
     "AgentProviderSettings",
+    "AgentProviderSettingsType",
     "AzureEmbeddingProviderSettings",
     "AzureProviderMixin",
+    "BaseDataProviderSettings",
     "BaseEmbeddingProviderSettings",
     "BaseProviderSettings",
     "BaseProviderSettingsDict",
@@ -1206,8 +1684,10 @@ __all__ = (
     "CollectionConfig",
     "ConnectionConfiguration",
     "ConnectionRateLimitConfig",
-    "DataProviderSettings",
+    "DataProviderSettingsType",
+    "DuckDuckGoProviderSettings",
     "EmbeddingProviderSettings",
+    "EmbeddingProviderSettingsType",
     "FastEmbedEmbeddingProviderSettings",
     "FastEmbedProviderMixin",
     "FastEmbedRerankingProviderSettings",
@@ -1217,6 +1697,10 @@ __all__ = (
     "ModelString",
     "QdrantVectorStoreProviderSettings",
     "RerankingProviderSettings",
+    "RerankingProviderSettingsType",
     "SparseEmbeddingProviderSettings",
+    "SparseEmbeddingProviderSettingsType",
+    "TavilyProviderSettings",
     "VectorStoreProviderSettings",
+    "VectorStoreProviderSettingsType",
 )

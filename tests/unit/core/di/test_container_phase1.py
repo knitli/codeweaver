@@ -21,8 +21,8 @@ from typing import Annotated, Union
 
 import pytest
 
-from codeweaver.core import INJECTED, Container, Depends, ResolutionResult
-from codeweaver.core.exceptions import CircularDependencyError, DependencyInjectionError
+from codeweaver.core import INJECTED, Container, Depends
+from codeweaver.core.exceptions import CircularDependencyError
 
 
 # ===========================================================================
@@ -102,8 +102,7 @@ class RequestScopedConsumer:
     """Consumer of request-scoped service."""
 
     def __init__(
-        self,
-        service: Annotated[RequestScopedService, Depends(scope="request")] = INJECTED,
+        self, service: Annotated[RequestScopedService, Depends(scope="request")] = INJECTED
     ):
         self.service = service
 
@@ -116,9 +115,7 @@ def get_counter_service() -> CounterService:
 class CachedCounterConsumer:
     """Consumer with cached counter."""
 
-    def __init__(
-        self, service: Annotated[CounterService, Depends(get_counter_service)] = INJECTED
-    ):
+    def __init__(self, service: Annotated[CounterService, Depends(get_counter_service)] = INJECTED):
         self.service = service
 
 
@@ -127,7 +124,9 @@ class UncachedCounterConsumer:
 
     def __init__(
         self,
-        service: Annotated[CounterService, Depends(get_counter_service, use_cache=False)] = INJECTED,
+        service: Annotated[
+            CounterService, Depends(get_counter_service, use_cache=False)
+        ] = INJECTED,
     ):
         self.service = service
 
@@ -244,7 +243,7 @@ async def test_circular_dependency_in_override():
     # dependencies and detect the cycle.
 
     async def circular_override(
-        service_b: Annotated[CircularServiceB, Depends()] = INJECTED
+        service_b: Annotated[CircularServiceB, Depends()] = INJECTED,
     ) -> CircularServiceA:
         # This override has a dependency that will create a circular reference
         return CircularServiceA(service_b=service_b)
@@ -1062,7 +1061,9 @@ async def test_complex_dependency_graph_with_all_features():
     container = Container()
     container.register(RootService, singleton=True)
     container.register(CachedService)
-    container.register(UncachedService, singleton=False)  # Must be non-singleton to create multiple instances
+    container.register(
+        UncachedService, singleton=False
+    )  # Must be non-singleton to create multiple instances
 
     # Cached services should share root
     cached1 = await container.resolve(CachedService)

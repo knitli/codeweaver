@@ -9,16 +9,14 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from collections.abc import Sequence
-from typing import Annotated, Any, Literal, LiteralString, NotRequired, Required, TypedDict, cast
+from typing import Annotated, Any, Literal, NotRequired, Required, TypedDict, cast
 
 from pydantic import Field
 
 from codeweaver.core import BasedModel, LiteralProvider, Provider
-from codeweaver.core.types import ModelName, ModelNameT
+from codeweaver.core.constants import DEFAULT_RERANKING_MAX_RESULTS
+from codeweaver.core.types import LiteralStringT, ModelName, ModelNameT
 from codeweaver.providers import RerankingModelCapabilities
-
-
-DEFAULT_RERANK_TOP_K = 10
 
 
 class SerializedRerankingOptionsDict(TypedDict, total=False):
@@ -121,7 +119,7 @@ class BaseRerankingConfig(BasedModel):
         description="The provider for this reranking configuration. Used for discriminated unions.",
     )
 
-    model_name: LiteralString
+    model_name: LiteralStringT
     """The name of the reranking model."""
 
     rerank: Annotated[
@@ -189,7 +187,7 @@ class CohereRerankingConfig(BaseRerankingConfig):
             "rerank-english-v3.0",
             "rerank-multilingual-v3.0",
         ]
-        | LiteralString
+        | LiteralStringT
     )
     """The Cohere reranking model to use."""
 
@@ -214,7 +212,7 @@ class BedrockRerankingConfig(BaseRerankingConfig):
     tag: Literal["bedrock"] = "bedrock"
     provider: Literal[Provider.BEDROCK] = Provider.BEDROCK
 
-    model_name: Literal["amazon.rerank-v1:0", "cohere.rerank-v3-5:0"] | LiteralString
+    model_name: Literal["amazon.rerank-v1:0", "cohere.rerank-v3-5:0"] | LiteralStringT
     """The Bedrock reranking model to use (e.g., 'amazon.rerank-v1:0', 'cohere.rerank-v3-5:0')."""
 
     model: BedrockRerankingModelConfig
@@ -282,7 +280,7 @@ class SentenceTransformersRerankingConfig(BaseRerankingConfig):
     @property
     def _defaults(self) -> SentenceTransformersRerankingOptionsDict:
         """Default config values for the rerank config."""
-        return {"top_k": DEFAULT_RERANK_TOP_K, "show_progress_bar": False}
+        return {"top_k": DEFAULT_RERANKING_MAX_RESULTS, "show_progress_bar": False}
 
 
 # ============================================================================

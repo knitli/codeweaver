@@ -178,7 +178,8 @@ def sanitize_unicode(
     matches = list(INJECT_PATTERN.finditer(filtered))
     for match in reversed(matches):
         start, end = match.span()
-        logger.warning("Possible prompt injection detected and neutralized: %s", match.group(0))
+        # We use logger.info here because this is prone to false positives and we don't want to spam warnings unnecessarily.
+        logger.info("Possible prompt injection detected and neutralized: %s", match.group(0))
         replacement = "[[ POSSIBLE PROMPT INJECTION REMOVED ]]"
         filtered = filtered[:start] + replacement + filtered[end:]
 

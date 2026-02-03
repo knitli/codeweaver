@@ -15,19 +15,15 @@ import asyncio
 import logging
 
 from collections.abc import Iterator, Sequence
-from typing import TYPE_CHECKING, Annotated, Any, Literal, Self, cast
+from typing import Annotated, Any, Literal, Self, cast
 
 from pydantic import AliasGenerator, ConfigDict, Field, JsonValue, PositiveInt, model_validator
 from pydantic.alias_generators import to_camel, to_snake
 
-from codeweaver.core import BasedModel, ConfigurationError, Provider
+from codeweaver.core import BasedModel, CodeChunk, ConfigurationError, Provider, StructuredDataInput
 from codeweaver.core import ValidationError as CodeWeaverValidationError
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 from codeweaver.providers.reranking.providers.base import RerankingProvider, RerankingResult
-
-
-if TYPE_CHECKING:
-    from codeweaver.core import CodeChunk, StructuredDataInput
 
 
 class BaseBedrockModel(BasedModel):

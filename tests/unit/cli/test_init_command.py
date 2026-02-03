@@ -124,7 +124,14 @@ class TestInitCommand:
         from codeweaver.cli.commands.init import _get_client_config_path
 
         with pytest.raises(SystemExit) as exc_info:
-            init_app(["init", "--quickstart", "--client", "claude_code", "--project", str(temp_project)])
+            init_app([
+                "init",
+                "--quickstart",
+                "--client",
+                "claude_code",
+                "--project",
+                str(temp_project),
+            ])
         capsys.readouterr()
 
         assert exc_info.value.code == 0
@@ -148,7 +155,14 @@ class TestInitCommand:
         from codeweaver.cli.commands.init import _get_client_config_path
 
         with pytest.raises(SystemExit) as exc_info:
-            init_app(["init", "--quickstart", "--config-only", "--force", "--project", str(temp_project)])
+            init_app([
+                "init",
+                "--quickstart",
+                "--config-only",
+                "--force",
+                "--project",
+                str(temp_project),
+            ])
         capsys.readouterr()
 
         assert exc_info.value.code == 0
@@ -172,7 +186,14 @@ class TestInitCommand:
         from codeweaver.cli.commands.init import _get_client_config_path
 
         with pytest.raises(SystemExit) as exc_info:
-            init_app(["init", "--mcp-only", "--client", "claude_code", "--project", str(temp_project)])
+            init_app([
+                "init",
+                "--mcp-only",
+                "--client",
+                "claude_code",
+                "--project",
+                str(temp_project),
+            ])
         capsys.readouterr()
 
         assert exc_info.value.code == 0
@@ -195,7 +216,14 @@ class TestHttpStreamingArchitecture:
         from codeweaver.cli.commands.init import _get_client_config_path
 
         with pytest.raises(SystemExit) as exc_info:
-            init_app(["init", "--mcp-only", "--client", "claude_code", "--transport", "streamable-http"])
+            init_app([
+                "init",
+                "--mcp-only",
+                "--client",
+                "claude_code",
+                "--transport",
+                "streamable-http",
+            ])
         capsys.readouterr()
 
         # If succeeded, check config
@@ -219,7 +247,14 @@ class TestHttpStreamingArchitecture:
         from codeweaver.cli.commands.init import _get_client_config_path
 
         with pytest.raises(SystemExit) as exc_info:
-            init_app(["init", "--mcp-only", "--client", "claude_code", "--transport", "streamable-http"])
+            init_app([
+                "init",
+                "--mcp-only",
+                "--client",
+                "claude_code",
+                "--transport",
+                "streamable-http",
+            ])
         capsys.readouterr()
 
         if exc_info.value.code == 0:

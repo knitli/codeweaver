@@ -7,12 +7,12 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, ClassVar, Literal, cast
+from typing import Any, ClassVar, Literal, cast
 
 from cohere import EmbedByTypeResponse
 from pydantic import SkipValidation
 
-from codeweaver.core import ConfigurationError, Provider
+from codeweaver.core import CodeChunk, ConfigurationError, Provider
 from codeweaver.providers.config import CohereEmbeddingConfig, EmbeddingProviderSettings
 from codeweaver.providers.embedding.providers.base import (
     EmbeddingCustomDeps,
@@ -20,9 +20,6 @@ from codeweaver.providers.embedding.providers.base import (
     EmbeddingProvider,
 )
 
-
-if TYPE_CHECKING:
-    from codeweaver.core import CodeChunk
 
 try:
     from cohere import AsyncClientV2 as CohereClient
@@ -52,11 +49,11 @@ class CohereEmbeddingProvider(EmbeddingProvider[CohereClient]):
         """Initialize the FastEmbed client."""
         from codeweaver.providers.config.embedding import CohereEmbeddingConfig
         from codeweaver.providers.config.kinds import EmbeddingProviderSettings
-        
+
         config = self.config or kwargs.get("config")
         if not config:
             return
-            
+
         # Handle CohereEmbeddingConfig (has .embedding and .query attributes)
         if isinstance(config, CohereEmbeddingConfig):
             if (embedding_config := config.embedding) and not embedding_config.get("model"):
@@ -71,7 +68,7 @@ class CohereEmbeddingProvider(EmbeddingProvider[CohereClient]):
         elif isinstance(config, EmbeddingProviderSettings):
             embedding_config = config.get_embed_kwargs()
             query_config = config.get_query_embed_kwargs()
-            
+
             # For EmbeddingProviderSettings, we need to update the underlying embedding_config
             if embedding_config and not embedding_config.get("model"):
                 # Create updated options

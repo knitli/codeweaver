@@ -32,6 +32,7 @@ from codeweaver.core import (
     generate_field_title,
     rpartial,
 )
+from codeweaver.core.constants import DEFAULT_SEMANTIC_IDENTIFICATION_CONFIDENCE_THRESHOLD
 from codeweaver.core.di import INJECTED
 from codeweaver.semantic.classifications import ImportanceRank, SemanticClass
 from codeweaver.semantic.dependencies import ThingRegistryDep
@@ -41,9 +42,6 @@ if TYPE_CHECKING:
     from codeweaver.semantic.ast_grep import AstThing
     from codeweaver.semantic.grammar import CompositeThing, Token
     from codeweaver.semantic.registry import ThingRegistry
-
-
-CONFIDENCE_THRESHOLD = 0.80
 
 
 def _get_registry(registry: ThingRegistryDep = INJECTED) -> ThingRegistry:
@@ -235,7 +233,7 @@ class GrammarClassificationResult(NamedTuple):
     @computed_field(description="Whether the confidence level is above the threshold", repr=True)
     def is_confident(self) -> bool:
         """Whether the confidence level is above the threshold."""
-        return self.confidence >= CONFIDENCE_THRESHOLD
+        return self.confidence >= DEFAULT_SEMANTIC_IDENTIFICATION_CONFIDENCE_THRESHOLD
 
     @computed_field(description="Human-readable summary of the evidence kinds used", repr=False)
     def evidence_summary(self) -> str:
@@ -845,7 +843,11 @@ class GrammarBasedClassifier:
                     continue
                 # if we have multiple classifications, we need to disambiguate
                 # fast path: if we have a classification above the confidence threshold, and it's the first one, return it immediately
-                if classification.confidence >= CONFIDENCE_THRESHOLD and not results:
+                if (
+                    classification.confidence
+                    >= DEFAULT_SEMANTIC_IDENTIFICATION_CONFIDENCE_THRESHOLD
+                    and not results
+                ):
                     return classification
                 # If we have multiple classifications, we need to disambiguate
                 # We collect all classifications and then choose the best one at the end

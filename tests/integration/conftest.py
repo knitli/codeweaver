@@ -13,13 +13,13 @@ import logging
 import os
 
 from collections.abc import AsyncGenerator, Generator
-from importlib.util import find_spec
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from codeweaver.core.utils import has_package
 from codeweaver.providers import (
     FastEmbedEmbeddingProvider,
     MemoryVectorStoreProvider,
@@ -91,8 +91,8 @@ def _set_settings() -> DictView[CodeWeaverSettingsDict]:
 
 _settings: DictView[CodeWeaverSettingsDict] = _set_settings()
 
-HAS_SENTENCE_TRANSFORMERS = find_spec("sentence_transformers") is not None
-HAS_FASTEMBED = find_spec("fastembed") is not None or find_spec("fastembed-gpu") is not None
+HAS_SENTENCE_TRANSFORMERS = has_package("sentence_transformers") is not None
+HAS_FASTEMBED = has_package("fastembed") is not None or has_package("fastembed_gpu") is not None
 
 
 def _get_configs(

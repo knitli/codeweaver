@@ -27,17 +27,18 @@ Environment Variables:
 
 from __future__ import annotations
 
-import importlib
 import os
 
 from typing import Annotated, Any, NotRequired, TypedDict
 
 from pydantic import Field, HttpUrl, PositiveInt, PrivateAttr, SecretStr
 
+from codeweaver.core.constants import ENV_EXPLICIT_TRUE_VALUES, ONE_MINUTE
 from codeweaver.core.telemetry._project import CODEWEAVER_POSTHOG_PROJECT_KEY
 from codeweaver.core.types.aliases import LiteralStringT
 from codeweaver.core.types.models import BasedModel
 from codeweaver.core.types.sentinel import UNSET, Unset
+from codeweaver.core.utils import has_package
 
 
 def _set_bool_env_var(env_var: str) -> bool | Unset:
@@ -45,7 +46,7 @@ def _set_bool_env_var(env_var: str) -> bool | Unset:
     value = os.environ.get(env_var)
     if value is not False and not value:
         return UNSET
-    return value in ("true", "1", "yes")
+    return value in ENV_EXPLICIT_TRUE_VALUES
 
 
 class TelemetrySettings(BasedModel):
@@ -123,7 +124,7 @@ class TelemetrySettings(BasedModel):
             disable_telemetry=False,
             tools_over_privacy=False,
             batch_size=10,
-            batch_interval_seconds=60,
+            batch_interval_seconds=ONE_MINUTE,
         )
 
     def model_post_init(self, _context: Any) -> None:
@@ -145,8 +146,12 @@ class TelemetrySettings(BasedModel):
         if isinstance(self.batch_size, Unset):
             self.batch_size = 10  # default batch size
         if isinstance(self.batch_interval_seconds, Unset):
-            self.batch_interval_seconds = 60  # default batch interval
-        if self.tools_over_privacy and importlib.util.find_spec("code-weaver") is None:
+            self.batch_interval_seconds = ONE_MINUTE  # default batch interval
+        if (
+            self.tools_over_privacy
+            and not has_package("code-weaver")
+            and not has_package("codeweaver")
+        ):
             # not running a full install, tools_over_privacy is not applicable
             self.tools_over_privacy = False
 

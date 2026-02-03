@@ -217,6 +217,14 @@ class DimensionMismatchError(ProviderError):
     """
 
 
+class DatatypeMismatchError(ProviderError):
+    """Embedding datatype mismatch error.
+
+    Raised when embedding datatypes don't match the vector store collection
+    configuration.
+    """
+
+
 class CollectionNotFoundError(ProviderError):
     """Collection not found error.
 
@@ -476,6 +484,7 @@ __all__ = (
     "CodeWeaverError",
     "CollectionNotFoundError",
     "ConfigurationError",
+    "DatatypeMismatchError",
     "DependencyInjectionError",
     "DependencyNotAvailableError",
     "DependencyResolutionError",

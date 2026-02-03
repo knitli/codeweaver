@@ -6,6 +6,10 @@
 # sourcery skip: no-complex-if-expressions
 """Common utilities for type handling."""
 
+import platform
+
+from enum import Enum
+from types import DynamicClassAttribute
 from typing import Any, cast
 
 import textcase
@@ -97,4 +101,69 @@ def generate_field_title(name: str, info: FieldInfo | ComputedFieldInfo) -> str:
     return textcase.sentence(name)
 
 
-__all__ = ("clean_sentinel_from_schema", "generate_field_title", "generate_title")
+def add_enum_member[EnumT: Enum](
+    enum_cls: type[EnumT], member_name: str, member_value: Any
+) -> None:
+    """Add a new member to an Enum class."""
+    if platform.python_version_tuple() >= ("3", "13"):
+        enum_cls._add_member_(member_name, member_value)  # ty:ignore[unresolved-attribute]
+    else:
+        add_enum_alias(enum_cls(member_value), member_name)
+
+
+def add_enum_alias[EnumT: Enum](enum_instance_member: EnumT, alias_name: str) -> None:
+    """Add an alias to an Enum member."""
+    if platform.python_version_tuple() >= ("3", "13"):
+        enum_instance_member._add_alias_(alias_name)  # ty:ignore[unresolved-attribute]
+    # life will be simpler when we can drop support for <3.13
+    else:
+        enum_cls = type(enum_instance_member)
+        found_descriptor = None
+        descriptor_type = None
+        class_type = None
+        for base in enum_cls.__mro__[1:]:
+            attr = base.__dict__.get(alias_name)
+            if attr is not None:
+                if isinstance(attr, (property, DynamicClassAttribute)):
+                    found_descriptor = attr
+                    class_type = base
+                    descriptor_type = "enum"
+                    break
+                if (
+                    hasattr(attr, "__get__")
+                    or hasattr(attr, "__set__")
+                    or hasattr(attr, "__delete__")
+                ):
+                    found_descriptor = attr
+                    descriptor_type = descriptor_type or "desc"
+                    class_type = class_type or base
+                    continue
+                descriptor_type = "attr"
+                class_type = base
+        if found_descriptor:
+            redirect = property()
+            redirect.member = enum_instance_member  # ty:ignore[unresolved-attribute]
+            redirect.__set_name__(enum_cls, alias_name)  # ty:ignore[unresolved-attribute]
+            if descriptor_type in ("enum", "desc"):
+                # earlier descriptor found; copy fget, fset, fdel to this one.
+                redirect.fget = getattr(found_descriptor, "fget", None)
+                redirect._get = getattr(found_descriptor, "__get__", None)  # ty:ignore[unresolved-attribute]
+                redirect.fset = getattr(found_descriptor, "fset", None)
+                redirect._set = getattr(found_descriptor, "__set__", None)  # ty:ignore[unresolved-attribute]
+                redirect.fdel = getattr(found_descriptor, "fdel", None)
+                redirect._del = getattr(found_descriptor, "__delete__", None)  # ty:ignore[unresolved-attribute]
+            redirect._attr_type = descriptor_type  # ty:ignore[unresolved-attribute]
+            redirect._cls_type = class_type  # ty:ignore[unresolved-attribute]
+            setattr(enum_cls, alias_name, redirect)
+        else:
+            setattr(enum_cls, alias_name, enum_instance_member)
+        enum_cls._member_map_[alias_name] = enum_instance_member  # ty:ignore[unresolved-attribute]
+
+
+__all__ = (
+    "add_enum_alias",
+    "add_enum_member",
+    "clean_sentinel_from_schema",
+    "generate_field_title",
+    "generate_title",
+)

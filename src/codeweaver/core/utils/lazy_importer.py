@@ -11,26 +11,7 @@ from importlib import import_module
 from types import MappingProxyType, ModuleType
 from typing import Any, cast
 
-
-INTROSPECTION_ATTRS: frozenset[str] = frozenset({
-    "__annotations__",
-    "__class__",
-    "__closure__",
-    "__code__",
-    "__defaults__",
-    "__dict__",
-    "__doc__",
-    "__func__",
-    "__globals__",
-    "__kwdefaults__",
-    "__module__",
-    "__name__",
-    "__qualname__",
-    "__self__",
-    "__signature__",
-    "__text_signature__",
-    "__wrapped__",
-})
+from codeweaver.core.constants import INTROSPECTION_ATTRIBUTES
 
 
 class LazyImport[Import: Any]:
@@ -100,7 +81,7 @@ class LazyImport[Import: Any]:
 
     def __getattr__(self, name: str) -> LazyImport[Import]:
         """Get attribute from the resolved object, or create a new LazyImport for it."""
-        if name in INTROSPECTION_ATTRS:
+        if name in INTROSPECTION_ATTRIBUTES:
             try:
                 resolved = self._resolve()
             except AttributeError as e:
@@ -188,4 +169,4 @@ def create_lazy_getattr(
     return __getattr__
 
 
-__all__ = ("INTROSPECTION_ATTRS", "LazyImport", "create_lazy_getattr", "lazy_import")
+__all__ = ("LazyImport", "create_lazy_getattr", "lazy_import")

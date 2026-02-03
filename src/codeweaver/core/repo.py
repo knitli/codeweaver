@@ -263,7 +263,18 @@ class RepoChecklist(BasedModel):
     # Directory name variants for common directories with alternate naming conventions
     _DIR_VARIANTS: ClassVar[MappingProxyType[str, set[str]]] = MappingProxyType({
         "apps": {"apps", "app", "applications", "application", "crates"},
-        "ci": {"ci", ".ci", "cd", ".cd", "ci-cd", ".ci-cd", ".ci_cd", "ci_cd"},
+        "ci": {
+            "ci",
+            ".ci",
+            "cd",
+            ".cd",
+            "ci-cd",
+            ".ci-cd",
+            ".ci_cd",
+            "ci_cd",
+            ".github",
+            ".circleci",
+        },
         "lib": {"lib", "library", "libs", "libraries"},
         "tests": {*TEST_DIR_NAMES},
         "src": {"src", "source"},
@@ -350,6 +361,7 @@ class RepoChecklist(BasedModel):
         - Path | False for directory/file presence flags
         - tuple[...] for tooling/config collections assigned later
         """
+        # TODO: Use rignore.walker as a kind of inverted ignore to efficiently scan the root only
         # ensure the dict can hold mixed value types (Path|False and tuples)
         attrs: RepoChecklistDict = RepoChecklistDict(**{  # type: ignore[missing-typed-dict-key]
             key: False if key.startswith("has_") else () for key in cls.__dataclass_fields__

@@ -246,7 +246,9 @@ class TestValidateDimensions:
     def test_both_dimensions_wrong_but_match_each_other(self) -> None:
         """Test that even if embed and query match, they must match family."""
         self._check_family_dimension_validation(
-            512, 512, "Embedding dimension 512 is not supported by this family; expected one of (2048, 1024)"
+            512,
+            512,
+            "Embedding dimension 512 is not supported by this family; expected one of (2048, 1024)",
         )
 
     # TODO Rename this here and in `test_mismatched_embed_dimension`, `test_mismatched_query_dimension`, `test_embed_and_query_dimensions_mismatch_each_other` and `test_both_dimensions_wrong_but_match_each_other`

@@ -58,6 +58,7 @@ if TYPE_CHECKING:
         try_git_rev_parse,
     )
     from codeweaver.core.utils.general import (
+        deep_merge_dicts,
         dict_set_to_tuple,
         ensure_iterable,
         generate_collection_name,
@@ -102,7 +103,6 @@ if TYPE_CHECKING:
         takes_args,
         takes_kwargs,
     )
-    from codeweaver.core.utils.lazy_importer import INTROSPECTION_ATTRS
     from codeweaver.core.utils.procs import (
         asyncio_or_uvloop,
         effective_cpu_count,
@@ -143,7 +143,6 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "COMMON_TOOLING_PATHS": (__spec__.parent, "filesystem"),
     "CONTROL_CHARS": (__spec__.parent, "text"),
     "INJECT_PATTERN": (__spec__.parent, "text"),
-    "INTROSPECTION_ATTRS": (__spec__.parent, "lazy_importer"),
     "INVISIBLE_CHARS": (__spec__.parent, "text"),
     "INVISIBLE_PATTERN": (__spec__.parent, "text"),
     "LOCALHOST_INDICATORS": (__spec__.parent, "checks"),
@@ -157,6 +156,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "clean_args": (__spec__.parent, "introspect"),
     "detect_root_package": (__spec__.parent, "environment"),
     "dict_set_to_tuple": (__spec__.parent, "general"),
+    "deep_merge_dicts": (__spec__.parent, "general"),
     "effective_cpu_count": (__spec__.parent, "procs"),
     "elapsed_time_to_human_readable": (__spec__.parent, "text"),
     "ensure_iterable": (__spec__.parent, "general"),
@@ -259,7 +259,6 @@ __all__ = (
     "COMMON_TOOLING_PATHS",
     "CONTROL_CHARS",
     "INJECT_PATTERN",
-    "INTROSPECTION_ATTRS",
     "INVISIBLE_CHARS",
     "INVISIBLE_PATTERN",
     "LOCALHOST_INDICATORS",
@@ -273,6 +272,7 @@ __all__ = (
     "asyncio_or_uvloop",
     "clean_args",
     "create_lazy_getattr",
+    "deep_merge_dicts",
     "detect_root_package",
     "dict_set_to_tuple",
     "effective_cpu_count",

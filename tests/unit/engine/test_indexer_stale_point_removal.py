@@ -45,6 +45,7 @@ async def mock_indexer(tmp_path: Path, mock_vector_store, monkeypatch: pytest.Mo
 
     # Create async lock mock
     from asyncio import Lock
+
     indexer._manifest_lock = Lock()
 
     indexer._providers_initialized = True

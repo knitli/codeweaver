@@ -142,7 +142,7 @@ def _create_codeweaver_config(
         project_path=project_path,
         project_name=project_path.name,
         config_file=config_path,
-        provider=ProviderSettings.model_construct(**(profile.as_settings_dict())),
+        provider=ProviderSettings.model_construct(**(profile.as_provider_settings())),
     )
 
     # Save to TOML file

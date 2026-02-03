@@ -7,19 +7,19 @@
 from __future__ import annotations
 
 import contextlib
-import importlib
 
 from typing import TYPE_CHECKING, Any
 
 from codeweaver.core.types import LiteralProviderType
 from codeweaver.core.types.provider import Provider
+from codeweaver.core.utils import has_package
 
 
-if TYPE_CHECKING and importlib.util.find_spec("pydantic_ai.common_tools.duckduckgo"):
+if TYPE_CHECKING and has_package("pydantic_ai.common_tools.duckduckgo"):
     from pydantic_ai.common_tools.duckduckgo import DuckDuckGoSearchTool as DuckDuckGoSearchTool
 else:
     DuckDuckGoSearchTool = Any
-if TYPE_CHECKING and importlib.util.find_spec("pydantic_ai.common_tools.tavily"):
+if TYPE_CHECKING and has_package("pydantic_ai.common_tools.tavily"):
     from pydantic_ai.common_tools.tavily import TavilySearchTool as TavilySearchTool
 else:
     TavilySearchTool = Any

@@ -8,18 +8,15 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, ClassVar, Literal, cast
+from typing import Any, ClassVar, Literal, cast
 
-from codeweaver.core import ConfigurationError, Provider
+from codeweaver.core import CodeChunk, ConfigurationError, Provider
 from codeweaver.providers.embedding.providers.base import (
     EmbeddingCustomDeps,
     EmbeddingImplementationDeps,
     EmbeddingProvider,
 )
 
-
-if TYPE_CHECKING:
-    from codeweaver.core import CodeChunk
 
 try:
     from mistralai import Mistral

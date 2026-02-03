@@ -50,7 +50,7 @@ import logging
 import time
 
 from pathlib import Path
-from typing import NamedTuple, cast
+from typing import NamedTuple
 
 from fastmcp.server.context import Context
 from pydantic import NonNegativeInt, PositiveInt
@@ -66,7 +66,7 @@ from codeweaver.core import (
     capture_search_event,
     log_to_client_or_fallback,
 )
-from codeweaver.core.types import Unset
+from codeweaver.core.constants import DEFAULT_MAX_RESULTS, DEFAULT_MAX_TOKENS
 from codeweaver.engine import IndexingServiceDep
 from codeweaver.engine.services.indexing_service import IndexingService
 from codeweaver.providers import SearchPackageDep, VectorStoreProvider
@@ -94,7 +94,6 @@ from codeweaver.server.agent_api.find_code.scoring import (
     process_unranked_results,
 )
 from codeweaver.server.agent_api.find_code.types import CodeMatch, FindCodeResponseSummary
-from codeweaver.server.config.settings import CodeWeaverSettings
 
 
 logger = logging.getLogger(__name__)
@@ -193,11 +192,6 @@ async def _ensure_index_ready(
             await indexer.index_project(add_dense=True, add_sparse=True)
         except Exception as e:
             logger.warning("Auto-indexing failed: %s", e)
-
-
-# Default values - will be overridden by settings at runtime if configured
-_DEFAULT_TOKEN_LIMIT = 15000
-_DEFAULT_MAX_RESULTS = 30
 
 
 async def _build_search_package(package: SearchPackageDep) -> SearchPackage:
@@ -335,9 +329,9 @@ async def find_code(
     query: str,
     *,
     intent: IntentType | None = None,
-    token_limit: int = _DEFAULT_TOKEN_LIMIT,
+    token_limit: int = DEFAULT_MAX_TOKENS,
     focus_languages: tuple[str, ...] | None = None,
-    max_results: int = _DEFAULT_MAX_RESULTS,
+    max_results: int = DEFAULT_MAX_RESULTS,
     context: Context | None = None,
     search_package: SearchPackageDep = INJECTED,
     telemetry_settings: TelemetrySettingsDep = INJECTED,

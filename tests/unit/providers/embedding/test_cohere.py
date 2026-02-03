@@ -81,8 +81,8 @@ def mock_cohere_config():
         tag="cohere",
         provider=Provider.COHERE,
         model_name="embed-english-v3.0",
-        embedding={"model": "embed-english-v3.0"},
-        query={"model": "embed-english-v3.0"},
+        embedding={},
+        query={},
         model={},
     )
 

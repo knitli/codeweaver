@@ -35,6 +35,7 @@ from codeweaver.core import (
     DataclassSerializationMixin,
     SemanticSearchLanguage,
 )
+from codeweaver.core.constants import FLOAT_ZERO, ONE, ONE_POINT_ZERO, ZERO
 
 
 if TYPE_CHECKING:
@@ -54,25 +55,43 @@ class ImportanceScoresDict(TypedDict):
 
     discovery: Annotated[
         NonNegativeFloat,
-        Field(description="Weight for discovery context; finding relevant code", ge=0.0, le=1.0),
+        Field(
+            description="Weight for discovery context; finding relevant code",
+            ge=FLOAT_ZERO,
+            le=ONE_POINT_ZERO,
+        ),
     ]
     comprehension: Annotated[
         NonNegativeFloat,
         Field(
-            description="Weight for comprehension context; understanding behavior", ge=0.0, le=1.0
+            description="Weight for comprehension context; understanding behavior",
+            ge=FLOAT_ZERO,
+            le=ONE_POINT_ZERO,
         ),
     ]
     modification: Annotated[
         NonNegativeFloat,
-        Field(description="Weight for modification context; safe editing points", ge=0.0, le=1.0),
+        Field(
+            description="Weight for modification context; safe editing points",
+            ge=FLOAT_ZERO,
+            le=ONE_POINT_ZERO,
+        ),
     ]
     debugging: Annotated[
         NonNegativeFloat,
-        Field(description="Weight for debugging context; tracing execution", ge=0.0, le=1.0),
+        Field(
+            description="Weight for debugging context; tracing execution",
+            ge=FLOAT_ZERO,
+            le=ONE_POINT_ZERO,
+        ),
     ]
     documentation: Annotated[
         NonNegativeFloat,
-        Field(description="Weight for documentation context; explaining code", ge=0.0, le=1.0),
+        Field(
+            description="Weight for documentation context; explaining code",
+            ge=FLOAT_ZERO,
+            le=ONE_POINT_ZERO,
+        ),
     ]
 
 
@@ -82,25 +101,43 @@ class ImportanceScores(DataclassSerializationMixin):
 
     discovery: Annotated[
         NonNegativeFloat,
-        Field(description="Weight for discovery context; finding relevant code", ge=0.0, le=1.0),
+        Field(
+            description="Weight for discovery context; finding relevant code",
+            ge=FLOAT_ZERO,
+            le=ONE_POINT_ZERO,
+        ),
     ]
     comprehension: Annotated[
         NonNegativeFloat,
         Field(
-            description="Weight for comprehension context; understanding behavior", ge=0.0, le=1.0
+            description="Weight for comprehension context; understanding behavior",
+            ge=FLOAT_ZERO,
+            le=ONE_POINT_ZERO,
         ),
     ]
     modification: Annotated[
         NonNegativeFloat,
-        Field(description="Weight for modification context; safe editing points", ge=0.0, le=1.0),
+        Field(
+            description="Weight for modification context; safe editing points",
+            ge=FLOAT_ZERO,
+            le=ONE_POINT_ZERO,
+        ),
     ]
     debugging: Annotated[
         NonNegativeFloat,
-        Field(description="Weight for debugging context; tracing execution", ge=0.0, le=1.0),
+        Field(
+            description="Weight for debugging context; tracing execution",
+            ge=FLOAT_ZERO,
+            le=ONE_POINT_ZERO,
+        ),
     ]
     documentation: Annotated[
         NonNegativeFloat,
-        Field(description="Weight for documentation context; explaining code", ge=0.0, le=1.0),
+        Field(
+            description="Weight for documentation context; explaining code",
+            ge=FLOAT_ZERO,
+            le=ONE_POINT_ZERO,
+        ),
     ]
 
     @classmethod
@@ -118,14 +155,16 @@ class ImportanceScores(DataclassSerializationMixin):
         """Calculate weighted importance score for given AI assistant context."""
         return self.validate_python(
             data={
-                "discovery": min(max(self.discovery * context_weights["discovery"], 0), 1),
+                "discovery": min(max(self.discovery * context_weights["discovery"], ZERO), ONE),
                 "comprehension": min(
-                    max(self.comprehension * context_weights["comprehension"], 0), 1
+                    max(self.comprehension * context_weights["comprehension"], ZERO), ONE
                 ),
-                "modification": min(max(self.modification * context_weights["modification"], 0), 1),
-                "debugging": min(max(self.debugging * context_weights["debugging"], 0), 1),
+                "modification": min(
+                    max(self.modification * context_weights["modification"], ZERO), ONE
+                ),
+                "debugging": min(max(self.debugging * context_weights["debugging"], ZERO), ONE),
                 "documentation": min(
-                    max(self.documentation * context_weights["documentation"], 0), 1
+                    max(self.documentation * context_weights["documentation"], ZERO), ONE
                 ),
             }
         )
@@ -1078,8 +1117,8 @@ class UsageMetrics(BasedModel):
     @property
     def usage_frequencies(self) -> dict[SemanticClass, NonNegativeFloat]:
         """Calculate usage frequency for each category."""
-        if self.total_use == 0:
-            return dict.fromkeys(self.category_usage_counts, 0.0)
+        if self.total_use == ZERO:
+            return dict.fromkeys(self.category_usage_counts, FLOAT_ZERO)
         return {
             cat: (count / self.total_use) * 100.0
             for cat, count in self.category_usage_counts.items()

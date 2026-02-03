@@ -41,8 +41,10 @@ from codeweaver.core import (
     StrategizedQuery,
 )
 from codeweaver.core import SparseEmbedding as CodeWeaverSparseEmbedding
+from codeweaver.core.constants import DEFAULT_VECTOR_STORE_MAX_RESULTS
 from codeweaver.core.exceptions import ConfigurationError
 from codeweaver.providers.config import QdrantVectorStoreProviderSettings
+from codeweaver.providers.embedding.capabilities import EmbeddingModelCapabilities
 from codeweaver.providers.types import EmbeddingCapabilityGroup
 from codeweaver.providers.vector_stores.base import MixedQueryInput, VectorStoreProvider
 from codeweaver.providers.vector_stores.metadata import CollectionMetadata, HybridVectorPayload
@@ -137,12 +139,42 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         Returns:
             CollectionMetadata configured from provider settings.
         """
+        # Get model family if available from dense capability
+        model_family_id = None
+        if (
+            self.caps.dense
+            and self.caps.dense.capability
+            and hasattr(self.caps.dense.capability, "model_family")
+            and self.caps.dense.capability.model_family
+        ):
+            model_family_id = cast(
+                EmbeddingModelCapabilities, self.caps.dense.capability
+            ).model_family.family_id
+
+        # Query model detection: Check if we're using asymmetric embedding
+        # by inspecting the config type (config_type discriminator)
+        query_model = None
+        if (
+            self.caps.dense
+            and self.caps.dense.config
+            and hasattr(self.caps.dense.config, "config_type")
+            and self.caps.dense.config.config_type == "asymmetric"
+        ):
+            # This is an asymmetric config - the config should be AsymmetricEmbeddingConfig
+            # Import here to avoid circular dependency
+            from codeweaver.providers.config.asymmetric import AsymmetricEmbeddingConfig
+
+            if isinstance(self.caps.dense.config, AsymmetricEmbeddingConfig):
+                query_model = str(self.caps.dense.config.query_provider.model_name)
+
         return CollectionMetadata.model_construct({
             "provider": type(self)._provider.variable,
             "created_at": datetime.now(UTC),
             "project_name": _project_name(),
             "collection_name": self.collection_name,
             "dense_model": self.embedding_capabilities.dense_model,
+            "dense_model_family": model_family_id,
+            "query_model": query_model,
             "sparse_model": self.embedding_capabilities.sparse_model,
         })
 
@@ -201,6 +233,57 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         else:
             return self._convert_search_results(results, strategized_vector)
 
+    async def _validate_existing_collection(self, collection_name: str) -> None:
+        """Validate metadata and configuration of an existing collection."""
+        self._known_collections.add(collection_name)
+
+        # Validate collection metadata (model family compatibility)
+        existing_metadata = await self._metadata()
+        if existing_metadata:
+            # Create metadata from current config
+            current_metadata = self._create_metadata_from_config()
+            # Validate compatibility (includes family validation)
+            current_metadata.validate_compatibility(existing_metadata)
+
+        # Validate vector configs
+        await self._validate_collection_config(collection_name)
+
+    async def _create_collection(self, collection_name: str) -> None:
+        """Create a new collection from the configured collection settings."""
+        # Create new collection from config.collection (source of truth)
+        metadata = self._create_metadata_from_config()
+
+        # Use service to get collection config (handles WalConfig merging, etc.)
+        collection_config = await self.service.get_collection_config(metadata=metadata)
+
+        # Convert CollectionConfig to create_collection parameters
+        configuration_params = collection_config.model_dump(exclude_none=True)
+        params = configuration_params.pop("params", None)
+
+        create_params = {}
+        if params:
+            create_params["vectors_config"] = params.get("vectors")
+            create_params["sparse_vectors_config"] = params.get("sparse_vectors")
+            create_params["shard_number"] = params.get("shard_number")
+            create_params["replication_factor"] = params.get("replication_factor")
+            create_params["write_consistency_factor"] = params.get("write_consistency_factor")
+            create_params["on_disk_payload"] = params.get("on_disk_payload")
+
+        # Map optimizer_config → optimizers_config (plural)
+        if "optimizer_config" in configuration_params:
+            create_params["optimizers_config"] = configuration_params.pop("optimizer_config")
+
+        # Add remaining configs
+        for key in ["hnsw_config", "wal_config", "quantization_config"]:
+            if key in configuration_params:
+                create_params[key] = configuration_params[key]
+
+        await self.client.create_collection(
+            collection_name=collection_name,
+            **{k: v for k, v in create_params.items() if v is not None},
+        )
+        self._known_collections.add(collection_name)
+
     async def _ensure_collection(self, collection_name: str, dense_dim: int | None = None) -> None:
         """Ensure collection exists, creating it if necessary.
 
@@ -214,52 +297,13 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
             raise ProviderError("Qdrant client is not initialized")
         try:
             if await self.client.collection_exists(collection_name):
-                self._known_collections.add(collection_name)
-                # Validate existing collection matches current config
-                await self._validate_collection_config(collection_name)
-                return
-
-            # Create new collection from config.collection (source of truth)
-            metadata = self._create_metadata_from_config()
-
-            # Use service to get collection config (handles WalConfig merging, etc.)
-            collection_config = await self.service.get_collection_config(metadata=metadata)
-
-            # Convert CollectionConfig to create_collection parameters
-            # QdrantCollectionConfig has: params, hnsw_config, optimizer_config, wal_config
-            # create_collection expects: vectors_config, sparse_vectors_config, hnsw_config, optimizers_config, wal_config
-            config_dict = collection_config.model_dump(exclude_none=True)
-            params = config_dict.pop("params", None)
-
-            create_params = {}
-            if params:
-                create_params["vectors_config"] = params.get("vectors")
-                create_params["sparse_vectors_config"] = params.get("sparse_vectors")
-                create_params["shard_number"] = params.get("shard_number")
-                create_params["replication_factor"] = params.get("replication_factor")
-                create_params["write_consistency_factor"] = params.get("write_consistency_factor")
-                create_params["on_disk_payload"] = params.get("on_disk_payload")
-
-            # Map optimizer_config → optimizers_config (plural)
-            if "optimizer_config" in config_dict:
-                create_params["optimizers_config"] = config_dict.pop("optimizer_config")
-
-            # Add remaining configs
-            for key in ["hnsw_config", "wal_config", "quantization_config"]:
-                if key in config_dict:
-                    create_params[key] = config_dict[key]
-
-            await self.client.create_collection(
-                collection_name=collection_name,
-                **{k: v for k, v in create_params.items() if v is not None},
-            )
-            self._known_collections.add(collection_name)
+                await self._validate_existing_collection(collection_name)
+            else:
+                await self._create_collection(collection_name)
         except UnexpectedResponse as e:
             raise ProviderError(
                 "The vector store provider encountered an error when trying to check if the collection existed, or when trying to create it."
             ) from e
-        else:
-            return
 
     def _raise_dimension_error(
         self,
@@ -510,7 +554,7 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         """
         qdrant_filter = None
         args = {
-            "limit": 100,
+            "limit": DEFAULT_VECTOR_STORE_MAX_RESULTS,
             "with_payload": True,
             "query_filter": qdrant_filter or None,
             "with_vectors": False,
@@ -693,10 +737,12 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
 
         # Fallback: if no sparse vector exists but sparse/IDF is configured, use BM25 document
         # Only add BM25 if we have sparse or IDF capabilities configured in the embedding group
-        if not has_sparse and "sparse" not in vectors:
-            # Check if we have sparse or IDF configured
-            if self.caps.sparse is not None or self.caps.idf is not None:
-                vectors["sparse"] = Document(text=chunk.content, model="qdrant/bm25")
+        if (
+            not has_sparse
+            and "sparse" not in vectors
+            and (self.caps.sparse is not None or self.caps.idf is not None)
+        ):
+            vectors["sparse"] = Document(text=chunk.content, model="qdrant/bm25")
 
         return vectors
 

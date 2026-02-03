@@ -10,10 +10,10 @@ from __future__ import annotations
 import contextlib
 import os
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Hashable, Iterable
 from functools import cache
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 from codeweaver.core.types import BaseCodeWeaverSettings
 from codeweaver.core.types.aliases import CategoryName, LiteralStringT
@@ -60,6 +60,17 @@ type DictOutputTypesT = (
     | dict[CategoryName, tuple[LiteralStringT, ...]]
     | dict[LiteralStringT, tuple[CategoryName, ...]]
 )
+
+
+def deep_merge_dicts(a: dict[Hashable, Any], b: dict[Hashable, Any]) -> dict[Hashable, Any]:
+    """Deep merge two dictionaries."""
+    result = a.copy()
+    for key, value in b.items():
+        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            result[key] = deep_merge_dicts(result[key], value)
+        else:
+            result[key] = value
+    return result
 
 
 def dict_set_to_tuple(d: DictInputTypesT) -> DictOutputTypesT:
@@ -134,6 +145,7 @@ def supported_language_count() -> int:
 __all__ = (
     "DictInputTypesT",
     "DictOutputTypesT",
+    "deep_merge_dicts",
     "dict_set_to_tuple",
     "ensure_iterable",
     "generate_collection_name",

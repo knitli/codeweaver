@@ -14,9 +14,9 @@ from __future__ import annotations
 
 import inspect
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Coroutine, Sequence
 from threading import Lock
-from typing import Any, Literal, NamedTuple, TypeVar, cast, overload
+from typing import Any, Literal, NamedTuple, TypeAliasType, TypeVar, cast, overload
 
 
 T = TypeVar("T")
@@ -107,8 +107,78 @@ def dependency_provider[T](
 ) -> Callable[[type[T]], type[T]]: ...
 
 
+# Async factory overloads
+@overload
 def dependency_provider[T](
-    cls: type[T] | None = None,
+    cls: type[T],
+    *,
+    scope: Literal["singleton", "request", "function"] = "singleton",
+    module: str | None = None,
+    tags: Sequence[str] | None = None,
+    collection: Literal[True],
+) -> Callable[
+    [Callable[..., Coroutine[Any, Any, Sequence[T]]]],
+    Callable[..., Coroutine[Any, Any, Sequence[T]]],
+]: ...
+
+
+@overload
+def dependency_provider[T](
+    cls: type[T],
+    *,
+    scope: Literal["singleton", "request", "function"] = "singleton",
+    module: str | None = None,
+    tags: Sequence[str] | None = None,
+    collection: Literal[False] = False,
+) -> Callable[[Callable[..., Coroutine[Any, Any, T]]], Callable[..., Coroutine[Any, Any, T]]]: ...
+
+
+@overload
+def dependency_provider[T](
+    cls: TypeAliasType[T],
+    *,
+    scope: Literal["singleton", "request", "function"] = "singleton",
+    module: str | None = None,
+    tags: Sequence[str] | None = None,
+    collection: Literal[False] = False,
+) -> Callable[..., T]: ...
+
+
+@overload
+def dependency_provider[T](
+    cls: TypeAliasType[type[T]],
+    *,
+    scope: Literal["singleton", "request", "function"] = "singleton",
+    module: str | None = None,
+    tags: Sequence[str] | None = None,
+    collection: Literal[False] = False,
+) -> Callable[..., T]: ...
+
+
+@overload
+def dependency_provider[T](
+    cls: TypeAliasType[Sequence[T]],
+    *,
+    scope: Literal["singleton", "request", "function"] = "singleton",
+    module: str | None = None,
+    tags: Sequence[str] | None = None,
+    collection: Literal[True] = True,
+) -> Callable[..., Sequence[T]]: ...
+
+
+@overload
+def dependency_provider[T](
+    cls: TypeAliasType[type[T]],
+    *,
+    scope: Literal["singleton", "request", "function"] = "singleton",
+    module: str | None = None,
+    tags: Sequence[str] | None = None,
+    collection: Literal[False] = False,
+) -> type[T]: ...
+
+
+def dependency_provider[T](
+    cls: type[T] | T | TypeAliasType[T] | TypeAliasType[type[T]] | None = None,
     *,
     scope: Literal["singleton", "request", "function"] = "singleton",
     module: str | None = None,
@@ -117,7 +187,13 @@ def dependency_provider[T](
 ) -> (
     Callable[[Callable[..., T]], Callable[..., T]]
     | Callable[[Callable[..., Sequence[T]]], Callable[..., Sequence[T]]]
+    | Callable[[Callable[..., Coroutine[Any, Any, T]]], Callable[..., Coroutine[Any, Any, T]]]
+    | Callable[
+        [Callable[..., Coroutine[Any, Any, Sequence[T]]]],
+        Callable[..., Coroutine[Any, Any, Sequence[T]]],
+    ]
     | Callable[[type[T]], type[T]]
+    | Callable[..., type[T]]
     | type[T]
 ):
     """Decorator that registers a function or class as the provider for a specific type.
@@ -126,7 +202,7 @@ def dependency_provider[T](
     When the DI system needs an instance of `cls`, it will use the decorated
     function or class to create it.
 
-    Supports three usage patterns:
+    Supports three usage patterns in sync and async contexts:
 
     1. Function registration (explicit type):
         ```python
@@ -382,11 +458,14 @@ def get_provider_metadata(
 
         # Filter by tags - provider must have ALL specified tags
         tag_set = frozenset(tags) if isinstance(tags, set) else tags
-        for _, metadata in reversed(providers_list):  # Check most recent first
-            if tag_set.issubset(metadata.tags):
-                return metadata
-
-        return None
+        return next(
+            (
+                metadata
+                for _, metadata in reversed(providers_list)
+                if tag_set.issubset(metadata.tags)
+            ),
+            None,
+        )
 
 
 def get_all_providers() -> dict[type, list[tuple[Callable[..., Any], ProviderMetadata]]]:

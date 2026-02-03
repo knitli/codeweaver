@@ -20,6 +20,11 @@ import watchfiles
 from fastmcp import Context
 
 from codeweaver.core import is_ci, is_tty
+from codeweaver.core.constants import (
+    DEFAULT_WATCHER_DEBOUNCE_MILLISECONDS,
+    DEFAULT_WATCHER_GRACE_PERIOD,
+    DEFAULT_WATCHER_STEP_MILLISECONDS,
+)
 from codeweaver.core.ui_protocol import ProgressReporter
 from codeweaver.engine.services.indexing_service import IndexingService
 from codeweaver.engine.watcher._logging import WatchfilesLogManager
@@ -98,9 +103,9 @@ class FileWatchingService:
             target_type="function",
             callback=self._handle_changes,  # type: ignore[invalid-argument-type]
             watch_filter=self.file_filter,  # type: ignore[invalid-argument-type]
-            grace_period=20.0,
-            debounce=200_000,
-            step=15_000,
+            grace_period=DEFAULT_WATCHER_GRACE_PERIOD,
+            debounce=DEFAULT_WATCHER_DEBOUNCE_MILLISECONDS,
+            step=DEFAULT_WATCHER_STEP_MILLISECONDS,
             debug=False,
             recursive=True,
             ignore_permission_denied=True,

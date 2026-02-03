@@ -13,11 +13,11 @@ from __future__ import annotations
 import logging
 
 from collections.abc import Iterator, Sequence
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import Any, ClassVar
 
 import numpy as np
 
-from codeweaver.core import ConfigurationError, Provider
+from codeweaver.core import CodeChunk, ConfigurationError, Provider
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.providers.base import (
     EmbeddingCustomDeps,
@@ -25,9 +25,6 @@ from codeweaver.providers.embedding.providers.base import (
     EmbeddingProvider,
 )
 
-
-if TYPE_CHECKING:
-    from codeweaver.core import CodeChunk
 
 logger = logging.getLogger(__name__)
 

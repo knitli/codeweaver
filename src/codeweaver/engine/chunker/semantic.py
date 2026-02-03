@@ -56,6 +56,13 @@ from codeweaver.core import (
     make_uuid_store,
     uuid7,
 )
+from codeweaver.core.constants import (
+    DEFAULT_BLAKE_STORE_MAX_SIZE,
+    DEFAULT_UUID_STORE_MAX_SIZE,
+    MAX_SEMANTIC_CHUNKER_RECURSION_DEPTH,
+    ONE_MILLISECOND_IN_MICROSECONDS,
+    SEMANTIC_CHUNKER_PERFORMANCE_THRESHOLD_MS,
+)
 from codeweaver.engine.chunker.base import BaseChunker
 from codeweaver.engine.chunker.exceptions import ASTDepthExceededError, BinaryFileError, ParseError
 from codeweaver.engine.chunker.governance import ResourceGovernor
@@ -79,12 +86,6 @@ from codeweaver.engine.chunker._logging import (
     log_chunking_failed,
     log_chunking_fallback,
 )
-
-
-PERFORMANCE_THRESHOLD_MS = 1000.0  # 1 second
-ONE_MEGABYTE = 1024 * 1024
-THREE_MEGABYTES = 3 * ONE_MEGABYTE
-TWO_HUNDRED_FIFTY_SIX_KB = 256 * 1024
 
 
 class SemanticChunker(BaseChunker):
@@ -120,11 +121,11 @@ class SemanticChunker(BaseChunker):
 
     _store: UUIDStore[list[CodeChunk]] = make_uuid_store(
         value_type=list,
-        size_limit=THREE_MEGABYTES,  # 3MB cache for chunk batches
+        size_limit=DEFAULT_UUID_STORE_MAX_SIZE,  # 3MB cache for chunk batches
     )
     _hash_store: BlakeStore[UUID7] = make_blake_store(
         value_type=UUID,  # UUID7 but UUID is the type
-        size_limit=TWO_HUNDRED_FIFTY_SIX_KB,  # 256KB cache for content hashes
+        size_limit=DEFAULT_BLAKE_STORE_MAX_SIZE,  # 256KB cache for content hashes
     )
 
     @classmethod
@@ -138,11 +139,11 @@ class SemanticChunker(BaseChunker):
         # Recreate stores instead of clearing to avoid weak reference issues with lists
         cls._store = make_uuid_store(
             value_type=list,
-            size_limit=THREE_MEGABYTES,  # 3MB cache for chunk batches
+            size_limit=DEFAULT_UUID_STORE_MAX_SIZE,  # 3MB cache for chunk batches
         )
         cls._hash_store = make_blake_store(
             value_type=UUID,  # UUID7 but UUID is the type
-            size_limit=TWO_HUNDRED_FIFTY_SIX_KB,  # 256KB cache for content hashes
+            size_limit=DEFAULT_BLAKE_STORE_MAX_SIZE,  # 256KB cache for content hashes
         )
 
     def __init__(
@@ -358,11 +359,13 @@ class SemanticChunker(BaseChunker):
             # Cache node text to avoid repeated property access
             node_text = node.text
             # Use cached tokenizer flag for performance
-            tokens = self.tokenizer.estimate(node_text) if self._has_tokenizer else len(node_text) // 4
-            
+            tokens = (
+                self.tokenizer.estimate(node_text) if self._has_tokenizer else len(node_text) // 4
+            )
+
             # Get cached depth for this node
             depth = node_depths.get(id(node))
-            
+
             if tokens <= self.chunk_limit:
                 chunks.append(self._create_chunk_from_node(node, file_path, source_id, depth))
                 governor.register_chunk()
@@ -720,7 +723,11 @@ class SemanticChunker(BaseChunker):
             )
 
     def _create_chunk_from_node(
-        self, node: AstThing[SgNode], file_path: Path | None, source_id: UUID7, depth: int | None = None
+        self,
+        node: AstThing[SgNode],
+        file_path: Path | None,
+        source_id: UUID7,
+        depth: int | None = None,
     ) -> CodeChunk:
         """Create CodeChunk with rich metadata from AstThing node.
 
@@ -825,7 +832,7 @@ class SemanticChunker(BaseChunker):
 
         Args:
             node: Oversized AstThing node
-            file_path: Optional file path for context
+            file_path: Optional file_path for context
             source_id: Shared source ID for all chunks from this file
             governor: Resource governor for limit enforcement
             recursion_depth: Current recursion depth to prevent stack overflow
@@ -833,50 +840,72 @@ class SemanticChunker(BaseChunker):
         Returns:
             List of chunks derived from oversized node
         """
-        # Prevent infinite recursion with depth limit
-        MAX_RECURSION_DEPTH = 10
-        
-        # Try chunking children first for composite nodes (unless max depth reached)
-        if recursion_depth < MAX_RECURSION_DEPTH and node.is_composite:
-            children = list(node.positional_connections)
-            child_chunks: list[CodeChunk] = []
+        # Tier 1: Recursive child chunking for composite nodes
+        if (
+            node.is_composite
+            and recursion_depth < MAX_SEMANTIC_CHUNKER_RECURSION_DEPTH
+            and (
+                child_chunks := self._chunk_oversized_node_children(
+                    node, file_path, source_id, governor, recursion_depth
+                )
+            )
+        ):
+            return child_chunks
 
-            for child in children:
-                governor.check_timeout()
-                # Cache child text for performance
-                child_text = child.text
-                if self._has_tokenizer:
-                    child_tokens = self.tokenizer.estimate(child_text)
-                else:
-                    child_tokens = len(child_text) // 4
-
-                if child_tokens <= self.chunk_limit:
-                    child_chunks.append(self._create_chunk_from_node(child, file_path, source_id))
-                    governor.register_chunk()
-                else:
-                    # Recursive handling for oversized children with incremented depth
-                    child_chunks.extend(
-                        self._handle_oversized_node(
-                            child, file_path, source_id, governor, recursion_depth + 1
-                        )
-                    )
-
-            if child_chunks:
-                return child_chunks
-        elif recursion_depth >= MAX_RECURSION_DEPTH:
+        # Log recursion limit warning if falling back due to depth
+        if recursion_depth >= MAX_SEMANTIC_CHUNKER_RECURSION_DEPTH:
             logger.warning(
                 "Maximum recursion depth (%d) reached for oversized node '%s', using delimiter fallback",
-                MAX_RECURSION_DEPTH,
+                MAX_SEMANTIC_CHUNKER_RECURSION_DEPTH,
                 node.name,
             )
 
-        # Fallback: Use delimiter chunker to split oversized node text
+        # Tier 2: Fallback to delimiter-based chunking
+        return self._fallback_to_delimiter_chunking(node, file_path, source_id, governor)
+
+    def _chunk_oversized_node_children(
+        self,
+        node: AstThing[SgNode],
+        file_path: Path | None,
+        source_id: UUID7,
+        governor: Any,
+        recursion_depth: int,
+    ) -> list[CodeChunk]:
+        """Recursive child chunking for oversized composite nodes."""
+        children = list(node.positional_connections)
+        child_chunks: list[CodeChunk] = []
+
+        for child in children:
+            governor.check_timeout()
+            # Cache child text for performance
+            child_text = child.text
+            if self._has_tokenizer:
+                child_tokens = self.tokenizer.estimate(child_text)
+            else:
+                child_tokens = len(child_text) // 4
+
+            if child_tokens <= self.chunk_limit:
+                child_chunks.append(self._create_chunk_from_node(child, file_path, source_id))
+                governor.register_chunk()
+            else:
+                # Recursive handling for oversized children with incremented depth
+                child_chunks.extend(
+                    self._handle_oversized_node(
+                        child, file_path, source_id, governor, recursion_depth + 1
+                    )
+                )
+
+        return child_chunks
+
+    def _fallback_to_delimiter_chunking(
+        self, node: AstThing[SgNode], file_path: Path | None, source_id: UUID7, governor: Any
+    ) -> list[CodeChunk]:
+        """Delimiter-based fallback for oversized nodes that cannot be semantically subdivided."""
         logger.info(
             "Oversized node without chunkable children: %s, falling back to delimiter chunker",
             node.name,
         )
 
-        # Import delimiter chunker for fallback
         from codeweaver.engine.chunker.delimiter import DelimiterChunker
 
         # Create delimiter chunker with same language
@@ -887,7 +916,6 @@ class SemanticChunker(BaseChunker):
             else str(self.language),
         )
 
-        # Log fallback event for observability
         log_chunking_fallback(
             file_path=file_path or Path("<unknown>"),
             from_chunker=self,
@@ -896,18 +924,13 @@ class SemanticChunker(BaseChunker):
             extra_context={"node_name": node.name, "node_text_length": len(node.text)},
         )
 
-        # Chunk the node text using delimiter patterns
-        # Create a pseudo-file for the node text with proper source tracking
         from codeweaver.core import DiscoveredFile as _DiscoveredFile
 
         temp_file = _DiscoveredFile.from_path(file_path) if file_path else None
-
-        # Get delimiter chunks
         delimiter_chunks = delimiter_chunker.chunk(node.text, file=temp_file)
 
         # If delimiter chunking didn't actually split it (produced 1 chunk >= original size)
         # OR if it produced no chunks, we MUST return a single chunk to avoid infinite recursion
-        # if the caller keeps trying to split it.
         if not delimiter_chunks or (
             len(delimiter_chunks) == 1 and len(delimiter_chunks[0].content) >= len(node.text)
         ):
@@ -1069,7 +1092,7 @@ class SemanticChunker(BaseChunker):
         """
         from codeweaver.engine.chunker import _logging as chunker_logging
 
-        duration_ms = duration * 1000
+        duration_ms = duration * ONE_MILLISECOND_IN_MICROSECONDS
 
         # Use standardized structured logging
         chunker_logging.log_chunking_completed(
@@ -1082,12 +1105,12 @@ class SemanticChunker(BaseChunker):
         )
 
         # Log performance warning if chunking took too long
-        if duration_ms > PERFORMANCE_THRESHOLD_MS:
+        if duration_ms > SEMANTIC_CHUNKER_PERFORMANCE_THRESHOLD_MS:
             chunker_logging.log_chunking_performance_warning(
                 file_path=file_path or Path("<unknown>"),
                 chunker_type=self,
                 duration_ms=duration_ms,
-                threshold_ms=PERFORMANCE_THRESHOLD_MS,
+                threshold_ms=SEMANTIC_CHUNKER_PERFORMANCE_THRESHOLD_MS,
                 extra_context={"chunk_count": len(chunks), "file_size_bytes": file_size_bytes},
             )
 

@@ -56,6 +56,7 @@ def _get_semantic_boundaries():
     global _SEMANTIC_BOUNDARIES
     if _SEMANTIC_BOUNDARIES is None:
         from codeweaver.core.types.delimiter import DelimiterKind
+
         _SEMANTIC_BOUNDARIES = {
             DelimiterKind.FUNCTION,
             DelimiterKind.CLASS,
@@ -1586,7 +1587,12 @@ class DelimiterChunker(BaseChunker):
         return merged_chunk, next_idx
 
     def _build_merge_metadata(
-        self, content: str, start_line: int, end_line: int, context: dict[str, Any] | None, full_content: str | None = None
+        self,
+        content: str,
+        start_line: int,
+        end_line: int,
+        context: dict[str, Any] | None,
+        full_content: str | None = None,
     ) -> Metadata:
         """Build metadata for a merged chunk.
 
@@ -1618,7 +1624,7 @@ class DelimiterChunker(BaseChunker):
             # Find position of start_line in full content
             lines = full_content.splitlines(keepends=True)
             if 0 < start_line <= len(lines):
-                pos = sum(len(line) for line in lines[:start_line - 1])
+                pos = sum(len(line) for line in lines[: start_line - 1])
                 nesting_level = self._calculate_nesting_level(full_content, pos)
 
         metadata: Metadata = {

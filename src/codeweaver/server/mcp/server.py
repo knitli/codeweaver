@@ -21,6 +21,7 @@ from fastmcp.server.proxy import FastMCPProxy, ProxyClient
 from fastmcp.tools import Tool
 
 from codeweaver.core import DictView, SettingsMapDep, StatisticsDep, Unset, lazy_import
+from codeweaver.core.constants import DEFAULT_MCP_PORT, LOCALHOST, MCP_ENDPOINT
 from codeweaver.core.di.depends import INJECTED
 from codeweaver.server.config import (
     FastMcpHttpRunArgs,
@@ -348,9 +349,9 @@ async def create_stdio_server(
     else:
         http_settings = _get_fastmcp_settings_map(http=True)
         run_args = http_settings.get("run_args", {})
-    resolved_host = host or run_args.get("host", "127.0.0.1")
-    resolved_port = port or run_args.get("port", 9328)
-    url = f"http://{resolved_host}:{resolved_port}{http_settings.get('path', '/mcp')}"
+    resolved_host = host or run_args.get("host", LOCALHOST)
+    resolved_port = port or run_args.get("port", DEFAULT_MCP_PORT)
+    url = f"http://{resolved_host}:{resolved_port}{http_settings.get('path', MCP_ENDPOINT)}"
     return app.as_proxy(backend=ProxyClient(transport=StreamableHttpTransport(url=url)))
 
 

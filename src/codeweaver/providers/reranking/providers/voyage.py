@@ -16,6 +16,7 @@ from warnings import filterwarnings
 from pydantic import ConfigDict, SkipValidation
 
 from codeweaver.core import Provider, ProviderError, rpartial
+from codeweaver.core.constants import DEFAULT_RERANKING_MAX_RESULTS
 from codeweaver.providers.reranking.providers.base import RerankingProvider, RerankingResult
 
 
@@ -85,7 +86,12 @@ class VoyageRerankingProvider(RerankingProvider[AsyncClient]):
         )
 
     async def _execute_rerank(
-        self, query: str, documents: Sequence[str], *, top_n: int = 10, **kwargs: Any
+        self,
+        query: str,
+        documents: Sequence[str],
+        *,
+        top_n: int = DEFAULT_RERANKING_MAX_RESULTS,
+        **kwargs: Any,
     ) -> Any:
         """Execute the reranking process."""
         try:

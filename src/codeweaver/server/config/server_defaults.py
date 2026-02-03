@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 
+from codeweaver.core.constants import DEFAULT_MCP_PORT, LOCALHOST, MCP_ENDPOINT
 from codeweaver.server.config.types import (
     EndpointSettingsDict,
     FastMcpHttpRunArgs,
@@ -37,10 +38,10 @@ DefaultUvicornSettingsForMcp = UvicornServerSettings.codeweaver_server_mcp()
 
 DefaultFastMcpHttpRunArgs = FastMcpHttpRunArgs(
     transport="streamable-http",
-    host="127.0.0.1",
-    port=9328,
+    host=LOCALHOST,
+    port=DEFAULT_MCP_PORT,
     log_level="warning",
-    path="/mcp/",
+    path=f"{MCP_ENDPOINT}/",
     uvicorn_config=DefaultUvicornSettingsForMcp,
     middleware=[],
 )

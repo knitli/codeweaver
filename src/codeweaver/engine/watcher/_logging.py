@@ -22,6 +22,7 @@ from codeweaver.core import (
     setup_logger,
     validate_regex_pattern,
 )
+from codeweaver.core.constants import DEFAULT_LOG_LEVEL, DEFAULT_RICH_HANDLER_OPTIONS
 
 
 def normalize_and_validate_patterns(
@@ -53,7 +54,7 @@ class WatchfilesLogManager:
     def __init__(
         self,
         *,
-        log_level: int = logging.WARNING,
+        log_level: int = DEFAULT_LOG_LEVEL,
         use_rich: bool = True,
         include_pattern: str | re.Pattern[str] | None = None,
         exclude_pattern: str | re.Pattern[str] | None = None,
@@ -63,7 +64,7 @@ class WatchfilesLogManager:
         """Initialize the watchfiles log manager.
 
         Args:
-            log_level: Minimum log level to capture (default: WARNING)
+            log_level: Minimum log level to capture (default: DEFAULT_LOG_LEVEL)
             use_rich: Use Rich handler for pretty console output
             include_pattern: Regex pattern - only log messages matching this
             exclude_pattern: Regex pattern - exclude messages matching this
@@ -104,12 +105,7 @@ class WatchfilesLogManager:
                 name="watchfiles",
                 level=self.log_level,
                 use_rich=True,
-                rich_options={
-                    "show_time": True,
-                    "show_level": True,
-                    "show_path": False,
-                    "rich_tracebacks": False,
-                },
+                rich_options=DEFAULT_RICH_HANDLER_OPTIONS,
             )
             # Logger is already configured, just return
             self.watchfiles_logger = logger

@@ -11,7 +11,6 @@ import logging
 from collections.abc import Callable, Sequence
 from io import BytesIO
 from typing import (
-    TYPE_CHECKING,
     Annotated,
     Any,
     ClassVar,
@@ -36,7 +35,7 @@ from pydantic import (
 from pydantic.alias_generators import to_camel, to_snake
 from types_boto3_bedrock_runtime.client import BedrockRuntimeClient
 
-from codeweaver.core import BasedModel, Provider, ProviderError
+from codeweaver.core import BasedModel, CodeChunk, Provider, ProviderError
 from codeweaver.core import ValidationError as CodeWeaverValidationError
 from codeweaver.providers.config import BedrockEmbeddingConfig, BedrockEmbeddingProviderSettings
 from codeweaver.providers.embedding.providers.base import (
@@ -45,9 +44,6 @@ from codeweaver.providers.embedding.providers.base import (
     EmbeddingProvider,
 )
 
-
-if TYPE_CHECKING:
-    from codeweaver.core import CodeChunk
 
 logger = logging.getLogger(__name__)
 

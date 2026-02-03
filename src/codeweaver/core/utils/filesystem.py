@@ -127,9 +127,11 @@ def _walk_up_to_git_root(path: Path | None = None) -> Path:
 
 def get_project_path(root_path: Path | None = None) -> Path:
     """Get the root directory of the project."""
-    if (env_path := os.environ.get("CODEWEAVER_PROJECT_PATH")) and (
-        path := Path(env_path)
-    ).is_dir():
+    if (
+        (env_path := os.environ.get("CODEWEAVER_PROJECT_PATH"))
+        and (path := Path(env_path))
+        and path.is_dir()
+    ):
         return path
     if (
         root_path is None
@@ -343,7 +345,15 @@ COMMON_TOOLING_PATHS: tuple[tuple[DevToolNameT, tuple[Path, ...]], ...] = (
         DevToolName("maven"),
         (Path("pom.xml"), Path("settings.xml"), Path(".mvn"), Path("mvnw"), Path("mvnw.cmd")),
     ),
-    (DevToolName("mise"), (Path("mise.toml"),)),
+    (
+        DevToolName("mise"),
+        (
+            Path("mise.toml"),
+            Path(".mise.toml"),
+            Path("mise/config.toml"),
+            Path(".mise/config.toml"),
+        ),
+    ),
     (DevToolName("moon"), (Path("moon.yml"), Path("moon.yaml"), Path(".moon"))),
     (DevToolName("nextjs"), (Path("next.config.js"), Path("next.config.ts"))),
     (DevToolName("npm"), (Path("package-lock.json"), Path(".npmrc"))),

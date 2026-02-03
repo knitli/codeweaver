@@ -21,20 +21,19 @@ import sys
 import time
 
 from functools import cache
-from importlib.util import find_spec
 from types import TracebackType
 from typing import Any, Self, cast
 
 from pydantic import HttpUrl
 from pydantic.types import SecretStr
 
-from codeweaver.core import Unset, UUID7HexT, uuid7
+from codeweaver.core import Unset, UUID7HexT, has_package, uuid7
 from codeweaver.core.dependencies import TelemetrySettingsDep
 from codeweaver.core.di import INJECTED
 from codeweaver.core.telemetry._project import CODEWEAVER_POSTHOG_PROJECT_KEY
 
 
-NO_HOG = find_spec("posthog") is None
+NO_HOG = not has_package("posthog")
 SESSION_ID: UUID7HexT = uuid7().hex  # ty:ignore[invalid-assignment]
 if NO_HOG:
 
@@ -118,7 +117,7 @@ class TelemetryService:
             )
             if isinstance(api_key, SecretStr):
                 api_key = api_key.get_secret_value()
-        if find_spec("posthog") is None:
+        if not has_package("posthog"):
             enabled = False
         self.enabled = bool(enabled and api_key)
         self.logger = logging.getLogger(__name__)

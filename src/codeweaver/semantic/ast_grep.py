@@ -49,7 +49,6 @@ A common way to move ("traverse") through the AST is to start at the root node (
 from __future__ import annotations
 
 import contextlib
-import importlib
 import logging
 
 from collections.abc import Iterator
@@ -61,7 +60,6 @@ from typing import (
     Annotated,
     Any,
     Literal,
-    LiteralString,
     NamedTuple,
     Unpack,
     cast,
@@ -106,6 +104,7 @@ from codeweaver.core import (
     ThingName,
     ThingNameT,
     generate_field_title,
+    has_package,
     humanize,
     uuid7,
 )
@@ -122,7 +121,7 @@ if TYPE_CHECKING:
     from codeweaver.semantic.classifications import AgentTask, ImportanceScores, ThingClass
     from codeweaver.semantic.registry import ThingRegistry
 
-    if importlib.util.find_spec("codeweaver.engine") is not None:
+    if has_package("codeweaver.engine") is not None:
         from codeweaver.engine.chunker.registry import SourceIdRegistry
         from codeweaver.engine.dependencies import SourceIdRegistryDep
     else:
@@ -615,7 +614,7 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
     @cached_property
     def name(self) -> ThingNameT:
         """Get the name (kind - the name in the grammar) of the node."""
-        return ThingName(cast(LiteralString, self._node.kind()))
+        return ThingName(cast(LiteralStringT, self._node.kind()))
 
     @computed_field
     @cached_property
@@ -949,13 +948,10 @@ def _rebuild_models_with_ast_thing() -> None:
                     logger.debug("Model %s already complete, skipping rebuild", model.__name__)
                     continue
 
-                # Rebuild with full namespace to resolve forward references
-                success = model.model_rebuild(_types_namespace=namespace)
-
-                if not success:
-                    logger.warning("Model %s failed to rebuild in ast_grep.py", model.__name__)
-                else:
+                if model.model_rebuild(_types_namespace=namespace):
                     logger.debug("Model %s rebuilt successfully in ast_grep.py", model.__name__)
+                else:
+                    logger.warning("Model %s failed to rebuild in ast_grep.py", model.__name__)
             except Exception as e:
                 logger.warning(
                     "Error rebuilding model %s in ast_grep.py: %s", model.__name__, e, exc_info=True

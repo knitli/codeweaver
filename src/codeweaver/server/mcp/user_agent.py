@@ -18,7 +18,8 @@ from mcp.server.session import ServerSession
 from mcp.shared.context import RequestContext
 from starlette.requests import Request
 
-from codeweaver.core import SemanticSearchLanguage, lazy_import
+from codeweaver.core import SemanticSearchLanguage, StatisticsDep
+from codeweaver.core.constants import DEFAULT_MAX_RESULTS, DEFAULT_MAX_TOKENS
 from codeweaver.core.di.depends import INJECTED
 from codeweaver.server import CodeWeaverStateDep
 from codeweaver.server.agent_api import FindCodeResponseSummary, IntentType, find_code
@@ -32,6 +33,11 @@ def _get_state(state: CodeWeaverStateDep = INJECTED):
     return state
 
 
+def _get_statistics(stats: StatisticsDep = INJECTED):
+    """Get the current session statistics."""
+    return stats
+
+
 # -------------------------
 # * `find_code` tool definition
 #
@@ -41,7 +47,7 @@ async def find_code_tool(
     query: str,
     intent: IntentType | None = None,
     *,
-    token_limit: int = 30000,
+    token_limit: int = DEFAULT_MAX_TOKENS,
     focus_languages: tuple[SemanticSearchLanguage | str, ...] | None = None,
     context: Context | None = None,
 ) -> FindCodeResponseSummary:
@@ -73,7 +79,7 @@ async def find_code_tool(
             if focus_languages
             else None
         )
-        statistics = lazy_import("codeweaver.core", "get_session_statistics")
+        statistics = _get_statistics()
 
         state = _get_state()
         if state.failover_manager and context:
@@ -84,7 +90,7 @@ async def find_code_tool(
             intent=intent,
             token_limit=token_limit,
             focus_languages=cast(tuple[str, ...], focus_langs),
-            max_results=30,  # Default from find_code signature
+            max_results=DEFAULT_MAX_RESULTS,  # Default from find_code signature
         )
 
         with contextlib.suppress(RuntimeError):

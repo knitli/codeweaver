@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 import rignore
 
 from codeweaver.core import INJECTED, DiscoveredFile, get_blake_hash, set_relative_path
+from codeweaver.core.constants import PRIMARY_SPARSE_VECTOR_NAME
 from codeweaver.providers import EmbeddingRegistryDep
 
 
@@ -462,9 +463,7 @@ class IndexingService:
         """Deserialize chunk from payload if needed."""
         from codeweaver.core import CodeChunk
 
-        if isinstance(chunk, dict):
-            return CodeChunk.model_validate(chunk)
-        return chunk
+        return CodeChunk.model_validate(chunk) if isinstance(chunk, dict) else chunk
 
     def _extract_sparse_vector(self, point: Any) -> Any | None:
         """Extract sparse vector from point if available."""
@@ -472,10 +471,7 @@ class IndexingService:
             return None
 
         vector = point.vector
-        if not isinstance(vector, dict):
-            return None
-
-        return vector.get("sparse")
+        return vector.get(PRIMARY_SPARSE_VECTOR_NAME) if isinstance(vector, dict) else None
 
     def _inject_sparse_vectors(
         self, chunks: list[CodeChunk], sparse_vectors: dict[str, Any], registry: Any
@@ -524,7 +520,7 @@ class IndexingService:
             chunk_id=chunk.chunk_id,
             model=model,
             embeddings=sparse_emb,
-            dtype="float32",
+            dtype="float16",
         )
 
         # Add to registry

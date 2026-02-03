@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Annotated, Any, Literal, TypedDict
+from typing import TYPE_CHECKING, Annotated, Any, Literal, TypedDict, cast
 
 from pydantic import Field, computed_field
 
@@ -217,10 +217,10 @@ class CollectionMetadata(BasedModel):
         Warnings:
             Logs warning if provider has changed (suggests reindexing)
         """
-        from codeweaver.core.exceptions import ConfigurationError
-
         # Warn on provider switch - suggests reindexing but doesn't block
-        if self.provider != other.provider:
+        if self.provider != other.provider and not (
+            self.dense_model_family and other.dense_model_family
+        ):
             logger.warning(
                 "Provider switch detected: collection created with '%s', but current provider is '%s'.",
                 other.provider,
@@ -241,163 +241,7 @@ class CollectionMetadata(BasedModel):
 
         # Family-aware validation: Check if collection has family metadata
         if other.dense_model_family:
-            # Collection was indexed with a model family
-            # Determine which model to validate based on configuration
-            indexed_model = other.dense_model
-
-            # Priority: query_model if set (for asymmetric), otherwise dense_model
-            current_model = self.query_model if self.query_model else self.dense_model
-
-            if not current_model:
-                # No current model configured - backward compat case
-                return
-
-            # If models match exactly, no further validation needed
-            if current_model == indexed_model:
-                return
-
-            # Models differ - validate family compatibility
-            from codeweaver.providers.embedding.capabilities.resolver import (
-                EmbeddingCapabilityResolver,
-            )
-
-            resolver = EmbeddingCapabilityResolver()
-
-            # Resolve capabilities for current query model
-            current_caps = resolver.resolve(current_model)
-
-            if not current_caps:
-                raise ConfigurationError(
-                    f"No capabilities found for current model: {current_model}",
-                    details={
-                        "current_model": current_model,
-                        "indexed_model": indexed_model,
-                        "indexed_family": other.dense_model_family,
-                    },
-                    suggestions=[
-                        f"Ensure model '{current_model}' is registered in the capabilities system",
-                        "Check that the model name is spelled correctly",
-                        "List available models with: codeweaver list models",
-                        f"Or use the indexed model '{indexed_model}' for queries",
-                    ],
-                )
-
-            # Check if current model belongs to a family
-            if not current_caps.model_family:  # ty:ignore[unresolved-attribute]
-                # Current model lacks family support
-                # If we're validating query_model specifically, raise ConfigurationError
-                # If it's a dense_model switch, raise ModelSwitchError
-                if self.query_model and current_model == self.query_model:
-                    # Query model validation failure
-                    raise ConfigurationError(
-                        f"Query model '{current_model}' does not belong to a model family, "
-                        f"but collection was indexed with family '{other.dense_model_family}'",
-                        details={
-                            "query_model": current_model,
-                            "indexed_model": indexed_model,
-                            "indexed_family": other.dense_model_family,
-                        },
-                        suggestions=[
-                            f"Use a query model from the '{other.dense_model_family}' family",
-                            f"Or use the indexed model '{indexed_model}' for queries",
-                            "Asymmetric embedding requires both models to belong to the same family",
-                        ],
-                    )
-                # Dense model switch to non-family model
-                raise ModelSwitchError(
-                    f"Your existing embedding collection was created with model '{indexed_model}' "
-                    f"(family: '{other.dense_model_family}'), but the current model '{current_model}' "
-                    f"does not belong to a model family. You can't switch to a non-family model.",
-                    suggestions=[
-                        f"Use a model from the '{other.dense_model_family}' family",
-                        "Or re-index your codebase with the new model",
-                        "Asymmetric embedding requires both models to belong to the same family",
-                    ],
-                    details={
-                        "current_model": current_model,
-                        "indexed_model": indexed_model,
-                        "indexed_family": other.dense_model_family,
-                        "collection": self.project_name,
-                    },
-                )
-
-            current_family = current_caps.model_family  # ty:ignore[unresolved-attribute]
-
-            # Verify same family ID
-            if current_family.family_id != other.dense_model_family:
-                # Get indexed model capabilities to show compatible alternatives
-                indexed_caps = resolver.resolve(indexed_model) if indexed_model else None
-                compatible_models = []
-                if indexed_caps and indexed_caps.model_family:  # ty:ignore[unresolved-attribute]
-                    compatible_models = sorted(indexed_caps.model_family.member_models)  # ty:ignore[unresolved-attribute]
-
-                raise ConfigurationError(
-                    f"Model family mismatch: collection indexed with '{other.dense_model_family}' family "
-                    f"but current model '{current_model}' belongs to '{current_family.family_id}' family",
-                    details={
-                        "current_model": current_model,
-                        "current_family": current_family.family_id,
-                        "indexed_model": indexed_model,
-                        "indexed_family": other.dense_model_family,
-                    },
-                    suggestions=[
-                        f"Use a model from the '{other.dense_model_family}' family",
-                        f"Compatible models: {', '.join(compatible_models)}"
-                        if compatible_models
-                        else f"Use the indexed model '{indexed_model}'",
-                        "Or re-index the collection with the new model family",
-                    ],
-                )
-
-            # Verify models are compatible within the family
-            if indexed_model and not current_family.is_compatible(indexed_model, current_model):
-                raise ConfigurationError(
-                    f"Models '{indexed_model}' and '{current_model}' are not compatible within family '{current_family.family_id}'",
-                    details={
-                        "current_model": current_model,
-                        "indexed_model": indexed_model,
-                        "family_id": current_family.family_id,
-                        "family_members": sorted(current_family.member_models),
-                    },
-                    suggestions=[
-                        "Ensure both models are listed as family members",
-                        f"Valid family members: {', '.join(sorted(current_family.member_models))}",
-                        "This may indicate a configuration error",
-                    ],
-                )
-
-            # Verify dimensions match (using family validation)
-            current_dim = current_caps.default_dimension
-            indexed_caps = resolver.resolve(indexed_model) if indexed_model else None
-            indexed_dim = indexed_caps.default_dimension if indexed_caps else None
-
-            if indexed_dim:
-                is_valid, error_msg = current_family.validate_dimensions(indexed_dim, current_dim)
-                if not is_valid:
-                    raise ConfigurationError(
-                        f"Dimension mismatch: {error_msg}",
-                        details={
-                            "current_model": current_model,
-                            "current_dimension": current_dim,
-                            "indexed_model": indexed_model,
-                            "indexed_dimension": indexed_dim,
-                            "expected_dimension": current_family.default_dimension,
-                            "family_id": current_family.family_id,
-                        },
-                        suggestions=[
-                            "Ensure both models use the same embedding dimension",
-                            f"Expected dimension for '{current_family.family_id}': {current_family.default_dimension}",
-                            "Check model configurations and verify dimension settings",
-                        ],
-                    )
-
-            # Family validation passed - asymmetric embedding is compatible
-            logger.info(
-                "Family-aware validation passed: query model '%s' is compatible with indexed model '%s' (family: %s)",
-                current_model,
-                indexed_model,
-                current_family.family_id,
-            )
+            self._validate_family_compatibility(other)
             return
 
         # Legacy validation (no family metadata) - strict model matching
@@ -420,6 +264,190 @@ class CollectionMetadata(BasedModel):
                     "collection": self.project_name,
                 },
             )
+
+    def _validate_family_compatibility(self, other: CollectionMetadata) -> None:
+        """Helper to validate family-aware compatibility."""
+        from codeweaver.core.exceptions import ConfigurationError
+        from codeweaver.providers.embedding.capabilities.resolver import EmbeddingCapabilityResolver
+
+        indexed_model = other.dense_model
+        # Priority: query_model if set (for asymmetric), otherwise dense_model
+        current_model = self.query_model or self.dense_model
+
+        if not current_model or current_model == indexed_model:
+            return
+
+        resolver = EmbeddingCapabilityResolver()
+        current_caps = resolver.resolve(current_model)
+
+        if not current_caps:
+            raise ConfigurationError(
+                f"No capabilities found for current model: {current_model}",
+                details={
+                    "current_model": current_model,
+                    "indexed_model": indexed_model,
+                    "indexed_family": other.dense_model_family,
+                },
+                suggestions=[
+                    f"Ensure model '{current_model}' is registered in the capabilities system",
+                    "Check that the model name is spelled correctly",
+                    "List available models with: codeweaver list models",
+                    f"Or use the indexed model '{indexed_model}' for queries",
+                ],
+            )
+
+        # Check if current model belongs to a family
+        if not current_caps.model_family:  # ty:ignore[unresolved-attribute]
+            self._handle_missing_family(current_model, indexed_model, other.dense_model_family)  # ty:ignore[invalid-argument-type]
+
+        current_family = current_caps.model_family  # ty:ignore[unresolved-attribute]
+
+        # Verify same family ID
+        if current_family.family_id != other.dense_model_family:
+            self._handle_family_mismatch(
+                current_model,
+                indexed_model,
+                cast(str, other.dense_model_family),
+                current_family,
+                resolver,  # ty:ignore[invalid-argument-type]
+            )
+
+        # Verify models are compatible within the family
+        if indexed_model and not current_family.is_compatible(indexed_model, current_model):
+            raise ConfigurationError(
+                f"Models '{indexed_model}' and '{current_model}' are not compatible within family '{current_family.family_id}'",
+                details={
+                    "current_model": current_model,
+                    "indexed_model": indexed_model,
+                    "family_id": current_family.family_id,
+                    "family_members": sorted(current_family.member_models),
+                },
+                suggestions=[
+                    "Ensure both models are listed as family members",
+                    f"Valid family members: {', '.join(sorted(current_family.member_models))}",
+                    "This may indicate a configuration error",
+                ],
+            )
+
+        # Verify dimensions match
+        self._validate_dimensions_compatibility(
+            current_model, indexed_model, current_caps, current_family, resolver
+        )
+
+        logger.debug(
+            "Family-aware validation passed: query model '%s' is compatible with indexed model '%s' (family: %s)",
+            current_model,
+            indexed_model,
+            current_family.family_id,
+        )
+
+    def _handle_missing_family(
+        self, current_model: str, indexed_model: str | None, indexed_family: str
+    ) -> None:
+        """Handle case where current model lacks family support."""
+        from codeweaver.core.exceptions import ConfigurationError
+
+        if self.query_model and current_model == self.query_model:
+            raise ConfigurationError(
+                f"Query model '{current_model}' does not belong to a model family, "
+                f"but collection was indexed with family '{indexed_family}'",
+                details={
+                    "query_model": current_model,
+                    "indexed_model": indexed_model,
+                    "indexed_family": indexed_family,
+                },
+                suggestions=[
+                    f"Use a query model from the '{indexed_family}' family",
+                    f"Or use the indexed model '{indexed_model}' for queries",
+                    "Asymmetric embedding requires both models to belong to the same family",
+                ],
+            )
+        raise ModelSwitchError(
+            f"Your existing embedding collection was created with model '{indexed_model}' "
+            f"(family: '{indexed_family}'), but the current model '{current_model}' "
+            f"does not belong to a model family. You can't switch to a non-family model.",
+            suggestions=[
+                f"Use a model from the '{indexed_family}' family",
+                "Or re-index your codebase with the new model",
+                "Asymmetric embedding requires both models to belong to the same family",
+            ],
+            details={
+                "current_model": current_model,
+                "indexed_model": indexed_model,
+                "indexed_family": indexed_family,
+                "collection": self.project_name,
+            },
+        )
+
+    def _handle_family_mismatch(
+        self,
+        current_model: str,
+        indexed_model: str | None,
+        indexed_family: str,
+        current_family: Any,
+        resolver: Any,
+    ) -> None:
+        """Handle case where model families don't match."""
+        from codeweaver.core.exceptions import ConfigurationError
+
+        indexed_caps = resolver.resolve(indexed_model) if indexed_model else None
+        compatible_models = []
+        if indexed_caps and indexed_caps.model_family:  # ty:ignore[unresolved-attribute]
+            compatible_models = sorted(indexed_caps.model_family.member_models)  # ty:ignore[unresolved-attribute]
+
+        raise ConfigurationError(
+            f"Model family mismatch: collection indexed with '{indexed_family}' family "
+            f"but current model '{current_model}' belongs to '{current_family.family_id}' family",
+            details={
+                "current_model": current_model,
+                "current_family": current_family.family_id,
+                "indexed_model": indexed_model,
+                "indexed_family": indexed_family,
+            },
+            suggestions=[
+                f"Use a model from the '{indexed_family}' family",
+                f"Compatible models: {', '.join(compatible_models)}"
+                if compatible_models
+                else f"Use the indexed model '{indexed_model}'",
+                "Or re-index the collection with the new model family",
+            ],
+        )
+
+    def _validate_dimensions_compatibility(
+        self,
+        current_model: str,
+        indexed_model: str | None,
+        current_caps: Any,
+        current_family: Any,
+        resolver: Any,
+    ) -> None:
+        """Verify embedding dimensions are compatible."""
+        from codeweaver.core.exceptions import ConfigurationError
+
+        indexed_caps = resolver.resolve(indexed_model) if indexed_model else None
+        indexed_dim = indexed_caps.default_dimension if indexed_caps else None
+
+        if indexed_dim:
+            is_valid, error_msg = current_family.validate_dimensions(
+                indexed_dim, current_caps.default_dimension
+            )
+            if not is_valid:
+                raise ConfigurationError(
+                    f"Dimension mismatch: {error_msg}",
+                    details={
+                        "current_model": current_model,
+                        "current_dimension": current_caps.default_dimension,
+                        "indexed_model": indexed_model,
+                        "indexed_dimension": indexed_dim,
+                        "expected_dimension": current_family.default_dimension,
+                        "family_id": current_family.family_id,
+                    },
+                    suggestions=[
+                        "Ensure both models use the same embedding dimension",
+                        f"Expected dimension for '{current_family.family_id}': {current_family.default_dimension}",
+                        "Check model configurations and verify dimension settings",
+                    ],
+                )
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         from codeweaver.core import AnonymityConversion, FilteredKey

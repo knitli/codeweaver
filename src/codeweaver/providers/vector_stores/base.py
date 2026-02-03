@@ -12,7 +12,7 @@ import time
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar, Literal, cast
+from typing import Any, ClassVar, Literal, cast
 
 import httpx
 
@@ -20,15 +20,18 @@ from pydantic import UUID7, ConfigDict, PrivateAttr
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from codeweaver.core import BasedModel, CodeChunk, Provider, StrategizedQuery
-from codeweaver.core.types import ModelNameT
+from codeweaver.core.constants import (
+    BASE_RETRYABLE_EXCEPTIONS,
+    DEFAULT_OPEN_BREAKER_DURATION,
+    MAX_RETRY_ATTEMPTS,
+    ZERO,
+)
+from codeweaver.core.types import ModelNameT, SearchResult
 from codeweaver.providers.config import VectorStoreProviderSettings
 from codeweaver.providers.exceptions import CircuitBreakerOpenError
 from codeweaver.providers.types import CircuitBreakerState, EmbeddingCapabilityGroup
 from codeweaver.providers.vector_stores.search import Filter
 
-
-if TYPE_CHECKING:
-    from codeweaver.core import SearchResult
 
 # Common retryable exceptions for vector store operations
 # Include httpcore and qdrant-specific exceptions that indicate transient network issues
@@ -37,9 +40,7 @@ try:
     import qdrant_client.http.exceptions
 
     RETRYABLE_EXCEPTIONS = (
-        ConnectionError,
-        TimeoutError,
-        OSError,
+        *BASE_RETRYABLE_EXCEPTIONS,
         httpx.TimeoutException,
         httpcore.ReadError,
         httpcore.WriteError,
@@ -49,7 +50,7 @@ try:
     )
 except ImportError:
     # Fallback if httpcore or qdrant_client not available
-    RETRYABLE_EXCEPTIONS = (ConnectionError, TimeoutError, OSError, httpx.TimeoutException)
+    RETRYABLE_EXCEPTIONS = (*BASE_RETRYABLE_EXCEPTIONS, httpx.TimeoutException)
 
 
 logger = logging.getLogger(__name__)
@@ -78,9 +79,9 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
 
     # Circuit breaker state tracking
     _circuit_state: CircuitBreakerState = CircuitBreakerState.CLOSED
-    _failure_count: int = 0
+    _failure_count: int = ZERO
     _last_failure_time: float | None = None
-    _circuit_open_duration: float = 30.0  # seconds
+    _circuit_open_duration: float = DEFAULT_OPEN_BREAKER_DURATION
 
     def __init__(
         self,
@@ -107,7 +108,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
 
         # Initialize circuit breaker state
         self._circuit_state = CircuitBreakerState.CLOSED
-        self._failure_count = 0
+        self._failure_count = ZERO
         self._last_failure_time = None
 
     async def _initialize(self) -> None:
@@ -174,7 +175,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
             Data type of dense embeddings.
         """
         dense_caps = self.embedding_capabilities.dense
-        return await dense_caps.datatype() if dense_caps else "float32"  # ty:ignore[invalid-return-type]
+        return await dense_caps.datatype() if dense_caps else "float16"  # ty:ignore[invalid-return-type]
 
     @property
     def distance_metric(self) -> Literal["cosine", "dot", "euclidean"]:
@@ -186,7 +187,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
         dense_caps = self.embedding_capabilities.dense
         if dense_caps and dense_caps.capability.preferred_metrics:
             return next(
-                measure
+                measure.lower()
                 for measure in dense_caps.capability.preferred_metrics
                 if measure.lower() in {"cosine", "dot", "euclidean", "manhattan"}
             )
@@ -255,7 +256,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
                 "Circuit breaker closing for %s after successful operation", type(self)._provider
             )
         self._circuit_state = CircuitBreakerState.CLOSED
-        self._failure_count = 0
+        self._failure_count = ZERO
         self._last_failure_time = None
 
     def _record_failure(self) -> None:
@@ -263,7 +264,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
         self._failure_count += 1
         self._last_failure_time = time.time()
 
-        if self._failure_count >= 3:  # 3 failures threshold as per spec FR-008a
+        if self._failure_count >= MAX_RETRY_ATTEMPTS:
             import logging
 
             logger = logging.getLogger(__name__)
@@ -293,7 +294,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
         """
 
     @retry(
-        stop=stop_after_attempt(5),
+        stop=stop_after_attempt(MAX_RETRY_ATTEMPTS),
         wait=wait_exponential(multiplier=1, min=1, max=16),  # 1s, 2s, 4s, 8s, 16s
         retry=retry_if_exception_type(RETRYABLE_EXCEPTIONS),
         reraise=True,
@@ -337,7 +338,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
                         "error": str(e),
                         "error_type": type(e).__name__,
                         "attempt": self._failure_count,
-                        "max_attempts": 5,
+                        "max_attempts": MAX_RETRY_ATTEMPTS,
                     },
                 },
             )
@@ -395,7 +396,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
         """
 
     @retry(
-        stop=stop_after_attempt(5),
+        stop=stop_after_attempt(MAX_RETRY_ATTEMPTS),
         wait=wait_exponential(multiplier=1, min=1, max=16),
         retry=retry_if_exception_type(RETRYABLE_EXCEPTIONS),
         reraise=True,
@@ -444,7 +445,7 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
                         "error": str(e),
                         "error_type": type(e).__name__,
                         "attempt": self._failure_count,
-                        "max_attempts": 5,
+                        "max_attempts": MAX_RETRY_ATTEMPTS,
                     },
                 },
             )

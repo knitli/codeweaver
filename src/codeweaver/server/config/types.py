@@ -44,6 +44,7 @@ from codeweaver.core import (
     LoggingConfigDict,
     Unset,
 )
+from codeweaver.core.constants import DEFAULT_MANAGEMENT_PORT, LOCALHOST, ONE_MEGABYTE
 from codeweaver.server.mcp import McpMiddleware
 
 
@@ -183,19 +184,19 @@ class UvicornServerSettings(BasedModel):
     model_config = BASEDMODEL_CONFIG
 
     name: Annotated[str, Field(exclude=True)] = "CodeWeaver_Management_Server"
-    host: str = os.environ.get("CODEWEAVER_HOST", "127.0.0.1")
+    host: str = os.environ.get("CODEWEAVER_HOST", LOCALHOST)
     port: PositiveInt = (
         int(port)
         if (
             port := os.environ.get("CODEWEAVER_PORT") or os.environ.get("CODEWEAVER__UVICORN__PORT")
         )
-        else 9329
+        else DEFAULT_MANAGEMENT_PORT
     )
     uds: str | None = None
     fd: int | None = None
     http: type[asyncio.Protocol] | HTTPProtocolType | str = "auto"
     ws: type[asyncio.Protocol] | WSProtocolType | str = "auto"
-    ws_max_size: PositiveInt = 16_777_216  # 16 MiB
+    ws_max_size: PositiveInt = 16 * ONE_MEGABYTE
     ws_max_queue: PositiveInt = 32
     ws_ping_interval: PositiveFloat = 20.0
     ws_ping_timeout: PositiveFloat = 20.0

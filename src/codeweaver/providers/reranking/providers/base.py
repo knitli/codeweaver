@@ -30,10 +30,17 @@ from tenacity import (
 from codeweaver.core import (
     INJECTED,
     BasedModel,
+    CodeChunk,
     Provider,
     RerankingProviderError,
     StatisticsDep,
     ValidationError,
+)
+from codeweaver.core.constants import (
+    DEFAULT_OPEN_BREAKER_DURATION,
+    DEFAULT_RERANKING_MAX_RESULTS,
+    MAX_RETRY_ATTEMPTS,
+    ZERO,
 )
 from codeweaver.core.types import ModelName, ModelNameT
 from codeweaver.providers.config import RerankingConfigT, RerankingProviderSettings
@@ -46,7 +53,6 @@ from codeweaver.providers.types import CircuitBreakerState
 if TYPE_CHECKING:
     from codeweaver.core import (
         AnonymityConversion,
-        CodeChunk,
         FilteredKeyT,
         SessionStatistics,
         StructuredDataInput,
@@ -62,8 +68,6 @@ def _get_statistics(stats: StatisticsDep = INJECTED) -> SessionStatistics:
 
 def default_reranking_input_transformer(documents: StructuredDataInput) -> Iterator[str]:
     """Default input transformer that converts documents to strings."""
-    from codeweaver.core import CodeChunk
-
     try:
         yield from CodeChunk.dechunkify(documents, for_embedding=True)
     except (PydanticValidationError, ValueError) as e:
@@ -144,9 +148,9 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
 
     # Circuit breaker state tracking
     _circuit_state: CircuitBreakerState = CircuitBreakerState.CLOSED
-    _failure_count: int = 0
+    _failure_count: int = ZERO
     _last_failure_time: float | None = None
-    _circuit_open_duration: float = 30.0  # 30 seconds as per spec FR-008a
+    _circuit_open_duration: float = DEFAULT_OPEN_BREAKER_DURATION  # 30 seconds as per spec FR-008a
 
     def __init__(
         self,
@@ -168,7 +172,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
 
         # Initialize circuit breaker state
         object.__setattr__(self, "_circuit_state", CircuitBreakerState.CLOSED)
-        object.__setattr__(self, "_failure_count", 0)
+        object.__setattr__(self, "_failure_count", ZERO)
         object.__setattr__(self, "_last_failure_time", None)
 
         # Extract rerank options from config
@@ -178,7 +182,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
             else {}
         )
         _rerank_kwargs = dict(rerank_options) | kwargs
-        _top_n = _rerank_kwargs.get("top_n", 10)
+        _top_n = _rerank_kwargs.get("top_n", DEFAULT_RERANKING_MAX_RESULTS)
 
         logger.debug("RerankingProvider kwargs", extra=_rerank_kwargs)
         logger.debug("Initialized RerankingProvider with top_n=%d", _top_n)
@@ -241,7 +245,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
                 "Circuit breaker closing for %s after successful operation", type(self)._provider
             )
         self._circuit_state = CircuitBreakerState.CLOSED
-        self._failure_count = 0
+        self._failure_count = ZERO
         self._last_failure_time = None
 
     def _record_failure(self) -> None:
@@ -249,7 +253,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         self._failure_count += 1
         self._last_failure_time = time.time()
 
-        if self._failure_count >= 3:  # 3 failures threshold as per spec FR-008a
+        if self._failure_count >= MAX_RETRY_ATTEMPTS:
             logger.warning(
                 "Circuit breaker opening for %s after %d consecutive failures",
                 type(self)._provider,
@@ -263,7 +267,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         return self._circuit_state.variable
 
     @retry(
-        stop=stop_after_attempt(5),
+        stop=stop_after_attempt(MAX_RETRY_ATTEMPTS),
         wait=wait_exponential(
             multiplier=1, min=1, max=16
         ),  # 1s, 2s, 4s, 8s, 16s as per spec FR-009c
@@ -271,7 +275,12 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         reraise=True,
     )
     async def _execute_rerank_with_retry(
-        self, query: str, documents: Sequence[str], *, top_n: int = 10, **kwargs: Any
+        self,
+        query: str,
+        documents: Sequence[str],
+        *,
+        top_n: int = DEFAULT_RERANKING_MAX_RESULTS,
+        **kwargs: Any,
     ) -> Any:
         """Wrapper around _execute_rerank with retry logic and circuit breaker.
 
@@ -285,10 +294,11 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         except (ConnectionError, TimeoutError, OSError) as e:
             self._record_failure()
             logger.warning(
-                "Reranking API call failed for %s: %s (attempt %d/5)",
+                "Reranking API call failed for %s: %s (attempt %d/%d)",
                 type(self)._provider,
                 str(e),
                 self._failure_count,
+                MAX_RETRY_ATTEMPTS,
             )
             raise
         except Exception:
@@ -300,7 +310,12 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
 
     @abstractmethod
     async def _execute_rerank(
-        self, query: str, documents: Sequence[str], *, top_n: int = 10, **kwargs: Any
+        self,
+        query: str,
+        documents: Sequence[str],
+        *,
+        top_n: int = DEFAULT_RERANKING_MAX_RESULTS,
+        **kwargs: Any,
     ) -> Any:
         """Execute the reranking process.
 

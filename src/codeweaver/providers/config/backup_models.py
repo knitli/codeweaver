@@ -16,12 +16,16 @@ Models:
 
 from __future__ import annotations
 
-import importlib
 import logging
 
 from typing import TYPE_CHECKING, Literal
 
+from codeweaver.core.constants import (
+    BACKUP_EMBEDDING_MODEL_FALLBACK,
+    BACKUP_EMBEDDING_MODEL_PRIMARY,
+)
 from codeweaver.core.types import ModelName, Provider
+from codeweaver.core.utils import has_package
 
 
 if TYPE_CHECKING:
@@ -30,10 +34,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Hardcoded backup models - these are small, efficient models for local backup
-BACKUP_MODEL_PRIMARY = "minishlab/potion-base-8M"
-BACKUP_MODEL_FALLBACK = "jinaai/jina-embeddings-v2-small-en"
-
 
 def _check_sentence_transformers_available() -> bool:
     """Check if sentence-transformers is installed.
@@ -41,7 +41,7 @@ def _check_sentence_transformers_available() -> bool:
     Returns:
         True if sentence-transformers is available, False otherwise
     """
-    return importlib.util.find_spec("sentence_transformers") is not None
+    return has_package("sentence_transformers") is not None
 
 
 def _check_fastembed_available() -> bool:
@@ -50,10 +50,7 @@ def _check_fastembed_available() -> bool:
     Returns:
         True if fastembed is available, False otherwise
     """
-    return (
-        importlib.util.find_spec("fastembed") is not None
-        and importlib.util.find_spec("fastembed_gpu") is not None
-    )
+    return has_package("fastembed") is not None and has_package("fastembed_gpu") is not None
 
 
 async def get_backup_embedding_config(
@@ -79,13 +76,13 @@ async def get_backup_embedding_config(
 
         return EmbeddingProviderSettings(
             provider=Provider.SENTENCE_TRANSFORMERS,
-            model_name=ModelName(BACKUP_MODEL_PRIMARY),
+            model_name=ModelName(BACKUP_EMBEDDING_MODEL_PRIMARY),
             connection=None,
             embedding_config=SentenceTransformersEmbeddingConfig(
-                model_name=ModelName(BACKUP_MODEL_PRIMARY)
+                model_name=ModelName(BACKUP_EMBEDDING_MODEL_PRIMARY)
             ),
             client_options=SentenceTransformersClientOptions(
-                model_name_or_path=BACKUP_MODEL_PRIMARY
+                model_name_or_path=BACKUP_EMBEDDING_MODEL_PRIMARY
             ),
         )
     if config_provider == "fastembed":
@@ -95,10 +92,12 @@ async def get_backup_embedding_config(
 
         return FastEmbedEmbeddingProviderSettings(
             provider=Provider.FASTEMBED,
-            model_name=ModelName(BACKUP_MODEL_FALLBACK),
+            model_name=ModelName(BACKUP_EMBEDDING_MODEL_FALLBACK),
             connection=None,
-            embedding_config=FastEmbedEmbeddingConfig(model_name=ModelName(BACKUP_MODEL_FALLBACK)),
-            client_options=FastEmbedClientOptions(model_name=BACKUP_MODEL_FALLBACK),
+            embedding_config=FastEmbedEmbeddingConfig(
+                model_name=ModelName(BACKUP_EMBEDDING_MODEL_FALLBACK)
+            ),
+            client_options=FastEmbedClientOptions(model_name=BACKUP_EMBEDDING_MODEL_FALLBACK),
         )
     raise ValueError(f"Unknown config provider: {config_provider}")
 
@@ -121,14 +120,14 @@ async def get_backup_embedding_provider() -> EmbeddingProvider | None:
     from codeweaver.providers.embedding.registry import EmbeddingRegistry
 
     container = get_container()
-    registry = container.resolve(EmbeddingRegistry)
-    cache_manager = container.resolve(EmbeddingCacheManager)
+    registry = await container.resolve(EmbeddingRegistry)
+    cache_manager = await container.resolve(EmbeddingCacheManager)
     # Try sentence-transformers first (preferred)
     if _check_sentence_transformers_available():
         try:
             logger.info(
                 "Creating backup embedding provider with sentence-transformers: %s",
-                BACKUP_MODEL_PRIMARY,
+                BACKUP_EMBEDDING_MODEL_PRIMARY,
             )
             from codeweaver.providers.embedding.capabilities.minishlab import (
                 get_minishlab_embedding_capabilities,
@@ -139,17 +138,17 @@ async def get_backup_embedding_provider() -> EmbeddingProvider | None:
 
             # Create provider with minimal configuration
             config = await get_backup_embedding_config("sentence-transformers")
-            client = config.get_client()
+            client = await config.get_client()
             provider = SentenceTransformersEmbeddingProvider(
                 client=client,  # Will be created internally
                 config=config,
                 caps=next(
                     cap
                     for cap in get_minishlab_embedding_capabilities()
-                    if cap.name == BACKUP_MODEL_PRIMARY
+                    if cap.name == BACKUP_EMBEDDING_MODEL_PRIMARY
                 ),
                 cache_manager=cache_manager,
-                registry=await registry,
+                registry=registry,
             )
 
             # Initialize the provider
@@ -157,7 +156,7 @@ async def get_backup_embedding_provider() -> EmbeddingProvider | None:
 
             logger.info(
                 "Successfully created backup embedding provider: sentence-transformers/%s",
-                BACKUP_MODEL_PRIMARY,
+                BACKUP_EMBEDDING_MODEL_PRIMARY,
             )
         except Exception as e:
             logger.warning(
@@ -170,7 +169,8 @@ async def get_backup_embedding_provider() -> EmbeddingProvider | None:
     if _check_fastembed_available():
         try:
             logger.info(
-                "Creating backup embedding provider with fastembed: %s", BACKUP_MODEL_FALLBACK
+                "Creating backup embedding provider with fastembed: %s",
+                BACKUP_EMBEDDING_MODEL_FALLBACK,
             )
             from codeweaver.providers.embedding.capabilities.jinaai import (
                 get_jinaai_embedding_capabilities,
@@ -181,7 +181,7 @@ async def get_backup_embedding_provider() -> EmbeddingProvider | None:
 
             # create the config
             config = await get_backup_embedding_config("fastembed")
-            client = config.get_client()
+            client = await config.get_client()
 
             provider = FastEmbedEmbeddingProvider(
                 client=client,
@@ -189,7 +189,7 @@ async def get_backup_embedding_provider() -> EmbeddingProvider | None:
                 caps=next(
                     cap
                     for cap in get_jinaai_embedding_capabilities()
-                    if cap.name == BACKUP_MODEL_FALLBACK
+                    if cap.name == BACKUP_EMBEDDING_MODEL_FALLBACK
                 ),
                 cache_manager=cache_manager,
                 registry=await registry,
@@ -200,7 +200,7 @@ async def get_backup_embedding_provider() -> EmbeddingProvider | None:
 
             logger.info(
                 "Successfully created backup embedding provider: fastembed/%s",
-                BACKUP_MODEL_FALLBACK,
+                BACKUP_EMBEDDING_MODEL_FALLBACK,
             )
 
         except Exception as e:
@@ -271,13 +271,13 @@ def get_backup_model_info() -> dict[str, str | bool]:
         Primary: minishlab/potion-base-8M
     """
     return {
-        "primary_model": BACKUP_MODEL_PRIMARY,
+        "primary_model": BACKUP_EMBEDDING_MODEL_PRIMARY,
         "primary_framework": "sentence-transformers",
-        "fallback_model": BACKUP_MODEL_FALLBACK,
+        "fallback_model": BACKUP_EMBEDDING_MODEL_FALLBACK,
         "fallback_framework": "fastembed",
         "sentence_transformers_available": _check_sentence_transformers_available(),
         "fastembed_available": _check_fastembed_available(),
     }
 
 
-__all__ = ("BACKUP_MODEL_FALLBACK", "BACKUP_MODEL_PRIMARY", "get_backup_embedding_provider")
+__all__ = ("get_backup_embedding_provider",)

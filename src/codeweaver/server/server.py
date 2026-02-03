@@ -38,6 +38,12 @@ from codeweaver.core import (
     get_project_path,
     get_settings,
 )
+from codeweaver.core.constants import (
+    DEFAULT_MANAGEMENT_PORT,
+    INDEXER_WINDDOWN_TIMEOUT,
+    LOCALHOST,
+    ONE,
+)
 from codeweaver.engine.services.failover_service import FailoverService
 from codeweaver.engine.services.indexing_service import IndexingService
 from codeweaver.providers import HttpClientPool
@@ -183,11 +189,14 @@ async def _cleanup_state(
     if indexing_task and (not indexing_task.done()):
         indexing_task.cancel()
         try:
-            await asyncio.wait_for(indexing_task, timeout=7.0)
+            await asyncio.wait_for(indexing_task, timeout=INDEXER_WINDDOWN_TIMEOUT)
             if verbose:
                 _logger.info("Background indexing stopped gracefully")
         except TimeoutError:
-            _logger.warning("Background indexing did not stop within 7 seconds, forcing shutdown")
+            _logger.warning(
+                "Background indexing did not stop within %d seconds, forcing shutdown",
+                INDEXER_WINDDOWN_TIMEOUT,
+            )
         except asyncio.CancelledError:
             if verbose:
                 _logger.info("Background indexing stopped")
@@ -200,7 +209,7 @@ async def _cleanup_state(
                 state.statistics,
                 version=version,
                 setup_success=state.initialized,
-                setup_attempts=1,
+                setup_attempts=ONE,
                 config_errors=None,
                 duration_seconds=duration_seconds,
             )
@@ -243,8 +252,12 @@ async def lifespan(
         debug: Enable debug logging
     """
     progress_reporter = RichConsoleProgressReporter()
-    server_host = getattr(app, "host", "127.0.0.1") if hasattr(app, "host") else "127.0.0.1"
-    server_port = getattr(app, "port", 9329) if hasattr(app, "port") else 9329
+    server_host = getattr(app, "host", LOCALHOST) if hasattr(app, "host") else LOCALHOST
+    server_port = (
+        getattr(app, "port", DEFAULT_MANAGEMENT_PORT)
+        if hasattr(app, "port")
+        else DEFAULT_MANAGEMENT_PORT
+    )
     progress_reporter.report_status(f"Server: http://{server_host}:{server_port}")
     progress_reporter.report_status("Built with FastMCP (https://gofastmcp.com)", level="debug")
 

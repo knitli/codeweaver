@@ -63,7 +63,7 @@ from codeweaver.core.types import ModelName
 from codeweaver.providers import AllDefaultProviderSettings, EmbeddingCapabilityGroup
 from codeweaver.providers.config import (
     AgentProviderSettings,
-    DataProviderSettings,
+    DataProviderSettingsType,
     EmbeddingProviderSettings,
     MemoryVectorStoreProviderSettings,
     ProviderSettings,
@@ -73,6 +73,7 @@ from codeweaver.providers.config import (
     VectorStoreProviderSettings,
 )
 from codeweaver.providers.config.kinds import _BaseQdrantVectorStoreProviderSettings
+from codeweaver.providers.config.providers import EmbeddingProviderSettingsType
 from codeweaver.providers.embedding import EmbeddingProvider, SparseEmbeddingProvider
 from codeweaver.providers.embedding.cache_manager import EmbeddingCacheManager
 from codeweaver.providers.embedding.capabilities.resolver import (
@@ -119,7 +120,7 @@ def _definitely_is_provider_settings_or_has_provider_settings_base(
 
 def _get_settings(settings: SettingsDep = INJECTED) -> CodeWeaverProviderSettings:
     """Helper to get BaseCodeWeaverSettings from SettingsDep."""
-    resolved_settings = settings if hasattr(settings, "provider") else settings.resolve()  # ty:ignore[unresolved-attribute]
+    resolved_settings = settings if hasattr(settings, "provider") else settings.resolve()
     if not _definitely_is_provider_settings_or_has_provider_settings_base(resolved_settings):
         raise TypeError(
             f"Expected CodeWeaverProviderSettings or BaseCodeWeaverSettings with 'provider' attribute (CodeWeaverEngineSettings or CodeWeaverSettings), got {type(resolved_settings)}"
@@ -133,8 +134,8 @@ def _get_provider_settings(settings: SettingsDep = INJECTED) -> ProviderSettings
     return cast(
         ProviderSettings,
         ProviderSettings.model_validate(AllDefaultProviderSettings)
-        if settings.provider is Unset  # ty:ignore[unresolved-attribute]
-        else settings.provider,  # ty:ignore[unresolved-attribute]
+        if settings.provider is Unset
+        else settings.provider,
     )
 
 
@@ -162,7 +163,7 @@ def _resolve_provider_settings[
     | RerankingProviderSettings
     | VectorStoreProviderSettings
     | AgentProviderSettings
-    | DataProviderSettings
+    | DataProviderSettingsType
 ](settings: tuple[T, ...] | T) -> T | None:
     """Helper to resolve provider settings if they're LazyImports."""
     if isinstance(settings, tuple):
@@ -298,7 +299,7 @@ def _get_primary_provider_config_for[
     | RerankingProviderSettings
     | VectorStoreProviderSettings
     | AgentProviderSettings
-    | DataProviderSettings
+    | DataProviderSettingsType
 ](settings: Sequence[T]) -> T:
     """Helper to get the primary provider config from a sequence of configs."""
     if settings:
@@ -309,10 +310,10 @@ def _get_primary_provider_config_for[
     )
 
 
-@dependency_provider(EmbeddingProviderSettings, scope="singleton", collection=True)
+@dependency_provider(EmbeddingProviderSettingsType, scope="singleton", collection=True)
 def _create_all_embedding_configs(
     provider_settings: ProviderSettingsDep = INJECTED,
-) -> tuple[EmbeddingProviderSettings, ...]:
+) -> tuple[EmbeddingProviderSettingsType, ...]:
     """Factory for creating ALL embedding configs (primary + backups) from settings."""
     embedding_configs = provider_settings.embedding
     return (
@@ -325,16 +326,16 @@ def _create_all_embedding_configs(
 
 
 type AllEmbeddingConfigsDep = Annotated[
-    Sequence[EmbeddingProviderSettings], depends(_create_all_embedding_configs, use_cache=False)
+    Sequence[EmbeddingProviderSettingsType], depends(_create_all_embedding_configs, use_cache=False)
 ]
 """Type alias for DI injection of all embedding provider settings.
 """
 
 
-@dependency_provider(EmbeddingProviderSettings, scope="singleton")
+@dependency_provider(EmbeddingProviderSettingsType, scope="singleton")
 def _create_primary_embedding_config(
     configs: AllEmbeddingConfigsDep = INJECTED,
-) -> EmbeddingProviderSettings:
+) -> EmbeddingProviderSettingsType:
     """Factory for creating PRIMARY embedding config from settings."""
     return _get_primary_provider_config_for(configs)
 
@@ -434,10 +435,10 @@ type AllVectorStoreConfigsDep = Annotated[
 """Type alias for DI injection of all vector store provider settings."""
 
 
-@dependency_provider(DataProviderSettings, scope="singleton", collection=True)
+@dependency_provider(DataProviderSettingsType, scope="singleton", collection=True)
 def _create_all_data_provider_configs(
     provider_settings: ProviderSettingsDep = INJECTED,
-) -> tuple[DataProviderSettings, ...]:
+) -> tuple[DataProviderSettingsType, ...]:
     """Factory for creating ALL data provider configs (primary + backups) from settings."""
     data_provider_configs = provider_settings.data
     return (
@@ -450,8 +451,7 @@ def _create_all_data_provider_configs(
 
 
 type AllDataProviderConfigsDep = Annotated[
-    Sequence[DataProviderSettings],  # type: ignore[name-defined]
-    depends(_create_all_data_provider_configs, use_cache=False),
+    Sequence[DataProviderSettingsType], depends(_create_all_data_provider_configs, use_cache=False)
 ]
 """Type alias for DI injection of all data provider settings."""
 
@@ -512,8 +512,7 @@ type SparseCapabilityResolverDep = Annotated[
 ]
 
 type RerankingProviderSettingsDep = Annotated[
-    RerankingProviderSettings,  # type: ignore[name-defined]
-    depends(_create_primary_reranking_config, use_cache=False),
+    RerankingProviderSettings, depends(_create_primary_reranking_config, use_cache=False)
 ]
 """Type alias for DI injection of reranking provider settings."""
 
@@ -633,7 +632,7 @@ type EmbeddingCapabilityGroupDep = Annotated[
 """Type alias for DI injection of primary embedding capability group."""
 
 
-def _get_embedding_provider_for_config(
+async def _get_embedding_provider_for_config(
     config: EmbeddingProviderSettings,
     registry: EmbeddingRegistryDep = INJECTED,
     cache_manager: CacheManagerDep = INJECTED,
@@ -651,7 +650,7 @@ def _get_embedding_provider_for_config(
                 "Check that the provider client is correctly configured",
             ],
         ) from e
-    client = config.get_client()
+    client = await config.get_client()
     if "openai" in config.client.variable:
         from codeweaver.providers.embedding.providers.openai_factory import OpenAIEmbeddingBase
 
@@ -660,10 +659,10 @@ def _get_embedding_provider_for_config(
             client=client,
             provider=config.provider,
             registry=registry,
-            cache_manager=cache_manager,  # ty:ignore[invalid-argument-type]
-            caps=capabilities,  # ty:ignore[invalid-argument-type]
-            config=config,  # ty:ignore[invalid-argument-type]
-        )  # ty:ignore[invalid-return-type]
+            cache_manager=cache_manager,
+            caps=capabilities,
+            config=config,
+        )
     return resolved_provider(
         client=client,
         registry=registry,
@@ -679,7 +678,7 @@ type EmbeddingProviderDep = Annotated[
 """Type alias for DI injection of embedding provider."""
 
 
-def _get_sparse_embedding_provider_for_config(
+async def _get_sparse_embedding_provider_for_config(
     config: SparseEmbeddingProviderSettings,
     registry: EmbeddingRegistryDep = INJECTED,
     cache_manager: CacheManagerDep = INJECTED,
@@ -697,7 +696,7 @@ def _get_sparse_embedding_provider_for_config(
                 "Check that the provider client is correctly configured",
             ],
         ) from e
-    client = config.get_client()
+    client = await config.get_client()
     return resolved_provider(
         client=client,
         registry=registry,
@@ -717,7 +716,9 @@ type SparseEmbeddingProviderDep = Annotated[
 # ===========================================================================
 
 
-def _get_reranking_provider_for_config(config: RerankingProviderSettings) -> RerankingProvider:
+async def _get_reranking_provider_for_config(
+    config: RerankingProviderSettings,
+) -> RerankingProvider:
     """Helper to get the reranking provider settings from config."""
     capabilities = config.reranking_config.capabilities
     provider = config.client.reranking_provider
@@ -731,7 +732,7 @@ def _get_reranking_provider_for_config(config: RerankingProviderSettings) -> Rer
                 "Check that the provider client is correctly configured",
             ],
         ) from e
-    client = config.get_client()
+    client = await config.get_client()
     return resolved_provider(client=client, config=config, caps=capabilities)
 
 
@@ -745,7 +746,7 @@ type RerankingProviderDep = Annotated[
 # ===========================================================================
 
 
-def _get_vector_store_provider_for_config(
+async def _get_vector_store_provider_for_config(
     config: VectorStoreProviderSettings,
     embedding_capabilities: EmbeddingCapabilityGroupDep = INJECTED,
 ) -> QdrantVectorStoreProvider | MemoryVectorStoreProvider:
@@ -763,11 +764,11 @@ def _get_vector_store_provider_for_config(
         raise ConfigurationError(
             f"Failed to resolve vector store provider for config {config}",
             suggestions=[
-                f"Ensure the vector store provider {config.client.as_title} SDK is installed and accessible",  # ty:ignore[unresolved-attribute]
+                f"Ensure the vector store provider {config.client.as_title} SDK is installed and accessible",
                 "Check that the provider client is correctly configured",
             ],
         ) from e
-    client = config.get_client()
+    client = await config.get_client()
     return resolved_provider(client=client, config=config, caps=embedding_capabilities)
 
 
@@ -792,7 +793,7 @@ class ProviderDict(TypedDict):
 
 
 @dependency_provider(ProviderDict, scope="singleton")
-def _get_all_provider_settings(
+async def _get_all_provider_settings(
     embedding_configs: AllEmbeddingConfigsDep = INJECTED,
     sparse_embedding_configs: AllSparseEmbeddingConfigsDep = INJECTED,
     reranking_configs: AllRerankingConfigsDep = INJECTED,
@@ -802,17 +803,17 @@ def _get_all_provider_settings(
 ) -> ProviderDict:
     """Factory to get all providers from settings."""
     embedding_providers = tuple(
-        _get_embedding_provider_for_config(cfg, registry) for cfg in embedding_configs or ()
+        await _get_embedding_provider_for_config(cfg, registry) for cfg in embedding_configs or ()
     )
     sparse_embedding_providers = tuple(
-        _get_sparse_embedding_provider_for_config(cfg, registry)
+        await _get_sparse_embedding_provider_for_config(cfg, registry)
         for cfg in sparse_embedding_configs or ()
     )
     reranking_providers = tuple(
-        _get_reranking_provider_for_config(cfg) for cfg in reranking_configs or ()
+        await _get_reranking_provider_for_config(cfg) for cfg in reranking_configs or ()
     )
     vector_store_providers = tuple(
-        _get_vector_store_provider_for_config(cfg, provider_settings)  # ty:ignore[invalid-argument-type]
+        await _get_vector_store_provider_for_config(cfg, provider_settings)
         for cfg in vector_store_configs or ()
     )
     return ProviderDict(
@@ -830,44 +831,44 @@ type AllProviderSettingsDep = Annotated[
 
 
 @dependency_provider(EmbeddingProvider, scope="singleton")
-def _create_embedding_provider(
+async def _create_embedding_provider(
     config: EmbeddingProviderSettingsDep = INJECTED, registry: EmbeddingRegistryDep = INJECTED
 ) -> EmbeddingProvider:
-    return _get_embedding_provider_for_config(config, registry)
+    return await _get_embedding_provider_for_config(config, registry)
 
 
 @dependency_provider(SparseEmbeddingProvider, scope="singleton")
-def _create_sparse_embedding_provider(
+async def _create_sparse_embedding_provider(
     config: SparseEmbeddingProviderSettingsDep = INJECTED, registry: EmbeddingRegistryDep = INJECTED
 ) -> SparseEmbeddingProvider:
-    return _get_sparse_embedding_provider_for_config(config, registry)
+    return await _get_sparse_embedding_provider_for_config(config, registry)
 
 
 @dependency_provider(RerankingProvider, scope="singleton")
-def _create_reranking_provider(
+async def _create_reranking_provider(
     config: RerankingProviderSettingsDep = INJECTED,
 ) -> RerankingProvider:
-    return _get_reranking_provider_for_config(config)
+    return await _get_reranking_provider_for_config(config)
 
 
 @dependency_provider(MemoryVectorStoreProvider, scope="singleton")
-def _create_memory_vector_store_provider(
+async def _create_memory_vector_store_provider(
     config: VectorStoreProviderSettingsDep = INJECTED,
     provider_settings: ProviderSettingsDep = INJECTED,
 ) -> MemoryVectorStoreProvider:
-    return _get_vector_store_provider_for_config(config, provider_settings)  # ty:ignore[invalid-argument-type, invalid-return-type]
+    return await _get_vector_store_provider_for_config(config, provider_settings)
 
 
-@dependency_provider(QdrantVectorStoreProvider, scope="singleton")  # ty:ignore[invalid-argument-type]
-def _create_vector_store_provider(
+@dependency_provider(QdrantVectorStoreProvider, scope="singleton")
+async def _create_vector_store_provider(
     config: VectorStoreProviderSettingsDep = INJECTED,
     provider_settings: ProviderSettingsDep = INJECTED,
 ) -> QdrantVectorStoreProvider | MemoryVectorStoreProvider:
-    return _get_vector_store_provider_for_config(config, provider_settings)  # ty:ignore[invalid-argument-type]
+    return await _get_vector_store_provider_for_config(config, provider_settings)
 
 
 @dependency_provider(ProviderDict, scope="singleton")
-def _get_all_provider_settings(
+async def _get_all_provider_settings(
     embedding_configs: AllEmbeddingConfigsDep = INJECTED,
     sparse_embedding_configs: AllSparseEmbeddingConfigsDep = INJECTED,
     reranking_configs: AllRerankingConfigsDep = INJECTED,
@@ -877,17 +878,17 @@ def _get_all_provider_settings(
 ) -> ProviderDict:
     """Factory to get all providers from settings."""
     embedding_providers = tuple(
-        _get_embedding_provider_for_config(cfg, registry) for cfg in embedding_configs or ()
+        await _get_embedding_provider_for_config(cfg, registry) for cfg in embedding_configs or ()
     )
     sparse_embedding_providers = tuple(
-        _get_sparse_embedding_provider_for_config(cfg, registry)
+        await _get_sparse_embedding_provider_for_config(cfg, registry)
         for cfg in sparse_embedding_configs or ()
     )
     reranking_providers = tuple(
-        _get_reranking_provider_for_config(cfg) for cfg in reranking_configs or ()
+        await _get_reranking_provider_for_config(cfg) for cfg in reranking_configs or ()
     )
     vector_store_providers = tuple(
-        _get_vector_store_provider_for_config(cfg, _get_primary_embedding_capability_group())
+        await _get_vector_store_provider_for_config(cfg, _get_primary_embedding_capability_group())
         for cfg in vector_store_configs or ()
     )
     return ProviderDict(

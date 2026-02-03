@@ -130,6 +130,8 @@ if TYPE_CHECKING:
         ToolOrPromptName,
     )
     from codeweaver.core.types.utils import (
+        add_enum_alias,
+        add_enum_member,
         clean_sentinel_from_schema,
         generate_field_title,
         generate_title,
@@ -240,6 +242,8 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "UUID7Hex": (__spec__.parent, "aliases"),
     "UUID7HexT": (__spec__.parent, "aliases"),
     "Unset": (__spec__.parent, "sentinel"),
+    "add_enum_alias": (__spec__.parent, "utils"),
+    "add_enum_member": (__spec__.parent, "utils"),
     "clean_sentinel_from_schema": (__spec__.parent, "utils"),
     "generate_field_title": (__spec__.parent, "utils"),
     "generate_title": (__spec__.parent, "utils"),
@@ -355,6 +359,8 @@ __all__ = (
     "UUID7Hex",
     "UUID7HexT",
     "Unset",
+    "add_enum_alias",
+    "add_enum_member",
     "clean_sentinel_from_schema",
     "generate_field_title",
     "generate_title",

@@ -35,6 +35,7 @@ from codeweaver.core.types import MISSING, BlakeHashKey, BlakeKey, Missing
 from codeweaver.core.utils import (
     get_blake_hash,
     get_git_branch,
+    has_package,
     sanitize_unicode,
     set_relative_path,
     uuid7,
@@ -44,7 +45,7 @@ from codeweaver.core.utils import (
 if TYPE_CHECKING:
     from codeweaver.core.types import AnonymityConversion, FilteredKeyT
 
-if importlib.util.find_spec("codeweaver.engine"):
+if has_package("codeweaver.engine"):
     SourceIdRegistry = importlib.import_module(
         "codeweaver.engine.chunker.registry"
     ).SourceIdRegistry

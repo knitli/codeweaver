@@ -9,7 +9,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any, Literal, NamedTuple, Self
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, Self
 
 from pydantic import PositiveInt
 from qdrant_client.http.models import Datatype
@@ -22,12 +22,17 @@ from qdrant_client.models import (
     VectorParams,
 )
 
+from codeweaver.core.constants import PRIMARY_SPARSE_VECTOR_NAME, PRIMARY_VECTOR_NAME
 from codeweaver.core.exceptions import InvalidEmbeddingModelError
 from codeweaver.core.types import ModelName, ModelNameT
 from codeweaver.providers.config.kinds import (
     EmbeddingProviderSettings,
     SparseEmbeddingProviderSettings,
 )
+
+
+if TYPE_CHECKING:
+    from codeweaver.providers.config.asymmetric import AsymmetricEmbeddingConfig
 from codeweaver.providers.embedding.capabilities.base import (
     EmbeddingModelCapabilities,
     SparseEmbeddingModelCapabilities,
@@ -38,11 +43,14 @@ class ConfiguredCapability(NamedTuple):
     """Contains a capability and its associated configuration.
 
     Note: user-defined capabilities may not have a capabilities object, but hopefully they define one :). If they don't we have to assume conservative defaults.
+
+    For asymmetric embedding configurations, the config field may be an AsymmetricEmbeddingConfig,
+    which contains both embed_provider and query_provider settings.
     """
 
     capability: EmbeddingModelCapabilities | SparseEmbeddingModelCapabilities | None
 
-    config: EmbeddingProviderSettings | SparseEmbeddingProviderSettings
+    config: EmbeddingProviderSettings | SparseEmbeddingProviderSettings | AsymmetricEmbeddingConfig
 
     @property
     def model_name(self) -> ModelNameT:
@@ -227,13 +235,12 @@ class EmbeddingCapabilityGroup(NamedTuple):
 
             # Create proper VectorParams object
             params["vectors"] = {
-                "primary": VectorParams(  # Changed from "dense" to "primary" (role-based architecture)
+                PRIMARY_VECTOR_NAME: VectorParams(  # Changed from "dense" to "primary" (role-based architecture)
                     size=size,
                     distance=Distance(distance_metric_name.title())
                     if isinstance(distance_metric_name, str)
                     else distance_metric_name or Distance("Cosine"),
                     on_disk=None,
-                    hnsw_config=None,
                     quantization_config=ScalarQuantization.model_construct(scalar={"type": "uint8"})
                     if datatype == "uint8"
                     else None,
@@ -243,7 +250,7 @@ class EmbeddingCapabilityGroup(NamedTuple):
         if self.sparse:
             datatype = await self.sparse.datatype()
             params["sparse_vectors"] = {
-                "sparse": SparseVectorParams.model_construct(
+                PRIMARY_SPARSE_VECTOR_NAME: SparseVectorParams.model_construct(
                     index=SparseIndexParams.model_construct(
                         datatype=Datatype(datatype) if datatype else Datatype.FLOAT16
                     ),

@@ -297,7 +297,9 @@ class TestGetProjectPath:
         """Test uses git rev-parse when no root_path provided."""
         # Clear env var to prevent it from overriding our test
         mocker.patch.dict("os.environ", {"CODEWEAVER_PROJECT_PATH": ""}, clear=False)
-        mocker.patch("codeweaver.core.utils.filesystem.try_git_rev_parse", return_value=temp_git_repo)
+        mocker.patch(
+            "codeweaver.core.utils.filesystem.try_git_rev_parse", return_value=temp_git_repo
+        )
         result = get_project_path()
         assert result == temp_git_repo
 
@@ -380,7 +382,9 @@ class TestSetRelativePath:
 
     def test_absolute_path_inside_project(self, mocker: MockerFixture, temp_git_repo: Path) -> None:
         """Test makes absolute path relative when inside project."""
-        mocker.patch("codeweaver.core.utils.filesystem.get_project_path", return_value=temp_git_repo)
+        mocker.patch(
+            "codeweaver.core.utils.filesystem.get_project_path", return_value=temp_git_repo
+        )
 
         abs_path = temp_git_repo / "src" / "module" / "file.py"
         result = set_relative_path(abs_path)
@@ -390,7 +394,9 @@ class TestSetRelativePath:
         self, mocker: MockerFixture, temp_git_repo: Path, tmp_path: Path
     ) -> None:
         """Test returns absolute path unchanged when outside project."""
-        mocker.patch("codeweaver.core.utils.filesystem.get_project_path", return_value=temp_git_repo)
+        mocker.patch(
+            "codeweaver.core.utils.filesystem.get_project_path", return_value=temp_git_repo
+        )
 
         outside_path = tmp_path / "external" / "file.py"
         result = set_relative_path(outside_path)
@@ -398,7 +404,9 @@ class TestSetRelativePath:
 
     def test_not_in_git_repo(self, mocker: MockerFixture, tmp_path: Path) -> None:
         """Test handles gracefully when not in git repository."""
-        mocker.patch("codeweaver.core.utils.filesystem.get_project_path", side_effect=FileNotFoundError)
+        mocker.patch(
+            "codeweaver.core.utils.filesystem.get_project_path", side_effect=FileNotFoundError
+        )
 
         abs_path = tmp_path / "file.py"
         result = set_relative_path(abs_path)
@@ -406,7 +414,9 @@ class TestSetRelativePath:
 
     def test_string_path_conversion(self, mocker: MockerFixture, temp_git_repo: Path) -> None:
         """Test handles string paths correctly."""
-        mocker.patch("codeweaver.core.utils.filesystem.get_project_path", return_value=temp_git_repo)
+        mocker.patch(
+            "codeweaver.core.utils.filesystem.get_project_path", return_value=temp_git_repo
+        )
 
         str_path = str(temp_git_repo / "src" / "file.py")
         result = set_relative_path(str_path)
@@ -432,7 +442,9 @@ class TestGetGitDir:
         self, mocker: MockerFixture, temp_git_repo: Path
     ) -> None:
         """Test finds project path when directory is not git repository."""
-        mocker.patch("codeweaver.core.utils.filesystem.get_project_path", return_value=temp_git_repo)
+        mocker.patch(
+            "codeweaver.core.utils.filesystem.get_project_path", return_value=temp_git_repo
+        )
 
         non_git = temp_git_repo.parent / "other"
         non_git.mkdir()
@@ -444,7 +456,9 @@ class TestGetGitDir:
         self, mocker: MockerFixture, temp_non_git_dir: Path
     ) -> None:
         """Test returns MISSING when git directory not found."""
-        mocker.patch("codeweaver.core.utils.filesystem.get_project_path", side_effect=FileNotFoundError)
+        mocker.patch(
+            "codeweaver.core.utils.filesystem.get_project_path", side_effect=FileNotFoundError
+        )
 
         result = _get_git_dir(temp_non_git_dir)
         assert result is MISSING
@@ -481,7 +495,9 @@ class TestGetGitRevision:
         self, mocker: MockerFixture, temp_non_git_dir: Path
     ) -> None:
         """Test returns MISSING for non-git directory."""
-        mocker.patch("codeweaver.core.utils.filesystem.get_project_path", side_effect=FileNotFoundError)
+        mocker.patch(
+            "codeweaver.core.utils.filesystem.get_project_path", side_effect=FileNotFoundError
+        )
 
         result = get_git_revision(temp_non_git_dir)
         assert result is MISSING
@@ -581,7 +597,9 @@ class TestGetGitBranch:
         mocker.patch("shutil.which", return_value="/usr/bin/git")
 
         # Mock _get_branch_from_origin to return MISSING
-        mocker.patch("codeweaver.core.utils.filesystem._get_branch_from_origin", return_value=MISSING)
+        mocker.patch(
+            "codeweaver.core.utils.filesystem._get_branch_from_origin", return_value=MISSING
+        )
 
         def mock_run(cmd: list[str], **kwargs):
             if "--abbrev-ref" in cmd and "HEAD" in cmd:
@@ -602,7 +620,9 @@ class TestGetGitBranch:
 
     def test_not_in_git_repo(self, mocker: MockerFixture, temp_non_git_dir: Path) -> None:
         """Test returns 'detached' when not in git repository."""
-        mocker.patch("codeweaver.core.utils.filesystem.get_project_path", side_effect=FileNotFoundError)
+        mocker.patch(
+            "codeweaver.core.utils.filesystem.get_project_path", side_effect=FileNotFoundError
+        )
 
         result = get_git_branch(temp_non_git_dir)
         assert result == "detached"
@@ -643,7 +663,10 @@ class TestInCodeweaverClone:
 
     def test_git_root_contains_codeweaver(self, mocker: MockerFixture, tmp_path: Path) -> None:
         """Test checks git root directory name."""
-        mocker.patch("codeweaver.core.utils.filesystem.try_git_rev_parse", return_value=tmp_path / "codeweaver")
+        mocker.patch(
+            "codeweaver.core.utils.filesystem.try_git_rev_parse",
+            return_value=tmp_path / "codeweaver",
+        )
 
         path = tmp_path / "other"
         assert in_codeweaver_clone(path) is True
@@ -673,7 +696,7 @@ class TestGitUtilsIntegration:
         """Test complete workflow in a real git repository."""
         # Clear env var to prevent it from overriding our test repo
         mocker.patch.dict("os.environ", {"CODEWEAVER_PROJECT_PATH": ""}, clear=False)
-        
+
         # Create real git repo
         repo = tmp_path / "test_repo"
         repo.mkdir()

@@ -24,6 +24,7 @@ from codeweaver.core import (
     Span,
     ValidationError,
 )
+from codeweaver.core.constants import ONE_POINT_ZERO, ZERO
 from codeweaver.server.agent_api.find_code.intent import IntentType
 
 
@@ -59,7 +60,7 @@ class CodeMatch(BasedModel):
     relevance_score: Annotated[
         NonNegativeFloat,
         Field(
-            le=1.0,
+            le=ONE_POINT_ZERO,
             description="""
         Adjusted relevance score (0.0-1.0).
 
@@ -250,7 +251,7 @@ class FindCodeResponseSummary(BasedModel):
     def populate_computed_fields(self) -> FindCodeResponseSummary:
         """Populate computed fields from other data."""
         # Set total_results from matches count if not already set
-        if self.total_results == 0 and self.matches:
+        if self.total_results == ZERO and self.matches:
             object.__setattr__(self, "total_results", len(self.matches))
 
         # Set languages_found from matches if not already populated

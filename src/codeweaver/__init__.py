@@ -56,7 +56,7 @@ def get_version() -> str:
         try:
             import importlib.metadata
 
-            __version__ = importlib.metadata.version("codeweaver")
+            __version__ = importlib.metadata.version("code-weaver")
         except importlib.metadata.PackageNotFoundError:
             try:
                 import shutil

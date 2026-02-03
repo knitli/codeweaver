@@ -23,6 +23,12 @@ from pydantic import Field, PositiveInt, computed_field
 from pydantic_settings import SettingsConfigDict
 
 from codeweaver.core import UNSET, BasedModel, Unset
+from codeweaver.core.constants import (
+    DEFAULT_MANAGEMENT_PORT,
+    DEFAULT_MAX_RESULTS,
+    DEFAULT_MAX_TOKENS,
+    LOCALHOST,
+)
 from codeweaver.engine.config import CodeWeaverEngineSettings
 from codeweaver.providers import ProviderSettings
 from codeweaver.server.config.mcp import MCPServerConfig, StdioCodeWeaverConfig
@@ -44,9 +50,6 @@ from codeweaver.server.mcp import McpMiddleware
 
 
 logger = logging.getLogger(__name__)
-
-ONE_MEGABYTE = 1 * 1024 * 1024
-
 
 DEFAULT_BASE_MIDDLEWARE = [
     f"codeweaver.server.mcp{mw}"
@@ -211,7 +214,7 @@ class CodeWeaverSettings(CodeWeaverEngineSettings):
     max_results: Annotated[
         PositiveInt | Unset,
         Field(
-            description="""Maximum code matches to return. Because CodeWeaver primarily indexes ast-nodes, a page can return multiple matches per file, so this is not the same as the number of files returned. This is the maximum number of code matches returned in a single response. The default is 15.""",
+            description="""Maximum code matches to return. Because CodeWeaver primarily indexes ast-nodes, a page can return multiple matches per file, so this is not the same as the number of files returned. This is the maximum number of code matches returned in a single response. """,
             validate_default=False,
         ),
     ] = UNSET
@@ -314,13 +317,13 @@ class CodeWeaverSettings(CodeWeaverEngineSettings):
     def _defaults(cls) -> dict[str, Any]:
         """Get a default settings dictionary."""
         return {
-            "token_limit": 15_000,
-            "max_results": 15,
+            "token_limit": DEFAULT_MAX_TOKENS,
+            "max_results": DEFAULT_MAX_RESULTS,
             "mcp_server": FastMcpHttpServerSettings().as_settings(),
             "stdio_server": FastMcpStdioServerSettings().as_settings(),
             "middleware": DefaultMiddlewareSettings,
-            "management_host": "127.0.0.1",
-            "management_port": 9329,
+            "management_host": LOCALHOST,
+            "management_port": DEFAULT_MANAGEMENT_PORT,
             "default_mcp_config": StdioCodeWeaverConfigDict(StdioCodeWeaverConfig().model_dump()),  # ty: ignore[missing-typed-dict-key, invalid-argument-type]
             "uvicorn": DefaultUvicornSettings,
             "endpoints": DefaultEndpointSettings,

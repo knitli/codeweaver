@@ -13,6 +13,7 @@ from collections.abc import Sequence
 from typing import Any, ClassVar
 
 from codeweaver.core import Provider, ProviderError
+from codeweaver.core.constants import DEFAULT_RERANKING_MAX_RESULTS
 from codeweaver.providers.reranking.providers.base import RerankingProvider
 
 
@@ -43,7 +44,12 @@ class FastEmbedRerankingProvider(RerankingProvider[TextCrossEncoder]):
     _provider: ClassVar[Provider] = Provider.FASTEMBED
 
     async def _execute_rerank(
-        self, query: str, documents: Sequence[str], *, top_n: int = 10, **kwargs: Any
+        self,
+        query: str,
+        documents: Sequence[str],
+        *,
+        top_n: int = DEFAULT_RERANKING_MAX_RESULTS,
+        **kwargs: Any,
     ) -> Any:
         """Execute the reranking process."""
         try:

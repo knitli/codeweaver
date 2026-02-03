@@ -24,7 +24,7 @@ def clean_registry():
 
     # Store original state - deep copy to preserve the list structure
     original_providers = {k: v.copy() for k, v in utils._providers.items()}
-    
+
     # Clear registry for test isolation
     utils._providers.clear()
 

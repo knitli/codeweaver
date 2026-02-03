@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Annotated, Any, Literal, Self
 from pydantic import ConfigDict, Field, PositiveFloat, PositiveInt
 
 from codeweaver.core import BasedModel, Provider, dependency_provider
+from codeweaver.core.utils import has_package
 
 
 if TYPE_CHECKING:
@@ -229,7 +230,7 @@ class EmbeddingModelCapabilities(BasedModel):
             pattern=r"^\d{1,2}\.\d{1,3}\.\d{1,3}$",
             description="""The version for the capabilities schema.""",
         ),
-    ] = "1.0.0"
+    ] = "1.1.0"
     hf_name: Annotated[
         str | None,
         Field(
@@ -269,11 +270,8 @@ class EmbeddingModelCapabilities(BasedModel):
         return None
 
 
-from importlib.util import find_spec
-
-
-HAS_FASTEMBED = find_spec("fastembed") is not None or find_spec("fastembed-gpu") is not None
-HAS_ST = find_spec("sentence_transformers") is not None
+HAS_FASTEMBED = has_package("fastembed") is not None or has_package("fastembed_gpu") is not None
+HAS_ST = has_package("sentence_transformers") is not None
 
 
 class SparseEmbeddingModelCapabilities(BasedModel):

@@ -12,6 +12,8 @@ import logging
 from typing import TYPE_CHECKING
 
 from codeweaver.core import DefaultLoggingSettings, LoggingSettingsDict, Unset
+from codeweaver.core.constants import DEFAULT_LOG_LEVEL, LOGGERS_TO_SUPPRESS
+from codeweaver.core.utils import is_tty
 
 
 if TYPE_CHECKING:
@@ -24,38 +26,7 @@ def _set_log_levels():
 
     Sets log levels AND removes handlers to prevent any output leakage.
     """
-    # List of loggers to suppress
-    loggers_to_suppress = (
-        "anthropic",
-        "aws",
-        "azure",
-        "boto3",
-        "botocore",
-        "cohere",
-        "fastapi",
-        "fastmcp",
-        "fastmcp.server",
-        "google",
-        "google.api_core",
-        "google.genai",
-        "hf",
-        "httpcore",
-        "httpx",
-        "httpx._client",
-        "huggingface_hub",
-        "mcp",
-        "mcp.server",
-        "mistral",
-        "ollama",
-        "openai",
-        "qdrant_client",
-        "uvicorn",
-        "uvicorn.access",
-        "uvicorn.error",
-        "voyage",
-    )
-
-    for logger_name in loggers_to_suppress:
+    for logger_name in LOGGERS_TO_SUPPRESS:
         logger_obj = logging.getLogger(logger_name)
         # Set level to CRITICAL to suppress almost everything
         logger_obj.setLevel(logging.CRITICAL)
@@ -76,8 +47,8 @@ def setup_logger(settings: DictView[CodeWeaverSettingsDict]) -> logging.Logger:
         if isinstance(settings.get("logging", {}), Unset)
         else settings.get("logging", {})
     )
-    level = app_logger_settings.get("level", 30)
-    use_rich = app_logger_settings.get("use_rich", True)
+    level = app_logger_settings.get("level", DEFAULT_LOG_LEVEL)
+    use_rich = app_logger_settings.get("use_rich", is_tty())
     rich_options = app_logger_settings.get("rich_options", {})
     logging_kwargs = app_logger_settings.get("dict_config", None)
     from codeweaver.core import setup_logger as setup_global_logging

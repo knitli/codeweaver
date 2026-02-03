@@ -43,7 +43,7 @@ logger = logging.getLogger(__name__)
 class ExtensionFilter(DefaultFilter):
     """Filter files by extension on top of the default directory/path ignores."""
 
-    __slots__ = ("extensions",)
+    __slots__ = ("_ignore_paths", "extensions")
 
     def __init__(
         self,

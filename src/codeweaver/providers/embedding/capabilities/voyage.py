@@ -58,8 +58,10 @@ class Voyage4ModelFamily(ModelFamily):
         "voyage-4",
         "voyage-4-lite",
         "voyage-4-nano",
+        "voyageai/voyage-4-nano",  # the huggingface name for voyage-4-nano
     })
     asymmetric_query_models: frozenset[str] = frozenset({
+        "voyageai/voyage-4-nano",
         "voyage-4-nano",
         "voyage-4-lite",
         "voyage-4",

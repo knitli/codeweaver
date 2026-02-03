@@ -8,7 +8,6 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from textwrap import dedent
 from typing import Any, TypedDict
 
 from fastmcp import FastMCP
@@ -17,14 +16,15 @@ from fastmcp.tools import Tool
 from mcp.types import ToolAnnotations
 
 from codeweaver.core import DictView, lazy_import
+from codeweaver.core.constants import (
+    CONTEXT_AGENT_TAGS,
+    FIND_CODE_DESCRIPTION,
+    FIND_CODE_TITLE,
+    USER_AGENT_TAGS,
+)
 from codeweaver.server.agent_api import FindCodeResponseSummary
 from codeweaver.server.mcp.types import ToolRegistrationDict
 from codeweaver.server.mcp.user_agent import find_code_tool
-
-
-USER_AGENT_TAGS = {"user", "external"}
-
-CONTEXT_AGENT_TAGS = {"context", "internal", "data"}
 
 
 class ToolCollectionDict(TypedDict):
@@ -65,32 +65,11 @@ TOOL_DEFINITIONS: DictView[ToolCollectionDict] = DictView(
             **ToolRegistrationDict(
                 fn=find_code_tool,
                 name="find_code",
-                description=dedent("""
-        CodeWeaver's `find_code` tool is an advanced code search function that leverages context and task-aware semantic search to identify and retrieve relevant code snippets from a codebase using natural language queries. `find_code` uses advanced sparse and dense embedding models, and reranking models to provide the best possible results, which are continuously updated. `find_code` is purpose-built to assist AI coding agents with getting exactly the information they need for any coding or repository task.
-
-        # Using `find_code`
-
-        **One Required Argument:**
-            - query: Provide a natural language query describing what you are looking for.
-
-        **Optional Arguments:**
-            - intent: Specify an intent to help narrow down the search results. Choose from: `understand`, `implement`, `debug`, `optimize`, `test`, `configure`, `document`.
-            - token_limit: Set a maximum number of tokens to return (default is 30000).
-            - focus_languages: Filter results by programming language(s). A list of languages using their common names (like "python", "javascript", etc.). CodeWeaver supports over 166 programming languages.
-
-        RETURNS:
-            A detailed summary of ranked matches and metadata. Including:
-            - matches: A list of code or documentation snippets *in ranked order by relevance* to the query. Each match includes:
-                - content: An object representing the code or documentation snippet or its syntax tree representation. These objects carry substantial metadata about the snippet depending on how it was retrieved. Metadata may include: language, size, importance, symbol, semantic role and relationships to other code snippets and symbols.
-                - file: The file and associated metadata where the snippet was found.
-                - span: A span object indicating the exact location of the snippet within the file.
-                - relevance_score: A numerical score indicating how relevant the snippet is to the query, normalized between 0 and 1. If all results have the same score, this is because they are ranked using reciprocal rank fusion and their scores are not directly comparable.
-
-        """),
+                description=FIND_CODE_DESCRIPTION,
                 enabled=True,
-                tags={"user", "external"},
+                tags=USER_AGENT_TAGS,
                 annotations=ToolAnnotations(
-                    title="CodeWeaver Find Code",
+                    title=FIND_CODE_TITLE,
                     readOnlyHint=True,
                     destructiveHint=False,
                     idempotentHint=True,

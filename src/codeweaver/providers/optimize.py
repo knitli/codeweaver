@@ -14,7 +14,6 @@ import subprocess
 
 from collections.abc import Callable
 from importlib import metadata
-from importlib.util import find_spec
 from types import ModuleType
 from typing import Literal, NotRequired, Required, TypedDict
 
@@ -36,9 +35,7 @@ logger = logging.getLogger(__name__)
 
 def _which_fastembed_dist() -> str | None:
     """Check if fastembed or fastembed-gpu is installed, and return which one."""
-    return next(
-        (dist for dist in ("fastembed-gpu", "fastembed") if find_spec(dist) is not None), None
-    )
+    return next((dist for dist in ("fastembed-gpu", "fastembed") if has_package(dist)), None)
 
 
 def _nvidia_smi_device_ids() -> list[int]:
@@ -169,6 +166,7 @@ class OptimizationDecisions(TypedDict, total=False):
     chunk_func: NotRequired[Callable[[int], int]]
     """A callable that takes the model's max_seq_length and returns the max chunk size to use."""
     use_small_batch_for_sparse: NotRequired[bool | None]
+    """Whether to use small batches for sparse models. """
 
 
 def _set_dense_optimization(opts: AvailableOptimizations) -> OptimizationDecisions:
@@ -248,28 +246,40 @@ def _set_cpu_optimizations() -> dict[
 
 def get_optimizations(model_kind: Literal["dense", "sparse", "both"]) -> OptimizationDecisions:
     """Determine the optimization strategy based on input parameters."""
-    opts = _get_general_optimizations_available()
-    dense_opts = _set_dense_optimization(opts)
-    sparse_opts = dense_opts
-    for key in ("use_small_chunks_for_dense", "chunk_func"):
-        _ = sparse_opts.pop(key, None)
-    sparse_opts = OptimizationDecisions(  # ty: ignore[missing-typed-dict-key]
-        **(
-            sparse_opts
-            | {
-                "use_small_batch_for_sparse": sparse_opts["backend"] == "onnx_gpu",
-                "backend": sparse_opts["backend"],
-                "dtype": sparse_opts["dtype"],
-            }
+    try:
+        opts = _get_general_optimizations_available()
+        dense_opts = _set_dense_optimization(opts)
+        sparse_opts = dense_opts
+        for key in ("use_small_chunks_for_dense", "chunk_func"):
+            _ = sparse_opts.pop(key, None)
+        sparse_opts = OptimizationDecisions(  # ty: ignore[missing-typed-dict-key]
+            **(
+                sparse_opts
+                | {
+                    "use_small_batch_for_sparse": sparse_opts["backend"] == "onnx_gpu",
+                    "backend": sparse_opts["backend"],
+                    "dtype": sparse_opts["dtype"],
+                }
+            )
         )
-    )
-    return (
-        dense_opts
-        if model_kind == "dense"
-        else sparse_opts
-        if model_kind == "sparse"
-        else OptimizationDecisions(**(dense_opts | sparse_opts))  # ty: ignore[missing-typed-dict-key]
-    )
+    except Exception as e:
+        logger.warning(
+            msg="Failed to determine optimizations, falling back to defaults.", exc_info=e
+        )
+        return OptimizationDecisions(
+            backend="torch" if has_package("torch") else "onnx",
+            dtype="float16",
+            use_small_chunks_for_dense=False,
+        )
+
+    else:
+        return (
+            dense_opts
+            if model_kind == "dense"
+            else sparse_opts
+            if model_kind == "sparse"
+            else OptimizationDecisions(**(dense_opts | sparse_opts))  # ty: ignore[missing-typed-dict-key]
+        )
 
 
 __all__ = (

@@ -7,8 +7,9 @@
 
 from __future__ import annotations
 
-from importlib.util import find_spec
 from typing import TYPE_CHECKING
+
+from codeweaver.core.utils import has_package
 
 
 if TYPE_CHECKING:
@@ -51,9 +52,9 @@ def check_provider_package_available(provider: Provider, kind: ProviderKind) -> 
         pkg_name = client_to_package.get(client)
         if not pkg_name:
             continue
-        if not find_spec(pkg_name):
+        if not has_package(pkg_name):
             # Special case for fastembed-gpu fallback
-            if pkg_name == "fastembed" and find_spec("fastembed_gpu"):
+            if pkg_name == "fastembed" and has_package("fastembed_gpu"):
                 continue
             return False
 

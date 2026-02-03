@@ -13,8 +13,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
+
 if TYPE_CHECKING:
-    from codeweaver.core.dependencies import CodeWeaverSettingsType
+    pass
 
 
 @pytest.fixture(autouse=True)

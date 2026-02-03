@@ -13,7 +13,6 @@ from __future__ import annotations
 import os
 import sys
 
-from importlib.util import find_spec
 from pathlib import Path
 from types import ModuleType
 from typing import TYPE_CHECKING, Annotated, Any, Literal, cast
@@ -39,6 +38,7 @@ from codeweaver.core import (
 from codeweaver.core.config.types import CodeWeaverSettingsDict
 from codeweaver.core.di import INJECTED
 from codeweaver.core.types.dictview import DictView
+from codeweaver.core.utils import has_package
 
 
 if TYPE_CHECKING:
@@ -232,7 +232,7 @@ def _identify_missing_dependencies(
         required_packages = [pkg for pkg in required_packages if pkg[0] != "uuid_extensions"]
 
     for display_name, module_name, _version in required_packages:
-        if find_spec(module_name):
+        if has_package(module_name):
             pkg_version = metadata.version(display_name)  # ty: ignore[unresolved-attribute]
             installed.append((display_name, pkg_version))
         else:

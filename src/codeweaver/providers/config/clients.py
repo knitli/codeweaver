@@ -15,7 +15,6 @@ The overall pattern:
 
 from __future__ import annotations
 
-import importlib
 import logging
 import os
 
@@ -27,10 +26,10 @@ from typing import (
     Any,
     Literal,
     NotRequired,
-    Required,
     Self,
     TypedDict,
     cast,
+    override,
 )
 
 import httpx
@@ -56,14 +55,22 @@ from codeweaver.core import (
     FilteredKeyT,
     LiteralProviderType,
     Provider,
-    ProviderLiteral,
 )
+from codeweaver.core.constants import (
+    DEFAULT_AGENT_TIMEOUT,
+    DEFAULT_EMBEDDING_TIMEOUT,
+    LOCALHOST_INDICATORS,
+    LOCALHOST_URL,
+    ONNX_CUDA_PROVIDER,
+)
+from codeweaver.core.types import LiteralStringT
+from codeweaver.core.utils import deep_merge_dicts, has_package
 from codeweaver.providers.config.types import HttpxClientParams
 
 
 logger = logging.getLogger(__name__)
 
-if TYPE_CHECKING and importlib.util.find_spec("google") is not None:
+if TYPE_CHECKING and has_package("google") is not None:
     from google.auth.credentials import Credentials as GoogleCredentials
 else:
     GoogleCredentials = Any
@@ -95,19 +102,16 @@ class GrpcParams(TypedDict, total=False):
     """A mapping of channel options. See grpc documentation for details. Note: max_send_message_length and max_receive_message_length can't be set here because qdrant_client will override them (always -1)."""
 
 
-if (
-    importlib.util.find_spec("fastembed") is not None
-    or importlib.util.find_spec("fastembed-gpu") is not None
-):
+if has_package("fastembed") is not None or has_package("fastembed_gpu") is not None:
     from fastembed.common.types import OnnxProvider
 else:
     OnnxProvider = object
 
-if importlib.util.find_spec("torch") is not None:
+if has_package("torch") is not None:
     from torch.nn import Module
 else:
     Module = object
-if importlib.util.find_spec("sentence-transformers") is not None:
+if has_package("sentence_transformers") is not None:
     from sentence_transformers.model_card import SentenceTransformerModelCardData
 else:
     SentenceTransformerModelCardData = object
@@ -382,7 +386,7 @@ class QdrantClientOptions(ClientOptions):
     def _is_local_url(url: str | AnyUrl) -> bool:
         """Determine if a URL is local."""
         host = (url.host if isinstance(url, AnyUrl) else url) or ""
-        return any(local in host for local in ("localhost", "127.0.0.1", "0.0.0.0"))  # noqa: S104
+        return any(local in host for local in LOCALHOST_INDICATORS)
 
     def _resolve_host_and_url(self) -> None:
         """Resolve host and url settings to avoid conflicts."""
@@ -411,7 +415,7 @@ class QdrantClientOptions(ClientOptions):
         The goal here is to ensure that only one of `location`, `url`, `host`, or `path` is set, as required by the Qdrant client.
         """
         if not (url_like_settings := (self.url, self.host, self.location, self.path)):
-            self.url = AnyUrl(url="http://127.0.0.1")
+            self.url = AnyUrl(url=LOCALHOST_URL)
             self.https = False
             return
         if ":memory:" in url_like_settings:
@@ -424,9 +428,7 @@ class QdrantClientOptions(ClientOptions):
         # we've already handled `:memory`
         if self.location:
             self.url = (
-                self.url or None
-                if self.location in {"localhost", "127.0.0.1", "0.0.0.0"}  # noqa: S104
-                else AnyUrl(self.location)
+                self.url or None if self.location in LOCALHOST_INDICATORS else AnyUrl(self.location)
             )
             self.host = self.host or None if self.url else self.location
             self._to_nones(["location", "path"])
@@ -644,7 +646,7 @@ class GoogleClientOptions(ClientOptions):
 
     api_key: SecretStr | None = None
     vertex_ai: bool = False
-    credentials: Any | None = None
+    credentials: GoogleCredentials | None = None
     project: str | None = None
     location: str | None = None
     debug_config: dict[str, Any] | None = None
@@ -698,14 +700,25 @@ class FastEmbedClientOptions(ClientOptions):
             device_ids = []
         object.__setattr__(self, "cuda", cuda)
         object.__setattr__(self, "device_ids", device_ids)
-        if cuda and (not self.providers or "CUDAExecutionProvider" not in self.providers):
-            object.__setattr__(
-                self, "providers", ["CUDAExecutionProvider", *(self.providers or [])]
-            )
+        if cuda and (not self.providers or ONNX_CUDA_PROVIDER not in self.providers):
+            object.__setattr__(self, "providers", [ONNX_CUDA_PROVIDER, *(self.providers or [])])
         return self
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         return {FilteredKey("cache_dir"): AnonymityConversion.HASH}
+
+
+class SentenceTransformersModelOptions(TypedDict, total=False):
+    """Options for SentenceTransformers models."""
+
+    torch_dtype: Literal["float", "float16", "bfloat16", "auto"] | None
+    attn_implementation: Literal["flash_attention_2", "spda", "eager"] | None
+    provider: OnnxProvider | None
+    """Onnx Provider if Onnx backend used."""
+    file_name: str | None
+    """Specific file name to load for onnx or openvino models."""
+    export: bool | None
+    """Whether to export the model to onnx/openvino format."""
 
 
 class SentenceTransformersClientOptions(ClientOptions):
@@ -713,7 +726,7 @@ class SentenceTransformersClientOptions(ClientOptions):
 
     _core_provider: Provider = Provider.SENTENCE_TRANSFORMERS
     _providers: tuple[Provider, ...] = (Provider.SENTENCE_TRANSFORMERS,)
-    tag: Literal["sentence-transformers"] = "sentence-transformers"
+    tag: Literal["sentence_transformers"] = "sentence_transformers"
 
     model_name_or_path: str | None = None
     modules: Iterable[Module] | None = None
@@ -726,19 +739,41 @@ class SentenceTransformersClientOptions(ClientOptions):
     revision: str | None = None
     local_files_only: bool = False
     token: bool | SecretStr | None = None
-    use_auth_token: bool | SecretStr | None = None
+    """Auth token for private/non-public models."""
     truncate_dim: int | None = None
-    model_kwargs: dict[str, Any] | None = None
+    model_kwargs: SentenceTransformersModelOptions | None = None
     tokenizer_kwargs: dict[str, Any] | None = None
     config_kwargs: dict[str, Any] | None = None
     model_card_data: SentenceTransformerModelCardData | None = None
     backend: Literal["torch", "onnx", "openvino"] = "torch"
+
+    def __init__(self, **data: Any) -> None:
+        """Initialize the SentenceTransformers client options."""
+        data = deep_merge_dicts(
+            self.default_kwargs_for_model(str(self.model_name_or_path)),  # type: ignore
+            data or {},  # type: ignore
+        )  # type: ignore
+        super().__init__(**data)
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         return {
             FilteredKey("cache_folder"): AnonymityConversion.HASH,
             FilteredKey("model_name_or_path"): AnonymityConversion.HASH,
         }
+
+    def _is_dense_model(self) -> bool:
+        """Determine if the model is a dense model based on its name."""
+        return (
+            False
+            if self.capabilities  # ty:ignore[unresolved-attribute]
+            and "sparse" in self.capabilities.__class__.__name__.lower()  # ty:ignore[unresolved-attribute]
+            else not self.model_name_or_path
+            or not any(
+                key
+                for key in ("sparse", "splade", "bm-25", "bm25", "attentions")
+                if key in str(self.model_name_or_path.lower())
+            )
+        )
 
     def __model_post_init__(self) -> None:
         """Post-initialization adjustments for specific models."""
@@ -755,17 +790,17 @@ class SentenceTransformersClientOptions(ClientOptions):
                     else self.model_kwargs.get("torch_dtype")
                 },
             )
-            if importlib.util.find_spec("flash_attention_2") is not None:
-                object.__setattr__(
-                    self,
-                    "model_kwargs",
-                    (self.model_kwargs or {})
-                    | {
-                        "attention_implementation": "flash_attention_2"
-                        if "attention_implementation" not in (self.model_kwargs or {})
-                        else self.model_kwargs.get("attention_implementation")
-                    },
-                )
+        if has_package("flash_attention_2"):
+            object.__setattr__(
+                self,
+                "model_kwargs",
+                (self.model_kwargs or {})
+                | {
+                    "attn_implementation": "flash_attention_2"
+                    if "attn_implementation" not in (self.model_kwargs or {})
+                    else self.model_kwargs.get("attn_implementation")
+                },
+            )
 
     def default_kwargs_for_model(
         self, *, model: str | None = None, query: bool = False
@@ -775,10 +810,10 @@ class SentenceTransformersClientOptions(ClientOptions):
         if not model:
             return {}
         extra: dict[str, Any] = {}
-        float16 = {"model_kwargs": {"torch_dtype": "torch.float16"}}
+        float16 = {"model_kwargs": {"torch_dtype": "float16"}}
         if "qwen3" in model.lower():
             extra = {
-                "instruction": "Use provided search results to of codebase data to retrieve relevant Documents that answer the Query.",
+                "instruction": "Use provided search results of codebase data to retrieve relevant Documents that answer the Query.",
                 "tokenizer_kwargs": {"padding_side": "left"},
                 **float16,
             }
@@ -883,7 +918,7 @@ class VoyageClientOptions(ClientOptions):
 
     api_key: SecretStr | None = None
     max_retries: PositiveInt = 0
-    timeout: PositiveFloat | None = None
+    timeout: PositiveFloat | None = DEFAULT_EMBEDDING_TIMEOUT
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         return {FilteredKey("api_key"): AnonymityConversion.BOOLEAN}
@@ -894,64 +929,6 @@ class VoyageClientOptions(ClientOptions):
 # ===========================================================================
 # *            Provider Connection and Rate Limit Settings
 # ===========================================================================
-
-
-class ConnectionRateLimitConfig(BasedModel):
-    """Settings for connection rate limiting."""
-
-    max_requests_per_second: PositiveInt | None
-    burst_capacity: PositiveInt | None
-    backoff_multiplier: PositiveFloat | None
-    max_retries: PositiveInt | None
-
-
-class ConnectionConfiguration(BasedModel):
-    """Settings for connection configuration. You probably don't need to set these unless you're doing something special."""
-
-    headers: Annotated[
-        dict[str, str] | None, Field(description="HTTP headers to include in requests.")
-    ] = None
-    rate_limits: Annotated[
-        ConnectionRateLimitConfig | None,
-        Field(description="Rate limit configuration for the connection."),
-    ] = None
-    httpx_config: Annotated[
-        HttpxClientParams | None,
-        Field(
-            description="You may optionally provide custom client parameters for the httpx client. CodeWeaver will use your parameters when it constructs its http client pool. You probably don't need this unless you need to handle unique auth or similar requirements."
-        ),
-    ] = None
-
-    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
-        return {
-            FilteredKey("headers"): AnonymityConversion.BOOLEAN,
-            FilteredKey("httpx_config"): AnonymityConversion.BOOLEAN,
-        }
-
-
-class BaseProviderSettings(BasedModel):
-    """Base settings for all providers."""
-
-    provider: Provider
-    connection: ConnectionConfiguration | None = None
-    tag: ProviderLiteral = Field(
-        default_factory=lambda data: (
-            data.get("provider").variable if isinstance(data, dict) else data.provider.variable
-        ),
-        exclude=True,
-        init=False,
-        description="Discriminator tag for the provider.",
-    )
-
-    def _telemetry_keys(self) -> None:
-        return None
-
-
-class BaseProviderSettingsDict(TypedDict, total=False):
-    """Base settings for all providers. Represents `BaseProviderSettings` in a TypedDict form."""
-
-    provider: Required[Provider]
-    connection: NotRequired[ConnectionConfiguration | None]
 
 
 # ===========================================================================
@@ -987,6 +964,7 @@ def discriminate_azure_embedding_client_options(v: Any) -> str:
 type GeneralEmbeddingClientOptionsType = Annotated[
     Annotated[SentenceTransformersClientOptions, Tag(Provider.SENTENCE_TRANSFORMERS.variable)]
     | Annotated[CohereClientOptions, Tag(Provider.COHERE.variable)]
+    | Annotated[FastEmbedClientOptions, Tag(Provider.FASTEMBED.variable)]
     | Annotated[OpenAIClientOptions, Tag(Provider.OPENAI.variable)]
     | Annotated[GoogleClientOptions, Tag(Provider.GOOGLE.variable)]
     | Annotated[HFInferenceClientOptions, Tag(Provider.HUGGINGFACE_INFERENCE.variable)]
@@ -1015,7 +993,7 @@ class BaseAnthropicClientOptions(ClientOptions):
     tag: Literal["anthropic", "anthropic-bedrock", "anthropic-azure", "anthropic-google", "groq"]
 
     base_url: AnyUrl | None = None
-    timeout: PositiveFloat | httpx.Timeout | None = None
+    timeout: PositiveFloat | httpx.Timeout | None = DEFAULT_AGENT_TIMEOUT
     max_retries: PositiveInt | None = None
     default_headers: Mapping[str, str] | None = None
     default_query: Mapping[str, object] | None = None
@@ -1146,6 +1124,43 @@ class OpenAIAgentClientOptions(OpenAIClientOptions):
     tag: Literal["openai"] = "openai"
 
 
+class PydanticGatewayClientOptions(ClientOptions):
+    """Client options for Pydantic Gateway-based embedding providers."""
+
+    _core_provider: Provider = Provider.PYDANTIC_GATEWAY
+    _providers: tuple[Provider, ...] = (Provider.PYDANTIC_GATEWAY,)
+    tag: Literal["gateway"] = "gateway"
+
+    upstream_provider: (
+        Literal["openai", "groq", "anthropic", "bedrock", "gemini", "google-vertex"]
+        | LiteralStringT
+    )
+    """The name of the upstream provider to use (e.g., 'openai'). The Literal type's values are the currently accepted values. We also allow any literal string for future compatibility."""
+    route: str | None = None
+    api_key: SecretStr | None = None
+    base_url: AnyUrl | None = None
+    http_client: httpx.Client | None = None
+
+    @override
+    def as_settings(self) -> tuple[str, dict[str, Any]]:  # ty:ignore[invalid-method-override]
+        """Return the client options as a dictionary suitable for passing as settings to the client constructor."""
+        settings = self.model_dump(
+            exclude={"_core_provider", "_providers", "tag", "advanced_http_options"}
+        )
+        upstream_provider = settings.pop("upstream_provider")
+        return upstream_provider, {k: self._filter_values(v) for k, v in settings.items()}
+
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
+        return {
+            FilteredKey(name): AnonymityConversion.BOOLEAN
+            for name in ("api_key", "http_client", "default_headers", "default_query")
+        } | (
+            {}
+            if "pydantic" in str(self.base_url)
+            else {FilteredKey("base_url"): AnonymityConversion.HASH}
+        )
+
+
 def discriminate_anthropic_agent_client_options(v: Any) -> str:
     """Identify the Anthropic agent provider settings type for discriminator field."""
     fields = list(v if isinstance(v, dict) else type(v).model_fields)
@@ -1179,18 +1194,80 @@ type AnthropicAgentClientOptionsType = Annotated[
     ),
 ]
 
-type GeneralAgentClientOptionsType = Annotated[
+type SimpleAgentClientOptionsType = Annotated[
     Annotated[CohereClientOptions, Tag(Provider.COHERE.variable)]
     | Annotated[OpenAIClientOptions, Tag(Provider.OPENAI.variable)]
     | Annotated[GoogleClientOptions, Tag(Provider.GOOGLE.variable)]
     | Annotated[HFInferenceClientOptions, Tag(Provider.HUGGINGFACE_INFERENCE.variable)]
-    | Annotated[MistralClientOptions, Tag(Provider.MISTRAL.variable)],
-    | Annotated[AnthropicAgentClientOptionsType, Tag("anthropic_agent")],
+    | Annotated[MistralClientOptions, Tag(Provider.MISTRAL.variable)]
+    | Annotated[PydanticGatewayClientOptions, Tag(Provider.PYDANTIC_GATEWAY.variable)],
     Field(
         description="Agent client options type.",
         discriminator=Discriminator(_discriminate_embedding_clients),
     ),
 ]
+
+
+def _discriminate_agent_clients(v: Any) -> str:
+    """Identify the general agent provider settings type for discriminator field."""
+    if tag := v.get("tag") if isinstance(v, dict) else getattr(v, "tag", None):
+        return "anthropic_agent" if "anthropic" in tag else "other_agent"
+    fields = list(v if isinstance(v, dict) else type(v).model_fields)
+    if any(
+        f
+        for f in fields
+        if f
+        in {
+            "aws_access_key_id",
+            "aws_secret_access_key",
+            "aws_account_id",
+            "botocore_session",
+            "client_name",
+            "environment",
+            "location",
+            "model_name",
+            "model_name_or_path",
+            "organization",
+            "project",
+            "region_name",
+            "profile_name",
+            "similarity_fn_name",
+            "token",
+            "vertex_ai",
+            "webhook_secret",
+            "websocket_base_url",
+        }
+    ):
+        return "other_agent"
+    if any(
+        f
+        for f in fields
+        if f
+        in {
+            "aws_secret_key",
+            "aws_access_key",
+            "aws_region",
+            "aws_profile",
+            "resource",
+            "azure_ad_token_provider",
+            "region",
+            "project_id",
+            "access_token",
+        }
+    ):
+        return "anthropic_agent"
+    return "other_agent"
+
+
+type GeneralAgentClientOptionsType = Annotated[
+    Annotated[AnthropicAgentClientOptionsType, Tag("anthropic_agent")]
+    | Annotated[SimpleAgentClientOptionsType, Tag("other_agent")],
+    Field(
+        description="General agent client options type.",
+        discriminator=Discriminator(_discriminate_agent_clients),
+    ),
+]
+
 
 class TavilyClientOptions(ClientOptions):
     """Client options for the Tavily data provider."""
@@ -1199,11 +1276,11 @@ class TavilyClientOptions(ClientOptions):
     _providers: tuple[Provider, ...] = (Provider.TAVILY,)
     tag: Literal["tavily"] = "tavily"
 
-    api_key: SecretStr | None = None
+    api_key: SecretStr | str | None = None
     company_info_tags: Sequence[str] | None = None
     proxies: dict[str, str] | None = None
     api_base_url: AnyUrl | None = None
-    timeout: PositiveFloat | None = None
+    timeout: PositiveFloat | None = DEFAULT_AGENT_TIMEOUT
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         return {
@@ -1211,6 +1288,7 @@ class TavilyClientOptions(ClientOptions):
             FilteredKey("proxies"): AnonymityConversion.BOOLEAN,
             FilteredKey("api_base_url"): AnonymityConversion.HASH,
         }
+
 
 class DuckDuckGoClientOptions(ClientOptions):
     """Client options for the DuckDuckGo data provider."""
@@ -1224,31 +1302,55 @@ class DuckDuckGoClientOptions(ClientOptions):
     verify: bool = True
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
-        return {
-            FilteredKey("proxy"): AnonymityConversion.BOOLEAN,
-        }
+        return {FilteredKey("proxy"): AnonymityConversion.BOOLEAN}
 
+
+def _data_client_options_discriminator(v: Any) -> str:
+    """Identify the data client provider settings type for discriminator field."""
+    fields = list(v if isinstance(v, dict) else type(v).model_fields)
+    if any(
+        field in fields for field in ("company_info_tags", "api_base_url", "proxies", "api_key")
+    ):
+        return "tavily"
+    return "duckduckgo"
+
+
+type GeneralDataClientOptionsType = Annotated[
+    Annotated[TavilyClientOptions, Tag(Provider.TAVILY.variable)]
+    | Annotated[DuckDuckGoClientOptions, Tag(Provider.DUCKDUCKGO.variable)],
+    Field(
+        description="Data client options type.",
+        discriminator=Discriminator(_data_client_options_discriminator),
+    ),
+]
 
 
 __all__ = (
-    "BaseProviderSettings",
-    "BaseProviderSettingsDict",
+    "AnthropicAgentClientOptionsType",
+    "AnthropicAzureClientOptions",
+    "AnthropicBedrockClientOptions",
+    "AnthropicClientOptions",
+    "AnthropicGoogleVertexClientOptions",
     "BedrockClientOptions",
     "ClientOptions",
     "CohereClientOptions",
-    "ConnectionConfiguration",
-    "ConnectionRateLimitConfig",
+    "DuckDuckGoClientOptions",
     "FastEmbedClientOptions",
+    "GeneralAgentClientOptionsType",
+    "GeneralDataClientOptionsType",
     "GeneralEmbeddingClientOptionsType",
     "GeneralRerankingClientOptionsType",
     "GoogleClientOptions",
+    "GroqClientOptions",
     "GrpcParams",
     "HFInferenceClientOptions",
     "HttpxClientParams",
     "MistralClientOptions",
     "OpenAIClientOptions",
+    "PydanticGatewayClientOptions",
     "QdrantClientOptions",
     "SentenceTransformersClientOptions",
+    "TavilyClientOptions",
     "VoyageClientOptions",
     "discriminate_azure_embedding_client_options",
 )

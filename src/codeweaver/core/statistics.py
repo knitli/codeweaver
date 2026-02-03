@@ -10,13 +10,13 @@ Statistics tracking for CodeWeaver, including file indexing, retrieval, and sess
 from __future__ import annotations
 
 import contextlib
-import importlib
 import statistics
 import time
 
 from collections import Counter, defaultdict
 from collections.abc import Awaitable, Callable, Sequence
 from datetime import datetime
+from enum import Enum
 from functools import cache
 from pathlib import Path
 from types import MappingProxyType
@@ -39,6 +39,14 @@ from pydantic import (
 from starlette.responses import PlainTextResponse
 
 from codeweaver.core import BasedModel
+from codeweaver.core.constants import (
+    CLOUD_EMBEDDING_COST_PER_1K_TOKENS,
+    CLOUD_RERANKING_COST_PER_1K_TOKENS,
+    CONTEXT_AGENT_COST_PER_1K_TOKENS,
+    LOCAL_EMBEDDING_COST_PER_1K_TOKENS,
+    USER_AGENT_COST_PER_1K_TOKENS,
+    ZERO,
+)
 from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
 from codeweaver.core.metadata import ChunkKind, ExtKind
 from codeweaver.core.types import (
@@ -56,13 +64,44 @@ from codeweaver.core.types import (
     SummaryKey,
     TimingStatisticsDict,
     ToolOrPromptName,
+    add_enum_alias,
     generate_field_title,
 )
-from codeweaver.core.utils import uuid7, uuid7_as_timestamp
+from codeweaver.core.utils import has_package, uuid7, uuid7_as_timestamp
 
 
 if TYPE_CHECKING:
     from codeweaver.core import CodeChunk, DiscoveredFile
+
+
+async def _is_cloud_embedding_model() -> bool:
+    """Check if the configured primary embedding model is a cloud embedding model."""
+    if has_package("codeweaver.providers"):
+        from codeweaver.core.di.container import get_container
+        from codeweaver.providers.config.kinds import EmbeddingProviderSettingsType
+
+        container = get_container()
+        embedding_settings = await container.resolve(EmbeddingProviderSettingsType)
+        if embedding_settings is not None:
+            provider = embedding_settings.provider
+            return provider.is_cloud_provider()
+    # most of them are cloud, so we default to True
+    return True
+
+
+async def _is_cloud_reranking_model() -> bool:
+    """Check if the configured primary reranking model is a cloud reranking model."""
+    if has_package("codeweaver.providers"):
+        from codeweaver.core.di.container import get_container
+        from codeweaver.providers.config.kinds import RerankingProviderSettingsType
+
+        container = get_container()
+        reranking_settings = await container.resolve(RerankingProviderSettingsType)
+        if reranking_settings is not None:
+            provider = reranking_settings.provider
+            return provider.is_cloud_provider()
+    # most of them are cloud, so we default to True
+    return True
 
 
 class TimingStatistics(BasedModel):
@@ -316,19 +355,19 @@ class _LanguageStatistics(BasedModel):
     ]
     indexed: Annotated[
         NonNegativeInt, Field(description="""Number of files indexed for this language.""")
-    ] = 0
+    ] = ZERO
     retrieved: Annotated[
         NonNegativeInt, Field(description="""Number of files retrieved for this language.""")
-    ] = 0
+    ] = ZERO
     processed: Annotated[
         NonNegativeInt, Field(description="""Number of files processed for this language.""")
-    ] = 0
+    ] = ZERO
     reindexed: Annotated[
         NonNegativeInt, Field(description="""Number of files reindexed for this language.""")
-    ] = 0
+    ] = ZERO
     skipped: Annotated[
         NonNegativeInt, Field(description="""Number of files skipped for this language.""")
-    ] = 0
+    ] = ZERO
     unique_files: ClassVar[Annotated[set[Path], Field(init=False, repr=False, exclude=True)]] = (
         set()
     )
@@ -336,19 +375,19 @@ class _LanguageStatistics(BasedModel):
     # Chunk tracking fields
     chunks_created: Annotated[
         NonNegativeInt, Field(description="""Total number of chunks created for this language.""")
-    ] = 0
+    ] = ZERO
     semantic_chunks: Annotated[
         NonNegativeInt,
         Field(description="""Number of semantic/AST-based chunks created for this language."""),
-    ] = 0
+    ] = ZERO
     delimiter_chunks: Annotated[
         NonNegativeInt,
         Field(description="""Number of delimiter/text-block chunks created for this language."""),
-    ] = 0
+    ] = ZERO
     file_chunks: Annotated[
         NonNegativeInt,
         Field(description="""Number of whole-file chunks created for this language."""),
-    ] = 0
+    ] = ZERO
     chunk_sizes: list[int] = Field(
         default_factory=list,
         description="""List of chunk content sizes (character counts) for statistics.""",
@@ -364,7 +403,7 @@ class _LanguageStatistics(BasedModel):
     @property
     def unique_count(self) -> NonNegativeInt:
         """Get the number of unique files for this language (excluding skipped)."""
-        return len(self.unique_files) if self.unique_files else 0
+        return len(self.unique_files) if self.unique_files else ZERO
 
     @computed_field
     @property
@@ -730,13 +769,13 @@ class FileStatistics(BasedModel):
         language_summary: dict[str | SemanticSearchLanguage | ConfigLanguage, LanguageSummary] = (
             defaultdict(
                 lambda: {
-                    "unique_files": 0,
-                    "total_operations": 0,
-                    "indexed": 0,
-                    "retrieved": 0,
-                    "processed": 0,
-                    "reindexed": 0,
-                    "skipped": 0,
+                    "unique_files": ZERO,
+                    "total_operations": ZERO,
+                    "indexed": ZERO,
+                    "retrieved": ZERO,
+                    "processed": ZERO,
+                    "reindexed": ZERO,
+                    "skipped": ZERO,
                 }
             )
         )
@@ -827,6 +866,25 @@ class TokenCategory(BaseEnum):
         return self in (TokenCategory.CONTEXT_AGENT, TokenCategory.SAVED_BY_CONTEXT_AGENT)
 
 
+class TokenCost(float, Enum):
+    """Cost categories for token usage."""
+
+    CLOUD_EMBEDDING = CLOUD_EMBEDDING_COST_PER_1K_TOKENS
+    CLOUD_RERANKING = CLOUD_RERANKING_COST_PER_1K_TOKENS
+
+    LOCAL_EMBEDDING = LOCAL_EMBEDDING_COST_PER_1K_TOKENS
+
+    CONTEXT_AGENT = CONTEXT_AGENT_COST_PER_1K_TOKENS
+    USER_AGENT = USER_AGENT_COST_PER_1K_TOKENS
+
+    def expense(self, token_count: NonNegativeInt) -> float:
+        """Calculate the expense for a given number of tokens."""
+        return (self / 1000) * token_count
+
+
+add_enum_alias(TokenCost.LOCAL_EMBEDDING, "LOCAL_RERANKING")
+
+
 class TokenCounter(Counter[TokenCategory]):
     """A counter for tracking token usage by operation."""
 
@@ -834,12 +892,14 @@ class TokenCounter(Counter[TokenCategory]):
         """Initialize the TokenCounter with zero counts for all token categories."""
         super().__init__()
         self.update({
-            TokenCategory.EMBEDDING: 0,
-            TokenCategory.RERANKING: 0,
-            TokenCategory.SPARSE_EMBEDDING: 0,
-            TokenCategory.CONTEXT_AGENT: 0,
-            TokenCategory.USER_AGENT: 0,
-            TokenCategory.SEARCH_RESULTS: 0,
+            TokenCategory.EMBEDDING: ZERO,
+            TokenCategory.RERANKING: ZERO,
+            TokenCategory.SPARSE_EMBEDDING: ZERO,
+            TokenCategory.CONTEXT_AGENT: ZERO,
+            TokenCategory.USER_AGENT: ZERO,
+            TokenCategory.SEARCH_RESULTS: ZERO,
+            TokenCategory.SAVED_BY_RERANKING: ZERO,
+            TokenCategory.SAVED_BY_CONTEXT_AGENT: ZERO,
         })
 
     @computed_field
@@ -874,9 +934,11 @@ class TokenCounter(Counter[TokenCategory]):
 
             Even if we had those numbers, they would still be lower bounds, because they don't account for increases in overall turns and token expenditure if CodeWeaver was never used. Let's call this the "blind bumbling savings" of CodeWeaver.
         """
-        return (self[TokenCategory.SEARCH_RESULTS] - self[TokenCategory.USER_AGENT]) + self[
-            TokenCategory.SAVED_BY_RERANKING
-        ]
+        return (
+            (self[TokenCategory.SEARCH_RESULTS] - self[TokenCategory.USER_AGENT])
+            + self[TokenCategory.SAVED_BY_RERANKING]
+            + self[TokenCategory.SAVED_BY_CONTEXT_AGENT]
+        )
 
     @computed_field
     @property
@@ -899,21 +961,25 @@ class TokenCounter(Counter[TokenCategory]):
             - Any "savings" are calculated against this assumed cost.
           - You can probably tell from the pricing that it is *much* more expensive to use an LLM, especially a front-line model, than it is to use embedding, reranking, and sparse models paired with lower cost agents (about two orders of magnitude less if my math is right).
         """
-        embedding_cost_per_1k = 0.00018
-        reranking_cost_per_1k = 0.00005
-        _sparse_cost_per_1k = 0.0  # we don't track sparse token use because costs are negligible compared to everything else
-        context_agent_cost_per_1k = 0.00025
-        user_agent_cost_per_1k = (0.8 * 0.003) + (0.2 * 0.015)
-
         # costs incurred by CodeWeaver
-        embedding_cost: float = self[TokenCategory.EMBEDDING] / 1000 * embedding_cost_per_1k
-        reranking_cost: float = self[TokenCategory.RERANKING] / 1000 * reranking_cost_per_1k
-        context_agent_cost: float = (
-            self[TokenCategory.CONTEXT_AGENT] / 1000 * context_agent_cost_per_1k
+        embedding_cost: float = (
+            TokenCost.CLOUD_EMBEDDING.expense(self[TokenCategory.EMBEDDING])
+            if _is_cloud_embedding_model()
+            else TokenCost.LOCAL_EMBEDDING.expense(self[TokenCategory.EMBEDDING])
+        )
+        reranking_cost: float = (
+            TokenCost.CLOUD_RERANKING.expense(self[TokenCategory.RERANKING])
+            if _is_cloud_reranking_model()
+            else TokenCost.LOCAL_RERANKING.expense(self[TokenCategory.RERANKING])
+        )  # ty:ignore[unresolved-attribute]
+        context_agent_cost: float = TokenCost.CONTEXT_AGENT.expense(
+            self[TokenCategory.CONTEXT_AGENT]
         )
 
-        user_agent_received: float = self[TokenCategory.USER_AGENT] / 1000 * user_agent_cost_per_1k
-        user_agent_savings: float = self.context_saved / 1000 * user_agent_cost_per_1k
+        user_agent_received: float = (
+            self[TokenCategory.USER_AGENT] / 1000 * USER_AGENT_COST_PER_1K_TOKENS
+        )
+        user_agent_savings: float = self.context_saved / 1000 * USER_AGENT_COST_PER_1K_TOKENS
 
         return user_agent_savings - (
             embedding_cost + reranking_cost + context_agent_cost + user_agent_received
@@ -1029,7 +1095,7 @@ class SessionStatistics(BasedModel):
             self.token_statistics = TokenCounter()
         if not self.failover_statistics:
             self.failover_statistics = FailoverStats()
-        if not self.semantic_statistics and importlib.util.find_spec("codeweaver.semantic"):
+        if not self.semantic_statistics and has_package("codeweaver.semantic"):
             from codeweaver.semantic.classifications import UsageMetrics
 
             self.semantic_statistics = UsageMetrics(category_usage_counts=Counter())

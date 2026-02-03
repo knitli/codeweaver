@@ -65,25 +65,27 @@ from pydantic import Field
 from pydantic_core import from_json
 
 from codeweaver.core import BasedModel, MissingValueError
+from codeweaver.core.constants import (
+    CODEWEAVER_DESCRIPTION,
+    CODEWEAVER_ICON,
+    DEFAULT_MCP_PORT,
+    DEFAULT_MCP_TIMEOUT,
+    LOCALHOST_URL,
+    MCP_ENDPOINT,
+)
 
 
 if TYPE_CHECKING:
     from codeweaver.core import AnonymityConversion, FilteredKeyT
     from codeweaver.server.config import CodeWeaverMCPConfigDict, StdioCodeWeaverConfigDict
 
-CODEWEAVER_DESCRIPTION = "CodeWeaver advanced code search and understanding server."
-
-CODEWEAVER_ICON = (
-    "https://raw.githubusercontent.com/knitli/codeweaver/main/docs/assets/codeweaver-primary.svg"
-)
-
 
 class CodeWeaverMCPConfig(BasedModel, FastMCPRemoteMCPServer):
     """Configuration model for CodeWeaver configuration in mcp.json files."""
 
-    url: str = "http://127.0.0.1:9328/mcp"
+    url: str = f"{LOCALHOST_URL}:{DEFAULT_MCP_PORT}{MCP_ENDPOINT}"
 
-    timeout: int | None = 120
+    timeout: int | None = DEFAULT_MCP_TIMEOUT
     description: str | None = CODEWEAVER_DESCRIPTION
     icon: str | None = CODEWEAVER_ICON
 

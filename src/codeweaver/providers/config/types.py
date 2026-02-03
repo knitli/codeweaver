@@ -5,12 +5,20 @@
 
 """Shared types for providers configurations."""
 
+import asyncio
 import ssl
 
 from collections.abc import Callable, Mapping
-from typing import Any, Literal, NotRequired, TypedDict
+from dataclasses import asdict, dataclass, field
+from typing import TYPE_CHECKING, Any, Literal, NotRequired, TypedDict
 
 from pydantic import NonNegativeInt, PositiveInt
+
+from codeweaver.core.constants import ZERO
+
+
+if TYPE_CHECKING:
+    from qdrant_client.models import Document
 
 
 # Mirror types to avoid httpx dependency at module initialization
@@ -62,4 +70,56 @@ class CohereRequestOptionsDict(TypedDict, total=False):
     """Additional query parameters to include in the request."""
 
 
-__all__ = ("CohereRequestOptionsDict", "HttpxClientParams")
+@dataclass(slots=True)
+class Bm25Config:
+    """CodeWeaver's BM25 configuration for Qdrant vector store."""
+
+    k: float = 1.2
+    "Frequency term saturation. Higher values = more impact on term frequency."
+    b: float = 0.3
+    "Document length normalization (0 to 1) -- higher numbers penalize long documents. We set this low because document length is not well correlated to relevance for code."
+    avg_len: int = 512
+    "Average document length for BM25 normalization. This is a placeholder value, in practice it's computed from the text batch for embedding."
+    tokenizer = "WORD"
+    "Tokenizer type to use for BM25. WORD is currently the best available for code, though less than ideal. Trying to submit a code specific tokenizer upstream is on the to-do list."
+    language: Literal["none"] = "none"
+    "Language for the tokenizer and stemmer -- we disable it with 'none' because language normalization messes up code."
+    lowercase: bool = True
+    "Whether to lowercase tokens. Defaults to True."
+    ascii_folding: bool = False
+    "Whether to fold ASCII characters. Defaults to False."
+    stopwords: None = None
+    "Stopwords to remove. Set to None to avoid loss of keywords like 'as' 'is', 'with' that have significance in code."
+    stemmer: None = None
+    "Stemmer to use for tokens. Set to None to avoid stemming code tokens."
+    min_token_len: int = 1
+    "Minimum token length to include in the index."
+    max_token_len: int = 128
+    "Maximum token length to include in the index."
+
+    async def serialize_for_upsert(self, avg_length: int) -> dict[str, Any]:
+        """Serialize the BM25 config for Qdrant upsert, updating avg_len."""
+        await asyncio.sleep(ZERO)
+        self.avg_len = avg_length
+        return asdict(self)
+
+
+@dataclass(slots=True)
+class DocumentRepr:
+    """A shell representation of a `qdrant_client.models.Document`. Document itself requires text for embedding, and a model name, which in our case is always `Qdrant/Bm25`, but this representation only includes the fields necessary for configuration purposes.
+
+    We don't currently allow users to set these options directly -- we want to experiment and identify optimal configuration for general and specific code search use cases, so we need to control these settings internally.
+    """
+
+    model: Literal["Qdrant/Bm25"] = "Qdrant/Bm25"
+    options: Bm25Config = field(default_factory=Bm25Config)
+
+    async def serialize_for_upsert(self, texts: list[str]) -> list[Document]:
+        """Serialize the document representations for Qdrant upsert."""
+        await asyncio.sleep(ZERO)
+        avg_length = int(sum(len(text.strip()) for text in texts) / len(texts)) if texts else 0
+        options = await self.options.serialize_for_upsert(avg_length)
+        return [Document(text=text, model=self.model, options=options) for text in texts]
+
+
+__all__ = ("Bm25Config", "CohereRequestOptionsDict", "DocumentRepr", "HttpxClientParams")

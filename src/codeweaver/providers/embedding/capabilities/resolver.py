@@ -10,16 +10,11 @@ Provides lazy loading and resolution of embedding model capabilities by model na
 from __future__ import annotations
 
 from types import MappingProxyType
-from typing import TYPE_CHECKING
 
 from codeweaver.core import dependency_provider
 from codeweaver.providers import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.capabilities.base import SparseEmbeddingModelCapabilities
 from codeweaver.providers.types import BaseCapabilityResolver, EmbeddingCapabilityType
-
-
-if TYPE_CHECKING:
-    pass  # Keep for consistency
 
 
 @dependency_provider(scope="singleton")
@@ -74,6 +69,9 @@ class EmbeddingCapabilityResolver(BaseCapabilityResolver[EmbeddingModelCapabilit
         from codeweaver.providers.embedding.capabilities.mixedbread_ai import (
             get_mixedbread_ai_embedding_capabilities,
         )
+        from codeweaver.providers.embedding.capabilities.morph import (
+            get_morph_embedding_capabilities,
+        )
         from codeweaver.providers.embedding.capabilities.nomic_ai import (
             get_nomic_ai_embedding_capabilities,
         )
@@ -112,6 +110,7 @@ class EmbeddingCapabilityResolver(BaseCapabilityResolver[EmbeddingModelCapabilit
             get_minishlab_embedding_capabilities,
             get_mistral_embedding_capabilities,
             get_mixedbread_ai_embedding_capabilities,
+            get_morph_embedding_capabilities,
             get_nomic_ai_embedding_capabilities,
             get_openai_embedding_capabilities,
             get_qwen_embedding_capabilities,

@@ -26,6 +26,7 @@ from typing import (
 
 from pydantic import BeforeValidator, Field, FieldSerializationInfo, PrivateAttr, field_serializer
 
+from codeweaver.core.constants import DEFAULT_LOG_LEVEL, DEFAULT_RICH_HANDLER_OPTIONS
 from codeweaver.core.types.enum import AnonymityConversion
 from codeweaver.core.types.models import BasedModel
 from codeweaver.core.utils.environment import (
@@ -215,7 +216,7 @@ def _from_env_log_level() -> Literal[0, 10, 20, 30, 40, 50]:
             return (
                 int(level_str)
                 if level_str in {"0", "10", "20", "30", "40", "50"}
-                else logging.WARNING  # ty: ignore[invalid-return-type]
+                else DEFAULT_LOG_LEVEL  # ty:ignore[invalid-return-type]
             )
         level_str = level_str.upper()
         level_map = {
@@ -225,8 +226,8 @@ def _from_env_log_level() -> Literal[0, 10, 20, 30, 40, 50]:
             "ERROR": logging.ERROR,
             "CRITICAL": logging.CRITICAL,
         }
-        return level_map.get(level_str, logging.WARNING)  # ty: ignore[invalid-return-type]
-    return logging.WARNING
+        return level_map.get(level_str, DEFAULT_LOG_LEVEL)  # ty: ignore[invalid-return-type]
+    return DEFAULT_LOG_LEVEL
 
 
 class LoggingSettingsDict(TypedDict, total=False):
@@ -257,14 +258,7 @@ DefaultLoggingSettings = LoggingSettingsDict({
     "name": "codeweaver",
     "level": cast(Literal[0, 10, 20, 30, 40, 50], _from_env_log_level()),
     "use_rich": is_tty(),
-    "rich_options": {
-        "show_time": True,
-        "show_level": True,
-        "show_path": True,
-        "rich_tracebacks": False,
-    }
-    if is_tty()
-    else {},
+    "rich_options": DEFAULT_RICH_HANDLER_OPTIONS if is_tty() else {},
 })
 
 

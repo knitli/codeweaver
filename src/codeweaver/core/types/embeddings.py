@@ -338,6 +338,10 @@ class ChunkEmbeddings(BasedModel):
         new_embeddings[intent] = embedding_info
         return self.model_copy(update={"embeddings": new_embeddings})
 
+    def get_model_by_vector_intent(self, intent: str) -> ModelNameT | None:
+        """Get the model name used for a specific embedding intent, if it exists."""
+        return self.embeddings.get(intent).model if intent in self.embeddings else None
+
     @property
     def models(self) -> tuple[ModelNameT, ...]:
         """Get all unique models used for the embeddings."""

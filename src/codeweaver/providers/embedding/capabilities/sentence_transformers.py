@@ -34,7 +34,7 @@ CAP_MAP: dict[
         "sentence-transformers/multi-qa-MiniLM-L6-cos-v1",
         "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
         "sentence-transformers/paraphrase-multilingual-mpnet-base-v2",
-        "voyage-4-nano",
+        "voyageai/voyage-4-nano",
     ],
     tuple[SentenceTransformersProvider, ...],
 ] = {
@@ -70,7 +70,7 @@ CAP_MAP: dict[
         Provider.HUGGINGFACE_INFERENCE,
         Provider.SENTENCE_TRANSFORMERS,
     ),
-    "voyage-4-nano": (Provider.SENTENCE_TRANSFORMERS,),
+    "voyageai/voyage-4-nano": (Provider.SENTENCE_TRANSFORMERS,),
 }
 
 
@@ -273,7 +273,7 @@ SENTENCE_TRANSFORMERS_PARAPHRASE_MULTILINGUAL_MPNET_BASE_V2_CAPABILITIES: Partia
 }
 
 VOYAGE_4_NANO_CAPABILITIES: PartialCapabilities = {
-    "name": "voyage-4-nano",
+    "name": "voyageai/voyage-4-nano",
     "default_dimension": 1024,
     "context_window": 32_000,
     "preferred_metrics": ("dot",),

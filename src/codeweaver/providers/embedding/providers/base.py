@@ -62,9 +62,21 @@ from codeweaver.core import (
     uuid7,
 )
 from codeweaver.core import ValidationError as CodeWeaverValidationError
+from codeweaver.core.constants import (
+    DEFAULT_OPEN_BREAKER_DURATION,
+    FLOAT_ZERO,
+    MAX_RETRY_ATTEMPTS,
+    ONE,
+    ONE_MEGABYTE,
+    ONE_POINT_ZERO,
+    ZERO,
+)
 from codeweaver.core.types import ModelNameT
 from codeweaver.providers.config import EmbeddingConfigT, EmbeddingProviderSettings
-from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+from codeweaver.providers.embedding.capabilities.base import (
+    EmbeddingModelCapabilities,
+    SparseEmbeddingModelCapabilities,
+)
 from codeweaver.providers.embedding.registry import EmbeddingRegistry
 from codeweaver.providers.exceptions import CircuitBreakerOpenError
 from codeweaver.providers.types import CircuitBreakerState
@@ -74,12 +86,7 @@ if TYPE_CHECKING:
     from codeweaver.core import FilteredKeyT, SerializedStrOnlyCodeChunk, StructuredDataInput
 
 
-ONE_KB = 1024
-ONE_MB = ONE_KB * 1024  # I guess it could be ONE_KB** but that'd be confusing
-
-DEFAULT_MAX_TOKENS = 120_000
-
-OPEN_CIRCUIT_DURATION = 30.0  # seconds
+DEFAULT_MAX_BATCH_TOKENS = 120_000
 
 type EmbeddingImplementationDeps = Annotated[Any, depends(lambda: None)]
 "Implementation-specific dependencies for the provider. To use this type, implement a dependency provider callable and register it with the DI system using this type as the key."
@@ -211,16 +218,16 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
     model_options: dict[str, Any] = Field(default_factory=dict, exclude=True)
 
     _provider: ClassVar[LiteralProvider] = cast(LiteralProvider, Provider.NOT_SET)
-    _max_tokens: ClassVar[PositiveInt] = DEFAULT_MAX_TOKENS
+    _max_tokens: ClassVar[PositiveInt] = DEFAULT_MAX_BATCH_TOKENS
     _input_transformer: Callable[[StructuredDataInput], Any] = default_input_transformer
     _output_transformer: Callable[[Any], list[list[float]] | list[list[int]]] = (
         default_output_transformer
     )
     # Circuit breaker state tracking
     _circuit_state: CircuitBreakerState = CircuitBreakerState.CLOSED
-    _failure_count: int = 0
+    _failure_count: int = ZERO
     _last_failure_time: float | None = None
-    _circuit_open_duration: float = OPEN_CIRCUIT_DURATION  # 30 seconds
+    _circuit_open_duration: float = DEFAULT_OPEN_BREAKER_DURATION  # 30 seconds
 
     def __init__(
         self,
@@ -248,12 +255,12 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         defaults = getattr(self, "_defaults", {})
         object.__setattr__(self, "_model_dump_json", super().model_dump_json)
         object.__setattr__(self, "_circuit_state", CircuitBreakerState.CLOSED)
-        object.__setattr__(self, "_failure_count", kwargs.get("failure_count", 0))
+        object.__setattr__(self, "_failure_count", kwargs.get("failure_count", ZERO))
         object.__setattr__(self, "_last_failure_time", kwargs.get("last_failure_time"))
         object.__setattr__(
             self,
             "_circuit_open_duration",
-            kwargs.get("circuit_open_duration", OPEN_CIRCUIT_DURATION),
+            kwargs.get("circuit_open_duration", DEFAULT_OPEN_BREAKER_DURATION),
         )
         # Set required fields
         object.__setattr__(self, "client", client)
@@ -372,7 +379,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         if not chunks:
             return []
 
-        max_tokens = max_tokens or DEFAULT_MAX_TOKENS
+        max_tokens = max_tokens or DEFAULT_MAX_BATCH_TOKENS
         # Apply 85% safety margin to account for tokenizer estimation variance
         # This prevents edge cases where our token estimate slightly underestimates
         # the provider's actual token count, which would cause API errors
@@ -381,7 +388,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
 
         batches: list[list[CodeChunk]] = []
         current_batch: list[CodeChunk] = []
-        current_tokens = 0
+        current_tokens = ZERO
 
         for chunk in chunks:
             # Estimate tokens for this chunk
@@ -399,7 +406,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                 if current_batch:
                     batches.append(current_batch)
                     current_batch = []
-                    current_tokens = 0
+                    current_tokens = ZERO
                 batches.append([chunk])
                 continue
 
@@ -407,7 +414,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             if current_tokens + chunk_tokens > effective_limit and current_batch:
                 batches.append(current_batch)
                 current_batch = []
-                current_tokens = 0
+                current_tokens = ZERO
 
             current_batch.append(chunk)
             current_tokens += chunk_tokens
@@ -416,7 +423,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         if current_batch:
             batches.append(current_batch)
 
-        if len(batches) > 1:
+        if len(batches) > ONE:
             logger.debug(
                 "Split %d chunks into %d token-aware batches (effective limit %d tokens/batch)",
                 len(chunks),
@@ -464,7 +471,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         self._failure_count += 1
         self._last_failure_time = time.time()
 
-        if self._failure_count >= 3:  # 3 failures threshold
+        if self._failure_count >= MAX_RETRY_ATTEMPTS:
             logger.warning(
                 "Circuit breaker opening for %s after %d consecutive failures",
                 type(self)._provider,
@@ -478,7 +485,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         return self._circuit_state.variable
 
     @retry(
-        stop=stop_after_attempt(5),
+        stop=stop_after_attempt(MAX_RETRY_ATTEMPTS),
         wait=wait_exponential(
             multiplier=1, min=1, max=16
         ),  # 1s, 2s, 4s, 8s, 16s as per spec FR-009c
@@ -500,10 +507,11 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         except (ConnectionError, TimeoutError, OSError) as e:
             self._record_failure()
             logger.warning(
-                "API call failed for %s: %s (attempt %d/5)",
+                "API call failed for %s: %s (attempt %d/%d)",
                 type(self)._provider,
                 str(e),
                 self._failure_count,
+                MAX_RETRY_ATTEMPTS,
             )
             raise
         except Exception:
@@ -604,13 +612,13 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             ] = []
 
             # Yield after CPU-bound token batching to prevent event loop blocking
-            await asyncio.sleep(0)
+            await asyncio.sleep(ZERO)
 
             for batch_idx, token_batch in enumerate(token_batches):
-                if len(token_batches) > 1:
+                if len(token_batches) > ONE:
                     logger.debug(
                         "Processing token batch %d/%d (%d chunks)",
-                        batch_idx + 1,
+                        batch_idx + ONE,
                         len(token_batches),
                         len(token_batch),
                     )
@@ -624,7 +632,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                 all_results.extend(batch_results)
 
                 # Yield between token batches to keep server responsive
-                await asyncio.sleep(0)
+                await asyncio.sleep(ZERO)
 
             results = all_results
         except CircuitBreakerOpenError as e:
@@ -705,7 +713,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             return results  # ty: ignore[invalid-return-type]
 
     @retry(
-        stop=stop_after_attempt(5),
+        stop=stop_after_attempt(MAX_RETRY_ATTEMPTS),
         wait=wait_exponential(multiplier=1, min=1, max=16),  # 1s, 2s, 4s, 8s, 16s
         retry=retry_if_exception_type((ConnectionError, TimeoutError, OSError)),
         reraise=True,
@@ -722,9 +730,10 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         except (ConnectionError, TimeoutError, OSError) as e:
             self._record_failure()
             logger.warning(
-                "Query embedding failed for %s(attempt %d/5)",
+                "Query embedding failed for %s(attempt %d/%d): %s",
                 type(self)._provider,
                 self._failure_count,
+                MAX_RETRY_ATTEMPTS,
                 extra={"query": query, "error": str(e)},
             )
             raise
@@ -804,11 +813,15 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
     @property
     def is_instruct_model(self) -> bool:
         """Return True if the model supports custom prompts."""
-        return self.model_name in (
-            "intfloat/multilingual-e5-large-instruct",
-            "Qwen/Qwen3-Embedding-0.6B",
-            "Qwen/Qwen3-Embedding-4B",
-            "Qwen/Qwen3-Embedding-8B",
+        return (
+            self.model_name
+            in (
+                "intfloat/multilingual-e5-large-instruct",
+                "Qwen/Qwen3-Embedding-0.6B",
+                "Qwen/Qwen3-Embedding-4B",
+                "Qwen/Qwen3-Embedding-8B",
+            )
+            or "instruct" in str(self.model_name).lower()
         )
 
     @overload
@@ -910,7 +923,11 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                 ],
             )
         denom = float(np.linalg.norm(arr))
-        return arr.tolist() if denom == 0.0 else (arr / np.asarray(denom, dtype=arr.dtype)).tolist()
+        return (
+            arr.tolist()
+            if denom == FLOAT_ZERO
+            else (arr / np.asarray(denom, dtype=arr.dtype)).tolist()
+        )
 
     @staticmethod
     def is_normalized(embedding: Sequence[float] | Sequence[int], *, tol: float = 1e-6) -> bool:
@@ -918,10 +935,10 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         import numpy as np
 
         arr = np.asarray(embedding, dtype=np.float32)
-        if arr.size == 0 or not np.all(np.isfinite(arr)):
+        if arr.size == ZERO or not np.all(np.isfinite(arr)):
             return False
         norm = float(np.linalg.norm(arr))
-        return bool(np.isclose(norm, 1.0, atol=tol, rtol=0.0))
+        return bool(np.isclose(norm, ONE_POINT_ZERO, atol=tol, rtol=FLOAT_ZERO))
 
     @staticmethod
     def chunks_to_strings(
@@ -1134,9 +1151,9 @@ class SparseEmbeddingProvider[SparseClient](EmbeddingProvider[SparseClient], ABC
         self,
         client: SparseClient,
         config: EmbeddingProviderSettings,
-        registry: Any,  # EmbeddingRegistry
+        registry: EmbeddingRegistry,
         cache_manager: Any,  # EmbeddingCacheManager
-        caps: Any = None,  # EmbeddingModelCapabilities
+        caps: SparseEmbeddingModelCapabilities | None = None,
         impl_deps: EmbeddingImplementationDeps = None,
         custom_deps: EmbeddingCustomDeps = None,
         **kwargs: Any,
@@ -1184,7 +1201,7 @@ class SparseEmbeddingProvider[SparseClient](EmbeddingProvider[SparseClient], ABC
             # Now add the hash to store, mapping it to this batch key
             self._hash_store[hashes[original_idx]] = key
             if not self._store:
-                self._store = make_uuid_store(value_type=list, size_limit=ONE_MB * 3)  # type: ignore
+                self._store = make_uuid_store(value_type=list, size_limit=ONE_MEGABYTE * 3)  # type: ignore
             self._store[key] = final_chunks  # type: ignore
 
         return iter(final_chunks), key

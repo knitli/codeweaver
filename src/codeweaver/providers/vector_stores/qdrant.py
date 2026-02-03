@@ -12,6 +12,7 @@ import logging
 from typing import ClassVar
 
 from codeweaver.core import Provider
+from codeweaver.core.constants import LOCALHOST_URL
 from codeweaver.providers.config import QdrantVectorStoreProviderSettings
 from codeweaver.providers.vector_stores.qdrant_base import QdrantBaseProvider
 
@@ -31,7 +32,7 @@ class QdrantVectorStoreProvider(QdrantBaseProvider):
     @property
     def base_url(self) -> str | None:
         """Get the base URL for the Qdrant instance from config."""
-        return str(self.config.client_options.url) or "http://localhost"
+        return str(self.config.client_options.url) or LOCALHOST_URL
 
     async def _init_provider(self) -> None:
         """We don't use this method at the moment for the main Qdrant provider."""

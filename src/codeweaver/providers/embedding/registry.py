@@ -26,11 +26,10 @@ from codeweaver.core import (
     dependency_provider,
 )
 from codeweaver.core import ValidationError as CodeWeaverValidationError
+from codeweaver.core.constants import DEFAULT_EMBEDDING_REGISTRY_MAX_SIZE
 
 
 logger = logging.getLogger(__name__)
-
-ONE_MB = 1024 * 1024
 
 
 class EmbeddingRegistry(UUIDStore[ChunkEmbeddings]):
@@ -43,7 +42,7 @@ class EmbeddingRegistry(UUIDStore[ChunkEmbeddings]):
 
     """
 
-    def __init__(self, *, size_limit: int = 100 * ONE_MB) -> None:
+    def __init__(self, *, size_limit: int = DEFAULT_EMBEDDING_REGISTRY_MAX_SIZE) -> None:
         """Initialize the EmbeddingRegistry with a size limit.
 
         Args:

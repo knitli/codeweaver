@@ -41,6 +41,16 @@ from typing import Any, ClassVar, Self
 
 import httpx
 
+from codeweaver.core.constants import (
+    DEFAULT_HTTPX_KEEPALIVE_EXPIRY,
+    DEFAULT_HTTPX_MAX_CONNECTIONS,
+    DEFAULT_HTTPX_MAX_KEEPALIVE_CONNECTIONS,
+    DEFAULT_POOL_ACQUIRE_TIMEOUT,
+    DEFAULT_POOL_CONNECTION_TIMEOUT,
+    DEFAULT_POOL_READ_TIMEOUT,
+    DEFAULT_POOL_WRITE_TIMEOUT,
+)
+
 
 logger = logging.getLogger(__name__)
 
@@ -58,9 +68,9 @@ class PoolLimits:
         keepalive_expiry: Seconds to keep idle connections alive.
     """
 
-    max_connections: int = 100
-    max_keepalive_connections: int = 20
-    keepalive_expiry: float = 5.0
+    max_connections: int = DEFAULT_HTTPX_MAX_CONNECTIONS
+    max_keepalive_connections: int = DEFAULT_HTTPX_MAX_KEEPALIVE_CONNECTIONS
+    keepalive_expiry: float = DEFAULT_HTTPX_KEEPALIVE_EXPIRY
 
 
 @dataclass(frozen=True)
@@ -74,10 +84,10 @@ class PoolTimeouts:
         pool: Pool acquire timeout in seconds.
     """
 
-    connect: float = 10.0
-    read: float = 60.0  # Longer for embedding/vector operations
-    write: float = 10.0
-    pool: float = 5.0
+    connect: float = DEFAULT_POOL_CONNECTION_TIMEOUT
+    read: float = DEFAULT_POOL_READ_TIMEOUT
+    write: float = DEFAULT_POOL_WRITE_TIMEOUT
+    pool: float = DEFAULT_POOL_ACQUIRE_TIMEOUT
 
 
 @dataclass
@@ -183,7 +193,7 @@ class HttpClientPool:
             Configured httpx.AsyncClient with connection pooling.
         """
         # Fast path: return existing client without lock
-        # Use try-except to handle race condition where client could be removed
+        # Use suppress to handle race condition where client could be removed
         # between check and return
         with contextlib.suppress(KeyError):
             return self._clients[name]

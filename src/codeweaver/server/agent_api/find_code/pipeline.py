@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 """Search pipeline orchestration.
 
 This module handles the core search pipeline including:
@@ -11,17 +15,19 @@ from __future__ import annotations
 import logging
 
 from contextvars import ContextVar
-from typing import TYPE_CHECKING, Any, NoReturn
+from typing import Any, NoReturn
 
 from codeweaver.core import (
     ConfigurationError,
     QueryError,
     QueryResult,
     RawEmbeddingVectors,
+    SearchResult,
     SearchStrategy,
     SparseEmbedding,
     StrategizedQuery,
 )
+from codeweaver.core.constants import ZERO
 from codeweaver.core.di import INJECTED
 from codeweaver.providers import (
     EmbeddingProviderDep,
@@ -31,8 +37,6 @@ from codeweaver.providers import (
 )
 
 
-if TYPE_CHECKING:
-    from codeweaver.core import SearchResult
 logger = logging.getLogger(__name__)
 _query_cv: ContextVar[str | None] = ContextVar("_query_cv", default=None)
 
@@ -564,7 +568,7 @@ async def rerank_results(
                 "extra": {
                     "phase": "reranking",
                     "reason": "no_candidates" if providers else "no_provider",
-                    "candidates_count": len(candidates) if candidates else 0,
+                    "candidates_count": len(candidates) if candidates else ZERO,
                 },
             },
         )

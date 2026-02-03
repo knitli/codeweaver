@@ -20,6 +20,8 @@ type LiteralStringT = Annotated[
 """A string that is known at type-checking time. This alias for LiteralString is also compatible with Pydantic schemas, unlike LiteralString itself.
 
 We occasionally skirt the restrictions on LiteralString, such as for config settings. In those cases, we just want to indicate that the string is intended to be a literal string, even if we can't enforce it. But they effectively are known strings because they must validate against a set of known values.
+
+Put another way: We use LiteralStringT to tell you 'this string should be specifically known', not generated programmatically.
 """
 
 SentinelName = NewType("SentinelName", LiteralStringT)

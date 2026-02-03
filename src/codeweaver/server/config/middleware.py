@@ -28,6 +28,15 @@ from fastmcp.server.middleware.middleware import MiddlewareContext as McpMiddlew
 from fastmcp.server.middleware.timing import DetailedTimingMiddleware
 from pydantic import Field, PositiveInt
 
+from codeweaver.core.constants import (
+    DEFAULT_LOG_LEVEL,
+    DEFAULT_MCP_MAX_RETRY_ATTEMPTS,
+    DEFAULT_MCP_RATE_LIMIT_BURST_CAPACITY,
+    DEFAULT_MCP_RATE_LIMIT_MAX_REQUESTS_PER_SECOND,
+    DEFAULT_MCP_RETRY_BACKOFF_MULTIPLIER,
+    DEFAULT_MCP_RETRY_BASE_DELAY,
+    DEFAULT_MCP_RETRY_MAX_DELAY,
+)
 from codeweaver.server.mcp import (
     ErrorHandlingMiddleware,
     LoggingMiddleware,
@@ -134,11 +143,17 @@ DefaultMiddlewareSettings = MiddlewareOptions(
         include_traceback=True, error_callback=None, transform_errors=False
     ),
     retry=RetryMiddlewareSettings(
-        max_retries=5, base_delay=1.0, max_delay=60.0, backoff_multiplier=2.0
+        max_retries=DEFAULT_MCP_MAX_RETRY_ATTEMPTS,
+        base_delay=DEFAULT_MCP_RETRY_BASE_DELAY,
+        max_delay=DEFAULT_MCP_RETRY_MAX_DELAY,
+        backoff_multiplier=DEFAULT_MCP_RETRY_BACKOFF_MULTIPLIER,
     ),
-    logging=LoggingMiddlewareSettings(log_level=30, include_payloads=False),
+    logging=LoggingMiddlewareSettings(log_level=DEFAULT_LOG_LEVEL, include_payloads=False),
     rate_limiting=RateLimitingMiddlewareSettings(
-        max_requests_per_second=75, get_client_id=None, burst_capacity=150, global_limit=True
+        max_requests_per_second=DEFAULT_MCP_RATE_LIMIT_MAX_REQUESTS_PER_SECOND,
+        get_client_id=None,
+        burst_capacity=DEFAULT_MCP_RATE_LIMIT_BURST_CAPACITY,
+        global_limit=True,
     ),
 )
 

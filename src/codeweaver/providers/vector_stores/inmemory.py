@@ -14,13 +14,19 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar, Literal
 
-from codeweaver.core import PersistenceError, Provider, ProviderError
+from codeweaver.core import (
+    CodeChunk,
+    PersistenceError,
+    Provider,
+    ProviderError,
+    SearchResult,
+    StrategizedQuery,
+)
 from codeweaver.providers import MemoryVectorStoreProviderSettings
 from codeweaver.providers.vector_stores.qdrant_base import QdrantBaseProvider
 
 
 if TYPE_CHECKING:
-    from codeweaver.core import CodeChunk, SearchResult, StrategizedQuery
     from codeweaver.providers.vector_stores.base import MixedQueryInput
     from codeweaver.providers.vector_stores.search import Filter
 
@@ -110,7 +116,7 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
     def persist_path(self) -> Path:
         """Get the persistence path for the in-memory store, if set."""
         path = self.config.in_memory_config["persist_path"]
-        return Path(path) if not isinstance(path, Path) else path
+        return path if isinstance(path, Path) else Path(path)
 
     @property
     def auto_persist(self) -> bool:

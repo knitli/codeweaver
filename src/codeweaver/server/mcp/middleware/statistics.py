@@ -44,6 +44,7 @@ from codeweaver.core import (
     TimingStatistics,
     TimingStatisticsDict,
 )
+from codeweaver.core.constants import DEFAULT_LOG_LEVEL, ONE_MILLISECOND_IN_MICROSECONDS
 from codeweaver.core.di.depends import INJECTED
 from codeweaver.core.exceptions import ProviderError
 from codeweaver.core.utils import TypeIs
@@ -61,7 +62,7 @@ class StatisticsMiddleware(McpMiddleware):
         self,
         statistics: SessionStatistics | None = None,
         logger: logging.Logger | None = None,
-        log_level: int = logging.WARNING,
+        log_level: int = DEFAULT_LOG_LEVEL,
     ) -> None:
         """Initialize statistics middleware.
 
@@ -73,7 +74,7 @@ class StatisticsMiddleware(McpMiddleware):
         self.statistics = statistics or _get_statistics()
         self.timing_statistics = self.statistics.timing_statistics
         self.logger = logger or logging.getLogger(__name__)
-        self.log_level = log_level or logging.WARNING
+        self.log_level = log_level or DEFAULT_LOG_LEVEL
         self._we_are_not_none()
 
     def _stats_is_stats(self, statistics: Any) -> TypeIs[SessionStatistics]:
@@ -165,7 +166,7 @@ class StatisticsMiddleware(McpMiddleware):
 
         try:
             result = await call_next(context)
-            duration_ms = (time.perf_counter() - start_time) * 1000
+            duration_ms = (time.perf_counter() - start_time) * ONE_MILLISECOND_IN_MICROSECONDS
             self.statistics.add_successful_request(request_id=request_id)
             self.timing_statistics.update(
                 cast(McpOperationRequests, operation_name),
@@ -174,7 +175,7 @@ class StatisticsMiddleware(McpMiddleware):
             )
 
         except Exception:
-            duration_ms = (time.perf_counter() - start_time) * 1000
+            duration_ms = (time.perf_counter() - start_time) * ONE_MILLISECOND_IN_MICROSECONDS
             self.statistics.add_failed_request(request_id=request_id)
             self.logger.warning(
                 "Operation in %s failed after %.2fms",

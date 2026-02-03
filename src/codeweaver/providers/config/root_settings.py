@@ -80,7 +80,7 @@ class CodeWeaverProviderSettings(CodeWeaverCoreSettings):
     def _initialize(self, **kwargs: Any) -> dict[str, Any]:  # ty:ignore[invalid-method-override]
         """Initialize provider settings."""
         profile_config = (
-            profile.as_settings_dict()
+            profile.as_provider_settings()
             if (profile := kwargs.get("profile")) is not None and profile is not Unset
             else {}
         )
@@ -96,7 +96,7 @@ class CodeWeaverProviderSettings(CodeWeaverCoreSettings):
             provider = ProviderSettings.model_validate(
                 **(
                     self._resolve_default_and_provided(
-                        profile.as_settings_dict(), provider.model_dump()
+                        profile.as_provider_settings(), provider.model_dump()
                     )
                 )
             )
@@ -107,11 +107,11 @@ class CodeWeaverProviderSettings(CodeWeaverCoreSettings):
 
             if is_test_environment():
                 kwargs["provider"] = ProviderSettings.model_construct(
-                    **(ProviderProfile.TESTING.as_settings_dict())
+                    **(ProviderProfile.TESTING.as_provider_settings())
                 )
             else:
                 kwargs["provider"] = ProviderSettings.model_construct(
-                    **(ProviderProfile.RECOMMENDED.as_settings_dict())
+                    **(ProviderProfile.RECOMMENDED.as_provider_settings())
                 )
         kwargs |= super()._initialize(**(kwargs or {}))
         return kwargs

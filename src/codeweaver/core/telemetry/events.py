@@ -14,20 +14,20 @@ All events use privacy-safe, anonymized data with support for opt-in detailed tr
 
 from __future__ import annotations
 
-import importlib
 import statistics
 
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Protocol, Self, cast
 
 from codeweaver.core.types import BasedModel
+from codeweaver.core.utils import has_package
 
 
 if TYPE_CHECKING:
     from codeweaver.core import SearchStrategy
     from codeweaver.core.statistics import SessionStatistics
 
-    if importlib.util.find_spec("codeweaver.server.agent_api") is not None:
+    if has_package("codeweaver.server.agent_api"):
         from codeweaver.server.agent_api import FindCodeResponseSummary, IntentType
     else:
         type FindCodeResponseSummary = object

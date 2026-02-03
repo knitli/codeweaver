@@ -30,6 +30,7 @@ from uuid import UUID
 from pydantic import UUID7, ConfigDict, Field, PrivateAttr
 
 from codeweaver.core import BlakeHashKey, CodeChunk
+from codeweaver.core.constants import ONE_MEGABYTE
 from codeweaver.core.stores import BlakeStore, UUIDStore, make_blake_store, make_uuid_store
 from codeweaver.core.types import BasedModel
 from codeweaver.core.utils import get_blake_hash
@@ -122,7 +123,7 @@ class EmbeddingCacheManager(BasedModel):
         if namespace not in self._batch_stores:
             # 3MB limit per namespace (same as original per-instance limit)
             self._batch_stores[namespace] = make_uuid_store(
-                value_type=list, size_limit=1024 * 1024 * 3
+                value_type=list, size_limit=ONE_MEGABYTE * 10
             )
         return self._batch_stores[namespace]
 
@@ -138,7 +139,7 @@ class EmbeddingCacheManager(BasedModel):
         if namespace not in self._hash_stores:
             # 10MB limit per namespace (same as original per-instance limit)
             self._hash_stores[namespace] = make_blake_store(  # ty:ignore[invalid-argument-type]
-                value_type=UUID, size_limit=1024 * 1024 * 10
+                value_type=UUID, size_limit=ONE_MEGABYTE * 10
             )
         return self._hash_stores[namespace]
 

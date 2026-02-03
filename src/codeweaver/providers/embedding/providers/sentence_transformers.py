@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 
-from codeweaver.core import ConfigurationError, Provider, rpartial
+from codeweaver.core import CodeChunk, ConfigurationError, Provider, rpartial
 from codeweaver.core import SparseEmbedding as CodeWeaverSparseEmbedding
 from codeweaver.providers.embedding.capabilities.base import (
     EmbeddingModelCapabilities,
@@ -28,9 +28,6 @@ from codeweaver.providers.embedding.providers.base import (
     SparseEmbeddingProvider,
 )
 
-
-if TYPE_CHECKING:
-    from codeweaver.core import CodeChunk
 
 logger = logging.getLogger(__name__)
 
@@ -79,18 +76,6 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
     ) -> None:
         """Initialize the SentenceTransformer client."""
         # Nothing to initialize here - options are set in initialize_async
-
-    async def initialize_async(self) -> None:
-        """Initialize the SentenceTransformer client asynchronously."""
-        if self.client is not None:
-            return
-
-        def _load_model() -> SentenceTransformer:
-            return SentenceTransformer(**self.client_options)
-
-        # Load model in a thread pool to avoid blocking the event loop
-        self.client = await asyncio.to_thread(_load_model)
-        logger.debug("Successfully loaded SentenceTransformer model: %s", self.caps.name)
 
     @property
     def base_url(self) -> str | None:

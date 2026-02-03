@@ -14,7 +14,20 @@ from typing import TYPE_CHECKING, Annotated, cast
 from pydantic import Field
 from qdrant_client.models import SparseVectorParams, VectorParams
 
-from codeweaver.core.types import BasedModel, BaseEnum, EmbeddingKind, ModelName, ModelNameT
+from codeweaver.core.constants import (
+    BACKUP_DENSE_VECTOR_NAME,
+    PRIMARY_SPARSE_VECTOR_NAME,
+    PRIMARY_VECTOR_NAME,
+)
+from codeweaver.core.types import (
+    BasedModel,
+    BaseEnum,
+    EmbeddingKind,
+    ModelName,
+    ModelNameT,
+    Provider,
+)
+from codeweaver.providers.config.embedding import FastEmbedSparseEmbeddingConfig
 
 
 if TYPE_CHECKING:
@@ -73,7 +86,7 @@ class VectorConfig(BasedModel, frozen=True):
     Example:
         >>> config = VectorConfig(
         ...     name="primary",
-        ...     model_name=ModelName("voyage-large-2-instruct"),
+        ...     model_name=ModelName("voyage-code-3"),
         ...     params=VectorParams(size=1024, distance="Cosine"),
         ...     role=VectorRole.PRIMARY,
         ... )
@@ -206,7 +219,7 @@ class VectorConfig(BasedModel, frozen=True):
         )
 
 
-class VectorSet(BasedModel, frozen=True):
+class VectorSet(BasedModel):
     """Immutable collection of vectors for a search/indexing strategy.
 
     Manages multiple named vectors with flexible organization. Vectors
@@ -228,6 +241,8 @@ class VectorSet(BasedModel, frozen=True):
         >>> vectors_config = vector_set.to_qdrant_vectors_config()
         >>> sparse_config = vector_set.to_qdrant_sparse_vectors_config()
     """
+
+    model_config = BasedModel.model_config | {"frozen": True}
 
     vectors: Annotated[
         dict[str, VectorConfig],
@@ -313,7 +328,7 @@ class VectorSet(BasedModel, frozen=True):
         """Get all sparse vectors.
 
         Returns:
-            Dict of sparse VectorConfigs (preserves keys)
+            Dict of SparseVectorConfigs (preserves keys)
         """
         return {k: v for k, v in self.vectors.items() if v.is_sparse}
 
@@ -400,11 +415,24 @@ class VectorSet(BasedModel, frozen=True):
 
         # Primary dense (required)
         if profile.embedding and profile.embedding[0]:
-            vectors["primary"] = await VectorConfig.from_provider_settings(
-                profile.embedding[0],
-                name="primary",  # Role-based physical name
-                role=VectorRole.PRIMARY,
-            )
+            from codeweaver.providers.config.asymmetric import AsymmetricEmbeddingConfig
+
+            first_config = profile.embedding[0]
+            # Check if this is an asymmetric config
+            if isinstance(first_config, AsymmetricEmbeddingConfig):
+                # Use the embed_provider for document embedding
+                vectors[PRIMARY_VECTOR_NAME] = await VectorConfig.from_provider_settings(
+                    first_config.embed_provider,
+                    name=PRIMARY_VECTOR_NAME,  # Role-based physical name
+                    role=VectorRole.PRIMARY,
+                )
+            else:
+                # Symmetric mode - use the provider directly
+                vectors[PRIMARY_VECTOR_NAME] = await VectorConfig.from_provider_settings(
+                    first_config,
+                    name=PRIMARY_VECTOR_NAME,  # Role-based physical name
+                    role=VectorRole.PRIMARY,
+                )
 
         # Backup dense (optional, if different from primary)
         if (
@@ -413,17 +441,29 @@ class VectorSet(BasedModel, frozen=True):
             and profile.embedding[1]
             and profile.embedding[1] != profile.embedding[0]
         ):
-            vectors["backup"] = await VectorConfig.from_provider_settings(
+            vectors[BACKUP_DENSE_VECTOR_NAME] = await VectorConfig.from_provider_settings(
                 profile.embedding[1],
-                name="backup",  # Role-based physical name
+                name=BACKUP_DENSE_VECTOR_NAME,  # Role-based physical name
                 role=VectorRole.BACKUP,
             )
 
-        # Sparse (optional)
         if profile.sparse_embedding and profile.sparse_embedding[0]:
-            vectors["sparse"] = await VectorConfig.from_provider_settings(
+            vectors[PRIMARY_SPARSE_VECTOR_NAME] = await VectorConfig.from_provider_settings(
                 profile.sparse_embedding[0],
-                name="sparse",  # Role-based physical name
+                name=PRIMARY_SPARSE_VECTOR_NAME,  # Role-based physical name
+                role=VectorRole.SPARSE,
+            )
+        else:
+            # CodeWeaver **always** has a sparse vector available; default to a simple BM25 if none configured
+            vectors[PRIMARY_SPARSE_VECTOR_NAME] = await VectorConfig.from_provider_settings(
+                SparseEmbeddingProviderSettings(
+                    provider=Provider.FASTEMBED,
+                    model_name=ModelName("qdrant/bm-25"),
+                    sparse_embedding_config=FastEmbedSparseEmbeddingConfig(
+                        model_name=ModelName("qdrant/bm-25")
+                    ),
+                ),
+                name=PRIMARY_SPARSE_VECTOR_NAME,  # Role-based physical name
                 role=VectorRole.SPARSE,
             )
 

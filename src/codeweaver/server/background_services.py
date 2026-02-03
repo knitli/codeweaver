@@ -14,6 +14,7 @@ from functools import partial
 from typing import TYPE_CHECKING, Any
 
 from codeweaver.core import elapsed_time_to_human_readable
+from codeweaver.core.constants import WATCHER_WINDDOWN_TIMEOUT
 from codeweaver.core.ui_protocol import ProgressReporter
 
 
@@ -94,7 +95,7 @@ async def _handle_watcher_cancellation(
 
     watcher_task.cancel()
     try:
-        await asyncio.wait_for(watcher_task, timeout=2.5)
+        await asyncio.wait_for(watcher_task, timeout=WATCHER_WINDDOWN_TIMEOUT)
     except (TimeoutError, asyncio.CancelledError):
         if verbose:
             _logger.warning("Watcher did not stop within timeout")

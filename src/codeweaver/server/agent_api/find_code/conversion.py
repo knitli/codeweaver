@@ -13,14 +13,10 @@ CodeMatch objects for API responses.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
 
-from codeweaver.core import DiscoveredFile, Span
+from codeweaver.core import DiscoveredFile, SearchResult, Span
+from codeweaver.core.constants import POSIX_NEWLINE
 from codeweaver.server.agent_api.find_code.types import CodeMatch, CodeMatchType
-
-
-if TYPE_CHECKING:
-    from codeweaver.core import SearchResult
 
 
 def convert_search_result_to_code_match(result: SearchResult) -> CodeMatch:
@@ -58,7 +54,9 @@ def convert_search_result_to_code_match(result: SearchResult) -> CodeMatch:
     else:
         # Fallback span - positional args: start, end, source_id
         span = Span(
-            1, chunk.content.count("\n") + 1 if hasattr(chunk, "content") else 1, file.source_id
+            1,
+            chunk.content.count(POSIX_NEWLINE) + 1 if hasattr(chunk, "content") else 1,
+            file.source_id,
         )
 
     # Use relevance_score if set, otherwise use base score
