@@ -44,10 +44,23 @@ if TYPE_CHECKING:
         TOGETHER,
         X_AI,
     )
+    from codeweaver.providers.env_registry.definitions.specialized import (
+        ANTHROPIC,
+        BEDROCK,
+        COHERE,
+        GOOGLE,
+        HUGGINGFACE_INFERENCE,
+        MISTRAL,
+        PYDANTIC_GATEWAY,
+        QDRANT,
+        TAVILY,
+        VOYAGE,
+    )
 
 
 # Phase 2-4: OpenAI-compatible providers (18 providers - complete)
 # Phase 5: Cloud platforms (3 providers - complete)
+# Phase 6: Specialized providers (10 providers - complete)
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType(
     {
         # OpenAI-compatible providers
@@ -73,6 +86,17 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType(
         "AZURE": ("codeweaver.providers.env_registry.definitions", "cloud_platforms"),
         "HEROKU": ("codeweaver.providers.env_registry.definitions", "cloud_platforms"),
         "VERCEL": ("codeweaver.providers.env_registry.definitions", "cloud_platforms"),
+        # Specialized providers
+        "VOYAGE": ("codeweaver.providers.env_registry.definitions", "specialized"),
+        "ANTHROPIC": ("codeweaver.providers.env_registry.definitions", "specialized"),
+        "HUGGINGFACE_INFERENCE": ("codeweaver.providers.env_registry.definitions", "specialized"),
+        "BEDROCK": ("codeweaver.providers.env_registry.definitions", "specialized"),
+        "COHERE": ("codeweaver.providers.env_registry.definitions", "specialized"),
+        "TAVILY": ("codeweaver.providers.env_registry.definitions", "specialized"),
+        "GOOGLE": ("codeweaver.providers.env_registry.definitions", "specialized"),
+        "MISTRAL": ("codeweaver.providers.env_registry.definitions", "specialized"),
+        "PYDANTIC_GATEWAY": ("codeweaver.providers.env_registry.definitions", "specialized"),
+        "QDRANT": ("codeweaver.providers.env_registry.definitions", "specialized"),
     }
 )
 
@@ -81,18 +105,37 @@ __getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
 # Export explicitly for clarity (optional, but helpful for IDE)
 # Phase 2-4: OpenAI-compatible providers (18 providers - complete)
 # Phase 5: Cloud platforms (3 providers - complete)
+# Phase 6: Specialized providers (10 providers - complete)
 __all__: tuple[str, ...] = (
     # OpenAI-compatible providers
     "ALIBABA",
+    # Specialized providers
+    "ANTHROPIC",
     # Cloud platforms
     "AZURE",
+    # Specialized providers
+    "BEDROCK",
+    # OpenAI-compatible providers
     "CEREBRAS",
+    # Specialized providers
+    "COHERE",
+    # OpenAI-compatible providers
     "DEEPSEEK",
     "FIREWORKS",
     "GITHUB",
+    # Specialized providers
+    "GOOGLE",
+    # OpenAI-compatible providers
     "GROQ",
+    # Cloud platforms
     "HEROKU",
+    # Specialized providers
+    "HUGGINGFACE_INFERENCE",
+    # OpenAI-compatible providers
     "LITELLM",
+    # Specialized providers
+    "MISTRAL",
+    # OpenAI-compatible providers
     "MOONSHOT",
     "MORPH",
     "NEBIUS",
@@ -101,9 +144,20 @@ __all__: tuple[str, ...] = (
     "OPENROUTER",
     "OVHCLOUD",
     "PERPLEXITY",
+    # Specialized providers
+    "PYDANTIC_GATEWAY",
+    "QDRANT",
+    # OpenAI-compatible providers
     "SAMBANOVA",
+    # Specialized providers
+    "TAVILY",
+    # OpenAI-compatible providers
     "TOGETHER",
+    # Cloud platforms
     "VERCEL",
+    # Specialized providers
+    "VOYAGE",
+    # OpenAI-compatible providers
     "X_AI",
 )
 
