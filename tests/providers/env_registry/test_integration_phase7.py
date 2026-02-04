@@ -52,6 +52,9 @@ ALL_PROVIDERS = [
 ]
 
 
+@pytest.mark.external_api
+@pytest.mark.parametrize
+@pytest.mark.qdrant
 class TestRegistryToProviderIntegration:
     """Test registry integration with Provider.other_env_vars."""
 
@@ -206,6 +209,9 @@ class TestRegistryToProviderIntegration:
         assert memory_env_vars is None or isinstance(memory_env_vars, tuple)
 
 
+@pytest.mark.external_api
+@pytest.mark.parametrize
+@pytest.mark.qdrant
 class TestSpecificProviderConfigurations:
     """Test specific provider configurations for correctness."""
 
