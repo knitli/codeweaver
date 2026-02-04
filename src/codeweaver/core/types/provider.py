@@ -459,6 +459,18 @@ class Provider(BaseEnum):
         self,
     ) -> tuple[ProviderEnvVars, ...] | None:
         """Get the environment variables used by the provider's client that are not part of CodeWeaver's settings."""
+        # Phase 7: Try registry first, fall back to hardcoded definitions
+        try:
+            from codeweaver.providers.env_registry.conversion import (
+                get_provider_env_vars_from_registry,
+            )
+
+            if registry_vars := get_provider_env_vars_from_registry(self.value):
+                return registry_vars
+        except ImportError:
+            pass  # Registry not available, use hardcoded definitions
+
+        # Legacy hardcoded definitions (Phase 1-6 backward compatibility)
         from codeweaver.core.types.env import EnvFormat, VariableInfo
         from codeweaver.core.types.env import EnvVarInfo as ProviderEnvVarInfo
 
