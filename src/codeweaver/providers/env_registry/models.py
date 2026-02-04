@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import os
 
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from typing import Any
 
 from codeweaver.core.types.env import EnvFormat, VariableInfo
@@ -63,6 +63,24 @@ class EnvVarConfig:
             # Auto-convert choices to frozenset for convenience
             if self.choices is not None and not isinstance(self.choices, frozenset):
                 object.__setattr__(self, "choices", frozenset(self.choices))
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for serialization.
+
+        Returns:
+            dictionary suitable for JSON serialization
+
+        Example:
+            >>> config = EnvVarConfig(...)
+            >>> data = config.to_dict()
+            >>> import json
+            >>> json.dumps(data)
+        """
+        serialized = asdict(self)
+        serialized["fmt"] = self.fmt.variable if self.fmt else None
+        serialized["choices"] = list(self.choices) if self.choices else None
+        serialized["variables"] = [v._asdict() for v in self.variables] if self.variables else None
+        return serialized
 
 
 @dataclass(frozen=True, slots=True)
@@ -184,10 +202,13 @@ class ProviderEnvConfig:
             >>> import json
             >>> json.dumps(data)
         """
-        from pydantic import TypeAdapter
-
-        adapter = TypeAdapter(type(self))
-        return adapter.dump_python(self, round_trip=True)
+        serialized = asdict(self)
+        serialized["other"] = {k: v.to_dict() for k, v in self.other} if self.other else None
+        return {
+            k: v.to_dict() if isinstance(v, EnvVarConfig) else v
+            for k, v in serialized.items()
+            if v is not None
+        }
 
 
 __all__ = ("EnvVarConfig", "ProviderEnvConfig")

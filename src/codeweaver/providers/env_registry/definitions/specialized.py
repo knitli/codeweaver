@@ -20,7 +20,7 @@ from codeweaver.providers.env_registry.models import EnvVarConfig, ProviderEnvCo
 # VOYAGE - Simple API key provider
 VOYAGE = [
     simple_api_key_provider(
-        "Voyage",
+        "voyage",
         client="voyage",
         api_key_env="VOYAGE_API_KEY",
         note="These variables are for the Voyage service.",
@@ -102,36 +102,33 @@ BEDROCK = [
             is_secret=True,
             variable_name="aws_secret_access_key",
         ),
-        other=httpx_env_vars()
-        | frozenset(
-            [
-                (
-                    "aws_access_key_id",
-                    EnvVarConfig(
-                        env="AWS_ACCESS_KEY_ID",
-                        description="AWS Access Key ID for Bedrock service",
-                        is_secret=True,
-                        variable_name="aws_access_key_id",
-                    ),
+        other=frozenset([
+            (
+                "aws_access_key_id",
+                EnvVarConfig(
+                    env="AWS_ACCESS_KEY_ID",
+                    description="AWS Access Key ID for Bedrock service",
+                    is_secret=True,
+                    variable_name="aws_access_key_id",
                 ),
-                (
-                    "aws_session_token",
-                    EnvVarConfig(
-                        env="AWS_SESSION_TOKEN",
-                        description="AWS Session Token for Bedrock service",
-                        is_secret=True,
-                        variable_name="aws_session_token",
-                    ),
+            ),
+            (
+                "aws_session_token",
+                EnvVarConfig(
+                    env="AWS_SESSION_TOKEN",
+                    description="AWS Session Token for Bedrock service",
+                    is_secret=True,
+                    variable_name="aws_session_token",
                 ),
-            ]
-        ),
+            ),
+        ]),
     )
 ]
 
 # COHERE - API key + base URL
 COHERE = [
     simple_api_key_provider(
-        "Cohere",
+        "tavily",
         client="cohere",
         api_key_env="COHERE_API_KEY",
         base_url_env="CO_API_URL",
@@ -142,7 +139,7 @@ COHERE = [
 # TAVILY - Simple API key provider
 TAVILY = [
     simple_api_key_provider(
-        "Tavily",
+        "tavily",
         client="tavily",
         api_key_env="TAVILY_API_KEY",
         note="These variables are for the Tavily service.",
@@ -179,7 +176,7 @@ GOOGLE = [
 # MISTRAL - Simple API key provider
 MISTRAL = [
     simple_api_key_provider(
-        "Mistral",
+        "mistral",
         client="mistral",
         api_key_env="MISTRAL_API_KEY",
         note="These variables are for the Mistral service.",
@@ -189,7 +186,7 @@ MISTRAL = [
 # PYDANTIC_GATEWAY - Simple API key provider
 PYDANTIC_GATEWAY = [
     simple_api_key_provider(
-        "Pydantic AI Gateway",
+        "gateway",
         client="gateway",
         api_key_env="PYDANTIC_AI_GATEWAY_API_KEY",
         note="These variables are for the Pydantic AI Gateway service.",
@@ -220,9 +217,7 @@ QDRANT = [
             choices=frozenset({"true", "false"}),
         ),
         host=EnvVarConfig(
-            env="QDRANT__SERVICE__HOST",
-            description="Host for Qdrant service",
-            variable_name="host",
+            env="QDRANT__SERVICE__HOST", description="Host for Qdrant service", variable_name="host"
         ),
         port=EnvVarConfig(
             env="QDRANT__SERVICE__HTTP_PORT",

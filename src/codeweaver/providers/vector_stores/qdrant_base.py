@@ -160,11 +160,11 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
             and hasattr(self.caps.dense.config, "config_type")
             and self.caps.dense.config.config_type == "asymmetric"
         ):
-            # This is an asymmetric config - the config should be AsymmetricEmbeddingConfig
+            # This is an asymmetric config - the config should be AsymmetricEmbeddingProviderSettings
             # Import here to avoid circular dependency
-            from codeweaver.providers.config.asymmetric import AsymmetricEmbeddingConfig
+            from codeweaver.providers.config.asymmetric import AsymmetricEmbeddingProviderSettings
 
-            if isinstance(self.caps.dense.config, AsymmetricEmbeddingConfig):
+            if isinstance(self.caps.dense.config, AsymmetricEmbeddingProviderSettings):
                 query_model = str(self.caps.dense.config.query_provider.model_name)
 
         return CollectionMetadata.model_construct({

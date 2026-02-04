@@ -3,7 +3,7 @@
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
 
-"""Integration tests for AsymmetricEmbeddingConfig TOML loading and validation.
+"""Integration tests for AsymmetricEmbeddingProviderSettings TOML loading and validation.
 
 Tests cover TOML file loading, configuration parsing, validation, and error scenarios:
 - TOML loading with asymmetric embedding configuration
@@ -26,7 +26,10 @@ from codeweaver.core.exceptions import ConfigurationError
 
 
 if TYPE_CHECKING:
-    from codeweaver.providers.config.providers import AsymmetricEmbeddingConfig, ProviderSettings
+    from codeweaver.providers.config.providers import (
+        AsymmetricEmbeddingProviderSettings,
+        ProviderSettings,
+    )
 
 
 pytestmark = [pytest.mark.integration]
@@ -138,7 +141,7 @@ model_name = "voyage-4-nano"
         # Verify asymmetric config loaded
         assert settings.asymmetric_embedding is not None
 
-        config: AsymmetricEmbeddingConfig = settings.asymmetric_embedding
+        config: AsymmetricEmbeddingProviderSettings = settings.asymmetric_embedding
 
         # Verify embed provider settings
         assert config.embed_provider_settings is not None
@@ -894,10 +897,10 @@ model_name = "voyage-4-nano"
 
         # Serialize and deserialize
         config = original_config.model_dump()
-        # Import from where AsymmetricEmbeddingConfig is defined
-        from codeweaver.providers import AsymmetricEmbeddingConfig
+        # Import from where AsymmetricEmbeddingProviderSettings is defined
+        from codeweaver.providers import AsymmetricEmbeddingProviderSettings
 
-        restored_config = AsymmetricEmbeddingConfig.model_validate(config)
+        restored_config = AsymmetricEmbeddingProviderSettings.model_validate(config)
 
         # Verify equivalence
         assert str(restored_config.embed_provider_settings.model_name) == str(

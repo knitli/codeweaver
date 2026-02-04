@@ -10,19 +10,19 @@ from __future__ import annotations
 import logging
 
 from functools import cached_property
-from typing import Annotated, Literal, NotRequired, Required, TypedDict, cast
+from typing import Annotated, Any, Literal, NotRequired, Required, TypedDict, cast
 
-from pydantic import Field, NonNegativeInt, model_validator
+from pydantic import Field, NonNegativeInt, PrivateAttr, model_validator
 
 from codeweaver.core.exceptions import DatatypeMismatchError, DimensionMismatchError
-from codeweaver.core.types import BasedModel
+from codeweaver.core.types import BasedModel, ModelName, ModelNameT
 from codeweaver.providers.config.kinds import EmbeddingProviderSettingsType
 
 
 logger = logging.getLogger(__name__)
 
 
-class AsymmetricEmbeddingConfigDict(TypedDict, total=False):
+class AsymmetricEmbeddingProviderSettingsDict(TypedDict, total=False):
     """Dictionary representation of asymmetric embedding configuration."""
 
     embed_provider: Required[EmbeddingProviderSettingsType]
@@ -30,7 +30,22 @@ class AsymmetricEmbeddingConfigDict(TypedDict, total=False):
     validate_family_compatibility: NotRequired[bool]
 
 
-class AsymmetricEmbeddingConfig(BasedModel):
+def _handle_ambiguous_property(v: Any, key: str) -> Any:
+    """Handle ambiguous property for private attribute."""
+    return v.get(key) if isinstance(v, dict) else getattr(v, key, None)
+
+def _get_model_name_for_family(v: Any) -> ModelNameT:
+    """Get model name for private attribute."""
+    configs = _handle_ambiguous_property(v, "embed_provider"), _handle_ambiguous_property(v, "query_provider")
+    configs = [(_handle_ambiguous_property(cfg, "embedding_config") or _handle_ambiguous_property(cfg, "embedding_config")) for cfg in configs if cfg]
+    if (caps := next((cfg.capabilities for cfg in configs if cfg and cfg.capabilities), None)) and caps.model_family and (fam_id := caps.model_family.family_id):
+        return fam_id
+    if (name := next((n for cfg in configs if cfg and (n := _handle_ambiguous_property(cfg, "model_name")) is not None), None)) is not None:
+        return ModelName(f"{name}-family")
+    raise ValueError("Cannot determine model name for asymmetric embedding configuration.")
+
+
+class AsymmetricEmbeddingProviderSettings(BasedModel):
     """Configuration for asymmetric embedding setup with separate embed and query models.
 
     Asymmetric embedding allows using different models for document embedding and query
@@ -61,6 +76,17 @@ class AsymmetricEmbeddingConfig(BasedModel):
         bool,
         Field(description="Whether to validate that both models belong to the same model family."),
     ] = True
+
+    _model_name: ModelNameT = PrivateAttr(default_factory=_get_model_name_for_family)  # ty:ignore[invalid-argument-type]
+
+
+    def get_embed_kwargs(self) -> dict[str, Any]:
+        """Get keyword arguments for the embed provider."""
+        return self.embed_provider.get_embed_kwargs()
+
+    def get_query_kwargs(self) -> dict[str, Any]:
+        """Get keyword arguments for the query provider."""
+        return self.query_provider.get_query_embed_kwargs()
 
     @cached_property
     def dimension_tuple(self) -> tuple[NonNegativeInt, NonNegativeInt]:
@@ -161,7 +187,7 @@ class AsymmetricEmbeddingConfig(BasedModel):
         )
 
     @model_validator(mode="after")
-    def validate_model_compatibility(self) -> AsymmetricEmbeddingConfig:
+    def validate_model_compatibility(self) -> AsymmetricEmbeddingProviderSettings:
         """Validate that embed and query models are compatible.
 
         Validates:
@@ -271,9 +297,21 @@ class AsymmetricEmbeddingConfig(BasedModel):
         """Get the embedding datatype for both models (they must match)."""
         return self.datatype_tuple[0]
 
+    @property
+    def embedding_config(self) -> Any:
+        """Get the embedding configuration for the embed provider."""
+        return self.embed_provider.embedding_config
+
+    @property
+    def model_name(self) -> ModelNameT:
+        """Get the model family name for the asymmetric embedding configuration."""
+        embed_provider = self.embed_provider.provider
+        query_provider = self.query_provider.provider
+        return self._model_name
+
     def _telemetry_keys(self) -> None:
         """Telemetry keys implementation."""
         return
 
 
-__all__ = ("AsymmetricEmbeddingConfig",)
+__all__ = ("AsymmetricEmbeddingProviderSettings",)

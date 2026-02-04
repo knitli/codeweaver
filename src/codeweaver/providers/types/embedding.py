@@ -32,7 +32,7 @@ from codeweaver.providers.config.kinds import (
 
 
 if TYPE_CHECKING:
-    from codeweaver.providers.config.asymmetric import AsymmetricEmbeddingConfig
+    from codeweaver.providers.config.asymmetric import AsymmetricEmbeddingProviderSettings
 from codeweaver.providers.embedding.capabilities.base import (
     EmbeddingModelCapabilities,
     SparseEmbeddingModelCapabilities,
@@ -44,13 +44,17 @@ class ConfiguredCapability(NamedTuple):
 
     Note: user-defined capabilities may not have a capabilities object, but hopefully they define one :). If they don't we have to assume conservative defaults.
 
-    For asymmetric embedding configurations, the config field may be an AsymmetricEmbeddingConfig,
+    For asymmetric embedding configurations, the config field may be an AsymmetricEmbeddingProviderSettings,
     which contains both embed_provider and query_provider settings.
     """
 
     capability: EmbeddingModelCapabilities | SparseEmbeddingModelCapabilities | None
 
-    config: EmbeddingProviderSettings | SparseEmbeddingProviderSettings | AsymmetricEmbeddingConfig
+    config: (
+        EmbeddingProviderSettings
+        | SparseEmbeddingProviderSettings
+        | AsymmetricEmbeddingProviderSettings
+    )
 
     @property
     def model_name(self) -> ModelNameT:

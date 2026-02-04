@@ -91,11 +91,13 @@ def has_package(package_name: str) -> bool:
         return util.find_spec(name) is not None
 
     try:
-        metadata.distribution(package_name.replace("_", "-"))
+        metadata.distribution(package_name.replace("_", "-").replace("codeweaver", "code-weaver"))
     except metadata.PackageNotFoundError:
         if check_spec(package_name):
             return True
-        if "-" in package_name and check_spec(package_name.replace("-", "_")):
+        if "-" in package_name and check_spec(
+            package_name.replace("-", "_").replace("code-weaver", "codeweaver")
+        ):
             return True
     else:
         return True

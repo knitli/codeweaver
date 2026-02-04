@@ -14,6 +14,7 @@ The overall pattern:
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import logging
 import re
@@ -80,6 +81,8 @@ from codeweaver.core.constants import (
     DEFAULT_PERSIST_INTERVAL,
     DEFAULT_RERANKING_MAX_RESULTS,
     DEFAULT_VECTOR_STORE_BATCH_SIZE,
+    DEFAULT_VECTOR_STORE_PERSIST_SUBPATH,
+    LOCALHOST,
 )
 from codeweaver.core.utils.checks import is_local_host
 from codeweaver.providers.agent.agent_models import AgentModelSettings
@@ -115,6 +118,7 @@ from codeweaver.providers.config.clients import (
     GoogleClientOptions,
     GroqClientOptions,
     HttpxClientParams,
+    MistralClientOptions,
     OpenAIClientOptions,
     PydanticGatewayClientOptions,
     QdrantClientOptions,
@@ -129,7 +133,6 @@ from codeweaver.providers.config.utils import (
     ensure_endpoint_version,
     try_for_azure_endpoint,
 )
-from codeweaver.providers.embedding import MistralClientOptions
 
 
 if TYPE_CHECKING:
@@ -312,7 +315,7 @@ class BaseProviderSettings(BasedModel, ABC):
         kind = next(
             (
                 name
-                for name in {"agent", "data", "sparse", "embed", "rerank"}
+                for name in ("agent", "data", "sparse", "embed", "rerank")  # order matters here
                 if name in type(self).__name__.lower()
             ),
             None,
@@ -326,7 +329,7 @@ class BaseProviderSettings(BasedModel, ABC):
                 "bedrock-runtime" if kind == "embed" else "bedrock-agent-runtime", **options
             )
         if self.provider in (Provider.SENTENCE_TRANSFORMERS, Provider.FASTEMBED):
-            return await client_import._resolve().initialize_async(**options)
+            return await asyncio.to_thread(client_import._resolve(), **options)
         if not isinstance(client_import, dict):
             return client_import._resolve()(**options)
         client_class = client_import.get(kind)._resolve()
@@ -612,7 +615,7 @@ class _BaseQdrantVectorStoreProviderSettings(VectorStoreProviderSettings):
         if not self.client_options:
             self.client_options = QdrantClientOptions(
                 location=":memory:" if self.provider == Provider.MEMORY else None,
-                host="localhost" if self.provider == Provider.QDRANT else None,
+                host=LOCALHOST if self.provider == Provider.QDRANT else None,
             )
         if self.provider == Provider.MEMORY:
             collection_name = None
@@ -816,7 +819,7 @@ class MemoryVectorStoreProviderSettings(_BaseQdrantVectorStoreProviderSettings):
     ) -> Path:
         """Get the persist path from in_memory_config."""
         return Path(
-            f"{get_user_state_dir()}/vectors/{generate_collection_name(project_name=project_name, project_path=project_path)}"
+            f"{get_user_state_dir()}/{DEFAULT_VECTOR_STORE_PERSIST_SUBPATH}/{generate_collection_name(project_name=project_name, project_path=project_path)}"
         )
 
     @staticmethod

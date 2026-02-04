@@ -61,81 +61,59 @@ if TYPE_CHECKING:
 # Phase 2-4: OpenAI-compatible providers (18 providers - complete)
 # Phase 5: Cloud platforms (3 providers - complete)
 # Phase 6: Specialized providers (10 providers - complete)
-_dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType(
-    {
-        # OpenAI-compatible providers
-        "OPENAI": ("codeweaver.providers.env_registry.definitions", "openai_compatible"),
-        "DEEPSEEK": ("codeweaver.providers.env_registry.definitions", "openai_compatible"),
-        "FIREWORKS": ("codeweaver.providers.env_registry.definitions", "openai_compatible"),
-        "TOGETHER": ("codeweaver.providers.env_registry.definitions", "openai_compatible"),
-        "CEREBRAS": ("codeweaver.providers.env_registry.definitions", "openai_compatible"),
-        "MOONSHOT": ("codeweaver.providers.env_registry.definitions", "openai_compatible"),
-        "MORPH": ("codeweaver.providers.env_registry.definitions", "openai_compatible"),
-        "NEBIUS": ("codeweaver.providers.env_registry.definitions", "openai_compatible"),
-        "OPENROUTER": ("codeweaver.providers.env_registry.definitions", "openai_compatible"),
-        "OVHCLOUD": ("codeweaver.providers.env_registry.definitions", "openai_compatible"),
-        "SAMBANOVA": ("codeweaver.providers.env_registry.definitions", "openai_compatible"),
-        "GROQ": ("codeweaver.providers.env_registry.definitions", "openai_compatible"),
-        "ALIBABA": ("codeweaver.providers.env_registry.definitions", "openai_compatible"),
-        "GITHUB": ("codeweaver.providers.env_registry.definitions", "openai_compatible"),
-        "LITELLM": ("codeweaver.providers.env_registry.definitions", "openai_compatible"),
-        "OLLAMA": ("codeweaver.providers.env_registry.definitions", "openai_compatible"),
-        "PERPLEXITY": ("codeweaver.providers.env_registry.definitions", "openai_compatible"),
-        "X_AI": ("codeweaver.providers.env_registry.definitions", "openai_compatible"),
-        # Cloud platforms
-        "AZURE": ("codeweaver.providers.env_registry.definitions", "cloud_platforms"),
-        "HEROKU": ("codeweaver.providers.env_registry.definitions", "cloud_platforms"),
-        "VERCEL": ("codeweaver.providers.env_registry.definitions", "cloud_platforms"),
-        # Specialized providers
-        "VOYAGE": ("codeweaver.providers.env_registry.definitions", "specialized"),
-        "ANTHROPIC": ("codeweaver.providers.env_registry.definitions", "specialized"),
-        "HUGGINGFACE_INFERENCE": ("codeweaver.providers.env_registry.definitions", "specialized"),
-        "BEDROCK": ("codeweaver.providers.env_registry.definitions", "specialized"),
-        "COHERE": ("codeweaver.providers.env_registry.definitions", "specialized"),
-        "TAVILY": ("codeweaver.providers.env_registry.definitions", "specialized"),
-        "GOOGLE": ("codeweaver.providers.env_registry.definitions", "specialized"),
-        "MISTRAL": ("codeweaver.providers.env_registry.definitions", "specialized"),
-        "PYDANTIC_GATEWAY": ("codeweaver.providers.env_registry.definitions", "specialized"),
-        "QDRANT": ("codeweaver.providers.env_registry.definitions", "specialized"),
-    }
-)
+_dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
+    "ALIBABA": (__spec__.parent, "openai_compatible"),
+    "ANTHROPIC": (__spec__.parent, "specialized"),
+    "AZURE": (__spec__.parent, "cloud_platforms"),
+    "BEDROCK": (__spec__.parent, "specialized"),
+    "CEREBRAS": (__spec__.parent, "openai_compatible"),
+    "COHERE": (__spec__.parent, "specialized"),
+    "DEEPSEEK": (__spec__.parent, "openai_compatible"),
+    "FIREWORKS": (__spec__.parent, "openai_compatible"),
+    "GITHUB": (__spec__.parent, "openai_compatible"),
+    "GOOGLE": (__spec__.parent, "specialized"),
+    "GROQ": (__spec__.parent, "openai_compatible"),
+    "HEROKU": (__spec__.parent, "cloud_platforms"),
+    "HUGGINGFACE_INFERENCE": (__spec__.parent, "specialized"),
+    "LITELLM": (__spec__.parent, "openai_compatible"),
+    "MISTRAL": (__spec__.parent, "specialized"),
+    "MOONSHOT": (__spec__.parent, "openai_compatible"),
+    "MORPH": (__spec__.parent, "openai_compatible"),
+    "NEBIUS": (__spec__.parent, "openai_compatible"),
+    "OLLAMA": (__spec__.parent, "openai_compatible"),
+    "OPENAI": (__spec__.parent, "openai_compatible"),
+    "OPENROUTER": (__spec__.parent, "openai_compatible"),
+    "OVHCLOUD": (__spec__.parent, "openai_compatible"),
+    "PERPLEXITY": (__spec__.parent, "openai_compatible"),
+    "PYDANTIC_GATEWAY": (__spec__.parent, "specialized"),
+    "QDRANT": (__spec__.parent, "specialized"),
+    "SAMBANOVA": (__spec__.parent, "openai_compatible"),
+    "TAVILY": (__spec__.parent, "specialized"),
+    "TOGETHER": (__spec__.parent, "openai_compatible"),
+    "VERCEL": (__spec__.parent, "cloud_platforms"),
+    "VOYAGE": (__spec__.parent, "specialized"),
+    "X_AI": (__spec__.parent, "openai_compatible"),
+})
 
 __getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
 
-# Export explicitly for clarity (optional, but helpful for IDE)
-# Phase 2-4: OpenAI-compatible providers (18 providers - complete)
-# Phase 5: Cloud platforms (3 providers - complete)
-# Phase 6: Specialized providers (10 providers - complete)
+
 __all__: tuple[str, ...] = (
-    # OpenAI-compatible providers
     "ALIBABA",
-    # Specialized providers
     "ANTHROPIC",
-    # Cloud platforms
     "AZURE",
-    # Specialized providers
     "BEDROCK",
-    # OpenAI-compatible providers
     "CEREBRAS",
-    # Specialized providers
     "COHERE",
-    # OpenAI-compatible providers
     "DEEPSEEK",
     "FIREWORKS",
     "GITHUB",
-    # Specialized providers
     "GOOGLE",
-    # OpenAI-compatible providers
     "GROQ",
-    # Cloud platforms
     "HEROKU",
-    # Specialized providers
     "HUGGINGFACE_INFERENCE",
-    # OpenAI-compatible providers
     "LITELLM",
-    # Specialized providers
     "MISTRAL",
-    # OpenAI-compatible providers
     "MOONSHOT",
     "MORPH",
     "NEBIUS",
@@ -144,20 +122,13 @@ __all__: tuple[str, ...] = (
     "OPENROUTER",
     "OVHCLOUD",
     "PERPLEXITY",
-    # Specialized providers
     "PYDANTIC_GATEWAY",
     "QDRANT",
-    # OpenAI-compatible providers
     "SAMBANOVA",
-    # Specialized providers
     "TAVILY",
-    # OpenAI-compatible providers
     "TOGETHER",
-    # Cloud platforms
     "VERCEL",
-    # Specialized providers
     "VOYAGE",
-    # OpenAI-compatible providers
     "X_AI",
 )
 

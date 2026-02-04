@@ -5,6 +5,8 @@
 
 """Shared types for providers configurations."""
 
+from __future__ import annotations
+
 import asyncio
 import ssl
 

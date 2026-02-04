@@ -388,9 +388,11 @@ DEFAULT_SERVER_SHUTDOWN_TIMEOUT = 10.0
 DEFAULT_USER_DIR_NAME = "codeweaver"
 """Default directory name for user-level configuration and data storage. CodeWeaver follows the XDG Base Directory Specification on Unix-like systems, and uses idiomatic equivalent directories on Windows and macOS."""
 
-DEFAULT_CHECKPOINT_SUBPATH = f"{DEFAULT_USER_DIR_NAME}/.checkpoints"
+DEFAULT_CHECKPOINT_SUBPATH = "checkpoints"
 
-DEFAULT_MANIFEST_SUBPATH = f"{DEFAULT_USER_DIR_NAME}/.manifests"
+DEFAULT_MANIFEST_SUBPATH = "manifests"
+
+DEFAULT_VECTOR_STORE_PERSIST_SUBPATH = "vectors"
 
 # ======= Semantic analysis Defaults
 
@@ -684,6 +686,7 @@ __all__ = (
     "DEFAULT_VECTOR_STORE_BATCH_SIZE",
     "DEFAULT_VECTOR_STORE_MAX_RESULTS",
     "DEFAULT_VECTOR_STORE_MAX_RESULTS",
+    "DEFAULT_VECTOR_STORE_PERSIST_SUBPATH",
     "DEFAULT_WATCHER_DEBOUNCE_MILLISECONDS",
     "DEFAULT_WATCHER_GRACE_PERIOD",
     "DEFAULT_WATCHER_STEP_MILLISECONDS",

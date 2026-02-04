@@ -28,26 +28,25 @@ class TestHttpxEnvVars:
     def test_contains_proxy_config(self) -> None:
         """Test includes HTTP proxy configuration."""
         result = httpx_env_vars()
-        keys = [key for key, _ in result]
-        assert "http_proxy" in keys
+        assert "http_proxy" in dict(result)
 
     def test_contains_ssl_cert_config(self) -> None:
         """Test includes SSL certificate configuration."""
         result = httpx_env_vars()
-        keys = [key for key, _ in result]
-        assert "ssl_cert_file" in keys
+        assert "ssl_cert_file" in dict(result)
 
     def test_proxy_env_var_name(self) -> None:
         """Test proxy uses HTTPS_PROXY env var."""
-        result = httpx_env_vars()
-        proxy_cfg = next(cfg for key, cfg in result if key == "http_proxy")
-        assert proxy_cfg.env == "HTTPS_PROXY"
+        self._validate_proxy_env_var("http_proxy", "HTTPS_PROXY")
 
     def test_ssl_cert_env_var_name(self) -> None:
         """Test SSL cert uses SSL_CERT_FILE env var."""
+        self._validate_proxy_env_var("ssl_cert_file", "SSL_CERT_FILE")
+
+    def _validate_proxy_env_var(self, variable_name: str, env_name: str):
         result = httpx_env_vars()
-        ssl_cfg = next(cfg for key, cfg in result if key == "ssl_cert_file")
-        assert ssl_cfg.env == "SSL_CERT_FILE"
+        proxy_cfg = next(cfg for key, cfg in result if key == variable_name)
+        assert proxy_cfg.env == env_name
 
 
 @pytest.mark.unit
@@ -126,9 +125,8 @@ class TestOpenAICompatibleProvider:
         """Test includes httpx environment variables."""
         cfg = openai_compatible_provider("Test", api_key_env="TEST_KEY")
 
-        other_keys = [key for key, _ in cfg.other]
-        assert "http_proxy" in other_keys
-        assert "ssl_cert_file" in other_keys
+        assert cfg.get_other("http_proxy") is not None
+        assert cfg.get_other("ssl_cert_file") is not None
 
     def test_extra_vars(self) -> None:
         """Test adding extra custom variables."""
@@ -136,8 +134,7 @@ class TestOpenAICompatibleProvider:
 
         cfg = openai_compatible_provider("Test", api_key_env="TEST_KEY", extra_vars=extra)
 
-        other_keys = [key for key, _ in cfg.other]
-        assert "custom" in other_keys
+        assert cfg.get_other("custom") is not None
 
 
 @pytest.mark.unit
@@ -176,15 +173,13 @@ class TestSimpleApiKeyProvider:
             "Test", client="test", api_key_env="TEST_KEY", additional_vars=additional
         )
 
-        other_keys = [key for key, _ in cfg.other]
-        assert "timeout" in other_keys
+        assert cfg.get_other("timeout") is not None
 
     def test_includes_httpx_vars(self) -> None:
         """Test includes httpx variables."""
         cfg = simple_api_key_provider("Test", client="test", api_key_env="TEST_KEY")
 
-        other_keys = [key for key, _ in cfg.other]
-        assert "http_proxy" in other_keys
+        assert cfg.get_other("http_proxy") is not None
 
 
 @pytest.mark.unit

@@ -9,8 +9,11 @@ These reduce boilerplate by providing templates for common configurations.
 Typical usage: 1-2 lines per provider instead of 50+ lines.
 """
 
+from __future__ import annotations
+
 from typing import Any
 
+from codeweaver.core.types import ProviderLiteral
 from codeweaver.core.types.env import EnvFormat, VariableInfo
 from codeweaver.providers.env_registry.models import EnvVarConfig, ProviderEnvConfig
 
@@ -179,8 +182,8 @@ def simple_api_key_provider(
 
 
 def multi_client_provider(
-    provider_name: str, configs: list[ProviderEnvConfig]
-) -> list[ProviderEnvConfig]:
+    provider_name: ProviderLiteral, configs: list[ProviderEnvConfig]
+) -> tuple[ProviderEnvConfig, ...]:
     """Build multi-client provider configuration (like Azure).
 
     Some providers (Azure, Heroku) support multiple underlying clients
@@ -188,10 +191,10 @@ def multi_client_provider(
 
     Args:
         provider_name: Provider name (e.g., "azure", "heroku")
-        configs: List of configs for each client
+        configs: Tuple of configs for each client
 
     Returns:
-        List of ProviderEnvConfig with updated provider names
+        Tuple of ProviderEnvConfig with updated provider names
 
     Example:
         >>> _azure_openai = ProviderEnvConfig(...)
@@ -199,7 +202,7 @@ def multi_client_provider(
         >>> AZURE = multi_client_provider("azure", [_azure_openai, _azure_cohere])
     """
     # Recreate each config with updated provider name
-    return [
+    return tuple(
         ProviderEnvConfig(
             provider=provider_name,
             clients=cfg.clients,
@@ -218,7 +221,7 @@ def multi_client_provider(
             inherits_from=cfg.inherits_from,
         )
         for cfg in configs
-    ]
+    )
 
 
 __all__ = (

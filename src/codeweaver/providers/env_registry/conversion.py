@@ -27,7 +27,7 @@ def env_var_config_to_info(config: EnvVarConfig) -> EnvVarInfo:
         ...     env="OPENAI_API_KEY",
         ...     description="API key",
         ...     is_secret=True,
-        ...     variable_name="api_key"
+        ...     variable_name="api_key",
         ... )
         >>> info = env_var_config_to_info(config)
         >>> info.env
@@ -61,8 +61,10 @@ def provider_env_config_to_vars(
         >>> config = ProviderEnvConfig(
         ...     provider="deepseek",
         ...     clients=("openai",),
-        ...     api_key=EnvVarConfig(env="DEEPSEEK_API_KEY", description="API key", is_secret=True),
-        ...     inherits_from="openai"
+        ...     api_key=EnvVarConfig(
+        ...         env="DEEPSEEK_API_KEY", description="API key", is_secret=True
+        ...     ),
+        ...     inherits_from="openai",
         ... )
         >>> env_vars = provider_env_config_to_vars(config)
         >>> env_vars["api_key"].env
@@ -95,10 +97,10 @@ def provider_env_config_to_vars(
 
     # Convert 'other' field from frozenset[tuple] to dict
     if config.other:
-        other_dict: dict[str, EnvVarInfo] = {}
-        for key, env_config in config.other:
-            other_dict[key] = env_var_config_to_info(env_config)
-        result["other"] = other_dict
+        other: dict[str, EnvVarInfo] = {
+            key: env_var_config_to_info(env_config) for key, env_config in config.other
+        }
+        result["other"] = other
 
     # Handle inheritance if requested
     # Note: Inheritance resolution is handled by get_provider_configs which
@@ -107,9 +109,7 @@ def provider_env_config_to_vars(
     return result
 
 
-def get_provider_configs(
-    provider_name: str,
-) -> tuple[ProviderEnvConfig, ...] | None:
+def get_provider_configs(provider_name: str) -> tuple[ProviderEnvConfig, ...] | None:
     """Get all provider configurations from registry.
 
     Args:
@@ -123,8 +123,44 @@ def get_provider_configs(
         >>> len(configs)
         3  # Azure has 3 client configurations
     """
-    try:
-        from codeweaver.providers.env_registry.definitions import (
+    from codeweaver.providers.env_registry.definitions import (
+        ALIBABA,
+        ANTHROPIC,
+        AZURE,
+        BEDROCK,
+        CEREBRAS,
+        COHERE,
+        DEEPSEEK,
+        FIREWORKS,
+        GITHUB,
+        GOOGLE,
+        GROQ,
+        HEROKU,
+        HUGGINGFACE_INFERENCE,
+        LITELLM,
+        MISTRAL,
+        MOONSHOT,
+        MORPH,
+        NEBIUS,
+        OLLAMA,
+        OPENAI,
+        OPENROUTER,
+        OVHCLOUD,
+        PERPLEXITY,
+        PYDANTIC_GATEWAY,
+        QDRANT,
+        SAMBANOVA,
+        TAVILY,
+        TOGETHER,
+        VERCEL,
+        VOYAGE,
+        X_AI,
+    )
+
+    # Map provider names to registry definitions
+    registry_map = {
+        cfg.__name__.lower(): cfg
+        for cfg in {
             ALIBABA,
             ANTHROPIC,
             AZURE,
@@ -156,43 +192,7 @@ def get_provider_configs(
             VERCEL,
             VOYAGE,
             X_AI,
-        )
-    except ImportError:
-        return None
-
-    # Map provider names to registry definitions
-    registry_map = {
-        "alibaba": ALIBABA,
-        "anthropic": ANTHROPIC,
-        "azure": AZURE,
-        "bedrock": BEDROCK,
-        "cerebras": CEREBRAS,
-        "cohere": COHERE,
-        "deepseek": DEEPSEEK,
-        "fireworks": FIREWORKS,
-        "github": GITHUB,
-        "google": GOOGLE,
-        "groq": GROQ,
-        "heroku": HEROKU,
-        "hf-inference": HUGGINGFACE_INFERENCE,
-        "litellm": LITELLM,
-        "mistral": MISTRAL,
-        "moonshot": MOONSHOT,
-        "morph": MORPH,
-        "nebius": NEBIUS,
-        "ollama": OLLAMA,
-        "openai": OPENAI,
-        "openrouter": OPENROUTER,
-        "ovhcloud": OVHCLOUD,
-        "perplexity": PERPLEXITY,
-        "gateway": PYDANTIC_GATEWAY,
-        "qdrant": QDRANT,
-        "sambanova": SAMBANOVA,
-        "tavily": TAVILY,
-        "together": TOGETHER,
-        "vercel": VERCEL,
-        "voyage": VOYAGE,
-        "x-ai": X_AI,
+        }
     }
 
     if provider_name not in registry_map:
@@ -201,14 +201,10 @@ def get_provider_configs(
     configs = registry_map[provider_name]
 
     # Registry definitions are lists of ProviderEnvConfig
-    if isinstance(configs, list):
-        return tuple(configs)
-    return None
+    return tuple(configs) if isinstance(configs, list) else None
 
 
-def get_provider_env_vars_from_registry(
-    provider_name: str,
-) -> tuple[ProviderEnvVars, ...] | None:
+def get_provider_env_vars_from_registry(provider_name: str) -> tuple[ProviderEnvVars, ...] | None:
     """Get provider environment variables from registry.
 
     Main entry point for registry integration.
@@ -224,12 +220,9 @@ def get_provider_env_vars_from_registry(
         >>> env_vars[0]["api_key"].env
         'DEEPSEEK_API_KEY'
     """
-    configs = get_provider_configs(provider_name)
-
-    if not configs:
-        return None
-
-    return tuple(provider_env_config_to_vars(config) for config in configs)
+    if configs := get_provider_configs(provider_name):
+        return tuple(provider_env_config_to_vars(config) for config in configs)
+    return None
 
 
 __all__ = (

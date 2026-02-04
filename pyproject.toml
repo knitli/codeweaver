@@ -676,6 +676,15 @@ invalid-argument-type = "ignore"
 invalid-return-type = "ignore"
 unresolved-attribute = "ignore"
 
+[[tool.ty.overrides]]
+include = ["src/codeweaver/core/types/_provider_maps.py"]
+
+[tool.ty.overrides.rules]
+invalid-argument-type = "ignore"
+invalid-return-type = "ignore"
+unsupported-operator = "ignore"
+no-matching-overload = "ignore"
+
 [tool.uv]
 cache-keys = [
   { file = "uv.lock" },

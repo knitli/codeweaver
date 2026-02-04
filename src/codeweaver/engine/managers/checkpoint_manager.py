@@ -25,18 +25,16 @@ from codeweaver.core import (
     INJECTED,
     BasedModel,
     BlakeHashKey,
-    CodeWeaverSettingsType,
     ResolvedProjectNameDep,
     ResolvedProjectPathDep,
     get_blake_hash,
     uuid7,
 )
-from codeweaver.engine.config import IndexerSettings
-from codeweaver.providers import (
-    EmbeddingProviderSettings,
-    SparseEmbeddingProviderSettings,
-    VectorStoreProviderSettings,
-)
+from codeweaver.core.constants import ONE_HOUR
+from codeweaver.engine.config import CodeWeaverEngineSettings, IndexerSettings
+from codeweaver.providers import SparseEmbeddingProviderSettings, VectorStoreProviderSettings
+from codeweaver.providers.config import EmbeddingProviderSettings
+from codeweaver.providers.config.asymmetric import AsymmetricEmbeddingProviderSettings
 
 
 if TYPE_CHECKING:
@@ -54,7 +52,7 @@ class CheckpointSettingsFingerprint(TypedDict):
     indexer: dict[str, Any]
     project_path: DirectoryPath
     project_name: str
-    embedding_provider: tuple[EmbeddingProviderSettings, ...] | None
+    embedding_provider: tuple[EmbeddingProviderSettings | AsymmetricEmbeddingProviderSettings, ...] | None
     sparse_provider: tuple[SparseEmbeddingProviderSettings, ...] | None
     vector_store: tuple[VectorStoreProviderSettings, ...] | None
 
@@ -72,16 +70,16 @@ def get_checkpoint_settings_map(
     from codeweaver.core import get_settings
 
     # These values will already have been resolved by dependency injection with defaults if needed
-    settings = cast(CodeWeaverSettingsType, get_settings())
-    indexer: IndexerSettings = cast(IndexerSettings, settings.indexer)  # ty:ignore[unresolved-attribute]
+    settings = cast(CodeWeaverEngineSettings, get_settings())
+    indexer: IndexerSettings = cast(IndexerSettings, settings.indexer)
 
     indexer_map = indexer.model_dump(mode="json", exclude_computed_fields=True, exclude_none=True)
 
     return CheckpointSettingsFingerprint(
         indexer=indexer_map,
-        embedding_provider=settings.provider.embedding,  # ty:ignore[unresolved-attribute]
-        sparse_provider=settings.provider.sparse_embedding,  # ty:ignore[unresolved-attribute]
-        vector_store=settings.provider.vector_store,  # ty:ignore[unresolved-attribute]
+        embedding_provider=settings.provider.embedding,
+        sparse_provider=settings.provider.sparse_embedding,
+        vector_store=settings.provider.vector_store,
         project_path=project_path,
         project_name=project_name,
     )
@@ -162,7 +160,7 @@ class IndexingCheckpoint(BasedModel):
 
     def is_stale(self, max_age_hours: int = 24) -> bool:
         """Check if checkpoint is too old or settings mismatch."""
-        age_hours = (datetime.now(UTC) - self.last_checkpoint).total_seconds() / 3600
+        age_hours = (datetime.now(UTC) - self.last_checkpoint).total_seconds() / ONE_HOUR
         return (
             (age_hours > max_age_hours)
             or (age_hours < 0)

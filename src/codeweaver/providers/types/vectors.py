@@ -27,6 +27,7 @@ from codeweaver.core.types import (
     ModelNameT,
     Provider,
 )
+from codeweaver.providers.config.asymmetric import AsymmetricEmbeddingProviderSettings
 from codeweaver.providers.config.embedding import FastEmbedSparseEmbeddingConfig
 
 
@@ -178,7 +179,9 @@ class VectorConfig(BasedModel, frozen=True):
     @classmethod
     async def from_provider_settings(
         cls,
-        config: EmbeddingProviderSettings | SparseEmbeddingProviderSettings,
+        config: EmbeddingProviderSettings
+        | AsymmetricEmbeddingProviderSettings
+        | SparseEmbeddingProviderSettings,
         *,
         name: str,
         role: VectorRole | str | None = None,
@@ -209,7 +212,11 @@ class VectorConfig(BasedModel, frozen=True):
         if isinstance(config, SparseEmbeddingProviderSettings):
             params = await config.sparse_embedding_config.as_sparse_vector_params()
         else:
-            params = await config.embedding_config.as_vector_params()
+            params = (
+                await config.embedding_config.as_vector_params()
+                if config.config_type == "symmetric"
+                else await config.embed_provider.embedding_config.as_vector_params()
+            )
 
         return cls(
             name=name,
@@ -415,11 +422,11 @@ class VectorSet(BasedModel):
 
         # Primary dense (required)
         if profile.embedding and profile.embedding[0]:
-            from codeweaver.providers.config.asymmetric import AsymmetricEmbeddingConfig
+            from codeweaver.providers.config.asymmetric import AsymmetricEmbeddingProviderSettings
 
             first_config = profile.embedding[0]
             # Check if this is an asymmetric config
-            if isinstance(first_config, AsymmetricEmbeddingConfig):
+            if isinstance(first_config, AsymmetricEmbeddingProviderSettings):
                 # Use the embed_provider for document embedding
                 vectors[PRIMARY_VECTOR_NAME] = await VectorConfig.from_provider_settings(
                     first_config.embed_provider,

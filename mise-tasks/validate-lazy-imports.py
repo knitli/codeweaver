@@ -83,8 +83,7 @@ NO_LAZY_PACKAGES = [
     "codeweaver.cli.commands",
     "codeweaver.agent_api.find_code",
     "codeweaver.providers.data",
-    "codeweaver.data",
-    "codeweaver.server.middleware",
+    "codeweaver.semantic.data",
 ]
 
 # Modules to check for package-level lazy imports
@@ -755,7 +754,7 @@ def get_broken_imports(file_path: Path, full_mod_name: str) -> list[ImportErrorD
     return errors
 
 
-def manage_tui():
+def manage_tui() -> None:
     """Handle TUI interaction."""
     if not is_tty():
         console.print(
@@ -1092,7 +1091,7 @@ def manage_tui():
 # ============================================================================
 
 
-def main():
+def main() -> Literal[0, 1]:
     """Main entry point for the import validator and manager."""
     if "--manage" in sys.argv:
         manage_tui()

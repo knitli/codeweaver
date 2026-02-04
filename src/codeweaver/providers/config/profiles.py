@@ -65,7 +65,7 @@ from codeweaver.providers.config.kinds import (
     SparseEmbeddingProviderSettings,
     TavilyProviderSettings,
 )
-from codeweaver.providers.config.providers import AsymmetricEmbeddingConfig
+from codeweaver.providers.config.providers import AsymmetricEmbeddingProviderSettings
 
 
 if TYPE_CHECKING:
@@ -203,7 +203,7 @@ def _recommended_default(
 
     return ProviderSettingsDict(
         embedding=(
-            AsymmetricEmbeddingConfig(
+            AsymmetricEmbeddingProviderSettings(
                 embed_provider=EmbeddingProviderSettings(
                     model_name=ModelName("voyage-4-large"),
                     embedding_config=VoyageEmbeddingConfig(model_name=ModelName("voyage-4-large")),

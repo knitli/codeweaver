@@ -21,6 +21,7 @@ from codeweaver.cli.dependencies import setup_cli_di
 from codeweaver.cli.ui import CLIErrorHandler, IndexingProgress, StatusDisplay, get_display
 from codeweaver.core import CodeWeaverError, SettingsMapDep, Unset
 from codeweaver.core.config.types import CodeWeaverSettingsDict
+from codeweaver.core.constants import ONE_MINUTE
 from codeweaver.core.di.depends import INJECTED
 from codeweaver.core.types.dictview import DictView
 from codeweaver.engine import CheckpointManager, FileManifestManager
@@ -310,12 +311,12 @@ async def _run_standalone_indexing(
     elapsed = stats.elapsed_time()
     if elapsed >= 3600:
         hours = int(elapsed // 3600)
-        minutes = int((elapsed % 3600) // 60)
-        seconds = int(elapsed % 60)
+        minutes = int((elapsed % 3600) // ONE_MINUTE)
+        seconds = int(elapsed % ONE_MINUTE)
         human_time = f"{hours}h {minutes}m {seconds}s"
-    elif elapsed >= 60:
-        minutes = int(elapsed // 60)
-        seconds = int(elapsed % 60)
+    elif elapsed >= ONE_MINUTE:
+        minutes = int(elapsed // ONE_MINUTE)
+        seconds = int(elapsed % ONE_MINUTE)
         human_time = f"{minutes}m {seconds}s"
     else:
         human_time = f"{elapsed:.1f}s"

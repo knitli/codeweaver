@@ -37,7 +37,7 @@ from codeweaver.core.types import (
 )
 from codeweaver.core.utils import has_package
 from codeweaver.providers import VoyageClientOptions
-from codeweaver.providers.config.asymmetric import AsymmetricEmbeddingConfig
+from codeweaver.providers.config.asymmetric import AsymmetricEmbeddingProviderSettings
 from codeweaver.providers.config.clients import (
     QdrantClientOptions,
     SentenceTransformersClientOptions,
@@ -97,7 +97,7 @@ class ProviderSettingsDict(TypedDict, total=False):
     # we currently only support one each of embedding, reranking and vector store providers
     # but we use tuples to allow for future expansion for some less common use cases
     embedding: NotRequired[
-        tuple[EmbeddingProviderSettingsType | AsymmetricEmbeddingConfig, ...] | None
+        tuple[EmbeddingProviderSettingsType | AsymmetricEmbeddingProviderSettings, ...] | None
     ]
     """Embedding configuration. Can include symmetric (single-model) or asymmetric (dual-model) embedding configs. Asymmetric embedding allows using different models for document and query embeddings while maintaining compatibility through shared vector spaces."""
     # rerank is probably the priority for multiple providers in the future, because they're vector agnostic, so you could have fallback providers, or use different ones for different tasks
@@ -179,7 +179,9 @@ def _get_default_embedding_settings() -> DeterminedDefaults:
 _embedding_defaults = _get_default_embedding_settings()
 
 
-def _produce_voyage_family(provider: Provider, model: ModelNameT) -> AsymmetricEmbeddingConfig:
+def _produce_voyage_family(
+    provider: Provider, model: ModelNameT
+) -> AsymmetricEmbeddingProviderSettings:
     """Produce the Voyage4ModelFamily instance for the given provider and model."""
     query_config = SentenceTransformersEmbeddingConfig(
         model_name=ModelName("voyageai/voyage-4-nano"),
@@ -213,7 +215,7 @@ def _produce_voyage_family(provider: Provider, model: ModelNameT) -> AsymmetricE
         )
     else:
         embed_settings = query_settings
-    return AsymmetricEmbeddingConfig(
+    return AsymmetricEmbeddingProviderSettings(
         embed_provider=embed_settings,
         query_provider=query_settings,
         validate_family_compatibility=True,
@@ -443,7 +445,7 @@ class ProviderSettings(BasedModel):
     ] = None
 
     embedding: Annotated[
-        tuple[EmbeddingProviderSettingsType | AsymmetricEmbeddingConfig, ...] | None,
+        tuple[EmbeddingProviderSettingsType | AsymmetricEmbeddingProviderSettings, ...] | None,
         Field(
             description="""Embedding provider configuration.
 
@@ -454,7 +456,7 @@ class ProviderSettings(BasedModel):
             - Traditional approach where a single model handles all embedding tasks
             - Simpler configuration, single provider setup
 
-            **Asymmetric Mode (AsymmetricEmbeddingConfig)**:
+            **Asymmetric Mode (AsymmetricEmbeddingProviderSettings)**:
             - Uses different models for document embedding and query embedding
             - Enables cost/performance optimization (e.g., API model for docs, local for queries)
             - Requires models from the same model family for compatibility
@@ -594,7 +596,7 @@ class ProviderSettings(BasedModel):
         if self.embedding is not None and self.embedding is not Unset and self.embedding:
             # Check if we have asymmetric or symmetric configs
             first_config = self.embedding[0]
-            if isinstance(first_config, AsymmetricEmbeddingConfig):
+            if isinstance(first_config, AsymmetricEmbeddingProviderSettings):
                 logger.debug(
                     "Using asymmetric embedding mode: embed=%s, query=%s",
                     str(first_config.embed_provider.model_name),

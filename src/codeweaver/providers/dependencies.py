@@ -72,6 +72,7 @@ from codeweaver.providers.config import (
     SparseEmbeddingProviderSettings,
     VectorStoreProviderSettings,
 )
+from codeweaver.providers.config.asymmetric import AsymmetricEmbeddingProviderSettings
 from codeweaver.providers.config.kinds import _BaseQdrantVectorStoreProviderSettings
 from codeweaver.providers.config.providers import EmbeddingProviderSettingsType
 from codeweaver.providers.embedding import EmbeddingProvider, SparseEmbeddingProvider
@@ -633,11 +634,20 @@ type EmbeddingCapabilityGroupDep = Annotated[
 
 
 async def _get_embedding_provider_for_config(
-    config: EmbeddingProviderSettings,
+    config: EmbeddingProviderSettings | AsymmetricEmbeddingProviderSettings,
     registry: EmbeddingRegistryDep = INJECTED,
     cache_manager: CacheManagerDep = INJECTED,
-) -> EmbeddingProvider:
+) -> EmbeddingProvider | tuple[EmbeddingProvider, EmbeddingProvider]:
     """Helper to get the embedding provider settings from config."""
+    if isinstance(config, AsymmetricEmbeddingProviderSettings):
+        return (
+            await _get_embedding_provider_for_config(
+                config.embed_provider, registry=registry, cache_manager=cache_manager
+            ),
+            await _get_embedding_provider_for_config(
+                config.query_provider, registry=registry, cache_manager=cache_manager
+            ),
+        )
     capabilities = config.embedding_config.capabilities
     provider = config.client.embedding_provider
     try:

@@ -15,6 +15,13 @@ from codeweaver.core.utils import create_lazy_getattr
 
 MappingProxyType = _types.MappingProxyType
 
+from codeweaver.core.types._provider_maps import ProviderKindLiteral, ProviderLiteral
+from codeweaver.core.types.provider import LiteralProvider, LiteralProviderKind
+
+
+type LiteralProviderKindType = ProviderKindLiteral | LiteralProviderKind
+type LiteralProviderType = ProviderLiteral | LiteralProvider
+
 
 if TYPE_CHECKING:
     from codeweaver.core.types.aliases import (
@@ -93,18 +100,7 @@ if TYPE_CHECKING:
         BasedModel,
         RootedRoot,
     )
-    from codeweaver.core.types.provider import (
-        LiteralProvider,
-        LiteralProviderKind,
-        LiteralProviderKindType,
-        LiteralProviderType,
-        Provider,
-        ProviderKind,
-        ProviderKindLiteral,
-        ProviderLiteral,
-        SDKClient,
-        get_provider_kinds,
-    )
+    from codeweaver.core.types.provider import Provider, ProviderKind, SDKClient, get_provider_kinds
     from codeweaver.core.types.search import SearchResult, SearchStrategy, StrategizedQuery
     from codeweaver.core.types.sentinel import MISSING, UNSET, Missing, Sentinel, Unset
     from codeweaver.core.types.settings_model import (
@@ -192,10 +188,6 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "LanguageName": (__spec__.parent, "aliases"),
     "LanguageNameT": (__spec__.parent, "aliases"),
     "LineStrategy": (__spec__.parent, "delimiter"),
-    "LiteralProvider": (__spec__.parent, "provider"),
-    "LiteralProviderKind": (__spec__.parent, "provider"),
-    "LiteralProviderKindType": (__spec__.parent, "provider"),
-    "LiteralProviderType": (__spec__.parent, "provider"),
     "LiteralStringT": (__spec__.parent, "aliases"),
     "LlmToolName": (__spec__.parent, "aliases"),
     "LlmToolNameT": (__spec__.parent, "aliases"),
@@ -211,8 +203,6 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "Provider": (__spec__.parent, "provider"),
     "ProviderEnvVars": (__spec__.parent, "env"),
     "ProviderKind": (__spec__.parent, "provider"),
-    "ProviderKindLiteral": (__spec__.parent, "provider"),
-    "ProviderLiteral": (__spec__.parent, "provider"),
     "QueryResult": (__spec__.parent, "embeddings"),
     "RawEmbeddingVectors": (__spec__.parent, "embeddings"),
     "RequestKind": (__spec__.parent, "statistics"),
