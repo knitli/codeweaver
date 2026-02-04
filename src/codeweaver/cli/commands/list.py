@@ -20,7 +20,6 @@ from rich.table import Table
 from codeweaver.cli.ui import CLIErrorHandler, get_display
 from codeweaver.cli.utils import check_provider_package_available
 from codeweaver.core import Provider, ProviderKind, get_container
-from codeweaver.core.types.provider import PROVIDER_CAPABILITIES
 from codeweaver.providers import EmbeddingModelCapabilities, RerankingModelCapabilities
 
 
@@ -99,13 +98,9 @@ def providers(
 
     # Use PROVIDER_CAPABILITIES map to find providers for each kind
     # This replaces registry.list_providers(p)
-    provider_capabilities = {}
-    for p in ProviderKind:
-        if p == ProviderKind.UNSET:
-            continue
-        # Invert the map: Find all providers that have capability `p`
-        providers_with_cap = [prov for prov, caps in PROVIDER_CAPABILITIES.items() if p in caps]
-        provider_capabilities[p] = providers_with_cap
+    provider_capabilities = {
+        kind: kind.providers for kind in ProviderKind if kind != ProviderKind.UNSET
+    }
 
     # Filter by kind if specified
     kind_filter = None

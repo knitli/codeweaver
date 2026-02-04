@@ -16,7 +16,7 @@ from __future__ import annotations
 import logging
 
 from codeweaver.core import CodeChunk, SearchResult
-from codeweaver.core.constants import DEFAULT_DENSE_WEIGHT, DEFAULT_SPARSE_WEIGHT, FLOAT_ZERO
+from codeweaver.core.constants import DEFAULT_DENSE_WEIGHT, DEFAULT_SPARSE_WEIGHT, ZERO_POINT_ZERO
 from codeweaver.providers import RerankingResult
 from codeweaver.semantic import AgentTask
 from codeweaver.server.agent_api.find_code.intent import IntentType
@@ -44,7 +44,7 @@ def apply_hybrid_weights(
         # Static weights for v0.1: dense=0.65, sparse=0.35
         candidate.score = (
             getattr(candidate, "dense_score", candidate.score) * dense_weight
-            + getattr(candidate, "sparse_score", FLOAT_ZERO) * sparse_weight
+            + getattr(candidate, "sparse_score", ZERO_POINT_ZERO) * sparse_weight
         )
 
 

@@ -109,7 +109,7 @@ ONE_LINE = 1
 ZERO: int = 0
 """Zero (0). Or, Zed for our British friends."""
 
-FLOAT_ZERO: float = 0.0
+ZERO_POINT_ZERO: float = 0.0
 """Floating point zero (0.0)."""
 
 ONE_POINT_ZERO: float = 1.0
@@ -698,7 +698,6 @@ __all__ = (
     "FIND_CODE_INSTRUCTION",
     "FIND_CODE_TITLE",
     "FIVE_MINUTES",
-    "FLOAT_ZERO",
     "HEALTH_ENDPOINT",
     "INDEXER_WINDDOWN_TIMEOUT",
     "INTROSPECTION_ATTRIBUTES",
@@ -747,4 +746,5 @@ __all__ = (
     "WHITESPACES",
     "WINDOWS_NEWLINE",
     "ZERO",
+    "ZERO_POINT_ZERO",
 )

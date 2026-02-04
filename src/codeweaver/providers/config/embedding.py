@@ -566,7 +566,7 @@ class BedrockCohereConfigDict(TypedDict, total=False):
 def _set_bedrock_model_config_discriminator(v: Any) -> Literal["cohere", "titan"]:
     """Set the discriminator for Bedrock model configuration based on the model name."""
     model_name = v.get("model_name") if isinstance(v, dict) else v.model_name
-    return "cohere" if model_name.startswith("cohere") else "titan"
+    return "cohere" if str(model_name).startswith("cohere") else "titan"
 
 
 type BedrockModelConfig = Annotated[

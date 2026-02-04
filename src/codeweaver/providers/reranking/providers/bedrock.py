@@ -308,7 +308,7 @@ class BedrockRerankingProvider(RerankingProvider[AgentsforBedrockRuntimeClient])
     def __init__(
         self,
         client: AgentsforBedrockRuntimeClient,
-        config: Any,  # RerankingProviderSettings (actually BedrockProviderSettings)
+        config: Any,  # RerankingProviderSettings (actually BedrockRerankingProviderSettings)
         caps: RerankingModelCapabilities,
         **kwargs: Any,
     ) -> None:
@@ -320,22 +320,24 @@ class BedrockRerankingProvider(RerankingProvider[AgentsforBedrockRuntimeClient])
             caps: Model capabilities (provided by DI)
             **kwargs: Additional keyword arguments to override config
         """
-        # Extract Bedrock-specific configuration
-        rerank_opts = (
-            config.reranking_config._as_options().get("rerank", {})
-            if hasattr(config, "reranking_config")
-            else {}
-        )
-        top_n_value = rerank_opts.get("top_n", 10)
+        from codeweaver.providers.config import BedrockRerankingProviderSettings
 
-        model_configuration = kwargs.pop("model_configuration", None) or (
-            RerankConfiguration.from_arn(config.model_arn, top_n_value)
-            if hasattr(config, "model_arn")
-            else None
-        )
+        # Ensure we have the correct config type
+        if not isinstance(config, BedrockRerankingProviderSettings):
+            raise TypeError(
+                f"Expected BedrockRerankingProviderSettings, got {type(config).__name__}"
+            )
 
-        if not model_configuration:
-            raise ValueError("Bedrock reranking requires a model configuration with ARN")
+        # Extract top_n from reranking config
+        rerank_opts = config.reranking_config._as_options().get("rerank", {})
+        top_n_value = rerank_opts.get("number_of_results", 10)
+
+        # Build model configuration from the model ARN
+        # The validator ensures model_arn is in reranking_config.model
+        model_arn = config.reranking_config.model.get("model_arn") or config.model_arn
+        model_configuration = kwargs.pop("model_configuration", None) or RerankConfiguration.from_arn(
+            model_arn, top_n_value
+        )
 
         # Call super().__init__() with client, config, and caps
         super().__init__(client=client, config=config, caps=caps, **kwargs)

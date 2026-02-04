@@ -28,6 +28,7 @@ from pydantic import (
     Field,
     Json,
     PositiveInt,
+    PrivateAttr,
     ValidationInfo,
     model_serializer,
     model_validator,
@@ -37,7 +38,11 @@ from types_boto3_bedrock_runtime.client import BedrockRuntimeClient
 
 from codeweaver.core import BasedModel, CodeChunk, Provider, ProviderError
 from codeweaver.core import ValidationError as CodeWeaverValidationError
-from codeweaver.providers.config import BedrockEmbeddingConfig, BedrockEmbeddingProviderSettings
+from codeweaver.providers.config import (
+    BedrockCohereConfigDict,
+    BedrockEmbeddingProviderSettings,
+    BedrockTitanV2ConfigDict,
+)
 from codeweaver.providers.embedding.providers.base import (
     EmbeddingCustomDeps,
     EmbeddingImplementationDeps,
@@ -442,7 +447,13 @@ class BedrockEmbeddingProvider(EmbeddingProvider[BedrockRuntimeClient]):
     _provider: ClassVar[Provider] = Provider.BEDROCK
 
     client: BedrockRuntimeClient
-    config: BedrockEmbeddingConfig | BedrockEmbeddingProviderSettings
+    config: BedrockEmbeddingProviderSettings
+
+    # Private instance variables to store extracted config values
+    _model_arn: str | None = PrivateAttr(default=None)
+    _model_config: BedrockTitanV2ConfigDict | BedrockCohereConfigDict | dict[str, Any] = (
+        PrivateAttr(default_factory=dict)
+    )
 
     def _initialize(
         self,
@@ -456,6 +467,25 @@ class BedrockEmbeddingProvider(EmbeddingProvider[BedrockRuntimeClient]):
             list[float] | list[int] | list[list[float]] | list[list[int]],
         ] = self._handle_response  # ty:ignore[invalid-assignment]
 
+        # Store model ARN and model config for easy access
+        object.__setattr__(self, "_model_arn", self.config.embedding_config.model_arn)
+        model_config = self.config.embedding_config.model
+        if not model_config:
+            if str(self.config.model_name).startswith("titan"):
+                model_config = BedrockTitanV2ConfigDict()
+            elif str(self.config.model_name).startswith("cohere"):
+                model_config = BedrockCohereConfigDict()
+            else:
+                model_config = {}
+        model_config = (
+            cast(BedrockTitanV2ConfigDict, model_config)
+            if any(k for k in ("dimensions", "embedding_types") if k in model_config)
+            else cast(BedrockCohereConfigDict, model_config)
+            if any(k for k in ("truncate", "embedding_types", "images") if k in model_config)
+            else cast(dict[str, Any], model_config)
+        )
+        object.__setattr__(self, "_model_config", model_config)
+
     @property
     def base_url(self) -> str | None:
         """Get the base URL for the Bedrock client."""
@@ -464,7 +494,7 @@ class BedrockEmbeddingProvider(EmbeddingProvider[BedrockRuntimeClient]):
     @property
     def dimension(self) -> int:
         """Get the dimension of the embeddings."""
-        return self.embed_options.get("dimensions") or self.caps.default_dimension  # ty:ignore[unresolved-attribute]
+        return self._model_config.get("dimensions") or self.caps.default_dimension
 
     def _handle_response(
         self, response: dict[str, Any], doc: CodeChunk | None = None
@@ -556,12 +586,13 @@ class BedrockEmbeddingProvider(EmbeddingProvider[BedrockRuntimeClient]):
         body = {
             "input_type": "search_document" if kind == "documents" else "search_query",
             "texts": texts,
-            "embedding_types": ["float"],
+            "truncate": self._model_config.get("truncate", "NONE"),
+            "embedding_types": self._model_config.get("embedding_types", ["float"]),
             **body_kwargs,
         }
         request: BedrockInvokeEmbeddingRequest = BedrockInvokeEmbeddingRequest.model_validate({
             "body": body,
-            "model_id": self.caps.name,
+            "model_id": self._model_arn,
         })
         return InvokeRequestDict(**dict(request.model_dump(by_alias=True)))  # ty: ignore[missing-typed-dict-key]
 
@@ -609,14 +640,14 @@ class BedrockEmbeddingProvider(EmbeddingProvider[BedrockRuntimeClient]):
             body = TitanEmbeddingV2RequestBody.model_validate({
                 "input_text": doc,
                 "dimensions": self.dimension,
-                "normalize": True,
-                "embedding_types": ["float"],
+                "normalize": self._model_config.get("normalize", True),
+                "embedding_types": self._model_config.get("embedding_types", ["float"]),
                 **body_kwargs,
             })
             requests.extend([
                 BedrockInvokeEmbeddingRequest.model_validate({
                     "body": body,
-                    "model_id": self.config.model_name,
+                    "model_id": self._model_arn,
                 })
             ])
         return [InvokeRequestDict(**dict(req.model_dump(by_alias=True))) for req in requests]  # ty: ignore[missing-typed-dict-key]

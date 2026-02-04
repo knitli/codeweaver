@@ -10,8 +10,8 @@ from __future__ import annotations
 import contextlib
 import os
 
+from collections.abc import Generator
 from functools import cached_property
-from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Literal, TypedDict, cast
 
 from codeweaver.core.types.enum import BaseEnum
@@ -96,6 +96,29 @@ class ProviderKind(BaseEnum):
     AGENT = "agent"
     UNSET = "unset"
 
+    @classmethod
+    def kinds(cls) -> Generator[ProviderKind]:
+        """Get all kinds."""
+        yield from cls.members()
+
+    @classmethod
+    def _provider_cls(cls) -> type[Provider]:
+        """Get the provider class for this kind.
+
+        (A little hacky but, it does the job).
+        """
+        return Provider
+
+    @cached_property
+    def providers(self) -> Generator[Provider]:
+        """Get all providers that support this kind."""
+        from codeweaver.core.types._provider_maps import get_providers_for_kind
+
+        if self == ProviderKind.UNSET:
+            yield from Provider
+        else:
+            yield from get_providers_for_kind(self)
+
 
 class SDKClient(BaseEnum):
     """Enumeration of available SDK clients.
@@ -119,6 +142,14 @@ class SDKClient(BaseEnum):
     SENTENCE_TRANSFORMERS = "sentence-transformers"
     TAVILY = "tavily"
     VOYAGE = "voyage"
+
+    @classmethod
+    def for_provider_and_kind(cls, provider: Provider, kind: ProviderKind) -> Generator[SDKClient]:
+        """Get the SDK clients for a given provider and kind."""
+        from codeweaver.core.types._provider_maps import get_sdk_client
+
+        if sdk_clients := get_sdk_client(provider, kind):
+            yield from (sdk_clients if isinstance(sdk_clients, tuple) else (sdk_clients,))
 
     @property
     def client(  # noqa: C901
@@ -181,6 +212,30 @@ class SDKClient(BaseEnum):
                 return lazy_import("voyageai.client_async", "AsyncClient")
             case _:
                 raise ValueError(f"Unsupported SDK client: {self.value}")
+
+    def client_available(self) -> bool:
+        """Check if the SDK client package is available."""
+
+        def try_import(lazy_import: LazyImport[Any]) -> Literal[True] | None:
+            try:
+                _ = lazy_import._resolve()
+            except ImportError:
+                return None
+            else:
+                return True
+
+        try:
+            if isinstance(self.client, LazyImport):
+                _ = self.client._resolve()
+            elif isinstance(self.client, dict):
+                for lazy_import in self.client.values():
+                    if try_import(lazy_import):
+                        return True
+        except (ImportError, AttributeError, KeyError):
+            return False
+        else:
+            return True
+        return False
 
     @property
     def agent_provider(self) -> LazyImport[Any] | None:
@@ -325,6 +380,27 @@ class SDKClient(BaseEnum):
                 )
             case _:
                 return None
+
+    def as_provider(self) -> Provider:
+        """Get the provider as a member of Provider."""
+        return Provider.from_string(self.variable)
+
+    @classmethod
+    def _providers(cls) -> Generator[Provider]:
+        """Get all providers that use this SDK client."""
+        yield from (client.as_provider() for client in cls.members())
+
+    @classmethod
+    def _any_provider(cls) -> Provider:
+        """Get a provider instance representing an SDKClient member as a provider member."""
+        return next(cls._providers())
+
+
+def get_provider_kinds(provider: Provider) -> tuple[ProviderKind, ...]:
+    """Get the kinds of a provider."""
+    from codeweaver.core.types._provider_maps import get_provider_kinds
+
+    return tuple(ProviderKind.from_string(kind) for kind in get_provider_kinds(provider))
 
 
 class Provider(BaseEnum):
@@ -1130,30 +1206,27 @@ class Provider(BaseEnum):
 
     def has_capability(self, kind: LiteralProviderKindType) -> bool:
         """Check if the provider has a specific capability."""
-        return kind in get_provider_kinds(cast(LiteralProviderType, self))
+        return kind in get_provider_kinds(self)
 
     def is_embedding_provider(self) -> bool:
         """Check if the provider is an embedding provider."""
-        return any(
-            kind == ProviderKind.EMBEDDING
-            for kind in get_provider_kinds(cast(LiteralProviderType, self))
-        )
+        return any(kind == ProviderKind.EMBEDDING for kind in get_provider_kinds(self))
 
     def is_sparse_provider(self) -> bool:
         """Check if the provider is a sparse embedding provider."""
-        return ProviderKind.SPARSE_EMBEDDING in get_provider_kinds(cast(LiteralProviderType, self))
+        return ProviderKind.SPARSE_EMBEDDING in get_provider_kinds(self)
 
     def is_reranking_provider(self) -> bool:
         """Check if the provider is a reranking provider."""
-        return ProviderKind.RERANKING in get_provider_kinds(cast(LiteralProviderType, self))
+        return ProviderKind.RERANKING in get_provider_kinds(self)
 
     def is_agent_provider(self) -> bool:
         """Check if the provider is an agent model provider."""
-        return ProviderKind.AGENT in get_provider_kinds(cast(LiteralProviderType, self))
+        return ProviderKind.AGENT in get_provider_kinds(self)
 
     def is_data_provider(self) -> bool:
         """Check if the provider is a data provider."""
-        return ProviderKind.DATA in get_provider_kinds(cast(LiteralProviderType, self))
+        return ProviderKind.DATA in get_provider_kinds(self)
 
     def get_env_api_key(self) -> str | None:
         """Get the API key from environment variables, if set."""
@@ -1195,138 +1268,10 @@ class Provider(BaseEnum):
             }
         )
 
-
-SDK_MAP: MappingProxyType[tuple[Provider, ProviderKind], SDKClient | tuple[SDKClient, ...]] = (
-    MappingProxyType(
-        {
-            (provider, ProviderKind.EMBEDDING): SDKClient.OPENAI
-            for provider in (
-                p
-                for p in Provider
-                if p.uses_openai_api
-                and p not in (Provider.AZURE, Provider.HEROKU, Provider.GROQ)
-                and p.is_embedding_provider()
-            )
-        }
-        | {
-            (Provider.AZURE, ProviderKind.EMBEDDING): (SDKClient.OPENAI, SDKClient.COHERE),
-            (Provider.HEROKU, ProviderKind.EMBEDDING): (SDKClient.OPENAI, SDKClient.COHERE),
-        }
-        | {
-            (provider, ProviderKind.EMBEDDING): SDKClient.from_string(provider.variable)
-            for provider in (Provider.MISTRAL, Provider.HUGGINGFACE_INFERENCE, Provider.GOOGLE)
-        }
-        | {
-            (provider, kind): SDKClient.from_string(provider.variable)
-            for provider, kind in (
-                (prov, knd)
-                for prov in (Provider.BEDROCK, Provider.COHERE, Provider.VOYAGE)
-                for knd in (ProviderKind.EMBEDDING, ProviderKind.RERANKING)
-            )
-        }
-        | {
-            (provider, kind): SDKClient.from_string(provider.variable)
-            for provider in (Provider.FASTEMBED, Provider.SENTENCE_TRANSFORMERS)
-            for kind in (
-                ProviderKind.EMBEDDING,
-                ProviderKind.SPARSE_EMBEDDING,
-                ProviderKind.RERANKING,
-            )
-        }
-        | {(Provider.QDRANT, ProviderKind.VECTOR_STORE): SDKClient.QDRANT}
-        | {(Provider.MEMORY, ProviderKind.VECTOR_STORE): SDKClient.QDRANT}
-        | {
-            (provider, ProviderKind.AGENT): SDKClient.OPENAI
-            for provider in Provider
-            if provider.uses_openai_api
-            and provider != Provider.GROQ
-            and provider.is_agent_provider()
-        }
-        | {(Provider.ANTHROPIC, ProviderKind.AGENT): SDKClient.ANTHROPIC}
-        | {(Provider.AZURE, ProviderKind.AGENT): (SDKClient.OPENAI, SDKClient.ANTHROPIC)}
-        | {(Provider.BEDROCK, ProviderKind.AGENT): (SDKClient.BEDROCK, SDKClient.ANTHROPIC)}
-        | {(Provider.COHERE, ProviderKind.AGENT): SDKClient.COHERE}
-        | {(Provider.GOOGLE, ProviderKind.AGENT): (SDKClient.GOOGLE, SDKClient.ANTHROPIC)}
-        | {(Provider.GROQ, ProviderKind.AGENT): SDKClient.GROQ}
-        | {(Provider.HUGGINGFACE_INFERENCE, ProviderKind.AGENT): SDKClient.HUGGINGFACE_INFERENCE}
-        | {(Provider.MISTRAL, ProviderKind.AGENT): SDKClient.MISTRAL}
-        | {
-            (provider, ProviderKind.AGENT): SDKClient.OPENAI
-            for provider in {
-                p
-                for p in Provider
-                if p.is_agent_provider()
-                and p.uses_openai_api
-                and p not in (Provider.AZURE, Provider.GROQ)
-            }
-        }
-        | {(Provider.DUCKDUCKGO, ProviderKind.DATA): SDKClient.DUCKDUCKGO}
-        | {(Provider.TAVILY, ProviderKind.DATA): SDKClient.TAVILY}
-    )
-)
-"""Mapping of providers and their kinds to SDK clients. Currently only handles embedding/sparse_embedding/reranking/vector_store kinds."""
-
-
-PROVIDER_CAPABILITIES: MappingProxyType[Provider, tuple[ProviderKind, ...]] = MappingProxyType({
-    Provider.ALIBABA: (ProviderKind.AGENT,),
-    Provider.ANTHROPIC: (ProviderKind.AGENT,),
-    Provider.AZURE: (ProviderKind.AGENT, ProviderKind.EMBEDDING),
-    Provider.BEDROCK: (ProviderKind.EMBEDDING, ProviderKind.RERANKING, ProviderKind.AGENT),
-    Provider.CEREBRAS: (ProviderKind.AGENT,),
-    Provider.COHERE: (ProviderKind.EMBEDDING, ProviderKind.RERANKING, ProviderKind.AGENT),
-    Provider.DEEPSEEK: (ProviderKind.AGENT,),
-    Provider.DUCKDUCKGO: (ProviderKind.DATA,),
-    Provider.FASTEMBED: (
-        ProviderKind.EMBEDDING,
-        ProviderKind.RERANKING,
-        ProviderKind.SPARSE_EMBEDDING,
-    ),
-    Provider.FIREWORKS: (ProviderKind.AGENT, ProviderKind.EMBEDDING),
-    Provider.GITHUB: (ProviderKind.AGENT, ProviderKind.EMBEDDING),
-    Provider.GOOGLE: (ProviderKind.AGENT, ProviderKind.EMBEDDING),
-    Provider.GROQ: (ProviderKind.AGENT, ProviderKind.EMBEDDING),
-    Provider.HEROKU: (ProviderKind.AGENT, ProviderKind.EMBEDDING),
-    Provider.HUGGINGFACE_INFERENCE: (ProviderKind.AGENT, ProviderKind.EMBEDDING),
-    Provider.LITELLM: (ProviderKind.AGENT,),  # supports embedding but not implemented yet
-    Provider.MISTRAL: (ProviderKind.AGENT, ProviderKind.EMBEDDING),
-    Provider.MEMORY: (ProviderKind.VECTOR_STORE,),
-    Provider.MOONSHOT: (ProviderKind.AGENT,),
-    Provider.MORPH: (ProviderKind.EMBEDDING,),  # supports agent but not implemented
-    Provider.NEBIUS: (ProviderKind.AGENT,),
-    Provider.OLLAMA: (ProviderKind.AGENT, ProviderKind.EMBEDDING),
-    Provider.OPENAI: (ProviderKind.AGENT, ProviderKind.EMBEDDING),
-    # Provider.OUTLINES: (ProviderKind.AGENT,),  # not implemented yet
-    Provider.OPENROUTER: (ProviderKind.AGENT,),  # supports embedding but not implemented yet
-    Provider.OVHCLOUD: (ProviderKind.AGENT,),
-    Provider.PERPLEXITY: (ProviderKind.AGENT,),
-    Provider.PYDANTIC_GATEWAY: (ProviderKind.AGENT,),
-    Provider.QDRANT: (ProviderKind.VECTOR_STORE,),
-    Provider.SENTENCE_TRANSFORMERS: (
-        ProviderKind.EMBEDDING,
-        ProviderKind.RERANKING,
-        ProviderKind.SPARSE_EMBEDDING,
-    ),
-    Provider.TAVILY: (ProviderKind.DATA,),
-    Provider.TOGETHER: (ProviderKind.AGENT, ProviderKind.EMBEDDING),
-    Provider.VERCEL: (ProviderKind.AGENT, ProviderKind.EMBEDDING),
-    Provider.VOYAGE: (ProviderKind.EMBEDDING, ProviderKind.RERANKING),
-    Provider.X_AI: (ProviderKind.AGENT,),
-})
-"""Mapping of providers to their capabilities (the kind of provider).
-
-One of the big questions you might have is "why don't certain providers have reranking models available?" For example, Hugging Face Inference has some models that can do reranking, but we don't list it here. The biggest reason is the SDK support, not model availability. Most notably, the SDK we use for many providers is the OpenAI SDK, which has no reranking endpoint because OpenAI itself has no reranking models.
-
-Eventually, we may be able to enable broader support from these providers, but for now, we only list providers that have first-class support for these capabilities in their SDKs.
-"""
-
-
-def get_provider_kinds(provider: LiteralProviderType) -> tuple[ProviderKind, ...]:
-    """Get capabilities for a provider."""
-    provider = cast(
-        LiteralProviderType,
-        provider if isinstance(provider, Provider) else Provider.from_string(provider),
-    )
-    return PROVIDER_CAPABILITIES.get(provider, (ProviderKind.DATA,))  # ty:ignore[no-matching-overload]
+    @classmethod
+    def _kind_cls(cls) -> type[ProviderKind]:
+        """Get the ProviderKind class."""
+        return ProviderKind
 
 
 type LiteralProviderKind = Literal[

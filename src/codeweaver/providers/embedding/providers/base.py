@@ -64,12 +64,12 @@ from codeweaver.core import (
 from codeweaver.core import ValidationError as CodeWeaverValidationError
 from codeweaver.core.constants import (
     DEFAULT_OPEN_BREAKER_DURATION,
-    FLOAT_ZERO,
     MAX_RETRY_ATTEMPTS,
     ONE,
     ONE_MEGABYTE,
     ONE_POINT_ZERO,
     ZERO,
+    ZERO_POINT_ZERO,
 )
 from codeweaver.core.types import ModelNameT
 from codeweaver.providers.config import EmbeddingConfigT, EmbeddingProviderSettings
@@ -925,7 +925,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         denom = float(np.linalg.norm(arr))
         return (
             arr.tolist()
-            if denom == FLOAT_ZERO
+            if denom == ZERO_POINT_ZERO
             else (arr / np.asarray(denom, dtype=arr.dtype)).tolist()
         )
 
@@ -938,7 +938,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         if arr.size == ZERO or not np.all(np.isfinite(arr)):
             return False
         norm = float(np.linalg.norm(arr))
-        return bool(np.isclose(norm, ONE_POINT_ZERO, atol=tol, rtol=FLOAT_ZERO))
+        return bool(np.isclose(norm, ONE_POINT_ZERO, atol=tol, rtol=ZERO_POINT_ZERO))
 
     @staticmethod
     def chunks_to_strings(

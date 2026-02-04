@@ -12,7 +12,7 @@ from ast_grep_py import SgNode
 from pydantic import Field, NonNegativeFloat, NonNegativeInt
 
 from codeweaver.core import BasedModel
-from codeweaver.core.constants import FLOAT_ZERO, ONE_POINT_ZERO
+from codeweaver.core.constants import ONE_POINT_ZERO, ZERO_POINT_ZERO
 
 
 if TYPE_CHECKING:
@@ -27,7 +27,9 @@ class SemanticScorer(BasedModel):
     depth_penalty_factor: Annotated[
         NonNegativeFloat,
         Field(
-            ge=FLOAT_ZERO, le=0.1, description="""Penalty per depth level (0.04 = 4% per level)"""
+            ge=ZERO_POINT_ZERO,
+            le=0.1,
+            description="""Penalty per depth level (0.04 = 4% per level)""",
         ),
     ] = 0.04
 
@@ -37,12 +39,12 @@ class SemanticScorer(BasedModel):
 
     size_bonus_factor: Annotated[
         NonNegativeFloat,
-        Field(ge=FLOAT_ZERO, le=0.3, description="""Bonus factor for large nodes"""),
+        Field(ge=ZERO_POINT_ZERO, le=0.3, description="""Bonus factor for large nodes"""),
     ] = 0.1
 
     file_thing_bonus: Annotated[
         NonNegativeFloat,
-        Field(ge=FLOAT_ZERO, le=0.2, description="""Bonus for top-level definitions"""),
+        Field(ge=ZERO_POINT_ZERO, le=0.2, description="""Bonus for top-level definitions"""),
     ] = 0.05
 
     def _telemetry_keys(self) -> None:

@@ -35,7 +35,7 @@ from codeweaver.core import (
     DataclassSerializationMixin,
     SemanticSearchLanguage,
 )
-from codeweaver.core.constants import FLOAT_ZERO, ONE, ONE_POINT_ZERO, ZERO
+from codeweaver.core.constants import ONE, ONE_POINT_ZERO, ZERO, ZERO_POINT_ZERO
 
 
 if TYPE_CHECKING:
@@ -57,7 +57,7 @@ class ImportanceScoresDict(TypedDict):
         NonNegativeFloat,
         Field(
             description="Weight for discovery context; finding relevant code",
-            ge=FLOAT_ZERO,
+            ge=ZERO_POINT_ZERO,
             le=ONE_POINT_ZERO,
         ),
     ]
@@ -65,7 +65,7 @@ class ImportanceScoresDict(TypedDict):
         NonNegativeFloat,
         Field(
             description="Weight for comprehension context; understanding behavior",
-            ge=FLOAT_ZERO,
+            ge=ZERO_POINT_ZERO,
             le=ONE_POINT_ZERO,
         ),
     ]
@@ -73,7 +73,7 @@ class ImportanceScoresDict(TypedDict):
         NonNegativeFloat,
         Field(
             description="Weight for modification context; safe editing points",
-            ge=FLOAT_ZERO,
+            ge=ZERO_POINT_ZERO,
             le=ONE_POINT_ZERO,
         ),
     ]
@@ -81,7 +81,7 @@ class ImportanceScoresDict(TypedDict):
         NonNegativeFloat,
         Field(
             description="Weight for debugging context; tracing execution",
-            ge=FLOAT_ZERO,
+            ge=ZERO_POINT_ZERO,
             le=ONE_POINT_ZERO,
         ),
     ]
@@ -89,7 +89,7 @@ class ImportanceScoresDict(TypedDict):
         NonNegativeFloat,
         Field(
             description="Weight for documentation context; explaining code",
-            ge=FLOAT_ZERO,
+            ge=ZERO_POINT_ZERO,
             le=ONE_POINT_ZERO,
         ),
     ]
@@ -103,7 +103,7 @@ class ImportanceScores(DataclassSerializationMixin):
         NonNegativeFloat,
         Field(
             description="Weight for discovery context; finding relevant code",
-            ge=FLOAT_ZERO,
+            ge=ZERO_POINT_ZERO,
             le=ONE_POINT_ZERO,
         ),
     ]
@@ -111,7 +111,7 @@ class ImportanceScores(DataclassSerializationMixin):
         NonNegativeFloat,
         Field(
             description="Weight for comprehension context; understanding behavior",
-            ge=FLOAT_ZERO,
+            ge=ZERO_POINT_ZERO,
             le=ONE_POINT_ZERO,
         ),
     ]
@@ -119,7 +119,7 @@ class ImportanceScores(DataclassSerializationMixin):
         NonNegativeFloat,
         Field(
             description="Weight for modification context; safe editing points",
-            ge=FLOAT_ZERO,
+            ge=ZERO_POINT_ZERO,
             le=ONE_POINT_ZERO,
         ),
     ]
@@ -127,7 +127,7 @@ class ImportanceScores(DataclassSerializationMixin):
         NonNegativeFloat,
         Field(
             description="Weight for debugging context; tracing execution",
-            ge=FLOAT_ZERO,
+            ge=ZERO_POINT_ZERO,
             le=ONE_POINT_ZERO,
         ),
     ]
@@ -135,7 +135,7 @@ class ImportanceScores(DataclassSerializationMixin):
         NonNegativeFloat,
         Field(
             description="Weight for documentation context; explaining code",
-            ge=FLOAT_ZERO,
+            ge=ZERO_POINT_ZERO,
             le=ONE_POINT_ZERO,
         ),
     ]
@@ -1118,7 +1118,7 @@ class UsageMetrics(BasedModel):
     def usage_frequencies(self) -> dict[SemanticClass, NonNegativeFloat]:
         """Calculate usage frequency for each category."""
         if self.total_use == ZERO:
-            return dict.fromkeys(self.category_usage_counts, FLOAT_ZERO)
+            return dict.fromkeys(self.category_usage_counts, ZERO_POINT_ZERO)
         return {
             cat: (count / self.total_use) * 100.0
             for cat, count in self.category_usage_counts.items()

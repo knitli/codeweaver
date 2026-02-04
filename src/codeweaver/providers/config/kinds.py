@@ -1006,6 +1006,37 @@ class BedrockEmbeddingProviderSettings(BedrockProviderMixin, EmbeddingProviderSe
     ] = None
     tag: Literal["bedrock"] = "bedrock"
 
+    @model_validator(mode="after")
+    def _inject_model_arn_into_params(self) -> Self:
+        """Inject model_arn into embedding/query params if not already present.
+
+        Bedrock requires the model ARN at request time. This validator ensures it's
+        available in the embedding_config's embedding and query parameters.
+        """
+        from codeweaver.providers.config.embedding import BedrockEmbeddingConfig
+
+        # Type narrow to ensure we're working with BedrockEmbeddingConfig
+        if not isinstance(self.embedding_config, BedrockEmbeddingConfig):
+            return self
+
+        # Inject ARN into embedding params
+        if self.embedding_config.embedding:
+            if "model_id" not in self.embedding_config.embedding:
+                self.embedding_config.embedding["model_id"] = self.model_arn
+        else:
+            # Create embedding params with just the model_id
+            object.__setattr__(self.embedding_config, "embedding", {"model_id": self.model_arn})
+
+        # Inject ARN into query params
+        if self.embedding_config.query:
+            if "model_id" not in self.embedding_config.query:
+                self.embedding_config.query["model_id"] = self.model_arn
+        else:
+            # Create query params with just the model_id
+            object.__setattr__(self.embedding_config, "query", {"model_id": self.model_arn})
+
+        return self
+
 
 class FastEmbedEmbeddingProviderSettings(FastEmbedProviderMixin, EmbeddingProviderSettings):
     """Provider settings for FastEmbed embedding models."""
@@ -1109,6 +1140,25 @@ class BedrockRerankingProviderSettings(BedrockProviderMixin, RerankingProviderSe
         Field(description="Client options for the SDK provider's client."),
     ] = None
     tag: Literal["bedrock"] = "bedrock"
+
+    @model_validator(mode="after")
+    def _inject_model_arn_into_model_config(self) -> Self:
+        """Inject model_arn into reranking_config.model if not already present.
+
+        Bedrock requires the model ARN in the model configuration. This validator
+        ensures it's available in the reranking_config's model field.
+        """
+        from codeweaver.providers.config.reranking import BedrockRerankingConfig
+
+        # Type narrow to ensure we're working with BedrockRerankingConfig
+        if not isinstance(self.reranking_config, BedrockRerankingConfig):
+            return self
+
+        # Inject ARN into model config
+        if "model_arn" not in self.reranking_config.model:
+            self.reranking_config.model["model_arn"] = self.model_arn
+
+        return self
 
 
 class BaseDataProviderSettings(BaseProviderSettings):

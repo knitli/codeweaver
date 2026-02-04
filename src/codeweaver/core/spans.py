@@ -12,7 +12,7 @@ from typing import Annotated, Any, NamedTuple, Self, TypeGuard, cast, override
 
 from pydantic import UUID7, Field, NonNegativeInt, PositiveInt, computed_field, model_validator
 
-from codeweaver.core import ONE_LINE
+from codeweaver.core.constants import ONE_LINE
 from codeweaver.core.types import BasedModel
 from codeweaver.core.utils import TypeIs, uuid7
 

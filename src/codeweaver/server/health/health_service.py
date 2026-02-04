@@ -17,12 +17,12 @@ from typing import TYPE_CHECKING, Any, Literal, NoReturn, cast
 
 from codeweaver.core import INJECTED, ConfigurationError, StatisticsDep
 from codeweaver.core.constants import (
-    FLOAT_ZERO,
     ONE_GIGABYTE,
     ONE_HUNDRED,
     ONE_KILOBYTE,
     ONE_MEGABYTE,
     ONE_MILLISECOND_IN_MICROSECONDS,
+    ZERO_POINT_ZERO,
 )
 from codeweaver.engine.dependencies import FailoverServiceDep, IndexingServiceDep
 from codeweaver.engine.services.indexing_service import IndexingService
@@ -216,7 +216,7 @@ class HealthService:
                 )
                 model_name = getattr(embedding_provider_instance, "model_name", "unknown")
                 status = "down" if circuit_state == "open" else "up"
-                latency_ms = 200.0 if status == "up" else FLOAT_ZERO
+                latency_ms = 200.0 if status == "up" else ZERO_POINT_ZERO
                 return EmbeddingProviderServiceInfo(
                     status=status,
                     model=model_name,
@@ -253,7 +253,7 @@ class HealthService:
                 )
                 model_name = getattr(reranking_instance, "model_name", "unknown")
                 status = "down" if circuit_state == "open" else "up"
-                latency_ms = 180.0 if status == "up" else FLOAT_ZERO
+                latency_ms = 180.0 if status == "up" else ZERO_POINT_ZERO
                 return RerankingServiceInfo(status=status, model=model_name, latency_ms=latency_ms)
         except Exception as e:
             logger.warning("Reranking health check failed: %s", e)
@@ -353,7 +353,7 @@ class HealthService:
                 failover_enabled=not self._failover_manager.settings.disable_failover,
                 failover_active=False,
                 failover_count=0,
-                total_failover_time_seconds=FLOAT_ZERO,
+                total_failover_time_seconds=ZERO_POINT_ZERO,
                 backup_syncs_completed=0,
                 chunks_in_failover=0,
             )
