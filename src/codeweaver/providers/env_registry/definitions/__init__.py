@@ -24,22 +24,28 @@ from codeweaver.core.utils.lazy_importer import create_lazy_getattr
 
 if TYPE_CHECKING:
     from codeweaver.providers.env_registry.definitions.openai_compatible import (
+        ALIBABA,
         CEREBRAS,
         DEEPSEEK,
         FIREWORKS,
+        GITHUB,
         GROQ,
+        LITELLM,
         MOONSHOT,
         MORPH,
         NEBIUS,
+        OLLAMA,
         OPENAI,
         OPENROUTER,
         OVHCLOUD,
+        PERPLEXITY,
         SAMBANOVA,
         TOGETHER,
+        X_AI,
     )
 
 
-# Phase 2-3: OpenAI-compatible providers (12 providers)
+# Phase 2-4: OpenAI-compatible providers (18 providers - complete)
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType(
     {
         "OPENAI": ("codeweaver.providers.env_registry.definitions", "openai_compatible"),
@@ -54,26 +60,38 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType(
         "OVHCLOUD": ("codeweaver.providers.env_registry.definitions", "openai_compatible"),
         "SAMBANOVA": ("codeweaver.providers.env_registry.definitions", "openai_compatible"),
         "GROQ": ("codeweaver.providers.env_registry.definitions", "openai_compatible"),
+        "ALIBABA": ("codeweaver.providers.env_registry.definitions", "openai_compatible"),
+        "GITHUB": ("codeweaver.providers.env_registry.definitions", "openai_compatible"),
+        "LITELLM": ("codeweaver.providers.env_registry.definitions", "openai_compatible"),
+        "OLLAMA": ("codeweaver.providers.env_registry.definitions", "openai_compatible"),
+        "PERPLEXITY": ("codeweaver.providers.env_registry.definitions", "openai_compatible"),
+        "X_AI": ("codeweaver.providers.env_registry.definitions", "openai_compatible"),
     }
 )
 
 __getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
 
 # Export explicitly for clarity (optional, but helpful for IDE)
-# Phase 2-3: OpenAI-compatible providers (12 providers)
+# Phase 2-4: OpenAI-compatible providers (18 providers - complete)
 __all__: tuple[str, ...] = (
+    "ALIBABA",
     "CEREBRAS",
     "DEEPSEEK",
     "FIREWORKS",
+    "GITHUB",
     "GROQ",
+    "LITELLM",
     "MOONSHOT",
     "MORPH",
     "NEBIUS",
+    "OLLAMA",
     "OPENAI",
     "OPENROUTER",
     "OVHCLOUD",
+    "PERPLEXITY",
     "SAMBANOVA",
     "TOGETHER",
+    "X_AI",
 )
 
 

@@ -156,17 +156,65 @@ GROQ = openai_compatible_provider(
     note="Groq AI service.",
 )
 
+# ALIBABA - Simple OpenAI-compatible provider
+ALIBABA = openai_compatible_provider(
+    "alibaba",
+    api_key_env="ALIBABA_API_KEY",
+    note="Alibaba Cloud AI service.",
+)
+
+# GITHUB - Simple OpenAI-compatible provider
+GITHUB = openai_compatible_provider(
+    "github",
+    api_key_env="GITHUB_TOKEN",
+    note="GitHub Models service.",
+)
+
+# LITELLM - Simple OpenAI-compatible provider
+LITELLM = openai_compatible_provider(
+    "litellm",
+    api_key_env="LITELLM_API_KEY",
+    note="LiteLLM unified API service.",
+)
+
+# OLLAMA - Simple OpenAI-compatible provider (local/cloud)
+OLLAMA = openai_compatible_provider(
+    "ollama",
+    api_key_env="OLLAMA_API_KEY",
+    note="Ollama local/cloud LLM service.",
+)
+
+# PERPLEXITY - Simple OpenAI-compatible provider
+PERPLEXITY = openai_compatible_provider(
+    "perplexity",
+    api_key_env="PERPLEXITY_API_KEY",
+    note="Perplexity AI service.",
+)
+
+# X_AI - Simple OpenAI-compatible provider
+X_AI = openai_compatible_provider(
+    "x-ai",
+    api_key_env="XAI_API_KEY",
+    note="X.AI (xAI) service.",
+)
+
 __all__ = (
+    "ALIBABA",
     "CEREBRAS",
     "DEEPSEEK",
     "FIREWORKS",
+    "GITHUB",
     "GROQ",
+    "LITELLM",
     "MOONSHOT",
     "MORPH",
     "NEBIUS",
+    "OLLAMA",
     "OPENAI",
     "OPENROUTER",
     "OVHCLOUD",
+    "PERPLEXITY",
     "SAMBANOVA",
     "TOGETHER",
+    "X_AI",
 )
