@@ -23,6 +23,7 @@ from codeweaver.core.utils.lazy_importer import create_lazy_getattr
 
 
 if TYPE_CHECKING:
+    from codeweaver.providers.env_registry.definitions.cloud_platforms import AZURE, HEROKU, VERCEL
     from codeweaver.providers.env_registry.definitions.openai_compatible import (
         ALIBABA,
         CEREBRAS,
@@ -46,8 +47,10 @@ if TYPE_CHECKING:
 
 
 # Phase 2-4: OpenAI-compatible providers (18 providers - complete)
+# Phase 5: Cloud platforms (3 providers - complete)
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType(
     {
+        # OpenAI-compatible providers
         "OPENAI": ("codeweaver.providers.env_registry.definitions", "openai_compatible"),
         "DEEPSEEK": ("codeweaver.providers.env_registry.definitions", "openai_compatible"),
         "FIREWORKS": ("codeweaver.providers.env_registry.definitions", "openai_compatible"),
@@ -66,6 +69,10 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType(
         "OLLAMA": ("codeweaver.providers.env_registry.definitions", "openai_compatible"),
         "PERPLEXITY": ("codeweaver.providers.env_registry.definitions", "openai_compatible"),
         "X_AI": ("codeweaver.providers.env_registry.definitions", "openai_compatible"),
+        # Cloud platforms
+        "AZURE": ("codeweaver.providers.env_registry.definitions", "cloud_platforms"),
+        "HEROKU": ("codeweaver.providers.env_registry.definitions", "cloud_platforms"),
+        "VERCEL": ("codeweaver.providers.env_registry.definitions", "cloud_platforms"),
     }
 )
 
@@ -73,13 +80,18 @@ __getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
 
 # Export explicitly for clarity (optional, but helpful for IDE)
 # Phase 2-4: OpenAI-compatible providers (18 providers - complete)
+# Phase 5: Cloud platforms (3 providers - complete)
 __all__: tuple[str, ...] = (
+    # OpenAI-compatible providers
     "ALIBABA",
+    # Cloud platforms
+    "AZURE",
     "CEREBRAS",
     "DEEPSEEK",
     "FIREWORKS",
     "GITHUB",
     "GROQ",
+    "HEROKU",
     "LITELLM",
     "MOONSHOT",
     "MORPH",
@@ -91,6 +103,7 @@ __all__: tuple[str, ...] = (
     "PERPLEXITY",
     "SAMBANOVA",
     "TOGETHER",
+    "VERCEL",
     "X_AI",
 )
 
