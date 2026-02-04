@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 """Comprehensive unit tests for AsymmetricEmbeddingConfig class.
 
 Tests cover all configuration and validation scenarios:
