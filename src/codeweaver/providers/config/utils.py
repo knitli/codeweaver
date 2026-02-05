@@ -7,18 +7,26 @@
 
 import os
 
+from collections.abc import Awaitable, Callable, Sequence
 from typing import Any, TypedDict
 
 from pydantic import SecretStr
+
+from codeweaver.core import ConfigurationError
+from codeweaver.core.types import Provider
 
 
 class AzureOptions(TypedDict, total=False):
     """Azure-specific options."""
 
     model_deployment: str
+    base_url: str | None
+    api_base: str | None
     endpoint: str | None
     region_name: str | None
-    api_key: SecretStr | None
+    api_key: (
+        SecretStr | Callable[[], str | SecretStr] | Callable[[], Awaitable[str | SecretStr]] | None
+    )
 
 
 def ensure_endpoint_version(url: str, *, cohere: bool = False) -> str:
@@ -65,7 +73,7 @@ def _parse_endpoint(endpoint: str, region: str | None = None) -> str | None:
     return f"https://{endpoint}.{region}.inference.ai.azure.com/v1"
 
 
-def try_for_azure_endpoint(options: dict[str, Any], *, cohere: bool = False) -> str | None:
+def try_for_azure_endpoint(options: AzureOptions, *, cohere: bool = False) -> str | None:
     """Try to identify the Azure endpoint.
 
     Azure uses this format: `https://<endpoint>.<region_name>.inference.ai.azure.com/v1`,
@@ -84,10 +92,10 @@ def try_for_azure_endpoint(options: dict[str, Any], *, cohere: bool = False) -> 
         return f"https://{endpoint}.{region}.inference.ai.azure.com/v1"
     if region and (endpoint := os.getenv(endpoint_var)):
         return _parse_endpoint(endpoint, region)
-    if "base_url" in options:
-        return ensure_endpoint_version(options["base_url"], cohere=cohere)
-    if "api_base" in options:
-        return ensure_endpoint_version(options["api_base"], cohere=cohere)
+    if base_url := options.get("base_url"):
+        return ensure_endpoint_version(base_url, cohere=cohere)
+    if api_base := options.get("api_base"):
+        return ensure_endpoint_version(api_base, cohere=cohere)
     if env_set := (
         os.getenv("AZURE_COHERE_ENDPOINT") if cohere else os.getenv("AZURE_OPENAI_ENDPOINT")
     ) or os.getenv("AZURE_API_BASE"):
@@ -95,8 +103,106 @@ def try_for_azure_endpoint(options: dict[str, Any], *, cohere: bool = False) -> 
     return None
 
 
+def _test_keys(keys: Sequence[str], v: dict[str, Any]) -> bool:
+    """Test if any of the keys are in the dictionary."""
+    return any(key for key in v if key in keys)
+
+
+def _discriminate_embedding_clients_by_keys(value: dict[str, Any]) -> str | None:
+    """Try to identify the provider based on unique key presence."""
+    if _test_keys(
+        ["model_name_or_path", "modules", "device", "prompts", "similarity_fn_name"], value
+    ):
+        return "sentence_transformers"
+    if _test_keys(
+        [
+            "aws_secret_access_key",
+            "aws_access_key_id",
+            "aws_session_token",
+            "region_name",
+            "profile_name",
+            "aws_account_id",
+            "botocore_session",
+        ],
+        value,
+    ):
+        return "bedrock"
+    if _test_keys(["vertex_ai", "credentials", "location"], value):
+        return "google"
+    if _test_keys(
+        ["model_name", "cache_dir", "threads", "providers", "cuda", "device_ids", "lazy_load"],
+        value,
+    ):
+        return "fastembed"
+    if _test_keys(["websocket_base_url", "organization", "project", "webhook_secret"], value):
+        return "openai"
+    if _test_keys(
+        ["model", "provider", "token", "headers", "cookies", "proxies", "bill_to"], value
+    ):
+        return "hf_inference"
+    if _test_keys(
+        [
+            "server",
+            "server_url",
+            "url_params",
+            "async_client",
+            "retry_config",
+            "timeout_ms",
+            "trust_env",
+            "url_params",
+            "debug_logger",
+        ],
+        value,
+    ):
+        return "mistral"
+    return None
+
+
+def _discriminate_embedding_clients_by_url(value: dict[str, Any]) -> str | None:
+    """Try to identify the provider based on URL patterns and key presence."""
+    url = str(value.get("base_url") or value.get("server_url"))
+    if _test_keys(
+        ["environment", "client_name", "thread_pool_executor", "log_experimental"], value
+    ) or (url and ("cohere" in url or "heroku" in url)):
+        return "cohere"
+    if url and "v1" in url and _test_keys(["api_key"], value):
+        return "openai"
+    if not url and _test_keys(["api_key", "max_retries", "timeout"], value):
+        return "voyage"
+    if url and (
+        provider := next((p.variable for p in Provider if p.variable in url.lower()), None)
+    ):
+        return provider
+    return None
+
+
+def discriminate_embedding_clients(v: Any) -> str | None:
+    """Identify the provider-specific settings type for discriminator field."""
+    # Client options use tag field but we may not have it in raw config
+    if tag := v.get("tag") if isinstance(v, dict) else getattr(v, "tag", None):
+        return tag  # Return empty string instead of None to match return type
+    value = v if isinstance(v, dict) else v.model_dump()
+    if found_value := _discriminate_embedding_clients_by_keys(value):
+        return found_value
+    if found_value := _discriminate_embedding_clients_by_url(value):
+        return found_value
+    if (env_var := next((k for k in os.environ if k.startswith("AZURE_")), None)) and (
+        provider := "cohere" if "COHERE" in env_var else "openai" if "OPENAI" in env_var else None
+    ):
+        return provider
+    if env_var := os.environ.get("CODEWEAVER_EMBEDDING_PROVIDER"):
+        return env_var.lower().replace(" ", "_").replace("-", "_")
+    raise ConfigurationError(
+        "Could not discriminate embedding client options type from provided data.",
+        suggestions=[
+            "Explicitly provide a 'tag' value in your configuration. This is the same as the provider., e.g., 'openai', 'cohere', etc."
+        ],
+    )
+
+
 __all__ = (
     "AzureOptions",
+    "discriminate_embedding_clients",
     "ensure_endpoint_version",
     "try_for_azure_endpoint",
     "try_for_heroku_endpoint",

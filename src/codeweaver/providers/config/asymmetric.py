@@ -34,13 +34,37 @@ def _handle_ambiguous_property(v: Any, key: str) -> Any:
     """Handle ambiguous property for private attribute."""
     return v.get(key) if isinstance(v, dict) else getattr(v, key, None)
 
+
 def _get_model_name_for_family(v: Any) -> ModelNameT:
     """Get model name for private attribute."""
-    configs = _handle_ambiguous_property(v, "embed_provider"), _handle_ambiguous_property(v, "query_provider")
-    configs = [(_handle_ambiguous_property(cfg, "embedding_config") or _handle_ambiguous_property(cfg, "embedding_config")) for cfg in configs if cfg]
-    if (caps := next((cfg.capabilities for cfg in configs if cfg and cfg.capabilities), None)) and caps.model_family and (fam_id := caps.model_family.family_id):
+    configs = (
+        _handle_ambiguous_property(v, "embed_provider"),
+        _handle_ambiguous_property(v, "query_provider"),
+    )
+    configs = [
+        (
+            _handle_ambiguous_property(cfg, "embedding_config")
+            or _handle_ambiguous_property(cfg, "embedding_config")
+        )
+        for cfg in configs
+        if cfg
+    ]
+    if (
+        (caps := next((cfg.capabilities for cfg in configs if cfg and cfg.capabilities), None))
+        and caps.model_family
+        and (fam_id := caps.model_family.family_id)
+    ):
         return fam_id
-    if (name := next((n for cfg in configs if cfg and (n := _handle_ambiguous_property(cfg, "model_name")) is not None), None)) is not None:
+    if (
+        name := next(
+            (
+                n
+                for cfg in configs
+                if cfg and (n := _handle_ambiguous_property(cfg, "model_name")) is not None
+            ),
+            None,
+        )
+    ) is not None:
         return ModelName(f"{name}-family")
     raise ValueError("Cannot determine model name for asymmetric embedding configuration.")
 
@@ -78,7 +102,6 @@ class AsymmetricEmbeddingProviderSettings(BasedModel):
     ] = True
 
     _model_name: ModelNameT = PrivateAttr(default_factory=_get_model_name_for_family)  # ty:ignore[invalid-argument-type]
-
 
     def get_embed_kwargs(self) -> dict[str, Any]:
         """Get keyword arguments for the embed provider."""
@@ -305,8 +328,6 @@ class AsymmetricEmbeddingProviderSettings(BasedModel):
     @property
     def model_name(self) -> ModelNameT:
         """Get the model family name for the asymmetric embedding configuration."""
-        embed_provider = self.embed_provider.provider
-        query_provider = self.query_provider.provider
         return self._model_name
 
     def _telemetry_keys(self) -> None:

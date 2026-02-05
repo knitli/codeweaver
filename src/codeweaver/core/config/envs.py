@@ -17,9 +17,10 @@ from typing import Literal, TypedDict, get_args
 from pydantic import AnyUrl, SecretStr
 
 from codeweaver.core.constants import DEFAULT_MANAGEMENT_PORT, DEFAULT_MCP_PORT, LOCALHOST_URL
+from codeweaver.core.types import LiteralProviderKindType
 from codeweaver.core.types.dictview import DictView
 from codeweaver.core.types.env import EnvFormat, EnvVarInfo
-from codeweaver.core.types.provider import LiteralProviderKindType, Provider
+from codeweaver.core.types.provider import Provider
 from codeweaver.core.utils.environment import detect_root_package
 
 

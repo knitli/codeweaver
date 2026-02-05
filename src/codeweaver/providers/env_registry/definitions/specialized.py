@@ -185,11 +185,9 @@ MISTRAL = [
 
 # PYDANTIC_GATEWAY - Simple API key provider
 PYDANTIC_GATEWAY = [
+    simple_api_key_provider("gateway", client="gateway", api_key_env="PYDANTIC_AI_GATEWAY_API_KEY", note="These variables are for the Pydantic Gateway service.", base_url_env="PYDANTIC_AI_GATEWAY_BASE_URL", additional_vars=dict(httpx_env_vars())),
     simple_api_key_provider(
-        "gateway",
-        client="gateway",
-        api_key_env="PYDANTIC_AI_GATEWAY_API_KEY",
-        note="These variables are for the Pydantic AI Gateway service.",
+        "gateway", client="gateway", api_key_env="PAIG_API_KEY", note="These variables are for the Pydantic AI Gateway service.", base_url_env="PAIG_BASE_URL"
     )
 ]
 
@@ -239,6 +237,19 @@ QDRANT = [
     )
 ]
 
+# X_AI
+X_AI = [
+    simple_api_key_provider(
+        "x-ai",
+        client="x_ai",
+        api_key_env="XAI_API_KEY",
+        note="These variables are for the X.AI (xAI) service.",
+        additional_vars={
+            "management_api_key": EnvVarConfig(env="XAI_MANAGEMENT_KEY", description="Management API key for X.AI service", is_secret=True, variable_name="management_api_key"),
+        }
+    )
+]
+
 __all__ = (
     "ANTHROPIC",
     "BEDROCK",
@@ -250,4 +261,5 @@ __all__ = (
     "QDRANT",
     "TAVILY",
     "VOYAGE",
+    "X_AI",
 )

@@ -33,6 +33,7 @@ from codeweaver.core.types import (
     ModelNameT,
     Provider,
     ProviderKind,
+    ProviderKindLiteralString,
     Unset,
 )
 from codeweaver.core.utils import has_package
@@ -420,10 +421,6 @@ DefaultVectorStoreProviderSettings: tuple[QdrantVectorStoreProviderSettings, ...
     None  # Will be lazy-initialized
 )
 
-type ProviderField = Literal[
-    "data", "embedding", "sparse_embedding", "reranking", "vector_store", "agent"
-]
-
 
 class ProviderNameMap(TypedDict):
     """Configured providers by kind."""
@@ -612,7 +609,9 @@ class ProviderSettings(BasedModel):
     def _telemetry_keys(self) -> None:
         return None
 
-    def has_setting(self, setting_name: ProviderField | LiteralProviderKindType) -> bool:
+    def has_setting(
+        self, setting_name: ProviderKindLiteralString | LiteralProviderKindType
+    ) -> bool:
         """Check if a specific provider setting is configured.
 
         Args:
@@ -622,8 +621,7 @@ class ProviderSettings(BasedModel):
 
         setting = (
             setting_name
-            if setting_name
-            in {"data", "embedding", "sparse_embedding", "reranking", "vector_store", "agent"}
+            if setting_name in ProviderKindLiteralString.__value__.__args__
             else cast(ProviderKind, setting_name).variable
         )
         return getattr(self, setting) is not Unset  # type: ignore
@@ -640,9 +638,9 @@ class ProviderSettings(BasedModel):
         })  # type: ignore
 
     @property
-    def _field_names(self) -> tuple[ProviderField, ...]:
+    def _field_names(self) -> tuple[ProviderKindLiteralString, ...]:
         """Get the field names for provider settings."""
-        return ("data", "embedding", "sparse_embedding", "reranking", "vector_store", "agent")
+        return ProviderKindLiteralString.__value__.__args__
 
     @property
     def _all_configs(self) -> tuple[BaseProviderSettings, ...]:
@@ -655,7 +653,7 @@ class ProviderSettings(BasedModel):
         )
 
     @property
-    def provider_configs(self) -> dict[ProviderField, tuple[BaseProviderSettings, ...]]:
+    def provider_configs(self) -> dict[ProviderKindLiteralString, tuple[BaseProviderSettings, ...]]:
         """Get a summary of configured provider settings by kind."""
         return {
             field_name: settings
@@ -670,7 +668,7 @@ class ProviderSettings(BasedModel):
     @property
     def provider_name_map(self) -> ProviderNameMap:
         """Get a summary of configured providers by kind."""
-        provider_data: dict[ProviderField, Provider | tuple[Provider, ...] | None] = {
+        provider_data: dict[ProviderKindLiteralString, Provider | tuple[Provider, ...] | None] = {
             field_name: (
                 tuple(s.provider for s in setting if setting and is_typeddict(s))  # type: ignore
                 if isinstance(setting, tuple)
@@ -759,7 +757,7 @@ class ProviderSettings(BasedModel):
 
     def settings_for_kind(
         self,
-        kind: ProviderField | LiteralProviderKindType,
+        kind: ProviderKindLiteralString | LiteralProviderKindType,
         *,
         primary: bool = True,
         backup: bool = False,

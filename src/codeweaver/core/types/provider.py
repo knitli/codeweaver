@@ -12,11 +12,15 @@ import os
 
 from collections.abc import Generator
 from functools import cached_property
-from typing import Any, Literal, Self
+from typing import TYPE_CHECKING, Any, Literal, Self
 
 from codeweaver.core.types.enum import BaseEnum
-from codeweaver.core.types.env import ProviderEnvVars
+from codeweaver.core.types.env import EnvVarInfo, ProviderEnvVars
 from codeweaver.core.utils.lazy_importer import LazyImport
+
+
+if TYPE_CHECKING:
+    from codeweaver.core.types import ProviderKindLiteralString, SDKClientLiteralString
 
 
 class ProviderKind(BaseEnum):
@@ -46,7 +50,7 @@ class ProviderKind(BaseEnum):
     @cached_property
     def providers(self) -> Generator[Provider]:
         """Get all providers that support this kind."""
-        from codeweaver.core.types._provider_maps import get_providers_for_kind
+        from codeweaver.core.types.service_cards import get_providers_for_kind
 
         if self == ProviderKind.UNSET:
             yield from Provider
@@ -76,23 +80,28 @@ class SDKClient(BaseEnum):
     SENTENCE_TRANSFORMERS = "sentence_transformers"
     TAVILY = "tavily"
     VOYAGE = "voyage"
+    X_AI = "x_ai"
 
     @classmethod
     def for_provider_and_kind(cls, provider: Provider, kind: ProviderKind) -> Generator[SDKClient]:
         """Get the SDK clients for a given provider and kind."""
-        from codeweaver.core.types._provider_maps import get_sdk_client
+        from codeweaver.core.types.service_cards import get_sdk_client
 
         if sdk_clients := get_sdk_client(provider, kind):
             yield from (sdk_clients if isinstance(sdk_clients, tuple) else (sdk_clients,))
 
-    @property
-    def client(
-        self,
-    ) -> (
-        LazyImport[Any]
+    @classmethod
+    def clients(cls) -> Generator[tuple[SDKClient, LazyImport[Any]]]:
+        """Get all SDK clients as lazy imports."""
+        from codeweaver.core.types.service_cards import get_service_cards
 
-    ):
+        cards = get_service_cards()
+        yield from {(card.client, card.client_cls) for card in cards if card.client is not None}
+
+    @property
+    def client(self) -> LazyImport[Any]:
         """Get a lazy import for the SDK client (not the provider class)."""
+        return next(client for client, client_cls in type(self).clients() if client == self)
 
     def client_available(self) -> bool:
         """Check if the SDK client package is available."""
@@ -138,7 +147,6 @@ class SDKClient(BaseEnum):
     def reranking_provider(self) -> LazyImport[Any] | None:
         """Get the default reranking provider for the SDK client."""
 
-
     @property
     def vector_store_provider(self) -> LazyImport[Any] | None:
         """Get the default vector store provider for the SDK client."""
@@ -157,10 +165,20 @@ class SDKClient(BaseEnum):
         """Get a provider instance representing an SDKClient member as a provider member."""
         return next(cls._providers())
 
+    @classmethod
+    def _kinds(cls) -> Generator[ProviderKind]:
+        """Get all kinds that use this SDK client."""
+        yield from ProviderKind
+
+    @classmethod
+    def _any_kind(cls) -> ProviderKind:
+        """Get a kind instance representing an SDKClient member as a kind member."""
+        return next(cls._kinds())
+
 
 def get_provider_kinds(provider: Provider) -> tuple[ProviderKind, ...]:
     """Get the kinds of a provider."""
-    from codeweaver.core.types._provider_maps import get_provider_kinds
+    from codeweaver.core.types.service_cards import get_provider_kinds
 
     return tuple(ProviderKind.from_string(kind) for kind in get_provider_kinds(provider))
 
@@ -239,7 +257,7 @@ class Provider(BaseEnum):
     @property
     def always_local(self) -> bool:
         """Check if the provider is a local provider."""
-        from codeweaver.core.types._provider_maps import get_local_only_provider_members
+        from codeweaver.core.types.service_cards import get_local_only_provider_members
 
         return self in get_local_only_provider_members(type(self))
 
@@ -278,6 +296,7 @@ class Provider(BaseEnum):
         """Check if the provider requires authentication."""
         return self not in {
             # Qdrant may not require auth -- we check for API key presence elsewhere
+            Provider.QDRANT,
             Provider.FASTEMBED,
             Provider.MEMORY,
             Provider.DUCKDUCKGO,
@@ -289,27 +308,27 @@ class Provider(BaseEnum):
     @property
     def uses_openai_api(self) -> bool:
         """Check if the provider uses the OpenAI API."""
-        from codeweaver.core.types._provider_maps import get_openai_provider_members
+        from codeweaver.core.types.service_cards import get_openai_provider_members
 
         return self in get_openai_provider_members(type(self))
 
     @staticmethod
-    def _flatten_envvars(env_vars: ProviderEnvVars) -> list[ProviderEnvVarInfo]:
-        """Flatten a ProviderEnvVars TypedDict into a list of ProviderEnvVarInfo tuples."""
-        from codeweaver.core.types.env import EnvVarInfo as ProviderEnvVarInfo
+    def _flatten_envvars(env_vars: ProviderEnvVars) -> list[EnvVarInfo]:
+        """Flatten a ProviderEnvVars TypedDict into a list of EnvVarInfo tuples."""
+        from codeweaver.core.types.env import EnvVarInfo as EnvVarInfo
 
-        found_vars: list[ProviderEnvVarInfo] = []
+        found_vars: list[EnvVarInfo] = []
         for key, value in env_vars.items():
-            if key not in ("note", "other") and isinstance(value, ProviderEnvVarInfo):
+            if key not in ("note", "other") and isinstance(value, EnvVarInfo):
                 found_vars.append(value)
             elif key == "other" and isinstance(value, dict) and value:
                 found_vars.extend(iter(value.values()))
         return found_vars
 
     @classmethod
-    def all_envs(cls) -> tuple[tuple[Provider, ProviderEnvVarInfo], ...]:
+    def all_envs(cls) -> tuple[tuple[Provider, EnvVarInfo], ...]:
         """Get all environment variables used by all providers."""
-        found_vars: list[tuple[Provider, ProviderEnvVarInfo]] = []
+        found_vars: list[tuple[Provider, EnvVarInfo]] = []
         for p in cls:
             if (v := p.other_env_vars) is not None:
                 # We need to handle both single ProviderEnvVars and tuple of them
@@ -323,32 +342,17 @@ class Provider(BaseEnum):
         return tuple(found_vars)
 
     def all_envs_for_client(
-        self,
-        client: Literal[
-            "anthropic",
-            "bedrock",
-            "cohere",
-            "duckduckgo",
-            "fastembed",
-            "google",
-            "groq",
-            "hf_inference",
-            "mistral",
-            "openai",
-            "qdrant",
-            "sentence_transformers",
-            "tavily",
-        ],
-    ) -> tuple[ProviderEnvVarInfo, ...]:
+        self, client: SDKClient | SDKClientLiteralString
+    ) -> tuple[EnvVarInfo, ...]:
         """Get all environment variables used by this provider for a specific client."""
-        found_vars: list[ProviderEnvVarInfo] = []
+        found_vars: list[EnvVarInfo] = []
         if envs := self.other_env_vars:
             for env_vars_dict in envs:
                 if "client" in env_vars_dict and client in env_vars_dict["client"]:
                     found_vars.extend(self._flatten_envvars(env_vars_dict))
         return tuple(found_vars)
 
-    def has_capability(self, kind: LiteralProviderKindType) -> bool:
+    def has_capability(self, kind: LiteralProviderKind | ProviderKindLiteralString) -> bool:
         """Check if the provider has a specific capability."""
         return kind in get_provider_kinds(self)
 
@@ -418,6 +422,26 @@ class Provider(BaseEnum):
         return ProviderKind
 
 
+type LiteralSDKClient = Literal[
+    SDKClient.ANTHROPIC,
+    SDKClient.BEDROCK,
+    SDKClient.COHERE,
+    SDKClient.DUCKDUCKGO,
+    SDKClient.FASTEMBED,
+    SDKClient.GOOGLE,
+    SDKClient.GROQ,
+    SDKClient.HUGGINGFACE_INFERENCE,
+    SDKClient.MISTRAL,
+    SDKClient.OPENAI,
+    SDKClient.PYDANTIC_GATEWAY,
+    SDKClient.QDRANT,
+    SDKClient.SENTENCE_TRANSFORMERS,
+    SDKClient.TAVILY,
+    SDKClient.VOYAGE,
+    SDKClient.X_AI,
+]
+
+
 type LiteralProviderKind = Literal[
     ProviderKind.AGENT,
     ProviderKind.DATA,
@@ -467,6 +491,7 @@ type LiteralProvider = Literal[
 __all__ = (
     "LiteralProvider",
     "LiteralProviderKind",
+    "LiteralSDKClient",
     "Provider",
     "ProviderKind",
     "SDKClient",

@@ -15,12 +15,17 @@ from codeweaver.core.utils import create_lazy_getattr
 
 MappingProxyType = _types.MappingProxyType
 
-from codeweaver.core.types._provider_maps import ProviderKindLiteral, ProviderLiteral
-from codeweaver.core.types.provider import LiteralProvider, LiteralProviderKind
+from codeweaver.core.types.provider import LiteralProvider, LiteralProviderKind, LiteralSDKClient
+from codeweaver.core.types.service_cards import (
+    ProviderKindLiteralString,
+    ProviderLiteralString,
+    SDKClientLiteralString,
+)
 
 
-type LiteralProviderKindType = ProviderKindLiteral | LiteralProviderKind
-type LiteralProviderType = ProviderLiteral | LiteralProvider
+type LiteralProviderKindType = ProviderKindLiteralString | LiteralProviderKind
+type LiteralProviderType = ProviderLiteralString | LiteralProvider
+type LiteralSDKClientType = SDKClientLiteralString | LiteralSDKClient
 
 
 if TYPE_CHECKING:
@@ -103,6 +108,20 @@ if TYPE_CHECKING:
     from codeweaver.core.types.provider import Provider, ProviderKind, SDKClient, get_provider_kinds
     from codeweaver.core.types.search import SearchResult, SearchStrategy, StrategizedQuery
     from codeweaver.core.types.sentinel import MISSING, UNSET, Missing, Sentinel, Unset
+    from codeweaver.core.types.service_cards import (
+        ServiceCard,
+        ServiceMetadata,
+        get_provider_capabilities_map,
+        get_provider_clients,
+        get_provider_kind_sdk_clients_for_provider,
+        get_provider_sdk_clients_for_kind,
+        get_providers_for_kind,
+        get_sdk_client,
+        get_sdk_client_map,
+        get_service_card,
+        get_service_cards,
+        service_card_factory,
+    )
     from codeweaver.core.types.settings_model import (
         DEFAULT_BASE_SETTINGS_CONFIG,
         BaseCodeWeaverSettings,
@@ -193,8 +212,8 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "LlmToolNameT": (__spec__.parent, "aliases"),
     "MISSING": (__spec__.parent, "sentinel"),
     "McpComponentRequests": (__spec__.parent, "statistics"),
-    "McpOperationRequests": (__spec__.parent, "statistics"),
     "McpComponentTimingDict": (__spec__.parent, "statistics"),
+    "McpOperationRequests": (__spec__.parent, "statistics"),
     "McpTimingDict": (__spec__.parent, "statistics"),
     "Missing": (__spec__.parent, "sentinel"),
     "ModelName": (__spec__.parent, "aliases"),
@@ -219,6 +238,8 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "SentinelName": (__spec__.parent, "aliases"),
     "SentinelNameT": (__spec__.parent, "aliases"),
     "SerializationKwargs": (__spec__.parent, "dataclasses"),
+    "ServiceCard": (__spec__.parent, "service_cards"),
+    "ServiceMetadata": (__spec__.parent, "service_cards"),
     "SparseEmbedding": (__spec__.parent, "embeddings"),
     "StoredEmbeddingVectors": (__spec__.parent, "embeddings"),
     "StrategizedQuery": (__spec__.parent, "search"),
@@ -240,7 +261,17 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "get_config_locations": (__spec__.parent, "settings_model"),
     "get_dotenv_locations": (__spec__.parent, "settings_model"),
     "get_possible_config_paths": (__spec__.parent, "settings_model"),
+    "get_provider_capabilities_map": (__spec__.parent, "service_cards"),
+    "get_provider_clients": (__spec__.parent, "service_cards"),
+    "get_provider_kind_sdk_clients_for_provider": (__spec__.parent, "service_cards"),
     "get_provider_kinds": (__spec__.parent, "provider"),
+    "get_provider_sdk_clients_for_kind": (__spec__.parent, "service_cards"),
+    "get_providers_for_kind": (__spec__.parent, "service_cards"),
+    "get_sdk_client": (__spec__.parent, "service_cards"),
+    "get_sdk_client_map": (__spec__.parent, "service_cards"),
+    "get_service_card": (__spec__.parent, "service_cards"),
+    "get_service_cards": (__spec__.parent, "service_cards"),
+    "service_card_factory": (__spec__.parent, "service_cards"),
 })
 
 
@@ -305,6 +336,7 @@ __all__ = (
     "LiteralProviderKind",
     "LiteralProviderKindType",
     "LiteralProviderType",
+    "LiteralSDKClientType",
     "LiteralStringT",
     "LlmToolName",
     "LlmToolNameT",
@@ -319,8 +351,8 @@ __all__ = (
     "Provider",
     "ProviderEnvVars",
     "ProviderKind",
-    "ProviderKindLiteral",
-    "ProviderLiteral",
+    "ProviderKindLiteralString",
+    "ProviderLiteralString",
     "QueryResult",
     "RawEmbeddingVectors",
     "RequestKind",
@@ -331,12 +363,15 @@ __all__ = (
     "RoleT",
     "RootedRoot",
     "SDKClient",
+    "SDKClientLiteralString",
     "SearchResult",
     "SearchStrategy",
     "Sentinel",
     "SentinelName",
     "SentinelNameT",
     "SerializationKwargs",
+    "ServiceCard",
+    "ServiceMetadata",
     "SparseEmbedding",
     "StoredEmbeddingVectors",
     "StrategizedQuery",
@@ -357,7 +392,17 @@ __all__ = (
     "get_config_locations",
     "get_dotenv_locations",
     "get_possible_config_paths",
+    "get_provider_capabilities_map",
+    "get_provider_clients",
+    "get_provider_kind_sdk_clients_for_provider",
     "get_provider_kinds",
+    "get_provider_sdk_clients_for_kind",
+    "get_providers_for_kind",
+    "get_sdk_client",
+    "get_sdk_client_map",
+    "get_service_card",
+    "get_service_cards",
+    "service_card_factory",
 )
 
 

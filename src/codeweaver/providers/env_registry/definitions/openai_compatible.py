@@ -191,13 +191,6 @@ PERPLEXITY = openai_compatible_provider(
     note="Perplexity AI service.",
 )
 
-# X_AI - Simple OpenAI-compatible provider
-X_AI = openai_compatible_provider(
-    "x-ai",
-    api_key_env="XAI_API_KEY",
-    note="X.AI (xAI) service.",
-)
-
 __all__ = (
     "ALIBABA",
     "CEREBRAS",
@@ -216,5 +209,4 @@ __all__ = (
     "PERPLEXITY",
     "SAMBANOVA",
     "TOGETHER",
-    "X_AI",
 )

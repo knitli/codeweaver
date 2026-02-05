@@ -71,7 +71,7 @@ from codeweaver.core import (
     ModelName,
     ModelNameT,
     Provider,
-    ProviderLiteral,
+    ProviderLiteralString,
     SDKClient,
     generate_collection_name,
     get_user_cache_dir,
@@ -341,7 +341,7 @@ class BaseProviderSettingsDict(TypedDict, total=False):
 
     provider: Required[Provider]
     connection: NotRequired[ConnectionConfiguration | None]
-    tag: NotRequired[ProviderLiteral]
+    tag: NotRequired[ProviderLiteralString]
     client_options: NotRequired[ClientOptions | None]
 
 

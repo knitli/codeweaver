@@ -1,0 +1,1617 @@
+# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+"""Mappings of provider types for various purposes (e.g. to clients, classes, etc.).
+
+This module is an internal implementation detail. You shouldn't use it directly. It supplies the raw data used in the `Provider` and `SDKClient` and `ProviderKind` enum classes (`codeweaver.core.types.provider`). Use those classes instead.
+
+To allow for lazy loading and prevent circular imports, we put the mappings in this separate module and wrapped in functions. To avoid circular dependencies and initialization order issues, we require callers to pass in themselves (`ProviderKind`, `Provider`, or `SDKClient`) either as a class or instance.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import re
+
+from collections import defaultdict
+from collections.abc import Coroutine
+from functools import cache
+from types import MappingProxyType
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, overload
+
+from beartype.typing import Callable
+
+from codeweaver.core.utils import LazyImport, has_package
+from codeweaver.core.utils.lazy_importer import lazy_import
+
+
+if TYPE_CHECKING:
+    from codeweaver.core.types.provider import (
+        LiteralProvider,  # Members of Provider
+        LiteralProviderKind,  # Members of ProviderKind
+        Provider,
+        ProviderKind,
+        SDKClient,
+    )
+
+if TYPE_CHECKING and has_package("sentence_transformers"):
+    from sentence_transformers import CrossEncoder, SentenceTransformer, SparseEncoder
+else:
+    SentenceTransformer = Any
+    CrossEncoder = Any
+    SparseEncoder = Any
+
+if TYPE_CHECKING and (has_package("fastembed") or has_package("fastembed-gpu")):
+    from fastembed.rerank.cross_encoder import TextCrossEncoder
+    from fastembed.sparse import SparseTextEmbedding
+    from fastembed.text import TextEmbedding
+else:
+    TextEmbedding = Any
+    TextCrossEncoder = Any
+    SparseTextEmbedding = Any
+
+if TYPE_CHECKING and has_package("anthropic"):
+    from anthropic import (
+        AsyncAnthropic,
+        AsyncAnthropicBedrock,
+        AsyncAnthropicFoundry,
+        AsyncAnthropicVertex,
+    )
+else:
+    AsyncAnthropic = Any
+    AsyncAnthropicBedrock = Any
+    AsyncAnthropicFoundry = Any
+    AsyncAnthropicVertex = Any
+
+
+type ProviderKindLiteralString = Literal[
+    "agent", "data", "embedding", "reranking", "sparse_embedding", "vector_store"
+]
+
+type ProviderLiteralString = Literal[
+    "alibaba",
+    "anthropic",
+    "azure",
+    "bedrock",
+    "cerebras",
+    "cohere",
+    "deepseek",
+    "duckduckgo",
+    "fastembed",
+    "fireworks",
+    "gateway",
+    "github",
+    "google",
+    "groq",
+    "heroku",
+    "hf_inference",
+    "litellm",
+    "memory",
+    "mistral",
+    "moonshot",
+    "morph",
+    "nebius",
+    "ollama",
+    "openai",
+    "openrouter",
+    "ovhcloud",
+    "perplexity",
+    "qdrant",
+    "sambanova",
+    "sentence_transformers",
+    "tavily",
+    "together",
+    "vercel",
+    "voyage",
+    "x_ai",
+    # "outlines",
+]
+
+type SDKClientLiteralString = Literal[
+    "anthropic",
+    "bedrock",
+    "cohere",
+    "duckduckgo",
+    "fastembed",
+    "gateway",
+    "google",
+    "groq",
+    "hf_inference",
+    "mistral",
+    "openai",
+    "qdrant",
+    "sentence_transformers",
+    "tavily",
+    "voyage",
+    "x_ai",
+]
+
+
+def _all_provider_gen() -> set[ProviderLiteralString]:
+    """Generate the set of all provider literals.
+
+    Returns:
+        A set of all provider literals as strings.
+    """
+    # we only need to maintain the ProviderLiteralString union this way.
+    return set(ProviderLiteralString.__value__.__args__)
+
+
+def _never_use_other_api() -> set[ProviderLiteralString]:
+    """These are providers that (at least in CodeWeaver) never use any API other than their own SDK/client.
+
+    This does not mean that others *don't* also use their API, just that they themselves never use anything else. It also does not mean any *models* associated with these providers aren't also available on other APIs. A `provider` is who you pay, not the client/API, or models.
+    """
+    # note: we can instead derive this from card lookups -- look for cards that only have matching provider and client and no others with the provider (all(card.provider == card.client for card in cards if card.provider == provider)))
+    return set(SDKClientLiteralString.__value__.__args__) - {"bedrock"}
+
+
+def _never_use_openai_api() -> set[ProviderLiteralString]:
+    """Get the set of providers that never use the OpenAI API.
+
+    Returns:
+        A set of provider literals that never use the OpenAI API.
+    """
+    return {"bedrock", "memory"} | _never_use_other_api()
+
+
+def _sometimes_use_openai_api() -> set[ProviderLiteralString]:
+    return {"azure", "heroku", "google", "groq"}
+
+
+def _local_only_providers() -> set[ProviderLiteralString]:
+    """Get the set of local-only providers.
+
+    Returns:
+        A set of provider literals that are local-only.
+    """
+    return {"fastembed", "sentence_transformers", "memory"}
+
+
+def _sometimes_local_providers() -> set[ProviderLiteralString]:
+    """Get the set of sometimes-local providers.
+
+    Returns:
+        A set of provider literals that are sometimes local.
+    """
+    return {"ollama", "qdrant"}
+
+
+@cache
+def _never_use_openai_api() -> set[ProviderLiteralString]:
+    """These are providers that (at least in CodeWeaver) never use the OpenAI API.
+
+    This does not mean that others *don't* also use their API, just that they themselves never use it. It also does not mean any *models* associated with these providers aren't also available on the OpenAI API. A `provider` is who you pay, not the client/API, or models.
+
+    ...unless you don't pay anyone, then it's the client (like sentence_transformers).
+    """
+    # bedrock sometimes uses Anthropic for agents, and memory uses Qdrant
+    return _all_provider_gen() - (_never_use_other_api() | _never_use_openai_api())
+
+
+@cache
+def _always_use_openai_api() -> set[ProviderLiteralString]:
+    """These are providers that (at least in CodeWeaver) do not always use the OpenAI API.
+
+    This means that they have their own SDK/client, and may also use other APIs.
+
+    It also does not mean any *models* associated with these providers aren't also available on the OpenAI API. A `provider` is who you pay, not the client/API, or models.
+    """
+    return _all_provider_gen() - _never_use_openai_api() - _sometimes_use_openai_api()
+
+
+def get_openai_providers() -> set[ProviderLiteralString]:
+    """Get the set of OpenAI-related providers.
+
+    Returns:
+        A set of provider strings that use the OpenAI API.
+    """
+    return _sometimes_use_openai_api() | _always_use_openai_api()
+
+
+def get_provider_literals() -> set[ProviderLiteralString]:
+    """Get the set of all provider literals.
+
+    Returns:
+        A set of all provider literals as strings.
+    """
+    return _all_provider_gen()
+
+
+def get_local_only_providers() -> set[ProviderLiteralString]:
+    """Get the set of local-only providers.
+
+    Returns:
+        A set of provider strings that are local-only.
+    """
+    return _local_only_providers()
+
+
+def get_sometimes_local_providers() -> set[ProviderLiteralString]:
+    """Get the set of sometimes-local providers.
+
+    Returns:
+        A set of provider strings that are sometimes local.
+    """
+    return _sometimes_local_providers()
+
+
+def get_sometimes_local_provider_members(
+    provider_cls: type[Provider],
+) -> set[ProviderLiteralString]:
+    """Get the set of sometimes-local provider members.
+
+    Args:
+        provider_cls: The `Provider` class to get members from.
+
+    Returns:
+        A set of `Provider` members that are sometimes local.
+    """
+    return {provider_cls.from_string(p) for p in get_sometimes_local_providers()}
+
+
+def get_openai_provider_members(provider_cls: type[Provider]) -> set[ProviderLiteralString]:
+    """Get the set of OpenAI-related provider members.
+
+    Args:
+        provider_cls: The `Provider` class to get members from.
+
+    Returns:
+        A set of `Provider` members that use the OpenAI API.
+    """
+    return {provider_cls.from_string(p) for p in get_openai_providers()}
+
+
+def get_local_only_provider_members(provider_cls: type[Provider]) -> set[ProviderLiteralString]:
+    """Get the set of local-only provider members.
+
+    Args:
+        provider_cls: The `Provider` class to get members from.
+
+    Returns:
+        A set of `Provider` members that are local-only.
+    """
+    return {provider_cls.from_string(p) for p in _local_only_providers()}
+
+
+# exclusivity groups
+# Groups of providers that are mutually exclusive in some way.
+
+
+def _data_providers():
+    return {"duckduckgo", "tavily"}
+
+
+def _vector_providers():
+    return {"memory", "qdrant"}
+
+
+def _sparse_providers():
+    return _local_only_providers() - _non_model_providers()
+
+
+def _non_model_providers():
+    return _data_providers() | _vector_providers()
+
+
+def _non_agent_providers():
+    return {"voyage"} | _local_only_providers() | _non_model_providers()
+
+
+def _agent_providers():
+    return _all_provider_gen() - _non_agent_providers()
+
+
+def _agent_only_providers():
+    return {
+        "alibaba",
+        "cerebras",
+        "deepseek",
+        "gateway",
+        "litellm",
+        "moonshot",
+        "nebius",
+        "openrouter",
+        "ovhcloud",
+        "perplexity",
+        "sambanova",
+        "x_ai",
+    }
+
+
+def _openai_agent_providers():
+    return get_openai_providers() - {"groq"}
+
+
+def _openai_embedding_providers():
+    return get_openai_providers() - _agent_only_providers() - {"google"}
+
+
+def _embedding_providers():
+    return _all_provider_gen() - _non_model_providers() - _agent_only_providers()
+
+
+def _reranking_providers():
+    return (_local_only_providers() - _non_model_providers()) | {"bedrock", "cohere", "voyage"}
+
+
+def _trifecta_providers():
+    return _all_provider_gen() & (
+        _reranking_providers() & _embedding_providers() & _agent_providers()
+    )
+
+
+def _sparse_providers():
+    return _local_only_providers() - _non_model_providers()
+
+
+class ServiceMetadata(NamedTuple):
+    """Optional metadata for services requiring special handling.
+
+    Used for multi-client scenarios (e.g., Azure supporting both OpenAI and Anthropic)
+    or cases requiring custom instantiation logic.
+    """
+
+    discriminator: tuple[Literal["model", "client"], str | re.Pattern] | None = None
+    """For multi-client providers, determines which card to use.
+
+    Format: (discriminator_kind, discriminator_value)
+
+    - ("model", "claude"): Use this card if model name starts with "claude"
+    - ("client", "openai"): Use this card if client preference is "openai"
+
+    Example: Azure agent can use Anthropic (for Claude models) or OpenAI (default).
+    """
+
+    handler: (
+        tuple[
+            Literal["client", "provider"],
+            Callable[[Any, ...], Any] | Callable[[Any, ...], Coroutine[Any, Any, Any]],
+        ]
+        | None
+    ) = None
+    """Custom instantiation handler for special cases.
+
+    The function receives the client or provider class, and any args/kwargs needed for instantiation, and returns the instantiated client or provider. The function may be sync or async (returning a coroutine). The caller will await if it's async.
+
+    Format: (handler_kind, handler_function)
+
+    - ("provider", func): Custom provider class instantiation
+    - ("client", func): Custom client instantiation
+
+    Rarely needed - most providers use standard instantiation patterns.
+    """
+
+
+class ServiceCard(NamedTuple):
+    """Service card representing a provider-kind-client combination.
+
+    A ServiceCard maps a provider-kind pair to the actual provider class and
+    client class needed to instantiate that service. For example:
+    - (cohere, reranking) → (CohereRerankingProvider, AsyncClientV2)
+
+    For multi-client scenarios (Azure, Bedrock, etc.), multiple cards exist
+    with different metadata.discriminator values to select the right one.
+    """
+
+    provider: LiteralProvider
+    """The provider (the service you pay for, e.g., 'openai', 'cohere')."""
+
+    kind: LiteralProviderKind
+    """The kind of service (e.g., 'embedding', 'agent', 'reranking')."""
+
+    provider_cls: LazyImport[Any]
+    """The provider class (e.g., CohereProvider, OpenAIEmbeddingProvider).
+
+    This is the class that wraps the client and implements the CodeWeaver
+    provider interface for this service type. (or pydantic AI interface for agents)
+    """
+
+    client_cls: LazyImport[Any]
+    """The SDK client class (e.g., AsyncCohereV2, AsyncOpenAI, Mistral).
+
+    This is the actual SDK client from the provider's library that will be
+    instantiated to make API calls.
+    """
+
+    client: SDKClientLiteralString
+
+    metadata: ServiceMetadata | None = None
+    """Optional metadata for multi-client scenarios or special handling.
+
+    Most cards have metadata=None. Only needed for:
+    - Multi-client providers (Azure, Bedrock) - uses discriminator
+    - Custom instantiation logic - uses handler
+    """
+
+    def has_multiple(self) -> bool:
+        """Check if this service card is part of a multi-client scenario."""
+        return self.metadata is not None and self.metadata.discriminator is not None
+
+    def evaluate(self, model_name: str | None = None, client_preference: str | None = None) -> bool:
+        """Evaluate if this service card matches the given model name or client preference.
+
+        Used in multi-client scenarios to determine if this card should be selected
+        based on the discriminator.
+
+        Args:
+            model_name: The model name to check against the discriminator (if kind is "model").
+            client_preference: The client preference to check against the discriminator (if kind is "client").
+
+        Returns:
+            True if this card matches the discriminator criteria, False otherwise.
+        """
+        if not self.has_multiple():
+            return True  # No discriminator, always matches
+
+        disc_kind = self.discriminator_kind
+        disc_value = self.discriminator
+
+        if disc_kind == "model" and model_name is not None:
+            if isinstance(disc_value, re.Pattern):
+                return bool(disc_value.match(model_name))
+            return model_name.startswith(disc_value)
+
+        if disc_kind == "client" and client_preference is not None:
+            return client_preference == disc_value
+
+        return False  # No match if required info not provided
+
+    @property
+    def discriminator_kind(self) -> Literal["model", "client"] | None:
+        """Get the discriminator kind if this card has a discriminator."""
+        if self.metadata and self.metadata.discriminator:
+            return self.metadata.discriminator[0]
+        return None
+
+    @property
+    def discriminator(self) -> str | re.Pattern | None:
+        """Get the discriminator value if this card has a discriminator."""
+        if self.metadata and self.metadata.discriminator:
+            return self.metadata.discriminator[1]
+        return None
+
+    @property
+    def handler[TargetCls](
+        self,
+    ) -> (
+        tuple[
+            Literal["client", "provider"],
+            Callable[[type[TargetCls], ...], TargetCls]
+            | Callable[[TargetCls, ...], Coroutine[TargetCls, Any, Any]],
+        ]
+        | None
+    ):
+        """Get the custom handler if this card has one."""
+        if self.metadata and self.metadata.handler:
+            return self.metadata.handler
+        return None
+
+    def _apply_handler(self, *args: Any, **kwargs: Any) -> Any:
+        """Apply the custom handler if it exists, otherwise return None.
+
+        This is used to get the actual client or provider instance when a card has a custom handler defined. The caller will check if the result is not None and use it instead of standard instantiation.
+
+        Args:
+            *args: Positional arguments to pass to the handler function.
+            **kwargs: Keyword arguments to pass to the handler function.
+
+        Returns:
+            The result of the handler function if it exists, otherwise None.
+        """
+        if not (handler := self.handler):
+            return None
+        kind, func = handler
+        import_cls = self.client_cls if kind == "client" else self.provider_cls
+        return func(import_cls._resolve(), *args, **kwargs) if callable(func) else None
+
+    def handler_is_async(self) -> bool:
+        """Check if the handler function is asynchronous."""
+        handler = self.handler
+        if not handler:
+            return False
+        from inspect import iscoroutinefunction
+
+        _, func = handler
+        return callable(func) and iscoroutinefunction(func)
+
+    def create_instance(
+        self, target: Literal["client", "provider"], *args: Any, **kwargs: Any
+    ) -> Any:
+        """Create an instance of the client or provider using the handler if it exists, otherwise standard instantiation.
+
+        This is a convenience method that abstracts away the logic of checking for a handler and applying it, versus just instantiating the client or provider in the standard way. The caller can simply call `card.create_instance()` and get the correct instance based on the card's configuration.
+
+        Args:
+            target: Whether to create a "client" or "provider" instance.
+            *args: Positional arguments to pass to the handler function if it exists.
+            **kwargs: Keyword arguments to pass to the handler function if it exists.
+
+        Returns:
+            An instance of the client or provider as defined by this service card.
+        """
+        try:
+            target_cls = (
+                self.client_cls._resolve() if target == "client" else self.provider_cls._resolve()
+            )
+        except (ImportError, AttributeError, KeyError):
+            raise ValueError(
+                f"Failed to resolve {target} class for provider {self.provider} and kind {self.kind}."
+            ) from None
+        return (
+            self._apply_handler(*args, **kwargs)
+            if self.handler and self.handler[0] == target
+            else target_cls(*args, **kwargs)
+        )
+
+
+@overload
+def service_card_factory(
+    provider: ProviderLiteralString,
+    kind: ProviderKindLiteralString,
+    provider_cls: LazyImport[Any],
+    client_cls: LazyImport[Any],
+    client: SDKClientLiteralString,
+) -> ServiceCard: ...
+
+
+@overload
+def service_card_factory(
+    provider: ProviderLiteralString,
+    kind: ProviderKindLiteralString,
+    provider_cls: LazyImport[Any],
+    client_cls: LazyImport[Any],
+    client: SDKClientLiteralString,
+    *,
+    metadata: ServiceMetadata,
+) -> ServiceCard: ...
+
+
+def service_card_factory(
+    provider: ProviderLiteralString,
+    kind: ProviderKindLiteralString,
+    provider_cls: LazyImport[Any],
+    client_cls: LazyImport[Any],
+    client: SDKClientLiteralString,
+    *,
+    metadata: ServiceMetadata | None = None,
+) -> ServiceCard:
+    """Factory function to create a ServiceCard with proper type checking.
+
+    Simplified factory that creates ServiceCards with 4 core fields and
+    optional metadata for special cases.
+
+    Args:
+        provider: The provider (the service you pay for).
+        kind: The kind of service (embedding, agent, etc.).
+        provider_cls: The provider class (e.g., CohereProvider).
+        client_cls: The client class (e.g., AsyncCohereV2).
+        metadata: Optional metadata for multi-client scenarios or special handling.
+
+    Returns:
+        A ServiceCard instance.
+
+    Examples:
+        Simple case (most providers):
+        >>> service_card_factory(
+        ...     "openai",
+        ...     "embedding",
+        ...     lazy_import("codeweaver.providers.embedding", "OpenAIEmbeddingProvider"),
+        ...     lazy_import("openai", "AsyncOpenAI"),
+        ...     client="openai",
+        ... )
+
+        Multi-client with discriminator:
+        >>> service_card_factory(
+        ...     "azure",
+        ...     "agent",
+        ...     lazy_import("pydantic_ai.providers.anthropic", "AnthropicProvider"),
+        ...     lazy_import("anthropic", "AsyncAnthropicFoundry"),
+        ...     "anthropic",
+        ...     metadata=ServiceMetadata(discriminator=("model", "claude")),
+        ... )
+
+        Custom handler:
+        >>> service_card_factory(
+        ...     "bedrock",
+        ...     "embedding",
+        ...     lazy_import("codeweaver.providers.embedding", "BedrockEmbeddingProvider"),
+        ...     lazy_import("boto3", "client"),
+        ...     "bedrock",
+        ...     metadata=ServiceMetadata(handler=("client", bedrock_client_factory)),
+        ... )
+    """
+    return ServiceCard(
+        provider=provider,
+        kind=kind,
+        provider_cls=provider_cls,
+        client_cls=client_cls,
+        client=client,
+        metadata=metadata,
+    )
+
+
+# ===========================================================================
+# *                    Registry Validation
+# ===========================================================================
+
+
+def _validate_registry(cards: tuple[ServiceCard, ...]) -> None:
+    """Validate the service card registry for consistency.
+
+    Logs warnings for suspicious patterns but doesn't raise exceptions.
+    This helps catch configuration issues without blocking imports.
+
+    Validation checks:
+    - Duplicate cards (same provider-kind-discriminator)
+    - Multi-client scenarios with inconsistent discriminator patterns
+    - Missing default fallback cards for multi-client providers
+
+    Args:
+        cards: The complete tuple of service cards to validate.
+    """
+    import logging
+
+    from collections import defaultdict
+
+    logger = logging.getLogger(__name__)
+
+    seen: set[tuple[ProviderLiteralString, ProviderKindLiteralString, str | None]] = set()
+    multi_client: defaultdict[
+        tuple[ProviderLiteralString, ProviderKindLiteralString], list[ServiceCard]
+    ] = defaultdict(list)
+
+    for card in cards:
+        # Track multi-client scenarios
+        key = (card.provider, card.kind)
+        multi_client[key].append(card)
+
+        # Check for exact duplicates
+        disc = (
+            card.metadata.discriminator[1]
+            if card.metadata and card.metadata.discriminator
+            else None
+        )
+        full_key = (card.provider, card.kind, disc)
+
+        if full_key in seen:
+            logger.warning("Duplicate service card detected: %s", full_key)
+        seen.add(full_key)
+
+    # Validate multi-client discriminator logic
+    for (provider, kind), card_list in multi_client.items():
+        if len(card_list) > 1:
+            has_default = any(
+                c.metadata is None or c.metadata.discriminator is None for c in card_list
+            )
+            has_discriminators = any(c.metadata and c.metadata.discriminator for c in card_list)
+
+            if has_discriminators and not has_default:
+                logger.warning(
+                    "Multi-client %s-%s has discriminators but no default fallback. "
+                    "Consider adding a card with metadata=None for the default case.",
+                    provider,
+                    kind,
+                )
+
+            if not has_discriminators:
+                logger.warning(
+                    "Multi-client %s-%s has multiple cards but no discriminators. "
+                    "Selection will be non-deterministic (first match wins).",
+                    provider,
+                    kind,
+                )
+
+
+# ===========================================================================
+# *                    Service Card Registry
+# ===========================================================================
+
+_anthropic_model_discriminator = (
+    "model",
+    re.compile(r".*(claude|opus|sonnet|haiku).*", re.IGNORECASE),
+)
+
+
+@cache
+def _build_service_card_registry() -> tuple[ServiceCard, ...]:
+    """Build the complete registry of service cards.
+
+    Returns immutable tuple for caching and thread safety.
+    All provider-kind-client mappings are defined through this registry.
+
+    The registry is built from pattern-specific builder functions that handle
+    common scenarios (OpenAI API, native SDKs, local providers, multi-client).
+
+    Returns:
+        Immutable tuple of all service cards.
+    """
+    cards: list[ServiceCard] = []
+
+    # Build cards for each category
+    cards.extend(_build_openai_api_cards())
+    cards.extend(_build_native_sdk_cards())
+    cards.extend(_build_local_provider_cards())
+    cards.extend(_build_pydantic_gateway_provider_cards())
+    cards.extend(_build_multi_client_cards())
+    cards.extend(_build_data_provider_cards())
+    cards.extend(_build_vector_store_cards())
+
+    registry = tuple(cards)
+    _validate_registry(registry)
+    return registry
+
+
+def _get_pydantic_ai_cls_module(provider_name: str) -> str:
+    """Get the module name for a given provider in the pydantic_ai.providers namespace.
+
+    This is needed to correctly import provider classes for the service cards, especially for providers that have different naming conventions between the provider literal and the module name.
+
+    Args:
+        provider_name: The provider literal string (e.g., "hf_inference", "moonshot").
+
+    Returns:
+        The module name to use for importing the provider class.
+    """
+    if provider_name == "hf_inference":
+        return "huggingface"
+    return "moonshotai" if provider_name == "moonshot" else provider_name
+
+
+def _get_pydantic_ai_provider_cls(provider_name: str) -> LazyImport[Any]:
+    """Get the LazyImport for the provider class in the pydantic_ai.providers namespace.
+
+    This uses the provider name to determine the correct module and class name to import for the provider. It handles special cases where the provider literal does not directly match the module or class name.
+
+    Args:
+        provider_name: The provider literal string (e.g., "hf_inference", "moonshot").
+
+    Returns:
+        A LazyImport for the provider class.
+    """
+    module_name = _get_pydantic_ai_cls_module(provider_name)
+    class_name = f"{module_name.title().replace('_', '')}Provider"
+    if module_name in {"moonshotai", "openai", "litellm", "huggingface"}:
+        class_name = class_name.replace("ai", "AI").replace("llm", "LLM").replace("face", "Face")
+    return lazy_import(f"pydantic_ai.providers.{module_name}", class_name)
+
+
+# Builder function stubs - will implement next
+def _build_openai_api_cards() -> list[ServiceCard]:
+    """Build service cards for OpenAI API-compatible providers.
+
+    These providers use the OpenAI SDK (AsyncOpenAI) but may connect to different endpoints.
+    Includes ~15 providers that implement the OpenAI-compatible API.
+
+    Excludes: Azure, Heroku, Google, Groq (multi-client or special handling)
+    """
+    agent_cards = [
+        service_card_factory(
+            provider=provider,
+            kind="agent",
+            provider_cls=_get_pydantic_ai_provider_cls(provider),
+            client_cls=lazy_import("openai", "AsyncOpenAI"),
+        )
+        for provider in _openai_agent_providers()
+    ]
+
+    embedding_cards = [
+        service_card_factory(
+            provider=provider,
+            kind="embedding",
+            provider_cls=lazy_import(
+                "codeweaver.providers.embedding.providers.openai_factory", "get_provider_class"
+            ),
+            client_cls=lazy_import("openai", "AsyncOpenAI"),
+        )
+        for provider in _openai_embedding_providers()
+    ]
+
+    return agent_cards + embedding_cards
+
+
+def _build_native_sdk_cards() -> list[ServiceCard]:
+    """Build service cards for providers with their own native SDKs.
+
+    These providers have their own SDK client libraries (not OpenAI-compatible).
+    Includes: Mistral, Cohere, Voyage, Anthropic, Google, HuggingFace, Gateway.
+    """
+    return [
+        # Mistral
+        service_card_factory(
+            "mistral",
+            "agent",
+            _get_pydantic_ai_provider_cls("mistral"),
+            lazy_import("mistralai", "Mistral"),
+            "mistral",
+        ),
+        service_card_factory(
+            "mistral",
+            "embedding",
+            lazy_import(
+                "codeweaver.providers.embedding.providers.mistral", "MistralEmbeddingProvider"
+            ),
+            lazy_import("mistralai", "Mistral"),
+            "mistral",
+        ),
+        # Cohere - agent, embedding, reranking
+        service_card_factory(
+            "cohere",
+            "agent",
+            _get_pydantic_ai_provider_cls("cohere"),
+            lazy_import("cohere", "AsyncClientV2"),
+            "cohere",
+        ),
+        service_card_factory(
+            "cohere",
+            "embedding",
+            lazy_import(
+                "codeweaver.providers.embedding.providers.cohere", "CohereEmbeddingProvider"
+            ),
+            lazy_import("cohere", "AsyncClientV2"),
+            "cohere",
+        ),
+        service_card_factory(
+            "cohere",
+            "reranking",
+            lazy_import(
+                "codeweaver.providers.reranking.providers.cohere", "CohereRerankingProvider"
+            ),
+            lazy_import("cohere", "AsyncClientV2"),
+            "cohere",
+        ),
+        # Voyage - embedding and reranking
+        service_card_factory(
+            "voyage",
+            "embedding",
+            lazy_import(
+                "codeweaver.providers.embedding.providers.voyage", "VoyageEmbeddingProvider"
+            ),
+            lazy_import("voyageai", "VoyageAI"),
+            "voyage",
+        ),
+        service_card_factory(
+            "voyage",
+            "reranking",
+            lazy_import(
+                "codeweaver.providers.reranking.providers.voyage", "VoyageRerankingProvider"
+            ),
+            lazy_import("voyageai", "VoyageAI"),
+            "voyage",
+        ),
+        # Anthropic - agent only (non-Azure/Bedrock/Google)
+        service_card_factory(
+            "anthropic",
+            "agent",
+            _get_pydantic_ai_provider_cls("anthropic"),
+            lazy_import("anthropic", "AsyncAnthropic"),
+            "anthropic",
+        ),
+        # Google - agent and embedding
+        service_card_factory(
+            "google",
+            "agent",
+            _get_pydantic_ai_provider_cls("google"),
+            lazy_import("google.genai", "Client"),
+            "google",
+        ),
+        service_card_factory(
+            "google",
+            "embedding",
+            lazy_import(
+                "codeweaver.providers.embedding.providers.google", "GoogleEmbeddingProvider"
+            ),
+            lazy_import("google.genai", "Client"),
+            "google",
+        ),
+        # HuggingFace Inference - agent and embedding
+        service_card_factory(
+            "hf_inference",
+            "agent",
+            _get_pydantic_ai_provider_cls("hf_inference"),
+            lazy_import("huggingface_hub", "AsyncInferenceClient"),
+            "hf_inference",
+        ),
+        service_card_factory(
+            "hf_inference",
+            "embedding",
+            lazy_import(
+                "codeweaver.providers.embedding.providers.huggingface",
+                "HuggingFaceEmbeddingProvider",
+            ),
+            lazy_import("huggingface_hub", "AsyncInferenceClient"),
+            "hf_inference",
+        ),
+        service_card_factory(
+            "x_ai",
+            "agent",
+            _get_pydantic_ai_provider_cls("xai"),
+            lazy_import("xai_sdk", "AsyncClient"),
+            "x_ai",
+        ),
+    ]
+
+
+async def _start_instance_in_thread(client_cls: type[Any], *args: Any, **kwargs: Any) -> Any:
+    """Helper function to start an instance in a separate thread for sync handlers."""
+    return await asyncio.to_thread(client_cls, *args, **kwargs)
+
+
+def _build_local_provider_cards() -> list[ServiceCard]:
+    """Build service cards for local-only providers (Fastembed, Sentence Transformers).
+
+    These providers run entirely locally without external API calls.
+    Both support embedding, sparse embedding, and reranking.
+    """
+    return [
+        service_card_factory(
+            "fastembed",
+            "embedding",
+            lazy_import(
+                "codeweaver.providers.embedding.providers.fastembed", "FastEmbedEmbeddingProvider"
+            ),
+            lazy_import("codeweaver.providers.embedding.fastembed_extensions", "get_text_embedder"),
+            "fastembed",
+            metadata=ServiceMetadata(handler=("client", _start_instance_in_thread)),
+        ),
+        service_card_factory(
+            "fastembed",
+            "sparse_embedding",
+            lazy_import(
+                "codeweaver.providers.embedding.providers.fastembed",
+                "FastEmbedSparseEmbeddingProvider",
+            ),
+            lazy_import(
+                "codeweaver.providers.embedding.fastembed_extensions",
+                "get_sparse_embedderfastembed",
+            ),
+            "fastembed",
+            metadata=ServiceMetadata(handler=("client", _start_instance_in_thread)),
+        ),
+        service_card_factory(
+            "fastembed",
+            "reranking",
+            lazy_import(
+                "codeweaver.providers.reranking.providers.fastembed", "FastEmbedRerankingProvider"
+            ),
+            lazy_import("fastembed.rerank.cross_encoder", "TextCrossEncoder"),
+            "fastembed",
+            metadata=ServiceMetadata(handler=("client", _start_instance_in_thread)),
+        ),
+        # Sentence Transformers - embedding, sparse_embedding, reranking
+        service_card_factory(
+            "sentence_transformers",
+            "embedding",
+            lazy_import(
+                "codeweaver.providers.embedding.providers.sentence_transformers",
+                "SentenceTransformersEmbeddingProvider",
+            ),
+            lazy_import("sentence_transformers", "SentenceTransformer"),
+            "sentence_transformers",
+            metadata=ServiceMetadata(handler=("client", _start_instance_in_thread)),
+        ),
+        service_card_factory(
+            "sentence_transformers",
+            "sparse_embedding",
+            lazy_import(
+                "codeweaver.providers.embedding.providers.sentence_transformers",
+                "SentenceTransformersSparseEmbeddingProvider",
+            ),
+            lazy_import("sentence_transformers", "SparseEncoder"),
+            "sentence_transformers",
+            metadata=ServiceMetadata(handler=("client", _start_instance_in_thread)),
+        ),
+        service_card_factory(
+            "sentence_transformers",
+            "reranking",
+            lazy_import(
+                "codeweaver.providers.reranking.providers.sentence_transformers",
+                "SentenceTransformersRerankingProvider",
+            ),
+            lazy_import("sentence_transformers", "CrossEncoder"),
+            "sentence_transformers",
+            metadata=ServiceMetadata(handler=("client", _start_instance_in_thread)),
+        ),
+    ]
+
+
+def _build_multi_client_cards() -> list[ServiceCard]:
+    """Build service cards for multi-client providers (Azure, Bedrock, Heroku, Groq).
+
+    These providers can use multiple different SDK clients depending on context:
+    - Model-based discrimination: Select client based on model name
+    - Client-based discrimination: Select based on explicit client preference
+
+    Each multi-client scenario should have:
+    - One or more cards with discriminators for specific cases
+    - One card without discriminator as the default fallback
+    """
+    anthropic_provider = _get_pydantic_ai_provider_cls("anthropic")
+    return [
+        service_card_factory(
+            "azure",
+            "agent",
+            anthropic_provider,
+            lazy_import("anthropic", "AsyncAnthropicFoundry"),
+            "anthropic",
+            metadata=ServiceMetadata(discriminator=("model", _anthropic_model_discriminator)),
+        ),
+        service_card_factory(
+            "azure",
+            "agent",
+            _get_pydantic_ai_provider_cls("azure"),
+            lazy_import("openai", "AsyncOpenAI"),
+            "openai",
+        ),
+        # Azure - Embedding (OpenAI or Cohere)
+        # Use Cohere for Cohere models
+        service_card_factory(
+            "azure",
+            "embedding",
+            lazy_import(
+                "codeweaver.providers.embedding.providers.cohere", "CohereEmbeddingProvider"
+            ),
+            lazy_import("cohere", "AsyncClientV2"),
+            metadata=ServiceMetadata(
+                discriminator=(
+                    "model",
+                    # currently only embed-v4 but assuming 5 will follow the pattern
+                    re.compile(r"^embed-(english-|multilingual-|v[45]).*", re.IGNORECASE),
+                )
+            ),
+        ),
+        # Use OpenAI by default
+        service_card_factory(
+            "azure",
+            "embedding",
+            lazy_import(
+                "codeweaver.providers.embedding.providers.openai_factory", "get_provider_class"
+            ),
+            lazy_import("openai", "AsyncOpenAI"),
+        ),
+        # Bedrock - Agent (Bedrock or Anthropic based on model)
+        # Use Anthropic client for Claude models on Bedrock
+        service_card_factory(
+            "bedrock",
+            "agent",
+            anthropic_provider,
+            lazy_import("anthropic", "AsyncAnthropicBedrock"),
+            metadata=ServiceMetadata(discriminator=("model", _anthropic_model_discriminator)),
+        ),
+        # Use Bedrock client for other models (default)
+        service_card_factory(
+            "bedrock",
+            "agent",
+            lazy_import("pydantic_ai.providers.bedrock", "BedrockProvider"),
+            lazy_import("boto3", "client"),
+            metadata=ServiceMetadata(
+                handler=(
+                    "client",
+                    lambda client, *args, **kwargs: client("bedrock-runtime", *args, **kwargs),
+                )
+            ),
+        ),
+        # Bedrock - Embedding and Reranking (only bedrock client)
+        service_card_factory(
+            "bedrock",
+            "embedding",
+            lazy_import(
+                "codeweaver.providers.embedding.providers.bedrock", "BedrockEmbeddingProvider"
+            ),
+            lazy_import("boto3", "client"),
+            "bedrock",
+            metadata=ServiceMetadata(
+                handler=(
+                    "client",
+                    lambda client, *args, **kwargs: client("bedrock", *args, **kwargs),
+                )
+            ),
+        ),
+        service_card_factory(
+            "bedrock",
+            "reranking",
+            lazy_import(
+                "codeweaver.providers.reranking.providers.bedrock", "BedrockRerankingProvider"
+            ),
+            lazy_import("boto3", "client"),
+            "bedrock",
+            metadata=ServiceMetadata(
+                handler=(
+                    "client",
+                    lambda client, *args, **kwargs: client("bedrock-runtime", *args, **kwargs),
+                )
+            ),
+        ),
+        # Heroku - Agent and Embedding (OpenAI or Cohere)
+        # Note: Heroku uses same client for both agent and embedding per provider
+        # Cohere client
+        service_card_factory(
+            "heroku",
+            "agent",
+            _get_pydantic_ai_provider_cls("cohere"),
+            lazy_import("cohere", "AsyncClientV2"),
+            "cohere",
+            metadata=ServiceMetadata(discriminator=("model", "cohere")),
+        ),
+        # OpenAI client (default)
+        service_card_factory(
+            "heroku",
+            "agent",
+            _get_pydantic_ai_provider_cls("heroku"),
+            lazy_import("openai", "AsyncOpenAI"),
+            "openai",
+        ),
+        # Cohere embedding
+        service_card_factory(
+            "heroku",
+            "embedding",
+            lazy_import(
+                "codeweaver.providers.embedding.providers.cohere", "CohereEmbeddingProvider"
+            ),
+            lazy_import("cohere", "AsyncClientV2"),
+            "cohere",
+            metadata=ServiceMetadata(discriminator=("model", "cohere-embed")),
+        ),
+        # OpenAI embedding (default)
+        service_card_factory(
+            "heroku",
+            "embedding",
+            lazy_import(
+                "codeweaver.providers.embedding.providers.openai_factory", "get_provider_class"
+            ),
+            lazy_import("openai", "AsyncOpenAI"),
+            "openai",
+        ),
+        # Groq - Special case: agent uses Groq client, embedding uses OpenAI client
+        service_card_factory(
+            "groq",
+            "agent",
+            _get_pydantic_ai_provider_cls("groq"),
+            lazy_import("groq", "AsyncGroq"),
+            "groq",
+        ),
+        service_card_factory(
+            "groq",
+            "embedding",
+            lazy_import(
+                "codeweaver.providers.embedding.providers.openai_factory", "get_provider_class"
+            ),
+            lazy_import("openai", "AsyncOpenAI"),
+            "openai",
+        ),
+        # Pydantic Gateway - agent only
+        service_card_factory(
+            "gateway",
+            "agent",
+            lazy_import("pydantic_ai.providers.gateway", "gateway_provider"),
+            lazy_import("pydantic_ai.providers.gateway", "gateway_provider"),
+            "gateway",
+        ),
+    ]
+
+
+def _build_pydantic_gateway_provider_cards() -> list[ServiceCard]:
+    """Build service cards for Pydantic Gateway provider.
+
+    Pydantic Gateway is a special provider that routes requests to various LLMs.
+    It uses its own client for both agent and embedding services.
+    """
+    return [
+        service_card_factory(
+            "gateway",
+            "agent",
+            lazy_import("pydantic_ai.providers.gateway", "gateway_provider"),
+            lazy_import("pydantic_ai.providers.gateway", "gateway_provider"),
+            "gateway",
+            metadata=ServiceMetadata(
+                handler=(
+                    "provider",
+                    lambda provider_cls, upstream_provider, **kwargs: provider_cls(
+                        upstream_provider=upstream_provider, **kwargs
+                    ),
+                )
+            ),
+        )
+    ]
+
+
+def _build_data_provider_cards() -> list[ServiceCard]:
+    """Build service cards for data providers (Tavily, DuckDuckGo).
+
+    Data providers are used for web search and data retrieval.
+    """
+    return [
+        service_card_factory(
+            "tavily",
+            "data",
+            lazy_import("pydantic_ai.common_tools.tavily", "tavily_search_tool"),
+            lazy_import("tavily", "AsyncTavilyClient"),
+            "tavily",
+            metadata=ServiceMetadata(
+                handler=("provider", lambda provider_cls, api_key: provider_cls(api_key=api_key))
+            ),
+        ),
+        service_card_factory(
+            "duckduckgo",
+            "data",
+            lazy_import("pydantic_ai.common_tools.duckduckgo", "duck_duck_go_search_tool"),
+            lazy_import("ddgs.ddgs", "DDGS"),
+            "duckduckgo",
+            metadata=ServiceMetadata(
+                handler=("provider", lambda provider_cls,: provider_cls(max_results=20))
+            ),
+        ),
+    ]
+
+
+def _build_vector_store_cards() -> list[ServiceCard]:
+    """Build service cards for vector store providers (Qdrant, Memory).
+
+    Vector stores are used for storing and querying embeddings.
+    Both use AsyncQdrantClient, but Memory is in-memory with JSON persistence.
+    """
+    return [
+        service_card_factory(
+            "qdrant",
+            "vector_store",
+            lazy_import(
+                "codeweaver.providers.vector_store.providers.qdrant", "QdrantVectorStoreProvider"
+            ),
+            lazy_import("qdrant_client", "AsyncQdrantClient"),
+            "qdrant",
+        ),
+        service_card_factory(
+            "memory",
+            "vector_store",
+            lazy_import(
+                "codeweaver.providers.vector_store.providers.inmemory", "MemoryVectorStoreProvider"
+            ),
+            lazy_import("qdrant_client", "AsyncQdrantClient"),
+            "qdrant",
+        ),
+    ]
+
+
+# ===========================================================================
+# *                    Query Interface - Helper Functions
+# ===========================================================================
+
+
+def _match_discriminator(
+    card: ServiceCard, model_hint: str | None = None, client_preference: str | None = None
+) -> bool:
+    """Check if a service card matches the given model or client discriminator.
+
+    Args:
+        card: The service card to check.
+        model_hint: Optional model name to match against model discriminators.
+        client_preference: Optional client name to match against client discriminators.
+
+    Returns:
+        True if the card matches the discriminator, False otherwise.
+        Cards without discriminators always return True (they're defaults).
+    """
+    if not card.metadata or not card.metadata.discriminator:
+        return True  # Default card (no discriminator)
+
+    disc_kind, disc_value = card.metadata.discriminator
+
+    if disc_kind == "model" and model_hint:
+        # Model discriminator: check if model name starts with discriminator value
+        return model_hint.lower().startswith(disc_value.lower())
+
+    if disc_kind == "client" and client_preference:
+        # Client discriminator: exact match
+        return client_preference.lower() == disc_value.lower()
+
+    return False
+
+
+# ===========================================================================
+# *                    Query Interface - Main Functions
+# ===========================================================================
+
+
+@cache
+def get_service_cards(
+    *,
+    provider: ProviderLiteralString | set[ProviderLiteralString] | None = None,
+    kind: ProviderKindLiteralString | set[ProviderKindLiteralString] | None = None,
+    client: SDKClientLiteralString | set[SDKClientLiteralString] | None = None,
+) -> tuple[ServiceCard, ...]:
+    """Query service cards by any combination of filters.
+
+    This is the primary query function for finding service cards.
+    All filters are optional and can be combined.
+
+    Args:
+        provider: Filter by provider name (e.g., "openai", "cohere").
+        kind: Filter by service kind (e.g., "embedding", "agent").
+        client: Filter by SDK client name (e.g., "openai", "anthropic").
+
+    Returns:
+        Tuple of matching service cards (may be empty).
+
+    Examples:
+        Get all OpenAI cards:
+        >>> get_service_cards(provider="openai")
+
+        Get all embedding providers:
+        >>> get_service_cards(kind="embedding")
+
+        Get providers using OpenAI client:
+        >>> get_service_cards(client="openai")
+
+        Get specific provider-kind combination:
+        >>> get_service_cards(provider="azure", kind="agent")
+    """
+    registry = _build_service_card_registry()
+    prov_filter, kind_filter, client_filter = (
+        provider if isinstance(provider, set) else {provider},
+        kind if isinstance(kind, set) else {kind},
+        client if isinstance(client, set) else {client},
+    )
+    if prov_filter or kind_filter or client_filter:
+        return tuple(
+            sorted(
+                c
+                for c in registry
+                if (not prov_filter or c.provider in prov_filter)
+                and (not kind_filter or c.kind in kind_filter)
+                and (not client_filter or c.client in client_filter)
+            ),
+            key=lambda c: (c.provider, c.kind, c.client),
+        )
+    return registry
+
+
+@cache
+def get_service_card(
+    provider: ProviderLiteralString,
+    kind: ProviderKindLiteralString,
+    *,
+    client_preference: str | None = None,
+    model_hint: str | None = None,
+) -> ServiceCard | None:
+    """Get single service card for exact provider-kind match with discriminator support.
+
+    For multi-client providers (Azure, Bedrock, Heroku), this function uses
+    discriminators to select the appropriate card:
+    - model_hint: Selects based on model name (e.g., "claude-3" → Anthropic client)
+    - client_preference: Selects based on explicit client preference
+
+    If no discriminators match, returns the default card (one without discriminator).
+
+    Args:
+        provider: The provider name (e.g., "azure", "openai").
+        kind: The service kind (e.g., "agent", "embedding").
+        client_preference: Optional client preference for multi-client providers.
+        model_hint: Optional model name hint for model-based discrimination.
+
+    Returns:
+        ServiceCard if found, None if provider-kind combination doesn't exist.
+
+    Examples:
+        Simple case:
+        >>> get_service_card("openai", "embedding")
+        ServiceCard(provider='openai', kind='embedding', ...)
+
+        Multi-client with model hint:
+        >>> get_service_card("azure", "agent", model_hint="claude-3-opus")
+        ServiceCard(...client_cls=AsyncAnthropicFoundry...)
+
+        Multi-client with client preference:
+        >>> get_service_card("heroku", "embedding", client_preference="cohere")
+        ServiceCard(...client_cls=AsyncClientV2...)
+    """
+    cards = get_service_cards(provider=provider, kind=kind)
+
+    if not cards:
+        return None
+
+    if len(cards) == 1:
+        return cards[0]
+
+    # Multiple cards exist - use discriminators to select
+    # First, try discriminators with hints
+    if model_hint or client_preference:
+        for card in cards:
+            if (
+                _match_discriminator(
+                    card, model_hint=model_hint, client_preference=client_preference
+                )
+                and card.metadata
+                and card.metadata.discriminator
+            ):
+                # This card has a discriminator that matched
+                return card
+
+    # Fall back to default card (no discriminator)
+    for card in cards:
+        if not card.metadata or not card.metadata.discriminator:
+            return card
+
+    # If no default exists, return first card
+    return cards[0]
+
+
+@cache
+def get_provider_clients(
+    provider: ProviderLiteralString,
+) -> dict[ProviderKindLiteralString, tuple[SDKClientLiteralString, ...]]:
+    """Get all SDK client options for a provider, grouped by service kind.
+
+    Useful for discovering what clients a provider supports for each service type.
+
+    Args:
+        provider: The provider name (e.g., "azure", "openai").
+
+    Returns:
+        Dictionary mapping service kinds to tuples of SDK client names.
+        Empty dict if provider not found.
+
+    Examples:
+        >>> get_provider_clients("azure")
+        {
+            'agent': ('openai', 'anthropic'),
+            'embedding': ('openai', 'cohere')
+        }
+
+        >>> get_provider_clients("openai")
+        {
+            'agent': ('openai',),
+            'embedding': ('openai',)
+        }
+    """
+    cards = get_service_cards(provider=provider)
+
+    result: dict[ProviderKindLiteralString, set[SDKClientLiteralString]] = defaultdict(set)
+    for card in cards:
+        result[card.kind] |= {card.client}
+
+    return {k: tuple(sorted(v)) for k, v in result.items() if v}
+
+
+@cache
+def get_provider_capabilities_map(
+    provider_cls: type[Provider],
+) -> MappingProxyType[Provider, tuple[ProviderKindLiteralString, ...]]:
+    """Get the mapping of provider capabilities.
+
+    The map is from `Provider` to their supported `ProviderKind`s as strings.
+
+    Args:
+        provider: The `Provider` class to get capabilities for.
+
+    Returns:
+        A mapping of `Provider` to their supported `ProviderKind`s as strings.
+    """
+    cards = get_service_cards()
+    mapping = defaultdict(set)
+    for card in cards:
+        mapping[Provider.from_string(card.provider)].add(card.kind)
+    return MappingProxyType({provider: tuple(sorted(kinds)) for provider, kinds in mapping.items()})
+
+
+@cache
+def get_provider_kinds(provider: LiteralProvider) -> tuple[ProviderKindLiteralString, ...]:
+    """Get the supported provider kinds for a given provider, returned as strings.
+
+    Args:
+        provider_instance: The `Provider` instance to get kinds for.
+
+    Returns:
+        A tuple of supported `ProviderKind`s as strings.
+    """
+    return get_provider_capabilities_map(provider_cls=type(provider)).get(provider, ())
+
+
+@cache
+def get_providers_for_kind(kind: LiteralProviderKind) -> set[ProviderLiteralString]:
+    """Get all providers that support a given provider kind.
+
+    Args:
+        kind: The `ProviderKind` to get providers for.
+
+    Returns:
+        A set of `Provider` members that support the given kind.
+    """
+    mapping = get_provider_capabilities_map(type(kind)._provider_cls())
+    return {provider for provider, kinds in mapping.items() if kind.variable in kinds}
+
+
+@cache
+def get_sdk_client_map(
+    client_cls: type[SDKClient],
+) -> MappingProxyType[
+    tuple[ProviderLiteralString, ProviderKindLiteralString], SDKClient | tuple[SDKClient, ...]
+]:
+    """Get the mapping of SDK clients.
+
+    The map is from `(Provider, ProviderKind)` to their `SDKClient` class.
+
+    Args:
+        client_cls: The `SDKClient` class to get the mapping for.
+
+    Returns:
+        A mapping of `(Provider, ProviderKind)` to their `SDKClient` class(es).
+    """
+    cards = get_service_cards()
+    return MappingProxyType({(c.provider, c.kind): client_cls.from_string(c.client) for c in cards})
+
+
+@cache
+def get_sdk_client(
+    client_cls: type[SDKClient], provider: LiteralProvider, kind: LiteralProviderKind
+) -> SDKClient | tuple[SDKClient, ...] | None:
+    """Get the SDK client for a given provider and kind.
+
+    Args:
+        client_cls: The `SDKClient` class to get the client for.
+        provider: The `Provider` to get the client for as a string.
+        kind: The `ProviderKind` to get the client for as a string.
+
+    Returns:
+        The `SDKClient` class or tuple of classes for the given provider and kind, or None if not found.
+    """
+    return get_sdk_client_map(client_cls).get((provider, kind))
+
+
+@cache
+def get_provider_sdk_clients_for_kind(
+    client_cls: type[SDKClient], kind: LiteralProviderKind
+) -> dict[Provider, SDKClient | tuple[SDKClient, ...]]:
+    """Get all SDK clients for a given provider kind.
+
+    Args:
+        client_cls: The `SDKClient` class to get the clients for.
+        kind: The `ProviderKind` to get the clients for as a string.
+    """
+    return {
+        provider: client
+        for (provider, k), client in get_sdk_client_map(client_cls).items()
+        if k == kind
+    }
+
+
+@cache
+def get_provider_kind_sdk_clients_for_provider(
+    client_cls: type[SDKClient], provider: Provider
+) -> dict[ProviderKind, tuple[SDKClient, ...] | SDKClient]:
+    """Get all SDK clients for a given provider.
+
+    Args:
+        client_cls: The `SDKClient` class to get the clients for.
+        provider: The `Provider` to get the clients for as a string.
+    """
+    provider_kind_cls = client_cls._any_kind()
+    return {
+        provider_kind_cls.from_string(kind): client
+        for (p, kind), client in get_sdk_client_map(client_cls).items()
+        if p == provider.variable
+    }
+
+
+# ===========================================================================
+# *                        Public Exports
+# ===========================================================================
+
+__all__ = (
+    "ProviderKindLiteralString",
+    "ProviderLiteralString",
+    "SDKClientLiteralString",
+    "ServiceCard",
+    "ServiceMetadata",
+    "get_provider_capabilities_map",
+    "get_provider_clients",
+    "get_provider_kind_sdk_clients_for_provider",
+    "get_provider_kinds",
+    "get_provider_sdk_clients_for_kind",
+    "get_providers_for_kind",
+    "get_sdk_client",
+    "get_sdk_client_map",
+    "get_service_card",
+    "get_service_cards",
+    "service_card_factory",
+)

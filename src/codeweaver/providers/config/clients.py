@@ -61,11 +61,18 @@ from codeweaver.core.constants import (
     DEFAULT_EMBEDDING_TIMEOUT,
     LOCALHOST_INDICATORS,
     LOCALHOST_URL,
+    ONE_MINUTE,
     ONNX_CUDA_PROVIDER,
 )
 from codeweaver.core.types import LiteralStringT
 from codeweaver.core.utils import deep_merge_dicts, has_package
 from codeweaver.providers.config.types import HttpxClientParams
+from codeweaver.providers.config.utils import (
+    AzureOptions,
+    discriminate_embedding_clients,
+    try_for_azure_endpoint,
+    try_for_heroku_endpoint,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -80,6 +87,9 @@ else:
 # httpx forward references, but we've simplified QdrantClientOptions.advanced_http_options to use
 # dict[str, Any] instead of HttpxClientParams to avoid the forward reference issue.
 # The actual type validation is deferred to the qdrant_client library.
+
+_DEFAULT_XAI_RPC_TIMEOUT = 27.0 * ONE_MINUTE
+"""Default timeout for X_AI API calls. Set to 27 minutes, which is the same as XAI's default timeout (even though their docs say it's 15 minutes...)."""
 
 
 # ===========================================================================
@@ -280,33 +290,6 @@ class ClientOptions(BasedModel):
             # it's a dictionary
             response_map |= cls._handle_env_dict(var_name, env_var_names)
         return response_map if response_map and response_map.values() else {}
-
-
-class CohereClientOptions(ClientOptions):
-    """Client options for Cohere (rerank and embeddings)."""
-
-    _core_provider: Provider = Provider.COHERE
-    _providers: tuple[Provider, ...] = (Provider.COHERE, Provider.AZURE, Provider.HEROKU)
-    tag: Literal["cohere"] = "cohere"
-
-    api_key: (
-        Annotated[SecretStr | Callable[[], str], Field(description="Cohere API key.")] | None
-    ) = None
-    base_url: Annotated[AnyUrl, Field(description="Base URL for the Cohere API.")] | None = None
-    environment: Literal["production", "staging", "development"] = "production"
-    client_name: str | None = "codeweaver_cohere_client"
-    timeout: PositiveFloat | None = None
-    httpx_client: httpx.Client | None = None
-    thread_pool_executor: ThreadPoolExecutor | None = None
-    log_experimental: bool = True  # disables warnings about experimental features
-
-    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
-        return {
-            FilteredKey("api_key"): AnonymityConversion.BOOLEAN,
-            FilteredKey("base_url"): AnonymityConversion.BOOLEAN,
-            FilteredKey("client_name"): AnonymityConversion.HASH,
-            FilteredKey("httpx_client"): AnonymityConversion.BOOLEAN,
-        }
 
 
 class QdrantClientOptions(ClientOptions):
@@ -551,6 +534,48 @@ class QdrantClientOptions(ClientOptions):
         return self
 
 
+class CohereClientOptions(ClientOptions):
+    """Client options for Cohere (rerank and embeddings)."""
+
+    _core_provider: Provider = Provider.COHERE
+    _providers: tuple[Provider, ...] = (Provider.COHERE, Provider.AZURE, Provider.HEROKU)
+    tag: Literal["cohere"] = "cohere"
+
+    api_key: (
+        Annotated[SecretStr | Callable[[], str], Field(description="Cohere API key.")] | None
+    ) = None
+    base_url: Annotated[AnyUrl, Field(description="Base URL for the Cohere API.")] | None = None
+    environment: Literal["production", "staging", "development"] = "production"
+    client_name: str | None = "codeweaver_cohere_client"
+    timeout: PositiveFloat | None = None
+    httpx_client: httpx.Client | None = None
+    thread_pool_executor: ThreadPoolExecutor | None = None
+    log_experimental: bool = True  # disables warnings about experimental features
+
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
+        return {
+            FilteredKey("api_key"): AnonymityConversion.BOOLEAN,
+            FilteredKey("base_url"): AnonymityConversion.BOOLEAN,
+            FilteredKey("client_name"): AnonymityConversion.HASH,
+            FilteredKey("httpx_client"): AnonymityConversion.BOOLEAN,
+        }
+
+    def computed_base_url(self, provider: LiteralProviderType) -> str | None:
+        """Return the default base URL for the Cohere client based on the provider."""
+        provider = provider if isinstance(provider, Provider) else Provider.from_string(provider)  # ty:ignore[invalid-assignment]
+        if base_url := {
+            Provider.COHERE: "https://api.cohere.com",
+            Provider.AZURE: try_for_azure_endpoint(
+                AzureOptions(api_key=self.api_key, endpoint=str(self.base_url)), cohere=True
+            ),
+            Provider.HEROKU: try_for_heroku_endpoint(self.model_dump(), cohere=True),
+        }.get(provider):
+            if not self.base_url:
+                self.base_url = AnyUrl(base_url)
+            return base_url
+        return None
+
+
 class OpenAIClientOptions(ClientOptions):
     """Client options for OpenAI-based embedding providers."""
 
@@ -582,13 +607,19 @@ class OpenAIClientOptions(ClientOptions):
         )
         super().__init__(**data)
 
-    def default_base_url(self, provider: LiteralProviderType) -> str | None:
+    def computed_base_url(self, provider: LiteralProviderType) -> str | None:
         """Return the default base URL for the OpenAI client based on the provider."""
+        if self.base_url:
+            return str(self.base_url)
         provider = provider if isinstance(provider, Provider) else Provider.from_string(provider)  # ty:ignore[invalid-assignment]
         return {
             Provider.OPENAI: "https://api.openai.com/v1",
-            Provider.AZURE: None,
+            Provider.AZURE: try_for_azure_endpoint(
+                AzureOptions(api_key=self.api_key, endpoint=str(self.base_url))
+            ),
+            Provider.HEROKU: try_for_heroku_endpoint(self.model_dump()),
             Provider.GROQ: "https://api.groq.com/openai/v1",
+            Provider.MORPH: "https://api.morphllm.com/v1",
             Provider.OLLAMA: "http://localhost:11434/v1",
             Provider.TOGETHER: "https://api.together.xyz/v1",
         }.get(provider)
@@ -924,13 +955,6 @@ class VoyageClientOptions(ClientOptions):
         return {FilteredKey("api_key"): AnonymityConversion.BOOLEAN}
 
 
-# We chose TypedDicts originally for speed. They can be substantially faster than Pydantic models (according to Pydantic: https://docs.pydantic.dev/2.12/concepts/performance/#use-typeddict-over-nested-models) But we lose a lot of benefits of Pydantic models.
-
-# ===========================================================================
-# *            Provider Connection and Rate Limit Settings
-# ===========================================================================
-
-
 # ===========================================================================
 # *                    Client Discriminators
 # ===========================================================================
@@ -941,13 +965,6 @@ type GeneralRerankingClientOptionsType = Annotated[
     | Annotated[VoyageClientOptions, Tag(Provider.VOYAGE.variable)],
     Field(description="Reranking client options type.", discriminator="tag"),
 ]
-
-
-def _discriminate_embedding_clients(v: Any) -> str:
-    """Identify the provider-specific settings type for discriminator field."""
-    # Client options use tag field
-    tag = v.get("tag") if isinstance(v, dict) else getattr(v, "tag", None)
-    return tag or ""  # Return empty string instead of None to match return type
 
 
 def discriminate_azure_embedding_client_options(v: Any) -> str:
@@ -972,9 +989,60 @@ type GeneralEmbeddingClientOptionsType = Annotated[
     | Annotated[VoyageClientOptions, Tag(Provider.VOYAGE.variable)],
     Field(
         description="Embedding client options type.",
-        discriminator=Discriminator(_discriminate_embedding_clients),
+        discriminator=Discriminator(discriminate_embedding_clients),
     ),
 ]
+
+# ===========================================================================
+# *                 Options for Agent-only Clients
+# ===========================================================================
+
+
+class XAIClientOptions(ClientOptions):
+    """Client options for X_AI-based providers."""
+
+    _core_provider: Provider = Provider.X_AI
+    _providers: tuple[Provider, ...] = (Provider.X_AI,)
+    tag: Literal["x_ai"] = "x_ai"
+
+    api_key: SecretStr | None = None
+    management_api_key: SecretStr | None = None
+
+    api_host: Literal["api.x.ai"] | str = "api.x.ai"
+    management_api_host: Literal["management-api.x.ai"] | str = "management-api.x.ai"
+
+    channel_options: list[tuple[str, Any]] | None = None
+    """gRPC channel options.
+
+    As of 5 February 2026, X_AI's default gRPC channel options are:
+
+    ```python
+    [
+    ("grpc.max_send_message_length", 20 * _MIB), # _MIB is one megabyte
+    ("grpc.max_receive_message_length", 20 * _MIB),
+    ("grpc.enable_retries", 1),
+    ("grpc.service_config", _DEFAULT_SERVICE_CONFIG_JSON),
+    ("grpc.keepalive_time_ms", 30000),  # 30 seconds
+    ("grpc.keepalive_timeout_ms", 10000),  # 10 seconds
+    ("grpc.keepalive_permit_without_calls", 1),
+    ("grpc.http2.max_pings_without_data", 0),
+    ]
+    ```
+    """
+
+    timeout: PositiveFloat = 27.0 * ONE_MINUTE
+    """Timeout for X_AI API calls. Default is 27 minutes, which is the same as XAI's default timeout (even though their docs say it's 15 minutes...)"""
+    use_insecure_channel: bool = False
+
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
+        return {
+            FilteredKey(name): AnonymityConversion.BOOLEAN
+            for name in ("api_key", "management_api_key", "channel_options")
+        } | {
+            FilteredKey(name): AnonymityConversion.HASH
+            for name in ("api_host", "management_api_host")
+            if not getattr(self, name).endswith("x.ai")
+        }
 
 
 class BaseAnthropicClientOptions(ClientOptions):
@@ -999,6 +1067,17 @@ class BaseAnthropicClientOptions(ClientOptions):
     default_query: Mapping[str, object] | None = None
     http_client: httpx.Client | None = None
 
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
+        return {
+            FilteredKey(name): AnonymityConversion.BOOLEAN
+            for name in ("http_client", "default_headers", "default_query")
+        } | {
+            FilteredKey("base_url"): AnonymityConversion.HASH
+            if not getattr(self, "base_url", None)
+            or not str(getattr(self, "base_url", "")).endswith("anthropic.com")
+            else AnonymityConversion.BOOLEAN
+        }
+
 
 class AnthropicClientOptions(BaseAnthropicClientOptions):
     """Client options for Anthropic-based embedding providers."""
@@ -1012,13 +1091,15 @@ class AnthropicClientOptions(BaseAnthropicClientOptions):
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         return {
-            FilteredKey(name): AnonymityConversion.BOOLEAN
-            for name in ("api_key", "http_client", "default_headers", "default_query")
-        } | {FilteredKey("base_url"): AnonymityConversion.HASH}
+            FilteredKey(name): AnonymityConversion.BOOLEAN for name in ("api_key", "auth_token")
+        } | super()._telemetry_keys()
 
 
 class AnthropicBedrockClientOptions(BaseAnthropicClientOptions):
-    """Client options for Anthropic agents on Bedrock runtime."""
+    """Client options for Anthropic agents on Bedrock runtime.
+
+    These differ from the standard AWS SDK options because Anthropic's client uses different variable names, which it converts to the standard AWS variable names internally. For example, `aws_secret_key` instead of `aws_secret_access_key`.
+    """
 
     _core_provider: Provider = Provider.BEDROCK
     _providers: tuple[Provider, ...] = (Provider.BEDROCK,)
@@ -1031,21 +1112,17 @@ class AnthropicBedrockClientOptions(BaseAnthropicClientOptions):
     aws_session_token: SecretStr | None = None
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
-        return {
-            FilteredKey(name): AnonymityConversion.BOOLEAN
-            for name in (
-                "aws_secret_key",
-                "aws_access_key",
-                "aws_session_token",
-                "http_client",
-                "default_headers",
-                "default_query",
-            )
-        } | {
-            FilteredKey("base_url"): AnonymityConversion.HASH,
-            FilteredKey("aws_region"): AnonymityConversion.HASH,
-            FilteredKey("aws_profile"): AnonymityConversion.HASH,
-        }
+        return (
+            {
+                FilteredKey(name): AnonymityConversion.BOOLEAN
+                for name in ("aws_secret_key", "aws_access_key", "aws_session_token")
+            }
+            | {
+                FilteredKey("aws_region"): AnonymityConversion.HASH,
+                FilteredKey("aws_profile"): AnonymityConversion.HASH,
+            }
+            | super()._telemetry_keys()
+        )
 
 
 class AnthropicAzureClientOptions(BaseAnthropicClientOptions):
@@ -1060,16 +1137,14 @@ class AnthropicAzureClientOptions(BaseAnthropicClientOptions):
     azure_ad_token_provider: Callable[[], Awaitable[str]] | None = None
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
-        return {
-            FilteredKey(name): AnonymityConversion.BOOLEAN
-            for name in (
-                "api_key",
-                "azure_ad_token_provider",
-                "http_client",
-                "default_headers",
-                "default_query",
-            )
-        } | {FilteredKey(name): AnonymityConversion.HASH for name in ("resource", "base_url")}
+        return (
+            {
+                FilteredKey(name): AnonymityConversion.BOOLEAN
+                for name in ("api_key", "azure_ad_token_provider")
+            }
+            | {FilteredKey("resource"): AnonymityConversion.HASH}
+            | super()._telemetry_keys()
+        )
 
 
 class AnthropicGoogleVertexClientOptions(BaseAnthropicClientOptions):
@@ -1085,16 +1160,14 @@ class AnthropicGoogleVertexClientOptions(BaseAnthropicClientOptions):
     credentials: GoogleCredentials | None = None
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
-        return {
-            FilteredKey(name): AnonymityConversion.BOOLEAN
-            for name in (
-                "http_client",
-                "default_headers",
-                "default_query",
-                "credentials",
-                "access_token",
-            )
-        } | {FilteredKey("project_id"): AnonymityConversion.HASH}
+        return (
+            {
+                FilteredKey(name): AnonymityConversion.BOOLEAN
+                for name in ("credentials", "access_token")
+            }
+            | {FilteredKey("project_id"): AnonymityConversion.HASH}
+            | super()._telemetry_keys()
+        )
 
 
 # Groq's client is a carbon copy of Anthropic's client, so we can just inherit from it.
@@ -1108,10 +1181,7 @@ class GroqClientOptions(BaseAnthropicClientOptions):
     api_key: SecretStr | None = None
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
-        return {
-            FilteredKey(name): AnonymityConversion.BOOLEAN
-            for name in ("api_key", "http_client", "default_headers", "default_query")
-        } | {FilteredKey("base_url"): AnonymityConversion.HASH}
+        return {FilteredKey("api_key"): AnonymityConversion.BOOLEAN} | super()._telemetry_keys()
 
 
 class OpenAIAgentClientOptions(OpenAIClientOptions):
@@ -1123,9 +1193,53 @@ class OpenAIAgentClientOptions(OpenAIClientOptions):
     )
     tag: Literal["openai"] = "openai"
 
+    def computed_base_url(self, provider: LiteralProviderType) -> str | None:
+        """Return the default base URL for the OpenAI agent client based on the provider."""
+        if self.base_url:
+            return str(self.base_url)
+        provider = provider if isinstance(provider, Provider) else Provider.from_string(provider)  # ty:ignore[invalid-assignment]
+        if found_provider_url := super().computed_base_url(provider):
+            return found_provider_url
+        if found_agent_provider_url := {
+            Provider.ALIBABA: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+            Provider.CEREBRAS: "https://api.cerebras.ai/v1",
+            Provider.DEEPSEEK: "https://api.deepseek.com/v1",
+            Provider.FIREWORKS: "https://api.fireworks.ai/inference/v1",
+            Provider.GITHUB: "https://models.github.ai/inference/v1",
+            # We have no reliable way of getting a litellm cloud endpoint, so we just try for the local proxy url
+            # This is usually how folks use litellm, so it's a reasonable default, and if it doesn't work, they can always set the base_url explicitly.
+            Provider.LITELLM: "http://0.0.0.0:4000",
+            Provider.MOONSHOT: "https://api.moonshot.ai/v1",
+            Provider.NEBIUS: "https://api.studio.nebius.com/v1",
+            Provider.OPENROUTER: "https://openrouter.ai/api/v1",
+            Provider.OVHCLOUD: "https://oai.endpoints.kepler.ai.cloud.ovh.net/v1",
+            Provider.SAMBANOVA: "https://api.sambanova.ai/v1",
+        }.get(provider):
+            self.base_url = AnyUrl(found_agent_provider_url)
+            return found_agent_provider_url
+        return None
+
 
 class PydanticGatewayClientOptions(ClientOptions):
-    """Client options for Pydantic Gateway-based embedding providers."""
+    """Client options for Pydantic Gateway-based agent providers.
+
+    Pydantic Gateway is a proxy service that routes requests to various upstream LLM providers. It isn't actually a client itself, but we treat it like one for the purposes of configuration. In reality, your options here configure how Pydantic-AI connects to the Pydantic Gateway, and which upstream provider it uses.
+
+    In practice, these values are passed to a factory function in Pydantic-AI that creates the *client and provider* instances based on the upstream provider selected.
+
+    ## Providing Provider-Specific Options
+
+    If you want to define provider-specific options, like for Cohere or OpenAI, you **should not use this class**.
+    Instead:
+      - Use the provider's options class directly (e.g., `CohereClientOptions` or `OpenAIClientOptions`).
+      - Set the base_url (or equivalent) to point to your Pydantic Gateway region.
+      - Provide your Pydantic Gateway API key in the `api_key` field.
+      - **Set your provider as the upstream_provider**.
+
+    In practice these steps do what pydantic's factory function does, but gives you more customization.
+
+    If you use this class and set Pydantic Gateway as your provider, you can still provide provider-specific ModelConfig settings. These will be passed through to the upstream provider by Pydantic Gateway.
+    """
 
     _core_provider: Provider = Provider.PYDANTIC_GATEWAY
     _providers: tuple[Provider, ...] = (Provider.PYDANTIC_GATEWAY,)
@@ -1144,9 +1258,7 @@ class PydanticGatewayClientOptions(ClientOptions):
     @override
     def as_settings(self) -> tuple[str, dict[str, Any]]:  # ty:ignore[invalid-method-override]
         """Return the client options as a dictionary suitable for passing as settings to the client constructor."""
-        settings = self.model_dump(
-            exclude={"_core_provider", "_providers", "tag", "advanced_http_options"}
-        )
+        settings = self.model_dump(exclude={"_core_provider", "_providers", "tag"})
         upstream_provider = settings.pop("upstream_provider")
         return upstream_provider, {k: self._filter_values(v) for k, v in settings.items()}
 
@@ -1200,10 +1312,11 @@ type SimpleAgentClientOptionsType = Annotated[
     | Annotated[GoogleClientOptions, Tag(Provider.GOOGLE.variable)]
     | Annotated[HFInferenceClientOptions, Tag(Provider.HUGGINGFACE_INFERENCE.variable)]
     | Annotated[MistralClientOptions, Tag(Provider.MISTRAL.variable)]
-    | Annotated[PydanticGatewayClientOptions, Tag(Provider.PYDANTIC_GATEWAY.variable)],
+    | Annotated[PydanticGatewayClientOptions, Tag(Provider.PYDANTIC_GATEWAY.variable)]
+    | Annotated[XAIClientOptions, Tag(Provider.X_AI.variable)],
     Field(
         description="Agent client options type.",
-        discriminator=Discriminator(_discriminate_embedding_clients),
+        discriminator=Discriminator(discriminate_embedding_clients),
     ),
 ]
 
@@ -1352,5 +1465,6 @@ __all__ = (
     "SentenceTransformersClientOptions",
     "TavilyClientOptions",
     "VoyageClientOptions",
+    "XAIClientOptions",
     "discriminate_azure_embedding_client_options",
 )

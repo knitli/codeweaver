@@ -42,7 +42,6 @@ if TYPE_CHECKING:
         PERPLEXITY,
         SAMBANOVA,
         TOGETHER,
-        X_AI,
     )
     from codeweaver.providers.env_registry.definitions.specialized import (
         ANTHROPIC,
@@ -55,6 +54,7 @@ if TYPE_CHECKING:
         QDRANT,
         TAVILY,
         VOYAGE,
+        X_AI,
     )
 
 
@@ -92,7 +92,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "TOGETHER": (__spec__.parent, "openai_compatible"),
     "VERCEL": (__spec__.parent, "cloud_platforms"),
     "VOYAGE": (__spec__.parent, "specialized"),
-    "X_AI": (__spec__.parent, "openai_compatible"),
+    "X_AI": (__spec__.parent, "specialized"),
 })
 
 __getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)

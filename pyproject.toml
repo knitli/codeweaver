@@ -677,7 +677,7 @@ invalid-return-type = "ignore"
 unresolved-attribute = "ignore"
 
 [[tool.ty.overrides]]
-include = ["src/codeweaver/core/types/_provider_maps.py"]
+include = ["src/codeweaver/core/types/service_cards.py"]
 
 [tool.ty.overrides.rules]
 invalid-argument-type = "ignore"

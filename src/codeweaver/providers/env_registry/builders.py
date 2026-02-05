@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from codeweaver.core.types import ProviderLiteral
+from codeweaver.core.types import ProviderLiteralString
 from codeweaver.core.types.env import EnvFormat, VariableInfo
 from codeweaver.providers.env_registry.models import EnvVarConfig, ProviderEnvConfig
 
@@ -182,7 +182,7 @@ def simple_api_key_provider(
 
 
 def multi_client_provider(
-    provider_name: ProviderLiteral, configs: list[ProviderEnvConfig]
+    provider_name: ProviderLiteralString, configs: list[ProviderEnvConfig]
 ) -> tuple[ProviderEnvConfig, ...]:
     """Build multi-client provider configuration (like Azure).
 
