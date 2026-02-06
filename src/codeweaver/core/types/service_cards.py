@@ -78,6 +78,7 @@ type ProviderLiteralString = Literal[
     "cohere",
     "deepseek",
     "duckduckgo",
+    "exa",
     "fastembed",
     "fireworks",
     "gateway",
@@ -113,6 +114,7 @@ type SDKClientLiteralString = Literal[
     "bedrock",
     "cohere",
     "duckduckgo",
+    "exa",
     "fastembed",
     "gateway",
     "google",
@@ -143,7 +145,6 @@ def _never_use_other_api() -> set[ProviderLiteralString]:
 
     This does not mean that others *don't* also use their API, just that they themselves never use anything else. It also does not mean any *models* associated with these providers aren't also available on other APIs. A `provider` is who you pay, not the client/API, or models.
     """
-    # note: we can instead derive this from card lookups -- look for cards that only have matching provider and client and no others with the provider (all(card.provider == card.client for card in cards if card.provider == provider)))
     return set(SDKClientLiteralString.__value__.__args__) - {"bedrock"}
 
 
@@ -280,7 +281,7 @@ def get_local_only_provider_members(provider_cls: type[Provider]) -> set[Provide
 
 
 def _data_providers():
-    return {"duckduckgo", "tavily"}
+    return {"duckduckgo", "exa", "tavily"}
 
 
 def _vector_providers():
@@ -1241,6 +1242,13 @@ def _build_data_provider_cards() -> list[ServiceCard]:
             metadata=ServiceMetadata(
                 handler=("provider", lambda provider_cls,: provider_cls(max_results=20))
             ),
+        ),
+        service_card_factory(
+            "exa",
+            "data",
+            lazy_import("pydantic_ai.common_tools.exa", "ExaToolset"),
+            lazy_import("exa_py", "AsyncExa"),
+            "exa",
         ),
     ]
 

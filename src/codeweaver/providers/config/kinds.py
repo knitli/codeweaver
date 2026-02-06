@@ -84,7 +84,7 @@ from codeweaver.core.constants import (
     DEFAULT_VECTOR_STORE_PERSIST_SUBPATH,
     LOCALHOST,
 )
-from codeweaver.core.utils.checks import is_local_host
+from codeweaver.core.utils import deep_merge_dicts, is_local_host
 from codeweaver.providers.agent.agent_models import AgentModelSettings
 from codeweaver.providers.config import (
     AnthropicClientOptions,
@@ -444,17 +444,6 @@ class VectorStoreProviderSettings(BaseProviderSettings):
     ] = DEFAULT_VECTOR_STORE_BATCH_SIZE
 
 
-def _deep_merge(dict1: dict[str, Any], dict2: dict[str, Any]) -> dict[str, Any]:
-    """Recursively merge two dictionaries."""
-    result = dict1.copy()
-    for key, value in dict2.items():
-        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
-            result[key] = _deep_merge(result[key], value)
-        else:
-            result[key] = value
-    return result
-
-
 class CollectionConfig(BasedModel):
     """Collection configuration for Qdrant and in-memory vector stores.
 
@@ -509,10 +498,10 @@ class CollectionConfig(BasedModel):
                 vectors_dict = cast(dict[str, VectorParams], vectors.model_dump())
         else:
             vectors_dict = {}
-        self.vectors_config = _deep_merge(dict(self.vectors_config or {}), vectors_dict)
-        self.sparse_vectors_config = _deep_merge(
-            dict(self.sparse_vectors_config or {}),
-            cast(dict[str, SparseVectorParams], params.sparse_vectors or {}),
+        self.vectors_config = deep_merge_dicts(dict(self.vectors_config or {}), vectors_dict)  # type: ignore
+        self.sparse_vectors_config = deep_merge_dicts(  # type: ignore
+            dict(self.sparse_vectors_config or {}),  # type: ignore
+            cast(dict[str, SparseVectorParams], params.sparse_vectors or {}),  # type: ignore
         )
         self._vectors_set = True
 
@@ -902,6 +891,24 @@ class EmbeddingProviderSettings(BaseEmbeddingProviderSettings):
         GeneralEmbeddingClientOptionsType | None,
         Field(description="Client options for the provider's client.", discriminator="tag"),
     ] = None
+
+    def __init__(self, **data: Any) -> None:
+        """Initialize embedding provider settings."""
+        if model_name := data.get("model_name"):
+            data["model_name"] = ModelName(model_name)
+        config = data["embedding_config"]
+        if (
+            not (
+                config_model_name := config.get("model_name")
+                if isinstance(config, dict)
+                else config.model_name
+            )
+            and model_name
+        ):
+            config["model_name"] = ModelName(model_name)
+        elif config_model_name and not model_name:
+            data["model_name"] = ModelName(config_model_name)
+        super().__init__(**data)
 
     @computed_field
     @property

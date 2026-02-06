@@ -1418,6 +1418,23 @@ class DuckDuckGoClientOptions(ClientOptions):
         return {FilteredKey("proxy"): AnonymityConversion.BOOLEAN}
 
 
+class ExaClientOptions(ClientOptions):
+    """Client options for the Exa data provider."""
+
+    _core_provider: Provider = Provider.EXA
+    _providers: tuple[Provider, ...] = (Provider.EXA,)
+    tag: Literal["exa"] = "exa"
+
+    api_key: SecretStr | str | None = None
+    api_base: AnyUrl | None = AnyUrl("https://api.exa.ai")
+
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
+        return {
+            FilteredKey("api_key"): AnonymityConversion.BOOLEAN,
+            FilteredKey("api_base"): AnonymityConversion.HASH,
+        }
+
+
 def _data_client_options_discriminator(v: Any) -> str:
     """Identify the data client provider settings type for discriminator field."""
     fields = list(v if isinstance(v, dict) else type(v).model_fields)

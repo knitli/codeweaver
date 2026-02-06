@@ -20,7 +20,11 @@ from codeweaver.core.utils.lazy_importer import LazyImport
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.types import ProviderKindLiteralString, SDKClientLiteralString
+    from codeweaver.core.types import (
+        ProviderKindLiteralString,
+        ProviderLiteralString,
+        SDKClientLiteralString,
+    )
 
 
 class ProviderKind(BaseEnum):
@@ -58,6 +62,17 @@ class ProviderKind(BaseEnum):
             yield from get_providers_for_kind(self)
 
 
+def get_default_provider_import_for_kind(
+    provider: Provider | ProviderLiteralString, kind: ProviderKind | ProviderKindLiteralString
+) -> LazyImport[Any] | None:
+    """Get the default provider import for a given provider and kind."""
+    from codeweaver.core.types.service_cards import get_service_card
+
+    if service_card := get_service_card(provider.variable, kind.variable):
+        return service_card.provider_cls
+    return None
+
+
 class SDKClient(BaseEnum):
     """Enumeration of available SDK clients.
 
@@ -69,6 +84,7 @@ class SDKClient(BaseEnum):
     BEDROCK = "bedrock"
     COHERE = "cohere"
     DUCKDUCKGO = "duckduckgo"
+    EXA = "exa"
     FASTEMBED = "fastembed"
     GOOGLE = "google"
     GROQ = "groq"
@@ -130,26 +146,34 @@ class SDKClient(BaseEnum):
     @property
     def agent_provider(self) -> LazyImport[Any] | None:
         """Get the default agent provider for the SDK client."""
+        return get_default_provider_import_for_kind(self.as_provider(), ProviderKind.AGENT)
 
     @property
     def data_provider(self) -> LazyImport[Any] | None:
         """Get the default data provider for the SDK client."""
+        return get_default_provider_import_for_kind(self.as_provider(), ProviderKind.DATA)
 
     @property
     def embedding_provider(self) -> LazyImport[Any] | None:
         """Get the default embedding provider for the SDK client."""
+        return get_default_provider_import_for_kind(self.as_provider(), ProviderKind.EMBEDDING)
 
     @property
     def sparse_embedding_provider(self) -> LazyImport[Any] | None:
         """Get the default sparse embedding provider for the SDK client."""
+        return get_default_provider_import_for_kind(
+            self.as_provider(), ProviderKind.SPARSE_EMBEDDING
+        )
 
     @property
     def reranking_provider(self) -> LazyImport[Any] | None:
         """Get the default reranking provider for the SDK client."""
+        return get_default_provider_import_for_kind(self.as_provider(), ProviderKind.RERANKING)
 
     @property
     def vector_store_provider(self) -> LazyImport[Any] | None:
         """Get the default vector store provider for the SDK client."""
+        return get_default_provider_import_for_kind(self.as_provider(), ProviderKind.VECTOR_STORE)
 
     def as_provider(self) -> Provider:
         """Get the provider as a member of Provider."""
@@ -194,6 +218,7 @@ class Provider(BaseEnum):
     COHERE = "cohere"
     DEEPSEEK = "deepseek"
     DUCKDUCKGO = "duckduckgo"
+    EXA = "exa"
     FASTEMBED = "fastembed"
     FIREWORKS = "fireworks"
     GITHUB = "github"
@@ -264,7 +289,9 @@ class Provider(BaseEnum):
     @property
     def is_local_provider(self) -> bool:
         """Check if the provider can be used as a local provider."""
-        return self.always_local or self in {Provider.OLLAMA, Provider.QDRANT, Provider.LITELLM}
+        from codeweaver.core.types.service_cards import get_sometimes_local_provider_members
+
+        return self in get_sometimes_local_provider_members(type(self)) or self.always_local
 
     @property
     def is_cloud_provider(self) -> bool:
@@ -294,16 +321,7 @@ class Provider(BaseEnum):
     @property
     def requires_auth(self) -> bool:
         """Check if the provider requires authentication."""
-        return self not in {
-            # Qdrant may not require auth -- we check for API key presence elsewhere
-            Provider.QDRANT,
-            Provider.FASTEMBED,
-            Provider.MEMORY,
-            Provider.DUCKDUCKGO,
-            Provider.SENTENCE_TRANSFORMERS,
-            # Ollama does for cloud, but generally people associate it as local
-            Provider.OLLAMA,
-        }
+        return not self.is_local_provider and self != Provider.DUCKDUCKGO
 
     @property
     def uses_openai_api(self) -> bool:
@@ -427,6 +445,7 @@ type LiteralSDKClient = Literal[
     SDKClient.BEDROCK,
     SDKClient.COHERE,
     SDKClient.DUCKDUCKGO,
+    SDKClient.EXA,
     SDKClient.FASTEMBED,
     SDKClient.GOOGLE,
     SDKClient.GROQ,
@@ -459,6 +478,7 @@ type LiteralProvider = Literal[
     Provider.COHERE,
     Provider.DEEPSEEK,
     Provider.DUCKDUCKGO,
+    Provider.EXA,
     Provider.FASTEMBED,
     Provider.FIREWORKS,
     Provider.GITHUB,

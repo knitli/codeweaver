@@ -15,16 +15,20 @@ from codeweaver.core.types.provider import Provider
 from codeweaver.core.utils import has_package
 
 
-if TYPE_CHECKING and has_package("pydantic_ai.common_tools.duckduckgo"):
+if TYPE_CHECKING and has_package("pydantic_ai.common_tools.duckduckgo") and has_package("ddgs"):
     from pydantic_ai.common_tools.duckduckgo import DuckDuckGoSearchTool as DuckDuckGoSearchTool
 else:
     DuckDuckGoSearchTool = Any
-if TYPE_CHECKING and has_package("pydantic_ai.common_tools.tavily"):
+if TYPE_CHECKING and has_package("pydantic_ai.common_tools.tavily") and has_package("tavily"):
     from pydantic_ai.common_tools.tavily import TavilySearchTool as TavilySearchTool
 else:
     TavilySearchTool = Any
+if TYPE_CHECKING and has_package("pydantic_ai.common_tools.exa") and has_package("exa_py"):
+    from pydantic_ai.common_tools.exa import ExaToolset as ExaToolset
+else:
+    ExaToolset = Any
 
-type DataProviderType = DuckDuckGoSearchTool | TavilySearchTool
+type DataProviderType = DuckDuckGoSearchTool | TavilySearchTool | ExaToolset
 
 
 def get_data_provider(provider: LiteralProviderType) -> DataProviderType | None:
