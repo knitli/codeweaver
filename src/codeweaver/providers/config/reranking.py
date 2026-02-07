@@ -13,9 +13,15 @@ from typing import Annotated, Any, Literal, NotRequired, Required, TypedDict, ca
 
 from pydantic import Field
 
-from codeweaver.core import BasedModel, LiteralProvider, Provider
 from codeweaver.core.constants import DEFAULT_RERANKING_MAX_RESULTS
-from codeweaver.core.types import LiteralStringT, ModelName, ModelNameT
+from codeweaver.core.types import (
+    BasedModel,
+    LiteralStringT,
+    ModelName,
+    ModelNameT,
+    Provider,
+    ProviderLiteralString,
+)
 from codeweaver.providers import RerankingModelCapabilities
 
 
@@ -108,7 +114,7 @@ class SentenceTransformersRerankingOptionsDict(TypedDict, total=False):
 class BaseRerankingConfig(BasedModel):
     """Base configuration for reranking models."""
 
-    tag: LiteralProvider = Field(
+    tag: ProviderLiteralString = Field(
         ...,
         description="The provider tag for the reranking model. Used for discriminated unions.",
         exclude=True,

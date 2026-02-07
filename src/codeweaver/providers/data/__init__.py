@@ -45,13 +45,18 @@ def get_data_provider(provider: LiteralProviderType) -> DataProviderType | None:
             from pydantic_ai.common_tools.tavily import TavilySearchTool
 
             return TavilySearchTool
+    if provider == Provider.EXA and has_package("exa_py"):
+        with contextlib.suppress(ImportError):
+            from codeweaver.providers.data.exa import ExaToolset
+
+            return ExaToolset
     return None
 
 
 def load_default_data_providers() -> tuple[type, ...]:
     """Load all available data providers."""
     providers: list[type] = []
-    for provider in (Provider.DUCKDUCKGO, Provider.TAVILY):
+    for provider in (Provider.DUCKDUCKGO, Provider.TAVILY, Provider.EXA):
         data_provider = get_data_provider(provider)
         if data_provider is not None:
             providers.append(data_provider)

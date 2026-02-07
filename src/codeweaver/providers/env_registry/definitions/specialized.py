@@ -59,6 +59,15 @@ ANTHROPIC = [
     ),
 ]
 
+EXA = [
+    simple_api_key_provider(
+        "exa",
+        client="exa",
+        api_key_env="EXA_API_KEY",
+        note="These variables are for the Exa service.",
+    )
+]
+
 # HUGGINGFACE_INFERENCE - API key + log level
 HUGGINGFACE_INFERENCE = [
     ProviderEnvConfig(
@@ -185,10 +194,21 @@ MISTRAL = [
 
 # PYDANTIC_GATEWAY - Simple API key provider
 PYDANTIC_GATEWAY = [
-    simple_api_key_provider("gateway", client="gateway", api_key_env="PYDANTIC_AI_GATEWAY_API_KEY", note="These variables are for the Pydantic Gateway service.", base_url_env="PYDANTIC_AI_GATEWAY_BASE_URL", additional_vars=dict(httpx_env_vars())),
     simple_api_key_provider(
-        "gateway", client="gateway", api_key_env="PAIG_API_KEY", note="These variables are for the Pydantic AI Gateway service.", base_url_env="PAIG_BASE_URL"
-    )
+        "gateway",
+        client="gateway",
+        api_key_env="PYDANTIC_AI_GATEWAY_API_KEY",
+        note="These variables are for the Pydantic Gateway service.",
+        base_url_env="PYDANTIC_AI_GATEWAY_BASE_URL",
+        additional_vars=dict(httpx_env_vars()),
+    ),
+    simple_api_key_provider(
+        "gateway",
+        client="gateway",
+        api_key_env="PAIG_API_KEY",
+        note="These variables are for the Pydantic AI Gateway service.",
+        base_url_env="PAIG_BASE_URL",
+    ),
 ]
 
 # QDRANT - Complex configuration with TLS and logging
@@ -245,8 +265,13 @@ X_AI = [
         api_key_env="XAI_API_KEY",
         note="These variables are for the X.AI (xAI) service.",
         additional_vars={
-            "management_api_key": EnvVarConfig(env="XAI_MANAGEMENT_KEY", description="Management API key for X.AI service", is_secret=True, variable_name="management_api_key"),
-        }
+            "management_api_key": EnvVarConfig(
+                env="XAI_MANAGEMENT_KEY",
+                description="Management API key for X.AI service",
+                is_secret=True,
+                variable_name="management_api_key",
+            )
+        },
     )
 ]
 

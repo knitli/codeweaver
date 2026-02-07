@@ -42,10 +42,10 @@ from qdrant_client.models import (
 from codeweaver.core import (
     BasedModel,
     ConfigurationError,
-    LiteralProvider,
     ModelName,
     ModelNameT,
     Provider,
+    ProviderLiteralString,
 )
 from codeweaver.core.constants import (
     DATATYPE_FIELDS,
@@ -119,7 +119,7 @@ class BaseEmbeddingConfig(BasedModel):
     _dimension: int | None = PrivateAttr(default=None)
     _datatype: str | None = PrivateAttr(default=None)
 
-    tag: LiteralProvider = Field(
+    tag: ProviderLiteralString = Field(
         ...,
         description="The provider tag for the embedding model. Used for discriminated unions.",
         exclude=True,

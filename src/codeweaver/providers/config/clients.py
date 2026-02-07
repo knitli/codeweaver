@@ -1465,6 +1465,7 @@ __all__ = (
     "ClientOptions",
     "CohereClientOptions",
     "DuckDuckGoClientOptions",
+    "ExaClientOptions",
     "FastEmbedClientOptions",
     "GeneralAgentClientOptionsType",
     "GeneralDataClientOptionsType",

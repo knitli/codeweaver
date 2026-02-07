@@ -110,6 +110,7 @@ from codeweaver.providers.config.clients import (
     ClientOptions,
     CohereClientOptions,
     DuckDuckGoClientOptions,
+    ExaClientOptions,
     FastEmbedClientOptions,
     GeneralAgentClientOptionsType,
     GeneralDataClientOptionsType,
@@ -126,6 +127,7 @@ from codeweaver.providers.config.clients import (
     TavilyClientOptions,
     discriminate_azure_embedding_client_options,
 )
+from codeweaver.providers.config.data import ExaToolConfig
 from codeweaver.providers.config.embedding import EmbeddingConfigT, SparseEmbeddingConfigT
 from codeweaver.providers.config.reranking import RerankingConfigT
 from codeweaver.providers.config.utils import (
@@ -1235,6 +1237,32 @@ class DuckDuckGoProviderSettings(BaseDataProviderSettings):
     def client(self) -> Literal[SDKClient.DUCKDUCKGO]:
         """Return the data SDKClient enum member."""
         return SDKClient.DUCKDUCKGO
+
+
+class ExaProviderSettings(BaseDataProviderSettings):
+    """Settings for Exa data provider."""
+
+    provider: Literal[Provider.EXA] = Provider.EXA
+    tag: Literal["exa"] = "exa"
+
+    client_options: Annotated[
+        ExaClientOptions | None, Field(description="Client options for the provider's client.")
+    ] = None
+
+    tool_config: Annotated[
+        ExaToolConfig | None, Field(description="Tool configuration for Exa data provider.")
+    ] = None
+
+    def __model_post_init__(self) -> None:
+        """Ensure we have a config."""
+        self.client_options = self.client_options or ExaClientOptions()
+        self.tool_config = self.tool_config or ExaToolConfig()
+
+    @computed_field(repr=False)
+    @property
+    def client(self) -> Literal[SDKClient.EXA]:
+        """Return the data SDKClient enum member."""
+        return SDKClient.EXA
 
 
 type ModelString = Annotated[
