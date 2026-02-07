@@ -31,7 +31,6 @@ from cyclopts import App, Parameter
 
 from codeweaver import __version__
 from codeweaver.cli.ui import get_display
-from codeweaver.core import CODEWEAVER_PREFIX
 from codeweaver.core.di.container import (
     get_container,  # ensure we're pulling in the container module
 )
@@ -76,12 +75,13 @@ app.command("codeweaver.cli.commands.config:app", name="config")
 
 
 def _handle_keyboard_interrupt():
+    from codeweaver.core.utils import get_codeweaver_prefix
+
+    prefix = get_codeweaver_prefix()
+    console.print(f"\n{prefix} [yellow]⚠️ We got a keyboard interrupt signal...⚠️[/yellow]")
+    console.print(f"{prefix} [yellow]Thanks for using CodeWeaver![/yellow]")
     console.print(
-        f"\n{CODEWEAVER_PREFIX} [yellow]⚠️ We got a keyboard interrupt signal...⚠️[/yellow]"
-    )
-    console.print(f"{CODEWEAVER_PREFIX} [yellow]Thanks for using CodeWeaver![/yellow]")
-    console.print(
-        f"{CODEWEAVER_PREFIX} [yellow]If you like CodeWeaver, please take a second to give us a star on GitHub! 🌟[/yellow] [cyan]https://github.com/knitli/codeweaver [/cyan] \n"
+        f"{prefix} [yellow]If you like CodeWeaver, please take a second to give us a star on GitHub! 🌟[/yellow] [cyan]https://github.com/knitli/codeweaver [/cyan] \n"
     )
     console.print()
     console.print("[dim]If you have feedback, please open an issue or discussion:[/dim]")
@@ -100,7 +100,10 @@ async def _init_di(config_path: str | None = None) -> None:
 
 
 def _print_error_message(message: str, e: Exception) -> NoReturn:
-    console.print(f"{CODEWEAVER_PREFIX}{message}{e}[/bold red]")
+    from codeweaver.core.utils import get_codeweaver_prefix
+
+    prefix = get_codeweaver_prefix()
+    console.print(f"{prefix} {message}{e}")
     console.print("\n[red]Traceback:[/red]")
     console.print_exception(max_frames=10)
     raise SystemExit(1) from e
@@ -141,7 +144,10 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    console.print(f"{CODEWEAVER_PREFIX} Starting CodeWeaver CLI...", style="dim")
+    from codeweaver.core.utils import get_codeweaver_prefix
+
+    prefix = get_codeweaver_prefix()
+    console.print(f"{prefix} Starting CodeWeaver CLI...", style="dim")
     try:
         main()
         console.print("Settings initialized.", style="dim")

@@ -2,8 +2,6 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 """Package-level lazy imports for codeweaver.core."""
 
-import sys
-
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
@@ -63,6 +61,7 @@ if TYPE_CHECKING:
         ResolvedProjectNameDep,
         ResolvedProjectPathDep,
         ResolvedProjectPathHashDep,
+        ServiceCardsDep,
         SettingsDep,
         SettingsMapDep,
         StatisticsDep,
@@ -362,6 +361,7 @@ if TYPE_CHECKING:
         get_class_properties,
         get_class_variables,
         get_codeweaver_config_paths,
+        get_codeweaver_prefix,
         get_cpu_count,
         get_file_path,
         get_function_annotations,
@@ -645,6 +645,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "SerializedCodeChunk": (__spec__.parent, "chunks"),
     "SerializedStrOnlyCodeChunk": (__spec__.parent, "chunks"),
     "ServiceCard": (__spec__.parent, "types"),
+    "ServiceCardsDep": (__spec__.parent, "dependencies"),
     "ServiceMetadata": (__spec__.parent, "types"),
     "SessionEvent": (__spec__.parent, "telemetry"),
     "SessionStatistics": (__spec__.parent, "statistics"),
@@ -729,6 +730,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "get_class_properties": (__spec__.parent, "utils"),
     "get_class_variables": (__spec__.parent, "utils"),
     "get_codeweaver_config_paths": (__spec__.parent, "utils"),
+    "get_codeweaver_prefix": (__spec__.parent, "utils"),
     "get_config_locations": (__spec__.parent, "types"),
     "get_cpu_count": (__spec__.parent, "utils"),
     "get_dotenv_locations": (__spec__.parent, "types"),
@@ -834,12 +836,6 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
 })
 
 __getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
-
-CODEWEAVER_PREFIX = (
-    "[bold dark_goldenrod][CodeWeaver][/bold dark_goldenrod]"
-    if sys.stdout.isatty()
-    else "[CodeWeaver]"
-)
 
 __all__ = (
     "ALL_LANGUAGES",
@@ -1057,6 +1053,7 @@ __all__ = (
     "SerializedCodeChunk",
     "SerializedStrOnlyCodeChunk",
     "ServiceCard",
+    "ServiceCardsDep",
     "ServiceMetadata",
     "SessionEvent",
     "SessionStatistics",
@@ -1140,6 +1137,7 @@ __all__ = (
     "get_class_properties",
     "get_class_variables",
     "get_codeweaver_config_paths",
+    "get_codeweaver_prefix",
     "get_config_locations",
     "get_container",
     "get_cpu_count",

@@ -47,6 +47,7 @@ if TYPE_CHECKING:
         ANTHROPIC,
         BEDROCK,
         COHERE,
+        EXA,
         GOOGLE,
         HUGGINGFACE_INFERENCE,
         MISTRAL,
@@ -58,9 +59,6 @@ if TYPE_CHECKING:
     )
 
 
-# Phase 2-4: OpenAI-compatible providers (18 providers - complete)
-# Phase 5: Cloud platforms (3 providers - complete)
-# Phase 6: Specialized providers (10 providers - complete)
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "ALIBABA": (__spec__.parent, "openai_compatible"),
     "ANTHROPIC": (__spec__.parent, "specialized"),
@@ -69,6 +67,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "CEREBRAS": (__spec__.parent, "openai_compatible"),
     "COHERE": (__spec__.parent, "specialized"),
     "DEEPSEEK": (__spec__.parent, "openai_compatible"),
+    "EXA": (__spec__.parent, "specialized"),
     "FIREWORKS": (__spec__.parent, "openai_compatible"),
     "GITHUB": (__spec__.parent, "openai_compatible"),
     "GOOGLE": (__spec__.parent, "specialized"),
@@ -106,6 +105,7 @@ __all__: tuple[str, ...] = (
     "CEREBRAS",
     "COHERE",
     "DEEPSEEK",
+    "EXA",
     "FIREWORKS",
     "GITHUB",
     "GOOGLE",

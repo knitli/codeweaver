@@ -9,12 +9,11 @@ This module provides types for configuring data providers, which in fact are int
 
 from __future__ import annotations
 
-import os
-
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Literal, NotRequired, TypedDict
 
 from pydantic import Field, PositiveInt
+from pydantic_ai import Tool
 
 from codeweaver.core.exceptions import ConfigurationError
 from codeweaver.core.types import BasedModel, LiteralStringT, Provider, ProviderLiteralString
@@ -28,6 +27,7 @@ else:
 
 if TYPE_CHECKING:
     from codeweaver.providers.data.exa import ExaToolset
+    from codeweaver.providers.data.tavily import TavilySearchContextTool
 
 
 class ExaContentsOptions(TypedDict, total=False):
@@ -143,9 +143,10 @@ class ExaToolConfig(BaseToolConfig):
         "exa",
         description="The provider tag for the Exa data provider. Used for discriminated unions.",
         exclude=True,
+        frozen=True,
     )
     provider: Literal[Provider.EXA] = Field(
-        Provider.EXA, description="The provider for the Exa data provider."
+        Provider.EXA, description="The provider for the Exa data provider.", frozen=True
     )
 
     include_search: bool = Field(
@@ -208,12 +209,12 @@ class ExaToolConfig(BaseToolConfig):
         """Get the telemetry keys for the Exa data provider."""
         return
 
-    async def to_call(self, *args: Any, **kwargs: Any) -> ExaToolset | None:
+    async def to_call(self, *args: Any, **kwargs: Any) -> ExaToolset:
         """Convert the Exa data config to an ExaToolset call."""
         from codeweaver.providers.data.exa import ExaToolset
 
         if not (client := kwargs.get("client")) and (
-            api_key := kwargs.get("api_key") or os.getenv("EXA_API_KEY")
+            api_key := kwargs.get("api_key") or self.provider.get_env_api_key()
         ):
             try:
                 from exa_py import AsyncExa
@@ -221,25 +222,68 @@ class ExaToolConfig(BaseToolConfig):
                 client = AsyncExa(api_key=api_key)
             except ImportError as e:
                 raise ImportError(
-                    "The `exa_py` package is required to use the Exa data provider. Please install it with `pip install exa_py`."
+                    "The `exa_py` package is required to use the Exa data provider. Please install it with `pip install code-weaver[exa]`."
                 ) from e
-        elif not client:
+        if not client:
             raise ConfigurationError(
                 "No client or API key provided for Exa data provider. Please provide either a client instance or an API key."
             )
-        if client:
-            return ExaToolset(
-                client=client, **self.model_dump(exclude={"tag", "provider"}, exclude_none=True)
-            )
-        return None
+        return ExaToolset(
+            client=client, **self.model_dump(exclude={"tag", "provider"}, exclude_none=True)
+        )
 
+
+class TavilySearchContextToolConfig(BaseToolConfig):
+    """Configuration for the TavilySearchContextTool."""
+
+    tag: Literal["tavily"] = Field("tavily", frozen=True, exclude=True)
+    provider: Literal[Provider.TAVILY] = Field(Provider.TAVILY, frozen=True)
+
+    max_results: PositiveInt = Field(
+        5, description="The maximum number of search results to return.", frozen=True
+    )
+
+    include_answer: Literal["basic", "advanced"] = Field(
+        "basic",
+        description="Whether to include the answer tool in the data provider. Defaults to True.",
+    )
+
+    def _telemetry_keys(self) -> None:
+        """Get the telemetry keys for the Tavily data provider."""
+        return
+
+    async def to_call(self, *args: Any, **kwargs: Any) -> Tool[TavilySearchContextTool]:
+        """Convert the Tavily data config to a TavilySearchContextTool call."""
+        from codeweaver.providers.data.tavily import tavily_search_tool
+
+        if not (client := kwargs.get("client")) and (
+            api_key := kwargs.get("api_key") or self.provider.get_env_api_key()
+        ):
+            try:
+                from tavily import AsyncTavilyClient
+
+                client = AsyncTavilyClient(api_key=api_key)
+            except ImportError as e:
+                raise ImportError(
+                    "The `tavily` package is required to use the Tavily data provider. Please install it with `[uv] pip install code-weaver[tavily]`."
+                ) from e
+        if not client:
+            raise ConfigurationError(
+                "No client or API key provided for Tavily data provider. Please provide either a client instance or an API key."
+            )
+        return tavily_search_tool(client)
+
+
+type DataToolConfigT = BaseToolConfig | ExaToolConfig | TavilySearchContextToolConfig
 
 __all__ = (
     "BaseToolConfig",
+    DataToolConfigT,
     "ExaAnswerToolOptions",
     "ExaContentsOptions",
     "ExaFindSimilarToolOptions",
     "ExaGetContentsToolOptions",
     "ExaSearchToolOptions",
     "ExaToolConfig",
+    "TavilySearchContextToolConfig",
 )

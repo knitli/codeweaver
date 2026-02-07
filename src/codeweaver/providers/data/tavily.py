@@ -7,7 +7,12 @@
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
 # Applies to modifications made to the original file.
-"""Tool wrapper for Tavily search."""
+"""Tool wrapper for Tavily search.
+
+We take the unusual approach of only exposing curated search results to context agents. This minimizes the risk of context rot and ensures that agents have access to high-quality, relevant information.
+
+We expose our own tailored version of the `search` endpoint. With out settings the search results are filtered and curated to ensure relevance and quality, limiting context rot.
+"""
 
 from __future__ import annotations
 
@@ -45,7 +50,7 @@ tavily_search_ta = TypeAdapter(list[TavilySearchResult])
 
 @dataclass
 class TavilySearchContextTool:
-    """Tavily tool that only returns relevant search results with no additional information."""
+    """Tavily tool that only returns relevant search results with no extra information."""
 
     client: AsyncTavilyClient
     """The Tavily search client."""
@@ -66,54 +71,11 @@ class TavilySearchContextTool:
         self,
         query: str,
         search_depth: Literal["basic", "advanced"] = "basic",
-        include_domains: Sequence[str] | None = None,
-        exclude_domains: Sequence[str] | None = None,
-    ) -> list[TavilySearchResult]:
-        """Searches Tavily for the given query and returns the results.
-
-        Args:
-            query: The search query to execute with Tavily.
-            search_depth: The depth of the search.
-            time_range: The time range back from the current date to filter results.
-            include_domains: A list of domains to include in the search results.
-            exclude_domains: A list of domains to exclude from the search results.
-
-        Returns:
-            A list of search results from Tavily.
-        """
-        results = await self.client.get_search_context(
-            query,
-            search_depth=search_depth,
-            topic="general",
-            include_domains=include_domains,  # ty:ignore[invalid-argument-type]
-            exclude_domains=exclude_domains,  # ty:ignore[invalid-argument-type]
-            max_results=self.max_results,
-        )  # type: ignore[reportUnknownMemberType]
-        return tavily_search_ta.validate_python(results["results"])
-
-
-@dataclass
-class TavilySearchTool:
-    """The Tavily search tool."""
-
-    client: AsyncTavilyClient
-    """The Tavily search client."""
-
-    max_results: int = 10
-    """The maximum number of search results to return."""
-
-    include_answer: bool | Literal["basic", "advanced"] = False
-    """Whether to include an answer to the search query in the results, and if so, the depth of the answer search."""
-
-    async def __call__(
-        self,
-        query: str,
-        search_depth: Literal["basic", "advanced"] = "basic",
         time_range: Literal["day", "week", "month", "year"] | None = "year",
         include_domains: Sequence[str] | None = None,
         exclude_domains: Sequence[str] | None = None,
     ) -> list[TavilySearchResult]:
-        """Searches Tavily for the given query and returns the results.
+        """Searches Tavily for the given query and returns only relevant snippets.
 
         Args:
             query: The search query to execute with Tavily.
@@ -129,27 +91,34 @@ class TavilySearchTool:
             query,
             search_depth=search_depth,
             topic="general",
+            max_tokens=self.max_tokens,
             time_range=time_range or "year",
-            include_domains=include_domains or [],
-            exclude_domains=exclude_domains or [],
+            format="markdown",
+            include_answer=True,
+            include_raw_content=False,
+            include_images=False,
+            include_domains=include_domains,  # ty:ignore[invalid-argument-type]
+            exclude_domains=exclude_domains,  # ty:ignore[invalid-argument-type]
             max_results=self.max_results,
-            include_answer=self.include_answer,
-        )  # type: ignore[reportUnknownMemberType]
+        )
         return tavily_search_ta.validate_python(results["results"])
 
 
 def tavily_search_tool(
     client: AsyncTavilyClient,
-    max_results: int = 10,
+    max_results: int = 5,
     *,
-    include_answer: bool | Literal["basic", "advanced"] = False,
-) -> Tool:
+    include_domains: Sequence[str] | None = None,
+    exclude_domains: Sequence[str] | None = None,
+    max_tokens: int | None = 6_000,
+    include_answer: bool | Literal["basic", "advanced"] = "basic",
+) -> Tool[TavilySearchContextTool]:
     """Create a Tavily search tool."""
-    return Tool(
-        TavilySearchTool(client, max_results=max_results, include_answer=include_answer).__call__,
+    return Tool[Any](
+        TavilySearchContextTool(client, max_results=max_results).__call__,
         name="tavily_search",
-        description="Search Tavily and return results.",
+        description="Search Tavily and return curated results.",
     )
 
 
-__all__ = ("tavily_search_tool",)
+__all__ = ("TavilySearchContextTool", "tavily_search_tool")

@@ -29,6 +29,7 @@ from rich.text import Text
 
 from codeweaver import __version__
 from codeweaver.core.ui_protocol import ProgressReporter
+from codeweaver.core.utils import get_codeweaver_prefix
 
 
 if TYPE_CHECKING:
@@ -37,8 +38,6 @@ if TYPE_CHECKING:
 
     from rich.console import RenderableType
     from rich.progress import Task
-
-CODEWEAVER_PREFIX = "[bold dark_orange][CodeWeaver][/bold dark_orange]"
 
 
 class AtomicAwareBarColumn(BarColumn):
@@ -517,7 +516,7 @@ class IndexingProgress:
         self.start()
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:  # type: ignore[no-untyped-def]
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         """Context manager exit - ensures clean terminal state."""
         self.stop()
         # Additional flush to ensure terminal is fully reset
@@ -700,7 +699,8 @@ class StatusDisplay(ProgressReporter):
             command: Command name (e.g., "index", "search")
             description: Optional command description
         """
-        self.console.print(f"{CODEWEAVER_PREFIX} {command}", style="bold")
+        prefix = get_codeweaver_prefix()
+        self.console.print(f"{prefix} {command}", style="bold")
         if description:
             self.console.print(f"  {description}")
         self.console.print()

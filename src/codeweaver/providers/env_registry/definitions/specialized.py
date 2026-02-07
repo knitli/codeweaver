@@ -279,6 +279,7 @@ __all__ = (
     "ANTHROPIC",
     "BEDROCK",
     "COHERE",
+    "EXA",
     "GOOGLE",
     "HUGGINGFACE_INFERENCE",
     "MISTRAL",

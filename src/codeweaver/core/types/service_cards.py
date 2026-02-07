@@ -773,8 +773,14 @@ def _get_pydantic_ai_provider_cls(provider_name: str) -> LazyImport[Any]:
     """
     module_name = _get_pydantic_ai_cls_module(provider_name)
     class_name = f"{module_name.title().replace('_', '')}Provider"
-    if module_name in {"moonshotai", "openai", "litellm", "huggingface"}:
-        class_name = class_name.replace("ai", "AI").replace("llm", "LLM").replace("face", "Face")
+    if module_name in {"moonshotai", "openai", "litellm", "huggingface", "ovhcloud"}:
+        class_name = (
+            class_name
+            .replace("ai", "AI")
+            .replace("llm", "LLM")
+            .replace("face", "Face")
+            .replace("Ovhcloud", "OVHcloud")
+        )  # the c is lowercase ... for some reason
     return lazy_import(f"pydantic_ai.providers.{module_name}", class_name)
 
 
@@ -1226,7 +1232,7 @@ def _build_data_provider_cards() -> list[ServiceCard]:
         service_card_factory(
             "tavily",
             "data",
-            lazy_import("pydantic_ai.common_tools.tavily", "tavily_search_tool"),
+            lazy_import("codeweaver.providers.data.tavily", "tavily_search_tool"),
             lazy_import("tavily", "AsyncTavilyClient"),
             "tavily",
             metadata=ServiceMetadata(
@@ -1240,13 +1246,13 @@ def _build_data_provider_cards() -> list[ServiceCard]:
             lazy_import("ddgs.ddgs", "DDGS"),
             "duckduckgo",
             metadata=ServiceMetadata(
-                handler=("provider", lambda provider_cls,: provider_cls(max_results=20))
+                handler=("provider", lambda provider_cls,: provider_cls(max_results=15))
             ),
         ),
         service_card_factory(
             "exa",
             "data",
-            lazy_import("pydantic_ai.common_tools.exa", "ExaToolset"),
+            lazy_import("codeweaver.providers.data.exa", "ExaToolset"),
             lazy_import("exa_py", "AsyncExa"),
             "exa",
         ),

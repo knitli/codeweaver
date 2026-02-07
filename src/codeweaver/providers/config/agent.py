@@ -9,12 +9,16 @@
 
 from __future__ import annotations
 
+import re
+
 from collections.abc import Iterable, Mapping
-from typing import TYPE_CHECKING, Any, Literal, Required, TypedDict
+from typing import TYPE_CHECKING, Annotated, Any, Literal, Required, TypedDict
+
+from pydantic import Discriminator, Field, Tag
+from pydantic_ai.models import ModelSettings as AgentModelConfig
 
 from codeweaver.core.types import LiteralStringT
 from codeweaver.core.utils import has_package
-from codeweaver.providers.agent.agent_models import AgentModelSettings as AgentModelConfig
 
 
 if TYPE_CHECKING and has_package("anthropic"):
@@ -418,7 +422,39 @@ else:
         """
 
 
+_matcher_re: re.Pattern = re.compile(
+    r"^(?P<provider>anthropic|bedrock|cerebras|cohere|google|groq|huggingface|mistral|openai|openrouter)_.*"
+)
+
+
+def _discriminate_agent_model_configs(v: Any) -> str:
+    keys = list(v)
+    if keys and (
+        next_match := next((_matcher_re.match(key) for key in keys if _matcher_re.match(key)), None)
+    ):
+        return next_match.group("provider")
+    return "agent"
+
+
+type AgentModelConfigT = Annotated[
+    Annotated[AgentModelConfig, Tag("agent")]
+    | Annotated[AnthropicAgentModelConfig, Tag("anthropic")]
+    | Annotated[BedrockAgentModelConfig, Tag("bedrock")]
+    | Annotated[CerebrasAgentModelConfig, Tag("cerebras")]
+    | Annotated[CohereAgentModelConfig, Tag("cohere")]
+    | Annotated[GoogleAgentModelConfig, Tag("google")]
+    | Annotated[GroqAgentModelConfig, Tag("groq")]
+    | Annotated[HuggingFaceAgentModelConfig, Tag("huggingface")]
+    | Annotated[MistralAgentModelConfig, Tag("mistral")]
+    | Annotated[OpenAIAgentModelConfig, Tag("openai")]
+    | Annotated[OpenRouterAgentModelConfig, Tag("openrouter")],
+    Field(discriminator=Discriminator(_discriminate_agent_model_configs)),
+]
+
+
 __all__ = (
+    "AgentModelConfig",
+    "AgentModelConfigT",
     "AnthropicAgentModelConfig",
     "BedrockAgentModelConfig",
     "CerebrasAgentModelConfig",

@@ -216,7 +216,7 @@ async def _check_ports(port_search: tuple[int, ...]) -> int | None:
     async with client:
         for port in port_search:
             try:
-                response = await client.get(_endpoint(port), timeout=0.2)
+                response = await client.get(await _endpoint(port), timeout=0.2)
                 if response.status_code == 200:
                     return port
             except httpx.RequestError:
@@ -259,11 +259,21 @@ async def qdrant_instance_live_at_port(port: int) -> bool:
     return await _try_qdrant_client(port)
 
 
+def get_codeweaver_prefix() -> str:
+    """Return the codeweaver terminal prefix."""
+    if is_tty():
+        if "truecolor" in os.environ.get("TERM", "").lower():
+            return """\033[38;2;181;108;48;m[codeweaver]\033[0m"""
+        return "\033[38;5;131m[codeweaver]\033[0m"
+    return "[codeweaver]"
+
+
 __all__ = (
     "detect_root_package",
     "find_qdrant_instance",
     "format_file_link",
     "get_codeweaver_config_paths",
+    "get_codeweaver_prefix",
     "get_possible_env_vars",
     "get_terminal_width",
     "in_ide",

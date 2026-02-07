@@ -178,8 +178,7 @@ def _resolve_provider_settings[
 
 
 type ProviderSettingsDep = Annotated[
-    ProviderSettings,  # type: ignore[name-defined]
-    depends(_get_provider_settings, use_cache=False),
+    ProviderSettings, depends(_get_provider_settings, use_cache=False)
 ]
 """Type alias for DI injection of root provider settings."""
 
@@ -270,6 +269,27 @@ def _create_vector_client(provider_settings: ProviderSettingsDep = INJECTED) -> 
     raise ConfigurationError(
         "No vector store provider configuration found",
         suggestions=["Ensure at least one vector store provider is configured in settings"],
+    )
+
+
+def _create_agent_client(provider_settings: ProviderSettingsDep = INJECTED) -> Any:
+    """Universal client factory for all agent providers.
+
+    Returns:
+        Configured SDK client instance appropriate for the provider type
+
+    Raises:
+        ConfigurationError: If config is missing, provider unsupported, or SDK not installed
+    """
+    default_agent_config: LazyImport[AgentProviderSettings] = lazy_import(
+        "codeweaver.providers.config.providers", "DefaultAgentProviderSettings"
+    )
+    agent_settings = provider_settings.agent or default_agent_config._resolve()
+    if resolved_settings := _resolve_provider_settings(agent_settings):
+        return resolved_settings.get_client()
+    raise ConfigurationError(
+        "No agent provider configuration found",
+        suggestions=["Ensure at least one agent provider is configured in settings"],
     )
 
 
@@ -400,8 +420,7 @@ def _create_primary_reranking_config(
 
 
 type AllRerankingConfigsDep = Annotated[
-    Sequence[RerankingProviderSettings],  # type: ignore[name-defined]
-    depends(_create_all_reranking_configs, use_cache=False),
+    Sequence[RerankingProviderSettings], depends(_create_all_reranking_configs, use_cache=False)
 ]
 """Type alias for DI injection of all reranking provider settings."""
 
@@ -430,7 +449,7 @@ def _create_primary_vector_store_config(
 
 
 type AllVectorStoreConfigsDep = Annotated[
-    Sequence[VectorStoreProviderSettings],  # type: ignore[name-defined]
+    Sequence[VectorStoreProviderSettings],
     depends(_create_all_vector_store_configs, use_cache=False),
 ]
 """Type alias for DI injection of all vector store provider settings."""
@@ -548,8 +567,7 @@ type RerankingCapabilityResolverDep = Annotated[
 
 
 type ProviderSettingsDep = Annotated[
-    ProviderSettings,  # type: ignore[name-defined]
-    depends(_get_provider_settings, use_cache=False),
+    ProviderSettings, depends(_get_provider_settings, use_cache=False)
 ]
 """Type alias for DI injection of root provider settings.
 

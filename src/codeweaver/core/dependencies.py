@@ -2,7 +2,6 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
-
 """Core dependency types and factories."""
 
 from __future__ import annotations
@@ -41,6 +40,7 @@ if TYPE_CHECKING:
     # Settings types only needed for type checking - actual type resolved at runtime
     from codeweaver.core.config.core_settings import CodeWeaverCoreSettings
     from codeweaver.core.telemetry.client import TelemetryService
+    from codeweaver.core.types.service_cards import ServiceCard
     from codeweaver.engine.config.root_settings import CodeWeaverEngineSettings
     from codeweaver.providers.config.root_settings import CodeWeaverProviderSettings
     from codeweaver.server.config.settings import CodeWeaverSettings
@@ -135,6 +135,18 @@ def _get_statistics() -> SessionStatistics:
 type StatisticsDep = Annotated[SessionStatistics, depends(_get_statistics)]
 
 
+@dependency_provider(
+    tuple[ServiceCard, ...], scope="singleton", collection=True, tags=["service_cards", "providers"]
+)
+def _get_service_cards() -> tuple[ServiceCard, ...]:
+    from codeweaver.core.types.service_cards import get_service_cards
+
+    return get_service_cards()
+
+
+type ServiceCardsDep = Annotated["tuple[ServiceCard, ...]", depends(_get_service_cards)]
+
+
 @dependency_provider(TelemetrySettings, scope="singleton")
 def _get_telemetry_settings(settings: SettingsDep = INJECTED) -> TelemetrySettings:
     from codeweaver.core.config import TelemetrySettings
@@ -147,11 +159,7 @@ type TelemetrySettingsDep = Annotated[TelemetrySettings, depends(_get_telemetry_
 
 @dependency_provider(LoggingSettingsDict, scope="singleton")
 def _get_logging_settings(settings: SettingsDep = INJECTED) -> LoggingSettingsDict:
-    return (
-        settings.logging  # type: ignore[return-value]
-        if settings.logging is not Unset
-        else DefaultLoggingSettings
-    )  # type: ignore[return-value]
+    return settings.logging if settings.logging is not Unset else DefaultLoggingSettings
 
 
 type LoggingSettingsDep = Annotated[LoggingSettingsDict, depends(_get_logging_settings)]
@@ -258,6 +266,7 @@ __all__ = (
     "ResolvedProjectNameDep",
     "ResolvedProjectPathDep",
     "ResolvedProjectPathHashDep",
+    "ServiceCardsDep",
     "SettingsDep",
     "SettingsMapDep",
     "StatisticsDep",

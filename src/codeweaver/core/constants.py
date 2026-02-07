@@ -54,7 +54,6 @@ DEFAULT_DENSE_WEIGHT = 0.65
 
 DEFAULT_SPARSE_WEIGHT = 0.35
 
-
 # ===========================================================================
 # *                           TIME Constants
 # ===========================================================================
@@ -177,6 +176,8 @@ BACKUP_EMBEDDING_MODEL_FALLBACK = "jinaai/jina-embeddings-v2-small-en"
 
 BACKUP_RERANKING_MODEL = "jinaai/jina-reranker-v1-tiny-en"
 """Backup reranking model used when the primary model is unavailable. This is a very small and fast model, and has the added bonus of being available with both Sentence Transformers and FastEmbed, and a large context window (8096 tokens). Its context window is larger than our maximum chunk size (~1000 tokens), so we can safely use it for reranking without worrying about truncation or re-chunking."""
+
+PREFERRED_SEARCH_PROVIDER_ORDER = ("tavily", "exa", "duckduckgo")
 
 # ======== Logging Defaults
 
@@ -617,6 +618,29 @@ ONNX_CUDA_PROVIDER = "CUDAExecutionProvider"
 QDRANT_MEMORY_LOCATION = ":memory:"
 """Special location string for creating an in-memory Qdrant instance."""
 
+PYDANTIC_AI_MODEL_PROFILE_PROVIDERS = (
+    "amazon",
+    "anthropic",
+    "cohere",
+    "deepseek",
+    "google",
+    "grok",
+    "groq",
+    "harmony",
+    "meta",
+    "mistral",
+    "moonshotai",
+    "openai",
+    "qwen",
+    "zai",
+)
+"""Pydantic AI model profile providers.
+
+In PydanticAI, a model profile is similar to CodeWeaver's `Capabilities` classes like `EmbeddingModelCapabilities` and `RerankingModelCapabilities`. Like with CodeWeaver, these are defined by the *model maker* vice the *model consumer*. For example, `qwen` is not an agent provider supported by CodeWeaver or PydanticAI but supported providers offers *qwen models*, so it is a 'profile' provider.
+
+I do have one small pedantic (pydantic?) nitpick with pydantic ai on this -- the modules and profiles are inconsistently named. Some are named after their company (like `meta` or `anthropic`) and others are named after the model family (like `grok` and `qwen`, which are model families and would be `x-ai` and `alibaba` if named after their company). Either name it after the company or the model, but stick to something!
+"""
+
 
 __all__ = (
     "BACKUP_DENSE_VECTOR_NAME",
@@ -729,8 +753,10 @@ __all__ = (
     "ONE_SECOND",
     "ONNX_CUDA_PROVIDER",
     "POSIX_NEWLINE",
+    "PREFERRED_SEARCH_PROVIDER_ORDER",
     "PRIMARY_SPARSE_VECTOR_NAME",
     "PRIMARY_VECTOR_NAME",
+    "PYDANTIC_AI_MODEL_PROFILE_PROVIDERS",
     "PYTHON_SHEBANG",
     "QDRANT_MEMORY_LOCATION",
     "SEMANTIC_CHUNKER_PERFORMANCE_THRESHOLD_MS",

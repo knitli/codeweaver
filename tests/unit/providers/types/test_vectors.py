@@ -2,6 +2,7 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
+# sourcery skip: name-type-suffix
 """Unit tests for vector types (VectorRole, VectorConfig, VectorSet).
 
 Tests the new vector types implementation according to the refactoring plan.
@@ -55,13 +56,7 @@ class TestVectorRole:
         - SEMANTIC_DOCS
         - KEYWORD
 
-        The enum should support dynamic extension using aenum.extend_enum.
         """
-        # Future extensions should work via:
-        # from aenum import extend_enum
-        # extend_enum(VectorRole, "SEMANTIC_CODE", "semantic_code")
-        #
-        # This test verifies the base enum is extensible (BaseEnum)
         from codeweaver.core.types import BaseEnum
 
         assert isinstance(VectorRole.PRIMARY, BaseEnum)
@@ -471,13 +466,13 @@ class TestVectorSet:
 
     def test_query_by_name(self, complete_vector_set: VectorSet):
         """Test querying vectors by physical Qdrant name."""
-        primary = complete_vector_set.by_name("primary")
-        assert primary is not None
-        assert primary.name == "primary"
+        self._assert_vector_exists_by_name(complete_vector_set, "primary")
+        self._assert_vector_exists_by_name(complete_vector_set, "backup")
 
-        backup = complete_vector_set.by_name("backup")
-        assert backup is not None
-        assert backup.name == "backup"
+    def _assert_vector_exists_by_name(self, complete_vector_set: VectorSet, name: str):
+        primary = complete_vector_set.by_name(name)
+        assert primary is not None
+        assert primary.name == name
 
     def test_query_by_name_returns_none(self, basic_vector_set: VectorSet):
         """Test that by_name returns None when not found."""
@@ -486,13 +481,13 @@ class TestVectorSet:
 
     def test_query_by_key(self, complete_vector_set: VectorSet):
         """Test querying vectors by logical dict key."""
-        primary = complete_vector_set.by_key("primary")
-        assert primary is not None
-        assert primary.name == "primary"
+        self._assert_vector_exists_by_key(complete_vector_set, "primary")
+        self._assert_vector_exists_by_key(complete_vector_set, "backup")
 
-        backup = complete_vector_set.by_key("backup")
-        assert backup is not None
-        assert backup.name == "backup"
+    def _assert_vector_exists_by_key(self, complete_vector_set, arg1):
+        primary = complete_vector_set.by_key(arg1)
+        assert primary is not None
+        assert primary.name == arg1
 
     def test_query_by_key_returns_none(self, basic_vector_set: VectorSet):
         """Test that by_key returns None when not found."""

@@ -74,7 +74,6 @@ from codeweaver.core import (
     ProviderLiteralString,
     SDKClient,
     generate_collection_name,
-    get_user_cache_dir,
     get_user_state_dir,
 )
 from codeweaver.core.constants import (
@@ -84,8 +83,9 @@ from codeweaver.core.constants import (
     DEFAULT_VECTOR_STORE_PERSIST_SUBPATH,
     LOCALHOST,
 )
+from codeweaver.core.types import LiteralStringT
 from codeweaver.core.utils import deep_merge_dicts, is_local_host
-from codeweaver.providers.agent.agent_models import AgentModelSettings
+from codeweaver.providers.agent import KnownAgentModelName
 from codeweaver.providers.config import (
     AnthropicClientOptions,
     GoogleAgentModelConfig,
@@ -695,7 +695,7 @@ class _BaseQdrantVectorStoreProviderSettings(VectorStoreProviderSettings):
                 embedding_group=embedding_group,
                 failover_settings=failover_settings,
                 failover_detector=failover_detector,
-            )  # ty:ignore[invalid-argument-type]
+            )
             return await service.get_collection_config(metadata)
         try:
             from codeweaver.core.di import get_container
@@ -715,7 +715,7 @@ class _BaseQdrantVectorStoreProviderSettings(VectorStoreProviderSettings):
                 embedding_group=embedding_group,
                 failover_settings=failover_settings,
                 failover_detector=failover_detector,
-            )  # ty:ignore[invalid-argument-type]
+            )
         except Exception as e:
             logger.debug("DI container not available, using basic config: %s", e)
             if not self.collection._vectors_set:
@@ -738,7 +738,7 @@ class MemoryConfig(TypedDict, total=False):
     """Configuration for in-memory vector store provider."""
 
     persist_path: NotRequired[Path]
-    f"Path for JSON persistence file. Defaults to {get_user_cache_dir()}/vectors/[your_project_name]-[filepath-hash]"
+    "Path for JSON persistence file. Defaults to [your_user_directory]/codeweaver/vectors/[your_project_name]-[filepath-hash]"
     auto_persist: NotRequired[bool]
     "Automatically save after operations. Defaults to True."
     persist_interval: NotRequired[PositiveInt | None]
@@ -1265,8 +1265,8 @@ class ExaProviderSettings(BaseDataProviderSettings):
         return SDKClient.EXA
 
 
-type ModelString = Annotated[
-    str,
+type AgentModelNameString = Annotated[
+    KnownAgentModelName | LiteralStringT,
     Field(description="The model string, as it appears in `pydantic_ai.models.KnownModelName`."),
 ]
 
@@ -1274,8 +1274,8 @@ type ModelString = Annotated[
 class AgentProviderSettings(BaseProviderSettings):
     """Settings for agent models."""
 
-    model_name: ModelString
-    model_options: AgentModelSettings | None = None
+    model_name: AgentModelNameString
+    model_options: AgentModelConfig | None = None
     "Settings for the agent model(s)."
     client_options: Annotated[
         GeneralAgentClientOptionsType | None,
@@ -1387,7 +1387,7 @@ class BedrockAnthropicAgentProviderSettings(BedrockProviderMixin, AgentProviderS
     tag: Literal["anthropic_bedrock"] = "anthropic_bedrock"
 
     model_name: Annotated[
-        ModelString,
+        AgentModelNameString,
         Field(
             description="The model string for Bedrock Anthropic models.",
             pattern=_anthropic_model_pattern,
@@ -1413,7 +1413,7 @@ class AzureAnthropicAgentProviderSettings(AzureProviderMixin, AgentProviderSetti
     tag: Literal["anthropic_azure"] = "anthropic_azure"
 
     model_name: Annotated[
-        ModelString,
+        AgentModelNameString,
         Field(
             description="The model string for Azure Anthropic models.",
             pattern=_anthropic_model_pattern,
@@ -1439,7 +1439,7 @@ class GoogleVertexAnthropicAgentProviderSettings(AgentProviderSettings):
     tag: Literal["anthropic_google"] = "anthropic_google"
 
     model_name: Annotated[
-        ModelString,
+        AgentModelNameString,
         Field(
             description="The model string for Google Vertex Anthropic models.",
             pattern=_anthropic_model_pattern,
@@ -1465,7 +1465,7 @@ class GroqAgentProviderSettings(AgentProviderSettings):
     tag: Literal["groq"] = "groq"
 
     model_name: Annotated[
-        ModelString,
+        AgentModelNameString,
         Field(
             description="The model string for Groq Anthropic models.",
             pattern=_anthropic_model_pattern,
@@ -1488,7 +1488,7 @@ class AnthropicAgentProviderSettings(AgentProviderSettings):
 
     tag: Literal["anthropic"] = "anthropic"
     model_name: Annotated[
-        ModelString,
+        AgentModelNameString,
         Field(
             description="The model string for Anthropic models.", pattern=_anthropic_model_pattern
         ),
@@ -1758,17 +1758,23 @@ with contextlib.suppress(Exception):
 
 
 __all__ = (
+    "AgentModelNameString",
     "AgentProviderSettings",
     "AgentProviderSettingsType",
+    "AnthropicAgentProviderSettings",
+    "AzureAnthropicAgentProviderSettings",
     "AzureEmbeddingProviderSettings",
     "AzureProviderMixin",
     "BaseDataProviderSettings",
     "BaseEmbeddingProviderSettings",
     "BaseProviderSettings",
     "BaseProviderSettingsDict",
+    "BedrockAnthropicAgentProviderSettings",
     "BedrockEmbeddingProviderSettings",
     "BedrockProviderMixin",
     "BedrockRerankingProviderSettings",
+    "CerebrasAgentProviderSettings",
+    "CohereAgentProviderSettings",
     "CollectionConfig",
     "ConnectionConfiguration",
     "ConnectionRateLimitConfig",
@@ -1780,9 +1786,15 @@ __all__ = (
     "FastEmbedProviderMixin",
     "FastEmbedRerankingProviderSettings",
     "FastEmbedSparseEmbeddingProviderSettings",
+    "GoogleAgentProviderSettings",
+    "GoogleVertexAnthropicAgentProviderSettings",
+    "GroqAgentProviderSettings",
+    "HFInferenceAgentProviderSettings",
     "MemoryConfig",
     "MemoryVectorStoreProviderSettings",
-    "ModelString",
+    "MistralAgentProviderSettings",
+    "OpenAIAgentProviderSettings",
+    "OpenRouterAgentProviderSettings",
     "QdrantVectorStoreProviderSettings",
     "RerankingProviderSettings",
     "RerankingProviderSettingsType",

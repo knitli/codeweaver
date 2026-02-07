@@ -10,7 +10,12 @@ name = "code-weaver"
 description = "Extensible MCP server for semantic code search with plugin architecture supporting multiple embedding providers, vector databases, and data sources."
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.12"
-license = { text = "MIT OR Apache-2.0" }
+license-files = [
+  "./LICENSE-Apache-2.0",
+  "./LICENSE-MIT",
+  "LICENSES/Apache-2.0.txt",
+  "LICENSES/MIT.txt"
+]
 authors = [
   { name = "Knitli Inc." },
   { name = "Adam Poulemanos", email = "adam@knit.li" },
@@ -108,17 +113,14 @@ classifiers = [
 # tombi: format.rules.array-values-order.disabled = true
 dependencies = [
   # * ================ Core Dependencies ==================*
-  # aenum used for adding enum members dynamically
-  # Code-Weaver uses enums extensively
-  "aenum>=3.1.16",
   "blake3>=1.0.8",
   # We use some pydantic internal/private utilities in dependency resolution
   # So we pin it to make sure we don't break on minor releases
   "pydantic==2.12.5",
   # for, you know, platform dirs
-  "platformdirs>=4.3.6",
+  "platformdirs>=4.5.1",
   # psutil used for resource governance/limiting by engine
-  "psutil>=7.2.1",
+  "psutil>=7.2.2",
   "textcase>=0.4.5",
   "typing_extensions>=4.15.0",
   "uuid7>=0.1.0; python_version < '3.14'",
@@ -142,11 +144,12 @@ dependencies = [
   "cohere==5.20.1",
   "fastembed==0.7.4; python_version < '3.14'",
   "google-genai==1.56.0",
+  # NOTE: We're waiting on pydantic-ai to update to 1.0+ before we can upgrade too
   "huggingface-hub==0.36.2",
   "mistralai==1.10.0",
-  "openai==2.14.0",
+  "openai==2.17.0",
   "qdrant-client==1.16.2",
-  "pydantic-ai-slim>=1.39.0",
+  "pydantic-ai-slim>=1.56.0",
   "sentence-transformers==5.2.0; python_version <= '3.14'",
   "voyageai==0.3.7",
   # * ================ Indexing and Engine ==================*
@@ -162,7 +165,7 @@ dependencies = [
   "ast-grep-py>=0.40.3",
   # * ================ Server and MCP Server Framework ==================*
   # fastmcp is the core MCP server framework
-  "fastmcp>=2.14.0",
+  "fastmcp>=2.14.5",
   # just used for types but we need them at runtime for Pydantic models
   "mcp>=1.19.0",
   # Runs the core admin/management server
@@ -217,6 +220,7 @@ bedrock = [
 cohere = ["pydantic-ai-slim[cohere]"]
 # ==== Data Sources ====
 duckduckgo = ["pydantic-ai-slim[duckduckgo]"]
+exa = ["exa-py"]
 fastembed = ["fastembed; python_version < '3.14'", "py-cpuinfo"]
 # Requires additional setup, see https://qdrant.github.io/fastembed/examples/FastEmbed_GPU/
 fastembed-gpu = ["fastembed-gpu; python_version < '3.14'", "py-cpuinfo"]
@@ -232,6 +236,7 @@ fastembed-gpu = ["fastembed-gpu; python_version < '3.14'", "py-cpuinfo"]
 full = [
   "permit-fastmcp",
   "eunomia-mcp",
+  "exa-py",
   "pydantic-ai-slim[openai,cohere,google,anthropic,groq,mistral,bedrock,huggingface,duckduckgo,tavily,retries]",
   "pydantic-settings[yaml,toml,aws-secrets-manager,azure-key-vault,gcp-secret-manager]",
   "permit-fastmcp",
@@ -243,6 +248,7 @@ full-gpu = [
   "eunomia-mcp",
   "fastembed-gpu; python_version < '3.14'",
   "permit-fastmcp",
+  "exa-py",
   "pydantic-ai-slim[openai,cohere,google,anthropic,groq,mistral,bedrock,huggingface,duckduckgo,tavily,retries]",
   "pydantic-settings[yaml,toml,aws-secrets-manager,azure-key-vault,gcp-secret-manager]",
   "sentence-transformers",
@@ -264,7 +270,7 @@ in-memory = ["qdrant-client", "tokenizers"]
 mistral = ["pydantic-ai-slim[mistral]"]
 # OpenAI includes support for:
 #   Cerebras, DeekSeek, Ollama, OpenRouter, Vercel, Perplexity, Moonshot, FireworksAI,
-#   TogetherAI, Azure AI Foundry, Heroku, and Github Models, X-AI
+#   TogetherAI, Azure AI Foundry, Heroku, and Github Models
 # which all use the OpenAI API
 openai = ["pydantic-ai-slim[openai]"]
 qdrant = ["qdrant-client"]
@@ -288,13 +294,13 @@ sentence-transformers = [
   "sentence-transformers",
   "py-cpuinfo",
 ]
-tavily = ["pydantic-ai-slim[tavily]"]
+tavily = ["tavily"]
 # NOTE: Why not GPU or OpenVino support for sentence-transformers?
 # The underlying runtimes for these packages, when resolved against our other dependencies,
 # essentially require us to choose between support for Python 3.14 and these packages.
 # When python 3.14 is included, then the only compatible build results in transformers version 3.x
 # Which does not have the `SparseEncoder` class required for sparse-encodings.
-# We think the sparse-encoding use case is much broader than GPU or OpenVino acceleration for most users,
+# We think the sparse-encoding use case is much broader than GPU or OpenVino acceleration for most users (in fact we always use sparse encodings),
 # so we are leaving these out of the official optional dependencies for now.
 # If you need GPU or OpenVino support, you can install these packages manually in your environment.
 # sentence-transformers-gpu = [
@@ -310,20 +316,20 @@ voyageai = ["voyageai"]
 [dependency-groups]
 dev = [
   # black is used to format generated code
-  "black>=25.12.0",
-  "ruff>=0.14.10",
+  "black>=26.1.0",
+  "ruff>=0.15.0",
   "serena>=0.9.1",
-  "ty>=0.0.8",
-  "uv>=0.9.21",
+  "ty>=0.0.15",
+  "uv>=0.10.0",
 ]
 build = ["hatchling>=1.28.0", "twine>=6.2.0", "uv-dynamic-versioning>=0.12.0"]
 dev-helpers = [
-  "ipython>=9.8.0",
+  "ipython>=9.10.0",
   "jsonlines>=4.0.0",
   "memory-profiler>=0.61.0",
-  "pdbpp>=0.11.7",
+  "pdbpp>=0.12.0.post1",
   "pyperclip>=1.11.0",
-  "superclaude>=4.1.9",
+  "superclaude>=4.2.0",
 ]
 docs = [
   "griffe>=1.15.0",
@@ -345,7 +351,7 @@ test = [
 requires = [
   "hatchling>=1.28.0",
   "twine>=6.2.0",
-  "uv-dynamic-versioning>=0.12.0"
+  "uv-dynamic-versioning>=0.13.0"
 ]
 build-backend = "hatchling.build"
 
@@ -361,7 +367,9 @@ omit = [
   "tests/*",
   "vendored/*",
   "src/codeweaver/__init__.py",
-  "src/codeweaver/**/__init__.py"
+  "src/codeweaver/**/__init__.py",
+  "src/codeweaver/**/types/*",
+  "src/codeweaver/**/types.py",
 ]
 
 [tool.hatch.build.hooks.version]

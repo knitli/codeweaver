@@ -6,61 +6,113 @@
 
 from __future__ import annotations
 
-import contextlib
+import logging
 
 from typing import TYPE_CHECKING, Any
 
+from beartype.typing import Callable, Sequence
+from pydantic_ai import Tool
+
+from codeweaver.core.constants import PREFERRED_SEARCH_PROVIDER_ORDER
 from codeweaver.core.types import LiteralProviderType
 from codeweaver.core.types.provider import Provider
 from codeweaver.core.utils import has_package
+from codeweaver.providers.data.exa import ExaToolset
+from codeweaver.providers.data.tavily import TavilySearchContextTool, tavily_search_tool
+
+
+logger = logging.getLogger(__name__)
 
 
 if TYPE_CHECKING and has_package("pydantic_ai.common_tools.duckduckgo") and has_package("ddgs"):
     from pydantic_ai.common_tools.duckduckgo import DuckDuckGoSearchTool as DuckDuckGoSearchTool
+    from pydantic_ai.common_tools.duckduckgo import duckduckgo_search_tool
 else:
     DuckDuckGoSearchTool = Any
-if TYPE_CHECKING and has_package("pydantic_ai.common_tools.tavily") and has_package("tavily"):
-    from pydantic_ai.common_tools.tavily import TavilySearchTool as TavilySearchTool
-else:
-    TavilySearchTool = Any
-if TYPE_CHECKING and has_package("pydantic_ai.common_tools.exa") and has_package("exa_py"):
-    from pydantic_ai.common_tools.exa import ExaToolset as ExaToolset
-else:
-    ExaToolset = Any
+    duckduckgo_search_tool = Tool
 
-type DataProviderType = DuckDuckGoSearchTool | TavilySearchTool | ExaToolset
+type DataProviderType = type[DuckDuckGoSearchTool | TavilySearchContextTool | ExaToolset]
 
 
-def get_data_provider(provider: LiteralProviderType) -> DataProviderType | None:
+def get_data_provider(
+    provider: LiteralProviderType, *, has_required_auth: bool = False
+) -> DataProviderType | Callable[..., Tool[Any]] | None:
     """Get available tools."""
     if isinstance(provider, str):
         provider: Provider = Provider.from_string(provider)
-    if provider == Provider.DUCKDUCKGO:
-        with contextlib.suppress(ImportError):
-            from pydantic_ai.common_tools.duckduckgo import DuckDuckGoSearchTool
-
-            return DuckDuckGoSearchTool
-    if provider == Provider.TAVILY:
-        with contextlib.suppress(ImportError):
-            from pydantic_ai.common_tools.tavily import TavilySearchTool
-
-            return TavilySearchTool
-    if provider == Provider.EXA and has_package("exa_py"):
-        with contextlib.suppress(ImportError):
-            from codeweaver.providers.data.exa import ExaToolset
-
-            return ExaToolset
+    if provider == Provider.DUCKDUCKGO and has_package("ddgs"):
+        return duckduckgo_search_tool
+    if provider == Provider.TAVILY and has_required_auth and has_package("tavily"):
+        return tavily_search_tool
+    if provider == Provider.EXA and has_required_auth and has_package("exa"):
+        return ExaToolset
+    data_providers = [provider for provider in Provider if provider.is_data_provider()]
+    if provider in data_providers:
+        logger.warning(
+            "You requested a valid data provider, but it is not available. This probably means you need to install the corresponding package. Install `uv pip install code-weaver[%s]`",
+            provider.variable,
+        )
+    else:
+        logger.warning(
+            "The provider %s isn't a recognized valid data provider. If we have it listed as one, then it's probably our mistake. Please report this issue at https://github.com/knitli/codeweaver/issues",
+            provider.variable,
+        )
     return None
 
 
-def load_default_data_providers() -> tuple[type, ...]:
-    """Load all available data providers."""
-    providers: list[type] = []
-    for provider in (Provider.DUCKDUCKGO, Provider.TAVILY, Provider.EXA):
-        data_provider = get_data_provider(provider)
-        if data_provider is not None:
-            providers.append(data_provider)
-    return tuple(providers)
+def load_default_data_providers(
+    providers_with_api_keys: Sequence[LiteralProviderType] | None = None,
+) -> tuple[DataProviderType, ...]:
+    """Load the first available (preferred) search data provider."""
+    normalized_api_providers: list[LiteralProviderType] = (
+        list(providers_with_api_keys) if providers_with_api_keys is not None else []
+    )
+    normalized_api_providers: list[Provider] = [
+        provider if isinstance(provider, Provider) else Provider.from_string(provider)
+        for provider in normalized_api_providers
+        if provider
+    ]
+    normalized_api_providers.extend(
+        provider
+        for provider in Provider
+        if provider.is_data_provider() and (not provider.requires_auth or provider.has_env_auth)
+    )
+    possible_providers = sorted(
+        set(normalized_api_providers),
+        key=lambda p: (
+            PREFERRED_SEARCH_PROVIDER_ORDER.index(p.variable)
+            if p.variable in PREFERRED_SEARCH_PROVIDER_ORDER
+            else len(PREFERRED_SEARCH_PROVIDER_ORDER) + 1
+        ),
+    )
+    if not possible_providers:
+        logger.warning("No available search data providers found.")
+        return ()
+    return (
+        (prov,)
+        if (
+            prov := (
+                next(
+                    (
+                        get_data_provider(provider, has_required_auth=True)
+                        for provider in possible_providers
+                        if get_data_provider(provider, has_required_auth=True)
+                    ),
+                    None,
+                )
+            )
+        )
+        else ()
+    )
 
 
-__all__ = ("DataProviderType", "get_data_provider", "load_default_data_providers")
+__all__ = (
+    "DataProviderType",
+    "DuckDuckGoSearchTool",
+    "ExaToolset",
+    "TavilySearchContextTool",
+    "duckduckgo_search_tool",
+    "get_data_provider",
+    "load_default_data_providers",
+    "tavily_search_tool",
+)

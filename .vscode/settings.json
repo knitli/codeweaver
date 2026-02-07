@@ -1,6 +1,6 @@
 {
   "yaml.schemas": {
-    "https://json.schemastore.org/sourcery.json": [
+    "https://www.schemastore.org/sourcery_yaml_schema.json": [
       ".sourcery.yaml"
     ]
   },
@@ -31,7 +31,12 @@
       "allowedModels": [
         "copilot/claude-haiku-4.5",
         "copilot/claude-sonnet-4.5",
-        "copilot/gemini-3-flash"
+        "copilot/gemini-3-flash",
+        "claude/claude-sonnet-4.5",
+        "claude/claude-haiku-4.5",
+        "sourcery/*",
+        "gemini/gemini-3-flash",
+        "gemini/gemini-3-pro"
       ]
     }
   }
