@@ -55,6 +55,7 @@ from codeweaver.core import (
     ProviderError,
     SparseEmbedding,
     StatisticsDep,
+    asyncio_or_uvloop,
     depends,
     get_blake_hash,
     log_to_client_or_fallback,
@@ -627,8 +628,8 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                 batch_results: (
                     Sequence[Sequence[float]]
                     | Sequence[Sequence[int]]
-                    | Sequence[dict[str, list[int] | list[float]]]  # ty:ignore[invalid-assignment]
-                ) = await self._embed_documents_with_retry(token_batch, **kwargs)
+                    | Sequence[dict[str, list[int] | list[float]]]
+                ) = await self._embed_documents_with_retry(token_batch, **kwargs)  # ty:ignore[invalid-assignment]
                 all_results.extend(batch_results)
 
                 # Yield between token batches to keep server responsive
@@ -872,13 +873,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
     ) -> Literal["float32", "float16", "int8", "binary"]:
         """Get the datatype of the embedding vectors based on capabilities and config."""
         # First try to get from capabilities
-        if self.caps:
-            default_dtype = self.caps.default_dtype
-            if default_dtype and default_dtype not in ("float32", "float16", "int8", "binary"):
-                default_dtype = "float16" if "float" in default_dtype else "int8"
-            return cast(Literal["float32", "float16", "int8", "binary"], default_dtype)
-        # Fallback to float32 if no capabilities
-        return "float32"
+        return self.embed_options.datatype
 
     def get_dimension(self, *, sparse: bool = False) -> PositiveInt | Literal[0]:
         """Get the dimension of the embedding vectors based on capabilities."""
@@ -1076,7 +1071,16 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         """Handle output data from embedding."""
         return self._output_transformer(output_data)
 
-    def _fire_and_forget(self, task: Callable[..., Any]) -> None:
+    async def _get_loop(self) -> asyncio.AbstractEventLoop | None:
+        try:
+            loop = asyncio_or_uvloop().get_running_loop()
+        except RuntimeError:
+            loop = None
+        return loop
+
+    def _fire_and_forget(
+        self, task: Callable[..., Any], loop: asyncio.AbstractEventLoop | None = None
+    ) -> None:
         """Execute a fire-and-forget task in a thread pool executor.
 
         This method must be called from async context (all embedding methods are async).
@@ -1085,8 +1089,15 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         Used for non-time-sensitive tasks like token statistics updates that don't need
         to block the main embedding workflow.
         """
-        loop = asyncio.get_running_loop()  # Will raise RuntimeError if not in async context
-        _ = loop.run_in_executor(None, task)
+        try:
+            _loop = (
+                loop or asyncio.get_running_loop()
+            )  # Will raise RuntimeError if not in async context
+            _ = _loop.call_soon_threadsafe(lambda: task())
+        except RuntimeError as e:
+            logger.warning("Failed to schedule fire-and-forget task: %s", e)
+            # just run it synchronously
+            task()
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
         from codeweaver.core import AnonymityConversion, FilteredKey

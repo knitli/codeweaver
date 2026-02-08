@@ -11,9 +11,11 @@ import asyncio
 import logging
 
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 import numpy as np
+
+from beartype.typing import ClassVar
 
 from codeweaver.core import CodeChunk, ConfigurationError, Provider, rpartial
 from codeweaver.core import SparseEmbedding as CodeWeaverSparseEmbedding
@@ -65,7 +67,7 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
     """Sentence Transformers embedding provider for dense embeddings."""
 
     client: SentenceTransformer
-    provider: Provider = Provider.SENTENCE_TRANSFORMERS
+    provider: ClassVar[Literal[Provider.SENTENCE_TRANSFORMERS]] = Provider.SENTENCE_TRANSFORMERS
     caps: EmbeddingModelCapabilities | None = None
 
     def _initialize(

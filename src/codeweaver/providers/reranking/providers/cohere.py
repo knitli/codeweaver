@@ -9,7 +9,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator, Sequence
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from pydantic import SkipValidation
 
@@ -75,7 +75,7 @@ class CohereRerankingProvider(RerankingProvider[CohereClient]):
     """Cohere reranking provider."""
 
     client: SkipValidation[CohereClient]
-    _provider = Provider.COHERE
+    _provider = ClassVar[Provider.COHERE]
 
     def _initialize(self) -> None:
         """Initialize the Cohere reranking provider after Pydantic setup."""

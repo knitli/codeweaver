@@ -61,6 +61,7 @@ uv = "latest"
 [tasks.info]
 description = "Print project information"
 run = '''
+echo "running info task"
 echo "${CW_PREFIX} Project: $PROJECT_NAME"
 echo "${CW_PREFIX} Virtual Environment: $VIRTUAL_ENV"
 
@@ -69,6 +70,7 @@ echo "${CW_PREFIX} CodeWeaver Version: $CODEWEAVER_VERSION"
 echo "${CW_PREFIX} Project Path: $CODEWEAVER_PROJECT_PATH"
 '''
 run_windows = '''
+echo "running info task"
 echo [codeweaver] Project: %PROJECT_NAME%
 echo [codeweaver] Virtual Environment: %VIRTUAL_ENV%
 echo [codeweaver] Python Version: %PYTHON_VERSION%
@@ -80,10 +82,12 @@ echo [codeweaver] Project Path: %CODEWEAVER_PROJECT_PATH%
 depends = ["source"]
 tools.uv = "latest"
 run = '''
+echo "running sync task"
 echo "${CW_PREFIX} Syncing dependencies..."
 uv sync --extra full --group dev --group docs --group build --group test
 '''
 run_windows = '''
+echo "running sync task"
 echo [codeweaver] Syncing dependencies...
 uv sync --extra full --group dev --group docs --group build --group test
 '''
@@ -92,12 +96,14 @@ uv sync --extra full --group dev --group docs --group build --group test
 depends = ["source"]
 tools.uv = "latest"
 run = '''
+echo "running sync-gpu task"
 echo "${CW_PREFIX} Syncing GPU dependencies..."
 uv sync --extra full-gpu --group dev --group docs --group build --group test
 '''
 
 [tasks.source]
 run = '''
+echo "running source task"
 # Source the virtual environment
 
 echo "${CW_PREFIX} Sourcing virtual environment..."
@@ -109,6 +115,7 @@ fi
 . .venv/bin/activate || echo "${CW_PREFIX} ⚠️  \033[0;31mFailed to source virtual environment.\033[0m"
 '''
 run_windows = '''
+echo "running source task"
 echo [codeweaver] Sourcing virtual environment...
 git rev-parse --show-toplevel
 .venv\Scripts\activate.bat
@@ -117,7 +124,7 @@ git rev-parse --show-toplevel
 [tasks.setup]
 # Development setup
 run = [
-  "",
+  "echo \"running setup task\"",
   "echo \"${CW_PREFIX} Setting up development environment for the first time...\"",
   "mise set &>/dev/null",
   "mise trust --all &>/dev/null",
@@ -131,6 +138,7 @@ run = [
   "eval \"$(mise activate \"$ACTIVE_SHELL\")\" &>/dev/null",
 ]
 run_windows = [
+  "echo [codeweaver] Running setup task",
   "echo [codeweaver] Setting up development environment for the first time...",
   "mise set > NUL 2>&1",
   "mise trust --all > NUL 2>&1",
@@ -156,6 +164,7 @@ uv = "latest"
 
 [tasks.cloud-setup]
 run = [
+  "echo \"running cloud-setup task\"",
   "echo \"[codeweaver] Setting up cloud development environment...\"",
   "ln -sf AGENTS.md CLAUDE.md",
   '''if ! command -v mise &>/dev/null; then
@@ -200,10 +209,15 @@ usage = '''
 arg "[dir]" help="directory to fix (default: current directory)" default="."
 '''
 run = [
+  "echo \"running fix-python task\"",
   "uvx ruff format \"${usage_dir}\"",
   "uvx ruff check --fix --unsafe-fixes \"${usage_dir}\"",
 ]
-run_windows = ["uvx ruff format .", "uvx ruff check --fix --unsafe-fixes ."]
+run_windows = [
+  "echo \"running fix-python task\"",
+  "uvx ruff format .",
+  "uvx ruff check --fix --unsafe-fixes ."
+]
 file = "scripts/code-quality/fix-ruff-patterns.sh"
 sources = ["{src,scripts,tests,mise-tasks}/*.py"]
 
@@ -214,11 +228,12 @@ tools."pipx:ty" = "latest"
 tools."pipx:reuse" = "latest"
 tools.ruff = "latest"
 run = '''
-
+echo "running check task"
 echo "${CW_PREFIX} Running quality checks..."
 hk check
 '''
 run_windows = '''
+echo "running check task"
 echo [codeweaver] Running quality checks...
 hk check
 '''
@@ -235,6 +250,7 @@ flag "-f --format <format>" {
 flag "--fix" help="Apply auto-fixes"
 '''
 run = '''
+echo "running lint task"
 echo "${CW_PREFIX} Running linting checks..."
 
 # Determine output format (CI overrides)
@@ -252,6 +268,7 @@ fi
 eval "$RUFF_CMD"
 '''
 run_windows = '''
+echo "running lint task"
 echo [codeweaver] Running linting checks...
 
 set OUTPUT_FORMAT=%usage_format%
@@ -266,11 +283,12 @@ if "%usage_fix%"=="true" (
 
 [tasks.format]
 run = '''
-
+echo "running format task"
 echo "${CW_PREFIX} Running formatting checks..."
 hk fix
 '''
 run_windows = '''
+echo "running format task"
 echo [codeweaver] Running formatting checks...
 hk fix
 '''
@@ -289,7 +307,7 @@ yq = "latest"
 
 [tasks.format-fix]
 run = '''
-
+echo "running format-fix task"
 echo "${CW_PREFIX} Applying formatting...hold onto your butts 🚬...🦖 "
 # mise -y //:fix-ruff-patterns || {  # there are some bugs to work out
 #    echo "${CW_PREFIX} ⚠️  \033[0;32mRuff pattern fixer encountered issues.\033[0m"}
@@ -301,6 +319,7 @@ if [ -n "$toml_files" ]; then
 fi
 '''
 run_windows = '''
+echo "running format-fix task"
 echo [codeweaver] Applying formatting...hold onto your butts 🚬...🦖
 uv run ruff format .
 for /f "delims=" %%f in ('git ls-files "*.yaml" "*.yml" "*.json" 2^>NUL') do (
@@ -320,18 +339,27 @@ uv = "latest"
 usage = '''
 arg "[dir]" help="python directory to generate a graph for" default="src"
 '''
-run = '''mise x -- ruff analyze graph --target-version py312 --python .venv/bin/python "${usage_dir:-src/}"'''
-run_windows = '''mise x -- ruff analyze graph --target-version py312 --python .venv\Scripts\python.exe .'''
+run = '''
+echo "running graph task"
+mise x -- ruff analyze graph --target-version py312 --python .venv/bin/python "${usage_dir:-src/}"
+'''
+run_windows = '''
+echo "running graph task"
+mise x -- ruff analyze graph --target-version py312 --python .venv\Scripts\python.exe .
+'''
 
 [tasks.tree]
 tools.uv = "latest"
-run = '''uv tree --no-dev --group full'''
+run = '''
+echo "running tree task"
+uv tree --no-dev --group full
+'''
 
 [tasks.venv]
 env.MISE_EXPERIMENTAL = "1"
 tools.uv = "latest"
 run = '''
-
+echo "running venv task"
 echo "${CW_PREFIX} Setting up Python virtual environment..."
 uv venv --allow-existing --seed --keyring-provider subprocess --python {{ get_env(name="MISE_PYTHON_VERSION", default="3.13") }} --refresh .venv &&
 echo "${CW_PREFIX} ✅ Virtual environment is ready!"
@@ -344,6 +372,7 @@ else
 fi
 '''
 run_windows = '''
+echo "running venv task"
 echo [codeweaver] Setting up Python virtual environment...
 uv venv --allow-existing --seed --keyring-provider subprocess --python {{ get_env(name="MISE_PYTHON_VERSION", default="3.13") }} --refresh .venv
 if %ERRORLEVEL% equ 0 (
@@ -375,6 +404,7 @@ flag "-p --profile <profile>" {
 flag "--cov" help="Run with coverage reporting"
 '''
 run = '''
+echo "running test task"
 echo "${CW_PREFIX} Running tests..."
 
 # Set markers based on profile
@@ -420,6 +450,7 @@ PYTEST_CMD="$PYTEST_CMD -v \"\$@\""
 eval "$PYTEST_CMD"
 '''
 run_windows = '''
+echo "running test task"
 echo [codeweaver] Running tests...
 set PYTEST_MARKS=%usage_marks%
 if "%usage_profile%"=="fast" (
@@ -469,11 +500,13 @@ env.PYTHONPATH = "src"
 tools.uv = "latest"
 tools.python = '''{{ get_env(name="MISE_PYTHON_VERSION", default="3.13") }}'''
 run = '''
+echo "running test-cov task"
 echo "${CW_PREFIX} Running tests with coverage..."
 uv sync --group test --inexact
 uv run pytest tests/ --cov=codeweaver --cov-report=xml --cov-report=term-missing --junit-xml=test-results.xml -v "$@"
 '''
 run_windows = '''
+echo "running test-cov task"
 echo [codeweaver] Running tests with coverage...
 uv sync --group test --inexact
 uv run pytest tests/ --cov=codeweaver --cov-report=xml --cov-report=term-missing --junit-xml=test-results.xml -v %*
@@ -484,6 +517,7 @@ description = "Show test counts by category"
 tools.uv = "latest"
 tools.python = '''{{ get_env(name="MISE_PYTHON_VERSION", default="3.13") }}'''
 run = '''
+echo "running test-categories task"
 echo "${CW_PREFIX} Test counts by category:"
 echo "${CW_PREFIX} Fast unit tests:"
 uv run pytest --collect-only -q -m "unit and not expensive and not requires_models" | grep -E "(test session|tests collected)" || echo "  No matching tests"
@@ -498,6 +532,7 @@ echo "${CW_PREFIX} Heavy tests:"
 uv run pytest --collect-only -q -m "requires_models or expensive" | grep -E "(test session|tests collected)" || echo "  No matching tests"
 '''
 run_windows = '''
+echo [codeweaver] Running test-categories task...
 echo [codeweaver] Test counts by category:
 echo [codeweaver] Fast unit tests:
 uv run pytest --collect-only -q -m "unit and not expensive and not requires_models" | findstr /R "test.*session tests.*collected" || echo   No matching tests
@@ -518,6 +553,7 @@ flag "--deep" help="Perform deep clean (includes .venv and caches)"
 flag "--venv-only" help="Only recreate virtual environment"
 '''
 run = '''
+echo "running clean task"
 if [ "${usage_deep}" = "true" ]; then
     echo "${CW_PREFIX} Performing deep clean..."
     # First clean build artifacts
@@ -543,6 +579,7 @@ else
 fi
 '''
 run_windows = '''
+echo "running clean task"
 if "%usage_deep%"=="true" (
     echo [codeweaver] Performing deep clean...
     if exist dist rd /s /q dist
@@ -578,12 +615,14 @@ if "%usage_deep%"=="true" (
 [tasks.version]
 tools.uv = "latest"
 run = '''
+echo "running version task"
 echo "${CW_PREFIX} CodeWeaver version information:"
 echo "${CW_PREFIX} 📦 Package version: $CODEWEAVER_VERSION"
 echo "${CW_PREFIX} 🐍 Python version: $(python --version)"
 echo "${CW_PREFIX} 🌞 UV version: $(uv --version)"
 '''
 run_windows = '''
+echo "running version task"
 echo [codeweaver] CodeWeaver version information:
 echo [codeweaver] 📦 Package version: %CODEWEAVER_VERSION%
 for /f "delims=" %%v in ('python --version') do echo [codeweaver] Python version: %%v
@@ -593,6 +632,7 @@ for /f "delims=" %%v in ('uv --version') do echo [codeweaver] UV version: %%v
 [tasks.pre-commit]
 env.MISE_EXPERIMENTAL = "1"
 run = [
+  "echo \"${CW_PREFIX} Running pre-commit task...\"",
   "echo \"${CW_PREFIX} Running CodeWeaver pre-commit checks 🪝... Thanks for your contributions! You're pretty cool. 🚀\" || true",
   "mise //:format || echo \"${CW_PREFIX} ⚠️  You need to fix some issues before committing. Do not pass go, do not collect 200 dollars. 💸 😦\" && exit 1",
   "git add .",
@@ -601,6 +641,7 @@ run = [
   "echo \"${CW_PREFIX} ✅ All pre-commit checks passed! You're awesome! 🎉 ... and they said the Kobiyashi Maru was unwinnable! 🖖\"",
 ]
 run_windows = '''
+echo "running pre-commit task"
 echo [codeweaver] Running CodeWeaver pre-commit checks... Thanks for your contributions! You're pretty cool. 🚀
 mise //:format
 if %ERRORLEVEL% neq 0 (
@@ -618,13 +659,25 @@ echo [codeweaver] All pre-commit checks passed! You're awesome!
 '''
 
 [tasks.activate]
-run = '''eval "$(mise activate "$ACTIVE_SHELL")" &>/dev/null'''
-run_windows = '''mise activate cmd'''
+run = '''
+echo "running activate task"
+eval "$(mise activate "$ACTIVE_SHELL")" &>/dev/null
+'''
+run_windows = '''
+echo "running activate task"
+mise activate cmd
+'''
 hide = true
 env.ACTIVE_SHELL = '''{{ exec(command='basename "$SHELL" 2>/dev/null || echo zsh') }}'''
 
 [tasks.activate-shims]
-run = '''eval '"$(mise activate "${ACTIVE_SHELL:-zsh}" --shims)"' &>/dev/null'''
-run_windows = '''mise activate cmd --shims'''
+run = '''
+echo "running activate-shims task"
+eval '"$(mise activate "${ACTIVE_SHELL:-zsh}" --shims)"' &>/dev/null
+'''
+run_windows = '''
+echo "running activate-shims task"
+mise activate cmd --shims
+'''
 hide = true
 env.ACTIVE_SHELL = '''{{ exec(command='basename "$SHELL" 2>/dev/null || echo bash') }}'''

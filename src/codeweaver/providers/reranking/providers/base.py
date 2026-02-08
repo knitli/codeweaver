@@ -35,6 +35,7 @@ from codeweaver.core import (
     RerankingProviderError,
     StatisticsDep,
     ValidationError,
+    asyncio_or_uvloop,
 )
 from codeweaver.core.constants import (
     DEFAULT_OPEN_BREAKER_DURATION,
@@ -324,6 +325,15 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         """
         raise NotImplementedError
 
+    async def _get_loop(self) -> asyncio.AbstractEventLoop | None:
+        """Get the current event loop, if available."""
+        try:
+            loop = asyncio_or_uvloop().get_running_loop()
+        except RuntimeError:
+            return None
+        else:
+            return loop
+
     async def rerank(
         self, query: str, documents: StructuredDataInput, **kwargs: Any
     ) -> Sequence[RerankingResult]:
@@ -353,8 +363,8 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
             # Return empty results on other errors
             return []
 
-        loop = asyncio.get_running_loop()
-        processed_results = self._process_results(reranked, processed_docs)
+        loop = await self._get_loop()
+        processed_results = self._process_results(reranked, processed_docs, loop)
         if len(processed_results) > self.top_n:
             # results already sorted in descending order
             processed_results = processed_results[: self.top_n]
@@ -445,7 +455,9 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
             )
             statistics.add_token_usage(reranking_generated=token_count)
 
-    def _process_results(self, results: Any, raw_docs: Sequence[str]) -> Sequence[RerankingResult]:
+    def _process_results(
+        self, results: Any, raw_docs: Sequence[str], loop: asyncio.AbstractEventLoop | None = None
+    ) -> Sequence[RerankingResult]:
         """Process the results from the reranking.
 
         Note: This sync method is only called from async contexts (from the rerank method).
@@ -453,8 +465,12 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         # voyage and cohere return token count, others do not
         if self.provider not in [Provider.VOYAGE, Provider.COHERE]:
             # We're always called from async context (rerank method), so we can safely get the loop
-            loop = asyncio.get_running_loop()
-            _ = loop.run_in_executor(None, lambda: self._update_token_stats(from_docs=raw_docs))
+            try:
+                loop = loop or asyncio_or_uvloop().get_running_loop()
+                _ = loop.call_soon_threadsafe(lambda: self._update_token_stats(from_docs=raw_docs))
+            except RuntimeError:
+                # just fallback to synchronous update
+                self._update_token_stats(from_docs=raw_docs)
 
         from codeweaver.core import CodeChunk
 

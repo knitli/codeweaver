@@ -8,15 +8,14 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 
 from collections.abc import Callable, Sequence
-from typing import Any, ClassVar, cast
+from typing import Any, ClassVar, Literal, cast
 
 import numpy as np
 
-from codeweaver.core import Provider, rpartial
+from codeweaver.core import Provider, has_package, rpartial
 from codeweaver.core import ValidationError as CodeWeaverValidationError
 from codeweaver.core.constants import DEFAULT_RERANKING_MAX_RESULTS
 from codeweaver.providers.reranking.providers.base import RerankingProvider
@@ -58,7 +57,7 @@ class SentenceTransformersRerankingProvider(RerankingProvider[CrossEncoder]):
     """
 
     client: CrossEncoder
-    _provider: ClassVar[Provider] = Provider.SENTENCE_TRANSFORMERS
+    _provider: ClassVar[Literal[Provider.SENTENCE_TRANSFORMERS]] = Provider.SENTENCE_TRANSFORMERS
 
     def _initialize(self) -> None:
         """
@@ -103,13 +102,13 @@ class SentenceTransformersRerankingProvider(RerankingProvider[CrossEncoder]):
                 prefix=self._query_prefix,
                 suffix=self._doc_suffix,
             )
-            if "Qwen3" in self.caps.name
+            if ("qwen3" in str(self.model_name.lower()))
             else [(query, doc) for doc in documents]
         )
         predict_partial = rpartial(
             cast(Callable[..., np.ndarray], self.client.predict), convert_to_numpy=True
         )
-        loop = asyncio.get_running_loop()
+        loop = await self._get_loop()
         scores = await loop.run_in_executor(None, predict_partial, preprocessed)
         return scores.tolist()
 
@@ -117,18 +116,11 @@ class SentenceTransformersRerankingProvider(RerankingProvider[CrossEncoder]):
         """Sets up Qwen3 specific parameters."""
         if "Qwen3" not in cast(str, self.kwargs["model_name"]):
             return
-        from importlib import metadata
-
-        try:
-            has_flash_attention = metadata.version("flash_attn")
-        except Exception:
-            has_flash_attention = None
-
         if other := self.caps.other:
             self._query_prefix = f"{other.get('prefix', '')}{self.caps.custom_prompt}\n<Query>:\n"
             self._doc_suffix = other.get("suffix", "")
         self.kwargs["model_kwargs"] = {"torch_dtype": "torch.float16"}
-        if has_flash_attention:
+        if has_package("flash_attn"):
             self.kwargs["model_kwargs"]["attention_implementation"] = "flash_attention_2"
 
 

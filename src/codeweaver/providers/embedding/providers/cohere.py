@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+import asyncio
+
 from collections.abc import Sequence
 from typing import Any, ClassVar, Literal, cast
 
@@ -126,16 +128,20 @@ class CohereEmbeddingProvider(EmbeddingProvider[CohereClient]):
             if response.meta and response.meta.tokens
             else None
         )
+        loop = await self._get_loop()
         if tokens:
-            self._fire_and_forget(lambda: self._update_token_stats(token_count=int(tokens)))
+            self._fire_and_forget(
+                lambda: self._update_token_stats(token_count=int(tokens)), loop=loop
+            )
         else:
-            self._fire_and_forget(lambda: self._update_token_stats(from_docs=texts))
+            self._fire_and_forget(lambda: self._update_token_stats(from_docs=texts), loop=loop)
         return response.embeddings.float_ or [[]]
 
     async def _embed_documents(
         self, documents: Sequence[CodeChunk], **kwargs: Any
     ) -> list[list[float]] | list[list[int]]:
         """Embed a list of documents."""
+        await asyncio.sleep(0)
         readied_texts = self.chunks_to_strings(documents)
         return await self._fetch_embeddings(
             cast(list[str], readied_texts), is_query=False, **kwargs

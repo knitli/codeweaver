@@ -11,17 +11,17 @@ Pydantic models and provider class for Bedrock reranking. Excuse the many ty ign
 
 from __future__ import annotations
 
-import asyncio
 import logging
 
 from collections.abc import Iterator, Sequence
-from typing import Annotated, Any, Literal, Self, cast
+from typing import Annotated, Any, ClassVar, Literal, Self, cast
 
 from pydantic import AliasGenerator, ConfigDict, Field, JsonValue, PositiveInt, model_validator
 from pydantic.alias_generators import to_camel, to_snake
 
 from codeweaver.core import BasedModel, CodeChunk, ConfigurationError, Provider, StructuredDataInput
 from codeweaver.core import ValidationError as CodeWeaverValidationError
+from codeweaver.core.constants import DEFAULT_RERANKING_MAX_RESULTS
 from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
 from codeweaver.providers.reranking.providers.base import RerankingProvider, RerankingResult
 
@@ -88,7 +88,7 @@ class BedrockRerankConfiguration(BaseBedrockModel):
     ]
     number_of_results: Annotated[
         PositiveInt, Field(description="""Number of results to return -- this is `top_n`.""")
-    ] = 40
+    ] = DEFAULT_RERANKING_MAX_RESULTS
 
 
 class RerankConfiguration(BaseBedrockModel):
@@ -103,7 +103,7 @@ class RerankConfiguration(BaseBedrockModel):
     ] = "BEDROCK_RERANKING_MODEL"
 
     @classmethod
-    def from_arn(cls, arn: str, top_n: PositiveInt = 10) -> Self:
+    def from_arn(cls, arn: str, top_n: PositiveInt = DEFAULT_RERANKING_MAX_RESULTS) -> Self:
         """Create a RerankConfiguration from a Bedrock model ARN."""
         return cls.model_validate({
             "bedrock_reranking_configuration": {
@@ -210,7 +210,7 @@ class BedrockRerankingResult(BaseBedrockModel):
 
 
 try:
-    from types_boto3_bedrock_agent_runtime.client import AgentsforBedrockRuntimeClient
+    from boto3_types import AgentsforBedrockRuntimeClient
 
 except ImportError as e:
     logger.warning("Failed to import boto3", exc_info=True)
@@ -276,28 +276,27 @@ def bedrock_reranking_output_transformer(
     from codeweaver.core import CodeChunk
 
     parsed_response = BedrockRerankingResult.model_validate_json(cast(bytes, response))
-    results: list[RerankingResult] = []
-    for item in parsed_response.results:
-        # ty doesn't know that this will always be CodeChunk-as-JSON because that's what we send.
-        chunk = CodeChunk.model_validate_json(item.document.json_document)  # ty:ignore[invalid-argument-type]
-        results.append(
-            RerankingResult(
-                original_index=original_chunks.index(chunk)
+    return [
+        RerankingResult(
+            original_index=(
+                original_chunks.index(chunk)
                 if isinstance(original_chunks, tuple)
-                else tuple(original_chunks).index(chunk),
-                score=item.relevance_score,
-                batch_rank=item.index,
-                chunk=chunk,
-            )
+                else tuple(original_chunks).index(chunk)
+            ),
+            score=item.relevance_score,
+            batch_rank=item.index,
+            chunk=chunk,
         )
-    return results
+        for item in parsed_response.results
+        if (chunk := CodeChunk.model_validate_json(cast(bytes, item.document.json_document)))
+    ]
 
 
 class BedrockRerankingProvider(RerankingProvider[AgentsforBedrockRuntimeClient]):
     """Provider for Bedrock reranking."""
 
     client: AgentsforBedrockRuntimeClient
-    _provider = Provider.BEDROCK
+    _provider = ClassVar[Provider.BEDROCK]
     model_configuration: RerankConfiguration
 
     _kwargs: dict[str, Any] | None
@@ -330,7 +329,7 @@ class BedrockRerankingProvider(RerankingProvider[AgentsforBedrockRuntimeClient])
 
         # Extract top_n from reranking config
         rerank_opts = config.reranking_config._as_options().get("rerank", {})
-        top_n_value = rerank_opts.get("number_of_results", 10)
+        top_n_value = rerank_opts.get("number_of_results", DEFAULT_RERANKING_MAX_RESULTS)
 
         # Build model configuration from the model ARN
         # The validator ensures model_arn is in reranking_config.model
@@ -355,7 +354,7 @@ class BedrockRerankingProvider(RerankingProvider[AgentsforBedrockRuntimeClient])
         query: str,
         documents: Sequence[BedrockInlineDocumentSource],
         *,
-        top_n: int = 10,
+        top_n: int = DEFAULT_RERANKING_MAX_RESULTS,
         **kwargs: dict[str, Any] | None,
     ) -> Any:  # ty:ignore[invalid-method-override]
         """
@@ -368,7 +367,7 @@ class BedrockRerankingProvider(RerankingProvider[AgentsforBedrockRuntimeClient])
             "sources": documents,
             "reranking_configuration": config,
         })
-        loop = asyncio.get_running_loop()
+        loop = await self._get_loop()
         return await loop.run_in_executor(None, self.client.rerank, request)
 
 

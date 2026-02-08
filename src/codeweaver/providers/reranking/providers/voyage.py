@@ -10,12 +10,12 @@ from __future__ import annotations
 import logging
 
 from collections.abc import Iterator, Sequence
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, cast
 from warnings import filterwarnings
 
 from pydantic import ConfigDict, SkipValidation
 
-from codeweaver.core import Provider, ProviderError, rpartial
+from codeweaver.core import Provider, ProviderError, asyncio_or_uvloop, rpartial
 from codeweaver.core.constants import DEFAULT_RERANKING_MAX_RESULTS
 from codeweaver.providers.reranking.providers.base import RerankingProvider, RerankingResult
 
@@ -62,7 +62,13 @@ def voyage_reranking_output_transformer(
         )
 
     results, token_count = returned_result.results, returned_result.total_tokens
-    _instance._update_token_stats(token_count=token_count)
+    try:
+        loop = _instance._loop or asyncio_or_uvloop().get_running_loop()
+        _ = loop.call_soon_threadsafe(
+            lambda: _instance._update_token_stats(token_count=token_count)
+        )
+    except RuntimeError:
+        _instance._update_token_stats(token_count=token_count)
     # Sort by relevance_score - handle both tuple (x[2]) and attribute (x.relevance_score) access
     try:
         results.sort(key=lambda x: cast(float, x.relevance_score), reverse=True)
@@ -77,7 +83,7 @@ class VoyageRerankingProvider(RerankingProvider[AsyncClient]):
     model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
 
     client: SkipValidation[AsyncClient]
-    _provider: Provider = Provider.VOYAGE
+    _provider: ClassVar[Literal[Provider.VOYAGE]] = Provider.VOYAGE
 
     def _initialize(self) -> None:
         """Initialize after Pydantic setup."""
@@ -102,6 +108,7 @@ class VoyageRerankingProvider(RerankingProvider[AsyncClient]):
                 model=self.caps.name,
                 top_k=top_n,
             )
+            self._loop = await self._get_loop()
         except Exception as e:
             raise ProviderError(
                 f"Voyage AI reranking request failed: {e}",

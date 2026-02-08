@@ -80,6 +80,7 @@ class TestVoyageRerankingProviderInitialization:
     ):
         """Test that provider initializes correctly with a client."""
         provider = VoyageRerankingProvider(
+            _provider=Provider.VOYAGE,
             client=mock_voyage_rerank_client,
             config=mock_voyage_rerank_config,
             caps=voyage_rerank_capabilities,
@@ -94,6 +95,7 @@ class TestVoyageRerankingProviderInitialization:
     ):
         """Test that _initialize sets the output transformer correctly."""
         provider = VoyageRerankingProvider(
+            _provider=Provider.VOYAGE,
             client=mock_voyage_rerank_client,
             config=mock_voyage_rerank_config,
             caps=voyage_rerank_capabilities,
@@ -107,6 +109,7 @@ class TestVoyageRerankingProviderInitialization:
     ):
         """Test that top_n is set correctly during initialization."""
         provider = VoyageRerankingProvider(
+            _provider=Provider.VOYAGE,
             client=mock_voyage_rerank_client,
             config=mock_voyage_rerank_config,
             caps=voyage_rerank_capabilities,
@@ -120,6 +123,7 @@ class TestVoyageRerankingProviderInitialization:
     ):
         """Test that default top_n is 10."""
         provider = VoyageRerankingProvider(
+            _provider=Provider.VOYAGE,
             client=mock_voyage_rerank_client,
             config=mock_voyage_rerank_config,
             caps=voyage_rerank_capabilities,
@@ -132,6 +136,7 @@ class TestVoyageRerankingProviderInitialization:
     ):
         """Test that custom prompts are stored but not used by Voyage."""
         provider = VoyageRerankingProvider(
+            _provider=Provider.VOYAGE,
             client=mock_voyage_rerank_client,
             config=mock_voyage_rerank_config,
             caps=voyage_rerank_capabilities,
@@ -160,6 +165,7 @@ class TestVoyageRerankingProviderReranking:
         mock_voyage_rerank_client.rerank.return_value = mock_response
 
         provider = VoyageRerankingProvider(
+            _provider=Provider.VOYAGE,
             client=mock_voyage_rerank_client,
             config=mock_voyage_rerank_config,
             caps=voyage_rerank_capabilities,
@@ -196,6 +202,7 @@ class TestVoyageRerankingProviderReranking:
         mock_voyage_rerank_client.rerank.return_value = mock_response
 
         provider = VoyageRerankingProvider(
+            _provider=Provider.VOYAGE,
             client=mock_voyage_rerank_client,
             config=mock_voyage_rerank_config,
             caps=voyage_rerank_capabilities,
@@ -251,6 +258,7 @@ class TestVoyageRerankingProviderReranking:
         mock_voyage_rerank_client.rerank.return_value = mock_response
 
         provider = VoyageRerankingProvider(
+            _provider=Provider.Voyage,
             client=mock_voyage_rerank_client,
             config=mock_voyage_rerank_config,
             caps=voyage_rerank_capabilities,
@@ -281,6 +289,7 @@ class TestVoyageRerankingProviderReranking:
         mock_voyage_rerank_client.rerank.return_value = mock_response
 
         provider = VoyageRerankingProvider(
+            _provider=Provider.VOYAGE,
             client=mock_voyage_rerank_client,
             config=mock_voyage_rerank_config,
             caps=voyage_rerank_capabilities,
@@ -309,6 +318,7 @@ class TestVoyageRerankingProviderErrorHandling:
         mock_voyage_rerank_client.rerank.side_effect = Exception("API error")
 
         provider = VoyageRerankingProvider(
+            _provider=Provider.Voyage,
             client=mock_voyage_rerank_client,
             config=mock_voyage_rerank_config,
             caps=voyage_rerank_capabilities,
@@ -328,6 +338,7 @@ class TestVoyageRerankingProviderErrorHandling:
         mock_voyage_rerank_client.rerank.side_effect = ConnectionError("Connection failed")
 
         provider = VoyageRerankingProvider(
+            _provider=Provider.Voyage,
             client=mock_voyage_rerank_client,
             config=mock_voyage_rerank_config,
             caps=voyage_rerank_capabilities,
@@ -348,6 +359,7 @@ class TestVoyageRerankingProviderErrorHandling:
         mock_voyage_rerank_client.rerank.side_effect = TimeoutError("Request timed out")
 
         provider = VoyageRerankingProvider(
+            _provider=Provider.Voyage,
             client=mock_voyage_rerank_client,
             config=mock_voyage_rerank_config,
             caps=voyage_rerank_capabilities,
@@ -369,6 +381,7 @@ class TestVoyageRerankingProviderProperties:
     ):
         """Test that provider property returns correct value."""
         provider = VoyageRerankingProvider(
+            _provider=Provider.Voyage,
             client=mock_voyage_rerank_client,
             config=mock_voyage_rerank_config,
             caps=voyage_rerank_capabilities,
@@ -381,6 +394,7 @@ class TestVoyageRerankingProviderProperties:
     ):
         """Test that model_name property returns correct value."""
         provider = VoyageRerankingProvider(
+            _provider=Provider.Voyage,
             client=mock_voyage_rerank_client,
             config=mock_voyage_rerank_config,
             caps=voyage_rerank_capabilities,
@@ -393,6 +407,7 @@ class TestVoyageRerankingProviderProperties:
     ):
         """Test that model_capabilities property returns correct value."""
         provider = VoyageRerankingProvider(
+            _provider=Provider.Voyage,
             client=mock_voyage_rerank_client,
             config=mock_voyage_rerank_config,
             caps=voyage_rerank_capabilities,
@@ -412,6 +427,7 @@ class TestVoyageRerankingProviderCircuitBreaker:
         mock_voyage_rerank_client.rerank.side_effect = ConnectionError("Connection failed")
 
         provider = VoyageRerankingProvider(
+            _provider=Provider.Voyage,
             client=mock_voyage_rerank_client,
             config=mock_voyage_rerank_config,
             caps=voyage_rerank_capabilities,
@@ -430,6 +446,7 @@ class TestVoyageRerankingProviderCircuitBreaker:
     ):
         """Test that circuit breaker starts in closed state."""
         provider = VoyageRerankingProvider(
+            _provider=Provider.Voyage,
             client=mock_voyage_rerank_client,
             config=mock_voyage_rerank_config,
             caps=voyage_rerank_capabilities,

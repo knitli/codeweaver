@@ -20,7 +20,15 @@ from typing import Any, ClassVar, Self, cast
 from pydantic import create_model
 from triton.runtime.cache import CacheManager
 
-from codeweaver.core import INJECTED, CodeChunk, ConfigurationError, Provider, ProviderError, TypeIs
+from codeweaver.core import (
+    INJECTED,
+    CodeChunk,
+    ConfigurationError,
+    Provider,
+    ProviderError,
+    TypeIs,
+    asyncio_or_uvloop,
+)
 from codeweaver.core import ValidationError as CodeWeaverValidationError
 from codeweaver.core.types import ModelName
 from codeweaver.providers.config import EmbeddingProviderSettings
@@ -202,26 +210,33 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
         """Get the dimension of the embeddings."""
         return self.embed_options.get("dimensions") or self.caps.default_dimension or 1024
 
-    def _report(self, response: CreateEmbeddingResponse, texts: Sequence[str]) -> None:
+    def _report(
+        self,
+        response: CreateEmbeddingResponse,
+        texts: Sequence[str],
+        loop: asyncio.AbstractEventLoop | None = None,
+    ) -> None:
         """Report token usage statistics.
 
         Note: This sync method is only called from async contexts.
         """
         try:
-            loop = asyncio.get_running_loop()
+            loop = loop or asyncio_or_uvloop().get_running_loop()
             if response.usage and (token_count := response.usage.total_tokens):
-                _ = loop.run_in_executor(
-                    None, lambda: self._update_token_stats(token_count=token_count)
+                _ = loop.call_soon_threadsafe(
+                    lambda: self._update_token_stats(token_count=token_count)
                 )
             else:
-                _ = loop.run_in_executor(None, lambda: self._update_token_stats(from_docs=texts))
+                _ = loop.call_soon_threadsafe(lambda: self._update_token_stats(from_docs=texts))
         except RuntimeError:
             # No running loop - shouldn't happen in normal usage since called from async methods
             # Fall back to synchronous execution
             if response.usage and (token_count := response.usage.total_tokens):
-                self._update_token_stats(token_count=token_count)
+                self._fire_and_forget(
+                    lambda: self._update_token_stats(token_count=token_count), loop=loop
+                )
             else:
-                self._update_token_stats(from_docs=texts)
+                self._fire_and_forget(lambda: self._update_token_stats(from_docs=texts), loop=loop)
 
     async def _get_vectors(
         self, texts: Sequence[str], *, is_query: bool = False, **kwargs: Any
@@ -246,7 +261,8 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
                     "Review API rate limits and quotas",
                 ],
             )
-        self._report(response, cast(list[str], texts))
+        loop = await self._get_loop()
+        self._report(response, cast(list[str], texts), loop=loop)
         results = sorted(response.data, key=lambda x: x.index)
         return [result.embedding for result in results]
 
@@ -266,12 +282,15 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
                     "Convert documents to CodeChunk format before embedding",
                 ],
             )
+        await asyncio.sleep(0)
         texts = self.chunks_to_strings(documents)
+        await asyncio.sleep(0)
         return await self._get_vectors(cast(list[str], texts), **kwargs)
 
     async def _embed_query(
         self, query: Sequence[str], **kwargs: Any
     ) -> list[list[float]] | list[list[int]]:
+        await asyncio.sleep(0)
         return await self._get_vectors(query, is_query=True, **kwargs)
 
 

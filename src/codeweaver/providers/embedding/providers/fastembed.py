@@ -17,7 +17,7 @@ import asyncio
 import logging
 
 from collections.abc import Callable, Iterable, Sequence
-from typing import Any, cast, override
+from typing import Any, ClassVar, Literal, cast, override
 
 import numpy as np
 
@@ -91,7 +91,7 @@ class FastEmbedEmbeddingProvider(EmbeddingProvider[TextEmbedding]):
     """
 
     client: SkipValidation[TextEmbedding]
-    _provider: Provider = Provider.FASTEMBED
+    _provider: ClassVar[Literal[Provider.FASTEMBED]] = Provider.FASTEMBED
 
     _output_transformer: Callable[[Any], list[list[float]] | list[list[int]]] = (
         fastembed_output_transformer
@@ -130,7 +130,7 @@ class FastEmbedEmbeddingProvider(EmbeddingProvider[TextEmbedding]):
             lambda: list(self.client.embed(texts=cast(Iterable[str], ready_documents), **kwargs)),
         )
         partial_tokens = rpartial(self._update_token_stats, from_docs=ready_documents)
-        self._fire_and_forget(partial_tokens)
+        self._fire_and_forget(partial_tokens, loop=loop)
         return await loop.run_in_executor(None, lambda: self._process_output(embeddings))
 
     async def _embed_query(
@@ -141,7 +141,8 @@ class FastEmbedEmbeddingProvider(EmbeddingProvider[TextEmbedding]):
         embeddings = await loop.run_in_executor(
             None, lambda: list(self.client.query_embed(query=query, **kwargs))
         )
-        self._update_token_stats(from_docs=query)
+        await asyncio.sleep(0)
+        self._fire_and_forget(lambda: self._update_token_stats(from_docs=query), loop=loop)
         return self._process_output(embeddings)
 
     @property

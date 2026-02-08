@@ -7,6 +7,8 @@
 
 from __future__ import annotations
 
+import asyncio
+
 from collections.abc import Callable, Sequence
 from typing import Annotated, Any, ClassVar, cast
 
@@ -121,8 +123,10 @@ class VoyageEmbeddingProvider(EmbeddingProvider[AsyncClient]):
             results: EmbeddingsObject = await self.client.embed(
                 texts=ready_documents, **kwargs | self.embed_options
             )
+            await asyncio.sleep(0)
+            loop = await self._get_loop()
             self._fire_and_forget(
-                lambda: self._update_token_stats(token_count=results.total_tokens)
+                lambda: self._update_token_stats(token_count=results.total_tokens), loop=loop
             )
         except Exception as e:
             error_msg = str(e)
@@ -149,7 +153,10 @@ class VoyageEmbeddingProvider(EmbeddingProvider[AsyncClient]):
         results: EmbeddingsObject = await self.client.embed(
             texts=list(query), **kwargs | self.query_options
         )
-        self._fire_and_forget(lambda: self._update_token_stats(token_count=results.total_tokens))
+        loop = await self._get_loop()
+        self._fire_and_forget(
+            lambda: self._update_token_stats(token_count=results.total_tokens), loop=loop
+        )
         return self._process_output(results)
 
     @property

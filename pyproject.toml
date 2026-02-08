@@ -14,7 +14,7 @@ license-files = [
   "./LICENSE-Apache-2.0",
   "./LICENSE-MIT",
   "LICENSES/Apache-2.0.txt",
-  "LICENSES/MIT.txt"
+  "LICENSES/MIT.txt",
 ]
 authors = [
   { name = "Knitli Inc." },
@@ -131,7 +131,7 @@ dependencies = [
   # no easy way to currently separate out stats-only usage from embedding/rerank usage
   "code-weaver-tokenizers",
   # numpy needed for all embedding providers
-  "numpy>=2.4.0",
+  "numpy>=2.4.2",
   # retries
   "tenacity>=9.1.2",
   # for local providers (sentence-transformers, fastembed) to detect CPU/GPU features
@@ -178,7 +178,7 @@ dependencies = [
   "tomli-w>=1.2.0",
   # * ================ Telemetry and Observability ==================*
   # It's telemetry. Our implementation is lightweight and privacy-focused.
-  "posthog>=7.4.2",
+  "posthog>=7.8.2",
 
   #! Not yet used, but planned for future releases
   # * ================ Future Dependencies ==================*
@@ -214,10 +214,7 @@ auth-permitio = ["permit-fastmcp"]
 # Settings/Config Secrets
 aws-secrets-manager = ["pydantic-settings[yaml,toml,aws-secrets-manager]"]
 azure-key-vault = ["pydantic-settings[yaml,toml,azure-key-vault]"]
-bedrock = [
-  "pydantic-ai-slim[bedrock]",
-  "types-boto3-custom",
-]
+bedrock = ["pydantic-ai-slim[bedrock]"]
 cohere = ["pydantic-ai-slim[cohere]"]
 # ==== Data Sources ====
 duckduckgo = ["pydantic-ai-slim[duckduckgo]"]
@@ -238,12 +235,11 @@ full = [
   "permit-fastmcp",
   "eunomia-mcp",
   "exa-py",
-  "pydantic-ai-slim[openai,cohere,google,anthropic,groq,mistral,bedrock,huggingface,duckduckgo,tavily,retries]",
+  "pydantic-ai-slim[openai,cohere,google,anthropic,groq,mistral,bedrock,huggingface,duckduckgo,retries,xai]",
   "pydantic-settings[yaml,toml,aws-secrets-manager,azure-key-vault,gcp-secret-manager]",
   "permit-fastmcp",
   "sentence-transformers",
-  "types-boto3-custom",
-  "tavily"
+  "tavily-python",
 ]
 full-gpu = [
   "permit-fastmcp",
@@ -251,13 +247,12 @@ full-gpu = [
   "fastembed-gpu; python_version < '3.14'",
   "permit-fastmcp",
   "exa-py",
-  "pydantic-ai-slim[openai,cohere,google,anthropic,groq,mistral,bedrock,huggingface,duckduckgo,tavily,retries]",
+  "pydantic-ai-slim[openai,cohere,google,anthropic,groq,mistral,bedrock,huggingface,duckduckgo,retries,xai]",
   "pydantic-settings[yaml,toml,aws-secrets-manager,azure-key-vault,gcp-secret-manager]",
   "sentence-transformers",
   # see note below about why this is commented out
   #  "sentence-transformers[onnx-gpu]; python_version>='3.12' and python_version<'3.14'",
-  "tavily",
-  "types-boto3-custom",
+  "tavily-python",
 ]
 gcp-secret-manager = ["pydantic-settings[yaml,toml,gcp-secret-manager]"]
 google = ["pydantic-ai-slim[google]"]
@@ -285,7 +280,7 @@ recommended = [
   "py-cpuinfo",
   "voyageai",
   "pydantic-ai-slim[openai,anthropic,duckduckgo,retries]",
-  "tavily"
+  "tavily",
 ]
 recommended-local-only = [
   "fastembed; python_version < '3.14'",
@@ -295,10 +290,7 @@ recommended-local-only = [
   # openai for ollama local models
   "pydantic-ai-slim[openai,duckduckgo,retries]",
 ]
-sentence-transformers = [
-  "sentence-transformers",
-  "py-cpuinfo",
-]
+sentence-transformers = ["sentence-transformers", "py-cpuinfo"]
 tavily = ["tavily"]
 # NOTE: Why not GPU or OpenVino support for sentence-transformers?
 # The underlying runtimes for these packages, when resolved against our other dependencies,
@@ -317,6 +309,7 @@ tavily = ["tavily"]
 #     "py-cpuinfo",
 # ]
 voyageai = ["voyageai"]
+xai = ["pydantic-ai-slim[xai]"]
 
 [dependency-groups]
 dev = [
@@ -336,9 +329,7 @@ dev-helpers = [
   "pyperclip>=1.11.0",
   "superclaude>=4.2.0",
 ]
-docs = [
-  "griffe>=1.15.0",
-]
+docs = ["griffe>=1.15.0"]
 test = [
   "dirty-equals>=0.11.0",
   "pytest>=9.0.2",
@@ -356,7 +347,7 @@ test = [
 requires = [
   "hatchling>=1.28.0",
   "twine>=6.2.0",
-  "uv-dynamic-versioning>=0.13.0"
+  "uv-dynamic-versioning>=0.13.0",
 ]
 build-backend = "hatchling.build"
 
@@ -675,14 +666,17 @@ invalid-newtype = "ignore"
 [[tool.ty.overrides]]
 include = [
   "src/codeweaver/providers/embedding/providers/*.py",
-  "src/codeweaver/providers/reranking/providers/*.py"
+  "src/codeweaver/providers/reranking/providers/*.py",
 ]
 
 [tool.ty.overrides.rules]
 unresolved-attribute = "ignore"
 
 [[tool.ty.overrides]]
-include = ["src/codeweaver/**/dependencies.py"]
+include = [
+  "src/codeweaver/*/dependencies.py",
+  "src/codeweaver/*/dependencies/*.py"
+]
 
 [tool.ty.overrides.rules]
 invalid-argument-type = "ignore"
@@ -725,11 +719,26 @@ cache-keys = [
   { dir = "packages" },
 ]
 conflicts = [
-  [{ extra = "full-gpu" }, { extra = "full" }],
-  [{ extra = "full-gpu" }, { package = "fastembed" }],
-  [{ extra = "full" }, { package = "fastembed-gpu" }],
-  [{ extra = "gpu-support" }, { package = "fastembed" }],
-  [{ package = "fastembed" }, { package = "fastembed-gpu" }],
+  [
+    { extra = "full-gpu" },
+    { extra = "full" },
+  ],
+  [
+    { extra = "full-gpu" },
+    { package = "fastembed" },
+  ],
+  [
+    { extra = "full" },
+    { package = "fastembed-gpu" },
+  ],
+  [
+    { extra = "gpu-support" },
+    { package = "fastembed" },
+  ],
+  [
+    { package = "fastembed" },
+    { package = "fastembed-gpu" },
+  ],
 ]
 preview = true
 
@@ -739,7 +748,7 @@ members = ["packages/*"]
 [tool.uv.sources]
 code-weaver-daemon = { workspace = true }
 code-weaver-tokenizers = { workspace = true }
-types-boto3-custom = { path = "vendored/types_boto3_custom-1.41.2-py3-none-any.whl" }
+boto3-types = { path = "./typings/boto3_types/__init__.pyi" }
 
 [tool.uv-dynamic-versioning]
 vcs = "git"

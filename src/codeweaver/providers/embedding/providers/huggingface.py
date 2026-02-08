@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 
 from collections.abc import Iterator, Sequence
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Literal
 
 import numpy as np
 
@@ -58,7 +58,7 @@ class HuggingFaceEmbeddingProvider(EmbeddingProvider[AsyncInferenceClient]):
     """HuggingFace embedding provider."""
 
     client: AsyncInferenceClient
-    _provider: ClassVar[Provider] = Provider.HUGGINGFACE_INFERENCE
+    _provider: ClassVar[Literal[Provider.HUGGINGFACE_INFERENCE]] = Provider.HUGGINGFACE_INFERENCE
     caps: EmbeddingModelCapabilities | None = None
 
     _output_transformer = staticmethod(huggingface_hub_output_transformer)
@@ -93,7 +93,10 @@ class HuggingFaceEmbeddingProvider(EmbeddingProvider[AsyncInferenceClient]):
         """Embed a list of documents into vectors."""
         transformed_input = self.chunks_to_strings(documents)
         all_output = await self._embed_sequence(transformed_input, **kwargs)
-        self._fire_and_forget(lambda: self._update_token_stats(from_docs=transformed_input))
+        loop = await self._get_loop()
+        self._fire_and_forget(
+            lambda: self._update_token_stats(from_docs=transformed_input), loop=loop
+        )
         return self._process_output(all_output)
 
     async def _embed_query(
@@ -102,7 +105,8 @@ class HuggingFaceEmbeddingProvider(EmbeddingProvider[AsyncInferenceClient]):
         """Embed a query into a vector."""
         query = [query] if isinstance(query, str) else query
         output = await self._embed_sequence(query, **kwargs)
-        self._fire_and_forget(lambda: self._update_token_stats(from_docs=query))
+        loop = await self._get_loop()
+        self._fire_and_forget(lambda: self._update_token_stats(from_docs=query), loop=loop)
         return self._process_output(output)
 
 

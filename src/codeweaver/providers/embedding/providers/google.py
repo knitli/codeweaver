@@ -9,8 +9,6 @@ from __future__ import annotations
 import contextlib
 import logging
 
-from genai_prices.types import Provider
-
 
 with contextlib.suppress(Exception):
     import warnings
@@ -25,7 +23,7 @@ with contextlib.suppress(Exception):
 from collections.abc import Iterable, Sequence
 from typing import Any, ClassVar, Literal, cast
 
-from codeweaver.core import BaseEnum, CodeChunk, ConfigurationError
+from codeweaver.core import BaseEnum, CodeChunk, ConfigurationError, Provider
 from codeweaver.providers.embedding.providers.base import (
     EmbeddingCustomDeps,
     EmbeddingImplementationDeps,
@@ -82,7 +80,7 @@ class GoogleEmbeddingProvider(EmbeddingProvider[genai.Client]):
     """Google embedding provider."""
 
     client: genai.Client
-    _provider: ClassVar[Provider] = Provider.GOOGLE
+    _provider: ClassVar[Literal[Provider.GOOGLE]] = Provider.GOOGLE
 
     def _initialize(
         self,
@@ -102,18 +100,22 @@ class GoogleEmbeddingProvider(EmbeddingProvider[genai.Client]):
                 config=genai_types.CountTokensConfig(),
             )
             if response and response.total_tokens is not None and response.total_tokens > 0:
+                loop = self._get_loop()
                 _ = self._fire_and_forget(
-                    lambda: self._update_token_stats(token_count=cast(int, response.total_tokens))
+                    lambda: self._update_token_stats(token_count=cast(int, response.total_tokens)),
+                    loop=loop,
                 )
         except genai_errors.APIError:
             logger.warning(
                 "Error requesting token stats from Google. Falling back to local tokenizer for approximation.",
                 exc_info=True,
             )
+            loop = self._get_loop()
             _ = self._fire_and_forget(
                 lambda: self._update_token_stats(
                     from_docs=[cast(str, part.text) for part in documents]
-                )
+                ),
+                loop=loop,
             )
 
     async def _embed_documents(

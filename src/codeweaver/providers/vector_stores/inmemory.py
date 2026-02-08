@@ -14,6 +14,8 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar, Literal
 
+from anyio import Path as AsyncPath
+
 from codeweaver.core import (
     CodeChunk,
     PersistenceError,
@@ -104,7 +106,7 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
             )
             sys.stdout.flush()
         # Restore from disk if persistence file exists (and not in test mode)
-        if not is_test_environment() and self.persist_path.exists():
+        if not is_test_environment() and await AsyncPath(str(self.persist_path)).exists():
             await self._restore_from_disk()
 
         # Set up periodic persistence if configured
@@ -130,11 +132,12 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
             PersistenceError: Failed to write persistence file.
         """
         # Atomic persistence via temporary directory
-        temp_path = self.persist_path.with_suffix(".tmp")
+        persist_path = AsyncPath(str(self.persist_path))
+        temp_path = persist_path.with_suffix(".tmp")
         if temp_path.exists():
             import shutil
 
-            shutil.rmtree(temp_path)
+            await asyncio.to_thread(shutil.rmtree, str(temp_path))
 
         try:
             # Initialize persistent client at temp path
@@ -148,20 +151,19 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
             await dest_client.close()
 
             # Atomic replace
-            if self.persist_path.exists():
+            if await temp_path.exists():
                 import shutil
 
-                if self.persist_path.is_dir():
-                    shutil.rmtree(str(self.persist_path))
+                if await temp_path.is_dir():
+                    await asyncio.to_thread(shutil.rmtree, str(self.persist_path))
                 else:
-                    self.persist_path.unlink()
+                    await persist_path.unlink()
 
-            temp_path.rename(str(self.persist_path))
+            await temp_path.rename(str(self.persist_path))
         except Exception as e:
-            if temp_path.exists():
+            if await temp_path.exists():
                 import shutil
-
-                shutil.rmtree(temp_path)
+            await asyncio.to_thread(shutil.rmtree, str(temp_path))
             raise PersistenceError(f"Failed to persist to disk: {e}") from e
 
     async def _restore_from_disk(self) -> None:
@@ -170,11 +172,12 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
         Raises:
             PersistenceError: Failed to restore from disk.
         """
-        if not self.persist_path.exists():
+        persist_path = AsyncPath(str(self.persist_path))
+        if not await persist_path.exists():
             return
 
         # Check if it's a directory
-        if self.persist_path.is_dir():
+        if await persist_path.is_dir():
             try:
                 source_client = AsyncQdrantClient(path=str(self.persist_path))
                 await self.migrate_from(source_client)

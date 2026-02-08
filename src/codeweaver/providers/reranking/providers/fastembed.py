@@ -9,8 +9,11 @@ from __future__ import annotations
 
 import logging
 
-from collections.abc import Sequence
-from typing import Any, ClassVar
+from collections.abc import Callable, Sequence
+from functools import partial
+from typing import Any, ClassVar, cast
+
+import numpy as np
 
 from codeweaver.core import Provider, ProviderError
 from codeweaver.core.constants import DEFAULT_RERANKING_MAX_RESULTS
@@ -55,9 +58,16 @@ class FastEmbedRerankingProvider(RerankingProvider[TextCrossEncoder]):
         try:
             # our batch_size needs to be the number of documents because we only get back the scores.
             # If we set it to a lower number, we wouldn't know what documents the scores correspond to without some extra setup.
-            response = self.client.rerank(
-                query=query, documents=documents, batch_size=len(documents), **(kwargs or {})
+            loop = await self._get_loop()
+            partial_func = partial(
+                cast(Callable[..., np.ndarray], self.client.rerank),
+                query=query,
+                documents=documents,
+                batch_size=len(documents),
+                convert_to_numpy=True,
+                **(kwargs or {}),
             )
+            response = await loop.run_in_executor(None, partial_func)
         except Exception as e:
             raise ProviderError(
                 f"FastEmbed reranking execution failed: {e}",
@@ -77,7 +87,7 @@ class FastEmbedRerankingProvider(RerankingProvider[TextCrossEncoder]):
                 ],
             ) from e
         else:
-            return response
+            return response.tolist()
 
 
 __all__ = ("FastEmbedRerankingProvider",)
