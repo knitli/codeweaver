@@ -114,7 +114,7 @@ def load_default_agent_providers() -> Generator[type[AgentProvider[Provider]], N
     for provider in Provider:
         if provider == Provider.NOT_SET:
             continue
-        kinds = get_provider_kinds(provider)  # type: ignore
+        kinds = get_provider_kinds(provider)
         if ProviderKind.AGENT in kinds:
             with contextlib.suppress(ValueError, AttributeError, ImportError):
                 if agent_provider := get_agent_model_provider(provider):  # type: ignore

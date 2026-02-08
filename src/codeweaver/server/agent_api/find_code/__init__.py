@@ -306,8 +306,8 @@ async def _finalize_response(
 
     if telemetry_settings.tools_over_privacy:
         feature_flags = {
-            "search-ranking-v2": telemetry.client.get_feature_flag("search-ranking-v2"),  # ty:ignore[unresolved-attribute]
-            "rerank-strategy": telemetry.client.get_feature_flag("rerank-strategy"),  # ty:ignore[unresolved-attribute]
+            "search-ranking-v2": telemetry.client.get_feature_flag("search-ranking-v2"),
+            "rerank-strategy": telemetry.client.get_feature_flag("rerank-strategy"),
         }
         try:
             capture_search_event(

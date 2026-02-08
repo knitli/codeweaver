@@ -244,7 +244,7 @@ class BaseEnum(Enum):
                 if isinstance(alias, str):
                     names.add(alias)
                 elif isinstance(alias, list | tuple):
-                    names |= set(alias)  # type: ignore
+                    names |= set(alias)
             names |= {n for name in names.copy() for n in self._multiply_variations(name)}
             return tuple(sorted(names))
         return (self.value, self.name, self.variable, self.as_title)
@@ -511,11 +511,11 @@ class AnonymityConversion(BaseEnum):
             AnonymityConversion.BOOLEAN: lambda v: bool(v),
             AnonymityConversion.COUNT: lambda v: len(v) if isinstance(v, list) else 1,
             AnonymityConversion.DISTRIBUTION: lambda v: (
-                {item: v.count(item) for item in set(v)}  # type: ignore
+                {item: v.count(item) for item in set(v)}
                 if (isinstance(v, Sequence) and not isinstance(v, str))
                 else {v: 1}
-            ),  # type: ignore
-            AnonymityConversion.AGGREGATE: lambda v: sum(v) if isinstance(v, list) else v,  # type: ignore
+            ),
+            AnonymityConversion.AGGREGATE: lambda v: sum(v) if isinstance(v, list) else v,
             AnonymityConversion.HASH: lambda v: _hash_it(v),
             AnonymityConversion.TEXT_COUNT: lambda v: len(v) if isinstance(v, str) else 0,
             AnonymityConversion.FORBIDDEN: lambda v: None,  # Accept value but return None

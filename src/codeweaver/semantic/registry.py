@@ -83,11 +83,11 @@ class ThingRegistry:
         ) = {}, {}, {}, {}, {}
         for lang in SemanticSearchLanguage:
             # pylance complains because the defaultdict isn't the TypedDict
-            self._tokens[lang] = defaultdict(dict)  # type: ignore
-            self._composite_things[lang] = defaultdict(dict)  # type: ignore
-            self._categories[lang] = defaultdict(dict)  # type: ignore
-            self._direct_connections[lang] = defaultdict(dict)  # type: ignore
-            self._positional_connections[lang] = defaultdict(dict)  # type: ignore
+            self._tokens[lang] = defaultdict(dict)
+            self._composite_things[lang] = defaultdict(dict)
+            self._categories[lang] = defaultdict(dict)
+            self._direct_connections[lang] = defaultdict(dict)
+            self._positional_connections[lang] = defaultdict(dict)
 
         self._contents = self._tokens, self._composite_things, self._categories
         self._connections = self._direct_connections, self._positional_connections
@@ -189,7 +189,7 @@ class ThingRegistry:
             from codeweaver.semantic.grammar import CompositeThing
 
             self._composite_things[SemanticSearchLanguage.JSX][thing.name] = (
-                CompositeThing.model_construct(  # type: ignore
+                CompositeThing.model_construct(
                     thing.model_fields_set,
                     **(
                         thing.model_dump(
@@ -251,7 +251,7 @@ class ThingRegistry:
         assert isinstance(connection, DirectConnection)  # noqa: S101
         if connection.source_thing not in self._direct_connections[connection.language]:
             self._direct_connections[connection.language][connection.source_thing] = []
-        self._direct_connections[connection.language][connection.source_thing].append(connection)  # type: ignore
+        self._direct_connections[connection.language][connection.source_thing].append(connection)
         logger.debug("Registered %s", connection)
         if connection.language == SemanticSearchLanguage.JAVASCRIPT:
             js_connection = DirectConnection.model_construct(
@@ -280,7 +280,7 @@ class ThingRegistry:
                 ] = []
             self._direct_connections[SemanticSearchLanguage.JSX][js_connection.source_thing].append(
                 js_connection
-            )  # type: ignore
+            )
             logger.debug("Registered %s", js_connection)
 
     def register_connections(
@@ -338,7 +338,7 @@ class ThingRegistry:
                     for con_name, conns in content.items()
                     if con_name == source
                 ),
-                [],  # type: ignore
+                [],
             )
         )
 

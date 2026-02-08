@@ -72,7 +72,7 @@ class CodeWeaverEngineSettings(CodeWeaverProviderSettings):
         FailoverSettings | Unset, Field(description="Failover configuration for service resilience")
     ] = UNSET
 
-    def _initialize(self, **kwargs: Any) -> dict[str, Any]:  # ty:ignore[invalid-method-override]
+    def _initialize(self, **kwargs: Any) -> dict[str, Any]:
         """Initialize engine settings - nothing special needed."""
         if "indexer" not in kwargs or kwargs.get("indexer") is UNSET:
             kwargs["indexer"] = IndexerSettings.model_construct(**DefaultIndexerSettings)

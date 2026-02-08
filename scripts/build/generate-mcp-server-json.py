@@ -48,7 +48,7 @@ class McpInputDict(TypedDict):
 def get_settings_env_vars() -> list[McpInputDict]:
     """Get all general codeweaver settings environment variables."""
     return sorted(
-        (McpInputDict(**var.as_mcp_info()) for var in environment_variables().values()),  # type: ignore[misc]
+        (McpInputDict(**var.as_mcp_info()) for var in environment_variables().values()),
         key=lambda v: v["name"],
     )
 
@@ -75,7 +75,7 @@ def get_provider_env_vars() -> dict[Provider, list[McpInputDict]]:
     """Get all provider-specific environment variables."""
     return {
         provider: sorted(
-            (McpInputDict(**var.as_mcp_info()) for var in var_infos),  # type: ignore[misc]
+            (McpInputDict(**var.as_mcp_info()) for var in var_infos),
             key=lambda v: v["name"],
         )
         for provider, var_infos in _all_var_infos().items()
@@ -540,7 +540,7 @@ def all_env_vars() -> list[McpInputDict]:
     """Get all environment variables, both general and provider-specific."""
     general_vars = get_settings_env_vars()
     generalized_provider_vars = sorted(
-        (McpInputDict(**var.as_mcp_info()) for var in _generalized_provider_env_vars()),  # type: ignore[misc]
+        (McpInputDict(**var.as_mcp_info()) for var in _generalized_provider_env_vars()),
         key=lambda v: v["name"],
     )
 

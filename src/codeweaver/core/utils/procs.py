@@ -66,7 +66,7 @@ def effective_cpu_count() -> PositiveInt:
 
     cpu_count = get_cpu_count()
     cgroup_limits = psutil.Process().cpu_affinity()
-    effective_count = min(len(cgroup_limits), cpu_count)  # type: ignore[arg-type]
+    effective_count = min(len(cgroup_limits), cpu_count)
     # WSL reports full CPU count, but will sometimes hang or crash if all are used
     return _wsl_count(effective_count)
 

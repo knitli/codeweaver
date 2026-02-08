@@ -77,7 +77,7 @@ class CodeWeaverProviderSettings(CodeWeaverCoreSettings):
         else UNSET
     )  # ty: ignore[invalid-assignment]
 
-    def _initialize(self, **kwargs: Any) -> dict[str, Any]:  # ty:ignore[invalid-method-override]
+    def _initialize(self, **kwargs: Any) -> dict[str, Any]:
         """Initialize provider settings."""
         profile_config = (
             profile.as_provider_settings()

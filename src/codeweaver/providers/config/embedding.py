@@ -625,7 +625,7 @@ class BedrockEmbeddingConfig(BaseEmbeddingConfig):
         self.model = self.model or {}  # ty:ignore[invalid-assignment]
         if str(self.model_name).startswith("amazon.titan-embed"):
             datatype = "binary" if "binary" in datatype else "float"
-            self.model["embedding_types"] = datatype  # ty:ignore[invalid-assignment]
+            self.model["embedding_types"] = datatype
         elif "cohere" in str(self.model_name):
             datatype = (
                 "float"

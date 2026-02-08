@@ -88,12 +88,12 @@ class DependsPlaceholder(Sentinel):
 
 _injected_sentinel: DependsPlaceholder = DependsPlaceholder(
     name=SentinelName("InjectedDependency"), module_name=Sentinel._get_module_name_generator()()
-)  # ty:ignore[invalid-argument-type]
+)
 
 # INJECTED is a proxy that supports subscripting while wrapping the sentinel.
 # Type annotation uses Any to allow it to work as a default value for any dependency-injected
 # parameter. Type checkers will infer the correct type from the parameter annotation.
-INJECTED: _InjectedProxy[Any, DependsPlaceholder] = _InjectedProxy(_injected_sentinel)  # type: ignore[assignment]
+INJECTED: _InjectedProxy[Any, DependsPlaceholder] = _InjectedProxy(_injected_sentinel)
 
 
 class Depends:

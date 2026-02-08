@@ -164,9 +164,9 @@ def test_duplicate_functions_deduplicated(
 
     # Verify that all chunks have content hashes
     content_hashes = {
-        chunk.metadata["context"]["content_hash"]
+        chunk.metadata.get("context", {}).get("content_hash")
         for chunk in chunks
-        if chunk.metadata and "context" in chunk.metadata
+        if chunk.metadata and chunk.metadata.get("context", {})
     }
 
     # All chunks should have content hashes

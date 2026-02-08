@@ -799,7 +799,7 @@ class NodeTypeParser:
     def _build_thing(self, node_dto: NodeTypeDTO, thing: type[ThingType]) -> ThingType:
         """Build a Thing (Token or CompositeThing) from a NodeTypeDTO and register it."""
         category_names = self._get_node_categories(node_dto)
-        return thing.from_node_dto(node_dto, category_names=category_names)  # type: ignore
+        return thing.from_node_dto(node_dto, category_names=category_names)
 
     def _parse_node_array(self, node_array: NodeArray) -> list[ThingOrCategoryType]:
         """Parse and translate a single node types file into internal representation.
@@ -892,7 +892,7 @@ if __name__ == "__main__":
         from rich.console import Console
 
         console = Console(markup=True)
-        print = console.print  # type: ignore  # noqa: A001
+        print = console.print  # noqa: A001
         has_rich = True
     parser = NodeTypeParser()
     all_things = parser.parse_all_nodes()
@@ -901,20 +901,20 @@ if __name__ == "__main__":
         all_things,
         key=lambda x: (
             x.language.as_title,
-            x.is_composite if hasattr(x, "is_composite") else False,  # type: ignore
+            x.is_composite if hasattr(x, "is_composite") else False,
             x.name,
         ),
     ):
         print(
-            f" - [bold dark_orange]{thing.language.as_title}[/bold dark_orange]: [cyan]{thing.name}[/cyan] [green]({thing.kind if hasattr(thing, 'kind') else 'Category'})[/green]"  # type: ignore
+            f" - [bold dark_orange]{thing.language.as_title}[/bold dark_orange]: [cyan]{thing.name}[/cyan] [green]({thing.kind if hasattr(thing, 'kind') else 'Category'})[/green]"
             if has_rich
-            else f" - {thing.language.as_title}: {thing.name} ({thing.kind if True else 'Category'})"  # type: ignore
+            else f" - {thing.language.as_title}: {thing.name} ({thing.kind if True else 'Category'})"
         )
     print(
         f"[magenta]Total: {len(all_things)} Things and Categories[/magenta]"
         if has_rich
         else f"Total: {len(all_things)} Things and Categories"
-    )  # type: ignore
+    )
 
 
 __all__ = ("NodeArray", "NodeTypeFileLoader", "NodeTypeParser", "get_things")

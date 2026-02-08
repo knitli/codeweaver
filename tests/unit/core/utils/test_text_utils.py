@@ -63,7 +63,7 @@ def test_walk_pattern_type_error_non_string(input_value) -> None:
     # Act
 
     with pytest.raises(TypeError) as exc_info:
-        _walk_pattern(input_value)  # type: ignore[arg-type]
+        _walk_pattern(input_value)
 
     # Assert
 

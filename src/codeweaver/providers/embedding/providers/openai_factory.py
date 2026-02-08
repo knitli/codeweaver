@@ -200,7 +200,7 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
     @property
     def dimension(self) -> int:
         """Get the dimension of the embeddings."""
-        return self.embed_options.get("dimensions") or self.caps.default_dimension or 1024  # type: ignore
+        return self.embed_options.get("dimensions") or self.caps.default_dimension or 1024
 
     def _report(self, response: CreateEmbeddingResponse, texts: Sequence[str]) -> None:
         """Report token usage statistics.

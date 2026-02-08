@@ -41,7 +41,7 @@ except ImportError as e:
 # SparseEncoder is not available in all versions of sentence-transformers
 # Import it conditionally for sparse embedding support
 try:
-    from sentence_transformers.sparse_encoder import SparseEncoder  # ty: ignore[unresolved-import]
+    from sentence_transformers.sparse_encoder import SparseEncoder
 
     HAS_SPARSE_ENCODER = True
 except ImportError:
@@ -90,7 +90,7 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
         if "nomic" in str(self.model_name):
             preprocessed = [f"search_document: {doc}" for doc in preprocessed]
 
-        embed_partial = rpartial(self.client.encode_document, **self.embed_options)  # type: ignore
+        embed_partial = rpartial(self.client.encode_document, **self.embed_options)
         loop = asyncio.get_running_loop()
         results: np.ndarray = await loop.run_in_executor(None, embed_partial, preprocessed)  # type: ignore
         _ = self._fire_and_forget(lambda: self._update_token_stats(from_docs=preprocessed))
@@ -102,11 +102,11 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
         """Embed a sequence of queries."""
         preprocessed = cast(list[str], query)
         if "qwen3" in self.model_name.lower() or "instruct" in self.model_name.lower():
-            preprocessed = self.preprocess(preprocessed)  # type: ignore
+            preprocessed = self.preprocess(preprocessed)
         elif "nomic" in str(self.model_name):
             preprocessed = [f"search_query: {query}" for query in preprocessed]
         # Filter incoming kwargs to remove dict structure keys before merging
-        embed_partial = rpartial(self.client.encode_query, **self.query_options)  # type: ignore
+        embed_partial = rpartial(self.client.encode_query, **self.query_options)
         loop = asyncio.get_running_loop()
         results: np.ndarray = await loop.run_in_executor(None, embed_partial, preprocessed)  # type: ignore
         _ = self._fire_and_forget(
@@ -120,7 +120,7 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
         if self.client is None:
             return {}
         # ty doesn't like these because the model doesn't exist statically
-        if isinstance(self.client, SentenceTransformer) and callable(self.client[1]):  # type: ignore
+        if isinstance(self.client, SentenceTransformer) and callable(self.client[1]):
             return self.client[1].get_config_dict()  # type: ignore
         return {}
 
@@ -129,16 +129,16 @@ class SentenceTransformersEmbeddingProvider(EmbeddingProvider[SentenceTransforme
         """Returns the transformer configuration for the SentenceTransformer."""
         if self.client is None:
             return {}
-        if isinstance(self.client, SentenceTransformer) and callable(self.client[0]):  # type: ignore
+        if isinstance(self.client, SentenceTransformer) and callable(self.client[0]):
             return self.client[0].get_config_dict()  # type: ignore
         return {}
 
 
 # Use SparseEncoder if available, otherwise use Any as a placeholder
-_SparseEncoderType = SparseEncoder if HAS_SPARSE_ENCODER else Any  # type: ignore
+_SparseEncoderType = SparseEncoder if HAS_SPARSE_ENCODER else Any
 
 
-class SentenceTransformersSparseProvider(SparseEmbeddingProvider[_SparseEncoderType]):  # type: ignore
+class SentenceTransformersSparseProvider(SparseEmbeddingProvider[_SparseEncoderType]):
     """Sentence Transformers sparse embedding provider.
 
     This provider handles sparse embeddings from SparseEncoder models,
@@ -193,15 +193,12 @@ class SentenceTransformersSparseProvider(SparseEmbeddingProvider[_SparseEncoderT
 
     async def _embed_documents(
         self, documents: Sequence[CodeChunk], **kwargs: Any
-    ) -> list[CodeWeaverSparseEmbedding]:  # ty:ignore[invalid-method-override]
+    ) -> list[CodeWeaverSparseEmbedding]:
         """Embed a sequence of documents into sparse vectors."""
         preprocessed = cast(list[str], self.chunks_to_strings(documents))
-        embed_partial = rpartial(  # type: ignore
-            self.client.encode,  # type: ignore
-            **(self.client_options | kwargs),
-        )
+        embed_partial = rpartial(self.client.encode, **(self.client_options | kwargs))
         loop = asyncio.get_running_loop()
-        results = await loop.run_in_executor(None, embed_partial, preprocessed)  # type: ignore
+        results = await loop.run_in_executor(None, embed_partial, preprocessed)
         _ = self._fire_and_forget(lambda: self._update_token_stats(from_docs=preprocessed))
 
         formatted_results = [self._to_sparse_format(emb) for emb in results]
@@ -210,15 +207,12 @@ class SentenceTransformersSparseProvider(SparseEmbeddingProvider[_SparseEncoderT
 
     async def _embed_query(
         self, query: Sequence[str], **kwargs: Any
-    ) -> list[CodeWeaverSparseEmbedding]:  # ty:ignore[invalid-method-override]
+    ) -> list[CodeWeaverSparseEmbedding]:
         """Embed a sequence of queries into sparse vectors."""
         preprocessed = cast(list[str], query)
-        embed_partial = rpartial(  # type: ignore
-            self.client.encode,  # type: ignore
-            **(self.query_options | kwargs),
-        )
+        embed_partial = rpartial(self.client.encode, **(self.query_options | kwargs))
         loop = asyncio.get_running_loop()
-        results = await loop.run_in_executor(None, embed_partial, preprocessed)  # type: ignore
+        results = await loop.run_in_executor(None, embed_partial, preprocessed)
         _ = self._fire_and_forget(lambda: self._update_token_stats(from_docs=preprocessed))
 
         formatted_results = [self._to_sparse_format(emb) for emb in results]

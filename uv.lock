@@ -176,16 +176,15 @@ wheels = [
 
 [[package]]
 name = "anyio"
-version = "4.11.0"
+version = "4.12.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "idna" },
-    { name = "sniffio" },
     { name = "typing-extensions", marker = "python_full_version < '3.13' or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'project-13-fastembed-gpu') or (extra == 'extra-11-code-weaver-full-gpu' and extra == 'project-9-fastembed') or (extra == 'extra-11-code-weaver-gpu-support' and extra == 'project-9-fastembed') or (extra == 'project-13-fastembed-gpu' and extra == 'project-9-fastembed')" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c6/78/7d432127c41b50bccba979505f272c16cbcadcc33645d5fa3a738110ae75/anyio-4.11.0.tar.gz", hash = "sha256:82a8d0b81e318cc5ce71a5f1f8b5c4e63619620b63141ef8c995fa0db95a57c4", size = 219094, upload-time = "2025-09-23T09:19:12.58Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/96/f0/5eb65b2bb0d09ac6776f2eb54adee6abe8228ea05b20a5ad0e4945de8aac/anyio-4.12.1.tar.gz", hash = "sha256:41cfcc3a4c85d3f05c932da7c26d0201ac36f72abd4435ba90d0464a3ffed703", size = 228685, upload-time = "2026-01-06T11:45:21.246Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/15/b3/9b1a8074496371342ec1e796a96f99c82c945a339cd81a8e73de28b4cf9e/anyio-4.11.0-py3-none-any.whl", hash = "sha256:0287e96f4d26d4149305414d4e3bc32f0dcd0862365a4bddea19d7a1ec38c4fc", size = 109097, upload-time = "2025-09-23T09:19:10.601Z" },
+    { url = "https://files.pythonhosted.org/packages/38/0e/27be9fdef66e72d64c0cdc3cc2823101b80585f8119b5c112c2e8f5f7dab/anyio-4.12.1-py3-none-any.whl", hash = "sha256:d405828884fc140aa80a3c667b8beed277f1dfedec42ba031bd6ac3db606ab6c", size = 113592, upload-time = "2026-01-06T11:45:19.497Z" },
 ]
 
 [[package]]
@@ -675,6 +674,7 @@ wheels = [
 name = "code-weaver"
 source = { editable = "." }
 dependencies = [
+    { name = "anyio" },
     { name = "ast-grep-py" },
     { name = "blake3" },
     { name = "boto3" },
@@ -756,6 +756,7 @@ full = [
     { name = "pydantic-ai-slim", extra = ["anthropic", "bedrock", "cohere", "duckduckgo", "google", "groq", "huggingface", "mistral", "openai", "retries", "tavily"], marker = "extra == 'extra-11-code-weaver-full' or (extra == 'extra-11-code-weaver-full-gpu' and extra == 'project-9-fastembed') or (extra == 'extra-11-code-weaver-gpu-support' and extra == 'project-9-fastembed') or (extra == 'project-13-fastembed-gpu' and extra == 'project-9-fastembed')" },
     { name = "pydantic-settings", extra = ["aws-secrets-manager", "azure-key-vault", "gcp-secret-manager", "toml", "yaml"], marker = "extra == 'extra-11-code-weaver-full' or (extra == 'extra-11-code-weaver-full-gpu' and extra == 'project-9-fastembed') or (extra == 'extra-11-code-weaver-gpu-support' and extra == 'project-9-fastembed') or (extra == 'project-13-fastembed-gpu' and extra == 'project-9-fastembed')" },
     { name = "sentence-transformers" },
+    { name = "tavily" },
     { name = "types-boto3-custom" },
 ]
 full-gpu = [
@@ -766,6 +767,8 @@ full-gpu = [
     { name = "pydantic-ai-slim", extra = ["anthropic", "bedrock", "cohere", "duckduckgo", "google", "groq", "huggingface", "mistral", "openai", "retries", "tavily"], marker = "extra == 'extra-11-code-weaver-full-gpu' or (extra == 'extra-11-code-weaver-full' and extra == 'project-13-fastembed-gpu') or (extra == 'extra-11-code-weaver-gpu-support' and extra != 'project-13-fastembed-gpu' and extra == 'project-9-fastembed') or (extra != 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-gpu-support' and extra == 'project-9-fastembed') or (extra != 'extra-11-code-weaver-gpu-support' and extra == 'project-13-fastembed-gpu' and extra == 'project-9-fastembed')" },
     { name = "pydantic-settings", extra = ["aws-secrets-manager", "azure-key-vault", "gcp-secret-manager", "toml", "yaml"], marker = "extra == 'extra-11-code-weaver-full-gpu' or (extra == 'extra-11-code-weaver-full' and extra == 'project-13-fastembed-gpu') or (extra == 'extra-11-code-weaver-gpu-support' and extra != 'project-13-fastembed-gpu' and extra == 'project-9-fastembed') or (extra != 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-gpu-support' and extra == 'project-9-fastembed') or (extra != 'extra-11-code-weaver-gpu-support' and extra == 'project-13-fastembed-gpu' and extra == 'project-9-fastembed')" },
     { name = "sentence-transformers" },
+    { name = "tavily" },
+    { name = "types-boto3-custom" },
 ]
 gcp-secret-manager = [
     { name = "pydantic-settings", extra = ["gcp-secret-manager", "toml", "yaml"] },
@@ -798,8 +801,9 @@ qdrant = [
 recommended = [
     { name = "fastembed", marker = "(python_full_version < '3.14' and extra != 'extra-11-code-weaver-full' and extra == 'project-9-fastembed') or (python_full_version < '3.14' and extra != 'extra-11-code-weaver-full-gpu' and extra != 'project-13-fastembed-gpu' and extra == 'project-9-fastembed') or (extra == 'extra-11-code-weaver-full' and extra == 'extra-11-code-weaver-full-gpu') or (extra == 'extra-11-code-weaver-full' and extra == 'project-13-fastembed-gpu') or (extra == 'extra-11-code-weaver-full-gpu' and extra == 'project-9-fastembed') or (extra == 'extra-11-code-weaver-gpu-support' and extra == 'project-9-fastembed') or (extra == 'project-13-fastembed-gpu' and extra == 'project-9-fastembed')" },
     { name = "py-cpuinfo" },
-    { name = "pydantic-ai-slim", extra = ["anthropic", "duckduckgo", "openai", "retries", "tavily"] },
+    { name = "pydantic-ai-slim", extra = ["anthropic", "duckduckgo", "openai", "retries"] },
     { name = "sentence-transformers" },
+    { name = "tavily" },
     { name = "tokenizers" },
     { name = "voyageai" },
 ]
@@ -860,13 +864,14 @@ test = [
 
 [package.metadata]
 requires-dist = [
+    { name = "anyio", specifier = ">4.12.0" },
     { name = "ast-grep-py", specifier = ">=0.40.3" },
     { name = "blake3", specifier = ">=1.0.8" },
     { name = "boto3", specifier = "==1.42.19" },
     { name = "code-weaver-daemon", editable = "packages/codeweaver-daemon" },
     { name = "code-weaver-tokenizers", editable = "packages/codeweaver-tokenizers" },
     { name = "cohere", specifier = "==5.20.1" },
-    { name = "cyclopts", specifier = ">=4.4.3" },
+    { name = "cyclopts", specifier = ">=4.5.1" },
     { name = "eunomia-mcp", marker = "extra == 'auth-eunomia'" },
     { name = "eunomia-mcp", marker = "extra == 'full'" },
     { name = "eunomia-mcp", marker = "extra == 'full-gpu'" },
@@ -904,7 +909,7 @@ requires-dist = [
     { name = "pydantic-ai-slim", extras = ["anthropic"], marker = "extra == 'anthropic'" },
     { name = "pydantic-ai-slim", extras = ["anthropic", "bedrock", "cohere", "duckduckgo", "google", "groq", "huggingface", "mistral", "openai", "retries", "tavily"], marker = "extra == 'full'" },
     { name = "pydantic-ai-slim", extras = ["anthropic", "bedrock", "cohere", "duckduckgo", "google", "groq", "huggingface", "mistral", "openai", "retries", "tavily"], marker = "extra == 'full-gpu'" },
-    { name = "pydantic-ai-slim", extras = ["anthropic", "duckduckgo", "openai", "retries", "tavily"], marker = "extra == 'recommended'" },
+    { name = "pydantic-ai-slim", extras = ["anthropic", "duckduckgo", "openai", "retries"], marker = "extra == 'recommended'" },
     { name = "pydantic-ai-slim", extras = ["bedrock"], marker = "extra == 'bedrock'" },
     { name = "pydantic-ai-slim", extras = ["cohere"], marker = "extra == 'cohere'" },
     { name = "pydantic-ai-slim", extras = ["duckduckgo"], marker = "extra == 'duckduckgo'" },
@@ -923,7 +928,7 @@ requires-dist = [
     { name = "qdrant-client", specifier = "==1.16.2" },
     { name = "qdrant-client", marker = "extra == 'in-memory'" },
     { name = "qdrant-client", marker = "extra == 'qdrant'" },
-    { name = "rich", specifier = ">=14.2.0" },
+    { name = "rich", specifier = ">=14.3.0" },
     { name = "rignore", specifier = ">=0.7.6" },
     { name = "sentence-transformers", marker = "python_full_version < '3.15'", specifier = "==5.2.0" },
     { name = "sentence-transformers", marker = "extra == 'full'" },
@@ -931,6 +936,9 @@ requires-dist = [
     { name = "sentence-transformers", marker = "extra == 'recommended'" },
     { name = "sentence-transformers", marker = "extra == 'recommended-local-only'" },
     { name = "sentence-transformers", marker = "extra == 'sentence-transformers'" },
+    { name = "tavily", marker = "extra == 'full'" },
+    { name = "tavily", marker = "extra == 'full-gpu'" },
+    { name = "tavily", marker = "extra == 'recommended'" },
     { name = "tavily", marker = "extra == 'tavily'" },
     { name = "tenacity", specifier = ">=9.1.2" },
     { name = "textcase", specifier = ">=0.4.5" },
@@ -940,6 +948,7 @@ requires-dist = [
     { name = "tomli-w", specifier = ">=1.2.0" },
     { name = "types-boto3-custom", marker = "extra == 'bedrock'", path = "vendored/types_boto3_custom-1.41.2-py3-none-any.whl" },
     { name = "types-boto3-custom", marker = "extra == 'full'", path = "vendored/types_boto3_custom-1.41.2-py3-none-any.whl" },
+    { name = "types-boto3-custom", marker = "extra == 'full-gpu'", path = "vendored/types_boto3_custom-1.41.2-py3-none-any.whl" },
     { name = "typing-extensions", specifier = ">=4.15.0" },
     { name = "uuid7", marker = "python_full_version < '3.14'", specifier = ">=0.1.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.40.0" },
@@ -4140,7 +4149,7 @@ retries = [
     { name = "tenacity" },
 ]
 tavily = [
-    { name = "tavily-python" },
+    { name = "tavily-python", marker = "extra == 'extra-11-code-weaver-full' or extra == 'extra-11-code-weaver-full-gpu' or (extra == 'extra-11-code-weaver-gpu-support' and extra == 'project-9-fastembed') or (extra == 'project-13-fastembed-gpu' and extra == 'project-9-fastembed')" },
 ]
 
 [[package]]
@@ -4747,15 +4756,15 @@ wheels = [
 
 [[package]]
 name = "rich"
-version = "14.2.0"
+version = "14.3.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "markdown-it-py" },
     { name = "pygments" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/fb/d2/8920e102050a0de7bfabeb4c4614a49248cf8d5d7a8d01885fbb24dc767a/rich-14.2.0.tar.gz", hash = "sha256:73ff50c7c0c1c77c8243079283f4edb376f0f6442433aecb8ce7e6d0b92d1fe4", size = 219990, upload-time = "2025-10-09T14:16:53.064Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/74/99/a4cab2acbb884f80e558b0771e97e21e939c5dfb460f488d19df485e8298/rich-14.3.2.tar.gz", hash = "sha256:e712f11c1a562a11843306f5ed999475f09ac31ffb64281f73ab29ffdda8b3b8", size = 230143, upload-time = "2026-02-01T16:20:47.908Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/25/7a/b0178788f8dc6cafce37a212c99565fa1fe7872c70c6c9c1e1a372d9d88f/rich-14.2.0-py3-none-any.whl", hash = "sha256:76bc51fe2e57d2b1be1f96c524b890b816e334ab4c1e45888799bfaab0021edd", size = 243393, upload-time = "2025-10-09T14:16:51.245Z" },
+    { url = "https://files.pythonhosted.org/packages/ef/45/615f5babd880b4bd7d405cc0dc348234c5ffb6ed1ea33e152ede08b2072d/rich-14.3.2-py3-none-any.whl", hash = "sha256:08e67c3e90884651da3239ea668222d19bea7b589149d8014a21c633420dbb69", size = 309963, upload-time = "2026-02-01T16:20:46.078Z" },
 ]
 
 [[package]]
@@ -5253,9 +5262,9 @@ name = "tavily-python"
 version = "0.7.13"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "httpx" },
-    { name = "requests" },
-    { name = "tiktoken" },
+    { name = "httpx", marker = "extra == 'extra-11-code-weaver-full' or extra == 'extra-11-code-weaver-full-gpu' or (extra == 'extra-11-code-weaver-gpu-support' and extra == 'project-9-fastembed') or (extra == 'project-13-fastembed-gpu' and extra == 'project-9-fastembed')" },
+    { name = "requests", marker = "extra == 'extra-11-code-weaver-full' or extra == 'extra-11-code-weaver-full-gpu' or (extra == 'extra-11-code-weaver-gpu-support' and extra == 'project-9-fastembed') or (extra == 'project-13-fastembed-gpu' and extra == 'project-9-fastembed')" },
+    { name = "tiktoken", marker = "extra == 'extra-11-code-weaver-full' or extra == 'extra-11-code-weaver-full-gpu' or (extra == 'extra-11-code-weaver-gpu-support' and extra == 'project-9-fastembed') or (extra == 'project-13-fastembed-gpu' and extra == 'project-9-fastembed')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/54/fb/b6d6327a78b9107681701d56b3a2dda48dc5420a6ee8b33a147d87bfba60/tavily_python-0.7.13.tar.gz", hash = "sha256:347f92402331d071557f6dd6680f813a7d484b4ba7240905cc397cd192d1355c", size = 17237, upload-time = "2025-11-13T18:53:03.998Z" }
 wheels = [

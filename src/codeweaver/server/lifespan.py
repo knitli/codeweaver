@@ -67,7 +67,7 @@ async def background_services_lifespan(
 
     # Initialize CodeWeaverState
     container = get_container()
-    container.override(CodeWeaverSettingsType, settings)  # ty:ignore[invalid-argument-type]
+    container.override(CodeWeaverSettingsType, settings)
 
     container.override(SessionStatistics, statistics)
 

@@ -25,6 +25,7 @@ from pydantic import ValidationError
 from codeweaver.providers.embedding.capabilities.base import ModelFamily
 
 
+@pytest.mark.unit
 class TestModelFamilyConstruction:
     """Test ModelFamily class construction and validation."""
 
@@ -120,12 +121,13 @@ class TestModelFamilyConstruction:
         # If frozen=True, should raise ValidationError or AttributeError
         # If not frozen, we just verify the model was created successfully
         with contextlib.suppress(ValidationError, AttributeError):
-            family.family_id = "new-id"  # type: ignore[misc]
+            family.family_id = "new-id"
             # If we get here, model is not frozen, which is acceptable
             # Just verify the original instance is still valid
             assert family.family_id in {"test-family", "new-id"}
 
 
+@pytest.mark.unit
 class TestIsCompatible:
     """Test the is_compatible() method with various scenarios."""
 
@@ -212,6 +214,7 @@ class TestIsCompatible:
         assert family.is_compatible("MODEL-A", "MODEL-B") is False
 
 
+@pytest.mark.unit
 class TestValidateDimensions:
     """Test the validate_dimensions() method."""
 
@@ -289,6 +292,7 @@ class TestValidateDimensions:
             assert error is None
 
 
+@pytest.mark.unit
 class TestVoyage4FamilyDefinition:
     """Test VOYAGE_4_FAMILY definition (when available).
 
@@ -379,6 +383,7 @@ class TestVoyage4FamilyDefinition:
         assert error is not None
 
 
+@pytest.mark.unit
 class TestCrossProviderFamilyLinking:
     """Test cross-provider family compatibility.
 
@@ -459,6 +464,7 @@ class TestCrossProviderFamilyLinking:
         assert single_provider_family.is_compatible("model-a", "model-b") is True
 
 
+@pytest.mark.unit
 class TestAsymmetricQueryModels:
     """Test asymmetric query model specifications."""
 
@@ -508,6 +514,7 @@ class TestAsymmetricQueryModels:
         assert family.asymmetric_query_models is None
 
 
+@pytest.mark.unit
 class TestEdgeCases:
     """Test edge cases and boundary conditions."""
 

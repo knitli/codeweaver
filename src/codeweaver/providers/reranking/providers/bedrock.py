@@ -335,9 +335,9 @@ class BedrockRerankingProvider(RerankingProvider[AgentsforBedrockRuntimeClient])
         # Build model configuration from the model ARN
         # The validator ensures model_arn is in reranking_config.model
         model_arn = config.reranking_config.model.get("model_arn") or config.model_arn
-        model_configuration = kwargs.pop("model_configuration", None) or RerankConfiguration.from_arn(
-            model_arn, top_n_value
-        )
+        model_configuration = kwargs.pop(
+            "model_configuration", None
+        ) or RerankConfiguration.from_arn(model_arn, top_n_value)
 
         # Call super().__init__() with client, config, and caps
         super().__init__(client=client, config=config, caps=caps, **kwargs)

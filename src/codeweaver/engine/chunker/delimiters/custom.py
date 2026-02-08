@@ -531,7 +531,7 @@ POD_SECTION_PATTERN = DelimiterPattern(
     inclusive=True,
     take_whole_lines=True,
     nestable=False,
-    formatter=lambda text: text.strip().replace("\n\n", "\n").strip(),  # type: ignore
+    formatter=lambda text: text.strip().replace("\n\n", "\n").strip(),
 )
 
 POD_SUB_PATTERN = DelimiterPattern(

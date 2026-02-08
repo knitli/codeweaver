@@ -307,7 +307,7 @@ def test_e2e_parallel_dict_convenience():
     if not files:
         pytest.skip("No fixture files available for parallel dict test")
     # Get results as dict
-    results = chunk_files_parallel_dict(files, governor, max_workers=2)  # ty: ignore[invalid-argument-type]
+    results = chunk_files_parallel_dict(files, governor, max_workers=2)
 
     # Verify it's a dictionary
     assert isinstance(results, dict), "Should return dictionary"

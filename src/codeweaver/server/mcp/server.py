@@ -75,7 +75,7 @@ def _get_middleware_settings(
         settings_map.get_subview("middleware")
         if settings_map.get("middleware") is not Unset
         else None
-    )  # type: ignore[arg-type]
+    )
 
 
 def _get_default_middleware() -> Container[type[McpMiddleware]]:
@@ -193,7 +193,7 @@ def setup_middleware(
     # ty gets very confused here, so we ignore most issues
 
     for mw in middleware:  # type: ignore
-        match mw.__name__:  # type: ignore[reportUnknownMemberType, reportUnknownArgumentType, reportAttributeAccessIssue]
+        match mw.__name__:
             case "ErrorHandlingMiddleware":
                 instance = mw(
                     **(
@@ -216,10 +216,10 @@ def setup_middleware(
             case "ResponseCachingMiddleware":
                 instance = mw(**middleware_settings.get("caching", {}))  # type: ignore
             case _:
-                if any_settings := middleware_settings.get(mw.__name__.lower()):  # type: ignore[reportUnknownMemberType, reportUnknownArgumentType, reportAttributeAccessIssue]
-                    instance = mw(**any_settings)  # type: ignore[reportCallIssue, reportUnknownVariableType]
+                if any_settings := middleware_settings.get(mw.__name__.lower()):
+                    instance = mw(**any_settings)
                 else:
-                    instance = mw()  # type: ignore[reportCallIssue, reportUnknownVariableType]
+                    instance = mw()
         result.add(instance)
     result.add(get_statistics_middleware(middleware_settings))
     return result
@@ -304,7 +304,7 @@ def _setup_server[TransportT: Literal["stdio", "streamable-http"]](
         run_args = setup_runargs(run_args, host, port, verbose=verbose, debug=debug)
     app = FastMCP(
         "CodeWeaver",
-        **(mutable_args | {"icons": [lazy_import("codeweaver.server", "CODEWEAVER_SVG_ICON")]}),  # ty: ignore[invalid-argument-type]
+        **(mutable_args | {"icons": [lazy_import("codeweaver.server", "CODEWEAVER_SVG_ICON")]}),
     )
     app = register_tools(app)
     app = register_middleware(app, cast(list[type[McpMiddleware]], middleware), middleware_opts)

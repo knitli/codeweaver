@@ -73,7 +73,7 @@ def _get_settings(settings: SettingsDep = INJECTED) -> CodeWeaverSettingsType:
 def _get_indexer_settings(settings: SettingsDep = INJECTED) -> IndexerSettings:
     """Factory for indexing service settings."""
     if settings.indexer is not Unset:
-        return settings.indexer  # type: ignore
+        return settings.indexer
     return IndexerSettings.model_validate(DefaultIndexerSettings)
 
 
@@ -81,7 +81,7 @@ def _get_indexer_settings(settings: SettingsDep = INJECTED) -> IndexerSettings:
 def _get_chunker_settings(settings: SettingsDep = INJECTED) -> ChunkerSettings:
     """Factory for chunking service settings."""
     if settings.chunker is not Unset:
-        return settings.chunker  # type: ignore
+        return settings.chunker
     return ChunkerSettings.model_validate(DefaultChunkerSettings)
 
 
@@ -89,7 +89,7 @@ def _get_chunker_settings(settings: SettingsDep = INJECTED) -> ChunkerSettings:
 def _get_failover_settings(settings: SettingsDep = INJECTED) -> FailoverSettings:
     """Factory for failover service settings."""
     if settings.failover is not Unset:
-        return settings.failover  # type: ignore
+        return settings.failover
     return FailoverSettings.model_validate(DefaultFailoverSettings())
 
 

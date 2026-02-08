@@ -1050,7 +1050,7 @@ class AgentTask(BaseAgentTask, BaseDataclassEnum):
     @property
     def profile(self) -> ImportanceScoresDict:
         """Get the context weight profile for this task."""
-        return self.value._profile  # type: ignore
+        return self.value._profile
 
 
 # =============================================================================
@@ -1075,20 +1075,20 @@ def _validate_categories(
             value.args[1],
             MappingProxyType(
                 nxt(
-                    dict(value.args[2])  # type: ignore
+                    dict(value.args[2])
                     if isinstance(value.args[2], MappingProxyType)
                     else value.args[2]
                 )
             ),
-        )  # type: ignore
+        )
     if isinstance(value, MappingProxyType) and all(
         isinstance(k, SemanticClass) and isinstance(v, ThingClass)
-        for k, v in value.items()  # type: ignore
-        if k and v  # type: ignore
+        for k, v in value.items()
+        if k and v
     ):
-        return value  # type: ignore
+        return value
     if isinstance(value, MappingProxyType | dict):
-        return MappingProxyType(nxt(dict(value) if isinstance(value, MappingProxyType) else value))  # type: ignore
+        return MappingProxyType(nxt(dict(value) if isinstance(value, MappingProxyType) else value))
     if isinstance(value, str | bytes | bytearray):
         return _validate_categories(nxt(value), nxt, _info)
     raise ValueError("Invalid type for core_categories")

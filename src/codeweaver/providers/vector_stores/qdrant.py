@@ -26,7 +26,7 @@ class QdrantVectorStoreProvider(QdrantBaseProvider):
     Supports hybrid search with dense and sparse embeddings via named vectors.
     """
 
-    _provider: ClassVar[Provider] = Provider.QDRANT  # type: ignore
+    _provider: ClassVar[Provider] = Provider.QDRANT
     config: QdrantVectorStoreProviderSettings
 
     @property

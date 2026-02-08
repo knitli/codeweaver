@@ -55,7 +55,7 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
         """Get the base URL for the memory provider - always :memory:."""
         return ":memory:"
 
-    async def _init_provider(self) -> None:  # type: ignore
+    async def _init_provider(self) -> None:
         """Initialize in-memory Qdrant client and restore from disk.
 
         Raises:
@@ -284,7 +284,7 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
 
         Called after upsert and delete operations to persist changes.
         """
-        if self.auto_persist:  # type: ignore
+        if self.auto_persist:
             await self._persist_to_disk()
 
 

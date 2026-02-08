@@ -82,7 +82,7 @@ class EmbeddingRegistry(UUIDStore[ChunkEmbeddings]):
             getattr(embeddings, f"{kind.variable}_model", None)
             for embeddings in self.values()
             if getattr(embeddings, f"has_{kind.variable}")
-        }  # type: ignore
+        }
         if len(models) > 1:
             raise CodeWeaverValidationError(
                 f"Multiple embedding models detected for {kind.variable} embeddings",

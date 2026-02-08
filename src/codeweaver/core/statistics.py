@@ -440,7 +440,7 @@ class _LanguageStatistics(BasedModel):
         if path and path.is_file() and operation != "skipped":
             self.unique_files.add(path)
 
-    def add_chunk(self, chunk: CodeChunk, operation: OperationsKey = "processed") -> None:  # type: ignore[name-defined]
+    def add_chunk(self, chunk: CodeChunk, operation: OperationsKey = "processed") -> None:
         """Track a chunk creation, including its source type and size.
 
         Args:
@@ -558,7 +558,7 @@ class _CategoryStatistics(BasedModel):
         _info: FieldSerializationInfo,
     ) -> str:
         """Serialize semantic languages for JSON output."""
-        return nxt(dict(value))  # type: ignore
+        return nxt(dict(value))
 
     @field_validator("semantic_languages", mode="wrap")
     @classmethod
@@ -568,12 +568,12 @@ class _CategoryStatistics(BasedModel):
         """Validate semantic languages for JSON input."""
         if isinstance(value, MappingProxyType) and all(
             isinstance(k, SemanticSearchLanguage) and isinstance(v, _LanguageStatistics)
-            for k, v in value.items()  # type: ignore
-            if k and v  # type: ignore
+            for k, v in value.items()
+            if k and v
         ):
-            return value  # type: ignore
+            return value
         if isinstance(value, MappingProxyType | dict):
-            return MappingProxyType({nxt(k): nxt(v) for k, v in value.items()})  # type: ignore
+            return MappingProxyType({nxt(k): nxt(v) for k, v in value.items()})
         if isinstance(value, str | bytes | bytearray):
             return cls._validate_semantic_languages(nxt(value), nxt)
         raise ValueError("Invalid type for semantic_languages")
@@ -656,9 +656,7 @@ class FileStatistics(BasedModel):
             self.categories[ChunkKind.OTHER].add_operation(language_name, operation, path)  # ty:ignore[invalid-argument-type]
 
     def add_file_from_discovered(
-        self,
-        discovered_file: DiscoveredFile,  # type: ignore[name-defined]
-        operation: OperationsKey,
+        self, discovered_file: DiscoveredFile, operation: OperationsKey
     ) -> None:
         """Add a file operation using a DiscoveredFile (more efficient).
 
@@ -690,7 +688,7 @@ class FileStatistics(BasedModel):
                 if isinstance(language_name, SemanticSearchLanguage | ConfigLanguage)
                 else LanguageName(language_name),
                 operation,
-                discovered_file.path,  # ty:ignore[invalid-argument-type]
+                discovered_file.path,
             )
 
     @computed_field
@@ -706,9 +704,7 @@ class FileStatistics(BasedModel):
         return sum(self.file_count_by_category.values())
 
     def add_chunk_from_codechunk(
-        self,
-        chunk: CodeChunk,  # type: ignore[name-defined]
-        operation: OperationsKey = "processed",
+        self, chunk: CodeChunk, operation: OperationsKey = "processed"
     ) -> None:
         """Add chunk statistics using a CodeChunk object (efficient).
 
@@ -971,7 +967,7 @@ class TokenCounter(Counter[TokenCategory]):
             TokenCost.CLOUD_RERANKING.expense(self[TokenCategory.RERANKING])
             if _is_cloud_reranking_model()
             else TokenCost.LOCAL_RERANKING.expense(self[TokenCategory.RERANKING])
-        )  # ty:ignore[unresolved-attribute]
+        )
         context_agent_cost: float = TokenCost.CONTEXT_AGENT.expense(
             self[TokenCategory.CONTEXT_AGENT]
         )
@@ -1305,9 +1301,7 @@ class SessionStatistics(BasedModel):
         self.index_statistics.add_file(path, operation)
 
     def add_file_from_discovered(
-        self,
-        discovered_file: DiscoveredFile,  # type: ignore[name-defined]
-        operation: OperationsKey,
+        self, discovered_file: DiscoveredFile, operation: OperationsKey
     ) -> None:
         """Add a file operation using a DiscoveredFile (more efficient).
 
@@ -1323,9 +1317,7 @@ class SessionStatistics(BasedModel):
         self.index_statistics.add_file_from_discovered(discovered_file, operation)
 
     def add_chunk_from_codechunk(
-        self,
-        chunk: CodeChunk,  # type: ignore[name-defined]
-        operation: OperationsKey = "processed",
+        self, chunk: CodeChunk, operation: OperationsKey = "processed"
     ) -> None:
         """Add chunk statistics using a CodeChunk object (efficient).
 

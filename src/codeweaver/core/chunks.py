@@ -302,7 +302,7 @@ class CodeChunk(BasedModel):
             k: v.serialize_for_cli() if hasattr(v, "serialize_for_cli") else v  # type: ignore
             for k, v in self.metadata.items()
             if k in ("name", "context", "semantic_meta")
-        }  # type: ignore
+        }
 
     def serialize_for_embedding(self) -> str:
         """Serialize the CodeChunk for embedding.
@@ -492,7 +492,7 @@ class CodeChunk(BasedModel):
     def dechunkify(chunks: StructuredDataInput, *, for_embedding: bool = False) -> Iterator[str]:
         """Convert a sequence of CodeChunks or mixed serialized and deserialized chunks back to json strings."""
         for chunk in ensure_iterable(chunks):
-            if isinstance(chunk, str | bytes | bytearray):  # type: ignore
+            if isinstance(chunk, str | bytes | bytearray):
                 yield (chunk.decode("utf-8") if isinstance(chunk, bytes | bytearray) else chunk)
             elif is_typeddict(chunk):
                 result = (

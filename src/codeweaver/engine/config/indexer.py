@@ -445,7 +445,7 @@ class IndexerSettings(BasedModel):
         # Set the filter for extension checking AND hidden file handling
         rignore_settings["should_exclude_entry"] = self.filter
 
-        return RignoreSettings(rignore_settings)
+        return RignoreSettings(rignore_settings)  # ty:ignore[invalid-argument-type]
 
     @cached_property
     def hidden_tool_paths(self) -> set[str]:
@@ -564,7 +564,7 @@ if not IndexerSettings.__pydantic_complete__:
     IndexerSettings.model_rebuild()
 
 DefaultIndexerSettings = IndexerSettingsDict(
-    IndexerSettings().model_dump(exclude_none=True, exclude_computed_fields=True)  # type: ignore
+    IndexerSettings().model_dump(exclude_none=True, exclude_computed_fields=True)
 )
 
 __all__ = ("DefaultIndexerSettings", "IndexerSettings", "IndexerSettingsDict", "RignoreSettings")

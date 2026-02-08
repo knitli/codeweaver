@@ -157,7 +157,7 @@ def add_enum_alias[EnumT: Enum](enum_instance_member: EnumT, alias_name: str) ->
             setattr(enum_cls, alias_name, redirect)
         else:
             setattr(enum_cls, alias_name, enum_instance_member)
-        enum_cls._member_map_[alias_name] = enum_instance_member  # ty:ignore[unresolved-attribute]
+        enum_cls._member_map_[alias_name] = enum_instance_member
 
 
 __all__ = (

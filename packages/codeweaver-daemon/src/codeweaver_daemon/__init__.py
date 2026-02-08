@@ -15,10 +15,8 @@ import logging
 import shutil
 import subprocess
 import sys
-
 from pathlib import Path
 from typing import Any
-
 
 logger = logging.getLogger(__name__)
 
@@ -128,7 +126,7 @@ def spawn_daemon_process(
         if working_dir:
             kwargs["cwd"] = working_dir
         if sys.platform == "win32":
-            kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP  # type: ignore[attr-defined]
+            kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
         else:
             kwargs["start_new_session"] = True
 

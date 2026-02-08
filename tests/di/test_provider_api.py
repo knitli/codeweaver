@@ -528,10 +528,10 @@ def test_api_functions_with_none_type():
     # These should raise or return sensible values, not crash
 
     # is_provider_registered with None
-    assert not is_provider_registered(None)  # type: ignore
+    assert not is_provider_registered(None)
 
     # get_provider_metadata with None
-    metadata = get_provider_metadata(None)  # type: ignore
+    metadata = get_provider_metadata(None)
     assert metadata is None
 
 

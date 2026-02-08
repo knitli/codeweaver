@@ -324,7 +324,7 @@ class CodeWeaverSettings(CodeWeaverEngineSettings):
             "middleware": DefaultMiddlewareSettings,
             "management_host": LOCALHOST,
             "management_port": DEFAULT_MANAGEMENT_PORT,
-            "default_mcp_config": StdioCodeWeaverConfigDict(StdioCodeWeaverConfig().model_dump()),  # ty: ignore[missing-typed-dict-key, invalid-argument-type]
+            "default_mcp_config": StdioCodeWeaverConfigDict(StdioCodeWeaverConfig().model_dump()),
             "uvicorn": DefaultUvicornSettings,
             "endpoints": DefaultEndpointSettings,
         }

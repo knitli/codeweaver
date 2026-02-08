@@ -372,7 +372,7 @@ class TestVoyageEmbeddingProviderEmbedding:
         from codeweaver.providers.embedding.providers import voyage as voyage_module
 
         original_transformer = voyage_module.voyage_context_output_transformer
-        voyage_module.voyage_context_output_transformer = mock_transformer  # ty: ignore[invalid-assignment]
+        voyage_module.voyage_context_output_transformer = mock_transformer
 
         try:
             provider = VoyageEmbeddingProvider(

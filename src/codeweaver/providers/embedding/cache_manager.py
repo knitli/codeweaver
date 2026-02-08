@@ -138,7 +138,7 @@ class EmbeddingCacheManager(BasedModel):
         """
         if namespace not in self._hash_stores:
             # 10MB limit per namespace (same as original per-instance limit)
-            self._hash_stores[namespace] = make_blake_store(  # ty:ignore[invalid-argument-type]
+            self._hash_stores[namespace] = make_blake_store(
                 value_type=UUID, size_limit=ONE_MEGABYTE * 10
             )
         return self._hash_stores[namespace]

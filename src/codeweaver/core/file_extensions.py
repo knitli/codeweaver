@@ -654,12 +654,12 @@ FALLBACK_TEST: MappingProxyType[FileExtensionT, FallBackTestDef] = MappingProxyT
     FileExt(".v"): FallBackTestDef({
         "values": ("Proof", "Qed", "Proof", "Defined", "Admitted"),
         "on": "not in",
-        "fallback_to": LanguageName(cast(LiteralStringT, "verilog")),  # type: ignore
+        "fallback_to": LanguageName(cast(LiteralStringT, "verilog")),
     }),
     FileExt(".m"): FallBackTestDef({
         "values": ("switch", "end", "parfor", "function"),
         "on": "not in",
-        "fallback_to": LanguageName(cast(LiteralStringT, "objective-c")),  # type: ignore
+        "fallback_to": LanguageName(cast(LiteralStringT, "objective-c")),
     }),
     FileExt(""): FallBackTestDef({
         "values": (
@@ -676,7 +676,7 @@ FALLBACK_TEST: MappingProxyType[FileExtensionT, FallBackTestDef] = MappingProxyT
             "#!/usr/bin/env /usr/bin/fish",
         ),
         "on": "in",
-        "fallback_to": LanguageName(cast(LiteralStringT, "bash")),  # type: ignore
+        "fallback_to": LanguageName(cast(LiteralStringT, "bash")),
     }),
 })
 """A mapping of file extensions to their fallback test definitions."""

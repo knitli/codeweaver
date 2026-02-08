@@ -210,7 +210,7 @@ class NodeTypeDTO(BasedModel):
     def direct_field_children(self) -> dict[LiteralStringT, tuple[SimpleNodeTypeDTO, ...]]:
         """Extract direct field children from the fields mapping."""
         return (
-            {role: tuple(child.types) for role, child in self.fields.items()} if self.fields else {}  # ty: ignore[invalid-return-type]
+            {role: tuple(child.types) for role, child in self.fields.items()} if self.fields else {}
         )
 
     @computed_field
@@ -484,7 +484,7 @@ class TokenPurpose(BaseEnum):
         )
 
 
-class ConnectionConstraint(Flag, BaseEnum):  # type:ignore  # we intentionally override BaseEnum where there's overlap with Flag
+class ConnectionConstraint(Flag, BaseEnum):
     """Flags for Connection constraints."""
 
     ZERO_OR_ONE = auto()

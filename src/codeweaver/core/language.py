@@ -815,7 +815,7 @@ class SemanticSearchLanguage(str, BaseEnum):
             if lang.config_files is not None:
                 yield from (
                     ConfigNamePair(
-                        filename=config_file.path.name,
+                        filename=FileName(config_file.path.name),
                         language=(
                             config_file.language_type
                             if config_file.language_type != ConfigLanguage.SELF
@@ -843,7 +843,7 @@ class SemanticSearchLanguage(str, BaseEnum):
         from codeweaver.core.metadata import ExtLangPair
 
         for lang, exts in cls.extension_map().items():
-            yield from (ExtLangPair(ext=FileExt(ext), language=lang) for ext in exts if ext)  # type: ignore
+            yield from (ExtLangPair(ext=FileExt(ext), language=lang) for ext in exts if ext)
 
     @classmethod
     def config_pairs(cls) -> Generator[ConfigPathPair]:
@@ -977,10 +977,7 @@ class SemanticSearchLanguage(str, BaseEnum):
                 workspace_files=(FileName("*.sln"),),
                 workspace_defined_in_file=True,
                 workspace_definition_files=(
-                    (
-                        FileGlob("*.sln"),
-                        ("Project",),
-                    ),  # Solution files list projects # type: ignore
+                    (FileGlob("*.sln"), ("Project",)),  # Solution files list projects
                 ),
             ),
             SemanticSearchLanguage.CSS: defaults
@@ -1446,7 +1443,7 @@ def has_semantic_extension(ext: FileExtensionT) -> SemanticSearchLanguage | None
     """Check if the given extension is a semantic search language."""
     return next(
         (lang for lang_ext, lang in SemanticSearchLanguage.ext_pairs() if lang_ext == ext), None
-    )  # type: ignore
+    )
 
 
 @cache
@@ -1478,7 +1475,9 @@ def language_from_config_file(config_file: Path) -> SemanticSearchLanguage | Non
     Returns:
         The corresponding SemanticSearchLanguage, or None if not found.
     """
-    return SemanticSearchLanguage._language_from_config_file(config_file)  # type: ignore  # we want people to use this function instead of the class method directly for caching
+    return SemanticSearchLanguage._language_from_config_file(
+        config_file
+    )  # we want people to use this function instead of the class method directly for caching
 
 
 def languages_present_from_configs() -> tuple[SemanticSearchLanguage, ...] | None:
@@ -1529,14 +1528,14 @@ def language_from_path(
     all_languages = CODE_FILES_EXTENSIONS + DATA_FILES_EXTENSIONS + DOC_FILES_EXTENSIONS
     # Check if the extension or filename matches any known language extensions
     if (
-        (all_exts := tuple(ext_pair.ext for ext_pair in all_languages)) and FileExt(ext) in all_exts  # type: ignore
-    ) or FileExt(file_path.name) in all_exts:  # type: ignore
+        (all_exts := tuple(ext_pair.ext for ext_pair in all_languages)) and FileExt(ext) in all_exts
+    ) or FileExt(file_path.name) in all_exts:
         return next(
             (
-                ext_pair.language  # type: ignore
-                for ext_pair in all_languages  # type: ignore
-                if ext_pair.ext in [FileExt(ext), FileExt(file_path.name)]  # type: ignore
-            ),  # type: ignore
+                ext_pair.language
+                for ext_pair in all_languages
+                if ext_pair.ext in [FileExt(ext), FileExt(file_path.name)]
+            ),
             None,
         )
     return None

@@ -53,7 +53,7 @@ class TestEnvVarConfig:
         """Test EnvVarConfig is immutable."""
         cfg = EnvVarConfig(env="TEST", description="Test")
         with pytest.raises(dataclasses.FrozenInstanceError):
-            cfg.env = "CHANGED"  # type: ignore[misc]
+            cfg.env = "CHANGED"
 
     def test_choices_as_frozenset(self) -> None:
         """Test choices must be frozenset for immutability."""
@@ -204,7 +204,7 @@ class TestProviderEnvConfig:
         """Test ProviderEnvConfig is immutable."""
         cfg = ProviderEnvConfig(provider="test", clients=("test_client",))
         with pytest.raises(dataclasses.FrozenInstanceError):
-            cfg.provider = "changed"  # type: ignore[misc]
+            cfg.provider = "changed"
 
     def test_all_standard_fields(self) -> None:
         """Test ProviderEnvConfig with all standard fields."""

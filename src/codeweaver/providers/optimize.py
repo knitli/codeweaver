@@ -278,7 +278,7 @@ def get_optimizations(model_kind: Literal["dense", "sparse", "both"]) -> Optimiz
             if model_kind == "dense"
             else sparse_opts
             if model_kind == "sparse"
-            else OptimizationDecisions(**(dense_opts | sparse_opts))  # ty: ignore[missing-typed-dict-key]
+            else OptimizationDecisions(**(dense_opts | sparse_opts))
         )
 
 

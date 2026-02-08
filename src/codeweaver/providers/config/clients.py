@@ -222,7 +222,7 @@ class ClientOptions(BasedModel):
                 if "_core_provider" in base.__dict__:
                     core_provider = base.__dict__["_core_provider"]
                     break
-        env_vars = core_provider.all_envs_for_client(core_provider.variable)  # ty:ignore[invalid-argument-type]
+        env_vars = core_provider.all_envs_for_client(core_provider.variable)
         mapped_vars = {}
         fields = tuple(cls.model_fields)
         for env_var in env_vars:

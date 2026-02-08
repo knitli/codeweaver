@@ -584,7 +584,7 @@ class CompositeThing(Thing):
         | None
     ) = None
 
-    _kind: ClassVar[Literal[ThingKind.COMPOSITE]] = ThingKind.COMPOSITE  # type: ignore
+    _kind: ClassVar[Literal[ThingKind.COMPOSITE]] = ThingKind.COMPOSITE
 
     def __init__(self, **data: Any) -> None:
         """Initialize a CompositeThing."""
@@ -675,7 +675,7 @@ class Token(Thing):
         ),
     ]
 
-    _kind: ClassVar[Literal[ThingKind.TOKEN]] = ThingKind.TOKEN  # type: ignore
+    _kind: ClassVar[Literal[ThingKind.TOKEN]] = ThingKind.TOKEN
 
     @property
     def kind(self) -> Literal[ThingKind.TOKEN]:
@@ -1041,14 +1041,14 @@ class DirectConnection(Connection):
             Tree-sitter equivalent: Field name in grammar
             """,
             default_factory=lambda name: (
-                role_name_normalizer(name)  # type: ignore
+                role_name_normalizer(name)
                 if isinstance(name, str)
                 else role_name_normalizer(name["role"])
-            ),  # type: ignore
+            ),
         ),
     ]
 
-    _connection_class: ClassVar[Literal[ConnectionClass.DIRECT]] = ConnectionClass.DIRECT  # type: ignore
+    _connection_class: ClassVar[Literal[ConnectionClass.DIRECT]] = ConnectionClass.DIRECT
     # pylance complains because the base class is a union of both DIRECT and POSITIONAL, but this is exactly what we want
     # We have clear segregation between DirectConnection and PositionalConnections via this class variable and separate subclasses
 
@@ -1098,9 +1098,7 @@ class PositionalConnections(Connection):
         - Average 1-2 Positional connections per Composite Thing
     """
 
-    _connection_class: ClassVar[  # type: ignore
-        Literal[ConnectionClass.POSITIONAL]
-    ] = ConnectionClass.POSITIONAL  # type: ignore
+    _connection_class: ClassVar[Literal[ConnectionClass.POSITIONAL]] = ConnectionClass.POSITIONAL
     # pylance complains because the base class is a union of both DIRECT and POSITIONAL, but this is exactly what we want
 
     @classmethod

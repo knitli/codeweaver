@@ -130,7 +130,7 @@ def get_nomic_ai_embedding_capabilities() -> tuple[NomicAiEmbeddingCapabilities,
     for cap in ALL_CAPABILITIES:
         capabilities.extend([
             EmbeddingCapabilitiesDict({**cap, "provider": provider})  # type: ignore[missing-typeddict-key]
-            for provider in CAP_MAP[cap["name"]]  # ty: ignore[invalid-argument-type]
+            for provider in CAP_MAP[cap["name"]]
         ])
     return tuple(NomicAiEmbeddingCapabilities.model_validate(cap) for cap in capabilities)
 

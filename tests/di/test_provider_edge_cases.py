@@ -87,7 +87,7 @@ def test_provider_with_invalid_scope_still_registers(clean_registry):
     assert is_provider_registered(ServiceA)
     metadata = get_provider_metadata(ServiceA)
     assert metadata is not None
-    assert metadata.scope == "invalid"  # type: ignore
+    assert metadata.scope == "invalid"
 
 
 # ==============================================================================
@@ -170,12 +170,12 @@ def test_provider_with_union_type(clean_registry):
 
     UnionType = ServiceA | ServiceB
 
-    @dependency_provider(UnionType, scope="singleton")  # type: ignore
+    @dependency_provider(UnionType, scope="singleton")
     def create() -> ServiceA:
         return ServiceA()
 
     # Should register (even though it's unusual)
-    assert is_provider_registered(UnionType)  # type: ignore
+    assert is_provider_registered(UnionType)
 
 
 def test_provider_with_optional_type(clean_registry):
@@ -183,11 +183,11 @@ def test_provider_with_optional_type(clean_registry):
 
     OptionalType = ServiceA | None
 
-    @dependency_provider(OptionalType, scope="singleton")  # type: ignore
+    @dependency_provider(OptionalType, scope="singleton")
     def create() -> ServiceA | None:
         return ServiceA()
 
-    assert is_provider_registered(OptionalType)  # type: ignore
+    assert is_provider_registered(OptionalType)
 
 
 # ==============================================================================
@@ -231,7 +231,7 @@ def test_provider_generator_that_yields_none(clean_registry):
 
     @dependency_provider(ServiceA, scope="singleton")
     def create_none() -> Iterator[ServiceA]:
-        yield None  # type: ignore
+        yield None
 
     # Should register and allow resolution
     assert is_provider_registered(ServiceA)
@@ -246,7 +246,7 @@ async def test_circular_dependency_detection_with_auto_discovery(clean_registry)
     """Test that circular dependencies are detected with auto-discovered providers."""
 
     class ServiceX:
-        def __init__(self, service_y: ServiceY) -> None:  # type: ignore
+        def __init__(self, service_y: ServiceY) -> None:
             self.service_y = service_y
 
     class ServiceY:
@@ -444,7 +444,7 @@ def test_provider_with_no_return_annotation(clean_registry):
     """Test provider without return type annotation."""
 
     @dependency_provider(ServiceA, scope="singleton")
-    def create_no_annotation():  # type: ignore
+    def create_no_annotation():
         return ServiceA()
 
     # Should still register
@@ -529,10 +529,7 @@ async def test_unknown_scope_defaults_to_singleton(clean_registry):
     from codeweaver.core import ProviderMetadata
 
     metadata = ProviderMetadata(
-        scope="unknown",  # type: ignore
-        is_generator=False,
-        is_async_generator=False,
-        module=None,
+        scope="unknown", is_generator=False, is_async_generator=False, module=None
     )
     utils._providers[ServiceA] = [(create, metadata)]
 

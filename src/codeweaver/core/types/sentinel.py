@@ -102,7 +102,7 @@ class Sentinel(BasedModel):
         # Include the class's module and fully qualified name in the
         # registry key to support sub-classing.
         registry_key = SentinelName(
-            _sys.intern(f"{cls.__module__}-{cls.__qualname__}-{module_name}-{name}")  # type: ignore
+            _sys.intern(f"{cls.__module__}-{cls.__qualname__}-{module_name}-{name}")
         )
         existing: Sentinel | None = _registry.get(registry_key)
         if existing is not None:

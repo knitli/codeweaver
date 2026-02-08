@@ -183,10 +183,10 @@ class AsymmetricEmbeddingProviderSettings(BasedModel):
             )
         match found_values:
             case (str(), None):
-                self.query_provider.embedding_config.set_datatype(cast(str, found_values[0]))  # ty:ignore[invalid-argument-type]
+                self.query_provider.embedding_config.set_datatype(cast(str, found_values[0]))
                 return cast(tuple[str, str], (found_values[0], found_values[0]))
             case (None, str()):
-                self.embed_provider.embedding_config.set_datatype(cast(str, found_values[1]))  # ty:ignore[invalid-argument-type]
+                self.embed_provider.embedding_config.set_datatype(cast(str, found_values[1]))
                 return cast(tuple[str, str], (found_values[1], found_values[1]))
             case _:
                 embed_caps = (

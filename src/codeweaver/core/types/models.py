@@ -95,10 +95,8 @@ class BasedModel(BaseModel):
                 self_map[field] = attr.serialize_for_cli()
             elif isinstance(attr, Sequence | Iterator) and not isinstance(attr, str):
                 self_map[field] = [
-                    item.serialize_for_cli()  # type: ignore
-                    if hasattr(item, "serialize_for_cli")  # type: ignore
-                    else item
-                    for item in attr  # type: ignore
+                    item.serialize_for_cli() if hasattr(item, "serialize_for_cli") else item
+                    for item in attr
                 ]
         # Get model dump, handling potential Missing/Undefined values
         base_dict = self.model_dump(mode="python", round_trip=True, exclude_none=True)

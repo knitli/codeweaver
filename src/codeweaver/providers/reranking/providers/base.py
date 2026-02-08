@@ -439,9 +439,9 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
             statistics.add_token_usage(reranking_generated=token_count)
         elif from_docs and all(isinstance(doc, str) for doc in from_docs):
             token_count = (
-                self.tokenizer.estimate_batch(from_docs)  # ty: ignore[invalid-argument-type]
+                self.tokenizer.estimate_batch(from_docs)  # ty:ignore[invalid-argument-type]
                 if all(isinstance(doc, str) for doc in from_docs)
-                else sum(self.tokenizer.estimate_batch(item) for item in from_docs)  # type: ignore
+                else sum(self.tokenizer.estimate_batch(item) for item in from_docs)
             )
             statistics.add_token_usage(reranking_generated=token_count)
 
@@ -553,7 +553,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         serialize_as_any: bool = False,
     ) -> str:
         """Serialize the model to JSON, excluding certain fields."""
-        return self._model_dump_json(  # ty: ignore[unresolved-attribute]
+        return self._model_dump_json(
             indent=indent,
             include=include,
             exclude={"client", "_input_transformer", "_output_transformer"},

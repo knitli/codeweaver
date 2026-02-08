@@ -301,30 +301,30 @@ class GrammarStructureAnalyzer:
             # Abstract type patterns (normalize leading underscore)
             for abstract_type in stats.abstract_types:
                 normalized = abstract_type.lstrip("_")
-                patterns["common_abstract_types"][normalized] += 1  # type: ignore
+                patterns["common_abstract_types"][normalized] += 1
 
             # Field name patterns
-            patterns["universal_field_names"].update(stats.common_field_names)  # type: ignore
+            patterns["universal_field_names"].update(stats.common_field_names)
 
             # Extra node patterns
             for extra_node in stats.extra_nodes:
-                patterns["common_extra_nodes"][extra_node] += 1  # type: ignore
+                patterns["common_extra_nodes"][extra_node] += 1
 
             # Field semantic patterns
             for field_name, contexts in stats.field_semantic_roles.items():
                 for context in contexts:
                     category = context.split(":")[0]
-                    patterns["field_semantic_patterns"][field_name][category] += 1  # type: ignore
+                    patterns["field_semantic_patterns"][field_name][category] += 1
 
             # Q1: Aggregate category and concrete references
-            patterns["category_refs_in_fields"].update(stats.category_references_in_fields)  # type: ignore
-            patterns["category_refs_in_children"].update(stats.category_references_in_children)  # type: ignore
-            patterns["concrete_refs_in_fields"].update(stats.concrete_references_in_fields)  # type: ignore
-            patterns["concrete_refs_in_children"].update(stats.concrete_references_in_children)  # type: ignore
+            patterns["category_refs_in_fields"].update(stats.category_references_in_fields)
+            patterns["category_refs_in_children"].update(stats.category_references_in_children)
+            patterns["concrete_refs_in_fields"].update(stats.concrete_references_in_fields)
+            patterns["concrete_refs_in_children"].update(stats.concrete_references_in_children)
 
             # Q2: Aggregate multi-category Things
             for thing, categories in stats.multi_category_things.items():
-                patterns["all_multi_category_things"][thing].update(categories)  # type: ignore
+                patterns["all_multi_category_things"][thing].update(categories)
 
         return patterns
 
@@ -578,7 +578,7 @@ class GrammarStructureAnalyzer:
         report = "\n".join(report_lines)
 
         if output_file:
-            output_file.write_text(report)  # type: ignore
+            output_file.write_text(report)
             print(f"\nReport written to: {output_file}")
 
         return report
@@ -594,7 +594,7 @@ def main() -> None:
     output_dir.mkdir(exist_ok=True)
     output_file = output_dir / "grammar_structure_analysis.md"
 
-    _report = analyzer.generate_report(output_file)  # type: ignore
+    _report = analyzer.generate_report(output_file)
 
     # Print summary
     print("\n" + "=" * 60)

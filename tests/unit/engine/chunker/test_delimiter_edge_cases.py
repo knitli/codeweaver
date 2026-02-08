@@ -28,6 +28,7 @@ def delimiter_chunker(chunk_governor: ChunkGovernor) -> DelimiterChunker:
     return DelimiterChunker(governor=chunk_governor)
 
 
+@pytest.mark.unit
 class TestGenericFallback:
     """Test generic delimiter fallback behavior."""
 
@@ -86,6 +87,7 @@ for multiple chunks if the generic patterns work correctly.
             assert len(chunks) > 1, "Generic patterns should split content into multiple chunks"
 
 
+@pytest.mark.unit
 class TestDelimiterBehavior:
     """Test inclusive vs exclusive delimiter behavior."""
 
@@ -138,6 +140,7 @@ def function_three():
                     )
 
 
+@pytest.mark.unit
 class TestLineExpansion:
     """Test line boundary expansion behavior."""
 
@@ -181,11 +184,11 @@ a, b, c = 1, 2, 3; total = a + b + c  # Another multi-statement line
 
             # metadata should be a dict here, so we can use 'in' operator
             # Verify line range metadata is present
-            assert "line_start" in chunk.metadata, "Chunks should have line_start metadata"  # ty: ignore[unsupported-operator]
-            assert "line_end" in chunk.metadata, "Chunks should have line_end metadata"  # ty: ignore[unsupported-operator]
+            assert "line_start" in chunk.metadata, "Chunks should have line_start metadata"
+            assert "line_end" in chunk.metadata, "Chunks should have line_end metadata"
 
-            line_start = chunk.metadata["line_start"]  # ty: ignore[not-subscriptable]
-            line_end = chunk.metadata["line_end"]  # ty: ignore[not-subscriptable]
+            line_start = chunk.metadata["line_start"]
+            line_end = chunk.metadata["line_end"]
 
             assert isinstance(line_start, int), "line_start should be integer"
             assert isinstance(line_end, int), "line_end should be integer"
@@ -201,6 +204,7 @@ a, b, c = 1, 2, 3; total = a + b + c  # Another multi-statement line
             )
 
 
+@pytest.mark.unit
 class TestUnusualPatterns:
     """Test delimiter chunker with unusual patterns."""
 
@@ -288,6 +292,7 @@ class MyClass:
             assert next_start >= current_end, "Chunks should not overlap"
 
 
+@pytest.mark.unit
 class TestEdgeCaseContent:
     """Test delimiter chunker with edge case content."""
 

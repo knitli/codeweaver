@@ -42,7 +42,7 @@ class TestPoolLimits:
         """Test that PoolLimits is frozen (immutable)."""
         limits = PoolLimits()
         with pytest.raises(AttributeError):
-            limits.max_connections = 200  # type: ignore
+            limits.max_connections = 200
 
 
 class TestPoolTimeouts:
@@ -68,7 +68,7 @@ class TestPoolTimeouts:
         """Test that PoolTimeouts is frozen (immutable)."""
         timeouts = PoolTimeouts()
         with pytest.raises(AttributeError):
-            timeouts.read = 200.0  # type: ignore
+            timeouts.read = 200.0
 
 
 class TestHttpClientPool:

@@ -147,7 +147,7 @@ async def _query_server_status(server_url: str) -> dict[str, Any] | None:
         async with httpx.AsyncClient(timeout=5.0) as client:
             response = await client.get(f"{server_url}/status")
             response.raise_for_status()
-            return from_json(response.content)  # type: ignore[no-any-return]
+            return from_json(response.content)
     except (httpx.ConnectError, httpx.TimeoutException):
         return None
     except httpx.HTTPStatusError:

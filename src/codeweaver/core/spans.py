@@ -185,7 +185,7 @@ class Span(NamedTuple):
         return self.start == other.start and self.end == other.end
 
     @override
-    def __iter__(self) -> Iterator[PositiveInt]:  # ty:ignore[invalid-method-override]
+    def __iter__(self) -> Iterator[PositiveInt]:
         """Return an iterator *over the lines* in the span."""
         current = self.start
         while current <= self.end:
@@ -211,7 +211,7 @@ class Span(NamedTuple):
             isinstance(span, tuple)
             and (len(span) == 2 or (len(span) == 3 and span[2] is None))
             and span[1] >= span[0]
-        )  # type: ignore
+        )
 
     def _is_contained(self, number: int) -> bool:
         """Check if the given number is contained in the span."""

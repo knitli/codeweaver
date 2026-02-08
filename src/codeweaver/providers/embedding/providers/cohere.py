@@ -113,7 +113,7 @@ class CohereEmbeddingProvider(EmbeddingProvider[CohereClient]):
         """Fetch embeddings from the Cohere API."""
         embed_kwargs = {
             **kwargs,
-            **(self.query_options if is_query else self.embed_options),  # ty:ignore[unresolved-attribute]
+            **(self.query_options if is_query else self.embed_options),
             "input_type": "search_query" if is_query else "search_document",
         }
         # Extract model from embed_kwargs to avoid passing it twice

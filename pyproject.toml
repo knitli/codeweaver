@@ -113,6 +113,7 @@ classifiers = [
 # tombi: format.rules.array-values-order.disabled = true
 dependencies = [
   # * ================ Core Dependencies ==================*
+  "anyio>4.12.0",
   "blake3>=1.0.8",
   # We use some pydantic internal/private utilities in dependency resolution
   # So we pin it to make sure we don't break on minor releases
@@ -136,8 +137,8 @@ dependencies = [
   # for local providers (sentence-transformers, fastembed) to detect CPU/GPU features
   "py-cpuinfo>=9.0.0",
   # * ================ CLI Dependencies ==================*
-  "cyclopts>=4.4.3",
-  "rich>=14.2.0",
+  "cyclopts>=4.5.1",
+  "rich>=14.3.0",
   # * ================ Provider Clients ==================*
   # we must pin these to specific versions to ensure compatibility with our ClientOptions subclasses
   "boto3==1.42.19",
@@ -242,6 +243,7 @@ full = [
   "permit-fastmcp",
   "sentence-transformers",
   "types-boto3-custom",
+  "tavily"
 ]
 full-gpu = [
   "permit-fastmcp",
@@ -254,6 +256,8 @@ full-gpu = [
   "sentence-transformers",
   # see note below about why this is commented out
   #  "sentence-transformers[onnx-gpu]; python_version>='3.12' and python_version<'3.14'",
+  "tavily",
+  "types-boto3-custom",
 ]
 gcp-secret-manager = ["pydantic-settings[yaml,toml,gcp-secret-manager]"]
 google = ["pydantic-ai-slim[google]"]
@@ -280,7 +284,8 @@ recommended = [
   "tokenizers",
   "py-cpuinfo",
   "voyageai",
-  "pydantic-ai-slim[openai,anthropic,duckduckgo,tavily,retries]",
+  "pydantic-ai-slim[openai,anthropic,duckduckgo,retries]",
+  "tavily"
 ]
 recommended-local-only = [
   "fastembed; python_version < '3.14'",
@@ -692,6 +697,24 @@ invalid-argument-type = "ignore"
 invalid-return-type = "ignore"
 unsupported-operator = "ignore"
 no-matching-overload = "ignore"
+
+[[tool.ty.overrides]]
+include = ["src/codeweaver/__init__.py"]
+
+[tool.ty.overrides.rules]
+invalid-assignment = "ignore"
+
+[[tool.ty.overrides]]
+include = ["src/codeweaver/core/di/container.py"]
+
+[tool.ty.overrides.rules]
+unresolved-attribute = "ignore"
+
+[[tool.ty.overrides]]
+include = ["src/codeweaver/semantic/classifier.py"]
+
+[tool.ty.overrides.rules]
+missing-argument = "ignore"
 
 [tool.uv]
 cache-keys = [

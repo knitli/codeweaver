@@ -326,7 +326,7 @@ def dependency_provider[T](
     def decorator(fn_or_cls: Callable[..., T] | type[T]) -> Callable[..., T] | type[T]:
         _register_provider(
             interface=cls,  # type: ignore - we know cls is not None here
-            factory=fn_or_cls,  # type: ignore
+            factory=fn_or_cls,
             scope=scope,
             module=module,
             tags=tags,

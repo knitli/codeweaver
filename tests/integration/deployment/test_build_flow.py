@@ -46,7 +46,7 @@ def test_build_and_validate_flow():
     assert dist_dir.exists(), "dist/ directory not created"
 
     # Step 3: Verify artifacts
-    artifacts = [f for f in dist_dir.glob("*") if f.is_file() and f.name not in [".gitignore"]]
+    artifacts = [f for f in dist_dir.glob("*") if f.is_file() and f.name != ".gitignore"]
     assert len(artifacts) == 2, (
         f"Expected 2 artifacts, found {len(artifacts)}: {[a.name for a in artifacts]}"
     )

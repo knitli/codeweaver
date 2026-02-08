@@ -212,16 +212,14 @@ def azure_key_vault_configured(
         env for env in os.environ if env.startswith("AZURE_KEY_VAULT")
     ) and importlib.util.find_spec("azure.identity"):
         try:
-            from azure.identity import DefaultAzureCredential  # type: ignore
+            from azure.identity import DefaultAzureCredential
 
         except ImportError:
             logger.warning("Azure SDK not installed, skipping Azure Key Vault settings.")
             return False
         else:
             return AzureKeyVaultSettingsSource(
-                settings_cls,
-                os.environ.get("AZURE_KEY_VAULT_URL", ""),
-                DefaultAzureCredential(),  # type: ignore
+                settings_cls, os.environ.get("AZURE_KEY_VAULT_URL", ""), DefaultAzureCredential()
             )
     return False
 
@@ -234,7 +232,7 @@ def google_secret_manager_configured(
         env for env in os.environ if env.startswith("GOOGLE_SECRET_MANAGER")
     ) and importlib.util.find_spec("google.auth"):
         try:
-            from google.auth import default  # type: ignore
+            from google.auth import default
 
         except ImportError:
             logger.warning(
@@ -243,9 +241,7 @@ def google_secret_manager_configured(
             return False
         else:
             return GoogleSecretManagerSettingsSource(
-                settings_cls,
-                default()[0],  # type: ignore
-                os.environ.get("GOOGLE_SECRET_MANAGER_PROJECT_ID", ""),
+                settings_cls, default()[0], os.environ.get("GOOGLE_SECRET_MANAGER_PROJECT_ID", "")
             )
     return False
 
@@ -513,7 +509,7 @@ class BaseCodeWeaverSettings(BaseSettings):
     def _update_settings(self, **kwargs: Any) -> Self:
         """Update settings, validating a new CodeWeaverSettings instance and updating the global instance."""
         try:
-            self.__init__(**kwargs)  # type: ignore # Unpack doesn't extend to nested dicts
+            self.__init__(**kwargs)  # Unpack doesn't extend to nested dicts
         except ValidationError:
             logger.warning(
                 "`CodeWeaverSettings` received invalid settings for an update. The settings failed to validate. We did not update the settings."
@@ -677,10 +673,10 @@ class BaseCodeWeaverSettings(BaseSettings):
             case _:
                 raise ValueError(f"Unsupported configuration file format: {extension}")
         return (
-            cls(project_path=project_path, **{**kwargs, "config_file": path})  # ty:ignore[invalid-argument-type, no-matching-overload]
+            cls(project_path=project_path, **{**kwargs, "config_file": path})  # ty:ignore[invalid-argument-type]
             if project_path
-            else cls(**{**kwargs, "config_file": path})  # ty:ignore[invalid-argument-type, no-matching-overload]
-        )  # ty:ignore[invalid-argument-type]
+            else cls(**{**kwargs, "config_file": path})  # ty:ignore[invalid-argument-type]
+        )
 
     @computed_field
     @property
@@ -777,8 +773,8 @@ class BaseCodeWeaverSettings(BaseSettings):
     def view(self) -> DictView[CodeWeaverSettingsDict]:
         """Get a read-only mapping view of the settings."""
         if self._map is None:
-            self._map = DictView(self.model_dump(exclude_computed_fields=True))  # type: ignore
-        return self._map  # type: ignore
+            self._map = DictView(self.model_dump(exclude_computed_fields=True))
+        return self._map
 
 
 __all__ = (

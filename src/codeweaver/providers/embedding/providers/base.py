@@ -134,10 +134,10 @@ def default_input_transformer(chunks: StructuredDataInput) -> Iterator[CodeChunk
 def default_output_transformer(output: Any) -> list[list[float]] | list[list[int]]:
     """Default output transformer that ensures the output is in the correct format."""
     if isinstance(output, list | tuple | set) and (
-        all(isinstance(i, list | set | tuple) for i in output)  # type: ignore
-        or (needs_wrapper := all(isinstance(i, int | float) for i in output))  # type: ignore
+        all(isinstance(i, list | set | tuple) for i in output)
+        or (needs_wrapper := all(isinstance(i, int | float) for i in output))
     ):
-        return [output] if needs_wrapper else list(output)  # type: ignore
+        return [output] if needs_wrapper else list(output)
     logger.error(
         ("Received unexpected output format from embedding provider."),
         extra={"output_data": output},
@@ -566,7 +566,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             is_old_batch = True
         chunks_iter, cache_key = await self._process_input(
             documents, is_old_batch=is_old_batch, skip_deduplication=skip_deduplication
-        )  # type: ignore
+        )
 
         # Convert iterator to tuple once to avoid exhaustion issues
         chunks = tuple(chunks_iter)
@@ -627,7 +627,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                 batch_results: (
                     Sequence[Sequence[float]]
                     | Sequence[Sequence[int]]
-                    | Sequence[dict[str, list[int] | list[float]]]
+                    | Sequence[dict[str, list[int] | list[float]]]  # ty:ignore[invalid-assignment]
                 ) = await self._embed_documents_with_retry(token_batch, **kwargs)
                 all_results.extend(batch_results)
 
@@ -649,7 +649,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                     },
                 },
             )
-            return self._handle_embedding_error(e, batch_id or cache_key, documents or [], None)  # type: ignore
+            return self._handle_embedding_error(e, batch_id or cache_key, documents or [], None)
         except RetryError as e:
             # All retry attempts exhausted
             await log_to_client_or_fallback(
@@ -664,7 +664,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                     },
                 },
             )
-            return self._handle_embedding_error(e, batch_id or cache_key, documents or [], None)  # type: ignore
+            return self._handle_embedding_error(e, batch_id or cache_key, documents or [], None)
         except Exception as e:
             await log_to_client_or_fallback(
                 context,
@@ -679,15 +679,12 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                     },
                 },
             )
-            return self._handle_embedding_error(e, batch_id or cache_key, documents or [], None)  # type: ignore
+            return self._handle_embedding_error(e, batch_id or cache_key, documents or [], None)
         else:
             if isinstance(results, dict):
                 # Sparse embedding format
-                results = [  # ty: ignore[invalid-assignment]
-                    SparseEmbedding(
-                        indices=result["indices"],  # type: ignore
-                        values=result["values"],  # type: ignore
-                    )
+                results = [
+                    SparseEmbedding(indices=result["indices"], values=result["values"])
                     for result in results
                 ]
             if not is_old_batch:
@@ -772,10 +769,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         else:
             if isinstance(results, dict):
                 results = [
-                    SparseEmbedding(
-                        indices=result["indices"],  # type: ignore
-                        values=result["values"],  # type: ignore
-                    )
+                    SparseEmbedding(indices=result["indices"], values=result["values"])
                     for result in results
                 ]
             return results
@@ -848,7 +842,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         if token_count is not None:
             statistics.add_token_usage(embedding_generated=token_count)
         elif from_docs and all(isinstance(doc, str) for doc in from_docs):
-            token_count = self.tokenizer.estimate_batch(from_docs)  # type: ignore
+            token_count = self.tokenizer.estimate_batch(from_docs)  # ty:ignore[invalid-argument-type]
             statistics.add_token_usage(embedding_generated=token_count)
         elif from_docs:
             # Handle nested sequences by flattening
@@ -857,7 +851,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                 if isinstance(item, str):
                     flattened.append(item)
                 else:
-                    flattened.extend(item)  # type: ignore
+                    flattened.extend(item)
             token_count = self.tokenizer.estimate_batch(flattened)
             statistics.add_token_usage(embedding_generated=token_count)
         else:
@@ -948,7 +942,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         return [
             serialized
             if (serialized := chunk.serialize_for_embedding()) and isinstance(serialized, str)
-            else serialized.decode("utf-8")  # ty:ignore[unresolved-attribute]
+            else serialized.decode("utf-8")
             for chunk in chunks
             if chunk
         ]
@@ -1006,8 +1000,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             if attr == "sparse" and isinstance(embedding, dict):
                 # For sparse embeddings, convert dict to SparseEmbedding
                 sparse_emb = SparseEmbedding(
-                    indices=embedding["indices"],  # type: ignore
-                    values=embedding["values"],  # type: ignore
+                    indices=embedding["indices"], values=embedding["values"]
                 )
                 chunk_info = EmbeddingBatchInfo.create_sparse(
                     batch_id=batch_id,
@@ -1124,7 +1117,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         serialize_as_any: bool = False,
     ) -> str:
         """Serialize the model to JSON, excluding certain fields."""
-        return self._model_dump_json(  # ty: ignore[unresolved-attribute]
+        return self._model_dump_json(
             indent=indent,
             include=include,
             exclude={"client", "_input_transformer", "_output_transformer"},
@@ -1201,8 +1194,8 @@ class SparseEmbeddingProvider[SparseClient](EmbeddingProvider[SparseClient], ABC
             # Now add the hash to store, mapping it to this batch key
             self._hash_store[hashes[original_idx]] = key
             if not self._store:
-                self._store = make_uuid_store(value_type=list, size_limit=ONE_MEGABYTE * 3)  # type: ignore
-            self._store[key] = final_chunks  # type: ignore
+                self._store = make_uuid_store(value_type=list, size_limit=ONE_MEGABYTE * 3)
+            self._store[key] = final_chunks
 
         return iter(final_chunks), key
 

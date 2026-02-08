@@ -202,8 +202,8 @@ class TelemetrySettingsDict(TypedDict, total=False):
 
 
 DefaultTelemetrySettings = TelemetrySettingsDict(
-    TelemetrySettings().model_dump(exclude_none=True, exclude_computed_fields=True)  # type: ignore
-)  # type: ignore
+    TelemetrySettings().model_dump(exclude_none=True, exclude_computed_fields=True)
+)
 
 
 __all__ = ("DefaultTelemetrySettings", "TelemetrySettings", "TelemetrySettingsDict")

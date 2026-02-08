@@ -418,12 +418,12 @@ def dict_to_partial(v: dict[str, Any] | str | ModelMeta) -> Callable[..., Any]:
             functools.partial(sentence_transformers_loader, **v.get("loader", {}))
             if isinstance(v.get("loader"), dict)
             else lambda _: None
-        )  # type: ignore
+        )
         if (
             cast(dict, v).get("license")
             and "jinaai" in v.get("name", "")
             and "qwen" in v.get("license", "")
-        ):  # type: ignore
+        ):
             cast(dict, new_v)["license"] = "cc-by-nc-4.0"
         if v.get("name") and v.get("name", "").startswith("snowflake-arctic-embed2"):
             cast(dict, new_v)["name"] = "Snowflake/snowflake-arctic-embed-v2.0-ollama"
@@ -441,10 +441,10 @@ def dict_to_partial(v: dict[str, Any] | str | ModelMeta) -> Callable[..., Any]:
         elif not hasattr(v.loader, "keywords") and callable(v.loader):
             new_loader = v.loader
         else:
-            new_loader = v.loader  # ty:ignore[invalid-assignment]
+            new_loader = v.loader
         if v.license and v.name and "jinaai" in v.name and "qwen" in v.license:
             cast(ModelMeta, new_v).license = "cc-by-nc-4.0"
-        cast(ModelMeta, new_v).loader = new_loader  # ty:ignore[invalid-assignment]
+        cast(ModelMeta, new_v).loader = new_loader
     return new_v  # ty:ignore[invalid-return-type]
 
 
@@ -467,9 +467,9 @@ class RootJson(BaseModel):
         """Serialize the models for JSON output."""
         for key, model in value.items():
             if model.loader and hasattr(model.loader, "keywords"):
-                model.loader = model.loader.keywords  # ty:ignore[invalid-assignment]
+                model.loader = model.loader.keywords
             else:
-                model.loader = {}  # type: ignore
+                model.loader = {}
             value[key] = model
         return value
 
@@ -511,7 +511,7 @@ class RootJson(BaseModel):
     @classmethod
     def from_model_metas(cls, models: Sequence[ModelMeta]) -> RootJson:
         """Create a RootJson instance from a sequence of ModelMeta objects."""
-        models = [{model.name: model} for model in models if models and model is not None]  # ty:ignore[invalid-assignment]
+        models = [{model.name: model} for model in models if models and model is not None]
         return cls(models=models)
 
     @classmethod
@@ -578,8 +578,8 @@ def mteb_to_capabilities(model: SimplifiedModelMeta) -> PartialCapabilities:
         and isinstance(other, dict)
         and (mem_usage := other.get("memory_usage_mb"))
     ):
-        other["memory_usage_mb"] = int(mem_usage)  # ty:ignore[invalid-assignment]
-        other["memory_usage_gb"] = round(int(mem_usage) / 1024, 2)  # ty:ignore[invalid-assignment]
+        other["memory_usage_mb"] = int(mem_usage)
+        other["memory_usage_gb"] = round(int(mem_usage) / 1024, 2)
     if (metric := caps.get("preferred_metrics")) and isinstance(metric, tuple):
         if metric[0] == "cosine" and len(metric) == 1:
             metric = ("cosine", "dot", "euclidean")
@@ -613,7 +613,7 @@ def from_mteb_to_simplified(obj: ModelMeta) -> SimplifiedModelMeta:
     """
     # loader is a functools.partial, we're going to grab its kwargs
     if isinstance(obj, ModelMeta) and isinstance(obj.loader, dict):
-        return SimplifiedModelMeta(dict(obj))  # ty:ignore[missing-typed-dict-key]
+        return SimplifiedModelMeta(dict(obj))
     mapped_obj = obj.model_copy(deep=True).model_dump(mode="python")
     mapped_obj["loader"] = mapped_obj["loader"] if isinstance(mapped_obj["loader"], dict) else {}
     if (loader := obj.loader) and hasattr(loader, "keywords"):
@@ -622,7 +622,7 @@ def from_mteb_to_simplified(obj: ModelMeta) -> SimplifiedModelMeta:
         }
     else:
         mapped_obj["loader"] = {}
-    return SimplifiedModelMeta(mapped_obj)  # ty:ignore[missing-typed-dict-key]
+    return SimplifiedModelMeta(mapped_obj)
 
 
 def build_get_function(maker: str) -> str:
@@ -665,7 +665,7 @@ def generate_capabilities_file(models: list[SimplifiedModelMeta], model_maker: M
     cap_partials = [mteb_to_capabilities(model) for model in models]
     for cap_partial in cap_partials:
         if not isinstance(cap_partial["output_dtypes"], tuple):
-            cap_partial["output_dtypes"] = (cap_partial["output_dtypes"],)  # ty:ignore[invalid-assignment]
+            cap_partial["output_dtypes"] = (cap_partial["output_dtypes"],)
     capabilities = []
     cap_map = MODEL_MAP_DATA.get(model_maker, {})
     maker_title = to_camel(model_maker)

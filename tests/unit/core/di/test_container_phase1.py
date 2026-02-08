@@ -135,21 +135,21 @@ class UncachedCounterConsumer:
 async def async_generator_factory() -> AsyncIterator[ServiceA]:
     """Async generator factory with cleanup tracking."""
     service = ServiceA("async_gen")
-    service.cleanup_called = False  # type: ignore
+    service.cleanup_called = False
     try:
         yield service
     finally:
-        service.cleanup_called = True  # type: ignore
+        service.cleanup_called = True
 
 
 def sync_generator_factory() -> Iterator[ServiceA]:
     """Sync generator factory with cleanup tracking."""
     service = ServiceA("sync_gen")
-    service.cleanup_called = False  # type: ignore
+    service.cleanup_called = False
     try:
         yield service
     finally:
-        service.cleanup_called = True  # type: ignore
+        service.cleanup_called = True
 
 
 # Union type test classes
@@ -308,19 +308,19 @@ async def test_multiple_generators_cleanup():
 
     async def generator1() -> AsyncIterator[ServiceA]:
         service = ServiceA("gen1")
-        service.cleanup_called = False  # type: ignore
+        service.cleanup_called = False
         try:
             yield service
         finally:
-            service.cleanup_called = True  # type: ignore
+            service.cleanup_called = True
 
     def generator2() -> Iterator[ServiceB]:
         service = ServiceB(ServiceA("gen2_inner"))
-        service.cleanup_called = False  # type: ignore
+        service.cleanup_called = False
         try:
             yield service
         finally:
-            service.cleanup_called = True  # type: ignore
+            service.cleanup_called = True
 
     container = Container()
 
@@ -332,11 +332,11 @@ async def test_multiple_generators_cleanup():
         service_b = await container.resolve(ServiceB)
 
         assert service_a.cleanup_called is False
-        assert service_b.cleanup_called is False  # type: ignore
+        assert service_b.cleanup_called is False
 
     # Both should be cleaned up
     assert service_a.cleanup_called is True
-    assert service_b.cleanup_called is True  # type: ignore
+    assert service_b.cleanup_called is True
 
 
 @pytest.mark.asyncio
@@ -433,28 +433,13 @@ async def test_function_scope_no_caching():
 
     # Use function scope
     service1 = await container._resolve_dependency(
-        "service",
-        None,  # type: ignore
-        Depends(get_service, scope="function"),
-        FunctionScopedService,
-        {},
-        None,
+        "service", None, Depends(get_service, scope="function"), FunctionScopedService, {}, None
     )
     service2 = await container._resolve_dependency(
-        "service",
-        None,  # type: ignore
-        Depends(get_service, scope="function"),
-        FunctionScopedService,
-        {},
-        None,
+        "service", None, Depends(get_service, scope="function"), FunctionScopedService, {}, None
     )
     service3 = await container._resolve_dependency(
-        "service",
-        None,  # type: ignore
-        Depends(get_service, scope="function"),
-        FunctionScopedService,
-        {},
-        None,
+        "service", None, Depends(get_service, scope="function"), FunctionScopedService, {}, None
     )
 
     # Each call should create a new instance
@@ -823,28 +808,13 @@ async def test_use_cache_false_disables_caching():
 
     # Multiple calls with use_cache=False
     service1 = await container._resolve_dependency(
-        "counter",
-        None,  # type: ignore
-        Depends(get_counter, use_cache=False),
-        CounterService,
-        {},
-        None,
+        "counter", None, Depends(get_counter, use_cache=False), CounterService, {}, None
     )
     service2 = await container._resolve_dependency(
-        "counter",
-        None,  # type: ignore
-        Depends(get_counter, use_cache=False),
-        CounterService,
-        {},
-        None,
+        "counter", None, Depends(get_counter, use_cache=False), CounterService, {}, None
     )
     service3 = await container._resolve_dependency(
-        "counter",
-        None,  # type: ignore
-        Depends(get_counter, use_cache=False),
-        CounterService,
-        {},
-        None,
+        "counter", None, Depends(get_counter, use_cache=False), CounterService, {}, None
     )
 
     # Each should be a different instance
@@ -867,7 +837,7 @@ async def test_use_cache_false_with_scope_parameter():
     # Even with scope="singleton", use_cache=False should disable caching
     service1 = await container._resolve_dependency(
         "counter",
-        None,  # type: ignore
+        None,
         Depends(get_counter, use_cache=False, scope="singleton"),
         CounterService,
         {},
@@ -875,7 +845,7 @@ async def test_use_cache_false_with_scope_parameter():
     )
     service2 = await container._resolve_dependency(
         "counter",
-        None,  # type: ignore
+        None,
         Depends(get_counter, use_cache=False, scope="singleton"),
         CounterService,
         {},
@@ -1001,20 +971,10 @@ async def test_scope_with_union_resolution():
 
     # Request scope with union type
     r1 = await container._resolve_dependency(
-        "c",
-        None,  # type: ignore
-        Depends(get_counter, scope="request"),
-        CounterService | ServiceA,
-        {},
-        None,
+        "c", None, Depends(get_counter, scope="request"), CounterService | ServiceA, {}, None
     )
     r2 = await container._resolve_dependency(
-        "c",
-        None,  # type: ignore
-        Depends(get_counter, scope="request"),
-        CounterService | ServiceA,
-        {},
-        None,
+        "c", None, Depends(get_counter, scope="request"), CounterService | ServiceA, {}, None
     )
 
     # Should be cached within request
@@ -1023,12 +983,7 @@ async def test_scope_with_union_resolution():
     container.clear_request_cache()
 
     r3 = await container._resolve_dependency(
-        "c",
-        None,  # type: ignore
-        Depends(get_counter, scope="request"),
-        CounterService | ServiceA,
-        {},
-        None,
+        "c", None, Depends(get_counter, scope="request"), CounterService | ServiceA, {}, None
     )
     # New request should have new instance
     assert r3 is not r1

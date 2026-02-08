@@ -117,7 +117,7 @@ class DirectoryPurpose(str, BaseEnum):
                 for path in paths[1]
                 if "." not in str(path)[1:] or "/" not in str(path)
             ),
-        }
+        }  # ty:ignore[invalid-assignment]
         return aliases.get(self, ())
 
     @property
@@ -218,7 +218,6 @@ class RepoChecklist(BasedModel):
 
     # monorepo indicators
     has_apps_dir: PathOrFalse
-    has_docs_dir: PathOrFalse
     has_packages_dir: PathOrFalse
     has_frontend_dir: PathOrFalse
     has_backend_dir: PathOrFalse
@@ -365,7 +364,7 @@ class RepoChecklist(BasedModel):
         # ensure the dict can hold mixed value types (Path|False and tuples)
         attrs: RepoChecklistDict = RepoChecklistDict(**{  # type: ignore[missing-typed-dict-key]
             key: False if key.startswith("has_") else () for key in cls.__dataclass_fields__
-        })  # type: ignore # it doesn't infer the keys
+        })
         for name in dir_checks:
             if name in root_level_dir_names:
                 attrs[f"has_{name}_dir"] = project_path / name  # ty: ignore[invalid-key]
@@ -510,9 +509,7 @@ class RepoChecklist(BasedModel):
             if instance.apps
         }
         instance._children = {
-            app: child
-            for app, child in children.items()
-            if child and cls._any_exists(child)  # type: ignore
+            app: child for app, child in children.items() if child and cls._any_exists(child)
         }
         return instance
 
@@ -542,7 +539,7 @@ class RepoChecklist(BasedModel):
             elif isinstance(value, tuple):
                 paths.extend(
                     item[1]
-                    for item in value  # type: ignore
+                    for item in value
                     if isinstance(item, tuple)
                     and len(cast(tuple[str, Path], item)) == 2
                     and isinstance(item[1], Path)

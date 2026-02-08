@@ -91,7 +91,7 @@ def get_rich_handler(**kwargs: Any) -> RichHandler:
     global RichHandler
     return RichHandler(
         console=console(markup=True, soft_wrap=True, emoji=True), markup=True, **kwargs
-    )  # type: ignore
+    )
 
 
 def _setup_config_logger(

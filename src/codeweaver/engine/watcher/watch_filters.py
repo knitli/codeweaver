@@ -166,7 +166,7 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
         walker: None = None,
         **settings: Unpack[RignoreSettings],
     ) -> None: ...
-    def __init__(  # type: ignore
+    def __init__(
         self, *, base_path: DirectoryPath | None, walker: Walker, settings: RignoreSettings
     ) -> None:
         """Initialize the IgnoreFilter with either rignore settings or a pre-configured walker."""
@@ -256,9 +256,7 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
                 "Use from_settings_async() for full initialization."
             )
 
-        walker = rignore.Walker(
-            **(index_settings.to_settings())  # type: ignore
-        )
+        walker = rignore.Walker(**(index_settings.to_settings()))
         return cls(base_path=None, walker=walker, settings=None)
 
     @classmethod
@@ -283,9 +281,7 @@ class IgnoreFilter[Walker: rignore.Walker](watchfiles.DefaultFilter):
             await index_settings.set_inc_exc(project_path)
             logger.debug("inc_exc patterns initialized for project: %s", project_path)
 
-        walker = rignore.Walker(
-            **(index_settings.to_settings())  # type: ignore
-        )
+        walker = rignore.Walker(**(index_settings.to_settings()))
         return cls(base_path=None, walker=walker, settings=None)
 
     @property

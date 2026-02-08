@@ -53,7 +53,6 @@ ALL_PROVIDERS = [
 
 
 @pytest.mark.external_api
-@pytest.mark.parametrize
 @pytest.mark.qdrant
 class TestRegistryToProviderIntegration:
     """Test registry integration with Provider.other_env_vars."""
@@ -64,9 +63,9 @@ class TestRegistryToProviderIntegration:
         configs = get_provider_configs(provider_name)
         assert configs is not None, f"Provider {provider_name} not found in registry"
         assert len(configs) > 0, f"Provider {provider_name} has no configurations"
-        assert all(
-            config.provider == provider_name for config in configs
-        ), f"Provider {provider_name} config mismatch"
+        assert all(config.provider == provider_name for config in configs), (
+            f"Provider {provider_name} config mismatch"
+        )
 
     @pytest.mark.parametrize("provider_name", ALL_PROVIDERS)
     def test_registry_conversion_to_env_vars(self, provider_name: str) -> None:
@@ -120,9 +119,7 @@ class TestRegistryToProviderIntegration:
         # Anthropic should have 2 configurations (API key, auth token)
         anthropic_configs = get_provider_configs("anthropic")
         assert anthropic_configs is not None
-        assert (
-            len(anthropic_configs) >= 2
-        ), "Anthropic should have at least 2 auth configurations"
+        assert len(anthropic_configs) >= 2, "Anthropic should have at least 2 auth configurations"
 
         # Google should have 2 configurations (Gemini, Google)
         google_configs = get_provider_configs("google")
@@ -157,9 +154,9 @@ class TestRegistryToProviderIntegration:
 
             # Check that first config has inherits_from
             first_config = configs[0]
-            assert (
-                first_config.inherits_from == "openai"
-            ), f"Provider {provider_name} should inherit from openai"
+            assert first_config.inherits_from == "openai", (
+                f"Provider {provider_name} should inherit from openai"
+            )
 
     def test_env_var_field_conversion(self) -> None:
         """Test that EnvVarConfig fields are properly converted to EnvVarInfo."""
@@ -210,7 +207,6 @@ class TestRegistryToProviderIntegration:
 
 
 @pytest.mark.external_api
-@pytest.mark.parametrize
 @pytest.mark.qdrant
 class TestSpecificProviderConfigurations:
     """Test specific provider configurations for correctness."""
@@ -283,7 +279,9 @@ class TestSpecificProviderConfigurations:
         assert len(heroku_config.other) > 0
 
         # Find model_id in other
-        model_id_config = next((conf for key, conf in heroku_config.other if key == "model_id"), None)
+        model_id_config = next(
+            (conf for key, conf in heroku_config.other if key == "model_id"), None
+        )
         assert model_id_config is not None
         assert model_id_config.env == "INFERENCE_MODEL_ID"
 

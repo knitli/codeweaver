@@ -81,7 +81,7 @@ class LocalEmbeddingDetector(FailoverDetector):
 
         # Check if first (primary) provider is local
         primary_embedding = self._settings.embedding[0]
-        return primary_embedding.is_local
+        return primary_embedding.is_local()
 
 
 __all__ = ("FailoverDetector", "LocalEmbeddingDetector")

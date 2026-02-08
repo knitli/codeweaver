@@ -492,7 +492,7 @@ def get_provider_vars() -> MappingProxyType[ProviderField, SetProviderEnvVarsDic
     for env_var in env_vars:
         kind = next(k for k in provider_keys if k.upper() in env_var)
         if env_map[kind] is None:
-            env_map[kind] = {}  # ty: ignore[invalid-assignment]
+            env_map[kind] = {}
         if value := os.environ.get(env_var):
             if "API_KEY" in env_var:
                 env_map[kind]["api_key"] = SecretStr(value)

@@ -335,7 +335,7 @@ model_name = "voyage-4-nano"
         from codeweaver.server.config.settings import CodeWeaverSettings
 
         with pytest.raises(ConfigurationError) as exc_info:
-            CodeWeaverSettings(config_file=toml_file)  # ty:ignore[missing-argument]
+            CodeWeaverSettings(config_file=toml_file)
 
         error_message = str(exc_info.value).lower()
         assert "cannot specify both" in error_message or "both" in error_message
@@ -370,7 +370,7 @@ model_name = "BAAI/bge-small-en-v1.5"
         from codeweaver.server.config.settings import CodeWeaverSettings
 
         with pytest.raises(ConfigurationError) as exc_info:
-            CodeWeaverSettings(config_file=toml_file)  # ty:ignore[missing-argument]
+            CodeWeaverSettings(config_file=toml_file)
 
         error = exc_info.value
         assert hasattr(error, "message") or str(error)
@@ -407,7 +407,7 @@ model_name = "voyage-4-nano"
         from codeweaver.server.config.settings import CodeWeaverSettings
 
         with pytest.raises(ConfigurationError) as exc_info:
-            CodeWeaverSettings(config_file=toml_file)  # ty:ignore[missing-argument]
+            CodeWeaverSettings(config_file=toml_file)
 
         error = exc_info.value
 
@@ -455,7 +455,7 @@ model_name = "voyage-4-nano"
         from codeweaver.server.config.settings import CodeWeaverSettings
 
         with pytest.raises(ConfigurationError) as exc_info:
-            CodeWeaverSettings(config_file=toml_file)  # ty:ignore[missing-argument]
+            CodeWeaverSettings(config_file=toml_file)
 
         error_message = str(exc_info.value).lower()
         assert any(keyword in error_message for keyword in ["family", "incompatible", "different"])
@@ -485,7 +485,7 @@ model_name = "text-embedding-3-large"
         from codeweaver.server.config.settings import CodeWeaverSettings
 
         with pytest.raises(ConfigurationError) as exc_info:
-            CodeWeaverSettings(config_file=toml_file)  # ty:ignore[missing-argument]
+            CodeWeaverSettings(config_file=toml_file)
 
         error_message = str(exc_info.value).lower()
         assert "family" in error_message or "incompatible" in error_message
@@ -514,7 +514,7 @@ model_name = "voyage-4-nano"
         from codeweaver.server.config.settings import CodeWeaverSettings
 
         with pytest.raises(ConfigurationError) as exc_info:
-            CodeWeaverSettings(config_file=toml_file)  # ty:ignore[missing-argument]
+            CodeWeaverSettings(config_file=toml_file)
 
         error_message = str(exc_info.value).lower()
         assert any(keyword in error_message for keyword in ["not found", "unknown", "capabilities"])
@@ -686,7 +686,7 @@ model_name = "voyage-4-nano"
         from codeweaver.server.config.settings import CodeWeaverSettings
 
         with pytest.raises((ConfigurationError, ValueError)) as exc_info:
-            CodeWeaverSettings(config_file=toml_file)  # ty:ignore[missing-argument]
+            CodeWeaverSettings(config_file=toml_file)
 
         # Should indicate missing required field
         assert exc_info.value is not None
@@ -710,7 +710,7 @@ model_name = "voyage-4-large"
         from codeweaver.server.config.settings import CodeWeaverSettings
 
         with pytest.raises((ConfigurationError, ValueError)) as exc_info:
-            CodeWeaverSettings(config_file=toml_file)  # ty:ignore[missing-argument]
+            CodeWeaverSettings(config_file=toml_file)
 
         # Should indicate missing required field
         assert exc_info.value is not None
@@ -738,7 +738,7 @@ model_name = "voyage-4-nano"
         from codeweaver.server.config.settings import CodeWeaverSettings
 
         with pytest.raises((ConfigurationError, ValueError)) as exc_info:
-            CodeWeaverSettings(config_file=toml_file)  # ty:ignore[missing-argument]
+            CodeWeaverSettings(config_file=toml_file)
 
         # Should indicate invalid provider
         assert exc_info.value is not None

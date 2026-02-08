@@ -297,10 +297,10 @@ class CollectionMetadata(BasedModel):
             )
 
         # Check if current model belongs to a family
-        if not current_caps.model_family:  # ty:ignore[unresolved-attribute]
+        if not current_caps.model_family:
             self._handle_missing_family(current_model, indexed_model, other.dense_model_family)  # ty:ignore[invalid-argument-type]
 
-        current_family = current_caps.model_family  # ty:ignore[unresolved-attribute]
+        current_family = current_caps.model_family
 
         # Verify same family ID
         if current_family.family_id != other.dense_model_family:
@@ -309,7 +309,7 @@ class CollectionMetadata(BasedModel):
                 indexed_model,
                 cast(str, other.dense_model_family),
                 current_family,
-                resolver,  # ty:ignore[invalid-argument-type]
+                resolver,
             )
 
         # Verify models are compatible within the family
@@ -392,8 +392,8 @@ class CollectionMetadata(BasedModel):
 
         indexed_caps = resolver.resolve(indexed_model) if indexed_model else None
         compatible_models = []
-        if indexed_caps and indexed_caps.model_family:  # ty:ignore[unresolved-attribute]
-            compatible_models = sorted(indexed_caps.model_family.member_models)  # ty:ignore[unresolved-attribute]
+        if indexed_caps and indexed_caps.model_family:
+            compatible_models = sorted(indexed_caps.model_family.member_models)
 
         raise ConfigurationError(
             f"Model family mismatch: collection indexed with '{indexed_family}' family "

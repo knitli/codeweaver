@@ -120,7 +120,7 @@ def merge_agent_model_settings(
 
 def _create_default_data_provider_settings() -> tuple[DataProviderSettingsType, ...]:
     """Create default data provider settings (delayed initialization)."""
-    if has_package("tavily") and Provider.TAVILY.has_env_auth():
+    if has_package("tavily") and Provider.TAVILY.has_env_auth:
         return (TavilyProviderSettings(),)
     return (DuckDuckGoProviderSettings(),) if has_package("ddgs") else ()
 
@@ -145,15 +145,15 @@ def _get_default_embedding_settings() -> DeterminedDefaults:
     ):
         if has_package(lib):
             # all three of the top defaults are extremely capable and finetuned for code tasks
-            if lib == "voyageai" and Provider.VOYAGE.has_env_auth():
+            if lib == "voyageai" and Provider.VOYAGE.has_env_auth:
                 return DeterminedDefaults(
                     provider=Provider.VOYAGE, model=ModelName("voyage-4"), enabled=True
                 )
-            if lib == "mistral" and Provider.MISTRAL.has_env_auth():
+            if lib == "mistral" and Provider.MISTRAL.has_env_auth:
                 return DeterminedDefaults(
                     provider=Provider.MISTRAL, model=ModelName("codestral-embed"), enabled=True
                 )
-            if lib == "google" and Provider.GOOGLE.has_env_auth():
+            if lib == "google" and Provider.GOOGLE.has_env_auth:
                 return DeterminedDefaults(
                     provider=Provider.GOOGLE, model=ModelName("gemini-embedding-001"), enabled=True
                 )
@@ -188,7 +188,7 @@ def _produce_voyage_family(
         model_name=ModelName("voyageai/voyage-4-nano"),
         embedding=SentenceTransformersEncodeDict(precision="uint8", truncate_dim=1024),
     )
-    if Provider.VOYAGE.has_env_auth() and str(model) in {
+    if Provider.VOYAGE.has_env_auth and str(model) in {
         "voyage-4",
         "voyage-4-lite",
         "voyage-4-large",
@@ -245,7 +245,7 @@ def _get_default_embedding_provider_settings() -> tuple[EmbeddingProviderSetting
     return (
         EmbeddingProviderSettings(
             provider=_embedding_defaults.provider,
-            model_name=_embedding_defaults.model,  # ty:ignore[invalid-argument-type]
+            model_name=_embedding_defaults.model,
             embedding_config=_create_embedding_config(
                 _embedding_defaults.provider,
                 _embedding_defaults.model,  # ty:ignore[invalid-argument-type]
@@ -578,7 +578,7 @@ class ProviderSettings(BasedModel):
                 default_value = AllDefaultProviderSettings.get(key)
                 setattr(self, key, default_value)
                 value = default_value
-            if not isinstance(value, tuple) and key not in {"disable_backup_system"}:
+            if not isinstance(value, tuple) and key != "disable_backup_system":
                 value = (value,)
                 setattr(self, key, value)
         return self
@@ -670,7 +670,7 @@ class ProviderSettings(BasedModel):
         """Get a summary of configured providers by kind."""
         provider_data: dict[ProviderKindLiteralString, Provider | tuple[Provider, ...] | None] = {
             field_name: (
-                tuple(s.provider for s in setting if setting and is_typeddict(s))  # type: ignore
+                tuple(s.provider for s in setting if setting and is_typeddict(s))
                 if isinstance(setting, tuple)
                 else (setting["provider"] if setting else None)
             )
@@ -703,7 +703,7 @@ class ProviderSettings(BasedModel):
         for field in matching_fields:
             if setting := self.settings_for_kind(field):
                 if isinstance(setting, tuple):
-                    all_settings.extend(setting)  # ty:ignore[invalid-argument-type]
+                    all_settings.extend(setting)
                 else:
                     all_settings.append(setting)
 

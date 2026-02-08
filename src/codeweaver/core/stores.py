@@ -153,7 +153,7 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
         elif data.get("_value_type"):
             value_type = data.pop("_value_type")
         elif data:
-            value_type = next(iter(data.values())).__class__  # type: ignore
+            value_type = next(iter(data.values())).__class__
         else:
             value_type = None
 
@@ -177,7 +177,7 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
         Override this to customize initialization behavior.
         """
 
-    def __pydantic_extra__(self, name: str, value: Any) -> dict[str, Any]:  # type: ignore
+    def __pydantic_extra__(self, name: str, value: Any) -> dict[str, Any]:
         """This is to prevent a pydantic bug that tries to set extra fields, when this method is deprecated.
         We'll remove once I get around to submitting a PR for it.
         """
@@ -221,7 +221,7 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
                     return "iter"
         return None
 
-    @cached_property
+    @cached_property  # ty:ignore[invalid-argument-type]
     def _get_copy_strategy(self) -> Callable[[T], T] | None:
         """Determine the best strategy for copying items from the store."""
         sample_item: T | None = None
@@ -244,16 +244,20 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
             if copy_strategy == "copy":
                 return copy.copy
             if copy_strategy == "constructor":
-                return lambda item: type(item)(item)  # type: ignore  # we know it's callable from trial_and_error_copy
+                return lambda item: type(item)(
+                    item
+                )  # we know it's callable from trial_and_error_copy
             # copy_strategy == "iter"
-            return lambda item: type(item)(iter(item))  # type: ignore
+            return lambda item: type(item)(iter(item))
         return lambda item: item  # no-op copy
 
     @override
     def get(self, key: KeyT, default: Any = None) -> T | None:  # ty:ignore[invalid-method-override]
         """Get a value from the store."""
         if item := self.store.get(key):
-            return self._get_copy_strategy(item) if self._get_copy_strategy else item
+            if (strategy := self._get_copy_strategy) is not None:
+                return strategy(item)
+            return item
         # Try to recover from trash first, then return default
         return self.store.get(key, default) if self.recover(key) else default
 
@@ -398,7 +402,7 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
             # LIFO removal strategy for simplicity
             removed = self.store.popitem()
             weight_loss_goal -= sys.getsizeof(removed[0]) + sys.getsizeof(removed[1])
-            if self._trash_heap is not None:  # type: ignore
+            if self._trash_heap is not None:
                 self._trash_heap[removed[0]] = removed[1]
             if weight_loss_goal <= 0:
                 break
@@ -414,7 +418,7 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
                 return
             _ = self._check_and_set(key, value)
         if (
-            self._trash_heap is not None  # type: ignore
+            self._trash_heap is not None
             and key in self._trash_heap
             and self._trash_heap[key] is not None
         ):
@@ -432,13 +436,13 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
         if key in self.store:
             with self._lock:
                 del self.store[key]
-        if self._trash_heap is not None and key in self._trash_heap:  # type: ignore
+        if self._trash_heap is not None and key in self._trash_heap:
             with self._trash_lock:
                 del self._trash_heap[key]
 
     def clear(self) -> None:
         """Clear the store."""
-        if self._trash_heap is not None:  # type: ignore
+        if self._trash_heap is not None:
             # Try to move items to trash heap, but if value type doesn't support weak refs
             # (e.g., NamedTuple), just skip the trash heap
             with contextlib.suppress(TypeError) and self._trash_lock:
@@ -449,13 +453,13 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
 
     def clear_trash(self) -> None:
         """Clear the trash heap."""
-        if self._trash_heap is not None:  # type: ignore
+        if self._trash_heap is not None:
             with self._trash_lock:
                 self._trash_heap.clear()
 
     def recover(self, key: KeyT) -> bool:
         """Recover a value from the trash heap."""
-        if self._trash_heap is None:  # type: ignore
+        if self._trash_heap is None:
             return False
         if (
             key in self._trash_heap

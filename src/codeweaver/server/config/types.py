@@ -85,7 +85,7 @@ class FastMcpServerSettingsDict(TypedDict, total=False):
     name: NotRequired[str]
     instructions: NotRequired[str | None]
     version: NotRequired[str | None]
-    lifespan: NotRequired[LifespanResultT | None]  # type: ignore  # it's just for clarity
+    lifespan: NotRequired[LifespanResultT | None]
     include_tags: NotRequired[set[str] | None]
     exclude_tags: NotRequired[set[str] | None]
     transport: NotRequired[Literal["stdio", "http"] | None]
@@ -271,13 +271,12 @@ class UvicornServerSettings(BasedModel):
         """Get default Uvicorn settings for CodeWeaver MCP Server."""
         return UvicornServerSettingsDict(
             cls.codeweaver_management_defaults()
-            | {
-                "name": "CodeWeaver MCP Server",
-                "port": int(env)
-                if (env := os.environ.get("CODEWEAVER_MCP_PORT")) and env.isdigit()
-                else 9328,
-            }
-        )
+        ) | UvicornServerSettingsDict({
+            "name": "CodeWeaver MCP Server",
+            "port": int(env)
+            if (env := os.environ.get("CODEWEAVER_MCP_PORT")) and env.isdigit()
+            else 9328,
+        })
 
 
 # ===========================================================================

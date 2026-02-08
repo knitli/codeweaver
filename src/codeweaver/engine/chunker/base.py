@@ -21,7 +21,7 @@ import logging
 import math
 
 from abc import ABC, abstractmethod
-from enum import Enum
+from enum import StrEnum
 from functools import cached_property
 from typing import TYPE_CHECKING, Annotated, Any, cast
 
@@ -66,7 +66,7 @@ MIN_FLOOR = 50
 """Absolute minimum floor regardless of optimal (tokens)."""
 
 
-class AdaptiveChunkBehavior(str, Enum):
+class AdaptiveChunkBehavior(StrEnum):
     """Actions for adaptive chunk sizing.
 
     The adaptive chunking system classifies each chunk by size and determines
@@ -94,7 +94,7 @@ class ChunkGovernor(BasedModel):
         | tuple[EmbeddingModelCapabilities]
         | tuple[EmbeddingModelCapabilities, RerankingModelCapabilities],
         Field(description="""The model capabilities to infer chunking behavior from."""),
-    ] = ()  # type: ignore[assignment]
+    ] = ()
 
     settings: Annotated[
         ChunkerSettings | None,
@@ -270,7 +270,7 @@ class ChunkGovernor(BasedModel):
             )
             return cls(capabilities=(embedding_caps, reranking_caps), settings=settings)
         if len(capabilities) == 1:
-            embedding_caps = cast(EmbeddingModelCapabilities, capabilities[0])  # ty: ignore[index-out-of-bounds]
+            embedding_caps = cast(EmbeddingModelCapabilities, capabilities[0])
             logger.debug("Creating ChunkGovernor with embedding caps: %s", embedding_caps)
             return cls(capabilities=(embedding_caps,), settings=settings)
         logger.warning("Could not determine capabilities from settings, using default chunk limits")

@@ -273,7 +273,7 @@ class TestCodeMatchSchema:
             ), "relevance_score must have maximum 1.0"
         else:
             # Check directly if not nested
-            pass  # type: ignore # Pydantic may represent this differently
+            pass  # Pydantic may represent this differently
 
     def test_code_match_match_type_enum(self):
         """Verify match_type uses CodeMatchType enum values."""
@@ -315,7 +315,7 @@ class TestCodeMatchSchema:
         # Invalid: start > end (CodeMatch validation catches this)
         with pytest.raises(
             CodeWeaverValidationError,
-            match="Invalid span.*start line must be less than or equal to end line",
+            match=r"Invalid span.*start line must be less than or equal to end line",
         ):
             CodeMatch(
                 file=test_file,
@@ -327,7 +327,10 @@ class TestCodeMatchSchema:
             )
 
         # Invalid: start < 1 (Span validation catches this at creation time)
-        with pytest.raises((ValidationError, CodeWeaverValidationError)):
+        with pytest.raises(
+            (ValidationError, CodeWeaverValidationError),
+            match=r"Invalid span.*start line must be greater than or equal to 1",
+        ):
             CodeMatch(
                 file=test_file,
                 content=test_chunk,
@@ -489,7 +492,7 @@ class TestTypesSafety:
         # Attempting to construct with wrong types should fail
         with pytest.raises((ValidationError, TypeError)):
             FindCodeResponseSummary(
-                matches="not a list",  # ty: ignore[invalid-argument-type]
+                matches="not a list",
                 summary="Test",
                 query_intent=IntentType.UNDERSTAND,
                 total_matches=0,

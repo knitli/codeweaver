@@ -97,7 +97,7 @@ class HealthService:
         """Get the primary (non-backup) provider of a given kind."""
         if not self._providers:
             return None
-        providers = self._providers.get(kind, ())  # type: ignore
+        providers = self._providers.get(kind, ())
         return next((p for p in providers if "Backup" not in p.__class__.__name__), None)
 
     async def get_health_response(self) -> HealthResponse:

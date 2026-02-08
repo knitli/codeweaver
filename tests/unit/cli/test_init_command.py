@@ -312,9 +312,7 @@ class TestMcpClientSupport:
         for client in expected_clients:
             try:
                 config_path = _get_client_config_path(
-                    client=client,  # type: ignore[arg-type]
-                    config_level="project",
-                    project_path=temp_project,
+                    client=client, config_level="project", project_path=temp_project
                 )
                 assert config_path is not None
                 assert isinstance(config_path, Path)
@@ -337,9 +335,7 @@ class TestMcpClientSupport:
         for client, config_level, expected_path in test_cases:
             try:
                 config_path = _get_client_config_path(
-                    client=client,  # type: ignore[arg-type]
-                    config_level=config_level,  # type: ignore[arg-type]
-                    project_path=temp_project,
+                    client=client, config_level=config_level, project_path=temp_project
                 )
                 assert config_path == expected_path
                 # Path should be absolute

@@ -475,13 +475,13 @@ async def test_performance_regression_check(qdrant_store: QdrantVectorStoreProvi
         baseline = json.loads(baseline_path.read_text())
 
         # Compare against baseline
-        search_regression = (metrics["search"]["p95_ms"] - baseline["search"]["p95_ms"]) / baseline[  # ty:ignore[not-subscriptable]
+        search_regression = (metrics["search"]["p95_ms"] - baseline["search"]["p95_ms"]) / baseline[
             "search"
         ]["p95_ms"]
 
         print("\nPerformance comparison vs baseline:")
         print(
-            f"  Search P95: {metrics['search']['p95_ms']:.2f}ms (baseline: {baseline['search']['p95_ms']:.2f}ms)"  # ty: ignore[not-subscriptable]
+            f"  Search P95: {metrics['search']['p95_ms']:.2f}ms (baseline: {baseline['search']['p95_ms']:.2f}ms)"
         )
         print(f"  Regression: {search_regression * 100:+.1f}%")
 
@@ -492,5 +492,5 @@ async def test_performance_regression_check(qdrant_store: QdrantVectorStoreProvi
             )
 
     print("\nCurrent performance metrics:")
-    print(f"  Search P95: {metrics['search']['p95_ms']:.2f}ms")  # ty: ignore[not-subscriptable]
-    print(f"  Delete: {metrics['delete']['latency_ms']:.2f}ms")  # ty: ignore[not-subscriptable]
+    print(f"  Search P95: {metrics['search']['p95_ms']:.2f}ms")
+    print(f"  Delete: {metrics['delete']['latency_ms']:.2f}ms")

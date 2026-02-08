@@ -81,16 +81,25 @@ depends = ["source"]
 tools.uv = "latest"
 run = '''
 echo "${CW_PREFIX} Syncing dependencies..."
-uv sync --extra full --group dev --group docs --group build --group test --no-install-workspace
+uv sync --extra full --group dev --group docs --group build --group test
 '''
 run_windows = '''
 echo [codeweaver] Syncing dependencies...
-uv sync --extra full --group dev --group docs --group build --group test --no-install-workspace
+uv sync --extra full --group dev --group docs --group build --group test
+'''
+
+[tasks.sync-gpu]
+depends = ["source"]
+tools.uv = "latest"
+run = '''
+echo "${CW_PREFIX} Syncing GPU dependencies..."
+uv sync --extra full-gpu --group dev --group docs --group build --group test
 '''
 
 [tasks.source]
 run = '''
 # Source the virtual environment
+
 echo "${CW_PREFIX} Sourcing virtual environment..."
 git rev-parse --show-toplevel || true
 if [ ! -d ".venv" ]; then
@@ -108,6 +117,7 @@ git rev-parse --show-toplevel
 [tasks.setup]
 # Development setup
 run = [
+  "",
   "echo \"${CW_PREFIX} Setting up development environment for the first time...\"",
   "mise set &>/dev/null",
   "mise trust --all &>/dev/null",
@@ -204,6 +214,7 @@ tools."pipx:ty" = "latest"
 tools."pipx:reuse" = "latest"
 tools.ruff = "latest"
 run = '''
+
 echo "${CW_PREFIX} Running quality checks..."
 hk check
 '''
@@ -255,6 +266,7 @@ if "%usage_fix%"=="true" (
 
 [tasks.format]
 run = '''
+
 echo "${CW_PREFIX} Running formatting checks..."
 hk fix
 '''
@@ -277,6 +289,7 @@ yq = "latest"
 
 [tasks.format-fix]
 run = '''
+
 echo "${CW_PREFIX} Applying formatting...hold onto your butts 🚬...🦖 "
 # mise -y //:fix-ruff-patterns || {  # there are some bugs to work out
 #    echo "${CW_PREFIX} ⚠️  \033[0;32mRuff pattern fixer encountered issues.\033[0m"}
@@ -318,12 +331,17 @@ run = '''uv tree --no-dev --group full'''
 env.MISE_EXPERIMENTAL = "1"
 tools.uv = "latest"
 run = '''
+
 echo "${CW_PREFIX} Setting up Python virtual environment..."
 uv venv --allow-existing --seed --keyring-provider subprocess --python {{ get_env(name="MISE_PYTHON_VERSION", default="3.13") }} --refresh .venv &&
 echo "${CW_PREFIX} ✅ Virtual environment is ready!"
 . .venv/bin/activate || echo "${CW_PREFIX} ⚠️  \033[0;31mFailed to source virtual environment.\033[0m"
 echo "${CW_PREFIX} Running dependency sync..."
-mise //:sync &
+if [ "$CODEWEAVER__DEV__USE_GPU" = "true" ]; then
+  mise //:sync-gpu &
+else
+  mise //:sync &
+fi
 '''
 run_windows = '''
 echo [codeweaver] Setting up Python virtual environment...
@@ -336,7 +354,11 @@ if %ERRORLEVEL% equ 0 (
     )
 )
 echo [codeweaver] Running dependency sync...
-start /b mise //:sync
+if "%CODEWEAVER__DEV__USE_GPU%"=="true" (
+    start /b mise //:sync-gpu
+) else (
+    start /b mise //:sync
+)
 '''
 
 [tasks.test]

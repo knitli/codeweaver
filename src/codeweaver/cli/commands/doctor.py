@@ -53,7 +53,7 @@ _display: StatusDisplay = get_display()
 
 def _get_settings_map(settings: SettingsMapDep = INJECTED) -> DictView[CodeWeaverSettingsDict]:
     """Get the settings map for CodeWeaver provider settings."""
-    return settings  # ty:ignore[invalid-return-type]
+    return settings
 
 
 def _get_display() -> StatusDisplay:
@@ -233,7 +233,7 @@ def _identify_missing_dependencies(
 
     for display_name, module_name, _version in required_packages:
         if has_package(module_name):
-            pkg_version = metadata.version(display_name)  # ty: ignore[unresolved-attribute]
+            pkg_version = metadata.version(display_name)
             installed.append((display_name, pkg_version))
         else:
             missing.append(display_name)
@@ -503,13 +503,13 @@ def _check_qdrant_api_key_env_vars(provider: Provider, check: DoctorCheck) -> Do
         _display.console.print(
             f"  [yellow]⚠[/yellow] You need to set your Qdrant API key. You can set using one of these environment variables: {', '.join(possible_keys)}"
             if len(possible_keys) > 1
-            else f"  [yellow]⚠[/yellow] You need to set your Qdrant API key. You can set using the environment variable: {possible_keys[0]}"  # type: ignore
+            else f"  [yellow]⚠[/yellow] You need to set your Qdrant API key. You can set using the environment variable: {possible_keys[0]}"
         )
     check.status = "⚠️"
     check.suggestions = [
         "Check provider authentication logic"
         if set_vars
-        else f"Set {possible_keys[0]} environment variable",  # type: ignore
+        else f"Set {possible_keys[0]} environment variable",
         "Or configure api_key in your codeweaver.toml file",
     ]
     return check

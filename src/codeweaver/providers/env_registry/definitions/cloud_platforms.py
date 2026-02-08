@@ -91,18 +91,16 @@ _azure_anthropic = ProviderEnvConfig(
         variable_name="region_name",
     ),
     other=httpx_env_vars()
-    | frozenset(
-        [
-            (
-                "resource",
-                EnvVarConfig(
-                    env="ANTHROPIC_FOUNDRY_RESOURCE",
-                    description="Resource name for Azure Anthropic service",
-                    variable_name="resource",
-                ),
-            )
-        ]
-    ),
+    | frozenset([
+        (
+            "resource",
+            EnvVarConfig(
+                env="ANTHROPIC_FOUNDRY_RESOURCE",
+                description="Resource name for Azure Anthropic service",
+                variable_name="resource",
+            ),
+        )
+    ]),
 )
 
 AZURE = multi_client_provider("azure", [_azure_openai, _azure_cohere, _azure_anthropic])
@@ -120,23 +118,19 @@ HEROKU = [
             variable_name="api_key",
         ),
         host=EnvVarConfig(
-            env="INFERENCE_URL",
-            description="Host URL for Heroku service",
-            variable_name="base_url",
+            env="INFERENCE_URL", description="Host URL for Heroku service", variable_name="base_url"
         ),
         other=httpx_env_vars()
-        | frozenset(
-            [
-                (
-                    "model_id",
-                    EnvVarConfig(
-                        env="INFERENCE_MODEL_ID",
-                        description="Model ID for Heroku service",
-                        variables=(VariableInfo(variable="model", dest="embed"),),
-                    ),
-                )
-            ]
-        ),
+        | frozenset([
+            (
+                "model_id",
+                EnvVarConfig(
+                    env="INFERENCE_MODEL_ID",
+                    description="Model ID for Heroku service",
+                    variables=(VariableInfo(variable="model", dest="embed"),),
+                ),
+            )
+        ]),
         inherits_from="openai",
     )
 ]
@@ -171,8 +165,4 @@ _vercel_oidc = ProviderEnvConfig(
 
 VERCEL = multi_client_provider("vercel", [_vercel_api_key, _vercel_oidc])
 
-__all__ = (
-    "AZURE",
-    "HEROKU",
-    "VERCEL",
-)
+__all__ = ("AZURE", "HEROKU", "VERCEL")

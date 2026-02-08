@@ -93,7 +93,7 @@ def provider_env_config_to_vars(
         "tls_key_path",
     ):
         if field_value := getattr(config, field_name, None):
-            result[field_name] = env_var_config_to_info(field_value)  # type: ignore
+            result[field_name] = env_var_config_to_info(field_value)
 
     # Convert 'other' field from frozenset[tuple] to dict
     if config.other:

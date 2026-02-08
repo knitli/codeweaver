@@ -100,7 +100,7 @@ async def find_code_tool(
             if (
                 context
                 and hasattr(context, "request_context")
-                and (request_context := context.request_context)  # type: ignore
+                and (request_context := context.request_context)
             ):
                 request_context: RequestContext[ServerSession, Any, Request]
                 request_id = request_context.request_id

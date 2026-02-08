@@ -17,12 +17,13 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Annotated, NamedTuple, cast
+from typing import TYPE_CHECKING, Annotated, cast
 
 from ast_grep_py import SgNode
 from pydantic import Field, NonNegativeFloat, NonNegativeInt, computed_field
 
 from codeweaver.core import (
+    BasedModel,
     BaseEnum,
     CategoryName,
     CategoryNameT,
@@ -153,7 +154,7 @@ class EvidenceKind(int, BaseEnum):
         return "\n".join(summaries)
 
 
-class GrammarClassificationResult(NamedTuple):
+class GrammarClassificationResult(BasedModel):
     """Result of grammar-based classification.
 
     Attributes:
@@ -180,7 +181,9 @@ class GrammarClassificationResult(NamedTuple):
             field_title_generator=generate_field_title,
         ),
     ]
-    classification_method: ClassificationMethod
+    classification_method: ClassificationMethod = Field(
+        description="Method used for classification", field_title_generator=generate_field_title
+    )
     evidence: tuple[EvidenceKind, ...] = Field(
         description="Kinds of evidence used for classification",
         default_factory=tuple,
@@ -369,25 +372,25 @@ class GrammarBasedClassifier:
             evidence=[EvidenceKind.SPECIFIC_THING, EvidenceKind.LANGUAGE, EvidenceKind.HEURISTIC],
             adjustment=100,
             differentiator=None,
-        )  # type: ignore
+        )
 
         if not thing.can_be_anywhere:
             return None
         # NOTE: we know exactly what each of these are from empirical analysis of all can_be_anywhere Things across all languages
         if language == SemanticSearchLanguage.SWIFT:
             if str(thing.name).lower() == "comment":
-                return result_func(SemanticClass.SYNTAX_ANNOTATION)  # type: ignore
+                return result_func(SemanticClass.SYNTAX_ANNOTATION)
             if str(thing.name).lower() == "multiline_comment":
-                return result_func(SemanticClass.DOCUMENTATION_STRUCTURED)  # type: ignore
+                return result_func(SemanticClass.DOCUMENTATION_STRUCTURED)
         if (
             str(thing.name).lower() == "line_continuation"
             and language == SemanticSearchLanguage.PYTHON
         ):
             # Special case: Python line_continuation is SYNTAX_PUNCTUATION
-            return result_func(SemanticClass.SYNTAX_PUNCTUATION)  # type: ignore
+            return result_func(SemanticClass.SYNTAX_PUNCTUATION)
         if str(thing.name).lower() == "text_interpolation":
             # Special case: (PHP) text_interpolation is SYNTAX_IDENTIFIER
-            return result_func(SemanticClass.SYNTAX_IDENTIFIER)  # type: ignore
+            return result_func(SemanticClass.SYNTAX_IDENTIFIER)
         return None
 
     def _handle_comment_cases(
@@ -405,7 +408,7 @@ class GrammarBasedClassifier:
                 ],
                 adjustment=90,
                 differentiator=None,
-            )  # type: ignore
+            )
         if language == SemanticSearchLanguage.RUST and str(thing.name).lower() in {
             "doc_comment",
             "block_comment",
@@ -419,17 +422,13 @@ class GrammarBasedClassifier:
                     EvidenceKind.SIMPLE_NAME_PATTERN,
                 ],
                 adjustment=90,
-                differentiator=lambda thing: (  # type: ignore
+                differentiator=lambda thing: (
                     SemanticClass.DOCUMENTATION_STRUCTURED
-                    if thing.text.strip().startswith(("/**", "///", "//!", "#[doc", "#![doc"))  # type: ignore
+                    if thing.text.strip().startswith(("/**", "///", "//!", "#[doc", "#![doc"))
                     else SemanticClass.SYNTAX_ANNOTATION
-                ),  # type: ignore
+                ),
             )
-        if str(thing.name).lower() in {  # type: ignore
-            "block_comment",
-            "multiline_comment",
-            "comment",
-        }:
+        if str(thing.name).lower() in {"block_comment", "multiline_comment", "comment"}:
             return self._to_classification_result(
                 SemanticClass.DOCUMENTATION_STRUCTURED,
                 method=ClassificationMethod.SPECIFIC_THING,
@@ -440,7 +439,7 @@ class GrammarBasedClassifier:
                 ],
                 adjustment=-30 if str(thing.name) == "comment" else -20,
                 differentiator=None,
-            )  # type: ignore
+            )
         return None
 
     def _classify_from_composite_checks(
@@ -484,15 +483,15 @@ class GrammarBasedClassifier:
             # a rare number of Things are *both* Tokens and CompositeThings in some languages
             return result_func(
                 classification=SemanticClass.from_token_purpose(thing.purpose, str(thing.name))
-            )  # ty:ignore[missing-argument]
+            )
         if (
             is_composite_thing(thing)
             and thing.name in registry.tokens[language]
             and (token := (registry.tokens[language][thing.name]))
         ):
             return result_func(
-                classification=SemanticClass.from_token_purpose(token.purpose, token.name)  # type: ignore
-            )  # ty:ignore[missing-argument]
+                classification=SemanticClass.from_token_purpose(token.purpose, str(str(token.name)))
+            )
         if is_composite_thing(thing):
             return self._classify_from_composite_checks(thing, language)
         return None
@@ -520,21 +519,21 @@ class GrammarBasedClassifier:
         )
         match thing_name:
             case "class" | "module" | "singleton_class":
-                return result_func(classification=SemanticClass.DEFINITION_TYPE)  # type: ignore
+                return result_func(classification=SemanticClass.DEFINITION_TYPE)
             case "method" | "singleton_method":
-                return result_func(classification=SemanticClass.DEFINITION_CALLABLE)  # type: ignore
+                return result_func(classification=SemanticClass.DEFINITION_CALLABLE)
             case "if" | "unless" | "case" | "case_match":
-                return result_func(classification=SemanticClass.FLOW_BRANCHING)  # type: ignore
+                return result_func(classification=SemanticClass.FLOW_BRANCHING)
             case "while" | "until" | "for":
-                return result_func(classification=SemanticClass.FLOW_ITERATION)  # type: ignore
+                return result_func(classification=SemanticClass.FLOW_ITERATION)
             case "break" | "next" | "redo" | "retry" | "return" | "yield":
-                return result_func(classification=SemanticClass.FLOW_CONTROL)  # type: ignore
+                return result_func(classification=SemanticClass.FLOW_CONTROL)
             case "unary":
-                return result_func(classification=SemanticClass.OPERATION_OPERATOR)  # type: ignore
+                return result_func(classification=SemanticClass.OPERATION_OPERATOR)
             case "call":
-                return result_func(classification=SemanticClass.OPERATION_INVOCATION)  # type: ignore
+                return result_func(classification=SemanticClass.OPERATION_INVOCATION)
             case "lambda":
-                return result_func(classification=SemanticClass.EXPRESSION_ANONYMOUS)  # type: ignore
+                return result_func(classification=SemanticClass.EXPRESSION_ANONYMOUS)
             case (
                 "simple_numeric"
                 | "character"
@@ -548,11 +547,11 @@ class GrammarBasedClassifier:
                 | "symbol_array"
                 | "hash"
             ):
-                return result_func(classification=SemanticClass.SYNTAX_LITERAL)  # type: ignore
+                return result_func(classification=SemanticClass.SYNTAX_LITERAL)
             case "lhs":
-                return result_func(classification=SemanticClass.SYNTAX_IDENTIFIER)  # type: ignore
+                return result_func(classification=SemanticClass.SYNTAX_IDENTIFIER)
             case "begin" | "subshell" | "parenthesized_statements" | "heredoc_beginning":
-                return result_func(classification=SemanticClass.SYNTAX_PUNCTUATION)  # type: ignore
+                return result_func(classification=SemanticClass.SYNTAX_PUNCTUATION)
             case _:
                 return None
 
@@ -608,31 +607,31 @@ class GrammarBasedClassifier:
                 | "type_item"
                 | "impl_item"
             ):
-                return result_func(classification=SemanticClass.DEFINITION_TYPE)  # type: ignore
+                return result_func(classification=SemanticClass.DEFINITION_TYPE)
 
             # Tier 1: Callable definitions
             case "function_item" | "function_signature_item":
-                return result_func(classification=SemanticClass.DEFINITION_CALLABLE)  # type: ignore
+                return result_func(classification=SemanticClass.DEFINITION_CALLABLE)
 
             # Tier 1: Data definitions
             case "const_item" | "static_item" | "let_declaration" | "associated_type":
-                return result_func(classification=SemanticClass.DEFINITION_DATA)  # type: ignore
+                return result_func(classification=SemanticClass.DEFINITION_DATA)
 
             # Tier 2: Module boundaries
             case "use_declaration" | "extern_crate_declaration" | "mod_item" | "foreign_mod_item":
-                return result_func(classification=SemanticClass.BOUNDARY_MODULE)  # type: ignore
+                return result_func(classification=SemanticClass.BOUNDARY_MODULE)
 
             # Syntax/metadata
             case "attribute_item" | "inner_attribute_item":
-                return result_func(classification=SemanticClass.SYNTAX_ANNOTATION)  # type: ignore
+                return result_func(classification=SemanticClass.SYNTAX_ANNOTATION)
 
             # Macros - treat as callable definitions
             case "macro_invocation" | "macro_definition":
-                return result_func(classification=SemanticClass.DEFINITION_CALLABLE)  # type: ignore
+                return result_func(classification=SemanticClass.DEFINITION_CALLABLE)
 
             # Empty statement
             case "empty_statement":
-                return result_func(classification=SemanticClass.SYNTAX_PUNCTUATION)  # type: ignore
+                return result_func(classification=SemanticClass.SYNTAX_PUNCTUATION)
             case _:
                 return None
 
@@ -661,20 +660,20 @@ class GrammarBasedClassifier:
         match thing_name:
             # Tier 1: Callable definitions
             case "function_declaration" | "function_definition" | "given_definition":
-                return result_func(classification=SemanticClass.DEFINITION_CALLABLE)  # type: ignore
+                return result_func(classification=SemanticClass.DEFINITION_CALLABLE)
             # Tier 1: Type definitions
             case "class_definition" | "trait_definition" | "enum_definition" | "object_definition":
-                return result_func(classification=SemanticClass.DEFINITION_TYPE)  # type: ignore
+                return result_func(classification=SemanticClass.DEFINITION_TYPE)
             case "type_definition":
-                return result_func(classification=SemanticClass.DEFINITION_TYPE)  # type: ignore
+                return result_func(classification=SemanticClass.DEFINITION_TYPE)
             # Tier 1: Data definitions
             case "var_definition" | "val_definition" | "var_declaration" | "val_declaration":
-                return result_func(classification=SemanticClass.DEFINITION_DATA)  # type: ignore
+                return result_func(classification=SemanticClass.DEFINITION_DATA)
             # Tier 2: Module boundaries
             case "import_declaration" | "export_declaration" | "package_clause" | "package_object":
-                return result_func(classification=SemanticClass.BOUNDARY_MODULE)  # type: ignore
+                return result_func(classification=SemanticClass.BOUNDARY_MODULE)
             case "extension_definition":
-                return result_func(classification=SemanticClass.DEFINITION_TYPE)  # type: ignore
+                return result_func(classification=SemanticClass.DEFINITION_TYPE)
             case _:
                 return None
 
@@ -698,17 +697,17 @@ class GrammarBasedClassifier:
             SemanticSearchLanguage.RUBY: lambda: (
                 self._classify_ruby_primary(thing_name)
                 # ty seems to think this is not ok -- it's explicitly defined on `Thing` as `__contains__`
-                if CategoryName("primary") in thing  # ty: ignore[unsupported-operator]
+                if CategoryName("primary") in thing
                 else None
             ),
             SemanticSearchLanguage.RUST: lambda: (
                 self._classify_rust_declaration_statement(thing_name)
-                if CategoryName("declaration_statement") in thing  # ty: ignore[unsupported-operator]
+                if CategoryName("declaration_statement") in thing
                 else None
             ),
             SemanticSearchLanguage.SCALA: lambda: (
                 self._classify_scala_definition(thing_name)
-                if CategoryName("definition") in thing  # ty: ignore[unsupported-operator]
+                if CategoryName("definition") in thing
                 else None
             ),
         }.get(language, lambda: None)()
@@ -776,9 +775,11 @@ class GrammarBasedClassifier:
                     adjustment=-5,  # we have multiple agreeing matches, so less reduction in confidence
                 )
             if combined_results := GrammarClassificationResult.from_results(results):
-                return combined_results._replace(
-                    classification_method=ClassificationMethod.THING_INFERENCE,
-                    adjustment=combined_results.adjustment - 10,  # reduce confidence
+                return combined_results.model_copy(
+                    update={
+                        "classification_method": ClassificationMethod.THING_INFERENCE,
+                        "adjustment": combined_results.adjustment - 10,  # reduce confidence
+                    }
                 )
         return None
 
@@ -1026,7 +1027,7 @@ class GrammarBasedClassifier:
                 )
                 for classification in alternates
                 if classification is not None
-            ]  # type: ignore
+            ]
             return tuple(results) if results else None
         return None
 

@@ -374,19 +374,19 @@ class Container[T]:
         """
         if interface not in self._factories:
             # Fall back to the interface itself (might be a class)
-            return interface  # type: ignore
+            return interface
 
         factories_list = self._factories[interface]
 
         # If no tags specified, return the last (most recently registered) factory
         if not tags:
-            return factories_list[-1][0]  # type: ignore
+            return factories_list[-1][0]
 
         # Filter by tags - factory must have ALL specified tags
         tag_set = frozenset(tags) if isinstance(tags, set) else tags
         for factory, factory_tags in reversed(factories_list):  # Check most recent first
             if tag_set.issubset(factory_tags):
-                return factory  # type: ignore
+                return factory
 
         raise KeyError(f"No factory registered for type {interface} with tags {tag_set}")
 
@@ -658,7 +658,7 @@ class Container[T]:
             )
 
         raise TypeError(
-            f"Parameter '{name}' in {obj.__name__} has INJECTED sentinel "  # ty:ignore[unresolved-attribute]
+            f"Parameter '{name}' in {obj.__name__} has INJECTED sentinel "
             f"but no Depends() marker and type cannot be auto-resolved.  "
             f"Use:  Annotated[{annotation}, Depends(... )]"
         )
@@ -911,29 +911,29 @@ class Container[T]:
                 target_type = resolved
         target_type = self._unwrap_annotated(target_type)
 
-        if target_type is inspect.Parameter.empty and not marker.dependency:  # ty:ignore[unresolved-attribute]
+        if target_type is inspect.Parameter.empty and not marker.dependency:
             raise ValueError(f"Parameter {name} has Depends() but no type hint.")
 
         # Use marker.dependency if provided, otherwise use target_type
-        dependency_target = marker.dependency or target_type  # ty:ignore[unresolved-attribute]
+        dependency_target = marker.dependency or target_type
 
         # Determine scope - use marker's scope if specified, otherwise look up from registration
-        if marker.scope:  # ty:ignore[unresolved-attribute]
-            scope = marker.scope  # ty:ignore[unresolved-attribute]
+        if marker.scope:
+            scope = marker.scope
         else:
             # Fall back to registered scope, checking both dependency_target and target_type
             # Use the dependency_target first (what we're actually resolving), then fall back to target_type
-            scope = self._scope.get(dependency_target, self._scope.get(target_type, "singleton"))  # ty:ignore[unresolved-attribute]
+            scope = self._scope.get(dependency_target, self._scope.get(target_type, "singleton"))
 
         # Create cache key for request/function scopes
         # Include tags in cache key to differentiate tagged dependencies
         cache_key = (dependency_target, tag_set) if tag_set else dependency_target
 
         # Function scope - always create new instance
-        if scope == "function" or not marker.use_cache:  # ty:ignore[unresolved-attribute]
+        if scope == "function" or not marker.use_cache:
             # Bypass all caching - always create new instance
-            if marker.dependency:  # ty:ignore[unresolved-attribute]
-                return await self._call_with_injection(marker.dependency, _resolution_stack)  # ty:ignore[unresolved-attribute]
+            if marker.dependency:
+                return await self._call_with_injection(marker.dependency, _resolution_stack)
             # Resolve from annotation without caching
             factory = self._get_factory(target_type, tag_set)
             return await self._call_with_injection(factory, _resolution_stack)
@@ -944,8 +944,8 @@ class Container[T]:
                 return self._request_cache[cache_key]
 
             # Create and cache in request scope
-            if marker.dependency:  # ty:ignore[unresolved-attribute]
-                instance = await self.resolve(marker.dependency, _resolution_stack, tags=tag_set)  # ty:ignore[unresolved-attribute]
+            if marker.dependency:
+                instance = await self.resolve(marker.dependency, _resolution_stack, tags=tag_set)
             else:
                 instance = await self.resolve(target_type, _resolution_stack, tags=tag_set)
 
@@ -953,9 +953,9 @@ class Container[T]:
             return instance
 
         # Singleton scope - use normal container resolution (default behavior)
-        if marker.dependency:  # ty:ignore[unresolved-attribute]
+        if marker.dependency:
             # Resolve via container to support registration, singletons, and overrides
-            return await self.resolve(marker.dependency, _resolution_stack, tags=tag_set)  # ty:ignore[unresolved-attribute]
+            return await self.resolve(marker.dependency, _resolution_stack, tags=tag_set)
 
         return await self.resolve(target_type, _resolution_stack, tags=tag_set)
 

@@ -94,12 +94,6 @@ class ModelFamily(BasedModel):
             description="Preferred distance metrics for comparing embeddings, in order of suitability."
         ),
     ] = ("cosine", "dot", "euclidean")
-    member_models: Annotated[
-        frozenset[str],
-        Field(
-            description="Set of model names that belong to this family and share the same vector space."
-        ),
-    ]
 
     def is_compatible(self, embed_model: str, query_model: str) -> bool:
         """Check if two models are compatible within this family.
@@ -350,7 +344,7 @@ class SparseCapabilities(SparseEmbeddingModelCapabilities):
 @dependency_provider(SparseCapabilities, scope="singleton", collection=True)
 def get_sparse_caps() -> tuple[SparseCapabilities, ...]:
     """Get sparse embedding model capabilities."""
-    caps = {  # type: ignore
+    caps = {
         # Qdrant's bm25 model has no tokenizer because it isn't actually a learned model
         "Qdrant/bm25": {
             "name": "Qdrant/bm25",
@@ -412,7 +406,7 @@ def get_sparse_caps() -> tuple[SparseCapabilities, ...]:
                 "tokenizer_model": cap.get("tokenizer_model") or cap["name"],
             }
         )
-        for cap in list(caps.values())[:3]  # type: ignore
+        for cap in list(caps.values())[:3]
     )
     st_caps = tuple(
         SparseCapabilities.model_validate(
@@ -422,7 +416,7 @@ def get_sparse_caps() -> tuple[SparseCapabilities, ...]:
                 "tokenizer_model": cap.get("tokenizer_model") or cap["name"],
             }
         )
-        for cap in list(caps.values())[2:]  # type: ignore
+        for cap in list(caps.values())[2:]
     )
     return fastembed_caps + st_caps
 

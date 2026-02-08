@@ -110,7 +110,7 @@ def providers(
         except (AttributeError, KeyError, ValueError):
             display.print_error("Invalid provider kind")
             display.print_list(
-                [prov.variable for prov in ProviderKind if prov != ProviderKind.UNSET],  # ty: ignore[invalid-argument-type]
+                [prov.variable for prov in ProviderKind if prov != ProviderKind.UNSET],
                 title="The following are valid provider kinds:",
             )
             sys.exit(1)

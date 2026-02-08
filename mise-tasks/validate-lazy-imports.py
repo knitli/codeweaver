@@ -884,7 +884,7 @@ def manage_tui() -> None:
                     full_mod = short_to_full[mod_choice]
 
                     # Resolve actual file path
-                    f_path = selected_pkg / (mod_choice + ".py")
+                    f_path = selected_pkg / f"{mod_choice}.py"
                     if not f_path.exists():
                         f_path = selected_pkg / mod_choice / "__init__.py"
 
@@ -902,7 +902,7 @@ def manage_tui() -> None:
                     mod_choice = Prompt.ask("Module", choices=list(short_to_full.keys()))
                     full_mod = short_to_full[mod_choice]
 
-                    f_path = selected_pkg / (mod_choice + ".py")
+                    f_path = selected_pkg / f"{mod_choice}.py"
                     if not f_path.exists():
                         f_path = selected_pkg / mod_choice / "__init__.py"
 
@@ -967,7 +967,7 @@ def manage_tui() -> None:
                 elif action == "f":
                     mod_choice = Prompt.ask("Module", choices=list(short_to_full.keys()))
                     full_mod = short_to_full[mod_choice]
-                    f_path = selected_pkg / (mod_choice + ".py")
+                    f_path = selected_pkg / f"{mod_choice}.py"
                     if not f_path.exists():
                         f_path = selected_pkg / mod_choice / "__init__.py"
 

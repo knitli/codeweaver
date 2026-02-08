@@ -465,7 +465,7 @@ class BedrockEmbeddingProvider(EmbeddingProvider[BedrockRuntimeClient]):
         self._output_transformer: Callable[
             [BedrockInvokeEmbeddingResponse, CodeChunk | None],
             list[float] | list[int] | list[list[float]] | list[list[int]],
-        ] = self._handle_response  # ty:ignore[invalid-assignment]
+        ] = self._handle_response
 
         # Store model ARN and model config for easy access
         object.__setattr__(self, "_model_arn", self.config.embedding_config.model_arn)
@@ -670,7 +670,7 @@ class BedrockEmbeddingProvider(EmbeddingProvider[BedrockRuntimeClient]):
         responses: list[BedrockInvokeEmbeddingResponse] = []
         for req in requests:
             response: BedrockInvokeEmbeddingResponse = await self.client.invoke_model(**req)  # type: ignore
-            responses.append(response)  # type: ignore
+            responses.append(response)
         return responses
 
     async def _embed_documents(
@@ -678,7 +678,7 @@ class BedrockEmbeddingProvider(EmbeddingProvider[BedrockRuntimeClient]):
     ) -> list[list[float]] | list[list[int]]:
         """Embed a batch of documents using the Bedrock API."""
         kwargs = kwargs or {}
-        requests = await self._create_request(documents, kind="documents", **kwargs)  # type: ignore
+        requests = await self._create_request(documents, kind="documents", **kwargs)
         responses = await self._get_vectors(requests if isinstance(requests, list) else [requests])
         if "cohere" in self.config.model_name.lower():
             return self._output_transformer(responses[0], documents)  # type: ignore
@@ -692,7 +692,7 @@ class BedrockEmbeddingProvider(EmbeddingProvider[BedrockRuntimeClient]):
     ) -> list[list[float]] | list[list[int]]:
         """Embed a batch of queries using the Bedrock API."""
         kwargs = kwargs or {}
-        requests = await self._create_request(query, kind="query", **kwargs)  # type: ignore
+        requests = await self._create_request(query, kind="query", **kwargs)
         responses: list[BedrockInvokeEmbeddingResponse] = await self._get_vectors(
             requests if isinstance(requests, list) else [requests]
         )

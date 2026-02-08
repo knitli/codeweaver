@@ -350,7 +350,7 @@ def get_snowflake_embedding_capabilities() -> tuple[SnowflakeEmbeddingCapabiliti
     for cap in ALL_CAPABILITIES:
         capabilities.extend([
             EmbeddingCapabilitiesDict({**cap, "provider": provider})  # type: ignore[missing-typeddict-key]
-            for provider in CAP_MAP[cap["name"]]  # ty: ignore[invalid-argument-type]
+            for provider in CAP_MAP[cap["name"]]
         ])
     return tuple(SnowflakeEmbeddingCapabilities.model_validate(cap) for cap in capabilities)
 

@@ -6,7 +6,6 @@
 # SPDX-FileCopyrightText: 2025 (c) 2025 Knitli Inc.
 # SPDX-License-Identifier: MIT OR Apache-2.0
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
-# ty:ignore[unresolved-attribute]
 """FastEmbed embedding provider implementation.
 
 FastEmbed is a lightweight and efficient library for generating embeddings locally.
@@ -156,11 +155,11 @@ class FastEmbedSparseProvider(SparseEmbeddingProvider[SparseTextEmbedding]):
     FastEmbed implementation for sparse embeddings.
     """
 
-    client: type[SparseTextEmbedding] | SparseTextEmbedding = _SparseTextEmbedding  # type: ignore
+    client: type[SparseTextEmbedding] | SparseTextEmbedding = _SparseTextEmbedding
     caps: SparseEmbeddingModelCapabilities | None = None
-    _output_transformer: Callable[[Any], list[CodeWeaverSparseEmbedding]] = (  # type: ignore
+    _output_transformer: Callable[[Any], list[CodeWeaverSparseEmbedding]] = (
         fastembed_sparse_output_transformer
-    )  # type: ignore
+    )
 
     @override
     def _initialize(self, caps: SparseEmbeddingModelCapabilities | None = None) -> None:  # type: ignore
@@ -190,7 +189,7 @@ class FastEmbedSparseProvider(SparseEmbeddingProvider[SparseTextEmbedding]):
 
     async def _embed_documents(
         self, documents: Sequence[CodeChunk], **kwargs: Any
-    ) -> list[CodeWeaverSparseEmbedding]:  # ty:ignore[invalid-method-override]
+    ) -> list[CodeWeaverSparseEmbedding]:
         """Embed a list of documents into sparse vectors."""
         ready_documents = self.chunks_to_strings(documents)
         loop = asyncio.get_running_loop()
@@ -204,11 +203,11 @@ class FastEmbedSparseProvider(SparseEmbeddingProvider[SparseTextEmbedding]):
         )
         features = sum(len(emb.indices) for emb in embeddings)
         self._update_token_stats(token_count=features, sparse=True)
-        return await loop.run_in_executor(None, lambda: self._process_output(embeddings))  # type: ignore
+        return await loop.run_in_executor(None, lambda: self._process_output(embeddings))
 
     async def _embed_query(
         self, query: Sequence[str], **kwargs: Any
-    ) -> list[CodeWeaverSparseEmbedding]:  # ty:ignore[invalid-method-override]
+    ) -> list[CodeWeaverSparseEmbedding]:
         """Embed a query into a sparse vector."""
         loop = asyncio.get_running_loop()
         embeddings = await loop.run_in_executor(
@@ -216,7 +215,7 @@ class FastEmbedSparseProvider(SparseEmbeddingProvider[SparseTextEmbedding]):
         )
         features = sum(len(emb.indices) for emb in embeddings)
         self._update_token_stats(token_count=features, sparse=True)
-        return await loop.run_in_executor(None, lambda: self._process_output(embeddings))  # type: ignore
+        return await loop.run_in_executor(None, lambda: self._process_output(embeddings))
 
 
 __all__ = ("FastEmbedEmbeddingProvider", "FastEmbedSparseProvider")

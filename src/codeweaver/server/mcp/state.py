@@ -59,7 +59,7 @@ def _get_fastmcp_settings_map(*, http: bool = False) -> DictView[FastMcpServerSe
             settings_map.get_subview("mcp_server")
             if settings_map.get("mcp_server") is not Unset
             else DictView(FastMcpHttpServerSettings().as_settings())
-        )  # type: ignore[arg-type]
+        )
     return (
         settings_map.get_subview("stdio_server")
         if settings_map.get("stdio_server") is not Unset

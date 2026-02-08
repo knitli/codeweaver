@@ -253,7 +253,7 @@ def _recommended_default(
         ),
         data=(
             (TavilyProviderSettings(provider=Provider.TAVILY),)
-            if Provider.TAVILY.has_env_auth() and has_package("tavily")
+            if Provider.TAVILY.has_env_auth and has_package("tavily")
             else (DuckDuckGoProviderSettings(provider=Provider.DUCKDUCKGO),)
         ),
         vector_store=(
@@ -333,7 +333,7 @@ def _quickstart_default(
         ),
         data=(
             TavilyProviderSettings(provider=Provider.TAVILY)
-            if has_package("tavily") and Provider.TAVILY.has_env_auth()
+            if has_package("tavily") and Provider.TAVILY.has_env_auth
             else DuckDuckGoProviderSettings(provider=Provider.DUCKDUCKGO),
         ),
         vector_store=(
@@ -481,7 +481,7 @@ class ProviderConfigProfile(BaseEnumData):
                 data=(*(self.data or ()), *(other.data or ())),
             ),
             self._aliases or (),  # ty:ignore[unresolved-attribute]
-            self._description or "",  # ty:ignore[unresolved-attribute]
+            self._description or "",
         )
 
 

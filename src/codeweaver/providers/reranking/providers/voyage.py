@@ -55,10 +55,10 @@ def voyage_reranking_output_transformer(
     def map_result(voyage_result: VoyageRerankingResult, new_index: int) -> RerankingResult:
         """Maps a VoyageRerankingResult to a CodeWeaver RerankingResult."""
         return RerankingResult(
-            original_index=voyage_result.index,  # type: ignore
+            original_index=voyage_result.index,
             batch_rank=new_index,
-            score=voyage_result.relevance_score,  # type: ignore
-            chunk=original_chunks[voyage_result.index],  # type: ignore
+            score=voyage_result.relevance_score,
+            chunk=original_chunks[voyage_result.index],
         )
 
     results, token_count = returned_result.results, returned_result.total_tokens

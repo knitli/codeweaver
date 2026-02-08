@@ -77,6 +77,8 @@ async def _embed_dense(
                 },
             )
             return None
+        assert not isinstance(result, dict)  # noqa: S101
+        assert "error" not in result  # noqa: S101
         await log_to_client_or_fallback(
             context,
             "debug",

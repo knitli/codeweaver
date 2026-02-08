@@ -163,43 +163,41 @@ EXTENSION_TESTS: tuple[ExtTestDef, ...] = (
     ExtTestDef(
         extension=FileExt(".v"),
         language=LanguageName(cast(LiteralStringT, "coq")),
-        test=lambda content: any(kw in content for kw in ("Proof", "Qed", "Defined", "Admitted")),  # type: ignore # give me a way to type a lambda...
+        test=lambda content: any(kw in content for kw in ("Proof", "Qed", "Defined", "Admitted")),
     ),
     ExtTestDef(
         extension=FileExt(".v"),
         language=LanguageName(cast(LiteralStringT, "verilog")),
-        test=lambda content: any(  # type: ignore
+        test=lambda content: any(
             kw in content for kw in ("module", "endmodule", "assign", "wire", "reg")
         ),
     ),
     ExtTestDef(
         extension=FileExt(".m"),
         language=LanguageName(cast(LiteralStringT, "matlab")),
-        test=lambda content: any(  # type: ignore
-            kw in content for kw in ("function", "end", "parfor", "switch")
-        ),
+        test=lambda content: any(kw in content for kw in ("function", "end", "parfor", "switch")),
     ),
     ExtTestDef(
         extension=FileExt(".m"),
         language=LanguageName(cast(LiteralStringT, "objective-c")),
-        test=lambda content: all(  # type: ignore
+        test=lambda content: all(
             kw not in content for kw in ("switch", "end", "parfor", "function")
         ),
     ),
     ExtTestDef(
         extension=FileExt(""),
         language=LanguageName(cast(LiteralStringT, "bash")),
-        test=lambda content: bool(BASH_SHEBANG_PATTERN.match(content)),  # type: ignore
+        test=lambda content: bool(BASH_SHEBANG_PATTERN.match(content)),
     ),
     ExtTestDef(
         extension=FileExt(""),
         language=LanguageName(cast(LiteralStringT, "python")),
-        test=lambda content: bool(PYTHON_SHEBANG_PATTERN.match(content)),  # type: ignore
+        test=lambda content: bool(PYTHON_SHEBANG_PATTERN.match(content)),
     ),
     ExtTestDef(
         extension=FileExt(""),
         language=LanguageName(cast(LiteralStringT, "perl")),
-        test=lambda content: bool(PERL_SHEBANG_PATTERN.match(content)),  # type: ignore
+        test=lambda content: bool(PERL_SHEBANG_PATTERN.match(content)),
     ),
 )
 

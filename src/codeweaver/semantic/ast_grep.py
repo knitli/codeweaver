@@ -126,7 +126,7 @@ if TYPE_CHECKING:
         from codeweaver.engine.dependencies import SourceIdRegistryDep
     else:
         SourceIdRegistry = None
-        SourceIdRegistryDep = None  # type: ignore
+        SourceIdRegistryDep = None
 
 
 logger = logging.getLogger(__name__)
@@ -292,7 +292,7 @@ class FileThing[SgRoot: (AstGrepRoot)](BasedModel):
         return Path(self._root.filename())
 
     @staticmethod
-    def _file_registry(registry: SourceIdRegistryDep = INJECTED) -> SourceIdRegistry | None:  # type: ignore[name-defined]
+    def _file_registry(registry: SourceIdRegistryDep = INJECTED) -> SourceIdRegistry | None:
         return registry
 
     @property
@@ -503,7 +503,7 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
     @property
     def thing(self) -> CompositeThing | Token | Category | None:
         """Get the grammar Thing that this node represents."""
-        thing_name: ThingName = self.name  # type: ignore
+        thing_name: ThingName = self.name
         registry = self._thing_registry()
         if thing := registry.get_thing_by_name(thing_name, language=self.language):
             return cast(CompositeThing | Token | Category, thing)
@@ -561,7 +561,7 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
     @cached_property
     def title(self) -> str:
         """Get a human-readable title for the node."""
-        name = humanize(self.name)
+        name = humanize(self.name)  # ty:ignore[invalid-argument-type]
         language = humanize(self.language.as_title)
         classification = (
             humanize(self.classification.name.as_title) if self.classification else "Not classified"
@@ -773,7 +773,7 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
         )
 
     @computed_field
-    @cached_property
+    @property
     def parent(self) -> AstThing[SgNode] | None:
         """Get the parent of the thing."""
         parent_node = self._node.parent()
@@ -838,12 +838,12 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
             value = getattr(self, field)
             if isinstance(value, tuple):
                 fields[field] = tuple(
-                    item.serialize_as_child  # type: ignore
-                    if hasattr(item, "serialize_as_child")  # type: ignore
-                    else item.serialize_for_cli()  # type: ignore
-                    if hasattr(item, "serialize_for_cli")  # type: ignore
+                    item.serialize_as_child
+                    if hasattr(item, "serialize_as_child")
+                    else item.serialize_for_cli()
+                    if hasattr(item, "serialize_for_cli")
                     else item
-                    for item in value  # type: ignore
+                    for item in value
                 )
                 if for_cli and len(fields[field]) > 4:
                     fields[field] = (*fields[field][:4], "...")

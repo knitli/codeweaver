@@ -123,19 +123,17 @@ class DataclassSerializationMixin:
             # ty won't like this because the attributes only exist on the inherited subclasses
             fields: dict[str, Any] = type(self).__pydantic_fields__  # type: ignore
             if hasattr(self, "__pydantic_decorators__") and (
-                computed_field_names := type(self).__pydantic_decorators__.computed_fields.keys()  # type: ignore
+                computed_field_names := type(self).__pydantic_decorators__.computed_fields.keys()
             ):
                 # Add computed fields to the fields dict (keys only, values don't matter for iteration)
-                fields = {**fields, **dict.fromkeys(computed_field_names)}  # type: ignore
-            for field in cast(dict[str, Any], fields):  # type: ignore
+                fields = {**fields, **dict.fromkeys(computed_field_names)}
+            for field in cast(dict[str, Any], fields):
                 if (attr := getattr(self, field, None)) and hasattr(attr, "serialize_for_cli"):
                     self_map[field] = attr.serialize_for_cli()
                 elif isinstance(attr, Sequence | Iterator) and not isinstance(attr, str):
                     self_map[field] = [
-                        item.serialize_for_cli()  # type: ignore
-                        if hasattr(item, "serialize_for_cli")  # type: ignore
-                        else item
-                        for item in attr  # type: ignore
+                        item.serialize_for_cli() if hasattr(item, "serialize_for_cli") else item
+                        for item in attr
                     ]
         return self.dump_python(round_trip=True, exclude_none=True) | self_map
 

@@ -285,7 +285,7 @@ def get_minishlab_embedding_capabilities() -> tuple[MinishlabEmbeddingCapabiliti
         assert model_name in CAP_MAP, f"Invalid model name: {model_name}"  # noqa: S101
         capabilities.extend([
             EmbeddingCapabilitiesDict({**cap, "provider": provider})  # type: ignore[missing-typeddict-key]
-            for provider in CAP_MAP[model_name]  # ty: ignore[invalid-argument-type]
+            for provider in CAP_MAP[model_name]
         ])
     return tuple(MinishlabEmbeddingCapabilities.model_validate(cap) for cap in capabilities)
 

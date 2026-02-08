@@ -15,6 +15,7 @@ from uuid import uuid4
 
 import pytest
 
+from anyio import Path as AsyncPath
 from qdrant_client import AsyncQdrantClient
 
 from codeweaver.core import CodeChunk, SemanticSearchLanguage, Span
@@ -253,11 +254,11 @@ class TestMemoryProviderContract:
         await memory_provider.upsert([sample_chunk])
         await memory_provider._persist_to_disk()
 
-        persist_path = Path(memory_config.in_memory_config["persist_path"])
-        assert persist_path.exists(), "Persistence directory should be created"
-        assert persist_path.is_dir(), "Persistence path should be a directory"
+        persist_path = AsyncPath(memory_config.in_memory_config["persist_path"])
+        assert await persist_path.exists(), "Persistence directory should be created"
+        assert await persist_path.is_dir(), "Persistence path should be a directory"
         # Check if Qdrant files exist inside (simple check)
-        assert any(persist_path.iterdir()), "Persistence directory should not be empty"
+        assert any([p async for p in persist_path.iterdir()]), "Persistence directory should not be empty"
 
     async def test_restore_from_disk(
         self, memory_config, sample_chunk, temp_persist_path, test_embedding_caps
@@ -324,9 +325,9 @@ class TestMemoryProviderContract:
         await provider.upsert([sample_chunk])
 
         # Auto-persist should have created the file
-        persist_file = Path(memory_config.in_memory_config["persist_path"])
-        assert persist_file.exists()
-        assert persist_file.is_dir()
+        persist_file = AsyncPath(memory_config.in_memory_config["persist_path"])
+        assert await persist_file.exists()
+        assert await persist_file.is_dir()
 
     async def test_collection_property(self, memory_provider, memory_config):
         """Test collection property contract (may be None after DI refactoring)."""

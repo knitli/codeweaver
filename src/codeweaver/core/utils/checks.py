@@ -33,7 +33,7 @@ if sys.version_info >= (3, 13):
 else:
     from typing_extensions import TypeIs as _TypeIs
 
-TypeIs = _TypeIs  # type: ignore[assignment]
+TypeIs = _TypeIs
 
 LOCALHOST_INDICATORS = {
     "localhost",

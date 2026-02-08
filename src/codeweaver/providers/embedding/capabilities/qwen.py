@@ -139,7 +139,7 @@ def get_qwen_embedding_capabilities() -> tuple[QwenEmbeddingCapabilities, ...]:
     for cap in ALL_CAPABILITIES:
         capabilities.extend([
             EmbeddingCapabilitiesDict({**cap, "provider": provider})  # type: ignore[missing-typeddict-key]
-            for provider in CAP_MAP[cap["name"]]  # ty: ignore[invalid-argument-type]
+            for provider in CAP_MAP[cap["name"]]
         ])
     return tuple(
         QwenEmbeddingCapabilities.model_validate(

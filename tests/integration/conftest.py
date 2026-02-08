@@ -118,7 +118,7 @@ def _get_configs(
     # Extract the appropriate settings based on parameters
     if rerank:
         # Reranking settings are stored as a tuple, get the first element
-        return profile.reranking[0]  # type: ignore[return-value]
+        return profile.reranking[0]
     return profile.sparse_embedding if sparse else profile.embedding
 
 

@@ -139,7 +139,7 @@ async def _run_http_server(
 
     # Load settings
     if config_file:
-        settings.config_file = config_file  # type: ignore
+        settings.config_file = config_file
     if project_path:
         settings.project_path = project_path
     elif isinstance(settings.project_path, Unset):
@@ -265,7 +265,7 @@ async def get_stdio_server(
     project_path: Path | None = None,
     host: str | None = None,
     port: int | None = None,
-) -> FastMCP:  # type: ignore
+) -> FastMCP:
     """Get a FastMCP stdio server setup for CodeWeaver.
 
     Args:

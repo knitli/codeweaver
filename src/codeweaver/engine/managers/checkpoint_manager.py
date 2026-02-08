@@ -52,7 +52,9 @@ class CheckpointSettingsFingerprint(TypedDict):
     indexer: dict[str, Any]
     project_path: DirectoryPath
     project_name: str
-    embedding_provider: tuple[EmbeddingProviderSettings | AsymmetricEmbeddingProviderSettings, ...] | None
+    embedding_provider: (
+        tuple[EmbeddingProviderSettings | AsymmetricEmbeddingProviderSettings, ...] | None
+    )
     sparse_provider: tuple[SparseEmbeddingProviderSettings, ...] | None
     vector_store: tuple[VectorStoreProviderSettings, ...] | None
 
@@ -90,7 +92,7 @@ class IndexingCheckpoint(BasedModel):
 
     session_id: Annotated[UUID7, Field(description="Unique session identifier (UUIDv7)")] = cast(
         UUID, uuid7()
-    )  # type: ignore
+    )
 
     project_path: Annotated[Path | None, Field(description="Path to the indexed codebase")] = None
 

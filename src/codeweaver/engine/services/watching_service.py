@@ -153,12 +153,12 @@ class FileWatchingService:
 
         # Start watching
         self.watcher = watchfiles.arun_process(
-            *(self._watch_args.pop("paths", ())),
-            **self._watch_args,  # type: ignore
+            *(self._watch_args.pop("paths", ())),  # ty:ignore[not-iterable]
+            **self._watch_args,  # ty:ignore[invalid-argument-type]
         )
 
         try:
-            return await self.watcher  # type: ignore[no-any-return]
+            return await self.watcher
         except KeyboardInterrupt:
             logger.info("FileWatchingService interrupted by user.")
             return 0

@@ -38,42 +38,38 @@ OPENAI = ProviderEnvConfig(
         choices=frozenset({"debug", "info", "warning", "error"}),
     ),
     other=httpx_env_vars()
-    | frozenset(
-        [
-            (
-                "organization",
-                EnvVarConfig(
-                    env="OPENAI_ORG_ID",
-                    description="Organization ID for OpenAI.",
-                    variable_name="organization",
-                ),
+    | frozenset([
+        (
+            "organization",
+            EnvVarConfig(
+                env="OPENAI_ORG_ID",
+                description="Organization ID for OpenAI.",
+                variable_name="organization",
             ),
-            (
-                "project",
-                EnvVarConfig(
-                    env="OPENAI_PROJECT_ID",
-                    description="An openai project id for tracking usage.",
-                    variable_name="project",
-                ),
+        ),
+        (
+            "project",
+            EnvVarConfig(
+                env="OPENAI_PROJECT_ID",
+                description="An openai project id for tracking usage.",
+                variable_name="project",
             ),
-            (
-                "webhook_secret",
-                EnvVarConfig(
-                    env="OPENAI_WEBHOOK_SECRET",
-                    description="Webhook secret for verifying incoming webhooks from OpenAI.",
-                    is_secret=True,
-                    variable_name="webhook_secret",
-                ),
+        ),
+        (
+            "webhook_secret",
+            EnvVarConfig(
+                env="OPENAI_WEBHOOK_SECRET",
+                description="Webhook secret for verifying incoming webhooks from OpenAI.",
+                is_secret=True,
+                variable_name="webhook_secret",
             ),
-        ]
-    ),
+        ),
+    ]),
 )
 
 # DEEPSEEK - OpenAI-compatible provider
 DEEPSEEK = openai_compatible_provider(
-    "deepseek",
-    api_key_env="DEEPSEEK_API_KEY",
-    note="These variables are for the DeepSeek service.",
+    "deepseek", api_key_env="DEEPSEEK_API_KEY", note="These variables are for the DeepSeek service."
 )
 
 # FIREWORKS - OpenAI-compatible provider with custom base URL
@@ -86,9 +82,7 @@ FIREWORKS = openai_compatible_provider(
 
 # TOGETHER - OpenAI-compatible provider
 TOGETHER = openai_compatible_provider(
-    "together",
-    api_key_env="TOGETHER_API_KEY",
-    note="These variables are for the Together service.",
+    "together", api_key_env="TOGETHER_API_KEY", note="These variables are for the Together service."
 )
 
 # CEREBRAS - OpenAI-compatible provider with custom base URL
@@ -117,10 +111,7 @@ MORPH = openai_compatible_provider(
 
 # NEBIUS - OpenAI-compatible provider with custom base URL
 NEBIUS = openai_compatible_provider(
-    "nebius",
-    api_key_env="NEBIUS_API_KEY",
-    base_url_env="NEBIUS_API_URL",
-    note="Nebius AI service.",
+    "nebius", api_key_env="NEBIUS_API_KEY", base_url_env="NEBIUS_API_URL", note="Nebius AI service."
 )
 
 # OPENROUTER - OpenAI-compatible provider
@@ -158,37 +149,27 @@ GROQ = openai_compatible_provider(
 
 # ALIBABA - Simple OpenAI-compatible provider
 ALIBABA = openai_compatible_provider(
-    "alibaba",
-    api_key_env="ALIBABA_API_KEY",
-    note="Alibaba Cloud AI service.",
+    "alibaba", api_key_env="ALIBABA_API_KEY", note="Alibaba Cloud AI service."
 )
 
 # GITHUB - Simple OpenAI-compatible provider
 GITHUB = openai_compatible_provider(
-    "github",
-    api_key_env="GITHUB_TOKEN",
-    note="GitHub Models service.",
+    "github", api_key_env="GITHUB_TOKEN", note="GitHub Models service."
 )
 
 # LITELLM - Simple OpenAI-compatible provider
 LITELLM = openai_compatible_provider(
-    "litellm",
-    api_key_env="LITELLM_API_KEY",
-    note="LiteLLM unified API service.",
+    "litellm", api_key_env="LITELLM_API_KEY", note="LiteLLM unified API service."
 )
 
 # OLLAMA - Simple OpenAI-compatible provider (local/cloud)
 OLLAMA = openai_compatible_provider(
-    "ollama",
-    api_key_env="OLLAMA_API_KEY",
-    note="Ollama local/cloud LLM service.",
+    "ollama", api_key_env="OLLAMA_API_KEY", note="Ollama local/cloud LLM service."
 )
 
 # PERPLEXITY - Simple OpenAI-compatible provider
 PERPLEXITY = openai_compatible_provider(
-    "perplexity",
-    api_key_env="PERPLEXITY_API_KEY",
-    note="Perplexity AI service.",
+    "perplexity", api_key_env="PERPLEXITY_API_KEY", note="Perplexity AI service."
 )
 
 __all__ = (

@@ -83,8 +83,8 @@ class HuggingFaceEmbeddingProvider(EmbeddingProvider[AsyncInferenceClient]):
         """Embed a sequence of strings into vectors."""
         all_output: Sequence[Sequence[float]] | Sequence[Sequence[int]] = []
         for doc in sequence:
-            output = await self.client.feature_extraction(doc, **kwargs)  # type: ignore
-            all_output.append(output)  # type: ignore
+            output = await self.client.feature_extraction(doc, **kwargs)
+            all_output.append(output)
         return all_output
 
     async def _embed_documents(

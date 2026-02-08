@@ -684,7 +684,7 @@ class SemanticChunker(BaseChunker):
         if node.importance:
             # Values are already NonNegativeFloat from ImportanceScoresDict
             # Type checker loses this info through .values(), so we help it with a cast
-            scores = node.importance.as_dict().values()  # type: ignore[attr-defined]
+            scores = node.importance.as_dict().values()
             return any(score >= self._importance_threshold for score in scores)  # type: ignore[operator]
 
         # Include if we have classification but no importance scores
@@ -754,7 +754,7 @@ class SemanticChunker(BaseChunker):
                 range_obj.start.line + 1,
                 range_obj.end.line + 1,
                 source_id,
-            ),  # type: ignore[call-arg]  # All spans from same file share source_id
+            ),  # All spans from same file share source_id
             ext_kind=ExtKind.from_file(file_path) if file_path else None,
             file_path=file_path,
             language=self.language,
@@ -784,7 +784,7 @@ class SemanticChunker(BaseChunker):
         with contextlib.suppress(Exception):
             # For functions/methods/classes, try to get the "name" field from AST
             # Note: Accessing _node is acceptable here as it's wrapped in exception handling
-            if name_node := node._node.field("name"):  # type: ignore[attr-defined]
+            if name_node := node._node.field("name"):
                 simple_name = name_node.text()
         # Fallback to using title or node name
         if not simple_name:
@@ -805,7 +805,7 @@ class SemanticChunker(BaseChunker):
                 "classification": node.classification.name if node.classification else None,
                 "kind": str(node.name),
                 "category": node.primary_category if hasattr(node, "primary_category") else None,
-                "importance_scores": node.importance.as_dict() if node.importance else None,  # type: ignore[attr-defined]
+                "importance_scores": node.importance.as_dict() if node.importance else None,
                 "is_composite": node.is_composite,
                 "nesting_level": nesting_level,
             },
@@ -937,7 +937,7 @@ class SemanticChunker(BaseChunker):
             metadata = self._build_metadata(node)
             chunk = CodeChunk(
                 content=node.text,
-                line_range=Span(node.range.start.line + 1, node.range.end.line + 1, source_id),  # type: ignore[call-arg]
+                line_range=Span(node.range.start.line + 1, node.range.end.line + 1, source_id),
                 ext_kind=ExtKind.from_file(file_path) if file_path else None,
                 file_path=file_path,
                 language=self.language,
@@ -967,8 +967,8 @@ class SemanticChunker(BaseChunker):
                 chunk_metadata["context"] = {}
 
             # Add semantic fallback indicators (both top-level and in context)
-            chunk_metadata["context"]["fallback"] = "delimiter"  # type: ignore[index]
-            chunk_metadata["context"]["parent_semantic_node"] = node.name  # type: ignore[index]
+            chunk_metadata["context"]["fallback"] = "delimiter"
+            chunk_metadata["context"]["parent_semantic_node"] = node.name
 
             # Create enhanced chunk preserving delimiter chunk properties
             enhanced_chunk = CodeChunk(
@@ -978,7 +978,7 @@ class SemanticChunker(BaseChunker):
                 file_path=delimiter_chunk.file_path,
                 language=delimiter_chunk.language,
                 source=ChunkSource.TEXT_BLOCK,  # Not truly semantic
-                metadata=Metadata(**chunk_metadata),  # type: ignore
+                metadata=Metadata(**chunk_metadata),
             )
             enhanced_chunks.append(enhanced_chunk)
 
@@ -986,7 +986,7 @@ class SemanticChunker(BaseChunker):
             # Last resort: single chunk with fallback metadata
             CodeChunk(
                 content=node.text,
-                line_range=Span(node.range.start.line, node.range.end.line, source_id),  # type: ignore[call-arg]
+                line_range=Span(node.range.start.line, node.range.end.line, source_id),
                 ext_kind=ExtKind.from_file(file_path) if file_path else None,
                 file_path=file_path,
                 language=self.language,

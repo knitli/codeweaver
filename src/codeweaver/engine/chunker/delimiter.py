@@ -469,10 +469,7 @@ class DelimiterChunker(BaseChunker):
 
                 # Find the matching closing delimiter for the structural character
                 struct_end = self._find_matching_close(
-                    content,
-                    struct_start,
-                    struct_char or "",
-                    structural_pairs.get(struct_char, ""),  # type: ignore
+                    content, struct_start, struct_char or "", structural_pairs.get(struct_char, "")
                 )
 
                 if struct_end is not None:
@@ -1009,19 +1006,19 @@ class DelimiterChunker(BaseChunker):
         explicit_matches: list[DelimiterMatch] = []
 
         for match in matches:
-            delimiter: Delimiter = match.delimiter  # type: ignore[assignment]
+            delimiter: Delimiter = match.delimiter
             # Keyword delimiters with empty ends that have been matched already have both positions
             # Also treat matches with both start and end positions as complete
             if (delimiter.is_keyword_delimiter and match.end_pos is not None) or (
                 match.end_pos is not None and delimiter.start == "" and delimiter.end == ""
-            ):  # type: ignore[union-attr]
+            ):
                 keyword_matches.append(match)
             else:
                 explicit_matches.append(match)
 
         # Handle keyword delimiter matches - they're already complete
         for match in keyword_matches:
-            delimiter: Delimiter = match.delimiter  # type: ignore[assignment]
+            delimiter: Delimiter = match.delimiter
             try:
                 boundary = Boundary(
                     start=match.start_pos,
@@ -1040,8 +1037,8 @@ class DelimiterChunker(BaseChunker):
 
         for match in explicit_matches:
             # Get delimiter with explicit type
-            delimiter: Delimiter = match.delimiter  # type: ignore[assignment]
-            delimiter_key: str = f"{delimiter.start}_{delimiter.end}"  # type: ignore[union-attr]
+            delimiter: Delimiter = match.delimiter
+            delimiter_key: str = f"{delimiter.start}_{delimiter.end}"
 
             if delimiter_key not in delimiter_stacks:
                 delimiter_stacks[delimiter_key] = []
@@ -1049,7 +1046,7 @@ class DelimiterChunker(BaseChunker):
             if match.is_start:
                 # Start delimiter - push to stack
                 current_level: int = (
-                    len(delimiter_stacks[delimiter_key]) if delimiter.nestable else 0  # type: ignore[union-attr]
+                    len(delimiter_stacks[delimiter_key]) if delimiter.nestable else 0
                 )
                 delimiter_stacks[delimiter_key].append((match, current_level))
             else:
@@ -1101,11 +1098,7 @@ class DelimiterChunker(BaseChunker):
         # Sort by priority (desc), length (desc), position (asc)
         sorted_boundaries = sorted(
             boundaries,
-            key=lambda b: (
-                -cast(int, b.delimiter.priority),  # type: ignore[union-attr]
-                -(b.end - b.start),
-                b.start,
-            ),
+            key=lambda b: (-cast(int, b.delimiter.priority), -(b.end - b.start), b.start),
         )
 
         # Keep non-overlapping boundaries, but allow nested structures with same priority
@@ -1123,7 +1116,7 @@ class DelimiterChunker(BaseChunker):
                     ) or (selected.start >= boundary.start and selected.end <= boundary.end)
 
                     # Only allow nesting if priorities are equal (same kind of structure)
-                    same_priority = boundary.delimiter.priority == selected.delimiter.priority  # type: ignore[union-attr]
+                    same_priority = boundary.delimiter.priority == selected.delimiter.priority
 
                     if not (is_nested and same_priority):
                         # Not a same-priority nested structure, skip this boundary
@@ -1192,7 +1185,9 @@ class DelimiterChunker(BaseChunker):
             chunk = CodeChunk(
                 content=chunk_text,
                 ext_kind=ExtKind.from_file(file_path) if file_path else None,
-                line_range=Span(start_line, end_line, source_id),  # type: ignore[call-arg]  # All spans from same file share source_id
+                line_range=Span(
+                    start_line, end_line, source_id
+                ),  # All spans from same file share source_id
                 file_path=file_path,
                 metadata=metadata,
             )
@@ -1222,16 +1217,16 @@ class DelimiterChunker(BaseChunker):
             Metadata dictionary
         """
         # Get delimiter with explicit type
-        delimiter: Delimiter = boundary.delimiter  # type: ignore[assignment]
+        delimiter: Delimiter = boundary.delimiter
 
         # Build context dict with proper types
         chunk_context: dict[str, Any] = {
             "chunker_type": "delimiter",
             "content_hash": str(get_blake_hash(text)),
-            "delimiter_kind": delimiter.kind.name,  # type: ignore[union-attr]
-            "delimiter_start": delimiter.start,  # type: ignore[union-attr]
-            "delimiter_end": delimiter.end,  # type: ignore[union-attr]
-            "priority": int(delimiter.priority),  # type: ignore[arg-type,union-attr]
+            "delimiter_kind": delimiter.kind.name,
+            "delimiter_start": delimiter.start,
+            "delimiter_end": delimiter.end,
+            "priority": int(delimiter.priority),
             "nesting_level": boundary.nesting_level,
         }
 
@@ -1242,7 +1237,7 @@ class DelimiterChunker(BaseChunker):
         metadata: Metadata = {
             "chunk_id": uuid7(),
             "created_at": datetime.now(UTC).timestamp(),
-            "name": f"{delimiter.kind.name.title()} at line {start_line}",  # type: ignore[union-attr]
+            "name": f"{delimiter.kind.name.title()} at line {start_line}",
             "kind": delimiter.kind,  # Add kind at top level for test compatibility
             "nesting_level": boundary.nesting_level,  # Add nesting_level at top level too
             "priority": int(delimiter.priority),  # Add priority at top level
@@ -1253,7 +1248,7 @@ class DelimiterChunker(BaseChunker):
 
         # Add fallback indicator at top level if present in context
         if context and context.get("fallback_to_generic"):
-            metadata["fallback_to_generic"] = True  # type: ignore[typeddict-unknown-key]
+            metadata["fallback_to_generic"] = True
 
         return metadata
 
@@ -1485,8 +1480,7 @@ class DelimiterChunker(BaseChunker):
 
             elif action == AdaptiveChunkBehavior.TRY_CHILDREN:
                 if boundary := self._find_boundary_for_chunk(chunk, boundaries):
-                    children = self._rediscover_children(chunk.content, boundary)
-                    if children:
+                    if children := self._rediscover_children(chunk.content, boundary):
                         split_chunks = self._split_at_children(
                             chunk, children, file_path, source_id, context
                         )
@@ -1641,7 +1635,7 @@ class DelimiterChunker(BaseChunker):
 
         # Add fallback indicator at top level if present in context (same logic as _build_metadata)
         if context and context.get("fallback_to_generic"):
-            metadata["fallback_to_generic"] = True  # type: ignore[typeddict-unknown-key]
+            metadata["fallback_to_generic"] = True
 
         return metadata
 
