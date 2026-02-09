@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING, Annotated, Any, NamedTuple, NotRequired, Typed
 
 from anyio import Path as AsyncPath
 from fastmcp import Context as FastMCPContext
-from pydantic import DirectoryPath, Field, FilePath, PrivateAttr, computed_field
+from pydantic import DirectoryPath, Field, FilePath, PositiveInt, PrivateAttr, computed_field
 
 from codeweaver.core import (
     DEFAULT_EXCLUDED_DIRS,
@@ -39,6 +39,7 @@ from codeweaver.core import (
     Unset,
     get_user_state_dir,
 )
+from codeweaver.core.constants import DEFAULT_MAX_CONCURRENT_BATCHES, DEFAULT_MAX_QUEUE_SIZE
 
 
 if TYPE_CHECKING:
@@ -273,6 +274,24 @@ class IndexerSettings(BasedModel):
             description="""Other kwargs to pass to `rignore`. See <https://pypi.org/project/rignore/>. By default we set same_file_system to True."""
         ),
     ] = UNSET
+
+    max_concurrent_batches: Annotated[
+        PositiveInt,
+        Field(
+            description="""Maximum number of concurrent indexing batches to process. Higher values increase indexing speed but use more resources.""",
+            ge=1,
+            le=32,
+        ),
+    ] = DEFAULT_MAX_CONCURRENT_BATCHES
+
+    max_queue_size: Annotated[
+        PositiveInt,
+        Field(
+            description="""Maximum number of files to queue for indexing. Higher values increase indexing speed but use more memory.""",
+            ge=1,
+            le=10_000,
+        ),
+    ] = DEFAULT_MAX_QUEUE_SIZE
 
     only_index_on_command: Annotated[
         bool,

@@ -258,7 +258,9 @@ class TestMemoryProviderContract:
         assert await persist_path.exists(), "Persistence directory should be created"
         assert await persist_path.is_dir(), "Persistence path should be a directory"
         # Check if Qdrant files exist inside (simple check)
-        assert any([p async for p in persist_path.iterdir()]), "Persistence directory should not be empty"
+        assert any([p async for p in persist_path.iterdir()]), (
+            "Persistence directory should not be empty"
+        )
 
     async def test_restore_from_disk(
         self, memory_config, sample_chunk, temp_persist_path, test_embedding_caps

@@ -516,6 +516,18 @@ MAX_SEMANTIC_CHUNKER_RECURSION_DEPTH = 10
 SEMANTIC_CHUNKER_PERFORMANCE_THRESHOLD_MS = 1_000
 """Performance threshold in milliseconds for the semantic chunker to log warnings if exceeded."""
 
+DEFAULT_MAX_CONCURRENT_BATCHES = 4
+"""Maximum number of concurrent batches for parallel chunking operations.  This is a safeguard to prevent overwhelming the system with too many concurrent processes or threads, which could lead to resource exhaustion. The optimal number may vary based on the system's hardware capabilities and the size of the codebase being processed, but 4 is a reasonable default for most modern systems. We'd rather stay conservative here to ensure stability and reliability during chunking operations."""
+
+FILE_BATCH_SIZE = 100
+"""Default batch size for processing files in parallel chunking operations. This controls how many files are processed together in a single batch before yielding results. A larger batch size may improve performance by reducing overhead, but it also increases memory usage. 100 is a reasonable default that balances performance and memory efficiency for most codebases."""
+
+DEFAULT_MAX_QUEUE_SIZE = 200
+"""The maximum size of the file queue for parallel chunking and embedding operations. This cap controls the number of active tasks in the queue to prevent excessive memory usage, or potential resource exhaustion (for very large codebases)."""
+
+FILE_CONSUMER_WORKER_BATCH_SIZE = 25
+"""Batch size for file consumer workers processing files in parallel chunking and embedding operations."""
+
 # ===========================================================================
 # *                   Miscellaneous Constants
 # ===========================================================================
@@ -679,6 +691,8 @@ __all__ = (
     "DEFAULT_LOG_LEVEL",
     "DEFAULT_MANAGEMENT_PORT",
     "DEFAULT_MANIFEST_SUBPATH",
+    "DEFAULT_MAX_CONCURRENT_BATCHES",
+    "DEFAULT_MAX_QUEUE_SIZE",
     "DEFAULT_MAX_RESULTS",
     "DEFAULT_MAX_TOKENS",
     "DEFAULT_MCP_MAX_RETRY_ATTEMPTS",
@@ -721,6 +735,8 @@ __all__ = (
     "ENV_EXPLICIT_TRUE_VALUES",
     "ENV_JETBRAINS_INDICATOR",
     "ENV_VSCODE_INDICATORS",
+    "FILE_BATCH_SIZE",
+    "FILE_CONSUMER_WORKER_BATCH_SIZE",
     "FIND_CODE_DESCRIPTION",
     "FIND_CODE_INSTRUCTION",
     "FIND_CODE_TITLE",

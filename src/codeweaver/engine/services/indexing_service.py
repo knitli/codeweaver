@@ -22,7 +22,12 @@ from codeweaver.core import (
     get_blake_hash,
     set_relative_path,
 )
-from codeweaver.core.constants import PRIMARY_SPARSE_VECTOR_NAME
+from codeweaver.core.constants import (
+    FILE_BATCH_SIZE,
+    FILE_CONSUMER_WORKER_BATCH_SIZE,
+    PRIMARY_SPARSE_VECTOR_NAME,
+    ZERO,
+)
 from codeweaver.providers import EmbeddingRegistryDep
 
 
@@ -90,9 +95,13 @@ class IndexingService:
         self._file_manifest: IndexFileManifest | None = None
         self._current_checkpoint: IndexingCheckpoint | None = None
         self._manifest_lock = asyncio.Lock()
-        self._duplicate_dense_count = 0
-        self._duplicate_sparse_count = 0
+        self._duplicate_dense_count = ZERO
+        self._duplicate_sparse_count = ZERO
         self._deleted_files: list[Path] = []
+
+        # Concurrency control
+        self._max_concurrent_batches = settings.max_concurrent_batches
+        self._indexing_semaphore = asyncio.Semaphore(self._max_concurrent_batches)
 
     @property
     def stats(self) -> IndexingStats:
@@ -158,35 +167,40 @@ class IndexingService:
         if self._file_manifest is None:
             self._file_manifest = self._manifest_manager.create_new()
 
-        # 2. Discover and filter files
-        files_to_index = await self._discover_files_to_index(progress_callback)
-        self.stats.files_discovered = len(files_to_index)
+        # 2. Setup streaming pipeline
+        queue: asyncio.Queue[Path | None] = asyncio.Queue(maxsize=self._settings.max_queue_size)
 
-        # 3. Clean up deleted files
-        if self._deleted_files:
-            await self._cleanup_deleted_files()
-
-        if not files_to_index:
-            logger.info("No new files to index (all up to date)")
-            return 0
+        # Start workers
+        discovery_task = asyncio.create_task(self._discovery_worker(queue, progress_callback))
+        indexing_task = asyncio.create_task(
+            self._indexing_worker(queue, self._indexing_semaphore, progress_callback)
+        )
 
         self._progress_tracker.update_phase("indexing")
 
-        # 4. Process in batches
-        await self._perform_batch_indexing(files_to_index, progress_callback)
+        # 3. Wait for discovery to complete
+        await discovery_task
 
-        # 5. Finalize
+        # 4. Wait for indexing to finish consuming the queue
+        await queue.join()
+        await indexing_task
+
+        # 5. Clean up deleted files (detected during discovery)
+        if self._deleted_files:
+            await self._cleanup_deleted_files()
+
+        # 6. Finalize
         await self._manifest_manager.save(self._file_manifest)
         await self._checkpoint_manager.delete()  # Clear checkpoint on success
 
         self._progress_tracker.update_phase("complete")
 
-        return len(files_to_index)
+        return self.stats.files_discovered
 
-    async def _discover_files_to_index(
-        self, progress_callback: ProgressCallback | None = None
-    ) -> list[Path]:
-        """Discover files using rignore walker and filter via manifest."""
+    async def _discovery_worker(
+        self, queue: asyncio.Queue[Path | None], progress_callback: ProgressCallback | None = None
+    ) -> None:
+        """Producer: Walks filesystem and identifies files needing indexing."""
         walker_settings = self._settings.to_settings()
 
         def _walk_and_collect() -> list[Path]:
@@ -198,28 +212,39 @@ class IndexingService:
         all_files = await loop.to_thread(_walk_and_collect)
 
         if not all_files:
-            return []
+            await queue.put(None)
+            return
 
-        # Filter unchanged files
-        files_to_index: list[Path] = []
         current_models = self._get_current_embedding_models()
+        batch_size = FILE_BATCH_SIZE
+        files_discovered_count = ZERO
 
-        # Batch hashing to allow the loop to breathe
-        batch_size = 100
+        # Detect deleted files first
+        unique_files = {
+            set_relative_path(p, base_path=self._project_path)
+            for p in all_files
+            if set_relative_path(p, base_path=self._project_path)
+        }
+        manifest_files = self._file_manifest.get_all_file_paths()
+        deleted_relative = manifest_files - unique_files
+        self._deleted_files = [self._project_path / rel for rel in deleted_relative]
+
+        # Process discovery batches
         for i in range(0, len(all_files), batch_size):
             batch = all_files[i : i + batch_size]
 
-            # Offload batch hashing to thread
             def _hash_batch(paths: list[Path]) -> list[tuple[Path, bytes]]:
                 return [(p, p.read_bytes()) for p in paths]
 
-            loop = asyncio_or_uvloop()
             hashed_batch = await loop.to_thread(_hash_batch, batch)
 
             for path, content_bytes in hashed_batch:
                 relative_path = set_relative_path(path, base_path=self._project_path)
                 if not relative_path:
-                    files_to_index.append(path)
+                    # External files always indexed? Or ignored?
+                    # For safety, let's just queue it if it's text.
+                    await queue.put(path)
+                    files_discovered_count += 1
                     continue
 
                 current_hash = get_blake_hash(content_bytes)
@@ -233,37 +258,90 @@ class IndexingService:
                 )
 
                 if needs_reindex:
-                    files_to_index.append(path)
+                    await queue.put(path)
+                    files_discovered_count += 1
+
+            self.stats.files_discovered = files_discovered_count
 
             if progress_callback:
                 progress_callback("discovery", min(i + batch_size, len(all_files)), len(all_files))
 
-            # Yield control
             await asyncio.sleep(0)
 
-        # Detect deleted files
-        manifest_files = self._file_manifest.get_all_file_paths()
-        all_files_relative = {
-            set_relative_path(p, base_path=self._project_path)
-            for p in all_files
-            if set_relative_path(p, base_path=self._project_path)
-        }
-        deleted_relative = manifest_files - all_files_relative
-        self._deleted_files = [self._project_path / rel for rel in deleted_relative]
+        # Signal completion
+        await queue.put(None)
 
-        return files_to_index
+    async def _indexing_worker(
+        self,
+        queue: asyncio.Queue[Path | None],
+        semaphore: asyncio.Semaphore,
+        progress_callback: ProgressCallback | None = None,
+    ) -> None:
+        """Consumer: Pulls files from queue and processes them in batches."""
+        batch_size = FILE_CONSUMER_WORKER_BATCH_SIZE
+        current_batch: list[Path] = []
+        indexing_tasks = []
+
+        while True:
+            path = await queue.get()
+
+            if path is None:
+                # Sentinel received
+                if current_batch:
+                    # Final partial batch
+                    task = asyncio.create_task(
+                        self._run_guarded_index_batch(
+                            current_batch, self._indexing_semaphore, progress_callback
+                        )
+                    )
+                    indexing_tasks.append(task)
+
+                queue.task_done()
+                break
+
+            current_batch.append(path)
+
+            if len(current_batch) >= batch_size:
+                # Process batch (under semaphore)
+                task = asyncio.create_task(
+                    self._run_guarded_index_batch(
+                        current_batch.copy(), self._indexing_semaphore, progress_callback
+                    )
+                )
+                indexing_tasks.append(task)
+                current_batch = []
+
+            queue.task_done()
+
+        # Wait for all indexing tasks to complete
+        if indexing_tasks:
+            await asyncio.gather(*indexing_tasks)
+
+    async def _run_guarded_index_batch(
+        self,
+        batch: list[Path],
+        semaphore: asyncio.Semaphore,
+        progress_callback: ProgressCallback | None,
+    ) -> None:
+        """Run a single indexing batch guarded by a semaphore."""
+        async with semaphore:
+            await self._index_files_batch(batch, progress_callback)
 
     async def _perform_batch_indexing(
         self, files: list[Path], progress_callback: ProgressCallback | None
     ) -> None:
         """Process files in batches through the pipeline."""
         batch_size = 50
+        tasks = []
         for i in range(0, len(files), batch_size):
             batch = files[i : i + batch_size]
-            await self._index_files_batch(batch, progress_callback)
+            task = asyncio.create_task(
+                self._run_guarded_index_batch(batch, self._indexing_semaphore, progress_callback)
+            )
+            tasks.append(task)
 
-            # Checkpoint after each batch
-            # self._save_checkpoint(...) # To be implemented if needed
+        if tasks:
+            await asyncio.gather(*tasks)
 
     async def _index_files_batch(
         self, files: list[Path], progress_callback: ProgressCallback | None
