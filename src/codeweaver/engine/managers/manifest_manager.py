@@ -20,6 +20,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, NotRequired, Required, TypedDict
 
+from anyio import Path as AsyncPath
 from pydantic import Field, NonNegativeInt, computed_field
 from pydantic_core import from_json
 
@@ -403,13 +404,13 @@ class FileManifestManager:
             self.manifest_dir / f"file_manifest_{self.project_name}_{path_hash}.json"
         )
 
-    def save(self, manifest: IndexFileManifest) -> bool:
+    async def save(self, manifest: IndexFileManifest) -> bool:
         """Save manifest to disk."""
         manifest.last_updated = datetime.now(UTC)
-        self.manifest_dir.mkdir(parents=True, exist_ok=True)
+        await AsyncPath(self.manifest_dir).mkdir(parents=True, exist_ok=True)
 
         try:
-            _ = self.manifest_file.write_text(manifest.model_dump_json(indent=2))
+            await AsyncPath(self.manifest_file).write_text(manifest.model_dump_json(indent=2))
             logger.info("Saved file manifest to %s", self.manifest_file)
         except OSError:
             logger.warning("Failed to save file manifest", exc_info=True)
@@ -417,22 +418,24 @@ class FileManifestManager:
         else:
             return True
 
-    def load(self) -> IndexFileManifest | None:
+    async def load(self) -> IndexFileManifest | None:
         """Load manifest from disk if available."""
-        if not self.manifest_file.exists():
+        async_file = AsyncPath(self.manifest_file)
+        if not await async_file.exists():
             return None
 
         try:
-            return IndexFileManifest.model_validate(from_json(self.manifest_file.read_bytes()))
+            return IndexFileManifest.model_validate(from_json(await async_file.read_bytes()))
         except (OSError, ValueError):
             logger.warning("Failed to load file manifest from %s", self.manifest_file)
             return None
 
-    def delete(self) -> None:
+    async def delete(self) -> None:
         """Delete manifest file."""
-        if self.manifest_file.exists():
+        async_file = AsyncPath(self.manifest_file)
+        if await async_file.exists():
             try:
-                self.manifest_file.unlink()
+                await async_file.unlink()
                 logger.info("Deleted file manifest %s", self.manifest_file)
             except OSError as e:
                 logger.warning("Failed to delete manifest: %s", e)

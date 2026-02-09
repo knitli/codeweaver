@@ -14,12 +14,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from codeweaver.core import DiscoveredFile, SearchResult, Span
+from codeweaver.core import DiscoveredFile, SearchResult, Span, asyncio_or_uvloop
 from codeweaver.core.constants import POSIX_NEWLINE
 from codeweaver.server.agent_api.find_code.types import CodeMatch, CodeMatchType
 
 
-def convert_search_result_to_code_match(result: SearchResult) -> CodeMatch:
+async def convert_search_result_to_code_match(result: SearchResult) -> CodeMatch:
     """Convert SearchResult from vector store to CodeMatch for response.
 
     Args:
@@ -33,10 +33,11 @@ def convert_search_result_to_code_match(result: SearchResult) -> CodeMatch:
 
     # Get file info (prefer from chunk, fallback to result.file_path, then create fallback)
     file: DiscoveredFile | None = None
+    loop = asyncio_or_uvloop()
     if hasattr(chunk, "file_path") and chunk.file_path:
-        file = DiscoveredFile.from_path(chunk.file_path)
+        file = await loop.to_thread(DiscoveredFile.from_path, chunk.file_path)
     elif result.file_path:
-        file = DiscoveredFile.from_path(result.file_path)
+        file = await loop.to_thread(DiscoveredFile.from_path, result.file_path)
 
     # Ensure we always have a DiscoveredFile (CodeMatch requires non-None)
     if file is None:

@@ -12,13 +12,14 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from codeweaver.core import asyncio_or_uvloop
 from codeweaver.engine.chunker import ChunkerSelector, chunk_files_parallel
 from codeweaver.engine.chunker.delimiter import DelimiterChunker
 from codeweaver.engine.chunker.exceptions import ChunkingError
 
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import AsyncIterator
 
     from codeweaver_tokenizers.base import Tokenizer
 
@@ -42,7 +43,7 @@ class ChunkingService:
         self.settings = settings
         self._selector = ChunkerSelector(governor, tokenizer)
 
-    def chunk_files(
+    async def chunk_files(
         self,
         files: list[DiscoveredFile],
         *,
@@ -50,7 +51,7 @@ class ChunkingService:
         executor_type: str | None = None,
         force_parallel: bool = False,
         source_chunks: dict[Path, list[CodeChunk]] | None = None,
-    ) -> Iterator[tuple[Path, list[CodeChunk]]]:
+    ) -> AsyncIterator[tuple[Path, list[CodeChunk]]]:
         """Chunk multiple files with optional parallel processing."""
         if not files:
             return
@@ -59,24 +60,28 @@ class ChunkingService:
         if force_parallel or (
             self.settings.enable_parallel and len(files) >= self.settings.parallel_threshold
         ):
-            yield from chunk_files_parallel(
+            async for result in chunk_files_parallel(
                 files,
                 self.governor,
                 max_workers=max_workers,
                 executor_type=executor_type,
                 tokenizer=self.tokenizer,
-            )
+            ):
+                yield result
         else:
-            yield from self._chunk_sequential(files)
+            async for result in self._chunk_sequential(files):
+                yield result
 
-    def _chunk_sequential(
+    async def _chunk_sequential(
         self, files: list[DiscoveredFile]
-    ) -> Iterator[tuple[Path, list[CodeChunk]]]:
+    ) -> AsyncIterator[tuple[Path, list[CodeChunk]]]:
         """Sequential chunking with fallback."""
         for file in files:
             try:
                 chunker = self._selector.select_for_file(file)
-                content = file.absolute_path.read_text(encoding="utf-8", errors="ignore")
+                # Offload blocking I/O to a thread
+                loop = asyncio_or_uvloop()
+                content = await loop.to_thread(file.absolute_path.read_text, "utf-8", "ignore")
 
                 try:
                     chunks = chunker.chunk(content, file=file)
@@ -93,9 +98,11 @@ class ChunkingService:
             except Exception:
                 logger.warning("Skipping file %s: chunking failed", file.path, exc_info=True)
 
-    def chunk_file(self, file: DiscoveredFile) -> list[CodeChunk]:
+    async def chunk_file(self, file: DiscoveredFile) -> list[CodeChunk]:
         """Chunk a single file."""
-        return next(iter(self._chunk_sequential([file])))[1]
+        async for _, chunks in self._chunk_sequential([file]):
+            return chunks
+        return []
 
 
 __all__ = ("ChunkingService",)

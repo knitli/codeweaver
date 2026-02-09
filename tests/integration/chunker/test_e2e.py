@@ -128,8 +128,9 @@ def sample_files():
     return files
 
 
+@pytest.mark.asyncio
 @pytest.mark.slow
-def test_e2e_multiple_files_parallel_process(sample_files):
+async def test_e2e_multiple_files_parallel_process(sample_files):
     """Integration test: Process multiple files in parallel with ProcessPoolExecutor.
 
     Tests true parallel processing using ProcessPoolExecutor with fixed pickling support.
@@ -159,9 +160,12 @@ def test_e2e_multiple_files_parallel_process(sample_files):
     governor = ChunkGovernor(capabilities=(capabilities,), settings=settings)
 
     # Process files in parallel
-    results = dict(
-        chunk_files_parallel(sample_files, governor, max_workers=2, executor_type="process")
-    )
+    results = {
+        k: v
+        async for k, v in chunk_files_parallel(
+            sample_files, governor, max_workers=2, executor_type="process"
+        )
+    }
 
     # Verify results
     assert results, "Should process at least one file"
@@ -181,8 +185,9 @@ def test_e2e_multiple_files_parallel_process(sample_files):
         _assert_chunk_quality(file_path, chunks)
 
 
+@pytest.mark.asyncio
 @pytest.mark.slow
-def test_e2e_multiple_files_parallel_thread(sample_files):
+async def test_e2e_multiple_files_parallel_thread(sample_files):
     """Integration test: Process multiple files in parallel with ThreadPoolExecutor."""
     from codeweaver.engine import (
         ChunkerSettings,
@@ -206,9 +211,12 @@ def test_e2e_multiple_files_parallel_thread(sample_files):
     governor = ChunkGovernor(capabilities=(capabilities,), settings=settings)
 
     # Process files in parallel with threads
-    results = dict(
-        chunk_files_parallel(sample_files, governor, max_workers=2, executor_type="thread")
-    )
+    results = {
+        k: v
+        async for k, v in chunk_files_parallel(
+            sample_files, governor, max_workers=2, executor_type="thread"
+        )
+    }
 
     # Verify results
     assert results, "Should process at least one file"
@@ -220,7 +228,8 @@ def test_e2e_multiple_files_parallel_thread(sample_files):
         assert len(chunks) > 0, f"File {file_path} should produce chunks"
 
 
-def test_e2e_parallel_error_handling(tmp_path):
+@pytest.mark.asyncio
+async def test_e2e_parallel_error_handling(tmp_path):
     """Verify parallel processing continues when individual files fail."""
     from codeweaver.core import DiscoveredFile
     from codeweaver.engine import ChunkerSettings, ChunkGovernor, chunk_files_parallel
@@ -253,7 +262,12 @@ def test_e2e_parallel_error_handling(tmp_path):
 
     # Process in parallel - should continue despite bad file
     # Use thread executor to avoid process pickling issues
-    results = dict(chunk_files_parallel(files, governor, max_workers=2, executor_type="thread"))
+    results = {
+        k: v
+        async for k, v in chunk_files_parallel(
+            files, governor, max_workers=2, executor_type="thread"
+        )
+    }
 
     # Should have processed the good files even though one failed
     # Note: Depending on error handling, bad file might produce chunks via fallback

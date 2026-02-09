@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, TypedDict, cast
 from uuid import UUID
 
+from anyio import Path as AsyncPath
 from pydantic import UUID7, DirectoryPath, Field, NonNegativeInt
 from pydantic_core import from_json, to_json
 
@@ -204,35 +205,37 @@ class CheckpointManager:
         """Get full path to checkpoint file."""
         return self.checkpoint_file.resolve()
 
-    def save(self, checkpoint: IndexingCheckpoint) -> None:
+    async def save(self, checkpoint: IndexingCheckpoint) -> None:
         """Save checkpoint to disk."""
         checkpoint.last_checkpoint = datetime.now(UTC)
-        self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
+        await AsyncPath(self.checkpoint_dir).mkdir(parents=True, exist_ok=True)
 
         try:
-            _ = self.checkpoint_file.write_text(
+            await AsyncPath(self.checkpoint_file).write_text(
                 checkpoint.model_dump_json(indent=2, round_trip=True)
             )
             logger.info("Saved indexing checkpoint to %s", self.checkpoint_file)
         except OSError:
             logger.warning("Failed to save checkpoint", exc_info=True)
 
-    def load(self) -> IndexingCheckpoint | None:
+    async def load(self) -> IndexingCheckpoint | None:
         """Load checkpoint from disk if available."""
-        if not self.checkpoint_file.exists():
+        async_file = AsyncPath(self.checkpoint_file)
+        if not await async_file.exists():
             return None
 
         try:
-            return IndexingCheckpoint.model_validate(from_json(self.checkpoint_file.read_bytes()))
+            return IndexingCheckpoint.model_validate(from_json(await async_file.read_bytes()))
         except (OSError, ValueError):
             logger.warning("Failed to load checkpoint from %s", self.checkpoint_file)
             return None
 
-    def delete(self) -> None:
+    async def delete(self) -> None:
         """Delete checkpoint file."""
-        if self.checkpoint_file.exists():
+        async_file = AsyncPath(self.checkpoint_file)
+        if await async_file.exists():
             try:
-                self.checkpoint_file.unlink()
+                await async_file.unlink()
                 logger.info("Deleted checkpoint file %s", self.checkpoint_file)
             except OSError as e:
                 logger.warning("Failed to delete checkpoint: %s", e)

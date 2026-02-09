@@ -419,7 +419,7 @@ async def find_code(
         code_matches: list[CodeMatch] = []
         for result in search_results:
             try:
-                match: CodeMatch = convert_search_result_to_code_match(result)
+                match: CodeMatch = await convert_search_result_to_code_match(result)
                 code_matches.append(match)
             except Exception as e:
                 logger.warning("Failed to convert search result to code match: %s", e)

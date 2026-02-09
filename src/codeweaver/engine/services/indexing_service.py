@@ -15,7 +15,13 @@ from typing import TYPE_CHECKING, Any, Protocol
 
 import rignore
 
-from codeweaver.core import INJECTED, DiscoveredFile, get_blake_hash, set_relative_path
+from codeweaver.core import (
+    INJECTED,
+    DiscoveredFile,
+    asyncio_or_uvloop,
+    get_blake_hash,
+    set_relative_path,
+)
 from codeweaver.core.constants import PRIMARY_SPARSE_VECTOR_NAME
 from codeweaver.providers import EmbeddingRegistryDep
 
@@ -100,7 +106,7 @@ class IndexingService:
         # Ensure manifest is loaded
         if self._file_manifest is None:
             self._file_manifest = (
-                self._manifest_manager.load() or self._manifest_manager.create_new()
+                await self._manifest_manager.load() or self._manifest_manager.create_new()
             )
 
         files_to_index: list[Path] = []
@@ -147,13 +153,13 @@ class IndexingService:
 
         # 1. Load manifest
         if not force_reindex:
-            self._file_manifest = self._manifest_manager.load()
+            self._file_manifest = await self._manifest_manager.load()
 
         if self._file_manifest is None:
             self._file_manifest = self._manifest_manager.create_new()
 
         # 2. Discover and filter files
-        files_to_index = self._discover_files_to_index(progress_callback)
+        files_to_index = await self._discover_files_to_index(progress_callback)
         self.stats.files_discovered = len(files_to_index)
 
         # 3. Clean up deleted files
@@ -170,28 +176,26 @@ class IndexingService:
         await self._perform_batch_indexing(files_to_index, progress_callback)
 
         # 5. Finalize
-        self._manifest_manager.save(self._file_manifest)
-        self._checkpoint_manager.delete()  # Clear checkpoint on success
+        await self._manifest_manager.save(self._file_manifest)
+        await self._checkpoint_manager.delete()  # Clear checkpoint on success
 
         self._progress_tracker.update_phase("complete")
 
         return len(files_to_index)
 
-    def _discover_files_to_index(
+    async def _discover_files_to_index(
         self, progress_callback: ProgressCallback | None = None
     ) -> list[Path]:
         """Discover files using rignore walker and filter via manifest."""
         walker_settings = self._settings.to_settings()
-        walker = rignore.Walker(**walker_settings)
 
-        all_files: list[Path] = []
-        file_count = 0
-        for p in walker:
-            if p and p.exists() and p.is_file():
-                all_files.append(p)
-                file_count += 1
-                if progress_callback and file_count % 10 == 0:
-                    progress_callback("discovery", file_count, 0)
+        def _walk_and_collect() -> list[Path]:
+            walker = rignore.Walker(**walker_settings)
+            return [p for p in walker if p and p.exists() and p.is_file()]
+
+        # Offload blocking walk to thread
+        loop = asyncio_or_uvloop()
+        all_files = await loop.to_thread(_walk_and_collect)
 
         if not all_files:
             return []
@@ -200,27 +204,42 @@ class IndexingService:
         files_to_index: list[Path] = []
         current_models = self._get_current_embedding_models()
 
-        for idx, path in enumerate(all_files):
-            relative_path = set_relative_path(path, base_path=self._project_path)
-            if not relative_path:
-                files_to_index.append(path)
-                continue
+        # Batch hashing to allow the loop to breathe
+        batch_size = 100
+        for i in range(0, len(all_files), batch_size):
+            batch = all_files[i : i + batch_size]
 
-            current_hash = get_blake_hash(path.read_bytes())
-            needs_reindex, _ = self._file_manifest.file_needs_reindexing(
-                relative_path,
-                current_hash,
-                current_dense_provider=current_models["dense_provider"],
-                current_dense_model=current_models["dense_model"],
-                current_sparse_provider=current_models["sparse_provider"],
-                current_sparse_model=current_models["sparse_model"],
-            )
+            # Offload batch hashing to thread
+            def _hash_batch(paths: list[Path]) -> list[tuple[Path, bytes]]:
+                return [(p, p.read_bytes()) for p in paths]
 
-            if needs_reindex:
-                files_to_index.append(path)
+            loop = asyncio_or_uvloop()
+            hashed_batch = await loop.to_thread(_hash_batch, batch)
 
-            if progress_callback and (idx + 1) % 100 == 0:
-                progress_callback("discovery", idx + 1, len(all_files))
+            for path, content_bytes in hashed_batch:
+                relative_path = set_relative_path(path, base_path=self._project_path)
+                if not relative_path:
+                    files_to_index.append(path)
+                    continue
+
+                current_hash = get_blake_hash(content_bytes)
+                needs_reindex, _ = self._file_manifest.file_needs_reindexing(
+                    relative_path,
+                    current_hash,
+                    current_dense_provider=current_models["dense_provider"],
+                    current_dense_model=current_models["dense_model"],
+                    current_sparse_provider=current_models["sparse_provider"],
+                    current_sparse_model=current_models["sparse_model"],
+                )
+
+                if needs_reindex:
+                    files_to_index.append(path)
+
+            if progress_callback:
+                progress_callback("discovery", min(i + batch_size, len(all_files)), len(all_files))
+
+            # Yield control
+            await asyncio.sleep(0)
 
         # Detect deleted files
         manifest_files = self._file_manifest.get_all_file_paths()
@@ -250,12 +269,18 @@ class IndexingService:
         self, files: list[Path], progress_callback: ProgressCallback | None
     ) -> None:
         """Index a single batch of files."""
-        discovered_files: list[DiscoveredFile] = [
-            df
-            for path in files
-            if DiscoveredFile.is_path_text(path)
-            and (df := DiscoveredFile.from_path(path, project_path=self._project_path))
-        ]
+
+        def _collect_discovered_files() -> list[DiscoveredFile]:
+            return [
+                df
+                for path in files
+                if DiscoveredFile.is_path_text(path)
+                and (df := DiscoveredFile.from_path(path, project_path=self._project_path))
+            ]
+
+        loop = asyncio_or_uvloop()
+        discovered_files = await loop.to_thread(_collect_discovered_files)
+
         if not discovered_files:
             return
 
@@ -271,7 +296,7 @@ class IndexingService:
 
         # Chunk
         all_chunks: list[CodeChunk] = []
-        for _, chunks in self._chunking_service.chunk_files(discovered_files):
+        async for _, chunks in self._chunking_service.chunk_files(discovered_files):
             all_chunks.extend(chunks)
 
         self.stats.chunks_created += len(all_chunks)

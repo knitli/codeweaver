@@ -1090,13 +1090,13 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         to block the main embedding workflow.
         """
         try:
-            _loop = (
-                loop or asyncio.get_running_loop()
-            )  # Will raise RuntimeError if not in async context
-            _ = _loop.call_soon_threadsafe(lambda: task())
+            _loop = loop or asyncio.get_running_loop()
+            # Offload to a thread pool executor to avoid blocking the event loop
+            # None as executor uses the default ThreadPoolExecutor
+            _ = _loop.run_in_executor(None, task)
         except RuntimeError as e:
             logger.warning("Failed to schedule fire-and-forget task: %s", e)
-            # just run it synchronously
+            # fallback to synchronous execution if no loop is available
             task()
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
