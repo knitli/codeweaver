@@ -652,7 +652,11 @@ include = ["scripts/build/generate-mcp-server-json.py"]
 unknown-argument = "ignore"
 
 [[tool.ty.overrides]]
-include = ["src/codeweaver/providers/vector_stores/qdrant_base.py"]
+include = [
+  "src/codeweaver/providers/vector_stores/qdrant_base.py",
+  "src/codeweaver/providers/data/providers.py",
+  "src/codeweaver/providers/data/exa.py"
+]
 
 [tool.ty.overrides.rules]
 invalid-argument-type = "ignore"

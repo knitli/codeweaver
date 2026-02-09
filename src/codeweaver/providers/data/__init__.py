@@ -2,117 +2,109 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
-"""MCP tools for CodeWeaver."""
+"""Data providers for CodeWeaver.
+
+CodeWeaver's data providers add outside context to improve code search and analysis. These data sources are only exposed to specialized internal agents, which we call Context Agents. These agents use the tools exposed by the data providers to gather relevant information and improve the information we return to either the user or the user's agent.
+"""
 
 from __future__ import annotations
 
-import logging
+from types import MappingProxyType
+from typing import TYPE_CHECKING
 
-from typing import TYPE_CHECKING, Any
-
-from beartype.typing import Callable, Sequence
-from pydantic_ai import Tool
-
-from codeweaver.core.constants import PREFERRED_SEARCH_PROVIDER_ORDER
-from codeweaver.core.types import LiteralProviderType
-from codeweaver.core.types.provider import Provider
-from codeweaver.core.utils import has_package
-from codeweaver.providers.data.exa import ExaToolset
-from codeweaver.providers.data.tavily import TavilySearchContextTool, tavily_search_tool
+from codeweaver.core.utils.lazy_importer import create_lazy_getattr
 
 
-logger = logging.getLogger(__name__)
-
-
-if TYPE_CHECKING and has_package("pydantic_ai.common_tools.duckduckgo") and has_package("ddgs"):
-    from pydantic_ai.common_tools.duckduckgo import DuckDuckGoSearchTool as DuckDuckGoSearchTool
-    from pydantic_ai.common_tools.duckduckgo import duckduckgo_search_tool
-else:
-    DuckDuckGoSearchTool = Any
-    duckduckgo_search_tool = Tool
-
-type DataProviderType = type[DuckDuckGoSearchTool | TavilySearchContextTool | ExaToolset]
-
-
-def get_data_provider(
-    provider: LiteralProviderType, *, has_required_auth: bool = False
-) -> DataProviderType | Callable[..., Tool[Any]] | None:
-    """Get available tools."""
-    if isinstance(provider, str):
-        provider: Provider = Provider.from_string(provider)
-    if provider == Provider.DUCKDUCKGO and has_package("ddgs"):
-        return duckduckgo_search_tool
-    if provider == Provider.TAVILY and has_required_auth and has_package("tavily"):
-        return tavily_search_tool
-    if provider == Provider.EXA and has_required_auth and has_package("exa"):
-        return ExaToolset
-    data_providers = [provider for provider in Provider if provider.is_data_provider()]
-    if provider in data_providers:
-        logger.warning(
-            "You requested a valid data provider, but it is not available. This probably means you need to install the corresponding package. Install `uv pip install code-weaver[%s]`",
-            provider.variable,
-        )
-    else:
-        logger.warning(
-            "The provider %s isn't a recognized valid data provider. If we have it listed as one, then it's probably our mistake. Please report this issue at https://github.com/knitli/codeweaver/issues",
-            provider.variable,
-        )
-    return None
-
-
-def load_default_data_providers(
-    providers_with_api_keys: Sequence[LiteralProviderType] | None = None,
-) -> tuple[DataProviderType, ...]:
-    """Load the first available (preferred) search data provider."""
-    normalized_api_providers: list[LiteralProviderType] = (
-        list(providers_with_api_keys) if providers_with_api_keys is not None else []
+if TYPE_CHECKING:
+    from codeweaver.providers.data.exa import (
+        ExaAnswerResult,
+        ExaAnswerTool,
+        ExaContentResult,
+        ExaFindSimilarTool,
+        ExaGetContentsTool,
+        ExaSearchResult,
+        ExaSearchTool,
+        ExaToolType,
+        register_exa_tools,
     )
-    normalized_api_providers: list[Provider] = [
-        provider if isinstance(provider, Provider) else Provider.from_string(provider)
-        for provider in normalized_api_providers
-        if provider
-    ]
-    normalized_api_providers.extend(
-        provider
-        for provider in Provider
-        if provider.is_data_provider() and (not provider.requires_auth or provider.has_env_auth)
+    from codeweaver.providers.data.providers import (
+        DataProviderType,
+        DuckDuckGoSearchTool,
+        duckduckgo_search_tool,
+        get_data_provider,
+        load_default_data_providers,
     )
-    possible_providers = sorted(
-        set(normalized_api_providers),
-        key=lambda p: (
-            PREFERRED_SEARCH_PROVIDER_ORDER.index(p.variable)
-            if p.variable in PREFERRED_SEARCH_PROVIDER_ORDER
-            else len(PREFERRED_SEARCH_PROVIDER_ORDER) + 1
-        ),
+    from codeweaver.providers.data.tavily import (
+        TavilyResults,
+        TavilySearchContextTool,
+        TavilySearchResult,
+        tavily_search_tool,
     )
-    if not possible_providers:
-        logger.warning("No available search data providers found.")
-        return ()
-    return (
-        (prov,)
-        if (
-            prov := (
-                next(
-                    (
-                        get_data_provider(provider, has_required_auth=True)
-                        for provider in possible_providers
-                        if get_data_provider(provider, has_required_auth=True)
-                    ),
-                    None,
-                )
-            )
-        )
-        else ()
+    from codeweaver.providers.data.utils import (
+        build_data_tool,
+        get_schema_for_type,
+        get_serializer_for_type,
+        get_type_adapter,
+        register_data_tool,
     )
+
+
+_dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
+    "DataProviderType": (__spec__.parent, "providers"),
+    "DuckDuckGoSearchTool": (__spec__.parent, "providers"),
+    "ExaAnswerResult": (__spec__.parent, "exa"),
+    "ExaAnswerTool": (__spec__.parent, "exa"),
+    "ExaContentResult": (__spec__.parent, "exa"),
+    "ExaFindSimilarTool": (__spec__.parent, "exa"),
+    "ExaGetContentsTool": (__spec__.parent, "exa"),
+    "ExaSearchResult": (__spec__.parent, "exa"),
+    "ExaSearchTool": (__spec__.parent, "exa"),
+    "ExaToolType": (__spec__.parent, "exa"),
+    "TavilyResults": (__spec__.parent, "tavily"),
+    "TavilySearchContextTool": (__spec__.parent, "tavily"),
+    "TavilySearchResult": (__spec__.parent, "tavily"),
+    "build_data_tool": (__spec__.parent, "utils"),
+    "duckduckgo_search_tool": (__spec__.parent, "providers"),
+    "get_data_provider": (__spec__.parent, "providers"),
+    "get_schema_for_type": (__spec__.parent, "utils"),
+    "get_serializer_for_type": (__spec__.parent, "utils"),
+    "get_type_adapter": (__spec__.parent, "utils"),
+    "load_default_data_providers": (__spec__.parent, "providers"),
+    "register_data_tool": (__spec__.parent, "utils"),
+    "register_exa_tools": (__spec__.parent, "exa"),
+    "tavily_search_tool": (__spec__.parent, "tavily"),
+})
+
+
+__getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
 
 
 __all__ = (
     "DataProviderType",
     "DuckDuckGoSearchTool",
-    "ExaToolset",
+    "ExaAnswerResult",
+    "ExaAnswerTool",
+    "ExaContentResult",
+    "ExaFindSimilarTool",
+    "ExaGetContentsTool",
+    "ExaSearchResult",
+    "ExaSearchTool",
+    "ExaToolType",
+    "TavilyResults",
     "TavilySearchContextTool",
+    "TavilySearchResult",
+    "build_data_tool",
     "duckduckgo_search_tool",
     "get_data_provider",
+    "get_schema_for_type",
+    "get_serializer_for_type",
+    "get_type_adapter",
     "load_default_data_providers",
+    "register_data_tool",
+    "register_exa_tools",
     "tavily_search_tool",
 )
+
+
+def __dir__() -> list[str]:
+    return list(__all__)

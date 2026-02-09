@@ -27,6 +27,13 @@ from codeweaver.server.mcp.types import ToolRegistrationDict
 from codeweaver.server.mcp.user_agent import find_code_tool
 
 
+class ContextAgentToolkit(TypedDict):
+    """Context agent search tool definition."""
+
+    search_tool: Tool
+    call_tool_bulk: Callable[[FastMCP[Any]], Tool]
+
+
 class ToolCollectionDict(TypedDict):
     """Collection of CodeWeaver MCP tool definitions."""
 
@@ -67,7 +74,7 @@ TOOL_DEFINITIONS: DictView[ToolCollectionDict] = DictView(
                 name="find_code",
                 description=FIND_CODE_DESCRIPTION,
                 enabled=True,
-                tags=USER_AGENT_TAGS,
+                tags=USER_AGENT_TAGS | {"find_code"},
                 annotations=ToolAnnotations(
                     title=FIND_CODE_TITLE,
                     readOnlyHint=True,

@@ -10,17 +10,28 @@
 
 from __future__ import annotations
 
+import logging
+
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING, Any, Literal, TypedDict, cast
+from typing import TYPE_CHECKING, Any, Literal, TypedDict, cast, overload
 
-from langsmith import uuid7
+from fastmcp.tools import Tool
+from mcp.types import ToolAnnotations
 from pydantic import PositiveFloat, PositiveInt
-from pydantic_ai import FunctionToolset, Tool
 
-from codeweaver.core.types import LiteralStringT, Provider
+from codeweaver.core.constants import CONTEXT_AGENT_TAGS
+from codeweaver.core.types import LiteralStringT
 from codeweaver.core.utils import has_package
 from codeweaver.providers.config.data import ExaContentsOptions, ExaToolConfig
+from codeweaver.providers.data.utils import (
+    build_data_tool,
+    get_schema_for_type,
+    get_serializer_for_type,
+    get_type_adapter,
+    register_data_tool,
+)
+from codeweaver.server import ToolRegistrationDict
 
 
 if TYPE_CHECKING and has_package("exa_py"):
@@ -37,6 +48,9 @@ else:
         """Mock AsyncExa client for type checking."""
 
         api_key: str
+
+
+logger = logging.getLogger(__name__)
 
 
 _ONE_DAY_IN_HRS = 24
@@ -204,7 +218,7 @@ class ExaSearchTool:
             query,
             num_results=self.num_results,
             type=search_type,
-            contents=text_config,  # ty:ignore[invalid-argument-type]
+            contents=text_config,
             include_domains=(self.include_domains or []) + (include_domains or []),
             exclude_domains=(self.exclude_domains or []) + (exclude_domains or []),
             start_published_date=from_date,
@@ -282,7 +296,7 @@ class ExaFindSimilarTool:
             url,
             num_results=self.num_results,
             exclude_source_domain=exclude_source_domain,
-            contents=contents_config,  # ty:ignore[invalid-argument-type]
+            contents=contents_config,
             include_domains=(self.include_domains or []) + (include_domains or []),
             exclude_domains=(self.exclude_domains or []) + (exclude_domains or []),
             start_published_date=from_date,
@@ -394,14 +408,11 @@ class ExaAnswerTool:
             An answer with supporting citations from web sources.
         """
         response = await self.client.answer(
-            query,
-            text=text,
-            system_prompt=self.system_prompt,
-            model=self.model,  # ty:ignore[invalid-argument-type]
+            query, text=text, system_prompt=self.system_prompt, model=self.model
         )
 
         return ExaAnswerResult(
-            answer=response.answer,  # type: ignore
+            answer=response.answer,
             citations=[
                 {
                     "id": citation.id,
@@ -427,7 +438,7 @@ def exa_search_tool(
     *,
     moderation: bool = False,
     iden: str | None = None,
-) -> Tool[Any]:
+) -> ExaSearchTool:
     """Creates an Exa search tool.
 
     Args:
@@ -437,19 +448,15 @@ def exa_search_tool(
         max_characters: Maximum characters of text content per result. Use this to limit
             token usage. Defaults to None (no limit).
     """
-    return Tool[Any](
-        ExaSearchTool(
-            client=client,
-            num_results=num_results,
-            max_characters=max_characters,
-            include_domains=include_domains,
-            exclude_domains=exclude_domains,
-            contents_options=contents_options,
-            moderation=moderation,
-            iden=iden,
-        ).__call__,
-        name="exa_search",
-        description="Searches Exa for the given query and returns the results with content. Exa is a neural search engine that finds high-quality, relevant results.",
+    return ExaSearchTool(
+        client=client,
+        num_results=num_results,
+        max_characters=max_characters,
+        include_domains=include_domains,
+        exclude_domains=exclude_domains,
+        contents_options=contents_options,
+        moderation=moderation,
+        iden=iden,
     )
 
 
@@ -462,7 +469,7 @@ def exa_find_similar_tool(
     contents_options: ExaContentsOptions | None = None,
     *,
     iden: str | None = None,
-) -> Tool[Any]:
+) -> ExaFindSimilarTool:
     """Creates an Exa find similar tool.
 
     Args:
@@ -473,18 +480,14 @@ def exa_find_similar_tool(
         exclude_domains: An optional list of domains to exclude from the results.
         contents_options: Optional content retrieval options.
     """
-    return Tool[Any](
-        ExaFindSimilarTool(
-            client=client,
-            num_results=num_results,
-            max_characters=max_characters,
-            include_domains=include_domains,
-            exclude_domains=exclude_domains,
-            contents_options=contents_options,
-            iden=iden,
-        ).__call__,
-        name="exa_find_similar",
-        description="Finds web pages similar to a given URL. Useful for discovering related content or alternative sources.",
+    return ExaFindSimilarTool(
+        client=client,
+        num_results=num_results,
+        max_characters=max_characters,
+        include_domains=include_domains,
+        exclude_domains=exclude_domains,
+        contents_options=contents_options,
+        iden=iden,
     )
 
 
@@ -496,7 +499,7 @@ def exa_get_contents_tool(
     summary: Literal[True] | None = None,
     filter_empty_results: bool = True,
     iden: str | None = None,
-) -> Tool[Any]:
+) -> ExaGetContentsTool:
     """Creates an Exa get contents tool.
 
     Args:
@@ -508,17 +511,13 @@ def exa_get_contents_tool(
         summary: Whether to include a summary of the content. Defaults to None.
 
     """
-    return Tool[Any](
-        ExaGetContentsTool(
-            client=client,
-            max_characters=max_characters,
-            contents_options=contents_options,
-            summary=summary,
-            filter_empty_results=filter_empty_results,
-            iden=iden,
-        ).__call__,
-        name="exa_get_contents",
-        description="Gets the full text content of specified URLs. Useful for reading articles, documentation, or any web page when you have the exact URL.",
+    return ExaGetContentsTool(
+        client=client,
+        max_characters=max_characters,
+        contents_options=contents_options,
+        summary=summary,
+        filter_empty_results=filter_empty_results,
+        iden=iden,
     )
 
 
@@ -527,7 +526,7 @@ def exa_answer_tool(
     system_prompt: str | None = None,
     model: Literal["exa", "exa-pro"] | LiteralStringT | None = None,
     iden: str | None = None,
-) -> Tool[Any]:
+) -> ExaAnswerTool:
     """Creates an Exa answer tool.
 
     Args:
@@ -535,85 +534,126 @@ def exa_answer_tool(
         system_prompt: An optional system prompt to provide to the Exa answer tool. This can be used to guide the behavior of the tool. For example, you could provide a prompt that instructs the tool to focus on certain types of sources. If not provided, the tool will use its default behavior.
             This is useful for sharing a client across multiple tools.
     """
-    return Tool[Any](
-        ExaAnswerTool(client=client, system_prompt=system_prompt, iden=iden, model=model).__call__,
-        name="exa_answer",
-        description="Generates an AI-powered answer to a question with citations from web sources. Returns a comprehensive answer backed by real sources.",
+    return ExaAnswerTool(client=client, system_prompt=system_prompt, iden=iden, model=model)
+
+
+_annotations = ToolAnnotations(
+    readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=True
+)
+
+
+async def _get_exa_search_tool(instance: ExaSearchTool) -> Tool[ExaSearchResult]:
+    """Gets an Exa search tool."""
+    adapter = get_type_adapter(list[ExaSearchResult], module=__name__)
+    return await build_data_tool(
+        ToolRegistrationDict(
+            fn=instance.__call__,
+            name="exa_web_search",
+            description="Get web and database search results from Exa. Use this tool to get up-to-date information on external APIs, usage examples, and language updates/changes.",
+            tags=CONTEXT_AGENT_TAGS | {"exa", "web_search_tool"},
+            output_schema=get_schema_for_type(adapter=adapter),
+            serializer=get_serializer_for_type(adapter=adapter),
+            annotations=_annotations,
+        )
     )
 
 
-class ExaToolset(FunctionToolset):
-    """Customized Exa toolset for CodeWeaver.
-
-    This toolset is modeled after Pydantic-AI's `pydantic_ai.common_tools.exa.ExaToolset` but designed to expose significantly more configuration options to users via CodeWeaver's data provider configuration system.
-    """
-
-    def __init__(
-        self,
-        client: AsyncExa,
-        *,
-        include_answer: bool = True,
-        include_search: bool = False,
-        include_find_similar: bool = False,
-        include_get_contents: bool = True,
-        iden: str | None = None,
-        config: ExaToolConfig | None = None,
-    ) -> None:
-        """Initialize the Exa toolset with the given configuration."""
-        tools: list[Tool[Any]] = []
-        config = config or ExaToolConfig(tag="exa", provider=Provider.EXA)
-        iden = iden or uuid7().hex
-        if include_search:
-            search_config = config.search_config or {}
-            tools.append(
-                exa_search_tool(
-                    client=client,
-                    iden=iden,
-                    num_results=search_config.get("num_results") or 5,
-                    max_characters=search_config.get("max_characters"),
-                    contents_options=search_config.get("contents_options"),
-                    include_domains=search_config.get("include_domains"),
-                    exclude_domains=search_config.get("exclude_domains"),
-                    moderation=search_config.get("moderation", False),
-                )
-            )
-        if include_find_similar:
-            find_similar_config = config.find_similar_config or {}
-            tools.append(
-                exa_find_similar_tool(
-                    client=client,
-                    iden=iden,
-                    num_results=find_similar_config.get("num_results") or 5,
-                    max_characters=find_similar_config.get("max_characters"),
-                    include_domains=find_similar_config.get("include_domains"),
-                    exclude_domains=find_similar_config.get("exclude_domains"),
-                    contents_options=find_similar_config.get("contents_options"),  # ty:ignore[invalid-argument-type]
-                )
-            )
-        if include_get_contents:
-            get_contents_config = config.get_contents_config or {}
-            tools.append(
-                exa_get_contents_tool(
-                    client=client,
-                    iden=iden,
-                    max_characters=get_contents_config.get("max_characters"),
-                    summary=get_contents_config.get("summary"),
-                    contents_options=get_contents_config.get("contents_options"),
-                    filter_empty_results=get_contents_config.get("filter_empty_results", True),
-                )
-            )
-        if include_answer:
-            answer_config = config.answer_config or {}
-            tools.append(
-                exa_answer_tool(
-                    client=client,
-                    iden=iden,
-                    system_prompt=answer_config.get("system_prompt"),
-                    model=answer_config.get("model"),
-                )
-            )
-
-        super().__init__(tools, id=iden)
+async def _get_exa_find_similar_tool(instance: ExaFindSimilarTool) -> Tool[ExaFindSimilarTool]:
+    """Gets an Exa find similar tool."""
+    adapter = get_type_adapter(list[ExaSearchResult], module=__name__)
+    return await build_data_tool(
+        ToolRegistrationDict(
+            fn=instance.__call__,
+            name="exa_find_similar",
+            description="Provide a URL or list of URLs and get similar content from other sources.",
+            tags=CONTEXT_AGENT_TAGS | {"exa", "find_similar_tool"},
+            output_schema=get_schema_for_type(adapter=adapter),
+            serializer=get_serializer_for_type(adapter=adapter),
+            annotations=_annotations,
+        )
+    )
 
 
-__all__ = ("ExaToolset",)
+async def _get_exa_get_contents_tool(instance: ExaGetContentsTool) -> Tool[ExaGetContentsTool]:
+    """Gets an Exa get contents tool."""
+    adapter = get_type_adapter(list[ExaContentResult], module=__name__)
+    return await build_data_tool(
+        ToolRegistrationDict(
+            fn=instance.__call__,
+            name="exa_get_contents",
+            description="Get the contents of a URL or list of URLs.",
+            tags=CONTEXT_AGENT_TAGS | {"exa", "get_contents_tool"},
+            output_schema=get_schema_for_type(adapter=adapter),
+            serializer=get_serializer_for_type(adapter=adapter),
+            annotations=_annotations,
+        )
+    )
+
+
+async def _get_exa_answer_tool(instance: ExaAnswerTool) -> Tool[ExaAnswerTool]:
+    """Gets an Exa answer tool."""
+    adapter = get_type_adapter(ExaAnswerResult, module=__name__)
+    return await build_data_tool(
+        ToolRegistrationDict(
+            fn=instance.__call__,
+            name="exa_answer",
+            description="Get a researched answer to a question from Exa. Use this to get a precise and well-supported response for a specific need. For example: 'What is the call signature and associated types for version 2.2 of Pydantic's `TypeAdapter` and its methods?'",
+            tags=CONTEXT_AGENT_TAGS | {"exa", "answer_tool"},
+            output_schema=get_schema_for_type(adapter=adapter),
+            serializer=get_serializer_for_type(adapter=adapter),
+            annotations=_annotations,
+        )
+    )
+
+
+@overload
+async def register_exa_tools(
+    *, client: AsyncExa, config: ExaToolConfig, register: bool = True, return_tools: Literal[True]
+) -> list[Tool]: ...
+@overload
+async def register_exa_tools(*, client: AsyncExa, config: ExaToolConfig) -> None: ...
+async def register_exa_tools(
+    *, client: AsyncExa, config: ExaToolConfig, register: bool = True, return_tools: bool = False
+) -> None | list[Tool]:
+    # sourcery skip: dict-assign-update-to-union
+    """Registers Exa tools with the given FastMCP app."""
+    if not has_package("exa_py"):
+        logger.info("exa_py package not found, skipping Exa toolset registration.")
+        return None
+    tools = []
+    if config.include_search:
+        logger.debug("Registering Exa tool: search")
+        instance = exa_search_tool(client, **((config.search_config) or {} | {"iden": config.iden}))
+        tools.append(await _get_exa_search_tool(instance))
+    if config.include_find_similar:
+        logger.debug("Registering Exa tool: find_similar")
+        instance = exa_find_similar_tool(
+            client, **((config.find_similar_config) or {} | {"iden": config.iden})
+        )
+        tools.append(await _get_exa_find_similar_tool(instance))
+    if config.include_get_contents:
+        logger.debug("Registering Exa tool: get_contents")
+        instance = exa_get_contents_tool(
+            client, **((config.get_contents_config) or {} | {"iden": config.iden})
+        )
+        tools.append(await _get_exa_get_contents_tool(instance))
+    if config.include_answer:
+        logger.debug("Registering Exa tool: answer")
+        instance = exa_answer_tool(client, **((config.answer_config) or {} | {"iden": config.iden}))
+        tools.append(await _get_exa_answer_tool(instance))
+    if tools and register:
+        for tool in tools:
+            await register_data_tool(tool)
+    return tools if return_tools else None
+
+
+type ExaToolType = ExaSearchTool | ExaFindSimilarTool | ExaGetContentsTool | ExaAnswerTool
+
+__all__ = (
+    "ExaAnswerTool",
+    "ExaFindSimilarTool",
+    "ExaGetContentsTool",
+    "ExaSearchTool",
+    "ExaToolType",
+    "register_exa_tools",
+)

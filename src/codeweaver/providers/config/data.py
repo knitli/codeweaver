@@ -9,12 +9,15 @@ This module provides types for configuring data providers, which in fact are int
 
 from __future__ import annotations
 
+import logging
+
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Literal, NotRequired, TypedDict
 
+from fastmcp.tools import Tool
 from pydantic import Field, PositiveInt
-from pydantic_ai import Tool
 
+from codeweaver.core import uuid7
 from codeweaver.core.exceptions import ConfigurationError
 from codeweaver.core.types import BasedModel, LiteralStringT, Provider, ProviderLiteralString
 from codeweaver.core.utils import has_package
@@ -26,8 +29,10 @@ else:
     AsyncExa = Any
 
 if TYPE_CHECKING:
-    from codeweaver.providers.data.exa import ExaToolset
     from codeweaver.providers.data.tavily import TavilySearchContextTool
+
+
+logger = logging.getLogger(__name__)
 
 
 class ExaContentsOptions(TypedDict, total=False):
@@ -209,10 +214,13 @@ class ExaToolConfig(BaseToolConfig):
         """Get the telemetry keys for the Exa data provider."""
         return
 
-    async def to_call(self, *args: Any, **kwargs: Any) -> ExaToolset:
-        """Convert the Exa data config to an ExaToolset call."""
-        from codeweaver.providers.data.exa import ExaToolset
-
+    async def to_call(self, *args: Any, **kwargs: Any) -> list[Tool] | None:
+        """Convert the Exa data config to a call to register the exa tools."""
+        if not has_package("codeweaver.server") or not has_package("exa_py"):
+            logger.info(
+                "Required packages for Exa data provider are not installed. Please install them with `pip install code-weaver[exa]`."
+            )
+            return None
         if not (client := kwargs.get("client")) and (
             api_key := kwargs.get("api_key") or self.provider.get_env_api_key()
         ):
@@ -228,8 +236,10 @@ class ExaToolConfig(BaseToolConfig):
             raise ConfigurationError(
                 "No client or API key provided for Exa data provider. Please provide either a client instance or an API key."
             )
-        return ExaToolset(
-            client=client, **self.model_dump(exclude={"tag", "provider"}, exclude_none=True)
+        from codeweaver.providers.data.exa import register_exa_tools
+
+        return await register_exa_tools(
+            client=client, config=self, return_tools=True, register=True
         )
 
 
@@ -246,6 +256,12 @@ class TavilySearchContextToolConfig(BaseToolConfig):
     include_answer: Literal["basic", "advanced"] = Field(
         "basic",
         description="Whether to include the answer tool in the data provider. Defaults to True.",
+    )
+
+    iden: str | None = Field(
+        default_factory=lambda: uuid7().hex,
+        description="A unique identifier for the tool instance.",
+        serialization_alias="id",
     )
 
     def _telemetry_keys(self) -> None:
@@ -271,7 +287,11 @@ class TavilySearchContextToolConfig(BaseToolConfig):
             raise ConfigurationError(
                 "No client or API key provided for Tavily data provider. Please provide either a client instance or an API key."
             )
-        return tavily_search_tool(client)
+        return await tavily_search_tool(
+            client,
+            **self.model_dump(exclude={"provider", "tag"}, exclude_none=True, by_alias=False),
+            register=True,
+        )
 
 
 type DataToolConfigT = BaseToolConfig | ExaToolConfig | TavilySearchContextToolConfig

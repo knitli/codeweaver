@@ -38,7 +38,7 @@ from pydantic import (
 )
 from starlette.responses import PlainTextResponse
 
-from codeweaver.core import BasedModel
+from codeweaver.core import BasedModel, CodeWeaverSettingsType
 from codeweaver.core.constants import (
     CLOUD_EMBEDDING_COST_PER_1K_TOKENS,
     CLOUD_RERANKING_COST_PER_1K_TOKENS,
@@ -71,7 +71,20 @@ from codeweaver.core.utils import has_package, uuid7, uuid7_as_timestamp
 
 
 if TYPE_CHECKING:
-    from codeweaver.core import CodeChunk, DiscoveredFile
+    from codeweaver.core import CodeChunk, Container, DiscoveredFile
+
+
+async def _check_profile(container: Container) -> bool | None:
+    """Check if the current profile uses cloud embedding and reranking providers."""
+    from codeweaver.providers.config.profiles import ProviderProfile
+
+    if (settings := await container.resolve(CodeWeaverSettingsType)) and (
+        profile := settings.profile
+    ):
+        from codeweaver.providers.config.profiles import ProviderProfile
+
+        return profile in [ProviderProfile.RECOMMENDED_CLOUD, ProviderProfile.RECOMMENDED]
+    return None
 
 
 async def _is_cloud_embedding_model() -> bool:
@@ -82,9 +95,16 @@ async def _is_cloud_embedding_model() -> bool:
 
         container = get_container()
         embedding_settings = await container.resolve(EmbeddingProviderSettingsType)
+        config = (
+            embedding_settings.embedding_config
+            if embedding_settings.config_type == "symmetric"
+            else embedding_settings.embedding_provider.embedding_config
+        )
         if embedding_settings is not None:
-            provider = embedding_settings.provider
+            provider = config.provider
             return provider.is_cloud_provider()
+        if (profile_result := await _check_profile(container)) is not None:
+            return profile_result
     # most of them are cloud, so we default to True
     return True
 
@@ -100,7 +120,9 @@ async def _is_cloud_reranking_model() -> bool:
         if reranking_settings is not None:
             provider = reranking_settings.provider
             return provider.is_cloud_provider()
-    # most of them are cloud, so we default to True
+        # most of them are cloud, so we default to True
+        if (profile_result := await _check_profile(container)) is not None:
+            return profile_result
     return True
 
 

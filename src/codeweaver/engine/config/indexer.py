@@ -19,6 +19,7 @@ from functools import cache, cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, NamedTuple, NotRequired, TypedDict
 
+from anyio import Path as AsyncPath
 from fastmcp import Context as FastMCPContext
 from pydantic import DirectoryPath, Field, FilePath, PrivateAttr, computed_field
 
@@ -138,7 +139,7 @@ class FilteredPaths(NamedTuple):
     excludes: frozenset[Path]
 
     @classmethod
-    async def from_settings(cls, indexing: IndexerSettings, repo_root: Path) -> FilteredPaths:
+    async def from_settings(cls, indexing: IndexerSettings, repo_root: AsyncPath) -> FilteredPaths:
         """Resolve included and excluded files based on filter settings.
 
         Resolves glob patterns for include and exclude paths, filtering includes for excluded extensions.
@@ -157,11 +158,11 @@ class FilteredPaths(NamedTuple):
             if file
             and "*" not in file
             and ("?" not in file)
-            and Path(file).exists()
-            and Path(file).is_file()
+            and await AsyncPath(str(file)).exists()
+            and await AsyncPath(str(file)).is_file()
         }
         for include in settings.get("forced_includes", set()):
-            other_files |= _resolve_globs(include, repo_root)
+            other_files |= _resolve_globs(include, Path(repo_root))
         for ext in settings.get("excluded_extensions", set()):
             if not ext:
                 continue
@@ -176,7 +177,7 @@ class FilteredPaths(NamedTuple):
         excluded_files = settings.get("excludes", set())
         for exclude in excluded_files:
             if exclude:
-                excludes |= _resolve_globs(exclude, repo_root)
+                excludes |= _resolve_globs(exclude, Path(repo_root))
         excludes -= specifically_included_files
         other_files -= excludes
         other_files -= {None, Path(), Path("./"), Path("./.")}
@@ -390,7 +391,9 @@ class IndexerSettings(BasedModel):
 
     async def set_inc_exc(self, project_path: Path) -> None:
         """Set that includes and excludes have been configured."""
-        self.forced_includes, self.excludes = await FilteredPaths.from_settings(self, project_path)
+        self.forced_includes, self.excludes = await FilteredPaths.from_settings(
+            self, AsyncPath(str(project_path))
+        )
         self._inc_exc_set = True
 
     def _as_settings(self, project_path: ResolvedProjectPathDep = INJECTED) -> RignoreSettings:

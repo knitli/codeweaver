@@ -187,10 +187,10 @@ class IndexingService:
         all_files: list[Path] = []
         file_count = 0
         for p in walker:
-            if p and p.is_file():
+            if p and p.exists() and p.is_file():
                 all_files.append(p)
                 file_count += 1
-                if progress_callback and file_count % 50 == 0:
+                if progress_callback and file_count % 10 == 0:
                     progress_callback("discovery", file_count, 0)
 
         if not all_files:
@@ -353,7 +353,6 @@ class IndexingService:
         for path in self._deleted_files:
             if self._vector_store:
                 await self._vector_store.delete_by_file(path)
-
             rel_path = set_relative_path(path, base_path=self._project_path)
             if rel_path and self._file_manifest:
                 async with self._manifest_lock:
