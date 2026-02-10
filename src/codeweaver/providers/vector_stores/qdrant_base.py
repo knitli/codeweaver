@@ -807,17 +807,29 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         Args:
             file_path: File path to remove from index.
         """
+        await self.delete_by_files([file_path])
+
+    async def delete_by_files(self, file_paths: list[Path]) -> None:
+        """Delete all chunks for multiple files in a single operation.
+
+        Args:
+            file_paths: List of file paths to remove from index.
+        """
         collection_name = self.collection_name
         if not collection_name:
             raise ProviderError("No collection configured")
         await self._ensure_collection(collection_name)
-        from qdrant_client.models import FieldCondition, MatchValue
+        from qdrant_client.models import FieldCondition, MatchAny
         from qdrant_client.models import Filter as QdrantFilter
 
         _ = await self.client.delete(
             collection_name=collection_name,
             points_selector=QdrantFilter(
-                must=[FieldCondition(key="file_path", match=MatchValue(value=str(file_path)))]
+                must=[
+                    FieldCondition(
+                        key="file_path", match=MatchAny(any=[str(p) for p in file_paths])
+                    )
+                ]
             ),
         )
         await self.handle_persistence()

@@ -60,6 +60,8 @@ def sample_manifest(temp_project_dir):
     return manifest
 
 
+@pytest.mark.async_test
+@pytest.mark.unit
 class TestIndexFileManifest:
     """Tests for IndexFileManifest class."""
 
@@ -83,6 +85,60 @@ class TestIndexFileManifest:
         assert entry["content_hash"] == str(content_hash)
         assert entry["chunk_count"] == 2
         assert entry["chunk_ids"] == chunk_ids
+
+    def test_add_files_batch(self, temp_project_dir):
+        """Test adding multiple files via batch update."""
+        manifest = IndexFileManifest(project_path=temp_project_dir)
+
+        entries = [
+            {
+                "path": Path("file1.py"),
+                "content_hash": get_blake_hash(b"content1"),
+                "chunk_ids": ["c1", "c2"],
+                "dense_embedding_provider": "openai",
+                "has_dense_embeddings": True,
+            },
+            {
+                "path": Path("file2.py"),
+                "content_hash": get_blake_hash(b"content2"),
+                "chunk_ids": ["c3"],
+                "sparse_embedding_provider": "fastembed",
+                "has_sparse_embeddings": True,
+            },
+        ]
+
+        manifest.add_files_batch(entries)
+
+        assert manifest.total_files == 2
+        assert manifest.total_chunks == 3
+        assert manifest.has_file(Path("file1.py"))
+        assert manifest.has_file(Path("file2.py"))
+
+        entry1 = manifest.get_file(Path("file1.py"))
+        assert entry1 is not None
+        assert entry1["dense_embedding_provider"] == "openai"
+        assert entry1["has_dense_embeddings"] is True
+
+        entry2 = manifest.get_file(Path("file2.py"))
+        assert entry2 is not None
+        assert entry2["sparse_embedding_provider"] == "fastembed"
+        assert entry2["has_sparse_embeddings"] is True
+
+    def test_add_files_batch_update_existing(self, sample_manifest):
+        """Test updating existing files via batch update."""
+        path = Path("src/main.py")
+        new_hash = get_blake_hash(b"updated")
+
+        entries = [{"path": path, "content_hash": new_hash, "chunk_ids": ["new_c1"]}]
+
+        manifest_total_files = sample_manifest.total_files
+
+        sample_manifest.add_files_batch(entries)
+
+        assert sample_manifest.total_files == manifest_total_files
+        entry = sample_manifest.get_file(path)
+        assert entry["content_hash"] == str(new_hash)
+        assert entry["chunk_count"] == 1
 
     def test_add_file_update_existing(self, sample_manifest):
         """Test updating an existing file in manifest."""
@@ -183,35 +239,38 @@ class TestIndexFileManifest:
         assert stats["manifest_version"] == "1.1.0"  # Updated to v1.1.0 for embedding metadata
 
 
+@pytest.mark.asyncio
+@pytest.mark.async_test
+@pytest.mark.unit
 class TestFileManifestManager:
     """Tests for FileManifestManager class."""
 
-    def test_save_and_load(self, manifest_manager, sample_manifest):
+    async def test_save_and_load(self, manifest_manager, sample_manifest):
         """Test saving and loading manifest."""
         # Save
-        manifest_manager.save(sample_manifest)
+        await manifest_manager.save(sample_manifest)
         assert manifest_manager.manifest_file.exists()
 
         # Load
-        loaded = manifest_manager.load()
+        loaded = await manifest_manager.load()
         assert loaded is not None
         assert loaded.total_files == sample_manifest.total_files
         assert loaded.total_chunks == sample_manifest.total_chunks
         assert len(loaded.files) == len(sample_manifest.files)
 
-    def test_load_nonexistent(self, manifest_manager):
+    async def test_load_nonexistent(self, manifest_manager):
         """Test loading when no manifest file exists."""
-        loaded = manifest_manager.load()
+        loaded = await manifest_manager.load()
         assert loaded is None
 
-    def test_delete(self, manifest_manager, sample_manifest):
+    async def test_delete(self, manifest_manager, sample_manifest):
         """Test deleting manifest file."""
         # Save first
-        manifest_manager.save(sample_manifest)
+        await manifest_manager.save(sample_manifest)
         assert manifest_manager.manifest_file.exists()
 
         # Delete
-        manifest_manager.delete()
+        await manifest_manager.delete()
         assert not manifest_manager.manifest_file.exists()
 
     def test_create_new(self, manifest_manager, temp_project_dir):
@@ -224,6 +283,8 @@ class TestFileManifestManager:
         assert len(manifest.files) == 0
 
 
+@pytest.mark.async_test
+@pytest.mark.unit
 class TestIncrementalIndexing:
     """Integration tests for incremental indexing workflow."""
 

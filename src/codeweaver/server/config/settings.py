@@ -31,6 +31,7 @@ from codeweaver.core.constants import (
 )
 from codeweaver.engine.config import CodeWeaverEngineSettings
 from codeweaver.providers import ProviderSettings
+from codeweaver.server import DefaultFastMcpServerSettings
 from codeweaver.server.config.mcp import MCPServerConfig, StdioCodeWeaverConfig
 from codeweaver.server.config.middleware import DefaultMiddlewareSettings, MiddlewareOptions
 from codeweaver.server.config.server_defaults import (
@@ -283,35 +284,59 @@ class CodeWeaverSettings(CodeWeaverEngineSettings):
         ),
     ] = UNSET
 
-    def _initialize(self, **kwargs: Any) -> dict[str, Any]:
+    async def _initialize(self, **kwargs: Any) -> None:
         """Initialize server settings."""
-        constructors = (
-            FastMcpHttpServerSettings,
-            FastMcpStdioServerSettings,
-            StdioCodeWeaverConfig,
-            UvicornServerSettings,
+        mcp_stdio_default = FastMcpStdioServerSettings().as_settings()
+        fields = (
+            ("token_limit", DEFAULT_MAX_TOKENS, int),
+            ("max_results", DEFAULT_MAX_RESULTS, int),
+            ("mcp_server", DefaultFastMcpServerSettings, FastMcpHttpServerSettings),
+            ("stdio_server", mcp_stdio_default, FastMcpStdioServerSettings),
+            ("middleware", DefaultMiddlewareSettings, MiddlewareOptions),
+            ("endpoints", DefaultEndpointSettings, EndpointSettingsDict),
+            ("uvicorn", DefaultUvicornSettings, UvicornServerSettings),
+            ("management_host", LOCALHOST, str),
+            ("management_port", DEFAULT_MANAGEMENT_PORT, int),
+            ("default_mcp_config", StdioCodeWeaverConfig(), MCPServerConfig),
         )
-        fields = type(self).model_fields
-        for k, v in type(self)._defaults().items():
-            if (value := kwargs.get(k)) is Unset or not value:
-                kwargs[k] = (
-                    constructor.model_construct(**v)
-                    if (field_info := fields.get(k))
-                    and (constructor := field_info.annotation) in constructors
-                    else v
+        for field_name, default, type_cls in fields:
+            existing_value = (
+                value
+                if (value := getattr(self, field_name, None)) and value is not Unset
+                else default
+            )
+            existing_value = (
+                existing_value.model_dump()
+                if isinstance(existing_value, BasedModel)
+                else existing_value
+            )
+            if (
+                existing_value != default
+                and existing_value is not Unset
+                and isinstance(existing_value, dict)
+            ):
+                existing_value = self._resolve_default_and_provided(existing_value, default)
+            field_value = (
+                v
+                if (v := kwargs.get(field_name, "NON_EXISTENT_VALUE")) is not Unset
+                else "NON_EXISTENT_VALUE"
+            )
+            if field_value not in ("NON_EXISTENT_VALUE", None, default):
+                resolved_value = (
+                    field_value if isinstance(field_value, dict) else field_value.model_dump()
                 )
-            elif k in ("token_limit", "max_results", "management_host", "management_port"):
-                kwargs[k] = value
-            elif (field_info := fields.get(k)) and (
-                constructor := field_info.annotation
-            ) in constructors:
-                kwargs[k] = constructor.model_validatee(
-                    **self._resolve_default_and_provided(v, value)
+                finalized_value = self._resolve_default_and_provided(
+                    default.model_dump() if isinstance(default, BasedModel) else default,
+                    resolved_value,
                 )
             else:
-                kwargs[k] = value
-        kwargs |= super()._initialize(**kwargs)
-        return kwargs
+                finalized_value = existing_value
+            if isinstance(finalized_value, dict) and hasattr(type_cls, "model_construct"):
+                setattr(self, field_name, type_cls.model_construct(**finalized_value))
+            else:
+                setattr(self, field_name, finalized_value)
+
+        await super()._initialize(**kwargs)
 
     @classmethod
     def _defaults(cls) -> dict[str, Any]:

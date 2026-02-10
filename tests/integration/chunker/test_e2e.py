@@ -284,7 +284,8 @@ async def test_e2e_parallel_error_handling(tmp_path):
     )
 
 
-def test_e2e_parallel_empty_file_list():
+@pytest.mark.asyncio
+async def test_e2e_parallel_empty_file_list():
     """Verify parallel processing handles empty file list gracefully."""
     from codeweaver.engine import ChunkGovernor, chunk_files_parallel
     from codeweaver.providers import EmbeddingModelCapabilities
@@ -293,14 +294,17 @@ def test_e2e_parallel_empty_file_list():
     governor = ChunkGovernor(capabilities=(capabilities,))
 
     # Process empty list
-    results = list(chunk_files_parallel([], governor))
+    results = [result async for result in chunk_files_parallel([], governor)]
 
     # Should return empty without error
     assert not results, "Empty input should yield no results"
 
 
-def test_e2e_parallel_dict_convenience():
+@pytest.mark.asyncio
+async def test_e2e_parallel_dict_convenience():
     """Test parallel_dict convenience wrapper."""
+    import anyio
+
     from codeweaver.core import DiscoveredFile
     from codeweaver.engine import ChunkerSettings, ChunkGovernor, chunk_files_parallel_dict
     from codeweaver.providers import EmbeddingModelCapabilities
@@ -308,7 +312,8 @@ def test_e2e_parallel_dict_convenience():
     # Get sample files
     fixture_dir = Path("tests/fixtures")
     files = [
-        DiscoveredFile.from_path(fixture_path) for fixture_path in fixture_dir.glob("sample*.py")
+        DiscoveredFile.from_path(fixture_path)
+        async for fixture_path in anyio.Path(fixture_dir).glob("sample*.py")
     ]
 
     if not files:
@@ -321,7 +326,7 @@ def test_e2e_parallel_dict_convenience():
     if not files:
         pytest.skip("No fixture files available for parallel dict test")
     # Get results as dict
-    results = chunk_files_parallel_dict(files, governor, max_workers=2)
+    results = await chunk_files_parallel_dict(files, governor, max_workers=2)
 
     # Verify it's a dictionary
     assert isinstance(results, dict), "Should return dictionary"

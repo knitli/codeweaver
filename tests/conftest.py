@@ -28,7 +28,7 @@ from .qdrant_test_manager import QdrantTestManager
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.dependencies import CodeWeaverSettingsType
+    from codeweaver.core.dependencies.core_settings import CodeWeaverSettingsType
     from codeweaver.core.di.container import Container
 
 # ===========================================================================

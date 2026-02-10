@@ -30,13 +30,19 @@ if TYPE_CHECKING:
         LoggingSettingsDict,
         SerializableLoggingFilter,
     )
-    from codeweaver.core.config.core_settings import CodeWeaverCoreSettings
+    from codeweaver.core.config.core_settings import (
+        CodeWeaverCoreSettings,
+        get_config_locations,
+        get_dotenv_locations,
+        get_possible_config_paths,
+    )
     from codeweaver.core.config.envs import (
         SettingsEnvVars,
         environment_variables,
         get_provider_vars,
     )
-    from codeweaver.core.config.loader import get_settings
+    from codeweaver.core.config.loader import get_settings, get_settings_async
+    from codeweaver.core.config.settings_type import CodeWeaverSettingsType
     from codeweaver.core.config.telemetry import (
         DefaultTelemetrySettings,
         TelemetrySettings,
@@ -47,6 +53,7 @@ if TYPE_CHECKING:
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "CodeWeaverCoreSettings": (__spec__.parent, "core_settings"),
     "CodeWeaverSettingsDict": (__spec__.parent, "types"),
+    "CodeWeaverSettingsType": (__spec__.parent, "settings_type"),
     "DefaultLoggingSettings": (__spec__.parent, "_logging"),
     "DefaultTelemetrySettings": (__spec__.parent, "telemetry"),
     "FilterID": (__spec__.parent, "_logging"),
@@ -64,8 +71,12 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "TelemetrySettings": (__spec__.parent, "telemetry"),
     "TelemetrySettingsDict": (__spec__.parent, "telemetry"),
     "environment_variables": (__spec__.parent, "envs"),
+    "get_config_locations": (__spec__.parent, "core_settings"),
+    "get_dotenv_locations": (__spec__.parent, "core_settings"),
+    "get_possible_config_paths": (__spec__.parent, "core_settings"),
     "get_provider_vars": (__spec__.parent, "envs"),
     "get_settings": (__spec__.parent, "loader"),
+    "get_settings_async": (__spec__.parent, "loader"),
 })
 
 __getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
@@ -73,6 +84,7 @@ __getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
 __all__ = (
     "CodeWeaverCoreSettings",
     "CodeWeaverSettingsDict",
+    "CodeWeaverSettingsType",
     "DefaultLoggingSettings",
     "DefaultTelemetrySettings",
     "FilterID",
@@ -90,8 +102,12 @@ __all__ = (
     "TelemetrySettings",
     "TelemetrySettingsDict",
     "environment_variables",
+    "get_config_locations",
+    "get_dotenv_locations",
+    "get_possible_config_paths",
     "get_provider_vars",
     "get_settings",
+    "get_settings_async",
 )
 
 

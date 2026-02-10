@@ -37,7 +37,7 @@ from pydantic import (
 )
 from pydantic.alias_generators import to_camel, to_snake
 
-from codeweaver.core import BasedModel, CodeChunk, Provider, ProviderError, asyncio_or_uvloop
+from codeweaver.core import BasedModel, CodeChunk, Provider, ProviderError
 from codeweaver.core import ValidationError as CodeWeaverValidationError
 from codeweaver.providers.config import (
     BedrockCohereConfigDict,
@@ -521,7 +521,7 @@ class BedrockEmbeddingProvider(EmbeddingProvider[BedrockRuntimeClient]):
         """Handle the response from Titan for embedding requests."""
         from codeweaver.core import CodeChunk
 
-        loop = loop or asyncio_or_uvloop().get_running_loop()
+        loop = loop or asyncio.get_running_loop()
         if (
             isinstance(response.body, TitanEmbeddingV2Response)
             and hasattr(response.body, "input_text_token_count")
@@ -564,7 +564,7 @@ class BedrockEmbeddingProvider(EmbeddingProvider[BedrockRuntimeClient]):
                     "Ensure the model supports the requested embedding operation",
                 ],
             )
-        loop = loop or asyncio_or_uvloop().get_running_loop()
+        loop = loop or asyncio.get_running_loop()
         self._fire_and_forget(
             lambda: self._update_token_stats(
                 from_docs=cast(

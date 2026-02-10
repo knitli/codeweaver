@@ -9,7 +9,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, Literal, NamedTuple, Self
+from typing import Any, Literal, NamedTuple, Self
 
 from pydantic import PositiveInt
 from qdrant_client.http.models import Datatype
@@ -25,14 +25,11 @@ from qdrant_client.models import (
 from codeweaver.core.constants import PRIMARY_SPARSE_VECTOR_NAME, PRIMARY_VECTOR_NAME
 from codeweaver.core.exceptions import InvalidEmbeddingModelError
 from codeweaver.core.types import ModelName, ModelNameT
+from codeweaver.providers.config.asymmetric import AsymmetricEmbeddingProviderSettings
 from codeweaver.providers.config.kinds import (
     EmbeddingProviderSettings,
     SparseEmbeddingProviderSettings,
 )
-
-
-if TYPE_CHECKING:
-    from codeweaver.providers.config.asymmetric import AsymmetricEmbeddingProviderSettings
 from codeweaver.providers.embedding.capabilities.base import (
     EmbeddingModelCapabilities,
     SparseEmbeddingModelCapabilities,

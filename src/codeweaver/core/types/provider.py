@@ -25,6 +25,7 @@ if TYPE_CHECKING:
         ProviderLiteralString,
         SDKClientLiteralString,
     )
+    from codeweaver.core.types.service_cards import ServiceCard
 
 
 class ProviderKind(BaseEnum):
@@ -106,13 +107,24 @@ class SDKClient(BaseEnum):
         if sdk_clients := get_sdk_client(provider, kind):
             yield from (sdk_clients if isinstance(sdk_clients, tuple) else (sdk_clients,))
 
+    @property
+    def cards(self) -> Generator[ServiceCard]:
+        """Get all service cards that use this SDK client."""
+        from codeweaver.core.types.service_cards import get_service_cards
+
+        yield from get_service_cards(client=self.variable)
+
     @classmethod
     def clients(cls) -> Generator[tuple[SDKClient, LazyImport[Any]]]:
         """Get all SDK clients as lazy imports."""
         from codeweaver.core.types.service_cards import get_service_cards
 
         cards = get_service_cards()
-        yield from {(card.client, card.client_cls) for card in cards if card.client is not None}
+        yield from {
+            (cls.from_string(card.client), card.client_cls)
+            for card in cards
+            if card.client is not None
+        }
 
     @property
     def client(self) -> LazyImport[Any]:

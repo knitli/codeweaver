@@ -37,7 +37,7 @@ else:
     type Console = object
 
 if TYPE_CHECKING:
-    from codeweaver.core.dependencies import CodeWeaverSettingsType
+    from codeweaver.core.config.settings_type import CodeWeaverSettingsType
 
 console: LazyImport[Console] = lazy_import("rich.console", "Console")
 
@@ -122,7 +122,7 @@ def format_file_link(file_path: str | Path, line: NonNegativeInt | None = None) 
 
 def get_codeweaver_config_paths() -> tuple[Path, ...]:
     """Get all possible CodeWeaver configuration file paths."""
-    from codeweaver.core.types.settings_model import get_possible_config_paths
+    from codeweaver.core.config.core_settings import get_possible_config_paths
 
     return tuple(get_possible_config_paths())
 
@@ -136,7 +136,7 @@ def _set_settings_for_config(config_file: Path) -> CodeWeaverSettingsType:
     """Set the global settings based on the given config file."""
     from codeweaver.core.config.loader import get_settings
 
-    return get_settings(config_file=config_file)  # ty:ignore[invalid-return-type]
+    return get_settings(config_file=config_file)
 
 
 def _set_project_path(project_path: Path) -> CodeWeaverSettingsType:
@@ -145,7 +145,7 @@ def _set_project_path(project_path: Path) -> CodeWeaverSettingsType:
 
     settings = get_settings()
     settings.project_path = project_path
-    return settings  # ty:ignore[invalid-return-type]
+    return settings
 
 
 def detect_root_package() -> Literal["server", "engine", "provider", "core"]:

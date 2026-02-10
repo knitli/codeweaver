@@ -91,7 +91,7 @@ def _handle_keyboard_interrupt():
 
 async def _init_di(config_path: str | None = None) -> None:
     """Initialize dependency injection container with settings."""
-    from codeweaver.core.dependencies import bootstrap_settings
+    from codeweaver.core.dependencies.core_settings import bootstrap_settings
 
     # Bootstrap settings - this registers them in the DI container
     await bootstrap_settings(config_file=Path(config_path) if config_path else None)

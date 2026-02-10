@@ -7,12 +7,12 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from codeweaver.core import asyncio_or_uvloop
 from codeweaver.engine.chunker import ChunkerSelector, chunk_files_parallel
 from codeweaver.engine.chunker.delimiter import DelimiterChunker
 from codeweaver.engine.chunker.exceptions import ChunkingError
@@ -80,8 +80,7 @@ class ChunkingService:
             try:
                 chunker = self._selector.select_for_file(file)
                 # Offload blocking I/O to a thread
-                loop = asyncio_or_uvloop()
-                content = await loop.to_thread(file.absolute_path.read_text, "utf-8", "ignore")
+                content = await asyncio.to_thread(file.absolute_path.read_text, "utf-8", "ignore")
 
                 try:
                     chunks = chunker.chunk(content, file=file)

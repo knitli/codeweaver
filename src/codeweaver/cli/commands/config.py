@@ -18,8 +18,9 @@ from pydantic import FilePath
 from rich.table import Table
 
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
+from codeweaver.core.config.settings_type import CodeWeaverSettingsType
 from codeweaver.core.config.types import CodeWeaverSettingsDict
-from codeweaver.core.dependencies import CodeWeaverSettingsType, ResolvedProjectPathDep, SettingsDep
+from codeweaver.core.dependencies import ResolvedProjectPathDep, SettingsDep
 from codeweaver.core.di import INJECTED
 from codeweaver.core.utils import detect_root_package, is_codeweaver_config_path
 from codeweaver.providers import ProviderSettings, ProviderSettingsDep

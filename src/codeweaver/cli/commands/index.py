@@ -152,9 +152,9 @@ async def _perform_clear_operation(
         display.print_info(f"Vector store collection '{collection_name}' did not exist")
 
     # Clear checkpoints and manifests
-    checkpoint_mgr.delete()
+    await checkpoint_mgr.delete()
     display.print_success("Checkpoints cleared")
-    manifest.delete()
+    await manifest.delete()
     display.print_success("File manifest cleared")
 
     display.print_success("Clear operation complete")
@@ -395,9 +395,9 @@ async def index(
         container = setup_cli_di(config_file, project_path, verbose=verbose)
 
         # We need to retrieve settings from the container now
-        from codeweaver.core.dependencies import CodeWeaverEngineSettings
+        from codeweaver.core.config.settings_type import CodeWeaverSettingsType
 
-        settings = await container.resolve(CodeWeaverEngineSettings)
+        settings = await container.resolve(CodeWeaverSettingsType)
 
         # Handle --clear flag
         if clear:

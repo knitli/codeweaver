@@ -125,9 +125,6 @@ if TYPE_CHECKING:
     from codeweaver.core.types.settings_model import (
         DEFAULT_BASE_SETTINGS_CONFIG,
         BaseCodeWeaverSettings,
-        get_config_locations,
-        get_dotenv_locations,
-        get_possible_config_paths,
     )
     from codeweaver.core.types.statistics import (
         CallHookTimingDict,
@@ -258,9 +255,6 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "clean_sentinel_from_schema": (__spec__.parent, "utils"),
     "generate_field_title": (__spec__.parent, "utils"),
     "generate_title": (__spec__.parent, "utils"),
-    "get_config_locations": (__spec__.parent, "settings_model"),
-    "get_dotenv_locations": (__spec__.parent, "settings_model"),
-    "get_possible_config_paths": (__spec__.parent, "settings_model"),
     "get_provider_capabilities_map": (__spec__.parent, "service_cards"),
     "get_provider_clients": (__spec__.parent, "service_cards"),
     "get_provider_kind_sdk_clients_for_provider": (__spec__.parent, "service_cards"),
@@ -389,9 +383,6 @@ __all__ = (
     "clean_sentinel_from_schema",
     "generate_field_title",
     "generate_title",
-    "get_config_locations",
-    "get_dotenv_locations",
-    "get_possible_config_paths",
     "get_provider_capabilities_map",
     "get_provider_clients",
     "get_provider_kind_sdk_clients_for_provider",
@@ -401,7 +392,6 @@ __all__ = (
     "get_sdk_client",
     "get_sdk_client_map",
     "get_service_card",
-    "get_service_cards",
     "service_card_factory",
 )
 

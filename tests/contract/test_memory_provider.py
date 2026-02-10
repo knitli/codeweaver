@@ -217,6 +217,50 @@ class TestMemoryProviderContract:
             r.chunk.file_path != sample_chunk.file_path for r in results
         )
 
+    async def test_delete_by_files(self, memory_provider, sample_chunk):
+        """Test delete_by_files removes chunks for multiple files."""
+        # Create a second chunk for a different file
+        from codeweaver.core import Span, uuid7
+
+        chunk2 = sample_chunk.model_copy(
+            update={
+                "chunk_id": uuid7(),
+                "file_path": Path("other_file.py"),
+                "chunk_name": "other_file.py:func",
+                "line_range": Span(start=1, end=2, source_id=uuid7()),
+            }
+        )
+        # Register embeddings for second chunk
+        from codeweaver.core.types import ChunkEmbeddings, EmbeddingBatchInfo
+
+        registry = await memory_provider._get_registry()
+        dense_info = EmbeddingBatchInfo.create_dense(
+            batch_id=uuid7(),
+            batch_index=0,
+            chunk_id=chunk2.chunk_id,
+            model="test-dense-model",
+            embeddings=[0.5] * 768,
+            dimension=768,
+            intent="primary",
+        )
+        registry[chunk2.chunk_id] = ChunkEmbeddings(chunk=chunk2).add(dense_info)
+
+        await memory_provider.upsert([sample_chunk, chunk2])
+
+        # Delete both files
+        await memory_provider.delete_by_files([sample_chunk.file_path, chunk2.file_path])
+
+        # Verify both are gone
+        results = await memory_provider.search(
+            vector=StrategizedQuery(
+                query="test delete",
+                dense=[0.5] * 768,
+                sparse=None,
+                strategy=SearchStrategy.DENSE_ONLY,
+            )
+        )
+        assert len(results) == 0
+
     async def test_delete_by_id(self, memory_provider, sample_chunk):
         """Test delete_by_id removes chunks."""
         await memory_provider.upsert([sample_chunk])

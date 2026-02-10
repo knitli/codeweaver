@@ -13,10 +13,13 @@ import os
 from collections.abc import Callable, Hashable, Iterable
 from functools import cache
 from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
-from codeweaver.core.types import BaseCodeWeaverSettings
 from codeweaver.core.types.aliases import CategoryName, LiteralStringT
+
+
+if TYPE_CHECKING:
+    from codeweaver.core.config.settings_type import CodeWeaverSettingsType
 
 
 @cache
@@ -92,7 +95,7 @@ def rpartial[**P, R](func: Callable[P, R], *args: object, **kwargs: object) -> C
     return partial_right
 
 
-def _try_for_settings() -> BaseCodeWeaverSettings | None:
+def _try_for_settings() -> CodeWeaverSettingsType | None:
     """Try to import and return the settings map if available."""
     with contextlib.suppress(Exception):
         from codeweaver.core.config import get_settings

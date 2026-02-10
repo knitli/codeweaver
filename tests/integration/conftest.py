@@ -1024,7 +1024,7 @@ async def indexed_test_project(known_test_codebase, clean_container):
     4. Ensures global state is correctly initialized
     5. Yields the project path for tests
     """
-    from codeweaver.core.config.loader import get_settings
+    from codeweaver.core.config.loader import get_settings_async
     from codeweaver.engine import IndexingService
     from codeweaver.server import CodeWeaverSettings, CodeWeaverState
 
@@ -1034,7 +1034,7 @@ async def indexed_test_project(known_test_codebase, clean_container):
     # Define a factory that returns settings with the test project path
     async def get_test_settings() -> CodeWeaverSettings:
         # codeweaver.test.toml is already loaded via CODEWEAVER_TEST_MODE="true"
-        settings = get_settings()
+        settings = await get_settings_async()
         settings.project_path = project_path
         settings.project_name = f"test_real_{project_path.name}"
         # get_settings() returns BaseCodeWeaverSettings, but in test mode it's actually CodeWeaverSettings

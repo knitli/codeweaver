@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import logging
 
-from os import cpu_count
 from typing import TYPE_CHECKING, Annotated, Any, Literal, NotRequired, Self, TypedDict
 
 from pydantic import (
@@ -28,6 +27,7 @@ from codeweaver.core import (
     ExtLangPair,
     LanguageNameT,
     SecondarySupportedLanguage,
+    effective_cpu_count,
 )
 
 
@@ -197,7 +197,7 @@ class ConcurrencySettings(BasedModel):
         Field(
             description="""Maximum files to chunk concurrently (equivalent to number of workers or threads)"""
         ),
-    ] = cpu_count() or 4
+    ] = effective_cpu_count() or 4
 
     executor: Annotated[
         Literal["process", "thread"],

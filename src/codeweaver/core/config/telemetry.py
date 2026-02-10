@@ -129,29 +129,38 @@ class TelemetrySettings(BasedModel):
 
     def model_post_init(self, _context: Any) -> None:
         """Post-initialization to track unset fields and set defaults."""
-        if self.disable_telemetry is True:
-            # telemetry explicitly disabled, so we turn it off completely
-            self._dismantle_telemetry()
-            return
         if not getattr(self, "_unset_fields", None):
             self._unset_fields = {
                 field
                 for field in type(self).model_fields
                 if isinstance(getattr(self, field), Unset)
             }
-        if isinstance(self.disable_telemetry, Unset):
-            self.disable_telemetry = False  # default to telemetry enabled
-        if isinstance(self.tools_over_privacy, Unset):
+        if (
+            self.disable_telemetry is True
+            or os.getenv("CODEWEAVER__TELEMETRY__DISABLE_TELEMETRY", "").lower()
+            in ENV_EXPLICIT_TRUE_VALUES
+        ):
+            # telemetry explicitly disabled, so we turn it off completely
+            self._dismantle_telemetry()
+            return
+        if self.disable_telemetry is Unset:
+            self.disable_telemetry = False  # ensure telemetry is enabled if not explicitly disabled
+        if (
+            self.tools_over_privacy is True
+            or os.getenv("CODEWEAVER__TELEMETRY__TOOLS_OVER_PRIVACY", "").lower()
+            in ENV_EXPLICIT_TRUE_VALUES
+        ):
+            # tools_over_privacy explicitly enabled, so we allow tools data to be collected
+            self.tools_over_privacy = True
+        elif self.tools_over_privacy is Unset:
             self.tools_over_privacy = False  # default to privacy first
+        if (env_value := os.getenv("CODEWEAVER__TELEMETRY__POSTHOG_PROJECT_KEY")) is not None:
+            self.posthog_project_key = SecretStr(env_value)
         if isinstance(self.batch_size, Unset):
             self.batch_size = 10  # default batch size
         if isinstance(self.batch_interval_seconds, Unset):
             self.batch_interval_seconds = ONE_MINUTE  # default batch interval
-        if (
-            self.tools_over_privacy
-            and not has_package("code-weaver")
-            and not has_package("codeweaver")
-        ):
+        if self.tools_over_privacy and not has_package("codeweaver.server"):
             # not running a full install, tools_over_privacy is not applicable
             self.tools_over_privacy = False
 

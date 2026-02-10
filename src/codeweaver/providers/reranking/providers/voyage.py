@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from collections.abc import Iterator, Sequence
@@ -15,7 +16,7 @@ from warnings import filterwarnings
 
 from pydantic import ConfigDict, SkipValidation
 
-from codeweaver.core import Provider, ProviderError, asyncio_or_uvloop, rpartial
+from codeweaver.core import Provider, ProviderError, rpartial
 from codeweaver.core.constants import DEFAULT_RERANKING_MAX_RESULTS
 from codeweaver.providers.reranking.providers.base import RerankingProvider, RerankingResult
 
@@ -63,7 +64,7 @@ def voyage_reranking_output_transformer(
 
     results, token_count = returned_result.results, returned_result.total_tokens
     try:
-        loop = _instance._loop or asyncio_or_uvloop().get_running_loop()
+        loop = _instance._loop or asyncio.get_running_loop()
         _ = loop.call_soon_threadsafe(
             lambda: _instance._update_token_stats(token_count=token_count)
         )

@@ -55,7 +55,6 @@ from codeweaver.core import (
     ProviderError,
     SparseEmbedding,
     StatisticsDep,
-    asyncio_or_uvloop,
     depends,
     get_blake_hash,
     log_to_client_or_fallback,
@@ -1073,7 +1072,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
 
     async def _get_loop(self) -> asyncio.AbstractEventLoop | None:
         try:
-            loop = asyncio_or_uvloop().get_running_loop()
+            loop = asyncio.get_running_loop()
         except RuntimeError:
             loop = None
         return loop

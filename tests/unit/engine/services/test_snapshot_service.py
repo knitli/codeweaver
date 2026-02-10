@@ -114,6 +114,7 @@ class TestSnapshotCreation:
         assert call_args[1]["collection_name"] == "test_collection"
         assert call_args[1]["snapshot_name"] == snapshot_name
 
+    @pytest.mark.slow
     @pytest.mark.asyncio
     async def test_create_snapshot_with_wait(self, snapshot_service, mock_vector_store: Mock):
         """Test snapshot creation with wait for completion."""

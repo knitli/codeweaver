@@ -2,7 +2,6 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
-
 """Dependency injection setup for provider configuration.
 
 This module provides DI type aliases and factory functions for provider settings.
@@ -124,7 +123,7 @@ def _get_settings(settings: SettingsDep = INJECTED) -> CodeWeaverProviderSetting
     resolved_settings = settings if hasattr(settings, "provider") else settings.resolve()
     if not _definitely_is_provider_settings_or_has_provider_settings_base(resolved_settings):
         raise TypeError(
-            f"Expected CodeWeaverProviderSettings or BaseCodeWeaverSettings with 'provider' attribute (CodeWeaverEngineSettings or CodeWeaverSettings), got {type(resolved_settings)}"
+            f"Expected CodeWeaverProviderSettings, CodeWeaverEngineSettings or CodeWeaverSettings, got {type(resolved_settings)}"
         )
     return resolved_settings
 
@@ -548,7 +547,7 @@ type EmbeddingCapabilityResolverDep = Annotated[
 ]
 """Type alias for DI injection of embedding capability resolver."""
 
-type SparseEmbeddingCapabilityResolverDep = Annotated[
+type SparseCapabilityResolverDep = Annotated[
     SparseEmbeddingCapabilityResolver, depends(SparseEmbeddingCapabilityResolver)
 ]
 """Type alias for DI injection of sparse embedding capability resolver."""
@@ -955,7 +954,7 @@ def _create_all_configured_capabilities(
     dense_configs: AllEmbeddingConfigsDep = INJECTED,
     sparse_configs: AllSparseEmbeddingConfigsDep = INJECTED,
     dense_resolver: EmbeddingCapabilityResolverDep = INJECTED,
-    sparse_resolver: SparseEmbeddingCapabilityResolverDep = INJECTED,
+    sparse_resolver: SparseCapabilityResolverDep = INJECTED,
 ) -> tuple[ConfiguredCapability, ...]:
     """Get all configured capabilities for providers."""
     return _assemble_configured_capabilities(

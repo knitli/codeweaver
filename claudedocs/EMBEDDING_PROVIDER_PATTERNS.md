@@ -345,8 +345,7 @@ class VoyageEmbeddingProvider(EmbeddingProvider[AsyncClient]):
 # Generic client dependency (parametric)
 type ClientDep[T] = Annotated[T, depends(lambda: None)]
 
-# Import from core
-from codeweaver.core.dependencies import NoneDep
+
 
 # All provider settings dependencies
 type EmbeddingProviderSettingsDep = Annotated[...]

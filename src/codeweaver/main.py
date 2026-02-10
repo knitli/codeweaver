@@ -282,7 +282,7 @@ async def get_stdio_server(
 
     if config_file or project_path:
         # We normally want to use the global settings instance, but here because a proxied stdio client could be used in isolation and outside a typical configuration, we create a unique settings instance.
-        from codeweaver.core.dependencies import bootstrap_settings
+        from codeweaver.core.dependencies.core_settings import bootstrap_settings
 
         if config_file and isinstance(config_file, Path) and config_file.exists():
             settings = await bootstrap_settings(config_file=config_file)

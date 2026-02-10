@@ -9,22 +9,18 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import multiprocessing
+import threading
 
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
 import rignore
 
-from codeweaver.core import (
-    INJECTED,
-    DiscoveredFile,
-    asyncio_or_uvloop,
-    get_blake_hash,
-    set_relative_path,
-)
+from codeweaver.core import INJECTED, DiscoveredFile, get_blake_hash, set_relative_path
 from codeweaver.core.constants import (
     FILE_BATCH_SIZE,
-    FILE_CONSUMER_WORKER_BATCH_SIZE,
+    MAX_INLINE_CONTENT_SIZE,
     PRIMARY_SPARSE_VECTOR_NAME,
     ZERO,
 )
@@ -102,6 +98,17 @@ class IndexingService:
         # Concurrency control
         self._max_concurrent_batches = settings.max_concurrent_batches
         self._indexing_semaphore = asyncio.Semaphore(self._max_concurrent_batches)
+        self._consumer_batch_size = self._calculate_consumer_batch_size()
+
+    def _calculate_consumer_batch_size(self) -> int:
+        """Calculate optimal consumer batch size based on available CPU cores."""
+        try:
+            cpu_count = multiprocessing.cpu_count()
+        except NotImplementedError:
+            cpu_count = 4
+        # We want roughly 4-8 files per core per batch to keep overhead low
+        # but throughput high. Min 10, Max 100.
+        return max(10, min(100, cpu_count * 4))
 
     @property
     def stats(self) -> IndexingStats:
@@ -168,7 +175,10 @@ class IndexingService:
             self._file_manifest = self._manifest_manager.create_new()
 
         # 2. Setup streaming pipeline
-        queue: asyncio.Queue[Path | None] = asyncio.Queue(maxsize=self._settings.max_queue_size)
+        # Now passing a tuple of (Path, bytes | None) to avoid redundant I/O
+        queue: asyncio.Queue[tuple[Path, bytes | None] | None] = asyncio.Queue(
+            maxsize=self._settings.max_queue_size
+        )
 
         # Start workers
         discovery_task = asyncio.create_task(self._discovery_worker(queue, progress_callback))
@@ -198,94 +208,144 @@ class IndexingService:
         return self.stats.files_discovered
 
     async def _discovery_worker(
-        self, queue: asyncio.Queue[Path | None], progress_callback: ProgressCallback | None = None
+        self,
+        queue: asyncio.Queue[tuple[Path, bytes | None] | None],
+        progress_callback: ProgressCallback | None = None,
     ) -> None:
         """Producer: Walks filesystem and identifies files needing indexing."""
+        from queue import Queue as SyncQueue
+
         walker_settings = self._settings.to_settings()
+        loop = asyncio.get_running_loop()
 
-        def _walk_and_collect() -> list[Path]:
-            walker = rignore.Walker(**walker_settings)
-            return [p for p in walker if p and p.exists() and p.is_file()]
+        # Thread-safe queue for streaming paths from discovery thread
+        path_queue: SyncQueue[Path | None] = SyncQueue(maxsize=1000)
 
-        # Offload blocking walk to thread
-        loop = asyncio_or_uvloop()
-        all_files = await loop.to_thread(_walk_and_collect)
+        def _walker_thread() -> None:
+            """Background thread for blocking filesystem walk."""
+            try:
+                walker = rignore.Walker(**walker_settings)
+                for p in walker:
+                    if p and p.exists() and p.is_file():
+                        path_queue.put(p)
+            except Exception:
+                logger.exception("Error in filesystem walker thread")
+            finally:
+                path_queue.put(None)
 
-        if not all_files:
-            await queue.put(None)
-            return
+        # Start walker thread
+        threading.Thread(target=_walker_thread, daemon=True).start()
 
         current_models = self._get_current_embedding_models()
         batch_size = FILE_BATCH_SIZE
         files_discovered_count = ZERO
+        seen_files: set[Path] = set()
+        current_batch: list[Path] = []
 
-        # Detect deleted files first
-        unique_files = {
-            set_relative_path(p, base_path=self._project_path)
-            for p in all_files
-            if set_relative_path(p, base_path=self._project_path)
-        }
-        manifest_files = self._file_manifest.get_all_file_paths()
-        deleted_relative = manifest_files - unique_files
-        self._deleted_files = [self._project_path / rel for rel in deleted_relative]
+        while True:
+            # Get next path from thread (offload the blocking get)
+            path = await loop.run_in_executor(None, path_queue.get)
 
-        # Process discovery batches
-        for i in range(0, len(all_files), batch_size):
-            batch = all_files[i : i + batch_size]
+            if path is None:
+                # End of walk - process final partial batch
+                if current_batch:
+                    files_discovered_count += await self._process_discovery_batch(
+                        current_batch, seen_files, current_models, queue
+                    )
+                break
 
-            def _hash_batch(paths: list[Path]) -> list[tuple[Path, bytes]]:
-                return [(p, p.read_bytes()) for p in paths]
+            current_batch.append(path)
 
-            hashed_batch = await loop.to_thread(_hash_batch, batch)
-
-            for path, content_bytes in hashed_batch:
-                relative_path = set_relative_path(path, base_path=self._project_path)
-                if not relative_path:
-                    # External files always indexed? Or ignored?
-                    # For safety, let's just queue it if it's text.
-                    await queue.put(path)
-                    files_discovered_count += 1
-                    continue
-
-                current_hash = get_blake_hash(content_bytes)
-                needs_reindex, _ = self._file_manifest.file_needs_reindexing(
-                    relative_path,
-                    current_hash,
-                    current_dense_provider=current_models["dense_provider"],
-                    current_dense_model=current_models["dense_model"],
-                    current_sparse_provider=current_models["sparse_provider"],
-                    current_sparse_model=current_models["sparse_model"],
+            if len(current_batch) >= batch_size:
+                files_discovered_count += await self._process_discovery_batch(
+                    current_batch, seen_files, current_models, queue
                 )
+                current_batch = []
 
-                if needs_reindex:
-                    await queue.put(path)
-                    files_discovered_count += 1
+                if progress_callback:
+                    # Approximation: we don't know the total files yet in streaming mode
+                    # Use 0 or -1 to indicate streaming/unknown total if protocol allows,
+                    # or just report current count.
+                    progress_callback("discovery", files_discovered_count, 0)
 
-            self.stats.files_discovered = files_discovered_count
-
-            if progress_callback:
-                progress_callback("discovery", min(i + batch_size, len(all_files)), len(all_files))
-
+            # Cooperative yield
             await asyncio.sleep(0)
 
-        # Signal completion
+        # Handle deleted files by comparing seen set with manifest
+        manifest_files = self._file_manifest.get_all_file_paths()
+        deleted_relative = manifest_files - seen_files
+        self._deleted_files = [self._project_path / rel for rel in deleted_relative]
+
+        self.stats.files_discovered = files_discovered_count
+
+        # Signal completion to indexing worker
         await queue.put(None)
+
+    async def _process_discovery_batch(
+        self,
+        batch: list[Path],
+        seen_files: set[Path],
+        current_models: dict[str, str | None],
+        index_queue: asyncio.Queue[tuple[Path, bytes | None] | None],
+    ) -> int:
+        """Process a batch of discovered files: hash, check manifest, and queue."""
+
+        def _hash_batch(paths: list[Path]) -> list[tuple[Path, bytes]]:
+            return [(p, p.read_bytes()) for p in paths]
+
+        # Offload hashing I/O to thread
+        hashed_batch = await asyncio.to_thread(_hash_batch, batch)
+
+        queued_count = 0
+
+        for path, content_bytes in hashed_batch:
+            relative_path = set_relative_path(path, base_path=self._project_path)
+            if not relative_path:
+                # Pass small content through to avoid re-reading
+                inline_content = (
+                    content_bytes if len(content_bytes) <= MAX_INLINE_CONTENT_SIZE else None
+                )
+                await index_queue.put((path, inline_content))
+                queued_count += 1
+                continue
+
+            seen_files.add(relative_path)
+            current_hash = get_blake_hash(content_bytes)
+
+            needs_reindex, _ = self._file_manifest.file_needs_reindexing(
+                relative_path,
+                current_hash,
+                current_dense_provider=current_models["dense_provider"],
+                current_dense_model=current_models["dense_model"],
+                current_sparse_provider=current_models["sparse_provider"],
+                current_sparse_model=current_models["sparse_model"],
+            )
+
+            if needs_reindex:
+                # Optimized: Pass already-read content if it's not too large
+                inline_content = (
+                    content_bytes if len(content_bytes) <= MAX_INLINE_CONTENT_SIZE else None
+                )
+                await index_queue.put((path, inline_content))
+                queued_count += 1
+
+        return queued_count
 
     async def _indexing_worker(
         self,
-        queue: asyncio.Queue[Path | None],
+        queue: asyncio.Queue[tuple[Path, bytes | None] | None],
         semaphore: asyncio.Semaphore,
         progress_callback: ProgressCallback | None = None,
     ) -> None:
         """Consumer: Pulls files from queue and processes them in batches."""
-        batch_size = FILE_CONSUMER_WORKER_BATCH_SIZE
-        current_batch: list[Path] = []
+        batch_size = self._consumer_batch_size
+        current_batch: list[tuple[Path, bytes | None]] = []
         indexing_tasks = []
 
         while True:
-            path = await queue.get()
+            item = await queue.get()
 
-            if path is None:
+            if item is None:
                 # Sentinel received
                 if current_batch:
                     # Final partial batch
@@ -299,7 +359,7 @@ class IndexingService:
                 queue.task_done()
                 break
 
-            current_batch.append(path)
+            current_batch.append(item)
 
             if len(current_batch) >= batch_size:
                 # Process batch (under semaphore)
@@ -319,7 +379,7 @@ class IndexingService:
 
     async def _run_guarded_index_batch(
         self,
-        batch: list[Path],
+        batch: list[tuple[Path, bytes | None]],
         semaphore: asyncio.Semaphore,
         progress_callback: ProgressCallback | None,
     ) -> None:
@@ -331,10 +391,12 @@ class IndexingService:
         self, files: list[Path], progress_callback: ProgressCallback | None
     ) -> None:
         """Process files in batches through the pipeline."""
+        # Note: process_changes uses this for incremental updates from watcher.
+        # It currently doesn't have the bytes, so we pass None for content.
         batch_size = 50
         tasks = []
         for i in range(0, len(files), batch_size):
-            batch = files[i : i + batch_size]
+            batch = [(p, None) for p in files[i : i + batch_size]]
             task = asyncio.create_task(
                 self._run_guarded_index_batch(batch, self._indexing_semaphore, progress_callback)
             )
@@ -344,31 +406,42 @@ class IndexingService:
             await asyncio.gather(*tasks)
 
     async def _index_files_batch(
-        self, files: list[Path], progress_callback: ProgressCallback | None
+        self, batch: list[tuple[Path, bytes | None]], progress_callback: ProgressCallback | None
     ) -> None:
         """Index a single batch of files."""
 
         def _collect_discovered_files() -> list[DiscoveredFile]:
-            return [
-                df
-                for path in files
-                if DiscoveredFile.is_path_text(path)
-                and (df := DiscoveredFile.from_path(path, project_path=self._project_path))
-            ]
+            results = []
+            for path, content in batch:
+                if content is not None:
+                    # Optimized: Use existing bytes to avoid re-reading and re-hashing
+                    # Note: We still use is_path_text for safety, but it's now against memory
+                    if DiscoveredFile.is_path_binary(path):
+                        continue
 
-        loop = asyncio_or_uvloop()
-        discovered_files = await loop.to_thread(_collect_discovered_files)
+                    df = DiscoveredFile(
+                        path=path,
+                        file_hash=get_blake_hash(content),
+                        project_path=self._project_path,
+                    )
+                    results.append(df)
+                else:
+                    # Fallback for large files or watcher updates
+                    if DiscoveredFile.is_path_text(path) and (
+                        df := DiscoveredFile.from_path(path, project_path=self._project_path)
+                    ):
+                        results.append(df)
+            return results
+
+        discovered_files = await asyncio.to_thread(_collect_discovered_files)
 
         if not discovered_files:
             return
 
         # Clean up old chunks for files being re-indexed
         if self._vector_store:
-            for df in discovered_files:
-                # We can delete blindly because if it's new, it won't have points
-                # But to be safe/efficient we could check manifest.
-                # For now, just delete to ensure consistency.
-                await self._vector_store.delete_by_file(df.path)
+            # OPTIMIZATION: Batch deletion of chunks for the entire file list
+            await self._vector_store.delete_by_files([df.path for df in discovered_files])
 
         self.stats.files_processed += len(discovered_files)
 
@@ -408,24 +481,29 @@ class IndexingService:
 
         # Update manifest
         model_info = self._get_current_embedding_models()
-        async with self._manifest_lock:
-            for df in discovered_files:
-                rel_path = set_relative_path(df.path, base_path=self._project_path)
-                if not rel_path:
-                    continue
+        manifest_updates = []
 
-                file_chunk_ids = [str(c.chunk_id) for c in updated_chunks if c.file_path == df.path]
-                self._file_manifest.add_file(
-                    path=rel_path,
-                    content_hash=df.file_hash,
-                    chunk_ids=file_chunk_ids,
-                    dense_embedding_provider=model_info["dense_provider"],
-                    dense_embedding_model=model_info["dense_model"],
-                    sparse_embedding_provider=model_info["sparse_provider"],
-                    sparse_embedding_model=model_info["sparse_model"],
-                    has_dense_embeddings=bool(self._embedding_provider),
-                    has_sparse_embeddings=bool(self._sparse_provider),
-                )
+        for df in discovered_files:
+            rel_path = set_relative_path(df.path, base_path=self._project_path)
+            if not rel_path:
+                continue
+
+            file_chunk_ids = [str(c.chunk_id) for c in updated_chunks if c.file_path == df.path]
+            manifest_updates.append({
+                "path": rel_path,
+                "content_hash": df.file_hash,
+                "chunk_ids": file_chunk_ids,
+                "dense_embedding_provider": model_info["dense_provider"],
+                "dense_model": model_info["dense_model"],
+                "sparse_provider": model_info["sparse_provider"],
+                "sparse_model": model_info["sparse_model"],
+                "has_dense_embeddings": bool(self._embedding_provider),
+                "has_sparse_embeddings": bool(self._sparse_provider),
+            })
+
+        if manifest_updates:
+            async with self._manifest_lock:
+                self._file_manifest.add_files_batch(manifest_updates)
 
     async def _embed_chunks(self, chunks: list[CodeChunk]) -> None:
         """Generate embeddings for chunks."""

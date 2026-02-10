@@ -327,6 +327,34 @@ class TestQdrantProviderContract:
         # Should not raise even if file has no chunks
         await qdrant_provider.delete_by_file(Path("nonexistent.py"))
 
+    @pytest.mark.qdrant
+    @pytest.mark.asyncio
+    async def test_delete_by_files(self, qdrant_provider, sample_chunk):
+        """Test delete_by_files removes chunks for multiple files."""
+        from codeweaver.core import Span, uuid7
+
+        # Create another chunk in a different file
+        chunk2 = CodeChunk.model_construct(
+            chunk_id=uuid7(),
+            chunk_name="test2.py:func",
+            file_path=Path("test2.py"),
+            content="def func2(): pass",
+            line_range=Span(start=1, end=1, source_id=uuid7()),
+        )
+        chunk2_with_emb = _register_chunk_embeddings(chunk2, dense=[0.5] * 768)
+
+        await qdrant_provider.upsert([sample_chunk, chunk2_with_emb])
+
+        # Delete both by file paths
+        await qdrant_provider.delete_by_files([sample_chunk.file_path, chunk2_with_emb.file_path])
+
+        # Verify chunks are gone
+        results = await qdrant_provider.search(vector={"dense": [0.1, 0.2, 0.3] * 256})
+        assert len(results) == 0 or all(
+            r.chunk.file_path not in [sample_chunk.file_path, chunk2_with_emb.file_path]
+            for r in results
+        )
+
     async def test_delete_by_id(self, qdrant_provider, sample_chunk):
         """Test delete_by_id removes specific chunks."""
         await qdrant_provider.upsert([sample_chunk])

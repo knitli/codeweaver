@@ -17,7 +17,7 @@ async def test_di_resolution():
 
     print("Bootstrapping settings...")
     # This registers the settings provider
-    bootstrap_settings()
+    await bootstrap_settings()
 
     # We need to make sure server dependencies are registered.
     # Importing the module should do it.

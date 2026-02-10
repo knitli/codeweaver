@@ -75,6 +75,7 @@ from codeweaver.core import (
     SDKClient,
     generate_collection_name,
     get_user_state_dir,
+    has_package,
 )
 from codeweaver.core.constants import (
     DEFAULT_PERSIST_INTERVAL,
@@ -118,7 +119,6 @@ from codeweaver.providers.config.clients import (
     GeneralRerankingClientOptionsType,
     GoogleClientOptions,
     GroqClientOptions,
-    HttpxClientParams,
     MistralClientOptions,
     OpenAIClientOptions,
     PydanticGatewayClientOptions,
@@ -127,14 +127,15 @@ from codeweaver.providers.config.clients import (
     TavilyClientOptions,
     discriminate_azure_embedding_client_options,
 )
-from codeweaver.providers.config.data import ExaToolConfig
-from codeweaver.providers.config.embedding import EmbeddingConfigT, SparseEmbeddingConfigT
-from codeweaver.providers.config.reranking import RerankingConfigT
-from codeweaver.providers.config.utils import (
+from codeweaver.providers.config.clients.utils import (
     AzureOptions,
     ensure_endpoint_version,
     try_for_azure_endpoint,
 )
+from codeweaver.providers.config.data import ExaToolConfig
+from codeweaver.providers.config.embedding import EmbeddingConfigT, SparseEmbeddingConfigT
+from codeweaver.providers.config.reranking import RerankingConfigT
+from codeweaver.providers.config.types import HttpxClientParams
 
 
 if TYPE_CHECKING:
@@ -153,6 +154,12 @@ type LiteralSDKClient = Literal[
     SDKClient.SENTENCE_TRANSFORMERS,
     SDKClient.QDRANT,
 ]
+
+
+# Import SentenceEvaluator for type checking - needed for Pydantic model resolution
+# This is used in downstream code but must be in the global namespace
+if has_package("sentence_transformers") is not None:
+    from sentence_transformers.evaluation import SentenceEvaluator as SentenceEvaluator
 
 
 def _get_embedding_group(group: EmbeddingCapabilityGroupDep = INJECTED) -> EmbeddingCapabilityGroup:
@@ -889,10 +896,7 @@ class EmbeddingProviderSettings(BaseEmbeddingProviderSettings):
     embedding_config: Annotated[
         EmbeddingConfigT, Field(description="Model configuration for embedding operations.")
     ]
-    client_options: Annotated[
-        GeneralEmbeddingClientOptionsType | None,
-        Field(description="Client options for the provider's client.", discriminator="tag"),
-    ] = None
+    client_options: GeneralEmbeddingClientOptionsType | None = None
 
     def __init__(self, **data: Any) -> None:
         """Initialize embedding provider settings."""
@@ -1798,9 +1802,16 @@ __all__ = (
     "QdrantVectorStoreProviderSettings",
     "RerankingProviderSettings",
     "RerankingProviderSettingsType",
+    "SentenceEvaluator",  # Exported for Pydantic forward reference resolution
     "SparseEmbeddingProviderSettings",
     "SparseEmbeddingProviderSettingsType",
     "TavilyProviderSettings",
     "VectorStoreProviderSettings",
     "VectorStoreProviderSettingsType",
 )
+
+# NOTE: We intentionally do NOT call model_rebuild() here because:
+# 1. These models have complex discriminated unions that break during forced rebuild
+# 2. Pydantic will automatically rebuild models lazily on first use
+# 3. SentenceEvaluator/SentenceTransformer are now imported in clients.py where they're needed
+# The models will be complete when first instantiated, which is when they're actually used.

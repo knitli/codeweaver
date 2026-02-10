@@ -48,8 +48,7 @@ if TYPE_CHECKING:
         TavilyClientOptions,
         VoyageClientOptions,
         XAIClientOptions,
-        discriminate_azure_embedding_client_options,
-    )
+]    )
     from codeweaver.providers.config.data import (
         BaseToolConfig,
         DataToolConfigT,
@@ -302,7 +301,6 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "VoyageRerankingConfig": (__spec__.parent, "reranking"),
     "VoyageRerankingOptionsDict": (__spec__.parent, "reranking"),
     "XAIClientOptions": (__spec__.parent, "clients"),
-    "discriminate_azure_embedding_client_options": (__spec__.parent, "clients"),
     "get_backup_embedding_provider": (__spec__.parent, "backup_models"),
     "merge_agent_model_settings": (__spec__.parent, "providers"),
 })
@@ -450,7 +448,6 @@ __all__ = (
     "VoyageRerankingConfig",
     "VoyageRerankingOptionsDict",
     "XAIClientOptions",
-    "discriminate_azure_embedding_client_options",
     "get_backup_embedding_provider",
     "merge_agent_model_settings",
 )

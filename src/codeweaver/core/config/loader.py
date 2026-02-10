@@ -1,3 +1,4 @@
+# sourcery skip: lambdas-should-be-short
 # SPDX-FileCopyrightText: 2026 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
@@ -11,21 +12,74 @@ root settings class based on which CodeWeaver packages are installed.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
-from codeweaver.core.utils.environment import detect_root_package
+from anyio import Path as AsyncPath
 
 
 if TYPE_CHECKING:
-    from codeweaver.core.types.settings_model import BaseCodeWeaverSettings
+    from codeweaver.core.config.settings_type import CodeWeaverSettingsType
 
 
 logger = logging.getLogger(__name__)
 
 
-def get_settings(**kwargs) -> BaseCodeWeaverSettings:
+async def get_settings_async(
+    config_file: AsyncPath | None = None, **kwargs
+) -> CodeWeaverSettingsType:
+    """Async version of get_settings for use in async contexts."""
+    from codeweaver.core.config.settings_type import _core_settings_module
+
+    match _core_settings_module:
+        case "server":
+            from codeweaver.server.config.settings import CodeWeaverSettings
+
+            return await asyncio.to_thread(
+                lambda: (
+                    CodeWeaverSettings.from_config(path=Path(str(config_file)))
+                    if config_file
+                    else CodeWeaverSettings(**kwargs)
+                )
+            )
+        case "engine":
+            from codeweaver.engine.config.root_settings import CodeWeaverEngineSettings
+
+            return await asyncio.to_thread(
+                lambda: (
+                    CodeWeaverEngineSettings.from_config(path=Path(str(config_file)))
+                    if config_file
+                    else CodeWeaverEngineSettings(**kwargs)
+                )
+            )
+        case "providers":
+            from codeweaver.providers.config.root_settings import CodeWeaverProviderSettings
+
+            return await asyncio.to_thread(
+                lambda: (
+                    CodeWeaverProviderSettings.from_config(path=Path(str(config_file)))
+                    if config_file
+                    else CodeWeaverProviderSettings(**kwargs)
+                )
+            )
+        case "core":
+            from codeweaver.core.config.core_settings import CodeWeaverCoreSettings
+
+            return await asyncio.to_thread(
+                lambda: (
+                    CodeWeaverCoreSettings.from_config(path=Path(str(config_file)))
+                    if config_file
+                    else CodeWeaverCoreSettings(**kwargs)
+                )
+            )
+        case _:
+            raise ImportError(f"Unsupported package detected: {_core_settings_module}")
+
+
+def get_settings(config_file: Path | None = None, **kwargs) -> CodeWeaverSettingsType:
     """Auto-load the appropriate root settings based on installation.
 
     This function detects which CodeWeaver packages are installed and
@@ -51,8 +105,9 @@ def get_settings(**kwargs) -> BaseCodeWeaverSettings:
         settings = get_settings(config_file="/path/to/config.toml")
         ```
     """
-    package = detect_root_package()
-    config_file = kwargs.get("config_file")
+    from codeweaver.core.config.settings_type import _core_settings_module
+
+    package = _core_settings_module
     match package:
         case "server":
             from codeweaver.server.config.settings import CodeWeaverSettings
@@ -94,4 +149,4 @@ def get_settings(**kwargs) -> BaseCodeWeaverSettings:
             raise ImportError(f"Unsupported package detected: {package}")
 
 
-__all__ = ("get_settings",)
+__all__ = ("get_settings", "get_settings_async")

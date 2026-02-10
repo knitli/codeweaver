@@ -110,8 +110,8 @@ async def _embed_dense(
         if not result:
             return None
         if isinstance(result, list) and len(result) > 0 and isinstance(result[0], list):
-            return result  # ty:ignore[invalid-return-type]
-        return [result]  # ty:ignore[invalid-return-type]
+            return result
+        return [result]
 
 
 async def _embed_sparse(
@@ -174,7 +174,7 @@ async def _embed_sparse(
             and isinstance(result[0], list)
             and isinstance(result[1], list)
         ):
-            return SparseEmbedding(indices=result[0], values=result[1])  # ty:ignore[invalid-argument-type]
+            return SparseEmbedding(indices=result[0], values=result[1])
     return None
 
 

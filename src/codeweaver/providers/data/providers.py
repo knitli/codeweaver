@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 
 from collections.abc import Callable, Sequence
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from fastmcp.tools import Tool
 
@@ -17,19 +17,13 @@ from codeweaver.core.constants import PREFERRED_SEARCH_PROVIDER_ORDER
 from codeweaver.core.types import LiteralProviderType
 from codeweaver.core.types.provider import Provider
 from codeweaver.core.utils import has_package
+from codeweaver.providers.data.duckduckgo import DuckDuckGoSearchTool, duckduckgo_search_tool
 from codeweaver.providers.data.exa import ExaToolType, register_exa_tools
 from codeweaver.providers.data.tavily import TavilySearchContextTool, tavily_search_tool
 
 
 logger = logging.getLogger(__name__)
 
-
-if TYPE_CHECKING and has_package("pydantic_ai.common_tools.duckduckgo") and has_package("ddgs"):
-    from pydantic_ai.common_tools.duckduckgo import DuckDuckGoSearchTool as DuckDuckGoSearchTool
-    from pydantic_ai.common_tools.duckduckgo import duckduckgo_search_tool
-else:
-    DuckDuckGoSearchTool = Any
-    duckduckgo_search_tool = Callable[..., Tool[Any]]
 
 type DataProviderType = type[DuckDuckGoSearchTool | TavilySearchContextTool | ExaToolType]
 

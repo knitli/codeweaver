@@ -41,6 +41,7 @@ from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from codeweaver.core.constants import DEFAULT_MAX_CONCURRENT_BATCHES, ZERO
 from codeweaver.engine.chunker.delimiter import DelimiterChunker
 from codeweaver.engine.chunker.exceptions import ChunkingError
 from codeweaver.engine.chunker.selector import ChunkerSelector
@@ -169,7 +170,7 @@ async def chunk_files_parallel(
         if governor.settings and governor.settings.concurrency:
             max_workers = governor.settings.concurrency.max_parallel_files
         else:
-            max_workers = 4
+            max_workers = DEFAULT_MAX_CONCURRENT_BATCHES
 
     if executor_type is None:
         if governor.settings and governor.settings.concurrency:
@@ -197,18 +198,25 @@ async def chunk_files_parallel(
         logger.info("Using ThreadPoolExecutor with %d workers", max_workers)
 
     total_files = len(files)
-    processed_count = 0
-    error_count = 0
+    processed_count = ZERO
+    error_count = ZERO
     logger.info("Starting parallel chunking of %d files with %d workers", total_files, max_workers)
 
     loop = asyncio.get_running_loop()
 
     with executor_class(max_workers=max_workers) as executor:
-        # Submit all tasks
-        futures = [
-            loop.run_in_executor(executor, _chunk_single_file, file, governor, tokenizer)
-            for file in files
-        ]
+        # Bounded task submission using a semaphore to prevent unbounded Future creation
+        # We allow a small buffer (max_workers * 2) to keep the pool saturated
+        semaphore = asyncio.Semaphore(max_workers * 2)
+
+        async def _run_task(file_obj: DiscoveredFile) -> tuple[Path, list[CodeChunk] | None]:
+            async with semaphore:
+                return await loop.run_in_executor(
+                    executor, _chunk_single_file, file_obj, governor, tokenizer
+                )
+
+        # Submit tasks through the bounded runner
+        futures = [_run_task(file) for file in files]
 
         # Use asyncio.as_completed to avoid blocking the event loop
         for future in asyncio.as_completed(futures):

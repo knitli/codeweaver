@@ -294,6 +294,31 @@ class TavilySearchContextToolConfig(BaseToolConfig):
         )
 
 
+class DuckDuckGoSearchToolConfig(BaseToolConfig):
+    """Configuration for the DuckDuckGoSearchTool."""
+
+    tag: Literal["duckduckgo"] = Field("duckduckgo", frozen=True, exclude=True)
+    provider: Literal[Provider.DUCKDUCKGO] = Field(Provider.DUCKDUCKGO, frozen=True)
+
+    safesearch: Literal["on", "moderate", "off"] = Field(
+        "moderate",
+        description="The safesearch setting for DuckDuckGo search. Defaults to 'moderate'.",
+    )
+    max_results: PositiveInt = Field(
+        10, description="The maximum number of search results to return.", frozen=True
+    )
+
+    iden: str | None = Field(
+        default_factory=lambda: uuid7().hex,
+        description="A unique identifier for the tool instance.",
+        serialization_alias="id",
+    )
+
+    def _telemetry_keys(self) -> None:
+        """Get the telemetry keys for the DuckDuckGo data provider."""
+        return
+
+
 type DataToolConfigT = BaseToolConfig | ExaToolConfig | TavilySearchContextToolConfig
 
 __all__ = (

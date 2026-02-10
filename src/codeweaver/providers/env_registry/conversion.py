@@ -158,42 +158,51 @@ def get_provider_configs(provider_name: str) -> tuple[ProviderEnvConfig, ...] | 
     )
 
     # Map provider names to registry definitions
-    registry_map = {
-        cfg.__name__.lower(): cfg
-        for cfg in {
-            ALIBABA,
-            ANTHROPIC,
-            AZURE,
-            BEDROCK,
-            CEREBRAS,
-            COHERE,
-            DEEPSEEK,
-            FIREWORKS,
-            GITHUB,
-            GOOGLE,
-            GROQ,
-            HEROKU,
-            HUGGINGFACE_INFERENCE,
-            LITELLM,
-            MISTRAL,
-            MOONSHOT,
-            MORPH,
-            NEBIUS,
-            OLLAMA,
-            OPENAI,
-            OPENROUTER,
-            OVHCLOUD,
-            PERPLEXITY,
-            PYDANTIC_GATEWAY,
-            QDRANT,
-            SAMBANOVA,
-            TAVILY,
-            TOGETHER,
-            VERCEL,
-            VOYAGE,
-            X_AI,
-        }
-    }
+    # Note: Some configs are single objects, others are lists
+    all_configs = (
+        ALIBABA,
+        ANTHROPIC,
+        AZURE,
+        BEDROCK,
+        CEREBRAS,
+        COHERE,
+        DEEPSEEK,
+        FIREWORKS,
+        GITHUB,
+        GOOGLE,
+        GROQ,
+        HEROKU,
+        HUGGINGFACE_INFERENCE,
+        LITELLM,
+        MISTRAL,
+        MOONSHOT,
+        MORPH,
+        NEBIUS,
+        OLLAMA,
+        OPENAI,
+        OPENROUTER,
+        OVHCLOUD,
+        PERPLEXITY,
+        PYDANTIC_GATEWAY,
+        QDRANT,
+        SAMBANOVA,
+        TAVILY,
+        TOGETHER,
+        VERCEL,
+        VOYAGE,
+        X_AI,
+    )
+
+    registry_map = {}
+    for cfg in all_configs:
+        # Handle single configs, lists, and tuples
+        if isinstance(cfg, (list, tuple)):
+            # Use the first config's provider name as the key
+            if cfg:
+                registry_map[cfg[0].provider.lower()] = cfg
+        else:
+            # Single ProviderEnvConfig object
+            registry_map[cfg.provider.lower()] = cfg
 
     if provider_name not in registry_map:
         return None

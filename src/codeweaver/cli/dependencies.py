@@ -11,7 +11,7 @@ from pathlib import Path
 
 from codeweaver.cli.ui import get_display
 from codeweaver.core.config.loader import get_settings
-from codeweaver.core.dependencies import CodeWeaverSettingsType
+from codeweaver.core.config.settings_type import CodeWeaverSettingsType
 from codeweaver.core.di import Container, get_container
 from codeweaver.core.ui_protocol import ProgressReporter
 

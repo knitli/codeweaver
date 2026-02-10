@@ -128,6 +128,64 @@ class IndexFileManifest(BasedModel):
         self.total_chunks += len(chunk_ids)
         self.last_updated = datetime.now(UTC)
 
+    def add_files_batch(self, entries: list[dict[str, Any]]) -> None:
+        """Add or update multiple files in the manifest in a single operation.
+
+        Args:
+            entries: List of dicts, each containing:
+                - path: Path object (relative)
+                - content_hash: BlakeHashKey
+                - chunk_ids: list[str]
+                - dense_embedding_provider: str | None (optional)
+                - dense_embedding_model: str | None (optional)
+                - sparse_embedding_provider: str | None (optional)
+                - sparse_embedding_model: str | None (optional)
+                - has_dense_embeddings: bool (optional)
+                - has_sparse_embeddings: bool (optional)
+        """
+        now = datetime.now(UTC)
+        iso_timestamp = now.isoformat()
+
+        for entry in entries:
+            path = entry["path"]
+            if not isinstance(path, Path):
+                path = Path(path)
+
+            if path.is_absolute():
+                # For batch processing, we just skip invalid paths with a warning
+                # instead of raising to keep the pipeline moving
+                logger.warning("Skipping absolute path in manifest update: %s", path)
+                continue
+
+            raw_path = str(path)
+            chunk_ids = entry["chunk_ids"]
+            chunk_count = len(chunk_ids)
+
+            # Remove old entry if exists
+            if raw_path in self.files:
+                old_entry = self.files[raw_path]
+                self.total_chunks -= old_entry["chunk_count"]
+                self.total_files -= 1
+
+            # Add new entry
+            self.files[raw_path] = FileManifestEntry(
+                path=raw_path,
+                content_hash=str(entry["content_hash"]),
+                indexed_at=iso_timestamp,
+                chunk_count=chunk_count,
+                chunk_ids=chunk_ids,
+                dense_embedding_provider=entry.get("dense_embedding_provider"),
+                dense_embedding_model=entry.get("dense_embedding_model"),
+                sparse_embedding_provider=entry.get("sparse_embedding_provider"),
+                sparse_embedding_model=entry.get("sparse_embedding_model"),
+                has_dense_embeddings=entry.get("has_dense_embeddings", False),
+                has_sparse_embeddings=entry.get("has_sparse_embeddings", False),
+            )
+            self.total_files += 1
+            self.total_chunks += chunk_count
+
+        self.last_updated = now
+
     def remove_file(self, path: Path) -> FileManifestEntry | None:
         """Remove a file from the manifest."""
         if path is None:

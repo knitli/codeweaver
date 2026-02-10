@@ -508,6 +508,23 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
         """
 
     @abstractmethod
+    async def delete_by_files(self, file_paths: list[Path]) -> None:
+        """Delete all chunks for multiple files in a single operation.
+
+        Args:
+            file_paths: List of file paths to remove from index.
+                Paths should be relative to project root.
+
+        Raises:
+            CollectionNotFoundError: Collection doesn't exist.
+            DeleteError: Delete operation failed.
+
+        Notes:
+            - Idempotent: No error if files have no chunks.
+            - More efficient than multiple calls to delete_by_file.
+        """
+
+    @abstractmethod
     async def delete_by_id(self, ids: list[UUID7]) -> None:
         """Delete specific code chunks by their unique identifiers.
 

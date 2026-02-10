@@ -72,28 +72,38 @@ class CodeWeaverEngineSettings(CodeWeaverProviderSettings):
         FailoverSettings | Unset, Field(description="Failover configuration for service resilience")
     ] = UNSET
 
-    def _initialize(self, **kwargs: Any) -> dict[str, Any]:
-        """Initialize engine settings - nothing special needed."""
-        if "indexer" not in kwargs or kwargs.get("indexer") is UNSET:
-            kwargs["indexer"] = IndexerSettings.model_construct(**DefaultIndexerSettings)
-        else:
-            kwargs["indexer"] = IndexerSettings(
-                **self._resolve_default_and_provided(DefaultIndexerSettings, kwargs["indexer"])  # ty:ignore[invalid-argument-type]
+    async def _initialize(self, **kwargs: Any) -> None:
+        """Initialize engine settings - resolve defaults."""
+        fields_and_defaults = (
+            ("indexer", DefaultIndexerSettings, IndexerSettings),
+            ("chunker", DefaultChunkerSettings, ChunkerSettings),
+            ("failover", DefaultFailoverSettings, FailoverSettings),
+        )
+        for field_name, default, type_cls in fields_and_defaults:
+            field_value = (
+                resolved_field
+                if (resolved_field := kwargs.get(field_name)) and resolved_field is not UNSET
+                else getattr(self, field_name, None)
             )
-        if "chunker" not in kwargs or kwargs.get("chunker") is UNSET:
-            kwargs["chunker"] = ChunkerSettings.model_construct(**DefaultChunkerSettings)
-        else:
-            kwargs["chunker"] = ChunkerSettings.model_validate(
-                self._resolve_default_and_provided(DefaultChunkerSettings, kwargs["chunker"])  # ty:ignore[invalid-argument-type]
-            )
-        if "failover" not in kwargs or kwargs.get("failover") is UNSET:
-            kwargs["failover"] = FailoverSettings.model_construct(**DefaultFailoverSettings())
-        else:
-            kwargs["failover"] = FailoverSettings.model_validate(
-                self._resolve_default_and_provided(DefaultFailoverSettings(), kwargs["failover"])  # ty:ignore[invalid-argument-type]
-            )
-        kwargs |= super()._initialize(**kwargs)
-        return kwargs
+            if field_value is Unset or field_value is None:
+                setattr(self, field_name, default)
+            else:
+                existing_value = (
+                    existing
+                    if (existing := getattr(self, field_name, None)) and existing is not UNSET
+                    else default
+                )
+                resolved_value = (
+                    field_value if isinstance(field_value, dict) else field_value.model_dump()
+                )
+                finalized_value = self._resolve_default_and_provided(
+                    existing_value
+                    if isinstance(existing_value, dict)
+                    else existing_value.model_dump(),
+                    resolved_value,
+                )
+                setattr(self, field_name, type_cls.model_construct(**finalized_value))
+        await super()._initialize(**kwargs)
 
 
 __all__ = ("CodeWeaverEngineSettings",)

@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import os
 
-from typing import Annotated, Any, TypedDict
+from typing import Annotated, Any, TypedDict, cast
 
 from pydantic import DirectoryPath, Field, FilePath
 from pydantic_settings import SettingsConfigDict
@@ -77,44 +77,36 @@ class CodeWeaverProviderSettings(CodeWeaverCoreSettings):
         else UNSET
     )  # ty: ignore[invalid-assignment]
 
-    def _initialize(self, **kwargs: Any) -> dict[str, Any]:
+    async def _initialize(self, **kwargs: Any) -> None:
         """Initialize provider settings."""
-        profile_config = (
-            profile.as_provider_settings()
-            if (profile := kwargs.get("profile")) is not None and profile is not Unset
-            else {}
-        )
-        if provider_config := kwargs.get("provider"):
-            provider = ProviderSettings.model_validate(
-                **(self._resolve_default_and_provided(profile_config, provider_config))
-            )
-        else:
-            provider = ProviderSettings.model_construct(**profile_config)
-        kwargs["provider"] = provider
-        if (profile := kwargs.get("profile")) is not None and profile is not Unset:
-            kwargs["profile"] = profile
+        from codeweaver.core.utils import is_test_environment
+
+        if is_test_environment():
+            kwargs["profile"] = ProviderProfile.TESTING
+            self.provider = UNSET
+        profile_config = kwargs.get("profile") or self.profile
+        if (
+            (provider_config := kwargs.get("provider") or self.provider)
+            and provider_config is not Unset
+            and profile_config
+            and profile_config is not Unset
+        ):
             provider = ProviderSettings.model_validate(
                 **(
                     self._resolve_default_and_provided(
-                        profile.as_provider_settings(), provider.model_dump()
+                        cast(dict[str, Any], profile_config.as_provider_settings()),
+                        provider_config
+                        if isinstance(provider_config, dict)
+                        else provider_config.model_dump(),
                     )
                 )
             )
-            kwargs["provider"] = provider
-        kwargs["profile"] = kwargs.get("profile")
-        if not kwargs["provider"] or kwargs["provider"] is Unset:
-            from codeweaver.core.utils import is_test_environment
-
-            if is_test_environment():
-                kwargs["provider"] = ProviderSettings.model_construct(
-                    **(ProviderProfile.TESTING.as_provider_settings())
-                )
-            else:
-                kwargs["provider"] = ProviderSettings.model_construct(
-                    **(ProviderProfile.RECOMMENDED.as_provider_settings())
-                )
-        kwargs |= super()._initialize(**(kwargs or {}))
-        return kwargs
+        else:
+            provider = ProviderSettings.model_construct(
+                **(profile_config or ProviderProfile.RECOMMENDED).as_provider_settings()
+            )
+        self.provider = provider
+        await super()._initialize(**kwargs)
 
 
 class CodeWeaverProviderSettingsDict(TypedDict, total=False):

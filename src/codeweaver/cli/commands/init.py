@@ -28,6 +28,8 @@ from rich.prompt import Confirm
 
 from codeweaver.cli.ui import CLIErrorHandler, get_display
 from codeweaver.core import CodeWeaverError, get_project_path, get_user_config_dir
+from codeweaver.core.config.settings_type import CodeWeaverSettingsType
+from codeweaver.core.dependencies.core_settings import SettingsDep
 from codeweaver.core.di.depends import INJECTED
 from codeweaver.core.exceptions import ConfigurationError
 from codeweaver.core.utils import TypeIs
@@ -36,7 +38,6 @@ from codeweaver.providers.config.profiles import ProviderProfile
 
 if TYPE_CHECKING:
     from codeweaver.cli.ui import StatusDisplay
-    from codeweaver.core.dependencies import CodeWeaverSettingsType, SettingsDep
     from codeweaver.server.config import CodeWeaverMCPConfig, StdioCodeWeaverConfig
 
 

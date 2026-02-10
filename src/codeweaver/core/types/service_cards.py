@@ -180,18 +180,6 @@ def _sometimes_local_providers() -> set[ProviderLiteralString]:
 
 
 @cache
-def _never_use_openai_api() -> set[ProviderLiteralString]:
-    """These are providers that (at least in CodeWeaver) never use the OpenAI API.
-
-    This does not mean that others *don't* also use their API, just that they themselves never use it. It also does not mean any *models* associated with these providers aren't also available on the OpenAI API. A `provider` is who you pay, not the client/API, or models.
-
-    ...unless you don't pay anyone, then it's the client (like sentence_transformers).
-    """
-    # bedrock sometimes uses Anthropic for agents, and memory uses Qdrant
-    return _all_provider_gen() - (_never_use_other_api() | _never_use_openai_api())
-
-
-@cache
 def _always_use_openai_api() -> set[ProviderLiteralString]:
     """These are providers that (at least in CodeWeaver) do not always use the OpenAI API.
 

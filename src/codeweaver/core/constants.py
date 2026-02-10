@@ -525,8 +525,8 @@ FILE_BATCH_SIZE = 100
 DEFAULT_MAX_QUEUE_SIZE = 200
 """The maximum size of the file queue for parallel chunking and embedding operations. This cap controls the number of active tasks in the queue to prevent excessive memory usage, or potential resource exhaustion (for very large codebases)."""
 
-FILE_CONSUMER_WORKER_BATCH_SIZE = 25
-"""Batch size for file consumer workers processing files in parallel chunking and embedding operations."""
+MAX_INLINE_CONTENT_SIZE = ONE_MEGABYTE // 2
+"""Maximum file size for inlining content directly into memory during processing. Files larger than this size will be processed when needed instead of maintaining their contents in memory."""
 
 # ===========================================================================
 # *                   Miscellaneous Constants
@@ -736,7 +736,6 @@ __all__ = (
     "ENV_JETBRAINS_INDICATOR",
     "ENV_VSCODE_INDICATORS",
     "FILE_BATCH_SIZE",
-    "FILE_CONSUMER_WORKER_BATCH_SIZE",
     "FIND_CODE_DESCRIPTION",
     "FIND_CODE_INSTRUCTION",
     "FIND_CODE_TITLE",
@@ -749,6 +748,7 @@ __all__ = (
     "LOCALHOST_URL",
     "LOCAL_EMBEDDING_COST_PER_1K_TOKENS",
     "LOGGERS_TO_SUPPRESS",
+    "MAX_INLINE_CONTENT_SIZE",
     "MAX_REGEX_PATTERN_LENGTH",
     "MAX_RETRY_ATTEMPTS",
     "MAX_SEMANTIC_CHUNKER_RECURSION_DEPTH",

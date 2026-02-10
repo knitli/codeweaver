@@ -38,7 +38,7 @@ from pydantic import (
 )
 from starlette.responses import PlainTextResponse
 
-from codeweaver.core import BasedModel, CodeWeaverSettingsType
+from codeweaver.core.config.settings_type import CodeWeaverSettingsType
 from codeweaver.core.constants import (
     CLOUD_EMBEDDING_COST_PER_1K_TOKENS,
     CLOUD_RERANKING_COST_PER_1K_TOKENS,
@@ -51,6 +51,7 @@ from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
 from codeweaver.core.metadata import ChunkKind, ExtKind
 from codeweaver.core.types import (
     AnonymityConversion,
+    BasedModel,
     BaseEnum,
     FilteredKey,
     FilteredKeyT,

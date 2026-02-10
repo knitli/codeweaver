@@ -24,7 +24,7 @@ from rich.table import Table
 from codeweaver.cli.dependencies import setup_cli_di
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
 from codeweaver.core import CodeWeaverError
-from codeweaver.core.dependencies import CodeWeaverSettingsType
+from codeweaver.core.config.loader import CodeWeaverSettingsType
 from codeweaver.server.agent_api.find_code import (
     CodeMatch,
     FindCodeResponseSummary,

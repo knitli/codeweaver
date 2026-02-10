@@ -224,6 +224,9 @@ class GrammarClassificationResult(BasedModel):
         ),
     ] = None
 
+    def _telemetry_keys(self) -> None:
+        return
+
     @computed_field(
         description="Confidence score (0.0-1.0) computed from evidence kinds and adjustment",
         repr=True,
@@ -490,7 +493,7 @@ class GrammarBasedClassifier:
             and (token := (registry.tokens[language][thing.name]))
         ):
             return result_func(
-                classification=SemanticClass.from_token_purpose(token.purpose, str(str(token.name)))
+                classification=SemanticClass.from_token_purpose(token.purpose, str(token.name))
             )
         if is_composite_thing(thing):
             return self._classify_from_composite_checks(thing, language)
@@ -1103,6 +1106,10 @@ class GrammarBasedClassifier:
             evidence=(EvidenceKind.ROLES, EvidenceKind.CONNECTIONS),
             adjustment=10,
         )
+
+    def _telemetry_keys(self) -> None:
+        """Return telemetry keys for this classifier."""
+        return
 
 
 __all__ = ("GrammarBasedClassifier", "GrammarClassificationResult")

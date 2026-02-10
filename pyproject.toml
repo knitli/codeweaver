@@ -655,7 +655,8 @@ unknown-argument = "ignore"
 include = [
   "src/codeweaver/providers/vector_stores/qdrant_base.py",
   "src/codeweaver/providers/data/providers.py",
-  "src/codeweaver/providers/data/exa.py"
+  "src/codeweaver/providers/data/exa.py",
+  "src/codeweaver/*/config/*settings.py"
 ]
 
 [tool.ty.overrides.rules]
@@ -682,7 +683,10 @@ include = [
   "src/codeweaver/*/dependencies/*.py"
 ]
 
+# there's an issue with type checkers resolving through the dependency_provider decorators and the dynamic provider registry, which causes false positives in these files
 [tool.ty.overrides.rules]
+call-non-callable = "ignore"
+invalid-await = "ignore"
 invalid-argument-type = "ignore"
 invalid-return-type = "ignore"
 unresolved-attribute = "ignore"

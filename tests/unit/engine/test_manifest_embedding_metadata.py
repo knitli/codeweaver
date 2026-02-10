@@ -31,10 +31,13 @@ def manifest(temp_project_dir):
     return IndexFileManifest(project_path=temp_project_dir)
 
 
+@pytest.mark.asyncio
+@pytest.mark.async_test
+@pytest.mark.unit
 class TestEmbeddingMetadataTracking:
     """Tests for v1.1.0 embedding metadata features."""
 
-    def test_add_file_with_dense_embedding_metadata(self, manifest):
+    async def test_add_file_with_dense_embedding_metadata(self, manifest):
         """Test adding file with dense embedding metadata."""
         path = Path("test.py")
         content_hash = get_blake_hash(b"test content")
@@ -56,7 +59,7 @@ class TestEmbeddingMetadataTracking:
         assert entry["has_dense_embeddings"] is True
         assert entry.get("has_sparse_embeddings") is False
 
-    def test_add_file_with_sparse_embedding_metadata(self, manifest):
+    async def test_add_file_with_sparse_embedding_metadata(self, manifest):
         """Test adding file with sparse embedding metadata."""
         path = Path("test.py")
         content_hash = get_blake_hash(b"test content")
@@ -78,7 +81,7 @@ class TestEmbeddingMetadataTracking:
         assert entry["has_sparse_embeddings"] is True
         assert entry.get("has_dense_embeddings") is False
 
-    def test_add_file_with_both_embedding_types(self, manifest):
+    async def test_add_file_with_both_embedding_types(self, manifest):
         """Test adding file with both dense and sparse embeddings."""
         path = Path("test.py")
         content_hash = get_blake_hash(b"test content")
@@ -105,7 +108,7 @@ class TestEmbeddingMetadataTracking:
         assert entry["has_dense_embeddings"] is True
         assert entry["has_sparse_embeddings"] is True
 
-    def test_backward_compatibility_v1_0_0(self, manifest):
+    async def test_backward_compatibility_v1_0_0(self, manifest):
         """Test that v1.0.0 manifests without embedding metadata still work."""
         path = Path("legacy.py")
         content_hash = get_blake_hash(b"legacy content")
@@ -123,10 +126,13 @@ class TestEmbeddingMetadataTracking:
         assert entry.get("has_dense_embeddings") is False
 
 
+@pytest.mark.asyncio
+@pytest.mark.async_test
+@pytest.mark.unit
 class TestModelChangeDetection:
     """Tests for embedding model change detection."""
 
-    def test_file_needs_reindexing_new_file(self, manifest):
+    async def test_file_needs_reindexing_new_file(self, manifest):
         """Test that new files need indexing."""
         path = Path("new_file.py")
         current_hash = get_blake_hash(b"new content")
@@ -136,7 +142,7 @@ class TestModelChangeDetection:
         assert needs_reindex is True
         assert reason == "new_file"
 
-    def test_file_needs_reindexing_content_changed(self, manifest):
+    async def test_file_needs_reindexing_content_changed(self, manifest):
         """Test that files with changed content need reindexing."""
         path = Path("test.py")
         original_hash = get_blake_hash(b"original content")
@@ -148,7 +154,7 @@ class TestModelChangeDetection:
         assert needs_reindex is True
         assert reason == "content_changed"
 
-    def test_file_needs_reindexing_dense_model_changed(self, manifest):
+    async def test_file_needs_reindexing_dense_model_changed(self, manifest):
         """Test that dense model changes trigger reindexing."""
         path = Path("test.py")
         content_hash = get_blake_hash(b"test content")
@@ -174,7 +180,7 @@ class TestModelChangeDetection:
         assert needs_reindex is True
         assert reason == "dense_embedding_model_changed"
 
-    def test_file_needs_reindexing_sparse_model_changed(self, manifest):
+    async def test_file_needs_reindexing_sparse_model_changed(self, manifest):
         """Test that sparse model changes trigger reindexing."""
         path = Path("test.py")
         content_hash = get_blake_hash(b"test content")
@@ -197,7 +203,7 @@ class TestModelChangeDetection:
         assert needs_reindex is True
         assert reason == "sparse_embedding_model_changed"
 
-    def test_file_unchanged_same_models(self, manifest):
+    async def test_file_unchanged_same_models(self, manifest):
         """Test that files with same content and models don't need reindexing."""
         path = Path("test.py")
         content_hash = get_blake_hash(b"test content")
@@ -218,7 +224,7 @@ class TestModelChangeDetection:
         assert needs_reindex is False
         assert reason == "unchanged"
 
-    def test_file_unchanged_no_embeddings(self, manifest):
+    async def test_file_unchanged_no_embeddings(self, manifest):
         """Test backward compatibility: files without embedding metadata."""
         path = Path("test.py")
         content_hash = get_blake_hash(b"test content")
@@ -236,10 +242,13 @@ class TestModelChangeDetection:
         assert reason == "dense_embedding_model_changed"
 
 
+@pytest.mark.asyncio
+@pytest.mark.async_test
+@pytest.mark.unit
 class TestGetEmbeddingModelInfo:
     """Tests for retrieving embedding model information."""
 
-    def test_get_embedding_model_info_with_metadata(self, manifest):
+    async def test_get_embedding_model_info_with_metadata(self, manifest):
         """Test retrieving embedding model info for file with metadata."""
         path = Path("test.py")
         content_hash = get_blake_hash(b"test content")
@@ -265,7 +274,7 @@ class TestGetEmbeddingModelInfo:
         assert info["has_dense"] is True
         assert info["has_sparse"] is True
 
-    def test_get_embedding_model_info_nonexistent_file(self, manifest):
+    async def test_get_embedding_model_info_nonexistent_file(self, manifest):
         """Test retrieving model info for nonexistent file."""
         path = Path("nonexistent.py")
 
@@ -273,7 +282,7 @@ class TestGetEmbeddingModelInfo:
 
         assert info == {}
 
-    def test_get_embedding_model_info_legacy_file(self, manifest):
+    async def test_get_embedding_model_info_legacy_file(self, manifest):
         """Test retrieving model info for legacy file without metadata."""
         path = Path("legacy.py")
         content_hash = get_blake_hash(b"legacy content")
@@ -291,10 +300,13 @@ class TestGetEmbeddingModelInfo:
         assert info["has_sparse"] is False
 
 
+@pytest.mark.asyncio
+@pytest.mark.async_test
+@pytest.mark.unit
 class TestManifestPersistence:
     """Tests for saving/loading manifests with embedding metadata."""
 
-    def test_save_and_load_with_embedding_metadata(self, temp_project_dir, tmpdir):
+    async def test_save_and_load_with_embedding_metadata(self, temp_project_dir, tmpdir):
         """Test that embedding metadata persists across save/load."""
         manager = FileManifestManager(
             project_path=temp_project_dir, manifest_dir=tmpdir, project_name="test_project"
@@ -314,10 +326,10 @@ class TestManifestPersistence:
         )
 
         # Save
-        assert manager.save(manifest) is True
+        assert await manager.save(manifest) is True
 
         # Load
-        loaded_manifest = manager.load()
+        loaded_manifest = await manager.load()
         assert loaded_manifest is not None
         assert loaded_manifest.manifest_version == "1.1.0"
 

@@ -20,15 +20,7 @@ from typing import Any, ClassVar, Self, cast
 from pydantic import create_model
 from triton.runtime.cache import CacheManager
 
-from codeweaver.core import (
-    INJECTED,
-    CodeChunk,
-    ConfigurationError,
-    Provider,
-    ProviderError,
-    TypeIs,
-    asyncio_or_uvloop,
-)
+from codeweaver.core import INJECTED, CodeChunk, ConfigurationError, Provider, ProviderError, TypeIs
 from codeweaver.core import ValidationError as CodeWeaverValidationError
 from codeweaver.core.types import ModelName
 from codeweaver.providers.config import EmbeddingProviderSettings
@@ -221,7 +213,7 @@ class OpenAIEmbeddingBase(EmbeddingProvider[AsyncOpenAI]):
         Note: This sync method is only called from async contexts.
         """
         try:
-            loop = loop or asyncio_or_uvloop().get_running_loop()
+            loop = loop or asyncio.get_running_loop()
             if response.usage and (token_count := response.usage.total_tokens):
                 _ = loop.call_soon_threadsafe(
                     lambda: self._update_token_stats(token_count=token_count)

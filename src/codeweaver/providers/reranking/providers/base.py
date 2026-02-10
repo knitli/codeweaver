@@ -35,7 +35,6 @@ from codeweaver.core import (
     RerankingProviderError,
     StatisticsDep,
     ValidationError,
-    asyncio_or_uvloop,
 )
 from codeweaver.core.constants import (
     DEFAULT_OPEN_BREAKER_DURATION,
@@ -328,7 +327,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
     async def _get_loop(self) -> asyncio.AbstractEventLoop | None:
         """Get the current event loop, if available."""
         try:
-            loop = asyncio_or_uvloop().get_running_loop()
+            loop = asyncio.get_running_loop()
         except RuntimeError:
             return None
         else:
@@ -466,7 +465,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         if self.provider not in [Provider.VOYAGE, Provider.COHERE]:
             # We're always called from async context (rerank method), so we can safely get the loop
             try:
-                loop = loop or asyncio_or_uvloop().get_running_loop()
+                loop = loop or asyncio.get_running_loop()
                 _ = loop.call_soon_threadsafe(lambda: self._update_token_stats(from_docs=raw_docs))
             except RuntimeError:
                 # just fallback to synchronous update
