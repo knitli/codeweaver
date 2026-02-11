@@ -177,9 +177,14 @@ class VoyageRerankingConfig(BaseRerankingConfig):
     def _as_options(self) -> SerializedRerankingOptionsDict:
         """Convert the Voyage reranking configuration to a dictionary of options."""
         return SerializedRerankingOptionsDict(
-            model_name=ModelName(self.model_name),
-            rerank=cast(dict[str, Any], self.rerank or {}),
-            model={},
+            **(
+                type(self)._defaults()["rerank"]
+                | SerializedRerankingOptionsDict(
+                    model_name=ModelName(self.model_name),
+                    rerank=cast(dict[str, Any], self.rerank or {}),
+                    model={},
+                )
+            )
         )
 
     @classmethod

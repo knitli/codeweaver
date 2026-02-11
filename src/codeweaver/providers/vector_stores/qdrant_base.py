@@ -46,8 +46,8 @@ from codeweaver.core.exceptions import ConfigurationError
 from codeweaver.providers.config import QdrantVectorStoreProviderSettings
 from codeweaver.providers.embedding.capabilities import EmbeddingModelCapabilities
 from codeweaver.providers.types import EmbeddingCapabilityGroup
+from codeweaver.providers.types.vector_store import CollectionMetadata, HybridVectorPayload
 from codeweaver.providers.vector_stores.base import MixedQueryInput, VectorStoreProvider
-from codeweaver.providers.vector_stores.metadata import CollectionMetadata, HybridVectorPayload
 from codeweaver.providers.vector_stores.search import Filter
 
 

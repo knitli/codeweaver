@@ -659,6 +659,8 @@ unknown-argument = "ignore"
 include = [
   "src/codeweaver/providers/vector_stores/qdrant_base.py",
   "src/codeweaver/providers/data/providers.py",
+  "src/codeweaver/providers/config/sdk/embedding.py",
+  "src/codeweaver/providers/config/sdk/reranking.py",
   "src/codeweaver/providers/config/categories/embedding.py",
   "src/codeweaver/providers/config/categories/vector_store.py",
   "src/codeweaver/providers/data/exa.py",

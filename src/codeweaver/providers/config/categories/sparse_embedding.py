@@ -15,7 +15,10 @@ from codeweaver.providers.config.clients import (
     FastEmbedClientOptions,
     SentenceTransformersClientOptions,
 )
-from codeweaver.providers.config.embedding import BaseSparseEmbeddingConfig, SparseEmbeddingConfigT
+from codeweaver.providers.config.sdk.sparse_embedding import (
+    BaseSparseEmbeddingConfig,
+    SparseEmbeddingConfigT,
+)
 
 
 if has_package("sentence_transformers"):

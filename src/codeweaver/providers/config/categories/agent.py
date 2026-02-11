@@ -14,17 +14,6 @@ from codeweaver.core.types import (
     SDKClient,
 )
 from codeweaver.providers import CohereAgentModelConfig
-from codeweaver.providers.config.agent import (
-    AgentModelConfig,
-    AnthropicAgentModelConfig,
-    CerebrasAgentModelConfig,
-    GoogleAgentModelConfig,
-    GroqAgentModelConfig,
-    HuggingFaceAgentModelConfig,
-    MistralAgentModelConfig,
-    OpenAIAgentModelConfig,
-    OpenRouterAgentModelConfig,
-)
 from codeweaver.providers.config.categories.base import BaseProviderCategorySettings
 from codeweaver.providers.config.categories.mixins import AzureProviderMixin, BedrockProviderMixin
 from codeweaver.providers.config.categories.utils import (
@@ -46,6 +35,17 @@ from codeweaver.providers.config.clients import (
     MistralClientOptions,
     OpenAIClientOptions,
     PydanticGatewayClientOptions,
+)
+from codeweaver.providers.config.sdk import (
+    AgentModelConfig,
+    AnthropicAgentModelConfig,
+    CerebrasAgentModelConfig,
+    GoogleAgentModelConfig,
+    GroqAgentModelConfig,
+    HuggingFaceAgentModelConfig,
+    MistralAgentModelConfig,
+    OpenAIAgentModelConfig,
+    OpenRouterAgentModelConfig,
 )
 from codeweaver.providers.config.types import AgentModelNameString
 

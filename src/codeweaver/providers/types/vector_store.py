@@ -152,7 +152,7 @@ class CollectionMetadata(BasedModel):
     """
 
     provider: Annotated[str, Field(description="Provider name that created collection")]
-    created_at: Annotated[datetime, Field(default_factory=lambda: datetime.now(UTC))]
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     project_name: Annotated[str, Field(description="Project/repository name")]
 
     dense_model: Annotated[
@@ -455,4 +455,4 @@ class CollectionMetadata(BasedModel):
         return {FilteredKey("project_name"): AnonymityConversion.HASH}
 
 
-__all__ = ("CollectionMetadata", "HybridVectorPayload")
+__all__ = ("CollectionMetadata", "HybridVectorPayload", "PayloadFieldDict")

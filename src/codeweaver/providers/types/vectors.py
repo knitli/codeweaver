@@ -28,7 +28,7 @@ from codeweaver.core.types import (
     Provider,
 )
 from codeweaver.providers.config.categories import AsymmetricEmbeddingProviderSettings
-from codeweaver.providers.config.embedding import FastEmbedSparseEmbeddingConfig
+from codeweaver.providers.config.sdk import FastEmbedSparseEmbeddingConfig
 
 
 if TYPE_CHECKING:

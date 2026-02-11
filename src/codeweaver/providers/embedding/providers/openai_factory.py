@@ -24,7 +24,7 @@ from codeweaver.core import INJECTED, CodeChunk, ConfigurationError, Provider, P
 from codeweaver.core import ValidationError as CodeWeaverValidationError
 from codeweaver.core.types import ModelName
 from codeweaver.providers.config import EmbeddingProviderSettings
-from codeweaver.providers.config.embedding import OpenAIEmbeddingConfig
+from codeweaver.providers.config.sdk import OpenAIEmbeddingConfig
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
 from codeweaver.providers.embedding.providers.base import (
     EmbeddingCustomDeps,

@@ -160,7 +160,7 @@ class QdrantVectorStoreService:
         Returns:
             QdrantCollectionConfig with merged WalConfig
         """
-        from codeweaver.providers.config.categories.vector_store import WalConfig
+        from codeweaver.providers.config.sdk.vector_store import WalConfig
 
         if self.failover_settings is None:
             return qdrant_config

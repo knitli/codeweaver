@@ -77,7 +77,6 @@ if TYPE_CHECKING:
     )
     from codeweaver.providers.config.categories.vector_store import (
         BaseVectorStoreProviderSettings,
-        CollectionConfig,
         MemoryConfig,
         MemoryVectorStoreProviderSettings,
         QdrantVectorStoreProviderSettings,
@@ -96,7 +95,6 @@ _dynamic_imports = MappingProxyType({
     "CohereRerankingProviderSettings": (__spec__.parent, "reranking"),
     "VoyageRerankingProviderSettings": (__spec__.parent, "reranking"),
     "BaseVectorStoreProviderSettings": (__spec__.parent, "vector_store"),
-    "CollectionConfig": (__spec__.parent, "vector_store"),
     "MemoryVectorStoreProviderSettings": (__spec__.parent, "vector_store"),
     "QdrantVectorStoreProviderSettings": (__spec__.parent, "vector_store"),
     "VectorStoreProviderSettings": (__spec__.parent, "vector_store"),
@@ -181,7 +179,6 @@ __all__ = (
     "CerebrasAgentProviderSettings",
     "CohereAgentProviderSettings",
     "CohereRerankingProviderSettings",
-    "CollectionConfig",
     "ConnectionConfiguration",
     "ConnectionRateLimitConfig",
     "DataProviderSettingsType",

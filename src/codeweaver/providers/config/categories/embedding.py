@@ -51,7 +51,7 @@ from codeweaver.providers.config.clients.multi import (
     discriminate_azure_embedding_client_options,
 )
 from codeweaver.providers.config.clients.utils import try_for_azure_endpoint
-from codeweaver.providers.config.embedding import EmbeddingConfigT
+from codeweaver.providers.config.sdk import EmbeddingConfigT
 from codeweaver.providers.data.utils import get_provider_names_for_category
 
 
@@ -262,7 +262,7 @@ class BedrockEmbeddingProviderSettings(BedrockProviderMixin, EmbeddingProviderSe
         Bedrock requires the model ARN at request time. This validator ensures it's
         available in the embedding_config's embedding and query parameters.
         """
-        from codeweaver.providers.config.embedding import BedrockEmbeddingConfig
+        from codeweaver.providers.config.sdk import BedrockEmbeddingConfig
 
         # Type narrow to ensure we're working with BedrockEmbeddingConfig
         if not isinstance(self.embedding_config, BedrockEmbeddingConfig):

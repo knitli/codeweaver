@@ -27,16 +27,7 @@ from typing import (
 )
 
 from pydantic import Discriminator, Field, PositiveInt, PrivateAttr, Tag, computed_field
-from qdrant_client.models import (
-    Datatype,
-    Distance,
-    Modifier,
-    ScalarQuantization,
-    ScalarType,
-    SparseIndexParams,
-    SparseVectorParams,
-    VectorParams,
-)
+from qdrant_client.models import Datatype, Distance, ScalarQuantization, ScalarType, VectorParams
 
 from codeweaver.core import BasedModel, ConfigurationError, ModelName, ModelNameT, Provider
 from codeweaver.core.constants import (
@@ -44,7 +35,6 @@ from codeweaver.core.constants import (
     DEFAULT_EMBEDDING_TIMEOUT,
     DEFAULT_LOCAL_EMBEDDING_BATCH_SIZE,
     DIMENSION_FIELDS,
-    ZERO,
 )
 from codeweaver.core.utils import deep_merge_dicts
 from codeweaver.providers.config.types import CohereRequestOptionsDict
@@ -668,23 +658,25 @@ class BedrockEmbeddingConfig(BaseEmbeddingConfig):
 
     def _as_options(self) -> SerializedEmbeddingOptionsDict:
         """Convert the Bedrock embedding configuration to a dictionary of options."""
+        if self.model_name.startswith("cohere"):
+            defaults = {"model": {"embedding_types": "float", "truncate": "NONE"}}
+        if self.model_name.startswith(
+            "amazon.titan-embed-text-v2"
+        ):  # be specific because models change and dimensions might too
+            defaults = {"model": {"dimensions": 1024, "embedding_types": "float"}}
+        else:
+            defaults = {}
         model = self.model.copy()
-        return SerializedEmbeddingOptionsDict(
+        return defaults | SerializedEmbeddingOptionsDict(
             model_name=ModelName(self.model_name),
             model=model,
             embedding=self.embedding or self.query or {},
             query=self.query or self.embedding or {},
         )
 
-    @property
-    def _defaults(self) -> dict[str, Any]:
+    @classmethod
+    def _defaults(cls) -> dict[str, Any]:
         """Return default values for the configuration."""
-        if self.model_name.startswith("cohere"):
-            return {"model": {"embedding_types": "float", "truncate": "NONE"}}
-        if self.model_name.startswith(
-            "amazon.titan-embed-text-v2"
-        ):  # be specific because models change and dimensions might too
-            return {"model": {"dimensions": 1024, "embedding_types": "float"}}
         return {}
 
 
@@ -795,28 +787,20 @@ class CohereEmbeddingConfig(BaseEmbeddingConfig):
             return embedding_types
         return "float"
 
-    @property
-    def _defaults(self) -> dict[str, Any]:
+    @classmethod
+    def _defaults(cls) -> dict[str, Any]:
         """Return default values for the configuration."""
         return {
-            "embedding": {
-                "model": self.model_name,
-                "output_dimension": 1536,
-                "embedding_types": "float",
-                "truncate": "NONE",
-            },
-            "query": {
-                "model": self.model_name,
-                "output_dimension": 1536,
-                "embedding_types": "float",
-                "truncate": "NONE",
-            },
+            "embedding": {"output_dimension": 1536, "embedding_types": "float", "truncate": "NONE"},
+            "query": {"output_dimension": 1536, "embedding_types": "float", "truncate": "NONE"},
         }
 
     def _as_options(self) -> SerializedEmbeddingOptionsDict:
         """Convert the Cohere embedding configuration to a dictionary of options."""
-        embedding_options = {"model": self.model_name} | (self.embedding or {})
-        query_options = {"model": self.model_name} | (self.query or {})
+        embedding_options = (
+            type(self)._defaults() | {"model": self.model_name} | (self.embedding or {})
+        )
+        query_options = type(self)._defaults() | {"model": self.model_name} | (self.query or {})
         return SerializedEmbeddingOptionsDict(
             model_name=ModelName(self.model_name),
             embedding=embedding_options,
@@ -854,6 +838,11 @@ class FastEmbedEmbeddingConfig(BaseEmbeddingConfig):
         """
         object.__setattr__(self, "_datatype", datatype)
         return self
+
+    @classmethod
+    def _defaults() -> dict[str, Any]:
+        """Return default values for the configuration."""
+        return {}
 
 
 class GoogleEmbeddingRequestParams(TypedDict, total=False):
@@ -908,9 +897,7 @@ class GoogleEmbeddingConfig(BaseEmbeddingConfig):
         """
         if self.embedding and (output_dimension := self.embedding.get("output_dimensionality")):
             return output_dimension
-        if default := self._defaults.get("embedding", {}):
-            return default.get("output_dimensionality")
-        return 768
+        return 768 if str(self.model_name == "gemini-embedding-001") else 0
 
     def _get_datatype(self) -> Literal["float"]:
         """Get explicitly configured datatype without fallbacks.
@@ -925,8 +912,12 @@ class GoogleEmbeddingConfig(BaseEmbeddingConfig):
 
     def _as_options(self) -> SerializedEmbeddingOptionsDict:
         """Convert the Google embedding configuration to a dictionary of options."""
-        embedding_options = {"model": self.model_name} | (self.embedding or {})
-        query_options = {"model": self.model_name} | (self.query or embedding_options)
+        dimension = 768 if self.model_name == "gemini-embedding-001" else None
+        dimension_config = {"output_dimensionality": dimension} if dimension else {}
+        embedding_options = dimension_config | {"model": self.model_name} | (self.embedding or {})
+        query_options = (
+            dimension_config | {"model": self.model_name} | (self.query or embedding_options)
+        )
         return SerializedEmbeddingOptionsDict(
             model_name=ModelName(self.model_name),
             embedding=embedding_options,
@@ -934,14 +925,10 @@ class GoogleEmbeddingConfig(BaseEmbeddingConfig):
             model={},
         )
 
-    @property
-    def _defaults(self) -> dict[str, Any]:
+    @classmethod
+    def _defaults(cls) -> dict[str, Any]:
         """Return default values for the configuration."""
-        return (
-            {"embedding": {"output_dimensionality": 768}}
-            if self.model_name == ModelName("gemini-embedding-001")
-            else {}
-        )
+        return ()
 
 
 class HuggingFaceEmbeddingConfig(BaseEmbeddingConfig):
@@ -995,8 +982,8 @@ class HuggingFaceEmbeddingConfig(BaseEmbeddingConfig):
             model={},
         )
 
-    @property
-    def _defaults(self) -> dict[str, Any]:
+    @classmethod
+    def _defaults(cls) -> dict[str, Any]:
         """Return default values for the configuration."""
         return {
             "embedding": {
@@ -1044,16 +1031,6 @@ class MistralEmbeddingConfig(BaseEmbeddingConfig):
 
     def _as_options(self) -> SerializedEmbeddingOptionsDict:
         """Convert the Mistral embedding configuration to a dictionary of options."""
-        return SerializedEmbeddingOptionsDict(
-            model_name=ModelName(self.model_name),
-            embedding=cast(dict[str, Any], self.embedding or {}),
-            query=cast(dict[str, Any], self.query or {}),
-            model={},
-        )
-
-    @property
-    def _defaults(self) -> dict[str, Any]:
-        """Return default values for the configuration."""
         dimension = (
             1024
             if str(self.model_name) == "mistral-embed"
@@ -1061,10 +1038,19 @@ class MistralEmbeddingConfig(BaseEmbeddingConfig):
             if str(self.model_name) == "codestral-embed"
             else None
         )
-        return {
-            "embedding": {"output_dimension": dimension, "output_dtype": "float"},
-            "query": {"output_dimension": dimension, "output_dtype": "float"},
-        }
+        return SerializedEmbeddingOptionsDict(
+            model_name=ModelName(self.model_name),
+            embedding=({"output_dimension": dimension} if dimension else {})
+            | cast(dict[str, Any], self.embedding or {}),
+            query=({"output_dimension": dimension} if dimension else {})
+            | cast(dict[str, Any], self.query or {}),
+            model={},
+        )
+
+    @classmethod
+    def _defaults(cls) -> dict[str, Any]:
+        """Return default values for the configuration."""
+        return {"embedding": {"output_dtype": "float"}, "query": {"output_dtype": "float"}}
 
     def set_dimension(self, dimension: int) -> Self:
         """Set the embedding dimension explicitly in the embedding configuration.
@@ -1192,6 +1178,17 @@ class OpenAIEmbeddingConfig(BaseEmbeddingConfig):
         """
         if self.embedding and (dimensions := self.embedding.get("dimensions")):
             return dimensions
+        if not dimensions and self.model_name in (
+            "text-embedding-3-large",
+            "text-embedding-3-small",
+        ):
+            return (
+                3072
+                if str(self.model_name) == "text-embedding-3-large"
+                else 1_536
+                if str(self.model_name) == "text-embedding-3-small"
+                else None
+            )
         return None
 
     def _get_datatype(self) -> str:
@@ -1203,27 +1200,12 @@ class OpenAIEmbeddingConfig(BaseEmbeddingConfig):
         """
         return self._datatype if self._datatype is not None else "float"
 
-    @property
-    def _defaults(self) -> dict[str, Any]:
+    @classmethod
+    def _defaults(cls) -> dict[str, Any]:
         """Return default values for the configuration."""
-        dimension = (
-            3072
-            if str(self.model_name) == "text-embedding-3-large"
-            else 1_536
-            if str(self.model_name) == "text-embedding-3-small"
-            else None
-        )
         return {
-            "embedding": {
-                "dimensions": dimension,
-                "encoding_format": "float",
-                "timeout": DEFAULT_EMBEDDING_TIMEOUT,
-            },
-            "query": {
-                "dimensions": dimension,
-                "encoding_format": "float",
-                "timeout": DEFAULT_EMBEDDING_TIMEOUT,
-            },
+            "embedding": {"encoding_format": "float", "timeout": DEFAULT_EMBEDDING_TIMEOUT},
+            "query": {"encoding_format": "float", "timeout": DEFAULT_EMBEDDING_TIMEOUT},
         }
 
     def _telemetry_handler(self, _serialized_self: dict[str, Any], /) -> dict[str, Any]:
@@ -1359,8 +1341,8 @@ class SentenceTransformersEmbeddingConfig(BaseEmbeddingConfig):
             return precision
         return "float32"
 
-    @property
-    def _defaults(self) -> dict[str, Any]:
+    @classmethod
+    def _defaults(cls) -> dict[str, Any]:
         """Return default values for the configuration."""
         return {
             "embedding": {
@@ -1454,174 +1436,13 @@ class VoyageEmbeddingConfig(BaseEmbeddingConfig):
         """Check if the model supports asymmetric query/document. These models can query each others' embeddings."""
         return str(self.model_name).startswith("voyage-4")
 
-    @property
-    def _defaults(self) -> dict[str, Any]:
+    @classmethod
+    def _defaults(cls) -> dict[str, Any]:
         """Return default values for the configuration."""
         return {
             "embedding": {"input_type": "document", "truncation": True, "output_dtype": "uint8"},
             "query": {"input_type": "query", "truncation": True, "output_dtype": "uint8"},
         }
-
-
-# ============================================================================
-# Sparse Embedding Configs (Reuse dense configs with renamed classes)
-# ============================================================================
-async def _to_sparse_vector_params(instance: BaseEmbeddingConfig) -> SparseVectorParams:
-    """Convert a sparse embedding config to SparseVectorParams."""
-    datatype = await instance.get_datatype()
-    resolved_datatype = (
-        datatype
-        if datatype and datatype in ("float32", "float16", "uint8")
-        else "float16"
-        if (not datatype or "float" in datatype)
-        else "uint8"
-    )
-    index_params = SparseIndexParams(datatype=Datatype(resolved_datatype))
-    modifier = Modifier.IDF if ("bm25" in str(instance.model_name).lower()) else Modifier.NONE
-    return SparseVectorParams(index=index_params, modifier=modifier)
-
-
-class BaseSparseEmbeddingConfig(BasedModel, EmbeddingMixin):
-    """Base configuration for sparse embedding models."""
-
-    model_name: ModelNameT = Field(
-        default_factory=ModelName, description="The sparse embedding model to use."
-    )
-
-    _is_sparse: ClassVar[bool] = True
-
-    def set_dimension(self, dimension: int) -> Self:
-        """No op for sparse embeddings."""
-        if self._dimension is None:
-            object.__setattr__(self, "_dimension", ZERO)
-        return self
-
-
-class SentenceTransformersSparseEmbeddingConfig(BaseSparseEmbeddingConfig):
-    """Configuration options for Sentence Transformers sparse embedding models."""
-
-    _is_sparse: ClassVar[bool] = True
-
-    provider: Literal[Provider.SENTENCE_TRANSFORMERS] = Provider.SENTENCE_TRANSFORMERS
-    tag: Literal["sentence_transformers"] = "sentence_transformers"
-
-    embedding: SentenceTransformersEncodeDict | None = None
-    """Parameters for document/corpus encoding."""
-
-    query: SentenceTransformersEncodeDict | None = None
-    """Parameters for query encoding (if different from document)."""
-
-    def _as_options(self) -> SerializedEmbeddingOptionsDict:
-        """Convert the Sentence Transformers configuration to a dictionary of options."""
-        return SerializedEmbeddingOptionsDict(
-            model_name=ModelName(self.model_name),
-            embedding=cast(dict[str, Any], self.embedding or {}),
-            query=cast(dict[str, Any], self.query or {}),
-            model={},
-        )
-
-    def set_dimension(self, dimension: int) -> Self:
-        """Set the embedding dimension explicitly in the embedding configuration.
-
-        Args:
-            dimension: The dimension to set.
-        """
-        object.__setattr__(self, "_dimension", dimension)
-        self.embedding = self.embedding or {}  # ty:ignore[invalid-assignment]
-        self.embedding["truncate_dim"] = dimension  # ty:ignore[invalid-assignment]
-        self.query = self.query or {}  # ty:ignore[invalid-assignment]
-        self.query["truncate_dim"] = dimension  # ty:ignore[invalid-assignment]
-        return self
-
-    def set_datatype(self, datatype: str) -> Self:
-        """Set the embedding datatype explicitly in the embedding configuration.
-
-        Args:
-            datatype: The datatype to set.
-        """
-        object.__setattr__(self, "_datatype", datatype)
-        self.embedding = self.embedding or {}  # ty:ignore[invalid-assignment]
-        self.embedding["precision"] = datatype  # ty:ignore[invalid-assignment]
-        self.query = self.query or {}  # ty:ignore[invalid-assignment]
-        self.query["precision"] = datatype  # ty:ignore[invalid-assignment]
-        return self
-
-    def _get_dimension(self) -> Literal[0]:
-        """No op for sparse embeddings since dimension is determined by the tokenizer and not fixed. Return 0 as a placeholder."""
-        return ZERO
-
-    def _get_datatype(self) -> str:
-        """Get explicitly configured datatype without fallbacks.
-        Optional field for subclasses to implement as a helper for get_datatype.
-
-        Returns:
-            Explicitly configured datatype or None
-        """
-        if self.embedding and (precision := self.embedding.get("precision")):
-            return precision
-        return "float16"
-
-    @property
-    def _defaults(self) -> dict[str, Any]:
-        """Return default values for the configuration."""
-        return {
-            "embedding": {
-                "normalize_embeddings": True,
-                "convert_to_numpy": True,
-                "batch_size": DEFAULT_LOCAL_EMBEDDING_BATCH_SIZE,
-                "show_progress_bar": False,
-            },
-            "query": {
-                "normalize_embeddings": True,
-                "convert_to_numpy": True,
-                "batch_size": DEFAULT_LOCAL_EMBEDDING_BATCH_SIZE,
-                "show_progress_bar": False,
-            },
-        }
-
-    async def as_sparse_vector_params(self) -> SparseVectorParams:
-        """Get Qdrant SparseVectorParams for this sparse embedding configuration."""
-        return await _to_sparse_vector_params(self)
-
-
-class FastEmbedSparseEmbeddingConfig(BaseSparseEmbeddingConfig):
-    """Configuration options for FastEmbed sparse embedding models.
-
-    Inherits all configuration from FastEmbedEmbeddingConfig.
-    """
-
-    _is_sparse: ClassVar[bool] = True
-
-    provider: Literal[Provider.FASTEMBED] = Provider.FASTEMBED
-    tag: Literal["fastembed"] = "fastembed"
-
-    async def as_sparse_vector_params(self) -> SparseVectorParams:
-        """Get Qdrant SparseVectorParams for this sparse embedding configuration."""
-        return await _to_sparse_vector_params(self)
-
-    def _as_options(self) -> SerializedEmbeddingOptionsDict:
-        """Convert the FastEmbed embedding configuration to a dictionary of options."""
-        return SerializedEmbeddingOptionsDict(
-            model_name=self.model_name, embedding={}, query={}, model={}
-        )
-
-    def set_dimension(self, dimension: int) -> Self:
-        """Set the embedding dimension explicitly in the embedding configuration.
-
-        Args:
-            dimension: The dimension to set.
-        """
-        object.__setattr__(self, "_dimension", ZERO)
-        return self
-
-    def set_datatype(self, datatype: str) -> Self:
-        """Set the embedding datatype explicitly in the embedding configuration.
-
-        Args:
-            datatype: The datatype to set.
-        """
-        object.__setattr__(self, "_datatype", datatype)
-        return self
 
 
 # ============================================================================
@@ -1642,25 +1463,21 @@ EmbeddingConfigT = Annotated[
 ]
 """Discriminated union type for all embedding configuration classes."""
 
-SparseEmbeddingConfigT = Annotated[
-    SentenceTransformersSparseEmbeddingConfig | FastEmbedSparseEmbeddingConfig,
-    Field(description="All sparse embedding config classes."),
-]
-
 
 __all__ = (
     "DATATYPE_FIELDS",
     "DIMENSION_FIELDS",
+    "INCOMPATIBLE_FIELDS",
     "BaseEmbeddingConfig",
-    "BaseSparseEmbeddingConfig",
     "BedrockCohereConfigDict",
     "BedrockEmbeddingConfig",
     "BedrockEmbeddingRequestParams",
     "BedrockTitanV2ConfigDict",
+    "CohereEmbeddingConfig",
+    "CohereEmbeddingOptionsDict",
     "EmbeddingConfigT",
     "EmbeddingMixin",
     "FastEmbedEmbeddingConfig",
-    "FastEmbedSparseEmbeddingConfig",
     "GoogleEmbeddingConfig",
     "GoogleEmbeddingRequestParams",
     "HuggingFaceEmbeddingConfig",
@@ -1670,9 +1487,7 @@ __all__ = (
     "OpenAIEmbeddingRequestParams",
     "SentenceTransformersEmbeddingConfig",
     "SentenceTransformersEncodeDict",
-    "SentenceTransformersSparseEmbeddingConfig",
     "SerializedEmbeddingOptionsDict",
-    "SparseEmbeddingConfigT",
     "VoyageEmbeddingConfig",
     "VoyageEmbeddingOptionsDict",
 )

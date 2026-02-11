@@ -43,7 +43,6 @@ from codeweaver.providers.config.categories import (
     AsymmetricEmbeddingProviderSettings,
     BaseAgentProviderSettings,
     BaseProviderCategorySettings,
-    CollectionConfig,
     DataProviderSettingsType,
     DuckDuckGoProviderSettings,
     EmbeddingProviderSettings,
@@ -60,23 +59,22 @@ from codeweaver.providers.config.clients import (
     QdrantClientOptions,
     SentenceTransformersClientOptions,
 )
-from codeweaver.providers.config.embedding import (
+from codeweaver.providers.config.sdk import (
+    CollectionConfig,
     EmbeddingConfigT,
     FastEmbedEmbeddingConfig,
+    FastEmbedRerankingConfig,
     FastEmbedSparseEmbeddingConfig,
     GoogleEmbeddingConfig,
     MistralEmbeddingConfig,
+    RerankingConfigT,
     SentenceTransformersEmbeddingConfig,
     SentenceTransformersEncodeDict,
+    SentenceTransformersRerankingConfig,
     SentenceTransformersSparseEmbeddingConfig,
     SparseEmbeddingConfigT,
     VoyageEmbeddingConfig,
     VoyageEmbeddingOptionsDict,
-)
-from codeweaver.providers.config.reranking import (
-    FastEmbedRerankingConfig,
-    RerankingConfigT,
-    SentenceTransformersRerankingConfig,
     VoyageRerankingConfig,
 )
 
@@ -403,7 +401,7 @@ def _get_default_agent_provider_settings() -> tuple[AgentProviderSettingsType, .
     )
 
 
-DefaultAgentProviderSettings: tuple[BaseAgentProviderSettings, ...] | None = (
+DefaultAgentProviderSettings: tuple[AgentProviderSettingsType, ...] | None = (
     None  # Will be lazy-initialized
 )
 

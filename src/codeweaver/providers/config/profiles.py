@@ -27,7 +27,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, overload
 
 from pydantic import AnyHttpUrl
-from pydantic_ai.settings import ModelSettings as AgentModelSettings
 
 from codeweaver.core import (
     BaseDataclassEnum,
@@ -45,10 +44,9 @@ from codeweaver.providers.config import (
     RerankingProviderSettingsType,
     SparseEmbeddingProviderSettingsType,
 )
-from codeweaver.providers.config.agent import AnthropicAgentModelConfig
 from codeweaver.providers.config.categories import (
     AnthropicAgentProviderSettings,
-    CollectionConfig,
+    AsymmetricEmbeddingProviderSettings,
     DuckDuckGoProviderSettings,
     EmbeddingProviderSettings,
     QdrantVectorStoreProviderSettings,
@@ -57,14 +55,15 @@ from codeweaver.providers.config.categories import (
     TavilyProviderSettings,
 )
 from codeweaver.providers.config.clients import QdrantClientOptions
-from codeweaver.providers.config.embedding import (
+from codeweaver.providers.config.sdk import (
+    AnthropicAgentModelConfig,
+    CollectionConfig,
     FastEmbedEmbeddingConfig,
     FastEmbedSparseEmbeddingConfig,
     SentenceTransformersEmbeddingConfig,
     SentenceTransformersSparseEmbeddingConfig,
     VoyageEmbeddingConfig,
 )
-from codeweaver.providers.config.providers import AsymmetricEmbeddingProviderSettings
 
 
 if TYPE_CHECKING:
@@ -74,7 +73,7 @@ if TYPE_CHECKING:
 # Check if FastEmbed is available
 HAS_FASTEMBED = find_spec("fastembed") is not None or find_spec("fastembed-gpu") is not None
 
-from codeweaver.providers.config.reranking import (
+from codeweaver.providers.config.sdk import (
     FastEmbedRerankingConfig,
     SentenceTransformersRerankingConfig,
     VoyageRerankingConfig,
@@ -327,7 +326,7 @@ def _quickstart_default(
             AnthropicAgentProviderSettings(
                 provider=Provider.ANTHROPIC,
                 model_name="claude-haiku-4.5",
-                agent_config=AgentModelSettings(),
+                agent_config=AnthropicAgentModelConfig(),
             ),
         ),
         data=(

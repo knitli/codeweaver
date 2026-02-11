@@ -24,6 +24,11 @@ if TYPE_CHECKING:
         RerankingCapabilityType,
     )
     from codeweaver.providers.types.search import ModelCapDict, ModelNameDict, SearchPackage
+    from codeweaver.providers.types.vector_store import (
+        CollectionMetadata,
+        HybridVectorPayload,
+        PayloadFieldDict,
+    )
     from codeweaver.providers.types.vectors import VectorConfig, VectorRole, VectorSet
 
 
@@ -33,12 +38,15 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "BaseRerankingCapabilityResolver": (__spec__.parent, "resolvers"),
     "BaseResolver": (__spec__.parent, "resolvers"),
     "BaseSparseEmbeddingCapabilityResolver": (__spec__.parent, "resolvers"),
-    "EmbeddingCapabilityType": (__spec__.parent, "resolvers"),
     "CircuitBreakerState": (__spec__.parent, "circuit_breaker"),
+    "CollectionMetadata": (__spec__.parent, "vector_store"),
     "ConfiguredCapability": (__spec__.parent, "embedding"),
     "EmbeddingCapabilityGroup": (__spec__.parent, "embedding"),
+    "EmbeddingCapabilityType": (__spec__.parent, "resolvers"),
+    "HybridVectorPayload": (__spec__.parent, "vector_store"),
     "ModelCapDict": (__spec__.parent, "search"),
     "ModelNameDict": (__spec__.parent, "search"),
+    "PayloadFieldDict": (__spec__.parent, "vector_store"),
     "RerankingCapabilityType": (__spec__.parent, "resolvers"),
     "SearchPackage": (__spec__.parent, "search"),
     "VectorConfig": (__spec__.parent, "vectors"),
@@ -56,11 +64,14 @@ __all__ = (
     "BaseResolver",
     "BaseSparseEmbeddingCapabilityResolver",
     "CircuitBreakerState",
+    "CollectionMetadata",
     "ConfiguredCapability",
     "EmbeddingCapabilityGroup",
     "EmbeddingCapabilityType",
+    "HybridVectorPayload",
     "ModelCapDict",
     "ModelNameDict",
+    "PayloadFieldDict",
     "RerankingCapabilityType",
     "SearchPackage",
     "VectorConfig",

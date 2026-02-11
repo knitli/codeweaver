@@ -15,7 +15,7 @@ from codeweaver.providers.config.clients import (
     GeneralDataClientOptionsType,
     TavilyClientOptions,
 )
-from codeweaver.providers.config.data import (
+from codeweaver.providers.config.sdk import (
     DuckDuckGoSearchToolConfig,
     ExaToolConfig,
     TavilySearchContextToolConfig,
