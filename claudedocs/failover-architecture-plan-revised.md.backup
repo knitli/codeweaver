@@ -235,7 +235,7 @@ class BackupConfig(BasedModel):
     @classmethod
     def from_settings(cls, settings: ProviderSettings, *, user_disabled: bool = False) -> BackupConfig:
         """Auto-detect backup needs."""
-        def _get_setting[T: BaseProviderSettings](provider_settings: tuple[T, ...] | T | None) -> T | None:
+        def _get_setting[T: BaseProviderCategorySettings](provider_settings: tuple[T, ...] | T | None) -> T | None:
             """Get the primary config for a given provider category's settings."""
             if not provider_settings:
                 return None

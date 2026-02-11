@@ -7,7 +7,7 @@ from typing import Annotated, ClassVar, Literal
 from pydantic import Field, Tag, computed_field
 
 from codeweaver.core.types import LiteralSDKClient, Provider, ProviderCategory, SDKClient
-from codeweaver.providers.config.categories.base import BaseProviderSettings
+from codeweaver.providers.config.categories.base import BaseProviderCategorySettings
 from codeweaver.providers.config.categories.utils import PROVIDER_DISCRIMINATOR, is_cloud_provider
 from codeweaver.providers.config.clients import (
     DuckDuckGoClientOptions,
@@ -22,7 +22,7 @@ from codeweaver.providers.config.data import (
 )
 
 
-class BaseDataProviderSettings(BaseProviderSettings):
+class BaseDataProviderSettings(BaseProviderCategorySettings):
     """Settings for data providers."""
 
     provider: Literal[Provider.TAVILY, Provider.DUCKDUCKGO, Provider.EXA]

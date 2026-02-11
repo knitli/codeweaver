@@ -8,7 +8,7 @@ from codeweaver.core import Provider, ProviderCategory
 from codeweaver.core.types import ModelNameT, SDKClient
 from codeweaver.core.utils import has_package
 from codeweaver.providers import ClientOptions
-from codeweaver.providers.config.categories.base import BaseProviderSettings
+from codeweaver.providers.config.categories.base import BaseProviderCategorySettings
 from codeweaver.providers.config.categories.mixins import FastEmbedProviderMixin
 from codeweaver.providers.config.categories.utils import PROVIDER_DISCRIMINATOR, is_cloud_provider
 from codeweaver.providers.config.clients import (
@@ -32,7 +32,7 @@ if has_package("sentence_transformers"):
     )
 
 
-class BaseSparseEmbeddingProviderSettings(BaseProviderSettings):
+class BaseSparseEmbeddingProviderSettings(BaseProviderCategorySettings):
     """Base settings for sparse embedding providers."""
 
     provider: Literal[Provider.SENTENCE_TRANSFORMERS, Provider.FASTEMBED]

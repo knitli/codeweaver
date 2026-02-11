@@ -105,8 +105,8 @@ def test_metadata_isolation_after_set_batch_keys(sample_chunk: CodeChunk) -> Non
 
     # Modify the updated chunk's metadata
     if updated_chunk.metadata:
-        updated_chunk.metadata["category"] = "modified"
+        updated_chunk.metadata["kind"] = "modified"
 
     # Original chunk's metadata should not have the modification
     assert sample_chunk.metadata is not None
-    assert sample_chunk.metadata.get("category") is None
+    assert sample_chunk.metadata.get("kind") is None

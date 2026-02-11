@@ -425,7 +425,7 @@ from codeweaver.core.config.registry import register_configurable
 
 
 class QdrantVectorStoreProviderSettings(
-    BaseProviderSettings,
+    BaseProviderCategorySettings,
     ConfigurableComponent
 ):
     """Settings for Qdrant vector store provider."""

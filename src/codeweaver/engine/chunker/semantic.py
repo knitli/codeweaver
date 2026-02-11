@@ -807,8 +807,11 @@ class SemanticChunker(BaseChunker):
                 "chunker_type": "semantic",
                 "content_hash": self._compute_content_hash(node.text),
                 "classification": node.classification.name if node.classification else None,
-                "category": str(node.name),
-                "category": node.primary_category if hasattr(node, "primary_category") else None,
+                "kind": node.primary_category
+                if hasattr(node, "primary_category")
+                else str(node.name)
+                if node.name
+                else "",
                 "importance_scores": node.importance.as_dict() if node.importance else None,
                 "is_composite": node.is_composite,
                 "nesting_level": nesting_level,

@@ -66,7 +66,7 @@ def validate_compatibility(self, other: CollectionMetadata) -> None:
 **Location**: `src/codeweaver/config/providers.py`
 
 ```python
-class EmbeddingProviderSettings(BaseProviderSettings):
+class EmbeddingProviderSettings(BaseProviderCategorySettings):
     model_name: ModelNameT
     embedding_config: EmbeddingConfigT  # Single provider config
 ```

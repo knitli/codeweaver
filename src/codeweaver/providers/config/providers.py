@@ -8,7 +8,7 @@ Models and TypedDict classes for provider and AI (embedding, sparse embedding, r
 
 The overall pattern:
     - Each potential provider client (the actual client class, e.g., OpenAIClient) has a corresponding ClientOptions class (e.g., OpenAIClientOptions).
-    - There is a baseline provider settings model, `BaseProviderSettings`. Each provider type (embedding, data, vector store, etc.) has a corresponding settings model that extends `BaseProviderSettings` (e.g., `EmbeddingProviderSettings`). These are mostly almost identical, but the class distinctions make identification easier and improves clarity.
+    - There is a baseline provider settings model, `BaseProviderCategorySettings`. Each provider type (embedding, data, vector store, etc.) has a corresponding settings model that extends `BaseProviderCategorySettings` (e.g., `EmbeddingProviderSettings`). These are mostly almost identical, but the class distinctions make identification easier and improves clarity.
     - Certain providers with unique settings requirements can define a mixin class that provides the additional required settings. Note that these should not overlap with the client options for the provider.
     - A series of discriminators help with identifying the correct client options and provider settings classes based on the provider and other settings.
 """
@@ -37,12 +37,12 @@ from codeweaver.core.types import (
     Unset,
 )
 from codeweaver.core.utils import has_package
-from codeweaver.providers import VoyageClientOptions
+from codeweaver.providers import AnthropicAgentProviderSettings, VoyageClientOptions
 from codeweaver.providers.config.categories import (
     AgentProviderSettingsType,
     AsymmetricEmbeddingProviderSettings,
     BaseAgentProviderSettings,
-    BaseProviderSettings,
+    BaseProviderCategorySettings,
     CollectionConfig,
     DataProviderSettingsType,
     DuckDuckGoProviderSettings,
@@ -389,13 +389,13 @@ DefaultRerankingProviderSettings: tuple[RerankingProviderSettings, ...] | None =
 HAS_ANTHROPIC = (has_package("anthropic") or has_package("claude-agent-sdk")) is not None
 
 
-def _get_default_agent_provider_settings() -> tuple[BaseAgentProviderSettings, ...] | None:
+def _get_default_agent_provider_settings() -> tuple[AgentProviderSettingsType, ...] | None:
     """Get default agent provider settings (delayed instantiation)."""
     if not HAS_ANTHROPIC:
         return None
     # Don't instantiate AgentModelSettings here to avoid forward reference issues
     return (
-        BaseAgentProviderSettings(
+        AnthropicAgentProviderSettings(
             provider=Provider.ANTHROPIC,
             model_name="claude-haiku-4.5-latest",
             agent_config=None,  # Use None to avoid forward reference validation
@@ -647,7 +647,7 @@ class ProviderSettings(BasedModel):
         return ProviderCategoryLiteralString.__value__.__args__
 
     @property
-    def _all_configs(self) -> tuple[BaseProviderSettings, ...]:
+    def _all_configs(self) -> tuple[BaseProviderCategorySettings, ...]:
         """Get all provider settings as a flat tuple."""
         return tuple(
             setting
@@ -659,7 +659,7 @@ class ProviderSettings(BasedModel):
     @property
     def provider_configs(
         self,
-    ) -> dict[ProviderCategoryLiteralString, tuple[BaseProviderSettings, ...]]:
+    ) -> dict[ProviderCategoryLiteralString, tuple[BaseProviderCategorySettings, ...]]:
         """Get a summary of configured provider settings by category."""
         return {
             field_name: settings
@@ -689,7 +689,7 @@ class ProviderSettings(BasedModel):
 
     def settings_for_provider(
         self, provider: Provider
-    ) -> BaseProviderSettings | tuple[BaseProviderSettings, ...] | None:
+    ) -> BaseProviderCategorySettings | tuple[BaseProviderCategorySettings, ...] | None:
         """Get the settings for a specific provider."""
         if provider == Provider.NOT_SET:
             return None
@@ -707,7 +707,7 @@ class ProviderSettings(BasedModel):
             return None
 
         # Retrieve and flatten settings for matching fields
-        all_settings: list[BaseProviderSettings] = []
+        all_settings: list[BaseProviderCategorySettings] = []
         for field in matching_fields:
             if setting := self.settings_for_category(field):
                 if isinstance(setting, tuple):
@@ -769,7 +769,7 @@ class ProviderSettings(BasedModel):
         *,
         primary: bool = True,
         backup: bool = False,
-    ) -> BaseProviderSettings | tuple[BaseProviderSettings, ...] | None:
+    ) -> BaseProviderCategorySettings | tuple[BaseProviderCategorySettings, ...] | None:
         """Get the settings for a specific provider category.
 
         Args:

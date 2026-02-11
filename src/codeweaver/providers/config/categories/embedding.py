@@ -32,7 +32,7 @@ from codeweaver.core.types import (
     SDKClient,
 )
 from codeweaver.core.utils import has_package
-from codeweaver.providers.config.categories.base import BaseProviderSettings
+from codeweaver.providers.config.categories.base import BaseProviderCategorySettings
 from codeweaver.providers.config.categories.mixins import (
     AzureProviderMixin,
     BedrockProviderMixin,
@@ -73,7 +73,7 @@ if has_package("sentence_transformers"):
 possible_tags = get_provider_names_for_category("embedding")
 
 
-class BaseEmbeddingProviderSettings(BaseProviderSettings, ABC):
+class BaseEmbeddingProviderSettings(BaseProviderCategorySettings, ABC):
     """Settings for (dense) embedding models. It validates that the model and provider settings are compatible and complete, reconciling environment variables and config file settings as needed."""
 
     category: ClassVar[Literal[ProviderCategory.EMBEDDING]] = ProviderCategory.EMBEDDING

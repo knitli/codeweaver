@@ -19,7 +19,7 @@ from codeweaver.providers import (
     VoyageRerankingConfig,
 )
 from codeweaver.providers.config.categories import PROVIDER_DISCRIMINATOR
-from codeweaver.providers.config.categories.base import BaseProviderSettings
+from codeweaver.providers.config.categories.base import BaseProviderCategorySettings
 from codeweaver.providers.config.categories.mixins import (
     BedrockProviderMixin,
     FastEmbedProviderMixin,
@@ -36,7 +36,7 @@ from codeweaver.providers.embedding import BedrockRerankingModelConfig
 
 def _config_factory[T: RerankingConfigT](data: dict[str, Any], config_class: type[T]) -> T:
     """Factory function to create a reranking config instance from the input data."""
-    defaults = config_class._defaults() if hasattr(config_class, "_defaults") else {}  # ty:ignore[invalid-argument-type]
+    defaults = config_class._defaults() if hasattr(config_class, "_defaults") else {}
     config_data = (
         defaults
         | {"model_name": data.get("model_name"), "provider": data.get("provider")}
@@ -49,7 +49,7 @@ def _config_factory[T: RerankingConfigT](data: dict[str, Any], config_class: typ
         )
     )
     if config_data.get("provider") == Provider.BEDROCK and data.get("model_arn"):
-        config_data["model"] = config_data.get("model", {}) | {"model_arn": data["model_arn"]}  # ty:ignore[unsupported-operator]
+        config_data["model"] = config_data.get("model", {}) | {"model_arn": data["model_arn"]}
     if (
         data["top_n"] != DEFAULT_RERANKING_MAX_RESULTS
         and (provider := config_data.get("provider"))
@@ -62,13 +62,13 @@ def _config_factory[T: RerankingConfigT](data: dict[str, Any], config_class: typ
             case Provider.SENTENCE_TRANSFORMERS:
                 config_data["rerank"]["top_k"] = data["top_n"]
             case Provider.BEDROCK:
-                config_data["rerank"]["number_of_results"] = data["top_n"]  # ty:ignore[invalid-key]
+                config_data["rerank"]["number_of_results"] = data["top_n"]
             case Provider.COHERE:
                 config_data["rerank"]["top_k"] = data["top_n"]
     return config_class.model_validate(config_data)
 
 
-class BaseRerankingProviderSettings(BaseProviderSettings):
+class BaseRerankingProviderSettings(BaseProviderCategorySettings):
     """Base settings for reranking providers."""
 
     model_name: Annotated[ModelNameT, Field(description="The name of the re-ranking model to use.")]

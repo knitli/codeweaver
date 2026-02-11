@@ -45,7 +45,7 @@ from codeweaver.core.utils import (
     has_package,
 )
 from codeweaver.providers.config.categories.base import (
-    BaseProviderSettings,
+    BaseProviderCategorySettings,
     ConnectionConfiguration,
 )
 from codeweaver.providers.config.categories.utils import PROVIDER_DISCRIMINATOR
@@ -67,7 +67,7 @@ def _get_embedding_group(group: EmbeddingCapabilityGroupDep = INJECTED) -> Embed
     return group
 
 
-class BaseVectorStoreProviderSettings(BaseProviderSettings):
+class BaseVectorStoreProviderSettings(BaseProviderCategorySettings):
     """Base settings for vector store providers."""
 
     provider: Literal[Provider.QDRANT, Provider.MEMORY]
@@ -148,7 +148,7 @@ class CollectionConfig(BasedModel):
         self.vectors_config = deep_merge_dicts(dict(self.vectors_config or {}), assembled_vectors)  # type: ignore
         self.sparse_vectors_config = deep_merge_dicts(  # type: ignore
             dict(self.sparse_vectors_config or {}),  # type: ignore
-            cast(dict[str, SparseVectorParams], params.sparse_vectors or {}),  # type: ignore
+            cast(dict[str, SparseVectorParams], params.sparse_vectors or {}),
         )
         self._vectors_initialized = True
 
@@ -333,7 +333,7 @@ class _BaseQdrantVectorStoreProviderSettings(VectorStoreProviderSettings):
             from codeweaver.providers.vector_stores.qdrant_service import QdrantVectorStoreService
 
             service = QdrantVectorStoreService(
-                settings=self,  # ty:ignore[invalid-argument-type]
+                settings=self,
                 embedding_group=embedding_group,
                 failover_settings=failover_settings,
                 failover_detector=failover_detector,

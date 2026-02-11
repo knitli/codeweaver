@@ -296,9 +296,7 @@ class TestCodeMatchSchema:
         test_file = DiscoveredFile(path=Path("test.py"))
         test_chunk = CodeChunk(
             content="def test(): pass",
-            ext_category=ExtCategory(
-                language=SemanticSearchLanguage.PYTHON, category=ChunkKind.CODE
-            ),
+            ext_category=ExtCategory(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
             line_range=Span(1, 1, uuid7()),
         )
 
@@ -427,9 +425,7 @@ class TestContractExamples:
         example_chunk = CodeChunk(
             content="class AuthMiddleware:\n    def __init__(self, config: AuthConfig):\n        ...",
             line_range=Span(15, 85, uuid7()),
-            ext_category=ExtCategory(
-                language=SemanticSearchLanguage.PYTHON, category=ChunkKind.CODE
-            ),
+            ext_category=ExtCategory(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
         )
         example_match = CodeMatch(
             file=example_file,

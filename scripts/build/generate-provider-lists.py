@@ -13,7 +13,7 @@ from codeweaver.core import PROVIDER_CAPABILITIES, Provider, ProviderCategory
 def generate_category(category: str) -> list[str]:
     """Generate a list of providers for a given category."""
     providers = {provider for provider in Provider if provider != Provider.NOT_SET}
-    category = ProviderCategory.from_string(category.lower())
+    category: ProviderCategory = ProviderCategory.from_string(category.lower())
     listing = [f"## {category.capitalize().replace('_', ' ')} Providers", ""]
     listing.extend(f"- {provider.as_title}" for provider in providers if category in PROVIDER_CAPABILITIES[provider])
     return sorted(listing)

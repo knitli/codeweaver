@@ -25,7 +25,7 @@ from codeweaver.providers.config.agent import (
     OpenAIAgentModelConfig,
     OpenRouterAgentModelConfig,
 )
-from codeweaver.providers.config.categories.base import BaseProviderSettings
+from codeweaver.providers.config.categories.base import BaseProviderCategorySettings
 from codeweaver.providers.config.categories.mixins import AzureProviderMixin, BedrockProviderMixin
 from codeweaver.providers.config.categories.utils import (
     ANTHROPIC_PROVIDER_DISCRIMINATOR,
@@ -50,7 +50,7 @@ from codeweaver.providers.config.clients import (
 from codeweaver.providers.config.types import AgentModelNameString
 
 
-class BaseAgentProviderSettings(BaseProviderSettings):
+class BaseAgentProviderSettings(BaseProviderCategorySettings):
     """Settings for agent providers."""
 
     model_name: Annotated[

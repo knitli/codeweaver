@@ -8,10 +8,10 @@ from pydantic import Discriminator
 
 from codeweaver.core import Provider
 from codeweaver.core.utils import is_local_host
-from codeweaver.providers.config.categories.base import BaseProviderSettings
+from codeweaver.providers.config.categories.base import BaseProviderCategorySettings
 
 
-def is_cloud_provider(_instance: BaseProviderSettings) -> bool:
+def is_cloud_provider(_instance: BaseProviderCategorySettings) -> bool:
     """Return True if the provider settings are for a cloud deployment."""
     if _instance.provider.always_cloud or not _instance.provider.always_local:
         return True

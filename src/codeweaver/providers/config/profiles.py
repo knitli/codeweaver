@@ -48,7 +48,6 @@ from codeweaver.providers.config import (
 from codeweaver.providers.config.agent import AnthropicAgentModelConfig
 from codeweaver.providers.config.categories import (
     AnthropicAgentProviderSettings,
-    BaseAgentProviderSettings,
     CollectionConfig,
     DuckDuckGoProviderSettings,
     EmbeddingProviderSettings,
@@ -325,7 +324,7 @@ def _quickstart_default(
             ),
         ),
         agent=(
-            BaseAgentProviderSettings(
+            AnthropicAgentProviderSettings(
                 provider=Provider.ANTHROPIC,
                 model_name="claude-haiku-4.5",
                 agent_config=AgentModelSettings(),

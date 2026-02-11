@@ -92,11 +92,11 @@ For local providers, this is the answer to the question "who do you use for this
 > - **the model family**. You can use Anthropic models on Azure, Bedrock, OpenRouter, and many others, for example, so the provider of an Anthropic model might be `azure`, `bedrock`, `openrouter`, etc. depending on where you access it, and is not necessarily `anthropic`.
 > A provider **can** be the same as the client, model, and class, but not always.
 
-For any top-level subclass of `BaseProviderSettings`, like `EmbeddingProviderSettings`, the `provider` field **is required**, even if it can only be one value for that class. That's because it's how we figure out that's the class you want. For example, if you create an `EmbeddingProviderSettings` with `provider=Provider.FASTEMBED`, we know to create a `FastEmbedEmbeddingProviderSettings` instance.
+For any top-level subclass of `BaseProviderCategorySettings`, like `EmbeddingProviderSettings`, the `provider` field **is required**, even if it can only be one value for that class. That's because it's how we figure out that's the class you want. For example, if you create an `EmbeddingProviderSettings` with `provider=Provider.FASTEMBED`, we know to create a `FastEmbedEmbeddingProviderSettings` instance.
 """
 
 
-class BaseProviderSettings(BasedModel, ABC):
+class BaseProviderCategorySettings(BasedModel, ABC):
     """Base settings for all providers."""
 
     provider: Annotated[Provider, Field(description=_provider_explanation)]
@@ -269,8 +269,8 @@ class BaseProviderSettings(BasedModel, ABC):
         return client_class(**options)
 
 
-class BaseProviderSettingsDict(TypedDict, total=False):
-    """Base settings for all providers. Represents `BaseProviderSettings` in a TypedDict form."""
+class BaseProviderCategorySettingsDict(TypedDict, total=False):
+    """Base settings for all providers. Represents `BaseProviderCategorySettings` in a TypedDict form."""
 
     provider: Required[Provider]
     connection: NotRequired[ConnectionConfiguration | None]
@@ -279,8 +279,8 @@ class BaseProviderSettingsDict(TypedDict, total=False):
 
 
 __all__ = (
-    "BaseProviderSettings",
-    "BaseProviderSettingsDict",
+    "BaseProviderCategorySettings",
+    "BaseProviderCategorySettingsDict",
     "ConnectionConfiguration",
     "ConnectionRateLimitConfig",
 )

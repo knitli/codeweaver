@@ -25,8 +25,8 @@ if TYPE_CHECKING:
         PydanticGatewayProviderSettings,
     )
     from codeweaver.providers.config.categories.base import (
-        BaseProviderSettings,
-        BaseProviderSettingsDict,
+        BaseProviderCategorySettings,
+        BaseProviderCategorySettingsDict,
         ConnectionConfiguration,
         ConnectionRateLimitConfig,
     )
@@ -137,8 +137,8 @@ _dynamic_imports = MappingProxyType({
     "CohereAgentProviderSettings": (__spec__.parent, "agent"),
     "ConnectionConfiguration": (__spec__.parent, "base"),
     "ConnectionRateLimitConfig": (__spec__.parent, "base"),
-    "BaseProviderSettings": (__spec__.parent, "base"),
-    "BaseProviderSettingsDict": (__spec__.parent, "base"),
+    "BaseProviderCategorySettings": (__spec__.parent, "base"),
+    "BaseProviderCategorySettingsDict": (__spec__.parent, "base"),
     "GoogleAgentProviderSettings": (__spec__.parent, "agent"),
     "GroqAgentProviderSettings": (__spec__.parent, "agent"),
     "HuggingFaceAgentProviderSettings": (__spec__.parent, "agent"),
@@ -170,8 +170,8 @@ __all__ = (
     "BaseAgentProviderSettings",
     "BaseDataProviderSettings",
     "BaseEmbeddingProviderSettings",
-    "BaseProviderSettings",
-    "BaseProviderSettingsDict",
+    "BaseProviderCategorySettings",
+    "BaseProviderCategorySettingsDict",
     "BaseRerankingProviderSettings",
     "BaseSparseEmbeddingProviderSettings",
     "BaseVectorStoreProviderSettings",

@@ -315,7 +315,7 @@ Need to verify reranking config has proper structure similar to embedding.
 #### Expected Structure (based on embedding):
 
 ```python
-class SomeRerankingProviderSettings(BaseProviderSettings):
+class SomeRerankingProviderSettings(BaseProviderCategorySettings):
     provider: Literal[Provider.SOME_PROVIDER]
 
     # Model configuration
