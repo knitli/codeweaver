@@ -24,7 +24,6 @@ from typing import (
     TypedDict,
     cast,
     overload,
-    override,
 )
 
 from pydantic import Discriminator, Field, PositiveInt, PrivateAttr, Tag, computed_field
@@ -39,19 +38,13 @@ from qdrant_client.models import (
     VectorParams,
 )
 
-from codeweaver.core import (
-    BasedModel,
-    ConfigurationError,
-    ModelName,
-    ModelNameT,
-    Provider,
-    ProviderLiteralString,
-)
+from codeweaver.core import BasedModel, ConfigurationError, ModelName, ModelNameT, Provider
 from codeweaver.core.constants import (
     DATATYPE_FIELDS,
     DEFAULT_EMBEDDING_TIMEOUT,
     DEFAULT_LOCAL_EMBEDDING_BATCH_SIZE,
     DIMENSION_FIELDS,
+    ZERO,
 )
 from codeweaver.core.utils import deep_merge_dicts
 from codeweaver.providers.config.types import CohereRequestOptionsDict
@@ -112,42 +105,38 @@ class SerializedEmbeddingOptionsDict(TypedDict, total=False):
     query: NotRequired[dict[str, Any]]
 
 
-class BaseEmbeddingConfig(BasedModel):
-    """Base configuration for embedding models."""
+class EmbeddingMixin:
+    """Mixin class for dense and sparse embedding configurations. Provides shared methods and interfaces for both types of embedding configurations."""
 
-    _is_sparse: ClassVar[bool] = False
-    _dimension: int | None = PrivateAttr(default=None)
     _datatype: str | None = PrivateAttr(default=None)
+    _dimension: int | None = PrivateAttr(default=None)
+    _is_sparse: ClassVar[bool] = False
 
-    tag: ProviderLiteralString = Field(
-        ...,
-        description="The provider tag for the embedding model. Used for discriminated unions.",
-        exclude=True,
-    )
+    provider: Annotated[
+        Provider | None,
+        Field(
+            description="The provider for this embedding configuration. You don't have to provide this value -- while provider is a required setting at the top-level EmbeddingProviderSettings object, we will inject that value into the embedding configuration for you, so you can just specify the provider-specific config without worrying about the provider field in most cases."
+        ),
+    ] = None
 
-    provider: Provider = Field(
-        ...,
-        description="The provider for this embedding configuration. Used for discriminated unions.",
-    )
-
-    model_name: ModelNameT
-    """The name of the embedding model."""
+    model_name: Annotated[
+        ModelNameT | None,
+        Field(
+            description="The name of the embedding model to use. This should be in the format used by the provider (e.g., for Bedrock, this would be the model ARN). Like with `provider`, we can inject that value into the embedding configuration for you, so you can just specify the model-specific config without worrying about the model_name field in most cases."
+        ),
+    ] = None
 
     embedding: Annotated[
-        dict[str, Any] | None, Field(description="Parameters for document embedding requests.")
+        dict[str, Any] | None,
+        Field(
+            description="Parameters for document embedding requests. The specific parameters that can be included here depend on the provider and model you're using. Subclasses should implement a TypedDict for these parameters."
+        ),
     ] = None
 
     query: Annotated[
         dict[str, Any] | None,
         Field(
-            description="Parameters for query embedding requests (often the same as embedding; if the types for each are the same, we'll copy the values so you only need to provide one)."
-        ),
-    ] = None
-
-    model: Annotated[
-        dict[str, Any] | None,
-        Field(
-            description="Parameters for model-level configuration (separate from embedding/query options)."
+            description="Parameters for query embedding requests. Often the same as the embedding parameters, but some providers/models allow for different parameters for query vs document embeddings, so this is a separate field. If the types for embedding and query are the same, and you only provide one of them, we'll copy the values over to the other one for you."
         ),
     ] = None
 
@@ -159,18 +148,18 @@ class BaseEmbeddingConfig(BasedModel):
             (embedding and not query) or (query and not embedding)
         ) and self._query_and_embedding_same_type():
             # if only one of embedding or query is provided, and they are the same type, copy it over, with caveats
-            no_copy_keys = {"prompt", "prompt_name", "task"}
             if embedding:
-                data["query"] = {k: v for k, v in embedding.copy().items() if k not in no_copy_keys}
+                data["query"] = type(self)._filter_and_merge(
+                    data.get("query", {}), data["embedding"]
+                )
             elif query:
-                data["embedding"] = {k: v for k, v in query.copy().items() if k not in no_copy_keys}
+                data["embedding"] = type(self)._filter_and_merge(
+                    data.get("embedding", {}), data["query"]
+                )
         if not embedding:
             data["embedding"] = {}
         if not query:
             data["query"] = {}
-        if "model" not in data or not data.get("model"):
-            data["model"] = {}
-        object.__setattr__(self, "_is_sparse", data.pop("_is_sparse", False))
         super().__init__(**data)
         from codeweaver.core.di import get_container
 
@@ -183,20 +172,6 @@ class BaseEmbeddingConfig(BasedModel):
                 "Dependency injection container not available, skipping registration of EmbeddingConfig: %s",
                 e,
             )
-
-    @abstractmethod
-    def set_dimension(self, dimension: int) -> Self:
-        """Set the embedding dimension explicitly in the embedding configuration.
-
-        Args:
-            dimension: The dimension to set.
-        """
-        raise NotImplementedError("Subclasses must implement set_dimension method.")
-
-    @abstractmethod
-    def set_datatype(self, datatype: str) -> Self:
-        """Set the embedding datatype explicitly in the embedding configuration."""
-        raise NotImplementedError("Subclasses must implement set_datatype method.")
 
     @staticmethod
     def _filter_and_merge(
@@ -211,8 +186,15 @@ class BaseEmbeddingConfig(BasedModel):
             ),
         )
 
+    @abstractmethod
+    def set_datatype(self, datatype: str) -> Self:
+        """Set the embedding datatype explicitly in the embedding configuration."""
+        raise NotImplementedError("Subclasses must implement set_datatype method.")
+
     def mirror_settings(self, **updates: Any) -> Self:
         """If the types for embedding and query are the same, mirrors settings between them with deep merge. If updates are provided, overrides resolved settings with the updates."""
+        if not hasattr(self, "model_copy") or not callable(self.model_copy):
+            return self
         if self._query_and_embedding_same_type():
             new_embedding = self._filter_and_merge(self.embedding or {}, self.query or {})
             new_embedding = self._filter_and_merge(new_embedding, updates or {})
@@ -408,6 +390,11 @@ class BaseEmbeddingConfig(BasedModel):
         object.__setattr__(self, "_datatype", "float16")
         return "float16"
 
+    @property
+    def capabilities(self) -> EmbeddingModelCapabilities | SparseEmbeddingModelCapabilities | None:
+        """Get the embedding model capabilities for this configuration."""
+        return _get_embedding_capabilities_for_model(self.model_name, sparse=type(self)._is_sparse)  # ty:ignore[no-matching-overload]
+
     @staticmethod
     def _clean_dtypes(
         kwargs: dict[Literal["embedding", "query", "model"], Any],
@@ -430,51 +417,18 @@ class BaseEmbeddingConfig(BasedModel):
             if "model" in kwargs:
                 kwargs["model"].pop(found_field, None)
         if "embedding" in kwargs:
-            kwargs["embedding"] = BaseEmbeddingConfig._clean_dtypes(kwargs.get("embedding", {}))
+            kwargs["embedding"] = EmbeddingMixin._clean_dtypes(kwargs.get("embedding", {}))
         if "query" in kwargs:
-            kwargs["query"] = BaseEmbeddingConfig._clean_dtypes(kwargs.get("query", {}))
+            kwargs["query"] = EmbeddingMixin._clean_dtypes(kwargs.get("query", {}))
         if "model" in kwargs:
-            kwargs["model"] = BaseEmbeddingConfig._clean_dtypes(kwargs.get("model", {}))
+            kwargs["model"] = EmbeddingMixin._clean_dtypes(kwargs.get("model", {}))
         return kwargs
-
-    async def as_vector_params(self) -> VectorParams:
-        """Get Qdrant VectorParams for this embedding configuration.
-
-        Returns:
-            VectorParams instance with dimension and datatype set.
-        """
-        dimension = await self.get_dimension()
-        datatype = await self.get_datatype()
-        if datatype and datatype not in ("float32", "float16", "uint8"):
-            datatype = "float16" if "float" in datatype else "uint8"
-        distance_metrics = (
-            self.capabilities.preferred_metrics
-            if self.capabilities and self.capabilities.preferred_metrics
-            else []
-        )
-        metric = next(
-            (m for m in distance_metrics if m in ("cosine", "dot", "euclidean", "manhattan")), None
-        )
-        quantization = (
-            None
-            if not datatype or "float" in datatype
-            else ScalarQuantization.model_validate({"scalar": {"type": ScalarType.INT8}})
-        )
-        return VectorParams(
-            size=dimension,
-            distance=Distance((metric or "cosine").title()),
-            datatype=Datatype(datatype or "float16") if datatype else None,
-            quantization_config=quantization,
-        )
-
-    @property
-    def capabilities(self) -> EmbeddingModelCapabilities | SparseEmbeddingModelCapabilities | None:
-        """Get the embedding model capabilities for this configuration."""
-        return _get_embedding_capabilities_for_model(self.model_name, sparse=type(self)._is_sparse)
 
     @classmethod
     def _query_and_embedding_same_type(cls) -> bool:
         """Check if both query and embedding configurations are of the same type."""
+        if not issubclass(cls, BasedModel):
+            return True
         query_field_info = cls.model_fields.get("query")
         embedding_field_info = cls.model_fields.get("embedding")
         if (
@@ -530,6 +484,47 @@ class BaseEmbeddingConfig(BasedModel):
         only explicitly configured values or None.
         """
         return self._datatype or self.get_datatype_sync()
+
+
+class BaseEmbeddingConfig(BasedModel, EmbeddingMixin):
+    """Base configuration for embedding models."""
+
+    model: Annotated[
+        dict[str, Any] | None,
+        Field(
+            description="Parameters for model-level configuration (separate from embedding/query options)."
+        ),
+    ] = None
+
+    async def as_vector_params(self) -> VectorParams:
+        """Get Qdrant VectorParams for this embedding configuration.
+
+        Returns:
+            VectorParams instance with dimension and datatype set.
+        """
+        dimension = await self.get_dimension()
+        datatype = await self.get_datatype()
+        if datatype and datatype not in ("float32", "float16", "uint8"):
+            datatype = "float16" if "float" in datatype else "uint8"
+        distance_metrics = (
+            self.capabilities.preferred_metrics
+            if self.capabilities and self.capabilities.preferred_metrics
+            else []
+        )
+        metric = next(
+            (m for m in distance_metrics if m in ("cosine", "dot", "euclidean", "manhattan")), None
+        )
+        quantization = (
+            None
+            if not datatype or "float" in datatype
+            else ScalarQuantization.model_validate({"scalar": {"type": ScalarType.INT8}})
+        )
+        return VectorParams(
+            size=dimension,
+            distance=Distance((metric or "cosine").title()),
+            datatype=Datatype(datatype or "float16") if datatype else None,
+            quantization_config=quantization,
+        )
 
 
 class BedrockEmbeddingRequestParams(TypedDict, total=False):
@@ -679,9 +674,9 @@ class BedrockEmbeddingConfig(BaseEmbeddingConfig):
         model = self.model.copy()
         return SerializedEmbeddingOptionsDict(
             model_name=ModelName(self.model_name),
-            model=model,  # ty:ignore[invalid-argument-type]
-            embedding=self.embedding or self.query or {},  # ty:ignore[invalid-argument-type]
-            query=self.query or self.embedding or {},  # ty:ignore[invalid-argument-type]
+            model=model,
+            embedding=self.embedding or self.query or {},
+            query=self.query or self.embedding or {},
         )
 
     @property
@@ -741,8 +736,7 @@ class CohereEmbeddingConfig(BaseEmbeddingConfig):
 
     model: dict[str, Any] | None = None
 
-    @override
-    def set_dimension(self, dimension: Literal[256, 512, 1024, 1536]) -> Self:  # ty:ignore[invalid-method-override]
+    def set_dimension(self, dimension: Literal[256, 512, 1024, 1536]) -> Self:
         """Set the embedding dimension explicitly in the embedding configuration.
 
         Args:
@@ -930,7 +924,7 @@ class GoogleEmbeddingConfig(BaseEmbeddingConfig):
         """
         if not self._datatype:
             object.__setattr__(self, "_datatype", "float")
-        return self._datatype  # type: ignore[return-value]
+        return self._datatype
 
     def _as_options(self) -> SerializedEmbeddingOptionsDict:
         """Convert the Google embedding configuration to a dictionary of options."""
@@ -1490,20 +1484,103 @@ async def _to_sparse_vector_params(instance: BaseEmbeddingConfig) -> SparseVecto
     return SparseVectorParams(index=index_params, modifier=modifier)
 
 
-class SentenceTransformersSparseEmbeddingConfig(SentenceTransformersEmbeddingConfig):
-    """Configuration options for Sentence Transformers sparse embedding models.
-
-    Inherits all configuration from SentenceTransformersEmbeddingConfig.
-    """
+class BaseSparseEmbeddingConfig(EmbeddingMixin, BasedModel):
+    """Base configuration for sparse embedding models."""
 
     _is_sparse: ClassVar[bool] = True
+
+    def set_dimension(self, dimension: int) -> Self:
+        """No op for sparse embeddings."""
+        if self._dimension is None:
+            object.__setattr__(self, "_dimension", ZERO)
+        return self
+
+
+class SentenceTransformersSparseEmbeddingConfig(BaseSparseEmbeddingConfig):
+    """Configuration options for Sentence Transformers sparse embedding models."""
+
+    _is_sparse: ClassVar[bool] = True
+
+    embedding: SentenceTransformersEncodeDict | None = None
+    """Parameters for document/corpus encoding."""
+
+    query: SentenceTransformersEncodeDict | None = None
+    """Parameters for query encoding (if different from document)."""
+
+    def _as_options(self) -> SerializedEmbeddingOptionsDict:
+        """Convert the Sentence Transformers configuration to a dictionary of options."""
+        return SerializedEmbeddingOptionsDict(
+            model_name=ModelName(self.model_name),
+            embedding=cast(dict[str, Any], self.embedding or {}),
+            query=cast(dict[str, Any], self.query or {}),
+            model={},
+        )
+
+    def set_dimension(self, dimension: int) -> Self:
+        """Set the embedding dimension explicitly in the embedding configuration.
+
+        Args:
+            dimension: The dimension to set.
+        """
+        object.__setattr__(self, "_dimension", dimension)
+        self.embedding = self.embedding or {}  # ty:ignore[invalid-assignment]
+        self.embedding["truncate_dim"] = dimension  # ty:ignore[invalid-assignment]
+        self.query = self.query or {}  # ty:ignore[invalid-assignment]
+        self.query["truncate_dim"] = dimension  # ty:ignore[invalid-assignment]
+        return self
+
+    def set_datatype(self, datatype: str) -> Self:
+        """Set the embedding datatype explicitly in the embedding configuration.
+
+        Args:
+            datatype: The datatype to set.
+        """
+        object.__setattr__(self, "_datatype", datatype)
+        self.embedding = self.embedding or {}  # ty:ignore[invalid-assignment]
+        self.embedding["precision"] = datatype  # ty:ignore[invalid-assignment]
+        self.query = self.query or {}  # ty:ignore[invalid-assignment]
+        self.query["precision"] = datatype  # ty:ignore[invalid-assignment]
+        return self
+
+    def _get_dimension(self) -> Literal[0]:
+        """No op for sparse embeddings since dimension is determined by the tokenizer and not fixed. Return 0 as a placeholder."""
+        return ZERO
+
+    def _get_datatype(self) -> str:
+        """Get explicitly configured datatype without fallbacks.
+        Optional field for subclasses to implement as a helper for get_datatype.
+
+        Returns:
+            Explicitly configured datatype or None
+        """
+        if self.embedding and (precision := self.embedding.get("precision")):
+            return precision
+        return "float16"
+
+    @property
+    def _defaults(self) -> dict[str, Any]:
+        """Return default values for the configuration."""
+        return {
+            "embedding": {
+                "normalize_embeddings": True,
+                "convert_to_numpy": True,
+                "batch_size": DEFAULT_LOCAL_EMBEDDING_BATCH_SIZE,
+                "show_progress_bar": False,
+            },
+            "query": {
+                "normalize_embeddings": True,
+                "convert_to_numpy": True,
+                "batch_size": DEFAULT_LOCAL_EMBEDDING_BATCH_SIZE,
+                "show_progress_bar": False,
+            },
+        }
 
     async def as_sparse_vector_params(self) -> SparseVectorParams:
         """Get Qdrant SparseVectorParams for this sparse embedding configuration."""
         return await _to_sparse_vector_params(self)
 
 
-class FastEmbedSparseEmbeddingConfig(FastEmbedEmbeddingConfig):
+class FastEmbedSparseEmbeddingConfig(BaseSparseEmbeddingConfig):
     """Configuration options for FastEmbed sparse embedding models.
 
     Inherits all configuration from FastEmbedEmbeddingConfig.
@@ -1514,6 +1591,30 @@ class FastEmbedSparseEmbeddingConfig(FastEmbedEmbeddingConfig):
     async def as_sparse_vector_params(self) -> SparseVectorParams:
         """Get Qdrant SparseVectorParams for this sparse embedding configuration."""
         return await _to_sparse_vector_params(self)
+
+    def _as_options(self) -> SerializedEmbeddingOptionsDict:
+        """Convert the FastEmbed embedding configuration to a dictionary of options."""
+        return SerializedEmbeddingOptionsDict(
+            model_name=self.model_name, embedding={}, query={}, model={}
+        )
+
+    def set_dimension(self, dimension: int) -> Self:
+        """Set the embedding dimension explicitly in the embedding configuration.
+
+        Args:
+            dimension: The dimension to set.
+        """
+        object.__setattr__(self, "_dimension", ZERO)
+        return self
+
+    def set_datatype(self, datatype: str) -> Self:
+        """Set the embedding datatype explicitly in the embedding configuration.
+
+        Args:
+            datatype: The datatype to set.
+        """
+        object.__setattr__(self, "_datatype", datatype)
+        return self
 
 
 # ============================================================================
@@ -1536,20 +1637,21 @@ EmbeddingConfigT = Annotated[
 
 SparseEmbeddingConfigT = Annotated[
     SentenceTransformersSparseEmbeddingConfig | FastEmbedSparseEmbeddingConfig,
-    Field(discriminator="provider"),
+    Field(description="All sparse embedding config classes."),
 ]
-"""Discriminated union type for all sparse embedding configuration classes."""
 
 
 __all__ = (
     "DATATYPE_FIELDS",
     "DIMENSION_FIELDS",
     "BaseEmbeddingConfig",
+    "BaseSparseEmbeddingConfig",
     "BedrockCohereConfigDict",
     "BedrockEmbeddingConfig",
     "BedrockEmbeddingRequestParams",
     "BedrockTitanV2ConfigDict",
     "EmbeddingConfigT",
+    "EmbeddingMixin",
     "FastEmbedEmbeddingConfig",
     "FastEmbedSparseEmbeddingConfig",
     "GoogleEmbeddingConfig",

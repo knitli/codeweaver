@@ -9,9 +9,10 @@ from __future__ import annotations
 import logging
 import os
 
-from typing import Annotated, Any
+from typing import Any
 
-from pydantic import AnyUrl, ConfigDict, Field, SecretStr, model_validator
+from beartype.typing import ClassVar
+from pydantic import AnyUrl, ConfigDict, SecretStr, model_validator
 
 from codeweaver.core.types.models import BASEDMODEL_CONFIG, BasedModel
 from codeweaver.core.types.provider import Provider
@@ -34,22 +35,8 @@ class ClientOptions(BasedModel):
     """
 
     model_config = BASEDMODEL_CONFIG | ConfigDict(frozen=True, from_attributes=True)
-    _core_provider: Annotated[
-        Provider,
-        Field(
-            exclude=True,
-            init=False,
-            description="The provider most associated with this options class. For example, OpenAI for OpenAIClientOptions, or Cohere for CohereClientOptions, even though both can be used with multiple providers. This value should be a provider that the client is *always* used with.",
-        ),
-    ]
-    _providers: Annotated[
-        tuple[Provider, ...],
-        Field(
-            exclude=True,
-            init=False,
-            description="Providers this client options class can apply to.",
-        ),
-    ]
+    _core_provider: ClassVar[Provider] = Provider.NOT_SET
+    _providers: ClassVar[tuple[Provider, ...]] = ()
 
     def __init__(self, **data: Any) -> None:
         """Initialize the ClientOptions."""

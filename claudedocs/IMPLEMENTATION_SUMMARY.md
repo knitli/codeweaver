@@ -26,7 +26,7 @@ All 6 phases have been completed according to the design specification.
 
 2. **`/home/knitli/codeweaver/src/codeweaver/core/config/registry.py`**
    - Implements component registry system
-   - Functions: `register_configurable()`, `get_configurable_components()`, `clear_configurables()`
+   - Functions: `register_configurable()`, `get_configurable_components()`, `clear_configurable()`
    - Thread-safe registry for tracking components
 
 3. **`/home/knitli/codeweaver/src/codeweaver/core/config/defaults.py`**
@@ -65,7 +65,7 @@ Changes:
 
 ### Phase 3: Vector Store Config Integration
 
-**`/home/knitli/codeweaver/src/codeweaver/providers/config/kinds.py`**
+**`/home/knitli/codeweaver/src/codeweaver/providers/config.provider_kinds.py`**
 
 Changes:
 - Added `PrivateAttr` import from pydantic
@@ -114,7 +114,7 @@ Created test suite in `/home/knitli/codeweaver/tests/unit/core/config/`:
    - Tests for `ConfigurableComponent` protocol
    - Tests for `resolve_all_configs()` with various scenarios
    - Tests for missing dependencies (monorepo compatibility)
-   - Tests for multiple configurables
+   - Tests for multiple configurable
 
 2. **`test_registry.py`**
    - Tests for component registration
@@ -173,7 +173,7 @@ register_default_provider("primary.embedding.datatype", lambda: "float16")
 ```python
 from codeweaver.server.config.settings import CodeWeaverSettings
 from codeweaver.providers.config.embedding import VoyageEmbeddingConfig
-from codeweaver.providers.config.kinds import QdrantVectorStoreProviderSettings
+from codeweaver.providers.config.provider_kinds import QdrantVectorStoreProviderSettings
 
 # User configuration
 settings = CodeWeaverSettings(

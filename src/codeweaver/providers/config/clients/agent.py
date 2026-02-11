@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Mapping
-from typing import TYPE_CHECKING, Annotated, Any, Literal, override
+from typing import TYPE_CHECKING, Annotated, Any, ClassVar, Literal, override
 
 import httpx
 
@@ -25,13 +25,17 @@ from codeweaver.core.types import (
 )
 from codeweaver.providers.config.clients.base import ClientOptions
 from codeweaver.providers.config.clients.multi import (
+    BedrockClientOptions,
     CohereClientOptions,
     GoogleClientOptions,
-    HFInferenceClientOptions,
+    HuggingFaceClientOptions,
     MistralClientOptions,
     OpenAIClientOptions,
 )
-from codeweaver.providers.config.clients.utils import discriminate_embedding_clients
+from codeweaver.providers.config.clients.utils import (
+    ANTHROPIC_CLIENT_OPTIONS_AGENT_DISCRIMINATOR,
+    simple_provider_discriminator,
+)
 
 
 if TYPE_CHECKING and has_package("google") is not None:
@@ -51,8 +55,8 @@ _DEFAULT_XAI_RPC_TIMEOUT = 27.0 * ONE_MINUTE
 class XAIClientOptions(ClientOptions):
     """Client options for X_AI-based providers."""
 
-    _core_provider: Provider = Provider.X_AI
-    _providers: tuple[Provider, ...] = (Provider.X_AI,)
+    _core_provider: ClassVar[Literal[Provider.X_AI]] = Provider.X_AI
+    _providers: ClassVar[tuple[Provider, ...]] = (Provider.X_AI,)
     tag: Literal["x_ai"] = "x_ai"
 
     api_key: SecretStr | None = None
@@ -98,10 +102,12 @@ class XAIClientOptions(ClientOptions):
 class BaseAnthropicClientOptions(ClientOptions):
     """Base client options for Anthropic-based providers."""
 
-    _core_provider: Literal[
-        Provider.ANTHROPIC, Provider.BEDROCK, Provider.AZURE, Provider.GOOGLE, Provider.GROQ
+    _core_provider: ClassVar[
+        Literal[
+            Provider.ANTHROPIC, Provider.BEDROCK, Provider.AZURE, Provider.GOOGLE, Provider.GROQ
+        ]
     ]
-    _providers: tuple[Provider, ...] = (
+    _providers: ClassVar[tuple[Provider, ...]] = (
         Provider.ANTHROPIC,
         Provider.BEDROCK,
         Provider.AZURE,
@@ -132,8 +138,8 @@ class BaseAnthropicClientOptions(ClientOptions):
 class AnthropicClientOptions(BaseAnthropicClientOptions):
     """Client options for Anthropic-based embedding providers."""
 
-    _core_provider: Provider = Provider.ANTHROPIC
-    _providers: tuple[Provider, ...] = (Provider.ANTHROPIC,)
+    _core_provider: ClassVar[Literal[Provider.ANTHROPIC]] = Provider.ANTHROPIC
+    _providers: ClassVar[tuple[Provider, ...]] = (Provider.ANTHROPIC,)
     tag: Literal["anthropic"] = "anthropic"
 
     api_key: SecretStr | None = None
@@ -151,8 +157,8 @@ class AnthropicBedrockClientOptions(BaseAnthropicClientOptions):
     These differ from the standard AWS SDK options because Anthropic's client uses different variable names, which it converts to the standard AWS variable names internally. For example, `aws_secret_key` instead of `aws_secret_access_key`.
     """
 
-    _core_provider: Provider = Provider.BEDROCK
-    _providers: tuple[Provider, ...] = (Provider.BEDROCK,)
+    _core_provider: ClassVar[Literal[Provider.BEDROCK]] = Provider.BEDROCK
+    _providers: ClassVar[tuple[Provider, ...]] = (Provider.BEDROCK,)
     tag: Literal["anthropic-bedrock"] = "anthropic-bedrock"
 
     aws_secret_key: SecretStr | None = None
@@ -178,8 +184,8 @@ class AnthropicBedrockClientOptions(BaseAnthropicClientOptions):
 class AnthropicAzureClientOptions(BaseAnthropicClientOptions):
     """Client options for Anthropic agents on Azure Foundry."""
 
-    _core_provider: Provider = Provider.AZURE
-    _providers: tuple[Provider, ...] = (Provider.AZURE,)
+    _core_provider: ClassVar[Literal[Provider.AZURE]] = Provider.AZURE
+    _providers: ClassVar[tuple[Provider, ...]] = (Provider.AZURE,)
     tag: Literal["anthropic-azure"] = "anthropic-azure"
 
     resource: str | None = None
@@ -200,8 +206,8 @@ class AnthropicAzureClientOptions(BaseAnthropicClientOptions):
 class AnthropicGoogleVertexClientOptions(BaseAnthropicClientOptions):
     """Client options for Anthropic agents on Google Vertex AI runtime."""
 
-    _core_provider: Provider = Provider.GOOGLE
-    _providers: tuple[Provider, ...] = (Provider.GOOGLE,)
+    _core_provider: ClassVar[Literal[Provider.GOOGLE]] = Provider.GOOGLE
+    _providers: ClassVar[tuple[Provider, ...]] = (Provider.GOOGLE,)
     tag: Literal["anthropic-google"] = "anthropic-google"
 
     region: str | None = None
@@ -224,8 +230,8 @@ class AnthropicGoogleVertexClientOptions(BaseAnthropicClientOptions):
 class GroqClientOptions(BaseAnthropicClientOptions):
     """Client options for Groq-based agent providers."""
 
-    _core_provider: Provider = Provider.GROQ
-    _providers: tuple[Provider, ...] = (Provider.GROQ,)
+    _core_provider: ClassVar[Literal[Provider.GROQ]] = Provider.GROQ
+    _providers: ClassVar[tuple[Provider, ...]] = (Provider.GROQ,)
     tag: Literal["groq"] = "groq"
 
     api_key: SecretStr | None = None
@@ -237,8 +243,8 @@ class GroqClientOptions(BaseAnthropicClientOptions):
 class OpenAIAgentClientOptions(OpenAIClientOptions):
     """Client options for OpenAI-based agent providers."""
 
-    _core_provider: Provider = Provider.OPENAI
-    _providers: tuple[Provider, ...] = tuple(
+    _core_provider: ClassVar[Literal[Provider.OPENAI]] = Provider.OPENAI
+    _providers: ClassVar[tuple[Provider, ...]] = tuple(
         provider for provider in Provider if provider.uses_openai_api and provider != Provider.GROQ
     )
     tag: Literal["openai"] = "openai"
@@ -291,8 +297,8 @@ class PydanticGatewayClientOptions(ClientOptions):
     If you use this class and set Pydantic Gateway as your provider, you can still provide provider-specific ModelConfig settings. These will be passed through to the upstream provider by Pydantic Gateway.
     """
 
-    _core_provider: Provider = Provider.PYDANTIC_GATEWAY
-    _providers: tuple[Provider, ...] = (Provider.PYDANTIC_GATEWAY,)
+    _core_provider: ClassVar[Literal[Provider.PYDANTIC_GATEWAY]] = Provider.PYDANTIC_GATEWAY
+    _providers: ClassVar[tuple[Provider, ...]] = (Provider.PYDANTIC_GATEWAY,)
     tag: Literal["gateway"] = "gateway"
 
     upstream_provider: (
@@ -348,86 +354,51 @@ type AnthropicAgentClientOptionsType = Annotated[
     Annotated[AnthropicClientOptions, Tag(Provider.ANTHROPIC.variable)]
     | Annotated[AnthropicBedrockClientOptions, Tag(Provider.BEDROCK.variable)]
     | Annotated[AnthropicAzureClientOptions, Tag(Provider.AZURE.variable)]
-    | Annotated[AnthropicGoogleVertexClientOptions, Tag(Provider.GOOGLE.variable)]
-    | Annotated[GroqClientOptions, Tag(Provider.GROQ.variable)],
-    Field(
-        description="Anthropic agent client options type.",
-        discriminator=Discriminator(discriminate_anthropic_agent_client_options),
-    ),
+    | Annotated[AnthropicGoogleVertexClientOptions, Tag(Provider.GOOGLE.variable)],
+    Field(description="Anthropic agent client options type.", discriminator="tag"),
 ]
+
 
 type SimpleAgentClientOptionsType = Annotated[
     Annotated[CohereClientOptions, Tag(Provider.COHERE.variable)]
+    | Annotated[BedrockClientOptions, Tag(Provider.BEDROCK.variable)]
     | Annotated[OpenAIClientOptions, Tag(Provider.OPENAI.variable)]
     | Annotated[GoogleClientOptions, Tag(Provider.GOOGLE.variable)]
-    | Annotated[HFInferenceClientOptions, Tag(Provider.HUGGINGFACE_INFERENCE.variable)]
+    | Annotated[GroqClientOptions, Tag(Provider.GROQ.variable)]
+    | Annotated[HuggingFaceClientOptions, Tag(Provider.HUGGINGFACE_INFERENCE.variable)]
     | Annotated[MistralClientOptions, Tag(Provider.MISTRAL.variable)]
     | Annotated[PydanticGatewayClientOptions, Tag(Provider.PYDANTIC_GATEWAY.variable)]
     | Annotated[XAIClientOptions, Tag(Provider.X_AI.variable)],
     Field(
         description="Agent client options type.",
-        discriminator=Discriminator(discriminate_embedding_clients),
+        discriminator=Discriminator(
+            lambda v: (
+                simple_provider_discriminator(v)
+                if simple_provider_discriminator(v)
+                in {
+                    "cohere",
+                    "openai",
+                    "google",
+                    "hf_inference",
+                    "mistral",
+                    "gateway",
+                    "x_ai",
+                    "groq",
+                    "bedrock",
+                }
+                else "openai"
+            )
+        ),
     ),
 ]
 
 
-def _discriminate_agent_clients(v: Any) -> str:
-    """Identify the general agent provider settings type for discriminator field."""
-    if tag := v.get("tag") if isinstance(v, dict) else getattr(v, "tag", None):
-        return "anthropic_agent" if "anthropic" in tag else "other_agent"
-    fields = list(v if isinstance(v, dict) else type(v).model_fields)
-    if any(
-        f
-        for f in fields
-        if f
-        in {
-            "aws_access_key_id",
-            "aws_secret_access_key",
-            "aws_account_id",
-            "botocore_session",
-            "client_name",
-            "environment",
-            "location",
-            "model_name",
-            "model_name_or_path",
-            "organization",
-            "project",
-            "region_name",
-            "profile_name",
-            "similarity_fn_name",
-            "token",
-            "vertex_ai",
-            "webhook_secret",
-            "websocket_base_url",
-        }
-    ):
-        return "other_agent"
-    if any(
-        f
-        for f in fields
-        if f
-        in {
-            "aws_secret_key",
-            "aws_access_key",
-            "aws_region",
-            "aws_profile",
-            "resource",
-            "azure_ad_token_provider",
-            "region",
-            "project_id",
-            "access_token",
-        }
-    ):
-        return "anthropic_agent"
-    return "other_agent"
-
-
 type GeneralAgentClientOptionsType = Annotated[
-    Annotated[AnthropicAgentClientOptionsType, Tag("anthropic_agent")]
-    | Annotated[SimpleAgentClientOptionsType, Tag("other_agent")],
+    Annotated[AnthropicAgentClientOptionsType, Tag("anthropic")]
+    | Annotated[SimpleAgentClientOptionsType, Tag("other")],
     Field(
         description="General agent client options type.",
-        discriminator=Discriminator(_discriminate_agent_clients),
+        discriminator=ANTHROPIC_CLIENT_OPTIONS_AGENT_DISCRIMINATOR,
     ),
 ]
 

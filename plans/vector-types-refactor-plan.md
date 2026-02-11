@@ -206,7 +206,7 @@ class VectorConfig(BasedModel, frozen=True):
             Configured VectorConfig instance
 
         Example:
-            >>> from codeweaver.providers.config.kinds import EmbeddingProviderSettings
+            >>> from codeweaver.providers.config.provider_kinds import EmbeddingProviderSettings
             >>> settings = EmbeddingProviderSettings(...)
             >>> config = await VectorConfig.from_provider_settings(
             ...     settings,
@@ -214,7 +214,7 @@ class VectorConfig(BasedModel, frozen=True):
             ...     role=VectorRole.PRIMARY
             ... )
         """
-        from codeweaver.providers.config.kinds import SparseEmbeddingProviderSettings
+        from codeweaver.providers.config.provider_kinds import SparseEmbeddingProviderSettings
 
         model_name = ModelName(config.model_name)
 

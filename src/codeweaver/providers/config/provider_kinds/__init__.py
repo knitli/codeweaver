@@ -1,0 +1,220 @@
+"""Entrypoint for provider kinds' settings.  A kind, in this context, is a specific type of provider (e.g., embedding, re-ranking) that has its own unique settings and configuration requirements. This package has the top-level settings classes for each provider kind (such as `RerankingProviderSettings`), which are used to define the configuration for providers of that kind. Most kinds also have multiple mixins and subclasses for specific providers (e.g., `FastEmbedRerankingProviderSettings`), which are used to define the configuration for specific providers within that kind. The mixins are used to provide common functionality and settings for providers that share similar characteristics (e.g., cloud providers, Bedrock providers)."""
+
+from types import MappingProxyType
+from typing import TYPE_CHECKING
+
+from codeweaver.core.utils.lazy_importer import create_lazy_getattr
+
+
+if TYPE_CHECKING:
+    from codeweaver.providers.config.provider_kinds.agent import (
+        AgentProviderSettingsType,
+        AnthropicAgentProviderSettings,
+        AnthropicAzureAgentProviderSettings,
+        AnthropicBedrockAgentProviderSettings,
+        AnthropicGoogleVertexAgentProviderSettings,
+        BaseAgentProviderSettings,
+        CerebrasAgentProviderSettings,
+        CohereAgentProviderSettings,
+        GoogleAgentProviderSettings,
+        GroqAgentProviderSettings,
+        HuggingFaceAgentProviderSettings,
+        MistralAgentProviderSettings,
+        OpenAIAgentProviderSettings,
+        OpenRouterAgentProviderSettings,
+        PydanticGatewayProviderSettings,
+    )
+    from codeweaver.providers.config.provider_kinds.base import (
+        BaseProviderSettings,
+        BaseProviderSettingsDict,
+        ConnectionConfiguration,
+        ConnectionRateLimitConfig,
+    )
+    from codeweaver.providers.config.provider_kinds.data import (
+        BaseDataProviderSettings,
+        DataProviderSettingsType,
+        DuckDuckGoProviderSettings,
+        ExaProviderSettings,
+        TavilyProviderSettings,
+    )
+    from codeweaver.providers.config.provider_kinds.embedding import (
+        AsymmetricEmbeddingProviderSettings,
+        AsymmetricEmbeddingProviderSettingsDict,
+        AzureEmbeddingProviderSettings,
+        BaseEmbeddingProviderSettings,
+        BedrockEmbeddingProviderSettings,
+        EmbeddingProviderSettings,
+        EmbeddingProviderSettingsType,
+        FastEmbedEmbeddingProviderSettings,
+    )
+    from codeweaver.providers.config.provider_kinds.mixins import (
+        AzureProviderMixin,
+        BedrockProviderMixin,
+        FastEmbedProviderMixin,
+    )
+    from codeweaver.providers.config.provider_kinds.reranking import (
+        BaseRerankingProviderSettings,
+        BedrockRerankingProviderSettings,
+        CohereRerankingProviderSettings,
+        FastEmbedRerankingProviderSettings,
+        RerankingProviderSettings,
+        RerankingProviderSettingsType,
+        VoyageRerankingProviderSettings,
+    )
+    from codeweaver.providers.config.provider_kinds.sparse_embedding import (
+        BaseSparseEmbeddingProviderSettings,
+        FastEmbedSparseEmbeddingProviderSettings,
+        SparseEmbeddingProviderSettings,
+        SparseEmbeddingProviderSettingsType,
+    )
+    from codeweaver.providers.config.provider_kinds.utils import (
+        ANTHROPIC_PROVIDER_DISCRIMINATOR,
+        CORE_EMBEDDING_PROVIDER_DISCRIMINATOR,
+        NON_ANTHROPIC_AGENT_PROVIDER_DISCRIMINATOR,
+        PROVIDER_DISCRIMINATOR,
+        RERANKING_PROVIDER_DISCRIMINATOR,
+        is_cloud_provider,
+    )
+    from codeweaver.providers.config.provider_kinds.vector_store import (
+        BaseVectorStoreProviderSettings,
+        CollectionConfig,
+        MemoryConfig,
+        MemoryVectorStoreProviderSettings,
+        QdrantVectorStoreProviderSettings,
+        VectorStoreProviderSettings,
+        VectorStoreProviderSettingsType,
+    )
+
+
+_dynamic_imports = MappingProxyType({
+    "BaseSparseEmbeddingProviderSettings": (__spec__.parent, "sparse_embedding"),
+    "SparseEmbeddingProviderSettingsType": (__spec__.parent, "sparse_embedding"),
+    "DataProviderSettingsType": (__spec__.parent, "data"),
+    "MemoryConfig": (__spec__.parent, "vector_store"),
+    "AnthropicGoogleVertexAgentProviderSettings": (__spec__.parent, "agent"),
+    "BaseRerankingProviderSettings": (__spec__.parent, "reranking"),
+    "CohereRerankingProviderSettings": (__spec__.parent, "reranking"),
+    "VoyageRerankingProviderSettings": (__spec__.parent, "reranking"),
+    "BaseVectorStoreProviderSettings": (__spec__.parent, "vector_store"),
+    "CollectionConfig": (__spec__.parent, "vector_store"),
+    "MemoryVectorStoreProviderSettings": (__spec__.parent, "vector_store"),
+    "QdrantVectorStoreProviderSettings": (__spec__.parent, "vector_store"),
+    "VectorStoreProviderSettings": (__spec__.parent, "vector_store"),
+    "VectorStoreProviderSettingsType": (__spec__.parent, "vector_store"),
+    "ANTHROPIC_PROVIDER_DISCRIMINATOR": (__spec__.parent, "utils"),
+    "NON_ANTHROPIC_AGENT_PROVIDER_DISCRIMINATOR": (__spec__.parent, "utils"),
+    "CORE_EMBEDDING_PROVIDER_DISCRIMINATOR": (__spec__.parent, "utils"),
+    "RERANKING_PROVIDER_DISCRIMINATOR": (__spec__.parent, "utils"),
+    "PROVIDER_DISCRIMINATOR": (__spec__.parent, "utils"),
+    "is_cloud_provider": (__spec__.parent, "utils"),
+    "SparseEmbeddingProviderSettings": (__spec__.parent, "sparse_embedding"),
+    "FastEmbedSparseEmbeddingProviderSettings": (__spec__.parent, "sparse_embedding"),
+    "RerankingProviderSettings": (__spec__.parent, "reranking"),
+    "RerankingProviderSettingsType": (__spec__.parent, "reranking"),
+    "FastEmbedRerankingProviderSettings": (__spec__.parent, "reranking"),
+    "BedrockRerankingProviderSettings": (__spec__.parent, "reranking"),
+    "AzureProviderMixin": (__spec__.parent, "mixins"),
+    "BedrockProviderMixin": (__spec__.parent, "mixins"),
+    "FastEmbedProviderMixin": (__spec__.parent, "mixins"),
+    "AsymmetricEmbeddingProviderSettings": (__spec__.parent, "embedding"),
+    "AsymmetricEmbeddingProviderSettingsDict": (__spec__.parent, "embedding"),
+    "AzureEmbeddingProviderSettings": (__spec__.parent, "embedding"),
+    "BedrockEmbeddingProviderSettings": (__spec__.parent, "embedding"),
+    "BaseEmbeddingProviderSettings": (__spec__.parent, "embedding"),
+    "EmbeddingProviderSettings": (__spec__.parent, "embedding"),
+    "EmbeddingProviderSettingsType": (__spec__.parent, "embedding"),
+    "FastEmbedEmbeddingProviderSettings": (__spec__.parent, "embedding"),
+    "BaseDataProviderSettings": (__spec__.parent, "data"),
+    "TavilyProviderSettings": (__spec__.parent, "data"),
+    "ExaProviderSettings": (__spec__.parent, "data"),
+    "DuckDuckGoProviderSettings": (__spec__.parent, "data"),
+    "AgentProviderSettingsType": (__spec__.parent, "agent"),
+    "AnthropicAgentProviderSettings": (__spec__.parent, "agent"),
+    "AnthropicAzureAgentProviderSettings": (__spec__.parent, "agent"),
+    "AnthropicBedrockAgentProviderSettings": (__spec__.parent, "agent"),
+    "BaseAgentProviderSettings": (__spec__.parent, "agent"),
+    "CerebrasAgentProviderSettings": (__spec__.parent, "agent"),
+    "CohereAgentProviderSettings": (__spec__.parent, "agent"),
+    "ConnectionConfiguration": (__spec__.parent, "base"),
+    "ConnectionRateLimitConfig": (__spec__.parent, "base"),
+    "BaseProviderSettings": (__spec__.parent, "base"),
+    "BaseProviderSettingsDict": (__spec__.parent, "base"),
+    "GoogleAgentProviderSettings": (__spec__.parent, "agent"),
+    "GroqAgentProviderSettings": (__spec__.parent, "agent"),
+    "HuggingFaceAgentProviderSettings": (__spec__.parent, "agent"),
+    "MistralAgentProviderSettings": (__spec__.parent, "agent"),
+    "OpenAIAgentProviderSettings": (__spec__.parent, "agent"),
+    "OpenRouterAgentProviderSettings": (__spec__.parent, "agent"),
+    "PydanticGatewayProviderSettings": (__spec__.parent, "agent"),
+})
+
+
+__getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
+
+
+__all__ = (
+    "ANTHROPIC_PROVIDER_DISCRIMINATOR",
+    "CORE_EMBEDDING_PROVIDER_DISCRIMINATOR",
+    "NON_ANTHROPIC_AGENT_PROVIDER_DISCRIMINATOR",
+    "PROVIDER_DISCRIMINATOR",
+    "RERANKING_PROVIDER_DISCRIMINATOR",
+    "AgentProviderSettingsType",
+    "AnthropicAgentProviderSettings",
+    "AnthropicAzureAgentProviderSettings",
+    "AnthropicBedrockAgentProviderSettings",
+    "AnthropicGoogleVertexAgentProviderSettings",
+    "AsymmetricEmbeddingProviderSettings",
+    "AsymmetricEmbeddingProviderSettingsDict",
+    "AzureEmbeddingProviderSettings",
+    "AzureProviderMixin",
+    "BaseAgentProviderSettings",
+    "BaseDataProviderSettings",
+    "BaseEmbeddingProviderSettings",
+    "BaseProviderSettings",
+    "BaseProviderSettingsDict",
+    "BaseRerankingProviderSettings",
+    "BaseSparseEmbeddingProviderSettings",
+    "BaseVectorStoreProviderSettings",
+    "BedrockEmbeddingProviderSettings",
+    "BedrockProviderMixin",
+    "BedrockRerankingProviderSettings",
+    "CerebrasAgentProviderSettings",
+    "CohereAgentProviderSettings",
+    "CohereRerankingProviderSettings",
+    "CollectionConfig",
+    "ConnectionConfiguration",
+    "ConnectionRateLimitConfig",
+    "DataProviderSettingsType",
+    "DuckDuckGoProviderSettings",
+    "EmbeddingProviderSettings",
+    "EmbeddingProviderSettingsType",
+    "ExaProviderSettings",
+    "FastEmbedEmbeddingProviderSettings",
+    "FastEmbedProviderMixin",
+    "FastEmbedRerankingProviderSettings",
+    "FastEmbedSparseEmbeddingProviderSettings",
+    "GoogleAgentProviderSettings",
+    "GroqAgentProviderSettings",
+    "HuggingFaceAgentProviderSettings",
+    "MemoryConfig",
+    "MemoryVectorStoreProviderSettings",
+    "MistralAgentProviderSettings",
+    "OpenAIAgentProviderSettings",
+    "OpenRouterAgentProviderSettings",
+    "PydanticGatewayProviderSettings",
+    "QdrantVectorStoreProviderSettings",
+    "RerankingProviderSettings",
+    "RerankingProviderSettingsType",
+    "SparseEmbeddingProviderSettings",
+    "SparseEmbeddingProviderSettingsType",
+    "TavilyProviderSettings",
+    "VectorStoreProviderSettings",
+    "VectorStoreProviderSettingsType",
+    "VoyageRerankingProviderSettings",
+    "is_cloud_provider",
+)
+
+
+def __dir__() -> list[str]:
+    """Return the list of attributes for the module, including dynamically imported ones."""
+    return list(__all__)

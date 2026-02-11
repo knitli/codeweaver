@@ -88,7 +88,7 @@ vectors_config={"primary": VectorParams()},  # Role-based name: primary dense ve
 sparse_vectors_config={"sparse": SparseVectorParams()},  # Role-based name: sparse vector
 ```
 
-### 3. `src/codeweaver/providers/config/kinds.py`
+### 3. `src/codeweaver/providers/config.provider_kinds.py`
 
 #### Updated Default Collection Config (line 644-645)
 ```python

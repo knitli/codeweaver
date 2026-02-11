@@ -162,7 +162,9 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         ):
             # This is an asymmetric config - the config should be AsymmetricEmbeddingProviderSettings
             # Import here to avoid circular dependency
-            from codeweaver.providers.config.asymmetric import AsymmetricEmbeddingProviderSettings
+            from codeweaver.providers.config.provider_kinds import (
+                AsymmetricEmbeddingProviderSettings,
+            )
 
             if isinstance(self.caps.dense.config, AsymmetricEmbeddingProviderSettings):
                 query_model = str(self.caps.dense.config.query_provider.model_name)
@@ -350,9 +352,9 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
             collection_name,
         )
         if isinstance(value, VectorParams):
-            self.config.collection.vectors_config[key] = value  # ty:ignore[invalid-assignment]
+            self.config.collection.vectors_config[key] = value
         else:
-            self.config.collection.sparse_vectors_config[key] = value  # ty:ignore[invalid-assignment]
+            self.config.collection.sparse_vectors_config[key] = value
 
     def _validate_dense_vector(
         self,
@@ -403,7 +405,7 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
                     dict, self.config.collection.sparse_vectors_config
                 ).pop(old_key)
             else:
-                self.config.collection.sparse_vectors_config[key] = value  # ty:ignore[invalid-assignment]
+                self.config.collection.sparse_vectors_config[key] = value
             return
 
         # Note: In qdrant-client 1.16+, SparseVectorParams no longer has a 'datatype' attribute

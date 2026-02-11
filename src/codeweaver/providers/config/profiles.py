@@ -54,9 +54,9 @@ from codeweaver.providers.config.embedding import (
     SentenceTransformersSparseEmbeddingConfig,
     VoyageEmbeddingConfig,
 )
-from codeweaver.providers.config.kinds import (
-    AgentProviderSettings,
+from codeweaver.providers.config.provider_kinds import (
     AnthropicAgentProviderSettings,
+    BaseAgentProviderSettings,
     CollectionConfig,
     DuckDuckGoProviderSettings,
     EmbeddingProviderSettings,
@@ -242,7 +242,7 @@ def _recommended_default(
             AnthropicAgentProviderSettings(
                 provider=Provider.ANTHROPIC,
                 model_name="claude-haiku-4.5",
-                model_options=AnthropicAgentModelConfig(
+                agent_config=AnthropicAgentModelConfig(
                     anthropic_metadata={"_user_id": f"cw-recommended-{uuid7().hex}"},
                     model_name="claude-haiku-4.5",
                     max_tokens=20_000,
@@ -325,10 +325,10 @@ def _quickstart_default(
             ),
         ),
         agent=(
-            AgentProviderSettings(
+            BaseAgentProviderSettings(
                 provider=Provider.ANTHROPIC,
                 model_name="claude-haiku-4.5",
-                model_options=AgentModelSettings(),
+                agent_config=AgentModelSettings(),
             ),
         ),
         data=(

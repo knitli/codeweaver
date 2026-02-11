@@ -17,14 +17,6 @@ if TYPE_CHECKING:
     from codeweaver.providers.embedding.capabilities.base import ModelFamily
 
 
-class EmbeddingSettingsDict(TypedDict, total=False):
-    """A dictionary representing the settings for an embedding client, embedding model, and the embedding call itself. If any."""
-
-    client_options: dict[str, Any]
-    model_options: dict[str, Any]
-    call_options: dict[str, Any]
-
-
 type PartialCapabilities = dict[
     Literal[
         "context_window",
@@ -81,4 +73,4 @@ class EmbeddingCapabilitiesDict(TypedDict, total=False):
     other: NotRequired[dict[str, Any]]
 
 
-__all__ = ("EmbeddingCapabilitiesDict", "EmbeddingSettingsDict", "PartialCapabilities")
+__all__ = ("EmbeddingCapabilitiesDict", "PartialCapabilities")

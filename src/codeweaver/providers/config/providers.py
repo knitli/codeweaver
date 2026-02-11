@@ -38,7 +38,6 @@ from codeweaver.core.types import (
 )
 from codeweaver.core.utils import has_package
 from codeweaver.providers import VoyageClientOptions
-from codeweaver.providers.config.asymmetric import AsymmetricEmbeddingProviderSettings
 from codeweaver.providers.config.clients import (
     QdrantClientOptions,
     SentenceTransformersClientOptions,
@@ -56,9 +55,10 @@ from codeweaver.providers.config.embedding import (
     VoyageEmbeddingConfig,
     VoyageEmbeddingOptionsDict,
 )
-from codeweaver.providers.config.kinds import (
-    AgentProviderSettings,
+from codeweaver.providers.config.provider_kinds import (
     AgentProviderSettingsType,
+    AsymmetricEmbeddingProviderSettings,
+    BaseAgentProviderSettings,
     BaseProviderSettings,
     CollectionConfig,
     DataProviderSettingsType,
@@ -121,8 +121,10 @@ def merge_agent_model_settings(
 def _create_default_data_provider_settings() -> tuple[DataProviderSettingsType, ...]:
     """Create default data provider settings (delayed initialization)."""
     if has_package("tavily") and Provider.TAVILY.has_env_auth:
-        return (TavilyProviderSettings(),)
-    return (DuckDuckGoProviderSettings(),) if has_package("ddgs") else ()
+        return (TavilyProviderSettings(provider=Provider.TAVILY),)
+    return (
+        (DuckDuckGoProviderSettings(provider=Provider.DUCKDUCKGO),) if has_package("ddgs") else ()
+    )
 
 
 class DeterminedDefaults(NamedTuple):
@@ -303,7 +305,7 @@ def _get_default_sparse_embedding_provider_settings() -> tuple[
     return (
         SparseEmbeddingProviderSettings(
             provider=_sparse_embedding_defaults.provider,
-            model_name=_sparse_embedding_defaults.model,  # ty:ignore[invalid-argument-type]
+            model_name=_sparse_embedding_defaults.model,
             sparse_embedding_config=_create_sparse_embedding_config(
                 _sparse_embedding_defaults.provider,
                 _sparse_embedding_defaults.model,  # ty:ignore[invalid-argument-type]
@@ -371,7 +373,7 @@ def _get_default_reranking_provider_settings() -> tuple[RerankingProviderSetting
     return (
         RerankingProviderSettings(
             provider=_reranking_defaults.provider,
-            model_name=_reranking_defaults.model,  # ty:ignore[invalid-argument-type]
+            model_name=_reranking_defaults.model,
             reranking_config=_create_reranking_config(
                 _reranking_defaults.provider,
                 _reranking_defaults.model,  # ty:ignore[invalid-argument-type]
@@ -387,21 +389,21 @@ DefaultRerankingProviderSettings: tuple[RerankingProviderSettings, ...] | None =
 HAS_ANTHROPIC = (has_package("anthropic") or has_package("claude-agent-sdk")) is not None
 
 
-def _get_default_agent_provider_settings() -> tuple[AgentProviderSettings, ...] | None:
+def _get_default_agent_provider_settings() -> tuple[BaseAgentProviderSettings, ...] | None:
     """Get default agent provider settings (delayed instantiation)."""
     if not HAS_ANTHROPIC:
         return None
     # Don't instantiate AgentModelSettings here to avoid forward reference issues
     return (
-        AgentProviderSettings(
+        BaseAgentProviderSettings(
             provider=Provider.ANTHROPIC,
             model_name="claude-haiku-4.5-latest",
-            model_options=None,  # Use None to avoid forward reference validation
+            agent_config=None,  # Use None to avoid forward reference validation
         ),
     )
 
 
-DefaultAgentProviderSettings: tuple[AgentProviderSettings, ...] | None = (
+DefaultAgentProviderSettings: tuple[BaseAgentProviderSettings, ...] | None = (
     None  # Will be lazy-initialized
 )
 
@@ -521,7 +523,7 @@ class ProviderSettings(BasedModel):
     ] = None
 
     agent: Annotated[
-        tuple[AgentProviderSettings, ...] | None,
+        tuple[BaseAgentProviderSettings, ...] | None,
         Field(description="""Agent provider configuration"""),
     ] = None
 
@@ -548,6 +550,8 @@ class ProviderSettings(BasedModel):
 
     def __init__(self, **data: Any) -> None:
         """Initialize ProviderSettings and register with DI container if available."""
+        # We'll set the _kind field on each class
+        # this will help with identification of settings classes
         try:
             from codeweaver.core.di import get_container
 

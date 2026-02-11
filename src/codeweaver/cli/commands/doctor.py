@@ -421,7 +421,7 @@ async def check_vector_store_config(settings: ProviderSettings) -> DoctorCheck:
     # Deployment-specific checks
     match deployment_type:
         case "cloud":
-            return _check_qdrant_cloud_api_key(provider, settings, check, url)  # ty:ignore[invalid-argument-type]
+            return _check_qdrant_cloud_api_key(provider, settings, check, str(url))
         case "local" | "local docker":
             _display.console.print(
                 f"  [green]✓[/green] Local Qdrant {'docker container' if deployment_type == 'local docker' else 'install'} detected"

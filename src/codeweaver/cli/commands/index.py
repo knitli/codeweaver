@@ -90,9 +90,9 @@ async def _derive_collection_name(
         and vector_settings is not Unset
     ):
         return (
-            vector_settings[0].collection_name  # ty:ignore[unresolved-attribute]
+            vector_settings[0].collection.collection_name
             if isinstance(vector_settings, tuple) and len(vector_settings) > 0
-            else vector_settings.collection_name  # ty:ignore[unresolved-attribute]
+            else vector_settings.collection.collection_name  # ty:ignore[unresolved-attribute, invalid-return-type]
         )
     return collection_name
 

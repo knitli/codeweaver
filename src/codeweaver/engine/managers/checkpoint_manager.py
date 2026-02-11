@@ -33,9 +33,11 @@ from codeweaver.core import (
 )
 from codeweaver.core.constants import ONE_HOUR
 from codeweaver.engine.config import CodeWeaverEngineSettings, IndexerSettings
-from codeweaver.providers import SparseEmbeddingProviderSettings, VectorStoreProviderSettings
-from codeweaver.providers.config import EmbeddingProviderSettings
-from codeweaver.providers.config.asymmetric import AsymmetricEmbeddingProviderSettings
+from codeweaver.providers.config.provider_kinds import (
+    EmbeddingProviderSettingsType,
+    SparseEmbeddingProviderSettingsType,
+    VectorStoreProviderSettingsType,
+)
 
 
 if TYPE_CHECKING:
@@ -53,11 +55,9 @@ class CheckpointSettingsFingerprint(TypedDict):
     indexer: dict[str, Any]
     project_path: DirectoryPath
     project_name: str
-    embedding_provider: (
-        tuple[EmbeddingProviderSettings | AsymmetricEmbeddingProviderSettings, ...] | None
-    )
-    sparse_provider: tuple[SparseEmbeddingProviderSettings, ...] | None
-    vector_store: tuple[VectorStoreProviderSettings, ...] | None
+    embedding_provider: tuple[EmbeddingProviderSettingsType, ...] | None
+    sparse_provider: tuple[SparseEmbeddingProviderSettingsType, ...] | None
+    vector_store: tuple[VectorStoreProviderSettingsType, ...] | None
 
 
 def get_checkpoint_settings_map(

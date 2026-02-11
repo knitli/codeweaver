@@ -415,7 +415,7 @@ class BaseEmbeddingConfig(BasedModel, ConfigurableComponent):
 
 ### Phase 3: Vector Store Config Integration
 
-#### Updates to `src/codeweaver/providers/config/kinds.py`
+#### Updates to `src/codeweaver/providers/config.provider_kinds.py`
 
 ```python
 # Add to QdrantVectorStoreProviderSettings

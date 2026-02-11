@@ -31,6 +31,7 @@ if TYPE_CHECKING:
         FailoverSettings,
         FailoverSettingsDict,
     )
+    from codeweaver.engine.config.failover_detector import FailoverDetector, LocalEmbeddingDetector
     from codeweaver.engine.config.indexer import (
         DefaultIndexerSettings,
         IndexerSettings,
@@ -51,10 +52,12 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "DefaultChunkerSettings": (__spec__.parent, "chunker"),
     "DefaultFailoverSettings": (__spec__.parent, "failover"),
     "DefaultIndexerSettings": (__spec__.parent, "indexer"),
+    "FailoverDetector": (__spec__.parent, "failover_detector"),
     "FailoverSettings": (__spec__.parent, "failover"),
     "FailoverSettingsDict": (__spec__.parent, "failover"),
     "IndexerSettings": (__spec__.parent, "indexer"),
     "IndexerSettingsDict": (__spec__.parent, "indexer"),
+    "LocalEmbeddingDetector": (__spec__.parent, "failover_detector"),
     "PerformanceSettings": (__spec__.parent, "chunker"),
     "PerformanceSettingsDict": (__spec__.parent, "chunker"),
     "RignoreSettings": (__spec__.parent, "indexer"),
@@ -75,10 +78,12 @@ __all__ = (
     "DefaultChunkerSettings",
     "DefaultFailoverSettings",
     "DefaultIndexerSettings",
+    "FailoverDetector",
     "FailoverSettings",
     "FailoverSettingsDict",
     "IndexerSettings",
     "IndexerSettingsDict",
+    "LocalEmbeddingDetector",
     "PerformanceSettings",
     "PerformanceSettingsDict",
     "RignoreSettings",

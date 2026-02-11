@@ -76,7 +76,7 @@ await self._client.create_collection(
    - Excludes metadata fields, returns just config dicts
 
 **Overlap concerns**:
-- `_BaseQdrantVectorStoreProviderSettings` (in config/kinds.py)
+- `_BaseQdrantVectorStoreProviderSettings` (in config.provider_kinds.py)
 - `CollectionMetadata` both have logic for generating vector configs
 
 ### 4. EmbeddingCapabilityGroup Structure
@@ -177,7 +177,7 @@ def _get_vector_store_provider_for_config(
 2. `CollectionMetadata.to_collection()` → dict for Qdrant
 
 **Overlap analysis needed**:
-- Find `_BaseQdrantVectorStoreProviderSettings` (in config/kinds.py)
+- Find `_BaseQdrantVectorStoreProviderSettings` (in config.provider_kinds.py)
 - Compare what it generates vs `_generate_metadata()`
 - Determine canonical source
 

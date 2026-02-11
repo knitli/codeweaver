@@ -114,7 +114,7 @@ result = await service.snapshot_and_cleanup(wait=False)
 
 ### 3. WalConfig Integration
 
-**File**: `src/codeweaver/providers/config/kinds.py` (MODIFIED)
+**File**: `src/codeweaver/providers/config.provider_kinds.py` (MODIFIED)
 
 **Changes Made to `_BaseQdrantVectorStoreProviderSettings`**:
 

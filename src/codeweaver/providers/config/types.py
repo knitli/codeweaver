@@ -10,17 +10,32 @@ from __future__ import annotations
 import asyncio
 import ssl
 
-from collections.abc import Callable, Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import asdict, dataclass, field
-from typing import TYPE_CHECKING, Any, Literal, NotRequired, TypedDict
+from typing import TYPE_CHECKING, Annotated, Any, Literal, NotRequired, TypedDict
 
-from pydantic import NonNegativeInt, PositiveInt
+from pydantic import Field, NonNegativeInt, PositiveInt, SecretStr
 
 from codeweaver.core.constants import ZERO
+from codeweaver.core.types import LiteralStringT
+from codeweaver.providers.agent import KnownAgentModelName
 
 
 if TYPE_CHECKING:
     from qdrant_client.models import Document
+
+
+class AzureOptions(TypedDict, total=False):
+    """Azure-specific options."""
+
+    model_deployment: str
+    base_url: str | None
+    api_base: str | None
+    endpoint: str | None
+    region_name: str | None
+    api_key: (
+        SecretStr | Callable[[], str | SecretStr] | Callable[[], Awaitable[str | SecretStr]] | None
+    )
 
 
 # Mirror types to avoid httpx dependency at module initialization
@@ -124,4 +139,18 @@ class DocumentRepr:
         return [Document(text=text, model=self.model, options=options) for text in texts]
 
 
-__all__ = ("Bm25Config", "CohereRequestOptionsDict", "DocumentRepr", "HttpxClientParams")
+type AgentModelNameString = Annotated[
+    KnownAgentModelName | LiteralStringT,
+    Field(description="The model string, as it appears in `pydantic_ai.models.KnownModelName`."),
+]
+"""Type for agent model name strings."""
+
+
+__all__ = (
+    "AgentModelNameString",
+    "AzureOptions",
+    "Bm25Config",
+    "CohereRequestOptionsDict",
+    "DocumentRepr",
+    "HttpxClientParams",
+)

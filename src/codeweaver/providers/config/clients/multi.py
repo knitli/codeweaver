@@ -10,7 +10,7 @@ import contextlib
 
 from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
-from typing import Annotated, Any, Literal, Self, TypedDict
+from typing import Annotated, Any, ClassVar, Literal, Self, TypedDict
 
 import httpx
 
@@ -73,8 +73,8 @@ if has_package("sentence_transformers") is not None:
 class CohereClientOptions(ClientOptions):
     """Client options for Cohere (rerank and embeddings)."""
 
-    _core_provider: Provider = Provider.COHERE
-    _providers: tuple[Provider, ...] = (Provider.COHERE, Provider.AZURE, Provider.HEROKU)
+    _core_provider: ClassVar[Literal[Provider.COHERE]] = Provider.COHERE
+    _providers: ClassVar[tuple[Provider, ...]] = (Provider.COHERE, Provider.AZURE, Provider.HEROKU)
     tag: Literal["cohere"] = "cohere"
 
     api_key: (
@@ -115,8 +115,8 @@ class CohereClientOptions(ClientOptions):
 class OpenAIClientOptions(ClientOptions):
     """Client options for OpenAI-based embedding providers."""
 
-    _core_provider: Provider = Provider.OPENAI
-    _providers: tuple[Provider, ...] = tuple(
+    _core_provider: ClassVar[Literal[Provider.OPENAI]] = Provider.OPENAI
+    _providers: ClassVar[tuple[Provider, ...]] = tuple(
         provider for provider in Provider if provider.uses_openai_api
     )
     tag: Literal["openai"] = "openai"
@@ -179,8 +179,8 @@ class OpenAIClientOptions(ClientOptions):
 class BedrockClientOptions(ClientOptions):
     """Client options for Boto3-based providers like Bedrock. Most of these are required but can be configured in other ways, such as environment variables or AWS config files."""
 
-    _core_provider: Provider = Provider.BEDROCK
-    _providers: tuple[Provider, ...] = (Provider.BEDROCK,)
+    _core_provider: ClassVar[Literal[Provider.BEDROCK]] = Provider.BEDROCK
+    _providers: ClassVar[tuple[Provider, ...]] = (Provider.BEDROCK,)
     tag: Literal["bedrock"] = "bedrock"
 
     aws_access_key_id: str | None = None
@@ -207,8 +207,8 @@ class BedrockClientOptions(ClientOptions):
 class GoogleClientOptions(ClientOptions):
     """Client options for the GenAI Google provider."""
 
-    _core_provider: Provider = Provider.GOOGLE
-    _providers: tuple[Provider, ...] = (Provider.GOOGLE,)
+    _core_provider: ClassVar[Literal[Provider.GOOGLE]] = Provider.GOOGLE
+    _providers: ClassVar[tuple[Provider, ...]] = (Provider.GOOGLE,)
     tag: Literal["google"] = "google"
 
     api_key: SecretStr | None = None
@@ -229,8 +229,8 @@ class GoogleClientOptions(ClientOptions):
 class FastEmbedClientOptions(ClientOptions):
     """Client options for FastEmbed-based embedding providers."""
 
-    _core_provider: Provider = Provider.FASTEMBED
-    _providers: tuple[Provider, ...] = (Provider.FASTEMBED,)
+    _core_provider: ClassVar[Literal[Provider.FASTEMBED]] = Provider.FASTEMBED
+    _providers: ClassVar[tuple[Provider, ...]] = (Provider.FASTEMBED,)
     tag: Literal["fastembed"] = "fastembed"
 
     model_name: str
@@ -291,8 +291,10 @@ class SentenceTransformersModelOptions(TypedDict, total=False):
 class SentenceTransformersClientOptions(ClientOptions):
     """Client options for SentenceTransformers-based embedding providers."""
 
-    _core_provider: Provider = Provider.SENTENCE_TRANSFORMERS
-    _providers: tuple[Provider, ...] = (Provider.SENTENCE_TRANSFORMERS,)
+    _core_provider: ClassVar[Literal[Provider.SENTENCE_TRANSFORMERS]] = (
+        Provider.SENTENCE_TRANSFORMERS
+    )
+    _providers: ClassVar[tuple[Provider, ...]] = (Provider.SENTENCE_TRANSFORMERS,)
     tag: Literal["sentence_transformers"] = "sentence_transformers"
 
     model_name_or_path: str | None = None
@@ -419,11 +421,13 @@ class SentenceTransformersClientOptions(ClientOptions):
         }
 
 
-class HFInferenceClientOptions(ClientOptions):
+class HuggingFaceClientOptions(ClientOptions):
     """Client options for HuggingFace Inference API-based embedding providers."""
 
-    _core_provider: Provider = Provider.HUGGINGFACE_INFERENCE
-    _providers: tuple[Provider, ...] = (Provider.HUGGINGFACE_INFERENCE,)
+    _core_provider: ClassVar[Literal[Provider.HUGGINGFACE_INFERENCE]] = (
+        Provider.HUGGINGFACE_INFERENCE
+    )
+    _providers: ClassVar[tuple[Provider, ...]] = (Provider.HUGGINGFACE_INFERENCE,)
     tag: Literal["hf_inference"] = "hf_inference"
 
     model: str | None = None
@@ -451,8 +455,8 @@ class HFInferenceClientOptions(ClientOptions):
 class MistralClientOptions(ClientOptions):
     """Client options for Mistral-based embedding providers."""
 
-    _core_provider: Provider = Provider.MISTRAL
-    _providers: tuple[Provider, ...] = (Provider.MISTRAL,)
+    _core_provider: ClassVar[Literal[Provider.MISTRAL]] = Provider.MISTRAL
+    _providers: ClassVar[tuple[Provider, ...]] = (Provider.MISTRAL,)
     tag: Literal["mistral"] = "mistral"
 
     api_key: (
@@ -479,8 +483,8 @@ class MistralClientOptions(ClientOptions):
 class VoyageClientOptions(ClientOptions):
     """Client options for Voyage AI-based embedding and reranking providers."""
 
-    _core_provider: Provider = Provider.VOYAGE
-    _providers: tuple[Provider, ...] = (Provider.VOYAGE,)
+    _core_provider: ClassVar[Literal[Provider.VOYAGE]] = Provider.VOYAGE
+    _providers: ClassVar[tuple[Provider, ...]] = (Provider.VOYAGE,)
     tag: Literal["voyage"] = "voyage"
 
     api_key: SecretStr | None = None
@@ -497,7 +501,7 @@ if (
     has_package("sentence_transformers") is not None
     and not SentenceTransformersClientOptions.__pydantic_complete__
 ):
-    # we can rebuilt lazily later if this fails
+    # we can rebuild lazily later if this fails
     with contextlib.suppress(Exception):
         SentenceTransformersClientOptions.model_rebuild()
 
@@ -507,9 +511,10 @@ if (
 # ===========================================================================
 
 type GeneralRerankingClientOptionsType = Annotated[
-    Annotated[SentenceTransformersClientOptions, Tag(Provider.SENTENCE_TRANSFORMERS.variable)]
-    | Annotated[BedrockClientOptions, Tag(Provider.BEDROCK.variable)]
+    Annotated[BedrockClientOptions, Tag(Provider.BEDROCK.variable)]
     | Annotated[CohereClientOptions, Tag(Provider.COHERE.variable)]
+    | Annotated[FastEmbedClientOptions, Tag(Provider.FASTEMBED.variable)]
+    | Annotated[SentenceTransformersClientOptions, Tag(Provider.SENTENCE_TRANSFORMERS.variable)]
     | Annotated[VoyageClientOptions, Tag(Provider.VOYAGE.variable)],
     Field(description="Reranking client options type.", discriminator="tag"),
 ]
@@ -527,14 +532,14 @@ def discriminate_azure_embedding_client_options(v: Any) -> str:
 
 
 type GeneralEmbeddingClientOptionsType = Annotated[
-    Annotated[SentenceTransformersClientOptions, Tag(Provider.SENTENCE_TRANSFORMERS.variable)]
-    | Annotated[BedrockClientOptions, Tag(Provider.BEDROCK.variable)]
+    Annotated[BedrockClientOptions, Tag(Provider.BEDROCK.variable)]
     | Annotated[CohereClientOptions, Tag(Provider.COHERE.variable)]
     | Annotated[FastEmbedClientOptions, Tag(Provider.FASTEMBED.variable)]
-    | Annotated[OpenAIClientOptions, Tag(Provider.OPENAI.variable)]
     | Annotated[GoogleClientOptions, Tag(Provider.GOOGLE.variable)]
-    | Annotated[HFInferenceClientOptions, Tag(Provider.HUGGINGFACE_INFERENCE.variable)]
+    | Annotated[HuggingFaceClientOptions, Tag(Provider.HUGGINGFACE_INFERENCE.variable)]
     | Annotated[MistralClientOptions, Tag(Provider.MISTRAL.variable)]
+    | Annotated[OpenAIClientOptions, Tag(Provider.OPENAI.variable)]
+    | Annotated[SentenceTransformersClientOptions, Tag(Provider.SENTENCE_TRANSFORMERS.variable)]
     | Annotated[VoyageClientOptions, Tag(Provider.VOYAGE.variable)],
     Field(
         description="Embedding client options type.",
@@ -550,7 +555,7 @@ __all__ = (
     "GeneralEmbeddingClientOptionsType",
     "GeneralRerankingClientOptionsType",
     "GoogleClientOptions",
-    "HFInferenceClientOptions",
+    "HuggingFaceClientOptions",
     "MistralClientOptions",
     "OpenAIClientOptions",
     "SentenceTransformersClientOptions",

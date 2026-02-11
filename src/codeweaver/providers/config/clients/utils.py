@@ -7,26 +7,14 @@
 
 import os
 
-from collections.abc import Awaitable, Callable, Sequence
-from typing import Any, TypedDict
+from collections.abc import Sequence
+from typing import Any
 
-from pydantic import SecretStr
+from pydantic import Discriminator
 
-from codeweaver.core import ConfigurationError
+from codeweaver.core.exceptions import ConfigurationError
 from codeweaver.core.types import Provider
-
-
-class AzureOptions(TypedDict, total=False):
-    """Azure-specific options."""
-
-    model_deployment: str
-    base_url: str | None
-    api_base: str | None
-    endpoint: str | None
-    region_name: str | None
-    api_key: (
-        SecretStr | Callable[[], str | SecretStr] | Callable[[], Awaitable[str | SecretStr]] | None
-    )
+from codeweaver.providers.config.types import AzureOptions
 
 
 def ensure_endpoint_version(url: str, *, cohere: bool = False) -> str:
@@ -200,10 +188,24 @@ def discriminate_embedding_clients(v: Any) -> str | None:
     )
 
 
+def simple_provider_discriminator(value: dict[str, Any]) -> str:
+    """Identify the provider for simple agent model provider options based on tag or URL patterns."""
+    return value["tag"] if isinstance(value, dict) else value.tag
+
+
+def _discriminate_anthropic_client_options(value: dict[str, Any]) -> str:
+    """Identify if the options are for Anthropic based on key presence."""
+    result = simple_provider_discriminator(value)
+    return "anthropic" if result.startswith("anthropic") else "other"
+
+
+ANTHROPIC_CLIENT_OPTIONS_AGENT_DISCRIMINATOR = Discriminator(_discriminate_anthropic_client_options)
+
 __all__ = (
-    "AzureOptions",
+    "ANTHROPIC_CLIENT_OPTIONS_AGENT_DISCRIMINATOR",
     "discriminate_embedding_clients",
     "ensure_endpoint_version",
+    "simple_provider_discriminator",
     "try_for_azure_endpoint",
     "try_for_heroku_endpoint",
 )

@@ -626,7 +626,7 @@ async def test_full_integration_with_real_container(clean_container, tmp_path):
 ### Phase 1: Extract Pure Settings (Day 1)
 
 **Files to modify**:
-- `src/codeweaver/providers/config/kinds.py`
+- `src/codeweaver/providers/config.provider_kinds.py`
 - `src/codeweaver/providers/config/clients.py`
 
 **Changes**:
@@ -687,7 +687,7 @@ from codeweaver.core.di import INJECTED, dependency_provider
 from codeweaver.engine.config import FailoverSettings
 from codeweaver.providers import ProviderSettingsDep
 from codeweaver.providers.embedding import EmbeddingCapabilityGroup
-from codeweaver.providers.config.kinds import QdrantVectorStoreProviderSettings
+from codeweaver.providers.config.provider_kinds import QdrantVectorStoreProviderSettings
 
 class QdrantVectorStoreService:
     """Service layer for Qdrant vector store operations."""

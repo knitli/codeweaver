@@ -26,7 +26,6 @@ if TYPE_CHECKING:
     )
     from codeweaver.providers.embedding.capabilities.types import (
         EmbeddingCapabilitiesDict,
-        EmbeddingSettingsDict,
         PartialCapabilities,
     )
 
@@ -36,7 +35,6 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "EmbeddingCapabilityResolver": (__spec__.parent, "resolver"),
     "SparseEmbeddingCapabilityResolver": (__spec__.parent, "resolver"),
     "EmbeddingModelCapabilities": (__spec__.parent, "base"),
-    "EmbeddingSettingsDict": (__spec__.parent, "types"),
     "PartialCapabilities": (__spec__.parent, "types"),
     "SparseCapabilities": (__spec__.parent, "base"),
     "SparseEmbeddingModelCapabilities": (__spec__.parent, "base"),
@@ -48,7 +46,6 @@ __all__ = (
     "EmbeddingCapabilitiesDict",
     "EmbeddingCapabilityResolver",
     "EmbeddingModelCapabilities",
-    "EmbeddingSettingsDict",
     "PartialCapabilities",
     "SparseCapabilities",
     "SparseEmbeddingCapabilityResolver",

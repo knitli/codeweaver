@@ -156,12 +156,12 @@ PASSED: 27 tests in 71.41s
 
 **Error Pattern**:
 ```
-AttributeError: <module 'codeweaver.providers.config.kinds' from '...'>
+AttributeError: <module 'codeweaver.providers.config.provider_kinds' from '...'>
 does not have the attribute 'get_container'
 ```
 
 **Root Cause**:
-- Tests mock `codeweaver.providers.config.kinds.get_container`
+- Tests mock `codeweaver.providers.config.provider_kinds.get_container`
 - But `get_container` is imported **inside the function**, not at module level
 - Mock target is incorrect - needs to patch `codeweaver.core.di.get_container` instead
 
