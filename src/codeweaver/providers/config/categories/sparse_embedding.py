@@ -4,21 +4,18 @@ from typing import Annotated, Any, ClassVar, Literal
 
 from pydantic import Field, Tag, computed_field
 
-from codeweaver.core import Provider, ProviderKind
+from codeweaver.core import Provider, ProviderCategory
 from codeweaver.core.types import ModelNameT, SDKClient
 from codeweaver.core.utils import has_package
 from codeweaver.providers import ClientOptions
+from codeweaver.providers.config.categories.base import BaseProviderSettings
+from codeweaver.providers.config.categories.mixins import FastEmbedProviderMixin
+from codeweaver.providers.config.categories.utils import PROVIDER_DISCRIMINATOR, is_cloud_provider
 from codeweaver.providers.config.clients import (
     FastEmbedClientOptions,
     SentenceTransformersClientOptions,
 )
 from codeweaver.providers.config.embedding import BaseSparseEmbeddingConfig, SparseEmbeddingConfigT
-from codeweaver.providers.config.provider_kinds.base import BaseProviderSettings
-from codeweaver.providers.config.provider_kinds.mixins import FastEmbedProviderMixin
-from codeweaver.providers.config.provider_kinds.utils import (
-    PROVIDER_DISCRIMINATOR,
-    is_cloud_provider,
-)
 
 
 if has_package("sentence_transformers"):
@@ -69,7 +66,9 @@ class SparseEmbeddingProviderSettings(BaseSparseEmbeddingProviderSettings):
         Field(description="Client options for the provider's client."),
     ] = None
 
-    kind: ClassVar[Literal[ProviderKind.SPARSE_EMBEDDING]] = ProviderKind.SPARSE_EMBEDDING
+    category: ClassVar[Literal[ProviderCategory.SPARSE_EMBEDDING]] = (
+        ProviderCategory.SPARSE_EMBEDDING
+    )
 
     @computed_field
     @property

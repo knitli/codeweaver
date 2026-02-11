@@ -112,7 +112,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 [38;5;238m 102[0m [38;5;238m│[0m 
 [38;5;238m 103[0m [38;5;238m│[0m [38;5;231m### Modified Files ✅[0m
 [38;5;238m 104[0m [38;5;238m│[0m 
-[38;5;238m 105[0m [38;5;238m│[0m [38;5;231m1. **`src/codeweaver/providers/config.provider_kinds.py`**[0m
+[38;5;238m 105[0m [38;5;238m│[0m [38;5;231m1. **`src/codeweaver/providers/config.categories.py`**[0m
 [38;5;238m 106[0m [38;5;238m│[0m [38;5;231m   - Added TYPE_CHECKING imports for FailoverSettings/FailoverDetector[0m
 [38;5;238m 107[0m [38;5;238m│[0m [38;5;231m   - Modified `get_collection_config()` to accept optional explicit dependencies[0m
 [38;5;238m 108[0m [38;5;238m│[0m [38;5;231m   - Fixed `as_qdrant_config()` validation with model_construct[0m

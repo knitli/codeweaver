@@ -14,7 +14,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from codeweaver.core import Provider, ProviderKind
+from codeweaver.core import Provider, ProviderCategory
 
 
 pytestmark = [
@@ -89,7 +89,7 @@ class TestProviderInstantiationWithClientFactory:
             Provider.VOYAGE: (
                 Client(
                     provider=Provider.VOYAGE,
-                    kind=ProviderKind.EMBEDDING,
+                    category=ProviderCategory.EMBEDDING,
                     client=mock_lazy_import,
                     provider_class=mock_provider_lazy,
                 ),
@@ -99,12 +99,12 @@ class TestProviderInstantiationWithClientFactory:
         with patch("codeweaver.providersCLIENT_MAP", mock_client_map):
             with patch.dict("os.environ", {"VOYAGE_API_KEY": "test_key"}):
                 # Register the provider
-                registry.register(Provider.VOYAGE, ProviderKind.EMBEDDING, mock_provider_lazy)
+                registry.register(Provider.VOYAGE, ProviderCategory.EMBEDDING, mock_provider_lazy)
 
                 # Create provider
                 registry.create_provider(
                     Provider.VOYAGE,
-                    ProviderKind.EMBEDDING,
+                    ProviderCategory.EMBEDDING,
                     provider_settings={"api_key": "test_key"},
                 )
 
@@ -135,7 +135,7 @@ class TestProviderInstantiationWithClientFactory:
             Provider.VOYAGE: (
                 Client(
                     provider=Provider.VOYAGE,
-                    kind=ProviderKind.EMBEDDING,
+                    category=ProviderCategory.EMBEDDING,
                     client=mock_lazy_import,
                     provider_class=mock_provider_lazy,
                 ),
@@ -143,12 +143,12 @@ class TestProviderInstantiationWithClientFactory:
         }
 
         with patch("codeweaver.providersCLIENT_MAP", mock_client_map):
-            registry.register(Provider.VOYAGE, ProviderKind.EMBEDDING, mock_provider_lazy)
+            registry.register(Provider.VOYAGE, ProviderCategory.EMBEDDING, mock_provider_lazy)
 
             # Pass explicit client
             registry.create_provider(
                 Provider.VOYAGE,
-                ProviderKind.EMBEDDING,
+                ProviderCategory.EMBEDDING,
                 client=mock_existing_client,  # Explicit client
             )
 
@@ -179,7 +179,7 @@ class TestProviderInstantiationWithClientFactory:
             Provider.VOYAGE: (
                 Client(
                     provider=Provider.VOYAGE,
-                    kind=ProviderKind.EMBEDDING,
+                    category=ProviderCategory.EMBEDDING,
                     client=mock_lazy_import,
                     provider_class=mock_provider_lazy,
                 ),
@@ -188,10 +188,10 @@ class TestProviderInstantiationWithClientFactory:
 
         with patch("codeweaver.providersCLIENT_MAP", mock_client_map):
             with patch.dict("os.environ", {"VOYAGE_API_KEY": "test_key"}):
-                registry.register(Provider.VOYAGE, ProviderKind.EMBEDDING, mock_provider_lazy)
+                registry.register(Provider.VOYAGE, ProviderCategory.EMBEDDING, mock_provider_lazy)
 
                 # Should not raise, just log warning
-                registry.create_provider(Provider.VOYAGE, ProviderKind.EMBEDDING)
+                registry.create_provider(Provider.VOYAGE, ProviderCategory.EMBEDDING)
 
                 # Provider should still be created (without client)
                 mock_provider_lazy.assert_called_once()
@@ -254,7 +254,7 @@ class TestVectorStoreProviderWithClientFactory:
             Provider.QDRANT: (
                 Client(
                     provider=Provider.QDRANT,
-                    kind=ProviderKind.VECTOR_STORE,
+                    category=ProviderCategory.VECTOR_STORE,
                     client=mock_lazy_import,
                     provider_class=mock_provider_lazy,
                 ),
@@ -262,10 +262,10 @@ class TestVectorStoreProviderWithClientFactory:
         }
 
         with patch("codeweaver.providersCLIENT_MAP", mock_client_map):
-            registry.register(Provider.QDRANT, ProviderKind.VECTOR_STORE, mock_provider_lazy)
+            registry.register(Provider.QDRANT, ProviderCategory.VECTOR_STORE, mock_provider_lazy)
 
             # Create provider without settings (should use memory mode)
-            registry.create_provider(Provider.QDRANT, ProviderKind.VECTOR_STORE)
+            registry.create_provider(Provider.QDRANT, ProviderCategory.VECTOR_STORE)
 
             # Verify client was created with memory mode (second call after exception)
             assert mock_client_class.call_count == 2
@@ -295,7 +295,7 @@ class TestVectorStoreProviderWithClientFactory:
             Provider.QDRANT: (
                 Client(
                     provider=Provider.QDRANT,
-                    kind=ProviderKind.VECTOR_STORE,
+                    category=ProviderCategory.VECTOR_STORE,
                     client=mock_lazy_import,
                     provider_class=mock_provider_lazy,
                 ),
@@ -315,12 +315,14 @@ class TestVectorStoreProviderWithClientFactory:
 
         with patch("os.getenv", side_effect=mock_getenv):
             with patch("codeweaver.providersCLIENT_MAP", mock_client_map):
-                registry.register(Provider.QDRANT, ProviderKind.VECTOR_STORE, mock_provider_lazy)
+                registry.register(
+                    Provider.QDRANT, ProviderCategory.VECTOR_STORE, mock_provider_lazy
+                )
 
                 # Create provider with URL
                 registry.create_provider(
                     Provider.QDRANT,
-                    ProviderKind.VECTOR_STORE,
+                    ProviderCategory.VECTOR_STORE,
                     provider_settings={"url": "http://localhost:6333", "api_key": "test_key"},
                 )
 
@@ -334,8 +336,8 @@ class TestVectorStoreProviderWithClientFactory:
 @pytest.mark.external_api
 @pytest.mark.mock_only
 @pytest.mark.qdrant
-class TestProviderKindStringHandling:
-    """Test that string provider_kind values work correctly."""
+class TestProviderCategoryStringHandling:
+    """Test that string provider_category values work correctly."""
 
     @pytest.fixture
     def registry(self):
@@ -365,8 +367,8 @@ class TestProviderKindStringHandling:
 
         return registry
 
-    def test_string_provider_kind_in_create_provider(self, registry):
-        """Test create_provider works with string provider_kind."""
+    def test_string_provider_category_in_create_provider(self, registry):
+        """Test create_provider works with string provider_category."""
         from inspect import Parameter, Signature
 
         from codeweaver.providers import Client
@@ -392,7 +394,7 @@ class TestProviderKindStringHandling:
             Provider.VOYAGE: (
                 Client(
                     provider=Provider.VOYAGE,
-                    kind=ProviderKind.EMBEDDING,
+                    category=ProviderCategory.EMBEDDING,
                     client=mock_lazy_import,
                     provider_class=mock_provider_lazy,
                 ),
@@ -401,7 +403,7 @@ class TestProviderKindStringHandling:
 
         with patch("codeweaver.providersCLIENT_MAP", mock_client_map):
             with patch.dict("os.environ", {"VOYAGE_API_KEY": "test_key"}):
-                registry.register(Provider.VOYAGE, ProviderKind.EMBEDDING, mock_provider_lazy)
+                registry.register(Provider.VOYAGE, ProviderCategory.EMBEDDING, mock_provider_lazy)
 
                 # Use string instead of enum
                 registry.create_provider(

@@ -1,4 +1,4 @@
-"""Entrypoint for provider kinds' settings.  A kind, in this context, is a specific type of provider (e.g., embedding, re-ranking) that has its own unique settings and configuration requirements. This package has the top-level settings classes for each provider kind (such as `RerankingProviderSettings`), which are used to define the configuration for providers of that kind. Most kinds also have multiple mixins and subclasses for specific providers (e.g., `FastEmbedRerankingProviderSettings`), which are used to define the configuration for specific providers within that kind. The mixins are used to provide common functionality and settings for providers that share similar characteristics (e.g., cloud providers, Bedrock providers)."""
+"""Entrypoint for provider categories' settings.  A category, in this context, is a specific type of provider (e.g., embedding, re-ranking) that has its own unique settings and configuration requirements. This package has the top-level settings classes for each provider category (such as `RerankingProviderSettings`), which are used to define the configuration for providers of that category. Most categories also have multiple mixins and subclasses for specific providers (e.g., `FastEmbedRerankingProviderSettings`), which are used to define the configuration for specific providers within that category. The mixins are used to provide common functionality and settings for providers that share similar characteristics (e.g., cloud providers, Bedrock providers)."""
 
 from types import MappingProxyType
 from typing import TYPE_CHECKING
@@ -7,7 +7,7 @@ from codeweaver.core.utils.lazy_importer import create_lazy_getattr
 
 
 if TYPE_CHECKING:
-    from codeweaver.providers.config.provider_kinds.agent import (
+    from codeweaver.providers.config.categories.agent import (
         AgentProviderSettingsType,
         AnthropicAgentProviderSettings,
         AnthropicAzureAgentProviderSettings,
@@ -24,20 +24,20 @@ if TYPE_CHECKING:
         OpenRouterAgentProviderSettings,
         PydanticGatewayProviderSettings,
     )
-    from codeweaver.providers.config.provider_kinds.base import (
+    from codeweaver.providers.config.categories.base import (
         BaseProviderSettings,
         BaseProviderSettingsDict,
         ConnectionConfiguration,
         ConnectionRateLimitConfig,
     )
-    from codeweaver.providers.config.provider_kinds.data import (
+    from codeweaver.providers.config.categories.data import (
         BaseDataProviderSettings,
         DataProviderSettingsType,
         DuckDuckGoProviderSettings,
         ExaProviderSettings,
         TavilyProviderSettings,
     )
-    from codeweaver.providers.config.provider_kinds.embedding import (
+    from codeweaver.providers.config.categories.embedding import (
         AsymmetricEmbeddingProviderSettings,
         AsymmetricEmbeddingProviderSettingsDict,
         AzureEmbeddingProviderSettings,
@@ -47,12 +47,12 @@ if TYPE_CHECKING:
         EmbeddingProviderSettingsType,
         FastEmbedEmbeddingProviderSettings,
     )
-    from codeweaver.providers.config.provider_kinds.mixins import (
+    from codeweaver.providers.config.categories.mixins import (
         AzureProviderMixin,
         BedrockProviderMixin,
         FastEmbedProviderMixin,
     )
-    from codeweaver.providers.config.provider_kinds.reranking import (
+    from codeweaver.providers.config.categories.reranking import (
         BaseRerankingProviderSettings,
         BedrockRerankingProviderSettings,
         CohereRerankingProviderSettings,
@@ -61,13 +61,13 @@ if TYPE_CHECKING:
         RerankingProviderSettingsType,
         VoyageRerankingProviderSettings,
     )
-    from codeweaver.providers.config.provider_kinds.sparse_embedding import (
+    from codeweaver.providers.config.categories.sparse_embedding import (
         BaseSparseEmbeddingProviderSettings,
         FastEmbedSparseEmbeddingProviderSettings,
         SparseEmbeddingProviderSettings,
         SparseEmbeddingProviderSettingsType,
     )
-    from codeweaver.providers.config.provider_kinds.utils import (
+    from codeweaver.providers.config.categories.utils import (
         ANTHROPIC_PROVIDER_DISCRIMINATOR,
         CORE_EMBEDDING_PROVIDER_DISCRIMINATOR,
         NON_ANTHROPIC_AGENT_PROVIDER_DISCRIMINATOR,
@@ -75,7 +75,7 @@ if TYPE_CHECKING:
         RERANKING_PROVIDER_DISCRIMINATOR,
         is_cloud_provider,
     )
-    from codeweaver.providers.config.provider_kinds.vector_store import (
+    from codeweaver.providers.config.categories.vector_store import (
         BaseVectorStoreProviderSettings,
         CollectionConfig,
         MemoryConfig,

@@ -42,12 +42,12 @@ async def convert_search_result_to_code_match(result: SearchResult) -> CodeMatch
     # Ensure we always have a DiscoveredFile (CodeMatch requires non-None)
     if file is None:
         # Create fallback DiscoveredFile with unknown path
-        from codeweaver.core import ExtKind
+        from codeweaver.core import ExtCategory
 
         unknown_path = Path("unknown")
-        ext_kind = ExtKind.from_language("text", "other")
-        # DiscoveredFile constructor accepts path and ext_kind directly
-        file = DiscoveredFile(path=unknown_path, ext_kind=ext_kind)
+        ext_category = ExtCategory.from_language("text", "other")
+        # DiscoveredFile constructor accepts path and ext_category directly
+        file = DiscoveredFile(path=unknown_path, ext_category=ext_category)
 
     # Extract span (line range) - ensure it's a Span object
     if hasattr(chunk, "line_range"):

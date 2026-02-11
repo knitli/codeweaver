@@ -1,6 +1,6 @@
-"""Base settings class for provider kinds (e.g. agent, embedding, etc.).
+"""Base settings class for provider categories (e.g. agent, embedding, etc.).
 
-The base class here defines the top-level settings for all provider kinds, and is extended by the specific provider kind settings classes (e.g. BaseAgentProviderSettings, EmbeddingProviderSettings, etc.).
+The base class here defines the top-level settings for all provider categories, and is extended by the specific provider category settings classes (e.g. BaseAgentProviderSettings, EmbeddingProviderSettings, etc.).
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from typing import Annotated, Any, NotRequired, Required, Self, TypedDict, cast
 from beartype.typing import ClassVar
 from pydantic import Field, PositiveFloat, PositiveInt, computed_field, model_validator
 
-from codeweaver.core import ProviderKind
+from codeweaver.core import ProviderCategory
 from codeweaver.core.exceptions import CodeWeaverDeveloperError
 from codeweaver.core.types import (
     AnonymityConversion,
@@ -107,11 +107,11 @@ class BaseProviderSettings(BasedModel, ABC):
     ] = None
     tag: ProviderLiteralString = Field(
         default_factory=_resolve_tag,
-        description="A tag to differentiate between multiple providers of the same type. You don't need to provide this, we'll figure it out from the provider, provider kind, and other context.",
+        description="A tag to differentiate between multiple providers of the same type. You don't need to provide this, we'll figure it out from the provider, provider category, and other context.",
     )
 
-    kind: ClassVar[ProviderKind]
-    """The provider kind for these settings. This is set in the subclasses and used to determine which provider class to instantiate when loading from config."""
+    category: ClassVar[ProviderCategory]
+    """The provider category for these settings. This is set in the subclasses and used to determine which provider class to instantiate when loading from config."""
 
     def __init__(self, **data: Any) -> None:
         """Initialize base provider settings."""
@@ -133,15 +133,15 @@ class BaseProviderSettings(BasedModel, ABC):
             "model_name" in type(self).model_fields
             and "model_name" not in data
             and (
-                kind_config := (
+                category_config := (
                     getattr(self, "embedding_config", None)
                     or getattr(self, "sparse_embedding_config", None)
                     or getattr(self, "reranking_config", None)
                 )
             )
-            and kind_config.model_name
+            and category_config.model_name
         ):
-            object.__setattr__(self, "model_name", kind_config.model_name)
+            object.__setattr__(self, "model_name", category_config.model_name)
         elif (
             "model_name" in type(self).model_fields
             and "model_name" not in data
@@ -243,7 +243,7 @@ class BaseProviderSettings(BasedModel, ABC):
             else {}
         )
         client_import = cast(SDKClient, self.client).client
-        kind = next(
+        category = next(
             (
                 name
                 for name in ("agent", "data", "sparse", "embed", "rerank")  # order matters here
@@ -252,12 +252,12 @@ class BaseProviderSettings(BasedModel, ABC):
             None,
         )
         if self.provider == Provider.BEDROCK:
-            if not kind:
+            if not category:
                 raise CodeWeaverDeveloperError(
                     "Kind must be one of 'agent', 'data', 'sparse', 'embed', or 'rerank' for Bedrock provider. File an issue. This is unexpected."
                 )
             return client_import._resolve()(
-                "bedrock-runtime" if kind == "embed" else "bedrock-agent-runtime", **options
+                "bedrock-runtime" if category == "embed" else "bedrock-agent-runtime", **options
             )
         if (self.provider in (Provider.SENTENCE_TRANSFORMERS, Provider.FASTEMBED)) or (
             self.provider in (Provider.BEDROCK) and self.client != SDKClient.ANTHROPIC
@@ -265,7 +265,7 @@ class BaseProviderSettings(BasedModel, ABC):
             return await asyncio.to_thread(client_import._resolve(), **options)
         if not isinstance(client_import, dict):
             return client_import._resolve()(**options)
-        client_class = client_import.get(kind)._resolve()
+        client_class = client_import.get(category)._resolve()
         return client_class(**options)
 
 

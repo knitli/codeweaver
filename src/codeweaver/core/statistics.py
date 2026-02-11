@@ -48,7 +48,7 @@ from codeweaver.core.constants import (
     ZERO,
 )
 from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
-from codeweaver.core.metadata import ChunkKind, ExtKind
+from codeweaver.core.metadata import ChunkKind, ExtCategory
 from codeweaver.core.types import (
     AnonymityConversion,
     BasedModel,
@@ -92,7 +92,7 @@ async def _is_cloud_embedding_model() -> bool:
     """Check if the configured primary embedding model is a cloud embedding model."""
     if has_package("codeweaver.providers"):
         from codeweaver.core.di.container import get_container
-        from codeweaver.providers.config.kinds import EmbeddingProviderSettingsType
+        from codeweaver.providers.config.categories import EmbeddingProviderSettingsType
 
         container = get_container()
         embedding_settings = await container.resolve(EmbeddingProviderSettingsType)
@@ -114,7 +114,7 @@ async def _is_cloud_reranking_model() -> bool:
     """Check if the configured primary reranking model is a cloud reranking model."""
     if has_package("codeweaver.providers"):
         from codeweaver.core.di.container import get_container
-        from codeweaver.providers.config.kinds import RerankingProviderSettingsType
+        from codeweaver.providers.config.categories import RerankingProviderSettingsType
 
         container = get_container()
         reranking_settings = await container.resolve(RerankingProviderSettingsType)
@@ -635,11 +635,11 @@ class _CategoryStatistics(BasedModel):
         lang_stats.add_operation(operation, path)
 
     @classmethod
-    def from_ext_kind(cls, ext_kind: ExtKind) -> _CategoryStatistics:
-        """Create a _CategoryStatistics from an ExtKind."""
+    def from_ext_category(cls, ext_category: ExtCategory) -> _CategoryStatistics:
+        """Create a _CategoryStatistics from an ExtCategory."""
         return cls(
-            category=ext_kind.kind,
-            languages={ext_kind.language: _LanguageStatistics(language=ext_kind.language)},  # ty:ignore[invalid-argument-type]
+            category=ext_category.kind,
+            languages={ext_category.language: _LanguageStatistics(language=ext_category.language)},  # ty:ignore[invalid-argument-type]
         )
 
 
@@ -663,15 +663,15 @@ class FileStatistics(BasedModel):
         return {FilteredKey("_other_files"): AnonymityConversion.COUNT}
 
     def add_file(
-        self, path: Path, operation: OperationsKey, ext_kind: ExtKind | None = None
+        self, path: Path, operation: OperationsKey, ext_category: ExtCategory | None = None
     ) -> None:
         """Add a file operation, automatically categorizing by extension."""
         if not path.is_file():
             raise ValueError(f"{path} is not a valid file")
-        # Use ExtKind to determine file category and language
-        if ext_kind := ext_kind or ExtKind.from_file(path):
-            category = ext_kind.kind
-            language = ext_kind.language
+        # Use ExtCategory to determine file category and language
+        if ext_category := ext_category or ExtCategory.from_file(path):
+            category = ext_category.kind
+            language = ext_category.language
             self.categories[category].add_operation(language, operation, path)
         elif self._other_files and path in self._other_files:
             # Handle explicitly added "other" files
@@ -684,21 +684,21 @@ class FileStatistics(BasedModel):
         """Add a file operation using a DiscoveredFile (more efficient).
 
         This method is more efficient than add_file() when you already have a
-        DiscoveredFile object, as it avoids redundant ExtKind.from_file() calls.
+        DiscoveredFile object, as it avoids redundant ExtCategory.from_file() calls.
 
         Args:
-            discovered_file: DiscoveredFile with pre-computed ext_kind
+            discovered_file: DiscoveredFile with pre-computed ext_category
             operation: Type of operation performed (indexed, retrieved, etc.)
         """
         # Skip non-text files
         if not discovered_file.is_text:
             return
 
-        # Use the already-computed ext_kind from DiscoveredFile
-        if ext_kind := discovered_file.ext_kind:
-            category = ext_kind.kind
-            language = ext_kind.language
-            self.categories[category].add_operation(language, operation, discovered_file.path)
+        # Use the already-computed ext_category from DiscoveredFile
+        if ext_category := discovered_file.ext_category:
+            kind = ext_category.kind
+            language = ext_category.language
+            self.categories[kind].add_operation(language, operation, discovered_file.path)
         elif self._other_files and discovered_file.path in self._other_files:
             # Handle explicitly added "other" files
             language_name = (
@@ -736,18 +736,18 @@ class FileStatistics(BasedModel):
         information from the CodeChunk to avoid redundant operations.
 
         Args:
-            chunk: CodeChunk with pre-computed ext_kind and metadata
+            chunk: CodeChunk with pre-computed ext_category and metadata
             operation: Type of operation performed (usually "processed" for chunks)
         """
         # Skip chunks without language/category information
-        if not chunk.ext_kind:
+        if not chunk.ext_category:
             return
 
-        category = chunk.ext_kind.kind
-        language = chunk.ext_kind.language
+        kind = chunk.ext_category.kind
+        language = chunk.ext_category.language
 
         # Get or create language stats for this category
-        lang_stats = self.categories[category].get_language_stats(language)
+        lang_stats = self.categories[kind].get_language_stats(language)
 
         # Track the chunk
         lang_stats.add_chunk(chunk, operation)
@@ -1329,10 +1329,10 @@ class SessionStatistics(BasedModel):
         """Add a file operation using a DiscoveredFile (more efficient).
 
         This method is more efficient than add_file() when you already have a
-        DiscoveredFile object, as it avoids redundant ExtKind.from_file() calls.
+        DiscoveredFile object, as it avoids redundant ExtCategory.from_file() calls.
 
         Args:
-            discovered_file: DiscoveredFile with pre-computed ext_kind
+            discovered_file: DiscoveredFile with pre-computed ext_category
             operation: Type of operation performed (indexed, retrieved, etc.)
         """
         if not self.index_statistics:
@@ -1348,21 +1348,21 @@ class SessionStatistics(BasedModel):
         including chunk type, size, and language distribution.
 
         Args:
-            chunk: CodeChunk with pre-computed ext_kind and metadata
+            chunk: CodeChunk with pre-computed ext_category and metadata
             operation: Type of operation performed (usually "processed" for chunks)
         """
         if not self.index_statistics:
             self.index_statistics = FileStatistics()
         self.index_statistics.add_chunk_from_codechunk(chunk, operation)
 
-    def add_file_operations_by_extkind(
-        self, operations: Sequence[tuple[Path, ExtKind, OperationsKey]]
+    def add_file_operations_by_extcategory(
+        self, operations: Sequence[tuple[Path, ExtCategory, OperationsKey]]
     ) -> None:
-        """Add file operations to the index statistics by extension kind."""
+        """Add file operations to the index statistics by extension category."""
         if not self.index_statistics:
             self.index_statistics = FileStatistics()
-        for path, ext_kind, operation in operations:
-            self.index_statistics.add_file(path, operation, ext_kind=ext_kind)
+        for path, ext_category, operation in operations:
+            self.index_statistics.add_file(path, operation, ext_category=ext_category)
 
     def add_file_operations(self, *file_operations: tuple[Path, OperationsKey]) -> None:
         """Add multiple file operations to the index statistics."""

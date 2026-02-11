@@ -212,7 +212,7 @@ def __init__(
 if caps is None:
     from codeweaver.core import get_model_registry
     registry = get_model_registry()
-    caps = registry.configured_models_for_kind("reranking")
+    caps = registry.configured_models_for_category("reranking")
     ...
 
 if client is None:

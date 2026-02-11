@@ -53,7 +53,7 @@ class TestFindCodeSignature:
 
         # Required parameter
         assert "query" in params, "find_code must have 'query' parameter"
-        assert params["query"].kind == inspect.Parameter.POSITIONAL_OR_KEYWORD, (
+        assert params["query"].category == inspect.Parameter.POSITIONAL_OR_KEYWORD, (
             "query must be positional"
         )
         assert params["query"].default == inspect.Parameter.empty, "query must not have default"
@@ -289,14 +289,16 @@ class TestCodeMatchSchema:
         """Verify span tuple validation (2 elements, start <= end, >= 1)."""
         from pathlib import Path
 
-        from codeweaver.core import CodeChunk, DiscoveredFile, ExtKind, Span, uuid7
+        from codeweaver.core import CodeChunk, DiscoveredFile, ExtCategory, Span, uuid7
         from codeweaver.core.exceptions import ValidationError as CodeWeaverValidationError
 
         # Create minimal test data
         test_file = DiscoveredFile(path=Path("test.py"))
         test_chunk = CodeChunk(
             content="def test(): pass",
-            ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
+            ext_category=ExtCategory(
+                language=SemanticSearchLanguage.PYTHON, category=ChunkKind.CODE
+            ),
             line_range=Span(1, 1, uuid7()),
         )
 
@@ -418,14 +420,16 @@ class TestContractExamples:
         """Verify response can represent the simple search example from contract."""
         from pathlib import Path
 
-        from codeweaver.core import CodeChunk, DiscoveredFile, ExtKind, Span, uuid7
+        from codeweaver.core import CodeChunk, DiscoveredFile, ExtCategory, Span, uuid7
 
         # Recreate example from contract
         example_file = DiscoveredFile(path=Path("src/auth/middleware.py"))
         example_chunk = CodeChunk(
             content="class AuthMiddleware:\n    def __init__(self, config: AuthConfig):\n        ...",
             line_range=Span(15, 85, uuid7()),
-            ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
+            ext_category=ExtCategory(
+                language=SemanticSearchLanguage.PYTHON, category=ChunkKind.CODE
+            ),
         )
         example_match = CodeMatch(
             file=example_file,

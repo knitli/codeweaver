@@ -21,15 +21,15 @@ from codeweaver.core.utils.lazy_importer import LazyImport
 
 if TYPE_CHECKING:
     from codeweaver.core.types import (
-        ProviderKindLiteralString,
+        ProviderCategoryLiteralString,
         ProviderLiteralString,
         SDKClientLiteralString,
     )
     from codeweaver.core.types.service_cards import ServiceCard
 
 
-class ProviderKind(BaseEnum):
-    """Enumeration of available provider kinds."""
+class ProviderCategory(BaseEnum):
+    """Enumeration of available provider categories."""
 
     DATA = "data"
     EMBEDDING = "embedding"
@@ -40,13 +40,13 @@ class ProviderKind(BaseEnum):
     UNSET = "unset"
 
     @classmethod
-    def kinds(cls) -> Generator[ProviderKind]:
-        """Get all kinds."""
+    def categories(cls) -> Generator[ProviderCategory]:
+        """Get all categories."""
         yield from cls.members()
 
     @classmethod
     def _provider_cls(cls) -> type[Provider]:
-        """Get the provider class for this kind.
+        """Get the provider class for this category.
 
         (A little hacky but, it does the job).
         """
@@ -54,22 +54,23 @@ class ProviderKind(BaseEnum):
 
     @cached_property
     def providers(self) -> Generator[Provider]:
-        """Get all providers that support this kind."""
-        from codeweaver.core.types.service_cards import get_providers_for_kind
+        """Get all providers that support this category."""
+        from codeweaver.core.types.service_cards import get_providers_for_category
 
-        if self == ProviderKind.UNSET:
+        if self == ProviderCategory.UNSET:
             yield from Provider
         else:
-            yield from get_providers_for_kind(self)
+            yield from get_providers_for_category(self)
 
 
-def get_default_provider_import_for_kind(
-    provider: Provider | ProviderLiteralString, kind: ProviderKind | ProviderKindLiteralString
+def get_default_provider_import_for_category(
+    provider: Provider | ProviderLiteralString,
+    category: ProviderCategory | ProviderCategoryLiteralString,
 ) -> LazyImport[Any] | None:
-    """Get the default provider import for a given provider and kind."""
+    """Get the default provider import for a given provider and category."""
     from codeweaver.core.types.service_cards import get_service_card
 
-    if service_card := get_service_card(provider.variable, kind.variable):
+    if service_card := get_service_card(provider.variable, category.variable):
         return service_card.provider_cls
     return None
 
@@ -100,11 +101,13 @@ class SDKClient(BaseEnum):
     X_AI = "x_ai"
 
     @classmethod
-    def for_provider_and_kind(cls, provider: Provider, kind: ProviderKind) -> Generator[SDKClient]:
-        """Get the SDK clients for a given provider and kind."""
+    def for_provider_and_category(
+        cls, provider: Provider, category: ProviderCategory
+    ) -> Generator[SDKClient]:
+        """Get the SDK clients for a given provider and category."""
         from codeweaver.core.types.service_cards import get_sdk_client
 
-        if sdk_clients := get_sdk_client(provider, kind):
+        if sdk_clients := get_sdk_client(provider, category):
             yield from (sdk_clients if isinstance(sdk_clients, tuple) else (sdk_clients,))
 
     @property
@@ -158,34 +161,40 @@ class SDKClient(BaseEnum):
     @property
     def agent_provider(self) -> LazyImport[Any] | None:
         """Get the default agent provider for the SDK client."""
-        return get_default_provider_import_for_kind(self.as_provider(), ProviderKind.AGENT)
+        return get_default_provider_import_for_category(self.as_provider(), ProviderCategory.AGENT)
 
     @property
     def data_provider(self) -> LazyImport[Any] | None:
         """Get the default data provider for the SDK client."""
-        return get_default_provider_import_for_kind(self.as_provider(), ProviderKind.DATA)
+        return get_default_provider_import_for_category(self.as_provider(), ProviderCategory.DATA)
 
     @property
     def embedding_provider(self) -> LazyImport[Any] | None:
         """Get the default embedding provider for the SDK client."""
-        return get_default_provider_import_for_kind(self.as_provider(), ProviderKind.EMBEDDING)
+        return get_default_provider_import_for_category(
+            self.as_provider(), ProviderCategory.EMBEDDING
+        )
 
     @property
     def sparse_embedding_provider(self) -> LazyImport[Any] | None:
         """Get the default sparse embedding provider for the SDK client."""
-        return get_default_provider_import_for_kind(
-            self.as_provider(), ProviderKind.SPARSE_EMBEDDING
+        return get_default_provider_import_for_category(
+            self.as_provider(), ProviderCategory.SPARSE_EMBEDDING
         )
 
     @property
     def reranking_provider(self) -> LazyImport[Any] | None:
         """Get the default reranking provider for the SDK client."""
-        return get_default_provider_import_for_kind(self.as_provider(), ProviderKind.RERANKING)
+        return get_default_provider_import_for_category(
+            self.as_provider(), ProviderCategory.RERANKING
+        )
 
     @property
     def vector_store_provider(self) -> LazyImport[Any] | None:
         """Get the default vector store provider for the SDK client."""
-        return get_default_provider_import_for_kind(self.as_provider(), ProviderKind.VECTOR_STORE)
+        return get_default_provider_import_for_category(
+            self.as_provider(), ProviderCategory.VECTOR_STORE
+        )
 
     def as_provider(self) -> Provider:
         """Get the provider as a member of Provider."""
@@ -202,21 +211,21 @@ class SDKClient(BaseEnum):
         return next(cls._providers())
 
     @classmethod
-    def _kinds(cls) -> Generator[ProviderKind]:
-        """Get all kinds that use this SDK client."""
-        yield from ProviderKind
+    def _categories(cls) -> Generator[ProviderCategory]:
+        """Get all categories that use this SDK client."""
+        yield from ProviderCategory
 
     @classmethod
-    def _any_kind(cls) -> ProviderKind:
-        """Get a kind instance representing an SDKClient member as a kind member."""
-        return next(cls._kinds())
+    def _any_category(cls) -> ProviderCategory:
+        """Get a category instance representing an SDKClient member as a category member."""
+        return next(cls._categories())
 
 
-def get_provider_kinds(provider: Provider) -> tuple[ProviderKind, ...]:
-    """Get the kinds of a provider."""
-    from codeweaver.core.types.service_cards import get_provider_kinds
+def get_categories(provider: Provider) -> tuple[ProviderCategory, ...]:
+    """Get the categories of a provider."""
+    from codeweaver.core.types.service_cards import get_categories
 
-    return tuple(ProviderKind.from_string(kind) for kind in get_provider_kinds(provider))
+    return tuple(ProviderCategory.from_string(category) for category in get_categories(provider))
 
 
 class Provider(BaseEnum):
@@ -382,29 +391,31 @@ class Provider(BaseEnum):
                     found_vars.extend(self._flatten_envvars(env_vars_dict))
         return tuple(found_vars)
 
-    def has_capability(self, kind: LiteralProviderKind | ProviderKindLiteralString) -> bool:
+    def has_capability(
+        self, category: LiteralProviderCategory | ProviderCategoryLiteralString
+    ) -> bool:
         """Check if the provider has a specific capability."""
-        return kind in get_provider_kinds(self)
+        return category in get_categories(self)
 
     def is_embedding_provider(self) -> bool:
         """Check if the provider is an embedding provider."""
-        return any(kind == ProviderKind.EMBEDDING for kind in get_provider_kinds(self))
+        return any(category == ProviderCategory.EMBEDDING for category in get_categories(self))
 
     def is_sparse_provider(self) -> bool:
         """Check if the provider is a sparse embedding provider."""
-        return ProviderKind.SPARSE_EMBEDDING in get_provider_kinds(self)
+        return ProviderCategory.SPARSE_EMBEDDING in get_categories(self)
 
     def is_reranking_provider(self) -> bool:
         """Check if the provider is a reranking provider."""
-        return ProviderKind.RERANKING in get_provider_kinds(self)
+        return ProviderCategory.RERANKING in get_categories(self)
 
     def is_agent_provider(self) -> bool:
         """Check if the provider is an agent model provider."""
-        return ProviderKind.AGENT in get_provider_kinds(self)
+        return ProviderCategory.AGENT in get_categories(self)
 
     def is_data_provider(self) -> bool:
         """Check if the provider is a data provider."""
-        return ProviderKind.DATA in get_provider_kinds(self)
+        return ProviderCategory.DATA in get_categories(self)
 
     def get_env_api_key(self) -> str | None:
         """Get the API key from environment variables, if set."""
@@ -447,9 +458,9 @@ class Provider(BaseEnum):
         )
 
     @classmethod
-    def _kind_cls(cls) -> type[ProviderKind]:
-        """Get the ProviderKind class."""
-        return ProviderKind
+    def _category_cls(cls) -> type[ProviderCategory]:
+        """Get the ProviderCategory class."""
+        return ProviderCategory
 
 
 type LiteralSDKClient = Literal[
@@ -473,13 +484,13 @@ type LiteralSDKClient = Literal[
 ]
 
 
-type LiteralProviderKind = Literal[
-    ProviderKind.AGENT,
-    ProviderKind.DATA,
-    ProviderKind.EMBEDDING,
-    ProviderKind.RERANKING,
-    ProviderKind.SPARSE_EMBEDDING,
-    ProviderKind.VECTOR_STORE,
+type LiteralProviderCategory = Literal[
+    ProviderCategory.AGENT,
+    ProviderCategory.DATA,
+    ProviderCategory.EMBEDDING,
+    ProviderCategory.RERANKING,
+    ProviderCategory.SPARSE_EMBEDDING,
+    ProviderCategory.VECTOR_STORE,
 ]
 type LiteralProvider = Literal[
     Provider.ALIBABA,
@@ -522,10 +533,10 @@ type LiteralProvider = Literal[
 
 __all__ = (
     "LiteralProvider",
-    "LiteralProviderKind",
+    "LiteralProviderCategory",
     "LiteralSDKClient",
     "Provider",
-    "ProviderKind",
+    "ProviderCategory",
     "SDKClient",
-    "get_provider_kinds",
+    "get_categories",
 )

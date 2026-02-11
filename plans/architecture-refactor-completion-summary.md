@@ -49,7 +49,7 @@ class QdrantVectorStoreService:
 
 ### 2. Simplified Settings
 
-**Modified**: `src/codeweaver/providers/config.provider_kinds.py`
+**Modified**: `src/codeweaver/providers/config.categories.py`
 
 - `QdrantVectorStoreProviderSettings` is now **pure configuration**
 - `get_collection_config()` method is a **transitional convenience wrapper** that delegates to service
@@ -154,7 +154,7 @@ tests/unit/providers/test_wal_config_integration.py::TestWalConfigIntegration::t
 
 ### Modified Files
 
-1. **`src/codeweaver/providers/config.provider_kinds.py`**
+1. **`src/codeweaver/providers/config.categories.py`**
    - Added TYPE_CHECKING imports for FailoverSettings, FailoverDetector
    - Modified `get_collection_config()` to accept optional explicit dependencies
    - Method delegates to QdrantVectorStoreService internally

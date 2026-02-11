@@ -235,7 +235,7 @@ src/codeweaver/
 │   │       ├── __init__.py
 │   │       ├── custom.py # Custom delimiter patterns
 │   │       ├── families.py # Delimiter families by language
-│   │       ├── kind.py   # Delimiter kind classification
+│   │       ├── category.py   # Delimiter category classification
 │   │       └── patterns.py # Delimiter pattern definitions
 │   ├── indexer/         # Indexing engine
 │   │   ├── __init__.py
@@ -267,7 +267,7 @@ src/codeweaver/
 │   ├── __init__.py
 │   ├── capabilities.py  # Provider capability definitions/constants
 │   ├── optimize.py      # optimization utilities for sentence-transformers and fastembed
-│   ├── provider.py      # `Provider` and `ProviderKind` enums
+│   ├── provider.py      # `Provider` and `ProviderCategory` enums
 │   ├── types.py         # *general* provider type definitions
 │   ├── agent/           # Agent providers (Context Agent, etc.) -- wraps `pydantic-ai`
 │   │   ├── __init__.py

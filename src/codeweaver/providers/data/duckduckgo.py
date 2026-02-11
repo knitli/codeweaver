@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: 2026 Knitli Inc.
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
+"""DuckDuckGo data provider tool implementation."""
 
 from __future__ import annotations
 

@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
 
-"""Client options for providers that can be used with multiple kinds (e.g. embedding, reranking)."""
+"""Client options for providers that can be used with multiple categories (e.g. embedding, reranking)."""
 
 from __future__ import annotations
 

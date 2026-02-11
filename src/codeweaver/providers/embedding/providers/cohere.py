@@ -49,8 +49,8 @@ class CohereEmbeddingProvider(EmbeddingProvider[CohereClient]):
         **kwargs: Any,
     ) -> None:
         """Initialize the FastEmbed client."""
+        from codeweaver.providers.config.categories import EmbeddingProviderSettings
         from codeweaver.providers.config.embedding import CohereEmbeddingConfig
-        from codeweaver.providers.config.kinds import EmbeddingProviderSettings
 
         config = self.config or kwargs.get("config")
         if not config:

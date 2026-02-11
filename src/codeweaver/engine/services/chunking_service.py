@@ -86,8 +86,8 @@ class ChunkingService:
                     chunks = chunker.chunk(content, file=file)
                 except ChunkingError:
                     language = (
-                        file.ext_kind.language.variable
-                        if file.ext_kind and file.ext_kind.language
+                        file.ext_category.language.variable
+                        if file.ext_category and file.ext_category.language
                         else "unknown"
                     )
                     fallback_chunker = DelimiterChunker(self.governor, language=language)

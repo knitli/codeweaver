@@ -4,9 +4,9 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 """Mappings of provider types for various purposes (e.g. to clients, classes, etc.).
 
-This module is an internal implementation detail. You shouldn't use it directly. It supplies the raw data used in the `Provider` and `SDKClient` and `ProviderKind` enum classes (`codeweaver.core.types.provider`). Use those classes instead.
+This module is an internal implementation detail. You shouldn't use it directly. It supplies the raw data used in the `Provider` and `SDKClient` and `ProviderCategory` enum classes (`codeweaver.core.types.provider`). Use those classes instead.
 
-To allow for lazy loading and prevent circular imports, we put the mappings in this separate module and wrapped in functions. To avoid circular dependencies and initialization order issues, we require callers to pass in themselves (`ProviderKind`, `Provider`, or `SDKClient`) either as a class or instance.
+To allow for lazy loading and prevent circular imports, we put the mappings in this separate module and wrapped in functions. To avoid circular dependencies and initialization order issues, we require callers to pass in themselves (`ProviderCategory`, `Provider`, or `SDKClient`) either as a class or instance.
 """
 
 from __future__ import annotations
@@ -29,9 +29,9 @@ from codeweaver.core.utils.lazy_importer import lazy_import
 if TYPE_CHECKING:
     from codeweaver.core.types.provider import (
         LiteralProvider,  # Members of Provider
-        LiteralProviderKind,  # Members of ProviderKind
+        LiteralProviderCategory,  # Members of ProviderCategory
         Provider,
-        ProviderKind,
+        ProviderCategory,
         SDKClient,
     )
 
@@ -65,7 +65,7 @@ else:
     AsyncAnthropicVertex = Any
 
 
-type ProviderKindLiteralString = Literal[
+type ProviderCategoryLiteralString = Literal[
     "agent", "data", "embedding", "reranking", "sparse_embedding", "vector_store"
 ]
 
@@ -345,7 +345,7 @@ class ServiceMetadata(NamedTuple):
     discriminator: tuple[Literal["model", "client"], str | re.Pattern] | None = None
     """For multi-client providers, determines which card to use.
 
-    Format: (discriminator_kind, discriminator_value)
+    Format: (discriminator_category, discriminator_value)
 
     - ("model", "claude"): Use this card if model name starts with "claude"
     - ("client", "openai"): Use this card if client preference is "openai"
@@ -364,7 +364,7 @@ class ServiceMetadata(NamedTuple):
 
     The function receives the client or provider class, and any args/kwargs needed for instantiation, and returns the instantiated client or provider. The function may be sync or async (returning a coroutine). The caller will await if it's async.
 
-    Format: (handler_kind, handler_function)
+    Format: (handler_category, handler_function)
 
     - ("provider", func): Custom provider class instantiation
     - ("client", func): Custom client instantiation
@@ -374,9 +374,9 @@ class ServiceMetadata(NamedTuple):
 
 
 class ServiceCard(NamedTuple):
-    """Service card representing a provider-kind-client combination.
+    """Service card representing a provider-category-client combination.
 
-    A ServiceCard maps a provider-kind pair to the actual provider class and
+    A ServiceCard maps a provider-category pair to the actual provider class and
     client class needed to instantiate that service. For example:
     - (cohere, reranking) → (CohereRerankingProvider, AsyncClientV2)
 
@@ -387,8 +387,8 @@ class ServiceCard(NamedTuple):
     provider: LiteralProvider
     """The provider (the service you pay for, e.g., 'openai', 'cohere')."""
 
-    kind: LiteralProviderKind
-    """The kind of service (e.g., 'embedding', 'agent', 'reranking')."""
+    category: LiteralProviderCategory
+    """The category of service (e.g., 'embedding', 'agent', 'reranking')."""
 
     provider_cls: LazyImport[Any]
     """The provider class (e.g., CohereProvider, OpenAIEmbeddingProvider).
@@ -425,8 +425,8 @@ class ServiceCard(NamedTuple):
         based on the discriminator.
 
         Args:
-            model_name: The model name to check against the discriminator (if kind is "model").
-            client_preference: The client preference to check against the discriminator (if kind is "client").
+            model_name: The model name to check against the discriminator (if category is "model").
+            client_preference: The client preference to check against the discriminator (if category is "client").
 
         Returns:
             True if this card matches the discriminator criteria, False otherwise.
@@ -434,22 +434,22 @@ class ServiceCard(NamedTuple):
         if not self.has_multiple():
             return True  # No discriminator, always matches
 
-        disc_kind = self.discriminator_kind
+        disc_category = self.discriminator_category
         disc_value = self.discriminator
 
-        if disc_kind == "model" and model_name is not None:
+        if disc_category == "model" and model_name is not None:
             if isinstance(disc_value, re.Pattern):
                 return bool(disc_value.match(model_name))
             return model_name.startswith(disc_value)
 
-        if disc_kind == "client" and client_preference is not None:
+        if disc_category == "client" and client_preference is not None:
             return client_preference == disc_value
 
         return False  # No match if required info not provided
 
     @property
-    def discriminator_kind(self) -> Literal["model", "client"] | None:
-        """Get the discriminator kind if this card has a discriminator."""
+    def discriminator_category(self) -> Literal["model", "client"] | None:
+        """Get the discriminator category if this card has a discriminator."""
         if self.metadata and self.metadata.discriminator:
             return self.metadata.discriminator[0]
         return None
@@ -491,8 +491,8 @@ class ServiceCard(NamedTuple):
         """
         if not (handler := self.handler):
             return None
-        kind, func = handler
-        import_cls = self.client_cls if kind == "client" else self.provider_cls
+        category, func = handler
+        import_cls = self.client_cls if category == "client" else self.provider_cls
         return func(import_cls._resolve(), *args, **kwargs) if callable(func) else None
 
     def handler_is_async(self) -> bool:
@@ -526,7 +526,7 @@ class ServiceCard(NamedTuple):
             )
         except (ImportError, AttributeError, KeyError):
             raise ValueError(
-                f"Failed to resolve {target} class for provider {self.provider} and kind {self.kind}."
+                f"Failed to resolve {target} class for provider {self.provider} and category {self.category}."
             ) from None
         return (
             self._apply_handler(*args, **kwargs)
@@ -538,7 +538,7 @@ class ServiceCard(NamedTuple):
 @overload
 def service_card_factory(
     provider: ProviderLiteralString,
-    kind: ProviderKindLiteralString,
+    category: ProviderCategoryLiteralString,
     provider_cls: LazyImport[Any],
     client_cls: LazyImport[Any],
     client: SDKClientLiteralString,
@@ -548,7 +548,7 @@ def service_card_factory(
 @overload
 def service_card_factory(
     provider: ProviderLiteralString,
-    kind: ProviderKindLiteralString,
+    category: ProviderCategoryLiteralString,
     provider_cls: LazyImport[Any],
     client_cls: LazyImport[Any],
     client: SDKClientLiteralString,
@@ -559,7 +559,7 @@ def service_card_factory(
 
 def service_card_factory(
     provider: ProviderLiteralString,
-    kind: ProviderKindLiteralString,
+    category: ProviderCategoryLiteralString,
     provider_cls: LazyImport[Any],
     client_cls: LazyImport[Any],
     client: SDKClientLiteralString,
@@ -573,7 +573,7 @@ def service_card_factory(
 
     Args:
         provider: The provider (the service you pay for).
-        kind: The kind of service (embedding, agent, etc.).
+        category: The category of service (embedding, agent, etc.).
         provider_cls: The provider class (e.g., CohereProvider).
         client_cls: The client class (e.g., AsyncCohereV2).
         metadata: Optional metadata for multi-client scenarios or special handling.
@@ -613,7 +613,7 @@ def service_card_factory(
     """
     return ServiceCard(
         provider=provider,
-        kind=kind,
+        category=category,
         provider_cls=provider_cls,
         client_cls=client_cls,
         client=client,
@@ -633,7 +633,7 @@ def _validate_registry(cards: tuple[ServiceCard, ...]) -> None:
     This helps catch configuration issues without blocking imports.
 
     Validation checks:
-    - Duplicate cards (same provider-kind-discriminator)
+    - Duplicate cards (same provider-category-discriminator)
     - Multi-client scenarios with inconsistent discriminator patterns
     - Missing default fallback cards for multi-client providers
 
@@ -646,14 +646,14 @@ def _validate_registry(cards: tuple[ServiceCard, ...]) -> None:
 
     logger = logging.getLogger(__name__)
 
-    seen: set[tuple[ProviderLiteralString, ProviderKindLiteralString, str | None]] = set()
+    seen: set[tuple[ProviderLiteralString, ProviderCategoryLiteralString, str | None]] = set()
     multi_client: defaultdict[
-        tuple[ProviderLiteralString, ProviderKindLiteralString], list[ServiceCard]
+        tuple[ProviderLiteralString, ProviderCategoryLiteralString], list[ServiceCard]
     ] = defaultdict(list)
 
     for card in cards:
         # Track multi-client scenarios
-        key = (card.provider, card.kind)
+        key = (card.provider, card.category)
         multi_client[key].append(card)
 
         # Check for exact duplicates
@@ -662,14 +662,14 @@ def _validate_registry(cards: tuple[ServiceCard, ...]) -> None:
             if card.metadata and card.metadata.discriminator
             else None
         )
-        full_key = (card.provider, card.kind, disc)
+        full_key = (card.provider, card.category, disc)
 
         if full_key in seen:
             logger.warning("Duplicate service card detected: %s", full_key)
         seen.add(full_key)
 
     # Validate multi-client discriminator logic
-    for (provider, kind), card_list in multi_client.items():
+    for (provider, category), card_list in multi_client.items():
         if len(card_list) > 1:
             has_default = any(
                 c.metadata is None or c.metadata.discriminator is None for c in card_list
@@ -681,7 +681,7 @@ def _validate_registry(cards: tuple[ServiceCard, ...]) -> None:
                     "Multi-client %s-%s has discriminators but no default fallback. "
                     "Consider adding a card with metadata=None for the default case.",
                     provider,
-                    kind,
+                    category,
                 )
 
             if not has_discriminators:
@@ -689,7 +689,7 @@ def _validate_registry(cards: tuple[ServiceCard, ...]) -> None:
                     "Multi-client %s-%s has multiple cards but no discriminators. "
                     "Selection will be non-deterministic (first match wins).",
                     provider,
-                    kind,
+                    category,
                 )
 
 
@@ -708,7 +708,7 @@ def _build_service_card_registry() -> tuple[ServiceCard, ...]:
     """Build the complete registry of service cards.
 
     Returns immutable tuple for caching and thread safety.
-    All provider-kind-client mappings are defined through this registry.
+    All provider-category-client mappings are defined through this registry.
 
     The registry is built from pattern-specific builder functions that handle
     common scenarios (OpenAI API, native SDKs, local providers, multi-client).
@@ -784,7 +784,7 @@ def _build_openai_api_cards() -> list[ServiceCard]:
     agent_cards = [
         service_card_factory(
             provider=provider,
-            kind="agent",
+            category="agent",
             provider_cls=_get_pydantic_ai_provider_cls(provider),
             client_cls=lazy_import("openai", "AsyncOpenAI"),
         )
@@ -794,7 +794,7 @@ def _build_openai_api_cards() -> list[ServiceCard]:
     embedding_cards = [
         service_card_factory(
             provider=provider,
-            kind="embedding",
+            category="embedding",
             provider_cls=lazy_import(
                 "codeweaver.providers.embedding.providers.openai_factory", "get_provider_class"
             ),
@@ -1297,13 +1297,13 @@ def _match_discriminator(
     if not card.metadata or not card.metadata.discriminator:
         return True  # Default card (no discriminator)
 
-    disc_kind, disc_value = card.metadata.discriminator
+    disc_category, disc_value = card.metadata.discriminator
 
-    if disc_kind == "model" and model_hint:
+    if disc_category == "model" and model_hint:
         # Model discriminator: check if model name starts with discriminator value
         return model_hint.lower().startswith(disc_value.lower())
 
-    if disc_kind == "client" and client_preference:
+    if disc_category == "client" and client_preference:
         # Client discriminator: exact match
         return client_preference.lower() == disc_value.lower()
 
@@ -1319,7 +1319,7 @@ def _match_discriminator(
 def get_service_cards(
     *,
     provider: ProviderLiteralString | set[ProviderLiteralString] | None = None,
-    kind: ProviderKindLiteralString | set[ProviderKindLiteralString] | None = None,
+    category: ProviderCategoryLiteralString | set[ProviderCategoryLiteralString] | None = None,
     client: SDKClientLiteralString | set[SDKClientLiteralString] | None = None,
 ) -> tuple[ServiceCard, ...]:
     """Query service cards by any combination of filters.
@@ -1329,7 +1329,7 @@ def get_service_cards(
 
     Args:
         provider: Filter by provider name (e.g., "openai", "cohere").
-        kind: Filter by service kind (e.g., "embedding", "agent").
+        category: Filter by service category (e.g., "embedding", "agent").
         client: Filter by SDK client name (e.g., "openai", "anthropic").
 
     Returns:
@@ -1340,30 +1340,30 @@ def get_service_cards(
         >>> get_service_cards(provider="openai")
 
         Get all embedding providers:
-        >>> get_service_cards(kind="embedding")
+        >>> get_service_cards(category="embedding")
 
         Get providers using OpenAI client:
         >>> get_service_cards(client="openai")
 
-        Get specific provider-kind combination:
-        >>> get_service_cards(provider="azure", kind="agent")
+        Get specific provider-category combination:
+        >>> get_service_cards(provider="azure", category="agent")
     """
     registry = _build_service_card_registry()
-    prov_filter, kind_filter, client_filter = (
+    prov_filter, category_filter, client_filter = (
         provider if isinstance(provider, set) else {provider},
-        kind if isinstance(kind, set) else {kind},
+        category if isinstance(category, set) else {category},
         client if isinstance(client, set) else {client},
     )
-    if prov_filter or kind_filter or client_filter:
+    if prov_filter or category_filter or client_filter:
         return tuple(
             sorted(
                 c
                 for c in registry
                 if (not prov_filter or c.provider in prov_filter)
-                and (not kind_filter or c.kind in kind_filter)
+                and (not category_filter or c.category in category_filter)
                 and (not client_filter or c.client in client_filter)
             ),
-            key=lambda c: (c.provider, c.kind, c.client),
+            key=lambda c: (c.provider, c.category, c.client),
         )
     return registry
 
@@ -1371,12 +1371,12 @@ def get_service_cards(
 @cache
 def get_service_card(
     provider: ProviderLiteralString,
-    kind: ProviderKindLiteralString,
+    category: ProviderCategoryLiteralString,
     *,
     client_preference: str | None = None,
     model_hint: str | None = None,
 ) -> ServiceCard | None:
-    """Get single service card for exact provider-kind match with discriminator support.
+    """Get single service card for exact provider-category match with discriminator support.
 
     For multi-client providers (Azure, Bedrock, Heroku), this function uses
     discriminators to select the appropriate card:
@@ -1387,17 +1387,17 @@ def get_service_card(
 
     Args:
         provider: The provider name (e.g., "azure", "openai").
-        kind: The service kind (e.g., "agent", "embedding").
+        category: The service category (e.g., "agent", "embedding").
         client_preference: Optional client preference for multi-client providers.
         model_hint: Optional model name hint for model-based discrimination.
 
     Returns:
-        ServiceCard if found, None if provider-kind combination doesn't exist.
+        ServiceCard if found, None if provider-category combination doesn't exist.
 
     Examples:
         Simple case:
         >>> get_service_card("openai", "embedding")
-        ServiceCard(provider='openai', kind='embedding', ...)
+        ServiceCard(provider='openai', category='embedding', ...)
 
         Multi-client with model hint:
         >>> get_service_card("azure", "agent", model_hint="claude-3-opus")
@@ -1407,7 +1407,7 @@ def get_service_card(
         >>> get_service_card("heroku", "embedding", client_preference="cohere")
         ServiceCard(...client_cls=AsyncClientV2...)
     """
-    cards = get_service_cards(provider=provider, kind=kind)
+    cards = get_service_cards(provider=provider, category=category)
 
     if not cards:
         return None
@@ -1441,8 +1441,8 @@ def get_service_card(
 @cache
 def get_provider_clients(
     provider: ProviderLiteralString,
-) -> dict[ProviderKindLiteralString, tuple[SDKClientLiteralString, ...]]:
-    """Get all SDK client options for a provider, grouped by service kind.
+) -> dict[ProviderCategoryLiteralString, tuple[SDKClientLiteralString, ...]]:
+    """Get all SDK client options for a provider, grouped by service category.
 
     Useful for discovering what clients a provider supports for each service type.
 
@@ -1450,7 +1450,7 @@ def get_provider_clients(
         provider: The provider name (e.g., "azure", "openai").
 
     Returns:
-        Dictionary mapping service kinds to tuples of SDK client names.
+        Dictionary mapping service categories to tuples of SDK client names.
         Empty dict if provider not found.
 
     Examples:
@@ -1468,9 +1468,9 @@ def get_provider_clients(
     """
     cards = get_service_cards(provider=provider)
 
-    result: dict[ProviderKindLiteralString, set[SDKClientLiteralString]] = defaultdict(set)
+    result: dict[ProviderCategoryLiteralString, set[SDKClientLiteralString]] = defaultdict(set)
     for card in cards:
-        result[card.kind] |= {card.client}
+        result[card.category] |= {card.client}
 
     return {k: tuple(sorted(v)) for k, v in result.items() if v}
 
@@ -1478,119 +1478,123 @@ def get_provider_clients(
 @cache
 def get_provider_capabilities_map(
     provider_cls: type[Provider],
-) -> MappingProxyType[Provider, tuple[ProviderKindLiteralString, ...]]:
+) -> MappingProxyType[Provider, tuple[ProviderCategoryLiteralString, ...]]:
     """Get the mapping of provider capabilities.
 
-    The map is from `Provider` to their supported `ProviderKind`s as strings.
+    The map is from `Provider` to their supported `ProviderCategory`s as strings.
 
     Args:
         provider: The `Provider` class to get capabilities for.
 
     Returns:
-        A mapping of `Provider` to their supported `ProviderKind`s as strings.
+        A mapping of `Provider` to their supported `ProviderCategory`s as strings.
     """
     cards = get_service_cards()
     mapping = defaultdict(set)
     for card in cards:
-        mapping[Provider.from_string(card.provider)].add(card.kind)
-    return MappingProxyType({provider: tuple(sorted(kinds)) for provider, kinds in mapping.items()})
+        mapping[Provider.from_string(card.provider)].add(card.category)
+    return MappingProxyType({
+        provider: tuple(sorted(categories)) for provider, categories in mapping.items()
+    })
 
 
 @cache
-def get_provider_kinds(provider: LiteralProvider) -> tuple[ProviderKindLiteralString, ...]:
-    """Get the supported provider kinds for a given provider, returned as strings.
+def get_categories(provider: LiteralProvider) -> tuple[ProviderCategoryLiteralString, ...]:
+    """Get the supported provider categories for a given provider, returned as strings.
 
     Args:
-        provider_instance: The `Provider` instance to get kinds for.
+        provider_instance: The `Provider` instance to get categories for.
 
     Returns:
-        A tuple of supported `ProviderKind`s as strings.
+        A tuple of supported `ProviderCategory`s as strings.
     """
     return get_provider_capabilities_map(provider_cls=type(provider)).get(provider, ())
 
 
 @cache
-def get_providers_for_kind(kind: LiteralProviderKind) -> set[ProviderLiteralString]:
-    """Get all providers that support a given provider kind.
+def get_providers_for_category(category: LiteralProviderCategory) -> set[ProviderLiteralString]:
+    """Get all providers that support a given provider category.
 
     Args:
-        kind: The `ProviderKind` to get providers for.
+        category: The `ProviderCategory` to get providers for.
 
     Returns:
-        A set of `Provider` members that support the given kind.
+        A set of `Provider` members that support the given category.
     """
-    mapping = get_provider_capabilities_map(type(kind)._provider_cls())
-    return {provider for provider, kinds in mapping.items() if kind.variable in kinds}
+    mapping = get_provider_capabilities_map(type(category)._provider_cls())
+    return {provider for provider, categories in mapping.items() if category.variable in categories}
 
 
 @cache
 def get_sdk_client_map(
     client_cls: type[SDKClient],
 ) -> MappingProxyType[
-    tuple[ProviderLiteralString, ProviderKindLiteralString], SDKClient | tuple[SDKClient, ...]
+    tuple[ProviderLiteralString, ProviderCategoryLiteralString], SDKClient | tuple[SDKClient, ...]
 ]:
     """Get the mapping of SDK clients.
 
-    The map is from `(Provider, ProviderKind)` to their `SDKClient` class.
+    The map is from `(Provider, ProviderCategory)` to their `SDKClient` class.
 
     Args:
         client_cls: The `SDKClient` class to get the mapping for.
 
     Returns:
-        A mapping of `(Provider, ProviderKind)` to their `SDKClient` class(es).
+        A mapping of `(Provider, ProviderCategory)` to their `SDKClient` class(es).
     """
     cards = get_service_cards()
-    return MappingProxyType({(c.provider, c.kind): client_cls.from_string(c.client) for c in cards})
+    return MappingProxyType({
+        (c.provider, c.category): client_cls.from_string(c.client) for c in cards
+    })
 
 
 @cache
 def get_sdk_client(
-    client_cls: type[SDKClient], provider: LiteralProvider, kind: LiteralProviderKind
+    client_cls: type[SDKClient], provider: LiteralProvider, category: LiteralProviderCategory
 ) -> SDKClient | tuple[SDKClient, ...] | None:
-    """Get the SDK client for a given provider and kind.
+    """Get the SDK client for a given provider and category.
 
     Args:
         client_cls: The `SDKClient` class to get the client for.
         provider: The `Provider` to get the client for as a string.
-        kind: The `ProviderKind` to get the client for as a string.
+        category: The `ProviderCategory` to get the client for as a string.
 
     Returns:
-        The `SDKClient` class or tuple of classes for the given provider and kind, or None if not found.
+        The `SDKClient` class or tuple of classes for the given provider and category, or None if not found.
     """
-    return get_sdk_client_map(client_cls).get((provider, kind))
+    return get_sdk_client_map(client_cls).get((provider, category))
 
 
 @cache
-def get_provider_sdk_clients_for_kind(
-    client_cls: type[SDKClient], kind: LiteralProviderKind
+def get_provider_sdk_clients_for_category(
+    client_cls: type[SDKClient], category: LiteralProviderCategory
 ) -> dict[Provider, SDKClient | tuple[SDKClient, ...]]:
-    """Get all SDK clients for a given provider kind.
+    """Get all SDK clients for a given provider category.
 
     Args:
         client_cls: The `SDKClient` class to get the clients for.
-        kind: The `ProviderKind` to get the clients for as a string.
+        category: The `ProviderCategory` to get the clients for as a string.
     """
     return {
         provider: client
         for (provider, k), client in get_sdk_client_map(client_cls).items()
-        if k == kind
+        if k == category
     }
 
 
 @cache
-def get_provider_kind_sdk_clients_for_provider(
+def get_provider_category_sdk_clients_for_provider(
     client_cls: type[SDKClient], provider: Provider
-) -> dict[ProviderKind, tuple[SDKClient, ...] | SDKClient]:
+) -> dict[ProviderCategory, tuple[SDKClient, ...] | SDKClient]:
     """Get all SDK clients for a given provider.
 
     Args:
         client_cls: The `SDKClient` class to get the clients for.
         provider: The `Provider` to get the clients for as a string.
     """
-    provider_kind_cls = client_cls._any_kind()
+    provider_category_cls = client_cls._any_category()
     return {
-        provider_kind_cls.from_string(kind): client
-        for (p, kind), client in get_sdk_client_map(client_cls).items()
+        provider_category_cls.from_string(category): client
+        for (p, category), client in get_sdk_client_map(client_cls).items()
         if p == provider.variable
     }
 
@@ -1600,17 +1604,17 @@ def get_provider_kind_sdk_clients_for_provider(
 # ===========================================================================
 
 __all__ = (
-    "ProviderKindLiteralString",
+    "ProviderCategoryLiteralString",
     "ProviderLiteralString",
     "SDKClientLiteralString",
     "ServiceCard",
     "ServiceMetadata",
+    "get_categories",
     "get_provider_capabilities_map",
+    "get_provider_category_sdk_clients_for_provider",
     "get_provider_clients",
-    "get_provider_kind_sdk_clients_for_provider",
-    "get_provider_kinds",
-    "get_provider_sdk_clients_for_kind",
-    "get_providers_for_kind",
+    "get_provider_sdk_clients_for_category",
+    "get_providers_for_category",
     "get_sdk_client",
     "get_sdk_client_map",
     "get_service_card",

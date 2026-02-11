@@ -17,7 +17,7 @@ pytest.importorskip("cohere", reason="cohere package is required for these tests
 from codeweaver.core import (
     ChunkKind,
     CodeChunk,
-    ExtKind,
+    ExtCategory,
     Provider,
     SemanticSearchLanguage,
     Span,
@@ -30,7 +30,7 @@ def make_test_chunk(content: str, index: int = 0) -> CodeChunk:
     """Helper to create CodeChunk for testing."""
     return CodeChunk(
         content=content,
-        ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
+        ext_category=ExtCategory(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
         language=SemanticSearchLanguage.PYTHON,
         line_range=Span(start=index + 1, end=index + 1, source_id=uuid7()),
         file_path=Path("/test/file.py"),
@@ -193,13 +193,15 @@ class TestCohereRerankingProviderReranking:
         )
         from pathlib import Path
 
-        from codeweaver.core import ChunkKind, ExtKind, SemanticSearchLanguage, Span, uuid7
+        from codeweaver.core import ChunkKind, ExtCategory, SemanticSearchLanguage, Span, uuid7
 
         # Create test chunks
         chunks = [
             CodeChunk(
                 content="def foo(): pass",
-                ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
+                ext_category=ExtCategory(
+                    language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE
+                ),
                 language=SemanticSearchLanguage.PYTHON,
                 line_range=Span(start=1, end=1, source_id=uuid7()),
                 file_path=Path("/test/file.py"),
@@ -207,7 +209,9 @@ class TestCohereRerankingProviderReranking:
             CodeChunk(
                 content="def bar(): pass",
                 language=SemanticSearchLanguage.PYTHON,
-                ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
+                ext_category=ExtCategory(
+                    language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE
+                ),
                 line_range=Span(start=2, end=2, source_id=uuid7()),
                 file_path=Path("/test/file.py"),
             ),
@@ -253,11 +257,11 @@ class TestCohereRerankingProviderReranking:
         )
         from pathlib import Path
 
-        from codeweaver.core import ChunkKind, ExtKind, SemanticSearchLanguage, Span, uuid7
+        from codeweaver.core import ChunkKind, ExtCategory, SemanticSearchLanguage, Span, uuid7
 
         chunk = CodeChunk(
             content="test content",
-            ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
+            ext_category=ExtCategory(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
             language=SemanticSearchLanguage.PYTHON,
             line_range=Span(start=1, end=1, source_id=uuid7()),
             file_path=Path("/test/file.py"),

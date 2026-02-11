@@ -44,7 +44,7 @@ from codeweaver.core import (
     BlakeStore,
     ChunkSource,
     CodeChunk,
-    ExtKind,
+    ExtCategory,
     Metadata,
     SemanticSearchLanguage,
     SessionStatistics,
@@ -404,8 +404,10 @@ class SemanticChunker(BaseChunker):
             start_time: Start time for duration calculation
         """
         with contextlib.suppress(ValueError, OSError):
-            if file_path and (ext_kind := ExtKind.from_file(file_path)):
-                statistics.add_file_operations_by_extkind([(file_path, ext_kind, "processed")])
+            if file_path and (ext_category := ExtCategory.from_file(file_path)):
+                statistics.add_file_operations_by_extcategory([
+                    (file_path, ext_category, "processed")
+                ])
 
         # Calculate file size from chunks
         file_size_bytes = sum(len(c.content) for c in chunks) if chunks else 0
@@ -426,8 +428,10 @@ class SemanticChunker(BaseChunker):
             statistics: Statistics tracker
         """
         with contextlib.suppress(ValueError, OSError):
-            if file_path and (ext_kind := ExtKind.from_file(file_path)):
-                statistics.add_file_operations_by_extkind([(file_path, ext_kind, "skipped")])
+            if file_path and (ext_category := ExtCategory.from_file(file_path)):
+                statistics.add_file_operations_by_extcategory([
+                    (file_path, ext_category, "skipped")
+                ])
 
     def _handle_edge_cases(
         self, content: str, file_path: Path | None, source_id: UUID7
@@ -485,7 +489,7 @@ class SemanticChunker(BaseChunker):
                 CodeChunk.model_construct(
                     content=content,
                     line_range=Span(1, content.count("\n") + 1, source_id),
-                    ext_kind=ExtKind.from_file(file_path) if file_path else None,
+                    ext_category=ExtCategory.from_file(file_path) if file_path else None,
                     file_path=file_path,
                     language=self.language,
                     source=ChunkSource.TEXT_BLOCK,
@@ -507,7 +511,7 @@ class SemanticChunker(BaseChunker):
         ]
 
         if len(code_lines) <= 1:
-            ext_kind = ExtKind.from_file(file_path) if file_path else None
+            ext_category = ExtCategory.from_file(file_path) if file_path else None
             total_lines = content.count("\n") + 1
 
             # Log edge case for observability
@@ -523,7 +527,7 @@ class SemanticChunker(BaseChunker):
                     content=content,
                     line_range=Span(1, total_lines, source_id),
                     file_path=file_path,
-                    ext_kind=ext_kind,
+                    ext_category=ext_category,
                     language=self.language,
                     source=ChunkSource.TEXT_BLOCK,
                     metadata={
@@ -755,7 +759,7 @@ class SemanticChunker(BaseChunker):
                 range_obj.end.line + 1,
                 source_id,
             ),  # All spans from same file share source_id
-            ext_kind=ExtKind.from_file(file_path) if file_path else None,
+            ext_category=ExtCategory.from_file(file_path) if file_path else None,
             file_path=file_path,
             language=self.language,
             source=ChunkSource.SEMANTIC,
@@ -803,7 +807,7 @@ class SemanticChunker(BaseChunker):
                 "chunker_type": "semantic",
                 "content_hash": self._compute_content_hash(node.text),
                 "classification": node.classification.name if node.classification else None,
-                "kind": str(node.name),
+                "category": str(node.name),
                 "category": node.primary_category if hasattr(node, "primary_category") else None,
                 "importance_scores": node.importance.as_dict() if node.importance else None,
                 "is_composite": node.is_composite,
@@ -938,7 +942,7 @@ class SemanticChunker(BaseChunker):
             chunk = CodeChunk(
                 content=node.text,
                 line_range=Span(node.range.start.line + 1, node.range.end.line + 1, source_id),
-                ext_kind=ExtKind.from_file(file_path) if file_path else None,
+                ext_category=ExtCategory.from_file(file_path) if file_path else None,
                 file_path=file_path,
                 language=self.language,
                 source=ChunkSource.SEMANTIC,
@@ -974,7 +978,7 @@ class SemanticChunker(BaseChunker):
             enhanced_chunk = CodeChunk(
                 content=delimiter_chunk.content,
                 line_range=delimiter_chunk.line_range,
-                ext_kind=delimiter_chunk.ext_kind,
+                ext_category=delimiter_chunk.ext_category,
                 file_path=delimiter_chunk.file_path,
                 language=delimiter_chunk.language,
                 source=ChunkSource.TEXT_BLOCK,  # Not truly semantic
@@ -987,7 +991,7 @@ class SemanticChunker(BaseChunker):
             CodeChunk(
                 content=node.text,
                 line_range=Span(node.range.start.line, node.range.end.line, source_id),
-                ext_kind=ExtKind.from_file(file_path) if file_path else None,
+                ext_category=ExtCategory.from_file(file_path) if file_path else None,
                 file_path=file_path,
                 language=self.language,
                 source=ChunkSource.SEMANTIC,

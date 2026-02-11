@@ -31,7 +31,7 @@ from qdrant_client.async_qdrant_client import AsyncQdrantClient
 from codeweaver.core import (
     ChunkKind,
     CodeChunk,
-    ExtKind,
+    ExtCategory,
     Provider,
     SearchStrategy,
     SemanticSearchLanguage,
@@ -62,7 +62,7 @@ def create_test_chunk(
     return CodeChunk(
         chunk_id=chunk_id,
         file_path=Path(file_path),
-        ext_kind=ExtKind(kind=ChunkKind.CODE, language=SemanticSearchLanguage.PYTHON),
+        ext_category=ExtCategory(category=ChunkKind.CODE, language=SemanticSearchLanguage.PYTHON),
         line_range=Span(chunk_index * 10 + 1, (chunk_index + 1) * 10, chunk_id),
         language=SemanticSearchLanguage.PYTHON,
         content=content,

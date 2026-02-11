@@ -19,7 +19,7 @@ from rich.table import Table
 
 from codeweaver.cli.ui import CLIErrorHandler, get_display
 from codeweaver.cli.utils import check_provider_package_available
-from codeweaver.core import Provider, ProviderKind, get_container
+from codeweaver.core import Provider, ProviderCategory, get_container
 from codeweaver.providers import EmbeddingModelCapabilities, RerankingModelCapabilities
 
 
@@ -34,7 +34,7 @@ console: Console = _display.console
 app = App("list", help="List available CodeWeaver resources.", console=console)
 
 
-def _check_api_key(provider: Provider, kind: ProviderKind) -> bool:
+def _check_api_key(provider: Provider, category: ProviderCategory) -> bool:
     """Check if API key is configured for a provider.
 
     Returns True if API key is configured or not required.
@@ -46,7 +46,7 @@ def _check_api_key(provider: Provider, kind: ProviderKind) -> bool:
         return True
 
     if provider.is_local_provider:
-        return check_provider_package_available(provider, kind)
+        return check_provider_package_available(provider, category)
     return provider.has_env_auth
 
 
@@ -75,8 +75,8 @@ def _get_provider_type(provider: Provider) -> str:
 class ProviderDict(TypedDict):
     """TypedDict for provider information."""
 
-    capabilities: list[ProviderKind]
-    kind: Literal["local", "cloud", "local/cloud"]
+    capabilities: list[ProviderCategory]
+    category: Literal["local", "cloud", "local/cloud"]
     status: Literal["[yellow]⚠️  needs key[/yellow]", "[green]✅ ready[/green]"]
 
 
@@ -85,10 +85,10 @@ type ProviderMap = dict[Provider, ProviderDict]
 
 @app.command
 def providers(
-    kind: Annotated[
-        ProviderKind | None,
-        cyclopts.Parameter(name=["--kind", "-k"], help="Filter by provider kind"),
-    ] = ProviderKind.EMBEDDING,
+    category: Annotated[
+        ProviderCategory | None,
+        cyclopts.Parameter(name=["--category", "-k"], help="Filter by provider category"),
+    ] = ProviderCategory.EMBEDDING,
 ) -> None:
     """List all available providers.
 
@@ -96,22 +96,26 @@ def providers(
     """
     display = _display
 
-    # Use PROVIDER_CAPABILITIES map to find providers for each kind
+    # Use PROVIDER_CAPABILITIES map to find providers for each category
     # This replaces registry.list_providers(p)
     provider_capabilities = {
-        kind: kind.providers for kind in ProviderKind if kind != ProviderKind.UNSET
+        category: category.providers
+        for category in ProviderCategory
+        if category != ProviderCategory.UNSET
     }
 
-    # Filter by kind if specified
-    kind_filter = None
-    if kind:
+    # Filter by category if specified
+    category_filter = None
+    if category:
         try:
-            kind_filter = ProviderKind.from_string(kind) if isinstance(kind, str) else kind
+            category_filter = (
+                ProviderCategory.from_string(category) if isinstance(category, str) else category
+            )
         except (AttributeError, KeyError, ValueError):
-            display.print_error("Invalid provider kind")
+            display.print_error("Invalid provider category")
             display.print_list(
-                [prov.variable for prov in ProviderKind if prov != ProviderKind.UNSET],
-                title="The following are valid provider kinds:",
+                [prov.variable for prov in ProviderCategory if prov != ProviderCategory.UNSET],
+                title="The following are valid provider categories:",
             )
             sys.exit(1)
 
@@ -123,7 +127,7 @@ def providers(
     provider_capabilities = {
         k: v
         for k, v in provider_capabilities.items()
-        if ((kind_filter and k == kind_filter) or not kind_filter)
+        if ((category_filter and k == category_filter) or not category_filter)
     }
     provider_map = dict.fromkeys(providers_list)
     for capability, p_list in provider_capabilities.items():
@@ -131,10 +135,10 @@ def providers(
             if provider not in provider_map:
                 continue
             if not provider_map.get(provider):
-                has_key = _check_api_key(provider, kind=capability)
+                has_key = _check_api_key(provider, category=capability)
                 provider_map[provider] = {
                     "capabilities": [capability],
-                    "kind": _get_provider_type(provider),
+                    "category": _get_provider_type(provider),
                     "status": _get_status_indicator(provider, has_key=has_key),
                 }
             elif capability and provider_map.get(provider) and is_typeddict(provider_map[provider]):
@@ -146,8 +150,8 @@ def providers(
 
     # Build table with count
     title_text = (
-        f"Available {kind.as_title} Providers ({provider_count} found)"
-        if kind_filter
+        f"Available {category.as_title} Providers ({provider_count} found)"
+        if category_filter
         else f"Available Providers ({provider_count} found)"
     )
     table = Table(show_header=True, header_style="bold blue", title=title_text)
@@ -160,12 +164,12 @@ def providers(
         if not info:
             continue
         joined_caps = ", ".join(cap.as_title for cap in info["capabilities"])
-        provider_type = info["kind"]
+        provider_type = info["category"]
         status = info["status"]
         table.add_row(provider.as_title, joined_caps, provider_type, status)
 
     if table.row_count == 0:
-        display.print_warning(f"No providers found for kind: {kind}")
+        display.print_warning(f"No providers found for category: {category}")
     else:
         display.console.print(table)
 
@@ -362,54 +366,54 @@ def _list_sparse_embedding_models(
 def embedding() -> None:
     """List all embedding providers (shortcut).
 
-    Equivalent to: codeweaver list providers --kind embedding
+    Equivalent to: codeweaver list providers --category embedding
     """
-    providers(kind=ProviderKind.EMBEDDING)
+    providers(category=ProviderCategory.EMBEDDING)
 
 
 @app.command
 def sparse_embedding() -> None:
     """List all sparse-embedding providers (shortcut).
 
-    Equivalent to: codeweaver list providers --kind sparse-embedding
+    Equivalent to: codeweaver list providers --category sparse-embedding
     """
-    providers(kind=ProviderKind.SPARSE_EMBEDDING)
+    providers(category=ProviderCategory.SPARSE_EMBEDDING)
 
 
 @app.command
 def vector_store(alias="vec") -> None:
     """List all vector-store providers (shortcut).
 
-    Equivalent to: codeweaver list providers --kind vector-store
+    Equivalent to: codeweaver list providers --category vector-store
     """
-    providers(kind=ProviderKind.VECTOR_STORE)
+    providers(category=ProviderCategory.VECTOR_STORE)
 
 
 @app.command(alias="rerank")
 def reranking() -> None:
     """List all reranking providers (shortcut).
 
-    Equivalent to: codeweaver list providers --kind reranking
+    Equivalent to: codeweaver list providers --category reranking
     """
-    providers(kind=ProviderKind.RERANKING)
+    providers(category=ProviderCategory.RERANKING)
 
 
 @app.command
 def agent() -> None:
     """List all agent providers (shortcut).
 
-    Equivalent to: codeweaver list providers --kind agent
+    Equivalent to: codeweaver list providers --category agent
     """
-    providers(kind=ProviderKind.AGENT)
+    providers(category=ProviderCategory.AGENT)
 
 
 @app.command
 def data() -> None:
     """List all data providers (shortcut).
 
-    Equivalent to: codeweaver list providers --kind data
+    Equivalent to: codeweaver list providers --category data
     """
-    providers(kind=ProviderKind.DATA)
+    providers(category=ProviderCategory.DATA)
 
 
 def main() -> None:

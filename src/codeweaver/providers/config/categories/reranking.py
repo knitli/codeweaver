@@ -8,7 +8,7 @@ from pydantic import Field, PositiveInt, Tag, computed_field, model_validator
 
 from codeweaver.core import Provider
 from codeweaver.core.constants import DEFAULT_RERANKING_MAX_RESULTS
-from codeweaver.core.types import LiteralSDKClient, ModelNameT, ProviderKind, SDKClient
+from codeweaver.core.types import LiteralSDKClient, ModelNameT, ProviderCategory, SDKClient
 from codeweaver.providers import (
     BedrockRerankingConfig,
     CohereClientOptions,
@@ -18,18 +18,18 @@ from codeweaver.providers import (
     SentenceTransformersRerankingConfig,
     VoyageRerankingConfig,
 )
+from codeweaver.providers.config.categories import PROVIDER_DISCRIMINATOR
+from codeweaver.providers.config.categories.base import BaseProviderSettings
+from codeweaver.providers.config.categories.mixins import (
+    BedrockProviderMixin,
+    FastEmbedProviderMixin,
+)
+from codeweaver.providers.config.categories.utils import is_cloud_provider
 from codeweaver.providers.config.clients import (
     BedrockClientOptions,
     FastEmbedClientOptions,
     GeneralRerankingClientOptionsType,
 )
-from codeweaver.providers.config.provider_kinds import PROVIDER_DISCRIMINATOR
-from codeweaver.providers.config.provider_kinds.base import BaseProviderSettings
-from codeweaver.providers.config.provider_kinds.mixins import (
-    BedrockProviderMixin,
-    FastEmbedProviderMixin,
-)
-from codeweaver.providers.config.provider_kinds.utils import is_cloud_provider
 from codeweaver.providers.config.reranking import RerankingConfigT
 from codeweaver.providers.embedding import BedrockRerankingModelConfig
 
@@ -55,7 +55,7 @@ def _config_factory[T: RerankingConfigT](data: dict[str, Any], config_class: typ
         and (provider := config_data.get("provider"))
         and provider not in {Provider.VOYAGE, Provider.FASTEMBED}
     ):
-        assert config_data["rerank"] is not None, (
+        assert config_data["rerank"] is not None, (  # noqa: S101
             "rerank config must be provided if top_n is set to a value other than the default"
         )
         match provider:
@@ -84,7 +84,7 @@ class BaseRerankingProviderSettings(BaseProviderSettings):
         | None
     ) = None
 
-    kind: ClassVar[Literal[ProviderKind.RERANKING]] = ProviderKind.RERANKING
+    category: ClassVar[Literal[ProviderCategory.RERANKING]] = ProviderCategory.RERANKING
 
     @computed_field
     @property
@@ -113,7 +113,7 @@ class RerankingProviderSettings(BaseRerankingProviderSettings):
         | None
     ) = None
 
-    kind: ClassVar[Literal[ProviderKind.RERANKING]] = ProviderKind.RERANKING
+    category: ClassVar[Literal[ProviderCategory.RERANKING]] = ProviderCategory.RERANKING
 
     def __init__(self, **data: Any) -> None:
         """Initialize the RerankingProviderSettings."""

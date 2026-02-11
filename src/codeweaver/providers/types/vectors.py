@@ -27,16 +27,16 @@ from codeweaver.core.types import (
     ModelNameT,
     Provider,
 )
+from codeweaver.providers.config.categories import AsymmetricEmbeddingProviderSettings
 from codeweaver.providers.config.embedding import FastEmbedSparseEmbeddingConfig
-from codeweaver.providers.config.provider_kinds import AsymmetricEmbeddingProviderSettings
 
 
 if TYPE_CHECKING:
-    from codeweaver.providers.config.profiles import ProviderProfile
-    from codeweaver.providers.config.provider_kinds import (
+    from codeweaver.providers.config.categories import (
         EmbeddingProviderSettings,
         SparseEmbeddingProviderSettings,
     )
+    from codeweaver.providers.config.profiles import ProviderProfile
 
 
 __all__ = ("VectorConfig", "VectorRole", "VectorSet")
@@ -198,13 +198,13 @@ class VectorConfig(BasedModel, frozen=True):
             Configured VectorConfig instance
 
         Example:
-            >>> from codeweaver.providers.config.provider_kinds import EmbeddingProviderSettings
+            >>> from codeweaver.providers.config.categories import EmbeddingProviderSettings
             >>> settings = EmbeddingProviderSettings(...)
             >>> config = await VectorConfig.from_provider_settings(
             ...     settings, name="primary", role=VectorRole.PRIMARY
             ... )
         """
-        from codeweaver.providers.config.provider_kinds import SparseEmbeddingProviderSettings
+        from codeweaver.providers.config.categories import SparseEmbeddingProviderSettings
 
         model_name = ModelName(config.model_name)
 
@@ -422,9 +422,7 @@ class VectorSet(BasedModel):
 
         # Primary dense (required)
         if profile.embedding and profile.embedding[0]:
-            from codeweaver.providers.config.provider_kinds import (
-                AsymmetricEmbeddingProviderSettings,
-            )
+            from codeweaver.providers.config.categories import AsymmetricEmbeddingProviderSettings
 
             first_config = profile.embedding[0]
             # Check if this is an asymmetric config

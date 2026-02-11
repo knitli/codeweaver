@@ -264,7 +264,7 @@ pytest tests/unit/engine/services/test_snapshot_service.py \
        tests/integration/engine/test_failover_snapshot_integration.py \
        tests/integration/workflows/test_backup_system_e2e.py \
        --cov=codeweaver.engine.services.snapshot_service \
-       --cov=codeweaver.providers.config.provider_kinds \
+       --cov=codeweaver.providers.config.categories \
        --cov=codeweaver.engine.services.failover_service \
        --cov-report=html
 ```
@@ -352,7 +352,7 @@ pytest tests/unit/engine/services/test_snapshot_service.py \
 4. **Verify Coverage**
    ```bash
    pytest --cov=codeweaver.engine.services.snapshot_service \
-          --cov=codeweaver.providers.config.provider_kinds \
+          --cov=codeweaver.providers.config.categories \
           --cov=codeweaver.engine.services.failover_service \
           --cov-report=html
    ```

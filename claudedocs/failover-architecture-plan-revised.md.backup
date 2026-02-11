@@ -236,7 +236,7 @@ class BackupConfig(BasedModel):
     def from_settings(cls, settings: ProviderSettings, *, user_disabled: bool = False) -> BackupConfig:
         """Auto-detect backup needs."""
         def _get_setting[T: BaseProviderSettings](provider_settings: tuple[T, ...] | T | None) -> T | None:
-            """Get the primary config for a given provider kind's settings."""
+            """Get the primary config for a given provider category's settings."""
             if not provider_settings:
                 return None
             return next((setting for setting in provider_settings if not setting.as_backup), None) if isinstance(provider_settings, tuple) else provider_settings

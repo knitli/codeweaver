@@ -112,7 +112,7 @@ def extract_languages(
         Tuple of unique languages found (excludes ConfigLanguage)
     """
     languages: set[SemanticSearchLanguage | LanguageName | ConfigLanguage] = {
-        m.file.ext_kind.language for m in code_matches if m.file.ext_kind is not None
+        m.file.ext_category.language for m in code_matches if m.file.ext_category is not None
     }
     return tuple(lang for lang in languages if not isinstance(lang, ConfigLanguage))
 

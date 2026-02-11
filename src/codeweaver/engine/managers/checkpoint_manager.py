@@ -33,7 +33,7 @@ from codeweaver.core import (
 )
 from codeweaver.core.constants import ONE_HOUR
 from codeweaver.engine.config import CodeWeaverEngineSettings, IndexerSettings
-from codeweaver.providers.config.provider_kinds import (
+from codeweaver.providers.config.categories import (
     EmbeddingProviderSettingsType,
     SparseEmbeddingProviderSettingsType,
     VectorStoreProviderSettingsType,

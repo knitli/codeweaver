@@ -253,7 +253,7 @@ def mock_vector_store() -> AsyncMock:
     from codeweaver.core import (
         ChunkKind,
         CodeChunk,
-        ExtKind,
+        ExtCategory,
         SearchResult,
         SemanticSearchLanguage,
         Span,
@@ -267,7 +267,7 @@ def mock_vector_store() -> AsyncMock:
         chunk_id = uuid7()
         return CodeChunk(
             chunk_id=chunk_id,
-            ext_kind=ExtKind.from_language(SemanticSearchLanguage.PYTHON, ChunkKind.CODE),
+            ext_category=ExtCategory.from_language(SemanticSearchLanguage.PYTHON, ChunkKind.CODE),
             chunk_name=name,
             file_path=file_path,
             language=SemanticSearchLanguage.PYTHON,
@@ -340,7 +340,7 @@ async def actual_vector_store() -> MemoryVectorStoreProvider:
         client = AsyncQdrantClient(location=":memory:")
 
         # Create collection config with test collection name
-        from codeweaver.providers.config.kinds import CollectionConfig
+        from codeweaver.providers.config.categories import CollectionConfig
 
         collection = CollectionConfig(collection_name="codeweaver-test-collection")
         config = MemoryVectorStoreProviderSettings(collection=collection)

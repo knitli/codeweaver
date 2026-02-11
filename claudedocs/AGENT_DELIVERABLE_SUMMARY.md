@@ -107,7 +107,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 [38;5;238m  97[0m [38;5;238m│[0m 
 [38;5;238m  98[0m [38;5;238m│[0m [38;5;231mTests are ready to activate once Agent A completes:[0m
 [38;5;238m  99[0m [38;5;238m│[0m 
-[38;5;238m 100[0m [38;5;238m│[0m [38;5;231m1. **AsymmetricEmbeddingConfig** class in `codeweaver.providers.config.provider_kinds`[0m
+[38;5;238m 100[0m [38;5;238m│[0m [38;5;231m1. **AsymmetricEmbeddingConfig** class in `codeweaver.providers.config.categories`[0m
 [38;5;238m 101[0m [38;5;238m│[0m [38;5;231m2. **ModelFamily** class in `codeweaver.providers.embedding.capabilities.base`[0m
 [38;5;238m 102[0m [38;5;238m│[0m [38;5;231m3. Model family assignments in capability definitions[0m
 [38;5;238m 103[0m [38;5;238m│[0m 

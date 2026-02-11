@@ -20,7 +20,13 @@ import pytest
 from pydantic.types import UUID7
 from qdrant_client import AsyncQdrantClient
 
-from codeweaver.core import ChunkKind, CodeChunk, ConfigLanguage, ExtKind, SemanticSearchLanguage
+from codeweaver.core import (
+    ChunkKind,
+    CodeChunk,
+    ConfigLanguage,
+    ExtCategory,
+    SemanticSearchLanguage,
+)
 from codeweaver.core.dependencies import SettingsDep
 from codeweaver.core.di.depends import INJECTED
 
@@ -544,7 +550,7 @@ def create_test_chunk_with_embeddings(
     # Create the base chunk
     chunk = CodeChunk(
         chunk_id=chunk_id,
-        ext_kind=ExtKind.from_language(language, ChunkKind.CODE),
+        ext_category=ExtCategory.from_language(language, ChunkKind.CODE),
         chunk_name=chunk_name,
         file_path=file_path,
         language=language,

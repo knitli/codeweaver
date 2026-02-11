@@ -17,7 +17,7 @@ from typing import Literal, TypedDict, get_args
 from pydantic import AnyUrl, SecretStr
 
 from codeweaver.core.constants import DEFAULT_MANAGEMENT_PORT, DEFAULT_MCP_PORT, LOCALHOST_URL
-from codeweaver.core.types import LiteralProviderKindType
+from codeweaver.core.types import LiteralProviderCategoryType
 from codeweaver.core.types.dictview import DictView
 from codeweaver.core.types.env import EnvFormat, EnvVarInfo
 from codeweaver.core.types.provider import Provider
@@ -212,7 +212,7 @@ class SettingsEnvVars:
                 is_secret=False,
                 default="qdrant",
                 variable_name="provider",
-                choices=_providers_for_kind("vector_store"),
+                choices=_providers_for_category("vector_store"),
                 resolver_key="primary.vector_store.provider",
                 available_with="providers",
             ),
@@ -242,7 +242,7 @@ class SettingsEnvVars:
                 is_required=False,
                 is_secret=True,
                 variable_name="api_key",
-                choices=_auth_list_for_kind("vector_store"),
+                choices=_auth_list_for_category("vector_store"),
                 resolver_key="primary.vector_store.api_key",
                 available_with="providers",
             ),
@@ -263,7 +263,7 @@ class SettingsEnvVars:
                 is_secret=False,
                 default="fastembed",
                 variable_name="provider",
-                choices=_providers_for_kind("sparse_embedding"),
+                choices=_providers_for_category("sparse_embedding"),
                 resolver_key="primary.sparse_embedding.provider",
                 available_with="providers",
             ),
@@ -274,7 +274,7 @@ class SettingsEnvVars:
                 is_secret=False,
                 default="voyage",
                 variable_name="provider",
-                choices=_providers_for_kind("embedding"),
+                choices=_providers_for_category("embedding"),
                 resolver_key="primary.embedding.provider",
                 available_with="providers",
             ),
@@ -294,7 +294,7 @@ class SettingsEnvVars:
                 is_required=False,
                 is_secret=True,
                 variable_name="api_key",
-                choices=_auth_list_for_kind("embedding"),
+                choices=_auth_list_for_category("embedding"),
                 resolver_key="primary.embedding.api_key",
                 available_with="providers",
             ),
@@ -305,7 +305,7 @@ class SettingsEnvVars:
                 is_secret=False,
                 default="voyage",
                 variable_name="provider",
-                choices=_providers_for_kind("reranking"),
+                choices=_providers_for_category("reranking"),
                 resolver_key="primary.reranking.provider",
                 available_with="providers",
             ),
@@ -325,7 +325,7 @@ class SettingsEnvVars:
                 is_required=False,
                 is_secret=True,
                 variable_name="api_key",
-                choices=_auth_list_for_kind("reranking"),
+                choices=_auth_list_for_category("reranking"),
                 resolver_key="primary.reranking.api_key",
                 available_with="providers",
             ),
@@ -336,7 +336,7 @@ class SettingsEnvVars:
                 is_secret=False,
                 default="anthropic",
                 variable_name="provider",
-                choices=_providers_for_kind("agent"),
+                choices=_providers_for_category("agent"),
                 resolver_key="primary.agent.provider",
                 available_with="providers",
             ),
@@ -356,7 +356,7 @@ class SettingsEnvVars:
                 is_required=False,
                 is_secret=True,
                 variable_name="api_key",
-                choices=_auth_list_for_kind("agent"),
+                choices=_auth_list_for_category("agent"),
                 resolver_key="primary.agent.api_key",
                 available_with="providers",
             ),
@@ -366,7 +366,7 @@ class SettingsEnvVars:
                 is_required=False,
                 is_secret=False,
                 default="tavily",
-                choices=_providers_for_kind("data"),
+                choices=_providers_for_category("data"),
                 available_with="providers",
                 resolver_key="data.providers",
             ),
@@ -419,17 +419,17 @@ class SettingsEnvVars:
         }
 
 
-def _providers_for_kind(kind: LiteralProviderKindType) -> set[str]:
+def _providers_for_category(category: LiteralProviderCategoryType) -> set[str]:
 
-    return {provider.variable for provider in Provider if provider.has_capability(kind)}
+    return {provider.variable for provider in Provider if provider.has_capability(category)}
 
 
-def _providers_for_kind_requiring_auth(kind: LiteralProviderKindType) -> set[str]:
+def _providers_for_category_requiring_auth(category: LiteralProviderCategoryType) -> set[str]:
 
     return {
         provider.variable
         for provider in Provider
-        if provider.has_capability(kind) and provider.requires_auth
+        if provider.has_capability(category) and provider.requires_auth
     }
 
 
@@ -437,19 +437,19 @@ def as_cloud_string(provider_name: str) -> str:
     return f"{provider_name} (cloud only)"
 
 
-def _auth_list_for_kind(kind: LiteralProviderKindType) -> set[str]:
+def _auth_list_for_category(category: LiteralProviderCategoryType) -> set[str]:
     return set(
-        _providers_for_kind_requiring_auth(kind)
-        | {as_cloud_string(p) for p in _maybe_requiring_auth(kind) if p}
+        _providers_for_category_requiring_auth(category)
+        | {as_cloud_string(p) for p in _maybe_requiring_auth(category) if p}
     )
 
 
-def _maybe_requiring_auth(kind: LiteralProviderKindType) -> set[str]:
+def _maybe_requiring_auth(category: LiteralProviderCategoryType) -> set[str]:
 
     return {
         provider.variable
         for provider in Provider
-        if provider.has_capability(kind) and provider.is_cloud_provider
+        if provider.has_capability(category) and provider.is_cloud_provider
     }
 
 
@@ -490,24 +490,24 @@ def get_provider_vars() -> MappingProxyType[ProviderField, SetProviderEnvVarsDic
         ("embedding", "reranking", "sparse_embedding", "vector_store"), None
     )
     for env_var in env_vars:
-        kind = next(k for k in provider_keys if k.upper() in env_var)
-        if env_map[kind] is None:
-            env_map[kind] = {}
+        category = next(k for k in provider_keys if k.upper() in env_var)
+        if env_map[category] is None:
+            env_map[category] = {}
         if value := os.environ.get(env_var):
             if "API_KEY" in env_var:
-                env_map[kind]["api_key"] = SecretStr(value)
+                env_map[category]["api_key"] = SecretStr(value)
             elif env_var.endswith("PROVIDER"):
                 from codeweaver.core import Provider
 
-                env_map[kind]["provider"] = Provider.from_string(value)
+                env_map[category]["provider"] = Provider.from_string(value)
             elif "PORT" in env_var:
-                env_map[kind]["port"] = int(value)
+                env_map[category]["port"] = int(value)
             elif "URL" in env_var:
-                env_map[kind]["url"] = AnyUrl(value)
+                env_map[category]["url"] = AnyUrl(value)
             else:
-                env_map[kind][next(k for k in provider_keys if k.upper() in env_var.lower())] = (
-                    value
-                )
+                env_map[category][
+                    next(k for k in provider_keys if k.upper() in env_var.lower())
+                ] = value
     return MappingProxyType(env_map)
 
 

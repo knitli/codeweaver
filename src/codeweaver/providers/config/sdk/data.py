@@ -18,9 +18,11 @@ from fastmcp.tools import Tool
 from pydantic import Field, PositiveInt
 
 from codeweaver.core import uuid7
+from codeweaver.core.constants import DEFAULT_MAX_RESULTS
 from codeweaver.core.exceptions import ConfigurationError
 from codeweaver.core.types import BasedModel, LiteralStringT, Provider, ProviderLiteralString
 from codeweaver.core.utils import has_package
+from codeweaver.providers import DuckDuckGoSearchTool
 
 
 if TYPE_CHECKING and has_package("exa_py"):
@@ -246,7 +248,6 @@ class ExaToolConfig(BaseToolConfig):
 class TavilySearchContextToolConfig(BaseToolConfig):
     """Configuration for the TavilySearchContextTool."""
 
-    tag: Literal["tavily"] = Field("tavily", frozen=True, exclude=True)
     provider: Literal[Provider.TAVILY] = Field(Provider.TAVILY, frozen=True)
 
     max_results: PositiveInt = Field(
@@ -256,12 +257,14 @@ class TavilySearchContextToolConfig(BaseToolConfig):
     include_answer: Literal["basic", "advanced"] = Field(
         "basic",
         description="Whether to include the answer tool in the data provider. Defaults to True.",
+        frozen=True,
     )
 
     iden: str | None = Field(
         default_factory=lambda: uuid7().hex,
         description="A unique identifier for the tool instance.",
         serialization_alias="id",
+        frozen=True,
     )
 
     def _telemetry_keys(self) -> None:
@@ -297,7 +300,6 @@ class TavilySearchContextToolConfig(BaseToolConfig):
 class DuckDuckGoSearchToolConfig(BaseToolConfig):
     """Configuration for the DuckDuckGoSearchTool."""
 
-    tag: Literal["duckduckgo"] = Field("duckduckgo", frozen=True, exclude=True)
     provider: Literal[Provider.DUCKDUCKGO] = Field(Provider.DUCKDUCKGO, frozen=True)
 
     safesearch: Literal["on", "moderate", "off"] = Field(
@@ -305,25 +307,39 @@ class DuckDuckGoSearchToolConfig(BaseToolConfig):
         description="The safesearch setting for DuckDuckGo search. Defaults to 'moderate'.",
     )
     max_results: PositiveInt = Field(
-        10, description="The maximum number of search results to return.", frozen=True
+        DEFAULT_MAX_RESULTS,
+        description="The maximum number of search results to return.",
+        frozen=True,
     )
 
     iden: str | None = Field(
         default_factory=lambda: uuid7().hex,
         description="A unique identifier for the tool instance.",
         serialization_alias="id",
+        frozen=True,
     )
 
     def _telemetry_keys(self) -> None:
         """Get the telemetry keys for the DuckDuckGo data provider."""
         return
 
+    async def to_call(self, *args: Any, **kwargs: Any) -> Tool[DuckDuckGoSearchTool]:
+        """Convert the DuckDuckGo data config to a DuckDuckGoSearchTool call."""
+        from codeweaver.providers.data.duckduckgo import duckduckgo_search_tool
 
-type DataToolConfigT = BaseToolConfig | ExaToolConfig | TavilySearchContextToolConfig
+        return await duckduckgo_search_tool(
+            **self.model_dump(exclude={"provider"}, exclude_none=True, by_alias=False),
+            register=True,
+        )
+
+
+type DataToolConfigT = (
+    BaseToolConfig | ExaToolConfig | TavilySearchContextToolConfig | DuckDuckGoSearchToolConfig
+)
 
 __all__ = (
     "BaseToolConfig",
-    DataToolConfigT,
+    "DuckDuckGoSearchToolConfig",
     "ExaAnswerToolOptions",
     "ExaContentsOptions",
     "ExaFindSimilarToolOptions",
@@ -331,4 +347,5 @@ __all__ = (
     "ExaSearchToolOptions",
     "ExaToolConfig",
     "TavilySearchContextToolConfig",
+    DataToolConfigT,
 )

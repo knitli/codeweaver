@@ -221,7 +221,7 @@ class EmbeddingCacheManager(BasedModel):
 
     Replaces per-instance provider stores with a shared singleton
     that provides namespace-based isolation for different providers
-    and embedding kinds (dense vs sparse).
+    and embedding categories (dense vs sparse).
 
     Benefits:
     - True cross-instance deduplication
@@ -239,9 +239,9 @@ class EmbeddingCacheManager(BasedModel):
     # Global registry (unchanged)
     registry: EmbeddingRegistry
 
-    def _get_namespace(self, provider_id: str, embedding_kind: str) -> str:
+    def _get_namespace(self, provider_id: str, embedding_category: str) -> str:
         """Generate namespace: 'voyage-code-2.dense' or 'voyage-code-2.sparse'"""
-        return f"{provider_id}.{embedding_kind}"
+        return f"{provider_id}.{embedding_category}"
 
     def _ensure_namespace(self, namespace: str) -> None:
         """Lazily initialize stores for namespace."""
@@ -430,7 +430,7 @@ def __init__(
     self._cache_manager = cache_manager
     self._namespace = cache_manager._get_namespace(
         provider_id=self.provider_id,
-        embedding_kind=self.caps.embedding_kind.value
+        embedding_category=self.caps.embedding_category.value
     )
 ```
 

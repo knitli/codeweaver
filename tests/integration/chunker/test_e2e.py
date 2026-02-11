@@ -43,20 +43,20 @@ def mock_discovered_file():
         mock_stat = Mock()
         mock_stat.st_size = 1024  # 1KB file size
 
-        # Create mock ExtKind
+        # Create mock ExtCategory
         from codeweaver.core import SemanticSearchLanguage
 
-        mock_ext_kind = Mock()
+        mock_ext_category = Mock()
         if path.suffix == ".py":
-            mock_ext_kind.language = SemanticSearchLanguage.PYTHON
+            mock_ext_category.language = SemanticSearchLanguage.PYTHON
         else:
-            mock_ext_kind.language = path.suffix.lstrip(".")
+            mock_ext_category.language = path.suffix.lstrip(".")
 
         # Create mock DiscoveredFile
         file = Mock()
         file.path = path
         file.absolute_path = path  # Add absolute_path attribute pointing to real path
-        file.ext_kind = mock_ext_kind
+        file.ext_category = mock_ext_category
         file.source_id = uuid7()  # Add source_id for Span validation (UUID7)
 
         return file

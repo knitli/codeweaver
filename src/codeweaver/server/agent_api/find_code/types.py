@@ -257,9 +257,12 @@ class FindCodeResponseSummary(BasedModel):
         # Set languages_found from matches if not already populated
         if not self.languages_found and self.matches:
             languages = tuple(
-                match.file.ext_kind.language
+                match.file.ext_category.language
                 for match in self.matches
-                if match and match.file and match.file.ext_kind and match.file.ext_kind.language
+                if match
+                and match.file
+                and match.file.ext_category
+                and match.file.ext_category.language
             )
             object.__setattr__(self, "languages_found", languages)
 

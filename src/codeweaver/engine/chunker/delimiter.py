@@ -1115,7 +1115,7 @@ class DelimiterChunker(BaseChunker):
                         boundary.start >= selected.start and boundary.end <= selected.end
                     ) or (selected.start >= boundary.start and selected.end <= boundary.end)
 
-                    # Only allow nesting if priorities are equal (same kind of structure)
+                    # Only allow nesting if priorities are equal (same category of structure)
                     same_priority = boundary.delimiter.priority == selected.delimiter.priority
 
                     if not (is_nested and same_priority):
@@ -1161,7 +1161,7 @@ class DelimiterChunker(BaseChunker):
         Returns:
             List of CodeChunk objects
         """
-        from codeweaver.core import ExtKind
+        from codeweaver.core import ExtCategory
 
         chunks: list[CodeChunk] = []
         lines = content.splitlines(keepends=True)
@@ -1184,7 +1184,7 @@ class DelimiterChunker(BaseChunker):
             # Create chunk with shared source_id
             chunk = CodeChunk(
                 content=chunk_text,
-                ext_kind=ExtKind.from_file(file_path) if file_path else None,
+                ext_category=ExtCategory.from_file(file_path) if file_path else None,
                 line_range=Span(
                     start_line, end_line, source_id
                 ),  # All spans from same file share source_id
@@ -1527,7 +1527,7 @@ class DelimiterChunker(BaseChunker):
         Note: Semantic boundaries (functions, classes, paragraphs) are filtered
         out before reaching this function, so we only merge non-semantic chunks.
         """
-        from codeweaver.core import ExtKind
+        from codeweaver.core import ExtCategory
 
         current = chunks[start_idx]
         merged_content = current.content
@@ -1572,7 +1572,7 @@ class DelimiterChunker(BaseChunker):
 
         merged_chunk = CodeChunk(
             content=merged_content,
-            ext_kind=ExtKind.from_file(file_path) if file_path else None,
+            ext_category=ExtCategory.from_file(file_path) if file_path else None,
             line_range=Span(merged_start_line, merged_end_line, source_id),
             file_path=file_path,
             metadata=merged_metadata,
@@ -1819,7 +1819,7 @@ class DelimiterChunker(BaseChunker):
         Returns:
             A new CodeChunk
         """
-        from codeweaver.core import ExtKind
+        from codeweaver.core import ExtCategory
         from codeweaver.engine.chunker.delimiter_model import DelimiterKind
 
         kind = delimiter.kind if delimiter else DelimiterKind.GENERIC
@@ -1849,7 +1849,7 @@ class DelimiterChunker(BaseChunker):
 
         return CodeChunk(
             content=content,
-            ext_kind=ExtKind.from_file(file_path) if file_path else None,
+            ext_category=ExtCategory.from_file(file_path) if file_path else None,
             line_range=Span(start_line, end_line, source_id),
             file_path=file_path,
             metadata=metadata,

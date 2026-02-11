@@ -13,8 +13,8 @@ from fastmcp.tools import Tool
 from pydantic import TypeAdapter
 
 from codeweaver.core import (
-    LiteralProviderKindType,
-    ProviderKind,
+    LiteralProviderCategoryType,
+    ProviderCategory,
     ProviderLiteralString,
     has_package,
 )
@@ -99,14 +99,21 @@ def get_serializer_for_type[T](
     return lambda data: adapter.dump_json(data, round_trip=True)
 
 
-def get_provider_names_for_kind(kind: LiteralProviderKindType) -> set[ProviderLiteralString]:
-    """Get the set of provider literal strings for the given provider kind."""
-    kind: ProviderKind = kind if isinstance(kind, ProviderKind) else ProviderKind.from_string(kind)
-    return cast(set[ProviderLiteralString], {provider.variable for provider in kind.providers})
+def get_provider_names_for_category(
+    category: LiteralProviderCategoryType,
+) -> set[ProviderLiteralString]:
+    """Get the set of provider literal strings for the given provider category."""
+    category: ProviderCategory = (
+        category
+        if isinstance(category, ProviderCategory)
+        else ProviderCategory.from_string(category)
+    )
+    return cast(set[ProviderLiteralString], {provider.variable for provider in category.providers})
+
 
 __all__ = (
     "build_data_tool",
-    "get_provider_names_for_kind",
+    "get_provider_names_for_category",
     "get_schema_for_type",
     "get_serializer_for_type",
     "get_type_adapter",

@@ -22,7 +22,7 @@ from pydantic import (
     model_validator,
 )
 
-from codeweaver.core import DatatypeMismatchError, DimensionMismatchError, ProviderKind
+from codeweaver.core import DatatypeMismatchError, DimensionMismatchError, ProviderCategory
 from codeweaver.core.types import (
     BasedModel,
     LiteralSDKClient,
@@ -32,6 +32,16 @@ from codeweaver.core.types import (
     SDKClient,
 )
 from codeweaver.core.utils import has_package
+from codeweaver.providers.config.categories.base import BaseProviderSettings
+from codeweaver.providers.config.categories.mixins import (
+    AzureProviderMixin,
+    BedrockProviderMixin,
+    FastEmbedProviderMixin,
+)
+from codeweaver.providers.config.categories.utils import (
+    CORE_EMBEDDING_PROVIDER_DISCRIMINATOR,
+    is_cloud_provider,
+)
 from codeweaver.providers.config.clients.multi import (
     BedrockClientOptions,
     CohereClientOptions,
@@ -42,17 +52,7 @@ from codeweaver.providers.config.clients.multi import (
 )
 from codeweaver.providers.config.clients.utils import try_for_azure_endpoint
 from codeweaver.providers.config.embedding import EmbeddingConfigT
-from codeweaver.providers.config.provider_kinds.base import BaseProviderSettings
-from codeweaver.providers.config.provider_kinds.mixins import (
-    AzureProviderMixin,
-    BedrockProviderMixin,
-    FastEmbedProviderMixin,
-)
-from codeweaver.providers.config.provider_kinds.utils import (
-    CORE_EMBEDDING_PROVIDER_DISCRIMINATOR,
-    is_cloud_provider,
-)
-from codeweaver.providers.data.utils import get_provider_names_for_kind
+from codeweaver.providers.data.utils import get_provider_names_for_category
 
 
 logger = logging.getLogger(__name__)
@@ -70,13 +70,13 @@ if has_package("sentence_transformers"):
         SentenceTransformerModelCardData as SentenceTransformerModelCardData,
     )
 
-possible_tags = get_provider_names_for_kind("embedding")
+possible_tags = get_provider_names_for_category("embedding")
 
 
 class BaseEmbeddingProviderSettings(BaseProviderSettings, ABC):
     """Settings for (dense) embedding models. It validates that the model and provider settings are compatible and complete, reconciling environment variables and config file settings as needed."""
 
-    kind: ClassVar[Literal[ProviderKind.EMBEDDING]] = ProviderKind.EMBEDDING
+    category: ClassVar[Literal[ProviderCategory.EMBEDDING]] = ProviderCategory.EMBEDDING
     config_type: ClassVar[Literal["symmetric"]] = "symmetric"
 
     @abstractmethod
@@ -387,7 +387,7 @@ class AsymmetricEmbeddingProviderSettings(BasedModel):
         Field(description="Whether to validate that both models belong to the same model family."),
     ] = True
 
-    kind: ClassVar[Literal[ProviderKind.EMBEDDING]] = ProviderKind.EMBEDDING
+    category: ClassVar[Literal[ProviderCategory.EMBEDDING]] = ProviderCategory.EMBEDDING
 
     _model_name: ModelNameT = PrivateAttr(default_factory=_get_model_name_for_family)
 

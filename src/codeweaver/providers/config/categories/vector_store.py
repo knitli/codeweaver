@@ -22,7 +22,7 @@ from qdrant_client.models import (
 )
 from qdrant_client.models import CollectionConfig as QdrantCollectionConfig
 
-from codeweaver.core import ProviderKind
+from codeweaver.core import ProviderCategory
 from codeweaver.core.constants import (
     DEFAULT_PERSIST_INTERVAL,
     DEFAULT_VECTOR_STORE_BATCH_SIZE,
@@ -44,13 +44,13 @@ from codeweaver.core.utils import (
     get_user_state_dir,
     has_package,
 )
-from codeweaver.providers.config.clients.base import ClientOptions
-from codeweaver.providers.config.clients.vector_store import QdrantClientOptions
-from codeweaver.providers.config.provider_kinds.base import (
+from codeweaver.providers.config.categories.base import (
     BaseProviderSettings,
     ConnectionConfiguration,
 )
-from codeweaver.providers.config.provider_kinds.utils import PROVIDER_DISCRIMINATOR
+from codeweaver.providers.config.categories.utils import PROVIDER_DISCRIMINATOR
+from codeweaver.providers.config.clients.base import ClientOptions
+from codeweaver.providers.config.clients.vector_store import QdrantClientOptions
 from codeweaver.providers.dependencies import EmbeddingCapabilityGroupDep
 from codeweaver.providers.types.embedding import EmbeddingCapabilityGroup
 from codeweaver.providers.vector_stores.metadata import CollectionMetadata
@@ -81,7 +81,7 @@ class BaseVectorStoreProviderSettings(BaseProviderSettings):
         ClientOptions | None, Field(description="Client options for the provider's client.")
     ] = None
 
-    kind: ClassVar[Literal[ProviderKind.VECTOR_STORE]] = ProviderKind.VECTOR_STORE
+    category: ClassVar[Literal[ProviderCategory.VECTOR_STORE]] = ProviderCategory.VECTOR_STORE
 
 
 class VectorStoreProviderSettings(BaseVectorStoreProviderSettings):

@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: 2026 Knitli Inc.
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
+"""Dependency injection types and factories for embedding services."""
 
 from __future__ import annotations
 

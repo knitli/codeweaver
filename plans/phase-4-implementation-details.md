@@ -21,7 +21,7 @@ Phase 4 migrates from per-instance `_store` and `_hash_store` ClassVar registrie
 **File**: `src/codeweaver/providers/embedding/cache_manager.py` (NEW, ~220 lines)
 
 Features implemented:
-- Namespace isolation via `_get_namespace(provider_id, embedding_kind)`
+- Namespace isolation via `_get_namespace(provider_id, embedding_category)`
 - Async-safe locking with `asyncio.Lock` per namespace
 - Lazy namespace initialization for batch/hash stores
 - Three core async methods:
@@ -143,10 +143,10 @@ def __init__(
     # ADD cache manager setup
     object.__setattr__(self, "_cache_manager", cache_manager)
 
-    # Compute namespace from provider ID + embedding kind
+    # Compute namespace from provider ID + embedding category
     provider_id = self.config.provider.variable if self.config.provider else "unknown"
-    embedding_kind = "sparse" if isinstance(self, SparseEmbeddingProvider) else "dense"
-    object.__setattr__(self, "_namespace", cache_manager._get_namespace(provider_id, embedding_kind))
+    embedding_category = "sparse" if isinstance(self, SparseEmbeddingProvider) else "dense"
+    object.__setattr__(self, "_namespace", cache_manager._get_namespace(provider_id, embedding_category))
 
     self._initialize(impl_deps, custom_deps)
     object.__setattr__(self, "caps", caps)
@@ -171,7 +171,7 @@ cache_manager: Annotated[
 ]
 
 _namespace: str = Field(
-    description="Namespace for cache isolation (computed from provider_id.embedding_kind)",
+    description="Namespace for cache isolation (computed from provider_id.embedding_category)",
     exclude=True,
 )
 ```

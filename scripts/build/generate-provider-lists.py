@@ -7,15 +7,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from codeweaver.core import PROVIDER_CAPABILITIES, Provider, ProviderKind
+from codeweaver.core import PROVIDER_CAPABILITIES, Provider, ProviderCategory
 
 
 def generate_category(category: str) -> list[str]:
     """Generate a list of providers for a given category."""
     providers = {provider for provider in Provider if provider != Provider.NOT_SET}
-    kind = ProviderKind.from_string(category.lower())
+    category = ProviderCategory.from_string(category.lower())
     listing = [f"## {category.capitalize().replace('_', ' ')} Providers", ""]
-    listing.extend(f"- {provider.as_title}" for provider in providers if kind in PROVIDER_CAPABILITIES[provider])
+    listing.extend(f"- {provider.as_title}" for provider in providers if category in PROVIDER_CAPABILITIES[provider])
     return sorted(listing)
 
 def get_heading() -> list[str]:

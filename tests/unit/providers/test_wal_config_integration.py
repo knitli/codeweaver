@@ -22,7 +22,7 @@ pytestmark = [pytest.mark.integration]
 @pytest.fixture
 def wal_config():
     """Create a user WalConfig."""
-    from codeweaver.providers.config.kinds import WalConfig
+    from codeweaver.providers.config.categories import WalConfig
 
     return WalConfig(
         wal_capacity_mb=128,  # User wants 128MB
@@ -48,7 +48,7 @@ class TestWalConfigIntegration:
         from codeweaver.core import Provider
         from codeweaver.engine.config.failover import FailoverSettings
         from codeweaver.providers import CollectionMetadata
-        from codeweaver.providers.config.kinds import (
+        from codeweaver.providers.config.categories import (
             CollectionConfig,
             QdrantClientOptions,
             QdrantVectorStoreProviderSettings,
@@ -114,7 +114,7 @@ class TestWalConfigIntegration:
         from codeweaver.core import Provider
         from codeweaver.engine.config.failover import FailoverSettings
         from codeweaver.providers import CollectionMetadata
-        from codeweaver.providers.config.kinds import (
+        from codeweaver.providers.config.categories import (
             CollectionConfig,
             QdrantClientOptions,
             QdrantVectorStoreProviderSettings,
@@ -178,7 +178,7 @@ class TestWalConfigIntegration:
         from codeweaver.core import Provider
         from codeweaver.engine.config.failover import FailoverSettings
         from codeweaver.providers import CollectionMetadata
-        from codeweaver.providers.config.kinds import (
+        from codeweaver.providers.config.categories import (
             CollectionConfig,
             QdrantClientOptions,
             QdrantVectorStoreProviderSettings,
@@ -242,7 +242,7 @@ class TestWalConfigIntegration:
         from codeweaver.core import Provider
         from codeweaver.engine.config.failover import FailoverSettings
         from codeweaver.providers import CollectionMetadata
-        from codeweaver.providers.config.kinds import (
+        from codeweaver.providers.config.categories import (
             CollectionConfig,
             QdrantClientOptions,
             QdrantVectorStoreProviderSettings,
@@ -301,7 +301,7 @@ class TestWalConfigIntegration:
         from codeweaver.core import Provider
         from codeweaver.engine.config.failover import FailoverSettings
         from codeweaver.providers import CollectionMetadata
-        from codeweaver.providers.config.kinds import (
+        from codeweaver.providers.config.categories import (
             CollectionConfig,
             QdrantClientOptions,
             QdrantVectorStoreProviderSettings,

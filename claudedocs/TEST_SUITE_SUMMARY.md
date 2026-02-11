@@ -105,7 +105,7 @@ cd /home/knitli/assymetric-model-families
 python -m pytest tests/unit/providers/config/test_asymmetric_config.py -v
 
 # Run with coverage
-python -m pytest tests/unit/providers/config/test_asymmetric_config.py --cov=codeweaver.providers.config.provider_kinds --cov-report=term-missing
+python -m pytest tests/unit/providers/config/test_asymmetric_config.py --cov=codeweaver.providers.config.categories --cov-report=term-missing
 
 # Run specific test class
 python -m pytest tests/unit/providers/config/test_asymmetric_config.py::TestErrorMessageQuality -v
@@ -113,7 +113,7 @@ python -m pytest tests/unit/providers/config/test_asymmetric_config.py::TestErro
 
 ## Next Steps
 
-1. **Agent A** completes AsymmetricEmbeddingConfig implementation in `src/codeweaver/providers/config.provider_kinds.py`
+1. **Agent A** completes AsymmetricEmbeddingConfig implementation in `src/codeweaver/providers/config.categories.py`
 2. **Agent A** implements ModelFamily in `src/codeweaver/providers/embedding/capabilities/base.py`
 3. Tests will automatically activate once imports resolve
 4. Fix any test failures based on actual implementation
@@ -124,7 +124,7 @@ python -m pytest tests/unit/providers/config/test_asymmetric_config.py::TestErro
 
 ### Required Implementations (from Agent A)
 
-- `AsymmetricEmbeddingConfig` class in `codeweaver.providers.config.provider_kinds`
+- `AsymmetricEmbeddingConfig` class in `codeweaver.providers.config.categories`
 - `ModelFamily` class in `codeweaver.providers.embedding.capabilities.base`
 - Model family assignments in capability definitions:
   - `voyage.py` - VOYAGE_4_FAMILY
@@ -133,7 +133,7 @@ python -m pytest tests/unit/providers/config/test_asymmetric_config.py::TestErro
 ### Required Imports
 
 ```python
-from codeweaver.providers.config.provider_kinds import (
+from codeweaver.providers.config.categories import (
     AsymmetricEmbeddingConfig,
     EmbeddingProviderSettings,
 )

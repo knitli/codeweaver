@@ -21,7 +21,7 @@ def _create_mock_file(file_path: Path) -> Mock:
     The Mock needs to simulate:
     - file.path: Path object with stat() method
     - file.path.stat().st_size: File size in bytes
-    - file.ext_kind: ExtKind object with language attribute
+    - file.ext_category: ExtCategory object with language attribute
     """
     # Create mock stat result
     mock_stat = Mock()
@@ -33,20 +33,20 @@ def _create_mock_file(file_path: Path) -> Mock:
     mock_path.suffix = file_path.suffix
     mock_path.__str__ = Mock(return_value=str(file_path))
 
-    # Create mock ExtKind
+    # Create mock ExtCategory
     from codeweaver.core import SemanticSearchLanguage
 
-    mock_ext_kind = Mock()
+    mock_ext_category = Mock()
     if file_path.suffix == ".py":
-        mock_ext_kind.language = SemanticSearchLanguage.PYTHON
+        mock_ext_category.language = SemanticSearchLanguage.PYTHON
     else:
-        mock_ext_kind.language = file_path.suffix.lstrip(".")
+        mock_ext_category.language = file_path.suffix.lstrip(".")
 
     # Create mock DiscoveredFile
     file = Mock()
     file.path = mock_path
     file.absolute_path = mock_path
-    file.ext_kind = mock_ext_kind
+    file.ext_category = mock_ext_category
 
     return file
 

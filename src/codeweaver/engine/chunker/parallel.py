@@ -96,8 +96,8 @@ def _chunk_single_file(
             )
             # Create delimiter chunker as fallback
             language = (
-                file.ext_kind.language.variable
-                if file.ext_kind and file.ext_kind.language
+                file.ext_category.language.variable
+                if file.ext_category and file.ext_category.language
                 else "unknown"
             )
             fallback_chunker = DelimiterChunker(governor, language=language)
@@ -122,7 +122,7 @@ def _chunk_single_file(
         logger.warning(
             "Skipping file %s: chunking failed",
             file.path,
-            extra={"file_path": str(file.path), "ext_kind": file.ext_kind or "unknown"},
+            extra={"file_path": str(file.path), "ext_category": file.ext_category or "unknown"},
         )
         # Log full traceback only at debug level
         logger.debug(

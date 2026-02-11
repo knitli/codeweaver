@@ -88,7 +88,7 @@ vectors_config={"primary": VectorParams()},  # Role-based name: primary dense ve
 sparse_vectors_config={"sparse": SparseVectorParams()},  # Role-based name: sparse vector
 ```
 
-### 3. `src/codeweaver/providers/config.provider_kinds.py`
+### 3. `src/codeweaver/providers/config.categories.py`
 
 #### Updated Default Collection Config (line 644-645)
 ```python
@@ -213,7 +213,7 @@ Collections created with old names ("dense", "backup_dense") will need to be:
 ## Files Modified Summary
 
 1. **Core Vector Store**: `qdrant_base.py` - Removed VectorNames dependency
-2. **Configuration**: `profiles.py`, `kinds.py` - Updated default vector names
+2. **Configuration**: `profiles.py`, `categories.py` - Updated default vector names
 3. **Type System**: Already completed in Phase 1
 
 ## Files Deleted

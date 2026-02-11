@@ -46,15 +46,7 @@ from codeweaver.providers.config import (
     SparseEmbeddingProviderSettingsType,
 )
 from codeweaver.providers.config.agent import AnthropicAgentModelConfig
-from codeweaver.providers.config.clients import QdrantClientOptions
-from codeweaver.providers.config.embedding import (
-    FastEmbedEmbeddingConfig,
-    FastEmbedSparseEmbeddingConfig,
-    SentenceTransformersEmbeddingConfig,
-    SentenceTransformersSparseEmbeddingConfig,
-    VoyageEmbeddingConfig,
-)
-from codeweaver.providers.config.provider_kinds import (
+from codeweaver.providers.config.categories import (
     AnthropicAgentProviderSettings,
     BaseAgentProviderSettings,
     CollectionConfig,
@@ -64,6 +56,14 @@ from codeweaver.providers.config.provider_kinds import (
     RerankingProviderSettings,
     SparseEmbeddingProviderSettings,
     TavilyProviderSettings,
+)
+from codeweaver.providers.config.clients import QdrantClientOptions
+from codeweaver.providers.config.embedding import (
+    FastEmbedEmbeddingConfig,
+    FastEmbedSparseEmbeddingConfig,
+    SentenceTransformersEmbeddingConfig,
+    SentenceTransformersSparseEmbeddingConfig,
+    VoyageEmbeddingConfig,
 )
 from codeweaver.providers.config.providers import AsymmetricEmbeddingProviderSettings
 

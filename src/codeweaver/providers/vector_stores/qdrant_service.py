@@ -40,7 +40,7 @@ if TYPE_CHECKING:
     from codeweaver.engine.config import FailoverSettings
     from codeweaver.engine.config.failover_detector import FailoverDetector
     from codeweaver.providers import CollectionMetadata
-    from codeweaver.providers.config.provider_kinds.vector_store import (
+    from codeweaver.providers.config.categories.vector_store import (
         QdrantCollectionConfig,
         QdrantVectorStoreProviderSettings,
     )
@@ -160,7 +160,7 @@ class QdrantVectorStoreService:
         Returns:
             QdrantCollectionConfig with merged WalConfig
         """
-        from codeweaver.providers.config.provider_kinds.vector_store import WalConfig
+        from codeweaver.providers.config.categories.vector_store import WalConfig
 
         if self.failover_settings is None:
             return qdrant_config
@@ -220,7 +220,7 @@ def create_qdrant_service(
         service = await container.resolve(QdrantVectorStoreService)
         config = await service.get_collection_config(metadata)
     """
-    from codeweaver.providers.config.provider_kinds import QdrantVectorStoreProviderSettings
+    from codeweaver.providers.config.categories import QdrantVectorStoreProviderSettings
 
     # Extract Qdrant-specific settings from provider settings
     # Assuming first vector_store is Qdrant (may need to filter by provider type)

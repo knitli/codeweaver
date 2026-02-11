@@ -46,7 +46,7 @@ type ProviderSettingsDep = Annotated[
 """Type alias for DI injection of root provider settings."""
 
 from codeweaver.core.exceptions import ConfigurationError
-from codeweaver.providers.config.kinds import (
+from codeweaver.providers.config.categories import (
     AgentProviderSettingsType,
     DataProviderSettingsType,
     EmbeddingProviderSettingsType,

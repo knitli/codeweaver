@@ -24,7 +24,7 @@ DI Resolution: EmbeddingProviderSettingsDep = Annotated[EmbeddingProviderSetting
 Provider receives: client (SDK), config (settings), embedding_options, query_options
 ```
 
-Each provider kind has:
+Each provider category has:
 - A union type (e.g., EmbeddingProviderSettingsType) discriminating by provider
 - A DI type alias (e.g., EmbeddingProviderSettingsDep) for injection
 - A factory function to create the provider settings instance, resolving dependencies as needed

@@ -249,7 +249,7 @@ def __init__(
 
 **Changes Needed**:
 - Remove primary/backup config separation
-- Single provider settings per kind
+- Single provider settings per category
 - Remove collection-based provider registration (tuple of all configs)
 
 **Impact**: Significant simplification of DI setup

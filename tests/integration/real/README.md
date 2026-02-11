@@ -290,7 +290,7 @@ python -c "from sentence_transformers import SentenceTransformer; SentenceTransf
 ### Tests fail with dimension mismatch
 - Check embedding model outputs correct dimensions
 - Verify vector store configured for model dimensions
-- This is exactly the kind of bug Tier 2 tests catch!
+- This is exactly the category of bug Tier 2 tests catch!
 
 ### Search doesn't find expected files
 - ✅ **This is a real quality issue** - don't change the test!

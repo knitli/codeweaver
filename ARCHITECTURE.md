@@ -273,7 +273,7 @@ cw server             # Run MCP server (stdio by default)
 **Design Decision**: Comprehensive semantic metadata classification system.
 
 **Components**:
-- `ExtKind`: Enumerates language and chunk types
+- `ExtCategory`: Enumerates language and chunk types
 - `SemanticMetadata`: Tracks AST nodes and classifications
 - Task-based priority ranking for nuanced searches
 - Support for 26 programming languages

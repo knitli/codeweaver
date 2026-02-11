@@ -45,7 +45,7 @@ from pydantic import (
 from pydantic_core import to_json
 
 from codeweaver.core.language import SemanticSearchLanguage
-from codeweaver.core.metadata import ChunkSource, ExtKind, Metadata, determine_ext_kind
+from codeweaver.core.metadata import ChunkSource, ExtCategory, Metadata, determine_ext_category
 from codeweaver.core.spans import Span, SpanTuple
 from codeweaver.core.stores import BlakeHashKey
 from codeweaver.core.types import BasedModel, FilteredKeyT, LanguageNameT
@@ -177,8 +177,9 @@ class CodeChunk(BasedModel):
         ),
         description="Additional metadata for the code chunk; includes ast-derived information under the `semantic` field for supported languages.",
     )
-    ext_kind: ExtKind | None = Field(
-        default_factory=determine_ext_kind, description="The file extension and its `ChunkKind`."
+    ext_category: ExtCategory | None = Field(
+        default_factory=determine_ext_category,
+        description="The file extension and its `ChunkKind`.",
     )
 
     parent_id: UUID7 | None = Field(
@@ -263,7 +264,7 @@ class CodeChunk(BasedModel):
             "metadata",
             "file_path",
             "line_range",
-            "ext_kind",
+            "ext_category",
             "language",
             "source",
             "chunk_version",
@@ -405,9 +406,9 @@ class CodeChunk(BasedModel):
             "line_range": line_range,
             "content": content,
             "language": (
-                file.ext_kind.language
-                if file.ext_kind
-                else getattr(ExtKind.from_file(file.path), "language", None)
+                file.ext_category.language
+                if file.ext_category
+                else getattr(ExtCategory.from_file(file.path), "language", None)
             ),
             "source": ChunkSource.FILE,
             "parent_id": file.source_id,

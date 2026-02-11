@@ -5,7 +5,16 @@
 # Docstrings taken from Pydantic AI where applicable.
 # SPDX-FileCopyrightText: 2025 Pydantic Services Inc.
 # SPDX-License-Identifier: MIT
-"""Settings objects for agent model providers."""
+"""Settings objects for agent model constructors.
+
+NOTE: As with other function config modules, the corresponding provider (i.e. anthropic for `AnthropicAgentModelConfig`), refers to the *SDK client* that uses these settings -- not necessarily the model provider or the service provider (i.e. AWS for Bedrock). For example: `BedrockAgentModelConfig` refers to settings used by the Bedrock SDK client, which may be used to access models from multiple service providers, while for Anthropic's Claude models with AWS Bedrock, the agent model config is `AnthropicAgentModelConfig`, because Anthropic's native client is being used, even though the service provider is AWS.
+
+It might seem complicated, but we've simplified it at the top provider-level settings by differentiating by both provider and SDK client where necessary, so for the example above, there is a `AnthropicBedrockAgentProviderSettings` class for using Anthropic's Claude models via AWS Bedrock where the `agent_config` field's type is `AnthropicAgentModelConfig`, and a `BedrockAgentProviderSettings` class for using other models via Bedrock where the `agent_config` field's type is `BedrockAgentModelConfig`.
+
+*Not all settings in a model are necessarily supported by every model or every SDK*. These are `pydantic_ai` types, and that library takes a little bit of a different approach to configuration than we do. I'm not sure we'd do it differently though because it quickly becomes a complex problem space given the number of providers, models, and SDKs and the speed at which new models and features are released. When in doubt, refer to the SDK documentation and model card/docs for the specific model you're using to verify which settings are supported.
+
+Each ModelConfig inherits from the base `AgentModelConfig` (which is actually `pydantic_ai.models.ModelSettings`) and adds additional fields for settings that are specific to that provider's SDK. Generally you can be certain that the SDK will support the namespaced fields (e.g. `anthropic_thinking` or `bedrock_guardrail_config` -- not necessarily for every model), but for the general fields inherited from `AgentModelConfig`, it's a good idea to check the SDK documentation for the specific model you're using to verify that the setting is supported. The `AgentModelConfig` fields are common settings found across providers (like `temperature` and `max_tokens`), but not every provider supports every setting, and some providers have unique settings that aren't shared by others, which is why we have provider-specific ModelConfig classes that inherit from the base `AgentModelConfig`. If two fields are similar, use the namespaced field. For example, if you're using Anthropic's SDK, use `anthropic_thinking` instead of a hypothetical `thinking` field that might be added to the base `AgentModelConfig` in the future, even if other providers eventually support a similar setting. This way you can be sure that the setting is supported by the SDK you're using, and you won't run into issues with your settings not being applied.
+"""
 
 from __future__ import annotations
 
@@ -20,6 +29,8 @@ from pydantic_ai.models import ModelSettings as AgentModelConfig
 from codeweaver.core.types import LiteralStringT
 from codeweaver.core.utils import has_package
 
+
+# This is a bit verbose, but it makes type checkers happy regardless of which packages are installed. This is entirely for IDE and type checker convenience; at runtime, only the relevant classes will be used.
 
 if TYPE_CHECKING and has_package("anthropic"):
     from pydantic_ai.models.anthropic import AnthropicModelSettings as AnthropicAgentModelConfig
@@ -186,7 +197,7 @@ else:
         cerebras_disable_reasoning: bool | None
         """Disable reasoning for the model.
 
-        This setting is only supported on reasoning models: `zai-glm-4.6` and `gpt-oss-120b`.
+        This setting is only supported on reasoning models, currently: `zai-glm-4.6` and `gpt-oss-120b`.
 
         See [the Cerebras docs](https://inference-docs.cerebras.ai/resources/openai#passing-non-standard-parameters) for more details.
         """
@@ -430,7 +441,7 @@ _matcher_re: re.Pattern = re.compile(
 def _discriminate_agent_model_configs(v: Any) -> str:
     keys = list(v)
     if keys and (
-        next_match := next((_matcher_re.match(key) for key in keys if _matcher_re.match(key)), None)
+        next_match := next((m if (m := _matcher_re.match(key)) else None for key in keys), None)
     ):
         return next_match.group("provider")
     return "agent"
@@ -450,6 +461,10 @@ type AgentModelConfigT = Annotated[
     | Annotated[OpenRouterAgentModelConfig, Tag("openrouter")],
     Field(discriminator=Discriminator(_discriminate_agent_model_configs)),
 ]
+# NOTE: This discriminated union is *usually* not necessary, as each provider's top-level settings
+# class will specify the correct AgentModelConfig type for that provider. However, it can be
+# useful in cases where the provider is not known ahead of time, such as in dynamic loading
+# scenarios with custom providers.
 
 
 __all__ = (

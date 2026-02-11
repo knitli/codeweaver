@@ -300,13 +300,15 @@ class TestCohereEmbeddingProviderEmbedding:
             registry=mock_embedding_registry,
             cache_manager=mock_cache_manager,
         )
-        from codeweaver.core import ChunkKind, ExtKind, SemanticSearchLanguage, Span, uuid7
+        from codeweaver.core import ChunkKind, ExtCategory, SemanticSearchLanguage, Span, uuid7
 
         # Create test chunks with explicit chunk_ids
         chunks = [
             CodeChunk(
                 content="test content 1",
-                ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
+                ext_category=ExtCategory(
+                    language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE
+                ),
                 language=SemanticSearchLanguage.PYTHON,
                 line_range=Span(start=1, end=1, source_id=uuid7()),
                 file_path=Path("/test/file.py"),
@@ -314,7 +316,9 @@ class TestCohereEmbeddingProviderEmbedding:
             ),
             CodeChunk(
                 content="test content 2",
-                ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
+                ext_category=ExtCategory(
+                    language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE
+                ),
                 language=SemanticSearchLanguage.PYTHON,
                 line_range=Span(start=2, end=2, source_id=uuid7()),
                 file_path=Path("/test/file.py"),
@@ -415,12 +419,14 @@ class TestCohereEmbeddingProviderEmbedding:
         )
         from pathlib import Path
 
-        from codeweaver.core import ChunkKind, ExtKind, SemanticSearchLanguage, Span, uuid7
+        from codeweaver.core import ChunkKind, ExtCategory, SemanticSearchLanguage, Span, uuid7
 
         chunks = [
             CodeChunk(
                 content="test content",
-                ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
+                ext_category=ExtCategory(
+                    language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE
+                ),
                 language=SemanticSearchLanguage.PYTHON,
                 line_range=Span(start=1, end=1, source_id=uuid7()),
                 start_line=1,
@@ -471,12 +477,14 @@ class TestCohereEmbeddingProviderErrorHandling:
         )
         from pathlib import Path
 
-        from codeweaver.core import ChunkKind, ExtKind, SemanticSearchLanguage, Span, uuid7
+        from codeweaver.core import ChunkKind, ExtCategory, SemanticSearchLanguage, Span, uuid7
 
         chunks = [
             CodeChunk(
                 content="test content",
-                ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
+                ext_category=ExtCategory(
+                    language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE
+                ),
                 language=SemanticSearchLanguage.PYTHON,
                 line_range=Span(start=1, end=1, source_id=uuid7()),
                 start_line=1,

@@ -41,7 +41,7 @@ The failover architecture plan needs to be updated to support user-configurable 
 
 from dataclasses import dataclass
 from qdrant_client.models import VectorParams, SparseVectorParams
-from codeweaver.providers.config.provider_kinds import CollectionConfig
+from codeweaver.providers.config.categories import CollectionConfig
 
 
 @dataclass(frozen=True)

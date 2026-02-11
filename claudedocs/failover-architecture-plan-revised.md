@@ -42,7 +42,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 **Type Changes:**
 - **DELETE**: `EmbeddingModelInfo` (replaced by `EmbeddingStrategy`)
 - **DELETE**: Old `QueryResult` NamedTuple (replaced with dict-based version, same name)
-- **ADD**: `VectorStrategy` - minimal vector configuration (model, kind, lazy)
+- **ADD**: `VectorStrategy` - minimal vector configuration (model, category, lazy)
 - **ADD**: `EmbeddingStrategy` - multi-vector strategy definition
 - **MODIFY**: `EmbeddingBatchInfo` - add required `intent: str` field
 - **MODIFY**: `QueryResult` - new dict-based multi-vector result type
@@ -204,16 +204,16 @@ class VectorNames(BasedModel):
 class VectorStrategy(BasedModel):
     """Configuration for a single vector type."""
     model: ModelNameT
-    kind: EmbeddingKind  # Reuse existing DENSE/SPARSE enum
+    category: EmbeddingKind  # Reuse existing DENSE/SPARSE enum
     lazy: bool = False   # Generate on-demand vs upfront
 
     @classmethod
     def dense(cls, model: str, *, lazy: bool = False) -> VectorStrategy:
-        return cls(model=ModelName(model), kind=EmbeddingKind.DENSE, lazy=lazy)
+        return cls(model=ModelName(model), category=EmbeddingKind.DENSE, lazy=lazy)
 
     @classmethod
     def sparse(cls, model: str, *, lazy: bool = False) -> VectorStrategy:
-        return cls(model=ModelName(model), kind=EmbeddingKind.SPARSE, lazy=lazy)
+        return cls(model=ModelName(model), category=EmbeddingKind.SPARSE, lazy=lazy)
 
 
 class EmbeddingStrategy(BasedModel):
@@ -323,7 +323,7 @@ class QueryResult(BasedModel):
 ```python
 class EmbeddingBatchInfo(BasedModel):
     # ... existing fields ...
-    kind: EmbeddingKind  # Already exists
+    category: EmbeddingKind  # Already exists
 
     # NEW: Required intent field
     intent: Annotated[
@@ -391,16 +391,16 @@ class ChunkEmbeddings(BasedModel):
 class VectorStrategy(BasedModel):
     """Configuration for a single vector type."""
     model: ModelNameT
-    kind: EmbeddingKind  # Reuse existing enum
+    category: EmbeddingKind  # Reuse existing enum
     lazy: bool = False   # Generate on-demand vs upfront
 
     @classmethod
     def dense(cls, model: str | ModelNameT, *, lazy: bool = False) -> VectorStrategy:
-        return cls(model=ModelName(model), kind=EmbeddingKind.DENSE, lazy=lazy)
+        return cls(model=ModelName(model), category=EmbeddingKind.DENSE, lazy=lazy)
 
     @classmethod
     def sparse(cls, model: str | ModelNameT, *, lazy: bool = False) -> VectorStrategy:
-        return cls(model=ModelName(model), kind=EmbeddingKind.SPARSE, lazy=lazy)
+        return cls(model=ModelName(model), category=EmbeddingKind.SPARSE, lazy=lazy)
 ```
 
 #### 2.2 ADD EmbeddingStrategy

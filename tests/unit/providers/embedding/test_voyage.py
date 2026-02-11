@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from codeweaver.core import CodeChunk, Provider, SemanticSearchLanguage
+from codeweaver.core import CodeChunk, ExtCategory, Provider, SemanticSearchLanguage
 from codeweaver.providers import (
     EmbeddingErrorInfo,
     EmbeddingModelCapabilities,
@@ -73,8 +73,9 @@ def voyage_context_capabilities():
 @pytest.fixture
 def mock_voyage_config():
     """Create a config for Voyage embedding provider."""
-    from codeweaver.providers import EmbeddingProviderSettings
     from codeweaver.providers.config.embedding import VoyageEmbeddingConfig
+
+    from codeweaver.providers import EmbeddingProviderSettings
 
     embedding_config = VoyageEmbeddingConfig(
         tag="voyage", provider=Provider.VOYAGE, model_name="voyage-3"
@@ -236,7 +237,7 @@ class TestVoyageEmbeddingProviderEmbedding:
         chunks = [
             CodeChunk(
                 content="test content 1",
-                ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
+                ext_category=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
                 language=SemanticSearchLanguage.PYTHON,
                 line_range=Span(start=1, end=1, source_id=uuid7()),
                 file_path=Path("/test/file.py"),
@@ -244,7 +245,7 @@ class TestVoyageEmbeddingProviderEmbedding:
             ),
             CodeChunk(
                 content="test content 2",
-                ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
+                ext_category=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
                 language=SemanticSearchLanguage.PYTHON,
                 line_range=Span(start=2, end=2, source_id=uuid7()),
                 file_path=Path("/test/file.py"),
@@ -385,13 +386,15 @@ class TestVoyageEmbeddingProviderEmbedding:
 
             from pathlib import Path
 
-            from codeweaver.core import ChunkKind, ExtKind, Span, uuid7
+            from codeweaver.core import ChunkKind, Span, uuid7
 
             # Create test chunks
             chunks = [
                 CodeChunk(
                     content="test content 1",
-                    ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
+                    ext_category=ExtCategory(
+                        language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE
+                    ),
                     language=SemanticSearchLanguage.PYTHON,
                     line_range=Span(start=1, end=1, source_id=uuid7()),
                     file_path=Path("/test/file.py"),
@@ -399,7 +402,9 @@ class TestVoyageEmbeddingProviderEmbedding:
                 ),
                 CodeChunk(
                     content="test content 2",
-                    ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
+                    ext_category=ExtCategory(
+                        language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE
+                    ),
                     language=SemanticSearchLanguage.PYTHON,
                     line_range=Span(start=2, end=2, source_id=uuid7()),
                     file_path=Path("/test/file.py"),
@@ -456,7 +461,7 @@ class TestVoyageEmbeddingProviderErrorHandling:
         chunks = [
             CodeChunk(
                 content="test content 1",
-                ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
+                ext_category=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
                 language=SemanticSearchLanguage.PYTHON,
                 line_range=Span(start=1, end=1, source_id=uuid7()),
                 file_path=Path("/test/file.py"),
@@ -464,7 +469,7 @@ class TestVoyageEmbeddingProviderErrorHandling:
             ),
             CodeChunk(
                 content="test content 2",
-                ext_kind=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
+                ext_category=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
                 language=SemanticSearchLanguage.PYTHON,
                 line_range=Span(start=2, end=2, source_id=uuid7()),
                 file_path=Path("/test/file.py"),
@@ -533,8 +538,9 @@ class TestVoyageEmbeddingProviderDimension:
         self, mock_voyage_client, mock_embedding_registry, mock_cache_manager
     ):
         """Test dimension property with custom output_dimension."""
-        from codeweaver.providers import EmbeddingProviderSettings
         from codeweaver.providers.config.embedding import VoyageEmbeddingConfig
+
+        from codeweaver.providers import EmbeddingProviderSettings
 
         caps = EmbeddingModelCapabilities(
             name="voyage-3",

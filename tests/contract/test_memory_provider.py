@@ -46,7 +46,7 @@ def temp_persist_path():
 @pytest.fixture
 async def memory_config(temp_persist_path):
     """Provide test Memory configuration."""
-    from codeweaver.providers.config.kinds import CollectionConfig
+    from codeweaver.providers.config.categories import CollectionConfig
 
     return MemoryVectorStoreProviderSettings(
         provider=Provider.MEMORY,
@@ -107,7 +107,7 @@ async def memory_provider(memory_config, test_embedding_caps):
 @pytest.fixture
 async def sample_chunk(clean_container):
     """Create a sample CodeChunk for testing with embeddings registered in DI container."""
-    from codeweaver.core import BatchKeys, ChunkKind, ExtKind, uuid7
+    from codeweaver.core import BatchKeys, ChunkKind, ExtCategory, uuid7
     from codeweaver.core.types import ChunkEmbeddings, EmbeddingBatchInfo
     from codeweaver.providers.embedding.registry import EmbeddingRegistry
 
@@ -119,7 +119,7 @@ async def sample_chunk(clean_container):
         chunk_name="memory_test.py:test_func",
         file_path=Path("memory_test.py"),
         language=SemanticSearchLanguage.PYTHON,
-        ext_kind=ExtKind.from_language(SemanticSearchLanguage.PYTHON, ChunkKind.CODE),
+        ext_category=ExtCategory.from_language(SemanticSearchLanguage.PYTHON, ChunkKind.CODE),
         content="def test_func():\n    return True",
         line_range=Span(start=1, end=2, source_id=chunk_id),
     )

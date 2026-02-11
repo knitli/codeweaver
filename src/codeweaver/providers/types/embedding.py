@@ -25,8 +25,8 @@ from qdrant_client.models import (
 from codeweaver.core.constants import PRIMARY_SPARSE_VECTOR_NAME, PRIMARY_VECTOR_NAME
 from codeweaver.core.exceptions import InvalidEmbeddingModelError
 from codeweaver.core.types import ModelName, ModelNameT
-from codeweaver.providers.config.provider_kinds import AsymmetricEmbeddingProviderSettings
-from codeweaver.providers.config.provider_kinds import (
+from codeweaver.providers.config.categories import (
+    AsymmetricEmbeddingProviderSettings,
     EmbeddingProviderSettings,
     SparseEmbeddingProviderSettings,
 )

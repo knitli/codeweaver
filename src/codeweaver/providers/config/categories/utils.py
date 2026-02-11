@@ -1,4 +1,4 @@
-"""Utility functions for provider kind settings."""
+"""Utility functions for provider category settings."""
 
 import re
 
@@ -8,7 +8,7 @@ from pydantic import Discriminator
 
 from codeweaver.core import Provider
 from codeweaver.core.utils import is_local_host
-from codeweaver.providers.config.provider_kinds.base import BaseProviderSettings
+from codeweaver.providers.config.categories.base import BaseProviderSettings
 
 
 def is_cloud_provider(_instance: BaseProviderSettings) -> bool:

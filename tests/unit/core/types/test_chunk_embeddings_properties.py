@@ -11,7 +11,7 @@ import pytest
 from uuid_extensions import uuid7
 
 from codeweaver.core import CodeChunk, Span
-from codeweaver.core.metadata import ChunkKind, ExtKind
+from codeweaver.core.metadata import ChunkKind, ExtCategory
 from codeweaver.core.types import ChunkEmbeddings, EmbeddingBatchInfo, SparseEmbedding
 
 
@@ -21,7 +21,7 @@ def sample_chunk():
     chunk_id = uuid7()
     return CodeChunk(
         chunk_id=chunk_id,
-        ext_kind=ExtKind.from_language("python", ChunkKind.CODE),
+        ext_category=ExtCategory.from_language("python", ChunkKind.CODE),
         chunk_name="test.py:func",
         file_path=Path("test.py"),
         language="python",

@@ -16,7 +16,7 @@ from pydantic_ai.models import KnownModelName as KnownAgentModelName
 from pydantic_ai.profiles import ModelProfile as AgentModelCapabilities
 from pydantic_ai.profiles import ModelProfileSpec as AgentModelCapabilitiesT
 
-from codeweaver.core.constants import PYDANTIC_AI_MODEL_PROFILE_PROVIDERS
+from codeweaver.core.constants import PYDANTIC_AI_MODEL_CAPABILITIES_PROVIDERS
 
 
 def _parse_model_name(name: str) -> tuple[str, str]:
@@ -80,7 +80,7 @@ def get_agent_capabilities_for_model(name: KnownAgentModelName | str) -> AgentMo
     return AgentModelCapabilities()
 
 
-_model_providers = PYDANTIC_AI_MODEL_PROFILE_PROVIDERS
+_model_providers = PYDANTIC_AI_MODEL_CAPABILITIES_PROVIDERS
 
 __all__ = (
     "AgentModelCapabilities",

@@ -65,7 +65,7 @@ Changes:
 
 ### Phase 3: Vector Store Config Integration
 
-**`/home/knitli/codeweaver/src/codeweaver/providers/config.provider_kinds.py`**
+**`/home/knitli/codeweaver/src/codeweaver/providers/config.categories.py`**
 
 Changes:
 - Added `PrivateAttr` import from pydantic
@@ -173,7 +173,7 @@ register_default_provider("primary.embedding.datatype", lambda: "float16")
 ```python
 from codeweaver.server.config.settings import CodeWeaverSettings
 from codeweaver.providers.config.embedding import VoyageEmbeddingConfig
-from codeweaver.providers.config.provider_kinds import QdrantVectorStoreProviderSettings
+from codeweaver.providers.config.categories import QdrantVectorStoreProviderSettings
 
 # User configuration
 settings = CodeWeaverSettings(

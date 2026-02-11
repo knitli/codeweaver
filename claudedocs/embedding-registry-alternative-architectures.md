@@ -233,7 +233,7 @@ class EmbeddingRepository(BasedModel):
         embeddings: list[list[float]],
         *,
         model: str,
-        kind: str,
+        category: str,
     ) -> None:
         """Register embeddings in final storage."""
         async with self._get_lock("embeddings"):
@@ -247,7 +247,7 @@ class EmbeddingRepository(BasedModel):
                     chunk_id=chunk.chunk_id,
                     model=model,
                     embeddings=embedding,
-                    kind=kind,
+                    category=category,
                 )
                 self._embeddings[chunk.chunk_id] = self._embeddings[chunk.chunk_id].add(batch_info)
 
@@ -301,7 +301,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                     chunks=deduplicated,
                     embeddings=results,
                     model=self.model_name,
-                    kind="dense",
+                    category="dense",
                 )
 
                 return results
@@ -487,7 +487,7 @@ class EmbeddingCacheManager(BasedModel):
         embeddings: Sequence[Sequence[float]],
         *,
         model: str,
-        kind: Literal["dense", "sparse"],
+        category: Literal["dense", "sparse"],
     ) -> None:
         """Register embeddings in final storage.
 
@@ -505,7 +505,7 @@ class EmbeddingCacheManager(BasedModel):
                     chunk_id=chunk.chunk_id,
                     model=model,
                     embeddings=embedding,
-                    kind=kind,
+                    category=category,
                 )
 
                 self._embeddings[chunk.chunk_id] = self._embeddings[chunk.chunk_id].add(batch_info)
@@ -611,7 +611,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                 chunks=deduplicated,
                 embeddings=results,
                 model=self.model_name,
-                kind="dense" if not self._is_sparse else "sparse",
+                category="dense" if not self._is_sparse else "sparse",
             )
 
             return results
@@ -721,7 +721,7 @@ class EmbeddingEvent:
 class EmbeddingRequested(EmbeddingEvent):
     """Event published when embeddings are requested."""
     chunks: list[CodeChunk]
-    kind: Literal["dense", "sparse"]
+    category: Literal["dense", "sparse"]
 
 
 @dataclass
@@ -730,7 +730,7 @@ class EmbeddingCompleted(EmbeddingEvent):
     chunks: list[CodeChunk]
     embeddings: list[list[float]]
     model: str
-    kind: Literal["dense", "sparse"]
+    category: Literal["dense", "sparse"]
 
 
 @dataclass
@@ -836,7 +836,7 @@ class RegistryService:
                 chunk_id=chunk.chunk_id,
                 model=event.model,
                 embeddings=embedding,
-                kind=event.kind,
+                category=event.category,
             )
 
             self.embeddings[chunk.chunk_id] = self.embeddings[chunk.chunk_id].add(batch_info)
@@ -877,7 +877,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             batch_id=batch_id,
             provider=self.namespace,
             chunks=list(documents),
-            kind="dense",
+            category="dense",
             timestamp=time.time(),
         )
         await self.event_bus.publish(request_event)
@@ -900,7 +900,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                 chunks=deduplicated,
                 embeddings=results,
                 model=self.model_name,
-                kind="dense",
+                category="dense",
                 timestamp=time.time(),
             )
             await self.event_bus.publish(completion_event)

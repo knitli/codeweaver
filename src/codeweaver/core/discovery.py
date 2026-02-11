@@ -30,7 +30,7 @@ from codeweaver.core import BasedModel, ResolvedProjectPathDep
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.di import INJECTED
 from codeweaver.core.language import is_semantic_config_ext
-from codeweaver.core.metadata import ExtKind
+from codeweaver.core.metadata import ExtCategory
 from codeweaver.core.types import MISSING, BlakeHashKey, BlakeKey, Missing
 from codeweaver.core.utils import (
     get_blake_hash,
@@ -79,7 +79,7 @@ class DiscoveredFile(BasedModel):
         Field(description="Relative path to the discovered file from the project root."),
         AfterValidator(set_relative_path),
     ]
-    ext_kind: ExtKind
+    ext_category: ExtCategory
     project_path: DirectoryPath
     _file_hash: Annotated[
         BlakeHashKey | None,
@@ -99,21 +99,23 @@ class DiscoveredFile(BasedModel):
 
     @model_validator(mode="before")
     @classmethod
-    def _ensure_ext_kind(cls, data: Any) -> Any:
-        """Ensure ext_kind is set based on path if not provided."""
+    def _ensure_ext_category(cls, data: Any) -> Any:
+        """Ensure ext_category is set based on path if not provided."""
         if (
             isinstance(data, dict)
-            and ("ext_kind" not in data or data["ext_kind"] is None)
+            and ("ext_category" not in data or data["ext_category"] is None)
             and (path := data.get("path"))
             and isinstance(path, (Path, str))
         ):
-            data["ext_kind"] = ExtKind.from_file(path if isinstance(path, Path) else Path(path))
+            data["ext_category"] = ExtCategory.from_file(
+                path if isinstance(path, Path) else Path(path)
+            )
         return data
 
     def __init__(
         self,
         path: Path,
-        ext_kind: ExtKind | None = None,
+        ext_category: ExtCategory | None = None,
         file_hash: BlakeKey | None = None,
         git_branch: str | None = None,
         project_path: ResolvedProjectPathDep = INJECTED,
@@ -123,10 +125,10 @@ class DiscoveredFile(BasedModel):
         """Initialize DiscoveredFile with optional file_hash and git_branch."""
         object.__setattr__(self, "path", path)
         object.__setattr__(self, "project_path", project_path)
-        if ext_kind:
-            object.__setattr__(self, "ext_kind", ext_kind)
+        if ext_category:
+            object.__setattr__(self, "ext_category", ext_category)
         else:
-            object.__setattr__(self, "ext_kind", ExtKind.from_file(path))
+            object.__setattr__(self, "ext_category", ExtCategory.from_file(path))
         if file_hash:
             object.__setattr__(self, "_file_hash", file_hash)
         elif path.is_file():
@@ -160,7 +162,7 @@ class DiscoveredFile(BasedModel):
     ) -> DiscoveredFile | None:
         """Create a DiscoveredFile from a file path."""
         branch = get_git_branch(path if path.is_dir() else path.parent) or "main"
-        if ext_kind := ExtKind.from_file(path):
+        if ext_category := ExtCategory.from_file(path):
             new_hash = get_blake_hash(path.read_bytes())
             if file_hash and new_hash != file_hash:
                 logger.warning(
@@ -175,7 +177,7 @@ class DiscoveredFile(BasedModel):
             final_path = set_relative_path(path, base_path=base_path) or path
             return cls(
                 path=final_path,
-                ext_kind=ext_kind,
+                ext_category=ext_category,
                 file_hash=new_hash,
                 git_branch=cast(str, branch),
                 project_path=resolved_project_path,
@@ -215,7 +217,7 @@ class DiscoveredFile(BasedModel):
     @property
     def size(self) -> NonNegativeInt:
         """Return the size of the file in bytes."""
-        if self.ext_kind and self.absolute_path.exists() and self.absolute_path.is_file():
+        if self.ext_category and self.absolute_path.exists() and self.absolute_path.is_file():
             return self.absolute_path.stat().st_size
         return 0
 

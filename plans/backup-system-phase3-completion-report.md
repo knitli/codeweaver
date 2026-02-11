@@ -114,7 +114,7 @@ result = await service.snapshot_and_cleanup(wait=False)
 
 ### 3. WalConfig Integration
 
-**File**: `src/codeweaver/providers/config.provider_kinds.py` (MODIFIED)
+**File**: `src/codeweaver/providers/config.categories.py` (MODIFIED)
 
 **Changes Made to `_BaseQdrantVectorStoreProviderSettings`**:
 
@@ -290,7 +290,7 @@ result = await service.snapshot_and_cleanup(wait=False)
 - **snapshot_service.py**: 0 errors, 0 warnings ✅
 - **failover_service.py**: 0 errors, 0 warnings ✅
 - **failover.py**: 2 pre-existing errors (not introduced by Phase 3)
-- **kinds.py**: Pre-existing errors (not introduced by Phase 3)
+- **categories.py**: Pre-existing errors (not introduced by Phase 3)
 
 ### ✅ Linting
 - Code formatted successfully with ruff
@@ -697,7 +697,7 @@ tests/unit/providers/config/test_wal_config_integration.py:
 
 **Files Modified**: 3
 - `failover.py` (+48 lines for configuration)
-- `kinds.py` (+38 lines for WalConfig integration)
+- `categories.py` (+38 lines for WalConfig integration)
 - `failover_service.py` (+38 lines for snapshot integration)
 
 **Total New Code**: ~494 lines

@@ -6,7 +6,9 @@ from typing import Annotated, ClassVar, Literal
 
 from pydantic import Field, Tag, computed_field
 
-from codeweaver.core.types import LiteralSDKClient, Provider, ProviderKind, SDKClient
+from codeweaver.core.types import LiteralSDKClient, Provider, ProviderCategory, SDKClient
+from codeweaver.providers.config.categories.base import BaseProviderSettings
+from codeweaver.providers.config.categories.utils import PROVIDER_DISCRIMINATOR, is_cloud_provider
 from codeweaver.providers.config.clients import (
     DuckDuckGoClientOptions,
     ExaClientOptions,
@@ -18,11 +20,6 @@ from codeweaver.providers.config.data import (
     ExaToolConfig,
     TavilySearchContextToolConfig,
 )
-from codeweaver.providers.config.provider_kinds.base import BaseProviderSettings
-from codeweaver.providers.config.provider_kinds.utils import (
-    PROVIDER_DISCRIMINATOR,
-    is_cloud_provider,
-)
 
 
 class BaseDataProviderSettings(BaseProviderSettings):
@@ -32,7 +29,7 @@ class BaseDataProviderSettings(BaseProviderSettings):
 
     client_options: GeneralDataClientOptionsType | None = None
 
-    kind: ClassVar[Literal[ProviderKind.DATA]] = ProviderKind.DATA
+    category: ClassVar[Literal[ProviderCategory.DATA]] = ProviderCategory.DATA
 
     @computed_field(repr=False)
     @property

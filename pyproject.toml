@@ -659,7 +659,7 @@ unknown-argument = "ignore"
 include = [
   "src/codeweaver/providers/vector_stores/qdrant_base.py",
   "src/codeweaver/providers/data/providers.py",
-  "src/codeweaver/providers/config/provider_kinds/embedding.py",
+  "src/codeweaver/providers/config/categories/embedding.py",
   "src/codeweaver/providers/data/exa.py",
   "src/codeweaver/*/config/*settings.py"
 ]
@@ -724,7 +724,7 @@ include = ["src/codeweaver/semantic/classifier.py"]
 missing-argument = "ignore"
 
 [[tool.ty.overrides]]
-include = ["src/codeweaver/providers/config/embedding.py"]
+include = ["src/codeweaver/providers/config/sdk/embedding.py"]
 
 [tool.ty.overrides.rules]
 invalid-argument-type = "ignore"

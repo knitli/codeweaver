@@ -98,10 +98,10 @@ def format_signature(signature: str) -> str:
 
 
 def format_descriptor(
-    module: str, file_name: str, code_kind: str, snippet_name: str | None = None
+    module: str, file_name: str, code_category: str, snippet_name: str | None = None
 ) -> str:
     """Format a code descriptor for display."""
-    return f"module {module} | file {file_name} | {code_kind} {format_snippet_name(snippet_name) if snippet_name else ''}".strip()
+    return f"module {module} | file {file_name} | {code_category} {format_snippet_name(snippet_name) if snippet_name else ''}".strip()
 
 
 def to_tokens(text: str) -> str:

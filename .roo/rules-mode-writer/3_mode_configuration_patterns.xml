@@ -78,7 +78,7 @@ SPDX-License-Identifier: MIT OR Apache-2.0
     - Rollback strategies
     - Testing approaches for migrations
   whenToUse: >-
-    Use this mode when performing any kind of migration or upgrade.
+    Use this mode when performing any category of migration or upgrade.
     This mode will analyze the current state, plan the migration,
     and guide you through each step with validation.
   groups:

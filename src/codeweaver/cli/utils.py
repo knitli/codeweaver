@@ -11,10 +11,10 @@ from typing import TYPE_CHECKING
 
 
 if TYPE_CHECKING:
-    from codeweaver.core import Provider, ProviderKind
+    from codeweaver.core import Provider, ProviderCategory
 
 
-def check_provider_package_available(provider: Provider, kind: ProviderKind) -> bool:
+def check_provider_package_available(provider: Provider, category: ProviderCategory) -> bool:
     """Check if the required package for a provider is installed.
 
     This replaces the registry.is_provider_available logic.
@@ -22,7 +22,7 @@ def check_provider_package_available(provider: Provider, kind: ProviderKind) -> 
     from codeweaver.core.types import SDKClient
 
     # Check if all required packages are available
-    if (sdk_clients := SDKClient.for_provider_and_kind(provider, kind)) and (
+    if (sdk_clients := SDKClient.for_provider_and_category(provider, category)) and (
         results := list(sdk_clients)
     ):
         for result in results:

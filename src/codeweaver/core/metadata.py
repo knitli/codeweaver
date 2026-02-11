@@ -305,10 +305,10 @@ class ExtLangPair(NamedTuple):
         return bool(self.is_weird_extension and filename.lower().endswith(str(self.ext).lower()))
 
 
-def determine_ext_kind(validated_data: dict[str, Any]) -> ExtKind | None:
-    """Determine the ExtKind based on validated data. Validated data here is the partially validated data field dictionary for a CodeChunk during pydantic model validation (i.e. what a default_factory can optionally receive)."""
+def determine_ext_category(validated_data: dict[str, Any]) -> ExtCategory | None:
+    """Determine the ExtCategory based on validated data. Validated data here is the partially validated data field dictionary for a CodeChunk during pydantic model validation (i.e. what a default_factory can optionally receive)."""
     if "file_path" in validated_data and validated_data["file_path"] is not None:
-        return ExtKind.from_file(validated_data["file_path"])
+        return ExtCategory.from_file(validated_data["file_path"])
     if (
         source := (
             validated_data.get("source")
@@ -330,31 +330,31 @@ def determine_ext_kind(validated_data: dict[str, Any]) -> ExtKind | None:
         language, SemanticSearchLanguage
     ):
         if language == SemanticSearchLanguage.KOTLIN:
-            return ExtKind.from_language(language, ChunkKind.CODE_OR_CONFIG)
+            return ExtCategory.from_language(language, ChunkKind.CODE_OR_CONFIG)
         return (
-            ExtKind.from_language(language, ChunkKind.CODE)
+            ExtCategory.from_language(language, ChunkKind.CODE)
             if language
             not in (
                 SemanticSearchLanguage.JSON,
                 SemanticSearchLanguage.YAML,
                 SemanticSearchLanguage.HCL,
             )
-            else ExtKind.from_language(language, ChunkKind.CONFIG)
+            else ExtCategory.from_language(language, ChunkKind.CONFIG)
         )
 
     if language and isinstance(language, ConfigLanguage):
-        return ExtKind.from_language(
+        return ExtCategory.from_language(
             language.as_semantic_search_language or language, ChunkKind.CONFIG
         )
     from codeweaver.core.file_extensions import CODE_LANGUAGES, DATA_LANGUAGES, DOCS_LANGUAGES
 
     if language and language in {pair.language for pair in DATA_LANGUAGES}:  # type: ignore
-        return ExtKind.from_language(language, ChunkKind.DATA)
+        return ExtCategory.from_language(language, ChunkKind.DATA)
     if language and language in {pair.language for pair in DOCS_LANGUAGES}:  # type: ignore
-        return ExtKind.from_language(language, ChunkKind.DOCS)
+        return ExtCategory.from_language(language, ChunkKind.DOCS)
     if language and language in {pair.language for pair in CODE_LANGUAGES}:  # type: ignore
-        return ExtKind.from_language(language, ChunkKind.CODE)
-    return ExtKind.from_language(language, ChunkKind.OTHER) if language else None
+        return ExtCategory.from_language(language, ChunkKind.CODE)
+    return ExtCategory.from_language(language, ChunkKind.OTHER) if language else None
 
 
 def get_ext_lang_pairs(*, include_data: bool = False) -> Generator[ExtLangPair]:
@@ -412,7 +412,7 @@ def get_ext_lang_pair_for_file(
     file_path: Path, *, include_data: bool = False
 ) -> ExtLangPair | None:
     """Get the `ExtLangPair` for a given file path."""
-    if in_tests := ExtKind.resolve_extension_tests(file_path):
+    if in_tests := ExtCategory.resolve_extension_tests(file_path):
         return ExtLangPair(
             ext=FileExt(cast(LiteralStringT, file_path.suffix or file_path.name)),
             language=get_semantic_or_config_lang(in_tests.language) or in_tests.language,  # type: ignore
@@ -471,8 +471,8 @@ def _categorize_language(
     return ChunkKind.DOCS if language in DOCS_LANGUAGES else ChunkKind.OTHER
 
 
-class ExtKind(NamedTuple):
-    """Represents a file extension and its associated kind."""
+class ExtCategory(NamedTuple):
+    """Represents a file extension and its associated category."""
 
     language: Annotated[
         LanguageName | SemanticSearchLanguage | ConfigLanguage,
@@ -490,7 +490,7 @@ class ExtKind(NamedTuple):
     ]
 
     def __str__(self) -> str:
-        """Return a string representation of the extension kind."""
+        """Return a string representation of the extension category."""
         return f"{self.kind}: {self.language}"
 
     @classmethod
@@ -498,7 +498,7 @@ class ExtKind(NamedTuple):
         cls,
         language: (LanguageName | LiteralStringT | SemanticSearchLanguage | ConfigLanguage),
         kind: str | ChunkKind,
-    ) -> ExtKind | None:
+    ) -> ExtCategory | None:
         """Create an ExtKind from a string representation."""
         # Handle SemanticSearchLanguage directly
         if isinstance(language, SemanticSearchLanguage):
@@ -533,7 +533,7 @@ class ExtKind(NamedTuple):
         return cls(language=lang_name, kind=ChunkKind.OTHER)
 
     @classmethod
-    def resolve_extension_tests(cls, file: str | Path) -> ExtKind | None:
+    def resolve_extension_tests(cls, file: str | Path) -> ExtCategory | None:
         """
         Resolve the extension tests for a given file path.
         """
@@ -556,9 +556,9 @@ class ExtKind(NamedTuple):
         )
 
     @classmethod
-    def from_file(cls, file: str | Path) -> ExtKind | None:
+    def from_file(cls, file: str | Path) -> ExtCategory | None:
         """
-        Create an ExtKind from a file path.
+        Create an ExtCategory from a file path.
         """
         from codeweaver.core.language import language_from_path
 
@@ -586,7 +586,7 @@ class ExtKind(NamedTuple):
         return None
 
     def serialize_for_cli(self) -> dict[str, Any]:
-        """Serialize the ExtKind for CLI output."""
+        """Serialize the ExtCategory for CLI output."""
         return {
             "language": str(
                 self.language.as_title
@@ -600,10 +600,10 @@ class ExtKind(NamedTuple):
 __all__ = (
     "ChunkKind",
     "ChunkSource",
-    "ExtKind",
+    "ExtCategory",
     "ExtLangPair",
     "Metadata",
-    "determine_ext_kind",
+    "determine_ext_category",
     "get_ext_lang_pair_for_file",
     "get_ext_lang_pairs",
     "get_language_from_extension",

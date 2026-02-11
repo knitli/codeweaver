@@ -28,7 +28,7 @@ from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
 from codeweaver.cli.utils import check_provider_package_available
 from codeweaver.core import (
     CodeWeaverSettingsType,
-    ProviderKind,
+    ProviderCategory,
     SettingsMapDep,
     Unset,
     get_codeweaver_config_paths,
@@ -573,13 +573,13 @@ def check_indexer_config(settings: CodeWeaverSettings) -> DoctorCheck:
 
 
 def _report_unimplemented_status(
-    kind: ProviderKind, provider: Provider, *, is_available: bool, has_auth: bool
+    category: ProviderCategory, provider: Provider, *, is_available: bool, has_auth: bool
 ) -> DoctorCheck | None:
     """Report unimplemented provider status checks for DATA and AGENT providers."""
-    if kind not in {ProviderKind.DATA, ProviderKind.AGENT}:
+    if category not in {ProviderCategory.DATA, ProviderCategory.AGENT}:
         return None
-    name = f"{kind.as_title} ({provider.as_title})"
-    if kind == ProviderKind.DATA:
+    name = f"{category.as_title} ({provider.as_title})"
+    if category == ProviderCategory.DATA:
         message = "We're still integrating data providers into CodeWeaver. Stay tuned!"
         return DoctorCheck.set_check(name, "warn", message, [])
     message = (
@@ -608,21 +608,21 @@ def check_provider_availability(settings: ProviderSettings) -> list[DoctorCheck]
                     ["Configure providers in your codeweaver configuration."],
                 )
             ]
-        from codeweaver.core import ProviderKind
+        from codeweaver.core import ProviderCategory
 
-        for kind, provider_configs in configs.items():
+        for category, provider_configs in configs.items():
             if not provider_configs:
                 continue
             for provider_config in provider_configs:
-                kind = ProviderKind.from_string(cast(str, kind))
+                category = ProviderCategory.from_string(cast(str, category))
                 provider = provider_config["provider"]
                 # Check package availability manually (Registry replacement)
-                is_package_available = check_provider_package_available(provider, kind)
+                is_package_available = check_provider_package_available(provider, category)
                 has_auth = provider.has_env_auth or provider.is_local_provider
-                if kind in {ProviderKind.DATA, ProviderKind.AGENT}:
+                if category in {ProviderCategory.DATA, ProviderCategory.AGENT}:
                     tested_providers.append(
                         _report_unimplemented_status(
-                            kind, provider, is_available=is_package_available, has_auth=has_auth
+                            category, provider, is_available=is_package_available, has_auth=has_auth
                         )  # type: ignore
                     )
                     continue
@@ -631,7 +631,7 @@ def check_provider_availability(settings: ProviderSettings) -> list[DoctorCheck]
                     # Package installed AND credentials configured
                     tested_providers.append(
                         DoctorCheck.set_check(
-                            f"{kind.as_title} ({provider.as_title})",
+                            f"{category.as_title} ({provider.as_title})",
                             "success",
                             "Package installed and configured",
                             [],
@@ -642,7 +642,7 @@ def check_provider_availability(settings: ProviderSettings) -> list[DoctorCheck]
                     env_vars = provider.api_key_env_vars
                     tested_providers.append(
                         DoctorCheck.set_check(
-                            f"{kind.as_title} ({provider.as_title})",
+                            f"{category.as_title} ({provider.as_title})",
                             "warn",
                             "Package installed but missing credentials",
                             [
@@ -657,7 +657,7 @@ def check_provider_availability(settings: ProviderSettings) -> list[DoctorCheck]
                     # Package not installed
                     tested_providers.append(
                         DoctorCheck.set_check(
-                            f"{kind.as_title} ({provider.as_title})",
+                            f"{category.as_title} ({provider.as_title})",
                             "fail",
                             "Package not installed",
                             [

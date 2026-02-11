@@ -112,19 +112,15 @@ class EmbeddingMixin:
     _dimension: int | None = PrivateAttr(default=None)
     _is_sparse: ClassVar[bool] = False
 
-    provider: Annotated[
-        Provider | None,
-        Field(
-            description="The provider for this embedding configuration. You don't have to provide this value -- while provider is a required setting at the top-level EmbeddingProviderSettings object, we will inject that value into the embedding configuration for you, so you can just specify the provider-specific config without worrying about the provider field in most cases."
-        ),
-    ] = None
+    provider: Provider | None = Field(
+        None,
+        description="The provider for this embedding configuration. You don't have to provide this value -- while provider is a required setting at the top-level EmbeddingProviderSettings object, we will inject that value into the embedding configuration for you, so you can just specify the provider-specific config without worrying about the provider field in most cases.",
+    )
 
-    model_name: Annotated[
-        ModelNameT | None,
-        Field(
-            description="The name of the embedding model to use. This should be in the format used by the provider (e.g., for Bedrock, this would be the model ARN). Like with `provider`, we can inject that value into the embedding configuration for you, so you can just specify the model-specific config without worrying about the model_name field in most cases."
-        ),
-    ] = None
+    model_name: ModelNameT | None = Field(
+        default_factory=ModelName,
+        description="The name of the embedding model to use. This should be in the format used by the provider (e.g., for Bedrock, this would be the model ARN). Like with `provider`, we can inject that value into the embedding configuration for you, so you can just specify the model-specific config without worrying about the model_name field in most cases.",
+    )
 
     embedding: Annotated[
         dict[str, Any] | None,
@@ -489,12 +485,14 @@ class EmbeddingMixin:
 class BaseEmbeddingConfig(BasedModel, EmbeddingMixin):
     """Base configuration for embedding models."""
 
-    model: Annotated[
-        dict[str, Any] | None,
-        Field(
-            description="Parameters for model-level configuration (separate from embedding/query options)."
-        ),
-    ] = None
+    model_name: ModelNameT = Field(
+        default_factory=ModelName, description="The embedding model to use."
+    )
+
+    model: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Parameters for model-level configuration (separate from embedding/query options).",
+    )
 
     async def as_vector_params(self) -> VectorParams:
         """Get Qdrant VectorParams for this embedding configuration.
@@ -574,7 +572,6 @@ type BedrockModelConfig = Annotated[
 class BedrockEmbeddingConfig(BaseEmbeddingConfig):
     """Configuration options for Bedrock embedding models."""
 
-    tag: Literal["bedrock"] = "bedrock"
     provider: Literal[Provider.BEDROCK] = Provider.BEDROCK
 
     model_name: (
@@ -585,7 +582,7 @@ class BedrockEmbeddingConfig(BaseEmbeddingConfig):
             "cohere.embed-v4:0",
         ]
         | ModelNameT
-    )
+    ) = Field(default_factory=ModelName, description="The Bedrock embedding model to use.")
     """The Bedrock embedding model to use. Can be one of the predefined models or a custom model identifier. Note that this isn't the AWS `model_id` (usually its ARN) - that's specified in the embedding request params."""
 
     model: Annotated[
@@ -1484,8 +1481,12 @@ async def _to_sparse_vector_params(instance: BaseEmbeddingConfig) -> SparseVecto
     return SparseVectorParams(index=index_params, modifier=modifier)
 
 
-class BaseSparseEmbeddingConfig(EmbeddingMixin, BasedModel):
+class BaseSparseEmbeddingConfig(BasedModel, EmbeddingMixin):
     """Base configuration for sparse embedding models."""
+
+    model_name: ModelNameT = Field(
+        default_factory=ModelName, description="The sparse embedding model to use."
+    )
 
     _is_sparse: ClassVar[bool] = True
 
@@ -1500,6 +1501,9 @@ class SentenceTransformersSparseEmbeddingConfig(BaseSparseEmbeddingConfig):
     """Configuration options for Sentence Transformers sparse embedding models."""
 
     _is_sparse: ClassVar[bool] = True
+
+    provider: Literal[Provider.SENTENCE_TRANSFORMERS] = Provider.SENTENCE_TRANSFORMERS
+    tag: Literal["sentence_transformers"] = "sentence_transformers"
 
     embedding: SentenceTransformersEncodeDict | None = None
     """Parameters for document/corpus encoding."""
@@ -1587,6 +1591,9 @@ class FastEmbedSparseEmbeddingConfig(BaseSparseEmbeddingConfig):
     """
 
     _is_sparse: ClassVar[bool] = True
+
+    provider: Literal[Provider.FASTEMBED] = Provider.FASTEMBED
+    tag: Literal["fastembed"] = "fastembed"
 
     async def as_sparse_vector_params(self) -> SparseVectorParams:
         """Get Qdrant SparseVectorParams for this sparse embedding configuration."""

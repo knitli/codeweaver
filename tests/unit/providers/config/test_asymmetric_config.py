@@ -19,13 +19,14 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from codeweaver.providers.config.embedding import VoyageEmbeddingConfig
+
 from codeweaver.core import Provider
 from codeweaver.core.exceptions import ConfigurationError
-from codeweaver.providers.config.embedding import VoyageEmbeddingConfig
 
 
 if TYPE_CHECKING:
-    from codeweaver.providers.config.kinds import EmbeddingProviderSettings
+    from codeweaver.providers.config.categories import EmbeddingProviderSettings
     from codeweaver.providers.embedding.capabilities.base import ModelFamily
 pytestmark = [pytest.mark.unit]
 
@@ -37,7 +38,7 @@ def voyage_4_large_settings() -> EmbeddingProviderSettings:
     This model is part of the VOYAGE_4_FAMILY and is suitable for
     asymmetric pairing with voyage-4-nano.
     """
-    from codeweaver.providers.config.kinds import EmbeddingProviderSettings
+    from codeweaver.providers.config.categories import EmbeddingProviderSettings
 
     return EmbeddingProviderSettings(
         provider=Provider.VOYAGE,
@@ -54,7 +55,8 @@ def voyage_4_nano_settings() -> EmbeddingProviderSettings:
     VOYAGE_4_FAMILY, allowing asymmetric pairing with VOYAGE API models.
     """
     from codeweaver.providers.config.embedding import SentenceTransformersEmbeddingConfig
-    from codeweaver.providers.config.kinds import EmbeddingProviderSettings
+
+    from codeweaver.providers.config.categories import EmbeddingProviderSettings
 
     return EmbeddingProviderSettings(
         provider=Provider.SENTENCE_TRANSFORMERS,
@@ -70,7 +72,7 @@ def voyage_code_3_settings() -> EmbeddingProviderSettings:
     This model is NOT in the VOYAGE_4_FAMILY (no model_family attribute) and
     should fail validation when paired with voyage-4 models.
     """
-    from codeweaver.providers.config.kinds import EmbeddingProviderSettings
+    from codeweaver.providers.config.categories import EmbeddingProviderSettings
 
     return EmbeddingProviderSettings(
         provider=Provider.VOYAGE,
@@ -87,7 +89,8 @@ def openai_settings() -> EmbeddingProviderSettings:
     validation when paired with Voyage models.
     """
     from codeweaver.providers.config.embedding import OpenAIEmbeddingConfig
-    from codeweaver.providers.config.kinds import EmbeddingProviderSettings
+
+    from codeweaver.providers.config.categories import EmbeddingProviderSettings
 
     return EmbeddingProviderSettings(
         provider=Provider.OPENAI,
@@ -128,7 +131,8 @@ class TestAsymmetricConfigCreation:
         """Test creating config with same provider but different models (less common use case)."""
         try:
             from codeweaver.providers.config.asymmetric import AsymmetricEmbeddingProviderSettings
-            from codeweaver.providers.config.kinds import EmbeddingProviderSettings
+
+            from codeweaver.providers.config.categories import EmbeddingProviderSettings
         except ImportError:
             pytest.skip("AsymmetricEmbeddingProviderSettings not yet implemented")
         voyage_4_settings = EmbeddingProviderSettings(
@@ -253,7 +257,8 @@ class TestModelWithoutFamily:
         try:
             from codeweaver.providers.config.asymmetric import AsymmetricEmbeddingProviderSettings
             from codeweaver.providers.config.embedding import FastEmbedEmbeddingConfig
-            from codeweaver.providers.config.kinds import EmbeddingProviderSettings
+
+            from codeweaver.providers.config.categories import EmbeddingProviderSettings
         except ImportError:
             pytest.skip("AsymmetricEmbeddingProviderSettings not yet implemented")
         no_family_settings = EmbeddingProviderSettings(
@@ -284,7 +289,8 @@ class TestUnknownModel:
         """Test that unknown models not in capability registry are rejected."""
         try:
             from codeweaver.providers.config.asymmetric import AsymmetricEmbeddingProviderSettings
-            from codeweaver.providers.config.kinds import EmbeddingProviderSettings
+
+            from codeweaver.providers.config.categories import EmbeddingProviderSettings
         except ImportError:
             pytest.skip("AsymmetricEmbeddingProviderSettings not yet implemented")
         unknown_settings = EmbeddingProviderSettings(

@@ -40,7 +40,7 @@ class BaseDataclassEnum(Enum):
     1. Create a dataclass. It should inherit from `codeweaver.core.types.dataclasses.BaseEnumData`.
         - Note that `BaseEnumData` already includes `_aliases`, and `_description` fields, so you don't need to redefine those unless you want to customize them. `_name` and `_value` are required by `Enum` members, **you cannot use those names or their non-sunder versions (i.e. 'name')**. `_name` will be the name of the Enum member you assign in the class definition, and `_value` *is your dataclass instance*.
         - It is already a dataclass and does not need a `@dataclass` decorator (which will break it).
-        - Suggestion: I find that it's easiest to kind of define a dataclass-within-a-dataclass, where there is only a single top-level field that is either a typed dict, dataclass or named tuple. It makes constructing the dataclass enum members easier to read.
+        - Suggestion: I find that it's easiest to define a dataclass-within-a-dataclass, where there is only a single top-level field that is either a typed dict, dataclass or named tuple. It makes constructing the dataclass enum members easier to read.
     2. Create your enum class, inheriting from `BaseDataclassEnum`.
     3. Define your enum members, assigning each to an instance of your dataclass.
     4. Use it.

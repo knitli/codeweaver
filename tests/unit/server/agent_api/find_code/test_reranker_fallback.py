@@ -34,12 +34,12 @@ def sample_chunk():
     """Create a sample CodeChunk for testing."""
     from pathlib import Path
 
-    from codeweaver.core import ChunkKind, CodeChunk, ExtKind, Span, uuid7
+    from codeweaver.core import ChunkKind, CodeChunk, ExtCategory, Span, uuid7
 
     chunk_id = uuid7()
     return CodeChunk(
         chunk_id=chunk_id,
-        ext_kind=ExtKind.from_language("python", ChunkKind.CODE),
+        ext_category=ExtCategory.from_language("python", ChunkKind.CODE),
         chunk_name="test.py:func",
         file_path=Path("test.py"),
         language="python",

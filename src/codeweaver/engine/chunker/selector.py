@@ -226,11 +226,11 @@ class ChunkerSelector:
             >>> selector._detect_language(file_xyz)
             'xyz'
         """
-        if file.ext_kind:
+        if file.ext_category:
             return (
-                file.ext_kind.language
-                if isinstance(file.ext_kind.language, (SemanticSearchLanguage, ConfigLanguage))
-                else str(file.ext_kind.language)
+                file.ext_category.language
+                if isinstance(file.ext_category.language, (SemanticSearchLanguage, ConfigLanguage))
+                else str(file.ext_category.language)
             )
         ext = file.absolute_path.suffix
         return ext.lstrip(".").lower()

@@ -167,16 +167,25 @@ def _show_provider_config(provider_settings: ProviderSettingsDep = INJECTED) -> 
         display.print_warning("No providers configured")
         return
 
-    valid_kinds = ("data", "embedding", "sparse_embedding", "reranking", "vector_store", "agent")
+    valid_categories = (
+        "data",
+        "embedding",
+        "sparse_embedding",
+        "reranking",
+        "vector_store",
+        "agent",
+    )
 
-    for kind, configs in provider_settings.items():
-        if kind not in valid_kinds or not configs or isinstance(configs, Unset):
+    for category, configs in provider_settings.items():
+        if category not in valid_categories or not configs or isinstance(configs, Unset):
             continue
 
-        config_list = _normalize_provider_configs(configs, field=kind)  # ty:ignore[invalid-argument-type]
+        config_list = _normalize_provider_configs(configs, field=category)  # ty:ignore[invalid-argument-type]
 
         table = Table(
-            title=f"{kind.replace('_', ' ').title()}", show_header=True, header_style="bold cyan"
+            title=f"{category.replace('_', ' ').title()}",
+            show_header=True,
+            header_style="bold cyan",
         )
         table.add_column("Provider", style="cyan")
         table.add_column("Status", style="white", no_wrap=True)

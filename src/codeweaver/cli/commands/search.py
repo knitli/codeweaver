@@ -175,7 +175,7 @@ def _display_match_details(matches: Sequence[CodeMatch], display: StatusDisplay)
         else:
             table.add_row(
                 str(match_data.get("file", {}).get("path", "unknown")),
-                str(match_data.get("file", {}).get("ext_kind", {}).get("language", "unknown")),
+                str(match_data.get("file", {}).get("ext_category", {}).get("language", "unknown")),
                 f"{match.relevance_score:.2f}",
                 f"{match.span!s}",
                 preview,
@@ -205,7 +205,7 @@ def _display_markdown_results(
         match_data = match.serialize_for_cli()
 
         file_path = match_data.get("file", {}).get("path", "unknown")
-        language = match_data.get("file", {}).get("ext_kind", {}).get("language", "unknown")
+        language = match_data.get("file", {}).get("ext_category", {}).get("language", "unknown")
 
         display.console.print(f"## {i}. {file_path}")
         display.console.print(

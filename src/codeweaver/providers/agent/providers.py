@@ -109,13 +109,13 @@ def infer_agent_provider_class(provider: str | Provider) -> type[AgentProvider[P
 
 def load_default_agent_providers() -> Generator[type[AgentProvider[Provider]], None, None]:
     """Load the default providers."""
-    from codeweaver.core.types import Provider, ProviderKind, get_provider_kinds
+    from codeweaver.core.types import Provider, ProviderCategory, get_categories
 
     for provider in Provider:
         if provider == Provider.NOT_SET:
             continue
-        kinds = get_provider_kinds(provider)
-        if ProviderKind.AGENT in kinds:
+        categories = get_categories(provider)
+        if ProviderCategory.AGENT in categories:
             with contextlib.suppress(ValueError, AttributeError, ImportError):
                 if agent_provider := get_agent_model_provider(provider):  # type: ignore
                     yield agent_provider

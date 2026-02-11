@@ -70,9 +70,9 @@ async def get_backup_embedding_config(
         ConfigurationError: If provider creation fails unexpectedly
     """
     if config_provider == "sentence-transformers":
+        from codeweaver.providers.config.categories import EmbeddingProviderSettings
         from codeweaver.providers.config.clients import SentenceTransformersClientOptions
         from codeweaver.providers.config.embedding import SentenceTransformersEmbeddingConfig
-        from codeweaver.providers.config.provider_kinds import EmbeddingProviderSettings
 
         return EmbeddingProviderSettings(
             provider=Provider.SENTENCE_TRANSFORMERS,
@@ -86,9 +86,9 @@ async def get_backup_embedding_config(
             ),
         )
     if config_provider == "fastembed":
+        from codeweaver.providers.config.categories import FastEmbedEmbeddingProviderSettings
         from codeweaver.providers.config.clients import FastEmbedClientOptions
         from codeweaver.providers.config.embedding import FastEmbedEmbeddingConfig
-        from codeweaver.providers.config.provider_kinds import FastEmbedEmbeddingProviderSettings
 
         return FastEmbedEmbeddingProviderSettings(
             provider=Provider.FASTEMBED,

@@ -143,8 +143,8 @@ class VectorConfig(BasedModel, frozen=True):
     # Properties
 
     @property
-    def kind(self) -> EmbeddingKind:
-        """Infer embedding kind from params type.
+    def category(self) -> EmbeddingKind:
+        """Infer embedding category from params type.
 
         Returns:
             EmbeddingKind.DENSE for VectorParams
@@ -159,12 +159,12 @@ class VectorConfig(BasedModel, frozen=True):
     @property
     def is_dense(self) -> bool:
         """Check if this is a dense vector configuration."""
-        return self.kind == EmbeddingKind.DENSE
+        return self.category == EmbeddingKind.DENSE
 
     @property
     def is_sparse(self) -> bool:
         """Check if this is a sparse vector configuration."""
-        return self.kind == EmbeddingKind.SPARSE
+        return self.category == EmbeddingKind.SPARSE
 
     # Conversion methods
 
@@ -206,7 +206,7 @@ class VectorConfig(BasedModel, frozen=True):
             Configured VectorConfig instance
 
         Example:
-            >>> from codeweaver.providers.config.provider_kinds import EmbeddingProviderSettings
+            >>> from codeweaver.providers.config.categories import EmbeddingProviderSettings
             >>> settings = EmbeddingProviderSettings(...)
             >>> config = await VectorConfig.from_provider_settings(
             ...     settings,
@@ -214,7 +214,7 @@ class VectorConfig(BasedModel, frozen=True):
             ...     role=VectorRole.PRIMARY
             ... )
         """
-        from codeweaver.providers.config.provider_kinds import SparseEmbeddingProviderSettings
+        from codeweaver.providers.config.categories import SparseEmbeddingProviderSettings
 
         model_name = ModelName(config.model_name)
 
@@ -527,7 +527,7 @@ def vector_strategy_to_config(strategy: VectorStrategy) -> VectorConfig:
     if "backup" in model_str or model_str.startswith("jina"):
         name = "backup"
         role = VectorRole.BACKUP
-    elif strategy.kind == EmbeddingKind.SPARSE:
+    elif strategy.category == EmbeddingKind.SPARSE:
         name = "sparse"
         role = VectorRole.SPARSE
 

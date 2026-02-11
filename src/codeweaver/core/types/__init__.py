@@ -15,15 +15,19 @@ from codeweaver.core.utils import create_lazy_getattr
 
 MappingProxyType = _types.MappingProxyType
 
-from codeweaver.core.types.provider import LiteralProvider, LiteralProviderKind, LiteralSDKClient
+from codeweaver.core.types.provider import (
+    LiteralProvider,
+    LiteralProviderCategory,
+    LiteralSDKClient,
+)
 from codeweaver.core.types.service_cards import (
-    ProviderKindLiteralString,
+    ProviderCategoryLiteralString,
     ProviderLiteralString,
     SDKClientLiteralString,
 )
 
 
-type LiteralProviderKindType = ProviderKindLiteralString | LiteralProviderKind
+type LiteralProviderCategoryType = ProviderCategoryLiteralString | LiteralProviderCategory
 type LiteralProviderType = ProviderLiteralString | LiteralProvider
 type LiteralSDKClientType = SDKClientLiteralString | LiteralSDKClient
 
@@ -105,17 +109,17 @@ if TYPE_CHECKING:
         BasedModel,
         RootedRoot,
     )
-    from codeweaver.core.types.provider import Provider, ProviderKind, SDKClient, get_provider_kinds
+    from codeweaver.core.types.provider import Provider, ProviderCategory, SDKClient, get_categories
     from codeweaver.core.types.search import SearchResult, SearchStrategy, StrategizedQuery
     from codeweaver.core.types.sentinel import MISSING, UNSET, Missing, Sentinel, Unset
     from codeweaver.core.types.service_cards import (
         ServiceCard,
         ServiceMetadata,
         get_provider_capabilities_map,
+        get_provider_category_sdk_clients_for_provider,
         get_provider_clients,
-        get_provider_kind_sdk_clients_for_provider,
-        get_provider_sdk_clients_for_kind,
-        get_providers_for_kind,
+        get_provider_sdk_clients_for_category,
+        get_providers_for_category,
         get_sdk_client,
         get_sdk_client_map,
         get_service_card,
@@ -218,7 +222,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "OperationsKey": (__spec__.parent, "statistics"),
     "Provider": (__spec__.parent, "provider"),
     "ProviderEnvVars": (__spec__.parent, "env"),
-    "ProviderKind": (__spec__.parent, "provider"),
+    "ProviderCategory": (__spec__.parent, "provider"),
     "QueryResult": (__spec__.parent, "embeddings"),
     "RawEmbeddingVectors": (__spec__.parent, "embeddings"),
     "RequestKind": (__spec__.parent, "statistics"),
@@ -257,10 +261,10 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "generate_title": (__spec__.parent, "utils"),
     "get_provider_capabilities_map": (__spec__.parent, "service_cards"),
     "get_provider_clients": (__spec__.parent, "service_cards"),
-    "get_provider_kind_sdk_clients_for_provider": (__spec__.parent, "service_cards"),
-    "get_provider_kinds": (__spec__.parent, "provider"),
-    "get_provider_sdk_clients_for_kind": (__spec__.parent, "service_cards"),
-    "get_providers_for_kind": (__spec__.parent, "service_cards"),
+    "get_provider_category_sdk_clients_for_provider": (__spec__.parent, "service_cards"),
+    "get_categories": (__spec__.parent, "provider"),
+    "get_provider_sdk_clients_for_category": (__spec__.parent, "service_cards"),
+    "get_providers_for_category": (__spec__.parent, "service_cards"),
     "get_sdk_client": (__spec__.parent, "service_cards"),
     "get_sdk_client_map": (__spec__.parent, "service_cards"),
     "get_service_card": (__spec__.parent, "service_cards"),
@@ -327,8 +331,8 @@ __all__ = (
     "LanguageNameT",
     "LineStrategy",
     "LiteralProvider",
-    "LiteralProviderKind",
-    "LiteralProviderKindType",
+    "LiteralProviderCategory",
+    "LiteralProviderCategoryType",
     "LiteralProviderType",
     "LiteralSDKClientType",
     "LiteralStringT",
@@ -343,9 +347,9 @@ __all__ = (
     "ModelNameT",
     "OperationsKey",
     "Provider",
+    "ProviderCategory",
+    "ProviderCategoryLiteralString",
     "ProviderEnvVars",
-    "ProviderKind",
-    "ProviderKindLiteralString",
     "ProviderLiteralString",
     "QueryResult",
     "RawEmbeddingVectors",
@@ -383,15 +387,16 @@ __all__ = (
     "clean_sentinel_from_schema",
     "generate_field_title",
     "generate_title",
+    "get_categories",
     "get_provider_capabilities_map",
+    "get_provider_category_sdk_clients_for_provider",
     "get_provider_clients",
-    "get_provider_kind_sdk_clients_for_provider",
-    "get_provider_kinds",
-    "get_provider_sdk_clients_for_kind",
-    "get_providers_for_kind",
+    "get_provider_sdk_clients_for_category",
+    "get_providers_for_category",
     "get_sdk_client",
     "get_sdk_client_map",
     "get_service_card",
+    "get_service_cards",
     "service_card_factory",
 )
 

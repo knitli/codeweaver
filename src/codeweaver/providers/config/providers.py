@@ -28,34 +28,17 @@ from codeweaver.core.constants import ENV_EXPLICIT_TRUE_VALUES, LOCALHOST, ONE, 
 from codeweaver.core.types import (
     BasedModel,
     DictView,
-    LiteralProviderKindType,
+    LiteralProviderCategoryType,
     ModelName,
     ModelNameT,
     Provider,
-    ProviderKind,
-    ProviderKindLiteralString,
+    ProviderCategory,
+    ProviderCategoryLiteralString,
     Unset,
 )
 from codeweaver.core.utils import has_package
 from codeweaver.providers import VoyageClientOptions
-from codeweaver.providers.config.clients import (
-    QdrantClientOptions,
-    SentenceTransformersClientOptions,
-)
-from codeweaver.providers.config.embedding import (
-    EmbeddingConfigT,
-    FastEmbedEmbeddingConfig,
-    FastEmbedSparseEmbeddingConfig,
-    GoogleEmbeddingConfig,
-    MistralEmbeddingConfig,
-    SentenceTransformersEmbeddingConfig,
-    SentenceTransformersEncodeDict,
-    SentenceTransformersSparseEmbeddingConfig,
-    SparseEmbeddingConfigT,
-    VoyageEmbeddingConfig,
-    VoyageEmbeddingOptionsDict,
-)
-from codeweaver.providers.config.provider_kinds import (
+from codeweaver.providers.config.categories import (
     AgentProviderSettingsType,
     AsymmetricEmbeddingProviderSettings,
     BaseAgentProviderSettings,
@@ -72,6 +55,23 @@ from codeweaver.providers.config.provider_kinds import (
     SparseEmbeddingProviderSettingsType,
     TavilyProviderSettings,
     VectorStoreProviderSettingsType,
+)
+from codeweaver.providers.config.clients import (
+    QdrantClientOptions,
+    SentenceTransformersClientOptions,
+)
+from codeweaver.providers.config.embedding import (
+    EmbeddingConfigT,
+    FastEmbedEmbeddingConfig,
+    FastEmbedSparseEmbeddingConfig,
+    GoogleEmbeddingConfig,
+    MistralEmbeddingConfig,
+    SentenceTransformersEmbeddingConfig,
+    SentenceTransformersEncodeDict,
+    SentenceTransformersSparseEmbeddingConfig,
+    SparseEmbeddingConfigT,
+    VoyageEmbeddingConfig,
+    VoyageEmbeddingOptionsDict,
 )
 from codeweaver.providers.config.reranking import (
     FastEmbedRerankingConfig,
@@ -425,7 +425,7 @@ DefaultVectorStoreProviderSettings: tuple[QdrantVectorStoreProviderSettings, ...
 
 
 class ProviderNameMap(TypedDict):
-    """Configured providers by kind."""
+    """Configured providers by category."""
 
     data: tuple[Provider, ...] | None
     embedding: Provider | tuple[Provider, ...] | None
@@ -550,7 +550,7 @@ class ProviderSettings(BasedModel):
 
     def __init__(self, **data: Any) -> None:
         """Initialize ProviderSettings and register with DI container if available."""
-        # We'll set the _kind field on each class
+        # We'll set the _category field on each class
         # this will help with identification of settings classes
         try:
             from codeweaver.core.di import get_container
@@ -614,19 +614,19 @@ class ProviderSettings(BasedModel):
         return None
 
     def has_setting(
-        self, setting_name: ProviderKindLiteralString | LiteralProviderKindType
+        self, setting_name: ProviderCategoryLiteralString | LiteralProviderCategoryType
     ) -> bool:
         """Check if a specific provider setting is configured.
 
         Args:
-            setting_name: The name of the setting or ProviderKind to check.
+            setting_name: The name of the setting or ProviderCategory to check.
         """
-        from codeweaver.core import ProviderKind
+        from codeweaver.core import ProviderCategory
 
         setting = (
             setting_name
-            if setting_name in ProviderKindLiteralString.__value__.__args__
-            else cast(ProviderKind, setting_name).variable
+            if setting_name in ProviderCategoryLiteralString.__value__.__args__
+            else cast(ProviderCategory, setting_name).variable
         )
         return getattr(self, setting) is not Unset  # type: ignore
 
@@ -642,9 +642,9 @@ class ProviderSettings(BasedModel):
         })  # type: ignore
 
     @property
-    def _field_names(self) -> tuple[ProviderKindLiteralString, ...]:
+    def _field_names(self) -> tuple[ProviderCategoryLiteralString, ...]:
         """Get the field names for provider settings."""
-        return ProviderKindLiteralString.__value__.__args__
+        return ProviderCategoryLiteralString.__value__.__args__
 
     @property
     def _all_configs(self) -> tuple[BaseProviderSettings, ...]:
@@ -657,8 +657,10 @@ class ProviderSettings(BasedModel):
         )
 
     @property
-    def provider_configs(self) -> dict[ProviderKindLiteralString, tuple[BaseProviderSettings, ...]]:
-        """Get a summary of configured provider settings by kind."""
+    def provider_configs(
+        self,
+    ) -> dict[ProviderCategoryLiteralString, tuple[BaseProviderSettings, ...]]:
+        """Get a summary of configured provider settings by category."""
         return {
             field_name: settings
             if isinstance(settings, tuple)
@@ -671,8 +673,10 @@ class ProviderSettings(BasedModel):
 
     @property
     def provider_name_map(self) -> ProviderNameMap:
-        """Get a summary of configured providers by kind."""
-        provider_data: dict[ProviderKindLiteralString, Provider | tuple[Provider, ...] | None] = {
+        """Get a summary of configured providers by category."""
+        provider_data: dict[
+            ProviderCategoryLiteralString, Provider | tuple[Provider, ...] | None
+        ] = {
             field_name: (
                 tuple(s.provider for s in setting if setting and is_typeddict(s))
                 if isinstance(setting, tuple)
@@ -705,7 +709,7 @@ class ProviderSettings(BasedModel):
         # Retrieve and flatten settings for matching fields
         all_settings: list[BaseProviderSettings] = []
         for field in matching_fields:
-            if setting := self.settings_for_kind(field):
+            if setting := self.settings_for_category(field):
                 if isinstance(setting, tuple):
                     all_settings.extend(setting)
                 else:
@@ -759,25 +763,25 @@ class ProviderSettings(BasedModel):
         settings = settings if isinstance(settings, tuple) else (settings,)
         return self._dig_for_secret_keys(tuple(c.model_dump() for c in settings))
 
-    def settings_for_kind(
+    def settings_for_category(
         self,
-        kind: ProviderKindLiteralString | LiteralProviderKindType,
+        category: ProviderCategoryLiteralString | LiteralProviderCategoryType,
         *,
         primary: bool = True,
         backup: bool = False,
     ) -> BaseProviderSettings | tuple[BaseProviderSettings, ...] | None:
-        """Get the settings for a specific provider kind.
+        """Get the settings for a specific provider category.
 
         Args:
-            kind: The kind of provider or ProviderKind to get settings for.
+            category: The category of provider or ProviderCategory to get settings for.
             primary: Whether to return the primary settings or all settings.
             backup: Whether to return the backup settings instead of the primary.
         """
         setting_field = (
-            kind
-            if kind
+            category
+            if category
             in {"data", "embedding", "sparse_embedding", "reranking", "vector_store", "agent"}
-            else cast(ProviderKind, kind).variable
+            else cast(ProviderCategory, category).variable
         )
         setting = getattr(self, setting_field, None)  # type: ignore
         if setting is None:

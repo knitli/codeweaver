@@ -13,6 +13,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Annotated, ClassVar, Literal, Self, TypedDict, cast
 
+from anyio import Path as AsyncPath
 from pydantic import DirectoryPath, Field, computed_field
 
 from codeweaver.core import BasedModel
@@ -360,7 +361,7 @@ class RepoChecklist(BasedModel):
         - Path | False for directory/file presence flags
         - tuple[...] for tooling/config collections assigned later
         """
-        # TODO: Use rignore.walker as a kind of inverted ignore to efficiently scan the root only
+        # TODO: Use rignore.walker as a category of inverted ignore to efficiently scan the root only
         # ensure the dict can hold mixed value types (Path|False and tuples)
         attrs: RepoChecklistDict = RepoChecklistDict(**{  # type: ignore[missing-typed-dict-key]
             key: False if key.startswith("has_") else () for key in cls.__dataclass_fields__
@@ -487,11 +488,10 @@ class RepoChecklist(BasedModel):
             if language == ConfigLanguage.SELF:
                 continue
             for ext in language.extensions:
-                config_files.extend(
-                    (language.variable, path)
-                    for path in project_path.rglob(f"*{ext}")
-                    if path in files and path.exists()
-                )
+                async for apath in AsyncPath(project_path).rglob(f"*{ext}"):
+                    path = Path(apath)
+                    if path in files and await apath.exists():
+                        config_files.append((language.variable, path))
         configs = [
             cfg
             for cfg in config_files

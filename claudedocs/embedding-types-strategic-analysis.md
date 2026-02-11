@@ -43,7 +43,7 @@ class EmbeddingBatchInfo(BasedModel):
     """Embedding metadata + actual vectors."""
     batch_id: UUID7
     batch_index: int
-    kind: EmbeddingKind  # DENSE or SPARSE
+    category: EmbeddingKind  # DENSE or SPARSE
     chunk_id: UUID7
     model: ModelNameT
     embeddings: StoredEmbeddingVectors | SparseEmbedding
@@ -420,7 +420,7 @@ src/codeweaver/core/types/embeddings/
     vectors.py           # RawEmbeddingVectors, StoredEmbeddingVectors, SparseEmbedding
     metadata.py          # EmbeddingBatchInfo, EmbeddingModelInfo
     references.py        # BatchKeys, ChunkEmbeddings
-    kinds.py             # EmbeddingKind, DataType
+    categories.py             # EmbeddingKind, DataType
     resolution.py        # VectorIntent (NEW)
 
 src/codeweaver/providers/vector_stores/

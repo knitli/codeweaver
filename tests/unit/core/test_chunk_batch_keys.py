@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pytest
 
-from codeweaver.core import BatchKeys, ChunkSource, CodeChunk, ExtKind, Metadata, Span, uuid7
+from codeweaver.core import BatchKeys, ChunkSource, CodeChunk, ExtCategory, Metadata, Span, uuid7
 
 
 pytestmark = [pytest.mark.unit]
@@ -37,7 +37,7 @@ def sample_chunk() -> CodeChunk:
         content="def hello():\n    print('world')",
         file_path=Path("test.py"),
         line_range=Span(start=1, end=2, source_id=uuid7()),
-        ext_kind=ExtKind.from_file("test.py"),
+        ext_category=ExtCategory.from_file("test.py"),
         language="python",
         source=ChunkSource.SEMANTIC,
         metadata=metadata,
@@ -105,8 +105,8 @@ def test_metadata_isolation_after_set_batch_keys(sample_chunk: CodeChunk) -> Non
 
     # Modify the updated chunk's metadata
     if updated_chunk.metadata:
-        updated_chunk.metadata["kind"] = "modified"
+        updated_chunk.metadata["category"] = "modified"
 
     # Original chunk's metadata should not have the modification
     assert sample_chunk.metadata is not None
-    assert sample_chunk.metadata.get("kind") is None
+    assert sample_chunk.metadata.get("category") is None

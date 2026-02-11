@@ -219,7 +219,7 @@ mise run test  # All tests should pass
 See full implementation in previous section (200 lines).
 
 **Key Features**:
-- Namespace isolation: `{provider_id}.{embedding_kind}`
+- Namespace isolation: `{provider_id}.{embedding_category}`
 - Async-safe with `asyncio.Lock` per namespace
 - Three core methods: `deduplicate()`, `store_batch()`, `register_embeddings()`
 - Lazy namespace initialization
@@ -302,7 +302,7 @@ def __init__(
     self._cache_manager = cache_manager
     self._namespace = cache_manager._get_namespace(
         provider_id=self.provider_id,
-        embedding_kind=self.caps.embedding_kind.value
+        embedding_category=self.caps.embedding_category.value
     )
 ```
 

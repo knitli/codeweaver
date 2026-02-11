@@ -171,10 +171,12 @@ class TestDoctorProviderEnvVars:
     def test_all_cloud_providers_have_env_vars(self) -> None:
         """Test all cloud providers have other_env_vars defined."""
         # We manually list providers instead of using registry
-        from codeweaver.core.types.provider import PROVIDER_CAPABILITIES, ProviderKind
+        from codeweaver.core.types.provider import PROVIDER_CAPABILITIES, ProviderCategory
 
         embedding_providers = [
-            prov for prov, caps in PROVIDER_CAPABILITIES.items() if ProviderKind.EMBEDDING in caps
+            prov
+            for prov, caps in PROVIDER_CAPABILITIES.items()
+            if ProviderCategory.EMBEDDING in caps
         ]
 
         # bedrock is a special case with many different auth methods and a very long list of env vars that aren't implemented in Provider.other_env_vars

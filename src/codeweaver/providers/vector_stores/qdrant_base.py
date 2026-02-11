@@ -162,9 +162,7 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         ):
             # This is an asymmetric config - the config should be AsymmetricEmbeddingProviderSettings
             # Import here to avoid circular dependency
-            from codeweaver.providers.config.provider_kinds import (
-                AsymmetricEmbeddingProviderSettings,
-            )
+            from codeweaver.providers.config.categories import AsymmetricEmbeddingProviderSettings
 
             if isinstance(self.caps.dense.config, AsymmetricEmbeddingProviderSettings):
                 query_model = str(self.caps.dense.config.query_provider.model_name)
@@ -520,7 +518,7 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         Args:
             collection_name: Name of the collection.
             field_name: Name of the payload field to index.
-            key_type: field value's data or schema type (what kind of data will be indexed)
+            key_type: field value's data or schema type (what category of data will be indexed)
 
         Raises:
             ProviderError: Qdrant operation failed.

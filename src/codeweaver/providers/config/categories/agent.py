@@ -10,7 +10,7 @@ from codeweaver.core.types import (
     LiteralProvider,
     LiteralSDKClient,
     Provider,
-    ProviderKind,
+    ProviderCategory,
     SDKClient,
 )
 from codeweaver.providers import CohereAgentModelConfig
@@ -25,6 +25,14 @@ from codeweaver.providers.config.agent import (
     OpenAIAgentModelConfig,
     OpenRouterAgentModelConfig,
 )
+from codeweaver.providers.config.categories.base import BaseProviderSettings
+from codeweaver.providers.config.categories.mixins import AzureProviderMixin, BedrockProviderMixin
+from codeweaver.providers.config.categories.utils import (
+    ANTHROPIC_PROVIDER_DISCRIMINATOR,
+    NON_ANTHROPIC_AGENT_PROVIDER_DISCRIMINATOR,
+    PROVIDER_DISCRIMINATOR,
+    is_cloud_provider,
+)
 from codeweaver.providers.config.clients import (
     AnthropicAzureClientOptions,
     AnthropicBedrockClientOptions,
@@ -38,17 +46,6 @@ from codeweaver.providers.config.clients import (
     MistralClientOptions,
     OpenAIClientOptions,
     PydanticGatewayClientOptions,
-)
-from codeweaver.providers.config.provider_kinds.base import BaseProviderSettings
-from codeweaver.providers.config.provider_kinds.mixins import (
-    AzureProviderMixin,
-    BedrockProviderMixin,
-)
-from codeweaver.providers.config.provider_kinds.utils import (
-    ANTHROPIC_PROVIDER_DISCRIMINATOR,
-    NON_ANTHROPIC_AGENT_PROVIDER_DISCRIMINATOR,
-    PROVIDER_DISCRIMINATOR,
-    is_cloud_provider,
 )
 from codeweaver.providers.config.types import AgentModelNameString
 
@@ -69,7 +66,7 @@ class BaseAgentProviderSettings(BaseProviderSettings):
         Field(description="Client options for the provider's client."),
     ] = None
 
-    kind: ClassVar[Literal[ProviderKind.AGENT]] = ProviderKind.AGENT
+    category: ClassVar[Literal[ProviderCategory.AGENT]] = ProviderCategory.AGENT
 
     @computed_field(repr=False)
     @property

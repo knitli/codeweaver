@@ -630,7 +630,7 @@ ONNX_CUDA_PROVIDER = "CUDAExecutionProvider"
 QDRANT_MEMORY_LOCATION = ":memory:"
 """Special location string for creating an in-memory Qdrant instance."""
 
-PYDANTIC_AI_MODEL_PROFILE_PROVIDERS = (
+PYDANTIC_AI_MODEL_CAPABILITIES_PROVIDERS = (
     "amazon",
     "anthropic",
     "cohere",
@@ -646,12 +646,44 @@ PYDANTIC_AI_MODEL_PROFILE_PROVIDERS = (
     "qwen",
     "zai",
 )
-"""Pydantic AI model profile providers.
+"""Pydantic AI model capabilities providers. In PydanticAI's terms, these are `profiles` -- we changed the name for consistency with CodeWeaver's terminology.
 
-In PydanticAI, a model profile is similar to CodeWeaver's `Capabilities` classes like `EmbeddingModelCapabilities` and `RerankingModelCapabilities`. Like with CodeWeaver, these are defined by the *model maker* vice the *model consumer*. For example, `qwen` is not an agent provider supported by CodeWeaver or PydanticAI but supported providers offers *qwen models*, so it is a 'profile' provider.
+In PydanticAI, a model profile is similar to CodeWeaver's `Capabilities` classes like `EmbeddingModelCapabilities` and `RerankingModelCapabilities`. Like with CodeWeaver, these are defined by the *model maker* vice the *model consumer*. For example, `qwen` is not an agent provider supported by CodeWeaver or PydanticAI but supported providers offers *qwen models*, so it is a 'profile', or capabilities, provider.
 
-I do have one small pedantic (pydantic?) nitpick with pydantic ai on this -- the modules and profiles are inconsistently named. Some are named after their company (like `meta` or `anthropic`) and others are named after the model family (like `grok` and `qwen`, which are model families and would be `x-ai` and `alibaba` if named after their company). Either name it after the company or the model, but stick to something!
+I do have one small pedantic (*pydantic?*) nitpick with PydanticAI on this -- the modules and profiles are inconsistently named. Some are named after their company (like `meta` or `anthropic`) and others are named after the model family (like `grok` and `qwen`, which are model families and would be `x-ai` (or xai; PydanticAI drops the hyphen) and `alibaba` if named after their company). Either name it after the company or the model, but stick to something!
 """
+
+# ===========================================================================
+# *                    DEFAULT CONTEXT AGENT CONFIGURATIONS
+# ===========================================================================
+
+# These are default model configurations for agent tasks. They provide a consistent baseline for the models used in various agent operations. If these tasks grow we may break them out into their own module, but for now, they are just constants here in the main constants module. The underlying type we're constructing for is `pydantic_ai.models.ModelSettings`, aliased in CodeWeaver as `AgentModelConfig`, which is a TypedDict.
+
+CONTEXT_AGENT_RESULT_REVIEW_CONFIG = {
+    "temperature": 0.1,
+    "max_tokens": 4096,
+    "top_p": 1.0,
+    "timeout": 30,
+    "parallel_tool_calls": True,
+}
+"""Default model configuration for context agent result review tasks. This is a low temperature configuration to encourage more deterministic outputs, with a long timeout to allow for complex reasoning and tool calls, and parallel tool calls enabled to allow for more efficient execution of multiple tool calls."""
+
+CONTEXT_AGENT_INTENT_AND_TASK_VALIDATION_CONFIG = {
+    "temperature": 0.0,
+    "max_tokens": 256,
+    "top_p": 1.0,
+    "timeout": 10.0,
+    "parallel_tool_calls": False,
+}
+"""Default model configuration for context agent intent and task validation tasks. This is a zero temperature configuration to ensure deterministic outputs, with a short timeout since these tasks should be quick, and parallel tool calls disabled as they are not needed for validation tasks. For these tasks, CodeWeaver's algorithms assign the intent and task classifications and the model is asked to confirm or override with enum values."""
+
+CONTEXT_AGENT_EXPLANATORY_TASK_CONFIG = {
+    "temperature": 0.3,
+    "max_tokens": 8192,
+    "top_p": 1.0,
+    "timeout": 45.0,
+    "parallel_tool_calls": True,
+}
 
 
 __all__ = (
@@ -665,6 +697,9 @@ __all__ = (
     "CODEWEAVER_DESCRIPTION",
     "CODEWEAVER_ICON",
     "CONTEXT_AGENT_COST_PER_1K_TOKENS",
+    "CONTEXT_AGENT_EXPLANATORY_TASK_CONFIG",
+    "CONTEXT_AGENT_INTENT_AND_TASK_VALIDATION_CONFIG",
+    "CONTEXT_AGENT_RESULT_REVIEW_CONFIG",
     "CONTEXT_AGENT_TAGS",
     "DATATYPE_FIELDS",
     "DEFAULT_AGENT_TEMPERATURE",
@@ -772,7 +807,7 @@ __all__ = (
     "PREFERRED_SEARCH_PROVIDER_ORDER",
     "PRIMARY_SPARSE_VECTOR_NAME",
     "PRIMARY_VECTOR_NAME",
-    "PYDANTIC_AI_MODEL_PROFILE_PROVIDERS",
+    "PYDANTIC_AI_MODEL_CAPABILITIES_PROVIDERS",
     "PYTHON_SHEBANG",
     "QDRANT_MEMORY_LOCATION",
     "SEMANTIC_CHUNKER_PERFORMANCE_THRESHOLD_MS",

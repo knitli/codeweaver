@@ -27,7 +27,7 @@ from codeweaver.core import (
     Provider,
     ProviderEnvVarInfo,
     ProviderEnvVars,
-    ProviderKind,
+    ProviderCategory,
     SemanticSearchLanguage,
 )
 
@@ -94,8 +94,8 @@ def set_version(version: str, *, for_docker: bool = False) -> str:
     return version.lstrip('v')
 
 
-def _providers_for_kind(kind: ProviderKind) -> set[Provider]:
-    return {prov for prov in Provider if prov != Provider.NOT_SET and prov in PROVIDER_CAPABILITIES and kind in PROVIDER_CAPABILITIES[prov]}
+def _providers_for_category(category: ProviderCategory) -> set[Provider]:
+    return {prov for prov in Provider if prov != Provider.NOT_SET and prov in PROVIDER_CAPABILITIES and category in PROVIDER_CAPABILITIES[prov]}
 
 
 def _shared_env_vars() -> dict[str, tuple[ProviderEnvVarInfo, list[Provider]]]:
@@ -159,29 +159,29 @@ def capabilities() -> dict[str, Any]:
         "languages_supported": len(_languages()),
 
         "embedding_providers": [
-            prov.as_title for prov in _providers_for_kind(ProviderKind.EMBEDDING)
+            prov.as_title for prov in _providers_for_category(ProviderCategory.EMBEDDING)
         ],
         "vector_store_providers": [
-            prov.as_title for prov in _providers_for_kind(ProviderKind.VECTOR_STORE)
+            prov.as_title for prov in _providers_for_category(ProviderCategory.VECTOR_STORE)
         ],
         "sparse_embedding_providers": [
-            prov.as_title for prov in _providers_for_kind(ProviderKind.SPARSE_EMBEDDING)
+            prov.as_title for prov in _providers_for_category(ProviderCategory.SPARSE_EMBEDDING)
         ],
         "reranking_providers": [
-            prov.as_title for prov in _providers_for_kind(ProviderKind.RERANKING)
+            prov.as_title for prov in _providers_for_category(ProviderCategory.RERANKING)
         ],
         # add when available:
-        # "agent_providers": [prov.as_title for prov in _providers_for_kind(ProviderKind.AGENT)],
-        # "data_providers": [prov.as_title for prov in _providers_for_kind(ProviderKind.DATA)],
+        # "agent_providers": [prov.as_title for prov in _providers_for_category(ProviderCategory.AGENT)],
+        # "data_providers": [prov.as_title for prov in _providers_for_category(ProviderCategory.DATA)],
     }
 
 
-AGENT_PROVIDERS = _providers_for_kind(ProviderKind.AGENT)
-DATA_PROVIDERS = _providers_for_kind(ProviderKind.DATA)
-EMBEDDING_PROVIDERS = _providers_for_kind(ProviderKind.EMBEDDING)
-SPARSE_EMBEDDING_PROVIDERS = _providers_for_kind(ProviderKind.SPARSE_EMBEDDING)
-RERANKING_PROVIDERS = _providers_for_kind(ProviderKind.RERANKING)
-VECTOR_STORE_PROVIDERS = _providers_for_kind(ProviderKind.VECTOR_STORE)
+AGENT_PROVIDERS = _providers_for_category(ProviderCategory.AGENT)
+DATA_PROVIDERS = _providers_for_category(ProviderCategory.DATA)
+EMBEDDING_PROVIDERS = _providers_for_category(ProviderCategory.EMBEDDING)
+SPARSE_EMBEDDING_PROVIDERS = _providers_for_category(ProviderCategory.SPARSE_EMBEDDING)
+RERANKING_PROVIDERS = _providers_for_category(ProviderCategory.RERANKING)
+VECTOR_STORE_PROVIDERS = _providers_for_category(ProviderCategory.VECTOR_STORE)
 
 
 class Repository(BaseModel):
