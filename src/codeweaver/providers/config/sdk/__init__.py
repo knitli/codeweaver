@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 """The `sdk` package provides method and function-level configuration for each provider category (e.g. embedding).
 
 This package contains submodules for different provider categories' SDKs, such as `agent` and `data`, each defining configuration models and utilities specific to their function type. For each configuration model, there is a field or fields that offer provider-specific configurations for the primary method/function calls (for example, `EmbeddingConfig` has `embed` and `query` fields for arguments to the embedding and query methods, respectively, for that provider). Each provider implements a `typing.TypedDict` for these parameters, and a corresponding method to convert the config into the format expected by the provider's SDK.

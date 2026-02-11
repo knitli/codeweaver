@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 """Top-level provider settings for sparse embedding providers."""
 
 from typing import Annotated, Any, ClassVar, Literal

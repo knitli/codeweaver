@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 """
 This module defines configuration models for sparse embedding providers in CodeWeaver, including Sentence Transformers and FastEmbed. Each model includes provider-specific configuration options for embedding and query encoding, as well as methods to convert these configurations into the format expected by the respective provider's SDK. The base class `BaseSparseEmbeddingConfig` provides common functionality for all sparse embedding configurations, while specific classes like `SentenceTransformersSparseEmbeddingConfig` and `FastEmbedSparseEmbeddingConfig` implement provider-specific details.
 """

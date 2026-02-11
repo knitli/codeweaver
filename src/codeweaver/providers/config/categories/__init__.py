@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 """Entrypoint for provider categories' settings.  A category, in this context, is a specific type of provider (e.g., embedding, re-ranking) that has its own unique settings and configuration requirements. This package has the top-level settings classes for each provider category (such as `RerankingProviderSettings`), which are used to define the configuration for providers of that category. Most categories also have multiple mixins and subclasses for specific providers (e.g., `FastEmbedRerankingProviderSettings`), which are used to define the configuration for specific providers within that category. The mixins are used to provide common functionality and settings for providers that share similar characteristics (e.g., cloud providers, Bedrock providers)."""
 
 from types import MappingProxyType

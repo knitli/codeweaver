@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 """Sets the globals settings type for the codeweaver based on package resolution."""
 
 from __future__ import annotations

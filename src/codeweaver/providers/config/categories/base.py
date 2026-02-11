@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 """Base settings class for provider categories (e.g. agent, embedding, etc.).
 
 The base class here defines the top-level settings for all provider categories, and is extended by the specific provider category settings classes (e.g. BaseAgentProviderSettings, EmbeddingProviderSettings, etc.).
