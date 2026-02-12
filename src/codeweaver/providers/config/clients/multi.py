@@ -278,7 +278,7 @@ class FastEmbedClientOptions(ClientOptions):
 class SentenceTransformersModelOptions(TypedDict, total=False):
     """Options for SentenceTransformers models."""
 
-    torch_dtype: Literal["float", "float16", "bfloat16", "auto"] | None
+    dtype: Literal["float", "float16", "bfloat16", "auto"] | None
     attn_implementation: Literal["flash_attention_2", "spda", "eager"] | None
     provider: OnnxProvider | None
     """Onnx Provider if Onnx backend used."""
@@ -354,9 +354,9 @@ class SentenceTransformersClientOptions(ClientOptions):
                 "model_kwargs",
                 (self.model_kwargs or {})
                 | {
-                    "torch_dtype": "float16"
-                    if "torch_dtype" not in (self.model_kwargs or {})
-                    else self.model_kwargs.get("torch_dtype")
+                    "dtype": "float16"
+                    if "dtype" not in (self.model_kwargs or {})
+                    else self.model_kwargs.get("dtype")
                 },
             )
         if has_package("flash_attention_2"):
@@ -379,7 +379,7 @@ class SentenceTransformersClientOptions(ClientOptions):
         if not model:
             return {}
         extra: dict[str, Any] = {}
-        float16 = {"model_kwargs": {"torch_dtype": "float16"}}
+        float16 = {"model_kwargs": {"dtype": "float16"}}
         if "qwen3" in model.lower():
             extra = {
                 "instruction": "Use provided search results of codebase data to retrieve relevant Documents that answer the Query.",

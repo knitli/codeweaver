@@ -71,7 +71,13 @@ def get_cohere_reranking_capabilities() -> tuple[CohereRerankingCapabilities, ..
             "provider": Provider.COHERE,
             "tokenizer_model": f"Cohere/{model}",
         })
-        for model in ("rerank-v3.5", "rerank-english-v3.0", "rerank-multilingual-v3.0")
+        for model in (
+            "rerank-v3.5",
+            "rerank-english-v3.0",
+            "rerank-multilingual-v3.0",
+            "rerank-v4.0-pro",
+            "rerank-v4.0-fast",
+        )
     ]
     capabilities.extend([])
     return (

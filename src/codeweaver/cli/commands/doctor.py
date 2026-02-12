@@ -39,6 +39,7 @@ from codeweaver.core.config.types import CodeWeaverSettingsDict
 from codeweaver.core.di import INJECTED
 from codeweaver.core.types.dictview import DictView
 from codeweaver.core.utils import has_package
+from codeweaver.engine import ConfigChangeAnalyzerDep
 
 
 if TYPE_CHECKING:
@@ -752,12 +753,120 @@ def _print_summary(has_failures: bool, has_warnings: bool, display: StatusDispla
         sys.exit(1)
 
 
-async def process_checks(display: StatusDisplay, settings: CodeWeaverSettings) -> list[DoctorCheck]:
+async def check_embedding_compatibility(
+    config_analyzer: ConfigChangeAnalyzerDep = INJECTED,  # type: ignore[name-defined]
+) -> DoctorCheck:
+    """Check if current embedding config matches collection.
+
+    This check validates that the current embedding configuration is compatible
+    with any existing indexed collection. It identifies:
+    - No changes (index remains valid)
+    - Compatible changes (query model changes in asymmetric config)
+    - Transformations (quantization or dimension reduction possible)
+    - Breaking changes (requires reindexing)
+
+    ARCHITECTURE NOTE: Service automatically injected by DI container.
+    Service itself has plain __init__ with no DI markers.
+    """
+    try:
+        # Analyze current configuration
+        analysis = await config_analyzer.analyze_current_config()
+
+        if analysis is None:
+            return DoctorCheck.set_check(
+                "Embedding Configuration",
+                "warn",
+                "No existing collection found",
+                ["Run 'cw index' to create initial index"],
+            )
+
+        from codeweaver.engine.managers.checkpoint_manager import ChangeImpact
+
+        match analysis.impact:
+            case ChangeImpact.NONE:
+                return DoctorCheck.set_check(
+                    "Embedding Configuration",
+                    "success",
+                    "Configuration matches indexed collection",
+                    [],
+                )
+
+            case ChangeImpact.COMPATIBLE:
+                return DoctorCheck.set_check(
+                    "Embedding Configuration",
+                    "success",
+                    "Configuration change is compatible with indexed collection",
+                    ["No reindex needed (same family)"],
+                )
+
+            case ChangeImpact.QUANTIZABLE:
+                if analysis.transformations:
+                    trans = analysis.transformations[0]
+                    return DoctorCheck.set_check(
+                        "Embedding Configuration",
+                        "warn",
+                        "Quantization available",
+                        [
+                            f"Can quantize {trans.old_value} → {trans.new_value}",
+                            f"Time: {trans.time_estimate}",
+                            f"Accuracy: {trans.accuracy_impact}",
+                            "Run: cw migrate --quantize-only",
+                        ],
+                    )
+                return DoctorCheck.set_check(
+                    "Embedding Configuration",
+                    "warn",
+                    "Quantization possible",
+                    ["No quantization transformations found"],
+                )
+
+            case ChangeImpact.TRANSFORMABLE:
+                return DoctorCheck.set_check(
+                    "Embedding Configuration",
+                    "warn",
+                    "Dimension reduction available",
+                    [
+                        "Can transform without full reindexing",
+                        f"Time: ~{analysis.estimated_time.total_seconds():.0f}s",
+                        f"Cost: ${analysis.estimated_cost:.4f}",
+                        f"Accuracy: {analysis.accuracy_impact}",
+                        "Run: cw migrate --dimension-reduction",
+                    ],
+                )
+
+            case ChangeImpact.BREAKING:
+                return DoctorCheck.set_check(
+                    "Embedding Configuration",
+                    "fail",
+                    "Incompatible configuration change detected",
+                    [
+                        f"Reason: {analysis.accuracy_impact}",
+                        f"Reindex required (~{analysis.estimated_time.total_seconds():.0f}s)",
+                        "Options:",
+                        "  1. Revert config: cw config revert",
+                        "  2. Reindex: cw index --force",
+                        "  3. Migrate: cw migrate",
+                    ],
+                )
+
+    except Exception as e:
+        return DoctorCheck.set_check(
+            "Embedding Configuration",
+            "fail",
+            f"Error checking compatibility: {e}",
+            ["Check logs for details"],
+        )
+
+
+async def process_checks(
+    display: StatusDisplay, settings: CodeWeaverSettings, container: Any = None
+) -> list[DoctorCheck]:
     """Process all doctor checks and return the results.
 
     Args:
         display: StatusDisplay for output
         settings: CodeWeaver settings object
+        container: Optional DI container for resolving services
 
     Returns:
         List of DoctorCheck results
@@ -807,6 +916,24 @@ async def process_checks(display: StatusDisplay, settings: CodeWeaverSettings) -
         await check_vector_store_config(provider_settings),
         *check_provider_availability(provider_settings),
     ))
+
+    # Check embedding configuration compatibility if container is available
+    if container:
+        try:
+            embedding_check = await container.resolve(
+                check_embedding_compatibility  # type: ignore[arg-type]
+            )
+            checks.append(embedding_check)
+        except Exception as e:
+            checks.append(
+                DoctorCheck.set_check(
+                    "Embedding Configuration",
+                    "warn",
+                    f"Could not check embedding compatibility: {e}",
+                    ["This check is optional and doesn't affect core functionality"],
+                )
+            )
+
     if remote_providers := {
         provider for provider in provider_settings.providers if provider.requires_auth
     }:
@@ -870,7 +997,7 @@ async def doctor(
     container = setup_cli_di(config_file, project_path, verbose=verbose)
     settings = await container.resolve(CodeWeaverSettingsType)
 
-    checks: list[DoctorCheck] = await process_checks(display, settings)
+    checks: list[DoctorCheck] = await process_checks(display, settings, container)
     # Display results table
     table = Table(show_header=True, header_style="bold blue", box=None)
     table.add_column("Status", style="white", no_wrap=True, width=6)

@@ -1,8 +1,13 @@
 # SPDX-FileCopyrightText: 2026 Knitli Inc.
 # SPDX-License-Identifier: MIT OR Apache-2.0
-"""Constants used throughout the CodeWeaver codebase."""
+"""Constants used throughout the CodeWeaver codebase.
+
+These constants are an internal detail in most cases, so we don't include them in the __init__ exports. They are organized into sections with comments for readability, but they are all just module-level constants. They include things like default settings, magic numbers, text constants, and other values that are used in multiple places across the codebase to ensure consistency and avoid hardcoding values in multiple places.
+"""
 
 from __future__ import annotations
+
+import importlib.util
 
 from textwrap import dedent
 
@@ -684,6 +689,107 @@ CONTEXT_AGENT_EXPLANATORY_TASK_CONFIG = {
     "timeout": 45.0,
     "parallel_tool_calls": True,
 }
+
+
+# ===========================================================================
+# *                 Default Model Selection
+# ===========================================================================
+# We set a series of default models in a few parts of CodeWeaver, primarily the `ProviderProfile`
+# class in `codeweaver.providers.config.profiles`, which are pre-built configurations. Given the
+# pace that models change, we need one central place to update these selections.
+# Notably, we can't update embedding models without deprecation notices because changing the default embedding model is a breaking change that can cause silent accuracy regressions for users.
+# Backups, however, are not.
+
+# NOTE: For each model class, we have four levels of recommendation:
+#
+# * 1. RECOMMENDED_CLOUD_MODEL: Our recommendation for cloud models. These are highly performant but not always the *best* performing models. We balance, cost, speed, and performance, and also consider it with out other recommendations because we assume you don't want to go grab 5 API keys from different providers just to use CodeWeaver.
+#
+# * 2. RECOMMENDED_LOCAL_MODEL: Our recommendation for local models. These are models that you can run on your own hardware. They may not be as performant as cloud models (though sometimes they are so close that it's negligible), but they offer privacy and control benefits.
+#
+# * 3. SOTA or "I must have the absolute best" model: We set this to the absolute best performing model we know of at the time of writing. This is for users who want the best possible performance and a) don't mind using several services, or b) are okay with potentially higher costs or latency (though many of these models are fast enough and offer free tiers most users will stay within), and c) Are OK with (maybe) waiting a few more seconds for slightly better results.
+#
+# * 4. Ultralight/fast: If you really hate waiting and want the fastest possible results, even if it means a hit to accuracy, this is the model for you. These are usually very small models that can run on nearly anything. We may also use statically generated embeddings in this category, which are not technically "models" but still provide a very fast and lightweight option for users who prioritize speed and simplicity over accuracy. These are always local models, and are also used as our backup models.
+
+# ===========================
+# *    Agents
+# ===========================
+
+RECOMMENDED_CLOUD_CONTEXT_AGENT_MODEL = "anthropic:claude-haiku-4.5"
+"""Recommended model for agent operations. This is a strong, cost-effective model for agent tasks with good reasoning capabilities and tool use, and is currently the best performing model for CodeWeaver's internal testing when balancing speed, performance, and cost."""
+
+SOTA_CONTEXT_AGENT_MODEL = "anthropic:claude-opus-4.6"
+"""State-of-the-art model for agent operations. Higher cost and latency than our recommendation, but currently the best performing model."""
+
+PREFERRED_MODELS_FOR_CONTEXT_AGENT_TASKS = (
+    "claude-haiku-4.5",
+    "gemini-3-flash-preview",
+    "gpt-5.1-mini",
+    "minimax-m2.1grok-code-fast-1",
+    "trinity-large-preview",
+    "grok-4-1-fast",
+    "glm-4.7-flash",
+    "qwen-3-coder-next",
+    "mistral-small-latest",
+    "claude-sonnet-4.5",
+    "claude-opus-4.6",
+    "deepseek-r1",
+    "gpt-oss-20b",
+    "nova-2-lite",
+    "lfm2.5-1.2b-thinking",
+)
+
+RECOMMENDED_LOCAL_CONTEXT_AGENT_MODEL = "lfm2.5-1.2b-thinking"
+
+ULTRALIGHT_CONTEXT_AGENT_MODEL = RECOMMENDED_LOCAL_CONTEXT_AGENT_MODEL
+"""Ultralight model for agent operations. For agents 'ultralight' isn't very light at all,"""
+
+
+# ===========================
+# *    Embedding
+# ===========================
+
+
+RECOMMENDED_CLOUD_EMBEDDING_MODEL = "voyage-4-large"
+"""Recommended cloud embedding model. This is currently the best performing model for code embeddings."""
+
+# because voyage-4-large is an asymmetric model, we use different models for query and embedding
+
+SOTA_EMBEDDING_MODEL = RECOMMENDED_CLOUD_EMBEDDING_MODEL
+"""State-of-the-art embedding model. This is currently the best performing model for code embeddings."""
+
+import importlib
+
+
+if importlib.util.find_spec("fastembed") is not None:
+    RECOMMENDED_QUERY_EMBEDDING_MODEL = "onnx-community/voyage-4-nano-ONNX"
+elif importlib.util.find_spec("sentence_transformers") is not None:
+    RECOMMENDED_QUERY_EMBEDDING_MODEL = "voyageai/voyage-4-nano"
+    """Voyage-4-nano is a local model capable of querying vectors generated by voyage-4-large with almost no hit to accuracy (3 pts)."""
+else:
+    RECOMMENDED_QUERY_EMBEDDING_MODEL = "voyage-4-lite"
+    """No local provider available, so we use the lightest cloud model in the same family."""
+
+
+RECOMMENDED_LOCAL_EMBEDDING_MODEL = RECOMMENDED_QUERY_EMBEDDING_MODEL
+"""Recommended local embedding model. The difference between querying embeddings generated by Voyage-4-large with those generated by Voyage-4-nano *with* voyage-4-nano is about 7 pts, with an RTEB-code score of around 80 for voyage-4-nano compared to around 87 for voyage-4-large (87 for voyage-4-large for embeddings and queries; with asymmetric queries of voyage-4-large embeddings, voyage-4-nano scores ~84). In contrast, some scores for flagship cloud models: gemini-embedding-001 (RTEB-code ~76), OpenAI text-embedding-3-large (also ~76).
+
+see https://docs.google.com/spreadsheets/d/1d-06Fh_LqAGBEEIbHN95OxccXcMWYq5uJ0e9LFKaPI8/edit?pli=1&gid=1400970209#gid=1400970209 for more voyage benchmarking details.
+"""
+
+
+# ===========================
+# *    Sparse Embedding
+# ===========================
+
+
+# ===========================
+# *    Reranking
+# ===========================
+
+RECOMMENDED_CLOUD_RERANKING_MODEL = "voyage-rerank-2.5"
+"""Performs very well with marginal differences between it and the current best reranking models. Our primary consideration here is that our embedding recommendations are currently Voyage models, so this simplifies setup."""
+
+SOTA_RERANKING_MODEL = "cohere:rerank-4-pro"
 
 
 __all__ = (

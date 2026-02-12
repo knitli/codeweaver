@@ -23,6 +23,7 @@ from codeweaver.core.config.types import CodeWeaverSettingsDict
 from codeweaver.core.dependencies import ResolvedProjectPathDep, SettingsDep
 from codeweaver.core.di import INJECTED
 from codeweaver.core.utils import detect_root_package, is_codeweaver_config_path
+from codeweaver.engine import ConfigChangeAnalyzerDep
 from codeweaver.providers import ProviderSettings, ProviderSettingsDep
 
 
@@ -208,6 +209,88 @@ def _show_provider_config(provider_settings: ProviderSettingsDep = INJECTED) -> 
 
         display.print_table(table)
         display.console.print()
+
+
+@app.command()
+async def set_config(
+    key: str,
+    value: str,
+    force: Annotated[
+        bool,
+        cyclopts.Parameter(
+            name=["--force", "-f"], help="Skip validation and apply change immediately"
+        ),
+    ] = False,
+    config_analyzer: ConfigChangeAnalyzerDep = INJECTED,  # type: ignore[name-defined]
+    settings: SettingsDep = INJECTED,
+) -> None:
+    """Set a configuration value with proactive validation.
+
+    Validates embedding configuration changes before applying them to prevent
+    incompatible index states.
+
+    Args:
+        key: Configuration key (e.g., "provider.embedding.dimension")
+        value: New value for the key
+        force: Skip validation and apply change immediately
+        config_analyzer: DI-injected configuration analyzer
+        settings: DI-injected settings service
+    """
+    from rich.prompt import Confirm
+
+    display.print_command_header("Set Configuration")
+
+    # Validate change using injected analyzer
+    if not force and key.startswith("provider.embedding"):
+        try:
+            analysis = await config_analyzer.validate_config_change(key, value)
+
+            if analysis:
+                from codeweaver.engine.managers.checkpoint_manager import ChangeImpact
+
+                display.console.print()
+                match analysis.impact:
+                    case ChangeImpact.BREAKING:
+                        display.print_error("Configuration change is incompatible!")
+                        display.console.print(f"  {analysis.accuracy_impact}")
+                        display.console.print()
+                        display.console.print("Options:")
+                        for i, rec in enumerate(analysis.recommendations, 1):
+                            display.console.print(f"  {i}. {rec}")
+                        if not Confirm.ask("Continue anyway?"):
+                            display.print_warning("Configuration change cancelled")
+                            return
+
+                    case ChangeImpact.QUANTIZABLE | ChangeImpact.TRANSFORMABLE:
+                        display.print_warning("Transformation available")
+                        display.console.print(
+                            f"  Accuracy impact: {analysis.accuracy_impact}"
+                        )
+                        display.console.print(
+                            f"  Time estimate: ~{analysis.estimated_time.total_seconds():.0f}s"
+                        )
+                        display.console.print()
+                        display.console.print("Recommendations:")
+                        for i, rec in enumerate(analysis.recommendations, 1):
+                            display.console.print(f"  {i}. {rec}")
+
+                    case _:
+                        display.print_success("Configuration change is compatible")
+
+        except Exception as e:
+            display.print_warning(f"Could not validate change: {e}")
+            if not force and not Confirm.ask("Continue without validation?"):
+                display.print_warning("Configuration change cancelled")
+                return
+
+    # Apply change using settings service
+    try:
+        await settings.set(key, value)
+        display.console.print()
+        display.print_success(f"Configuration updated: {key} = {value}")
+    except Exception as e:
+        display.print_error(f"Failed to update configuration: {e}")
+        raise
 
 
 def main() -> None:

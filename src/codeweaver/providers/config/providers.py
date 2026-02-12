@@ -82,6 +82,8 @@ from codeweaver.providers.config.sdk import (
 logger = logging.getLogger(__name__)
 
 
+type ProviderCategorySettingsType = EmbeddingProviderSettingsType | SparseEmbeddingProviderSettingsType | RerankingProviderSettingsType | DataProviderSettingsType  | VectorStoreProviderSettingsType | AgentProviderSettingsType
+
 # ===========================================================================
 # *                    More TypedDict versions of Models
 # ===========================================================================

@@ -138,7 +138,7 @@ class LoaderDict(TypedDict, total=False):
         Literal["embedding"]
     ]  # probably more values, but not in my small set of models
     pooling_method: NotRequired[Literal["mean", "max"]]
-    torch_dtype: NotRequired[Literal["float16", "bfloat16", "float32"]]
+    dtype: NotRequired[Literal["float16", "bfloat16", "float32"]]
     max_seq_length: NotRequired[int]
     padding_side: NotRequired[Literal["left", "right"]]
     add_eos_token: NotRequired[bool]

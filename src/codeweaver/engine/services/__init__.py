@@ -14,6 +14,11 @@ from codeweaver.core import create_lazy_getattr
 
 if TYPE_CHECKING:
     from codeweaver.engine.services.chunking_service import ChunkingService
+    from codeweaver.engine.services.config_analyzer import (
+        ConfigChangeAnalysis,
+        ConfigChangeAnalyzer,
+        TransformationDetails,
+    )
     from codeweaver.engine.services.failover_service import FailoverService
     from codeweaver.engine.services.indexing_service import IndexingService
     from codeweaver.engine.services.watching_service import FileWatchingService
@@ -21,14 +26,25 @@ if TYPE_CHECKING:
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "ChunkingService": (__spec__.parent, "chunking_service"),
+    "ConfigChangeAnalysis": (__spec__.parent, "config_analyzer"),
+    "ConfigChangeAnalyzer": (__spec__.parent, "config_analyzer"),
     "FailoverService": (__spec__.parent, "failover_service"),
     "IndexingService": (__spec__.parent, "indexing_service"),
+    "TransformationDetails": (__spec__.parent, "config_analyzer"),
     "FileWatchingService": (__spec__.parent, "watching_service"),
 })
 
 __getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
 
-__all__ = ("ChunkingService", "FailoverService", "FileWatchingService", "IndexingService")
+__all__ = (
+    "ChunkingService",
+    "ConfigChangeAnalysis",
+    "ConfigChangeAnalyzer",
+    "FailoverService",
+    "FileWatchingService",
+    "IndexingService",
+    "TransformationDetails",
+)
 
 
 def __dir__():

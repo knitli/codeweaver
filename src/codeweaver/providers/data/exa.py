@@ -23,7 +23,7 @@ from pydantic import PositiveFloat, PositiveInt
 from codeweaver.core.constants import CONTEXT_AGENT_TAGS
 from codeweaver.core.types import LiteralStringT
 from codeweaver.core.utils import has_package
-from codeweaver.providers.config.data import ExaContentsOptions, ExaToolConfig
+from codeweaver.providers.config.sdk import ExaContentsOptions, ExaToolConfig
 from codeweaver.providers.data.utils import (
     build_data_tool,
     get_schema_for_type,

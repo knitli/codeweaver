@@ -13,9 +13,11 @@ from __future__ import annotations
 import logging
 import re
 
+from dataclasses import dataclass
 from datetime import UTC, datetime
+from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any, TypedDict, cast
+from typing import TYPE_CHECKING, Annotated, Any, Literal, TypedDict, cast
 from uuid import UUID
 
 from anyio import Path as AsyncPath
@@ -34,6 +36,7 @@ from codeweaver.core import (
 from codeweaver.core.constants import ONE_HOUR
 from codeweaver.engine.config import CodeWeaverEngineSettings, IndexerSettings
 from codeweaver.providers.config.categories import (
+    AsymmetricEmbeddingProviderSettings,
     EmbeddingProviderSettingsType,
     SparseEmbeddingProviderSettingsType,
     VectorStoreProviderSettingsType,
@@ -49,8 +52,173 @@ logger = logging.getLogger(__name__)
 EXCEPTION_PATTERN = re.compile(r"\b\w+(Exception|Error|Failure|Fault|Abort|Abortive)\b")
 
 
-class CheckpointSettingsFingerprint(TypedDict):
-    """Subset of settings relevant for checkpoint hashing."""
+class ChangeImpact(Enum):
+    """Classification of configuration change impact on index validity.
+
+    Defines how configuration changes affect the need for reindexing operations.
+    Each level represents increasingly severe impacts requiring different handling strategies.
+    """
+
+    NONE = "none"
+    """No configuration changes detected. Index remains fully valid."""
+
+    COMPATIBLE = "compatible"
+    """Changes within same model family that don't require reindexing.
+
+    Example: Query model change in asymmetric config within same family.
+    The indexed embeddings remain valid because they use the same embed model.
+    """
+
+    QUANTIZABLE = "quantizable"
+    """Datatype reduction only, no dimension changes.
+
+    Example: float32 → float16 or float16 → uint8.
+    Can be handled via quantization without full reindexing.
+    """
+
+    TRANSFORMABLE = "transformable"
+    """Dimension reduction within same model family.
+
+    Example: 1024 → 768 dimensions using same model.
+    Requires transformation but not full reindexing from source.
+    """
+
+    BREAKING = "breaking"
+    """Requires full reindexing from source documents.
+
+    Examples:
+    - Different embed model or model family
+    - Different sparse embedding model
+    - Incompatible dimension changes
+    - Different vector store requiring migration
+    """
+
+
+@dataclass(frozen=True)
+class CheckpointSettingsFingerprint:
+    """Family-aware configuration fingerprint for checkpoint compatibility checking.
+
+    This dataclass captures the critical configuration elements that determine whether
+    an existing index can be reused. It supports asymmetric embedding configurations
+    where query models can change without invalidating the index if they stay within
+    the same model family.
+
+    Attributes:
+        embedding_config_type: Whether config is "symmetric" or "asymmetric"
+        embed_model: Document embedding model name
+        embed_model_family: Model family ID for compatibility checks (optional)
+        query_model: Query embedding model name (required for asymmetric configs)
+        sparse_model: Sparse embedding model name (optional)
+        vector_store: Vector store provider name
+        config_hash: Hash of full configuration for validation
+    """
+
+    embedding_config_type: Literal["symmetric", "asymmetric"]
+    embed_model: str
+    embed_model_family: str | None
+    query_model: str | None
+    sparse_model: str | None
+    vector_store: str
+    config_hash: str
+
+    def is_compatible_with(
+        self, other: CheckpointSettingsFingerprint
+    ) -> tuple[bool, ChangeImpact]:
+        """Check compatibility and classify change impact with family-aware logic.
+
+        Implements comprehensive compatibility checking that handles:
+        - Asymmetric embedding configs with model families
+        - Symmetric embedding model changes
+        - Sparse model changes
+        - Vector store changes
+
+        For asymmetric configs:
+        - Same family + same embed model + different query model = COMPATIBLE
+        - Different families or embed models = BREAKING
+
+        For symmetric configs:
+        - Different model = BREAKING
+
+        Args:
+            other: The other fingerprint to compare against (typically from checkpoint)
+
+        Returns:
+            Tuple of (is_compatible: bool, impact: ChangeImpact)
+        """
+        # Check vector store changes (always breaking if different)
+        if self.vector_store != other.vector_store:
+            logger.info(
+                "Vector store changed: %s → %s (BREAKING)",
+                other.vector_store,
+                self.vector_store,
+            )
+            return False, ChangeImpact.BREAKING
+
+        # Check sparse model changes (always breaking if different)
+        if self.sparse_model != other.sparse_model:
+            logger.info(
+                "Sparse model changed: %s → %s (BREAKING)",
+                other.sparse_model,
+                self.sparse_model,
+            )
+            return False, ChangeImpact.BREAKING
+
+        # Handle asymmetric embedding configuration
+        if self.embedding_config_type == "asymmetric":
+            # Family-aware comparison for asymmetric configs
+            if (
+                self.embed_model_family
+                and other.embed_model_family
+                and self.embed_model_family == other.embed_model_family
+            ):
+                # Same family - check if only query model changed
+                if self.embed_model == other.embed_model:
+                    if self.query_model != other.query_model:
+                        logger.info(
+                            "Query model changed within family %s: %s → %s (COMPATIBLE)",
+                            self.embed_model_family,
+                            other.query_model,
+                            self.query_model,
+                        )
+                        return True, ChangeImpact.COMPATIBLE
+                    # No changes at all
+                    return True, ChangeImpact.NONE
+                else:
+                    # Embed model changed even within same family
+                    logger.info(
+                        "Embed model changed within family %s: %s → %s (BREAKING)",
+                        self.embed_model_family,
+                        other.embed_model,
+                        self.embed_model,
+                    )
+                    return False, ChangeImpact.BREAKING
+            # Different families or no family info
+            logger.info(
+                "Model family changed or unavailable: %s → %s (BREAKING)",
+                other.embed_model_family,
+                self.embed_model_family,
+            )
+            return False, ChangeImpact.BREAKING
+
+        # Symmetric mode: exact match required for embed_model
+        if self.embed_model != other.embed_model:
+            logger.info(
+                "Embed model changed (symmetric): %s → %s (BREAKING)",
+                other.embed_model,
+                self.embed_model,
+            )
+            return False, ChangeImpact.BREAKING
+
+        # No relevant changes detected
+        return True, ChangeImpact.NONE
+
+
+class CheckpointSettingsMap(TypedDict):
+    """Subset of settings relevant for checkpoint hashing.
+
+    This is the complete settings map used for hash generation, distinct from
+    the CheckpointSettingsFingerprint which is used for compatibility checking.
+    """
 
     indexer: dict[str, Any]
     project_path: DirectoryPath
@@ -62,13 +230,14 @@ class CheckpointSettingsFingerprint(TypedDict):
 
 def get_checkpoint_settings_map(
     project_path: ResolvedProjectPathDep = INJECTED, project_name: ResolvedProjectNameDep = INJECTED
-) -> CheckpointSettingsFingerprint:
+) -> CheckpointSettingsMap:
     """Get relevant settings for checkpoint hashing.
 
     Note: This is a helper for the manager/checkpoint to use.
     It still needs access to the global settings to compute the hash.
 
-    # We could also consider vector store changes more carefully -- we can migrate vector stores without reindexing if needed.
+    We could also consider vector store changes more carefully -- we can migrate
+    vector stores without reindexing if needed.
     """
     from codeweaver.core import get_settings
 
@@ -78,7 +247,7 @@ def get_checkpoint_settings_map(
 
     indexer_map = indexer.model_dump(mode="json", exclude_computed_fields=True, exclude_none=True)
 
-    return CheckpointSettingsFingerprint(
+    return CheckpointSettingsMap(
         indexer=indexer_map,
         embedding_provider=settings.provider.embedding,
         sparse_provider=settings.provider.sparse_embedding,
@@ -180,6 +349,10 @@ class CheckpointManager:
     """Manages checkpoint save/load operations for indexing pipeline.
 
     PURE state management. No default configuration fetching.
+
+    This manager now includes unified compatibility checking that bridges:
+    - CheckpointSettingsFingerprint (new family-aware comparison)
+    - IndexingCheckpoint.matches_settings() (existing validation)
     """
 
     def __init__(self, project_path: Path, project_name: str, checkpoint_dir: Path):
@@ -240,10 +413,195 @@ class CheckpointManager:
             except OSError as e:
                 logger.warning("Failed to delete checkpoint: %s", e)
 
+    def is_index_valid_for_config(
+        self,
+        checkpoint: IndexingCheckpoint,
+        new_config: EmbeddingProviderSettingsType,
+    ) -> tuple[bool, ChangeImpact]:
+        """Unified compatibility check connecting fingerprint and checkpoint logic.
+
+        This method bridges the gap between:
+        - CheckpointSettingsFingerprint (new family-aware comparison)
+        - IndexingCheckpoint.matches_settings() (existing validation)
+
+        It implements family-aware compatibility checking for asymmetric embedding
+        configurations while maintaining backward compatibility with existing
+        checkpoint validation logic.
+
+        Args:
+            checkpoint: Existing indexing checkpoint
+            new_config: New embedding configuration to check against
+
+        Returns:
+            Tuple of (is_valid: bool, impact: ChangeImpact)
+            - is_valid: True if checkpoint can be reused with new config
+            - impact: Classification of the configuration change impact
+        """
+        # Get fingerprints from checkpoint and new config
+        old_fingerprint = self._extract_fingerprint(checkpoint)
+        new_fingerprint = self._create_fingerprint(new_config)
+
+        # Delegate to fingerprint comparison (family-aware)
+        is_compatible, impact = new_fingerprint.is_compatible_with(old_fingerprint)
+
+        # Only invalidate if BREAKING change
+        if is_compatible:
+            if impact == ChangeImpact.BREAKING:
+                return False, impact
+            return True, impact
+
+        return False, ChangeImpact.BREAKING
+
+    def _extract_fingerprint(
+        self,
+        checkpoint: IndexingCheckpoint,
+    ) -> CheckpointSettingsFingerprint:
+        """Extract fingerprint from existing checkpoint.
+
+        Constructs a CheckpointSettingsFingerprint from the checkpoint's stored
+        configuration hash and settings. This allows comparison with new configurations.
+
+        Args:
+            checkpoint: The checkpoint to extract fingerprint from
+
+        Returns:
+            CheckpointSettingsFingerprint instance
+
+        Note:
+            This currently extracts from the settings hash. In the future,
+            checkpoints will store fingerprint data directly for better
+            forward compatibility.
+        """
+        from codeweaver.core import get_settings
+
+        settings = cast(CodeWeaverEngineSettings, get_settings())
+
+        # Get provider configurations
+        embedding_config = (
+            settings.provider.embedding[0] if settings.provider.embedding else None
+        )
+        sparse_config = (
+            settings.provider.sparse_embedding[0]
+            if settings.provider.sparse_embedding
+            else None
+        )
+        vector_store_config = (
+            settings.provider.vector_store[0] if settings.provider.vector_store else None
+        )
+
+        # Extract embedding model information
+        embed_model = ""
+        embed_model_family = None
+        query_model = None
+        config_type: Literal["symmetric", "asymmetric"] = "symmetric"
+
+        if embedding_config:
+            if isinstance(embedding_config, AsymmetricEmbeddingProviderSettings):
+                config_type = "asymmetric"
+                embed_model = str(embedding_config.embed_provider.model_name)
+                query_model = str(embedding_config.query_provider.model_name)
+
+                # Try to get model family from capabilities
+                if (
+                    embed_caps := embedding_config.embed_provider.embedding_config.capabilities
+                ) and embed_caps.model_family:
+                    embed_model_family = embed_caps.model_family.family_id
+            else:
+                embed_model = str(embedding_config.model_name)
+                # Try to get model family for symmetric config too
+                if (
+                    embed_caps := embedding_config.embedding_config.capabilities
+                ) and embed_caps.model_family:
+                    embed_model_family = embed_caps.model_family.family_id
+
+        sparse_model = str(sparse_config.model_name) if sparse_config else None
+        vector_store = str(vector_store_config.provider) if vector_store_config else "inmemory"
+
+        return CheckpointSettingsFingerprint(
+            embedding_config_type=config_type,
+            embed_model=embed_model,
+            embed_model_family=embed_model_family,
+            query_model=query_model,
+            sparse_model=sparse_model,
+            vector_store=vector_store,
+            config_hash=str(checkpoint.settings_hash or ""),
+        )
+
+    def _create_fingerprint(
+        self,
+        config: EmbeddingProviderSettingsType,
+    ) -> CheckpointSettingsFingerprint:
+        """Create fingerprint from new embedding configuration.
+
+        Extracts the critical configuration elements needed for compatibility
+        checking from a new embedding configuration.
+
+        Args:
+            config: New embedding configuration
+
+        Returns:
+            CheckpointSettingsFingerprint instance
+        """
+        from codeweaver.core import get_settings
+
+        settings = cast(CodeWeaverEngineSettings, get_settings())
+
+        # Extract sparse and vector store info
+        sparse_config = (
+            settings.provider.sparse_embedding[0]
+            if settings.provider.sparse_embedding
+            else None
+        )
+        vector_store_config = (
+            settings.provider.vector_store[0] if settings.provider.vector_store else None
+        )
+
+        # Extract embedding model information
+        embed_model = ""
+        embed_model_family = None
+        query_model = None
+        config_type: Literal["symmetric", "asymmetric"] = "symmetric"
+
+        if isinstance(config, AsymmetricEmbeddingProviderSettings):
+            config_type = "asymmetric"
+            embed_model = str(config.embed_provider.model_name)
+            query_model = str(config.query_provider.model_name)
+
+            # Try to get model family from capabilities
+            if (
+                embed_caps := config.embed_provider.embedding_config.capabilities
+            ) and embed_caps.model_family:
+                embed_model_family = embed_caps.model_family.family_id
+        else:
+            embed_model = str(config.model_name)
+            # Try to get model family for symmetric config too
+            if (
+                embed_caps := config.embedding_config.capabilities
+            ) and embed_caps.model_family:
+                embed_model_family = embed_caps.model_family.family_id
+
+        sparse_model = str(sparse_config.model_name) if sparse_config else None
+        vector_store = str(vector_store_config.provider) if vector_store_config else "inmemory"
+
+        # Compute hash of current settings
+        config_hash = get_blake_hash(to_json(get_checkpoint_settings_map()))
+
+        return CheckpointSettingsFingerprint(
+            embedding_config_type=config_type,
+            embed_model=embed_model,
+            embed_model_family=embed_model_family,
+            query_model=query_model,
+            sparse_model=sparse_model,
+            vector_store=vector_store,
+            config_hash=str(config_hash),
+        )
+
 
 __all__ = (
+    "ChangeImpact",
     "CheckpointManager",
     "CheckpointSettingsFingerprint",
+    "CheckpointSettingsMap",
     "IndexingCheckpoint",
     "get_checkpoint_settings_map",
 )

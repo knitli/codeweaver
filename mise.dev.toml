@@ -16,10 +16,11 @@ uv = "latest"
 "aqua:tombi-toml/tombi" = "latest"
 "ubi:astral-sh/ty" = "latest"
 ruff = "latest"  # Python linting/formatting
+"pipx:ipython" = "latest"
 
 [tools."pipx:reuse"]
 version = "latest"
-python = "3.13.11"
+python = "3.13"
 
 [env]
 _.python.venv = { path = ".venv" }

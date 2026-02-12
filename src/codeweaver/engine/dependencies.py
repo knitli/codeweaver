@@ -47,6 +47,7 @@ from codeweaver.engine.managers.checkpoint_manager import CheckpointManager
 from codeweaver.engine.managers.manifest_manager import FileManifestManager
 from codeweaver.engine.managers.progress_tracker import IndexingProgressTracker, IndexingStats
 from codeweaver.engine.services.chunking_service import ChunkingService
+from codeweaver.engine.services.config_analyzer import ConfigChangeAnalyzer
 from codeweaver.engine.services.failover_service import FailoverService
 from codeweaver.engine.services.indexing_service import IndexingService
 from codeweaver.engine.services.watching_service import FileWatchingService
@@ -271,6 +272,29 @@ type FileWatchingServiceDep = Annotated[
 ]
 
 
+@dependency_provider(ConfigChangeAnalyzer, scope="singleton")
+def _create_config_analyzer(
+    settings: SettingsDep = INJECTED,
+    checkpoint_manager: CheckpointManagerDep = INJECTED,
+    manifest_manager: ManifestManagerDep = INJECTED,
+) -> ConfigChangeAnalyzer:
+    """Factory for configuration change analyzer service.
+
+    The ConfigChangeAnalyzer is a plain class with no DI markers in its
+    constructor. DI integration is handled entirely by this factory function.
+    """
+    return ConfigChangeAnalyzer(
+        settings=settings,
+        checkpoint_manager=checkpoint_manager,
+        manifest_manager=manifest_manager,
+    )
+
+
+type ConfigChangeAnalyzerDep = Annotated[
+    ConfigChangeAnalyzer, depends(_create_config_analyzer, scope="singleton")
+]
+
+
 # ===========================================================================
 # Watcher Factories
 # ===========================================================================
@@ -309,6 +333,7 @@ __all__ = (
     "CheckpointManagerDep",
     "ChunkerSettingsDep",
     "ChunkingServiceDep",
+    "ConfigChangeAnalyzerDep",
     "ExtensionFilterDep",
     "FailoverServiceDep",
     "FailoverSettingsDep",

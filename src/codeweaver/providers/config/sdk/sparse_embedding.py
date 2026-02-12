@@ -49,16 +49,29 @@ async def _to_sparse_vector_params(instance: BaseSparseEmbeddingConfig) -> Spars
 class BaseSparseEmbeddingConfig(BasedModel, EmbeddingMixin):
     """Base configuration for sparse embedding models."""
 
-    model_name: ModelNameT = Field(
-        default_factory=ModelName, description="The sparse embedding model to use."
-    )
-    embedding: dict[str, Any] | None = Field(
-        default=None, description="Parameters for document/corpus encoding."
+    provider: Provider | None = Field(
+        None,
+        description="The provider for this embedding configuration. You don't have to provide this value -- while provider is a required setting at the top-level EmbeddingProviderSettings object, we will inject that value into the embedding configuration for you, so you can just specify the provider-specific config without worrying about the provider field in most cases.",
     )
 
-    query: dict[str, Any] | None = Field(
-        default=None, description="Parameters for query encoding (if different from document)."
+    model_name: ModelNameT | None = Field(
+        default_factory=ModelName,
+        description="The name of the embedding model to use. This should be in the format used by the provider (e.g., for Bedrock, this would be the model ARN). Like with `provider`, we can inject that value into the embedding configuration for you, so you can just specify the model-specific config without worrying about the model_name field in most cases.",
     )
+
+    embedding: Annotated[
+        dict[str, Any] | None,
+        Field(
+            description="Parameters for document embedding requests. The specific parameters that can be included here depend on the provider and model you're using. Subclasses should implement a TypedDict for these parameters."
+        ),
+    ] = None
+
+    query: Annotated[
+        dict[str, Any] | None,
+        Field(
+            description="Parameters for query embedding requests. Often the same as the embedding parameters, but some providers/models allow for different parameters for query vs document embeddings, so this is a separate field. If the types for embedding and query are the same, and you only provide one of them, we'll copy the values over to the other one for you."
+        ),
+    ] = None
 
     _is_sparse: ClassVar[bool] = True
 
@@ -72,8 +85,7 @@ class BaseSparseEmbeddingConfig(BasedModel, EmbeddingMixin):
 def _st_options_factory() -> SentenceTransformersEncodeDict:
     """Factory function to create default options for Sentence Transformers encoding."""
     return SentenceTransformersEncodeDict(
-        batch_size=DEFAULT_LOCAL_EMBEDDING_BATCH_SIZE,
-        show_progress_bar=False,
+        batch_size=DEFAULT_LOCAL_EMBEDDING_BATCH_SIZE, show_progress_bar=False
     )
 
 
@@ -83,7 +95,6 @@ class SentenceTransformersSparseEmbeddingConfig(BaseSparseEmbeddingConfig):
     _is_sparse: ClassVar[bool] = True
 
     provider: Literal[Provider.SENTENCE_TRANSFORMERS] = Provider.SENTENCE_TRANSFORMERS
-    tag: Literal["sentence_transformers"] = "sentence_transformers"
 
     embedding: SentenceTransformersEncodeDict = Field(
         default_factory=_st_options_factory, description="Parameters for document/corpus encoding."
@@ -126,7 +137,9 @@ class SentenceTransformersSparseEmbeddingConfig(BaseSparseEmbeddingConfig):
             resolved_datatype = "uint8"
         else:
             resolved_datatype = "ubinary"
-        self.embedding["precision"] = cast(Literal["float32", "uint8", "ubinary"], resolved_datatype)
+        self.embedding["precision"] = cast(
+            Literal["float32", "uint8", "ubinary"], resolved_datatype
+        )
         self.query = self.query or SentenceTransformersEncodeDict(**self._defaults["query"])
         self.query["precision"] = datatype  # ty:ignore[invalid-assignment]
         return self
@@ -178,7 +191,16 @@ class FastEmbedSparseEmbeddingConfig(BaseSparseEmbeddingConfig):
     _is_sparse: ClassVar[bool] = True
 
     provider: Literal[Provider.FASTEMBED] = Provider.FASTEMBED
-    tag: Literal["fastembed"] = "fastembed"
+
+    embedding: dict[str, Any] = Field(
+        default_factory=dict, description="Parameters for document embedding requests."
+    )
+    """Parameters for document embedding requests."""
+
+    query: dict[str, Any] = Field(
+        default_factory=dict, description="Parameters for query embedding requests."
+    )
+    """Parameters for query embedding requests."""
 
     async def as_sparse_vector_params(self) -> SparseVectorParams:
         """Get Qdrant SparseVectorParams for this sparse embedding configuration."""
@@ -187,7 +209,10 @@ class FastEmbedSparseEmbeddingConfig(BaseSparseEmbeddingConfig):
     def _as_options(self) -> SerializedEmbeddingOptionsDict:
         """Convert the FastEmbed embedding configuration to a dictionary of options."""
         return SerializedEmbeddingOptionsDict(
-            model_name=self.model_name, embedding={}, query={}, model={}
+            model_name=ModelName(self.model_name),
+            embedding=self.embedding or {},
+            query=self.query or {},
+            model={},
         )
 
     def set_dimension(self, dimension: int) -> Self:
@@ -207,6 +232,11 @@ class FastEmbedSparseEmbeddingConfig(BaseSparseEmbeddingConfig):
         """
         object.__setattr__(self, "_datatype", datatype)
         return self
+
+    @classmethod
+    def _defaults(cls) -> dict[str, Any]:
+        """Return default values for the configuration."""
+        return {}
 
 
 # ============================================================================

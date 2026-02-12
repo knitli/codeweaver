@@ -336,6 +336,7 @@ dev-helpers = [
 docs = ["griffe>=1.15.0"]
 test = [
   "dirty-equals>=0.11.0",
+  "hypothesis>=6.122.0",
   "pytest>=9.0.2",
   "pytest-asyncio>=1.3.0",
   "pytest-cov>=7.0.0",

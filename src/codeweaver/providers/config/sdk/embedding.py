@@ -102,29 +102,9 @@ class EmbeddingMixin:
     _dimension: int | None = PrivateAttr(default=None)
     _is_sparse: ClassVar[bool] = False
 
-    provider: Provider | None = Field(
-        None,
-        description="The provider for this embedding configuration. You don't have to provide this value -- while provider is a required setting at the top-level EmbeddingProviderSettings object, we will inject that value into the embedding configuration for you, so you can just specify the provider-specific config without worrying about the provider field in most cases.",
-    )
-
-    model_name: ModelNameT | None = Field(
-        default_factory=ModelName,
-        description="The name of the embedding model to use. This should be in the format used by the provider (e.g., for Bedrock, this would be the model ARN). Like with `provider`, we can inject that value into the embedding configuration for you, so you can just specify the model-specific config without worrying about the model_name field in most cases.",
-    )
-
-    embedding: Annotated[
-        dict[str, Any] | None,
-        Field(
-            description="Parameters for document embedding requests. The specific parameters that can be included here depend on the provider and model you're using. Subclasses should implement a TypedDict for these parameters."
-        ),
-    ] = None
-
-    query: Annotated[
-        dict[str, Any] | None,
-        Field(
-            description="Parameters for query embedding requests. Often the same as the embedding parameters, but some providers/models allow for different parameters for query vs document embeddings, so this is a separate field. If the types for embedding and query are the same, and you only provide one of them, we'll copy the values over to the other one for you."
-        ),
-    ] = None
+    model_name: ModelNameT
+    embedding: dict[str, Any] | None
+    query: dict[str, Any] | None
 
     def __init__(self, **data: Any) -> None:
         """Initialize the embedding configuration."""
@@ -379,7 +359,7 @@ class EmbeddingMixin:
     @property
     def capabilities(self) -> EmbeddingModelCapabilities | SparseEmbeddingModelCapabilities | None:
         """Get the embedding model capabilities for this configuration."""
-        return _get_embedding_capabilities_for_model(self.model_name, sparse=type(self)._is_sparse)  # ty:ignore[no-matching-overload]
+        return _get_embedding_capabilities_for_model(self.model_name, sparse=type(self)._is_sparse)
 
     @staticmethod
     def _clean_dtypes(
@@ -475,9 +455,29 @@ class EmbeddingMixin:
 class BaseEmbeddingConfig(BasedModel, EmbeddingMixin):
     """Base configuration for embedding models."""
 
-    model_name: ModelNameT = Field(
-        default_factory=ModelName, description="The embedding model to use."
+    provider: Provider | None = Field(
+        None,
+        description="The provider for this embedding configuration. You don't have to provide this value -- while provider is a required setting at the top-level EmbeddingProviderSettings object, we will inject that value into the embedding configuration for you, so you can just specify the provider-specific config without worrying about the provider field in most cases.",
     )
+
+    model_name: ModelNameT | None = Field(
+        default_factory=ModelName,
+        description="The name of the embedding model to use. This should be in the format used by the provider (e.g., for Bedrock, this would be the model ARN). Like with `provider`, we can inject that value into the embedding configuration for you, so you can just specify the model-specific config without worrying about the model_name field in most cases.",
+    )
+
+    embedding: Annotated[
+        dict[str, Any] | None,
+        Field(
+            description="Parameters for document embedding requests. The specific parameters that can be included here depend on the provider and model you're using. Subclasses should implement a TypedDict for these parameters."
+        ),
+    ] = None
+
+    query: Annotated[
+        dict[str, Any] | None,
+        Field(
+            description="Parameters for query embedding requests. Often the same as the embedding parameters, but some providers/models allow for different parameters for query vs document embeddings, so this is a separate field. If the types for embedding and query are the same, and you only provide one of them, we'll copy the values over to the other one for you."
+        ),
+    ] = None
 
     model: dict[str, Any] = Field(
         default_factory=dict,
@@ -814,6 +814,16 @@ class FastEmbedEmbeddingConfig(BaseEmbeddingConfig):
 
     tag: Literal["fastembed"] = "fastembed"
     provider: Literal[Provider.FASTEMBED] = Provider.FASTEMBED
+
+    embedding: dict[str, Any] = Field(
+        default_factory=dict, description="Parameters for document embedding requests."
+    )
+    """Parameters for document embedding requests."""
+
+    query: dict[str, Any] = Field(
+        default_factory=dict, description="Parameters for query embedding requests."
+    )
+    """Parameters for query embedding requests."""
 
     def _as_options(self) -> SerializedEmbeddingOptionsDict:
         """Convert the FastEmbed embedding configuration to a dictionary of options."""
