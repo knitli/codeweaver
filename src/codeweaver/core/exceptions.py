@@ -173,6 +173,15 @@ class ConfigurationError(CodeWeaverError):
     """
 
 
+class ConfigurationLockError(ConfigurationError):
+    """Collection configuration lock error.
+
+    Raised when attempting to modify a collection's configuration in a way that
+    violates the collection's policy (e.g., changing models when policy is STRICT,
+    or switching to an incompatible model family when policy is FAMILY_AWARE).
+    """
+
+
 class InvalidEmbeddingModelError(ConfigurationError):
     """Exception raised when an invalid embedding model is encountered."""
 
@@ -484,6 +493,7 @@ __all__ = (
     "CodeWeaverError",
     "CollectionNotFoundError",
     "ConfigurationError",
+    "ConfigurationLockError",
     "DatatypeMismatchError",
     "DependencyInjectionError",
     "DependencyNotAvailableError",

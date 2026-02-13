@@ -20,8 +20,10 @@ if TYPE_CHECKING:
         DelimiterDict,
         DelimiterPattern,
         LanguageFamily,
+        detect_family_characteristics,
         detect_language_family,
         expand_pattern,
+        get_family_patterns,
     )
     from codeweaver.engine.chunker.exceptions import (
         ASTDepthExceededError,
@@ -63,6 +65,8 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "chunk_files_parallel": (__spec__.parent, "parallel"),
     "chunk_files_parallel_dict": (__spec__.parent, "parallel"),
     "detect_language_family": (__spec__.parent, "delimiters"),
+    "get_family_patterns": (__spec__.parent, "delimiters"),
+    "detect_family_characteristics": (__spec__.parent, "delimiters"),
     "expand_pattern": (__spec__.parent, "delimiters"),
 })
 
@@ -93,8 +97,11 @@ __all__ = (
     "SourceIdRegistry",
     "chunk_files_parallel",
     "chunk_files_parallel_dict",
+    "detect_family_characteristics",
+    "detect_language_family",
     "detect_language_family",
     "expand_pattern",
+    "get_family_patterns",
 )
 
 

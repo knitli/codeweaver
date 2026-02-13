@@ -32,7 +32,7 @@ if TYPE_CHECKING:
 
 
 @pytest.fixture
-def test_container() -> Mock:
+def test_container():
     """Create test DI container.
 
     Uses real services where possible, with mocked external dependencies
@@ -82,9 +82,7 @@ async def test_checkpoint_data(tmp_path: Path) -> dict:
 
 
 @pytest.fixture
-def mock_checkpoint_manager(
-    test_checkpoint_data: dict,
-) -> AsyncMock:
+def mock_checkpoint_manager(test_checkpoint_data: dict) -> AsyncMock:
     """Create mock CheckpointManager with test data."""
     manager = AsyncMock()
 
@@ -97,9 +95,7 @@ def mock_checkpoint_manager(
     # Create collection metadata
     metadata = Mock()
     metadata.dense_model = test_checkpoint_data["collection_metadata"]["dense_model"]
-    metadata.dense_model_family = (
-        test_checkpoint_data["collection_metadata"]["dense_model_family"]
-    )
+    metadata.dense_model_family = test_checkpoint_data["collection_metadata"]["dense_model_family"]
     metadata.query_model = test_checkpoint_data["collection_metadata"]["query_model"]
     metadata.dimension = test_checkpoint_data["collection_metadata"]["dimension"]
     metadata.datatype = test_checkpoint_data["collection_metadata"]["datatype"]
@@ -122,6 +118,22 @@ def mock_manifest_manager() -> AsyncMock:
     manager.read_manifest = AsyncMock(return_value=None)
     manager.write_manifest = AsyncMock()
     return manager
+
+
+@pytest.fixture
+def mock_vector_store() -> AsyncMock:
+    """Create mock VectorStoreProvider."""
+    store = AsyncMock()
+
+    # Mock get_collection_metadata for policy validation
+    metadata = Mock()
+    metadata.policy = Mock()
+    metadata.policy.value = "family_aware"
+    metadata.validate_config_change = Mock()  # Policy validation method
+
+    store.get_collection_metadata = AsyncMock(return_value=metadata)
+
+    return store
 
 
 # ===========================================================================
@@ -170,6 +182,7 @@ class TestFullValidationWorkflow:
         self,
         mock_checkpoint_manager: AsyncMock,
         mock_manifest_manager: AsyncMock,
+        mock_vector_store: AsyncMock,
         test_settings: Mock,
     ) -> None:
         """Test complete workflow: load checkpoint and analyze current config."""
@@ -177,6 +190,7 @@ class TestFullValidationWorkflow:
 
         analyzer = ConfigChangeAnalyzer(
             settings=test_settings,
+            vector_store=mock_vector_store,
             checkpoint_manager=mock_checkpoint_manager,
             manifest_manager=mock_manifest_manager,
         )
@@ -191,6 +205,7 @@ class TestFullValidationWorkflow:
         self,
         mock_checkpoint_manager: AsyncMock,
         mock_manifest_manager: AsyncMock,
+        mock_vector_store: AsyncMock,
         test_settings: Mock,
     ) -> None:
         """Test validation of embedding dimension change."""
@@ -198,14 +213,13 @@ class TestFullValidationWorkflow:
 
         analyzer = ConfigChangeAnalyzer(
             settings=test_settings,
+            vector_store=mock_vector_store,
             checkpoint_manager=mock_checkpoint_manager,
             manifest_manager=mock_manifest_manager,
         )
 
         # Simulate dimension reduction (valid change)
-        result = await analyzer.validate_config_change(
-            "provider.embedding.dimension", 1024
-        )
+        result = await analyzer.validate_config_change("provider.embedding.dimension", 1024)
 
         # Should analyze change and return result
         assert result is not None
@@ -229,6 +243,7 @@ class TestConfigChangeClassification:
         self,
         mock_checkpoint_manager: AsyncMock,
         mock_manifest_manager: AsyncMock,
+        mock_vector_store: AsyncMock,
         test_settings: Mock,
     ) -> None:
         """Test that changing query model in asymmetric config is compatible."""
@@ -240,6 +255,7 @@ class TestConfigChangeClassification:
 
         analyzer = ConfigChangeAnalyzer(
             settings=test_settings,
+            vector_store=mock_vector_store,
             checkpoint_manager=mock_checkpoint_manager,
             manifest_manager=mock_manifest_manager,
         )
@@ -254,8 +270,22 @@ class TestConfigChangeClassification:
 
         # Get checkpoint metadata
         checkpoint = await mock_checkpoint_manager.load_checkpoint()
+
+        # Create fingerprint from checkpoint metadata
+        from codeweaver.engine.managers.checkpoint_manager import CheckpointSettingsFingerprint
+
+        old_fingerprint = CheckpointSettingsFingerprint(
+            embedding_config_type="asymmetric",
+            embed_model=checkpoint.collection_metadata.dense_model,
+            embed_model_family=checkpoint.collection_metadata.dense_model_family,
+            query_model=checkpoint.collection_metadata.query_model,
+            sparse_model=None,
+            vector_store="qdrant",
+            config_hash="test_hash",
+        )
+
         analysis = await analyzer.analyze_config_change(
-            old_meta=checkpoint.collection_metadata,
+            old_fingerprint=old_fingerprint,
             new_config=new_config,
             vector_count=checkpoint.total_vectors,
         )
@@ -266,6 +296,7 @@ class TestConfigChangeClassification:
         self,
         mock_checkpoint_manager: AsyncMock,
         mock_manifest_manager: AsyncMock,
+        mock_vector_store: AsyncMock,
         test_settings: Mock,
     ) -> None:
         """Test that dimension reduction is transformable."""
@@ -274,6 +305,7 @@ class TestConfigChangeClassification:
 
         analyzer = ConfigChangeAnalyzer(
             settings=test_settings,
+            vector_store=mock_vector_store,
             checkpoint_manager=mock_checkpoint_manager,
             manifest_manager=mock_manifest_manager,
         )
@@ -285,8 +317,22 @@ class TestConfigChangeClassification:
         new_config.datatype = "float32"
 
         checkpoint = await mock_checkpoint_manager.load_checkpoint()
+
+        # Create fingerprint from checkpoint metadata
+        from codeweaver.engine.managers.checkpoint_manager import CheckpointSettingsFingerprint
+
+        old_fingerprint = CheckpointSettingsFingerprint(
+            embedding_config_type="symmetric",
+            embed_model=checkpoint.collection_metadata.dense_model,
+            embed_model_family=None,
+            query_model=None,
+            sparse_model=None,
+            vector_store="qdrant",
+            config_hash="test_hash",
+        )
+
         analysis = await analyzer.analyze_config_change(
-            old_meta=checkpoint.collection_metadata,
+            old_fingerprint=old_fingerprint,
             new_config=new_config,
             vector_count=checkpoint.total_vectors,
         )
@@ -298,6 +344,7 @@ class TestConfigChangeClassification:
         self,
         mock_checkpoint_manager: AsyncMock,
         mock_manifest_manager: AsyncMock,
+        mock_vector_store: AsyncMock,
         test_settings: Mock,
     ) -> None:
         """Test that different model is breaking."""
@@ -306,6 +353,7 @@ class TestConfigChangeClassification:
 
         analyzer = ConfigChangeAnalyzer(
             settings=test_settings,
+            vector_store=mock_vector_store,
             checkpoint_manager=mock_checkpoint_manager,
             manifest_manager=mock_manifest_manager,
         )
@@ -317,8 +365,22 @@ class TestConfigChangeClassification:
         new_config.datatype = "float32"
 
         checkpoint = await mock_checkpoint_manager.load_checkpoint()
+
+        # Create fingerprint from checkpoint metadata
+        from codeweaver.engine.managers.checkpoint_manager import CheckpointSettingsFingerprint
+
+        old_fingerprint = CheckpointSettingsFingerprint(
+            embedding_config_type="symmetric",
+            embed_model=checkpoint.collection_metadata.dense_model,
+            embed_model_family=None,
+            query_model=None,
+            sparse_model=None,
+            vector_store="qdrant",
+            config_hash="test_hash",
+        )
+
         analysis = await analyzer.analyze_config_change(
-            old_meta=checkpoint.collection_metadata,
+            old_fingerprint=old_fingerprint,
             new_config=new_config,
             vector_count=checkpoint.total_vectors,
         )
@@ -344,6 +406,7 @@ class TestNoCheckpointScenarios:
         self,
         mock_checkpoint_manager: AsyncMock,
         mock_manifest_manager: AsyncMock,
+        mock_vector_store: AsyncMock,
         test_settings: Mock,
     ) -> None:
         """Test analysis when no checkpoint exists (first indexing)."""
@@ -354,6 +417,7 @@ class TestNoCheckpointScenarios:
 
         analyzer = ConfigChangeAnalyzer(
             settings=test_settings,
+            vector_store=mock_vector_store,
             checkpoint_manager=mock_checkpoint_manager,
             manifest_manager=mock_manifest_manager,
         )
@@ -367,6 +431,7 @@ class TestNoCheckpointScenarios:
         self,
         mock_checkpoint_manager: AsyncMock,
         mock_manifest_manager: AsyncMock,
+        mock_vector_store: AsyncMock,
         test_settings: Mock,
     ) -> None:
         """Test that config change validation succeeds for fresh start."""
@@ -377,14 +442,13 @@ class TestNoCheckpointScenarios:
 
         analyzer = ConfigChangeAnalyzer(
             settings=test_settings,
+            vector_store=mock_vector_store,
             checkpoint_manager=mock_checkpoint_manager,
             manifest_manager=mock_manifest_manager,
         )
 
         # Any config is safe on first indexing
-        result = await analyzer.validate_config_change(
-            "provider.embedding.dimension", 512
-        )
+        result = await analyzer.validate_config_change("provider.embedding.dimension", 512)
 
         assert result is None  # Safe, so no analysis needed
 
@@ -407,6 +471,7 @@ class TestEmpiricalDataUsage:
         self,
         mock_checkpoint_manager: AsyncMock,
         mock_manifest_manager: AsyncMock,
+        mock_vector_store: AsyncMock,
         test_settings: Mock,
     ) -> None:
         """Test that Voyage-3 empirical data is used in estimates."""
@@ -414,6 +479,7 @@ class TestEmpiricalDataUsage:
 
         analyzer = ConfigChangeAnalyzer(
             settings=test_settings,
+            vector_store=mock_vector_store,
             checkpoint_manager=mock_checkpoint_manager,
             manifest_manager=mock_manifest_manager,
         )
@@ -425,8 +491,22 @@ class TestEmpiricalDataUsage:
         new_config.datatype = "float32"
 
         checkpoint = await mock_checkpoint_manager.load_checkpoint()
+
+        # Create fingerprint
+        from codeweaver.engine.managers.checkpoint_manager import CheckpointSettingsFingerprint
+
+        old_fingerprint = CheckpointSettingsFingerprint(
+            embedding_config_type="symmetric",
+            embed_model="voyage-code-3",
+            embed_model_family=None,
+            query_model=None,
+            sparse_model=None,
+            vector_store="qdrant",
+            config_hash="test_hash",
+        )
+
         analysis = await analyzer.analyze_config_change(
-            old_meta=checkpoint.collection_metadata,
+            old_fingerprint=old_fingerprint,
             new_config=new_config,
             vector_count=checkpoint.total_vectors,
         )
@@ -439,6 +519,7 @@ class TestEmpiricalDataUsage:
         self,
         mock_checkpoint_manager: AsyncMock,
         mock_manifest_manager: AsyncMock,
+        mock_vector_store: AsyncMock,
         test_settings: Mock,
     ) -> None:
         """Test fallback to generic estimation for unmapped dimension pairs."""
@@ -446,6 +527,7 @@ class TestEmpiricalDataUsage:
 
         analyzer = ConfigChangeAnalyzer(
             settings=test_settings,
+            vector_store=mock_vector_store,
             checkpoint_manager=mock_checkpoint_manager,
             manifest_manager=mock_manifest_manager,
         )
@@ -457,8 +539,22 @@ class TestEmpiricalDataUsage:
         new_config.datatype = "float32"
 
         checkpoint = await mock_checkpoint_manager.load_checkpoint()
+
+        # Create fingerprint
+        from codeweaver.engine.managers.checkpoint_manager import CheckpointSettingsFingerprint
+
+        old_fingerprint = CheckpointSettingsFingerprint(
+            embedding_config_type="symmetric",
+            embed_model="voyage-code-3",
+            embed_model_family=None,
+            query_model=None,
+            sparse_model=None,
+            vector_store="qdrant",
+            config_hash="test_hash",
+        )
+
         analysis = await analyzer.analyze_config_change(
-            old_meta=checkpoint.collection_metadata,
+            old_fingerprint=old_fingerprint,
             new_config=new_config,
             vector_count=checkpoint.total_vectors,
         )
@@ -485,6 +581,7 @@ class TestEdgeCasesIntegration:
         self,
         mock_checkpoint_manager: AsyncMock,
         mock_manifest_manager: AsyncMock,
+        mock_vector_store: AsyncMock,
         test_settings: Mock,
     ) -> None:
         """Test handling of very large collection (10M+ vectors)."""
@@ -496,6 +593,7 @@ class TestEdgeCasesIntegration:
 
         analyzer = ConfigChangeAnalyzer(
             settings=test_settings,
+            vector_store=mock_vector_store,
             checkpoint_manager=mock_checkpoint_manager,
             manifest_manager=mock_manifest_manager,
         )
@@ -505,8 +603,21 @@ class TestEdgeCasesIntegration:
         new_config.dimension = 1024
         new_config.datatype = "float32"
 
+        # Create fingerprint
+        from codeweaver.engine.managers.checkpoint_manager import CheckpointSettingsFingerprint
+
+        old_fingerprint = CheckpointSettingsFingerprint(
+            embedding_config_type="symmetric",
+            embed_model="voyage-code-3",
+            embed_model_family=None,
+            query_model=None,
+            sparse_model=None,
+            vector_store="qdrant",
+            config_hash="test_hash",
+        )
+
         analysis = await analyzer.analyze_config_change(
-            old_meta=checkpoint.collection_metadata,
+            old_fingerprint=old_fingerprint,
             new_config=new_config,
             vector_count=checkpoint.total_vectors,
         )
@@ -519,6 +630,7 @@ class TestEdgeCasesIntegration:
         self,
         mock_checkpoint_manager: AsyncMock,
         mock_manifest_manager: AsyncMock,
+        mock_vector_store: AsyncMock,
         test_settings: Mock,
     ) -> None:
         """Test handling of collection with zero vectors."""
@@ -529,6 +641,7 @@ class TestEdgeCasesIntegration:
 
         analyzer = ConfigChangeAnalyzer(
             settings=test_settings,
+            vector_store=mock_vector_store,
             checkpoint_manager=mock_checkpoint_manager,
             manifest_manager=mock_manifest_manager,
         )
@@ -538,10 +651,21 @@ class TestEdgeCasesIntegration:
         new_config.dimension = 1024
         new_config.datatype = "float32"
 
+        # Create fingerprint
+        from codeweaver.engine.managers.checkpoint_manager import CheckpointSettingsFingerprint
+
+        old_fingerprint = CheckpointSettingsFingerprint(
+            embedding_config_type="symmetric",
+            embed_model="voyage-code-3",
+            embed_model_family=None,
+            query_model=None,
+            sparse_model=None,
+            vector_store="qdrant",
+            config_hash="test_hash",
+        )
+
         analysis = await analyzer.analyze_config_change(
-            old_meta=checkpoint.collection_metadata,
-            new_config=new_config,
-            vector_count=0,
+            old_fingerprint=old_fingerprint, new_config=new_config, vector_count=0
         )
 
         # Should not crash
@@ -566,6 +690,7 @@ class TestRecommendationsQuality:
         self,
         mock_checkpoint_manager: AsyncMock,
         mock_manifest_manager: AsyncMock,
+        mock_vector_store: AsyncMock,
         test_settings: Mock,
     ) -> None:
         """Test that breaking changes include recovery recommendations."""
@@ -573,6 +698,7 @@ class TestRecommendationsQuality:
 
         analyzer = ConfigChangeAnalyzer(
             settings=test_settings,
+            vector_store=mock_vector_store,
             checkpoint_manager=mock_checkpoint_manager,
             manifest_manager=mock_manifest_manager,
         )
@@ -584,8 +710,22 @@ class TestRecommendationsQuality:
         new_config.datatype = "float32"
 
         checkpoint = await mock_checkpoint_manager.load_checkpoint()
+
+        # Create fingerprint
+        from codeweaver.engine.managers.checkpoint_manager import CheckpointSettingsFingerprint
+
+        old_fingerprint = CheckpointSettingsFingerprint(
+            embedding_config_type="symmetric",
+            embed_model="voyage-code-3",
+            embed_model_family=None,
+            query_model=None,
+            sparse_model=None,
+            vector_store="qdrant",
+            config_hash="test_hash",
+        )
+
         analysis = await analyzer.analyze_config_change(
-            old_meta=checkpoint.collection_metadata,
+            old_fingerprint=old_fingerprint,
             new_config=new_config,
             vector_count=checkpoint.total_vectors,
         )
@@ -593,14 +733,14 @@ class TestRecommendationsQuality:
         # Should include helpful recommendations
         assert len(analysis.recommendations) > 0
         assert any(
-            "revert" in rec.lower() or "reindex" in rec.lower()
-            for rec in analysis.recommendations
+            "revert" in rec.lower() or "reindex" in rec.lower() for rec in analysis.recommendations
         )
 
     async def test_transformable_change_provides_strategy(
         self,
         mock_checkpoint_manager: AsyncMock,
         mock_manifest_manager: AsyncMock,
+        mock_vector_store: AsyncMock,
         test_settings: Mock,
     ) -> None:
         """Test that transformable changes include migration strategy."""
@@ -608,6 +748,7 @@ class TestRecommendationsQuality:
 
         analyzer = ConfigChangeAnalyzer(
             settings=test_settings,
+            vector_store=mock_vector_store,
             checkpoint_manager=mock_checkpoint_manager,
             manifest_manager=mock_manifest_manager,
         )
@@ -618,8 +759,22 @@ class TestRecommendationsQuality:
         new_config.datatype = "float32"
 
         checkpoint = await mock_checkpoint_manager.load_checkpoint()
+
+        # Create fingerprint
+        from codeweaver.engine.managers.checkpoint_manager import CheckpointSettingsFingerprint
+
+        old_fingerprint = CheckpointSettingsFingerprint(
+            embedding_config_type="symmetric",
+            embed_model="voyage-code-3",
+            embed_model_family=None,
+            query_model=None,
+            sparse_model=None,
+            vector_store="qdrant",
+            config_hash="test_hash",
+        )
+
         analysis = await analyzer.analyze_config_change(
-            old_meta=checkpoint.collection_metadata,
+            old_fingerprint=old_fingerprint,
             new_config=new_config,
             vector_count=checkpoint.total_vectors,
         )
@@ -646,6 +801,7 @@ class TestTimeAndCostEstimates:
         self,
         mock_checkpoint_manager: AsyncMock,
         mock_manifest_manager: AsyncMock,
+        mock_vector_store: AsyncMock,
         test_settings: Mock,
     ) -> None:
         """Test that estimates scale appropriately with vector count."""
@@ -653,6 +809,7 @@ class TestTimeAndCostEstimates:
 
         analyzer = ConfigChangeAnalyzer(
             settings=test_settings,
+            vector_store=mock_vector_store,
             checkpoint_manager=mock_checkpoint_manager,
             manifest_manager=mock_manifest_manager,
         )
@@ -664,18 +821,27 @@ class TestTimeAndCostEstimates:
 
         checkpoint = await mock_checkpoint_manager.load_checkpoint()
 
+        # Create fingerprint
+        from codeweaver.engine.managers.checkpoint_manager import CheckpointSettingsFingerprint
+
+        old_fingerprint = CheckpointSettingsFingerprint(
+            embedding_config_type="symmetric",
+            embed_model="voyage-code-3",
+            embed_model_family=None,
+            query_model=None,
+            sparse_model=None,
+            vector_store="qdrant",
+            config_hash="test_hash",
+        )
+
         # Get estimates for checkpoint vector count
         analysis_1 = await analyzer.analyze_config_change(
-            old_meta=checkpoint.collection_metadata,
-            new_config=new_config,
-            vector_count=5000,
+            old_fingerprint=old_fingerprint, new_config=new_config, vector_count=5000
         )
 
         # Get estimates for larger vector count
         analysis_2 = await analyzer.analyze_config_change(
-            old_meta=checkpoint.collection_metadata,
-            new_config=new_config,
-            vector_count=50000,
+            old_fingerprint=old_fingerprint, new_config=new_config, vector_count=50000
         )
 
         # Larger collection should have larger estimates
@@ -686,6 +852,7 @@ class TestTimeAndCostEstimates:
         self,
         mock_checkpoint_manager: AsyncMock,
         mock_manifest_manager: AsyncMock,
+        mock_vector_store: AsyncMock,
         test_settings: Mock,
     ) -> None:
         """Test that no-change scenario has zero time/cost estimates."""
@@ -694,6 +861,7 @@ class TestTimeAndCostEstimates:
 
         analyzer = ConfigChangeAnalyzer(
             settings=test_settings,
+            vector_store=mock_vector_store,
             checkpoint_manager=mock_checkpoint_manager,
             manifest_manager=mock_manifest_manager,
         )
@@ -705,8 +873,22 @@ class TestTimeAndCostEstimates:
         new_config.datatype = "float32"
 
         checkpoint = await mock_checkpoint_manager.load_checkpoint()
+
+        # Create fingerprint
+        from codeweaver.engine.managers.checkpoint_manager import CheckpointSettingsFingerprint
+
+        old_fingerprint = CheckpointSettingsFingerprint(
+            embedding_config_type="symmetric",
+            embed_model="voyage-code-3",
+            embed_model_family=None,
+            query_model=None,
+            sparse_model=None,
+            vector_store="qdrant",
+            config_hash="test_hash",
+        )
+
         analysis = await analyzer.analyze_config_change(
-            old_meta=checkpoint.collection_metadata,
+            old_fingerprint=old_fingerprint,
             new_config=new_config,
             vector_count=checkpoint.total_vectors,
         )

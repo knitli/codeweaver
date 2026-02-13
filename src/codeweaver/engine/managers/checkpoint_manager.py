@@ -121,9 +121,7 @@ class CheckpointSettingsFingerprint:
     vector_store: str
     config_hash: str
 
-    def is_compatible_with(
-        self, other: CheckpointSettingsFingerprint
-    ) -> tuple[bool, ChangeImpact]:
+    def is_compatible_with(self, other: CheckpointSettingsFingerprint) -> tuple[bool, ChangeImpact]:
         """Check compatibility and classify change impact with family-aware logic.
 
         Implements comprehensive compatibility checking that handles:
@@ -148,18 +146,14 @@ class CheckpointSettingsFingerprint:
         # Check vector store changes (always breaking if different)
         if self.vector_store != other.vector_store:
             logger.info(
-                "Vector store changed: %s → %s (BREAKING)",
-                other.vector_store,
-                self.vector_store,
+                "Vector store changed: %s → %s (BREAKING)", other.vector_store, self.vector_store
             )
             return False, ChangeImpact.BREAKING
 
         # Check sparse model changes (always breaking if different)
         if self.sparse_model != other.sparse_model:
             logger.info(
-                "Sparse model changed: %s → %s (BREAKING)",
-                other.sparse_model,
-                self.sparse_model,
+                "Sparse model changed: %s → %s (BREAKING)", other.sparse_model, self.sparse_model
             )
             return False, ChangeImpact.BREAKING
 
@@ -183,15 +177,14 @@ class CheckpointSettingsFingerprint:
                         return True, ChangeImpact.COMPATIBLE
                     # No changes at all
                     return True, ChangeImpact.NONE
-                else:
-                    # Embed model changed even within same family
-                    logger.info(
-                        "Embed model changed within family %s: %s → %s (BREAKING)",
-                        self.embed_model_family,
-                        other.embed_model,
-                        self.embed_model,
-                    )
-                    return False, ChangeImpact.BREAKING
+                # Embed model changed even within same family
+                logger.info(
+                    "Embed model changed within family %s: %s → %s (BREAKING)",
+                    self.embed_model_family,
+                    other.embed_model,
+                    self.embed_model,
+                )
+                return False, ChangeImpact.BREAKING
             # Different families or no family info
             logger.info(
                 "Model family changed or unavailable: %s → %s (BREAKING)",
@@ -414,9 +407,7 @@ class CheckpointManager:
                 logger.warning("Failed to delete checkpoint: %s", e)
 
     def is_index_valid_for_config(
-        self,
-        checkpoint: IndexingCheckpoint,
-        new_config: EmbeddingProviderSettingsType,
+        self, checkpoint: IndexingCheckpoint, new_config: EmbeddingProviderSettingsType
     ) -> tuple[bool, ChangeImpact]:
         """Unified compatibility check connecting fingerprint and checkpoint logic.
 
@@ -452,10 +443,7 @@ class CheckpointManager:
 
         return False, ChangeImpact.BREAKING
 
-    def _extract_fingerprint(
-        self,
-        checkpoint: IndexingCheckpoint,
-    ) -> CheckpointSettingsFingerprint:
+    def _extract_fingerprint(self, checkpoint: IndexingCheckpoint) -> CheckpointSettingsFingerprint:
         """Extract fingerprint from existing checkpoint.
 
         Constructs a CheckpointSettingsFingerprint from the checkpoint's stored
@@ -477,13 +465,9 @@ class CheckpointManager:
         settings = cast(CodeWeaverEngineSettings, get_settings())
 
         # Get provider configurations
-        embedding_config = (
-            settings.provider.embedding[0] if settings.provider.embedding else None
-        )
+        embedding_config = settings.provider.embedding[0] if settings.provider.embedding else None
         sparse_config = (
-            settings.provider.sparse_embedding[0]
-            if settings.provider.sparse_embedding
-            else None
+            settings.provider.sparse_embedding[0] if settings.provider.sparse_embedding else None
         )
         vector_store_config = (
             settings.provider.vector_store[0] if settings.provider.vector_store else None
@@ -528,8 +512,7 @@ class CheckpointManager:
         )
 
     def _create_fingerprint(
-        self,
-        config: EmbeddingProviderSettingsType,
+        self, config: EmbeddingProviderSettingsType
     ) -> CheckpointSettingsFingerprint:
         """Create fingerprint from new embedding configuration.
 
@@ -548,9 +531,7 @@ class CheckpointManager:
 
         # Extract sparse and vector store info
         sparse_config = (
-            settings.provider.sparse_embedding[0]
-            if settings.provider.sparse_embedding
-            else None
+            settings.provider.sparse_embedding[0] if settings.provider.sparse_embedding else None
         )
         vector_store_config = (
             settings.provider.vector_store[0] if settings.provider.vector_store else None
@@ -575,9 +556,7 @@ class CheckpointManager:
         else:
             embed_model = str(config.model_name)
             # Try to get model family for symmetric config too
-            if (
-                embed_caps := config.embedding_config.capabilities
-            ) and embed_caps.model_family:
+            if (embed_caps := config.embedding_config.capabilities) and embed_caps.model_family:
                 embed_model_family = embed_caps.model_family.family_id
 
         sparse_model = str(sparse_config.model_name) if sparse_config else None

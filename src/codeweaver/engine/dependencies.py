@@ -50,6 +50,7 @@ from codeweaver.engine.services.chunking_service import ChunkingService
 from codeweaver.engine.services.config_analyzer import ConfigChangeAnalyzer
 from codeweaver.engine.services.failover_service import FailoverService
 from codeweaver.engine.services.indexing_service import IndexingService
+from codeweaver.engine.services.migration_service import MigrationService
 from codeweaver.engine.services.watching_service import FileWatchingService
 from codeweaver.engine.watcher.watch_filters import ExtensionFilter, IgnoreFilter
 from codeweaver.providers import (
@@ -277,21 +278,49 @@ def _create_config_analyzer(
     settings: SettingsDep = INJECTED,
     checkpoint_manager: CheckpointManagerDep = INJECTED,
     manifest_manager: ManifestManagerDep = INJECTED,
+    vector_store: VectorStoreProviderDep = INJECTED,
 ) -> ConfigChangeAnalyzer:
     """Factory for configuration change analyzer service.
 
     The ConfigChangeAnalyzer is a plain class with no DI markers in its
     constructor. DI integration is handled entirely by this factory function.
+
+    Note: Vector store dependency added for policy enforcement (Phase 2).
     """
     return ConfigChangeAnalyzer(
         settings=settings,
         checkpoint_manager=checkpoint_manager,
         manifest_manager=manifest_manager,
+        vector_store=vector_store,
     )
 
 
 type ConfigChangeAnalyzerDep = Annotated[
     ConfigChangeAnalyzer, depends(_create_config_analyzer, scope="singleton")
+]
+
+
+@dependency_provider(MigrationService, scope="singleton")
+def _create_migration_service(
+    vector_store: VectorStoreProviderDep = INJECTED,
+    config_analyzer: ConfigChangeAnalyzerDep = INJECTED,
+    checkpoint_manager: CheckpointManagerDep = INJECTED,
+    manifest_manager: ManifestManagerDep = INJECTED,
+) -> MigrationService:
+    """Factory creates migration service with DI-resolved dependencies.
+
+    The service itself is a plain class. This factory wraps it for DI integration.
+    """
+    return MigrationService(
+        vector_store=vector_store,
+        config_analyzer=config_analyzer,
+        checkpoint_manager=checkpoint_manager,
+        manifest_manager=manifest_manager,
+    )
+
+
+type MigrationServiceDep = Annotated[
+    MigrationService, depends(_create_migration_service, scope="singleton")
 ]
 
 
@@ -343,6 +372,7 @@ __all__ = (
     "IndexingServiceDep",
     "IndexingStatsDep",
     "ManifestManagerDep",
+    "MigrationServiceDep",
     "ProgressTrackerDep",
     "SourceIdRegistryDep",
 )

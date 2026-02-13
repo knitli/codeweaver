@@ -21,8 +21,8 @@ if TYPE_CHECKING:
     )
     from codeweaver.engine.services.failover_service import FailoverService
     from codeweaver.engine.services.indexing_service import IndexingService
+    from codeweaver.engine.services.migration_service import MigrationService
     from codeweaver.engine.services.watching_service import FileWatchingService
-
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "ChunkingService": (__spec__.parent, "chunking_service"),
@@ -32,6 +32,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "IndexingService": (__spec__.parent, "indexing_service"),
     "TransformationDetails": (__spec__.parent, "config_analyzer"),
     "FileWatchingService": (__spec__.parent, "watching_service"),
+    "MigrationService": (__spec__.parent, "migration_service"),
 })
 
 __getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
@@ -43,6 +44,7 @@ __all__ = (
     "FailoverService",
     "FileWatchingService",
     "IndexingService",
+    "MigrationService",
     "TransformationDetails",
 )
 

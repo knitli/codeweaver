@@ -28,11 +28,12 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING
 from unittest.mock import patch
-from uuid import uuid4
 
 import pytest
 
 from pydantic import UUID7
+
+from codeweaver.core import uuid7
 
 
 if TYPE_CHECKING:
@@ -82,7 +83,6 @@ class InvalidStateTransitionError(Exception):
     """Raised when an invalid state transition is attempted."""
 
 
-
 @dataclass
 class Migration:
     """Mock migration object for testing state machine.
@@ -110,10 +110,7 @@ def create_migration(initial_state: MigrationState | None = None) -> Migration:
     Returns:
         Migration object for testing
     """
-    return Migration(
-        id=uuid4(),  # ty: ignore[arg-type]
-        current_state=initial_state or MigrationState.PENDING,
-    )
+    return Migration(id=uuid7(), current_state=initial_state or MigrationState.PENDING)
 
 
 def can_transition(migration: Migration, target_state: MigrationState) -> bool:
@@ -146,9 +143,7 @@ def transition(migration: Migration, target_state: MigrationState) -> Migration:
         InvalidStateTransitionError: If transition is invalid
     """
     if not can_transition(migration, target_state):
-        msg = (
-            f"Invalid state transition: {migration.current_state.value} -> {target_state.value}"
-        )
+        msg = f"Invalid state transition: {migration.current_state.value} -> {target_state.value}"
         raise InvalidStateTransitionError(msg)
 
     # Simulate atomic update (mock - real implementation will use database transaction)
@@ -175,7 +170,9 @@ async def transition_async(migration: Migration, target_state: MigrationState) -
         await asyncio.sleep(0.001)
 
         if not can_transition(migration, target_state):
-            msg = f"Invalid state transition: {migration.current_state.value} -> {target_state.value}"
+            msg = (
+                f"Invalid state transition: {migration.current_state.value} -> {target_state.value}"
+            )
             raise InvalidStateTransitionError(msg)
 
         # Simulate atomic update
@@ -228,11 +225,11 @@ def find_path(
 
         for next_state in VALID_TRANSITIONS.get(current, set()):
             if next_state == target:
-                return path + [next_state]
+                return [*path, next_state]
 
             if next_state not in explored:
                 explored.add(next_state)
-                queue.append((next_state, path + [next_state]))
+                queue.append((next_state, [*path, next_state]))
 
     return None
 
@@ -262,10 +259,7 @@ def load_migration(data: dict[str, str]) -> Migration:
     Returns:
         Reconstructed migration object
     """
-    return Migration(
-        id=UUID7(data["id"]),  # ty: ignore[arg-type]
-        current_state=MigrationState(data["current_state"]),
-    )
+    return Migration(id=data["id"], current_state=MigrationState(data["current_state"]))
 
 
 @contextmanager
@@ -292,7 +286,6 @@ pytestmark = [pytest.mark.unit, pytest.mark.async_test]
 
 @pytest.mark.async_test
 @pytest.mark.mock_only
-@pytest.mark.parametrize
 @pytest.mark.unit
 class TestValidStateTransitions:
     """Test all valid state transitions work correctly."""
@@ -302,14 +295,14 @@ class TestValidStateTransitions:
         for start_state, end_states in VALID_TRANSITIONS.items():
             for end_state in end_states:
                 migration = create_migration(start_state)
-                assert can_transition(
-                    migration, end_state
-                ), f"Should be able to transition {start_state} -> {end_state}"
+                assert can_transition(migration, end_state), (
+                    f"Should be able to transition {start_state} -> {end_state}"
+                )
 
                 result = transition(migration, end_state)
-                assert (
-                    result.current_state == end_state
-                ), f"State should be {end_state} after transition"
+                assert result.current_state == end_state, (
+                    f"State should be {end_state} after transition"
+                )
 
     def test_pending_to_in_progress(self) -> None:
         """Test PENDING -> IN_PROGRESS transition."""
@@ -350,7 +343,6 @@ class TestValidStateTransitions:
 
 @pytest.mark.async_test
 @pytest.mark.mock_only
-@pytest.mark.parametrize
 @pytest.mark.unit
 class TestInvalidStateTransitions:
     """Test that invalid state transitions are properly rejected."""
@@ -380,9 +372,9 @@ class TestInvalidStateTransitions:
             with pytest.raises(InvalidStateTransitionError) as exc_info:
                 transition(migration, end)
 
-            assert f"{start.value} -> {end.value}" in str(
-                exc_info.value
-            ), f"Error message should mention the invalid transition {start.value} -> {end.value}"
+            assert f"{start.value} -> {end.value}" in str(exc_info.value), (
+                f"Error message should mention the invalid transition {start.value} -> {end.value}"
+            )
 
     def test_no_self_transitions(self) -> None:
         """Verify no state can transition to itself."""
@@ -395,7 +387,6 @@ class TestInvalidStateTransitions:
 
 @pytest.mark.async_test
 @pytest.mark.mock_only
-@pytest.mark.parametrize
 @pytest.mark.unit
 class TestStateTransitionAtomicity:
     """Test that state transitions are atomic and handle failures correctly."""
@@ -415,9 +406,9 @@ class TestStateTransitionAtomicity:
 
         # State should remain PENDING (not corrupted)
         # In real implementation, this would be guaranteed by database transaction
-        assert (
-            migration.current_state == original_state
-        ), "State should not change if transition fails"
+        assert migration.current_state == original_state, (
+            "State should not change if transition fails"
+        )
 
     def test_transition_preserves_migration_id(self) -> None:
         """Verify migration ID is preserved across state transitions."""
@@ -437,7 +428,6 @@ class TestStateTransitionAtomicity:
 
 @pytest.mark.async_test
 @pytest.mark.mock_only
-@pytest.mark.parametrize
 @pytest.mark.unit
 class TestStateReachability:
     """Test that all states are reachable and state machine is connected."""
@@ -478,14 +468,11 @@ class TestStateReachability:
             valid_transitions = get_valid_transitions(state)
 
             # In this state machine, no states are intentionally terminal
-            assert (
-                len(valid_transitions) > 0
-            ), f"State {state} has no valid transitions (dead end)"
+            assert len(valid_transitions) > 0, f"State {state} has no valid transitions (dead end)"
 
 
 @pytest.mark.async_test
 @pytest.mark.mock_only
-@pytest.mark.parametrize
 @pytest.mark.unit
 class TestStatePersistence:
     """Test that migration states can be persisted and restored."""
@@ -521,7 +508,6 @@ class TestStatePersistence:
 
 @pytest.mark.async_test
 @pytest.mark.mock_only
-@pytest.mark.parametrize
 @pytest.mark.unit
 class TestConcurrentStateTransitions:
     """Test that state transitions are safe under concurrent access."""
@@ -566,10 +552,9 @@ class TestConcurrentStateTransitions:
         assert len(failures) == 1, "Exactly one transition should fail"
 
         # Final state should be one of the two attempted states
-        assert migration.current_state in [
-            MigrationState.COMPLETED,
-            MigrationState.FAILED,
-        ], "Migration should be in one of the attempted target states"
+        assert migration.current_state in [MigrationState.COMPLETED, MigrationState.FAILED], (
+            "Migration should be in one of the attempted target states"
+        )
 
 
 # ===========================================================================
@@ -579,7 +564,6 @@ class TestConcurrentStateTransitions:
 
 @pytest.mark.async_test
 @pytest.mark.mock_only
-@pytest.mark.parametrize
 @pytest.mark.unit
 class TestStateMachineProperties:
     """Property-based tests for state machine invariants.
@@ -603,9 +587,7 @@ class TestStateMachineProperties:
 
             # In this state machine design, no states are intentionally terminal
             # Every state should have at least one valid transition
-            assert (
-                len(valid_next) > 0
-            ), f"State {start_state} has no valid transitions (dead end)"
+            assert len(valid_next) > 0, f"State {start_state} has no valid transitions (dead end)"
 
         check_has_transitions()
 
@@ -621,9 +603,7 @@ class TestStateMachineProperties:
         def check_no_self_transition(start_state: MigrationState) -> None:
             """Verify no state transitions to itself."""
             valid_next = get_valid_transitions(start_state)
-            assert (
-                start_state not in valid_next
-            ), f"State {start_state} can transition to itself"
+            assert start_state not in valid_next, f"State {start_state} can transition to itself"
 
         check_no_self_transition()
 
@@ -644,9 +624,9 @@ class TestStateMachineProperties:
             valid_next = get_valid_transitions(start_state)
             for next_state in valid_next:
                 result = transition(migration, next_state)
-                assert (
-                    result.id == original_id
-                ), f"ID changed during {start_state} -> {next_state} transition"
+                assert result.id == original_id, (
+                    f"ID changed during {start_state} -> {next_state} transition"
+                )
 
                 # Reset state for next iteration
                 migration.current_state = start_state
@@ -676,9 +656,9 @@ class TestStateMachineProperties:
                 result2 = transition(migration2, target_state)
 
                 # Results should be in same state
-                assert (
-                    result1.current_state == result2.current_state == target_state
-                ), f"Non-deterministic transition {start_state} -> {target_state}"
+                assert result1.current_state == result2.current_state == target_state, (
+                    f"Non-deterministic transition {start_state} -> {target_state}"
+                )
 
         check_determinism()
 
@@ -690,7 +670,6 @@ class TestStateMachineProperties:
 
 @pytest.mark.async_test
 @pytest.mark.mock_only
-@pytest.mark.parametrize
 @pytest.mark.unit
 class TestStateMachineDocumentation:
     """Tests to verify state machine is properly documented and understood."""
@@ -707,9 +686,7 @@ class TestStateMachineDocumentation:
             has_outgoing = state in documented_states
             is_target = any(state in targets for targets in VALID_TRANSITIONS.values())
 
-            assert (
-                has_outgoing or is_target
-            ), f"State {state} is neither documented nor reachable"
+            assert has_outgoing or is_target, f"State {state} is neither documented nor reachable"
 
     def test_state_machine_diagram_accuracy(self) -> None:
         """Verify the state machine diagram in docstring matches implementation."""
@@ -733,9 +710,9 @@ class TestStateMachineDocumentation:
             for i in range(len(path) - 1):
                 start = path[i]
                 end = path[i + 1]
-                assert end in VALID_TRANSITIONS.get(
-                    start, set()
-                ), f"Expected transition {start} -> {end} not found in VALID_TRANSITIONS"
+                assert end in VALID_TRANSITIONS.get(start, set()), (
+                    f"Expected transition {start} -> {end} not found in VALID_TRANSITIONS"
+                )
 
 
 # ===========================================================================
@@ -745,7 +722,6 @@ class TestStateMachineDocumentation:
 
 @pytest.mark.async_test
 @pytest.mark.mock_only
-@pytest.mark.parametrize
 @pytest.mark.unit
 class TestStateTransitionEdgeCases:
     """Test edge cases and boundary conditions in state transitions."""
@@ -814,6 +790,8 @@ def test_suite_completeness() -> None:
 
         # Verify test class has test methods
         test_methods = [
-            method for method in dir(test_class) if method.startswith("test_") and callable(getattr(test_class, method))
+            method
+            for method in dir(test_class)
+            if method.startswith("test_") and callable(getattr(test_class, method))
         ]
         assert len(test_methods) > 0, f"Test class {test_class.__name__} has no test methods"

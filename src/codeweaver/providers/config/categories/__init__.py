@@ -2,7 +2,17 @@
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
 
-"""Entrypoint for provider categories' settings.  A category, in this context, is a specific type of provider (e.g., embedding, re-ranking) that has its own unique settings and configuration requirements. This package has the top-level settings classes for each provider category (such as `RerankingProviderSettings`), which are used to define the configuration for providers of that category. Most categories also have multiple mixins and subclasses for specific providers (e.g., `FastEmbedRerankingProviderSettings`), which are used to define the configuration for specific providers within that category. The mixins are used to provide common functionality and settings for providers that share similar characteristics (e.g., cloud providers, Bedrock providers)."""
+"""Entrypoint for provider categories' settings.  A category, in this context, is a specific type of provider (e.g., embedding, re-ranking) that has its own unique settings and configuration requirements. This package has the top-level settings classes for each provider category (such as `RerankingProviderSettings`), which are used to define the configuration for providers of that category. Most categories also have multiple mixins and subclasses for specific providers (e.g., `FastEmbedRerankingProviderSettings`), which are used to define the configuration for specific providers within that category. The mixins are used to provide common functionality and settings for providers that share similar characteristics (e.g., cloud providers, Bedrock providers).
+
+Design principles for adding new provider implementations in a category:
+1. **Evaluate the root implementation**: Each category has an implemented base class (e.g. `EmbeddingProviderSettings` from `BaseEmbeddingProviderSettings`). For simple cases, you may not need to create a new class at all. It may be sufficient to just add a new provider enum and handle it in the factory methods.
+2. **Create a mixin for provider-specific top-level settings**: If the provider has unique settings that are shared across multiple categories or implementations (e.g., Bedrock-specific settings), or if it requires special handling, create a mixin class.
+3. **Creating a new class**: If you need to create a new class for the provider, inherit from the root implementation for the category and any relevant mixins. Your implementation should:
+    - Define but not set the `provider` field to your provider's enum member (which you can create dynamically or statically define in the provider enum).
+    - Type the category's configuration fields with narrowed types that only apply to the provider (e.g. `BedrockEmbeddingConfig` instead of `EmbeddingConfig`).
+    - Inject common settings. There are some settings that are common across the configurations within the provider (in its config class or client options; often from its mixin), such as credentials or connection settings. Don't make users type out nested config settings multiple times. When instantiating the provider's settings, these settings should be injected down into the relevant fields automatically, so users only have to provide them once at the top level of the provider's settings. The base class handles things like the `Provider` field, but anything else is on you.
+4. **Special handling**: If your provider requires special handling for initialization that you can't address in the common `_initialize` method. You can provide a callable to its service card (codeweaver.core.types.service_cards.ServiceCard) that will be called during provider initialization.
+"""
 
 from types import MappingProxyType
 from typing import TYPE_CHECKING

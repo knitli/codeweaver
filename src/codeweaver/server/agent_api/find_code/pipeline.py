@@ -1,7 +1,3 @@
-# SPDX-FileCopyrightText: 2026 Knitli Inc.
-#
-# SPDX-License-Identifier: MIT OR Apache-2.0
-
 """Search pipeline orchestration.
 
 This module handles the core search pipeline including:
@@ -77,8 +73,8 @@ async def _embed_dense(
                 },
             )
             return None
-        assert not isinstance(result, dict)  # noqa: S101
-        assert "error" not in result  # noqa: S101
+        assert not isinstance(result, dict)
+        assert "error" not in result
         await log_to_client_or_fallback(
             context,
             "debug",
@@ -481,8 +477,7 @@ async def _try_rerank_with_provider(
                     },
                 },
             )
-            return None, None
-
+            return (None, None)
         enriched_results = [
             RerankingResult(
                 original_index=r.original_index,
@@ -515,7 +510,6 @@ async def _try_rerank_with_provider(
                 },
             },
         )
-        return list(enriched_results), None
     except CircuitBreakerOpenError as e:
         await log_to_client_or_fallback(
             context,
@@ -531,7 +525,7 @@ async def _try_rerank_with_provider(
                 },
             },
         )
-        return None, e
+        return (None, e)
     except Exception as e:
         await log_to_client_or_fallback(
             context,
@@ -548,7 +542,9 @@ async def _try_rerank_with_provider(
                 },
             },
         )
-        return None, e
+        return (None, e)
+    else:
+        return (list(enriched_results), None)
 
 
 async def rerank_results(
@@ -575,7 +571,6 @@ async def rerank_results(
             },
         )
         return (None, None)
-
     await log_to_client_or_fallback(
         context,
         "info",
@@ -588,13 +583,11 @@ async def rerank_results(
             },
         },
     )
-
     metadata_map: dict[str, SearchResult] = {str(c.content.chunk_id): c for c in candidates}
     chunks_for_reranking = [c.content for c in candidates]
     if not chunks_for_reranking:
         logger.warning("No CodeChunk objects available for reranking, skipping")
         return (None, None)
-
     last_error: Exception | None = None
     for idx, provider in enumerate(providers):
         enriched_results, error = await _try_rerank_with_provider(
@@ -604,7 +597,6 @@ async def rerank_results(
             return (enriched_results, SearchStrategy.SEMANTIC_RERANK)
         if error is not None:
             last_error = error
-
     await log_to_client_or_fallback(
         context,
         "warning",

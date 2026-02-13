@@ -82,7 +82,14 @@ from codeweaver.providers.config.sdk import (
 logger = logging.getLogger(__name__)
 
 
-type ProviderCategorySettingsType = EmbeddingProviderSettingsType | SparseEmbeddingProviderSettingsType | RerankingProviderSettingsType | DataProviderSettingsType  | VectorStoreProviderSettingsType | AgentProviderSettingsType
+type ProviderCategorySettingsType = (
+    EmbeddingProviderSettingsType
+    | SparseEmbeddingProviderSettingsType
+    | RerankingProviderSettingsType
+    | DataProviderSettingsType
+    | VectorStoreProviderSettingsType
+    | AgentProviderSettingsType
+)
 
 # ===========================================================================
 # *                    More TypedDict versions of Models
@@ -97,9 +104,7 @@ class ProviderSettingsDict(TypedDict, total=False):
     data: NotRequired[tuple[DataProviderSettingsType, ...] | None]
     # we currently only support one each of embedding, reranking and vector store providers
     # but we use tuples to allow for future expansion for some less common use cases
-    embedding: NotRequired[
-        tuple[EmbeddingProviderSettingsType | AsymmetricEmbeddingProviderSettings, ...] | None
-    ]
+    embedding: NotRequired[tuple[EmbeddingProviderSettingsType, ...] | None]
     """Embedding configuration. Can include symmetric (single-model) or asymmetric (dual-model) embedding configs. Asymmetric embedding allows using different models for document and query embeddings while maintaining compatibility through shared vector spaces."""
     # rerank is probably the priority for multiple providers in the future, because they're vector agnostic, so you could have fallback providers, or use different ones for different tasks
     sparse_embedding: NotRequired[tuple[SparseEmbeddingProviderSettingsType, ...] | None]
@@ -814,11 +819,9 @@ AllDefaultProviderSettings = None  # Will be lazy-initialized on first access
 
 __all__ = (
     "AllDefaultProviderSettings",
-    "EmbeddingProviderSettingsType",
+    "ProviderCategorySettingsType",
     "ProviderSettings",
     "ProviderSettingsDict",
     "ProviderSettingsView",
-    "RerankingProviderSettingsType",
-    "VectorStoreProviderSettingsType",
     "merge_agent_model_settings",
 )

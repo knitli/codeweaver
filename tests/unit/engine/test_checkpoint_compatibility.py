@@ -17,7 +17,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from codeweaver.core import BlakeHashKey, get_blake_hash
+from codeweaver.core import BlakeKey, get_blake_hash
 from codeweaver.engine.managers.checkpoint_manager import (
     ChangeImpact,
     CheckpointManager,
@@ -64,13 +64,8 @@ def mock_voyage_3_family() -> ModelFamily:
     return ModelFamily(
         family_id="voyage-3",
         default_dimension=1024,
-        member_models=frozenset({
-            "voyage-3",
-            "voyage-3-lite",
-        }),
-        asymmetric_query_models=frozenset({
-            "voyage-3-lite",
-        }),
+        member_models=frozenset({"voyage-3", "voyage-3-lite"}),
+        asymmetric_query_models=frozenset({"voyage-3-lite"}),
         output_dimensions=(512, 1024),
         cross_provider_compatible=True,
         default_dtype="float16",
@@ -85,10 +80,7 @@ def mock_voyage_2_family() -> ModelFamily:
     return ModelFamily(
         family_id="voyage-2",
         default_dimension=1024,
-        member_models=frozenset({
-            "voyage-2",
-            "voyage-code-2",
-        }),
+        member_models=frozenset({"voyage-2", "voyage-code-2"}),
         output_dimensions=(1024,),
         cross_provider_compatible=False,
         default_dtype="float32",
@@ -336,9 +328,7 @@ class TestCheckpointManagerCompatibility:
     async def test_checkpoint_save_load_roundtrip(self, checkpoint_manager: CheckpointManager):
         """Test basic checkpoint save and load."""
         checkpoint = IndexingCheckpoint(
-            project_path=Path("/test/project"),
-            files_discovered=10,
-            files_indexed=5,
+            project_path=Path("/test/project"), files_discovered=10, files_indexed=5
         )
 
         await checkpoint_manager.save(checkpoint)
@@ -355,7 +345,7 @@ class TestCheckpointManagerCompatibility:
         # Create a checkpoint with settings
         checkpoint = IndexingCheckpoint(
             project_path=Path("/test/project"),
-            settings_hash=BlakeHashKey(get_blake_hash(b"test_settings")),
+            settings_hash=BlakeKey(get_blake_hash(b"test_settings")),
         )
 
         # Mock settings with symmetric config
@@ -365,9 +355,7 @@ class TestCheckpointManagerCompatibility:
             mock_embedding_config = MagicMock()
             mock_embedding_config.model_name = "voyage-3"
             mock_embedding_config.embedding_config.capabilities = EmbeddingModelCapabilities(
-                model_name="voyage-3",
-                model_family=mock_voyage_3_family,
-                default_dimension=1024,
+                model_name="voyage-3", model_family=mock_voyage_3_family, default_dimension=1024
             )
 
             mock_provider_settings = MagicMock()
@@ -399,9 +387,7 @@ class TestCheckpointManagerCompatibility:
             mock_embedding_config = MagicMock(spec=EmbeddingProviderSettings)
             mock_embedding_config.model_name = "voyage-3"
             mock_embedding_config.embedding_config.capabilities = EmbeddingModelCapabilities(
-                model_name="voyage-3",
-                model_family=mock_voyage_3_family,
-                default_dimension=1024,
+                model_name="voyage-3", model_family=mock_voyage_3_family, default_dimension=1024
             )
 
             mock_provider_settings = MagicMock()
@@ -431,7 +417,7 @@ class TestCheckpointManagerCompatibility:
         """Test that compatible query model changes don't invalidate index."""
         checkpoint = IndexingCheckpoint(
             project_path=Path("/test/project"),
-            settings_hash=BlakeHashKey(get_blake_hash(b"old_settings")),
+            settings_hash=BlakeKey(get_blake_hash(b"old_settings")),
         )
 
         # Mock old config: asymmetric with voyage-3/voyage-3
@@ -442,9 +428,7 @@ class TestCheckpointManagerCompatibility:
             mock_embed_provider_old = MagicMock()
             mock_embed_provider_old.model_name = "voyage-3"
             mock_embed_provider_old.embedding_config.capabilities = EmbeddingModelCapabilities(
-                model_name="voyage-3",
-                model_family=mock_voyage_3_family,
-                default_dimension=1024,
+                model_name="voyage-3", model_family=mock_voyage_3_family, default_dimension=1024
             )
 
             mock_query_provider_old = MagicMock()
@@ -458,9 +442,7 @@ class TestCheckpointManagerCompatibility:
             mock_embed_provider_new = MagicMock()
             mock_embed_provider_new.model_name = "voyage-3"
             mock_embed_provider_new.embedding_config.capabilities = EmbeddingModelCapabilities(
-                model_name="voyage-3",
-                model_family=mock_voyage_3_family,
-                default_dimension=1024,
+                model_name="voyage-3", model_family=mock_voyage_3_family, default_dimension=1024
             )
 
             mock_query_provider_new = MagicMock()
@@ -502,7 +484,7 @@ class TestCheckpointManagerCompatibility:
         """Test that model family changes invalidate index."""
         checkpoint = IndexingCheckpoint(
             project_path=Path("/test/project"),
-            settings_hash=BlakeHashKey(get_blake_hash(b"old_settings")),
+            settings_hash=BlakeKey(get_blake_hash(b"old_settings")),
         )
 
         with patch(
@@ -512,18 +494,14 @@ class TestCheckpointManagerCompatibility:
             mock_old_embedding = MagicMock(spec=EmbeddingProviderSettings)
             mock_old_embedding.model_name = "voyage-2"
             mock_old_embedding.embedding_config.capabilities = EmbeddingModelCapabilities(
-                model_name="voyage-2",
-                model_family=mock_voyage_2_family,
-                default_dimension=1024,
+                model_name="voyage-2", model_family=mock_voyage_2_family, default_dimension=1024
             )
 
             # Setup new config: voyage-3
             mock_new_embedding = MagicMock(spec=EmbeddingProviderSettings)
             mock_new_embedding.model_name = "voyage-3"
             mock_new_embedding.embedding_config.capabilities = EmbeddingModelCapabilities(
-                model_name="voyage-3",
-                model_family=mock_voyage_3_family,
-                default_dimension=1024,
+                model_name="voyage-3", model_family=mock_voyage_3_family, default_dimension=1024
             )
 
             mock_provider_settings = MagicMock()

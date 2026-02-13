@@ -1,8 +1,3 @@
-# sourcery skip: lambdas-should-be-short, no-complex-if-expressions
-# SPDX-FileCopyrightText: 2025 Knitli Inc.
-# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
-#
-# SPDX-License-Identifier: MIT OR Apache-2.0
 """Prebuilt settings profiles for CodeWeaver quick setup.
 
 A few important things to note about profiles (or any provider settings):
@@ -20,12 +15,13 @@ from __future__ import annotations
 
 import contextlib
 
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from importlib import util
 from importlib.util import find_spec
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, overload
 
+from packaging.version import parse as parse_version
 from pydantic import AnyHttpUrl
 
 from codeweaver.core import (
@@ -36,6 +32,8 @@ from codeweaver.core import (
     generate_collection_name,
     get_user_data_dir,
 )
+from codeweaver.core.types import AnonymityConversion, FilteredKeyT
+from codeweaver.core.types.dataclasses import DataclassSerializationMixin
 from codeweaver.core.utils import has_package, uuid7
 from codeweaver.providers.config import (
     AgentProviderSettingsType,
@@ -68,11 +66,7 @@ from codeweaver.providers.config.sdk import (
 
 if TYPE_CHECKING:
     from codeweaver.providers.config.providers import ProviderSettingsDict
-
-
-# Check if FastEmbed is available
 HAS_FASTEMBED = find_spec("fastembed") is not None or find_spec("fastembed-gpu") is not None
-
 from codeweaver.providers.config.sdk import (
     FastEmbedRerankingConfig,
     SentenceTransformersRerankingConfig,
@@ -101,8 +95,8 @@ def _default_collection_options(
         collection_name=generate_collection_name(
             project_name=project_name, project_path=project_path
         ),
-        vectors_config=None,  # Will be set from embedding config at runtime
-        sparse_vectors_config=None,  # Will be set from sparse embedding config at runtime
+        vectors_config=None,
+        sparse_vectors_config=None,
     )
 
 
@@ -112,10 +106,9 @@ def _get_vector_client_options(
     if vector_deployment != "cloud":
         return _default_local_vector_client_options()
     if url is None:
-        # Provide placeholder for cloud deployment - will need to be configured before use
         from pydantic import AnyHttpUrl
 
-        url = AnyHttpUrl("https://qdrant.example.com")  # Placeholder URL
+        url = AnyHttpUrl("https://qdrant.example.com")
     return _default_remote_vector_client_options(url)
 
 
@@ -128,6 +121,8 @@ def _get_profile(
     project_name: str | None = None,
     project_path: Path | None = None,
 ) -> ProviderSettingsDict: ...
+
+
 @overload
 def _get_profile(
     profile: Literal["recommended", "quickstart", "testing"],
@@ -137,6 +132,8 @@ def _get_profile(
     project_name: str | None = None,
     project_path: Path | None = None,
 ) -> ProviderSettingsDict: ...
+
+
 def _get_profile(
     profile: Literal["recommended", "quickstart", "testing"],
     vector_deployment: Literal["cloud", "local"],
@@ -219,10 +216,6 @@ def _recommended_default(
         sparse_embedding=(
             SparseEmbeddingProviderSettings(
                 provider=Provider.FASTEMBED,
-                # Splade is a strong sparse embedding model that works well for code search
-                # Splade models are slow to generate embeddings, but lightning fast at inference time
-                # This version comes without license complications associated with `naver`'s versions
-                # There is a v2 available, but not yet supported by FastEmbed
                 model_name=ModelName("prithivida/Splade_PP_en_v1"),
                 sparse_embedding_config=FastEmbedSparseEmbeddingConfig(
                     model_name=ModelName("prithivida/Splade_PP_en_v1")
@@ -243,17 +236,15 @@ def _recommended_default(
                 agent_config=AnthropicAgentModelConfig(
                     anthropic_metadata={"_user_id": f"cw-recommended-{uuid7().hex}"},
                     model_name="claude-haiku-4.5",
-                    max_tokens=20_000,
+                    max_tokens=20000,
                     temperature=0.2,
                     top_p=1.0,
                 ),
             ),
         ),
-        data=(
-            (TavilyProviderSettings(provider=Provider.TAVILY),)
-            if Provider.TAVILY.has_env_auth and has_package("tavily")
-            else (DuckDuckGoProviderSettings(provider=Provider.DUCKDUCKGO),)
-        ),
+        data=(TavilyProviderSettings(provider=Provider.TAVILY),)
+        if Provider.TAVILY.has_env_auth and has_package("tavily")
+        else (DuckDuckGoProviderSettings(provider=Provider.DUCKDUCKGO),),
         vector_store=(
             QdrantVectorStoreProviderSettings(
                 provider=Provider.QDRANT,
@@ -287,39 +278,34 @@ def _quickstart_default(
         else ModelName("prithivida/Splade_PP_en_v1")
     )
     reranking_model = ModelName("jinaai/jina-reranker-v1-en-")
-
     return ProviderSettingsDict(
         embedding=(
             EmbeddingProviderSettings(
                 model_name=embedding_model,
-                embedding_config=(
-                    SentenceTransformersEmbeddingConfig(model_name=embedding_model)
-                    if HAS_ST
-                    else FastEmbedEmbeddingConfig(model_name=embedding_model)
-                ),
-                provider=(Provider.SENTENCE_TRANSFORMERS if HAS_ST else Provider.FASTEMBED),
+                embedding_config=SentenceTransformersEmbeddingConfig(model_name=embedding_model)
+                if HAS_ST
+                else FastEmbedEmbeddingConfig(model_name=embedding_model),
+                provider=Provider.SENTENCE_TRANSFORMERS if HAS_ST else Provider.FASTEMBED,
             ),
         ),
         sparse_embedding=(
             SparseEmbeddingProviderSettings(
-                provider=(Provider.SENTENCE_TRANSFORMERS if HAS_ST else Provider.FASTEMBED),
+                provider=Provider.SENTENCE_TRANSFORMERS if HAS_ST else Provider.FASTEMBED,
                 model_name=sparse_model,
-                sparse_embedding_config=(
-                    SentenceTransformersSparseEmbeddingConfig(model_name=sparse_model)
-                    if HAS_ST
-                    else FastEmbedSparseEmbeddingConfig(model_name=sparse_model)
-                ),
+                sparse_embedding_config=SentenceTransformersSparseEmbeddingConfig(
+                    model_name=sparse_model
+                )
+                if HAS_ST
+                else FastEmbedSparseEmbeddingConfig(model_name=sparse_model),
             ),
         ),
         reranking=(
             RerankingProviderSettings(
-                provider=(Provider.SENTENCE_TRANSFORMERS if HAS_ST else Provider.FASTEMBED),
+                provider=Provider.SENTENCE_TRANSFORMERS if HAS_ST else Provider.FASTEMBED,
                 model_name=reranking_model,
-                reranking_config=(
-                    SentenceTransformersRerankingConfig(model_name=reranking_model)
-                    if HAS_ST
-                    else FastEmbedRerankingConfig(model_name=reranking_model)
-                ),
+                reranking_config=SentenceTransformersRerankingConfig(model_name=reranking_model)
+                if HAS_ST
+                else FastEmbedRerankingConfig(model_name=reranking_model),
             ),
         ),
         agent=(
@@ -361,14 +347,11 @@ def _testing_profile(
     from codeweaver.core import Provider
     from codeweaver.providers.config.providers import ProviderSettingsDict
 
-    # NOTE: qdrant/bm25 doesn't require FASTEMBED -- FastEmbed can generate with it, but so can the qdrant_client itself
-    # We lose true sparse embeddings with bm25, but it's a good lightweight backup option
     embedding_model = "minishlab/potion-base-8M" if HAS_ST else "jinaai/jina-embeddings-v2-small-en"
     reranking_model = "jinaai/jina-reranker-v1-tiny-en"
     default_collection = _default_collection_options(
         project_name=project_name, project_path=project_path
     )
-
     backup_settings = _quickstart_default("local") | {
         "sparse_embedding": SparseEmbeddingProviderSettings(
             provider=Provider.FASTEMBED,
@@ -377,28 +360,23 @@ def _testing_profile(
                 model_name=ModelName("qdrant/bm25")
             ),
         ),
-        # For the dense embeddings, we essentially choose the lightest available model
-        # potion-base-8M is a static embedding model, which loses some quality, but is extremely light weight and virtually instant
         "embedding": EmbeddingProviderSettings(
             provider=Provider.SENTENCE_TRANSFORMERS if HAS_ST else Provider.FASTEMBED,
             model_name=ModelName(embedding_model),
-            embedding_config=(
-                SentenceTransformersEmbeddingConfig(model_name=ModelName(embedding_model))
-                if HAS_ST
-                else FastEmbedEmbeddingConfig(model_name=ModelName(embedding_model))
-            ),
+            embedding_config=SentenceTransformersEmbeddingConfig(
+                model_name=ModelName(embedding_model)
+            )
+            if HAS_ST
+            else FastEmbedEmbeddingConfig(model_name=ModelName(embedding_model)),
         ),
     }
-
     backup_settings["reranking"] = (
         RerankingProviderSettings(
             provider=Provider.FASTEMBED if HAS_FASTEMBED else Provider.SENTENCE_TRANSFORMERS,
             model_name=ModelName(reranking_model),
-            reranking_config=(
-                FastEmbedRerankingConfig(model_name=ModelName(reranking_model))
-                if HAS_FASTEMBED
-                else SentenceTransformersRerankingConfig(model_name=ModelName(reranking_model))
-            ),
+            reranking_config=FastEmbedRerankingConfig(model_name=ModelName(reranking_model))
+            if HAS_FASTEMBED
+            else SentenceTransformersRerankingConfig(model_name=ModelName(reranking_model)),
         ),
     )
     if use_local:
@@ -417,8 +395,164 @@ def _testing_profile(
             ),
             collection=default_collection,
         )
-
     return ProviderSettingsDict(**backup_settings)
+
+
+@dataclass(frozen=True)
+class VersionedProfile(DataclassSerializationMixin):
+    """Profile configuration with version tracking for compatibility management.
+
+    Tracks the CodeWeaver version associated with each profile configuration,
+    enabling semantic versioning-based compatibility checks between profile
+    versions and collection metadata versions.
+
+    Version Compatibility:
+        - Major version must match for compatibility (e.g., 0.x.x with 0.y.z)
+        - Minor and patch versions can differ (backward compatible)
+        - Changelog tracks profile evolution across versions
+
+    Integration with Collections:
+        When a collection is created, it stores:
+        - profile_name: The name of this profile
+        - profile_version: The CodeWeaver version when profile was applied
+        - This enables compatibility validation on collection reuse
+
+    Attributes:
+        name: Unique identifier for the profile (e.g., "recommended", "quickstart")
+        version: CodeWeaver version string following semantic versioning (e.g., "0.1.0a6")
+        embedding_config: The embedding provider configuration for this profile
+        changelog: Historical record of profile changes across versions
+    """
+
+    name: str
+    "Unique identifier for this profile configuration."
+    version: str
+    "CodeWeaver version when this profile was defined, following semantic versioning."
+    embedding_config: EmbeddingProviderSettingsType | AsymmetricEmbeddingProviderSettings
+    "Embedding provider configuration for this profile."
+    changelog: tuple[str, ...]
+    "Chronological record of profile changes, newest entries first."
+
+    def __init__(
+        self,
+        name: str,
+        version: str,
+        embedding_config: EmbeddingProviderSettingsType | AsymmetricEmbeddingProviderSettings,
+        changelog: tuple[str, ...] | list[str],
+    ) -> None:
+        """Initialize a versioned profile.
+
+        Args:
+            name: Profile identifier
+            version: CodeWeaver version string
+            embedding_config: Embedding configuration
+            changelog: List or tuple of changelog entries
+        """
+        object.__setattr__(self, "name", name)
+        object.__setattr__(self, "version", version)
+        object.__setattr__(self, "embedding_config", embedding_config)
+        object.__setattr__(
+            self, "changelog", tuple(changelog) if isinstance(changelog, list) else changelog
+        )
+        super().__init__()
+
+    def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion] | None:
+        """Define telemetry anonymization rules."""
+        return None
+
+    @classmethod
+    def is_compatible_with(cls, profile_version: str, collection_version: str) -> bool:
+        """Check if profile version is compatible with collection version.
+
+        Uses semantic versioning rules where major versions must match for
+        compatibility. Minor and patch version differences are acceptable as
+        they represent backward-compatible changes.
+
+        Args:
+            profile_version: Version string of the profile (e.g., "0.1.0a6")
+            collection_version: Version string from collection metadata
+
+        Returns:
+            True if versions are compatible (same major version), False otherwise
+
+        Examples:
+            >>> VersionedProfile.is_compatible_with("0.1.0", "0.2.5")
+            True  # Same major version (0)
+            >>> VersionedProfile.is_compatible_with("0.1.0", "1.0.0")
+            False  # Different major versions
+            >>> VersionedProfile.is_compatible_with("0.1.0a6", "0.1.0")
+            True  # Pre-release compatible with same major.minor
+        """
+        try:
+            pv = parse_version(profile_version)
+            cv = parse_version(collection_version)
+            profile_major = pv.release[0] if pv.release else 0
+            collection_major = cv.release[0] if cv.release else 0
+        except Exception:
+            return False
+        else:
+            return profile_major == collection_major
+
+    def get_changelog_for_version(self, target_version: str) -> list[str]:
+        """Get changelog entries relevant to upgrading to target version.
+
+        Filters changelog entries that apply when migrating from this profile's
+        version to the target version. Useful for displaying migration guidance.
+
+        Args:
+            target_version: Version string to migrate to
+
+        Returns:
+            List of relevant changelog entries, newest first
+        """
+        try:
+            current = parse_version(self.version)
+            target = parse_version(target_version)
+            if target > current:
+                return list(self.changelog)
+        except Exception:
+            return list(self.changelog)
+        else:
+            return []
+
+    def validate_against_collection(
+        self, collection_profile_name: str | None, collection_profile_version: str | None
+    ) -> tuple[bool, str | None]:
+        """Validate this profile can be used with an existing collection.
+
+        Checks both profile name matching and version compatibility to determine
+        if this profile can safely be used with a collection created under different
+        profile/version settings.
+
+        Args:
+            collection_profile_name: Profile name stored in collection metadata
+            collection_profile_version: Profile version stored in collection metadata
+
+        Returns:
+            Tuple of (is_valid, error_message). error_message is None if valid.
+
+        Examples:
+            >>> profile = VersionedProfile("recommended", "0.1.0", config, [])
+            >>> profile.validate_against_collection("recommended", "0.1.5")
+            (True, None)
+            >>> profile.validate_against_collection("quickstart", "0.1.0")
+            (False, "Profile name mismatch: ...")
+            >>> profile.validate_against_collection("recommended", "1.0.0")
+            (False, "Incompatible versions: ...")
+        """
+        if not collection_profile_name or not collection_profile_version:
+            return (True, None)
+        if collection_profile_name != self.name:
+            return (
+                False,
+                f"Profile name mismatch: collection uses '{collection_profile_name}' but current profile is '{self.name}'. Consider re-indexing with the correct profile or switching to '{collection_profile_name}'.",
+            )
+        if not self.is_compatible_with(self.version, collection_profile_version):
+            return (
+                False,
+                f"Incompatible versions: collection created with version '{collection_profile_version}' but current version is '{self.version}'. Major version mismatch requires re-indexing. See changelog for breaking changes.",
+            )
+        return (True, None)
 
 
 class ProviderConfigProfile(BaseEnumData):
@@ -445,7 +579,6 @@ class ProviderConfigProfile(BaseEnumData):
             **kwargs: Additional keyword args passed to BaseEnumData
         """
         provider_settings = provider_settings or ProviderSettingsDict()
-
         object.__setattr__(self, "vector_store", provider_settings.get("vector_store"))
         object.__setattr__(self, "embedding", provider_settings.get("embedding"))
         object.__setattr__(self, "sparse_embedding", provider_settings.get("sparse_embedding"))
@@ -478,7 +611,7 @@ class ProviderConfigProfile(BaseEnumData):
                 agent=(*(self.agent or ()), *(other.agent or ())),
                 data=(*(self.data or ()), *(other.data or ())),
             ),
-            self._aliases or (),  # ty:ignore[unresolved-attribute]
+            self._aliases if hasattr(self, "_aliases") else (),
             self._description or "",
         )
 
@@ -538,7 +671,10 @@ class ProviderProfile(ProviderConfigProfile, BaseDataclassEnum):
             ValueError: If the profile name is unknown.
         """
         for profile in cls:
-            if name in (alias.lower() for alias in (profile._aliases or ())):  # type: ignore[unresolved-attribute]
+            if name in (
+                alias.lower()
+                for alias in (profile._aliases if hasattr(profile, "_aliases") else ())
+            ):
                 return profile
         provider = ProviderProfile.from_string(name)
         if provider in {ProviderProfile.RECOMMENDED, ProviderProfile.RECOMMENDED_CLOUD}:
@@ -558,4 +694,4 @@ class ProviderProfile(ProviderConfigProfile, BaseDataclassEnum):
         })
 
 
-__all__ = ("ProviderConfigProfile", "ProviderProfile")
+__all__ = ("ProviderConfigProfile", "ProviderProfile", "VersionedProfile")

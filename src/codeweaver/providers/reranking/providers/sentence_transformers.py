@@ -120,6 +120,7 @@ class SentenceTransformersRerankingProvider(RerankingProvider[CrossEncoder]):
             self._query_prefix = f"{other.get('prefix', '')}{self.caps.custom_prompt}\n<Query>:\n"
             self._doc_suffix = other.get("suffix", "")
         import torch
+
         self.kwargs["model_kwargs"] = {"dtype": torch.float16}
         if has_package("flash_attn"):
             self.kwargs["model_kwargs"]["attention_implementation"] = "flash_attention_2"

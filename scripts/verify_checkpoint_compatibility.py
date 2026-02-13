@@ -39,9 +39,7 @@ class CheckpointSettingsFingerprint:
     vector_store: str
     config_hash: str
 
-    def is_compatible_with(
-        self, other: CheckpointSettingsFingerprint
-    ) -> tuple[bool, ChangeImpact]:
+    def is_compatible_with(self, other: CheckpointSettingsFingerprint) -> tuple[bool, ChangeImpact]:
         """Check compatibility and classify change impact."""
         # Check vector store changes
         if self.vector_store != other.vector_store:
@@ -62,8 +60,7 @@ class CheckpointSettingsFingerprint:
                     if self.query_model != other.query_model:
                         return True, ChangeImpact.COMPATIBLE
                     return True, ChangeImpact.NONE
-                else:
-                    return False, ChangeImpact.BREAKING
+                return False, ChangeImpact.BREAKING
             return False, ChangeImpact.BREAKING
 
         # Symmetric mode

@@ -37,21 +37,10 @@ if TYPE_CHECKING:
         SourceIdRegistry,
         chunk_files_parallel,
         chunk_files_parallel_dict,
+        detect_family_characteristics,
         detect_language_family,
         expand_pattern,
-    )
-    from codeweaver.engine.chunker.delimiters.families import (
-        detect_family_characteristics,
         get_family_patterns,
-    )
-    from codeweaver.engine.chunker.delimiters.patterns import (
-        ALL_PATTERNS,
-        CONDITIONAL_PATTERN,
-        FUNCTION_PATTERN,
-        HASH_COMMENT_PATTERN,
-        PARAGRAPH_PATTERN,
-        STRING_QUOTE_PATTERN,
-        matches_pattern,
     )
     from codeweaver.engine.config import (
         ChunkerSettings,
@@ -107,6 +96,7 @@ if TYPE_CHECKING:
         FailoverService,
         FileWatchingService,
         IndexingService,
+        MigrationService,
         TransformationDetails,
     )
     from codeweaver.engine.watcher import (
@@ -122,14 +112,8 @@ if TYPE_CHECKING:
 parent = __spec__.parent or "codeweaver.engine"
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
-    "ALL_PATTERNS": (f"{parent}.chunker.delimiters", "patterns"),
     "ASTDepthExceededError": (f"{parent}.chunker", "exceptions"),
     "BinaryFileError": (parent, "chunker"),
-    "CONDITIONAL_PATTERN": (f"{parent}.chunker.delimiters", "patterns"),
-    "FUNCTION_PATTERN": (f"{parent}.chunker.delimiters", "patterns"),
-    "HASH_COMMENT_PATTERN": (f"{parent}.chunker.delimiters", "patterns"),
-    "PARAGRAPH_PATTERN": (f"{parent}.chunker.delimiters", "patterns"),
-    "STRING_QUOTE_PATTERN": (f"{parent}.chunker.delimiters", "patterns"),
     "Boundary": (parent, "chunker"),
     "CheckpointManager": (parent, "managers"),
     "CheckpointManagerDep": (parent, "dependencies"),
@@ -150,7 +134,6 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "CodeFilter": (parent, "watcher"),
     "ConcurrencySettings": (parent, "config"),
     "ConcurrencySettingsDict": (parent, "config"),
-    "ConfigChangeAnalyzerDep": (parent, "dependencies"),
     "ConfigFilter": (parent, "watcher"),
     "CustomDelimiter": (parent, "chunker"),
     "CustomLanguage": (parent, "chunker"),
@@ -162,11 +145,10 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "Delimiter": (parent, "chunker"),
     "DelimiterChunker": (parent, "chunker"),
     "DelimiterDict": (parent, "chunker"),
-    "DelimiterKind": ("codeweaver.core.types", "delimiter"),
     "DelimiterMatch": (parent, "chunker"),
     "DelimiterPattern": (parent, "chunker"),
-    "detect_family_characteristics": (f"{parent}.chunker.delimiters", "families"),
-    "get_family_patterns": (f"{parent}.chunker.delimiters", "families"),
+    "detect_family_characteristics": (parent, "chunker"),
+    "get_family_patterns": (parent, "chunker"),
     "DocsFilter": (parent, "watcher"),
     "ExtensionFilter": (parent, "watcher"),
     "ExtensionFilterDep": (parent, "dependencies"),
@@ -196,8 +178,9 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "LanguageFamily": (parent, "chunker"),
     "LocalEmbeddingDetector": (parent, "config"),
     "ManifestManagerDep": (parent, "dependencies"),
+    "MigrationService": (parent, "services"),
+    "MigrationServiceDep": (parent, "dependencies"),
     "TransformationDetails": (parent, "services"),
-    "matches_pattern": (f"{parent}.chunker.delimiters", "patterns"),
     "OversizedChunkError": (parent, "chunker"),
     "ParseError": (parent, "chunker"),
     "PerformanceSettings": (parent, "config"),
@@ -317,6 +300,8 @@ __all__ = (
     "MatchPhrase",
     "MatchText",
     "MatchValue",
+    "MigrationService",
+    "MigrationServiceDep",
     "MinShould",
     "Nested",
     "NestedCondition",
@@ -345,7 +330,6 @@ __all__ = (
     "expand_pattern",
     "get_family_patterns",
     "make_partial_function",
-    "matches_pattern",
     "wrap_filters",
 )
 

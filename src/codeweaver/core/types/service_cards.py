@@ -448,6 +448,11 @@ class ServiceCard(NamedTuple):
         return False  # No match if required info not provided
 
     @property
+    def is_only_client(self) -> bool:
+        """Check if this card is the only client for its provider-category."""
+        return not self.has_multiple()
+
+    @property
     def discriminator_category(self) -> Literal["model", "client"] | None:
         """Get the discriminator category if this card has a discriminator."""
         if self.metadata and self.metadata.discriminator:

@@ -754,7 +754,7 @@ def _print_summary(has_failures: bool, has_warnings: bool, display: StatusDispla
 
 
 async def check_embedding_compatibility(
-    config_analyzer: ConfigChangeAnalyzerDep = INJECTED,  # type: ignore[name-defined]
+    config_analyzer: ConfigChangeAnalyzerDep = INJECTED,
 ) -> DoctorCheck:
     """Check if current embedding config matches collection.
 
@@ -920,9 +920,7 @@ async def process_checks(
     # Check embedding configuration compatibility if container is available
     if container:
         try:
-            embedding_check = await container.resolve(
-                check_embedding_compatibility  # type: ignore[arg-type]
-            )
+            embedding_check = await container.resolve(check_embedding_compatibility)
             checks.append(embedding_check)
         except Exception as e:
             checks.append(

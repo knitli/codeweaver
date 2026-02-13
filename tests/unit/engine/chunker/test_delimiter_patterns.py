@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import pytest
 
-from codeweaver.engine import (
+from codeweaver.engine.chunker.delimiter import (
     ALL_PATTERNS,
     CONDITIONAL_PATTERN,
     FUNCTION_PATTERN,

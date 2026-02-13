@@ -21,13 +21,10 @@ from codeweaver.engine.managers.checkpoint_manager import ChangeImpact
 
 
 if TYPE_CHECKING:
-    from codeweaver.config.settings import Settings
+    from codeweaver.core.config.settings_type import CodeWeaverSettingsType as Settings
     from codeweaver.engine.managers.checkpoint_manager import CheckpointManager
     from codeweaver.engine.managers.manifest_manager import FileManifestManager
-    from codeweaver.providers.config.categories import (
-        AsymmetricEmbeddingProviderSettings,
-        EmbeddingProviderSettingsType,
-    )
+    from codeweaver.providers.config.categories import EmbeddingProviderSettingsType
 
 
 logger = logging.getLogger(__name__)
@@ -65,13 +62,17 @@ class ConfigChangeAnalysis:
 
     # User guidance
     recommendations: list[str]
-    migration_strategy: Literal[
-        "full_reindex", "quantize_only", "dimension_reduction", "no_action"
-    ] | None
+    migration_strategy: (
+        Literal["full_reindex", "quantize_only", "dimension_reduction", "no_action"] | None
+    )
 
 
 class ConfigChangeAnalyzer:
-    """Analyzes configuration changes for compatibility.
+    """Analyzes configuration changes for compatibility with policy enforcement.
+
+    Integrates with the collection policy system to enforce configuration change
+    restrictions before analyzing compatibility. Policy validation happens before
+    technical compatibility checks.
 
     ARCHITECTURE NOTE: This is a PLAIN CLASS with no DI in constructor.
     Factory function in engine/dependencies.py handles DI integration.
@@ -82,6 +83,7 @@ class ConfigChangeAnalyzer:
         settings: Settings,  # NO DI markers
         checkpoint_manager: CheckpointManager,  # NO DI markers
         manifest_manager: FileManifestManager,  # NO DI markers
+        vector_store: Any,  # NO DI markers - VectorStoreProvider protocol
     ) -> None:
         """Initialize with dependencies (plain parameters).
 
@@ -89,10 +91,12 @@ class ConfigChangeAnalyzer:
             settings: Application settings
             checkpoint_manager: Checkpoint manager for validation
             manifest_manager: Manifest manager for collection metadata
+            vector_store: Vector store provider for accessing collection metadata
         """
         self.settings = settings
         self.checkpoint_manager = checkpoint_manager
         self.manifest_manager = manifest_manager
+        self.vector_store = vector_store
 
     async def analyze_current_config(self) -> ConfigChangeAnalysis | None:
         """Analyze current config against existing collection.
@@ -131,7 +135,11 @@ class ConfigChangeAnalyzer:
         new_config: EmbeddingProviderSettingsType,
         vector_count: int,
     ) -> ConfigChangeAnalysis:
-        """Comprehensive config change analysis with impact classification.
+        """Comprehensive config change analysis with policy enforcement and impact classification.
+
+        Validates configuration changes against collection policy before performing
+        technical compatibility analysis. Policy enforcement happens first to ensure
+        changes are allowed before analyzing their technical impact.
 
         Args:
             old_fingerprint: Existing checkpoint fingerprint
@@ -140,11 +148,75 @@ class ConfigChangeAnalyzer:
 
         Returns:
             Detailed analysis with impact classification and recommendations
+
+        Note:
+            Policy validation occurs before compatibility checks. A STRICT policy
+            may block changes that would otherwise be technically compatible.
         """
+        from codeweaver.core.exceptions import ConfigurationLockError
+        from codeweaver.providers.config.categories import AsymmetricEmbeddingProviderSettings
+
         changes: list[TransformationDetails] = []
 
         # Create fingerprint from new config
         new_fingerprint = self.checkpoint_manager._create_fingerprint(new_config)
+
+        # POLICY CHECK FIRST: Validate against collection policy before compatibility checks
+        # This ensures policy restrictions are enforced before technical analysis.
+        # FLEXIBLE policy only warns (doesn't raise), so we continue to compatibility checks.
+        try:
+            collection_metadata = await self.vector_store.collection_info()
+            if collection_metadata:
+                # Extract proposed configuration from new settings
+                new_dense_model = None
+                new_query_model = None
+                new_sparse_model = None
+                new_provider = (
+                    str(self.settings.provider.vector_store[0].provider)
+                    if self.settings.provider.vector_store
+                    and len(self.settings.provider.vector_store) > 0
+                    else None
+                )
+
+                if isinstance(new_config, AsymmetricEmbeddingProviderSettings):
+                    new_dense_model = str(new_config.embed_provider.model_name)
+                    new_query_model = str(new_config.query_provider.model_name)
+                else:
+                    new_dense_model = str(new_config.model_name)
+
+                # Get sparse model from settings if available
+                if self.settings.provider.sparse_embedding:
+                    new_sparse_model = str(self.settings.provider.sparse_embedding[0].model_name)
+
+                # Validate policy compliance
+                # FLEXIBLE policy logs warnings but doesn't raise
+                # STRICT and FAMILY_AWARE raise ConfigurationLockError
+                collection_metadata.validate_config_change(
+                    new_dense_model=new_dense_model,
+                    new_query_model=new_query_model,
+                    new_sparse_model=new_sparse_model,
+                    new_provider=str(new_provider) if new_provider else None,
+                )
+        except ConfigurationLockError as e:
+            # Policy violation - return breaking analysis with policy guidance
+            old_summary = self._create_config_summary(old_fingerprint)
+            new_summary = self._create_config_summary_from_settings(new_config)
+
+            # Extract policy from error details
+            policy = e.details.get("policy", "unknown")
+
+            return ConfigChangeAnalysis(
+                impact=ChangeImpact.BREAKING,
+                old_config_summary=old_summary,
+                new_config_summary=new_summary,
+                transformation_type=None,
+                transformations=[],
+                estimated_time=self._estimate_reindex_time(vector_count),
+                estimated_cost=self._estimate_reindex_cost(vector_count),
+                accuracy_impact=f"Collection policy ({policy}) blocks this change",
+                recommendations=self._build_policy_recommendations(policy, e),
+                migration_strategy="full_reindex",
+            )
 
         # 1. Check compatibility using checkpoint manager logic
         is_compatible, impact = new_fingerprint.is_compatible_with(old_fingerprint)
@@ -235,9 +307,7 @@ class ConfigChangeAnalyzer:
                     complexity="medium",
                     time_estimate=self._estimate_migration_time(vector_count),
                     requires_vector_update=True,
-                    accuracy_impact=self._estimate_matryoshka_impact(
-                        model_name, old_dim, new_dim
-                    ),
+                    accuracy_impact=self._estimate_matryoshka_impact(model_name, old_dim, new_dim),
                 )
             )
 
@@ -264,7 +334,7 @@ class ConfigChangeAnalyzer:
             return self._build_transformable_analysis(
                 old_summary, new_summary, changes, vector_count
             )
-        elif has_quantization:
+        if has_quantization:
             return self._build_quantizable_analysis(old_summary, new_summary, changes)
 
         # Should not reach here, but handle gracefully
@@ -281,19 +351,12 @@ class ConfigChangeAnalyzer:
             migration_strategy="no_action",
         )
 
-    def _estimate_matryoshka_impact(
-        self,
-        model_name: str,
-        old_dim: int,
-        new_dim: int,
-    ) -> str:
+    def _estimate_matryoshka_impact(self, model_name: str, old_dim: int, new_dim: int) -> str:
         """Estimate accuracy impact using empirical data.
 
         Uses Voyage-3 benchmark data for accurate predictions.
         """
-        from codeweaver.providers.embedding.capabilities.resolver import (
-            EmbeddingCapabilityResolver,
-        )
+        from codeweaver.providers.embedding.capabilities.resolver import EmbeddingCapabilityResolver
 
         resolver = EmbeddingCapabilityResolver()
         caps = resolver.resolve(model_name)
@@ -313,7 +376,7 @@ class ConfigChangeAnalyzer:
                 return f"~{impact_map[(old_dim, new_dim)]:.1f}% (empirical)"
 
         # Generic Matryoshka estimate
-        if caps and caps.supports_matryoshka:
+        if caps and hasattr(caps, "supports_matryoshka") and caps.supports_matryoshka:
             impact = reduction_pct * 0.05  # ~5% loss per 100% reduction
             return f"~{impact:.1f}% (Matryoshka-optimized, estimated)"
 
@@ -321,11 +384,7 @@ class ConfigChangeAnalyzer:
         impact = reduction_pct * 0.15  # ~15% loss per 100% reduction
         return f"~{impact:.1f}% (generic truncation, estimated)"
 
-    async def validate_config_change(
-        self,
-        key: str,
-        value: Any,
-    ) -> ConfigChangeAnalysis | None:
+    async def validate_config_change(self, key: str, value: Any) -> ConfigChangeAnalysis | None:
         """Validate config change before applying (proactive validation).
 
         Called by `cw config set` command for early warning.
@@ -364,19 +423,13 @@ class ConfigChangeAnalyzer:
         manifest = await self.manifest_manager.load()
         vector_count = manifest.total_chunks if manifest else checkpoint.chunks_indexed
 
-        analysis = await self.analyze_config_change(
+        return await self.analyze_config_change(
             old_fingerprint=checkpoint_fingerprint,
             new_config=new_embedding_config,
             vector_count=vector_count,
         )
 
-        return analysis
-
-    def _simulate_config_change(
-        self,
-        key: str,
-        value: Any,
-    ) -> Any:  # Settings
+    def _simulate_config_change(self, key: str, value: Any) -> Any:  # Settings
         """Simulate applying a config change to current settings.
 
         Args:
@@ -505,8 +558,12 @@ class ConfigChangeAnalyzer:
 
         if isinstance(config, AsymmetricEmbeddingProviderSettings):
             embed_caps = config.embed_provider.embedding_config.capabilities
-            family = embed_caps.model_family.family_id if embed_caps and embed_caps.model_family else None
-            
+            family = (
+                embed_caps.model_family.family_id
+                if embed_caps and embed_caps.model_family
+                else None
+            )
+
             return {
                 "config_type": "asymmetric",
                 "embed_model": str(config.embed_provider.model_name),
@@ -515,18 +572,19 @@ class ConfigChangeAnalyzer:
                 "sparse_model": None,  # Get from settings if available
                 "vector_store": "default",  # Get from settings if available
             }
-        else:
-            embed_caps = config.embedding_config.capabilities
-            family = embed_caps.model_family.family_id if embed_caps and embed_caps.model_family else None
-            
-            return {
-                "config_type": "symmetric",
-                "embed_model": str(config.model_name),
-                "embed_model_family": family,
-                "query_model": None,
-                "sparse_model": None,  # Get from settings if available
-                "vector_store": "default",  # Get from settings if available
-            }
+        embed_caps = config.embedding_config.capabilities
+        family = (
+            embed_caps.model_family.family_id if embed_caps and embed_caps.model_family else None
+        )
+
+        return {
+            "config_type": "symmetric",
+            "embed_model": str(config.model_name),
+            "embed_model_family": family,
+            "query_model": None,
+            "sparse_model": None,  # Get from settings if available
+            "vector_store": "default",  # Get from settings if available
+        }
 
     def _get_datatype_from_fingerprint(self, fingerprint: Any) -> str | None:
         """Extract datatype from checkpoint fingerprint (if available)."""
@@ -534,13 +592,9 @@ class ConfigChangeAnalyzer:
         # This is a placeholder for future enhancement
         return None
 
-    def _get_datatype_from_config(
-        self, config: EmbeddingProviderSettingsType
-    ) -> str | None:
+    def _get_datatype_from_config(self, config: EmbeddingProviderSettingsType) -> str | None:
         """Extract datatype from embedding config."""
-        if hasattr(config, "datatype"):
-            return str(config.datatype)
-        return None
+        return str(config.datatype) if hasattr(config, "datatype") else None
 
     def _get_dimension_from_fingerprint(self, fingerprint: Any) -> int | None:
         """Extract dimension from checkpoint fingerprint (if available)."""
@@ -548,18 +602,17 @@ class ConfigChangeAnalyzer:
         # This is a placeholder for future enhancement
         return None
 
-    def _get_dimension_from_config(
-        self, config: EmbeddingProviderSettingsType
-    ) -> int | None:
+    def _get_dimension_from_config(self, config: EmbeddingProviderSettingsType) -> int | None:
         """Extract dimension from embedding config."""
         from codeweaver.providers.config.categories import AsymmetricEmbeddingProviderSettings
 
         if isinstance(config, AsymmetricEmbeddingProviderSettings):
-            if hasattr(config.embed_provider, "dimension"):
-                return int(config.embed_provider.dimension)
-        elif hasattr(config, "dimension"):
-            return int(config.dimension)
-        return None
+            return (
+                config.embed_provider.embedding_config.dimension
+                if config.embed_provider.embedding_config
+                else None
+            )
+        return config.embedding_config.dimension if config.embedding_config else None
 
     def _is_valid_quantization(self, old_dtype: str, new_dtype: str) -> bool:
         """Check if quantization is valid (can only reduce precision)."""
@@ -568,9 +621,10 @@ class ConfigChangeAnalyzer:
         try:
             old_idx = precision_order.index(old_dtype)
             new_idx = precision_order.index(new_dtype)
-            return new_idx >= old_idx  # Can only reduce precision
         except ValueError:
             return False
+        else:
+            return new_idx >= old_idx  # Can only reduce precision
 
     def _estimate_reindex_time(self, vector_count: int) -> timedelta:
         """Estimate time for full reindexing."""
@@ -593,6 +647,54 @@ class ConfigChangeAnalyzer:
         """Estimate cost for dimension reduction migration."""
         # Much cheaper than reindex: $0.00001 per vector
         return vector_count * 0.00001
+
+    def _build_policy_recommendations(
+        self,
+        policy: str,
+        error: Any,  # ConfigurationLockError
+    ) -> list[str]:
+        """Build policy-specific recommendations based on policy level.
+
+        Args:
+            policy: Collection policy level (strict, family_aware, flexible, unlocked)
+            error: ConfigurationLockError with details
+
+        Returns:
+            List of actionable recommendations
+        """
+        base_recommendations = [f"Collection policy is '{policy}' - change blocked", "", "Options:"]
+
+        # Get error suggestions if available
+        if hasattr(error, "suggestions") and error.suggestions:
+            base_recommendations.extend(f"  • {s}" for s in error.suggestions)
+        else:
+            # Provide default recommendations based on policy
+            match policy:
+                case "strict":
+                    base_recommendations.extend([
+                        "  • Use original model configuration",
+                        "  • Change policy: cw config set-policy --policy family-aware",
+                        "  • Reindex with new config: cw index --force",
+                    ])
+                case "family_aware":
+                    base_recommendations.extend([
+                        "  • Use model from same family as indexed model",
+                        "  • Change policy to flexible: cw config set-policy --policy flexible",
+                        "  • Reindex with new config: cw index --force",
+                    ])
+                case "flexible":
+                    base_recommendations.extend([
+                        "  • WARNING: Change may degrade search quality",
+                        "  • Consider reverting config or reindexing",
+                        "  • Unlock policy: cw config set-policy --policy unlocked (not recommended)",
+                    ])
+                case _:
+                    base_recommendations.extend([
+                        "  • Revert config: cw config revert",
+                        "  • Reindex: cw index --force",
+                    ])
+
+        return base_recommendations
 
 
 __all__ = ("ConfigChangeAnalysis", "ConfigChangeAnalyzer", "TransformationDetails")
