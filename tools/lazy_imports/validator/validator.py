@@ -81,6 +81,33 @@ class LazyImportValidator:
             )
             return errors
 
+        # Check for syntax errors first
+        try:
+            content = file_path.read_text()
+            ast.parse(content, str(file_path))
+        except SyntaxError as e:
+            errors.append(
+                ValidationError(
+                    file=file_path,
+                    line=e.lineno or 0,
+                    message=f"Syntax error: {e.msg}",
+                    suggestion="Fix the syntax error",
+                    code="SYNTAX_ERROR",
+                )
+            )
+            return errors  # Can't validate further if syntax is broken
+        except Exception as e:
+            errors.append(
+                ValidationError(
+                    file=file_path,
+                    line=0,
+                    message=f"Error reading file: {e}",
+                    suggestion="Check file encoding and permissions",
+                    code="READ_ERROR",
+                )
+            )
+            return errors
+
         # Find lazy_import() calls
         if self.config.check_lazy_import_calls:
             call_errors = self._find_lazy_import_calls(file_path)

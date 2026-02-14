@@ -1,6 +1,6 @@
 """Tests for Rule Engine."""
 
-# ruff: noqa: TID252, S101, ANN201
+# ruff: noqa: S101, ANN201
 # sourcery skip: require-return-annotation, require-parameter-annotation, no-relative-imports
 from __future__ import annotations
 
@@ -98,7 +98,8 @@ class TestRuleEngine:
         ]
         engine = RuleEngine()
 
-        engine.add_rule(rule)
+        for rule in rules:
+            engine.add_rule(rule)
 
         result = engine.evaluate("__version__", "any.module", MemberType.VARIABLE)
 
@@ -125,7 +126,8 @@ class TestRuleEngine:
         ]
         engine = RuleEngine()
 
-        engine.add_rule(rule)
+        for rule in rules:
+            engine.add_rule(rule)
 
         result = engine.evaluate("test", "module", MemberType.CLASS)
 
@@ -134,8 +136,14 @@ class TestRuleEngine:
 
     def test_no_matching_rule(self):
         """When no rule matches, should return NO_DECISION."""
+        rule = Rule(
+            name="specific-rule",
+            priority=500,
+            description="Only matches 'specific'",
+            match=RuleMatchCriteria(name_exact="specific"),
+            action=RuleAction.INCLUDE,
+        )
         engine = RuleEngine()
-
 
         engine.add_rule(rule)
 
@@ -197,6 +205,7 @@ class TestRuleEngine:
         )
         engine = RuleEngine()
 
+        engine.add_rule(rule)
 
         # Class should match
         result_class = engine.evaluate("MyClass", "module", MemberType.CLASS)
@@ -285,7 +294,8 @@ class TestRuleEngine:
         ]
         engine = RuleEngine()
 
-        engine.add_rule(rule)
+        for rule in rules:
+            engine.add_rule(rule)
 
         result = engine.evaluate("test", "module", MemberType.CLASS)
 
@@ -326,6 +336,7 @@ class TestRuleEngine:
         )
         engine = RuleEngine()
 
+        engine.add_rule(rule)
 
         # Should match
         assert engine.evaluate("MyClass", "module", MemberType.CLASS).action == RuleAction.INCLUDE
@@ -354,6 +365,7 @@ class TestRuleEngine:
         )
         engine = RuleEngine()
 
+        engine.add_rule(rule)
 
         # All match - should include
         assert (
@@ -382,8 +394,7 @@ class TestRuleEngine:
         """Engine with empty rules list should always return NO_DECISION."""
         engine = RuleEngine()
 
-
-        engine.add_rule(rule)
+        # Don't add any rules - test empty engine
 
         result = engine.evaluate("anything", "any.module", MemberType.CLASS)
 
@@ -396,24 +407,37 @@ class TestRuleLoading:
     """Test suite for rule loading and validation."""
 
     def test_load_from_dict_list(self):
-        """Should load rules from list of dicts."""
-        rules_data = [
-            {
-                "name": "test-rule",
-                "priority": 500,
-                "description": "Test rule",
-                "match": {"name_pattern": "^test_"},
-                "action": "include",
-            }
-        ]
+        """Should load rules from YAML dict structure."""
+        # Create a YAML file with rules
+        import tempfile
+        import yaml
+        from pathlib import Path
 
-        engine = RuleEngine()
+        rules_data = {
+            "schema_version": "1.0",
+            "rules": [
+                {
+                    "name": "test-rule",
+                    "priority": 500,
+                    "description": "Test rule",
+                    "match": {"name_pattern": "^test_"},
+                    "action": "include",
+                }
+            ],
+        }
 
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+            yaml.dump(rules_data, f)
+            temp_path = Path(f.name)
 
-        engine.add_rule(rule)
+        try:
+            engine = RuleEngine()
+            engine.load_rules([temp_path])
 
-        result = engine.evaluate("test_func", "module", MemberType.FUNCTION)
-        assert result.action == RuleAction.INCLUDE
+            result = engine.evaluate("test_func", "module", MemberType.FUNCTION)
+            assert result.action == RuleAction.INCLUDE
+        finally:
+            temp_path.unlink()
 
     def test_invalid_action_value(self):
         """Should reject invalid action values."""

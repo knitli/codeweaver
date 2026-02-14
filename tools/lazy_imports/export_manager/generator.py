@@ -266,12 +266,20 @@ class CodeGenerator:
 
         # Validate Python syntax
         try:
-            ast.parse(code.content)
+            tree = ast.parse(code.content)
         except SyntaxError as e:
             errors.append(f"Syntax error at line {e.lineno}: {e.msg}")
+            return errors  # Can't check further if syntax is invalid
 
-        # Validate __all__ is present
-        if "__all__" not in code.content:
+        # Validate __all__ is present (check AST for actual assignment)
+        has_all = False
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name) and target.id == "__all__":
+                        has_all = True
+                        break
+        if not has_all:
             errors.append("Missing __all__ declaration")
 
         # Validate imports (basic check - should have either imports or empty)

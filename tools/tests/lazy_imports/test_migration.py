@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Tests for lazy import migration tool."""
 
-# ruff: noqa: TID252, S101, ANN201
+# ruff: noqa: S101, ANN201
 # sourcery skip: require-return-annotation, require-parameter-annotation, no-relative-imports, avoid-loops-in-tests
 from __future__ import annotations
 
@@ -104,11 +104,14 @@ class TestRuleMigrator:
         assert "action" in rule
 
     def test_rule_priority_ordering(self):
-        """Test rules are ordered by priority."""
+        """Test rules are ordered by priority in generated YAML."""
         migrator = RuleMigrator()
         migrator._extract_hardcoded_rules(Path("fake"))
+        yaml_content = migrator._generate_yaml()
 
-        priorities = [r.priority for r in migrator.rules]
+        import yaml
+        parsed = yaml.safe_load(yaml_content)
+        priorities = [r["priority"] for r in parsed["rules"]]
 
         # Should be in descending order
         assert priorities == sorted(priorities, reverse=True)
@@ -216,15 +219,19 @@ class TestEndToEndMigration:
 
         output_path = tmp_path / "lazy_import_rules.yaml"
 
-        # Perform migration (will use defaults since old script may not exist)
-        result = migrate_to_yaml(output_path, dry_run=True)
+        # Use a path that doesn't exist - migration should use defaults
+        fake_script = tmp_path / "nonexistent.py"
 
-        # Check result
+        # Perform migration with fake script (uses defaults)
+        result = migrate_to_yaml(output_path, old_script=fake_script, dry_run=True)
+
+        # Migration should succeed with defaults even if script not found
+        # (It uses hardcoded default rules)
         assert result.rules_extracted
         assert result.yaml_content
         assert result.equivalence_report
 
-        # Should have key rules
+        # Should have key rules (from defaults)
         rule_names = {r.name for r in result.rules_extracted}
         assert "exclude-private-members" in rule_names
         assert "include-constants" in rule_names

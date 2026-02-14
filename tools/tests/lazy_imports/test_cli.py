@@ -2,7 +2,7 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
-# ruff: noqa: TID252, S101, ANN201
+# ruff: noqa: S101, ANN201
 # sourcery skip: require-return-annotation, require-parameter-annotation, no-relative-imports
 """Tests for lazy import CLI."""
 
@@ -19,11 +19,16 @@ class TestLazyImportsCLI:
         from tools.lazy_imports.cli import app
 
         assert app is not None
-        assert app.name == "lazy-imports"
+        # Cyclopts apps have name as a tuple
+        assert "lazy-imports" in app.name or app.name == ("lazy-imports",)
 
     def test_types_module_imports(self):
         """Test that types module can be imported."""
-        from tools.lazy_imports.types import CacheStatistics, ExportGenerationResult, ValidationReport
+        from tools.lazy_imports.types import (
+            CacheStatistics,
+            ExportGenerationResult,
+            ValidationReport,
+        )
 
         assert CacheStatistics is not None
         assert ExportGenerationResult is not None

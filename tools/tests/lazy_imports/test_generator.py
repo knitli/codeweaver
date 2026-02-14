@@ -10,7 +10,7 @@ Tests cover:
 - Error handling (FM-003, FM-010, FM-011)
 """
 
-# ruff: noqa: TID252, S101, ANN201
+# ruff: noqa: S101, ANN201
 # sourcery skip: require-return-annotation, require-parameter-annotation, no-relative-imports
 from __future__ import annotations
 
@@ -494,24 +494,24 @@ def test_write_file_permission_error(generator: CodeGenerator, temp_dir: Path):
     target = temp_dir / "test" / "module" / "__init__.py"
     target.parent.mkdir(parents=True)
 
-    # Create read-only file
+    # Create file and make directory read-only (prevents writing/replacing)
     target.write_text("# Initial")
-    target.chmod(0o444)
+    target.parent.chmod(0o555)
 
     try:
         exports = [make_export("MyClass", module_path)]
         manifest = make_manifest(module_path, own_exports=exports)
         code = generator.generate(manifest)
 
-        # Should raise PermissionError with helpful message
-        with pytest.raises(PermissionError) as exc:
+        # Should raise OSError with helpful message (backup creation fails)
+        with pytest.raises(OSError) as exc:
             generator.write_file(module_path, code)
 
         assert "Permission denied" in str(exc.value)
         assert "chmod" in str(exc.value)
     finally:
         # Cleanup
-        target.chmod(0o644)
+        target.parent.chmod(0o755)
 
 
 # Integration tests

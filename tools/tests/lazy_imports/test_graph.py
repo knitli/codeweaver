@@ -1,6 +1,6 @@
 """Tests for Propagation Graph."""
 
-# ruff: noqa: TID252, S101, ANN201
+# ruff: noqa: S101, ANN201
 # sourcery skip: require-return-annotation, require-parameter-annotation, no-relative-imports, avoid-loops-in-tests
 from __future__ import annotations
 
@@ -19,6 +19,11 @@ class TestPropagationGraph:
 
         engine = RuleEngine()
         graph = PropagationGraph(rule_engine=engine)
+
+        # Register modules first
+        graph.add_module("codeweaver.core.types", "codeweaver.core")
+        graph.add_module("codeweaver.core", "codeweaver")
+        graph.add_module("codeweaver", None)
 
         # Add export from child module
         node = ExportNode(
@@ -46,6 +51,13 @@ class TestPropagationGraph:
 
         engine = RuleEngine()
         graph = PropagationGraph(rule_engine=engine)
+
+        # Register all modules in hierarchy
+        graph.add_module("codeweaver.core.deep.nested.types", "codeweaver.core.deep.nested")
+        graph.add_module("codeweaver.core.deep.nested", "codeweaver.core.deep")
+        graph.add_module("codeweaver.core.deep", "codeweaver.core")
+        graph.add_module("codeweaver.core", "codeweaver")
+        graph.add_module("codeweaver", None)
 
         # Add export deep in hierarchy
         node = ExportNode(
@@ -75,6 +87,11 @@ class TestPropagationGraph:
         engine = RuleEngine()
         graph = PropagationGraph(rule_engine=engine)
 
+        # Register modules
+        graph.add_module("codeweaver.core.internal", "codeweaver.core")
+        graph.add_module("codeweaver.core", "codeweaver")
+        graph.add_module("codeweaver", None)
+
         node = ExportNode(
             name="InternalClass",
             module="codeweaver.core.internal",
@@ -101,6 +118,10 @@ class TestPropagationGraph:
 
         engine = RuleEngine()
         graph = PropagationGraph(rule_engine=engine)
+
+        # Register modules
+        graph.add_module("test.module", "test")
+        graph.add_module("test", None)
 
         exports = [
             ExportNode(
@@ -143,6 +164,13 @@ class TestPropagationGraph:
         engine = RuleEngine()
         graph = PropagationGraph(rule_engine=engine)
 
+        # Register all modules
+        graph.add_module("codeweaver.core.config", "codeweaver.core")
+        graph.add_module("codeweaver.utils.config", "codeweaver.utils")
+        graph.add_module("codeweaver.core", "codeweaver")
+        graph.add_module("codeweaver.utils", "codeweaver")
+        graph.add_module("codeweaver", None)
+
         # Two modules export "Config" to parent
         graph.add_export(
             ExportNode(
@@ -184,6 +212,11 @@ class TestPropagationGraph:
 
         engine = RuleEngine()
         graph = PropagationGraph(rule_engine=engine)
+
+        # Register modules
+        graph.add_module("pkg.sub.deep", "pkg.sub")
+        graph.add_module("pkg.sub", "pkg")
+        graph.add_module("pkg", None)
 
         # Add exports in non-topological order
         graph.add_export(
@@ -233,6 +266,9 @@ class TestPropagationGraph:
         engine = RuleEngine()
         graph = PropagationGraph(rule_engine=engine)
 
+        # Register module
+        graph.add_module("toplevel", None)
+
         node = ExportNode(
             name="TopLevel",
             module="toplevel",
@@ -256,6 +292,11 @@ class TestPropagationGraph:
 
         engine = RuleEngine()
         graph = PropagationGraph(rule_engine=engine)
+
+        # Register modules
+        graph.add_module("pkg.core.types", "pkg.core")
+        graph.add_module("pkg.core", "pkg")
+        graph.add_module("pkg", None)
 
         node = ExportNode(
             name="Type",
@@ -282,6 +323,10 @@ class TestPropagationGraph:
 
         engine = RuleEngine()
         graph = PropagationGraph(rule_engine=engine)
+
+        # Register modules
+        graph.add_module("pkg.mod", "pkg")
+        graph.add_module("pkg", None)
 
         exports = [
             ExportNode(
@@ -337,6 +382,11 @@ class TestPropagationGraph:
         engine = RuleEngine()
         graph = PropagationGraph(rule_engine=engine)
 
+        # Register modules
+        graph.add_module("pkg.core.types", "pkg.core")
+        graph.add_module("pkg.core", "pkg")
+        graph.add_module("pkg", None)
+
         # Own export
         graph.add_export(
             ExportNode(
@@ -387,6 +437,9 @@ class TestPropagationGraph:
 
         engine = RuleEngine()
         graph = PropagationGraph(rule_engine=engine)
+
+        # Register module
+        graph.add_module("test", None)
 
         names = ["Zebra", "Apple", "Mango", "Banana"]
         for name in names:

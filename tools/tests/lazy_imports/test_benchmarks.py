@@ -7,7 +7,7 @@ Tests verify performance requirements from lazy-import-requirements.md:
 - REQ-PERF-004: Memory usage <500MB
 """
 
-# ruff: noqa: TID252, S101, ANN201
+# ruff: noqa: S101, ANN201
 # sourcery skip: require-return-annotation, require-parameter-annotation, no-relative-imports, avoid-loops-in-tests
 from __future__ import annotations
 
@@ -25,10 +25,9 @@ class TestPerformanceBenchmarks:
 
     def test_processing_speed_requirement(self, tmp_path: Path):
         """REQ-PERF-001: Full pipeline should complete in <5s for 500 modules."""
-        from tools.tests.lazy_imports.conftest import create_test_modules
-
         from tools.lazy_imports.common.types import ExportNode, MemberType, PropagationLevel
         from tools.lazy_imports.export_manager.graph import PropagationGraph
+        from tools.tests.lazy_imports.conftest import create_test_modules
 
         # Create 500 test modules
         modules_dir = tmp_path / "test_package"
@@ -44,8 +43,14 @@ class TestPerformanceBenchmarks:
         engine = RuleEngine()
         graph = PropagationGraph(rule_engine=engine)
 
+        # Register parent module
+        graph.add_module("test_package", None)
+
         # Simulate processing all modules
         for i, module_file in enumerate(modules):
+            # Register module
+            graph.add_module(f"test_package.module_{i}", "test_package")
+
             # Create exports for each module
             export = ExportNode(
                 name=f"TestClass{i}",
@@ -204,10 +209,9 @@ class TestPerformanceBenchmarks:
 
     def test_memory_usage_requirement(self, tmp_path: Path):
         """REQ-PERF-004: Memory usage should be <500MB for large codebase."""
-        from tools.tests.lazy_imports.conftest import create_test_modules
-
         from tools.lazy_imports.common.types import ExportNode, MemberType, PropagationLevel
         from tools.lazy_imports.export_manager.graph import PropagationGraph
+        from tools.tests.lazy_imports.conftest import create_test_modules
 
         # Start memory tracking
         tracemalloc.start()
@@ -223,8 +227,14 @@ class TestPerformanceBenchmarks:
         engine = RuleEngine()
         graph = PropagationGraph(rule_engine=engine)
 
+        # Register parent module
+        graph.add_module("large_package", None)
+
         # Process all modules
         for i, module_file in enumerate(modules):
+            # Register module
+            graph.add_module(f"large_package.module_{i}", "large_package")
+
             export = ExportNode(
                 name=f"Class{i}",
                 module=f"large_package.module_{i}",
@@ -303,10 +313,9 @@ class TestScalability:
 
     def test_linear_scaling_with_module_count(self, tmp_path: Path):
         """Processing time should scale linearly with module count."""
-        from tools.tests.lazy_imports.conftest import create_test_modules
-
         from tools.lazy_imports.common.types import ExportNode, MemberType, PropagationLevel
         from tools.lazy_imports.export_manager.graph import PropagationGraph
+        from tools.tests.lazy_imports.conftest import create_test_modules
 
         module_counts = [50, 100, 200]
         durations = []
@@ -324,7 +333,13 @@ class TestScalability:
             engine = RuleEngine()
             graph = PropagationGraph(rule_engine=engine)
 
+            # Register parent module
+            graph.add_module(f"package_{count}", None)
+
             for i, module_file in enumerate(modules):
+                # Register module
+                graph.add_module(f"package_{count}.module_{i}", f"package_{count}")
+
                 export = ExportNode(
                     name=f"Class{i}",
                     module=f"package_{count}.module_{i}",

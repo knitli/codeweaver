@@ -132,6 +132,26 @@ class Rule:
         if not self.name:
             raise ValueError("Rule name required")
 
+        # Validate action is a valid RuleAction
+        if not isinstance(self.action, RuleAction):
+            try:
+                # Try to convert string to RuleAction
+                object.__setattr__(self, "action", RuleAction(self.action))
+            except (ValueError, KeyError) as e:
+                raise ValueError(
+                    f"Invalid action: {self.action!r}. Must be one of: {[a.value for a in RuleAction]}"
+                ) from e
+
+        # Validate propagate is a valid PropagationLevel if provided
+        if self.propagate is not None and not isinstance(self.propagate, PropagationLevel):
+            try:
+                # Try to convert string to PropagationLevel
+                object.__setattr__(self, "propagate", PropagationLevel(self.propagate))
+            except (ValueError, KeyError) as e:
+                raise ValueError(
+                    f"Invalid propagation level: {self.propagate!r}. Must be one of: {[p.value for p in PropagationLevel]}"
+                ) from e
+
 
 @dataclass(frozen=True)
 class RuleMatch:

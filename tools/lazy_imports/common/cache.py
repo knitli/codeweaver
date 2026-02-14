@@ -9,6 +9,7 @@ Provides caching of file analysis results to improve performance.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from tools.lazy_imports.types import CacheStatistics
@@ -34,6 +35,7 @@ class JSONAnalysisCache:
         self._cache_dir = cache_dir or Path(".codeweaver/cache")
         self._cache_dir.mkdir(parents=True, exist_ok=True)
         self._cache: dict[Path, dict] = {}
+        self._load_from_disk()
 
     def get(self, file_path: Path, file_hash: str):
         """Get cached analysis result.
@@ -45,12 +47,35 @@ class JSONAnalysisCache:
         Returns:
             Cached analysis result or None if not found/invalid
         """
-        # Placeholder implementation
         cache_key = file_path
         if cache_key in self._cache:
             cached_data = self._cache[cache_key]
             if cached_data.get("file_hash") == file_hash:
-                return cached_data.get("analysis")
+                analysis_data = cached_data.get("analysis")
+                if isinstance(analysis_data, dict):
+                    # Reconstruct AnalysisResult with nested ExportNode objects
+                    from tools.lazy_imports.common.types import AnalysisResult, ExportNode
+
+                    # Reconstruct exports list
+                    exports = []
+                    for export_dict in analysis_data.get("exports", []):
+                        if isinstance(export_dict, dict):
+                            exports.append(ExportNode(**export_dict))
+                        else:
+                            exports.append(export_dict)
+
+                    # Reconstruct imports list (if they're objects too)
+                    imports = analysis_data.get("imports", [])
+
+                    # Create AnalysisResult with reconstructed objects
+                    return AnalysisResult(
+                        exports=exports,
+                        imports=imports,
+                        file_hash=analysis_data.get("file_hash", file_hash),
+                        analysis_timestamp=analysis_data.get("analysis_timestamp", 0.0),
+                        schema_version=analysis_data.get("schema_version", "1.0"),
+                    )
+                return analysis_data
         return None
 
     def put(self, file_path: Path, file_hash: str, analysis) -> None:
@@ -61,8 +86,27 @@ class JSONAnalysisCache:
             file_hash: Hash of the file content
             analysis: Analysis result to cache
         """
-        # Placeholder implementation - in-memory only
-        self._cache[file_path] = {"file_hash": file_hash, "analysis": analysis}
+        # Convert analysis to dict for JSON serialization
+        def to_dict(obj):
+            """Recursively convert objects to dicts."""
+            if hasattr(obj, "model_dump"):
+                return obj.model_dump(mode="json")
+            elif hasattr(obj, "__dataclass_fields__"):
+                # Dataclass
+                import dataclasses
+                return {k: to_dict(v) for k, v in dataclasses.asdict(obj).items()}
+            elif isinstance(obj, list):
+                return [to_dict(item) for item in obj]
+            elif isinstance(obj, dict):
+                return {k: to_dict(v) for k, v in obj.items()}
+            elif isinstance(obj, Path):
+                return str(obj)
+            else:
+                return obj
+
+        analysis_dict = to_dict(analysis)
+        self._cache[file_path] = {"file_hash": file_hash, "analysis": analysis_dict}
+        self._save_to_disk()
 
     def set(self, file_path: Path, analysis) -> None:
         """Alias for put() method for backwards compatibility.
@@ -110,7 +154,6 @@ class JSONAnalysisCache:
 
     def clear(self) -> None:
         """Clear all cache entries."""
-        # Placeholder implementation
         import shutil
 
         self._cache.clear()
@@ -118,8 +161,37 @@ class JSONAnalysisCache:
             shutil.rmtree(self._cache_dir)
         self._cache_dir.mkdir(parents=True, exist_ok=True)
 
+    def _get_cache_file(self) -> Path:
+        """Get path to the cache file."""
+        return self._cache_dir / "analysis_cache.json"
+
+    def _load_from_disk(self) -> None:
+        """Load cache from disk."""
+        cache_file = self._get_cache_file()
+        if cache_file.exists():
+            try:
+                with cache_file.open("r") as f:
+                    data = json.load(f)
+                # Convert string keys back to Path objects
+                self._cache = {Path(k): v for k, v in data.items()}
+            except (json.JSONDecodeError, OSError):
+                # If cache is corrupted, start fresh
+                self._cache = {}
+
+    def _save_to_disk(self) -> None:
+        """Save cache to disk."""
+        cache_file = self._get_cache_file()
+        try:
+            # Convert Path keys to strings for JSON serialization
+            data = {str(k): v for k, v in self._cache.items()}
+            with cache_file.open("w") as f:
+                json.dump(data, f, indent=2, default=str)
+        except (OSError, TypeError):
+            # If we can't save, continue without persistence
+            pass
+
 
 # Keep backwards compatibility
 AnalysisCache = JSONAnalysisCache
 
-__all__ = ("JSONAnalysisCache", "AnalysisCache")
+__all__ = ("AnalysisCache", "JSONAnalysisCache")

@@ -1,6 +1,6 @@
 """Tests for Analysis Cache."""
 
-# ruff: noqa: TID252, S101, ANN201
+# ruff: noqa: S101, ANN201
 # sourcery skip: require-return-annotation, require-parameter-annotation, no-relative-imports
 from __future__ import annotations
 
@@ -137,7 +137,6 @@ class TestJSONAnalysisCache:
         cached = cache.get(Path("module.py"), "hash123")
         assert cached is None
 
-    @pytest.mark.skip(reason="Placeholder implementation doesn't persist to disk")
     def test_cache_persistence(self, temp_cache_dir: Path):
         """Should persist across cache instances."""
         cache1 = JSONAnalysisCache(cache_dir=temp_cache_dir)

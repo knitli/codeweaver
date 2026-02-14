@@ -106,6 +106,17 @@ class ConsistencyChecker:
 
         return issues
 
+    def check_package(self, package_path: Path) -> list[ConsistencyIssue]:
+        """Check consistency of entire package (alias for check_package_consistency).
+
+        Args:
+            package_path: Path to package directory
+
+        Returns:
+            List of consistency issues found
+        """
+        return self.check_package_consistency(package_path)
+
     def _find_all_exports(self, tree: ast.AST) -> list[str]:
         """Find __all__ exports in AST.
 

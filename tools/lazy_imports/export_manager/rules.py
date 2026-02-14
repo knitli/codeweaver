@@ -111,6 +111,7 @@ class RuleEngine:
                 all_matches=[],
             )
         all_matches: list[RuleMatch] = []
+        # First, collect all matching rules
         for rule in self.rules:
             if self._matches_rule(name, module, member_type, rule):
                 match = RuleMatch(
@@ -121,17 +122,22 @@ class RuleEngine:
                     reason=self._get_match_reason(name, module, member_type, rule),
                 )
                 all_matches.append(match)
-                return RuleEvaluationResult(
-                    action=rule.action,
-                    matched_rule=match,
-                    propagation=rule.propagate,
-                    all_matches=all_matches,
-                )
+
+        # Return the highest priority match (first in list due to sorting)
+        if all_matches:
+            best_match = all_matches[0]
+            return RuleEvaluationResult(
+                action=best_match.action,
+                matched_rule=best_match,
+                propagation=best_match.propagation,
+                all_matches=all_matches,
+            )
+
         return RuleEvaluationResult(
-            action=RuleAction.INCLUDE,
+            action=RuleAction.NO_DECISION,
             matched_rule=None,
             propagation=PropagationLevel.NONE,
-            all_matches=[],
+            all_matches=all_matches,
         )
 
     def _matches_rule(self, name: str, module: str, member_type: MemberType, rule: Rule) -> bool:

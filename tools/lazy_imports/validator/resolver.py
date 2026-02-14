@@ -81,6 +81,18 @@ class ImportResolver:
             module=module, obj=obj, exists=True, path=self._get_module_path(mod), error=None
         )
 
+    def resolve(self, module: str, name: str) -> ImportResolution:
+        """Resolve an import (alias for resolve_import).
+
+        Args:
+            module: Module path
+            name: Object name
+
+        Returns:
+            ImportResolution with exists=True if import works
+        """
+        return self.resolve_import(module, name)
+
     def _get_module_path(self, module) -> Path | None:
         """Get the file path for a module.
 
