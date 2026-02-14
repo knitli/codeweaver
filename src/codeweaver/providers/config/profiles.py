@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 """Prebuilt settings profiles for CodeWeaver quick setup.
 
 A few important things to note about profiles (or any provider settings):

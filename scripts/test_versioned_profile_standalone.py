@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 """Standalone test for VersionedProfile implementation.
 
 This script tests the VersionedProfile functionality without requiring

@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Knitli Inc.
+
+SPDX-License-Identifier: MIT OR Apache-2.0
+-->
+
 # Phase 2 Migration Test Suite Summary
 
 Comprehensive test suite for Phase 2 transformation engine migration features.

@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 """Migration service for vector store transformations.
 
 This service implements dimension reduction and quantization migrations with:

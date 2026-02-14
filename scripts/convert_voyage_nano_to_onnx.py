@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 """Convert voyage-4-nano to ONNX format for FastEmbed usage.
 
 This script converts the VoyageAI voyage-4-nano model to ONNX format,

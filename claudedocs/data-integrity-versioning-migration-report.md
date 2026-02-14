@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Knitli Inc.
+
+SPDX-License-Identifier: MIT OR Apache-2.0
+-->
+
 # Data Integrity, Versioning, and Migration Analysis Report
 
 **CodeWeaver Data Architecture Assessment**
