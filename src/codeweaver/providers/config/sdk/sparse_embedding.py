@@ -15,6 +15,7 @@ from typing import Annotated, Any, ClassVar, Literal, Self, cast
 from pydantic import Field
 from qdrant_client.models import Datatype, Modifier, SparseIndexParams
 
+from codeweaver.core import effective_cpu_count
 from codeweaver.core.constants import DEFAULT_LOCAL_EMBEDDING_BATCH_SIZE, ZERO
 from codeweaver.core.types import BasedModel, ModelName, ModelNameT, Provider
 from codeweaver.providers.config.sdk.embedding import (
@@ -94,7 +95,7 @@ class SentenceTransformersSparseEmbeddingConfig(BaseSparseEmbeddingConfig):
 
     _is_sparse: ClassVar[bool] = True
 
-    provider: Literal[Provider.SENTENCE_TRANSFORMERS] = Provider.SENTENCE_TRANSFORMERS
+    provider: ClassVar[Literal[Provider.SENTENCE_TRANSFORMERS]] = Provider.SENTENCE_TRANSFORMERS
 
     embedding: SentenceTransformersEncodeDict = Field(
         default_factory=_st_options_factory, description="Parameters for document/corpus encoding."
@@ -111,8 +112,8 @@ class SentenceTransformersSparseEmbeddingConfig(BaseSparseEmbeddingConfig):
         """Convert the Sentence Transformers configuration to a dictionary of options."""
         return SerializedEmbeddingOptionsDict(
             model_name=ModelName(self.model_name),
-            embedding=cast(dict[str, Any], self.embedding or {}),
-            query=cast(dict[str, Any], self.query or {}),
+            embedding=cast(dict[str, Any], self.embedding),
+            query=cast(dict[str, Any], self.query),
             model={},
         )
 
@@ -190,7 +191,7 @@ class FastEmbedSparseEmbeddingConfig(BaseSparseEmbeddingConfig):
 
     _is_sparse: ClassVar[bool] = True
 
-    provider: Literal[Provider.FASTEMBED] = Provider.FASTEMBED
+    provider: ClassVar[Literal[Provider.FASTEMBED]] = Provider.FASTEMBED
 
     embedding: dict[str, Any] = Field(
         default_factory=dict, description="Parameters for document embedding requests."
@@ -210,8 +211,8 @@ class FastEmbedSparseEmbeddingConfig(BaseSparseEmbeddingConfig):
         """Convert the FastEmbed embedding configuration to a dictionary of options."""
         return SerializedEmbeddingOptionsDict(
             model_name=ModelName(self.model_name),
-            embedding=self.embedding or {},
-            query=self.query or {},
+            embedding=self.embedding,
+            query=self.query,
             model={},
         )
 
@@ -236,7 +237,10 @@ class FastEmbedSparseEmbeddingConfig(BaseSparseEmbeddingConfig):
     @classmethod
     def _defaults(cls) -> dict[str, Any]:
         """Return default values for the configuration."""
-        return {}
+        return {
+            "embedding": {"parallel": effective_cpu_count()},
+            "query": {"parallel": effective_cpu_count()},
+        }
 
 
 # ============================================================================

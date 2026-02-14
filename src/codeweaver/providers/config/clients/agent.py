@@ -57,7 +57,6 @@ class XAIClientOptions(ClientOptions):
 
     _core_provider: ClassVar[Literal[Provider.X_AI]] = Provider.X_AI
     _providers: ClassVar[tuple[Provider, ...]] = (Provider.X_AI,)
-    tag: Literal["x_ai"] = "x_ai"
 
     api_key: SecretStr | None = None
     management_api_key: SecretStr | None = None

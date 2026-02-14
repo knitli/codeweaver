@@ -87,8 +87,6 @@ class SparseEmbeddingProviderSettings(BaseSparseEmbeddingProviderSettings):
         """Return True if the provider settings are for a cloud deployment."""
         return is_cloud_provider(self)
 
-    tag: Literal["sentence-transformers"] = "sentence-transformers"
-
     def __init__(self, **data: Any) -> None:
         """Initialize the SparseEmbeddingProviderSettings."""
         model_key = (
@@ -96,10 +94,8 @@ class SparseEmbeddingProviderSettings(BaseSparseEmbeddingProviderSettings):
         )
 
         if "client_options" in data and isinstance(data["client_options"], dict):
-            data["client_options"]["tag"] = self.client.variable
             data["client_options"][model_key] = data.get("model_name", self.model_name)
-        elif data.get("client_options"):
-            data["client_options"].tag = self.client.variable
+        if isinstance(data.get("client_options"), ClientOptions):
             setattr(data["client_options"], model_key, data.get("model_name", self.model_name))
         if isinstance(data["sparse_embedding_config"], dict):
             data["sparse_embedding_config"]["model_name"] = data.get("model_name", self.model_name)

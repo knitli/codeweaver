@@ -60,7 +60,6 @@ class QdrantClientOptions(ClientOptions):
 
     _core_provider: Provider = Provider.QDRANT
     _providers: tuple[Provider, ...] = (Provider.QDRANT, Provider.MEMORY)
-    tag: Literal["qdrant"] = "qdrant"
 
     location: Literal[":memory:"] | AnyUrl | None = None
     url: AnyUrl | Literal[":memory:"] | None = None

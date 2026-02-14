@@ -9,7 +9,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Annotated, ClassVar, Literal
 
-from pydantic import AnyUrl, Field, PositiveFloat, SecretStr, Tag
+from pydantic import AnyUrl, Field, PositiveFloat, SecretStr
 
 from codeweaver.core.constants import DEFAULT_AGENT_TIMEOUT
 from codeweaver.core.types import AnonymityConversion, FilteredKey, FilteredKeyT, Provider
@@ -21,7 +21,6 @@ class TavilyClientOptions(ClientOptions):
 
     _core_provider: ClassVar[Literal[Provider.TAVILY]] = Provider.TAVILY
     _providers: ClassVar[tuple[Provider, ...]] = (Provider.TAVILY,)
-    tag: Literal["tavily"] = "tavily"
 
     api_key: SecretStr | str | None = None
     company_info_tags: Sequence[str] | None = None
@@ -42,7 +41,6 @@ class DuckDuckGoClientOptions(ClientOptions):
 
     _core_provider: ClassVar[Literal[Provider.DUCKDUCKGO]] = Provider.DUCKDUCKGO
     _providers: ClassVar[tuple[Provider, ...]] = (Provider.DUCKDUCKGO,)
-    tag: Literal["duckduckgo"] = "duckduckgo"
 
     proxy: str | None = None
     timeout: PositiveFloat | None = None
@@ -57,7 +55,6 @@ class ExaClientOptions(ClientOptions):
 
     _core_provider: ClassVar[Literal[Provider.EXA]] = Provider.EXA
     _providers: ClassVar[tuple[Provider, ...]] = (Provider.EXA,)
-    tag: Literal["exa"] = "exa"
 
     api_key: SecretStr | str | None = None
     api_base: AnyUrl | None = AnyUrl("https://api.exa.ai")
@@ -70,10 +67,8 @@ class ExaClientOptions(ClientOptions):
 
 
 type GeneralDataClientOptionsType = Annotated[
-    Annotated[TavilyClientOptions, Tag(Provider.TAVILY.variable)]
-    | Annotated[ExaClientOptions, Tag(Provider.EXA.variable)]
-    | Annotated[DuckDuckGoClientOptions, Tag(Provider.DUCKDUCKGO.variable)],
-    Field(description="Data client options type.", discriminator="tag"),
+    DuckDuckGoClientOptions | ExaClientOptions | TavilyClientOptions,
+    Field(description="Data client options type."),
 ]
 
 

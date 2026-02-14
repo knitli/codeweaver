@@ -39,7 +39,7 @@ class BaseDataProviderSettings(BaseProviderCategorySettings):
     @property
     def client(self) -> LiteralSDKClient:
         """Return the data SDKClient enum member."""
-        return SDKClient.from_string(self.tag)
+        return SDKClient.from_string(self.provider.variable)
 
     def is_cloud(self) -> bool:
         """Return True if the provider is a cloud provider, False otherwise."""

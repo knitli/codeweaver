@@ -25,6 +25,7 @@ if TYPE_CHECKING:
         ProviderLiteralString,
         SDKClientLiteralString,
     )
+    from codeweaver.core.types.aliases import ModelNameT
     from codeweaver.core.types.service_cards import ServiceCard
 
 
@@ -116,6 +117,19 @@ class SDKClient(BaseEnum):
         from codeweaver.core.types.service_cards import get_service_cards
 
         yield from get_service_cards(client=self.variable)
+
+    def card_for_provider_and_category(
+        self, provider: Provider, category: ProviderCategory, model_hint: ModelNameT | None = None
+    ) -> ServiceCard | None:
+        """Get the service card for a given provider and category that uses this SDK client."""
+        from codeweaver.core.types.service_cards import get_service_card
+
+        return get_service_card(
+            provider.variable,
+            category.variable,
+            client_preference=self.variable,
+            model_hint=str(model_hint) if model_hint else None,
+        )
 
     @classmethod
     def clients(cls) -> Generator[tuple[SDKClient, LazyImport[Any]]]:

@@ -773,7 +773,7 @@ def _get_pydantic_ai_provider_cls(provider_name: str) -> LazyImport[Any]:
             .replace("llm", "LLM")
             .replace("face", "Face")
             .replace("Ovhcloud", "OVHcloud")
-        )  # the c is lowercase ... for some reason
+        )  # the c is lowercase ... for some reason, I guess to distinguish the acronym from "cloud"?
     return lazy_import(f"pydantic_ai.providers.{module_name}", class_name)
 
 
@@ -1104,7 +1104,7 @@ def _build_multi_client_cards() -> list[ServiceCard]:
             metadata=ServiceMetadata(
                 handler=(
                     "client",
-                    lambda client, *args, **kwargs: client("bedrock", *args, **kwargs),
+                    lambda client, *args, **kwargs: client("bedrock-runtime", *args, **kwargs),
                 )
             ),
         ),
@@ -1119,7 +1119,9 @@ def _build_multi_client_cards() -> list[ServiceCard]:
             metadata=ServiceMetadata(
                 handler=(
                     "client",
-                    lambda client, *args, **kwargs: client("bedrock-runtime", *args, **kwargs),
+                    lambda client, *args, **kwargs: client(
+                        "bedrock-agent-runtime", *args, **kwargs
+                    ),
                 )
             ),
         ),

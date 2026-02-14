@@ -114,7 +114,6 @@ class _BaseQdrantVectorStoreProviderSettings(VectorStoreProviderSettings):
         )
         constructed = self.__class__.model_construct(
             provider=provider,
-            tag=provider.variable,
             connection=connection,
             client_options=prepared_client_options,
             collection=prepared_collection,
@@ -333,7 +332,6 @@ class MemoryVectorStoreProviderSettings(_BaseQdrantVectorStoreProviderSettings):
             )
         constructed = self.__class__.model_construct(
             provider=provider,
-            tag=provider.variable,
             connection=connection,
             client_options=prepared_client_options,
             collection=prepared_collection,

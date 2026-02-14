@@ -280,7 +280,7 @@ class TestNoDataLoss:
         total_vectors = 10000
         checkpoint_vectors = 2500
 
-        checkpoint = MigrationCheckpoint(
+        MigrationCheckpoint(
             migration_id="test",
             state=MigrationState.IN_PROGRESS,
             batches_completed=25,

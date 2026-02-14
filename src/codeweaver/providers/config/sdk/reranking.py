@@ -10,11 +10,25 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from collections.abc import Sequence
-from typing import Annotated, Any, Literal, NotRequired, Required, TypedDict, cast, override
+from typing import (
+    Annotated,
+    Any,
+    ClassVar,
+    Literal,
+    NotRequired,
+    Required,
+    TypedDict,
+    cast,
+    override,
+)
 
 from pydantic import Field
 
-from codeweaver.core.constants import DEFAULT_EMBEDDING_BATCH_SIZE, DEFAULT_RERANKING_MAX_RESULTS
+from codeweaver.core.constants import (
+    DEFAULT_EMBEDDING_BATCH_SIZE,
+    DEFAULT_LOCAL_EMBEDDING_BATCH_SIZE,
+    DEFAULT_RERANKING_MAX_RESULTS,
+)
 from codeweaver.core.types import BasedModel, ModelName, ModelNameT, Provider
 from codeweaver.providers import RerankingModelCapabilities
 
@@ -111,10 +125,7 @@ class SentenceTransformersRerankingOptionsDict(TypedDict, total=False):
 class BaseRerankingConfig(BasedModel):
     """Base configuration for reranking models."""
 
-    provider: Provider = Field(
-        ...,
-        description="The provider for this reranking configuration. Used for discriminated unions.",
-    )
+    provider: ClassVar[Provider] = Provider.NOT_SET
 
     model_name: ModelNameT = Field(
         default_factory=ModelName,
@@ -163,7 +174,7 @@ class BaseRerankingConfig(BasedModel):
 class VoyageRerankingConfig(BaseRerankingConfig):
     """Configuration options for Voyage AI reranking models."""
 
-    provider: Literal[Provider.VOYAGE] = Provider.VOYAGE
+    provider: ClassVar[Literal[Provider.VOYAGE]] = Provider.VOYAGE
 
     model_name: Literal["rerank-2.5", "rerank-2.5-lite"] | ModelNameT = Field(
         default_factory=ModelName,
@@ -197,8 +208,7 @@ class VoyageRerankingConfig(BaseRerankingConfig):
 class CohereRerankingConfig(BaseRerankingConfig):
     """Configuration options for Cohere reranking models."""
 
-    tag: Literal["cohere"] = "cohere"
-    provider: Literal[Provider.COHERE] = Provider.COHERE
+    provider: ClassVar[Literal[Provider.COHERE]] = Provider.COHERE
 
     model_name: (
         Literal[
@@ -300,7 +310,7 @@ class FastEmbedRerankingConfig(BaseRerankingConfig):
     @classmethod
     def _defaults(cls) -> dict[str, Any]:
         """Default config values for the rerank config."""
-        return {"rerank": {"batch_size": DEFAULT_EMBEDDING_BATCH_SIZE}}
+        return {"rerank": {"batch_size": DEFAULT_LOCAL_EMBEDDING_BATCH_SIZE}}
 
 
 class SentenceTransformersRerankingConfig(BaseRerankingConfig):

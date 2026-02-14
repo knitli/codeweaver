@@ -109,10 +109,6 @@ class BaseProviderCategorySettings(BasedModel, ABC):
     client_options: Annotated[
         ClientOptions | None, Field(description="Client options for the provider's client.")
     ] = None
-    tag: ProviderLiteralString = Field(
-        default_factory=_resolve_tag,
-        description="A tag to differentiate between multiple providers of the same type. You don't need to provide this, we'll figure it out from the provider, provider category, and other context.",
-    )
 
     category: ClassVar[ProviderCategory]
     """The provider category for these settings. This is set in the subclasses and used to determine which provider class to instantiate when loading from config."""
@@ -167,11 +163,6 @@ class BaseProviderCategorySettings(BasedModel, ABC):
 
     def _initialize(self, data: dict[str, Any]) -> dict[str, Any]:
         """Perform any additional initialization steps. Happens before pydantic initialization and the model's post_init."""
-        client_options = data.get("client_options")
-        if isinstance(client_options, dict):
-            data["client_options"]["tag"] = cast(SDKClient, self.client).variable
-        elif client_options:
-            data["client_options"].tag = cast(SDKClient, self.client).variable
         return data
 
     def _set_client_option(
@@ -235,6 +226,7 @@ class BaseProviderCategorySettings(BasedModel, ABC):
 
     @abstractmethod
     @computed_field
+    @property
     def client(self) -> LiteralSDKClient:
         """Return an SDKClient enum member corresponding to this provider settings instance.  Often this is the same as `self.provider`, but not always, and sometimes must be computed (e.g., Azure embedding models)."""
         raise NotImplementedError("client must be implemented by subclasses.")
@@ -278,7 +270,6 @@ class BaseProviderCategorySettingsDict(TypedDict, total=False):
 
     provider: Required[Provider]
     connection: NotRequired[ConnectionConfiguration | None]
-    tag: NotRequired[ProviderLiteralString]
     client_options: NotRequired[ClientOptions | None]
 
 

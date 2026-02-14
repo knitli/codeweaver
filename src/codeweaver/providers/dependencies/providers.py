@@ -8,15 +8,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, TypeAliasType
 
-from codeweaver.core import INJECTED, ProviderCategoryLiteralString
-from codeweaver.core.dependencies import ServiceCardsDep
-from codeweaver.core.types import (
-    LiteralProvider,
-    LiteralProviderCategory,
-    LiteralSDKClient,
-    ModelNameT,
-    ProviderCategory,
-)
+from codeweaver.core import ProviderCategoryLiteralString
+from codeweaver.core.types import LiteralProviderCategory, ProviderCategory
 from codeweaver.providers.config import ProviderCategorySettingsType
 from codeweaver.providers.config.categories import AsymmetricEmbeddingProviderSettings
 from codeweaver.providers.embedding import EmbeddingProvider
@@ -71,16 +64,6 @@ async def _get_settings_for_category(
 from codeweaver.core.di.utils import dependency_provider
 
 
-async def _get_service_card_for_provider(
-    provider: LiteralProvider,
-    category: LiteralProviderCategory,
-    model_name: ModelNameT,
-    sdk: LiteralSDKClient,
-    service_cards: ServiceCardsDep = INJECTED,
-) -> str | None:
-    """Get the service card for a given provider."""
-
-
 def _properties_for_category(
     category: LiteralProviderCategory,
 ) -> dict[LiteralProviderCategory, set[str]]:
@@ -116,9 +99,93 @@ async def _create_embedding_providers() -> tuple[EmbeddingProvider, ...]:
         )
     if not isinstance(settings, tuple):
         settings = (settings,)
-    providers = []
     for setting in settings:
-        client_options = setting.client_options
         embed_config = setting.embed_config
-        query_config = setting.query_config
-        model_config = setting.model_config if hasattr(setting, "model_config") else {}
+        setting.model_config if hasattr(setting, "model_config") else {}
+        if card := setting.client.card_for_provider_and_category(
+            setting.provider, type(setting).category.variable, str(embed_config.model_name)
+        ):
+            await card.create_instance(target="client")
+        card.client_cls._resolve()
+
+
+# ===========================================================================
+# *                      Agent Factory Architecture
+# ===========================================================================
+#
+# Agents use a different construction pattern from other CodeWeaver providers because they're
+# built on pydantic_ai, which uses a 3-layer architecture vs CodeWeaver's 2-layer pattern.
+#
+# ARCHITECTURE COMPARISON
+# =======================
+#
+# pydantic_ai (3 layers):           CodeWeaver (2 layers):
+#   1. Provider (auth/client) [^1]    1. Client (instance) (i.e. `anthropic.AsyncAnthropic`)
+#   2. Model (API interface)          2. Provider (interface)
+#   3. Agent (orchestration)
+#
+# [^1]: pydantic_ai Providers can receive auth and connection parameters or a client instance, but typically construct the client internally. All CodeWeaver providers expect a client instance to be passed in, and don't handle auth or connection management directly. Since pydantic_ai allows this, we stick to the pattern for Agents, passing in a constructed client. If we didn't, we'd lose our extensive customization of the client construction process, which is part of our "everything configurable; nothing requires configuration" philosophy.
+#
+#
+# COMPONENT MAPPING
+# =================
+#
+# Pydantic AI          | CodeWeaver Alias     | Purpose
+# ---------------------|----------------------|----------------------------------
+# Provider             | AgentProvider        | Auth, connection management
+# Model                | (no equivalent)      | API abstraction layer
+# ModelSettings        | AgentModelConfig     | Request config (temp, max_tokens)
+# ModelProfile         | AgentModelCapabilities* | API compatibility (JSON schemas)
+# Agent                | (no equivalent)      | Conversation orchestration
+#
+# * Note: ModelProfile is more focused on API compatibility than general capabilities
+#
+# CONSTRUCTION FLOW
+# =================
+#
+# Factory must perform 3-step construction:
+#
+#   1. Construct Provider (client wrapper with auth):
+#      provider = infer_provider(provider_name, api_key=...)
+#
+#   2. Construct Model (with provider + settings + profile):
+#      model = ModelClass(
+#          model_name,
+#          provider=provider,
+#          settings=agent_model_config,
+#          profile=None  # Usually auto-selected by provider
+#      ) # unlike with CodeWeaver providers, you don't need to pass profile/capabilities here.
+# we do resolve profiles internally, but primarily for things like the cli `list` command.
+#
+#   3. Construct Agent (with model + tools + prompts):
+#      agent = Agent(
+#          model,
+#          output_type=output_type,
+#          tools=tools,
+#          system_prompt=system_prompt
+#      )
+#
+# WHY THE DIFFERENCE?
+# ===================
+#
+# pydantic_ai prioritizes:
+#   - Multi-vendor flexibility (swap providers without code changes)
+#   - Composability (mix providers/models/profiles independently)
+#   - Better separation of concerns (auth vs API vs orchestration)
+#
+# CodeWeaver prioritizes:
+#   - Simplicity (direct provider interface)
+#   - Consistency (unified pattern across categories)
+#   - Ease of reasoning (fewer abstraction layers, simpler abstractions)
+#   - CodeWeaver's focus on vector search and embeddings means the third abstraction layer for orchestration is
+#     less relevant, since most of the complexity is in the provider/model layer.
+#
+# The pydantic_ai approach is more flexible and has cleaner separation of concerns,
+# but requires understanding its multi-layer architecture for proper construction.
+#
+# The CodeWeaver approach is simpler and more consistent across categories, but can lead to more complex
+# provider implementations that handle both auth and API logic, may also require: more boilerplate in providers,
+# and more overlap between provider implementations.
+#
+# We may eventually want to move our architecture closer to the pydantic_ai pattern, or even directly extend it. # We didn't do it originally because we didn't understand it, and that's a good indicator that it might be a
+# barrier to contributions or extensibility. It's not magic, but it's also not intuitive.

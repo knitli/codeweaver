@@ -123,17 +123,17 @@ class RerankingProviderSettings(BaseRerankingProviderSettings):
 
     def __init__(self, **data: Any) -> None:
         """Initialize the RerankingProviderSettings."""
-        if "client_options" in data and isinstance(data["client_options"], dict):
-            data["client_options"]["tag"] = self.client.variable
-            if self.provider in (Provider.SENTENCE_TRANSFORMERS, Provider.FASTEMBED):
-                if self.provider == Provider.FASTEMBED:
-                    data["client_options"]["model_name"] = data.get("model_name", self.model_name)
-                else:
-                    data["client_options"]["model_name_or_path"] = data.get(
-                        "model_name", self.model_name
-                    )
-        elif data.get("client_options"):
-            data["client_options"].tag = self.client.variable
+        if (
+            "client_options" in data
+            and isinstance(data["client_options"], dict)
+            and self.provider in (Provider.SENTENCE_TRANSFORMERS, Provider.FASTEMBED)
+        ):
+            if self.provider == Provider.FASTEMBED:
+                data["client_options"]["model_name"] = data.get("model_name", self.model_name)
+            else:
+                data["client_options"]["model_name_or_path"] = data.get(
+                    "model_name", self.model_name
+                )
         if isinstance(data["reranking_config"], dict):
             data["reranking_config"]["model_name"] = data["model_name"]
             data["reranking_config"]["provider"] = self.provider
@@ -146,9 +146,7 @@ class RerankingProviderSettings(BaseRerankingProviderSettings):
 def _construct_st_client_options(data: dict[str, Any]) -> SentenceTransformersClientOptions:
     """Construct a SentenceTransformersClientOptions from the input data."""
     return SentenceTransformersClientOptions(
-        tag="sentence_transformers",
-        model_name_or_path=data["model_name"],
-        **data.get("client_options", {}),
+        model_name_or_path=data["model_name"], **data.get("client_options", {})
     )
 
 
@@ -213,9 +211,7 @@ class BedrockRerankingProviderSettings(BedrockProviderMixin, RerankingProviderSe
     provider: Literal[Provider.BEDROCK]
     client_options: BedrockClientOptions = Field(
         description="Client options for the Bedrock re-ranking provider.",
-        default_factory=lambda data: BedrockClientOptions(
-            tag="bedrock", **data.get("client_options", {})
-        ),
+        default_factory=lambda data: BedrockClientOptions(**data.get("client_options", {})),
     )
     reranking_config: BedrockRerankingConfig = Field(
         description="Reranking configuration for the Bedrock re-ranking provider.",

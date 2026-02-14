@@ -7,13 +7,13 @@
 from __future__ import annotations
 
 import contextlib
+import importlib
 import logging
 
 from abc import ABC, abstractmethod
 from functools import cached_property
-from typing import Annotated, Any, Literal, NotRequired, Required, Self, TypedDict, cast
+from typing import Annotated, Any, ClassVar, Literal, NotRequired, Required, Self, TypedDict, cast
 
-from beartype.typing import ClassVar
 from pydantic import (
     AnyUrl,
     ConfigDict,
@@ -36,6 +36,30 @@ from codeweaver.core.types import (
     SDKClient,
 )
 from codeweaver.core.utils import has_package
+from codeweaver.providers import (
+    BedrockCohereConfigDict,
+    BedrockEmbeddingConfig,
+    BedrockEmbeddingRequestParams,
+    BedrockTitanV2ConfigDict,
+    EmbeddingModelCapabilities,
+    FastEmbedEmbeddingConfig,
+    GoogleClientOptions,
+    GoogleEmbeddingConfig,
+    HuggingFaceClientOptions,
+    HuggingFaceEmbeddingConfig,
+    MistralEmbeddingConfig,
+    SentenceTransformersClientOptions,
+    SentenceTransformersEmbeddingConfig,
+    SentenceTransformersEncodeDict,
+    VoyageClientOptions,
+    VoyageEmbeddingConfig,
+)
+from codeweaver.providers.config import (
+    CohereEmbeddingConfig,
+    CohereEmbeddingOptionsDict,
+    GoogleEmbeddingRequestParams,
+    MistralClientOptions,
+)
 from codeweaver.providers.config.categories.base import BaseProviderCategorySettings
 from codeweaver.providers.config.categories.mixins import (
     AzureProviderMixin,
@@ -75,6 +99,23 @@ if has_package("sentence_transformers"):
     )
 
 possible_tags = get_provider_names_for_category("embedding")
+
+
+def _get_embedding_capabilities(model_name: ModelNameT) -> EmbeddingModelCapabilities | None:
+    """Get the embedding model capabilities for a given model name.
+
+    Args:
+        model_name: The name of the embedding model.
+        sparse: Whether to get sparse embedding capabilities.
+
+    Returns:
+        The embedding model capabilities or None if not found.
+    """
+    resolver_module = importlib.import_module(
+        "codeweaver.providers.embedding.capabilities.resolver"
+    )
+    resolver = resolver_module.EmbeddingCapabilityResolver
+    return None if resolver is None else resolver().resolve(model_name)
 
 
 class BaseEmbeddingProviderSettings(BaseProviderCategorySettings, ABC):
@@ -152,6 +193,12 @@ class EmbeddingProviderSettings(BaseEmbeddingProviderSettings):
             data["model_name"] = ModelName(config_model_name)
         super().__init__(**data)
 
+    def _get_capabilities(self) -> Any:
+        """Get capabilities for the embedding model."""
+        if self.embedding_config and self.embedding_config.capabilities:
+            return self.embedding_config.capabilities
+        return _get_embedding_capabilities(self.model_name)
+
     @computed_field
     @property
     def client(self) -> LiteralSDKClient:
@@ -173,15 +220,33 @@ class EmbeddingProviderSettings(BaseEmbeddingProviderSettings):
             return SDKClient.COHERE
         return SDKClient.OPENAI
 
+    def _filter_kwargs(self, kwargs: dict[str, Any]) -> dict[str, Any]:
+        """An optional filter for embed and query kwargs that subclasses may implement."""
+        return kwargs
+
     def get_embed_kwargs(self) -> dict[str, Any]:
         """Get keyword arguments for embedding requests based on the provider settings."""
         embedding_config = self.embedding_config.as_options()
-        return embedding_config.get("embedding", {})
+        return self._filter_kwargs(embedding_config.get("embedding", {}))
 
     def get_query_embed_kwargs(self) -> dict[str, Any]:
         """Get keyword arguments for query embedding requests based on the provider settings."""
         embedding_config = self.embedding_config.as_options()
-        return embedding_config.get("query", {})
+        return self._filter_kwargs(embedding_config.get("query", {}))
+
+    def is_cloud(self) -> bool:
+        """Return True if the provider settings are for a cloud deployment."""
+        return self.client not in {SDKClient.SENTENCE_TRANSFORMERS, SDKClient.FASTEMBED}
+
+
+type AzureClientOptionsType = Annotated[
+    Annotated[CohereClientOptions, Tag(Provider.COHERE.variable)]
+    | Annotated[OpenAIClientOptions, Tag(Provider.OPENAI.variable)],
+    Field(
+        description="Client options for the provider's client.",
+        discriminator=Discriminator(discriminate_azure_embedding_client_options),
+    ),
+]
 
 
 class AzureEmbeddingProviderSettings(AzureProviderMixin, EmbeddingProviderSettings):
@@ -190,17 +255,33 @@ class AzureEmbeddingProviderSettings(AzureProviderMixin, EmbeddingProviderSettin
     model_config = EmbeddingProviderSettings.model_config | ConfigDict(frozen=False)
 
     provider: Literal[Provider.AZURE]
-    client_options: (
-        Annotated[
-            Annotated[CohereClientOptions, Tag(Provider.COHERE.variable)]
-            | Annotated[OpenAIClientOptions, Tag(Provider.OPENAI.variable)],
-            Field(
-                description="Client options for the provider's client.",
-                discriminator=Discriminator(discriminate_azure_embedding_client_options),
-            ),
-        ]
-        | None
-    ) = None
+    client_options: AzureClientOptionsType | None = Field(
+        default=None, description="Client options for either Cohere or OpenAI client."
+    )
+    embedding_config: Annotated[
+        CohereEmbeddingConfig | BedrockEmbeddingConfig,
+        Field(
+            description="Model configuration for embedding operations.",
+            discriminator="client_options",
+        ),
+    ]
+
+    @property
+    def uses_cohere_api(self) -> bool:
+        """Determine if the provider is configured to use Cohere for embedding."""
+        return self.client == SDKClient.COHERE
+
+    @property
+    def uses_openai_api(self) -> bool:
+        """Determine if the provider is configured to use OpenAI for embedding."""
+        return not self.uses_cohere_api
+
+    def _filter_kwargs(self, kwargs: dict[str, Any]) -> dict[str, Any]:
+        """Filter kwargs to ensure compatibility with Azure embedding requirements."""
+        if (embedding_types := kwargs.get("embedding_types")) and embedding_types != "float":
+            kwargs = kwargs.copy()
+            kwargs["embedding_types"] = "float"
+        return kwargs
 
     @model_validator(mode="after")
     def _validate_client_options(self) -> Self:
@@ -213,17 +294,14 @@ class AzureEmbeddingProviderSettings(AzureProviderMixin, EmbeddingProviderSettin
             return self
         if not self.client_options:
             client_options = (
-                CohereClientOptions() if self.client == SDKClient.COHERE else OpenAIClientOptions()
+                CohereClientOptions() if self.uses_cohere_api else OpenAIClientOptions()
             )
         else:
             client_options = self.client_options
         api_key = self.api_key or self.client_options.api_key or Provider.AZURE.get_env_api_key()
         options = self.as_azure_options() | client_options.model_dump() | {"api_key": api_key}
-        is_cohere = (
-            isinstance(client_options, CohereClientOptions) or self.client == SDKClient.COHERE
-        )
         if not options.get("base_url") and (
-            endpoint := try_for_azure_endpoint(options, cohere=is_cohere)
+            endpoint := try_for_azure_endpoint(options, cohere=self.uses_cohere_api)
         ):
             options["base_url"] = AnyUrl(endpoint)
         final_client_options = {
@@ -233,7 +311,7 @@ class AzureEmbeddingProviderSettings(AzureProviderMixin, EmbeddingProviderSettin
         }
         client = (
             CohereClientOptions(**final_client_options)
-            if is_cohere
+            if self.uses_cohere_api
             else OpenAIClientOptions(**final_client_options)
         )
         object.__setattr__(self, "client_options", client)
@@ -254,10 +332,36 @@ class AzureEmbeddingProviderSettings(AzureProviderMixin, EmbeddingProviderSettin
 class BedrockEmbeddingProviderSettings(BedrockProviderMixin, EmbeddingProviderSettings):
     """Provider settings for Bedrock embedding models."""
 
-    client_options: Annotated[
-        BedrockClientOptions | None, Field(description="Client options for the provider's client.")
-    ] = None
     provider: Literal[Provider.BEDROCK]
+
+    model_name: ModelNameT | None = Field(
+        default=None,
+        init=False,
+        description="The name of the embedding model to use. For Bedrock, this is optional because the model ARN is required and contains the model name. If not provided, the model name will be inferred from the ARN.",
+    )
+
+    client_options: BedrockClientOptions = Field(
+        default_factory=BedrockClientOptions, description="Client options for Bedrock."
+    )
+
+    embedding_config: BedrockEmbeddingConfig = Field(
+        default_factory=lambda data: BedrockEmbeddingConfig(
+            model_name=ModelName(data["model_name"] if isinstance(data, dict) else data.model_name)
+        ),
+        description="Model configuration for embedding operations.",
+    )
+
+    @property
+    def is_cohere_model(self) -> bool:
+        """Determine if the provider is configured to use a Cohere model for embedding."""
+        return str(self.model_name).startswith("cohere")
+
+    def _filter_kwargs(self, kwargs: dict[str, Any]) -> dict[str, Any]:
+        """Ensure datatype is float. If not, we'll quantize when stored but not now."""
+        if "embedding_types" in kwargs and kwargs["embedding_types"] != "float":
+            kwargs = kwargs.copy()
+            kwargs["embedding_types"] = "float"
+        return kwargs
 
     @model_validator(mode="after")
     def _inject_model_arn_into_params(self) -> Self:
@@ -273,22 +377,64 @@ class BedrockEmbeddingProviderSettings(BedrockProviderMixin, EmbeddingProviderSe
             return self
 
         # Inject ARN into embedding params
+        base_config = BedrockEmbeddingRequestParams(model_id=self.model_arn)
+        base_model_options = (
+            BedrockCohereConfigDict(embedding_types="float")
+            if self.is_cohere_model
+            else BedrockTitanV2ConfigDict(embedding_types="float")
+        )
+        model_name = str(self.model_name) or self.model_arn.split("/")[-1]
+        self.model_name = self.model_name or ModelName(model_name)
+
         if self.embedding_config.embedding:
-            if "model_id" not in self.embedding_config.embedding:
-                self.embedding_config.embedding["model_id"] = self.model_arn
+            self.embedding_config.embedding = base_config | self.embedding_config.embedding
         else:
-            # Create embedding params with just the model_id
-            object.__setattr__(self.embedding_config, "embedding", {"model_id": self.model_arn})
-
-        # Inject ARN into query params
-        if self.embedding_config.query:
-            if "model_id" not in self.embedding_config.query:
-                self.embedding_config.query["model_id"] = self.model_arn
-        else:
-            # Create query params with just the model_id
-            object.__setattr__(self.embedding_config, "query", {"model_id": self.model_arn})
-
+            self.embedding_config = BedrockEmbeddingConfig(
+                model_name=model_name,
+                embedding=base_config,
+                query=base_config,
+                model=base_model_options,
+            )
         return self
+
+
+def _cohere_default_embedding_config_factory(data: dict[str, Any]) -> CohereEmbeddingConfig:
+    """Default factory for Cohere embedding config."""
+    data = data if isinstance(data, dict) else data.model_dump()
+    model_name = ModelName(data["model_name"])
+    if (capabilities := _get_embedding_capabilities(model_name)) is not None:
+        options = CohereEmbeddingOptionsDict(
+            output_dimension=capabilities.default_dimension, embedding_types="float"
+        )
+        config = CohereEmbeddingConfig(model_name=model_name, embedding=options, query=options)
+        config.set_datatype("float")
+        config.set_dimension(capabilities.default_dimension)
+        return config
+    return CohereEmbeddingConfig(
+        model_name=model_name,
+        embedding=CohereEmbeddingOptionsDict(),
+        query=CohereEmbeddingOptionsDict(),
+    )
+
+
+class CohereEmbeddingProviderSettings(EmbeddingProviderSettings):
+    """Provider settings for direct use of Cohere as a provider."""
+
+    provider: Literal[Provider.COHERE]
+    client_options: CohereClientOptions = Field(
+        default_factory=CohereClientOptions,
+        description="Client options for Cohere embedding client.",
+    )
+    embedding_config: CohereEmbeddingConfig = Field(
+        default_factory=_cohere_default_embedding_config_factory
+    )
+
+    def _filter_kwargs(self, kwargs: dict[str, Any]) -> dict[str, Any]:
+        """Filter kwargs to ensure compatibility with Cohere embedding requirements."""
+        if (embedding_types := kwargs.get("embedding_types")) and embedding_types != "float":
+            kwargs = kwargs.copy()
+            kwargs["embedding_types"] = "float"
+        return kwargs
 
 
 class FastEmbedEmbeddingProviderSettings(FastEmbedProviderMixin, EmbeddingProviderSettings):
@@ -296,10 +442,51 @@ class FastEmbedEmbeddingProviderSettings(FastEmbedProviderMixin, EmbeddingProvid
 
     provider: Literal[Provider.FASTEMBED]
 
-    client_options: Annotated[
-        FastEmbedClientOptions | None,
-        Field(description="Client options for the provider's client."),
-    ] = None
+    client_options: FastEmbedClientOptions = Field(
+        default_factory=lambda data: FastEmbedClientOptions(
+            model_name=ModelName(data["model_name"] if isinstance(data, dict) else data.model_name)
+        ),
+        description="Client options for FastEmbed embedding client.",
+    )
+
+    embedding_config: FastEmbedEmbeddingConfig = Field(
+        default_factory=lambda data: FastEmbedClientOptions(
+            model_name=ModelName(data["model_name"] if isinstance(data, dict) else data.model_name)
+        )
+    )
+
+
+def _google_default_embedding_config_factory(data: dict[str, Any]) -> GoogleEmbeddingConfig:
+    """Default factory for Google embedding config."""
+    data = data if isinstance(data, dict) else data.model_dump()
+    model_name = ModelName(data["model_name"])
+    if (capabilities := _get_embedding_capabilities(model_name)) is not None:
+        options = GoogleEmbeddingRequestParams(output_dimensionality=capabilities.default_dimension)
+        config = GoogleEmbeddingConfig(model_name=model_name, embedding=options, query=options)
+        config.set_dimension(capabilities.default_dimension)
+        config.set_datatype("float")
+        return config
+    return GoogleEmbeddingConfig(
+        model_name=model_name,
+        embedding=GoogleEmbeddingRequestParams(),
+        query=GoogleEmbeddingRequestParams(),
+    )
+
+
+class GoogleEmbeddingProviderSettings(EmbeddingProviderSettings):
+    """Provider settings for Google embedding models."""
+
+    provider: Literal[Provider.GOOGLE]
+
+    client_options: GoogleClientOptions = Field(
+        default_factory=GoogleClientOptions,
+        description="Client options for Google embedding client.",
+    )
+
+    embedding_config: GoogleEmbeddingConfig = Field(
+        default_factory=_google_default_embedding_config_factory,
+        description="Model configuration for Google embedding operations.",
+    )
 
 
 type CoreEmbeddingProviderSettingsType = Annotated[
@@ -313,6 +500,107 @@ type CoreEmbeddingProviderSettingsType = Annotated[
     ),
 ]
 """A type alias representing all configuration classes for core embedding providers -- meaning an embedding provider that only represents one model. This is used as the type for the embed_provider and query_provider fields in the AsymmetricEmbeddingProviderSettings, which allows for asymmetric embedding configurations where the embed and query providers can be different but still must be from the same family."""
+
+
+class HuggingFaceEmbeddingProviderSettings(EmbeddingProviderSettings):
+    """Provider settings for HuggingFace Inference embedding models."""
+
+    provider: Literal[Provider.HUGGINGFACE_INFERENCE]
+
+    client_options: HuggingFaceClientOptions = Field(
+        default_factory=lambda data: HuggingFaceClientOptions(
+            model=str(data["model_name"] if isinstance(data, dict) else data.model_name)
+        ),
+        description="Client options for HuggingFace Inference embedding client.",
+    )
+
+    embedding_config: HuggingFaceEmbeddingConfig = Field(
+        default_factory=lambda data: HuggingFaceEmbeddingConfig(
+            model_name=str(data["model_name"] if isinstance(data, dict) else data.model_name)
+        )
+    )
+
+
+class MistralEmbeddingProviderSettings(EmbeddingProviderSettings):
+    """Provider settings for Mistral embedding models."""
+
+    provider: Literal[Provider.MISTRAL]
+
+    client_options: MistralClientOptions = Field(
+        description="Client options for Mistral embedding client.",
+        default_factory=MistralClientOptions,
+    )
+
+    embedding_config: MistralEmbeddingConfig = Field(
+        default_factory=lambda data: MistralEmbeddingConfig(
+            model_name=ModelName(
+                data["model_name"] if isinstance(data, dict) else data.model_name,
+                **MistralEmbeddingConfig._defaults(),
+            )
+        ),
+        description="Model configuration for Mistral embedding operations.",
+    )
+
+    def _filter_kwargs(self, kwargs: dict[str, Any]) -> dict[str, Any]:
+        """Filter kwargs to ensure compatibility with Mistral embedding requirements."""
+        if (dtype := kwargs.get("output_dtype")) and dtype != "float":
+            kwargs = kwargs.copy()
+            kwargs["output_dtype"] = "float"
+        return kwargs
+
+
+class SentenceTransformersEmbeddingProviderSettings(EmbeddingProviderSettings):
+    """Provider settings for Sentence Transformers embedding models."""
+
+    provider: Literal[Provider.SENTENCE_TRANSFORMERS]
+
+    client_options: SentenceTransformersClientOptions = Field(
+        default_factory=lambda data: SentenceTransformersClientOptions(
+            model_name_or_path=str(
+                data["model_name"] if isinstance(data, dict) else data.model_name
+            )
+        ),
+        description="Client options for Sentence Transformers embedding client.",
+    )
+    embedding_config: SentenceTransformersEmbeddingConfig = Field(
+        default_factory=lambda data: SentenceTransformersEmbeddingConfig(
+            model_name=str(data["model_name"] if isinstance(data, dict) else data.model_name),
+            embedding=SentenceTransformersEncodeDict(),
+            query=SentenceTransformersEncodeDict(),
+        )
+    )
+
+    def _filter_kwargs(self, kwargs: dict[str, Any]) -> dict[str, Any]:
+        """Filter kwargs to ensure compatibility with Sentence Transformers embedding requirements."""
+        if (precision := kwargs.get("precision")) is not None and precision != "float32":
+            kwargs = kwargs.copy()
+            kwargs["precision"] = "float32"
+        return kwargs
+
+
+class VoyageEmbeddingProviderSettings(EmbeddingProviderSettings):
+    """Provider settings for Voyage embedding models."""
+
+    provider: Literal[Provider.VOYAGE]
+
+    client_options: VoyageClientOptions = Field(
+        default_factory=VoyageClientOptions,
+        description="Client options for Voyage embedding client.",
+    )
+
+    embedding_config: VoyageEmbeddingConfig = Field(
+        default_factory=lambda data: VoyageEmbeddingConfig(
+            model_name=ModelName(data["model_name"] if isinstance(data, dict) else data.model_name)
+        ),
+        description="Model configuration for Voyage embedding operations.",
+    )
+
+    def _filter_kwargs(self, kwargs: dict[str, Any]) -> dict[str, Any]:
+        """Filter kwargs to ensure compatibility with Voyage embedding requirements."""
+        if (dtype := kwargs.get("output_dtype")) and dtype != "float":
+            kwargs = kwargs.copy()
+            kwargs["output_dtype"] = "float"
+        return kwargs
 
 
 class AsymmetricEmbeddingProviderSettingsDict(TypedDict, total=False):
@@ -661,7 +949,13 @@ __all__ = (
     "AzureEmbeddingProviderSettings",
     "BaseEmbeddingProviderSettings",
     "BedrockEmbeddingProviderSettings",
+    "CohereEmbeddingProviderSettings",
     "EmbeddingProviderSettings",
     "EmbeddingProviderSettingsType",
     "FastEmbedEmbeddingProviderSettings",
+    "GoogleEmbeddingProviderSettings",
+    "HuggingFaceEmbeddingProviderSettings",
+    "MistralEmbeddingProviderSettings",
+    "SentenceTransformersEmbeddingProviderSettings",
+    "VoyageEmbeddingProviderSettings",
 )

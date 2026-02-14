@@ -29,7 +29,14 @@ from typing import (
 from pydantic import Discriminator, Field, PositiveInt, PrivateAttr, Tag, computed_field
 from qdrant_client.models import Datatype, Distance, ScalarQuantization, ScalarType, VectorParams
 
-from codeweaver.core import BasedModel, ConfigurationError, ModelName, ModelNameT, Provider
+from codeweaver.core import (
+    BasedModel,
+    ConfigurationError,
+    ModelName,
+    ModelNameT,
+    Provider,
+    effective_cpu_count,
+)
 from codeweaver.core.constants import (
     DATATYPE_FIELDS,
     DEFAULT_EMBEDDING_TIMEOUT,
@@ -455,12 +462,12 @@ class EmbeddingMixin:
 class BaseEmbeddingConfig(BasedModel, EmbeddingMixin):
     """Base configuration for embedding models."""
 
-    provider: Provider | None = Field(
+    provider: ClassVar[Provider | None] = Field(
         None,
         description="The provider for this embedding configuration. You don't have to provide this value -- while provider is a required setting at the top-level EmbeddingProviderSettings object, we will inject that value into the embedding configuration for you, so you can just specify the provider-specific config without worrying about the provider field in most cases.",
     )
 
-    model_name: ModelNameT | None = Field(
+    model_name: ModelNameT = Field(
         default_factory=ModelName,
         description="The name of the embedding model to use. This should be in the format used by the provider (e.g., for Bedrock, this would be the model ARN). Like with `provider`, we can inject that value into the embedding configuration for you, so you can just specify the model-specific config without worrying about the model_name field in most cases.",
     )
@@ -562,7 +569,7 @@ type BedrockModelConfig = Annotated[
 class BedrockEmbeddingConfig(BaseEmbeddingConfig):
     """Configuration options for Bedrock embedding models."""
 
-    provider: Literal[Provider.BEDROCK] = Provider.BEDROCK
+    provider: ClassVar[Literal[Provider.BEDROCK]] = Provider.BEDROCK
 
     model_name: (
         Literal[
@@ -575,15 +582,22 @@ class BedrockEmbeddingConfig(BaseEmbeddingConfig):
     ) = Field(default_factory=ModelName, description="The Bedrock embedding model to use.")
     """The Bedrock embedding model to use. Can be one of the predefined models or a custom model identifier. Note that this isn't the AWS `model_id` (usually its ARN) - that's specified in the embedding request params."""
 
-    model: Annotated[
-        BedrockModelConfig, Field(description="Model-specific embedding configuration options.")
-    ]
+    model: BedrockModelConfig = Field(
+        default_factory=lambda data: (
+            BedrockCohereConfigDict()
+            if str(data["model_name"] if isinstance(data, dict) else data.model_name).startswith(
+                "cohere"
+            )
+            else BedrockTitanV2ConfigDict()
+        ),
+        description="Model-specific configuration options for Bedrock embedding models.",
+    )
     """Model-specific embedding configuration options."""
 
-    embedding: BedrockEmbeddingRequestParams | None
+    embedding: BedrockEmbeddingRequestParams | None = None
     """Parameters for the embedding request to Bedrock."""
 
-    query: BedrockEmbeddingRequestParams | None
+    query: BedrockEmbeddingRequestParams | None = None
     """Parameters for the query request to Bedrock."""
 
     def set_dimension(self, dimension: int) -> Self:
@@ -697,15 +711,14 @@ class CohereEmbeddingOptionsDict(TypedDict, total=False):
     truncate: NotRequired[Literal["NONE", "START", "END"]]
     """Truncation strategy for inputs that exceed the model's maximum context length. Can be "NONE", "START", or "END". Defaults to "NONE"."""
 
-    request_options: CohereRequestOptionsDict | None
+    request_options: NotRequired[CohereRequestOptionsDict]
     """Additional request options for the Cohere API."""
 
 
 class CohereEmbeddingConfig(BaseEmbeddingConfig):
     """Configuration options for Cohere embedding models."""
 
-    tag: Literal["cohere"] = "cohere"
-    provider: Literal[Provider.COHERE] = Provider.COHERE
+    provider: ClassVar[Literal[Provider.COHERE]] = Provider.COHERE
 
     model_name: (
         Literal[
@@ -716,12 +729,18 @@ class CohereEmbeddingConfig(BaseEmbeddingConfig):
             "embed-multilingual-light-v3.0",
         ]
         | ModelNameT
-    )
+    ) = Field(default_factory=ModelName, description="The Cohere embedding model to use.")
     """The Cohere embedding model to use."""
 
-    embedding: CohereEmbeddingOptionsDict | None = None
+    embedding: CohereEmbeddingOptionsDict = Field(
+        default_factory=CohereEmbeddingOptionsDict,
+        description="Parameters for the embedding request to Cohere.",
+    )
 
-    query: CohereEmbeddingOptionsDict | None = None
+    query: CohereEmbeddingOptionsDict = Field(
+        default_factory=CohereEmbeddingOptionsDict,
+        description="Parameters for the query request to Cohere.",
+    )
 
     model: dict[str, Any] | None = None
 
@@ -810,10 +829,12 @@ class CohereEmbeddingConfig(BaseEmbeddingConfig):
 
 
 class FastEmbedEmbeddingConfig(BaseEmbeddingConfig):
-    """Configuration options for FastEmbed embedding models."""
+    """Configuration options for FastEmbed embedding models.
 
-    tag: Literal["fastembed"] = "fastembed"
-    provider: Literal[Provider.FASTEMBED] = Provider.FASTEMBED
+    FastEmbed has no specific embedding parameters. It does pass kwargs on to the ONNX model, but they are the same keys/values as `FastEmbedClientOptions`, and are combined internally in FastEmbed. So, these are empty dicts and we recommend you set configs using `FastEmbedClientOptions` instead of these fields, but we include them here for consistency and future extensibility.
+    """
+
+    provider: ClassVar[Literal[Provider.FASTEMBED]] = Provider.FASTEMBED
 
     embedding: dict[str, Any] = Field(
         default_factory=dict, description="Parameters for document embedding requests."
@@ -852,7 +873,8 @@ class FastEmbedEmbeddingConfig(BaseEmbeddingConfig):
     @classmethod
     def _defaults() -> dict[str, Any]:
         """Return default values for the configuration."""
-        return {}
+        # ok, there is one parameter
+        return {"parallel": effective_cpu_count()}
 
 
 class GoogleEmbeddingRequestParams(TypedDict, total=False):
@@ -865,15 +887,22 @@ class GoogleEmbeddingRequestParams(TypedDict, total=False):
 class GoogleEmbeddingConfig(BaseEmbeddingConfig):
     """Configuration options for Google embedding models."""
 
-    tag: Literal["google"] = "google"
-    provider: Literal[Provider.GOOGLE] = Provider.GOOGLE
+    provider: ClassVar[Literal[Provider.GOOGLE]] = Provider.GOOGLE
 
-    model_name: Literal["gemini-embedding-001"] | ModelNameT
+    model_name: Literal["gemini-embedding-001"] | ModelNameT = Field(
+        default_factory=ModelName, description="The Google embedding model to use."
+    )
     """The Google embedding model to use."""
-    embedding: GoogleEmbeddingRequestParams | None = None
+    embedding: GoogleEmbeddingRequestParams = Field(
+        default_factory=GoogleEmbeddingRequestParams,
+        description="Parameters for the embedding request to Google.",
+    )
     """Parameters for the embedding request to Google."""
 
-    query: GoogleEmbeddingRequestParams | None = None
+    query: GoogleEmbeddingRequestParams = Field(
+        default_factory=GoogleEmbeddingRequestParams,
+        description="Parameters for the query request to Google.",
+    )
     """Parameters for the query request to Google."""
 
     def set_dimension(self, dimension: int) -> Self:
@@ -941,11 +970,45 @@ class GoogleEmbeddingConfig(BaseEmbeddingConfig):
         return ()
 
 
+class HuggingFaceEmbeddingOptionsDict(TypedDict, total=False):
+    """Embedding request options for HuggingFace embedding API.
+
+    These parameters are passed to the embedding generation method (e.g., pipeline or client method).
+    """
+
+    normalize: NotRequired[bool]
+    """Whether to normalize the embeddings to unit length. Defaults to True."""
+
+    prompt_name: NotRequired[str]
+    """The prompt name to use for the embedding request, if the model supports prompt-based embeddings. This is used to specify different prompts for query vs document embeddings when the model supports it."""
+
+    truncate: NotRequired[bool]
+    """Whether to truncate inputs that exceed the model's maximum context length. Defaults to True."""
+
+    truncation_direction: NotRequired[Literal["left", "right"]]
+    """The direction to truncate inputs that exceed the model's maximum context length. Can be "left" or "right" if truncate is 'True'."""
+
+
 class HuggingFaceEmbeddingConfig(BaseEmbeddingConfig):
     """Configuration options for HuggingFace embedding models."""
 
-    tag: Literal["huggingface"] = "huggingface"
-    provider: Literal[Provider.HUGGINGFACE_INFERENCE] = Provider.HUGGINGFACE_INFERENCE
+    provider: ClassVar[Literal[Provider.HUGGINGFACE_INFERENCE]] = Provider.HUGGINGFACE_INFERENCE
+
+    embedding: HuggingFaceEmbeddingOptionsDict = Field(
+        default_factory=lambda: HuggingFaceEmbeddingOptionsDict(
+            HuggingFaceEmbeddingConfig._defaults()["embedding"]
+        ),
+        description="Parameters for document embedding requests.",
+    )
+    """Parameters for document embedding requests."""
+
+    query: HuggingFaceEmbeddingOptionsDict = Field(
+        default_factory=lambda: HuggingFaceEmbeddingOptionsDict(
+            HuggingFaceEmbeddingConfig._defaults()["query"]
+        ),
+        description="Parameters for query embedding requests.",
+    )
+    """Parameters for query embedding requests."""
 
     def set_dimension(self, dimension: int) -> Self:
         """Set the embedding dimension explicitly in the embedding configuration.
@@ -972,7 +1035,14 @@ class HuggingFaceEmbeddingConfig(BaseEmbeddingConfig):
         Returns:
             Explicitly configured dimension or None
         """
-        return self._dimension
+        if self._dimension:
+            return self._dimension
+        if (capabilities := self.capabilities) and (
+            dim := getattr(capabilities, "default_dimension", None)
+        ):
+            self.set_dimension(dim)
+            return dim
+        return None
 
     def _get_datatype(self) -> str | None:
         """Get explicitly configured datatype without fallbacks.
@@ -981,6 +1051,12 @@ class HuggingFaceEmbeddingConfig(BaseEmbeddingConfig):
         Returns:
             Explicitly configured datatype or None
         """
+        if self._datatype:
+            return self._datatype
+        if (capabilities := self.capabilities) and (
+            dtype := getattr(capabilities, "default_datatype", None)
+        ):
+            self.set_datatype(dtype)
         return self._datatype
 
     def _as_options(self) -> SerializedEmbeddingOptionsDict:
@@ -1027,16 +1103,23 @@ class MistralEmbeddingOptionsDict(TypedDict, total=False):
 class MistralEmbeddingConfig(BaseEmbeddingConfig):
     """Configuration options for Mistral AI embedding models."""
 
-    tag: Literal["mistral"] = "mistral"
-    provider: Literal[Provider.MISTRAL] = Provider.MISTRAL
+    provider: ClassVar[Literal[Provider.MISTRAL]] = Provider.MISTRAL
 
-    model_name: Literal["mistral-embed", "codestral-embed"] | ModelNameT
+    model_name: Literal["mistral-embed", "codestral-embed"] | ModelNameT = Field(
+        default_factory=ModelName, description="The Mistral AI embedding model to use."
+    )
     """The Mistral AI embedding model to use."""
 
-    embedding: MistralEmbeddingOptionsDict | None = None
+    embedding: MistralEmbeddingOptionsDict = Field(
+        default_factory=MistralEmbeddingOptionsDict,
+        description="Parameters for document embedding requests.",
+    )
     """Parameters for document embedding requests."""
 
-    query: MistralEmbeddingOptionsDict | None = None
+    query: MistralEmbeddingOptionsDict = Field(
+        default_factory=MistralEmbeddingOptionsDict,
+        description="Parameters for query embedding requests (same as embedding for Mistral).",
+    )
     """Parameters for query embedding requests (same as embedding for Mistral)."""
 
     def _as_options(self) -> SerializedEmbeddingOptionsDict:
@@ -1069,10 +1152,8 @@ class MistralEmbeddingConfig(BaseEmbeddingConfig):
             dimension: The dimension to set.
         """
         object.__setattr__(self, "_dimension", dimension)
-        self.embedding = self.embedding or {}  # ty:ignore[invalid-assignment]
-        self.query = self.query or {}  # ty:ignore[invalid-assignment]
-        self.embedding["output_dimension"] = dimension  # ty:ignore[invalid-assignment]
-        self.query["output_dimension"] = dimension  # ty:ignore[invalid-assignment]
+        self.embedding["output_dimension"] = dimension
+        self.query["output_dimension"] = dimension
         return self
 
     def _get_dimension(self) -> int | None:
@@ -1136,17 +1217,21 @@ class OpenAIEmbeddingConfig(BaseEmbeddingConfig):
     Supports OpenAI, Azure OpenAI, Ollama, Fireworks, Together AI, GitHub Models, Groq, and other OpenAI-compatible providers.
     """
 
-    tag: Literal["openai"] = "openai"
-    provider: Literal[Provider.OPENAI] = Provider.OPENAI
+    provider: ClassVar[Literal[Provider.OPENAI]] = Provider.OPENAI
 
-    model_name: Literal["text-embedding-3-large", "text-embedding-3-small"] | ModelNameT
-    """The OpenAI-compatible embedding model to use."""
+    model_name: Literal["text-embedding-3-large", "text-embedding-3-small"] | ModelNameT = Field(
+        default_factory=ModelName, description="The OpenAI-API compatible embedding model to use."
+    )
 
-    embedding: OpenAIEmbeddingRequestParams | None = None
-    """Parameters for document embedding requests."""
+    embedding: OpenAIEmbeddingRequestParams = Field(
+        default_factory=OpenAIEmbeddingRequestParams,
+        description="Parameters for document embedding requests.",
+    )
 
-    query: OpenAIEmbeddingRequestParams | None = None
-    """Parameters for query embedding requests (same as embedding for OpenAI)."""
+    query: OpenAIEmbeddingRequestParams = Field(
+        default_factory=OpenAIEmbeddingRequestParams,
+        description="Parameters for query embedding requests (same as embedding for OpenAI).",
+    )
 
     def _as_options(self) -> SerializedEmbeddingOptionsDict:
         """Convert the OpenAI embedding configuration to a dictionary of options."""
@@ -1164,10 +1249,8 @@ class OpenAIEmbeddingConfig(BaseEmbeddingConfig):
             dimension: The dimension to set.
         """
         object.__setattr__(self, "_dimension", dimension)
-        self.embedding = self.embedding or {}  # ty:ignore[invalid-assignment]
-        self.query = self.query or {}  # ty:ignore[invalid-assignment]
-        self.embedding["dimensions"] = dimension  # ty:ignore[invalid-assignment]
-        self.query["dimensions"] = dimension  # ty:ignore[invalid-assignment]
+        self.embedding["dimensions"] = dimension
+        self.query["dimensions"] = dimension
         return self
 
     def set_datatype(self, datatype: str) -> Self:
@@ -1282,16 +1365,23 @@ class SentenceTransformersEmbeddingConfig(BaseEmbeddingConfig):
     Note: Sentence Transformers receives model kwargs through its client constructor. Provide model options to the `model_kwargs` field in `SentenceTransformersClientOptions`.
     """
 
-    tag: Literal["sentence_transformers"] = "sentence_transformers"
-    provider: Literal[Provider.SENTENCE_TRANSFORMERS] = Provider.SENTENCE_TRANSFORMERS
+    provider: ClassVar[Literal[Provider.SENTENCE_TRANSFORMERS]] = Provider.SENTENCE_TRANSFORMERS
 
-    model_name: ModelNameT
+    model_name: ModelNameT = Field(
+        default_factory=ModelName, description="The Sentence Transformers model to use."
+    )
     """The Sentence Transformers model to use."""
 
-    embedding: SentenceTransformersEncodeDict | None = None
+    embedding: SentenceTransformersEncodeDict = Field(
+        default_factory=SentenceTransformersEncodeDict,
+        description="Parameters for document/corpus encoding.",
+    )
     """Parameters for document/corpus encoding."""
 
-    query: SentenceTransformersEncodeDict | None = None
+    query: SentenceTransformersEncodeDict = Field(
+        default_factory=SentenceTransformersEncodeDict,
+        description="Parameters for query encoding (if different from document).",
+    )
     """Parameters for query encoding (if different from document)."""
 
     def _as_options(self) -> SerializedEmbeddingOptionsDict:
@@ -1310,10 +1400,8 @@ class SentenceTransformersEmbeddingConfig(BaseEmbeddingConfig):
             dimension: The dimension to set.
         """
         object.__setattr__(self, "_dimension", dimension)
-        self.embedding = self.embedding or {}  # ty:ignore[invalid-assignment]
-        self.embedding["truncate_dim"] = dimension  # ty:ignore[invalid-assignment]
-        self.query = self.query or {}  # ty:ignore[invalid-assignment]
-        self.query["truncate_dim"] = dimension  # ty:ignore[invalid-assignment]
+        self.embedding["truncate_dim"] = dimension
+        self.query["truncate_dim"] = dimension
         return self
 
     def set_datatype(self, datatype: str) -> Self:
@@ -1323,9 +1411,7 @@ class SentenceTransformersEmbeddingConfig(BaseEmbeddingConfig):
             datatype: The datatype to set.
         """
         object.__setattr__(self, "_datatype", datatype)
-        self.embedding = self.embedding or {}  # ty:ignore[invalid-assignment]
         self.embedding["precision"] = datatype  # ty:ignore[invalid-assignment]
-        self.query = self.query or {}  # ty:ignore[invalid-assignment]
         self.query["precision"] = datatype  # ty:ignore[invalid-assignment]
         return self
 
@@ -1386,8 +1472,7 @@ class VoyageEmbeddingOptionsDict(TypedDict, total=False):
 class VoyageEmbeddingConfig(BaseEmbeddingConfig):
     """Configuration options for Voyage AI embedding models."""
 
-    tag: Literal["voyage"] = "voyage"
-    provider: Literal[Provider.VOYAGE] = Provider.VOYAGE
+    provider: ClassVar[Literal[Provider.VOYAGE]] = Provider.VOYAGE
 
     model_name: (
         Literal[
@@ -1404,10 +1489,10 @@ class VoyageEmbeddingConfig(BaseEmbeddingConfig):
     )
     """The Voyage AI embedding model to use."""
 
-    embedding: VoyageEmbeddingOptionsDict | None = None
+    embedding: VoyageEmbeddingOptionsDict = Field(default_factory=VoyageEmbeddingOptionsDict)
     """Parameters for document embedding requests."""
 
-    query: VoyageEmbeddingOptionsDict | None = None
+    query: VoyageEmbeddingOptionsDict = Field(default_factory=VoyageEmbeddingOptionsDict)
     """Parameters for query embedding requests."""
 
     def _as_options(self) -> SerializedEmbeddingOptionsDict:

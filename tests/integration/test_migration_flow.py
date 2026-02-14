@@ -40,14 +40,13 @@ def test_container():
     """
     from codeweaver.core.di.container import Container
 
-    container = Container()
+    return Container()
 
     # TODO: Configure for testing
     # - Use inmemory vector store
     # - Use test settings
     # - Mock external providers (APIs, etc.)
 
-    return container
 
 
 @pytest.fixture

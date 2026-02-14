@@ -181,16 +181,13 @@ def discriminate_embedding_clients(v: Any) -> str | None:
     if env_var := os.environ.get("CODEWEAVER_EMBEDDING_PROVIDER"):
         return env_var.lower().replace(" ", "_").replace("-", "_")
     raise ConfigurationError(
-        "Could not discriminate embedding client options type from provided data.",
-        suggestions=[
-            "Explicitly provide a 'tag' value in your configuration. This is the same as the provider., e.g., 'openai', 'cohere', etc."
-        ],
+        "Could not discriminate embedding client options type from provided data."
     )
 
 
 def simple_provider_discriminator(value: dict[str, Any]) -> str:
     """Identify the provider for simple agent model provider options based on tag or URL patterns."""
-    return value["tag"] if isinstance(value, dict) else value.tag
+    return value["provider"].variable if isinstance(value, dict) else value.provider.variable
 
 
 def _discriminate_anthropic_client_options(value: dict[str, Any]) -> str:

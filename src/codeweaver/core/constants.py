@@ -278,10 +278,10 @@ DEFAULT_AGENT_TIMEOUT = 2 * ONE_MINUTE
 DEFAULT_EMBEDDING_TIMEOUT = 45 * ONE_SECOND
 """Default timeout in seconds for embedding operations."""
 
-DEFAULT_EMBEDDING_BATCH_SIZE = 64
+DEFAULT_EMBEDDING_BATCH_SIZE = 96
 """Default batch size for embedding operations."""
 
-DEFAULT_LOCAL_EMBEDDING_BATCH_SIZE = 32
+DEFAULT_LOCAL_EMBEDDING_BATCH_SIZE = 96
 """Default batch size for local embedding operations."""
 
 DEFAULT_RERANKING_TIMEOUT = 30 * ONE_SECOND
@@ -724,7 +724,9 @@ PREFERRED_MODELS_FOR_CONTEXT_AGENT_TASKS = (
     "claude-haiku-4.5",
     "gemini-3-flash-preview",
     "gpt-5.1-mini",
-    "minimax-m2.1grok-code-fast-1",
+    "minimax-m2.1",
+    "grok-code-fast-1",
+    "gemini-2.5-flash",
     "trinity-large-preview",
     "grok-4-1-fast",
     "glm-4.7-flash",

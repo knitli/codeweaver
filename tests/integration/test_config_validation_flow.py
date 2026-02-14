@@ -40,13 +40,12 @@ def test_container():
     """
     from codeweaver.core.di.container import Container
 
-    container = Container()
+    return Container()
 
     # Configure for testing
     # NOTE: In real implementation, would use test settings
     # with inmemory vector store and mock providers
 
-    return container
 
 
 @pytest.fixture
@@ -819,7 +818,7 @@ class TestTimeAndCostEstimates:
         new_config.dimension = 1024
         new_config.datatype = "float32"
 
-        checkpoint = await mock_checkpoint_manager.load_checkpoint()
+        await mock_checkpoint_manager.load_checkpoint()
 
         # Create fingerprint
         from codeweaver.engine.managers.checkpoint_manager import CheckpointSettingsFingerprint

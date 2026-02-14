@@ -75,7 +75,6 @@ class CohereClientOptions(ClientOptions):
 
     _core_provider: ClassVar[Literal[Provider.COHERE]] = Provider.COHERE
     _providers: ClassVar[tuple[Provider, ...]] = (Provider.COHERE, Provider.AZURE, Provider.HEROKU)
-    tag: Literal["cohere"] = "cohere"
 
     api_key: (
         Annotated[SecretStr | Callable[[], str], Field(description="Cohere API key.")] | None
@@ -119,7 +118,6 @@ class OpenAIClientOptions(ClientOptions):
     _providers: ClassVar[tuple[Provider, ...]] = tuple(
         provider for provider in Provider if provider.uses_openai_api
     )
-    tag: Literal["openai"] = "openai"
 
     api_key: (
         SecretStr | Callable[[], str | SecretStr] | Callable[[], Awaitable[str | SecretStr]] | None
@@ -181,7 +179,6 @@ class BedrockClientOptions(ClientOptions):
 
     _core_provider: ClassVar[Literal[Provider.BEDROCK]] = Provider.BEDROCK
     _providers: ClassVar[tuple[Provider, ...]] = (Provider.BEDROCK,)
-    tag: Literal["bedrock"] = "bedrock"
 
     aws_access_key_id: str | None = None
     aws_secret_access_key: SecretStr | None = None
@@ -209,7 +206,6 @@ class GoogleClientOptions(ClientOptions):
 
     _core_provider: ClassVar[Literal[Provider.GOOGLE]] = Provider.GOOGLE
     _providers: ClassVar[tuple[Provider, ...]] = (Provider.GOOGLE,)
-    tag: Literal["google"] = "google"
 
     api_key: SecretStr | None = None
     vertex_ai: bool = False
@@ -231,7 +227,6 @@ class FastEmbedClientOptions(ClientOptions):
 
     _core_provider: ClassVar[Literal[Provider.FASTEMBED]] = Provider.FASTEMBED
     _providers: ClassVar[tuple[Provider, ...]] = (Provider.FASTEMBED,)
-    tag: Literal["fastembed"] = "fastembed"
 
     model_name: str
     cache_dir: str | None = None
@@ -295,7 +290,6 @@ class SentenceTransformersClientOptions(ClientOptions):
         Provider.SENTENCE_TRANSFORMERS
     )
     _providers: ClassVar[tuple[Provider, ...]] = (Provider.SENTENCE_TRANSFORMERS,)
-    tag: Literal["sentence_transformers"] = "sentence_transformers"
 
     model_name_or_path: str | None = None
     modules: Iterable[Module] | None = None
@@ -428,7 +422,6 @@ class HuggingFaceClientOptions(ClientOptions):
         Provider.HUGGINGFACE_INFERENCE
     )
     _providers: ClassVar[tuple[Provider, ...]] = (Provider.HUGGINGFACE_INFERENCE,)
-    tag: Literal["hf_inference"] = "hf_inference"
 
     model: str | None = None
     provider: str | None = None
@@ -457,7 +450,6 @@ class MistralClientOptions(ClientOptions):
 
     _core_provider: ClassVar[Literal[Provider.MISTRAL]] = Provider.MISTRAL
     _providers: ClassVar[tuple[Provider, ...]] = (Provider.MISTRAL,)
-    tag: Literal["mistral"] = "mistral"
 
     api_key: (
         SecretStr | Callable[[], str | SecretStr] | Callable[[], Awaitable[str | SecretStr]] | None
@@ -485,10 +477,9 @@ class VoyageClientOptions(ClientOptions):
 
     _core_provider: ClassVar[Literal[Provider.VOYAGE]] = Provider.VOYAGE
     _providers: ClassVar[tuple[Provider, ...]] = (Provider.VOYAGE,)
-    tag: Literal["voyage"] = "voyage"
 
     api_key: SecretStr | None = None
-    max_retries: PositiveInt = 0
+    max_retries: PositiveInt = 0  # we handle retries ourself
     timeout: PositiveFloat | None = DEFAULT_EMBEDDING_TIMEOUT
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:

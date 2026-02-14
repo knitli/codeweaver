@@ -12,7 +12,7 @@ from __future__ import annotations
 import logging
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Literal, NotRequired, TypedDict
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, NotRequired, TypedDict
 
 from fastmcp.tools import Tool
 from pydantic import Field, PositiveInt
@@ -20,7 +20,7 @@ from pydantic import Field, PositiveInt
 from codeweaver.core import uuid7
 from codeweaver.core.constants import DEFAULT_MAX_RESULTS
 from codeweaver.core.exceptions import ConfigurationError
-from codeweaver.core.types import BasedModel, LiteralStringT, Provider, ProviderLiteralString
+from codeweaver.core.types import BasedModel, LiteralStringT, Provider
 from codeweaver.core.utils import has_package
 from codeweaver.providers import DuckDuckGoSearchTool
 
@@ -118,8 +118,7 @@ class ExaAnswerToolOptions(TypedDict, total=False):
 class BaseToolConfig(BasedModel, ABC):
     """Base configuration for data providers."""
 
-    tag: ProviderLiteralString
-    provider: Provider
+    provider: ClassVar[Provider]
 
     @abstractmethod
     async def to_call(self, *args: Any, **kwargs: Any) -> Any:
@@ -146,16 +145,7 @@ class ExaToolConfig(BaseToolConfig):
     We're very conservative about what tools we expose to the internal context agents; we want to make sure they stay focused on their core competency of tailoring and curating information for the user and the user's agent, and we don't want to overwhelm them with too many tools or capabilities that could lead them astray. The `GetContentsTool` and `AnswerTool` are the most directly relevant to their core competency, so those are the ones we're prioritizing for now.
     """
 
-    tag: ProviderLiteralString = Field(
-        "exa",
-        description="The provider tag for the Exa data provider. Used for discriminated unions.",
-        exclude=True,
-        frozen=True,
-    )
-    provider: Literal[Provider.EXA] = Field(
-        Provider.EXA, description="The provider for the Exa data provider.", frozen=True
-    )
-
+    provider: ClassVar[Literal[Provider.EXA]] = Provider.EXA
     include_search: bool = Field(
         False,
         description="Whether to include the search tool in the data provider. Defaults to False.",
@@ -248,7 +238,7 @@ class ExaToolConfig(BaseToolConfig):
 class TavilySearchContextToolConfig(BaseToolConfig):
     """Configuration for the TavilySearchContextTool."""
 
-    provider: Literal[Provider.TAVILY] = Field(Provider.TAVILY, frozen=True)
+    provider: ClassVar[Literal[Provider.TAVILY]] = Provider.TAVILY
 
     max_results: PositiveInt = Field(
         5, description="The maximum number of search results to return.", frozen=True
@@ -300,7 +290,7 @@ class TavilySearchContextToolConfig(BaseToolConfig):
 class DuckDuckGoSearchToolConfig(BaseToolConfig):
     """Configuration for the DuckDuckGoSearchTool."""
 
-    provider: Literal[Provider.DUCKDUCKGO] = Field(Provider.DUCKDUCKGO, frozen=True)
+    provider: ClassVar[Literal[Provider.DUCKDUCKGO]] = Provider.DUCKDUCKGO
 
     safesearch: Literal["on", "moderate", "off"] = Field(
         "moderate",
