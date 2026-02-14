@@ -47,7 +47,6 @@ def test_container():
     # with inmemory vector store and mock providers
 
 
-
 @pytest.fixture
 def test_config_path(tmp_path: Path) -> Path:
     """Create test configuration directory."""

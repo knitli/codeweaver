@@ -48,7 +48,6 @@ def test_container():
     # - Mock external providers (APIs, etc.)
 
 
-
 @pytest.fixture
 def test_project_dir(tmp_path: Path) -> Path:
     """Create test project directory."""
