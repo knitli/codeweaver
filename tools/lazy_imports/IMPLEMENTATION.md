@@ -8,8 +8,8 @@ SPDX-License-Identifier: MIT OR Apache-2.0
 
 ## Completed: CLI Interface
 
-**Status:** ✅ Complete  
-**Date:** 2026-02-14  
+**Status:** ✅ Complete
+**Date:** 2026-02-14
 **Location:** `src/codeweaver/tools/lazy_imports/cli.py`
 
 ### What Was Implemented
