@@ -265,6 +265,11 @@ convention = "google"
 "src/codeweaver/providers/vector_stores/inmemory.py" = [
   "C901",  # too complex - vector store initialization has many conditions
 ]
+"tools/tests/**/*.py" = [
+  "ANN201",  # missing type annotation for self in method
+  "ANN002",
+  "S101"
+]
 
 [lint.isort]
 force-single-line = false

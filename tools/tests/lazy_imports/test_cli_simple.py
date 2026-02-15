@@ -2,7 +2,6 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
-# ruff: noqa: S101, ANN201
 # sourcery skip: require-return-annotation, require-parameter-annotation, no-relative-imports
 """Simple standalone tests for lazy import CLI (no pytest fixtures needed)."""
 
@@ -80,19 +79,39 @@ def test_component_initialization():
 
 def test_validation_placeholder():
     """Test that validator returns expected structure."""
-    print("\nTesting validator behavior...")
+    print("\\nTesting validator behavior...")
+
+    from pathlib import Path
 
     from tools.lazy_imports.common.cache import AnalysisCache
-    from tools.lazy_imports.validator import ImportValidator
+    from tools.lazy_imports.validator import LazyImportValidator
 
     cache = AnalysisCache()
-    validator = ImportValidator(cache=cache)
+    validator = LazyImportValidator(cache=cache)
 
-    report = validator.validate()
+    # Validate with no files (should return successful empty report)
+    report = validator.validate(file_paths=[])
     assert report.success is True
     assert len(report.errors) == 0
     assert len(report.warnings) == 0
-    print("✓ Validator returns valid report structure")
+    assert report.metrics.files_validated == 0
+
+    # Also test with a valid file to ensure structure is correct
+    # Create a simple valid Python file
+    import tempfile
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
+        f.write('"""Test file."""\\n')
+        temp_file = Path(f.name)
+
+    try:
+        report2 = validator.validate(file_paths=[temp_file])
+        assert isinstance(report2.errors, list)
+        assert isinstance(report2.warnings, list)
+        assert report2.metrics.files_validated == 1
+        print("✓ Validator returns valid report structure")
+    finally:
+        temp_file.unlink()
 
 
 if __name__ == "__main__":

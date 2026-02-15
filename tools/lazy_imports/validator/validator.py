@@ -1,408 +1,525 @@
-#!/usr/bin/env python3
-"""Main validator for lazy import system.
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
 
-Coordinates all validation activities:
-- Import resolution
-- Consistency checking
-- Auto-fixing
+"""Main validator for lazy imports.
+
+Validates lazy_import calls and Python module structure.
 """
 
 from __future__ import annotations
 
 import ast
-import time
+import contextlib
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
-from .consistency import ConsistencyChecker
-from .fixer import AutoFixer
-from .resolver import ImportResolver
+from tools.lazy_imports.common.types import ValidationError, ValidationWarning
 
 
 if TYPE_CHECKING:
-    from ..common.types import (
-        CallError,
-        ConsistencyIssue,
-        UpdatedFile,
-        ValidationConfig,
-        ValidationReport,
-    )
+    from tools.lazy_imports.common.types import ValidationReport
+
+from tools.lazy_imports.validator.consistency import ConsistencyChecker
+from tools.lazy_imports.validator.resolver import ImportResolver
 
 
 class LazyImportValidator:
-    """Validates lazy import correctness.
+    """Validates lazy import usage and module structure.
 
-    Provides comprehensive validation of the lazy import system:
-    - Checks that all lazy_import() calls resolve correctly
-    - Verifies package consistency (__all__ matches exports)
-    - Validates TYPE_CHECKING imports
-    - Auto-fixes broken imports
+    Checks:
+    - lazy_import() call syntax and arguments
+    - Import resolution (module and object exist)
+    - __all__ declarations match definitions
+    - TYPE_CHECKING block structure
+    - Import organization
     """
 
-    def __init__(self, project_root: Path, config: ValidationConfig | None = None) -> None:
+    def __init__(
+        self,
+        project_root: Path | None = None,
+        cache: Any | None = None,  # JSONAnalysisCache type, but avoiding import
+    ) -> None:
         """Initialize validator.
 
         Args:
             project_root: Root directory of the project
-            config: Validation configuration (uses defaults if None)
+            cache: Optional cache for analysis results (not currently used but accepted for compatibility)
         """
-        self.project_root = project_root
-        self.config = config or self._default_config()
+        self.project_root = project_root or Path.cwd()
+        self.cache = cache  # Store for future use
+        self.resolver = ImportResolver(project_root=self.project_root)
+        self.consistency_checker = ConsistencyChecker(project_root=self.project_root)
 
-        # Create components
-        self.resolver = ImportResolver(project_root)
-        self.consistency_checker = ConsistencyChecker(project_root)
-        self.fixer = AutoFixer(project_root, dry_run=self.config.dry_run_by_default)
-
-    def validate_file(self, file_path: Path) -> list:
-        """Validate a single file.
+    def validate_file(self, file_path: Path) -> list[ValidationError | ValidationWarning]:
+        """Validate a single Python file.
 
         Args:
-            file_path: Path to the file to validate
+            file_path: Path to Python file to validate
 
         Returns:
-            List of validation issues found in the file
+            List of validation errors and warnings
         """
-        from ..common.types import ValidationError, ValidationWarning
-
-        errors: list = []
-
-        # Check if file exists
-        if not file_path.exists():
-            errors.append(
-                ValidationError(
-                    file=file_path,
-                    line=0,
-                    message=f"File not found: {file_path}",
-                    suggestion="Check the file path",
-                    code="FILE_NOT_FOUND",
-                )
-            )
-            return errors
-
-        # Check for syntax errors first
         try:
             content = file_path.read_text()
-            ast.parse(content, str(file_path))
+            tree = ast.parse(content)
         except SyntaxError as e:
-            errors.append(
+            return [
                 ValidationError(
                     file=file_path,
-                    line=e.lineno or 0,
+                    line=e.lineno,
                     message=f"Syntax error: {e.msg}",
-                    suggestion="Fix the syntax error",
+                    suggestion="Fix syntax error",
                     code="SYNTAX_ERROR",
                 )
-            )
-            return errors  # Can't validate further if syntax is broken
+            ]
         except Exception as e:
-            errors.append(
+            return [
                 ValidationError(
                     file=file_path,
-                    line=0,
-                    message=f"Error reading file: {e}",
-                    suggestion="Check file encoding and permissions",
-                    code="READ_ERROR",
+                    line=None,
+                    message=f"Validation failed: {e}",
+                    suggestion="Check file for errors",
+                    code="VALIDATION_ERROR",
+                )
+            ]
+
+        issues: list[ValidationError | ValidationWarning] = []
+        has_all_declaration = self._collect_all_declaration_issues(file_path, tree, issues)
+        has_type_checking_block, has_lazy_import_calls = self._check_structure_and_imports(
+            file_path, tree, issues
+        )
+        issues.extend(
+            self._finalize_warnings(
+                file_path,
+                tree,
+                has_all_declaration=has_all_declaration,
+                has_type_checking_block=has_type_checking_block,
+                has_lazy_import_calls=has_lazy_import_calls,
+            )
+        )
+        return issues
+
+    def _collect_all_declaration_issues(
+        self, file_path: Path, tree: ast.AST, issues: list[ValidationError | ValidationWarning]
+    ) -> bool:
+        has_all_declaration = False
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Assign):
+                continue
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id == "__all__":
+                    has_all_declaration = True
+                    issues.extend(self._validate_all_declaration(file_path, node))
+        return has_all_declaration
+
+    def _check_structure_and_imports(
+        self, file_path: Path, tree: ast.AST, issues: list[ValidationError | ValidationWarning]
+    ) -> tuple[bool, bool]:
+        seen_code = False
+        has_type_checking_block = False
+        has_lazy_import_calls = False
+
+        for i, node in enumerate(tree.body):
+            is_import = isinstance(node, (ast.Import, ast.ImportFrom))
+            is_code = self._is_code_statement(node, is_import=is_import)
+
+            if is_import and seen_code and not self._is_type_checking_block(tree.body[:i]):
+                issues.append(
+                    ValidationWarning(
+                        file=file_path,
+                        line=node.lineno,
+                        message="Import statement after non-import code",
+                        suggestion="Move imports to the top of the file",
+                    )
+                )
+
+            if is_code:
+                seen_code = True
+
+            if isinstance(node, ast.If) and self._is_type_checking_guard(node):
+                has_type_checking_block = True
+                issues.extend(self._validate_type_checking_block(file_path, node))
+
+            has_lazy_import_calls |= self._collect_lazy_import_issues(file_path, node, issues)
+
+        return has_type_checking_block, has_lazy_import_calls
+
+    def _is_code_statement(self, node: ast.stmt, *, is_import: bool) -> bool:
+        if is_import:
+            return False
+        if isinstance(node, ast.Expr):
+            return not isinstance(node.value, ast.Constant)
+        return not isinstance(node, ast.Pass)
+
+    def _collect_lazy_import_issues(
+        self, file_path: Path, node: ast.stmt, issues: list[ValidationError | ValidationWarning]
+    ) -> bool:
+        if isinstance(node, ast.Assign):
+            return self._collect_lazy_import_calls_from_value(file_path, node.value, issues)
+        if (
+            isinstance(node, ast.Expr)
+            and isinstance(node.value, ast.Call)
+            and self._is_lazy_import_call(node.value)
+        ):
+            issues.extend(self._validate_lazy_import_call(file_path, node.value))
+            return True
+        return False
+
+    def _collect_lazy_import_calls_from_value(
+        self, file_path: Path, value: ast.AST, issues: list[ValidationError | ValidationWarning]
+    ) -> bool:
+        found = False
+        for item in ast.walk(value):
+            if isinstance(item, ast.Call) and self._is_lazy_import_call(item):
+                found = True
+                issues.extend(self._validate_lazy_import_call(file_path, item))
+        return found
+
+    def _finalize_warnings(
+        self,
+        file_path: Path,
+        tree: ast.AST,
+        *,
+        has_all_declaration: bool,
+        has_type_checking_block: bool,
+        has_lazy_import_calls: bool,
+    ) -> list[ValidationError | ValidationWarning]:
+        issues: list[ValidationError | ValidationWarning] = []
+
+        if not has_all_declaration and self._has_exports(tree):
+            issues.append(
+                ValidationWarning(
+                    file=file_path,
+                    line=1,
+                    message="Missing __all__ declaration",
+                    suggestion="Add __all__ to explicitly declare public API",
                 )
             )
-            return errors
 
-        # Find lazy_import() calls
-        if self.config.check_lazy_import_calls:
-            call_errors = self._find_lazy_import_calls(file_path)
+        if has_lazy_import_calls and not has_type_checking_block:
+            issues.append(
+                ValidationWarning(
+                    file=file_path,
+                    line=1,
+                    message="File uses lazy_import but has no TYPE_CHECKING block",
+                    suggestion="Add TYPE_CHECKING block with type imports for better type checking",
+                )
+            )
 
-            # Check each call
-            for module, obj, line in call_errors:
-                resolution = self.resolver.resolve_lazy_import(module, obj)
-                if not resolution.exists:
-                    errors.append(
-                        ValidationError(
-                            file=file_path,
-                            line=line,
-                            message=f"Broken import: lazy_import({module!r}, {obj!r})",
-                            suggestion=f"Check if module '{module}' exports '{obj}'",
-                            code="BROKEN_IMPORT",
-                        )
-                    )
+        return issues
 
-        # Check TYPE_CHECKING imports
-        if self.config.check_type_checking_imports:
-            type_checking_imports = self._find_type_checking_imports(file_path)
-            for module, obj, line in type_checking_imports:
-                if not self.resolver.check_type_checking_import(module, obj):
-                    errors.append(
-                        ValidationWarning(
-                            file=file_path,
-                            line=line,
-                            message=f"TYPE_CHECKING import may not exist: from {module} import {obj}",
-                            suggestion="Verify this import is valid",
-                        )
-                    )
-
-        return errors
-
-    def validate_files(self, file_paths: list[Path]) -> list:
+    def validate_files(self, file_paths: list[Path]) -> list[ValidationError | ValidationWarning]:
         """Validate multiple files.
 
         Args:
             file_paths: List of file paths to validate
 
         Returns:
-            Combined list of validation issues from all files
+            Combined list of all validation issues
         """
-        all_issues = []
+        all_issues: list[ValidationError | ValidationWarning] = []
         for file_path in file_paths:
-            all_issues.extend(self.validate_file(file_path))
+            issues = self.validate_file(file_path)
+            all_issues.extend(issues)
         return all_issues
 
-    def validate_imports(self) -> ValidationReport:  # noqa: C901
-        """Validate all lazy_import() calls.
+    def validate(self, file_paths: list[Path] | None = None) -> ValidationReport:
+        """Validate project files for lazy import compliance.
+
+        Validates all Python files in the project (or provided list) and aggregates results.
+
+        Args:
+            file_paths: Optional list of files to validate. If None, validates all Python files
+                       in project_root.
 
         Returns:
-            Complete validation report
+            ValidationReport with aggregated errors, warnings, and metrics
         """
-        from ..common.types import (
-            ValidationError,
-            ValidationMetrics,
-            ValidationReport,
-            ValidationWarning,
-        )
+        import time
 
-        start_time = time.perf_counter()
-        errors: list[ValidationError] = []
-        warnings: list[ValidationWarning] = []
+        from tools.lazy_imports.common.types import ValidationMetrics, ValidationReport
 
-        # Find all Python files
-        src_path = self.project_root / "src"
-        if not src_path.exists():
-            src_path = self.project_root
+        start_time = time.time()
 
-        python_files = list(src_path.rglob("*.py"))
+        # Determine files to validate
+        if file_paths is None:
+            # Find all Python files in project
+            file_paths = list(self.project_root.rglob("*.py"))
 
-        # Filter ignored files
-        if self.config.ignore_patterns:
-            python_files = [f for f in python_files if not self._is_ignored(f)]
-
-        files_validated = 0
+        # Validate all files
+        all_errors: list[ValidationError] = []
+        all_warnings: list[ValidationWarning] = []
         imports_checked = 0
 
-        # Validate each file
-        for file_path in python_files:
-            # Skip test files
-            if "test" in file_path.parts:
-                continue
+        for file_path in file_paths:
+            results = self.validate_file(file_path)
 
-            files_validated += 1
+            # Separate errors and warnings
+            errors = [r for r in results if isinstance(r, ValidationError)]
+            warnings = [r for r in results if isinstance(r, ValidationWarning)]
 
-            # Find lazy_import() calls
-            if self.config.check_lazy_import_calls:
-                call_errors = self._find_lazy_import_calls(file_path)
-                imports_checked += len(call_errors)
+            all_errors.extend(errors)
+            all_warnings.extend(warnings)
 
-                # Check each call
-                for module, obj, line in call_errors:
-                    resolution = self.resolver.resolve_lazy_import(module, obj)
-                    if not resolution.exists:
-                        errors.append(
-                            ValidationError(
-                                file=file_path,
-                                line=line,
-                                message=f"Broken import: lazy_import({module!r}, {obj!r})",
-                                suggestion=f"Check if module '{module}' exports '{obj}'",
-                                code="BROKEN_IMPORT",
-                            )
-                        )
+            # Count lazy_import calls checked
+            with contextlib.suppress(Exception):
+                content = file_path.read_text()
+                imports_checked += content.count("lazy_import(")
 
-            # Check TYPE_CHECKING imports
-            if self.config.check_type_checking_imports:
-                type_checking_imports = self._find_type_checking_imports(file_path)
-                for module, obj, line in type_checking_imports:
-                    if not self.resolver.check_type_checking_import(module, obj):
-                        warnings.append(
-                            ValidationWarning(
-                                file=file_path,
-                                line=line,
-                                message=f"TYPE_CHECKING import may not exist: from {module} import {obj}",
-                                suggestion="Verify this import is valid",
-                            )
-                        )
-
-        # Check package consistency
+        # Run consistency checks on __init__.py files
+        init_files = [f for f in file_paths if f.name == "__init__.py"]
         consistency_checks = 0
-        if self.config.check_package_consistency:
-            issues = self.check_consistency()
-            consistency_checks = len(issues)
 
-            for issue in issues:
+        for init_file in init_files:
+            consistency_issues = self.consistency_checker.check_file_consistency(init_file)
+            consistency_checks += len(consistency_issues)
+
+            # Convert ConsistencyIssue to ValidationError/Warning
+            for issue in consistency_issues:
                 if issue.severity == "error":
-                    errors.append(
+                    all_errors.append(
                         ValidationError(
                             file=issue.location,
                             line=issue.line,
                             message=issue.message,
-                            suggestion="Fix this consistency issue",
+                            suggestion="Check __all__ and _dynamic_imports consistency",
                             code="CONSISTENCY_ERROR",
                         )
                     )
                 else:
-                    warnings.append(
+                    all_warnings.append(
                         ValidationWarning(
                             file=issue.location,
                             line=issue.line,
                             message=issue.message,
-                            suggestion="Consider fixing this issue",
+                            suggestion="Review module exports",
                         )
                     )
 
-        # Calculate metrics
-        elapsed_ms = int((time.perf_counter() - start_time) * 1000)
-        metrics = ValidationMetrics(
-            files_validated=files_validated,
-            imports_checked=imports_checked,
-            consistency_checks=consistency_checks,
-            validation_time_ms=elapsed_ms,
-        )
+        end_time = time.time()
+        validation_time_ms = int((end_time - start_time) * 1000)
 
         return ValidationReport(
-            errors=errors, warnings=warnings, metrics=metrics, success=not errors
+            errors=all_errors,
+            warnings=all_warnings,
+            metrics=ValidationMetrics(
+                files_validated=len(file_paths),
+                imports_checked=imports_checked,
+                consistency_checks=consistency_checks,
+                validation_time_ms=validation_time_ms,
+            ),
+            success=len(all_errors) == 0,
         )
 
-    def check_consistency(self) -> list[ConsistencyIssue]:
-        """Check package consistency.
-
-        Returns:
-            List of consistency issues
-        """
-        src_path = self.project_root / "src"
-        if not src_path.exists():
-            src_path = self.project_root
-
-        return self.consistency_checker.check_package_consistency(src_path)
-
-    def auto_fix(self, *, dry_run: bool = True) -> list[UpdatedFile]:
-        """Auto-fix broken imports.
+    def _is_lazy_import_call(self, node: ast.Call) -> bool:
+        """Check if node is a lazy_import() call.
 
         Args:
-            dry_run: If True, don't actually modify files
+            node: AST Call node
 
         Returns:
-            List of files that were (or would be) updated
+            True if this is a lazy_import call
         """
-        # Update fixer dry_run setting
-        self.fixer.dry_run = dry_run
+        if isinstance(node.func, ast.Name) and node.func.id == "lazy_import":
+            return True
+        return bool(isinstance(node.func, ast.Attribute) and node.func.attr == "lazy_import")
 
-        # Validate to find errors
-        report = self.validate_imports()
-
-        return self.fixer.fix_validation_errors(report.errors) if report.errors else []
-
-    def fix_broken_imports(
-        self, call_errors: list[CallError], *, dry_run: bool = True
-    ) -> list[UpdatedFile]:
-        """Fix specific broken imports.
+    def _validate_lazy_import_call(
+        self, file_path: Path, node: ast.Call
+    ) -> list[ValidationError | ValidationWarning]:
+        """Validate a lazy_import() call.
 
         Args:
-            call_errors: List of broken import calls
-            dry_run: If True, don't actually modify files
+            file_path: Path to file containing the call
+            node: AST Call node for lazy_import
 
         Returns:
-            List of files that were (or would be) updated
+            List of validation issues
         """
-        self.fixer.dry_run = dry_run
-        return self.fixer.fix_broken_imports(call_errors)
+        issues: list[ValidationError | ValidationWarning] = []
 
-    def _find_lazy_import_calls(self, file_path: Path) -> list[tuple[str, str, int]]:
-        """Find all lazy_import() calls in a file.
+        # Check argument count
+        if len(node.args) < 2:
+            issues.append(
+                ValidationError(
+                    file=file_path,
+                    line=node.lineno,
+                    message="lazy_import() requires at least 2 arguments (module, object)",
+                    suggestion="Add missing arguments",
+                    code="INVALID_LAZY_IMPORT",
+                )
+            )
+            return issues
+
+        # Check that arguments are string literals
+        module_arg = node.args[0]
+        obj_arg = node.args[1]
+
+        if not isinstance(module_arg, ast.Constant) or not isinstance(module_arg.value, str):
+            issues.append(
+                ValidationError(
+                    file=file_path,
+                    line=node.lineno,
+                    message="lazy_import() module argument must be a string literal",
+                    suggestion="Use a string literal instead of a variable",
+                    code="NON_LITERAL_LAZY_IMPORT",
+                )
+            )
+            return issues
+
+        if not isinstance(obj_arg, ast.Constant) or not isinstance(obj_arg.value, str):
+            issues.append(
+                ValidationError(
+                    file=file_path,
+                    line=node.lineno,
+                    message="lazy_import() object argument must be a string literal",
+                    suggestion="Use a string literal instead of a variable",
+                    code="NON_LITERAL_LAZY_IMPORT",
+                )
+            )
+            return issues
+
+        # Resolve the import
+        module = module_arg.value
+        obj = obj_arg.value
+
+        resolution = self.resolver.resolve(module, obj)
+
+        if not resolution.exists:
+            issues.append(
+                ValidationError(
+                    file=file_path,
+                    line=node.lineno,
+                    message=resolution.error or f"Failed to resolve {module}.{obj}",
+                    suggestion="Check module and object names",
+                    code="BROKEN_IMPORT",
+                )
+            )
+
+        return issues
+
+    def _validate_type_checking_block(
+        self, file_path: Path, node: ast.If
+    ) -> list[ValidationError | ValidationWarning]:
+        """Validate TYPE_CHECKING block structure.
 
         Args:
-            file_path: Path to Python file
+            file_path: Path to file
+            node: If node for TYPE_CHECKING block
 
         Returns:
-            List of (module, obj, line) tuples
+            List of validation issues
         """
-        try:
+        issues: list[ValidationError | ValidationWarning] = []
+
+        # Check that block only contains imports
+        issues.extend(
+            ValidationWarning(
+                file=file_path,
+                line=stmt.lineno,
+                message="TYPE_CHECKING block should only contain imports",
+                suggestion="Move non-import code outside TYPE_CHECKING block",
+            )
+            for stmt in node.body
+            if not isinstance(stmt, (ast.Import, ast.ImportFrom))
+        )
+        return issues
+
+    def _validate_all_declaration(
+        self, file_path: Path, node: ast.Assign
+    ) -> list[ValidationError | ValidationWarning]:
+        """Validate __all__ declaration.
+
+        Args:
+            file_path: Path to file
+            node: Assignment node for __all__
+
+        Returns:
+            List of validation issues
+        """
+        issues: list[ValidationError | ValidationWarning] = []
+
+        if not isinstance(node.value, ast.List):
+            return issues
+
+        # Get all names in __all__
+        all_names = []
+        all_names.extend(
+            elt.value
+            for elt in node.value.elts
+            if isinstance(elt, ast.Constant) and isinstance(elt.value, str)
+        )
+        # Read the file to find defined names
+        with contextlib.suppress(Exception):
             content = file_path.read_text()
-        except Exception:
-            return []
+            tree = ast.parse(content)
 
-        try:
-            tree = ast.parse(content, str(file_path))
-        except SyntaxError:
-            return []
+            # Collect defined names
+            defined_names = set()
+            for node_item in ast.walk(tree):
+                if isinstance(node_item, (ast.FunctionDef, ast.ClassDef)):
+                    defined_names.add(node_item.name)
+                elif isinstance(node_item, ast.Assign):
+                    for target in node_item.targets:
+                        if isinstance(target, ast.Name):
+                            defined_names.add(target.id)
 
-        calls = []
-        calls.extend(
-            (node.args[0].s, node.args[1].s, node.lineno)
+            # Check for undefined names in __all__
+            issues.extend(
+                ValidationError(
+                    file=file_path,
+                    line=node.lineno,
+                    message=f"Name '{name}' in __all__ is not defined in module",
+                    suggestion=f"Define '{name}' or remove from __all__",
+                    code="UNDEFINED_IN_ALL",
+                )
+                for name in all_names
+                if name not in defined_names and name != "__all__"
+            )
+        return issues
+
+    def _is_type_checking_guard(self, node: ast.If) -> bool:
+        """Check if node is a TYPE_CHECKING guard.
+
+        Args:
+            node: If statement node
+
+        Returns:
+            True if this is a TYPE_CHECKING guard
+        """
+        return isinstance(node.test, ast.Name) and node.test.id == "TYPE_CHECKING"
+
+    def _is_type_checking_block(self, nodes: list[ast.stmt]) -> bool:
+        """Check if we're currently in a TYPE_CHECKING block.
+
+        This is a simplified check - it just looks for any TYPE_CHECKING if in the nodes.
+        More sophisticated tracking would be needed for nested structures.
+
+        Args:
+            nodes: List of AST nodes to check (body up to current position)
+
+        Returns:
+            True if there's a TYPE_CHECKING block in the nodes (simplified)
+        """
+        # For now, just return False - this is too simplistic
+        # The real check needs to track nesting depth and current scope
+        return False
+
+    def _has_exports(self, tree: ast.AST) -> bool:
+        """Check if module has any exports (classes, functions, etc.).
+
+        Args:
+            tree: Parsed AST
+
+        Returns:
+            True if module has exportable items
+        """
+        return any(
+            isinstance(node, (ast.FunctionDef, ast.ClassDef)) and not node.name.startswith("_")
             for node in ast.walk(tree)
-            if isinstance(node, ast.Call)
-            and (isinstance(node.func, ast.Name) and node.func.id == "lazy_import")
-            and len(node.args) >= 2
-            and (isinstance(node.args[0], ast.Constant) and isinstance(node.args[1], ast.Constant))
         )
-        return calls
 
-    def _find_type_checking_imports(self, file_path: Path) -> list[tuple[str, str, int]]:
-        """Find all TYPE_CHECKING imports in a file.
 
-        Args:
-            file_path: Path to Python file
-
-        Returns:
-            List of (module, obj, line) tuples
-        """
-        try:
-            content = file_path.read_text()
-        except Exception:
-            return []
-
-        try:
-            tree = ast.parse(content, str(file_path))
-        except SyntaxError:
-            return []
-
-        imports = []
-
-        # Find TYPE_CHECKING blocks
-        for node in ast.walk(tree):
-            if isinstance(node, ast.If) and (
-                isinstance(node.test, ast.Name) and node.test.id == "TYPE_CHECKING"
-            ):
-                for stmt in node.body:
-                    if isinstance(stmt, ast.ImportFrom):
-                        module = stmt.module or ""
-                        imports.extend((module, alias.name, stmt.lineno) for alias in stmt.names)
-        return imports
-
-    def _is_ignored(self, file_path: Path) -> bool:
-        """Check if file matches ignore patterns.
-
-        Args:
-            file_path: Path to check
-
-        Returns:
-            True if file should be ignored
-        """
-        import re
-
-        return any(re.search(pattern, str(file_path)) for pattern in self.config.ignore_patterns)
-
-    def _default_config(self) -> ValidationConfig:
-        """Create default validation configuration.
-
-        Returns:
-            Default ValidationConfig
-        """
-        from ..common.types import ValidationConfig
-
-        return ValidationConfig(
-            check_lazy_import_calls=True,
-            check_package_consistency=True,
-            check_broken_imports=True,
-            check_type_checking_imports=True,
-            strict_mode=False,
-            ignore_patterns=["test_.*\\.py", ".*_test\\.py"],
-            auto_fix_enabled=True,
-            dry_run_by_default=True,
-            backup_before_fix=True,
-        )
+__all__ = ["LazyImportValidator"]

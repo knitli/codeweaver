@@ -1,6 +1,9 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 """Tests for Rule Engine."""
 
-# ruff: noqa: S101, ANN201
 # sourcery skip: require-return-annotation, require-parameter-annotation, no-relative-imports
 from __future__ import annotations
 
@@ -30,7 +33,6 @@ class TestRuleEngine:
         )
         engine = RuleEngine()
 
-
         engine.add_rule(rule)
 
         result = engine.evaluate("__version__", "codeweaver.core", MemberType.VARIABLE)
@@ -50,7 +52,6 @@ class TestRuleEngine:
         )
         engine = RuleEngine()
 
-
         engine.add_rule(rule)
 
         result = engine.evaluate("get_config", "codeweaver.core", MemberType.FUNCTION)
@@ -69,7 +70,6 @@ class TestRuleEngine:
             action=RuleAction.INCLUDE,
         )
         engine = RuleEngine()
-
 
         engine.add_rule(rule)
 
@@ -166,7 +166,6 @@ class TestRuleEngine:
         )
         engine = RuleEngine()
 
-
         engine.add_rule(rule)
 
         result = engine.evaluate("MyType", "codeweaver.core.types", MemberType.CLASS)
@@ -186,7 +185,6 @@ class TestRuleEngine:
             action=RuleAction.INCLUDE,
         )
         engine = RuleEngine()
-
 
         engine.add_rule(rule)
 
@@ -226,7 +224,6 @@ class TestRuleEngine:
         )
         engine = RuleEngine()
 
-
         engine.add_rule(rule)
 
         result = engine.evaluate("_private_func", "module", MemberType.FUNCTION)
@@ -244,7 +241,6 @@ class TestRuleEngine:
             # No propagate specified
         )
         engine = RuleEngine()
-
 
         engine.add_rule(rule)
 
@@ -265,7 +261,6 @@ class TestRuleEngine:
             propagate=PropagationLevel.ROOT,
         )
         engine = RuleEngine()
-
 
         engine.add_rule(rule)
 
@@ -305,7 +300,7 @@ class TestRuleEngine:
     def test_invalid_regex_pattern(self):
         """Invalid regex pattern should raise error during rule creation or evaluation."""
         # This depends on implementation - might validate at rule load time
-        rule = Rule(
+        Rule(
             name="invalid-regex",
             priority=500,
             description="Invalid regex",
@@ -314,7 +309,6 @@ class TestRuleEngine:
         )
 
         engine = RuleEngine()
-
 
         # Should either fail at engine creation or during evaluation
         # For now, let's expect it to handle gracefully during evaluation
@@ -410,8 +404,10 @@ class TestRuleLoading:
         """Should load rules from YAML dict structure."""
         # Create a YAML file with rules
         import tempfile
-        import yaml
+
         from pathlib import Path
+
+        import yaml
 
         rules_data = {
             "schema_version": "1.0",
@@ -473,3 +469,178 @@ class TestRuleLoading:
                 action=RuleAction.INCLUDE,
                 propagate="invalid_level",
             )
+
+
+class TestSchemaVersioning:
+    """Test suite for schema version validation."""
+
+    def test_missing_schema_version_raises_error(self):
+        """Missing schema_version should raise SchemaVersionError."""
+        import tempfile
+
+        from pathlib import Path
+
+        import yaml
+
+        from tools.lazy_imports.export_manager.rules import SchemaVersionError
+
+        rules_data = {
+            # No schema_version field
+            "rules": [
+                {
+                    "name": "test-rule",
+                    "priority": 500,
+                    "description": "Test rule",
+                    "match": {"name_pattern": "^test_"},
+                    "action": "include",
+                }
+            ]
+        }
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+            yaml.dump(rules_data, f)
+            temp_path = Path(f.name)
+
+        try:
+            engine = RuleEngine()
+            with pytest.raises(SchemaVersionError) as exc_info:
+                engine.load_rules([temp_path])
+
+            error_msg = str(exc_info.value)
+            assert "Missing schema_version" in error_msg
+            assert "Expected: 1.0" in error_msg
+        finally:
+            temp_path.unlink()
+
+    def test_unsupported_version_raises_error_with_helpful_message(self):
+        """Unsupported version (e.g., '2.0') should raise with helpful message."""
+        import tempfile
+
+        from pathlib import Path
+
+        import yaml
+
+        from tools.lazy_imports.export_manager.rules import SchemaVersionError
+
+        rules_data = {
+            "schema_version": "2.0",  # Unsupported version
+            "rules": [
+                {
+                    "name": "test-rule",
+                    "priority": 500,
+                    "description": "Test rule",
+                    "match": {"name_pattern": "^test_"},
+                    "action": "include",
+                }
+            ],
+        }
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+            yaml.dump(rules_data, f)
+            temp_path = Path(f.name)
+
+        try:
+            engine = RuleEngine()
+            with pytest.raises(SchemaVersionError) as exc_info:
+                engine.load_rules([temp_path])
+
+            error_msg = str(exc_info.value)
+            assert "Unsupported schema version 2.0" in error_msg
+            assert "Supported versions: 1.0" in error_msg
+            assert "Current version: 1.0" in error_msg
+            assert "You may need to:" in error_msg
+            assert "Update CodeWeaver to support this version" in error_msg
+            assert "Migrate the config file" in error_msg
+            assert "codeweaver lazy-imports migrate" in error_msg
+        finally:
+            temp_path.unlink()
+
+    def test_supported_version_loads_successfully(self):
+        """Supported version ('1.0') should load successfully."""
+        import tempfile
+
+        from pathlib import Path
+
+        import yaml
+
+        rules_data = {
+            "schema_version": "1.0",  # Supported version
+            "rules": [
+                {
+                    "name": "test-rule",
+                    "priority": 500,
+                    "description": "Test rule",
+                    "match": {"name_pattern": "^test_"},
+                    "action": "include",
+                }
+            ],
+        }
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+            yaml.dump(rules_data, f)
+            temp_path = Path(f.name)
+
+        try:
+            engine = RuleEngine()
+            # Should not raise any errors
+            engine.load_rules([temp_path])
+
+            # Verify rule was loaded
+            result = engine.evaluate("test_func", "module", MemberType.FUNCTION)
+            assert result.action == RuleAction.INCLUDE
+        finally:
+            temp_path.unlink()
+
+    def test_future_migration_path(self):
+        """Test migration framework is in place (even if unused)."""
+        from tools.lazy_imports.export_manager.rules import RuleEngine
+
+        engine = RuleEngine()
+
+        # Test that _migrate_schema method exists and is callable
+        assert hasattr(engine, "_migrate_schema")
+        assert callable(engine._migrate_schema)
+
+        # Test migration with current version (should be no-op)
+        test_data = {"schema_version": "1.0", "rules": []}
+        migrated = engine._migrate_schema(test_data, from_version="1.0")
+
+        # Should return data unchanged (no migrations needed for 1.0 -> 1.0)
+        assert migrated == test_data
+        assert migrated["schema_version"] == "1.0"
+
+    def test_error_message_includes_migration_suggestions(self):
+        """Error message should include actionable migration suggestions."""
+        import tempfile
+
+        from pathlib import Path
+
+        import yaml
+
+        from tools.lazy_imports.export_manager.rules import SchemaVersionError
+
+        rules_data = {
+            "schema_version": "99.0",  # Future version
+            "rules": [],
+        }
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+            yaml.dump(rules_data, f)
+            temp_path = Path(f.name)
+
+        try:
+            engine = RuleEngine()
+            with pytest.raises(SchemaVersionError) as exc_info:
+                engine.load_rules([temp_path])
+
+            error_msg = str(exc_info.value)
+
+            # Check for all three suggested actions
+            assert "1. Update CodeWeaver to support this version" in error_msg
+            assert "2. Migrate the config file to 1.0" in error_msg
+            assert "3. Run: codeweaver lazy-imports migrate" in error_msg
+
+            # Verify it includes file path for context
+            assert str(temp_path) in error_msg
+        finally:
+            temp_path.unlink()

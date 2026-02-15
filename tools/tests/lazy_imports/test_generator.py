@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 """Tests for code generator.
 
 Tests cover:
@@ -10,7 +15,6 @@ Tests cover:
 - Error handling (FM-003, FM-010, FM-011)
 """
 
-# ruff: noqa: S101, ANN201
 # sourcery skip: require-return-annotation, require-parameter-annotation, no-relative-imports
 from __future__ import annotations
 
@@ -279,7 +283,7 @@ def test_write_file_atomic_on_syntax_error(generator: CodeGenerator, temp_dir: P
     # Create invalid code (force syntax error)
     exports = [make_export("MyClass", module_path)]
     manifest = make_manifest(module_path, own_exports=exports)
-    code = generator.generate(manifest)
+    generator.generate(manifest)
 
     # Corrupt the code to force syntax error
     corrupted = GeneratedCode(
@@ -499,19 +503,22 @@ def test_write_file_permission_error(generator: CodeGenerator, temp_dir: Path):
     target.parent.chmod(0o555)
 
     try:
-        exports = [make_export("MyClass", module_path)]
-        manifest = make_manifest(module_path, own_exports=exports)
-        code = generator.generate(manifest)
-
-        # Should raise OSError with helpful message (backup creation fails)
-        with pytest.raises(OSError) as exc:
-            generator.write_file(module_path, code)
-
-        assert "Permission denied" in str(exc.value)
-        assert "chmod" in str(exc.value)
+        _cause_os_error(module_path, generator)
     finally:
         # Cleanup
         target.parent.chmod(0o755)
+
+
+def _cause_os_error(module_path, generator):
+    exports = [make_export("MyClass", module_path)]
+    manifest = make_manifest(module_path, own_exports=exports)
+    code = generator.generate(manifest)
+
+    # Should raise OSError with helpful message (backup creation fails)
+    with pytest.raises(OSError, match="Permission denied") as exc:
+        generator.write_file(module_path, code)
+
+    assert "chmod" in str(exc.value)
 
 
 # Integration tests
@@ -575,20 +582,18 @@ CUSTOM = 42
 """
     target.write_text(f"{manual_code}\n{SENTINEL}\n__all__ = []")
 
-    # First regeneration
-    exports_v1 = [make_export("ClassV1", module_path)]
-    manifest_v1 = make_manifest(module_path, own_exports=exports_v1)
-    code_v1 = generator.generate(manifest_v1)
-    generator.write_file(module_path, code_v1)
-
-    # Second regeneration with different exports
-    exports_v2 = [make_export("ClassV2", module_path)]
-    manifest_v2 = make_manifest(module_path, own_exports=exports_v2)
-    code_v2 = generator.generate(manifest_v2)
-    generator.write_file(module_path, code_v2)
-
+    _create_file("ClassV1", module_path, generator)
+    _create_file("ClassV2", module_path, generator)
     # Manual section should be preserved across both regenerations
     final_content = target.read_text()
     assert "CUSTOM = 42" in final_content
     assert "ClassV2" in final_content
     assert "ClassV1" not in final_content  # Old export replaced
+
+
+def _create_file(arg0, module_path, generator):
+    # First regeneration
+    exports_v1 = [make_export(arg0, module_path)]
+    manifest_v1 = make_manifest(module_path, own_exports=exports_v1)
+    code_v1 = generator.generate(manifest_v1)
+    generator.write_file(module_path, code_v1)

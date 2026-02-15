@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 """Integration tests for lazy import system.
 
 Tests complete workflows:
@@ -7,7 +11,6 @@ Tests complete workflows:
 - Rule changes invalidate cache
 """
 
-# ruff: noqa: S101, ANN201
 # sourcery skip: require-return-annotation, require-parameter-annotation, no-relative-imports, avoid-loops-in-tests
 from __future__ import annotations
 
@@ -55,23 +58,6 @@ class _PrivateClass:
         from tools.lazy_imports.export_manager.rules import RuleEngine
 
         # Setup rules
-        rules = [
-            {
-                "name": "exclude-private",
-                "priority": 900,
-                "description": "Exclude private",
-                "match": {"name_pattern": r"^_"},
-                "action": "exclude",
-            },
-            {
-                "name": "include-public",
-                "priority": 500,
-                "description": "Include public",
-                "match": {"name_pattern": r"^[a-zA-Z]"},
-                "action": "include",
-                "propagate": "parent",
-            },
-        ]
 
         engine = RuleEngine()
         graph = PropagationGraph(rule_engine=engine)
@@ -288,6 +274,7 @@ class TestRuleChanges:
     def test_rule_change_requires_reprocessing(self, tmp_path: Path):
         """Changing rules should trigger reprocessing."""
         import yaml
+
         from tools.lazy_imports.common.types import MemberType, RuleAction
         from tools.lazy_imports.export_manager.rules import RuleEngine
 
@@ -473,6 +460,7 @@ class TestMigrationValidation:
 
         # YAML should be valid and loadable
         import yaml
+
         with output_path.open() as f:
             config = yaml.safe_load(f)
 

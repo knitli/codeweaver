@@ -1,6 +1,9 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 """Tests for Propagation Graph."""
 
-# ruff: noqa: S101, ANN201
 # sourcery skip: require-return-annotation, require-parameter-annotation, no-relative-imports, avoid-loops-in-tests
 from __future__ import annotations
 

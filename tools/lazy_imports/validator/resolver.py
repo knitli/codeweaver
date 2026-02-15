@@ -1,160 +1,118 @@
-"""Import resolution logic for lazy import validation.
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
 
-Resolves imports to verify they exist and are correctly specified.
+"""Import resolution for validation.
+
+Resolves import statements to verify they are valid and accessible.
 """
 
 from __future__ import annotations
 
-import contextlib
-import importlib
 import importlib.util
-import sys
 
 from pathlib import Path
-from typing import TYPE_CHECKING
 
-
-if TYPE_CHECKING:
-    from ..common.types import ImportResolution
+from tools.lazy_imports.common.types import ImportResolution
 
 
 class ImportResolver:
-    """Resolves imports to validate correctness.
+    """Resolves imports to verify they exist and are accessible.
 
-    Uses Python's import machinery to check if imports will work at runtime.
+    Caches resolution results for efficiency.
     """
 
-    def __init__(self, project_root: Path) -> None:
+    def __init__(self, project_root: Path | None = None) -> None:
         """Initialize resolver.
 
         Args:
-            project_root: Root directory of the project
+            project_root: Root directory of the project for relative imports
         """
-        self.project_root = project_root
-        self._src_path = project_root / "src"
-        if self._src_path.exists() and str(self._src_path) not in sys.path:
-            sys.path.insert(0, str(self._src_path))
+        self.project_root = project_root or Path.cwd()
+        self._cache: dict[tuple[str, str], ImportResolution] = {}
 
-    def resolve_import(self, module: str, obj: str | None = None) -> ImportResolution:
-        """Resolve an import to check if it exists.
+    def resolve(self, module: str, obj: str) -> ImportResolution:
+        """Resolve import to verify module and object exist.
 
         Args:
-            module: Module path (e.g., 'codeweaver.core.chunks')
-            obj: Object name (e.g., 'CodeChunk'), None for module-level
+            module: Module path (e.g., "pathlib")
+            obj: Object name (e.g., "Path")
 
         Returns:
-            ImportResolution with exists=True if import works
+            ImportResolution with exists=True if valid, False otherwise
         """
-        from ..common.types import ImportResolution
+        cache_key = (module, obj)
 
+        # Check cache first
+        if cache_key in self._cache:
+            return self._cache[cache_key]
+
+        # Try to import the module
         try:
-            mod = importlib.import_module(module)
-        except ImportError as e:
-            return ImportResolution(
-                module=module,
-                obj=obj or "",
-                exists=False,
-                path=None,
-                error=f"Module not found: {e}",
-            )
+            # Check if module exists
+            spec = importlib.util.find_spec(module)
+            if spec is None:
+                result = ImportResolution(
+                    module=module,
+                    obj=obj,
+                    exists=False,
+                    path=None,
+                    error=f"Module '{module}' not found",
+                )
+                self._cache[cache_key] = result
+                return result
+
+            # Module exists, try to import it
+            try:
+                mod = importlib.import_module(module)
+
+                # Check if object exists in module
+                if not hasattr(mod, obj):
+                    result = ImportResolution(
+                        module=module,
+                        obj=obj,
+                        exists=False,
+                        path=Path(spec.origin) if spec.origin else None,
+                        error=f"Object '{obj}' not found in module '{module}'",
+                    )
+                    self._cache[cache_key] = result
+                    return result
+
+                # Success - both module and object exist
+                result = ImportResolution(
+                    module=module,
+                    obj=obj,
+                    exists=True,
+                    path=Path(spec.origin) if spec.origin else None,
+                    error=None,
+                )
+                self._cache[cache_key] = result
+
+            except Exception as e:
+                # Module found but import failed
+                result = ImportResolution(
+                    module=module,
+                    obj=obj,
+                    exists=False,
+                    path=Path(spec.origin) if spec.origin else None,
+                    error=f"Failed to import module '{module}': {e}",
+                )
+                self._cache[cache_key] = result
+                return result
+            else:
+                return result
+
         except Exception as e:
-            return ImportResolution(
-                module=module,
-                obj=obj or "",
-                exists=False,
-                path=None,
-                error=f"Error importing module: {e}",
-            )
-        if obj is None:
-            return ImportResolution(
-                module=module, obj="", exists=True, path=self._get_module_path(mod), error=None
-            )
-        if not hasattr(mod, obj):
-            return ImportResolution(
+            # Module lookup failed
+            result = ImportResolution(
                 module=module,
                 obj=obj,
                 exists=False,
-                path=self._get_module_path(mod),
-                error=f"Object '{obj}' not found in module '{module}'",
+                path=None,
+                error=f"Failed to resolve module '{module}': {e}",
             )
-        return ImportResolution(
-            module=module, obj=obj, exists=True, path=self._get_module_path(mod), error=None
-        )
+            self._cache[cache_key] = result
+            return result
 
-    def resolve(self, module: str, name: str) -> ImportResolution:
-        """Resolve an import (alias for resolve_import).
 
-        Args:
-            module: Module path
-            name: Object name
-
-        Returns:
-            ImportResolution with exists=True if import works
-        """
-        return self.resolve_import(module, name)
-
-    def _get_module_path(self, module) -> Path | None:
-        """Get the file path for a module.
-
-        Args:
-            module: Imported module object
-
-        Returns:
-            Path to module file, or None if not found
-        """
-        with contextlib.suppress(Exception):
-            if hasattr(module, "__file__") and module.__file__:
-                return Path(module.__file__)
-        return None
-
-    def resolve_lazy_import(self, module: str, obj: str) -> ImportResolution:
-        """Resolve a lazy_import(module, obj) call.
-
-        Args:
-            module: Module path
-            obj: Object name
-
-        Returns:
-            ImportResolution with exists=True if valid
-        """
-        return self.resolve_import(module, obj)
-
-    def check_type_checking_import(self, module: str, obj: str) -> bool:
-        """Check if an import is valid for TYPE_CHECKING.
-
-        TYPE_CHECKING imports are only loaded by type checkers, so we verify
-        they exist without trying to import them at runtime.
-
-        Args:
-            module: Module path
-            obj: Object name
-
-        Returns:
-            True if import is valid for TYPE_CHECKING
-        """
-        try:
-            spec = importlib.util.find_spec(module)
-            if spec is None:
-                return False
-        except (ImportError, ModuleNotFoundError, ValueError):
-            return False
-        else:
-            return True
-
-    def validate_package_consistency(self, package: str) -> list[str]:
-        """Validate package __all__ exports exist.
-
-        Args:
-            package: Package path (e.g., 'codeweaver.core')
-
-        Returns:
-            List of missing exports (empty if all exist)
-        """
-        missing = []
-        try:
-            mod = importlib.import_module(package)
-        except ImportError:
-            return [f"Package '{package}' not found"]
-        all_exports = getattr(mod, "__all__", [])
-        missing.extend(f"{package}.{name}" for name in all_exports if not hasattr(mod, name))
-        return missing
+__all__ = ["ImportResolver"]

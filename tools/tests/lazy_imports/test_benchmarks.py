@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 """Performance benchmarks for lazy import system.
 
 Tests verify performance requirements from lazy-import-requirements.md:
@@ -7,7 +11,6 @@ Tests verify performance requirements from lazy-import-requirements.md:
 - REQ-PERF-004: Memory usage <500MB
 """
 
-# ruff: noqa: S101, ANN201
 # sourcery skip: require-return-annotation, require-parameter-annotation, no-relative-imports, avoid-loops-in-tests
 from __future__ import annotations
 
@@ -250,7 +253,7 @@ class TestPerformanceBenchmarks:
         manifests = graph.build_manifests()
 
         # Get peak memory usage
-        current, peak = tracemalloc.get_traced_memory()
+        _current, peak = tracemalloc.get_traced_memory()
         tracemalloc.stop()
 
         peak_mb = peak / (1024 * 1024)

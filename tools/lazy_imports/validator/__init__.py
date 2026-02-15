@@ -1,61 +1,20 @@
-# SPDX-FileCopyrightText: 2025 Knitli Inc.
-# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
-"""Import validation components."""
+
+"""Validator module for lazy imports.
+
+Provides validation of lazy_import calls, package consistency, and import resolution.
+"""
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import TYPE_CHECKING
+from tools.lazy_imports.validator.consistency import ConsistencyChecker
+from tools.lazy_imports.validator.resolver import ImportResolver
+from tools.lazy_imports.validator.validator import LazyImportValidator
 
 
-if TYPE_CHECKING:
-    from tools.lazy_imports.common.cache import AnalysisCache
-    from tools.lazy_imports.types import ValidationReport
+# Alias for backward compatibility with tests
+ImportValidator = LazyImportValidator
 
-
-class ImportValidator:
-    """Validates lazy imports.
-
-    This is a placeholder implementation. The full version would:
-    - Parse Python files for lazy_import() calls
-    - Validate that all imports resolve
-    - Check __all__ consistency
-    - Validate TYPE_CHECKING imports
-    """
-
-    def __init__(self, cache: AnalysisCache) -> None:
-        """Initialize validator.
-
-        Args:
-            cache: Analysis cache to use
-        """
-        self._cache = cache
-
-    def validate(
-        self, module_path: Path | None = None, *, strict: bool = False
-    ) -> ValidationReport:
-        """Validate lazy imports.
-
-        Args:
-            module_path: Specific module to validate, or None for all
-            strict: Fail on warnings as well as errors
-
-        Returns:
-            Validation report with errors and warnings
-        """
-        from tools.lazy_imports.types import ValidationMetrics, ValidationReport
-
-        # Placeholder implementation
-        return ValidationReport(
-            errors=[],
-            warnings=[],
-            metrics=ValidationMetrics(
-                files_validated=0, imports_checked=0, consistency_checks=0, validation_time_ms=0
-            ),
-            success=True,
-        )
-
-
-__all__ = ("ImportValidator",)
+__all__ = ["ConsistencyChecker", "ImportResolver", "ImportValidator", "LazyImportValidator"]

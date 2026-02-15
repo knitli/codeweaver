@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 """Rule engine for export decision making.
 
 This module implements the priority-based rule system for determining which
@@ -23,6 +27,15 @@ from tools.lazy_imports.common.types import (
     RuleMatch,
     RuleMatchCriteria,
 )
+
+
+# Schema version constants
+CURRENT_SCHEMA_VERSION = "1.0"
+SUPPORTED_VERSIONS = ["1.0"]
+
+
+class SchemaVersionError(Exception):
+    """Schema version mismatch or unsupported."""
 
 
 class RuleEngineProtocol(Protocol):
@@ -199,7 +212,7 @@ class RuleEngine:
         return " AND ".join(reasons) if reasons else "always matches"
 
     def load_rules(self, rule_files: list[Path]) -> None:
-        """Load rules from YAML files.
+        """Load rules from YAML files with schema version validation.
 
         Args:
             rule_files: List of YAML files containing rule definitions
@@ -207,6 +220,7 @@ class RuleEngine:
         Raises:
             FileNotFoundError: If a rule file doesn't exist
             yaml.YAMLError: If YAML syntax is invalid
+            SchemaVersionError: If schema version is missing or unsupported
             ValueError: If rule schema is invalid
         """
         for rule_file in rule_files:
@@ -221,14 +235,50 @@ class RuleEngine:
                     raise ValueError(
                         f"❌ Error loading rules from {rule_file}\n\nInvalid YAML syntax:\n{e}\n\nSuggestions:\n- Check for missing quotes, colons, or indentation\n- Validate YAML at: https://www.yamllint.com/\n- Restore from backup: {rule_file}.bak"
                     ) from e
-            schema_version = data.get("schema_version", "1.0")
-            if schema_version not in ("1.0", "1.1"):
-                raise ValueError(
-                    f"❌ Error: Unsupported schema version\n\nFile: {rule_file}\nSchema version: {schema_version!r}\nSupported versions: 1.0, 1.1\n\nSuggestions:\n- Upgrade codeweaver to support this schema\n- Migrate config to supported version\n- Use migration tool: mise run lazy-imports migrate-config"
+
+            # Validate schema version
+            if "schema_version" not in data:
+                raise SchemaVersionError(
+                    f"Missing schema_version in {rule_file}\nExpected: {CURRENT_SCHEMA_VERSION}"
                 )
+
+            version = data["schema_version"]
+            if version not in SUPPORTED_VERSIONS:
+                raise SchemaVersionError(
+                    f"Unsupported schema version {version} in {rule_file}\n"
+                    f"Supported versions: {', '.join(SUPPORTED_VERSIONS)}\n"
+                    f"Current version: {CURRENT_SCHEMA_VERSION}\n\n"
+                    f"You may need to:\n"
+                    f"  1. Update CodeWeaver to support this version\n"
+                    f"  2. Migrate the config file to {CURRENT_SCHEMA_VERSION}\n"
+                    f"  3. Run: codeweaver lazy-imports migrate"
+                )
+
+            # If older version, migrate
+            if version != CURRENT_SCHEMA_VERSION:
+                data = self._migrate_schema(data, from_version=version)
+
             for rule_data in data.get("rules", []):
                 rule = self._parse_rule(rule_data, rule_file)
                 self.add_rule(rule)
+
+    def _migrate_schema(self, data: dict, from_version: str) -> dict:
+        """Migrate config from old schema to current.
+
+        Args:
+            data: Configuration data to migrate
+            from_version: Source schema version
+
+        Returns:
+            Migrated configuration data
+
+        Note:
+            Currently no migrations are implemented. This is a placeholder
+            for future schema version updates.
+        """
+        # Placeholder for future migrations
+        # When we add version 1.1, we'll implement migration logic here
+        return data
 
     def _parse_rule(self, rule_data: dict, source_file: Path) -> Rule:
         """Parse a rule from YAML data.

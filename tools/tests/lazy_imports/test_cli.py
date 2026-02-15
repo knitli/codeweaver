@@ -2,7 +2,6 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
-# ruff: noqa: S101, ANN201
 # sourcery skip: require-return-annotation, require-parameter-annotation, no-relative-imports
 """Tests for lazy import CLI."""
 
@@ -67,10 +66,10 @@ class TestLazyImportsCLI:
     def test_validator_initialization(self):
         """Test that validator can be initialized."""
         from tools.lazy_imports.common.cache import AnalysisCache
-        from tools.lazy_imports.validator import ImportValidator
+        from tools.lazy_imports.validator import LazyImportValidator
 
         cache = AnalysisCache()
-        validator = ImportValidator(cache=cache)
+        validator = LazyImportValidator(cache=cache)
 
         assert validator is not None
 

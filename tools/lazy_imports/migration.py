@@ -1,3 +1,8 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+# sourcery skip: no-relative-imports
 #!/usr/bin/env python3
 """Migration tool to convert old hardcoded validation to new YAML-based rules.
 
@@ -86,7 +91,7 @@ class MigrationResult:
 class RuleMigrator:
     """Migrator to convert old hardcoded system to YAML rules."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize migrator with empty state."""
         self.rules: list[ExtractedRule] = []
         self.overrides_include: dict[str, list[str]] = {}
@@ -316,13 +321,13 @@ class RuleMigrator:
         # Add overrides if any
         if self.overrides_include or self.overrides_exclude:
             yaml_data["overrides"] = {}
-            if self.overrides_include:
-                yaml_data["overrides"]["include"] = self.overrides_include
-            if self.overrides_exclude:
-                yaml_data["overrides"]["exclude"] = self.overrides_exclude
+        if self.overrides_include:
+            yaml_data["overrides"]["include"] = self.overrides_include
+        if self.overrides_exclude:
+            yaml_data["overrides"]["exclude"] = self.overrides_exclude
 
         # Generate YAML with comments
-        yaml_str = yaml.dump(
+        serialized_yaml = yaml.dump(
             yaml_data, sort_keys=False, allow_unicode=True, default_flow_style=False, width=100
         )
 
@@ -338,7 +343,7 @@ class RuleMigrator:
 
 """
 
-        return header + yaml_str
+        return header + serialized_yaml
 
     def _generate_equivalence_report(self) -> str:
         """Generate report showing migration equivalence.
@@ -361,37 +366,25 @@ class RuleMigrator:
         sorted_rules = sorted(self.rules, key=lambda r: (-r.priority, r.name))
 
         for rule in sorted_rules:
-            report_lines.append(f"### {rule.name} (priority {rule.priority})")
-            report_lines.append(f"**Description**: {rule.description}")
-            report_lines.append(f"**Action**: `{rule.action.value}`")
-
-            if rule.pattern:
-                report_lines.append(f"**Pattern**: `{rule.pattern}`")
-            if rule.exact_match:
-                report_lines.append(f"**Exact Match**: `{rule.exact_match}`")
-            if rule.member_type:
-                report_lines.append(f"**Member Type**: `{rule.member_type.value}`")
-            if rule.propagate:
-                report_lines.append(f"**Propagation**: `{rule.propagate.value}`")
-
-            report_lines.append("")
-
+            self._assemble_report(report_lines, rule)
         # Overrides section
         if self.overrides_include or self.overrides_exclude:
-            report_lines.append("## Manual Overrides")
+            report_lines.extend(("## Manual Overrides", ""))
+        if self.overrides_include:
+            report_lines.append("### Include Overrides")
+            report_lines.extend(
+                f"- **{module}**: {', '.join(sorted(names))}"
+                for module, names in sorted(self.overrides_include.items())
+            )
             report_lines.append("")
 
-            if self.overrides_include:
-                report_lines.append("### Include Overrides")
-                for module, names in sorted(self.overrides_include.items()):
-                    report_lines.append(f"- **{module}**: {', '.join(sorted(names))}")
-                report_lines.append("")
-
-            if self.overrides_exclude:
-                report_lines.append("### Exclude Overrides")
-                for module, names in sorted(self.overrides_exclude.items()):
-                    report_lines.append(f"- **{module}**: {', '.join(sorted(names))}")
-                report_lines.append("")
+        if self.overrides_exclude:
+            report_lines.append("### Exclude Overrides")
+            report_lines.extend(
+                f"- **{module}**: {', '.join(sorted(names))}"
+                for module, names in sorted(self.overrides_exclude.items())
+            )
+            report_lines.append("")
 
         # Validation notes
         report_lines.extend([
@@ -417,6 +410,23 @@ class RuleMigrator:
         ])
 
         return "\n".join(report_lines)
+
+    def _assemble_report(self, report_lines: list[str], rule: ExtractedRule) -> None:
+        # sourcery skip: merge-list-appends-into-extend
+        report_lines.append(f"### {rule.name} (priority {rule.priority})")
+        report_lines.append(f"**Description**: {rule.description}")
+        report_lines.append(f"**Action**: `{rule.action.value}`")
+
+        if rule.pattern:
+            report_lines.append(f"**Pattern**: `{rule.pattern}`")
+        if rule.exact_match:
+            report_lines.append(f"**Exact Match**: `{rule.exact_match}`")
+        if rule.member_type:
+            report_lines.append(f"**Member Type**: `{rule.member_type.value}`")
+        if rule.propagate:
+            report_lines.append(f"**Propagation**: `{rule.propagate.value}`")
+
+        report_lines.append("")
 
 
 def migrate_to_yaml(
@@ -447,6 +457,54 @@ def migrate_to_yaml(
         report_path.write_text(result.equivalence_report, encoding="utf-8")
 
     return result
+
+
+def _validate_private_member(name: str, result) -> list[str]:
+    """Validate private member exclusion."""
+    if result.action != RuleAction.EXCLUDE:
+        return [f"Private member {name} not excluded: got {result.action.value}"]
+    return []
+
+
+def _validate_constant(name: str, result) -> list[str]:
+    """Validate constant inclusion."""
+    if result.action != RuleAction.INCLUDE:
+        return [f"Constant {name} not included: got {result.action.value}"]
+    return []
+
+
+def _validate_exception_class(name: str, result) -> list[str]:
+    """Validate exception class inclusion and propagation."""
+    errors = []
+    if result.action != RuleAction.INCLUDE:
+        errors.append(f"Exception {name} not included: got {result.action.value}")
+    if result.propagation != PropagationLevel.ROOT:
+        errors.append(f"Exception {name} not propagated to root: got {result.propagation}")
+    return errors
+
+
+def _validate_public_member(name: str, result) -> list[str]:
+    """Validate public member inclusion."""
+    if result.action != RuleAction.INCLUDE:
+        return [f"Public member {name} not included: got {result.action.value}"]
+    return []
+
+
+def _is_private(member_name: str) -> bool:
+    """Check if member is private (starts with underscore)."""
+    return member_name.startswith("_")
+
+
+def _is_constant(member_name: str, member_kind: MemberType) -> bool:
+    """Check if member is a constant."""
+    return member_kind == MemberType.CONSTANT and re.match(r"^[A-Z][A-Z0-9_]*$", member_name)
+
+
+def _is_exception_class(member_name: str, member_kind: MemberType) -> bool:
+    """Check if member is an exception class."""
+    return member_kind == MemberType.CLASS and re.match(
+        r".*Error$|.*Exception$|.*Warning$", member_name
+    )
 
 
 def verify_migration(
@@ -487,36 +545,20 @@ def verify_migration(
             ("PublicClass", "codeweaver.core", MemberType.CLASS),
         ]
 
-    errors = []
+    errors: list[str] = []
 
     # Test each case
     for name, module, member_type in test_cases:
         result = engine.evaluate(name, module, member_type)
 
-        # Verify expected behavior
-        if name.startswith("_"):
-            # Private should be excluded
-            if result.action != RuleAction.EXCLUDE:
-                errors.append(f"Private member {name} not excluded: got {result.action.value}")
-
-        elif re.match(r"^[A-Z][A-Z0-9_]*$", name) and member_type == MemberType.CONSTANT:
-            # Constants should be included
-            if result.action != RuleAction.INCLUDE:
-                errors.append(f"Constant {name} not included: got {result.action.value}")
-
-        elif (
-            re.match(r".*Error$|.*Exception$|.*Warning$", name) and member_type == MemberType.CLASS
-        ):
-            # Exceptions should be included and propagated to root
-            if result.action != RuleAction.INCLUDE:
-                errors.append(f"Exception {name} not included: got {result.action.value}")
-            if result.propagation != PropagationLevel.ROOT:
-                errors.append(f"Exception {name} not propagated to root: got {result.propagation}")
-
+        if _is_private(name):
+            errors.extend(_validate_private_member(name, result))
+        elif _is_constant(name, member_type):
+            errors.extend(_validate_constant(name, result))
+        elif _is_exception_class(name, member_type):
+            errors.extend(_validate_exception_class(name, result))
         else:
-            # Other public members should be included (with no/parent propagation)
-            if result.action != RuleAction.INCLUDE:
-                errors.append(f"Public member {name} not included: got {result.action.value}")
+            errors.extend(_validate_public_member(name, result))
 
     return not errors, errors
 

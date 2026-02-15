@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
+
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 """Tests for lazy import migration tool."""
 
-# ruff: noqa: S101, ANN201
 # sourcery skip: require-return-annotation, require-parameter-annotation, no-relative-imports, avoid-loops-in-tests
 from __future__ import annotations
 
@@ -110,6 +114,7 @@ class TestRuleMigrator:
         yaml_content = migrator._generate_yaml()
 
         import yaml
+
         parsed = yaml.safe_load(yaml_content)
         priorities = [r["priority"] for r in parsed["rules"]]
 

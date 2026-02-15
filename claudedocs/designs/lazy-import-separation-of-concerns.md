@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Knitli Inc.
+
+SPDX-License-Identifier: MIT OR Apache-2.0
+-->
+
 # Lazy Import System - Separation of Concerns
 
 > **Expert Panel Review**: Strong architectural design (8.0/10)

@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Knitli Inc.
+
+SPDX-License-Identifier: MIT OR Apache-2.0
+-->
+
 # Lazy Import System CLI
 
 Command-line interface for managing lazy imports and auto-generated `__init__.py` files in CodeWeaver.

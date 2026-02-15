@@ -13,13 +13,17 @@ Provides user interface for all lazy import operations:
 
 from __future__ import annotations
 
+import logging
+
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, NoReturn
 
 from cyclopts import App, Parameter
 from rich.console import Console
 from rich.panel import Panel
-from rich.table import Table
+
+
+logger = logging.getLogger(__name__)
 
 
 if TYPE_CHECKING:
@@ -179,6 +183,10 @@ def validate(
 def generate(
     dry_run: Annotated[bool, Parameter(help="Show changes without writing files")] = False,
     module: Annotated[Path | None, Parameter(help="Generate for specific module")] = None,
+    source: Annotated[Path, Parameter(help="Source root directory")] = Path("src"),
+    output: Annotated[
+        Path | None, Parameter(help="Output directory (default: same as source)")
+    ] = None,
 ) -> None:
     """Generate __init__.py files from export manifests.
 
@@ -191,8 +199,16 @@ def generate(
         codeweaver lazy-imports generate
         codeweaver lazy-imports generate --dry-run
         codeweaver lazy-imports generate --module src/codeweaver/core
+        codeweaver lazy-imports generate --source tools/lazy_imports --output /tmp/test
     """
-    from tools.lazy_imports.export_manager import PropagationGraph, RuleEngine
+
+    def _raise_system_exit(message: str) -> NoReturn:
+        _print_error(message)
+        raise SystemExit(1)
+
+    from tools.lazy_imports.common.cache import JSONAnalysisCache
+    from tools.lazy_imports.export_manager import RuleEngine
+    from tools.lazy_imports.pipeline import Pipeline
 
     _print_info("Generating exports...")
     console.print()
@@ -209,41 +225,60 @@ def generate(
         rules.load_rules([rules_path])
         _print_success(f"Loaded rules from {rules_path}")
 
-    # Build propagation graph
-    _print_info("Building export propagation graph...")
-    PropagationGraph(rule_engine=rules)
-
-    # Analyze codebase (this would be implemented)
-    src_root = module or Path("src")
-    _print_info(f"Analyzing codebase in {src_root}...")
-
-    # TODO: Implement actual analysis
-    # For now, show what would happen
-    console.print()
-    _print_warning("Note: This is a placeholder implementation")
-    _print_info("Full implementation requires:")
-    console.print("  • File discovery and parsing")
-    console.print("  • Export node extraction")
-    console.print("  • Propagation graph building")
-    console.print("  • Manifest generation")
     console.print()
 
+    # Set up cache and output directory
+    cache = JSONAnalysisCache()
+    output_dir = output or source
+
+    # Create pipeline
+    _print_info("Initializing pipeline...")
+    pipeline = Pipeline(rule_engine=rules, cache=cache, output_dir=output_dir)
+
+    # Determine source root
+    source_root = source
+    if not source_root.exists():
+        _print_error(f"Source directory not found: {source_root}")
+        raise SystemExit(1)
+
+    console.print()
+
+    # Show dry-run status
     if dry_run:
         _print_info("Dry run mode - no files will be written")
         console.print()
-        console.print("Would generate __init__.py files for:")
-        console.print("  • src/codeweaver/__init__.py")
-        console.print("  • src/codeweaver/core/__init__.py")
-        console.print("  • src/codeweaver/providers/__init__.py")
+
+    # Execute pipeline
+    _print_info(f"Processing {source_root}...")
+    if module:
+        _print_info(f"Filtering to module: {module}")
+
+    console.print()
+
+    try:
+        result = pipeline.run(source_root=source_root, dry_run=dry_run, module=module)
+
+        # Display results
+        _print_generation_results(result)
+
+        # Exit with error if generation failed
+        if not result.success:
+            _raise_system_exit("Export generation failed - see above for details")
+
+    except Exception as e:
+        _print_error(f"Pipeline execution failed: {e}")
         console.print()
-    else:
-        _print_info("Generation would write files here")
-        console.print()
+        import traceback
+
+        console.print("[dim]Full traceback:[/dim]")
+        console.print(traceback.format_exc())
+        raise SystemExit(1) from e
 
 
 @app.command
 def analyze(
-    format: Annotated[str, Parameter(help="Output format: json, table, or report")] = "table",
+    format: Annotated[str, Parameter(help="Output format: json, table, or report")] = "table",  # noqa: A002
+    source: Annotated[Path, Parameter(help="Source directory to analyze")] = Path("src"),
 ) -> None:
     """Analyze export patterns across the codebase.
 
@@ -257,28 +292,48 @@ def analyze(
         codeweaver lazy-imports analyze
         codeweaver lazy-imports analyze --format json
         codeweaver lazy-imports analyze --format report
+        codeweaver lazy-imports analyze --source lazy_imports
     """
+    from tools.lazy_imports.common.cache import AnalysisCache
+    from tools.lazy_imports.export_manager import RuleEngine
+    from tools.lazy_imports.pipeline import Pipeline
+
     _print_info("Analyzing export patterns...")
     console.print()
 
-    # Create sample data for demonstration
-    table = Table(title="Export Statistics")
-    table.add_column("Module", style="cyan")
-    table.add_column("Own Exports", style="green", justify="right")
-    table.add_column("Propagated", style="yellow", justify="right")
-    table.add_column("Total", style="blue", justify="right")
+    # Load rules
+    _print_info("Loading export rules...")
+    rules = RuleEngine()
+    rules_path = Path(".codeweaver/lazy_import_rules.yaml")
 
-    # Sample data
-    table.add_row("codeweaver.core.types", "45", "0", "45")
-    table.add_row("codeweaver.core", "12", "45", "57")
-    table.add_row("codeweaver.providers", "23", "8", "31")
-    table.add_row("codeweaver", "5", "93", "98")
+    if not rules_path.exists():
+        _print_warning(f"Rules file not found: {rules_path}")
+        _print_info("Using default rules")
+    else:
+        rules.load_rules([rules_path])
+        _print_success(f"Loaded rules from {rules_path}")
 
-    console.print(table)
-    console.print()
+    # Initialize cache
+    cache = AnalysisCache()
 
-    _print_warning("Note: This is sample data - full implementation pending")
-    console.print()
+    # Create pipeline
+    _print_info(f"Analyzing codebase in {source}...")
+    pipeline = Pipeline(rule_engine=rules, cache=cache, output_dir=Path.cwd())
+
+    # Run analysis in dry-run mode
+    try:
+        result = pipeline.run(
+            source_root=source,
+            dry_run=True,  # analyze command doesn't write files
+        )
+
+        # Display results using existing function
+        _print_generation_results(result)
+
+    except Exception as e:
+        _print_error(f"Analysis failed: {e}")
+        logger.exception("Analysis error details")
+        raise SystemExit(1) from e
 
 
 @app.command
@@ -342,6 +397,8 @@ def migrate(
     rules_output: Annotated[Path, Parameter(help="Output path for rules YAML")] = Path(
         ".codeweaver/lazy_import_rules.yaml"
     ),
+    dry_run: Annotated[bool, Parameter(help="Show changes without writing files")] = False,
+    verbose: Annotated[bool, Parameter(help="Show detailed migration report")] = False,
 ) -> None:
     """Migrate from old hardcoded system to new YAML rules.
 
@@ -354,44 +411,71 @@ def migrate(
 
     Examples:
         codeweaver lazy-imports migrate
+        codeweaver lazy-imports migrate --dry-run
         codeweaver lazy-imports migrate --no-backup
         codeweaver lazy-imports migrate --rules-output custom/path.yaml
+        codeweaver lazy-imports migrate --verbose
     """
+    from tools.lazy_imports.migration import migrate_to_yaml
+
     _print_info("Starting migration to new lazy import system...")
     console.print()
 
     old_script = Path("mise-tasks/validate-lazy-imports.py")
 
-    if not old_script.exists():
-        _print_error(f"Old script not found: {old_script}")
-        _print_info("Nothing to migrate")
-        raise SystemExit(1)
-
-    # Create backup
-    if backup:
+    # Create backup if old script exists and backup is requested
+    if backup and old_script.exists():
         backup_path = old_script.with_suffix(".py.backup")
         _print_info(f"Creating backup at {backup_path}...")
         import shutil
 
         shutil.copy2(old_script, backup_path)
         _print_success(f"Backup created: {backup_path}")
-
-    console.print()
+        console.print()
 
     # Run migration
-    _print_info("Analyzing old configuration...")
-    _print_warning("Note: Migration tool implementation is pending")
+    _print_info("Performing migration...")
+    result = migrate_to_yaml(rules_output, old_script=old_script, dry_run=dry_run)
+
+    if not result.success:
+        _print_error("Migration failed:")
+        for error in result.errors:
+            console.print(f"  [red]•[/red] {error}")
+        console.print()
+        raise SystemExit(1)
+
+    # Show results
+    console.print()
+    _print_success("Migration completed successfully!")
+    console.print(f"  Rules extracted: [cyan]{len(result.rules_extracted)}[/cyan]")
+
+    include_overrides = len(result.overrides_extracted.get("include", {}))
+    exclude_overrides = len(result.overrides_extracted.get("exclude", {}))
+    console.print(
+        f"  Overrides: [cyan]{include_overrides}[/cyan] include, "
+        f"[cyan]{exclude_overrides}[/cyan] exclude"
+    )
     console.print()
 
-    _print_info("Would perform:")
-    console.print("  • Extract hardcoded rules from Python")
-    console.print("  • Convert to YAML format")
-    console.print("  • Generate configuration files")
-    console.print("  • Create rule documentation")
+    if dry_run:
+        _print_info("Dry run mode - no files written")
+        console.print()
+        console.print("[bold]Generated YAML:[/bold]")
+        console.print("─" * 80)
+        console.print(result.yaml_content)
+        console.print("─" * 80)
+    else:
+        _print_success(f"Rules written to: {rules_output}")
+        report_path = rules_output.with_suffix(".migration.md")
+        _print_success(f"Migration report: {report_path}")
+
     console.print()
 
-    _print_info(f"Output would be written to: {rules_output}")
-    console.print()
+    if verbose and result.equivalence_report:
+        console.print("[bold]Migration Report:[/bold]")
+        console.print()
+        console.print(result.equivalence_report)
+        console.print()
 
 
 @app.command
@@ -472,5 +556,8 @@ def clear_cache() -> None:
     _print_success("Cache cleared successfully")
     console.print()
 
+
+if __name__ == "__main__":
+    app()
 
 __all__ = ("app",)

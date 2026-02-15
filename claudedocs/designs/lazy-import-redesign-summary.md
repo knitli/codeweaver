@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Knitli Inc.
+
+SPDX-License-Identifier: MIT OR Apache-2.0
+-->
+
 # Lazy Import System Redesign - Executive Summary
 
 > **Expert Panel Review Complete**: Specification quality **7.4/10**

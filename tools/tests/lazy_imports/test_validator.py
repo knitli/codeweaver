@@ -1,6 +1,9 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 """Tests for Import Validator."""
 
-# ruff: noqa: S101, ANN201
 # sourcery skip: require-return-annotation, require-parameter-annotation, no-relative-imports
 from __future__ import annotations
 
@@ -92,7 +95,9 @@ class MyClass:
         validator = LazyImportValidator(project_root=tmp_path)
         issues = validator.validate_file(test_file)
 
-        assert len(issues) == 0
+        # Should have no errors (warnings about missing __all__ are acceptable)
+        errors = [i for i in issues if isinstance(i, ValidationError)]
+        assert not errors
 
     def test_syntax_error_in_file(self, tmp_path: Path):
         """Syntax errors should be reported."""
@@ -280,6 +285,318 @@ class TestImportResolver:
 
         assert res1.exists == res2.exists
         assert res1.module == res2.module
+
+
+class TestComprehensiveValidation:
+    """Test suite for comprehensive validation methods."""
+
+    def test_lazy_import_with_correct_arguments(self, tmp_path: Path):
+        """Valid lazy_import call with correct arguments should pass."""
+        test_file = tmp_path / "test.py"
+        test_file.write_text("""
+from codeweaver.common.utils import lazy_import
+
+MyClass = lazy_import("module.path", "MyClass")
+""")
+
+        validator = LazyImportValidator(project_root=tmp_path)
+        issues = validator.validate_file(test_file)
+
+        # Should have no errors about call syntax (may have resolution errors)
+        syntax_errors = [
+            i
+            for i in issues
+            if isinstance(i, ValidationError)
+            and i.code in ("INVALID_LAZY_IMPORT", "NON_LITERAL_LAZY_IMPORT")
+        ]
+        assert not syntax_errors
+
+    def test_lazy_import_with_insufficient_arguments(self, tmp_path: Path):
+        """lazy_import with < 2 arguments should error."""
+        test_file = tmp_path / "test.py"
+        test_file.write_text("""
+from codeweaver.common.utils import lazy_import
+
+MyClass = lazy_import("module.path")  # Missing second arg
+""")
+
+        validator = LazyImportValidator(project_root=tmp_path)
+        issues = validator.validate_file(test_file)
+
+        errors = [
+            i for i in issues if isinstance(i, ValidationError) and i.code == "INVALID_LAZY_IMPORT"
+        ]
+        assert errors
+        assert any("at least 2 arguments" in e.message for e in errors)
+
+    def test_lazy_import_with_non_string_arguments(self, tmp_path: Path):
+        """lazy_import with non-string arguments should error."""
+        test_file = tmp_path / "test.py"
+        test_file.write_text("""
+from codeweaver.common.utils import lazy_import
+
+module_var = "module.path"
+MyClass = lazy_import(module_var, "MyClass")  # Variable, not literal
+""")
+
+        validator = LazyImportValidator(project_root=tmp_path)
+        issues = validator.validate_file(test_file)
+
+        errors = [
+            i
+            for i in issues
+            if isinstance(i, ValidationError) and i.code == "NON_LITERAL_LAZY_IMPORT"
+        ]
+        assert errors
+        assert any("string literal" in e.message for e in errors)
+
+    def test_type_checking_with_only_imports(self, tmp_path: Path):
+        """TYPE_CHECKING block with only imports should not warn."""
+        test_file = tmp_path / "test.py"
+        test_file.write_text("""
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from module import Class1
+    from module import Class2
+""")
+
+        validator = LazyImportValidator(project_root=tmp_path)
+        issues = validator.validate_file(test_file)
+
+        # No warnings about TYPE_CHECKING structure
+        type_warnings = [
+            i
+            for i in issues
+            if isinstance(i, ValidationWarning)
+            and "TYPE_CHECKING block should only contain imports" in i.message
+        ]
+        assert not type_warnings
+
+    def test_type_checking_with_non_import_code(self, tmp_path: Path):
+        """TYPE_CHECKING block with non-import code should warn."""
+        test_file = tmp_path / "test.py"
+        test_file.write_text("""
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from module import Class1
+    x = 5  # Non-import statement
+    def helper(): pass  # Non-import statement
+""")
+
+        validator = LazyImportValidator(project_root=tmp_path)
+        issues = validator.validate_file(test_file)
+
+        warnings = [
+            i
+            for i in issues
+            if isinstance(i, ValidationWarning)
+            and "TYPE_CHECKING block should only contain imports" in i.message
+        ]
+        assert len(warnings) == 2  # One for each non-import statement
+
+    def test_all_with_all_names_defined(self, tmp_path: Path):
+        """__all__ with all names defined should pass."""
+        test_file = tmp_path / "test.py"
+        test_file.write_text("""
+__all__ = ["MyClass", "my_function", "MY_CONSTANT"]
+
+class MyClass:
+    pass
+
+def my_function():
+    pass
+
+MY_CONSTANT = 42
+""")
+
+        validator = LazyImportValidator(project_root=tmp_path)
+        issues = validator.validate_file(test_file)
+
+        # No errors about undefined names
+        all_errors = [
+            i for i in issues if isinstance(i, ValidationError) and i.code == "UNDEFINED_IN_ALL"
+        ]
+        assert not all_errors
+
+    def test_all_with_undefined_name(self, tmp_path: Path):
+        """__all__ with undefined name should error."""
+        test_file = tmp_path / "test.py"
+        test_file.write_text("""
+__all__ = ["MyClass", "UndefinedClass"]
+
+class MyClass:
+    pass
+""")
+
+        validator = LazyImportValidator(project_root=tmp_path)
+        issues = validator.validate_file(test_file)
+
+        errors = [
+            i for i in issues if isinstance(i, ValidationError) and i.code == "UNDEFINED_IN_ALL"
+        ]
+        assert errors
+        assert any("UndefinedClass" in e.message for e in errors)
+
+    def test_missing_all_declaration(self, tmp_path: Path):
+        """Missing __all__ should warn."""
+        test_file = tmp_path / "test.py"
+        test_file.write_text("""
+class MyClass:
+    pass
+
+def my_function():
+    pass
+""")
+
+        validator = LazyImportValidator(project_root=tmp_path)
+        issues = validator.validate_file(test_file)
+
+        warnings = [
+            i for i in issues if isinstance(i, ValidationWarning) and "Missing __all__" in i.message
+        ]
+        assert warnings
+
+    def test_imports_at_top_of_file(self, tmp_path: Path):
+        """Imports at top of file should not warn."""
+        test_file = tmp_path / "test.py"
+        test_file.write_text("""
+import os
+from pathlib import Path
+
+class MyClass:
+    pass
+""")
+
+        validator = LazyImportValidator(project_root=tmp_path)
+        issues = validator.validate_file(test_file)
+
+        # No warnings about import organization
+        org_warnings = [
+            i
+            for i in issues
+            if isinstance(i, ValidationWarning)
+            and "Import statement after non-import code" in i.message
+        ]
+        assert not org_warnings
+
+    def test_imports_after_code(self, tmp_path: Path):
+        """Imports after code should warn."""
+        test_file = tmp_path / "test.py"
+        test_file.write_text("""
+class MyClass:
+    pass
+
+import os  # Import after code
+from pathlib import Path  # Import after code
+""")
+
+        validator = LazyImportValidator(project_root=tmp_path)
+        issues = validator.validate_file(test_file)
+
+        warnings = [
+            i
+            for i in issues
+            if isinstance(i, ValidationWarning)
+            and "Import statement after non-import code" in i.message
+        ]
+        assert len(warnings) == 2  # Both imports flagged
+
+    def test_syntax_error_handling(self, tmp_path: Path):
+        """Syntax errors should be caught and reported."""
+        test_file = tmp_path / "test.py"
+        test_file.write_text("""
+def broken(
+    # Missing closing parenthesis
+""")
+
+        validator = LazyImportValidator(project_root=tmp_path)
+        issues = validator.validate_file(test_file)
+
+        errors = [i for i in issues if isinstance(i, ValidationError) and i.code == "SYNTAX_ERROR"]
+        assert errors
+
+    def test_empty_file(self, tmp_path: Path):
+        """Empty file should pass validation."""
+        test_file = tmp_path / "test.py"
+        test_file.write_text("")
+
+        validator = LazyImportValidator(project_root=tmp_path)
+        issues = validator.validate_file(test_file)
+
+        # Should just warn about missing __all__
+        errors = [i for i in issues if isinstance(i, ValidationError)]
+        assert not errors
+
+    def test_file_with_only_docstring(self, tmp_path: Path):
+        """File with only docstring should pass validation."""
+        test_file = tmp_path / "test.py"
+        test_file.write_text('"""Module docstring."""')
+
+        validator = LazyImportValidator(project_root=tmp_path)
+        issues = validator.validate_file(test_file)
+
+        # Should just warn about missing __all__
+        errors = [i for i in issues if isinstance(i, ValidationError)]
+        assert not errors
+
+    def test_comprehensive_validation(self, tmp_path: Path):
+        """Test multiple validation checks at once."""
+        test_file = tmp_path / "test.py"
+        test_file.write_text("""
+from typing import TYPE_CHECKING
+from codeweaver.common.utils import lazy_import
+
+__all__ = ["MyClass", "UndefinedExport"]
+
+class MyClass:
+    pass
+
+if TYPE_CHECKING:
+    from module import Type1
+    x = 5  # Should warn
+
+BadImport = lazy_import("module")  # Should error - insufficient args
+
+import late_import  # Should warn - import after code
+""")
+
+        validator = LazyImportValidator(project_root=tmp_path)
+        issues = validator.validate_file(test_file)
+
+        # Should have errors and warnings
+        errors = [i for i in issues if isinstance(i, ValidationError)]
+        warnings = [i for i in issues if isinstance(i, ValidationWarning)]
+
+        assert len(errors) >= 2  # Insufficient args, undefined export
+        assert len(warnings) >= 2  # TYPE_CHECKING non-import, late import
+
+    def test_validation_result_aggregation(self, tmp_path: Path):
+        """Test that validation results are properly aggregated."""
+        test_file = tmp_path / "test.py"
+        test_file.write_text("""
+from codeweaver.common.utils import lazy_import
+
+__all__ = ["Missing1", "Missing2"]
+
+lazy_import("bad")  # Error
+lazy_import("also", "bad", "extra")  # Should still validate
+""")
+
+        validator = LazyImportValidator(project_root=tmp_path)
+        issues = validator.validate_file(test_file)
+
+        # All issues should be in a single list
+        assert isinstance(issues, list)
+        assert len(issues) > 0
+
+        # Should have both errors and warnings
+        has_errors = any(isinstance(i, ValidationError) for i in issues)
+        has_warnings = any(isinstance(i, ValidationWarning) for i in issues)
+
+        assert has_errors  # From lazy_import and __all__
+        assert has_warnings  # From late import and missing TYPE_CHECKING block
 
 
 class TestValidationReport:

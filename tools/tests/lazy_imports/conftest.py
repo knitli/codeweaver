@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 # sourcery skip: no-relative-imports
 """Shared fixtures for lazy import tests."""
 
@@ -97,10 +101,9 @@ def rule_engine(sample_rules):
     """Configured rule engine."""
     from tools.lazy_imports.export_manager.rules import RuleEngine
 
-    engine = RuleEngine()
+    return RuleEngine()
     # Note: RuleEngine() takes no arguments.
     # If rules need to be loaded, use engine.add_rule() or load from config
-    return engine
 
 
 @pytest.fixture
@@ -268,3 +271,31 @@ class AnotherModel:
     create_test_module(root / "__init__.py", "")
 
     return root
+
+
+@pytest.fixture(scope="session", autouse=True)
+def cleanup_shared_cache():
+    """Clean up shared cache before and after test session."""
+    cache_file = Path(".codeweaver/cache/analysis_cache.json")
+
+    # Clean before tests
+    if cache_file.exists():
+        cache_file.unlink()
+
+    yield
+
+    # Clean after tests
+    if cache_file.exists():
+        cache_file.unlink()
+
+
+@pytest.fixture(scope="module", autouse=True)
+def cleanup_cache_per_module():
+    """Clean up cache before each test module."""
+    cache_file = Path(".codeweaver/cache/analysis_cache.json")
+
+    # Clean before module
+    if cache_file.exists():
+        cache_file.unlink()
+
+    return
