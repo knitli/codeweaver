@@ -268,7 +268,14 @@ convention = "google"
 "tools/tests/**/*.py" = [
   "ANN201",  # missing type annotation for self in method
   "ANN002",
-  "S101"
+  "S101",
+  "S108"
+]
+"tools/**/tests/**/*.py" = [
+  "ANN201",  # missing type annotation for self in method
+  "ANN002",
+  "S101",
+  "S108"
 ]
 
 [lint.isort]

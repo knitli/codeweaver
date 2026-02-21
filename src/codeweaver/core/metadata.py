@@ -391,6 +391,7 @@ def get_semantic_or_config_lang(
                 return config_lang
         return None
     if file_path:
+        file_path = file_path if isinstance(file_path, Path) else Path(file_path)  # ty:ignore[invalid-argument-type]
         with contextlib.suppress(KeyError, ValueError, AttributeError):
             if semantic_lang := SemanticSearchLanguage.from_extension(
                 FileExt(cast(LiteralStringT, file_path.suffix or file_path.name))

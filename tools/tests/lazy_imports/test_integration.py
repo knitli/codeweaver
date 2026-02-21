@@ -65,34 +65,52 @@ class _PrivateClass:
 
         # Analyze and build graph
         # (This would normally be done by analyzer)
-        from tools.lazy_imports.common.types import ExportNode, MemberType, PropagationLevel
+        # Analyze and build graph
+        from tools.lazy_imports.common.types import (
+            DetectedSymbol,
+            MemberType,
+            SourceLocation,
+            SymbolProvenance,
+        )
 
-        exports = [
-            ExportNode(
+        symbols = [
+            DetectedSymbol(
                 name="PublicClass",
-                module="test_package",
                 member_type=MemberType.CLASS,
-                propagation=PropagationLevel.PARENT,
-                source_file=module_file,
-                line_number=4,
-                defined_in="test_package.module",
+                provenance=SymbolProvenance.DEFINED_HERE,
+                location=SourceLocation(line=4),
+                is_private=False,
+                original_source=None,
+                original_name=None,
             ),
-            ExportNode(
+            DetectedSymbol(
                 name="public_function",
-                module="test_package",
                 member_type=MemberType.FUNCTION,
-                propagation=PropagationLevel.PARENT,
-                source_file=module_file,
-                line_number=8,
-                defined_in="test_package.module",
+                provenance=SymbolProvenance.DEFINED_HERE,
+                location=SourceLocation(line=8),
+                is_private=False,
+                original_source=None,
+                original_name=None,
             ),
         ]
 
         # Register module first
         graph.add_module("test_package", None)
 
-        for export in exports:
-            graph.add_export(export)
+        from tools.lazy_imports.common.types import ExportDecision, PropagationLevel, RuleAction
+
+        for symbol in symbols:
+            # Manually create decision to ensure it's added
+            decision = ExportDecision(
+                module_path="test_package",
+                action=RuleAction.INCLUDE,
+                export_name=symbol.name,
+                propagation=PropagationLevel.PARENT,
+                priority=100,
+                reason="Manual test decision",
+                source_symbol=symbol,
+            )
+            graph.add_export(decision)
 
         # Build manifests
         manifests = graph.build_manifests()
@@ -111,6 +129,7 @@ class _PrivateClass:
             assert "public_function" in content
             assert "_PrivateClass" not in content
             assert "__all__" in content
+            assert "_dynamic_imports" in content
 
     @pytest.mark.integration
     def test_nested_module_workflow(self, tmp_path: Path, nested_module_structure: Path):
@@ -118,35 +137,55 @@ class _PrivateClass:
         # Use nested_module_structure fixture
         # nested_module_structure has: test_package/core/types/models.py
 
-        from tools.lazy_imports.common.types import ExportNode, MemberType, PropagationLevel
+        from tools.lazy_imports.common.types import (
+            DetectedSymbol,
+            MemberType,
+            SourceLocation,
+            SymbolProvenance,
+        )
         from tools.lazy_imports.export_manager.generator import CodeGenerator
+
+        # Prepare graph components
         from tools.lazy_imports.export_manager.graph import PropagationGraph
         from tools.lazy_imports.export_manager.rules import RuleEngine
 
         engine = RuleEngine()
         graph = PropagationGraph(rule_engine=engine)
 
-        # Register modules first
+        # Register modules logic
+        # nested_module_structure has: test_package/core/types/models.py
+        # We need to register parents effectively
         graph.add_module("test_package.core.types.models", "test_package.core.types")
         graph.add_module("test_package.core.types", "test_package.core")
         graph.add_module("test_package.core", "test_package")
         graph.add_module("test_package", None)
 
-        # Add exports with ROOT propagation
-        exports = [
-            ExportNode(
-                name="MyModel",
-                module="test_package.core.types.models",
-                member_type=MemberType.CLASS,
-                propagation=PropagationLevel.ROOT,
-                source_file=nested_module_structure / "core" / "types" / "models.py",
-                line_number=3,
-                defined_in="test_package.core.types.models",
-            )
-        ]
+        symbol = DetectedSymbol(
+            name="MyModel",
+            member_type=MemberType.CLASS,
+            provenance=SymbolProvenance.DEFINED_HERE,
+            location=SourceLocation(line=3),
+            is_private=False,
+            original_source=None,
+            original_name=None,
+        )
 
-        for export in exports:
-            graph.add_export(export)
+        # We need to ensure it propagates to root.
+        # Default rules might not propagate to ROOT.
+        # So we can manually create an ExportDecision to simulate what the engine would return if configured.
+        from tools.lazy_imports.common.types import ExportDecision, PropagationLevel, RuleAction
+
+        decision = ExportDecision(
+            module_path="test_package.core.types.models",
+            action=RuleAction.INCLUDE,
+            export_name="MyModel",
+            propagation=PropagationLevel.ROOT,
+            priority=100,
+            reason="Manual test decision",
+            source_symbol=symbol,
+        )
+
+        graph.add_export(decision)
 
         manifests = graph.build_manifests()
 
@@ -174,9 +213,10 @@ class TestCacheIntegration:
         from tools.lazy_imports.common.cache import JSONAnalysisCache
         from tools.lazy_imports.common.types import (
             AnalysisResult,
-            ExportNode,
+            DetectedSymbol,
             MemberType,
-            PropagationLevel,
+            SourceLocation,
+            SymbolProvenance,
         )
 
         cache = JSONAnalysisCache(cache_dir=temp_cache_dir)
@@ -185,20 +225,20 @@ class TestCacheIntegration:
         test_file = tmp_path / "module.py"
         test_file.write_text("class MyClass: pass")
 
-        exports = [
-            ExportNode(
+        symbols = [
+            DetectedSymbol(
                 name="MyClass",
-                module="test",
                 member_type=MemberType.CLASS,
-                propagation=PropagationLevel.PARENT,
-                source_file=test_file,
-                line_number=1,
-                defined_in="test",
+                provenance=SymbolProvenance.DEFINED_HERE,
+                location=SourceLocation(line=1),
+                is_private=False,
+                original_source=None,
+                original_name=None,
             )
         ]
 
         analysis = AnalysisResult(
-            exports=exports,
+            symbols=symbols,
             imports=[],
             file_hash="hash123",
             analysis_timestamp=time.time(),
@@ -225,9 +265,10 @@ class TestCacheIntegration:
         from tools.lazy_imports.common.cache import JSONAnalysisCache
         from tools.lazy_imports.common.types import (
             AnalysisResult,
-            ExportNode,
+            DetectedSymbol,
             MemberType,
-            PropagationLevel,
+            SourceLocation,
+            SymbolProvenance,
         )
 
         cache = JSONAnalysisCache(cache_dir=temp_cache_dir)
@@ -236,20 +277,20 @@ class TestCacheIntegration:
         test_file.write_text("class MyClass: pass")
 
         # Cache initial version
-        exports = [
-            ExportNode(
+        symbols = [
+            DetectedSymbol(
                 name="MyClass",
-                module="test",
                 member_type=MemberType.CLASS,
-                propagation=PropagationLevel.PARENT,
-                source_file=test_file,
-                line_number=1,
-                defined_in="test",
+                provenance=SymbolProvenance.DEFINED_HERE,
+                location=SourceLocation(line=1),
+                is_private=False,
+                original_source=None,
+                original_name=None,
             )
         ]
 
         analysis = AnalysisResult(
-            exports=exports,
+            symbols=symbols,
             imports=[],
             file_hash="hash123",
             analysis_timestamp=time.time(),
@@ -275,7 +316,13 @@ class TestRuleChanges:
         """Changing rules should trigger reprocessing."""
         import yaml
 
-        from tools.lazy_imports.common.types import MemberType, RuleAction
+        from tools.lazy_imports.common.types import (
+            DetectedSymbol,
+            MemberType,
+            RuleAction,
+            SourceLocation,
+            SymbolProvenance,
+        )
         from tools.lazy_imports.export_manager.rules import RuleEngine
 
         # Initial rules - exclude private
@@ -298,7 +345,17 @@ class TestRuleChanges:
         engine_v1 = RuleEngine()
         engine_v1.load_rules([rules_file_v1])
 
-        result_v1 = engine_v1.evaluate("_private", "module", MemberType.FUNCTION)
+        symbol = DetectedSymbol(
+            name="_private",
+            member_type=MemberType.FUNCTION,
+            provenance=SymbolProvenance.DEFINED_HERE,
+            location=SourceLocation(line=1),
+            is_private=True,
+            original_source=None,
+            original_name=None,
+        )
+
+        result_v1 = engine_v1.evaluate(symbol, "module")
         assert result_v1.action == RuleAction.EXCLUDE
 
         # Changed rules - include private
@@ -321,7 +378,7 @@ class TestRuleChanges:
         engine_v2 = RuleEngine()
         engine_v2.load_rules([rules_file_v2])
 
-        result_v2 = engine_v2.evaluate("_private", "module", MemberType.FUNCTION)
+        result_v2 = engine_v2.evaluate(symbol, "module")
         assert result_v2.action == RuleAction.INCLUDE
 
         # Results changed - cache would be invalid
@@ -389,25 +446,26 @@ class TestIncrementalUpdates:
         for file in files:
             from tools.lazy_imports.common.types import (
                 AnalysisResult,
-                ExportNode,
+                DetectedSymbol,
                 MemberType,
-                PropagationLevel,
+                SourceLocation,
+                SymbolProvenance,
             )
 
-            exports = [
-                ExportNode(
+            symbols = [
+                DetectedSymbol(
                     name=f"Class{files.index(file)}",
-                    module="test",
                     member_type=MemberType.CLASS,
-                    propagation=PropagationLevel.PARENT,
-                    source_file=file,
-                    line_number=1,
-                    defined_in="test",
+                    provenance=SymbolProvenance.DEFINED_HERE,
+                    location=SourceLocation(line=1),
+                    is_private=False,
+                    original_source=None,
+                    original_name=None,
                 )
             ]
 
             analysis = AnalysisResult(
-                exports=exports,
+                symbols=symbols,
                 imports=[],
                 file_hash=f"hash{files.index(file)}",
                 analysis_timestamp=time.time(),

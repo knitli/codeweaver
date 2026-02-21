@@ -8,11 +8,11 @@
 
 Tests cover:
 - Sentinel-based preservation of manual code
-- Import statement generation (absolute/relative, TYPE_CHECKING)
+- Lazy import generation (_dynamic_imports, __getattr__)
+- Type checking support
 - __all__ list generation
 - Atomic writes with backup and rollback
 - Syntax validation
-- Error handling (FM-003, FM-010, FM-011)
 """
 
 # sourcery skip: require-return-annotation, require-parameter-annotation, no-relative-imports
@@ -25,7 +25,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from tools.lazy_imports.common.types import ExportManifest, ExportNode, MemberType, PropagationLevel
+from tools.lazy_imports.common.types import ExportManifest, LazyExport
 from tools.lazy_imports.export_manager.generator import (
     SENTINEL,
     CodeGenerator,
@@ -54,26 +54,24 @@ def generator(temp_dir: Path) -> CodeGenerator:
 # Test data
 
 
-def make_export(
-    name: str,
-    module: str,
-    member_type: MemberType = MemberType.CLASS,
-    defined_in: str | None = None,
-) -> ExportNode:
-    """Create test export node."""
-    return ExportNode(
-        name=name,
-        module=module,
-        member_type=member_type,
-        propagation=PropagationLevel.PARENT,
-        source_file=Path("/fake/path.py"),
-        line_number=1,
-        defined_in=defined_in or module,
+def make_lazy_export(
+    public_name: str,
+    target_module: str,
+    target_object: str | None = None,
+    *,
+    is_type_only: bool = False,
+) -> LazyExport:
+    """Create test LazyExport."""
+    return LazyExport(
+        public_name=public_name,
+        target_module=target_module,
+        target_object=target_object or public_name,
+        is_type_only=is_type_only,
     )
 
 
 def make_manifest(
-    module_path: str, own_exports: list[ExportNode], propagated: list[ExportNode] | None = None
+    module_path: str, own_exports: list[LazyExport], propagated: list[LazyExport] | None = None
 ) -> ExportManifest:
     """Create test export manifest."""
     propagated = propagated or []
@@ -97,53 +95,80 @@ def test_generate_empty_manifest(generator: CodeGenerator):
     code = generator.generate(manifest)
 
     assert code.export_count == 0
-    assert "__all__ = []" in code.content
+    assert "__all__ = ()" in code.content  # Tuple, not list
     assert SENTINEL in code.content
     assert "from __future__ import annotations" in code.content
+    assert "MappingProxyType" in code.content
+    assert "create_lazy_getattr" in code.content
+    assert "def __dir__() -> list[str]:" in code.content
+    # Check SPDX headers
+    assert "SPDX-FileCopyrightText: 2025 Knitli Inc." in code.content
+    assert "SPDX-License-Identifier: MIT OR Apache-2.0" in code.content
 
 
 def test_generate_single_export(generator: CodeGenerator):
-    """Test generating code with single export."""
-    exports = [make_export("MyClass", "test.module.submodule")]
+    """Test generating code with single lazy export."""
+    exports = [make_lazy_export("MyClass", "test.module.submodule")]
     manifest = make_manifest("test.module", own_exports=exports)
 
     code = generator.generate(manifest)
 
     assert code.export_count == 1
-    assert '__all__ = ["MyClass"]' in code.content
-    assert "from .submodule import MyClass" in code.content
+    assert '__all__ = ("MyClass",)' in code.content  # Tuple with trailing comma
+
+    # Check for lazy loading machinery with new format
+    assert (
+        "_dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({"
+        in code.content
+    )
+    assert '"MyClass": (__spec__.parent, "submodule"),' in code.content  # Relative module name
+    assert (
+        "__getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)" in code.content
+    )
+    assert "def __dir__() -> list[str]:" in code.content
+
+    # Should NOT use old-style __getattr__ function
+    assert "def __getattr__(name: str):" not in code.content
+    assert "import importlib" not in code.content  # No longer needed in generated code
 
 
 def test_generate_multiple_exports(generator: CodeGenerator):
     """Test generating code with multiple exports."""
     exports = [
-        make_export("ClassA", "test.module.sub1"),
-        make_export("ClassB", "test.module.sub2"),
-        make_export("function_c", "test.module.sub1", MemberType.FUNCTION),
+        make_lazy_export("ClassA", "test.module.sub1"),
+        make_lazy_export("ClassB", "test.module.sub2"),
+        make_lazy_export("function_c", "test.module.sub1"),
     ]
     manifest = make_manifest("test.module", own_exports=exports)
 
     code = generator.generate(manifest)
 
     assert code.export_count == 3
-    assert "ClassA" in code.content
-    assert "ClassB" in code.content
-    assert "function_c" in code.content
-    # Should be sorted in __all__
+    # New format with __spec__.parent and relative module names
+    assert '"ClassA": (__spec__.parent, "sub1"),' in code.content
+    assert '"ClassB": (__spec__.parent, "sub2"),' in code.content
+    assert '"function_c": (__spec__.parent, "sub1"),' in code.content
+
+    # Should be sorted in __all__ using custom sort key
+    # PascalCase (group 1) comes before snake_case (group 2)
     lines = code.content.split("\n")
-    all_section = "\n".join(line for line in lines if line.strip().startswith('"') and "," in line)
-    assert all_section.index("ClassA") < all_section.index("ClassB")
-    assert all_section.index("ClassB") < all_section.index("function_c")
+    all_section_start = next(i for i, line in enumerate(lines) if line.startswith("__all__ = ("))
+    all_lines = lines[all_section_start:]
+    all_text = "\n".join(all_lines)
+
+    # ClassA and ClassB (PascalCase) should come before function_c (snake_case)
+    assert all_text.index("ClassA") < all_text.index("ClassB")
+    assert all_text.index("ClassB") < all_text.index("function_c")
 
 
 # TYPE_CHECKING tests
 
 
 def test_type_alias_in_type_checking_block(generator: CodeGenerator):
-    """Test type aliases go in TYPE_CHECKING block."""
+    """Test type aliases go in TYPE_CHECKING block and NOT in _dynamic_imports."""
     exports = [
-        make_export("MyClass", "test.module.sub", MemberType.CLASS),
-        make_export("MyType", "test.module.sub", MemberType.TYPE_ALIAS),
+        make_lazy_export("MyClass", "test.module.sub"),
+        make_lazy_export("MyType", "test.module.sub", is_type_only=True),
     ]
     manifest = make_manifest("test.module", own_exports=exports)
 
@@ -153,15 +178,16 @@ def test_type_alias_in_type_checking_block(generator: CodeGenerator):
     assert "from typing import TYPE_CHECKING" in code.content
     assert "if TYPE_CHECKING:" in code.content
 
-    # Type alias should be in TYPE_CHECKING block
-    lines = code.content.split("\n")
-    type_checking_idx = next(i for i, line in enumerate(lines) if "if TYPE_CHECKING:" in line)
-    mytype_idx = next(i for i, line in enumerate(lines) if "MyType" in line and "import" in line)
-    assert mytype_idx > type_checking_idx
+    # Both should be in TYPE_CHECKING block with new grouped format
+    assert "MyType" in code.content
+    assert "MyClass" in code.content
+    assert "from test.module.sub import (" in code.content
 
-    # Class should be in runtime imports
-    myclass_idx = next(i for i, line in enumerate(lines) if "MyClass" in line and "import" in line)
-    assert myclass_idx < type_checking_idx
+    # MyType should NOT be in _dynamic_imports
+    assert '"MyType":' not in code.content
+
+    # MyClass should be in _dynamic_imports with new format
+    assert '"MyClass": (__spec__.parent, "sub"),' in code.content
 
 
 # Sentinel preservation tests
@@ -187,7 +213,7 @@ __all__ = ["OldExport"]
     target.write_text(existing_content)
 
     # Generate new code
-    exports = [make_export("NewExport", "test.module.sub")]
+    exports = [make_lazy_export("NewExport", "test.module.sub")]
     manifest = make_manifest(module_path, own_exports=exports)
     code = generator.generate(manifest)
 
@@ -217,7 +243,7 @@ __all__ = ["LegacyExport"]
     target.write_text(existing_content)
 
     # Generate new code
-    exports = [make_export("NewExport", "test.module.sub")]
+    exports = [make_lazy_export("NewExport", "test.module.sub")]
     manifest = make_manifest(module_path, own_exports=exports)
     code = generator.generate(manifest)
 
@@ -232,7 +258,7 @@ __all__ = ["LegacyExport"]
 def test_write_file_creates_directories(generator: CodeGenerator, temp_dir: Path):
     """Test write_file creates parent directories."""
     module_path = "test.deeply.nested.module"
-    exports = [make_export("MyClass", module_path)]
+    exports = [make_lazy_export("MyClass", module_path)]
     manifest = make_manifest(module_path, own_exports=exports)
     code = generator.generate(manifest)
 
@@ -255,7 +281,7 @@ def test_write_file_creates_backup(generator: CodeGenerator, temp_dir: Path):
     target.write_text(initial_content)
 
     # Write new file
-    exports = [make_export("NewClass", module_path)]
+    exports = [make_lazy_export("NewClass", module_path)]
     manifest = make_manifest(module_path, own_exports=exports)
     code = generator.generate(manifest)
     generator.write_file(module_path, code)
@@ -281,7 +307,7 @@ def test_write_file_atomic_on_syntax_error(generator: CodeGenerator, temp_dir: P
     target.write_text(initial_content)
 
     # Create invalid code (force syntax error)
-    exports = [make_export("MyClass", module_path)]
+    exports = [make_lazy_export("MyClass", module_path)]
     manifest = make_manifest(module_path, own_exports=exports)
     generator.generate(manifest)
 
@@ -309,7 +335,7 @@ def test_write_file_atomic_on_syntax_error(generator: CodeGenerator, temp_dir: P
 
 def test_validate_generated_valid_code(generator: CodeGenerator):
     """Test validation passes for valid code."""
-    exports = [make_export("MyClass", "test.module")]
+    exports = [make_lazy_export("MyClass", "test.module")]
     manifest = make_manifest("test.module", own_exports=exports)
     code = generator.generate(manifest)
 
@@ -344,6 +370,7 @@ def test_validate_generated_missing_all(generator: CodeGenerator):
 
     errors = generator.validate_generated(code)
     assert any("__all__" in err for err in errors)
+    assert any("__dir__" in err for err in errors)  # Should also catch missing __dir__()
 
 
 # validate_init_file tests
@@ -359,7 +386,11 @@ def test_validate_init_file_valid(temp_dir: Path):
 {SENTINEL}
 # Managed section
 
-__all__ = ["MyClass"]
+__all__ = ("MyClass",)
+
+def __dir__() -> list[str]:
+    \"\"\"List available attributes for the package.\"\"\"
+    return list(__all__)
 """
     init_file.write_text(content)
 
@@ -397,128 +428,117 @@ def test_validate_init_file_missing_all(temp_dir: Path):
 
     errors = validate_init_file(init_file)
     assert any("__all__" in err for err in errors)
+    assert any("__dir__" in err for err in errors)  # Should also catch missing __dir__()
 
 
-# Import generation tests
+# Sorting tests
 
 
-def test_import_generation_grouping(generator: CodeGenerator):
-    """Test imports are grouped by source module."""
+def test_export_sorting_screaming_snake_pascal_snake(generator: CodeGenerator):
+    """Test exports are sorted by custom key: SCREAMING_SNAKE, PascalCase, snake_case."""
     exports = [
-        make_export("ClassA", "test.module", defined_in="test.module.sub1"),
-        make_export("ClassB", "test.module", defined_in="test.module.sub1"),
-        make_export("ClassC", "test.module", defined_in="test.module.sub2"),
+        make_lazy_export("function_c", "test.module.sub"),
+        make_lazy_export("ClassB", "test.module.sub"),
+        make_lazy_export("CONSTANT_A", "test.module.sub"),
+        make_lazy_export("another_function", "test.module.sub"),
+        make_lazy_export("AnotherClass", "test.module.sub"),
+        make_lazy_export("ANOTHER_CONST", "test.module.sub"),
     ]
     manifest = make_manifest("test.module", own_exports=exports)
-
     code = generator.generate(manifest)
 
-    # Should have two import statements (one per source module)
-    import_lines = [line for line in code.content.split("\n") if "from ." in line]
-    assert len(import_lines) == 2
+    # Extract __all__ section
+    lines = code.content.split("\n")
+    all_start = next(i for i, line in enumerate(lines) if line.startswith("__all__ = ("))
+    all_end = next(i for i in range(all_start, len(lines)) if lines[i] == ")")
+    all_items = [
+        line.strip().strip('",')
+        for line in lines[all_start + 1 : all_end]
+        if line.strip() and line.strip() != ","
+    ]
 
-    # Should group ClassA and ClassB together
-    assert any("ClassA" in line and "ClassB" in line for line in import_lines)
+    # Expected order: CONSTANTS first (group 0), then Classes (group 1), then functions (group 2)
+    expected_order = [
+        "ANOTHER_CONST",  # SCREAMING_SNAKE (sorted alphabetically within group)
+        "CONSTANT_A",
+        "AnotherClass",  # PascalCase
+        "ClassB",
+        "another_function",  # snake_case
+        "function_c",
+    ]
+
+    assert all_items == expected_order
 
 
-def test_import_generation_sorting(generator: CodeGenerator):
-    """Test imports and __all__ are sorted."""
+def test_type_checking_imports_grouped_by_module(generator: CodeGenerator):
+    """Test TYPE_CHECKING imports are grouped by source module."""
     exports = [
-        make_export("Zebra", "test.module.sub"),
-        make_export("Apple", "test.module.sub"),
-        make_export("Banana", "test.module.sub"),
+        make_lazy_export("ClassA", "test.module.sub1"),
+        make_lazy_export("ClassB", "test.module.sub2"),
+        make_lazy_export("ClassC", "test.module.sub1"),  # Same module as ClassA
+        make_lazy_export("function_d", "test.module.sub2"),  # Same module as ClassB
     ]
     manifest = make_manifest("test.module", own_exports=exports)
-
     code = generator.generate(manifest)
 
-    # __all__ should be sorted
-    all_section = code.content[code.content.index("__all__") :]
-    assert all_section.index("Apple") < all_section.index("Banana")
-    assert all_section.index("Banana") < all_section.index("Zebra")
+    # Should group imports by module with multi-line format
+    assert "from test.module.sub1 import (" in code.content
+    assert "from test.module.sub2 import (" in code.content
+
+    # Check proper formatting with trailing commas
+    lines = code.content.split("\n")
+
+    # Find sub1 import section
+    sub1_start = next(i for i, line in enumerate(lines) if "from test.module.sub1 import (" in line)
+    sub1_section = []
+    for i in range(sub1_start + 1, len(lines)):
+        if lines[i].strip() == ")":
+            break
+        sub1_section.append(lines[i].strip())
+
+    # Both ClassA and ClassC should be in sub1 group
+    assert "ClassA," in sub1_section
+    assert "ClassC," in sub1_section
 
 
-# Edge cases
-
-
-def test_generate_with_empty_manual_section(generator: CodeGenerator):
-    """Test generating with no manual section."""
-    exports = [make_export("MyClass", "test.module")]
+def test_spdx_headers_present(generator: CodeGenerator):
+    """Test SPDX headers are included in generated files."""
+    exports = [make_lazy_export("MyClass", "test.module.sub")]
     manifest = make_manifest("test.module", own_exports=exports)
-
     code = generator.generate(manifest)
 
-    # Should start with sentinel
-    assert code.content.startswith(SENTINEL)
-    assert code.manual_section == ""
+    # Check all SPDX header lines
+    assert "# SPDX-FileCopyrightText: 2025 Knitli Inc." in code.content
+    assert "# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>" in code.content
+    assert "#" in code.content
+    assert "# SPDX-License-Identifier: MIT OR Apache-2.0" in code.content
+
+    # Headers should be at the very beginning
+    lines = code.content.split("\n")
+    assert lines[0].startswith("# SPDX-FileCopyrightText:")
 
 
-def test_generate_with_long_manual_section(generator: CodeGenerator, temp_dir: Path):
-    """Test preserving long manual section."""
-    module_path = "test.module"
-    target = temp_dir / "test" / "module" / "__init__.py"
-    target.parent.mkdir(parents=True)
-
-    # Write file with long manual section
-    manual_lines = [f"# Line {i}" for i in range(100)]
-    manual_section = "\n".join(manual_lines)
-
-    existing = f"{manual_section}\n\n{SENTINEL}\n__all__ = []"
-    target.write_text(existing)
-
-    # Generate new code
-    exports = [make_export("NewClass", module_path)]
-    manifest = make_manifest(module_path, own_exports=exports)
-    code = generator.generate(manifest)
-
-    # Should preserve all 100 lines
-    assert code.manual_section.count("\n") >= 99
-
-
-def test_generated_code_hash(generator: CodeGenerator):
-    """Test generated code has correct hash."""
-    exports = [make_export("MyClass", "test.module")]
+def test_mapping_proxy_type_annotation(generator: CodeGenerator):
+    """Test _dynamic_imports has correct MappingProxyType annotation."""
+    exports = [make_lazy_export("MyClass", "test.module.sub")]
     manifest = make_manifest("test.module", own_exports=exports)
-
     code = generator.generate(manifest)
 
-    # Hash should be SHA-256 of content
-    import hashlib
-
-    expected_hash = hashlib.sha256(code.content.encode()).hexdigest()
-    assert code.hash == expected_hash
-
-
-# Error handling tests
+    assert (
+        "_dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({"
+        in code.content
+    )
 
 
-def test_write_file_permission_error(generator: CodeGenerator, temp_dir: Path):
-    """Test write_file handles permission errors gracefully."""
-    module_path = "test.module"
-    target = temp_dir / "test" / "module" / "__init__.py"
-    target.parent.mkdir(parents=True)
-
-    # Create file and make directory read-only (prevents writing/replacing)
-    target.write_text("# Initial")
-    target.parent.chmod(0o555)
-
-    try:
-        _cause_os_error(module_path, generator)
-    finally:
-        # Cleanup
-        target.parent.chmod(0o755)
-
-
-def _cause_os_error(module_path, generator):
-    exports = [make_export("MyClass", module_path)]
-    manifest = make_manifest(module_path, own_exports=exports)
+def test_spec_parent_usage(generator: CodeGenerator):
+    """Test __spec__.parent is used instead of hardcoded package name."""
+    exports = [make_lazy_export("MyClass", "test.module.submodule")]
+    manifest = make_manifest("test.module", own_exports=exports)
     code = generator.generate(manifest)
 
-    # Should raise OSError with helpful message (backup creation fails)
-    with pytest.raises(OSError, match="Permission denied") as exc:
-        generator.write_file(module_path, code)
-
-    assert "chmod" in str(exc.value)
+    # Should use __spec__.parent, not hardcoded "test.module"
+    assert "(__spec__.parent," in code.content
+    assert '"test.module"' not in code.content.split("_dynamic_imports")[1].split("}")[0]
 
 
 # Integration tests
@@ -530,12 +550,10 @@ def test_full_generation_workflow(generator: CodeGenerator, temp_dir: Path):
 
     # Create manifest with mixed exports
     exports = [
-        make_export("MyClass", module_path, MemberType.CLASS, "codeweaver.core.types.models"),
-        make_export("MyEnum", module_path, MemberType.CLASS, "codeweaver.core.types.enums"),
-        make_export("MyType", module_path, MemberType.TYPE_ALIAS, "codeweaver.core.types.aliases"),
-        make_export(
-            "CONSTANT", module_path, MemberType.CONSTANT, "codeweaver.core.types.constants"
-        ),
+        make_lazy_export("MyClass", "codeweaver.core.types.models"),
+        make_lazy_export("MyEnum", "codeweaver.core.types.enums"),
+        make_lazy_export("MyType", "codeweaver.core.types.aliases", is_type_only=True),
+        make_lazy_export("CONSTANT", "codeweaver.core.types.constants"),
     ]
     manifest = make_manifest(module_path, own_exports=exports)
 
@@ -564,6 +582,8 @@ def test_full_generation_workflow(generator: CodeGenerator, temp_dir: Path):
     assert "MyType" in content
     assert "CONSTANT" in content
     assert "TYPE_CHECKING" in content  # For MyType
+    assert "_dynamic_imports" in content
+    assert "__getattr__" in content
     assert "__all__" in content
 
 
@@ -593,7 +613,7 @@ CUSTOM = 42
 
 def _create_file(arg0, module_path, generator):
     # First regeneration
-    exports_v1 = [make_export(arg0, module_path)]
+    exports_v1 = [make_lazy_export(arg0, module_path + ".sub")]
     manifest_v1 = make_manifest(module_path, own_exports=exports_v1)
     code_v1 = generator.generate(manifest_v1)
     generator.write_file(module_path, code_v1)

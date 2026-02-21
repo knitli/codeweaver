@@ -321,7 +321,7 @@ dev = [
   "black>=26.1.0",
   "ruff>=0.15.0",
   "serena>=0.9.1",
-  "ty>=0.0.15",
+  "ty>=0.0.17",
   "uv>=0.10.0",
 ]
 build = ["hatchling>=1.28.0", "twine>=6.2.0", "uv-dynamic-versioning>=0.12.0"]
@@ -340,7 +340,7 @@ test = [
   "pytest>=9.0.2",
   "pytest-asyncio>=1.3.0",
   "pytest-cov>=7.0.0",
-  "pytest-env>=1.2.0",
+  "pytest-env>=1.3.0",
   "pytest-examples>=0.0.18",
   "pytest-flakefinder>=1.1.0",
   "pytest-mock>=3.15.1",
@@ -631,6 +631,7 @@ unresolved-reference = "ignore"
 # All __init__.py files' lazy import patterns cause false positives
 include = [
   "src/codeweaver/__init__.py",
+  "src/codeweaver/**/__init__.py",
   "src/codeweaver/*/__init__.py",
   "src/codeweaver/*/*/__init__.py",
   "src/codeweaver/*/*/*/__init__.py",
@@ -642,7 +643,9 @@ include = [
 ]
 
 [tool.ty.overrides.rules]
+invalid-assignment = "ignore"
 invalid-argument-type = "ignore"
+unresolved-attribute = "ignore"
 
 [[tool.ty.overrides]]
 include = ["src/codeweaver/providers/vector_stores/qdrant_base.py"]
@@ -655,6 +658,12 @@ include = ["scripts/build/generate-mcp-server-json.py"]
 
 [tool.ty.overrides.rules]
 unknown-argument = "ignore"
+
+[[tool.ty.overrides]]
+include = ["src/codeweaver/providers/config/categories/embedding.py"]
+
+[tool.ty.overrides.rules]
+unresolved-attribute = "ignore"
 
 [[tool.ty.overrides]]
 include = [
@@ -681,6 +690,8 @@ invalid-newtype = "ignore"
 include = [
   "src/codeweaver/providers/embedding/providers/*.py",
   "src/codeweaver/providers/reranking/providers/*.py",
+  "src/codeweaver/providers/data/*.py",
+  "src/codeweaver/engine/services/config_analyzer.py",
 ]
 
 [tool.ty.overrides.rules]

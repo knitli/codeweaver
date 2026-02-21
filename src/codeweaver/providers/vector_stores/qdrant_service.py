@@ -114,7 +114,7 @@ class QdrantVectorStoreService:
         """
         # Set vector params if not already set
         # This uses the injected embedding_group instead of DI resolution
-        if not self.settings.collection._vectors_set:
+        if not self.settings.collection._vectors_initialized:
             await self.settings.collection.set_vector_params(self.embedding_group)
 
         # Get base qdrant config from collection settings

@@ -151,7 +151,7 @@ def providers(
     # Build table with count
     title_text = (
         f"Available {category.as_title} Providers ({provider_count} found)"
-        if category_filter
+        if category and category_filter
         else f"Available Providers ({provider_count} found)"
     )
     table = Table(show_header=True, header_style="bold blue", title=title_text)

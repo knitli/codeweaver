@@ -898,11 +898,11 @@ class SemanticClass(str, BaseEnum):
         if isinstance(category, dict):
             category["language"] = language
             category = ThingClass.model_validate(category)
-        if not category.language_specific:
+        if not cast(ThingClass, category).language_specific:
             raise ValueError("Only language-specific categories can be added.")
-        member_name = f"{language.name.upper()}_{category.name}"
+        member_name = f"{language.name.upper()}_{cast(ThingClass, category).name}"
         new_member = cls.add_member(member_name, textcase.snake(member_name))
-        category = category.model_copy(update={"name": new_member})
+        category = cast(ThingClass, category).model_copy(update={"name": new_member})
         cls._update_categories(category)
         cls._update_rank_map(category)
         return new_member

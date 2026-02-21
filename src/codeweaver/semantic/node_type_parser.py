@@ -908,7 +908,7 @@ if __name__ == "__main__":
         print(
             f" - [bold dark_orange]{thing.language.as_title}[/bold dark_orange]: [cyan]{thing.name}[/cyan] [green]({thing.kind if hasattr(thing, 'kind') else 'Category'})[/green]"
             if has_rich
-            else f" - {thing.language.as_title}: {thing.name} ({thing.kind if True else 'Category'})"
+            else f" - {thing.language.as_title}: {thing.name} ({thing.kind if isinstance(thing, Token | CompositeThing) else 'Category'})"
         )
     print(
         f"[magenta]Total: {len(all_things)} Things and Categories[/magenta]"

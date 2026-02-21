@@ -45,6 +45,7 @@ from codeweaver.core.constants import DEFAULT_VECTOR_STORE_MAX_RESULTS
 from codeweaver.core.exceptions import ConfigurationError
 from codeweaver.providers.config import QdrantVectorStoreProviderSettings
 from codeweaver.providers.embedding.capabilities import EmbeddingModelCapabilities
+from codeweaver.providers.embedding.capabilities.base import ModelFamily
 from codeweaver.providers.types import EmbeddingCapabilityGroup
 from codeweaver.providers.types.vector_store import CollectionMetadata, HybridVectorPayload
 from codeweaver.providers.vector_stores.base import MixedQueryInput, VectorStoreProvider
@@ -103,7 +104,11 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
     @property
     def base_url(self) -> str | None:
         """Get the base URL for the Qdrant instance."""
-        return str(self.config.client_options.url)
+        return str(
+            self.config.client_options.url
+            if self.config.client_options and self.config.client_options.url
+            else None
+        )
 
     @property
     def collection_name(self) -> str:
@@ -148,8 +153,9 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
             and self.caps.dense.capability.model_family
         ):
             model_family_id = cast(
-                EmbeddingModelCapabilities, self.caps.dense.capability
-            ).model_family.family_id
+                ModelFamily,
+                cast(EmbeddingModelCapabilities, self.caps.dense.capability).model_family,
+            ).family_id
 
         # Query model detection: Check if we're using asymmetric embedding
         # by inspecting the config type (config_type discriminator)
@@ -391,6 +397,9 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         self, key: str, value: SparseVectorParams, collection_name: str
     ) -> None:
         """Validate sparse vector parameters match configuration."""
+        if not self.config.collection.sparse_vectors_config:
+            self.config.collection.sparse_vectors_config = {key: value}
+            return
         ours = self.config.collection.sparse_vectors_config.get(key)
 
         if not ours:
@@ -450,7 +459,11 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         for vector_name, vector_config in store_params.vectors.items():
             if isinstance(vector_config, VectorParams):
                 actual_dense = vector_config
-                expected_dense = expected_vectors.get(vector_name)
+                expected_dense = (
+                    expected_vectors.get(vector_name)
+                    if isinstance(expected_vectors, dict)
+                    else expected_vectors
+                )
                 if expected_dense:
                     break
 
@@ -611,7 +624,12 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
                     indices=vector["indices"],
                     values=[float(x) if isinstance(x, int) else x for x in vector["values"]],
                 )
-            elif "sparse" in vector:
+            elif (
+                "sparse" in vector
+                and isinstance(vector["sparse"], dict)
+                and "indices" in vector["sparse"]
+                and "values" in vector["sparse"]
+            ):
                 sparse = SparseEmbedding(
                     indices=vector["sparse"].get("indices", []),
                     values=[
@@ -910,18 +928,18 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
                 }
 
                 # Update metadata with quantization info
-                metadata_dict = existing_metadata.model_dump(mode="json", exclude_none=True)
-                metadata_dict["quantization_type"] = quantization_type
-                metadata_dict["quantization_rescore"] = rescore
+                metadata_record = existing_metadata.model_dump(mode="json", exclude_none=True)
+                metadata_record["quantization_type"] = quantization_type
+                metadata_record["quantization_rescore"] = rescore
 
                 # Add to transformations list (initialize if needed)
-                if "transformations" not in metadata_dict:
-                    metadata_dict["transformations"] = []
-                metadata_dict["transformations"].append(transformation)
+                if "transformations" not in metadata_record:
+                    metadata_record["transformations"] = []
+                metadata_record["transformations"].append(transformation)
 
                 # Apply updated metadata to collection
                 await self.client.update_collection(
-                    collection_name=collection_name, metadata=metadata_dict
+                    collection_name=collection_name, metadata=metadata_record
                 )
 
                 logger.info(

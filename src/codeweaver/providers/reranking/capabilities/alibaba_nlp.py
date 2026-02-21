@@ -32,6 +32,24 @@ def get_alibaba_reranking_capabilities() -> tuple[AlibabaNlpRerankingCapabilitie
             "context_window": 8192,
             "provider": Provider.SENTENCE_TRANSFORMERS,
         }),
+        AlibabaNlpRerankingCapabilities.model_validate({
+            "name": "Alibaba-NLP/gte-reranker-modernbert-base",
+            "tokenizer": "tokenizers",
+            "tokenizer_model": "Alibaba-NLP/gte-reranker-modernbert-base",
+            "supports_custom_prompt": False,
+            "max_input": 8192,
+            "context_window": 8192,
+            "provider": Provider.SENTENCE_TRANSFORMERS
+        }),
+        AlibabaNlpRerankingCapabilities.model_validate({
+            "name": "Alibaba-NLP/gte-reranker-modernbert-base",
+            "tokenizer": "tokenizers",
+            "tokenizer_model": "Alibaba-NLP/gte-reranker-modernbert-base",
+            "supports_custom_prompt": False,
+            "max_input": 8192,
+            "context_window": 8192,
+            "provider": Provider.FASTEMBED
+        })
     )
 
 

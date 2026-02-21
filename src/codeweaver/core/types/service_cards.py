@@ -18,7 +18,7 @@ from collections import defaultdict
 from collections.abc import Coroutine
 from functools import cache
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any, Literal, NamedTuple, overload
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, cast, overload
 
 from beartype.typing import Callable
 
@@ -353,23 +353,28 @@ class ServiceMetadata(NamedTuple):
     Example: Azure agent can use Anthropic (for Claude models) or OpenAI (default).
     """
 
-    handler: (
-        tuple[
-            Literal["client", "provider"],
-            Callable[[Any, ...], Any] | Callable[[Any, ...], Coroutine[Any, Any, Any]],
-        ]
+    client_handler: (
+        Callable[[Any, ServiceCard, ...], Any]
+        | Callable[[Any, ServiceCard, ...], Coroutine[Any, Any, Any]]
         | None
     ) = None
-    """Custom instantiation handler for special cases.
+    """Custom instantiation handler for the SDK client.
 
-    The function receives the client or provider class, and any args/kwargs needed for instantiation, and returns the instantiated client or provider. The function may be sync or async (returning a coroutine). The caller will await if it's async.
+    The function receives the client class (resolved from client_cls), the service card instance,
+    and any args/kwargs needed for instantiation. It returns the instantiated client.
+    The function may be sync or async.
+    """
 
-    Format: (handler_category, handler_function)
+    provider_handler: (
+        Callable[[Any, ServiceCard, ...], Any]
+        | Callable[[Any, ServiceCard, ...], Coroutine[Any, Any, Any]]
+        | None
+    ) = None
+    """Custom instantiation handler for the provider wrapper.
 
-    - ("provider", func): Custom provider class instantiation
-    - ("client", func): Custom client instantiation
-
-    Rarely needed - most providers use standard instantiation patterns.
+    The function receives the provider class (resolved from provider_cls), the service card instance,
+    and any args/kwargs needed for instantiation. It returns the instantiated provider.
+    The function may be sync or async.
     """
 
 
@@ -466,49 +471,24 @@ class ServiceCard(NamedTuple):
             return self.metadata.discriminator[1]
         return None
 
-    @property
-    def handler[TargetCls](
-        self,
-    ) -> (
-        tuple[
-            Literal["client", "provider"],
-            Callable[[type[TargetCls], ...], TargetCls]
-            | Callable[[TargetCls, ...], Coroutine[TargetCls, Any, Any]],
-        ]
-        | None
-    ):
-        """Get the custom handler if this card has one."""
-        if self.metadata and self.metadata.handler:
-            return self.metadata.handler
-        return None
-
-    def _apply_handler(self, *args: Any, **kwargs: Any) -> Any:
+    def _apply_handler(
+        self, target: Literal["client", "provider"], *args: Any, **kwargs: Any
+    ) -> Any:
         """Apply the custom handler if it exists, otherwise return None.
 
-        This is used to get the actual client or provider instance when a card has a custom handler defined. The caller will check if the result is not None and use it instead of standard instantiation.
-
-        Args:
-            *args: Positional arguments to pass to the handler function.
-            **kwargs: Keyword arguments to pass to the handler function.
-
-        Returns:
-            The result of the handler function if it exists, otherwise None.
+        This is used to get the actual client or provider instance when a card has a custom handler defined.
         """
-        if not (handler := self.handler):
+        if not self.metadata:
             return None
-        category, func = handler
-        import_cls = self.client_cls if category == "client" else self.provider_cls
-        return func(import_cls._resolve(), *args, **kwargs) if callable(func) else None
 
-    def handler_is_async(self) -> bool:
-        """Check if the handler function is asynchronous."""
-        handler = self.handler
+        handler = (
+            self.metadata.client_handler if target == "client" else self.metadata.provider_handler
+        )
         if not handler:
-            return False
-        from inspect import iscoroutinefunction
+            return None
 
-        _, func = handler
-        return callable(func) and iscoroutinefunction(func)
+        import_cls = self.client_cls if target == "client" else self.provider_cls
+        return handler(import_cls._resolve(), self, *args, **kwargs)
 
     def create_instance(
         self, target: Literal["client", "provider"], *args: Any, **kwargs: Any
@@ -533,11 +513,19 @@ class ServiceCard(NamedTuple):
             raise ValueError(
                 f"Failed to resolve {target} class for provider {self.provider} and category {self.category}."
             ) from None
-        return (
-            self._apply_handler(*args, **kwargs)
-            if self.handler and self.handler[0] == target
-            else target_cls(*args, **kwargs)
-        )
+
+        result = self._apply_handler(target, *args, **kwargs)
+        if result is None:
+            result = target_cls(*args, **kwargs)
+
+        return result
+
+    async def create_instance_async(
+        self, target: Literal["client", "provider"], *args: Any, **kwargs: Any
+    ) -> Any:
+        """Asynchronously create an instance, awaiting if the handler or constructor is async."""
+        result = self.create_instance(target, *args, **kwargs)
+        return await result if asyncio.iscoroutine(result) else result
 
 
 @overload
@@ -933,9 +921,11 @@ def _build_native_sdk_cards() -> list[ServiceCard]:
     ]
 
 
-async def _start_instance_in_thread(client_cls: type[Any], *args: Any, **kwargs: Any) -> Any:
+async def _start_instance_in_thread(
+    cls: type[Any], card: ServiceCard, *args: Any, **kwargs: Any
+) -> Any:
     """Helper function to start an instance in a separate thread for sync handlers."""
-    return await asyncio.to_thread(client_cls, *args, **kwargs)
+    return await asyncio.to_thread(cls, *args, **kwargs)
 
 
 def _build_local_provider_cards() -> list[ServiceCard]:
@@ -953,7 +943,7 @@ def _build_local_provider_cards() -> list[ServiceCard]:
             ),
             lazy_import("codeweaver.providers.embedding.fastembed_extensions", "get_text_embedder"),
             "fastembed",
-            metadata=ServiceMetadata(handler=("client", _start_instance_in_thread)),
+            metadata=ServiceMetadata(client_handler=_start_instance_in_thread),
         ),
         service_card_factory(
             "fastembed",
@@ -964,10 +954,10 @@ def _build_local_provider_cards() -> list[ServiceCard]:
             ),
             lazy_import(
                 "codeweaver.providers.embedding.fastembed_extensions",
-                "get_sparse_embedderfastembed",
+                "get_sparse_embedder",
             ),
             "fastembed",
-            metadata=ServiceMetadata(handler=("client", _start_instance_in_thread)),
+            metadata=ServiceMetadata(client_handler=_start_instance_in_thread),
         ),
         service_card_factory(
             "fastembed",
@@ -975,9 +965,9 @@ def _build_local_provider_cards() -> list[ServiceCard]:
             lazy_import(
                 "codeweaver.providers.reranking.providers.fastembed", "FastEmbedRerankingProvider"
             ),
-            lazy_import("fastembed.rerank.cross_encoder", "TextCrossEncoder"),
+            lazy_import("codeweaver.providers.embedding.fastembed_extensions", "get_cross_encoder"),
             "fastembed",
-            metadata=ServiceMetadata(handler=("client", _start_instance_in_thread)),
+            metadata=ServiceMetadata(client_handler=_start_instance_in_thread),
         ),
         # Sentence Transformers - embedding, sparse_embedding, reranking
         service_card_factory(
@@ -989,7 +979,7 @@ def _build_local_provider_cards() -> list[ServiceCard]:
             ),
             lazy_import("sentence_transformers", "SentenceTransformer"),
             "sentence_transformers",
-            metadata=ServiceMetadata(handler=("client", _start_instance_in_thread)),
+            metadata=ServiceMetadata(client_handler=_start_instance_in_thread),
         ),
         service_card_factory(
             "sentence_transformers",
@@ -1000,7 +990,7 @@ def _build_local_provider_cards() -> list[ServiceCard]:
             ),
             lazy_import("sentence_transformers", "SparseEncoder"),
             "sentence_transformers",
-            metadata=ServiceMetadata(handler=("client", _start_instance_in_thread)),
+            metadata=ServiceMetadata(client_handler=_start_instance_in_thread),
         ),
         service_card_factory(
             "sentence_transformers",
@@ -1011,7 +1001,7 @@ def _build_local_provider_cards() -> list[ServiceCard]:
             ),
             lazy_import("sentence_transformers", "CrossEncoder"),
             "sentence_transformers",
-            metadata=ServiceMetadata(handler=("client", _start_instance_in_thread)),
+            metadata=ServiceMetadata(client_handler=_start_instance_in_thread),
         ),
     ]
 
@@ -1086,9 +1076,8 @@ def _build_multi_client_cards() -> list[ServiceCard]:
             lazy_import("pydantic_ai.providers.bedrock", "BedrockProvider"),
             lazy_import("boto3", "client"),
             metadata=ServiceMetadata(
-                handler=(
-                    "client",
-                    lambda client, *args, **kwargs: client("bedrock-runtime", *args, **kwargs),
+                client_handler=lambda client, card, *args, **kwargs: client(
+                    "bedrock-runtime", *args, **kwargs
                 )
             ),
         ),
@@ -1102,9 +1091,8 @@ def _build_multi_client_cards() -> list[ServiceCard]:
             lazy_import("boto3", "client"),
             "bedrock",
             metadata=ServiceMetadata(
-                handler=(
-                    "client",
-                    lambda client, *args, **kwargs: client("bedrock-runtime", *args, **kwargs),
+                client_handler=lambda client, card, *args, **kwargs: client(
+                    "bedrock-runtime", *args, **kwargs
                 )
             ),
         ),
@@ -1117,11 +1105,8 @@ def _build_multi_client_cards() -> list[ServiceCard]:
             lazy_import("boto3", "client"),
             "bedrock",
             metadata=ServiceMetadata(
-                handler=(
-                    "client",
-                    lambda client, *args, **kwargs: client(
-                        "bedrock-agent-runtime", *args, **kwargs
-                    ),
+                client_handler=lambda client, card, *args, **kwargs: client(
+                    "bedrock-agent-runtime", *args, **kwargs
                 )
             ),
         ),
@@ -1189,6 +1174,11 @@ def _build_multi_client_cards() -> list[ServiceCard]:
             lazy_import("pydantic_ai.providers.gateway", "gateway_provider"),
             lazy_import("pydantic_ai.providers.gateway", "gateway_provider"),
             "gateway",
+            metadata=ServiceMetadata(
+                provider_handler=lambda provider_cls, card, upstream_provider, **kwargs: (
+                    provider_cls(upstream_provider=upstream_provider, **kwargs)
+                )
+            ),
         ),
     ]
 
@@ -1207,11 +1197,8 @@ def _build_pydantic_gateway_provider_cards() -> list[ServiceCard]:
             lazy_import("pydantic_ai.providers.gateway", "gateway_provider"),
             "gateway",
             metadata=ServiceMetadata(
-                handler=(
-                    "provider",
-                    lambda provider_cls, upstream_provider, **kwargs: provider_cls(
-                        upstream_provider=upstream_provider, **kwargs
-                    ),
+                provider_handler=lambda provider_cls, card, upstream_provider, **kwargs: (
+                    provider_cls(upstream_provider=upstream_provider, **kwargs)
                 )
             ),
         )
@@ -1231,7 +1218,7 @@ def _build_data_provider_cards() -> list[ServiceCard]:
             lazy_import("tavily", "AsyncTavilyClient"),
             "tavily",
             metadata=ServiceMetadata(
-                handler=("provider", lambda provider_cls, api_key: provider_cls(api_key=api_key))
+                provider_handler=lambda provider_cls, card, api_key: provider_cls(api_key=api_key)
             ),
         ),
         service_card_factory(
@@ -1241,7 +1228,7 @@ def _build_data_provider_cards() -> list[ServiceCard]:
             lazy_import("ddgs.ddgs", "DDGS"),
             "duckduckgo",
             metadata=ServiceMetadata(
-                handler=("provider", lambda provider_cls,: provider_cls(max_results=15))
+                provider_handler=lambda provider_cls, card: provider_cls(max_results=15)
             ),
         ),
         service_card_factory(
@@ -1303,16 +1290,28 @@ def _match_discriminator(
     """
     if not card.metadata or not card.metadata.discriminator:
         return True  # Default card (no discriminator)
-
-    disc_category, disc_value = card.metadata.discriminator
-
+    if isinstance(card.metadata.discriminator, tuple):
+        disc_category, disc_value = card.metadata.discriminator
+    elif isinstance(card.metadata.discriminator, re.Pattern) and (
+        model_hint and (match := card.metadata.discriminator.match(model_hint))
+    ):
+        disc_category, disc_value = "model", match.group(1)
+    elif (
+        isinstance(card.metadata.discriminator, re.Pattern)
+        and client_preference
+        and (match := card.metadata.discriminator.match(client_preference))
+    ):
+        disc_category, disc_value = "client", match.group(1)
+    elif isinstance(card.metadata.discriminator, re.Pattern):
+        # If it's a regex but no hint provided, we can't match
+        return False
     if disc_category == "model" and model_hint:
         # Model discriminator: check if model name starts with discriminator value
-        return model_hint.lower().startswith(disc_value.lower())
+        return model_hint.lower().startswith(cast(str, disc_value).lower())
 
     if disc_category == "client" and client_preference:
         # Client discriminator: exact match
-        return client_preference.lower() == disc_value.lower()
+        return client_preference.lower() == cast(str, disc_value).lower()
 
     return False
 
@@ -1572,23 +1571,6 @@ def get_sdk_client(
 
 
 @cache
-def get_provider_sdk_clients_for_category(
-    client_cls: type[SDKClient], category: LiteralProviderCategory
-) -> dict[Provider, SDKClient | tuple[SDKClient, ...]]:
-    """Get all SDK clients for a given provider category.
-
-    Args:
-        client_cls: The `SDKClient` class to get the clients for.
-        category: The `ProviderCategory` to get the clients for as a string.
-    """
-    return {
-        provider: client
-        for (provider, k), client in get_sdk_client_map(client_cls).items()
-        if k == category
-    }
-
-
-@cache
 def get_provider_category_sdk_clients_for_provider(
     client_cls: type[SDKClient], provider: Provider
 ) -> dict[ProviderCategory, tuple[SDKClient, ...] | SDKClient]:
@@ -1620,7 +1602,6 @@ __all__ = (
     "get_provider_capabilities_map",
     "get_provider_category_sdk_clients_for_provider",
     "get_provider_clients",
-    "get_provider_sdk_clients_for_category",
     "get_providers_for_category",
     "get_sdk_client",
     "get_sdk_client_map",

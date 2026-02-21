@@ -40,25 +40,7 @@ DEFAULT_OUTPUT = Path(".codeweaver/lazy_import_rules.yaml")
 SCHEMA_VERSION = "1.0"
 
 # Known exception patterns in old system
-EXCEPTION_MODULES = [
-    "codeweaver.__version__",
-    "codeweaver.server.mcp.user_agent",
-    "codeweaver.core.utils.create_lazy_getattr",
-    "codeweaver.core.utils.LazyImport",
-    "codeweaver.core.utils.lazy_importer",
-    "codeweaver.server.mcp.middleware.default_middleware_for_transport",
-    "codeweaver.server.mcp.middleware.McpMiddleware",
-    "codeweaver.providers.agent.AgentProfile",
-    "codeweaver.providers.agent.AgentProfileSpec",
-    "codeweaver.providers.reranking.providers.sentence_transformers",
-    "codeweaver.providers.embedding.providers.sentence_transformers",
-    "codeweaver.providers.reranking.capabilities.dependency_map",
-    "codeweaver.providers.reranking.capabilities.load_default_capabilities",
-    "codeweaver.providers.vector_stores.get_vector_store_provider",
-    "codeweaver_tokenizers.get_tokenizer",
-    "codeweaver.providers.embedding.capabilities.load_default_capabilities",
-    "codeweaver.providers.embedding.capabilities.load_sparse_capabilities",
-]
+EXCEPTION_MODULES = []
 
 
 @dataclass
@@ -296,7 +278,7 @@ class RuleMigrator:
 
         # Add rules
         for rule in sorted_rules:
-            rule_dict: dict[str, Any] = {
+            rule_mapping: dict[str, Any] = {
                 "name": rule.name,
                 "priority": rule.priority,
                 "description": rule.description,
@@ -306,17 +288,17 @@ class RuleMigrator:
 
             # Add match criteria
             if rule.pattern:
-                rule_dict["match"]["name_pattern"] = rule.pattern
+                rule_mapping["match"]["name_pattern"] = rule.pattern
             if rule.exact_match:
-                rule_dict["match"]["name_exact"] = rule.exact_match
+                rule_mapping["match"]["name_exact"] = rule.exact_match
             if rule.member_type:
-                rule_dict["match"]["member_type"] = rule.member_type.value
+                rule_mapping["match"]["member_type"] = rule.member_type.value
 
             # Add propagation if specified
             if rule.propagate:
-                rule_dict["propagate"] = rule.propagate.value
+                rule_mapping["propagate"] = rule.propagate.value
 
-            yaml_data["rules"].append(rule_dict)
+            yaml_data["rules"].append(rule_mapping)
 
         # Add overrides if any
         if self.overrides_include or self.overrides_exclude:
@@ -547,9 +529,22 @@ def verify_migration(
 
     errors: list[str] = []
 
+    from .common.types import DetectedSymbol, SourceLocation, SymbolProvenance
+
     # Test each case
     for name, module, member_type in test_cases:
-        result = engine.evaluate(name, module, member_type)
+        # Create a dummy symbol for evaluation
+        symbol = DetectedSymbol(
+            name=name,
+            member_type=member_type,
+            provenance=SymbolProvenance.DEFINED_HERE,
+            location=SourceLocation(line=1),
+            is_private=_is_private(name),
+            original_source=None,
+            original_name=None,
+        )
+
+        result = engine.evaluate(symbol, module)
 
         if _is_private(name):
             errors.extend(_validate_private_member(name, result))

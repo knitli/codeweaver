@@ -45,7 +45,15 @@ async def _perform_indexing(
 
     # Define simple callback wrapper
     callback = partial(_progress_callback, progress_reporter)
-
+    if not state.indexer:
+        progress_reporter.report_error(
+            "No indexer configured, cannot perform indexing", recoverable=True
+        )
+        if verbose:
+            _logger.warning(
+                "No indexer configured, cannot perform indexing. This is probably a bug if you have everything else set up correctly."
+            )
+        return
     await state.indexer.index_project(force_reindex=False, progress_callback=callback)
     progress_reporter.complete_operation("indexing")
 
@@ -104,12 +112,21 @@ async def _handle_watcher_cancellation(
 
 async def _run_indexing_workflow(
     state: CodeWeaverState, progress_reporter: ProgressReporter, *, verbose: bool, debug: bool
-) -> asyncio.Task[None | int]:
+) -> asyncio.Task[None | int] | None:
     """Run the complete indexing workflow and start the watcher."""
     # Perform indexing with progress tracking
     await _perform_indexing(state, progress_reporter, verbose=verbose, debug=debug)
 
     # Display final summary
+    if not state.indexer:
+        progress_reporter.report_error(
+            "No indexer configured, cannot display indexing summary", recoverable=True
+        )
+        if verbose:
+            _logger.warning(
+                "No indexer configured, cannot display indexing summary. This is probably a bug if you have everything else set up correctly."
+            )
+        return None
     _display_indexing_summary(progress_reporter, state.indexer.stats)
 
     progress_reporter.report_status("Watching for file changes...")

@@ -340,7 +340,7 @@ class ChunkEmbeddings(BasedModel):
 
     def get_model_by_vector_intent(self, intent: str) -> ModelNameT | None:
         """Get the model name used for a specific embedding intent, if it exists."""
-        return self.embeddings.get(intent).model if intent in self.embeddings else None
+        return embeddings.model if (embeddings := self.embeddings.get(intent)) else None
 
     @property
     def models(self) -> tuple[ModelNameT, ...]:
@@ -350,17 +350,17 @@ class ChunkEmbeddings(BasedModel):
     @property
     def dense_model(self) -> ModelNameT | None:
         """Get the model name used for primary dense embeddings, if any."""
-        return self.embeddings.get("primary").model if "primary" in self.embeddings else None
+        return embeddings.model if (embeddings := self.embeddings.get("primary")) else None
 
     @property
     def sparse_model(self) -> ModelNameT | None:
         """Get the model name used for sparse embeddings, if any."""
-        return self.embeddings.get("sparse").model if "sparse" in self.embeddings else None
+        return embeddings.model if (embeddings := self.embeddings.get("sparse")) else None
 
     @property
     def backup_dense_model(self) -> ModelNameT | None:
         """Get the model name used for backup dense embeddings, if any."""
-        return self.embeddings.get("backup").model if "backup" in self.embeddings else None
+        return embeddings.model if (embeddings := self.embeddings.get("backup")) else None
 
     @property
     def has_dense(self) -> bool:

@@ -345,11 +345,11 @@ def _get_default_reranking_settings() -> DeterminedDefaults:
                     model=ModelName("sentence-transformers:BAAI/bge-reranking-v2-m3"),
                     enabled=True,
                 )
-    possible_libs = [has_package(lib) for lib in ("boto3", "cohere") if has_package(lib)]
+    possible_libs = [lib for lib in ("boto3", "cohere") if has_package(lib)]
     logger.warning(
         "No default reranking provider libraries found. Reranking functionality will be disabled unless explicitly set in your config or environment variables. %s",
         (
-            f"It looks like you have {'these' if len(possible_libs) > 1 else 'this'} libraries installed that support reranking: {', '.join(lib.name for lib in possible_libs)}."
+            f"It looks like you have {'these libraries' if len(possible_libs) > 1 else 'this library'} installed that support reranking: {', '.join(possible_libs)}."
             if possible_libs
             else "You have no known reranking libraries installed."
         ),

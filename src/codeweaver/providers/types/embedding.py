@@ -9,7 +9,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any, Literal, NamedTuple, Self
+from typing import Any, Literal, NamedTuple, Self, cast
 
 from pydantic import PositiveInt
 from qdrant_client.http.models import Datatype
@@ -63,7 +63,9 @@ class ConfiguredCapability(NamedTuple):
             else self.config.embedding_config
         )
         return ModelName(
-            self.config.model_name or embedding_config.model_name or self.capability.name
+            self.config.model_name
+            or embedding_config.model_name
+            or (self.capability.name if self.capability else ModelName("unknown"))
         )
 
     async def datatype(self) -> str | None:
@@ -80,15 +82,17 @@ class ConfiguredCapability(NamedTuple):
         """Get the preferred distance metric for this capability."""
         if self.is_sparse or self.is_idf:
             return None
-        if self.capability:
+        if self.capability and not isinstance(self.capability, SparseEmbeddingModelCapabilities):
             return next(
                 (
-                    metric
-                    for metric in self.capability.preferred_metrics
+                    metric.title()
+                    for metric in cast(
+                        EmbeddingModelCapabilities, self.capability
+                    ).preferred_metrics
                     if metric.lower() in ("cosine", "dot", "euclidean", "manhattan")
                 ),
                 "Cosine",
-            )
+            )  # ty:ignore[invalid-return-type]
         return "Cosine"
 
     async def dimension(self) -> PositiveInt | None:
@@ -206,7 +210,7 @@ class EmbeddingCapabilityGroup(NamedTuple):
     @property
     def dense_model(self) -> ModelNameT | None:
         """Get the name of the dense embedding model."""
-        return self.dense.model_name
+        return self.dense.model_name if self.dense else None
 
     @property
     def sparse_model(self) -> ModelNameT | None:

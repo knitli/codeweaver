@@ -272,6 +272,8 @@ class IndexingService:
             await asyncio.sleep(0)
 
         # Handle deleted files by comparing seen set with manifest
+        if not self._file_manifest:
+            self._file_manifest = self._manifest_manager.create_new()
         manifest_files = self._file_manifest.get_all_file_paths()
         deleted_relative = manifest_files - seen_files
         self._deleted_files = [self._project_path / rel for rel in deleted_relative]
@@ -311,7 +313,8 @@ class IndexingService:
 
             seen_files.add(relative_path)
             current_hash = get_blake_hash(content_bytes)
-
+            if not self._file_manifest:
+                self._file_manifest = self._manifest_manager.create_new()
             needs_reindex, _ = self._file_manifest.file_needs_reindexing(
                 relative_path,
                 current_hash,
@@ -502,6 +505,8 @@ class IndexingService:
             })
 
         if manifest_updates:
+            if not self._file_manifest:
+                self._file_manifest = self._manifest_manager.create_new()
             async with self._manifest_lock:
                 self._file_manifest.add_files_batch(manifest_updates)
 

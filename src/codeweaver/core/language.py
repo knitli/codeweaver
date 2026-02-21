@@ -348,7 +348,11 @@ class SemanticSearchLanguage(str, BaseEnum):
         """
         Returns the SemanticSearchLanguage associated with the given file extension.
         """
-        ext = FileExt(ext.lower()) if ext.startswith(".") else FileExt(f".{ext.lower()}")
+        ext = (
+            FileExt(str(ext).lower())
+            if str(ext).startswith(".")
+            else FileExt(f".{str(ext).lower()}")
+        )
         return next(
             (language for language, extensions in cls.extension_map().items() if ext in extensions),
             None,
@@ -1442,7 +1446,12 @@ class SemanticSearchLanguage(str, BaseEnum):
 def has_semantic_extension(ext: FileExtensionT) -> SemanticSearchLanguage | None:
     """Check if the given extension is a semantic search language."""
     return next(
-        (lang for lang_ext, lang in SemanticSearchLanguage.ext_pairs() if lang_ext == ext), None
+        (
+            lang
+            for lang_ext, lang in SemanticSearchLanguage.ext_pairs()
+            if lang_ext == ext and isinstance(lang, SemanticSearchLanguage)
+        ),
+        None,
     )
 
 

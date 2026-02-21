@@ -13,6 +13,8 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from codeweaver.core import SemanticSearchLanguage
+from codeweaver.core.constants import PARALLEL_CHUNKING_THRESHOLD
 from codeweaver.engine.chunker import ChunkerSelector, chunk_files_parallel
 from codeweaver.engine.chunker.delimiter import DelimiterChunker
 from codeweaver.engine.chunker.exceptions import ChunkingError
@@ -57,9 +59,7 @@ class ChunkingService:
             return
 
         # Normal chunking logic
-        if force_parallel or (
-            self.settings.enable_parallel and len(files) >= self.settings.parallel_threshold
-        ):
+        if force_parallel or (len(files) >= PARALLEL_CHUNKING_THRESHOLD):
             async for result in chunk_files_parallel(
                 files,
                 self.governor,
@@ -87,8 +87,8 @@ class ChunkingService:
                 except ChunkingError:
                     language = (
                         file.ext_category.language.variable
-                        if file.ext_category and file.ext_category.language
-                        else "unknown"
+                        if isinstance(file.ext_category, SemanticSearchLanguage)
+                        else str(file.ext_category.language)
                     )
                     fallback_chunker = DelimiterChunker(self.governor, language=language)
                     chunks = fallback_chunker.chunk(content, file=file)

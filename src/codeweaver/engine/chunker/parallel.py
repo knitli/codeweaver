@@ -41,6 +41,7 @@ from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from codeweaver.core import BaseEnum
 from codeweaver.core.constants import DEFAULT_MAX_CONCURRENT_BATCHES, ZERO
 from codeweaver.engine.chunker.delimiter import DelimiterChunker
 from codeweaver.engine.chunker.exceptions import ChunkingError
@@ -97,8 +98,8 @@ def _chunk_single_file(
             # Create delimiter chunker as fallback
             language = (
                 file.ext_category.language.variable
-                if file.ext_category and file.ext_category.language
-                else "unknown"
+                if isinstance(file.ext_category.language, BaseEnum)
+                else str(file.ext_category.language)
             )
             fallback_chunker = DelimiterChunker(governor, language=language)
 

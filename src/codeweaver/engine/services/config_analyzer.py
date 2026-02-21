@@ -1,3 +1,4 @@
+# sourcery skip: no-complex-if-expressions
 # SPDX-FileCopyrightText: 2026 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
@@ -17,6 +18,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any, Literal
 
+from codeweaver.core import Unset
 from codeweaver.engine.managers.checkpoint_manager import ChangeImpact
 
 
@@ -109,6 +111,8 @@ class ConfigChangeAnalyzer:
         if not checkpoint:
             return None
 
+        if self.settings.providers is Unset:
+            return None
         # Get current embedding configuration
         current_embedding = (
             self.settings.provider.embedding[0] if self.settings.provider.embedding else None
@@ -153,95 +157,27 @@ class ConfigChangeAnalyzer:
             Policy validation occurs before compatibility checks. A STRICT policy
             may block changes that would otherwise be technically compatible.
         """
-        from codeweaver.core.exceptions import ConfigurationLockError
-        from codeweaver.providers.config.categories import AsymmetricEmbeddingProviderSettings
-
-        changes: list[TransformationDetails] = []
-
         # Create fingerprint from new config
         new_fingerprint = self.checkpoint_manager._create_fingerprint(new_config)
-
-        # POLICY CHECK FIRST: Validate against collection policy before compatibility checks
-        # This ensures policy restrictions are enforced before technical analysis.
-        # FLEXIBLE policy only warns (doesn't raise), so we continue to compatibility checks.
-        try:
-            collection_metadata = await self.vector_store.collection_info()
-            if collection_metadata:
-                # Extract proposed configuration from new settings
-                new_dense_model = None
-                new_query_model = None
-                new_sparse_model = None
-                new_provider = (
-                    str(self.settings.provider.vector_store[0].provider)
-                    if self.settings.provider.vector_store
-                    and len(self.settings.provider.vector_store) > 0
-                    else None
-                )
-
-                if isinstance(new_config, AsymmetricEmbeddingProviderSettings):
-                    new_dense_model = str(new_config.embed_provider.model_name)
-                    new_query_model = str(new_config.query_provider.model_name)
-                else:
-                    new_dense_model = str(new_config.model_name)
-
-                # Get sparse model from settings if available
-                if self.settings.provider.sparse_embedding:
-                    new_sparse_model = str(self.settings.provider.sparse_embedding[0].model_name)
-
-                # Validate policy compliance
-                # FLEXIBLE policy logs warnings but doesn't raise
-                # STRICT and FAMILY_AWARE raise ConfigurationLockError
-                collection_metadata.validate_config_change(
-                    new_dense_model=new_dense_model,
-                    new_query_model=new_query_model,
-                    new_sparse_model=new_sparse_model,
-                    new_provider=str(new_provider) if new_provider else None,
-                )
-        except ConfigurationLockError as e:
-            # Policy violation - return breaking analysis with policy guidance
-            old_summary = self._create_config_summary(old_fingerprint)
-            new_summary = self._create_config_summary_from_settings(new_config)
-
-            # Extract policy from error details
-            policy = e.details.get("policy", "unknown")
-
-            return ConfigChangeAnalysis(
-                impact=ChangeImpact.BREAKING,
-                old_config_summary=old_summary,
-                new_config_summary=new_summary,
-                transformation_type=None,
-                transformations=[],
-                estimated_time=self._estimate_reindex_time(vector_count),
-                estimated_cost=self._estimate_reindex_cost(vector_count),
-                accuracy_impact=f"Collection policy ({policy}) blocks this change",
-                recommendations=self._build_policy_recommendations(policy, e),
-                migration_strategy="full_reindex",
-            )
-
-        # 1. Check compatibility using checkpoint manager logic
-        is_compatible, impact = new_fingerprint.is_compatible_with(old_fingerprint)
 
         # Create config summaries for reporting
         old_summary = self._create_config_summary(old_fingerprint)
         new_summary = self._create_config_summary_from_settings(new_config)
 
+        # POLICY CHECK FIRST: Validate against collection policy before compatibility checks
+        policy_result = await self._validate_policy_change(
+            old_fingerprint, new_config, new_fingerprint, old_summary, new_summary, vector_count
+        )
+        if policy_result is not None:
+            return policy_result
+
+        # 1. Check compatibility using checkpoint manager logic
+        is_compatible, impact = new_fingerprint.is_compatible_with(old_fingerprint)
+
         # 2. If breaking change, return early
         if not is_compatible or impact == ChangeImpact.BREAKING:
-            return ConfigChangeAnalysis(
-                impact=ChangeImpact.BREAKING,
-                old_config_summary=old_summary,
-                new_config_summary=new_summary,
-                transformation_type=None,
-                transformations=[],
-                estimated_time=self._estimate_reindex_time(vector_count),
-                estimated_cost=self._estimate_reindex_cost(vector_count),
-                accuracy_impact="Requires full reindex",
-                recommendations=[
-                    "Revert config: cw config revert",
-                    "Reindex: cw index --force",
-                    "Migrate to new collection: cw migrate",
-                ],
-                migration_strategy="full_reindex",
+            return self._build_breaking_analysis(
+                old_summary, new_summary, vector_count, reason="Requires full reindex"
             )
 
         # 3. If no changes, return early
@@ -259,97 +195,13 @@ class ConfigChangeAnalyzer:
                 migration_strategy="no_action",
             )
 
-        # 4. Check for datatype changes (quantization)
-        old_dtype = self._get_datatype_from_fingerprint(old_fingerprint)
-        new_dtype = self._get_datatype_from_config(new_config)
-
-        if old_dtype != new_dtype and old_dtype and new_dtype:
-            if self._is_valid_quantization(old_dtype, new_dtype):
-                changes.append(
-                    TransformationDetails(
-                        type="quantization",
-                        old_value=old_dtype,
-                        new_value=new_dtype,
-                        complexity="low",
-                        time_estimate=timedelta(seconds=30),
-                        requires_vector_update=False,
-                        accuracy_impact="~2% (acceptable, validated)",
-                    )
-                )
-            else:
-                return self._build_breaking_analysis(
-                    old_summary,
-                    new_summary,
-                    vector_count,
-                    reason=f"Cannot increase precision from {new_dtype} to {old_dtype}",
-                )
-
-        # 5. Check for dimension changes (requires migration)
-        old_dim = self._get_dimension_from_fingerprint(old_fingerprint)
-        new_dim = self._get_dimension_from_config(new_config)
-
-        if old_dim != new_dim and old_dim and new_dim:
-            if new_dim > old_dim:
-                return self._build_breaking_analysis(
-                    old_summary,
-                    new_summary,
-                    vector_count,
-                    reason=f"Cannot increase dimensions from {old_dim} to {new_dim}",
-                )
-
-            # Dimension reduction is transformable
-            model_name = new_fingerprint.embed_model
-            changes.append(
-                TransformationDetails(
-                    type="dimension_reduction",
-                    old_value=old_dim,
-                    new_value=new_dim,
-                    complexity="medium",
-                    time_estimate=self._estimate_migration_time(vector_count),
-                    requires_vector_update=True,
-                    accuracy_impact=self._estimate_matryoshka_impact(model_name, old_dim, new_dim),
-                )
-            )
-
-        # 6. Determine overall impact and build response
-        if not changes:
-            # Compatible change (e.g., query model change in asymmetric config)
-            return ConfigChangeAnalysis(
-                impact=ChangeImpact.COMPATIBLE,
-                old_config_summary=old_summary,
-                new_config_summary=new_summary,
-                transformation_type=None,
-                transformations=[],
-                estimated_time=timedelta(0),
-                estimated_cost=0.0,
-                accuracy_impact="No impact (compatible model family change)",
-                recommendations=["No action required - change is compatible"],
-                migration_strategy="no_action",
-            )
-
-        has_quantization = any(c.type == "quantization" for c in changes)
-        has_dimension = any(c.type == "dimension_reduction" for c in changes)
-
-        if has_dimension:
-            return self._build_transformable_analysis(
-                old_summary, new_summary, changes, vector_count
-            )
-        if has_quantization:
-            return self._build_quantizable_analysis(old_summary, new_summary, changes)
-
-        # Should not reach here, but handle gracefully
-        return ConfigChangeAnalysis(
-            impact=ChangeImpact.NONE,
-            old_config_summary=old_summary,
-            new_config_summary=new_summary,
-            transformation_type=None,
-            transformations=[],
-            estimated_time=timedelta(0),
-            estimated_cost=0.0,
-            accuracy_impact="No change",
-            recommendations=[],
-            migration_strategy="no_action",
+        # 4. Detect transformations
+        changes = await self._detect_transformations(
+            old_fingerprint, new_config, new_fingerprint, old_summary, new_summary, vector_count
         )
+
+        # 5. Build response based on detected transformations
+        return self._build_analysis_response(old_summary, new_summary, changes, vector_count)
 
     def _estimate_matryoshka_impact(self, model_name: str, old_dim: int, new_dim: int) -> str:
         """Estimate accuracy impact using empirical data.
@@ -364,7 +216,7 @@ class ConfigChangeAnalyzer:
         reduction_pct = (old_dim - new_dim) / old_dim * 100
 
         # Use empirical data for Voyage models (EVIDENCE-BASED)
-        if model_name.startswith("voyage-code-3"):
+        if model_name.startswith("voyage-"):
             # Based on benchmark data
             impact_map = {
                 (2048, 1024): 0.04,  # 75.16% → 75.20%

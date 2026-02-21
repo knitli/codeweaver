@@ -137,8 +137,9 @@ def _resolve_contents_options(
     max_age_hours: int | None = None,
 ) -> ExaContentsOptions | Literal[True] | None:
     """Resolve the contents options, applying defaults if necessary."""
-    if not options and not max_characters and not max_age_hours:
+    if (not options and not max_characters and not max_age_hours) or options is True:
         return None
+    options = options or ExaContentsOptions()
     resolved_options: ExaContentsOptions = options.copy() if isinstance(options, dict) else {}
     if options.get("text") is True and max_characters is not None:
         resolved_options["text"] = cast(

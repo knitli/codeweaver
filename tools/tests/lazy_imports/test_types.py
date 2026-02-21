@@ -10,13 +10,17 @@ from __future__ import annotations
 import pytest
 
 from tools.lazy_imports.common.types import (
+    DetectedSymbol,
+    ExportDecision,
     ExportManifest,
-    ExportNode,
+    LazyExport,
     MemberType,
     PropagationLevel,
     Rule,
     RuleAction,
     RuleMatchCriteria,
+    SourceLocation,
+    SymbolProvenance,
     ValidationError,
 )
 
@@ -61,73 +65,71 @@ class TestRuleAction:
         assert RuleAction.NO_DECISION == "no_decision"
 
 
-class TestExportNode:
-    """Test ExportNode dataclass."""
+class TestDetectedSymbol:
+    """Test DetectedSymbol dataclass."""
 
-    def test_export_node_creation(self):
-        """Can create export node."""
-        from pathlib import Path
-
-        node = ExportNode(
+    def test_symbol_creation(self):
+        """Can create detected symbol."""
+        symbol = DetectedSymbol(
             name="MyClass",
-            module="test.module",
+            provenance=SymbolProvenance.DEFINED_HERE,
+            location=SourceLocation(line=10, column=4),
             member_type=MemberType.CLASS,
-            propagation=PropagationLevel.PARENT,
-            source_file=Path("test/module.py"),
-            line_number=10,
-            defined_in="test.module",
+            is_private=False,
+            original_source=None,
+            original_name=None,
         )
 
-        assert node.name == "MyClass"
-        assert node.module == "test.module"
-        assert node.member_type == MemberType.CLASS
-        assert node.propagation == PropagationLevel.PARENT
+        assert symbol.name == "MyClass"
+        assert symbol.member_type == MemberType.CLASS
+        assert symbol.location.line == 10
+        assert symbol.provenance == SymbolProvenance.DEFINED_HERE
 
-    def test_export_node_is_hashable(self):
-        """Export nodes are hashable for use in sets."""
-        from pathlib import Path
-
-        node1 = ExportNode(
-            name="MyClass",
-            module="test.module",
-            member_type=MemberType.CLASS,
-            propagation=PropagationLevel.PARENT,
-            source_file=Path("test/module.py"),
-            line_number=10,
-            defined_in="test.module",
-        )
-
-        node2 = ExportNode(
-            name="MyClass",
-            module="test.module",
-            member_type=MemberType.CLASS,
-            propagation=PropagationLevel.PARENT,
-            source_file=Path("test/module.py"),
-            line_number=10,
-            defined_in="test.module",
-        )
-
-        # Can use in sets
-        nodes = {node1, node2}
-        assert len(nodes) == 1  # Same content = same hash
-
-    def test_export_node_default_fields(self):
-        """Export node has default values for optional fields."""
-        from pathlib import Path
-
-        node = ExportNode(
+    def test_symbol_defaults(self):
+        """Test default values."""
+        symbol = DetectedSymbol(
             name="func",
-            module="test",
+            provenance=SymbolProvenance.IMPORTED,
+            location=SourceLocation(line=1),
             member_type=MemberType.FUNCTION,
-            propagation=PropagationLevel.NONE,
-            source_file=Path("test.py"),
-            line_number=1,
-            defined_in="test",
+            is_private=True,
+            original_source="other.module",
+            original_name="other_func",
         )
 
-        assert node.docstring is None
-        assert node.propagates_to == set()
-        assert node.dependencies == set()
+        assert symbol.docstring is None
+        assert symbol.metadata == {}
+        assert symbol.location.column is None
+
+
+class TestExportDecision:
+    """Test ExportDecision dataclass."""
+
+    def test_decision_creation(self):
+        """Can create export decision."""
+        symbol = DetectedSymbol(
+            name="MyClass",
+            provenance=SymbolProvenance.DEFINED_HERE,
+            location=SourceLocation(line=10),
+            member_type=MemberType.CLASS,
+            is_private=False,
+            original_source=None,
+            original_name=None,
+        )
+
+        decision = ExportDecision(
+            module_path="test.module",
+            action=RuleAction.INCLUDE,
+            export_name="MyClass",
+            propagation=PropagationLevel.PARENT,
+            priority=100,
+            reason="Test rule",
+            source_symbol=symbol,
+        )
+
+        assert decision.module_path == "test.module"
+        assert decision.action == RuleAction.INCLUDE
+        assert decision.source_symbol == symbol
 
 
 class TestExportManifest:
@@ -135,29 +137,18 @@ class TestExportManifest:
 
     def test_manifest_creation(self):
         """Can create export manifest."""
-        from pathlib import Path
-
         own = [
-            ExportNode(
-                name="Own",
-                module="test",
-                member_type=MemberType.CLASS,
-                propagation=PropagationLevel.PARENT,
-                source_file=Path("test.py"),
-                line_number=1,
-                defined_in="test",
+            LazyExport(
+                public_name="Own", target_module="test", target_object="Own", is_type_only=False
             )
         ]
 
         propagated = [
-            ExportNode(
-                name="Propagated",
-                module="test.child",
-                member_type=MemberType.CLASS,
-                propagation=PropagationLevel.PARENT,
-                source_file=Path("test/child.py"),
-                line_number=1,
-                defined_in="test.child",
+            LazyExport(
+                public_name="Propagated",
+                target_module="test.child",
+                target_object="Propagated",
+                is_type_only=False,
             )
         ]
 
@@ -175,26 +166,12 @@ class TestExportManifest:
 
     def test_export_names_sorted(self):
         """Export names are sorted alphabetically."""
-        from pathlib import Path
-
         exports = [
-            ExportNode(
-                name="Zebra",
-                module="test",
-                member_type=MemberType.CLASS,
-                propagation=PropagationLevel.PARENT,
-                source_file=Path("test.py"),
-                line_number=1,
-                defined_in="test",
+            LazyExport(
+                public_name="Zebra", target_module="test", target_object="Zebra", is_type_only=False
             ),
-            ExportNode(
-                name="Apple",
-                module="test",
-                member_type=MemberType.CLASS,
-                propagation=PropagationLevel.PARENT,
-                source_file=Path("test.py"),
-                line_number=2,
-                defined_in="test",
+            LazyExport(
+                public_name="Apple", target_module="test", target_object="Apple", is_type_only=False
             ),
         ]
 

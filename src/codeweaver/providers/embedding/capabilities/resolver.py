@@ -10,6 +10,7 @@ Provides lazy loading and resolution of embedding model capabilities by model na
 from __future__ import annotations
 
 from types import MappingProxyType
+from typing import cast
 
 from codeweaver.core import dependency_provider
 from codeweaver.providers import EmbeddingModelCapabilities
@@ -123,7 +124,9 @@ class EmbeddingCapabilityResolver(BaseCapabilityResolver[EmbeddingModelCapabilit
             for cap in getter():
                 temp_capabilities[cap.name] = cap
 
-        self._capabilities_by_name = MappingProxyType(temp_capabilities)
+        self._capabilities_by_name = MappingProxyType(
+            cast(dict[str, EmbeddingModelCapabilities], temp_capabilities)
+        )
         self._loaded = True
 
 

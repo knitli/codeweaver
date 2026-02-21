@@ -282,7 +282,8 @@ def config(
 
     # Handle existing configuration
     if (
-        config_path.exists()
+        config_path
+        and config_path.exists()
         and not force
         and not Confirm.ask(
             f"[yellow]Configuration file already exists at {config_path}. Overwrite?[/yellow]",

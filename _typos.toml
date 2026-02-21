@@ -22,7 +22,7 @@ extend-exclude = [
   "src/assets/fonts/**/*",
   "src/assets/images/**/*",
   "src/assets/videos/**/*",
-  "vendor",
+  "vendored/**/*",
 ]
 ignore-hidden = false
 ignore-files = true

@@ -46,36 +46,78 @@ class MemberType(StrEnum):
     VARIABLE = "variable"
     CONSTANT = "constant"
     TYPE_ALIAS = "type_alias"
+    IMPORTED = "imported"  # For imported symbols
     UNKNOWN = "unknown"
 
 
-# Export Node - Core data structure
+class SymbolProvenance(StrEnum):
+    """Where a symbol comes from."""
+
+    DEFINED_HERE = "defined_here"  # Defined in the current file
+    IMPORTED = "imported"  # Imported from another module
+    ALIAS_IMPORTED = "alias_imported"  # Imported with an alias (import X as Y)
+    UNKNOWN = "unknown"
 
 
 @dataclass(frozen=True)
-class ExportNode:
-    """A single export in the propagation graph.
+class SourceLocation:
+    """Location in a source file."""
 
-    This is the core data structure representing an export (class, function, etc.)
-    and its propagation behavior.
-    """
+    line: int
+    column: int | None = None
 
-    name: str  # Symbol name
-    module: str  # Fully qualified module name
+
+# Discovery Phase Types
+
+
+@dataclass(frozen=True)
+class DetectedSymbol:
+    """A raw symbol found in a source file (Discovery Phase)."""
+
+    name: str
+    provenance: SymbolProvenance
+    location: SourceLocation
     member_type: MemberType
-    propagation: PropagationLevel
-    source_file: Path  # Where it's defined
-    line_number: int  # Line where defined
-    defined_in: str  # Module where actually defined (may differ from module during propagation)
-    docstring: str | None = None
 
-    # Graph relationships (these will be populated during graph building)
-    propagates_to: set[str] = field(default_factory=set)  # Parent modules
-    dependencies: set[str] = field(default_factory=set)  # Other exports this depends on
+    # Critical Context
+    is_private: bool
+    original_source: str | None  # If imported, where from? "codeweaver.utils"
+    original_name: str | None  # If aliased, what was the original name?
+    docstring: str | None = None
+    metadata: dict[str, object] = field(default_factory=dict)
+
+
+# Decision Phase Types
+
+
+@dataclass(frozen=True)
+class ExportDecision:
+    """The result of applying rules to a symbol (Decision Phase)."""
+
+    module_path: str  # Context of decision
+    action: RuleAction
+    export_name: str  # Usually symbol.name, but rules could rename it
+    propagation: PropagationLevel
+    priority: int  # Traceable priority for conflict resolution
+    reason: str  # "Matched rule: PublicVariable"
+    source_symbol: DetectedSymbol  # logic trace back
+
+
+# Graph/Generation Phase Types
+
+
+@dataclass(frozen=True)
+class LazyExport:
+    """A finalized export entry for __init__.py generation (Graph Phase)."""
+
+    public_name: str  # Name in __all__
+    target_module: str  # "codeweaver.core.utils" (absolute)
+    target_object: str  # "some_function"
+    is_type_only: bool  # Goes in TYPE_CHECKING only?
 
     def __hash__(self):
-        """Make hashable for use in sets."""
-        return hash((self.name, self.module, self.source_file))
+        """Hash based on public_name, target_module, and target_object for use in sets/dicts."""
+        return hash((self.public_name, self.target_module, self.target_object))
 
 
 @dataclass(frozen=True)
@@ -87,14 +129,25 @@ class ExportManifest:
     """
 
     module_path: str
-    own_exports: list[ExportNode]  # Defined in this module
-    propagated_exports: list[ExportNode]  # From children
-    all_exports: list[ExportNode]  # own + propagated
+    own_exports: list[LazyExport]  # Defined in this module
+    propagated_exports: list[LazyExport]  # From children
+    all_exports: list[LazyExport]  # own + propagated
 
     @property
     def export_names(self) -> list[str]:
-        """All export names for __all__ declaration (sorted)."""
-        return sorted(e.name for e in self.all_exports)
+        """All export names for __all__ declaration (sorted by export_sort_key)."""
+        # Note: all_exports should be pre-sorted by PropagationGraph.build_manifests(),
+        # but we sort defensively to handle manually-constructed manifests (e.g., tests)
+        import textcase
+
+        def _sort_key(name: str) -> tuple[int, str]:
+            """SCREAMING_SNAKE (0) → PascalCase (1) → snake_case (2), then alphabetically."""
+            if textcase.constant.match(name):
+                return (0, name.lower())
+            return (1, name.lower()) if textcase.pascal.match(name) else (2, name.lower())
+
+        names = [e.public_name for e in self.all_exports]
+        return sorted(names, key=_sort_key)
 
 
 # Rule System Types
@@ -109,6 +162,7 @@ class RuleMatchCriteria:
     module_exact: str | None = None
     module_pattern: str | None = None  # Regex
     member_type: MemberType | None = None
+    provenance: SymbolProvenance | None = None  # NEW: Match on symbol provenance
     any_of: list[RuleMatchCriteria] | None = None  # OR conditions
     all_of: list[RuleMatchCriteria] | None = None  # AND conditions
 
@@ -288,7 +342,7 @@ class ValidationReport:
 class AnalysisResult:
     """Cached analysis of a Python file."""
 
-    exports: list[ExportNode]
+    symbols: list[DetectedSymbol]
     imports: list[str]  # Import statements
     file_hash: str  # SHA-256 of file content
     analysis_timestamp: float

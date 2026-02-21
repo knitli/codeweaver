@@ -71,7 +71,7 @@ class Pipeline:
 
         # Initialize components
         self.file_discovery = FileDiscovery()
-        self.ast_parser = ASTParser(rule_engine)
+        self.ast_parser = ASTParser()
         self.generator = CodeGenerator(output_dir)
         self.graph = PropagationGraph(rule_engine)
 
@@ -153,7 +153,7 @@ class Pipeline:
                             path=target,
                             content=code.content,
                             exports=manifest.export_names,
-                            source_modules=list({e.defined_in for e in manifest.all_exports}),
+                            source_modules=list({e.target_module for e in manifest.all_exports}),
                             timestamp=time.time(),
                             hash=code.hash,
                         )
@@ -237,8 +237,12 @@ class Pipeline:
         self.graph.add_module(module_path, parent_module)
 
         # Add exports to graph
-        for export in analysis.exports:
-            self.graph.add_export(export)
+        for symbol in analysis.symbols:
+            # Evaluate rules for the symbol
+            decision = self.rule_engine.evaluate(symbol, module_path)
+
+            # Add decision to graph
+            self.graph.add_export(decision)
             self.stats.exports_extracted += 1
 
     def _get_parent_module(self, module_path: str) -> str | None:

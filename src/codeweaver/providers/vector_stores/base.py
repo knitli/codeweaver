@@ -27,6 +27,7 @@ from codeweaver.core.constants import (
     ZERO,
 )
 from codeweaver.core.types import ModelNameT, SearchResult
+from codeweaver.providers import EmbeddingModelCapabilities
 from codeweaver.providers.config import VectorStoreProviderSettings
 from codeweaver.providers.exceptions import CircuitBreakerOpenError
 from codeweaver.providers.types import CircuitBreakerState, EmbeddingCapabilityGroup
@@ -178,17 +179,19 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
         return await dense_caps.datatype() if dense_caps else "float16"  # ty:ignore[invalid-return-type]
 
     @property
-    def distance_metric(self) -> Literal["cosine", "dot", "euclidean"]:
+    def distance_metric(self) -> Literal["cosine", "dot", "euclidean", "manhattan"]:
         """Get the distance metric used for similarity search.
 
         Returns:
             Distance metric as a string.
         """
         dense_caps = self.embedding_capabilities.dense
-        if dense_caps and dense_caps.capability.preferred_metrics:
+        if dense_caps and cast(EmbeddingModelCapabilities, dense_caps.capability).preferred_metrics:
             return next(
-                measure.lower()
-                for measure in dense_caps.capability.preferred_metrics
+                cast(Literal["cosine", "dot", "euclidean", "manhattan"], measure.lower())
+                for measure in cast(
+                    EmbeddingModelCapabilities, dense_caps.capability
+                ).preferred_metrics
                 if measure.lower() in {"cosine", "dot", "euclidean", "manhattan"}
             )
         return "cosine"
@@ -217,6 +220,8 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
             self.embedding_capabilities.sparse.config.model_name
             if self.embedding_capabilities.sparse
             else self.embedding_capabilities.idf.config.model_name
+            if self.embedding_capabilities.idf
+            else None
         )
 
     @property

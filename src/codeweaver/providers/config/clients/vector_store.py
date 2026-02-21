@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 
 from collections.abc import Awaitable, Callable, Sequence
-from typing import Any, Literal, NotRequired, Self, TypedDict, cast
+from typing import Any, Literal, NotRequired, Self, TypedDict, cast, type_check_only
 
 from pydantic import (
     AnyUrl,
@@ -25,6 +25,7 @@ from codeweaver.core.constants import LOCALHOST_INDICATORS, LOCALHOST_URL, QDRAN
 from codeweaver.core.exceptions import ConfigurationError
 from codeweaver.core.types import AnonymityConversion, FilteredKey, FilteredKeyT
 from codeweaver.core.types.provider import Provider
+from codeweaver.core.utils import TypeIs
 from codeweaver.providers.config.clients.base import ClientOptions
 from codeweaver.providers.config.types import HttpxClientParams
 
@@ -45,6 +46,12 @@ class GrpcParams(TypedDict, total=False):
     """Metadata to be sent with each request."""
     options: NotRequired[dict[str, Any]]
     """A mapping of channel options. See grpc documentation for details. Note: max_send_message_length and max_receive_message_length can't be set here because qdrant_client will override them (always -1)."""
+
+
+@type_check_only
+def _is_memory_provider(value: Any) -> TypeIs[Literal[":memory:"]]:
+    value = str(value) if value is not None else ""
+    return value == ":memory:"
 
 
 class QdrantClientOptions(ClientOptions):
@@ -100,12 +107,14 @@ class QdrantClientOptions(ClientOptions):
 
     def _handle_cloud_inference(self) -> None:
         """Adjust settings for cloud inference if enabled."""
-        if not self.cloud_inference:
+        if not self.cloud_inference or _is_memory_provider(self.url):
             return
-        if not self.url or (
-            (self.url and not self.url.host.endswith(".cloud.qdrant.io"))
-            or (self.host and not self.host.host.endswith(".cloud.qdrant.io"))
-        ):
+        if not self.url:
+            logger.warning(
+                "Cloud inference is enabled but you didn't provide a URL. Cloud inference requires a Qdrant Cloud endpoint. Disabling cloud_inference."
+            )
+            return
+        if self.url.host:
             logger.warning(
                 "Cloud inference can only be enabled for Qdrant cloud endpoints. Disabling cloud_inference."
             )
@@ -128,6 +137,8 @@ class QdrantClientOptions(ClientOptions):
     def _resolve_host_and_url(self) -> None:
         """Resolve host and url settings to avoid conflicts."""
         if not self.host or not self.url:
+            return
+        if _is_memory_provider(self.url) or _is_memory_provider(self.host):
             return
         if self.url.host == (self.host if isinstance(self.host, str) else self.host.host) or (
             self._is_local_url(self.url) and self._is_local_url(self.host)
@@ -281,7 +292,12 @@ class QdrantClientOptions(ClientOptions):
                     **((self.advanced_http_options or {}) | {"http2": True, "http1": False})
                 ),
             )
-        if self.url and not self._is_local_url(self.url) and self.https is None:
+        if (
+            self.url
+            and not self._is_local_url(self.url)
+            and self.https is None
+            and not _is_memory_provider(self.url)
+        ):
             self.https = True
             if self.url.scheme == "http":
                 self.url = AnyUrl(url=str(self.url).replace("http://", "https://", 1))

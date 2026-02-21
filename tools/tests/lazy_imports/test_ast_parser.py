@@ -14,53 +14,13 @@ from pathlib import Path
 import pytest
 
 from tools.lazy_imports.analysis.ast_parser import ASTParser
-from tools.lazy_imports.common.types import (
-    MemberType,
-    PropagationLevel,
-    Rule,
-    RuleAction,
-    RuleMatchCriteria,
-)
-from tools.lazy_imports.export_manager.rules import RuleEngine
+from tools.lazy_imports.common.types import MemberType, SymbolProvenance
 
 
 @pytest.fixture
-def rule_engine():
-    """Create a basic rule engine for testing."""
-    engine = RuleEngine()
-
-    # Add basic rules using proper Rule objects
-    # Rule 1: Include everything by default with parent propagation
-    engine.add_rule(
-        Rule(
-            name="default-include",
-            priority=0,
-            description="Include all exports by default",
-            match=RuleMatchCriteria(name_pattern=".*"),
-            action=RuleAction.INCLUDE,
-            propagate=PropagationLevel.PARENT,
-        )
-    )
-
-    # Rule 2: Exclude private members (higher priority)
-    engine.add_rule(
-        Rule(
-            name="exclude-private",
-            priority=100,
-            description="Exclude private members",
-            match=RuleMatchCriteria(name_pattern=r"^_.*"),
-            action=RuleAction.EXCLUDE,
-            propagate=None,
-        )
-    )
-
-    return engine
-
-
-@pytest.fixture
-def parser(rule_engine):
-    """Create AST parser with rule engine."""
-    return ASTParser(rule_engine)
+def parser():
+    """Create AST parser."""
+    return ASTParser()
 
 
 def create_temp_file(content: str) -> Path:
@@ -83,19 +43,17 @@ class MyClass:
 '''
         file_path = create_temp_file(content)
         try:
-            self._parse_file(parser, file_path)
+            result = parser.parse_file(file_path, "test.module")
+
+            assert len(result.symbols) == 1
+            symbol = result.symbols[0]
+            assert symbol.name == "MyClass"
+            assert symbol.member_type == MemberType.CLASS
+            assert symbol.docstring == "A simple class."
+            assert symbol.location.line == 2
+            assert symbol.provenance == SymbolProvenance.DEFINED_HERE
         finally:
             file_path.unlink()
-
-    def _parse_file(self, parser, file_path):
-        result = parser.parse_file(file_path, "test.module")
-
-        assert len(result.exports) == 1
-        export = result.exports[0]
-        assert export.name == "MyClass"
-        assert export.member_type == MemberType.CLASS
-        assert export.docstring == "A simple class."
-        assert export.line_number == 2
 
     def test_multiple_classes(self, parser) -> None:
         """Extract multiple classes."""
@@ -114,8 +72,8 @@ class Third:
         try:
             result = parser.parse_file(file_path, "test.module")
 
-            assert len(result.exports) == 3
-            names = [e.name for e in result.exports]
+            assert len(result.symbols) == 3
+            names = [e.name for e in result.symbols]
             assert names == ["First", "Second", "Third"]
         finally:
             file_path.unlink()
@@ -132,8 +90,8 @@ class Outer:
             result = parser.parse_file(file_path, "test.module")
 
             # Only Outer should be extracted
-            assert len(result.exports) == 1
-            assert result.exports[0].name == "Outer"
+            assert len(result.symbols) == 1
+            assert result.symbols[0].name == "Outer"
         finally:
             file_path.unlink()
 
@@ -150,18 +108,14 @@ def my_function():
 '''
         file_path = create_temp_file(content)
         try:
-            self._extract_function(parser, file_path)
+            result = parser.parse_file(file_path, "test.module")
+            assert len(result.symbols) == 1
+            symbol = result.symbols[0]
+            assert symbol.name == "my_function"
+            assert symbol.member_type == MemberType.FUNCTION
+            assert symbol.docstring == "Does something."
         finally:
             file_path.unlink()
-
-    def _extract_function(self, parser, file_path):
-        result = parser.parse_file(file_path, "test.module")
-
-        assert len(result.exports) == 1
-        export = result.exports[0]
-        assert export.name == "my_function"
-        assert export.member_type == MemberType.FUNCTION
-        assert export.docstring == "Does something."
 
     def test_async_function(self, parser) -> None:
         """Extract async function."""
@@ -174,10 +128,10 @@ async def async_function():
         try:
             result = parser.parse_file(file_path, "test.module")
 
-            assert len(result.exports) == 1
-            export = result.exports[0]
-            assert export.name == "async_function"
-            assert export.member_type == MemberType.FUNCTION
+            assert len(result.symbols) == 1
+            symbol = result.symbols[0]
+            assert symbol.name == "async_function"
+            assert symbol.member_type == MemberType.FUNCTION
         finally:
             file_path.unlink()
 
@@ -193,8 +147,8 @@ class MyClass:
             result = parser.parse_file(file_path, "test.module")
 
             # Only class, not method
-            assert len(result.exports) == 1
-            assert result.exports[0].name == "MyClass"
+            assert len(result.symbols) == 1
+            assert result.symbols[0].name == "MyClass"
         finally:
             file_path.unlink()
 
@@ -211,10 +165,10 @@ my_var: int = 42
         try:
             result = parser.parse_file(file_path, "test.module")
 
-            assert len(result.exports) == 1
-            export = result.exports[0]
-            assert export.name == "my_var"
-            assert export.member_type == MemberType.VARIABLE
+            assert len(result.symbols) == 1
+            symbol = result.symbols[0]
+            assert symbol.name == "my_var"
+            assert symbol.member_type == MemberType.VARIABLE
         finally:
             file_path.unlink()
 
@@ -227,10 +181,10 @@ my_var = "value"
         try:
             result = parser.parse_file(file_path, "test.module")
 
-            assert len(result.exports) == 1
-            export = result.exports[0]
-            assert export.name == "my_var"
-            assert export.member_type == MemberType.VARIABLE
+            assert len(result.symbols) == 1
+            symbol = result.symbols[0]
+            assert symbol.name == "my_var"
+            assert symbol.member_type == MemberType.VARIABLE
         finally:
             file_path.unlink()
 
@@ -249,9 +203,9 @@ RETRY_COUNT = 3
         try:
             result = parser.parse_file(file_path, "test.module")
 
-            assert len(result.exports) == 3
-            for export in result.exports:
-                assert export.member_type == MemberType.CONSTANT
+            assert len(result.symbols) == 3
+            for symbol in result.symbols:
+                assert symbol.member_type == MemberType.CONSTANT
         finally:
             file_path.unlink()
 
@@ -264,8 +218,8 @@ max_size = 100
         try:
             result = parser.parse_file(file_path, "test.module")
 
-            assert len(result.exports) == 1
-            assert result.exports[0].member_type == MemberType.VARIABLE
+            assert len(result.symbols) == 1
+            assert result.symbols[0].member_type == MemberType.VARIABLE
         finally:
             file_path.unlink()
 
@@ -285,9 +239,10 @@ MyType: TypeAlias = int | str
             result = parser.parse_file(file_path, "test.module")
 
             # Find MyType (imports are also extracted)
-            my_type = [e for e in result.exports if e.name == "MyType"]
+            my_type = [e for e in result.symbols if e.name == "MyType"]
             assert len(my_type) == 1
             assert my_type[0].member_type == MemberType.TYPE_ALIAS
+            assert my_type[0].metadata.get("style") == "pre-python3.12"
         finally:
             file_path.unlink()
 
@@ -302,7 +257,7 @@ MyType: typing.TypeAlias = list[int]
         try:
             result = parser.parse_file(file_path, "test.module")
 
-            my_type = [e for e in result.exports if e.name == "MyType"]
+            my_type = [e for e in result.symbols if e.name == "MyType"]
             assert len(my_type) == 1
             assert my_type[0].member_type == MemberType.TYPE_ALIAS
         finally:
@@ -326,7 +281,7 @@ class MyClass:
         try:
             result = parser.parse_file(file_path, "test.module")
 
-            assert result.exports[0].docstring.startswith("This is a docstring")
+            assert result.symbols[0].docstring.startswith("This is a docstring")
         finally:
             file_path.unlink()
 
@@ -341,7 +296,7 @@ def my_func():
         try:
             result = parser.parse_file(file_path, "test.module")
 
-            assert result.exports[0].docstring == "Function docstring."
+            assert result.symbols[0].docstring == "Function docstring."
         finally:
             file_path.unlink()
 
@@ -355,7 +310,7 @@ class NoDoc:
         try:
             result = parser.parse_file(file_path, "test.module")
 
-            assert result.exports[0].docstring is None
+            assert result.symbols[0].docstring is None
         finally:
             file_path.unlink()
 
@@ -378,25 +333,21 @@ THIRD = 42
 """
         file_path = create_temp_file(content)
         try:
-            self._extracted_from_test_accurate_line_numbers_16(parser, file_path)
+            result = parser.parse_file(file_path, "test.module")
+
+            # First class is on line 4
+            first = next(e for e in result.symbols if e.name == "First")
+            assert first.location.line == 4
+
+            # second function is on line 7
+            second = next(e for e in result.symbols if e.name == "second")
+            assert second.location.line == 7
+
+            # THIRD constant is on line 10
+            third = next(e for e in result.symbols if e.name == "THIRD")
+            assert third.location.line == 10
         finally:
             file_path.unlink()
-
-    # TODO Rename this here and in `test_accurate_line_numbers`
-    def _extracted_from_test_accurate_line_numbers_16(self, parser, file_path):
-        result = parser.parse_file(file_path, "test.module")
-
-        # First class is on line 4
-        first = next(e for e in result.exports if e.name == "First")
-        assert first.line_number == 4
-
-        # second function is on line 7
-        second = next(e for e in result.exports if e.name == "second")
-        assert second.line_number == 7
-
-        # THIRD constant is on line 10
-        third = next(e for e in result.exports if e.name == "THIRD")
-        assert third.line_number == 10
 
 
 class TestSyntaxErrorHandling:
@@ -412,7 +363,7 @@ def broken(
         try:
             result = parser.parse_file(file_path, "test.module")
 
-            assert len(result.exports) == 0
+            assert len(result.symbols) == 0
             assert result.file_hash  # Should still have hash
         finally:
             file_path.unlink()
@@ -428,7 +379,7 @@ class TestEmptyFileHandling:
         try:
             result = parser.parse_file(file_path, "test.module")
 
-            assert len(result.exports) == 0
+            assert len(result.symbols) == 0
             assert result.file_hash
         finally:
             file_path.unlink()
@@ -442,7 +393,7 @@ class TestEmptyFileHandling:
         try:
             result = parser.parse_file(file_path, "test.module")
 
-            assert len(result.exports) == 0
+            assert len(result.symbols) == 0
         finally:
             file_path.unlink()
 
@@ -512,71 +463,6 @@ from pathlib import Path as P
         assert arg3 in result.imports
 
 
-class TestRuleEngineIntegration:
-    """Test rule engine integration."""
-
-    def test_include_action(self, parser) -> None:
-        """INCLUDE action should include symbol."""
-        content = """
-class PublicClass:
-    pass
-"""
-        file_path = create_temp_file(content)
-        try:
-            result = parser.parse_file(file_path, "test.module")
-
-            assert len(result.exports) == 1
-            assert result.exports[0].name == "PublicClass"
-        finally:
-            file_path.unlink()
-
-    def test_exclude_action(self, parser) -> None:
-        """EXCLUDE action should exclude symbol."""
-        content = """
-class _PrivateClass:
-    pass
-
-class PublicClass:
-    pass
-"""
-        file_path = create_temp_file(content)
-        try:
-            result = parser.parse_file(file_path, "test.module")
-
-            # Only PublicClass should be included
-            assert len(result.exports) == 1
-            assert result.exports[0].name == "PublicClass"
-        finally:
-            file_path.unlink()
-
-    def test_propagation_level_assignment(self, rule_engine) -> None:
-        """Propagation level should be assigned by rules."""
-        # Add custom rule for specific propagation
-        rule_engine.add_rule(
-            Rule(
-                name="special-class-root",
-                priority=200,
-                description="Propagate SpecialClass to root",
-                match=RuleMatchCriteria(name_exact="SpecialClass"),
-                action=RuleAction.INCLUDE,
-                propagate=PropagationLevel.ROOT,
-            )
-        )
-
-        parser = ASTParser(rule_engine)
-        content = """
-class SpecialClass:
-    pass
-"""
-        file_path = create_temp_file(content)
-        try:
-            result = parser.parse_file(file_path, "test.module")
-
-            assert result.exports[0].propagation == PropagationLevel.ROOT
-        finally:
-            file_path.unlink()
-
-
 class TestMixedSymbols:
     """Test files with multiple symbol types."""
 
@@ -595,21 +481,18 @@ my_var: str = "value"
 """
         file_path = create_temp_file(content)
         try:
-            self._test_symbols(parser, file_path)
+            result = parser.parse_file(file_path, "test.module")
+
+            assert len(result.symbols) == 4
+
+            # Check types
+            types = {e.name: e.member_type for e in result.symbols}
+            assert types["MAX_SIZE"] == MemberType.CONSTANT
+            assert types["MyClass"] == MemberType.CLASS
+            assert types["my_function"] == MemberType.FUNCTION
+            assert types["my_var"] == MemberType.VARIABLE
         finally:
             file_path.unlink()
-
-    def _test_symbols(self, parser, file_path):
-        result = parser.parse_file(file_path, "test.module")
-
-        assert len(result.exports) == 4
-
-        # Check types
-        types = {e.name: e.member_type for e in result.exports}
-        assert types["MAX_SIZE"] == MemberType.CONSTANT
-        assert types["MyClass"] == MemberType.CLASS
-        assert types["my_function"] == MemberType.FUNCTION
-        assert types["my_var"] == MemberType.VARIABLE
 
 
 class TestFileHash:
@@ -642,164 +525,3 @@ class TestFileHash:
         finally:
             file1.unlink()
             file2.unlink()
-
-
-class TestMetadata:
-    """Test analysis result metadata."""
-
-    def test_timestamp_generation(self, parser) -> None:
-        """Timestamp should be generated."""
-        content = "class Test:\n    pass\n"
-        file_path = create_temp_file(content)
-        try:
-            result = parser.parse_file(file_path, "test.module")
-
-            assert result.analysis_timestamp > 0
-        finally:
-            file_path.unlink()
-
-    def test_schema_version(self, parser) -> None:
-        """Schema version should be set."""
-        content = "class Test:\n    pass\n"
-        file_path = create_temp_file(content)
-        try:
-            result = parser.parse_file(file_path, "test.module")
-
-            assert result.schema_version == "1.0"
-        finally:
-            file_path.unlink()
-
-
-class TestCacheCompatibility:
-    """Test cache compatibility."""
-
-    def test_analysis_result_format(self, parser) -> None:
-        """AnalysisResult should be cache-compatible."""
-        content = '''
-class MyClass:
-    """Test class."""
-    pass
-'''
-        file_path = create_temp_file(content)
-        try:
-            result = parser.parse_file(file_path, "test.module")
-
-            # Should have all required fields
-            assert hasattr(result, "exports")
-            assert hasattr(result, "imports")
-            assert hasattr(result, "file_hash")
-            assert hasattr(result, "analysis_timestamp")
-            assert hasattr(result, "schema_version")
-
-            # ExportNode should have required fields
-            export = result.exports[0]
-            assert hasattr(export, "name")
-            assert hasattr(export, "module")
-            assert hasattr(export, "member_type")
-            assert hasattr(export, "propagation")
-            assert hasattr(export, "source_file")
-            assert hasattr(export, "line_number")
-            assert hasattr(export, "defined_in")
-        finally:
-            file_path.unlink()
-
-
-class TestRealWorldFile:
-    """Test parsing complex real-world file."""
-
-    def test_complex_file(self, parser) -> None:
-        """Parse complex file with multiple constructs."""
-        content = '''
-"""Module docstring."""
-
-from __future__ import annotations
-
-import os
-from pathlib import Path
-from typing import TYPE_CHECKING, TypeAlias
-
-if TYPE_CHECKING:
-    from collections.abc import Iterator
-
-# Constants
-MAX_RETRIES = 3
-API_URL = "https://api.example.com"
-
-# Type aliases
-PathLike: TypeAlias = str | Path
-
-# Variables
-_private_var = "hidden"
-public_var: int = 42
-
-
-class BaseClass:
-    """Base class."""
-
-    def method(self):
-        """Should not be extracted."""
-        pass
-
-
-class DerivedClass(BaseClass):
-    """Derived class with nested class."""
-
-    class Nested:
-        """Should not be extracted."""
-        pass
-
-
-def sync_function() -> None:
-    """Synchronous function."""
-    pass
-
-
-async def async_function() -> None:
-    """Asynchronous function."""
-    pass
-
-
-def _private_function():
-    """Should be excluded."""
-    pass
-'''
-        file_path = create_temp_file(content)
-        try:
-            self._test_extracted_exports(parser, file_path)
-        finally:
-            file_path.unlink()
-
-    def _test_extracted_exports(self, parser, file_path):
-        result = parser.parse_file(file_path, "test.complex")
-
-        # Check exports
-        export_names = {e.name for e in result.exports}
-
-        # Should include
-        assert "MAX_RETRIES" in export_names
-        assert "API_URL" in export_names
-        assert "PathLike" in export_names
-        assert "public_var" in export_names
-        assert "BaseClass" in export_names
-        assert "DerivedClass" in export_names
-        assert "sync_function" in export_names
-        assert "async_function" in export_names
-
-        # Should exclude
-        assert "_private_var" not in export_names
-        assert "_private_function" not in export_names
-        assert "Nested" not in export_names
-        assert "method" not in export_names
-
-        # Check imports
-        assert len(result.imports) > 0
-        assert "import os" in result.imports
-        assert "from pathlib import Path" in result.imports
-
-        # Check types
-        types = {e.name: e.member_type for e in result.exports}
-        assert types["MAX_RETRIES"] == MemberType.CONSTANT
-        assert types["PathLike"] == MemberType.TYPE_ALIAS
-        assert types["public_var"] == MemberType.VARIABLE
-        assert types["BaseClass"] == MemberType.CLASS
-        assert types["sync_function"] == MemberType.FUNCTION

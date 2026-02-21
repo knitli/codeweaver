@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2025 Knitli Inc.
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
@@ -18,14 +18,7 @@ from __future__ import annotations
 
 from .generator import CodeGenerator, GeneratedCode, validate_init_file
 from .graph import PropagationGraph
-from .rules import RuleEngine, RuleEngineProtocol
+from .rules import RuleEngine
 
 
-__all__ = [
-    "CodeGenerator",
-    "GeneratedCode",
-    "PropagationGraph",
-    "RuleEngine",
-    "RuleEngineProtocol",
-    "validate_init_file",
-]
+__all__ = ["CodeGenerator", "GeneratedCode", "PropagationGraph", "RuleEngine", "validate_init_file"]

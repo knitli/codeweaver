@@ -100,7 +100,7 @@ def get_statistics_middleware(
     return StatisticsMiddleware(
         statistics=statistics,
         logger=logging.getLogger("codeweaver.server.mcpmiddleware.statistics"),
-        log_level=settings.get("logging", {}).get("log_level", 30),
+        log_level=(settings or {}).get("logging", {}).get("log_level", 30),  # ty:ignore[unresolved-attribute]
     )
 
 

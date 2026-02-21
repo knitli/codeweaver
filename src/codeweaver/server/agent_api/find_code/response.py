@@ -208,12 +208,13 @@ def build_error_response(
     from codeweaver.server.agent_api.find_code.types import FindCodeResponseSummary
 
     mode = "unknown"
-    capabilities = vector_store.embedding_capabilities
-    mode = (
-        "hybrid"
-        if ((dense := capabilities.dense) and (sparse := capabilities.sparse))  # ty:ignore[invalid-assignment]
-        else ("dense_only" if dense else "sparse_only" if sparse else "unknown")
-    )
+    if vector_store and dense and reranking and sparse:
+        capabilities = vector_store.embedding_capabilities
+        mode = (
+            "hybrid"
+            if ((dense := capabilities.dense) and (sparse := capabilities.sparse))  # ty:ignore[invalid-assignment]
+            else ("dense_only" if dense else "sparse_only" if sparse else "unknown")
+        )
     error_message = f"Critical error: {type(error).__name__}: {str(error)!s}"
     return FindCodeResponseSummary(
         matches=[],

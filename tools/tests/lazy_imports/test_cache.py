@@ -15,7 +15,13 @@ from pathlib import Path
 import pytest as pytest
 
 from tools.lazy_imports.common.cache import JSONAnalysisCache
-from tools.lazy_imports.common.types import AnalysisResult, ExportNode, MemberType, PropagationLevel
+from tools.lazy_imports.common.types import (
+    AnalysisResult,
+    DetectedSymbol,
+    MemberType,
+    SourceLocation,
+    SymbolProvenance,
+)
 
 
 class TestJSONAnalysisCache:
@@ -26,19 +32,19 @@ class TestJSONAnalysisCache:
         cache = JSONAnalysisCache(cache_dir=temp_cache_dir)
 
         exports = [
-            ExportNode(
+            DetectedSymbol(
                 name="Foo",
-                module="test",
                 member_type=MemberType.CLASS,
-                propagation=PropagationLevel.PARENT,
-                source_file=Path("test.py"),
-                line_number=1,
-                defined_in="test",
+                provenance=SymbolProvenance.DEFINED_HERE,
+                location=SourceLocation(line=1),
+                is_private=False,
+                original_source=None,
+                original_name=None,
             )
         ]
 
         analysis = AnalysisResult(
-            exports=exports,
+            symbols=exports,
             imports=["import os"],
             file_hash="hash123",
             analysis_timestamp=time.time(),
@@ -49,7 +55,7 @@ class TestJSONAnalysisCache:
         cache.put(Path("module.py"), "hash123", analysis)
 
         cached = self._check_cache_integrity(cache, "module.py", 1)
-        assert cached.exports[0].name == "Foo"
+        assert cached.symbols[0].name == "Foo"
         assert cached.file_hash == "hash123"
 
     def test_cache_miss_different_hash(self, temp_cache_dir: Path):
@@ -57,19 +63,19 @@ class TestJSONAnalysisCache:
         cache = JSONAnalysisCache(cache_dir=temp_cache_dir)
 
         exports = [
-            ExportNode(
+            DetectedSymbol(
                 name="Foo",
-                module="test",
                 member_type=MemberType.CLASS,
-                propagation=PropagationLevel.PARENT,
-                source_file=Path("test.py"),
-                line_number=1,
-                defined_in="test",
+                provenance=SymbolProvenance.DEFINED_HERE,
+                location=SourceLocation(line=1),
+                is_private=False,
+                original_source=None,
+                original_name=None,
             )
         ]
 
         analysis = AnalysisResult(
-            exports=exports,
+            symbols=exports,
             imports=[],
             file_hash="hash123",
             analysis_timestamp=time.time(),
@@ -96,19 +102,19 @@ class TestJSONAnalysisCache:
         cache = JSONAnalysisCache(cache_dir=temp_cache_dir)
 
         exports = [
-            ExportNode(
+            DetectedSymbol(
                 name="Foo",
-                module="test",
                 member_type=MemberType.CLASS,
-                propagation=PropagationLevel.PARENT,
-                source_file=Path("test.py"),
-                line_number=1,
-                defined_in="test",
+                provenance=SymbolProvenance.DEFINED_HERE,
+                location=SourceLocation(line=1),
+                is_private=False,
+                original_source=None,
+                original_name=None,
             )
         ]
 
         analysis = AnalysisResult(
-            exports=exports,
+            symbols=exports,
             imports=[],
             file_hash="hash123",
             analysis_timestamp=time.time(),
@@ -142,19 +148,19 @@ class TestJSONAnalysisCache:
         cache1 = JSONAnalysisCache(cache_dir=temp_cache_dir)
 
         exports = [
-            ExportNode(
+            DetectedSymbol(
                 name="Persistent",
-                module="test",
                 member_type=MemberType.CLASS,
-                propagation=PropagationLevel.PARENT,
-                source_file=Path("test.py"),
-                line_number=1,
-                defined_in="test",
+                provenance=SymbolProvenance.DEFINED_HERE,
+                location=SourceLocation(line=1),
+                is_private=False,
+                original_source=None,
+                original_name=None,
             )
         ]
 
         analysis = AnalysisResult(
-            exports=exports,
+            symbols=exports,
             imports=[],
             file_hash="hash123",
             analysis_timestamp=time.time(),
@@ -166,7 +172,7 @@ class TestJSONAnalysisCache:
         # New cache instance
         cache2 = JSONAnalysisCache(cache_dir=temp_cache_dir)
         cached = self._check_cache_integrity(cache2, "module.py", 1)
-        assert cached.exports[0].name == "Persistent"
+        assert cached.symbols[0].name == "Persistent"
 
     def test_multiple_files_cached(self, temp_cache_dir: Path):
         """Can cache multiple files."""
@@ -174,19 +180,19 @@ class TestJSONAnalysisCache:
 
         for i in range(5):
             exports = [
-                ExportNode(
+                DetectedSymbol(
                     name=f"Class{i}",
-                    module="test",
                     member_type=MemberType.CLASS,
-                    propagation=PropagationLevel.PARENT,
-                    source_file=Path(f"test{i}.py"),
-                    line_number=1,
-                    defined_in="test",
+                    provenance=SymbolProvenance.DEFINED_HERE,
+                    location=SourceLocation(line=1),
+                    is_private=False,
+                    original_source=None,
+                    original_name=None,
                 )
             ]
 
             analysis = AnalysisResult(
-                exports=exports,
+                symbols=exports,
                 imports=[],
                 file_hash=f"hash{i}",
                 analysis_timestamp=time.time(),
@@ -199,7 +205,7 @@ class TestJSONAnalysisCache:
         for i in range(5):
             cached = cache.get(Path(f"module{i}.py"), f"hash{i}")
             assert cached is not None
-            assert cached.exports[0].name == f"Class{i}"
+            assert cached.symbols[0].name == f"Class{i}"
 
     def test_cache_statistics(self, temp_cache_dir: Path):
         """Can get cache statistics."""
@@ -208,19 +214,19 @@ class TestJSONAnalysisCache:
         # Add some entries
         for i in range(3):
             exports = [
-                ExportNode(
+                DetectedSymbol(
                     name=f"Class{i}",
-                    module="test",
                     member_type=MemberType.CLASS,
-                    propagation=PropagationLevel.PARENT,
-                    source_file=Path(f"test{i}.py"),
-                    line_number=1,
-                    defined_in="test",
+                    provenance=SymbolProvenance.DEFINED_HERE,
+                    location=SourceLocation(line=1),
+                    is_private=False,
+                    original_source=None,
+                    original_name=None,
                 )
             ]
 
             analysis = AnalysisResult(
-                exports=exports,
+                symbols=exports,
                 imports=[],
                 file_hash=f"hash{i}",
                 analysis_timestamp=time.time(),
@@ -242,19 +248,19 @@ class TestJSONAnalysisCache:
 
         # Add entries
         exports = [
-            ExportNode(
+            DetectedSymbol(
                 name="Class",
-                module="test",
                 member_type=MemberType.CLASS,
-                propagation=PropagationLevel.PARENT,
-                source_file=Path("test.py"),
-                line_number=1,
-                defined_in="test",
+                provenance=SymbolProvenance.DEFINED_HERE,
+                location=SourceLocation(line=1),
+                is_private=False,
+                original_source=None,
+                original_name=None,
             )
         ]
 
         analysis = AnalysisResult(
-            exports=exports,
+            symbols=exports,
             imports=[],
             file_hash="hash123",
             analysis_timestamp=time.time(),
@@ -275,20 +281,20 @@ class TestJSONAnalysisCache:
         cache = JSONAnalysisCache(cache_dir=temp_cache_dir)
 
         exports = [
-            ExportNode(
+            DetectedSymbol(
                 name="Class",
-                module="test",
                 member_type=MemberType.CLASS,
-                propagation=PropagationLevel.PARENT,
-                source_file=Path("test.py"),
-                line_number=1,
-                defined_in="test",
+                provenance=SymbolProvenance.DEFINED_HERE,
+                location=SourceLocation(line=1),
+                is_private=False,
+                original_source=None,
+                original_name=None,
             )
         ]
 
         # Store with old schema version
         analysis = AnalysisResult(
-            exports=exports,
+            symbols=exports,
             imports=[],
             file_hash="hash123",
             analysis_timestamp=time.time(),
@@ -310,19 +316,19 @@ class TestJSONAnalysisCache:
         cache = JSONAnalysisCache(cache_dir=temp_cache_dir)
 
         exports = [
-            ExportNode(
+            DetectedSymbol(
                 name="Class",
-                module="test",
                 member_type=MemberType.CLASS,
-                propagation=PropagationLevel.PARENT,
-                source_file=Path("test.py"),
-                line_number=1,
-                defined_in="test",
+                provenance=SymbolProvenance.DEFINED_HERE,
+                location=SourceLocation(line=1),
+                is_private=False,
+                original_source=None,
+                original_name=None,
             )
         ]
 
         analysis = AnalysisResult(
-            exports=exports,
+            symbols=exports,
             imports=[],
             file_hash="hash123",
             analysis_timestamp=time.time(),
@@ -341,7 +347,7 @@ class TestJSONAnalysisCache:
         cache = JSONAnalysisCache(cache_dir=temp_cache_dir)
 
         analysis = AnalysisResult(
-            exports=[],  # No exports
+            symbols=[],  # No exports
             imports=["import os"],
             file_hash="hash123",
             analysis_timestamp=time.time(),
@@ -358,7 +364,7 @@ class TestJSONAnalysisCache:
     ) -> AnalysisResult:
         result = cache.get(Path(file_name), "hash123")
         assert result is not None
-        assert len(result.exports) == expected_exports
+        assert len(result.symbols) == expected_exports
         return result
 
 
@@ -377,19 +383,19 @@ class TestCircuitBreaker:
 
         # Normal operations should work
         exports = [
-            ExportNode(
+            DetectedSymbol(
                 name="Foo",
-                module="test",
                 member_type=MemberType.CLASS,
-                propagation=PropagationLevel.PARENT,
-                source_file=Path("test.py"),
-                line_number=1,
-                defined_in="test",
+                provenance=SymbolProvenance.DEFINED_HERE,
+                location=SourceLocation(line=1),
+                is_private=False,
+                original_source=None,
+                original_name=None,
             )
         ]
 
         analysis = AnalysisResult(
-            exports=exports,
+            symbols=exports,
             imports=[],
             file_hash="hash123",
             analysis_timestamp=time.time(),
@@ -445,19 +451,19 @@ class TestCircuitBreaker:
 
         # Put should skip without error
         exports = [
-            ExportNode(
+            DetectedSymbol(
                 name="Foo",
-                module="test",
                 member_type=MemberType.CLASS,
-                propagation=PropagationLevel.PARENT,
-                source_file=Path("test.py"),
-                line_number=1,
-                defined_in="test",
+                provenance=SymbolProvenance.DEFINED_HERE,
+                location=SourceLocation(line=1),
+                is_private=False,
+                original_source=None,
+                original_name=None,
             )
         ]
 
         analysis = AnalysisResult(
-            exports=exports,
+            symbols=exports,
             imports=[],
             file_hash="hash123",
             analysis_timestamp=time.time(),
@@ -499,19 +505,19 @@ class TestCircuitBreaker:
         cache.circuit_breaker.state = CircuitState.HALF_OPEN
 
         exports = [
-            ExportNode(
+            DetectedSymbol(
                 name="Foo",
-                module="test",
                 member_type=MemberType.CLASS,
-                propagation=PropagationLevel.PARENT,
-                source_file=Path("test.py"),
-                line_number=1,
-                defined_in="test",
+                provenance=SymbolProvenance.DEFINED_HERE,
+                location=SourceLocation(line=1),
+                is_private=False,
+                original_source=None,
+                original_name=None,
             )
         ]
 
         analysis = AnalysisResult(
-            exports=exports,
+            symbols=exports,
             imports=[],
             file_hash="hash123",
             analysis_timestamp=time.time(),
@@ -598,19 +604,19 @@ class TestCircuitBreaker:
 
         # Successful operations in HALF_OPEN should log recovery
         exports = [
-            ExportNode(
+            DetectedSymbol(
                 name="Foo",
-                module="test",
                 member_type=MemberType.CLASS,
-                propagation=PropagationLevel.PARENT,
-                source_file=Path("test.py"),
-                line_number=1,
-                defined_in="test",
+                provenance=SymbolProvenance.DEFINED_HERE,
+                location=SourceLocation(line=1),
+                is_private=False,
+                original_source=None,
+                original_name=None,
             )
         ]
 
         analysis = AnalysisResult(
-            exports=exports,
+            symbols=exports,
             imports=[],
             file_hash="hash123",
             analysis_timestamp=time.time(),

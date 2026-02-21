@@ -9,7 +9,6 @@ The base class here defines the top-level settings for all provider categories, 
 
 from __future__ import annotations
 
-import asyncio
 import logging
 
 from abc import ABC, abstractmethod
@@ -19,7 +18,6 @@ from beartype.typing import ClassVar
 from pydantic import Field, PositiveFloat, PositiveInt, computed_field, model_validator
 
 from codeweaver.core import ProviderCategory
-from codeweaver.core.exceptions import CodeWeaverDeveloperError
 from codeweaver.core.types import (
     AnonymityConversion,
     BasedModel,
@@ -29,7 +27,6 @@ from codeweaver.core.types import (
     ModelName,
     Provider,
     ProviderLiteralString,
-    SDKClient,
 )
 from codeweaver.providers.config.clients.base import ClientOptions
 from codeweaver.providers.config.clients.utils import ensure_endpoint_version
@@ -230,39 +227,6 @@ class BaseProviderCategorySettings(BasedModel, ABC):
     def client(self) -> LiteralSDKClient:
         """Return an SDKClient enum member corresponding to this provider settings instance.  Often this is the same as `self.provider`, but not always, and sometimes must be computed (e.g., Azure embedding models)."""
         raise NotImplementedError("client must be implemented by subclasses.")
-
-    async def get_client(self) -> Any:
-        """Construct and return the client instance based on the provider settings."""
-        options = (
-            self.client_options.as_settings()
-            if isinstance(self.client_options, ClientOptions)
-            else {}
-        )
-        client_import = cast(SDKClient, self.client).client
-        category = next(
-            (
-                name
-                for name in ("agent", "data", "sparse", "embed", "rerank")  # order matters here
-                if name in type(self).__name__.lower()
-            ),
-            None,
-        )
-        if self.provider == Provider.BEDROCK:
-            if not category:
-                raise CodeWeaverDeveloperError(
-                    "Kind must be one of 'agent', 'data', 'sparse', 'embed', or 'rerank' for Bedrock provider. File an issue. This is unexpected."
-                )
-            return client_import._resolve()(
-                "bedrock-runtime" if category == "embed" else "bedrock-agent-runtime", **options
-            )
-        if (self.provider in (Provider.SENTENCE_TRANSFORMERS, Provider.FASTEMBED)) or (
-            self.provider in (Provider.BEDROCK) and self.client != SDKClient.ANTHROPIC
-        ):
-            return await asyncio.to_thread(client_import._resolve(), **options)
-        if not isinstance(client_import, dict):
-            return client_import._resolve()(**options)
-        client_class = client_import.get(category)._resolve()
-        return client_class(**options)
 
 
 class BaseProviderCategorySettingsDict(TypedDict, total=False):

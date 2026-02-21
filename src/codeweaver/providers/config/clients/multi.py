@@ -374,6 +374,8 @@ class SentenceTransformersClientOptions(ClientOptions):
             return {}
         extra: dict[str, Any] = {}
         float16 = {"model_kwargs": {"dtype": "float16"}}
+        if "alibaba" in model.lower() and "gte-reranker-modernbert-base" in model.lower():
+            extra = {"tokenizer_kwargs": {"padding": True}}
         if "qwen3" in model.lower():
             extra = {
                 "instruction": "Use provided search results of codebase data to retrieve relevant Documents that answer the Query.",

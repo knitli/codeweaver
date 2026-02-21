@@ -123,7 +123,7 @@ class CustomDelimiter(BasedModel):
     extensions: Annotated[
         list[ExtLangPair] | None,
         Field(
-            description="""List of file extensions and their associated languages to apply this delimiter to. If you are defining delimiters for a language that does not currently have support see `codeweaver.coreCODE_FILES_EXTENSIONS`, `codeweaver.coreDATA_FILES_EXTENSIONS`, and `codeweaver.coreDOC_FILES_EXTENSIONS`. An ExtLangPair is a tuple of `ext: FileExt, language: LanguageName` (str NewTypes for FileExt and LanguageName) or `ConfigLanguage` or `SemanticSearchLanguage` enums. If the language and extensions are already defined in `codeweaver.core` then you don't need to provide these, but you DO need to provide a language."""
+            description="""List of file extensions and their associated languages to apply this delimiter to. If you are defining delimiters for a language that does not currently have support see `codeweaver.core.CODE_FILES_EXTENSIONS`, `codeweaver.core.DATA_FILES_EXTENSIONS`, and `codeweaver.core.DOC_FILES_EXTENSIONS`. An ExtLangPair is a tuple of `ext: FileExt, language: LanguageName` (str NewTypes for FileExt and LanguageName) or `ConfigLanguage` or `SemanticSearchLanguage` enums. If the language and extensions are already defined in `codeweaver.core` then you don't need to provide these, but you DO need to provide a language."""
         ),
     ] = None
 

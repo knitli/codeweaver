@@ -1,0 +1,24 @@
+schema_version: "1.0"
+rules:
+  - name: "skip_private"
+    priority: 1000
+    description: "Skip private symbols (leading underscore)"
+    match:
+      name_pattern: "^_.*"
+    action: "exclude"
+
+  - name: "export_classes"
+    priority: 800
+    description: "Export all classes"
+    match:
+      member_type: "class"
+    action: "include"
+    propagate: "parent"
+
+  - name: "export_functions"
+    priority: 700
+    description: "Export all functions"
+    match:
+      member_type: "function"
+    action: "include"
+    propagate: "parent"

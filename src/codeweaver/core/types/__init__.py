@@ -118,7 +118,6 @@ if TYPE_CHECKING:
         get_provider_capabilities_map,
         get_provider_category_sdk_clients_for_provider,
         get_provider_clients,
-        get_provider_sdk_clients_for_category,
         get_providers_for_category,
         get_sdk_client,
         get_sdk_client_map,

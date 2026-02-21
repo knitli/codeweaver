@@ -128,7 +128,12 @@ class TelemetryService:
         if self.enabled and api_key:
             try:
                 self._client = Posthog(
-                    project_api_key=api_key, host=host, debug=False, disable_geoip=True
+                    project_api_key=api_key
+                    if isinstance(api_key, str)
+                    else api_key.get_secret_value(),
+                    host=host,
+                    debug=False,
+                    disable_geoip=True,
                 )
                 self.logger.info("PostHog telemetry client initialized")
             except ImportError:

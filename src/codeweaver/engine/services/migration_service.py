@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from anyio import Path as AsyncPath
 from pydantic_core import from_json, to_json
@@ -315,9 +315,11 @@ class MigrationService:
             if isinstance(result, Exception):
                 logger.error("Worker failed: %s", result, exc_info=result)
                 raise MigrationError(f"Worker failed: {result}")
-            if not result.success:
-                raise MigrationError(f"Worker {result.worker_id} failed: {result.error}")
-            total_vectors += result.vectors_processed
+            if not cast(ChunkResult, result).success:
+                raise MigrationError(
+                    f"Worker {cast(ChunkResult, result).worker_id} failed: {cast(ChunkResult, result).error}"
+                )
+            total_vectors += cast(ChunkResult, result).vectors_processed
         return total_vectors
 
     @retry(

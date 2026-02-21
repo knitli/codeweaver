@@ -390,8 +390,11 @@ async def check_vector_store_config(settings: ProviderSettings) -> DoctorCheck:
     # Detect deployment type
     deployment_type = "unknown"
     url = None
-    if (provider := vector_config.provider) != Provider.MEMORY and (
-        url := vector_config.client_options.url
+    if (
+        vector_config
+        and (provider := vector_config.provider) != Provider.MEMORY
+        and vector_config.client_options
+        and (url := vector_config.client_options.url)
     ):
         host = cast(url, AnyUrl)  # ty:ignore[invalid-type-form]
         if host and (host == "qdrant.io" or host.endswith(".qdrant.io")):

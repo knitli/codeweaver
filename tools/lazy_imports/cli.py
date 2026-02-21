@@ -22,6 +22,8 @@ from cyclopts import App, Parameter
 from rich.console import Console
 from rich.panel import Panel
 
+from tools.lazy_imports.common.types import MemberType, RuleAction, RuleEngine
+
 
 logger = logging.getLogger(__name__)
 
@@ -130,11 +132,120 @@ def _print_validation_results(report: ValidationReport) -> None:
     console.print()
 
 
+def _resolve_validation_files(module: Path | None, *, json_output: bool) -> list[Path] | None:
+    """Resolve file paths to validate based on module parameter."""
+    if not module:
+        return None
+
+    if module.is_file():
+        return [module]
+    if module.is_dir():
+        return list(module.rglob("*.py"))
+
+    if not json_output:
+        _print_error(f"Module path does not exist: {module}")
+    raise SystemExit(1)
+
+
+def _output_validation_json(results) -> None:
+    """Output validation results in JSON format."""
+    import json as json_lib
+
+    output_data = {
+        "success": results.success,
+        "errors": [
+            {
+                "file": str(error.file),
+                "line": error.line,
+                "message": error.message,
+                "code": error.code,
+                "suggestion": error.suggestion,
+            }
+            for error in results.errors
+        ],
+        "warnings": [
+            {
+                "file": str(warning.file),
+                "line": warning.line,
+                "message": warning.message,
+                "suggestion": warning.suggestion,
+            }
+            for warning in results.warnings
+        ],
+        "metrics": {
+            "files_validated": results.metrics.files_validated,
+            "imports_checked": results.metrics.imports_checked,
+            "consistency_checks": results.metrics.consistency_checks,
+            "validation_time_ms": results.metrics.validation_time_ms,
+        },
+    }
+    console.print(json_lib.dumps(output_data, indent=2))
+
+
+def _output_validation_verbose(results) -> None:
+    """Output validation results in verbose human-readable format."""
+    console.print()
+    console.print(Panel("[bold]Validation Results[/bold]", expand=False))
+    console.print()
+
+    # Show errors with full context
+    if results.errors:
+        console.print(f"[red]Errors found: {len(results.errors)}[/red]")
+        console.print()
+        for error in results.errors:
+            location = f"{error.file}:{error.line}" if error.line else str(error.file)
+            console.print(f"[red]ERROR[/red] {location}: [bold]{error.code}[/bold]")
+            _print_error_in_validation(error)
+    # Show warnings with full context
+    if results.warnings:
+        console.print(f"[yellow]Warnings found: {len(results.warnings)}[/yellow]")
+        console.print()
+        for warning in results.warnings:
+            location = f"{warning.file}:{warning.line}" if warning.line else str(warning.file)
+            console.print(f"[yellow]WARNING[/yellow] {location}")
+            _print_error_in_validation(warning)
+    # Show metrics
+    metrics = results.metrics
+    console.print("[bold]Metrics:[/bold]")
+    console.print(f"  Files validated: [cyan]{metrics.files_validated}[/cyan]")
+    console.print(f"  Imports checked: [cyan]{metrics.imports_checked}[/cyan]")
+    console.print(f"  Consistency checks: [cyan]{metrics.consistency_checks}[/cyan]")
+    console.print(f"  Validation time: [cyan]{metrics.validation_time_ms / 1000:.2f}s[/cyan]")
+    console.print()
+
+
+def _print_error_in_validation(error):
+    console.print(f"  {error.message}")
+    if error.suggestion:
+        console.print(f"  [dim]Suggestion: {error.suggestion}[/dim]")
+    console.print()
+
+
+def _output_validation_concise(results) -> None:
+    """Output validation results in concise human-readable format."""
+    if results.errors:
+        for error in results.errors:
+            location = f"{error.file}:{error.line}" if error.line else str(error.file)
+            console.print(f"[red][ERROR][/red] {location}: {error.code} ({error.message})")
+
+    if results.warnings:
+        for warning in results.warnings:
+            location = f"{warning.file}:{warning.line}" if warning.line else str(warning.file)
+            console.print(f"[yellow][WARNING][/yellow] {location}: {warning.message}")
+
+    # Show summary
+    console.print()
+    console.print(f"Files validated: {results.metrics.files_validated}")
+    console.print(f"Errors: {len(results.errors)}, Warnings: {len(results.warnings)}")
+
+
 @app.command
 def validate(
     fix: Annotated[bool, Parameter(help="Auto-fix import issues")] = False,
     strict: Annotated[bool, Parameter(help="Fail on any issues (including warnings)")] = False,
-    module: Annotated[Path | None, Parameter(help="Validate specific module")] = None,
+    module: Annotated[Path | None, Parameter(help="Validate specific module or file")] = None,
+    json_output: Annotated[bool, Parameter(name="json", help="Output results as JSON")] = False,
+    verbose: Annotated[bool, Parameter(help="Show detailed validation information")] = False,
 ) -> None:
     """Validate that imports match exports.
 
@@ -149,29 +260,46 @@ def validate(
         codeweaver lazy-imports validate --fix
         codeweaver lazy-imports validate --strict
         codeweaver lazy-imports validate --module src/codeweaver/core
+        codeweaver lazy-imports validate --json
+        codeweaver lazy-imports validate --verbose
     """
-    from tools.lazy_imports.common.cache import AnalysisCache
-    from tools.lazy_imports.validator import ImportValidator
+    from tools.lazy_imports.common.cache import JSONAnalysisCache
+    from tools.lazy_imports.validator.validator import LazyImportValidator
 
-    _print_info("Validating lazy imports...")
+    if not json_output:
+        _print_info("Validating lazy imports...")
+        console.print()
+
+    # Set up validator
+    cache = JSONAnalysisCache()
+    project_root = Path.cwd()
+    validator = LazyImportValidator(project_root=project_root, cache=cache)
+
+    # Determine files to validate
+    file_paths = _resolve_validation_files(module, json_output)
+
+    # Run validation
+    results = validator.validate(file_paths=file_paths)
+
+    # Output results based on format
+    if json_output:
+        _output_validation_json(results)
+    elif verbose:
+        _output_validation_verbose(results)
+    else:
+        _output_validation_concise(results)
+
+    # Status message
+    console.print()
+    if results.success:
+        _print_success("All validations passed")
+    else:
+        _print_error("Validation failed")
     console.print()
 
-    cache = AnalysisCache()
-    validator = ImportValidator(cache=cache)
-
-    results = validator.validate(module_path=module, strict=strict)
-    _print_validation_results(results)
-
-    if fix and (results.errors or results.warnings):
-        _print_info("Attempting to fix issues...")
-        from tools.lazy_imports.validator.fixer import AutoFixer
-
-        fixer = AutoFixer(Path.cwd(), dry_run=False)
-        fixed_files = fixer.fix_all(results.errors + results.warnings)
-        console.print()
-        _print_success(f"Fixed {len(fixed_files)} files")
-        for file in fixed_files:
-            console.print(f"  [green]•[/green] {file}")
+    # Auto-fix if requested
+    if fix and (results.errors or results.warnings) and not json_output:
+        _print_info("Auto-fix is not yet implemented")
         console.print()
 
     # Exit with error code if validation failed
@@ -275,30 +403,347 @@ def generate(
         raise SystemExit(1) from e
 
 
+def _analyze_target_path(module: Path | None, source_root: Path) -> tuple[Path, Path, str]:
+    """Determine and validate target path for analysis.
+
+    Returns: (target_path, target_file, module_path)
+    """
+    # Parse target module or package
+    if module:
+        target_path = module
+        if not target_path.exists():
+            _print_error(f"Module not found: {target_path}")
+            raise SystemExit(1)
+    else:
+        target_path = source_root
+
+    # For simplicity, analyze a single module for now
+    if target_path.is_dir():
+        init_file = target_path / "__init__.py"
+        if not init_file.exists():
+            _analyze_missing_init_and_exit(target_path)
+        target_file = init_file
+        module_path = _path_to_module(target_path, source_root)
+    else:
+        target_file = target_path
+        module_path = _path_to_module(target_path.parent, source_root)
+
+    return target_path, target_file, module_path
+
+
+def _analyze_missing_init_and_exit(target_path) -> NoReturn:
+    _print_warning(f"No __init__.py found in {target_path}")
+    _print_info("Searching for Python modules...")
+
+    # Find all Python files in directory
+    python_files = list(target_path.rglob("*.py"))
+    if not python_files:
+        _print_error("No Python files found")
+        raise SystemExit(1)
+
+    _print_info(f"Found {len(python_files)} Python files")
+    console.print()
+
+    # For now, just show summary
+    _print_warning("Multi-module analysis not yet fully implemented")
+    _print_info("Please specify a specific module with __init__.py")
+    raise SystemExit(1)
+
+
+def _collect_analysis_data(
+    target_path: Path, module_path: str, rules: RuleEngine
+) -> tuple[dict, dict]:
+    """Collect symbols and decisions from target module."""
+    from collections import defaultdict
+
+    from tools.lazy_imports.analysis.ast_parser import ASTParser
+
+    parser = ASTParser()
+
+    # Parse all Python files in the package
+    package_dir = target_path if target_path.is_dir() else target_path.parent
+    python_files = [f for f in package_dir.glob("*.py") if f.name != "__init__.py"]
+
+    # Collect all symbols from child modules
+    all_symbols: dict[str, list] = defaultdict(list)
+    all_decisions: dict[str, list] = defaultdict(list)
+
+    for py_file in python_files:
+        rel_module = py_file.stem
+        full_module = f"{module_path}.{rel_module}"
+
+        analysis = parser.parse_file(py_file, full_module)
+        all_symbols[rel_module] = analysis.symbols
+
+        # Evaluate rules for each symbol
+        for symbol in analysis.symbols:
+            decision = rules.evaluate(symbol, full_module)
+            if decision.action != RuleAction.NO_DECISION:
+                all_decisions[rel_module].append(decision)
+
+    return all_symbols, all_decisions
+
+
+def _build_manifest(module_path: str, all_decisions: dict, rules: RuleEngine):
+    """Build manifest from decisions."""
+    from tools.lazy_imports.export_manager import CodeGenerator
+    from tools.lazy_imports.export_manager.graph import PropagationGraph
+
+    # Generate code to see what would be created
+    CodeGenerator(output_dir=Path.cwd())
+
+    # Build propagation graph (simplified for single module analysis)
+    graph = PropagationGraph(rule_engine=rules)
+
+    # Add modules to graph first
+    graph.add_module(module_path, parent=None)
+    for rel_module in all_decisions:
+        full_module = f"{module_path}.{rel_module}"
+        graph.add_module(full_module, parent=module_path)
+
+    # Add export decisions
+    for decisions in all_decisions.values():
+        for decision in decisions:
+            if decision.action == RuleAction.INCLUDE:
+                graph.add_export(decision)
+
+    manifests = graph.build_manifests()
+    return manifests.get(module_path)
+
+
+def _get_preserved_code(target_file: Path) -> str:
+    """Extract preserved code from existing __init__.py."""
+    if target_file.exists() and target_file.name == "__init__.py":
+        content = target_file.read_text()
+        from tools.lazy_imports.export_manager.section_parser import SectionParser
+
+        parser_section = SectionParser()
+        parsed = parser_section.parse_content(content)
+        return parsed.preserved_code
+    return ""
+
+
+def _print_json_output(
+    module_path: str, all_symbols: dict, all_decisions: dict, target_manifest, preserved_code: str
+) -> None:
+    """Print analysis results in JSON format."""
+    import json
+
+    output = {
+        "package": module_path,
+        "status": "ready" if target_manifest else "no_exports",
+        "symbols": {
+            rel_module: [
+                {
+                    "name": s.name,
+                    "type": s.member_type.value,
+                    "provenance": s.provenance.value,
+                    "is_private": s.is_private,
+                    "location": {"line": s.location.line},
+                }
+                for s in symbols
+            ]
+            for rel_module, symbols in all_symbols.items()
+        },
+        "decisions": {
+            rel_module: [
+                {
+                    "symbol": d.export_name,
+                    "action": d.action.value,
+                    "rule": d.reason,
+                    "propagation": d.propagation.value if d.propagation else None,
+                }
+                for d in decisions
+            ]
+            for rel_module, decisions in all_decisions.items()
+        },
+        "would_generate": {
+            "type_checking_count": len(target_manifest.all_exports) if target_manifest else 0,
+            "dynamic_imports_count": len([
+                e for e in target_manifest.all_exports if not e.is_type_only
+            ])
+            if target_manifest
+            else 0,
+            "all_count": len(target_manifest.all_exports) if target_manifest else 0,
+        },
+        "preserved_code": bool(preserved_code),
+    }
+    console.print(json.dumps(output, indent=2))
+
+
+def _print_symbols_section(all_symbols: dict, *, verbose: bool) -> None:
+    """Print detected symbols section."""
+    from collections import defaultdict
+
+    total_symbols = sum(len(symbols) for symbols in all_symbols.values())
+    console.print(f"[bold]Detected Symbols ({total_symbols}):[/bold]")
+
+    for rel_module, symbols in sorted(all_symbols.items()):
+        if not symbols:
+            continue
+
+        console.print(f"  [cyan]{rel_module}.py[/cyan]:")
+        by_type: dict[MemberType, list] = defaultdict(list)
+        for symbol in symbols:
+            by_type[symbol.member_type].append(symbol)
+
+        for member_type in [
+            MemberType.CLASS,
+            MemberType.FUNCTION,
+            MemberType.CONSTANT,
+            MemberType.VARIABLE,
+            MemberType.TYPE_ALIAS,
+            MemberType.IMPORTED,
+        ]:
+            if member_type not in by_type:
+                continue
+
+            names = [s.name for s in by_type[member_type]]
+            if not verbose:
+                display_names = names[:5]
+                if len(names) > 5:
+                    display_names.append(f"... and {len(names) - 5} more")
+                console.print(f"    {member_type.value.title()}: {', '.join(display_names)}")
+            else:
+                console.print(f"    {member_type.value.title()}:")
+                for name in names:
+                    console.print(f"      • {name}")
+
+    console.print()
+
+
+def _print_decisions_section(all_decisions: dict, *, verbose: bool) -> None:
+    """Print export rules applied section."""
+    total_decisions = sum(len(decisions) for decisions in all_decisions.values())
+    console.print(f"[bold]Export Rules Applied ({total_decisions}):[/bold]")
+
+    for rel_module, decisions in sorted(all_decisions.items()):
+        if not decisions:
+            continue
+
+        console.print(f"  [cyan]{rel_module}.py[/cyan]:")
+        for decision in decisions[: None if verbose else 10]:
+            status = "✓" if decision.action == RuleAction.INCLUDE else "✗"
+            color = "green" if decision.action == RuleAction.INCLUDE else "red"
+            console.print(
+                f"    [{color}]{status}[/{color}] {decision.export_name:<20} [{decision.reason}]"
+            )
+
+        if not verbose and len(decisions) > 10:
+            console.print(f"    [dim]... and {len(decisions) - 10} more[/dim]")
+
+    console.print()
+
+
+def _print_generation_section(target_manifest) -> None:
+    """Print would generate section."""
+    if not target_manifest:
+        return
+
+    runtime_exports = [e for e in target_manifest.all_exports if not e.is_type_only]
+    console.print("[bold]Would Generate:[/bold]")
+    console.print(f"  TYPE_CHECKING: [cyan]{len(target_manifest.all_exports)}[/cyan] imports")
+    console.print(f"  _dynamic_imports: [cyan]{len(runtime_exports)}[/cyan] entries")
+    console.print(f"  __all__: [cyan]{len(target_manifest.all_exports)}[/cyan] exports")
+    console.print()
+
+
+def _print_preserved_code_section(preserved_code: str, *, verbose: bool) -> None:
+    """Print preserved code section."""
+    if not preserved_code:
+        return
+
+    console.print("[bold]Preserved Code:[/bold]")
+    lines = preserved_code.strip().split("\n")
+    console.print(f"  {len(lines)} lines of user code")
+
+    if verbose:
+        console.print()
+        console.print("  [dim]Preview:[/dim]")
+        for line in lines[:10]:
+            console.print(f"  [dim]{line}[/dim]")
+        if len(lines) > 10:
+            console.print(f"  [dim]... and {len(lines) - 10} more lines[/dim]")
+
+    console.print()
+
+
+def _print_warnings_section(target_manifest) -> None:
+    """Print warnings section."""
+    warnings = []
+    if not target_manifest or not target_manifest.all_exports:
+        warnings.append("No exports detected - package may be empty or all private")
+
+    console.print("[bold]Warnings:[/bold]")
+    if warnings:
+        for warning in warnings:
+            _print_warning(warning)
+    else:
+        console.print("  None")
+
+    console.print()
+
+
+def _print_ready_status(target_manifest) -> None:
+    """Print final ready status."""
+    if target_manifest and target_manifest.all_exports:
+        _print_success("Ready: Yes")
+    else:
+        _print_warning("Ready: No (no exports to generate)")
+
+
+def _print_text_output(
+    module_path: str,
+    all_symbols: dict,
+    all_decisions: dict,
+    target_manifest,
+    preserved_code: str,
+    *,
+    verbose: bool,
+) -> None:
+    """Print analysis results in human-readable text format."""
+    console.print(f"[bold]Package:[/bold] {module_path}")
+    console.print(
+        f"[bold]Status:[/bold] {'[green]Ready for generation[/green]' if target_manifest else '[yellow]No exports detected[/yellow]'}"
+    )
+    console.print()
+
+    _print_symbols_section(all_symbols, verbose)
+    _print_decisions_section(all_decisions, verbose)
+    _print_generation_section(target_manifest)
+    _print_preserved_code_section(preserved_code, verbose)
+    _print_warnings_section(target_manifest)
+    _print_ready_status(target_manifest)
+
+
 @app.command
 def analyze(
-    format: Annotated[str, Parameter(help="Output format: json, table, or report")] = "table",  # noqa: A002
+    module: Annotated[Path | None, Parameter(help="Analyze specific module")] = None,
     source: Annotated[Path, Parameter(help="Source directory to analyze")] = Path("src"),
+    verbose: Annotated[bool, Parameter(help="Show detailed analysis")] = False,
+    format: Annotated[  # noqa: A002
+        str, Parameter(help="Output format: text, json")
+    ] = "text",
 ) -> None:
-    """Analyze export patterns across the codebase.
+    """Analyze package structure and show what would be generated.
 
-    Generates statistics about:
-    - Export counts by module
-    - Propagation patterns
-    - Rule usage
-    - Cache effectiveness
+    Performs dry-run analysis showing:
+    - Detected symbols with metadata
+    - Export rules applied
+    - What would be generated
+    - Preserved code sections
+    - Warnings and issues
 
     Examples:
         codeweaver lazy-imports analyze
+        codeweaver lazy-imports analyze --module src/codeweaver/core/types
+        codeweaver lazy-imports analyze --verbose
         codeweaver lazy-imports analyze --format json
-        codeweaver lazy-imports analyze --format report
-        codeweaver lazy-imports analyze --source lazy_imports
     """
     from tools.lazy_imports.common.cache import AnalysisCache
     from tools.lazy_imports.export_manager import RuleEngine
-    from tools.lazy_imports.pipeline import Pipeline
 
-    _print_info("Analyzing export patterns...")
+    _print_info("Analyzing package structure...")
     console.print()
 
     # Load rules
@@ -313,27 +758,53 @@ def analyze(
         rules.load_rules([rules_path])
         _print_success(f"Loaded rules from {rules_path}")
 
-    # Initialize cache
-    cache = AnalysisCache()
+    console.print()
 
-    # Create pipeline
-    _print_info(f"Analyzing codebase in {source}...")
-    pipeline = Pipeline(rule_engine=rules, cache=cache, output_dir=Path.cwd())
+    # Determine target path
+    source_root = source
+    if not source_root.exists():
+        _print_error(f"Source directory not found: {source_root}")
+        raise SystemExit(1)
 
-    # Run analysis in dry-run mode
-    try:
-        result = pipeline.run(
-            source_root=source,
-            dry_run=True,  # analyze command doesn't write files
+    # Analyze target path
+    target_path, target_file, module_path = _analyze_target_path(module, source_root)
+
+    # Parse the module
+    _print_info(f"Analyzing module: {module_path}")
+    console.print()
+
+    AnalysisCache()
+
+    # Collect analysis data
+    all_symbols, all_decisions = _collect_analysis_data(target_path, module_path, rules)
+
+    # Build manifest
+    target_manifest = _build_manifest(module_path, all_decisions, rules)
+
+    # Get preserved code
+    preserved_code = _get_preserved_code(target_file)
+
+    # Output results
+    if format == "json":
+        _print_json_output(module_path, all_symbols, all_decisions, target_manifest, preserved_code)
+    else:
+        _print_text_output(
+            module_path, all_symbols, all_decisions, target_manifest, preserved_code, verbose
         )
 
-        # Display results using existing function
-        _print_generation_results(result)
+    console.print()
 
-    except Exception as e:
-        _print_error(f"Analysis failed: {e}")
-        logger.exception("Analysis error details")
-        raise SystemExit(1) from e
+
+def _path_to_module(path: Path, source_root: Path) -> str:
+    """Convert a file path to a module path."""
+    try:
+        relative = path.relative_to(source_root)
+    except ValueError:
+        # Not relative to source_root, use absolute
+        relative = path
+
+    parts = relative.parts
+    return ".".join(parts)
 
 
 @app.command

@@ -144,7 +144,7 @@ class SDKClient(BaseEnum):
         }
 
     @property
-    def client(self) -> LazyImport[Any]:
+    def client(self) -> SDKClient:
         """Get a lazy import for the SDK client (not the provider class)."""
         return next(client for client, client_cls in type(self).clients() if client == self)
 

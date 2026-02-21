@@ -1,3 +1,4 @@
+# sourcery skip: no-complex-if-expressions
 # SPDX-FileCopyrightText: 2026 Knitli Inc.
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
@@ -215,7 +216,9 @@ class VectorConfig(BasedModel, frozen=True):
             params = (
                 await config.embedding_config.as_vector_params()
                 if config.config_type == "symmetric"
-                else await config.embed_provider.embedding_config.as_vector_params()
+                else await cast(
+                    AsymmetricEmbeddingProviderSettings, config
+                ).embed_provider.embedding_config.as_vector_params()
             )
 
         return cls(

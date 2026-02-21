@@ -9,16 +9,19 @@
 from __future__ import annotations
 
 from codeweaver.core import dependency_provider
+from dataclasses import asdict
 
 
 try:
     from fastembed.common.model_description import (
+        BaseModelDescription,
         DenseModelDescription,
         ModelSource,
         #    SparseModelDescription,
     )
     from fastembed.sparse import SparseTextEmbedding
     from fastembed.text import TextEmbedding
+    from fastembed.rerank.cross_encoder import TextCrossEncoder
 
 except ImportError as e:
     from codeweaver.core import ConfigurationError
@@ -90,15 +93,35 @@ DENSE_MODELS = (
     ),
 )
 
-# FastEmbed hasn't implemented custom model addition for sparse models yet
-# but we only need one for now, and it's the next version of one already implemented
-# so we just subclass and add it ourselves
+RERANKING_MODELS = (
+    BaseModelDescription(
+        model="Alibaba-NLP/gte-reranker-modernbert-base",
+        license="apache-2.0",
+        sources=ModelSource(hf="Alibaba-NLP/gte-reranker-modernbert-base"),
+        description="""A lightweight high-performance cross-encoder with 8192 token context length."""
+        model_file="onnx/model_fp16.onnx",
+        size_in_gb="0.3"
+    )
+)
 
-CUSTOM_DENSE_MODELS = tuple(model.model for model in DENSE_MODELS)
-# CUSTOM_SPARSE_MODELS = tuple(model.model for model in SPARSE_MODELS)
+
+def add_models[T: type[TextCrossEncoder] | type[TextEmbedding]](cls: T, models: tuple[BaseModelDescription, ...]) -> T:
+    """Add custom models to the input cls."""
+    known_models = {model.model for model in cls.list_supported_models()}
+    for model in models:
+        if model.model not in known_models:
+            cls.add_custom_model(model)
+    return cls
+
+@dependency_provider(TextCrossEncoder)
+def get_cross_encoder() -> type[TextCrossEncoder]:
+    """
+    Get the cross encoder with added custom models.
+    """
+    return add_models(TextCrossEncoder, RERANKING_MODELS)
 
 
-@dependency_provider(SparseTextEmbedding)  # ty:ignore[invalid-argument-type]
+@dependency_provider(SparseTextEmbedding)
 def get_sparse_embedder() -> type[SparseTextEmbedding]:
     """
     Get the sparse embedder with added custom models.
@@ -109,14 +132,14 @@ def get_sparse_embedder() -> type[SparseTextEmbedding]:
     return SparseTextEmbedding
 
 
-@dependency_provider(TextEmbedding)  # ty:ignore[invalid-argument-type]
+@dependency_provider(TextEmbedding)
 def get_text_embedder() -> type[TextEmbedding]:
     """
     Get the text embedder with added custom models.
 
     Only adds models that aren't already in FastEmbed's native registry to avoid conflicts.
     """
-    """
+    # we don't add these yet, but they're here for when we do
     additional_params = {
         "Alibaba-NLP/gte-modernbert-base": {"pooling": PoolingType.CLS, "normalization": True},
         "BAAI/bge-m3": {"pooling": PoolingType.CLS, "normalization": True},
@@ -130,27 +153,8 @@ def get_text_embedder() -> type[TextEmbedding]:
             "normalization": True,
         },
     }
-    """
-    """
-    TODO: Temporarily disabled until we can work out the bugs on added dense models in FastEmbed.
-    # Get existing model names from native FastEmbed registry
-    existing_model_names = {model.get("model") for model in embedder.list_supported_models()}
+    return add_models(TextEmbedding, DENSE_MODELS)
 
-    if models_to_add := [
-        model for model in DENSE_MODELS if model.model not in existing_model_names
-    ]:
-        custom_embedder = custom_text_embedding.CustomTextEmbedding
-        for model in models_to_add:
-            custom_embedder.add_model(model, **additional_params[model.model])  # type: ignore
-
-        embedder.EMBEDDINGS_REGISTRY = [
-            cls
-            for cls in TextEmbedding.EMBEDDINGS_REGISTRY
-            if cls is not custom_text_embedding.CustomTextEmbedding
-        ]
-        embedder.EMBEDDINGS_REGISTRY.append(custom_embedder)
-    """
-    return TextEmbedding
 
 
 __all__ = ("get_sparse_embedder", "get_text_embedder")

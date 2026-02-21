@@ -17,7 +17,10 @@ from __future__ import annotations
 
 import logging
 
-from typing import TYPE_CHECKING, TypedDict
+from typing import TYPE_CHECKING, TypedDict, cast
+from uuid import UUID
+
+from qdrant_client.grpc import PointId
 
 from codeweaver.core import CodeChunk
 from codeweaver.core.constants import (
@@ -25,6 +28,7 @@ from codeweaver.core.constants import (
     DEFAULT_RECONCILIATION_SERVICE_BATCH_SIZE,
 )
 from codeweaver.providers.config.backup_models import get_backup_embedding_provider
+from codeweaver.providers.vector_stores.qdrant_base import QdrantBaseProvider
 
 
 if TYPE_CHECKING:
@@ -121,11 +125,16 @@ class VectorReconciliationService:
         logger.info(
             "Starting detection of missing backup vectors in collection: %s", collection_name
         )
+        if not self.vector_store:
+            logger.warning("No vector store provider available for detection")
+            return missing_ids
 
         try:
             while True:
                 # Scroll through collection in batches
-                points, next_offset = await self.vector_store.scroll(
+                points, next_offset = await cast(
+                    QdrantBaseProvider, self.vector_store
+                ).client.scroll(
                     collection_name=collection_name,
                     limit=self.batch_size,
                     offset=offset,
@@ -147,7 +156,13 @@ class VectorReconciliationService:
                             return missing_ids
 
                 # Update offset for next batch
-                offset = next_offset
+                offset = (
+                    str(next_offset)
+                    if isinstance(next_offset, int | PointId)
+                    else next_offset.hex
+                    if isinstance(next_offset, UUID)
+                    else next_offset
+                )
                 if offset is None:
                     break
 
@@ -269,7 +284,7 @@ class VectorReconciliationService:
 
         try:
             # Retrieve points with payload
-            points = await self.vector_store.retrieve(
+            points = await cast(QdrantBaseProvider, self.vector_store).client.retrieve(
                 collection_name=collection_name,
                 ids=point_ids,
                 with_vectors=False,  # Don't need existing vectors
@@ -329,7 +344,7 @@ class VectorReconciliationService:
             for idx, embedding in enumerate(backup_embeddings):
                 point_id = point_map[idx]
                 try:
-                    await self.vector_store.update_vectors(
+                    await self.vector_store.client.update_vectors(
                         collection_name=collection_name,
                         points=[{"id": point_id, "vector": {self.backup_vector_name: embedding}}],
                     )

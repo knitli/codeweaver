@@ -17,7 +17,16 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any, Literal, TypedDict, cast
+from typing import (
+    TYPE_CHECKING,
+    Annotated,
+    Any,
+    Literal,
+    NoReturn,
+    TypedDict,
+    cast,
+    type_check_only,
+)
 from uuid import UUID
 
 from anyio import Path as AsyncPath
@@ -28,13 +37,16 @@ from codeweaver.core import (
     INJECTED,
     BasedModel,
     BlakeHashKey,
+    CodeWeaverDeveloperError,
     ResolvedProjectNameDep,
     ResolvedProjectPathDep,
+    TypeIs,
     get_blake_hash,
     uuid7,
 )
 from codeweaver.core.constants import ONE_HOUR
 from codeweaver.engine.config import CodeWeaverEngineSettings, IndexerSettings
+from codeweaver.providers import EmbeddingModelCapabilities, ProviderSettings
 from codeweaver.providers.config.categories import (
     AsymmetricEmbeddingProviderSettings,
     EmbeddingProviderSettingsType,
@@ -50,6 +62,18 @@ logger = logging.getLogger(__name__)
 
 
 EXCEPTION_PATTERN = re.compile(r"\b\w+(Exception|Error|Failure|Fault|Abort|Abortive)\b")
+
+
+def _raise_if_unset_provider() -> NoReturn:
+    raise CodeWeaverDeveloperError(
+        "Encountered unset provider configuration when analyzing configuration changes in `CheckpointManager`. This shouldn't be possible; please file an issue if you see this error."
+    )
+
+
+@type_check_only
+def _is_provider_settings(value: Any) -> TypeIs[ProviderSettings]:
+    assert isinstance(ProviderSettings, value)  # noqa: S101
+    return True
 
 
 class ChangeImpact(Enum):
@@ -239,12 +263,13 @@ def get_checkpoint_settings_map(
     indexer: IndexerSettings = cast(IndexerSettings, settings.indexer)
 
     indexer_map = indexer.model_dump(mode="json", exclude_computed_fields=True, exclude_none=True)
-
+    if not _is_provider_settings(settings.provider):
+        _raise_if_unset_provider()
     return CheckpointSettingsMap(
         indexer=indexer_map,
-        embedding_provider=settings.provider.embedding,
-        sparse_provider=settings.provider.sparse_embedding,
-        vector_store=settings.provider.vector_store,
+        embedding_provider=cast(ProviderSettings, settings.provider).embedding,
+        sparse_provider=cast(ProviderSettings, settings.provider).sparse_embedding,
+        vector_store=cast(ProviderSettings, settings.provider).vector_store,
         project_path=project_path,
         project_name=project_name,
     )
@@ -437,10 +462,7 @@ class CheckpointManager:
 
         # Only invalidate if BREAKING change
         if is_compatible:
-            if impact == ChangeImpact.BREAKING:
-                return False, impact
-            return True, impact
-
+            return (False, impact) if impact == ChangeImpact.BREAKING else (True, impact)
         return False, ChangeImpact.BREAKING
 
     def _extract_fingerprint(self, checkpoint: IndexingCheckpoint) -> CheckpointSettingsFingerprint:
@@ -463,7 +485,8 @@ class CheckpointManager:
         from codeweaver.core import get_settings
 
         settings = cast(CodeWeaverEngineSettings, get_settings())
-
+        if not _is_provider_settings(settings.provider):
+            _raise_if_unset_provider()
         # Get provider configurations
         embedding_config = settings.provider.embedding[0] if settings.provider.embedding else None
         sparse_config = (
@@ -487,15 +510,19 @@ class CheckpointManager:
 
                 # Try to get model family from capabilities
                 if (
-                    embed_caps := embedding_config.embed_provider.embedding_config.capabilities
-                ) and embed_caps.model_family:
+                    (embed_caps := embedding_config.embed_provider.embedding_config.capabilities)
+                    and isinstance(embed_caps, EmbeddingModelCapabilities)
+                    and embed_caps.model_family
+                ):
                     embed_model_family = embed_caps.model_family.family_id
             else:
                 embed_model = str(embedding_config.model_name)
                 # Try to get model family for symmetric config too
                 if (
-                    embed_caps := embedding_config.embedding_config.capabilities
-                ) and embed_caps.model_family:
+                    (embed_caps := embedding_config.embedding_config.capabilities)
+                    and isinstance(embed_caps, EmbeddingModelCapabilities)
+                    and embed_caps.model_family
+                ):
                     embed_model_family = embed_caps.model_family.family_id
 
         sparse_model = str(sparse_config.model_name) if sparse_config else None
@@ -528,7 +555,8 @@ class CheckpointManager:
         from codeweaver.core import get_settings
 
         settings = cast(CodeWeaverEngineSettings, get_settings())
-
+        if not _is_provider_settings(settings.provider):
+            _raise_if_unset_provider()
         # Extract sparse and vector store info
         sparse_config = (
             settings.provider.sparse_embedding[0] if settings.provider.sparse_embedding else None
@@ -550,13 +578,19 @@ class CheckpointManager:
 
             # Try to get model family from capabilities
             if (
-                embed_caps := config.embed_provider.embedding_config.capabilities
-            ) and embed_caps.model_family:
+                (embed_caps := config.embed_provider.embedding_config.capabilities)
+                and isinstance(embed_caps, EmbeddingModelCapabilities)
+                and embed_caps.model_family
+            ):
                 embed_model_family = embed_caps.model_family.family_id
         else:
             embed_model = str(config.model_name)
             # Try to get model family for symmetric config too
-            if (embed_caps := config.embedding_config.capabilities) and embed_caps.model_family:
+            if (
+                (embed_caps := config.embedding_config.capabilities)
+                and isinstance(embed_caps, EmbeddingModelCapabilities)
+                and embed_caps.model_family
+            ):
                 embed_model_family = embed_caps.model_family.family_id
 
         sparse_model = str(sparse_config.model_name) if sparse_config else None

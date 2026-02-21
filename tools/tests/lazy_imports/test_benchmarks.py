@@ -28,7 +28,14 @@ class TestPerformanceBenchmarks:
 
     def test_processing_speed_requirement(self, tmp_path: Path):
         """REQ-PERF-001: Full pipeline should complete in <5s for 500 modules."""
-        from tools.lazy_imports.common.types import ExportNode, MemberType, PropagationLevel
+        from tools.lazy_imports.common.types import (
+            DetectedSymbol,
+            ExportDecision,
+            MemberType,
+            PropagationLevel,
+            SourceLocation,
+            SymbolProvenance,
+        )
         from tools.lazy_imports.export_manager.graph import PropagationGraph
         from tools.tests.lazy_imports.conftest import create_test_modules
 
@@ -41,7 +48,7 @@ class TestPerformanceBenchmarks:
         # Measure processing time
         start = time.time()
 
-        from tools.lazy_imports.export_manager.rules import RuleEngine
+        from tools.lazy_imports.export_manager.rules import RuleAction, RuleEngine
 
         engine = RuleEngine()
         graph = PropagationGraph(rule_engine=engine)
@@ -50,21 +57,30 @@ class TestPerformanceBenchmarks:
         graph.add_module("test_package", None)
 
         # Simulate processing all modules
-        for i, module_file in enumerate(modules):
+        for i, _module_file in enumerate(modules):
             # Register module
             graph.add_module(f"test_package.module_{i}", "test_package")
 
             # Create exports for each module
-            export = ExportNode(
+            symbol = DetectedSymbol(
                 name=f"TestClass{i}",
-                module=f"test_package.module_{i}",
                 member_type=MemberType.CLASS,
-                propagation=PropagationLevel.PARENT,
-                source_file=module_file,
-                line_number=4,
-                defined_in=f"test_package.module_{i}",
+                provenance=SymbolProvenance.DEFINED_HERE,
+                location=SourceLocation(line=4),
+                is_private=False,
+                original_source=None,
+                original_name=None,
             )
-            graph.add_export(export)
+            decision = ExportDecision(
+                module_path=f"test_package.module_{i}",
+                action=RuleAction.INCLUDE,
+                export_name=symbol.name,
+                propagation=PropagationLevel.PARENT,
+                priority=1,
+                reason="Benchmark",
+                source_symbol=symbol,
+            )
+            graph.add_export(decision)
 
         # Build manifests
         manifests = graph.build_manifests()
@@ -80,9 +96,10 @@ class TestPerformanceBenchmarks:
         from tools.lazy_imports.common.cache import JSONAnalysisCache
         from tools.lazy_imports.common.types import (
             AnalysisResult,
-            ExportNode,
+            DetectedSymbol,
             MemberType,
-            PropagationLevel,
+            SourceLocation,
+            SymbolProvenance,
         )
 
         cache = JSONAnalysisCache(cache_dir=temp_cache_dir)
@@ -97,19 +114,19 @@ class TestPerformanceBenchmarks:
         # First run - populate cache
         for i, file in enumerate(files):
             exports = [
-                ExportNode(
+                DetectedSymbol(
                     name=f"Class{i}",
-                    module="test",
                     member_type=MemberType.CLASS,
-                    propagation=PropagationLevel.PARENT,
-                    source_file=file,
-                    line_number=1,
-                    defined_in="test",
+                    provenance=SymbolProvenance.DEFINED_HERE,
+                    location=SourceLocation(line=1),
+                    is_private=False,
+                    original_source=None,
+                    original_name=None,
                 )
             ]
 
             analysis = AnalysisResult(
-                exports=exports,
+                symbols=exports,
                 imports=[],
                 file_hash=f"hash{i}",
                 analysis_timestamp=time.time(),
@@ -140,9 +157,10 @@ class TestPerformanceBenchmarks:
         from tools.lazy_imports.common.cache import JSONAnalysisCache
         from tools.lazy_imports.common.types import (
             AnalysisResult,
-            ExportNode,
+            DetectedSymbol,
             MemberType,
-            PropagationLevel,
+            SourceLocation,
+            SymbolProvenance,
         )
 
         cache = JSONAnalysisCache(cache_dir=temp_cache_dir)
@@ -155,19 +173,19 @@ class TestPerformanceBenchmarks:
             files.append(file)
 
             exports = [
-                ExportNode(
+                DetectedSymbol(
                     name=f"Class{i}",
-                    module="test",
                     member_type=MemberType.CLASS,
-                    propagation=PropagationLevel.PARENT,
-                    source_file=file,
-                    line_number=1,
-                    defined_in="test",
+                    provenance=SymbolProvenance.DEFINED_HERE,
+                    location=SourceLocation(line=1),
+                    is_private=False,
+                    original_source=None,
+                    original_name=None,
                 )
             ]
 
             analysis = AnalysisResult(
-                exports=exports,
+                symbols=exports,
                 imports=[],
                 file_hash=f"hash{i}",
                 analysis_timestamp=time.time(),
@@ -184,19 +202,19 @@ class TestPerformanceBenchmarks:
 
         # Simulate incremental update (only modified file)
         new_exports = [
-            ExportNode(
+            DetectedSymbol(
                 name="ModifiedClass",
-                module="test",
                 member_type=MemberType.CLASS,
-                propagation=PropagationLevel.PARENT,
-                source_file=files[50],
-                line_number=1,
-                defined_in="test",
+                provenance=SymbolProvenance.DEFINED_HERE,
+                location=SourceLocation(line=1),
+                is_private=False,
+                original_source=None,
+                original_name=None,
             )
         ]
 
         new_analysis = AnalysisResult(
-            exports=new_exports,
+            symbols=new_exports,
             imports=[],
             file_hash="new_hash",
             analysis_timestamp=time.time(),
@@ -212,7 +230,14 @@ class TestPerformanceBenchmarks:
 
     def test_memory_usage_requirement(self, tmp_path: Path):
         """REQ-PERF-004: Memory usage should be <500MB for large codebase."""
-        from tools.lazy_imports.common.types import ExportNode, MemberType, PropagationLevel
+        from tools.lazy_imports.common.types import (
+            DetectedSymbol,
+            ExportDecision,
+            MemberType,
+            PropagationLevel,
+            SourceLocation,
+            SymbolProvenance,
+        )
         from tools.lazy_imports.export_manager.graph import PropagationGraph
         from tools.tests.lazy_imports.conftest import create_test_modules
 
@@ -225,7 +250,7 @@ class TestPerformanceBenchmarks:
 
         modules = create_test_modules(modules_dir, count=1000)
 
-        from tools.lazy_imports.export_manager.rules import RuleEngine
+        from tools.lazy_imports.export_manager.rules import RuleAction, RuleEngine
 
         engine = RuleEngine()
         graph = PropagationGraph(rule_engine=engine)
@@ -234,20 +259,29 @@ class TestPerformanceBenchmarks:
         graph.add_module("large_package", None)
 
         # Process all modules
-        for i, module_file in enumerate(modules):
+        for i, _module_file in enumerate(modules):
             # Register module
             graph.add_module(f"large_package.module_{i}", "large_package")
 
-            export = ExportNode(
+            symbol = DetectedSymbol(
                 name=f"Class{i}",
-                module=f"large_package.module_{i}",
                 member_type=MemberType.CLASS,
-                propagation=PropagationLevel.PARENT,
-                source_file=module_file,
-                line_number=4,
-                defined_in=f"large_package.module_{i}",
+                provenance=SymbolProvenance.DEFINED_HERE,
+                location=SourceLocation(line=4),
+                is_private=False,
+                original_source=None,
+                original_name=None,
             )
-            graph.add_export(export)
+            decision = ExportDecision(
+                module_path=f"large_package.module_{i}",
+                action=RuleAction.INCLUDE,
+                export_name=symbol.name,
+                propagation=PropagationLevel.PARENT,
+                priority=1,
+                reason="Benchmark",
+                source_symbol=symbol,
+            )
+            graph.add_export(decision)
 
         # Build manifests
         manifests = graph.build_manifests()
@@ -267,27 +301,28 @@ class TestPerformanceBenchmarks:
         from tools.lazy_imports.common.cache import JSONAnalysisCache
         from tools.lazy_imports.common.types import (
             AnalysisResult,
-            ExportNode,
+            DetectedSymbol,
             MemberType,
-            PropagationLevel,
+            SourceLocation,
+            SymbolProvenance,
         )
 
         cache = JSONAnalysisCache(cache_dir=temp_cache_dir)
 
         exports = [
-            ExportNode(
+            DetectedSymbol(
                 name="TestClass",
-                module="test",
                 member_type=MemberType.CLASS,
-                propagation=PropagationLevel.PARENT,
-                source_file=Path("test.py"),
-                line_number=1,
-                defined_in="test",
+                provenance=SymbolProvenance.DEFINED_HERE,
+                location=SourceLocation(line=1),
+                is_private=False,
+                original_source=None,
+                original_name=None,
             )
         ]
 
         analysis = AnalysisResult(
-            exports=exports,
+            symbols=exports,
             imports=[],
             file_hash="hash123",
             analysis_timestamp=time.time(),
@@ -316,7 +351,14 @@ class TestScalability:
 
     def test_linear_scaling_with_module_count(self, tmp_path: Path):
         """Processing time should scale linearly with module count."""
-        from tools.lazy_imports.common.types import ExportNode, MemberType, PropagationLevel
+        from tools.lazy_imports.common.types import (
+            DetectedSymbol,
+            ExportDecision,
+            MemberType,
+            PropagationLevel,
+            SourceLocation,
+            SymbolProvenance,
+        )
         from tools.lazy_imports.export_manager.graph import PropagationGraph
         from tools.tests.lazy_imports.conftest import create_test_modules
 
@@ -331,7 +373,7 @@ class TestScalability:
 
             start = time.time()
 
-            from tools.lazy_imports.export_manager.rules import RuleEngine
+            from tools.lazy_imports.export_manager.rules import RuleAction, RuleEngine
 
             engine = RuleEngine()
             graph = PropagationGraph(rule_engine=engine)
@@ -339,20 +381,29 @@ class TestScalability:
             # Register parent module
             graph.add_module(f"package_{count}", None)
 
-            for i, module_file in enumerate(modules):
+            for i, _module_file in enumerate(modules):
                 # Register module
                 graph.add_module(f"package_{count}.module_{i}", f"package_{count}")
 
-                export = ExportNode(
+                symbol = DetectedSymbol(
                     name=f"Class{i}",
-                    module=f"package_{count}.module_{i}",
                     member_type=MemberType.CLASS,
-                    propagation=PropagationLevel.PARENT,
-                    source_file=module_file,
-                    line_number=1,
-                    defined_in=f"package_{count}.module_{i}",
+                    provenance=SymbolProvenance.DEFINED_HERE,
+                    location=SourceLocation(line=1),
+                    is_private=False,
+                    original_source=None,
+                    original_name=None,
                 )
-                graph.add_export(export)
+                decision = ExportDecision(
+                    module_path=f"package_{count}.module_{i}",
+                    action=RuleAction.INCLUDE,
+                    export_name=symbol.name,
+                    propagation=PropagationLevel.PARENT,
+                    priority=1,
+                    reason="Benchmark",
+                    source_symbol=symbol,
+                )
+                graph.add_export(decision)
 
             graph.build_manifests()
 
@@ -369,9 +420,10 @@ class TestScalability:
         from tools.lazy_imports.common.cache import JSONAnalysisCache
         from tools.lazy_imports.common.types import (
             AnalysisResult,
-            ExportNode,
+            DetectedSymbol,
             MemberType,
-            PropagationLevel,
+            SourceLocation,
+            SymbolProvenance,
         )
 
         cache = JSONAnalysisCache(cache_dir=temp_cache_dir)
@@ -388,19 +440,19 @@ class TestScalability:
             # Populate cache
             for i, file in enumerate(files):
                 exports = [
-                    ExportNode(
+                    DetectedSymbol(
                         name=f"Class{i}",
-                        module="test",
                         member_type=MemberType.CLASS,
-                        propagation=PropagationLevel.PARENT,
-                        source_file=file,
-                        line_number=1,
-                        defined_in="test",
+                        provenance=SymbolProvenance.DEFINED_HERE,
+                        location=SourceLocation(line=1),
+                        is_private=False,
+                        original_source=None,
+                        original_name=None,
                     )
                 ]
 
                 analysis = AnalysisResult(
-                    exports=exports,
+                    symbols=exports,
                     imports=[],
                     file_hash=f"hash{count}_{i}",
                     analysis_timestamp=time.time(),
@@ -429,27 +481,28 @@ class TestConcurrency:
         from tools.lazy_imports.common.cache import JSONAnalysisCache
         from tools.lazy_imports.common.types import (
             AnalysisResult,
-            ExportNode,
+            DetectedSymbol,
             MemberType,
-            PropagationLevel,
+            SourceLocation,
+            SymbolProvenance,
         )
 
         cache = JSONAnalysisCache(cache_dir=temp_cache_dir)
 
         exports = [
-            ExportNode(
+            DetectedSymbol(
                 name="Class",
-                module="test",
                 member_type=MemberType.CLASS,
-                propagation=PropagationLevel.PARENT,
-                source_file=Path("test.py"),
-                line_number=1,
-                defined_in="test",
+                provenance=SymbolProvenance.DEFINED_HERE,
+                location=SourceLocation(line=1),
+                is_private=False,
+                original_source=None,
+                original_name=None,
             )
         ]
 
         analysis = AnalysisResult(
-            exports=exports,
+            symbols=exports,
             imports=[],
             file_hash="hash123",
             analysis_timestamp=time.time(),

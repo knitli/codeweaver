@@ -19,8 +19,14 @@ from pydantic import DirectoryPath, Field, computed_field
 from codeweaver.core import BasedModel
 from codeweaver.core.file_extensions import COMMON_TOOLING_PATHS, TEST_DIR_NAMES
 from codeweaver.core.language import ConfigLanguage, SemanticSearchLanguage
-from codeweaver.core.types import DevToolNameT, LlmToolNameT
-from codeweaver.core.types.aliases import FilteredKeyT
+from codeweaver.core.types import (
+    DevToolNameT,
+    DirectoryName,
+    DirectoryNameT,
+    FilteredKey,
+    FilteredKeyT,
+    LlmToolNameT,
+)
 from codeweaver.core.types.enum import BaseEnum
 
 
@@ -154,7 +160,6 @@ class RepoDirectory(BasedModel):
     """Cache of subdirectories in the directory."""
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
-        from codeweaver.core.types.aliases import FilteredKey
         from codeweaver.core.types.enum import AnonymityConversion
 
         return {
@@ -261,29 +266,41 @@ class RepoChecklist(BasedModel):
     """Cache of child RepoChecklist instances for subdirectories."""
 
     # Directory name variants for common directories with alternate naming conventions
-    _DIR_VARIANTS: ClassVar[MappingProxyType[str, set[str]]] = MappingProxyType({
-        "apps": {"apps", "app", "applications", "application", "crates"},
-        "ci": {
-            "ci",
-            ".ci",
-            "cd",
-            ".cd",
-            "ci-cd",
-            ".ci-cd",
-            ".ci_cd",
-            "ci_cd",
-            ".github",
-            ".circleci",
+    _DIR_VARIANTS: ClassVar[MappingProxyType[str, set[DirectoryNameT]]] = MappingProxyType({
+        "apps": {
+            DirectoryName(name) for name in {"apps", "app", "applications", "application", "crates"}
         },
-        "lib": {"lib", "library", "libs", "libraries"},
-        "tests": {*TEST_DIR_NAMES},
-        "src": {"src", "source"},
-        "packages": {"packages", "pkg", "pkgs"},
-        "modules": {"modules", "mod", "mods", "workspaces", "pkgspaces", "services", "svcs"},
+        "ci": {
+            DirectoryName(name)
+            for name in {
+                "ci",
+                ".ci",
+                "cd",
+                ".cd",
+                "ci-cd",
+                ".ci-cd",
+                ".ci_cd",
+                "ci_cd",
+                ".github",
+                ".circleci",
+            }
+        },
+        "lib": {DirectoryName(name) for name in {"lib", "library", "libs", "libraries"}},
+        "tests": {DirectoryName(name) for name in TEST_DIR_NAMES}
+        | {
+            DirectoryName(name)
+            for name in {".cd", "ci-cd", ".ci-cd", ".ci_cd", "ci_cd", ".github", ".circleci"}
+        },
+        "src": {DirectoryName("src"), DirectoryName("source")},
+        "packages": {DirectoryName(name) for name in {"packages", "pkg", "pkgs"}},
+        "modules": {
+            DirectoryName(name)
+            for name in {"modules", "mod", "mods", "workspaces", "pkgspaces", "services", "svcs"}
+        },
     })
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion]:
-        from codeweaver.core.types import AnonymityConversion, FilteredKey
+        from codeweaver.core.types import AnonymityConversion
 
         return {
             FilteredKey("_children"): AnonymityConversion.COUNT,

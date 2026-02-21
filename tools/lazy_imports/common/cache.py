@@ -220,23 +220,39 @@ class JSONAnalysisCache:
         if not isinstance(analysis_data, dict):
             return analysis_data
 
-        # Reconstruct AnalysisResult with nested ExportNode objects
-        from tools.lazy_imports.common.types import AnalysisResult, ExportNode
+        # Reconstruct AnalysisResult with nested DetectedSymbol objects
+        from tools.lazy_imports.common.types import (
+            AnalysisResult,
+            DetectedSymbol,
+            MemberType,
+            SourceLocation,
+            SymbolProvenance,
+        )
 
-        # Reconstruct exports list
-        exports = []
-        for export_dict in analysis_data.get("exports", []):
-            if isinstance(export_dict, dict):
-                exports.append(ExportNode(**export_dict))
+        # Reconstruct symbols list
+        symbols = []
+        for symbol_dict in analysis_data.get("symbols", []):
+            if isinstance(symbol_dict, dict):
+                # Handle nested objects
+                if "location" in symbol_dict and isinstance(symbol_dict["location"], dict):
+                    symbol_dict["location"] = SourceLocation(**symbol_dict["location"])
+
+                # Handle enums if they are strings
+                if "provenance" in symbol_dict and isinstance(symbol_dict["provenance"], str):
+                    symbol_dict["provenance"] = SymbolProvenance(symbol_dict["provenance"])
+                if "member_type" in symbol_dict and isinstance(symbol_dict["member_type"], str):
+                    symbol_dict["member_type"] = MemberType(symbol_dict["member_type"])
+
+                symbols.append(DetectedSymbol(**symbol_dict))
             else:
-                exports.append(export_dict)
+                symbols.append(symbol_dict)
 
-        # Reconstruct imports list (if they're objects too)
+        # Reconstruct imports list
         imports = analysis_data.get("imports", [])
 
         # Create AnalysisResult with reconstructed objects
         return AnalysisResult(
-            exports=exports,
+            symbols=symbols,
             imports=imports,
             file_hash=analysis_data.get("file_hash", file_hash),
             analysis_timestamp=analysis_data.get("analysis_timestamp", 0.0),
