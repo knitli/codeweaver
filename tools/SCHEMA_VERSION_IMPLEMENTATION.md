@@ -12,7 +12,7 @@ Implemented schema versioning enforcement in the lazy import system according to
 ## Changes Made
 
 ### 1. Added Schema Version Constants and Error Class
-**File**: `tools/lazy_imports/export_manager/rules.py`
+**File**: `tools/exportify/export_manager/rules.py`
 
 Added:
 - `CURRENT_SCHEMA_VERSION = "1.0"` - Current schema version
@@ -20,7 +20,7 @@ Added:
 - `SchemaVersionError` - Custom exception for version errors
 
 ### 2. Enhanced `load_rules()` Method
-**File**: `tools/lazy_imports/export_manager/rules.py`
+**File**: `tools/exportify/export_manager/rules.py`
 
 Improvements:
 - **Missing version check**: Raises `SchemaVersionError` if `schema_version` field is missing
@@ -37,7 +37,7 @@ Error message includes:
   3. Run migration tool command
 
 ### 3. Added Migration Framework
-**File**: `tools/lazy_imports/export_manager/rules.py`
+**File**: `tools/exportify/export_manager/rules.py`
 
 New method: `_migrate_schema(data: dict, from_version: str) -> dict`
 - Placeholder for future schema migrations
@@ -45,7 +45,7 @@ New method: `_migrate_schema(data: dict, from_version: str) -> dict`
 - Framework ready for version updates (e.g., when 1.1 is introduced)
 
 ### 4. Comprehensive Test Suite
-**File**: `tools/tests/lazy_imports/test_rules.py`
+**File**: `tools/tests/exportify/test_rules.py`
 
 Added `TestSchemaVersioning` class with 5 tests:
 
@@ -76,11 +76,11 @@ Added `TestSchemaVersioning` class with 5 tests:
 
 All tests pass successfully:
 ```
-tests/lazy_imports/test_rules.py::TestSchemaVersioning::test_missing_schema_version_raises_error PASSED
-tests/lazy_imports/test_rules.py::TestSchemaVersioning::test_unsupported_version_raises_error_with_helpful_message PASSED
-tests/lazy_imports/test_rules.py::TestSchemaVersioning::test_supported_version_loads_successfully PASSED
-tests/lazy_imports/test_rules.py::TestSchemaVersioning::test_future_migration_path PASSED
-tests/lazy_imports/test_rules.py::TestSchemaVersioning::test_error_message_includes_migration_suggestions PASSED
+tests/exportify/test_rules.py::TestSchemaVersioning::test_missing_schema_version_raises_error PASSED
+tests/exportify/test_rules.py::TestSchemaVersioning::test_unsupported_version_raises_error_with_helpful_message PASSED
+tests/exportify/test_rules.py::TestSchemaVersioning::test_supported_version_loads_successfully PASSED
+tests/exportify/test_rules.py::TestSchemaVersioning::test_future_migration_path PASSED
+tests/exportify/test_rules.py::TestSchemaVersioning::test_error_message_includes_migration_suggestions PASSED
 
 Total: 25 tests passed (17 existing + 3 loading + 5 new schema versioning)
 ```
@@ -129,7 +129,7 @@ Current version: 1.0
 You may need to:
   1. Update CodeWeaver to support this version
   2. Migrate the config file to 1.0
-  3. Run: codeweaver lazy-imports migrate
+  3. Run: exportify migrate
 ```
 
 ## Future Enhancements
@@ -150,5 +150,5 @@ def _migrate_schema(self, data: dict, from_version: str) -> dict:
 
 ## Files Modified
 
-1. `tools/lazy_imports/export_manager/rules.py` - Implementation
-2. `tools/tests/lazy_imports/test_rules.py` - Tests
+1. `tools/exportify/export_manager/rules.py` - Implementation
+2. `tools/tests/exportify/test_rules.py` - Tests

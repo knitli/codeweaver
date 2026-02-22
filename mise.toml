@@ -30,7 +30,7 @@ _.path = [
   "scripts/testing",
   "scripts/utils",
   ".venv/bin",
-  "tools/lazy_imports",
+  "tools/exportify",
 ]
 MISE_ENV = '''{% if get_env(name="CI", default="") == "true" %}""{% else %}dev{% endif %}'''
 CW_PREFIX = '''{% if get_env(name="CI", default="") == "true" %}[codeweaver]{% elif get_env(name="TERM", default="xterm-256color") == "*truecolor*" %}\033[38;2;181;108;48;m[codeweaver]\033[0m{% else %}\033[38;5;131m[codeweaver]\033[0m{% endif %}'''

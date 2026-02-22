@@ -171,6 +171,8 @@ remote-debug-profile/
 .vscode/zsh/.zsh_history
 
 __pycache__/
+**/.pytest_cache/
+.pytest_cache/
 # //!SECTION  EXCEPTIONS -- Put all inverted ("!") rules at the end of the file!
 
 # but keep track of directories ending in .cache
@@ -204,7 +206,6 @@ __pycache__/
 
 # Generated Files
 **/htmlcov/
-htmlcov/
 .coverage
 .coveragexml
 .vscode/.history/
