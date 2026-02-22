@@ -363,14 +363,14 @@ class CodeWeaverCoreSettings(BaseCodeWeaverSettings):
             if data.get(key) is UNSET or locals().get(key) is UNSET
         }
         if project_path is not Unset and project_path is not None:
-            data["project_path"] = project_path.resolve()
+            data["project_path"] = cast(DirectoryPath, project_path).resolve()
         else:
             if (env_path := _set_or_unset("CODEWEAVER_PROJECT_PATH", is_path=True)) is not UNSET:
                 data["project_path"] = env_path.resolve()
             else:
                 data["project_path"] = _resolve_project_path()
         if (env_config_file := _set_or_unset("CODEWEAVER_CONFIG_FILE", is_path=True)) is not UNSET:
-            data["config_file"] = env_config_file.resolve()
+            data["config_file"] = cast(Path, env_config_file).resolve()
         else:
             data["config_file"] = None
         data["project_name"] = project_name or os.getenv(
@@ -513,7 +513,7 @@ class CodeWeaverCoreSettings(BaseCodeWeaverSettings):
             )
             / Path("codeweaver.toml")
         )
-        extension = config_file.suffix.lower()
+        extension = cast(Path, config_file).suffix.lower()
         match extension:
             case ".json":
                 from pydantic_core import to_json
@@ -549,7 +549,7 @@ class CodeWeaverCoreSettings(BaseCodeWeaverSettings):
 
         The file format is determined by the file extension (.toml, .yaml/.yml, .json).
         """
-        path = (  # ty:ignore[invalid-assignment]
+        path: Path | None = (  # ty:ignore[invalid-assignment]
             path
             if path and path is not Unset
             else self.config_file
@@ -560,7 +560,7 @@ class CodeWeaverCoreSettings(BaseCodeWeaverSettings):
             path = self.project_path / "codeweaver.toml"
         if path is None:
             raise ValueError("No path provided to save configuration file.")
-        extension = path.suffix.lower()
+        extension = cast(Path, path).suffix.lower()
         # Use mode='json' to serialize Path objects to strings (needed for TOML/YAML)
         # model_dump kwargs (indent is NOT a valid model_dump parameter)
         dump_kwargs = {

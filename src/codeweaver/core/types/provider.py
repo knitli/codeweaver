@@ -10,9 +10,9 @@ from __future__ import annotations
 import contextlib
 import os
 
-from collections.abc import Generator
+from collections.abc import Generator, Iterable
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Literal, Self
+from typing import TYPE_CHECKING, Any, Literal, Self, cast
 
 from codeweaver.core.types.enum import BaseEnum
 from codeweaver.core.types.env import EnvVarInfo, ProviderEnvVars
@@ -71,6 +71,12 @@ def get_default_provider_import_for_category(
     """Get the default provider import for a given provider and category."""
     from codeweaver.core.types.service_cards import get_service_card
 
+    provider = provider if isinstance(provider, Provider) else Provider.from_string(provider)
+    category = (
+        category
+        if isinstance(category, ProviderCategory)
+        else ProviderCategory.from_string(category)
+    )
     if service_card := get_service_card(provider.variable, category.variable):
         return service_card.provider_cls
     return None
@@ -375,7 +381,7 @@ class Provider(BaseEnum):
             if key not in ("note", "other") and isinstance(value, EnvVarInfo):
                 found_vars.append(value)
             elif key == "other" and isinstance(value, dict) and value:
-                found_vars.extend(iter(value.values()))
+                found_vars.extend(iter(cast(Iterable[EnvVarInfo], value.values())))
         return found_vars
 
     @classmethod

@@ -686,12 +686,17 @@ class IndexingService:
         self, chunk: CodeChunk, sparse_vec: Any, batch_id: Any, batch_index: int, registry: Any
     ) -> None:
         """Register a single sparse embedding in the registry."""
-        from codeweaver.core import ChunkEmbeddings, EmbeddingBatchInfo, ModelName, SparseEmbedding
+        from codeweaver.core import (
+            ChunkEmbeddings,
+            CodeWeaverSparseEmbedding,
+            EmbeddingBatchInfo,
+            ModelName,
+        )
 
         # Convert Qdrant SparseVector to SparseEmbedding
         indices = getattr(sparse_vec, "indices", None) or sparse_vec.get("indices")
         values = getattr(sparse_vec, "values", None) or sparse_vec.get("values")
-        sparse_emb = SparseEmbedding(indices=indices, values=values)
+        sparse_emb = CodeWeaverSparseEmbedding(indices=indices, values=values)
 
         # Create embedding info with current sparse provider model
         model = (

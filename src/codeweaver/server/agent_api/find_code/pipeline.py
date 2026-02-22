@@ -18,13 +18,13 @@ from contextvars import ContextVar
 from typing import Any, NoReturn
 
 from codeweaver.core import (
+    CodeWeaverSparseEmbedding,
     ConfigurationError,
     QueryError,
     QueryResult,
     RawEmbeddingVectors,
     SearchResult,
     SearchStrategy,
-    SparseEmbedding,
     StrategizedQuery,
 )
 from codeweaver.core.constants import ZERO
@@ -77,8 +77,6 @@ async def _embed_dense(
                 },
             )
             return None
-        assert not isinstance(result, dict)
-        assert "error" not in result
         await log_to_client_or_fallback(
             context,
             "debug",
@@ -116,7 +114,7 @@ async def _embed_dense(
 
 async def _embed_sparse(
     query: str, context: Any, sparse_provider: SparseEmbeddingProviderDep = INJECTED
-) -> SparseEmbedding | None:
+) -> CodeWeaverSparseEmbedding | None:
     """Attempt sparse embedding, return None on failure."""
     from codeweaver.core import log_to_client_or_fallback
 
@@ -160,21 +158,25 @@ async def _embed_sparse(
         )
         return None
     else:
-        if isinstance(result, SparseEmbedding):
+        if isinstance(result, CodeWeaverSparseEmbedding):
             return result
-        if isinstance(result, list) and len(result) > 0 and isinstance(result[0], SparseEmbedding):
+        if (
+            isinstance(result, list)
+            and len(result) > 0
+            and isinstance(result[0], CodeWeaverSparseEmbedding)
+        ):
             return result[0]
         if isinstance(result, dict) and "indices" in result and ("values" in result):
-            return SparseEmbedding(**result)
+            return CodeWeaverSparseEmbedding(**result)
         if isinstance(result, list) and len(result) > 0 and isinstance(result[0], dict):
-            return SparseEmbedding(**result[0])
+            return CodeWeaverSparseEmbedding(**result[0])
         if (
             isinstance(result, list)
             and len(result) == 2
             and isinstance(result[0], list)
             and isinstance(result[1], list)
         ):
-            return SparseEmbedding(indices=result[0], values=result[1])
+            return CodeWeaverSparseEmbedding(indices=result[0], values=result[1])
     return None
 
 
@@ -194,12 +196,12 @@ def _normalize_dense_embedding(embedding: Any) -> RawEmbeddingVectors | None:
     return [embedding]
 
 
-def _normalize_sparse_embedding(result: Any) -> SparseEmbedding | None:
-    """Normalize sparse embedding result to SparseEmbedding format.
+def _normalize_sparse_embedding(result: Any) -> CodeWeaverSparseEmbedding | None:
+    """Normalize sparse embedding result to CodeWeaverSparseEmbedding format.
 
     Handles multiple provider return formats:
-    - SparseEmbedding object
-    - list[SparseEmbedding]
+    - CodeWeaverSparseEmbedding object
+    - list[CodeWeaverSparseEmbedding]
     - dict with indices/values
     - list[dict] with indices/values
     - list[list, list] tuple format
@@ -208,33 +210,33 @@ def _normalize_sparse_embedding(result: Any) -> SparseEmbedding | None:
         result: Raw result from sparse provider
 
     Returns:
-        Normalized SparseEmbedding or None if invalid format
+        Normalized CodeWeaverSparseEmbedding or None if invalid format
     """
-    if isinstance(result, SparseEmbedding):
+    if isinstance(result, CodeWeaverSparseEmbedding):
         return result
     if isinstance(result, list) and len(result) > 0:
         return _transform_to_sparse_embedding(result)
     if isinstance(result, dict) and "indices" in result and ("values" in result):
-        return SparseEmbedding(**result)
+        return CodeWeaverSparseEmbedding(**result)
     logger.warning("Unexpected sparse embedding format: %s", type(result))
     return None
 
 
 def _transform_to_sparse_embedding(result):
-    """Transform list result to SparseEmbedding."""
+    """Transform list result to CodeWeaverSparseEmbedding."""
     item = result[0]
-    if isinstance(item, SparseEmbedding):
+    if isinstance(item, CodeWeaverSparseEmbedding):
         return item
     if isinstance(item, dict) and "indices" in item and ("values" in item):
-        return SparseEmbedding(**item)
+        return CodeWeaverSparseEmbedding(**item)
     if isinstance(item, list) and len(result) == 2 and isinstance(result[1], list):
-        return SparseEmbedding(indices=result[0], values=result[1])
+        return CodeWeaverSparseEmbedding(indices=result[0], values=result[1])
     logger.warning("Unexpected sparse embedding format in list: %s", type(item))
     return None
 
 
 def _build_vectors_dict(
-    dense_embedding: RawEmbeddingVectors | None, sparse_embedding: SparseEmbedding | None
+    dense_embedding: RawEmbeddingVectors | None, sparse_embedding: CodeWeaverSparseEmbedding | None
 ) -> dict[str, Any]:
     """Build vectors dictionary from embeddings.
 
@@ -333,10 +335,14 @@ def build_query_vector(query_result: QueryResult, query: str) -> StrategizedQuer
     dense_embedding_raw = query_result.get("primary")
     sparse_embedding_raw = query_result.get("sparse")
     dense_embedding: RawEmbeddingVectors | None = None
-    if dense_embedding_raw is not None and (not isinstance(dense_embedding_raw, SparseEmbedding)):
+    if dense_embedding_raw is not None and (
+        not isinstance(dense_embedding_raw, CodeWeaverSparseEmbedding)
+    ):
         dense_embedding = dense_embedding_raw
-    sparse_embedding: SparseEmbedding | None = None
-    if sparse_embedding_raw is not None and isinstance(sparse_embedding_raw, SparseEmbedding):
+    sparse_embedding: CodeWeaverSparseEmbedding | None = None
+    if sparse_embedding_raw is not None and isinstance(
+        sparse_embedding_raw, CodeWeaverSparseEmbedding
+    ):
         sparse_embedding = sparse_embedding_raw
     if dense_embedding:
         dense_vector: RawEmbeddingVectors = (

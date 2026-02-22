@@ -29,6 +29,7 @@ def test_version_compatibility():
         ("0.1.0", "0.1.0.dev152+g358bbdf4", True, "Dev version compatible"),
     ]
     print("Testing version compatibility logic...")
+    # sourcery skip: no-loop-in-tests
     for pv_str, cv_str, expected, description in test_cases:
         pv = parse_version(pv_str)
         cv = parse_version(cv_str)
@@ -68,7 +69,7 @@ def test_dataclass_structure():
     assert profile.version == "0.1.0"
     print("  ✓ Dataclass creation works")
     try:
-        profile.name = "changed"  # ty:ignore[invalid-assignment]
+        profile.name = "changed"
         print("  ✗ Dataclass should be immutable")
         raise AssertionError("Should have raised AttributeError")
     except AttributeError:

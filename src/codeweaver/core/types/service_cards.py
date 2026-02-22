@@ -953,8 +953,7 @@ def _build_local_provider_cards() -> list[ServiceCard]:
                 "FastEmbedSparseEmbeddingProvider",
             ),
             lazy_import(
-                "codeweaver.providers.embedding.fastembed_extensions",
-                "get_sparse_embedder",
+                "codeweaver.providers.embedding.fastembed_extensions", "get_sparse_embedder"
             ),
             "fastembed",
             metadata=ServiceMetadata(client_handler=_start_instance_in_thread),

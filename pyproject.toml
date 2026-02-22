@@ -579,7 +579,8 @@ exclude = ["./typings", "./tests/**/malformed.py", "./vendored"]
 include = ["scripts/**/*.py"]
 
 [tool.ty.overrides.rules]
-invalid-assignment = "warn"
+invalid-assignment = "ignore"
+missing-typed-dict-key = "ignore"
 unresolved-import = "ignore"
 invalid-argument-type = "ignore"
 unresolved-reference = "ignore"
@@ -607,7 +608,7 @@ unresolved-import = "ignore"  # pytest and other test dependencies may not be in
 unknown-argument = "ignore"  # pytest fixtures inject arguments dynamically
 unresolved-reference = "ignore"  # test fixtures and dynamic test patterns
 unresolved-attribute = "ignore"  # mocks and fixtures have dynamic attributes
-not-subscriptable = "warn"  # Often false positive after pytest assertions
+not-subscriptable = "ignore"  # Often false positive after pytest assertions
 unsupported-operator = "warn"  # Type narrowing after assertions not always understood
 missing-argument = "warn"  # Dynamic test patterns and fixtures
 too-many-positional-arguments = "warn"  # Dynamic function calls in tests
@@ -744,7 +745,6 @@ include = ["src/codeweaver/providers/config/sdk/embedding.py"]
 [tool.ty.overrides.rules]
 invalid-argument-type = "ignore"
 call-non-callable = "ignore"
-call-top-callable = "ignore"
 invalid-return-type = "ignore"
 
 [tool.uv]

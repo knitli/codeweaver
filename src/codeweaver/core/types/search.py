@@ -16,7 +16,7 @@ from pydantic import AfterValidator, ConfigDict, Field, NonNegativeFloat
 from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.discovery import DiscoveredFile
 from codeweaver.core.metadata import Metadata
-from codeweaver.core.types.embeddings import SparseEmbedding
+from codeweaver.core.types.embeddings import CodeWeaverSparseEmbedding
 from codeweaver.core.types.enum import BaseEnum
 from codeweaver.core.types.models import BasedModel
 from codeweaver.core.types.utils import generate_field_title
@@ -53,7 +53,7 @@ class StrategizedQuery(NamedTuple):
     query: str
     dense: Sequence[float] | Sequence[int] | None
     sparse: Annotated[
-        SparseEmbedding | None,
+        CodeWeaverSparseEmbedding | None,
         Field(description="Sparse embedding data", field_title_generator=generate_field_title),
     ]
     strategy: Annotated[

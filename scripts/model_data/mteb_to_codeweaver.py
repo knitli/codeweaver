@@ -317,7 +317,7 @@ def key_in_prompts(loader: LoaderDict, key: Literal["query", "document"]) -> str
             s.replace("-", "."),
         )
 
-    if not (prompts := check_for_prompts({"loader": loader})):  # ty:ignore[missing-typed-dict-key]
+    if not (prompts := check_for_prompts({"loader": loader})):
         return None
     query_keys = {
         word

@@ -99,7 +99,7 @@ class CodeWeaverEngineSettings(CodeWeaverProviderSettings):
                 finalized_value = self._resolve_default_and_provided(
                     existing_value
                     if isinstance(existing_value, dict)
-                    else existing_value.model_dump(),
+                    else existing_value.model_dump(),  # ty:ignore[unresolved-attribute]
                     resolved_value,
                 )
                 setattr(self, field_name, type_cls.model_construct(**finalized_value))

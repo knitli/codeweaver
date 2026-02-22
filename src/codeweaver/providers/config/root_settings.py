@@ -94,7 +94,7 @@ class CodeWeaverProviderSettings(CodeWeaverCoreSettings):
             provider = ProviderSettings.model_validate(
                 **(
                     self._resolve_default_and_provided(
-                        cast(dict[str, Any], profile_config.as_provider_settings()),
+                        cast(ProviderProfile, profile_config).as_provider_settings(),
                         provider_config
                         if isinstance(provider_config, dict)
                         else provider_config.model_dump(),
@@ -103,7 +103,9 @@ class CodeWeaverProviderSettings(CodeWeaverCoreSettings):
             )
         else:
             provider = ProviderSettings.model_construct(
-                **(profile_config or ProviderProfile.RECOMMENDED).as_provider_settings()
+                **(
+                    cast(ProviderProfile, profile_config or ProviderProfile.RECOMMENDED)
+                ).as_provider_settings()
             )
         self.provider = provider
         await super()._initialize(**kwargs)

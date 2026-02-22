@@ -39,7 +39,7 @@ def get_alibaba_reranking_capabilities() -> tuple[AlibabaNlpRerankingCapabilitie
             "supports_custom_prompt": False,
             "max_input": 8192,
             "context_window": 8192,
-            "provider": Provider.SENTENCE_TRANSFORMERS
+            "provider": Provider.SENTENCE_TRANSFORMERS,
         }),
         AlibabaNlpRerankingCapabilities.model_validate({
             "name": "Alibaba-NLP/gte-reranker-modernbert-base",
@@ -48,8 +48,8 @@ def get_alibaba_reranking_capabilities() -> tuple[AlibabaNlpRerankingCapabilitie
             "supports_custom_prompt": False,
             "max_input": 8192,
             "context_window": 8192,
-            "provider": Provider.FASTEMBED
-        })
+            "provider": Provider.FASTEMBED,
+        }),
     )
 
 

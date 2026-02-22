@@ -23,8 +23,13 @@ import numpy as np
 
 from pydantic import SkipValidation
 
-from codeweaver.core import CodeChunk, ConfigurationError, Provider, rpartial
-from codeweaver.core import SparseEmbedding as CodeWeaverSparseEmbedding
+from codeweaver.core import (
+    CodeChunk,
+    CodeWeaverSparseEmbedding,
+    ConfigurationError,
+    Provider,
+    rpartial,
+)
 from codeweaver.providers.embedding.capabilities.base import SparseEmbeddingModelCapabilities
 from codeweaver.providers.embedding.providers.base import (
     EmbeddingCustomDeps,

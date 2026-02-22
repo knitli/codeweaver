@@ -93,12 +93,12 @@ if TYPE_CHECKING:
     from codeweaver.core.types.dictview import DictView
     from codeweaver.core.types.embeddings import (
         ChunkEmbeddings,
+        CodeWeaverSparseEmbedding,
         DataType,
         EmbeddingBatchInfo,
         EmbeddingKind,
         QueryResult,
         RawEmbeddingVectors,
-        SparseEmbedding,
         StoredEmbeddingVectors,
     )
     from codeweaver.core.types.enum import AnonymityConversion, BaseDataclassEnum, BaseEnum
@@ -240,7 +240,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "SerializationKwargs": (__spec__.parent, "dataclasses"),
     "ServiceCard": (__spec__.parent, "service_cards"),
     "ServiceMetadata": (__spec__.parent, "service_cards"),
-    "SparseEmbedding": (__spec__.parent, "embeddings"),
+    "CodeWeaverSparseEmbedding": (__spec__.parent, "embeddings"),
     "StoredEmbeddingVectors": (__spec__.parent, "embeddings"),
     "StrategizedQuery": (__spec__.parent, "search"),
     "SummaryKey": (__spec__.parent, "statistics"),
@@ -295,6 +295,7 @@ __all__ = (
     "CategoryName",
     "CategoryNameT",
     "ChunkEmbeddings",
+    "CodeWeaverSparseEmbedding",
     "DataType",
     "DataclassSerializationMixin",
     "DelimiterDict",
@@ -369,7 +370,6 @@ __all__ = (
     "SerializationKwargs",
     "ServiceCard",
     "ServiceMetadata",
-    "SparseEmbedding",
     "StoredEmbeddingVectors",
     "StrategizedQuery",
     "SummaryKey",

@@ -360,7 +360,9 @@ class SemanticChunker(BaseChunker):
             node_text = node.text
             # Use cached tokenizer flag for performance
             tokens = (
-                self.tokenizer.estimate(node_text) if self._has_tokenizer else len(node_text) // 4
+                cast(Tokenizer, self.tokenizer).estimate(node_text)
+                if self._has_tokenizer
+                else len(node_text) // 4
             )
 
             # Get cached depth for this node
@@ -887,7 +889,7 @@ class SemanticChunker(BaseChunker):
             # Cache child text for performance
             child_text = child.text
             if self._has_tokenizer:
-                child_tokens = self.tokenizer.estimate(child_text)
+                child_tokens = cast(Tokenizer, self.tokenizer).estimate(child_text)
             else:
                 child_tokens = len(child_text) // 4
 

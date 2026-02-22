@@ -27,7 +27,7 @@ type RawEmbeddingVectors = Sequence[float] | Sequence[int]
 type StoredEmbeddingVectors = tuple[float, ...] | tuple[int, ...]
 
 
-class SparseEmbedding(NamedTuple):
+class CodeWeaverSparseEmbedding(NamedTuple):
     """NamedTuple representing sparse embedding with indices and values.
 
     Sparse embeddings are represented as two parallel arrays:
@@ -52,8 +52,8 @@ class SparseEmbedding(NamedTuple):
         ),
     ]
 
-    def to_tuple(self) -> SparseEmbedding:
-        """Convert to a SparseEmbedding with tuples for indices and values."""
+    def to_tuple(self) -> CodeWeaverSparseEmbedding:
+        """Convert to a CodeWeaverSparseEmbedding with tuples for indices and values."""
         return self._replace(indices=tuple(self.indices), values=tuple(self.values))
 
 
@@ -95,7 +95,7 @@ class QueryResult(BasedModel):
     """
 
     vectors: Annotated[
-        dict[str, RawEmbeddingVectors | SparseEmbedding],
+        dict[str, RawEmbeddingVectors | CodeWeaverSparseEmbedding],
         Field(
             description="Embeddings keyed by intent name",
             field_title_generator=generate_field_title,
@@ -108,14 +108,14 @@ class QueryResult(BasedModel):
         return {FilteredKey("vectors"): AnonymityConversion.COUNT}
 
     @override
-    def __getitem__(self, intent: str) -> RawEmbeddingVectors | SparseEmbedding:  # ty: ignore[invalid-method-override]
+    def __getitem__(self, intent: str) -> RawEmbeddingVectors | CodeWeaverSparseEmbedding:  # ty: ignore[invalid-method-override]
         """Get embedding for a specific intent."""
         return self.vectors[intent]
 
     @override
     def get(  # ty: ignore[invalid-method-override]
-        self, intent: str, default: RawEmbeddingVectors | SparseEmbedding | None = None
-    ) -> RawEmbeddingVectors | SparseEmbedding | None:
+        self, intent: str, default: RawEmbeddingVectors | CodeWeaverSparseEmbedding | None = None
+    ) -> RawEmbeddingVectors | CodeWeaverSparseEmbedding | None:
         """Get embedding for an intent with optional default."""
         return self.vectors.get(intent, default)
 
@@ -171,7 +171,7 @@ class EmbeddingBatchInfo(BasedModel):
         ),
     ]
     embeddings: Annotated[
-        StoredEmbeddingVectors | SparseEmbedding,
+        StoredEmbeddingVectors | CodeWeaverSparseEmbedding,
         Field(
             description="The embedding vectors (dense or sparse)",
             field_title_generator=generate_field_title,
@@ -225,7 +225,7 @@ class EmbeddingBatchInfo(BasedModel):
         batch_index: NonNegativeInt,
         chunk_id: UUID7,
         model: LiteralStringT | ModelNameT,
-        embeddings: SparseEmbedding,
+        embeddings: CodeWeaverSparseEmbedding,
         *,
         intent: str = "sparse",
         dimension: Literal[0] = 0,
@@ -238,7 +238,7 @@ class EmbeddingBatchInfo(BasedModel):
             batch_index: Index within the batch
             chunk_id: Unique identifier for the chunk
             model: Model name
-            embeddings: SparseEmbedding with indices and values
+            embeddings: CodeWeaverSparseEmbedding with indices and values
             intent: Intent/purpose of this embedding (default: "sparse")
             dimension: Dimensionality of the embedding (always 0 for sparse)
             dtype: Data type of the embedding values
@@ -380,11 +380,11 @@ class ChunkEmbeddings(BasedModel):
 
 __all__ = (
     "ChunkEmbeddings",
+    "CodeWeaverSparseEmbedding",
     "DataType",
     "EmbeddingBatchInfo",
     "EmbeddingKind",
     "QueryResult",
     "RawEmbeddingVectors",
-    "SparseEmbedding",
     "StoredEmbeddingVectors",
 )

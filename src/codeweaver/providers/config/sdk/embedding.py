@@ -171,21 +171,21 @@ class EmbeddingMixin:
         if self._query_and_embedding_same_type():
             new_embedding = self._filter_and_merge(self.embedding or {}, self.query or {})
             new_embedding = self._filter_and_merge(new_embedding, updates or {})
-            return self.model_copy(update={"embedding": new_embedding, "query": new_embedding})
+            return self.model_copy(update={"embedding": new_embedding, "query": new_embedding})  # ty:ignore[call-top-callable]
         if all(
             k
             for k in updates
             if k in {k for k in (self.embedding or {}) if k not in INCOMPATIBLE_FIELDS}
         ):
             new_embedding = self._filter_and_merge(self.embedding or {}, updates or {})
-            return self.model_copy(update={"embedding": new_embedding})
+            return self.model_copy(update={"embedding": new_embedding})  # ty:ignore[call-top-callable]
         if all(
             k
             for k in updates
             if k in {k for k in (self.query or {}) if k not in INCOMPATIBLE_FIELDS}
         ):
             new_query = self._filter_and_merge(self.query or {}, updates or {})
-            return self.model_copy(update={"query": new_query})
+            return self.model_copy(update={"query": new_query})  # ty:ignore[call-top-callable]
         logger.warning(
             "Could not mirror settings between embedding and query configs; they are of different types and we can't tell where to apply them."
         )
@@ -239,9 +239,9 @@ class EmbeddingMixin:
             if dim := getattr(cap, "default_dimension", None):
                 object.__setattr__(self, "_dimension", dim)
                 return dim
-            if cap.output_dimensions:
-                object.__setattr__(self, "_dimension", cap.output_dimensions[0])
-                return cap.output_dimensions[0]
+            if cap.output_dimensions:  # ty:ignore[unresolved-attribute]
+                object.__setattr__(self, "_dimension", cap.output_dimensions[0])  # ty:ignore[unresolved-attribute]
+                return cap.output_dimensions[0]  # ty:ignore[unresolved-attribute]
         raise ConfigurationError(
             "Could not resolve embedding dimension from config, capabilities, or registered defaults. You need to specify it explicitly, for best results, register an `EmbeddingModelCapabilities` subclass with the capability resolver."
         )
@@ -501,9 +501,12 @@ class BaseEmbeddingConfig(BasedModel, EmbeddingMixin):
         datatype = await self.get_datatype()
         if datatype and datatype not in ("float32", "float16", "uint8"):
             datatype = "float16" if "float" in datatype else "uint8"
+        if isinstance(self.capabilities, SparseEmbeddingModelCapabilities):
+            dimension = 0
         distance_metrics = (
-            self.capabilities.preferred_metrics
-            if self.capabilities and self.capabilities.preferred_metrics
+            cast(EmbeddingModelCapabilities, self.capabilities).preferred_metrics
+            if self.capabilities
+            and cast(EmbeddingModelCapabilities, self.capabilities).preferred_metrics
             else []
         )
         metric = next(
@@ -672,9 +675,9 @@ class BedrockEmbeddingConfig(BaseEmbeddingConfig):
 
     def _as_options(self) -> SerializedEmbeddingOptionsDict:
         """Convert the Bedrock embedding configuration to a dictionary of options."""
-        if self.model_name.startswith("cohere"):
+        if str(self.model_name).startswith("cohere"):
             defaults = {"model": {"embedding_types": "float", "truncate": "NONE"}}
-        if self.model_name.startswith(
+        if str(self.model_name).startswith(
             "amazon.titan-embed-text-v2"
         ):  # be specific because models change and dimensions might too
             defaults = {"model": {"dimensions": 1024, "embedding_types": "float"}}
@@ -1152,7 +1155,9 @@ class MistralEmbeddingConfig(BaseEmbeddingConfig):
             dimension: The dimension to set.
         """
         object.__setattr__(self, "_dimension", dimension)
+        self.embedding = self.embedding or {}  # ty:ignore[invalid-assignment]
         self.embedding["output_dimension"] = dimension
+        self.query = self.query or {}  # ty:ignore[invalid-assignment]
         self.query["output_dimension"] = dimension
         return self
 
@@ -1249,7 +1254,9 @@ class OpenAIEmbeddingConfig(BaseEmbeddingConfig):
             dimension: The dimension to set.
         """
         object.__setattr__(self, "_dimension", dimension)
+        self.embedding = self.embedding or {}  # ty:ignore[invalid-assignment]
         self.embedding["dimensions"] = dimension
+        self.query = self.query or {}  # ty:ignore[invalid-assignment]
         self.query["dimensions"] = dimension
         return self
 
@@ -1400,7 +1407,9 @@ class SentenceTransformersEmbeddingConfig(BaseEmbeddingConfig):
             dimension: The dimension to set.
         """
         object.__setattr__(self, "_dimension", dimension)
+        self.embedding = self.embedding or {}  # ty:ignore[invalid-assignment]
         self.embedding["truncate_dim"] = dimension
+        self.query = self.query or {}  # ty:ignore[invalid-assignment]
         self.query["truncate_dim"] = dimension
         return self
 
@@ -1411,7 +1420,9 @@ class SentenceTransformersEmbeddingConfig(BaseEmbeddingConfig):
             datatype: The datatype to set.
         """
         object.__setattr__(self, "_datatype", datatype)
+        self.embedding = self.embedding or {}  # ty:ignore[invalid-assignment]
         self.embedding["precision"] = datatype  # ty:ignore[invalid-assignment]
+        self.query = self.query or {}  # ty:ignore[invalid-assignment]
         self.query["precision"] = datatype  # ty:ignore[invalid-assignment]
         return self
 

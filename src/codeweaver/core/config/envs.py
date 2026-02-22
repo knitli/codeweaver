@@ -17,7 +17,7 @@ from typing import Literal, TypedDict, get_args
 from pydantic import AnyUrl, SecretStr
 
 from codeweaver.core.constants import DEFAULT_MANAGEMENT_PORT, DEFAULT_MCP_PORT, LOCALHOST_URL
-from codeweaver.core.types import LiteralProviderCategoryType
+from codeweaver.core.types import LiteralProviderCategoryType, ProviderCategoryLiteralString
 from codeweaver.core.types.dictview import DictView
 from codeweaver.core.types.env import EnvFormat, EnvVarInfo
 from codeweaver.core.types.provider import Provider
@@ -458,7 +458,6 @@ def environment_variables() -> DictView[SettingsEnvVars]:  # ty:ignore[invalid-t
     return DictView(asdict(SettingsEnvVars))
 
 
-type ProviderField = Literal["embedding", "reranking", "sparse_embedding", "vector_store"]
 type ProviderKey = Literal["provider", "model", "api_key", "url", "host", "port"]
 
 
@@ -473,7 +472,7 @@ class SetProviderEnvVarsDict(TypedDict):
     port: int | None
 
 
-def get_provider_vars() -> MappingProxyType[ProviderField, SetProviderEnvVarsDict]:
+def get_provider_vars() -> MappingProxyType[ProviderCategoryLiteralString, SetProviderEnvVarsDict]:
     """Get all environment variable names related to providers."""
     provider_keys = get_args(ProviderKey)
     env_vars = {
@@ -486,8 +485,8 @@ def get_provider_vars() -> MappingProxyType[ProviderField, SetProviderEnvVarsDic
             and not any(x for x in {"AGENT", "DATA"} if x in var_info.env)
         )
     }
-    env_map: dict[ProviderField, SetProviderEnvVarsDict] = dict.fromkeys(  # ty: ignore[invalid-assignment]
-        ("embedding", "reranking", "sparse_embedding", "vector_store"), None
+    env_map: dict[ProviderCategoryLiteralString, SetProviderEnvVarsDict] = dict.fromkeys(  # ty: ignore[invalid-assignment]
+        ("embedding", "reranking", "sparse_embedding", "vector_store")
     )
     for env_var in env_vars:
         category = next(k for k in provider_keys if k.upper() in env_var)

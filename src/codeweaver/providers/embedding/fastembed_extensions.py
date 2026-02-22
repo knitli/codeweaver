@@ -8,8 +8,9 @@
 
 from __future__ import annotations
 
-from codeweaver.core import dependency_provider
-from dataclasses import asdict
+from typing import overload
+
+from codeweaver.core.di import dependency_provider
 
 
 try:
@@ -19,9 +20,9 @@ try:
         ModelSource,
         #    SparseModelDescription,
     )
+    from fastembed.rerank.cross_encoder import TextCrossEncoder
     from fastembed.sparse import SparseTextEmbedding
     from fastembed.text import TextEmbedding
-    from fastembed.rerank.cross_encoder import TextCrossEncoder
 
 except ImportError as e:
     from codeweaver.core import ConfigurationError
@@ -93,27 +94,41 @@ DENSE_MODELS = (
     ),
 )
 
-RERANKING_MODELS = (
+RERANKING_MODELS: tuple[BaseModelDescription, ...] = (
     BaseModelDescription(
         model="Alibaba-NLP/gte-reranker-modernbert-base",
         license="apache-2.0",
         sources=ModelSource(hf="Alibaba-NLP/gte-reranker-modernbert-base"),
-        description="""A lightweight high-performance cross-encoder with 8192 token context length."""
+        description="""A lightweight high-performance cross-encoder with 8192 token context length.""",
         model_file="onnx/model_fp16.onnx",
-        size_in_gb="0.3"
-    )
+        size_in_GB=0.3,
+    ),
 )
 
 
-def add_models[T: type[TextCrossEncoder] | type[TextEmbedding]](cls: T, models: tuple[BaseModelDescription, ...]) -> T:
-    """Add custom models to the input cls."""
+@overload
+def add_models[T: type[TextEmbedding]](cls: T, models: tuple[DenseModelDescription, ...]) -> T: ...
+@overload
+def add_models[T: type[TextCrossEncoder]](
+    cls: T, models: tuple[BaseModelDescription, ...]
+) -> T: ...
+
+
+def add_models[T: type[TextCrossEncoder | TextEmbedding]](
+    cls: T, models: tuple[BaseModelDescription, ...] | tuple[DenseModelDescription, ...]
+) -> T:
+    """Add custom models to the input cls.
+
+    Models are added to the *class*; the function returns the input class, not an instance.
+    """
     known_models = {model.model for model in cls.list_supported_models()}
     for model in models:
         if model.model not in known_models:
             cls.add_custom_model(model)
     return cls
 
-@dependency_provider(TextCrossEncoder)
+
+@dependency_provider(type[TextCrossEncoder], scope="singleton")
 def get_cross_encoder() -> type[TextCrossEncoder]:
     """
     Get the cross encoder with added custom models.
@@ -121,7 +136,7 @@ def get_cross_encoder() -> type[TextCrossEncoder]:
     return add_models(TextCrossEncoder, RERANKING_MODELS)
 
 
-@dependency_provider(SparseTextEmbedding)
+@dependency_provider(type[SparseTextEmbedding], scope="singleton")
 def get_sparse_embedder() -> type[SparseTextEmbedding]:
     """
     Get the sparse embedder with added custom models.
@@ -132,15 +147,17 @@ def get_sparse_embedder() -> type[SparseTextEmbedding]:
     return SparseTextEmbedding
 
 
-@dependency_provider(TextEmbedding)
+@dependency_provider(type[TextEmbedding], scope="singleton")
 def get_text_embedder() -> type[TextEmbedding]:
     """
     Get the text embedder with added custom models.
 
     Only adds models that aren't already in FastEmbed's native registry to avoid conflicts.
     """
+    from fastembed.common.model_description import PoolingType
+
     # we don't add these yet, but they're here for when we do
-    additional_params = {
+    _additional_params = {
         "Alibaba-NLP/gte-modernbert-base": {"pooling": PoolingType.CLS, "normalization": True},
         "BAAI/bge-m3": {"pooling": PoolingType.CLS, "normalization": True},
         "WhereIsAI/UAE-Large-V1": {"pooling": PoolingType.CLS, "normalization": True},
@@ -154,7 +171,6 @@ def get_text_embedder() -> type[TextEmbedding]:
         },
     }
     return add_models(TextEmbedding, DENSE_MODELS)
-
 
 
 __all__ = ("get_sparse_embedder", "get_text_embedder")

@@ -434,6 +434,20 @@ class CollectionMetadata(BasedModel):
         current_family = current_caps.model_family
 
         # Verify same family ID
+        if not current_family:
+            raise ConfigurationError(
+                f"Current model '{current_model}' does not belong to any family, but collection was indexed with family '{other.dense_model_family}'",
+                details={
+                    "current_model": current_model,
+                    "indexed_model": indexed_model,
+                    "indexed_family": other.dense_model_family,
+                },
+                suggestions=[
+                    f"Use a model from the '{other.dense_model_family}' family",
+                    f"Or use the indexed model '{indexed_model}' for queries",
+                    "Asymmetric embedding requires both models to belong to the same family",
+                ],
+            )
         if current_family.family_id != other.dense_model_family:
             self._handle_family_mismatch(
                 current_model,

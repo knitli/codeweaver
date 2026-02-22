@@ -10,7 +10,7 @@ from __future__ import annotations
 import sys
 
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Annotated, Literal, TypedDict, is_typeddict
+from typing import TYPE_CHECKING, Annotated, Any, Literal, TypedDict, cast
 
 import cyclopts
 
@@ -19,7 +19,7 @@ from rich.table import Table
 
 from codeweaver.cli.ui import CLIErrorHandler, get_display
 from codeweaver.cli.utils import check_provider_package_available
-from codeweaver.core import Provider, ProviderCategory, get_container
+from codeweaver.core import Provider, ProviderCategory, TypeIs, get_container
 from codeweaver.providers import EmbeddingModelCapabilities, RerankingModelCapabilities
 
 
@@ -32,6 +32,11 @@ if TYPE_CHECKING:
 _display: StatusDisplay = get_display()
 console: Console = _display.console
 app = App("list", help="List available CodeWeaver resources.", console=console)
+
+type CategoryDisplay = Literal[
+    "[green]local[/green]", "[magenta]local/cloud[/magenta]", "[blue]cloud[/blue]"
+]
+type ApiStatus = Literal["[yellow]⚠️  needs key[/yellow]", "[green]✅ ready[/green]"]
 
 
 def _check_api_key(provider: Provider, category: ProviderCategory) -> bool:
@@ -50,7 +55,7 @@ def _check_api_key(provider: Provider, category: ProviderCategory) -> bool:
     return provider.has_env_auth
 
 
-def _get_status_indicator(provider: Provider, *, has_key: bool) -> str:
+def _get_status_indicator(provider: Provider, *, has_key: bool) -> ApiStatus:
     """Get status indicator for a provider.
 
     Args:
@@ -65,7 +70,7 @@ def _get_status_indicator(provider: Provider, *, has_key: bool) -> str:
     return "[green]✅ ready[/green]"
 
 
-def _get_provider_type(provider: Provider) -> str:
+def _get_provider_type(provider: Provider) -> CategoryDisplay:
     """Get human-readable type for a provider with color coding."""
     if provider.always_local:
         return "[green]local[/green]"
@@ -76,11 +81,119 @@ class ProviderDict(TypedDict):
     """TypedDict for provider information."""
 
     capabilities: list[ProviderCategory]
-    category: Literal["local", "cloud", "local/cloud"]
-    status: Literal["[yellow]⚠️  needs key[/yellow]", "[green]✅ ready[/green]"]
+    category: CategoryDisplay
+    status: ApiStatus
 
 
 type ProviderMap = dict[Provider, ProviderDict]
+
+
+def _is_definitely_real_provider_dict(d: Any) -> TypeIs[ProviderDict]:
+    """Type guard to check if a dict is definitely a ProviderDict."""
+    if not isinstance(d, dict):
+        return False
+    required_keys = {"capabilities", "category", "status"}
+    return (
+        all(key in d for key in required_keys)
+        and isinstance(d["capabilities"], list)
+        and isinstance(d["category"], str)
+        and isinstance(d["status"], str)
+    )
+
+
+def _validate_category_filter(category: ProviderCategory | None) -> ProviderCategory | None:
+    """Validate and convert category filter to ProviderCategory enum.
+
+    Args:
+        category: The category to validate
+
+    Returns:
+        The validated ProviderCategory or None
+
+    Raises:
+        SystemExit: If category is invalid
+    """
+    if not category:
+        return None
+
+    try:
+        return ProviderCategory.from_string(category) if isinstance(category, str) else category
+    except (AttributeError, KeyError, ValueError):
+        display = _display
+        display.print_error("Invalid provider category")
+        display.print_list(
+            [prov.variable for prov in ProviderCategory if prov != ProviderCategory.UNSET],
+            title="The following are valid provider categories:",
+        )
+        sys.exit(1)
+
+
+def _build_provider_map(
+    providers_list: list[Provider], capability_categories: dict[ProviderCategory, list[Provider]]
+) -> ProviderMap:
+    """Build provider information map with capabilities and status.
+
+    Args:
+        providers_list: List of providers to include
+        capability_categories: Mapping of categories to providers
+
+    Returns:
+        Dictionary mapping providers to their information
+    """
+    provider_map: ProviderMap = {}
+
+    for capability, p_list in capability_categories.items():
+        for provider in p_list:
+            if provider not in providers_list:
+                continue
+
+            if provider not in provider_map:
+                has_key = _check_api_key(provider, category=capability)
+                provider_map[provider] = ProviderDict(
+                    capabilities=[capability],
+                    category=_get_provider_type(provider),
+                    status=_get_status_indicator(provider, has_key=has_key),
+                )
+            else:
+                # Provider already exists, append new capability
+                provider_map[provider]["capabilities"].append(capability)
+
+    return provider_map
+
+
+def _display_provider_table(provider_map: ProviderMap, category: ProviderCategory | None) -> None:
+    """Display providers in a formatted table.
+
+    Args:
+        provider_map: Mapping of providers to their information
+        category: Optional category filter for title
+    """
+    display = _display
+    valid_providers = [p for p, info in provider_map.items() if info]
+    provider_count = len(valid_providers)
+
+    title_text = (
+        f"Available {category.as_title} Providers ({provider_count} found)"
+        if category
+        else f"Available Providers ({provider_count} found)"
+    )
+
+    table = Table(show_header=True, header_style="bold blue", title=title_text)
+    table.add_column("Provider", style="cyan", no_wrap=True)
+    table.add_column("Kind", style="white")
+    table.add_column("Type", style="white")
+    table.add_column("Status", style="white")
+
+    for provider, info in provider_map.items():
+        if not info:
+            continue
+        joined_caps = ", ".join(cap.as_title for cap in info["capabilities"])
+        table.add_row(provider.as_title, joined_caps, info["category"], info["status"])
+
+    if table.row_count == 0:
+        display.print_warning(f"No providers found for category: {category}")
+    else:
+        display.console.print(table)
 
 
 @app.command
@@ -94,84 +207,30 @@ def providers(
 
     Shows provider name, capabilities, and status (ready or needs configuration).
     """
-    display = _display
+    # Validate and filter category
+    category_filter = _validate_category_filter(category)
 
-    # Use PROVIDER_CAPABILITIES map to find providers for each category
-    # This replaces registry.list_providers(p)
-    provider_capabilities = {
-        category: category.providers
-        for category in ProviderCategory
-        if category != ProviderCategory.UNSET
-    }
-
-    # Filter by category if specified
-    category_filter = None
-    if category:
-        try:
-            category_filter = (
-                ProviderCategory.from_string(category) if isinstance(category, str) else category
-            )
-        except (AttributeError, KeyError, ValueError):
-            display.print_error("Invalid provider category")
-            display.print_list(
-                [prov.variable for prov in ProviderCategory if prov != ProviderCategory.UNSET],
-                title="The following are valid provider categories:",
-            )
-            sys.exit(1)
-
+    # Get all providers sorted by name
     providers_list = sorted(
         (provider for provider in Provider if provider != Provider.NOT_SET),
         key=lambda p: p.variable,
     )
 
-    provider_capabilities = {
-        k: v
-        for k, v in provider_capabilities.items()
-        if ((category_filter and k == category_filter) or not category_filter)
+    # Build capability mapping for each category
+    all_capabilities = {
+        cat: cat.providers for cat in ProviderCategory if cat != ProviderCategory.UNSET
     }
-    provider_map = dict.fromkeys(providers_list)
-    for capability, p_list in provider_capabilities.items():
-        for provider in p_list:
-            if provider not in provider_map:
-                continue
-            if not provider_map.get(provider):
-                has_key = _check_api_key(provider, category=capability)
-                provider_map[provider] = {
-                    "capabilities": [capability],
-                    "category": _get_provider_type(provider),
-                    "status": _get_status_indicator(provider, has_key=has_key),
-                }
-            elif capability and provider_map.get(provider) and is_typeddict(provider_map[provider]):
-                provider_map[provider]["capabilities"].append(capability)  # ty: ignore[not-subscriptable]  # not sure how else to prove it..
 
-    # Count valid providers
-    valid_providers = [p for p, info in provider_map.items() if info]
-    provider_count = len(valid_providers)
+    # Filter capabilities by category if specified
+    filtered_capabilities = {
+        k: cast(list[Provider], v)
+        for k, v in all_capabilities.items()
+        if not category_filter or k == category_filter
+    }
 
-    # Build table with count
-    title_text = (
-        f"Available {category.as_title} Providers ({provider_count} found)"
-        if category and category_filter
-        else f"Available Providers ({provider_count} found)"
-    )
-    table = Table(show_header=True, header_style="bold blue", title=title_text)
-    table.add_column("Provider", style="cyan", no_wrap=True)
-    table.add_column("Kind", style="white")
-    table.add_column("Type", style="white")
-    table.add_column("Status", style="white")
-
-    for provider, info in provider_map.items():
-        if not info:
-            continue
-        joined_caps = ", ".join(cap.as_title for cap in info["capabilities"])
-        provider_type = info["category"]
-        status = info["status"]
-        table.add_row(provider.as_title, joined_caps, provider_type, status)
-
-    if table.row_count == 0:
-        display.print_warning(f"No providers found for category: {category}")
-    else:
-        display.console.print(table)
+    # Build provider map and display
+    provider_map = _build_provider_map(providers_list, filtered_capabilities)
+    _display_provider_table(provider_map, category_filter)
 
 
 @app.command

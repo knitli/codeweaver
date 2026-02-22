@@ -17,8 +17,13 @@ import numpy as np
 
 from beartype.typing import ClassVar
 
-from codeweaver.core import CodeChunk, ConfigurationError, Provider, rpartial
-from codeweaver.core import SparseEmbedding as CodeWeaverSparseEmbedding
+from codeweaver.core import (
+    CodeChunk,
+    CodeWeaverSparseEmbedding,
+    ConfigurationError,
+    Provider,
+    rpartial,
+)
 from codeweaver.providers.embedding.capabilities.base import (
     EmbeddingModelCapabilities,
     SparseEmbeddingModelCapabilities,

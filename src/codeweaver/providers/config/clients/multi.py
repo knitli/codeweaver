@@ -350,7 +350,7 @@ class SentenceTransformersClientOptions(ClientOptions):
                 | {
                     "dtype": "float16"
                     if "dtype" not in (self.model_kwargs or {})
-                    else self.model_kwargs.get("dtype")
+                    else (self.model_kwargs or {}).get("dtype")
                 },
             )
         if has_package("flash_attention_2"):
@@ -361,7 +361,7 @@ class SentenceTransformersClientOptions(ClientOptions):
                 | {
                     "attn_implementation": "flash_attention_2"
                     if "attn_implementation" not in (self.model_kwargs or {})
-                    else self.model_kwargs.get("attn_implementation")
+                    else (self.model_kwargs or {}).get("attn_implementation")
                 },
             )
 

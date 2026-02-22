@@ -191,7 +191,7 @@ class VoyageRerankingConfig(BaseRerankingConfig):
             **(
                 type(self)._defaults()["rerank"]
                 | SerializedRerankingOptionsDict(
-                    model_name=ModelName(self.model_name),
+                    model_name=ModelName(self.model_name),  # <-- it's right there, ty
                     rerank=cast(dict[str, Any], self.rerank or {}),
                     model={},
                 )

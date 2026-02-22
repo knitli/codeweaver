@@ -47,13 +47,13 @@ from codeweaver.core import (
     BasedModel,
     BatchKeys,
     CodeChunk,
+    CodeWeaverSparseEmbedding,
     EmbeddingBatchInfo,
     LiteralProvider,
     LiteralStringT,
     ModelName,
     Provider,
     ProviderError,
-    SparseEmbedding,
     StatisticsDep,
     depends,
     get_blake_hash,
@@ -554,7 +554,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         skip_deduplication: bool = False,
         context: Any = None,
         **kwargs: Any,
-    ) -> list[list[float]] | list[list[int]] | list[SparseEmbedding] | EmbeddingErrorInfo:
+    ) -> list[list[float]] | list[list[int]] | list[CodeWeaverSparseEmbedding] | EmbeddingErrorInfo:
         # sourcery skip: low-code-quality
         """Embed a list of documents into vectors.
 
@@ -684,14 +684,14 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             if isinstance(results, dict):
                 # Sparse embedding format
                 results = [
-                    SparseEmbedding(indices=result["indices"], values=result["values"])
+                    CodeWeaverSparseEmbedding(indices=result["indices"], values=result["values"])
                     for result in results
                 ]
             if not is_old_batch:
                 await self._register_chunks(
                     chunks=chunks,  # Already a tuple, no need to convert again
                     batch_id=cast(UUID7, batch_id or cache_key),
-                    embeddings=results,  # ty: ignore[invalid-argument-type]
+                    embeddings=results,  # ty:ignore[invalid-argument-type]
                 )
 
             await log_to_client_or_fallback(
@@ -707,7 +707,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
                 },
             )
 
-            return results  # ty: ignore[invalid-return-type]
+            return results  # ty:ignore[invalid-return-type]
 
     @retry(
         stop=stop_after_attempt(MAX_RETRY_ATTEMPTS),
@@ -748,7 +748,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
 
     async def embed_query(
         self, query: str | Sequence[str], **kwargs: Any
-    ) -> list[list[float]] | list[list[int]] | list[SparseEmbedding] | EmbeddingErrorInfo:
+    ) -> list[list[float]] | list[list[int]] | list[CodeWeaverSparseEmbedding] | EmbeddingErrorInfo:
         """Embed a query into a vector."""
         # Config structure delivers query options directly, no need to merge kwargs
         queries: Sequence[str] = [query] if isinstance(query, str) else list(query)
@@ -756,7 +756,9 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             # Use retry wrapper instead of calling _embed_query directly
             kwargs = (self.query_options or {}) | kwargs
             results: (
-                Sequence[Sequence[float]] | Sequence[Sequence[int]] | Sequence[SparseEmbedding]
+                Sequence[Sequence[float]]
+                | Sequence[Sequence[int]]
+                | Sequence[CodeWeaverSparseEmbedding]
             ) = await self._embed_query_with_retry(queries, **kwargs)
         except CircuitBreakerOpenError as e:
             logger.warning("Circuit breaker open for query embedding")
@@ -769,7 +771,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         else:
             if isinstance(results, dict):
                 results = [
-                    SparseEmbedding(indices=result["indices"], values=result["values"])
+                    CodeWeaverSparseEmbedding(indices=result["indices"], values=result["values"])
                     for result in results
                 ]
             return results
@@ -945,7 +947,9 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         self,
         chunks: Sequence[CodeChunk],
         batch_id: UUID7,
-        embeddings: Sequence[Sequence[float]] | Sequence[Sequence[int]] | Sequence[SparseEmbedding],
+        embeddings: Sequence[Sequence[float]]
+        | Sequence[Sequence[int]]
+        | Sequence[CodeWeaverSparseEmbedding],
     ) -> None:  # sourcery skip: low-code-quality
         """Register chunks in the embedding registry.
 
@@ -958,7 +962,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         if not is_sparse and embeddings:
             expected_dim = self.get_dimension(sparse=False)
             first_embedding = embeddings[0]
-            if not isinstance(first_embedding, SparseEmbedding):
+            if not isinstance(first_embedding, CodeWeaverSparseEmbedding):
                 actual_dim = len(first_embedding)
                 if actual_dim != expected_dim:
                     # Debug logging
@@ -993,7 +997,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         for i, (chunk, embedding) in enumerate(zip(chunks, embeddings, strict=True)):
             if attr == "sparse" and isinstance(embedding, dict):
                 # For sparse embeddings, convert dict to SparseEmbedding
-                sparse_emb = SparseEmbedding(
+                sparse_emb = CodeWeaverSparseEmbedding(
                     indices=embedding["indices"], values=embedding["values"]
                 )
                 chunk_info = EmbeddingBatchInfo.create_sparse(
@@ -1213,12 +1217,14 @@ class SparseEmbeddingProvider[SparseClient](EmbeddingProvider[SparseClient], ABC
     @override
     async def _embed_documents(
         self, documents: Sequence[CodeChunk], **kwargs: Any
-    ) -> list[SparseEmbedding]:  # ty:ignore[invalid-method-override]
+    ) -> list[CodeWeaverSparseEmbedding]:  # ty:ignore[invalid-method-override]
         """Abstract method to implement document embedding logic for sparse embeddings."""
 
     @abstractmethod
     @override
-    async def _embed_query(self, query: Sequence[str], **kwargs: Any) -> list[SparseEmbedding]:  # ty:ignore[invalid-method-override]
+    async def _embed_query(
+        self, query: Sequence[str], **kwargs: Any
+    ) -> list[CodeWeaverSparseEmbedding]:  # ty:ignore[invalid-method-override]
         """Abstract method to implement query embedding logic for sparse embeddings."""
 
 

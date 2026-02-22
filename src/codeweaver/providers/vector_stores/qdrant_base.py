@@ -33,6 +33,7 @@ from qdrant_client.models import (
 from codeweaver.core import (
     INJECTED,
     CodeChunk,
+    CodeWeaverSparseEmbedding,
     Provider,
     ProviderError,
     ResolvedProjectNameDep,
@@ -40,7 +41,6 @@ from codeweaver.core import (
     SearchStrategy,
     StrategizedQuery,
 )
-from codeweaver.core import SparseEmbedding as CodeWeaverSparseEmbedding
 from codeweaver.core.constants import DEFAULT_VECTOR_STORE_MAX_RESULTS
 from codeweaver.core.exceptions import ConfigurationError
 from codeweaver.providers.config import QdrantVectorStoreProviderSettings
@@ -613,14 +613,14 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
         Raises:
             ProviderError: Invalid vector input format.
         """
-        from codeweaver.core import SparseEmbedding, StrategizedQuery
+        from codeweaver.core import CodeWeaverSparseEmbedding, StrategizedQuery
 
         if isinstance(vector, StrategizedQuery):
             return vector
         sparse, dense = (None, None)
         if isinstance(vector, dict):
             if "indices" in vector and "values" in vector:
-                sparse = SparseEmbedding(
+                sparse = CodeWeaverSparseEmbedding(
                     indices=vector["indices"],
                     values=[float(x) if isinstance(x, int) else x for x in vector["values"]],
                 )
@@ -630,7 +630,7 @@ class QdrantBaseProvider(VectorStoreProvider[AsyncQdrantClient], ABC):
                 and "indices" in vector["sparse"]
                 and "values" in vector["sparse"]
             ):
-                sparse = SparseEmbedding(
+                sparse = CodeWeaverSparseEmbedding(
                     indices=vector["sparse"].get("indices", []),
                     values=[
                         float(x) if isinstance(x, int) else x
