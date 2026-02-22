@@ -23,8 +23,10 @@ Output structure:
     rust.json
     ...
 """
+
 from __future__ import annotations
 
+import contextlib
 import json
 import sys
 import time
@@ -32,6 +34,73 @@ import time
 from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
+
+
+AGENT_TASKS = {
+    "debug": {
+        "discovery": 0.2,
+        "comprehension": 0.3,
+        "modification": 0.1,
+        "debugging": 0.35,
+        "documentation": 0.05,
+    },
+    "default": {
+        "discovery": 0.05,
+        "comprehension": 0.05,
+        "modification": 0.05,
+        "debugging": 0.05,
+        "documentation": 0.05,
+    },
+    "document": {
+        "discovery": 0.2,
+        "comprehension": 0.2,
+        "modification": 0.1,
+        "debugging": 0.05,
+        "documentation": 0.45,
+    },
+    "implement": {
+        "discovery": 0.3,
+        "comprehension": 0.3,
+        "modification": 0.2,
+        "debugging": 0.1,
+        "documentation": 0.1,
+    },
+    "local_edit": {
+        "discovery": 0.4,
+        "comprehension": 0.3,
+        "modification": 0.2,
+        "debugging": 0.05,
+        "documentation": 0.05,
+    },
+    "refactor": {
+        "discovery": 0.15,
+        "comprehension": 0.25,
+        "modification": 0.45,
+        "debugging": 0.1,
+        "documentation": 0.05,
+    },
+    "review": {
+        "discovery": 0.25,
+        "comprehension": 0.35,
+        "modification": 0.15,
+        "debugging": 0.15,
+        "documentation": 0.1,
+    },
+    "search": {
+        "discovery": 0.5,
+        "comprehension": 0.2,
+        "modification": 0.15,
+        "debugging": 0.1,
+        "documentation": 0.05,
+    },
+    "test": {
+        "discovery": 0.5,
+        "comprehension": 0.2,
+        "modification": 0.2,
+        "debugging": 0.4,
+        "documentation": 0.1,
+    },
+}
 
 
 def main() -> int:
@@ -48,7 +117,7 @@ def main() -> int:
     print("Loading semantic package...")
 
     from codeweaver.core import SemanticSearchLanguage
-    from codeweaver.semantic.classifications import AgentTask, ImportanceRank, SemanticClass
+    from codeweaver.semantic.classifications import ImportanceRank, SemanticClass
     from codeweaver.semantic.classifier import GrammarBasedClassifier
     from codeweaver.semantic.grammar import get_grammar
 
@@ -101,7 +170,9 @@ def main() -> int:
                 "purpose": token.purpose.variable,
                 "is_explicit_rule": token.is_explicit_rule,
                 "can_be_anywhere": token.can_be_anywhere or False,
-                "categories": sorted(str(c) for c in token.category_names) if token.category_names else [],
+                "categories": sorted(str(c) for c in token.category_names)
+                if token.category_names
+                else [],
             }
 
             result = classifier.classify_thing(token.name, lang)
@@ -124,7 +195,11 @@ def main() -> int:
                     }
             else:
                 entry["classification"] = None
-                unclassified_things.append({"language": lang_key, "name": str(token.name), "kind": "token"})
+                unclassified_things.append({
+                    "language": lang_key,
+                    "name": str(token.name),
+                    "kind": "token",
+                })
 
             lang_data["tokens"][str(token.name)] = entry
 
@@ -138,26 +213,29 @@ def main() -> int:
                 "is_explicit_rule": comp.is_explicit_rule,
                 "is_file": comp.is_file or False,
                 "can_be_anywhere": comp.can_be_anywhere or False,
-                "categories": sorted(str(c) for c in comp.category_names) if comp.category_names else [],
+                "categories": sorted(str(c) for c in comp.category_names)
+                if comp.category_names
+                else [],
             }
 
             # Capture connection roles (the key signal for role-based inference)
-            try:
+            with contextlib.suppress(Exception):
                 roles = sorted(str(conn.role) for conn in comp.direct_connections)
                 if roles:
                     entry["roles"] = roles
-            except Exception:
-                pass
 
-            try:
+            with contextlib.suppress(Exception):
                 if comp.positional_connections:
-                    pos_targets = sorted(str(t) for t in comp.positional_connections.target_thing_names)
+                    pos_targets = sorted(
+                        str(t) for t in comp.positional_connections.target_thing_names
+                    )
                     if pos_targets:
                         entry["positional_targets"] = pos_targets
-                        entry["positional_constraints"] = comp.positional_connections.constraints.variable if comp.positional_connections.constraints else None
-            except Exception:
-                pass
-
+                        entry["positional_constraints"] = (
+                            comp.positional_connections.constraints.variable
+                            if comp.positional_connections.constraints
+                            else None
+                        )
             result = classifier.classify_thing(comp.name, lang)
             if result:
                 lang_classified += 1
@@ -178,7 +256,11 @@ def main() -> int:
                     }
             else:
                 entry["classification"] = None
-                unclassified_things.append({"language": lang_key, "name": str(comp.name), "kind": "composite"})
+                unclassified_things.append({
+                    "language": lang_key,
+                    "name": str(comp.name),
+                    "kind": "composite",
+                })
 
             lang_data["composites"][str(comp.name)] = entry
 
@@ -235,7 +317,7 @@ def main() -> int:
     }
 
     for sc in SemanticClass:
-        try:
+        with contextlib.suppress(Exception):
             tc = sc.category
             scoring_data["semantic_classes"][sc.variable] = {
                 "description": tc.description,
@@ -250,26 +332,21 @@ def main() -> int:
                 },
                 "examples": list(tc.examples),
             }
-        except Exception:
-            pass
 
     for rank in ImportanceRank:
         scoring_data["importance_ranks"][rank.name] = {
             "value": rank.value,
             "classifications": [sc.variable for sc in rank.semantic_classifications],
         }
-
-    for task in AgentTask:
-        scoring_data["agent_tasks"][task.name] = {
+    for task, profile in AGENT_TASKS.items():
+        scoring_data["agent_tasks"][task] = {
             "profile": {
-                "discovery": task.profile["discovery"],
-                "comprehension": task.profile["comprehension"],
-                "modification": task.profile["modification"],
-                "debugging": task.profile["debugging"],
-                "documentation": task.profile["documentation"],
-            },
-            "aliases": list(task.value.aliases) if hasattr(task.value, "aliases") else [],
-            "description": task.value._description if hasattr(task.value, "_description") else "",
+                "discovery": profile["discovery"],
+                "comprehension": profile["comprehension"],
+                "modification": profile["modification"],
+                "debugging": profile["debugging"],
+                "documentation": profile["documentation"],
+            }
         }
 
     with (output_dir / "_scoring.json").open("w", encoding="utf-8") as f:
@@ -358,13 +435,15 @@ def main() -> int:
     # =================================================================
     # Summary
     # =================================================================
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Export complete in {elapsed:.1f}s")
     print(f"  Total Things:      {total_things:,}")
     print(f"  Classified:        {total_classified:,} ({meta['coverage_pct']}%)")
     print(f"  High confidence:   {total_confident:,} ({meta['confident_pct']}%)")
     print(f"  Unclassified:      {len(unclassified_things):,}")
-    print(f"  Universal exact:   {len(universal_exact):,} thing names classified same in all languages")
+    print(
+        f"  Universal exact:   {len(universal_exact):,} thing names classified same in all languages"
+    )
     print(f"  Universal 75%+:    {len(universal_majority):,} thing names with majority agreement")
     print("\n  Tier distribution:")
     for tier, count in sorted(tier_distribution.items()):
@@ -373,7 +452,7 @@ def main() -> int:
     for method, count in sorted(method_distribution.items(), key=lambda x: -x[1]):
         print(f"    {method}: {count:,}")
     print(f"\n  Output: {output_dir}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     return 0
 
