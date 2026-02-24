@@ -87,3 +87,44 @@ def test_reranking_default_sentence_transformers_detected():
     assert result.enabled is True
     assert ":" not in str(result.model)
     assert str(result.model) == RECOMMENDED_LOCAL_RERANKING_MODEL
+
+
+# ---------------------------------------------------------------------------
+# Task 3: agent defaults auth check tests
+# ---------------------------------------------------------------------------
+
+
+def _agent_defaults_with_mocked_env(has_anthropic: bool, has_auth: bool):
+    """Helper: test agent defaults with controlled environment."""
+    from codeweaver.providers.config import providers as pmod
+
+    with (
+        patch.object(pmod, "HAS_ANTHROPIC", new=has_anthropic),
+        patch.object(Provider.ANTHROPIC, "has_env_auth", new=has_auth),
+    ):
+        return pmod._get_default_agent_provider_settings()
+
+
+def test_agent_default_requires_auth():
+    """Agent default must not activate when anthropic installed but no API key present."""
+    result = _agent_defaults_with_mocked_env(has_anthropic=True, has_auth=False)
+    assert result is None
+
+
+def test_agent_default_with_auth():
+    """Agent default activates when anthropic installed AND API key configured."""
+    from codeweaver.core.constants import RECOMMENDED_CLOUD_CONTEXT_AGENT_MODEL_BARE
+
+    result = _agent_defaults_with_mocked_env(has_anthropic=True, has_auth=True)
+    assert result is not None
+    assert len(result) == 1
+    agent_settings = result[0]
+    assert agent_settings.provider == Provider.ANTHROPIC
+    assert ":" not in str(agent_settings.model_name)
+    assert str(agent_settings.model_name) == RECOMMENDED_CLOUD_CONTEXT_AGENT_MODEL_BARE
+
+
+def test_agent_default_no_package():
+    """Agent default returns None when no anthropic package present."""
+    result = _agent_defaults_with_mocked_env(has_anthropic=False, has_auth=False)
+    assert result is None

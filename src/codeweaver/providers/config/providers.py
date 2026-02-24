@@ -28,6 +28,7 @@ from codeweaver.core.constants import (
     ENV_EXPLICIT_TRUE_VALUES,
     LOCALHOST,
     ONE,
+    RECOMMENDED_CLOUD_CONTEXT_AGENT_MODEL_BARE,
     RECOMMENDED_CLOUD_RERANKING_MODEL,
     RECOMMENDED_LOCAL_RERANKING_MODEL,
     ZERO,
@@ -411,15 +412,19 @@ HAS_ANTHROPIC = (has_package("anthropic") or has_package("claude-agent-sdk")) is
 
 
 def _get_default_agent_provider_settings() -> tuple[AgentProviderSettingsType, ...] | None:
-    """Get default agent provider settings (delayed instantiation)."""
-    if not HAS_ANTHROPIC:
+    """Get default agent provider settings.
+
+    Only activates if both the Anthropic package is present AND an API key is configured.
+    Installing the anthropic SDK for unrelated reasons must not silently enable the
+    CodeWeaver agent.
+    """
+    if not HAS_ANTHROPIC or not Provider.ANTHROPIC.has_env_auth:
         return None
-    # Don't instantiate AgentModelSettings here to avoid forward reference issues
     return (
         AnthropicAgentProviderSettings(
             provider=Provider.ANTHROPIC,
-            model_name="claude-haiku-4.5-latest",
-            agent_config=None,  # Use None to avoid forward reference validation
+            model_name=RECOMMENDED_CLOUD_CONTEXT_AGENT_MODEL_BARE,
+            agent_config=None,
         ),
     )
 
@@ -834,13 +839,13 @@ AllDefaultProviderSettings = None  # Will be lazy-initialized on first access
 
 
 __all__ = (
+    "HAS_ANTHROPIC",
     "AllDefaultProviderSettings",
+    "DeterminedDefaults",
     "ProviderCategorySettingsType",
+    "ProviderNameMap",
     "ProviderSettings",
     "ProviderSettingsDict",
     "ProviderSettingsView",
     "merge_agent_model_settings",
-    "HAS_ANTHROPIC",
-    "DeterminedDefaults",
-    "ProviderNameMap",
 )
