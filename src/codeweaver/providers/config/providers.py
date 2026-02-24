@@ -24,7 +24,14 @@ from pydantic import Field, SecretStr, computed_field, model_validator
 from pydantic_ai.settings import ModelSettings as AgentModelSettings
 from pydantic_ai.settings import merge_model_settings
 
-from codeweaver.core.constants import ENV_EXPLICIT_TRUE_VALUES, LOCALHOST, ONE, ZERO
+from codeweaver.core.constants import (
+    ENV_EXPLICIT_TRUE_VALUES,
+    LOCALHOST,
+    ONE,
+    RECOMMENDED_CLOUD_RERANKING_MODEL,
+    RECOMMENDED_LOCAL_RERANKING_MODEL,
+    ZERO,
+)
 from codeweaver.core.types import (
     BasedModel,
     DictView,
@@ -325,31 +332,40 @@ DefaultSparseEmbeddingProviderSettings: tuple[SparseEmbeddingProviderSettings, .
 
 
 def _get_default_reranking_settings() -> DeterminedDefaults:
-    """Determine the default reranking provider, model, and enabled status based on available libraries."""
+    """Determine the default reranking provider and model based on available libraries.
+
+    Cloud providers (Voyage) require both the client library and a configured API key.
+    Local providers (FastEmbed, SentenceTransformers) only require the library.
+    Priority: Voyage (cloud, auth required) > FastEmbed > SentenceTransformers.
+    """
     for lib in ("voyageai", "fastembed_gpu", "fastembed", "sentence_transformers"):
         if has_package(lib) is not None:
-            if lib == "voyageai":
+            if lib == "voyageai" and Provider.VOYAGE.has_env_auth:
                 return DeterminedDefaults(
-                    provider=Provider.VOYAGE, model=ModelName("voyage:rerank-2.5"), enabled=True
-                )
-            if lib in {"fastembed-gpu", "fastembed"}:
-                return DeterminedDefaults(
-                    provider=Provider.FASTEMBED,
-                    model=ModelName("fastembed:jinaai/jina-reranking-v2-base-multilingual"),
+                    provider=Provider.VOYAGE,
+                    model=ModelName(RECOMMENDED_CLOUD_RERANKING_MODEL),
                     enabled=True,
                 )
-            if lib == "sentence-transformers":
+            if lib in {"fastembed_gpu", "fastembed"}:
+                return DeterminedDefaults(
+                    provider=Provider.FASTEMBED,
+                    model=ModelName(RECOMMENDED_LOCAL_RERANKING_MODEL),
+                    enabled=True,
+                )
+            if lib == "sentence_transformers":
                 return DeterminedDefaults(
                     provider=Provider.SENTENCE_TRANSFORMERS,
-                    # on the heavier side for what we aim for as a default but very capable
-                    model=ModelName("sentence-transformers:BAAI/bge-reranking-v2-m3"),
+                    model=ModelName(RECOMMENDED_LOCAL_RERANKING_MODEL),
                     enabled=True,
                 )
     possible_libs = [lib for lib in ("boto3", "cohere") if has_package(lib)]
     logger.warning(
-        "No default reranking provider libraries found. Reranking functionality will be disabled unless explicitly set in your config or environment variables. %s",
+        "No default reranking provider libraries found. Reranking functionality will be "
+        "disabled unless explicitly set in your config or environment variables. %s",
         (
-            f"It looks like you have {'these libraries' if len(possible_libs) > 1 else 'this library'} installed that support reranking: {', '.join(possible_libs)}."
+            f"It looks like you have "
+            f"{'these libraries' if len(possible_libs) > 1 else 'this library'} installed "
+            f"that support reranking: {', '.join(possible_libs)}."
             if possible_libs
             else "You have no known reranking libraries installed."
         ),
@@ -824,4 +840,7 @@ __all__ = (
     "ProviderSettingsDict",
     "ProviderSettingsView",
     "merge_agent_model_settings",
+    "HAS_ANTHROPIC",
+    "DeterminedDefaults",
+    "ProviderNameMap",
 )
