@@ -30,7 +30,7 @@ _.path = [
   "scripts/testing",
   "scripts/utils",
   ".venv/bin",
-  "tools/exportify",
+  "tools/exportify/",
 ]
 MISE_ENV = '''{% if get_env(name="CI", default="") == "true" %}""{% else %}dev{% endif %}'''
 CW_PREFIX = '''{% if get_env(name="CI", default="") == "true" %}[codeweaver]{% elif get_env(name="TERM", default="xterm-256color") == "*truecolor*" %}\033[38;2;181;108;48;m[codeweaver]\033[0m{% else %}\033[38;5;131m[codeweaver]\033[0m{% endif %}'''
@@ -56,6 +56,7 @@ ast-grep = "latest"
 # Where needed, tools are defined at the task level here, which allows for more granular control
 python = '''{{ get_env(name="MISE_PYTHON_VERSION", default="3.13") }}'''
 uv = "latest"
+"pipx:exportify" = "latest"
 
 # Quick note for those unfamiliar with mise:
 #   - despite the namespace, tools prefixed with "pipx:" are installed via "uv" (I assume once upon a time they were installed with pipx before uv came along)
@@ -228,6 +229,7 @@ sources = ["{src,scripts,tests,mise-tasks}/*.py"]
 [tasks.check]
 tools.hk = "latest"
 tools.pkl = "latest"
+tools."pipx:exportify" = "latest"
 tools."pipx:ty" = "latest"
 tools."pipx:reuse" = "latest"
 tools.ruff = "latest"
@@ -299,6 +301,7 @@ hk fix
 
 [tasks.format.tools]
 "aqua:typos" = "latest"
+"pipx:exportify" = "latest"
 "pipx:reuse" = "latest"
 "aqua:tombi-toml/tombi" = "latest"
 "ubi:astral-sh/ty" = "latest"
@@ -316,8 +319,10 @@ echo "${CW_PREFIX} Applying formatting...hold onto your butts 🚬...🦖 "
 # mise -y //:fix-ruff-patterns || {  # there are some bugs to work out
 #    echo "${CW_PREFIX} ⚠️  \033[0;32mRuff pattern fixer encountered issues.\033[0m"}
 uv run ruff format .
+uv run ruff check --fix --unsafe-fixes . || true
 git ls-files "*.yaml" "*.yml" "*.json" 2>/dev/null | xargs -r yq -iP --indent=2 eval "." 2>/dev/null || true
 toml_files="$(git ls-files "*.toml" 2>/dev/null)"
+exportify fix || true
 if [ -n "$toml_files" ]; then
     printf '%s\n' "$toml_files" | xargs -r tombi format 2>/dev/null || true
 fi

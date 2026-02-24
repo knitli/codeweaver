@@ -73,15 +73,16 @@ local linters = new Mapping<String, Step> {
         fix = if (useInteractive) "./scripts/code-quality/update-licenses.py add {{ files }}" else "./scripts/code-quality/update-licenses.py add --interactive {{ files }}"
     }
 
+    ["exportify"] = new Step {
+        glob = "{src,packages}/**/*.py"
+        fix = "exportify fix {{ files }}"
+        check = "exportify check {{ files }}"
+        stage = List("src/**/*.py", "packages/**/*.py")
+    }
 
     ["add-marks"] = new Step {
         glob = "tests/**/*.py"
         fix = "./scripts/testing/apply-test-marks.py {{ files }}"
-    }
-
-    ["validate-lazy-imports"] = new Step {
-        glob = "{src,tests}/**/*.py"
-        check = "uv run --refresh-package code-weaver mise-tasks/validate-lazy-imports.py {{ files }}"
     }
 
     // ty typechecker for python
