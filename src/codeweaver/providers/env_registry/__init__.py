@@ -19,7 +19,7 @@ This package is part of the providers package and depends on core.
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
-from codeweaver.core.utils.lazy_importer import create_lazy_getattr
+from lateimport import create_late_getattr
 
 
 if TYPE_CHECKING:
@@ -43,7 +43,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "simple_api_key_provider": (__spec__.parent, "builders"),
 })
 
-__getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
+__getattr__ = create_late_getattr(_dynamic_imports, globals(), __name__)
 
 
 __all__ = [

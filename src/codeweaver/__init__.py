@@ -42,7 +42,7 @@ warnings.filterwarnings(
     category=DeprecationWarning,
 )
 
-from codeweaver.core import create_lazy_getattr
+from lateimport import create_late_getattr
 
 
 def get_version() -> str:
@@ -108,7 +108,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "wait_for_daemon_shutdown": ("codeweaver_daemon", "wait_for_daemon_shutdown"),
 })
 
-__getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
+__getattr__ = create_late_getattr(_dynamic_imports, globals(), __name__)
 
 
 __all__ = (

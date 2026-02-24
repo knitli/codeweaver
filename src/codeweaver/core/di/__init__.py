@@ -84,8 +84,9 @@ from __future__ import annotations
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
+from lateimport import create_late_getattr
+
 from codeweaver.core.di.container import Container, get_container, reset_container
-from codeweaver.core.utils import create_lazy_getattr
 
 
 if TYPE_CHECKING:
@@ -123,7 +124,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "dependency_provider": (__spec__.parent, "utils"),
 })
 
-__getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
+__getattr__ = create_late_getattr(_dynamic_imports, globals(), __name__)
 
 
 __all__ = (

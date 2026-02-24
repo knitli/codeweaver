@@ -14,9 +14,10 @@ from collections.abc import Generator, Iterable
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, Literal, Self, cast
 
+from lateimport import LateImport
+
 from codeweaver.core.types.enum import BaseEnum
 from codeweaver.core.types.env import EnvVarInfo, ProviderEnvVars
-from codeweaver.core.utils.lazy_importer import LazyImport
 
 
 if TYPE_CHECKING:
@@ -67,7 +68,7 @@ class ProviderCategory(BaseEnum):
 def get_default_provider_import_for_category(
     provider: Provider | ProviderLiteralString,
     category: ProviderCategory | ProviderCategoryLiteralString,
-) -> LazyImport[Any] | None:
+) -> LateImport[Any] | None:
     """Get the default provider import for a given provider and category."""
     from codeweaver.core.types.service_cards import get_service_card
 
@@ -138,7 +139,7 @@ class SDKClient(BaseEnum):
         )
 
     @classmethod
-    def clients(cls) -> Generator[tuple[SDKClient, LazyImport[Any]]]:
+    def clients(cls) -> Generator[tuple[SDKClient, LateImport[Any]]]:
         """Get all SDK clients as lazy imports."""
         from codeweaver.core.types.service_cards import get_service_cards
 
@@ -157,20 +158,20 @@ class SDKClient(BaseEnum):
     def client_available(self) -> bool:
         """Check if the SDK client package is available."""
 
-        def try_import(lazy_import: LazyImport[Any]) -> Literal[True] | None:
+        def try_import(lateimport: LateImport[Any]) -> Literal[True] | None:
             try:
-                _ = lazy_import._resolve()
+                _ = lateimport._resolve()
             except ImportError:
                 return None
             else:
                 return True
 
         try:
-            if isinstance(self.client, LazyImport):
+            if isinstance(self.client, LateImport):
                 _ = self.client._resolve()
             elif isinstance(self.client, dict):
-                for lazy_import in self.client.values():
-                    if try_import(lazy_import):
+                for lateimport in self.client.values():
+                    if try_import(lateimport):
                         return True
         except (ImportError, AttributeError, KeyError):
             return False
@@ -179,38 +180,38 @@ class SDKClient(BaseEnum):
         return False
 
     @property
-    def agent_provider(self) -> LazyImport[Any] | None:
+    def agent_provider(self) -> LateImport[Any] | None:
         """Get the default agent provider for the SDK client."""
         return get_default_provider_import_for_category(self.as_provider(), ProviderCategory.AGENT)
 
     @property
-    def data_provider(self) -> LazyImport[Any] | None:
+    def data_provider(self) -> LateImport[Any] | None:
         """Get the default data provider for the SDK client."""
         return get_default_provider_import_for_category(self.as_provider(), ProviderCategory.DATA)
 
     @property
-    def embedding_provider(self) -> LazyImport[Any] | None:
+    def embedding_provider(self) -> LateImport[Any] | None:
         """Get the default embedding provider for the SDK client."""
         return get_default_provider_import_for_category(
             self.as_provider(), ProviderCategory.EMBEDDING
         )
 
     @property
-    def sparse_embedding_provider(self) -> LazyImport[Any] | None:
+    def sparse_embedding_provider(self) -> LateImport[Any] | None:
         """Get the default sparse embedding provider for the SDK client."""
         return get_default_provider_import_for_category(
             self.as_provider(), ProviderCategory.SPARSE_EMBEDDING
         )
 
     @property
-    def reranking_provider(self) -> LazyImport[Any] | None:
+    def reranking_provider(self) -> LateImport[Any] | None:
         """Get the default reranking provider for the SDK client."""
         return get_default_provider_import_for_category(
             self.as_provider(), ProviderCategory.RERANKING
         )
 
     @property
-    def vector_store_provider(self) -> LazyImport[Any] | None:
+    def vector_store_provider(self) -> LateImport[Any] | None:
         """Get the default vector store provider for the SDK client."""
         return get_default_provider_import_for_category(
             self.as_provider(), ProviderCategory.VECTOR_STORE

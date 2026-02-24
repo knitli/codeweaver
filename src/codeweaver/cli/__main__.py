@@ -74,7 +74,7 @@ if ROOT_PACKAGE in ("provider", "engine", "server"):
 app.command("codeweaver.cli.commands.config:app", name="config")
 
 # Developer tools - available in all packages
-app.command("codeweaver.tools.lazy_imports.cli:app", name="lazy-imports")
+app.command("codeweaver.tools.lateimports.cli:app", name="lazy-imports")
 
 
 def _handle_keyboard_interrupt():

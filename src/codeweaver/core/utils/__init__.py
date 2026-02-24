@@ -5,7 +5,7 @@
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
-from codeweaver.core.utils.lazy_importer import LazyImport, create_lazy_getattr, lazy_import
+from lateimport import create_late_getattr
 
 
 if TYPE_CHECKING:
@@ -253,7 +253,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "we_are_in_vscode": (__spec__.parent, "environment"),
 })
 
-__getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
+__getattr__ = create_late_getattr(_dynamic_imports, globals(), __name__)
 
 __all__ = (
     "BOUNDARY",
@@ -269,11 +269,11 @@ __all__ = (
     "NORMALIZE_FORM",
     "POSSIBLE_PROMPT_INJECTS",
     "REMOVE_ID",
-    "LazyImport",
+    "LateImport",
     "TypeIs",
     "asyncio_or_uvloop",
     "clean_args",
-    "create_lazy_getattr",
+    "create_late_getattr",
     "deep_merge_dicts",
     "detect_root_package",
     "dict_set_to_tuple",
@@ -345,7 +345,7 @@ __all__ = (
     "isfunction",
     "ismethod",
     "keyword_args",
-    "lazy_import",
+    "lateimport",
     "low_priority",
     "normalize_ext",
     "positional_args",

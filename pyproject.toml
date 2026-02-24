@@ -119,7 +119,7 @@ dependencies = [
   # So we pin it to make sure we don't break on minor releases
   "pydantic==2.12.5",
   # for, you know, platform dirs
-  "platformdirs>=4.5.1",
+  "platformdirs>=4.9.2",
   # psutil used for resource governance/limiting by engine
   "psutil>=7.2.2",
   "textcase>=0.4.5",
@@ -132,6 +132,8 @@ dependencies = [
   "code-weaver-tokenizers",
   # numpy needed for all embedding providers
   "numpy>=2.4.2",
+  # lazy import handling; spun off from core/utils/lazy_importer into its own package
+  "lateimport>=0.1.0",
   # retries
   "tenacity>=9.1.2",
   # for local providers (sentence-transformers, fastembed) to detect CPU/GPU features

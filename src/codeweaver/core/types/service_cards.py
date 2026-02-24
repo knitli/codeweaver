@@ -21,9 +21,9 @@ from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple, cast, overload
 
 from beartype.typing import Callable
+from lateimport import LateImport, lateimport
 
-from codeweaver.core.utils import LazyImport, has_package
-from codeweaver.core.utils.lazy_importer import lazy_import
+from codeweaver.core.utils import has_package
 
 
 if TYPE_CHECKING:
@@ -395,14 +395,14 @@ class ServiceCard(NamedTuple):
     category: LiteralProviderCategory
     """The category of service (e.g., 'embedding', 'agent', 'reranking')."""
 
-    provider_cls: LazyImport[Any]
+    provider_cls: LateImport[Any]
     """The provider class (e.g., CohereProvider, OpenAIEmbeddingProvider).
 
     This is the class that wraps the client and implements the CodeWeaver
     provider interface for this service type. (or pydantic AI interface for agents)
     """
 
-    client_cls: LazyImport[Any]
+    client_cls: LateImport[Any]
     """The SDK client class (e.g., AsyncCohereV2, AsyncOpenAI, Mistral).
 
     This is the actual SDK client from the provider's library that will be
@@ -532,8 +532,8 @@ class ServiceCard(NamedTuple):
 def service_card_factory(
     provider: ProviderLiteralString,
     category: ProviderCategoryLiteralString,
-    provider_cls: LazyImport[Any],
-    client_cls: LazyImport[Any],
+    provider_cls: LateImport[Any],
+    client_cls: LateImport[Any],
     client: SDKClientLiteralString,
 ) -> ServiceCard: ...
 
@@ -542,8 +542,8 @@ def service_card_factory(
 def service_card_factory(
     provider: ProviderLiteralString,
     category: ProviderCategoryLiteralString,
-    provider_cls: LazyImport[Any],
-    client_cls: LazyImport[Any],
+    provider_cls: LateImport[Any],
+    client_cls: LateImport[Any],
     client: SDKClientLiteralString,
     *,
     metadata: ServiceMetadata,
@@ -553,8 +553,8 @@ def service_card_factory(
 def service_card_factory(
     provider: ProviderLiteralString,
     category: ProviderCategoryLiteralString,
-    provider_cls: LazyImport[Any],
-    client_cls: LazyImport[Any],
+    provider_cls: LateImport[Any],
+    client_cls: LateImport[Any],
     client: SDKClientLiteralString,
     *,
     metadata: ServiceMetadata | None = None,
@@ -579,8 +579,8 @@ def service_card_factory(
         >>> service_card_factory(
         ...     "openai",
         ...     "embedding",
-        ...     lazy_import("codeweaver.providers.embedding", "OpenAIEmbeddingProvider"),
-        ...     lazy_import("openai", "AsyncOpenAI"),
+        ...     lateimport("codeweaver.providers.embedding", "OpenAIEmbeddingProvider"),
+        ...     lateimport("openai", "AsyncOpenAI"),
         ...     client="openai",
         ... )
 
@@ -588,8 +588,8 @@ def service_card_factory(
         >>> service_card_factory(
         ...     "azure",
         ...     "agent",
-        ...     lazy_import("pydantic_ai.providers.anthropic", "AnthropicProvider"),
-        ...     lazy_import("anthropic", "AsyncAnthropicFoundry"),
+        ...     lateimport("pydantic_ai.providers.anthropic", "AnthropicProvider"),
+        ...     lateimport("anthropic", "AsyncAnthropicFoundry"),
         ...     "anthropic",
         ...     metadata=ServiceMetadata(discriminator=("model", "claude")),
         ... )
@@ -598,8 +598,8 @@ def service_card_factory(
         >>> service_card_factory(
         ...     "bedrock",
         ...     "embedding",
-        ...     lazy_import("codeweaver.providers.embedding", "BedrockEmbeddingProvider"),
-        ...     lazy_import("boto3", "client"),
+        ...     lateimport("codeweaver.providers.embedding", "BedrockEmbeddingProvider"),
+        ...     lateimport("boto3", "client"),
         ...     "bedrock",
         ...     metadata=ServiceMetadata(handler=("client", bedrock_client_factory)),
         ... )
@@ -741,8 +741,8 @@ def _get_pydantic_ai_cls_module(provider_name: str) -> str:
     return "moonshotai" if provider_name == "moonshot" else provider_name
 
 
-def _get_pydantic_ai_provider_cls(provider_name: str) -> LazyImport[Any]:
-    """Get the LazyImport for the provider class in the pydantic_ai.providers namespace.
+def _get_pydantic_ai_provider_cls(provider_name: str) -> LateImport[Any]:
+    """Get the LateImport for the provider class in the pydantic_ai.providers namespace.
 
     This uses the provider name to determine the correct module and class name to import for the provider. It handles special cases where the provider literal does not directly match the module or class name.
 
@@ -750,7 +750,7 @@ def _get_pydantic_ai_provider_cls(provider_name: str) -> LazyImport[Any]:
         provider_name: The provider literal string (e.g., "hf_inference", "moonshot").
 
     Returns:
-        A LazyImport for the provider class.
+        A LateImport for the provider class.
     """
     module_name = _get_pydantic_ai_cls_module(provider_name)
     class_name = f"{module_name.title().replace('_', '')}Provider"
@@ -762,7 +762,7 @@ def _get_pydantic_ai_provider_cls(provider_name: str) -> LazyImport[Any]:
             .replace("face", "Face")
             .replace("Ovhcloud", "OVHcloud")
         )  # the c is lowercase ... for some reason, I guess to distinguish the acronym from "cloud"?
-    return lazy_import(f"pydantic_ai.providers.{module_name}", class_name)
+    return lateimport(f"pydantic_ai.providers.{module_name}", class_name)
 
 
 # Builder function stubs - will implement next
@@ -779,7 +779,7 @@ def _build_openai_api_cards() -> list[ServiceCard]:
             provider=provider,
             category="agent",
             provider_cls=_get_pydantic_ai_provider_cls(provider),
-            client_cls=lazy_import("openai", "AsyncOpenAI"),
+            client_cls=lateimport("openai", "AsyncOpenAI"),
         )
         for provider in _openai_agent_providers()
     ]
@@ -788,10 +788,10 @@ def _build_openai_api_cards() -> list[ServiceCard]:
         service_card_factory(
             provider=provider,
             category="embedding",
-            provider_cls=lazy_import(
+            provider_cls=lateimport(
                 "codeweaver.providers.embedding.providers.openai_factory", "get_provider_class"
             ),
-            client_cls=lazy_import("openai", "AsyncOpenAI"),
+            client_cls=lateimport("openai", "AsyncOpenAI"),
         )
         for provider in _openai_embedding_providers()
     ]
@@ -811,16 +811,16 @@ def _build_native_sdk_cards() -> list[ServiceCard]:
             "mistral",
             "agent",
             _get_pydantic_ai_provider_cls("mistral"),
-            lazy_import("mistralai", "Mistral"),
+            lateimport("mistralai", "Mistral"),
             "mistral",
         ),
         service_card_factory(
             "mistral",
             "embedding",
-            lazy_import(
+            lateimport(
                 "codeweaver.providers.embedding.providers.mistral", "MistralEmbeddingProvider"
             ),
-            lazy_import("mistralai", "Mistral"),
+            lateimport("mistralai", "Mistral"),
             "mistral",
         ),
         # Cohere - agent, embedding, reranking
@@ -828,44 +828,44 @@ def _build_native_sdk_cards() -> list[ServiceCard]:
             "cohere",
             "agent",
             _get_pydantic_ai_provider_cls("cohere"),
-            lazy_import("cohere", "AsyncClientV2"),
+            lateimport("cohere", "AsyncClientV2"),
             "cohere",
         ),
         service_card_factory(
             "cohere",
             "embedding",
-            lazy_import(
+            lateimport(
                 "codeweaver.providers.embedding.providers.cohere", "CohereEmbeddingProvider"
             ),
-            lazy_import("cohere", "AsyncClientV2"),
+            lateimport("cohere", "AsyncClientV2"),
             "cohere",
         ),
         service_card_factory(
             "cohere",
             "reranking",
-            lazy_import(
+            lateimport(
                 "codeweaver.providers.reranking.providers.cohere", "CohereRerankingProvider"
             ),
-            lazy_import("cohere", "AsyncClientV2"),
+            lateimport("cohere", "AsyncClientV2"),
             "cohere",
         ),
         # Voyage - embedding and reranking
         service_card_factory(
             "voyage",
             "embedding",
-            lazy_import(
+            lateimport(
                 "codeweaver.providers.embedding.providers.voyage", "VoyageEmbeddingProvider"
             ),
-            lazy_import("voyageai", "VoyageAI"),
+            lateimport("voyageai", "VoyageAI"),
             "voyage",
         ),
         service_card_factory(
             "voyage",
             "reranking",
-            lazy_import(
+            lateimport(
                 "codeweaver.providers.reranking.providers.voyage", "VoyageRerankingProvider"
             ),
-            lazy_import("voyageai", "VoyageAI"),
+            lateimport("voyageai", "VoyageAI"),
             "voyage",
         ),
         # Anthropic - agent only (non-Azure/Bedrock/Google)
@@ -873,7 +873,7 @@ def _build_native_sdk_cards() -> list[ServiceCard]:
             "anthropic",
             "agent",
             _get_pydantic_ai_provider_cls("anthropic"),
-            lazy_import("anthropic", "AsyncAnthropic"),
+            lateimport("anthropic", "AsyncAnthropic"),
             "anthropic",
         ),
         # Google - agent and embedding
@@ -881,16 +881,16 @@ def _build_native_sdk_cards() -> list[ServiceCard]:
             "google",
             "agent",
             _get_pydantic_ai_provider_cls("google"),
-            lazy_import("google.genai", "Client"),
+            lateimport("google.genai", "Client"),
             "google",
         ),
         service_card_factory(
             "google",
             "embedding",
-            lazy_import(
+            lateimport(
                 "codeweaver.providers.embedding.providers.google", "GoogleEmbeddingProvider"
             ),
-            lazy_import("google.genai", "Client"),
+            lateimport("google.genai", "Client"),
             "google",
         ),
         # HuggingFace Inference - agent and embedding
@@ -898,24 +898,24 @@ def _build_native_sdk_cards() -> list[ServiceCard]:
             "hf_inference",
             "agent",
             _get_pydantic_ai_provider_cls("hf_inference"),
-            lazy_import("huggingface_hub", "AsyncInferenceClient"),
+            lateimport("huggingface_hub", "AsyncInferenceClient"),
             "hf_inference",
         ),
         service_card_factory(
             "hf_inference",
             "embedding",
-            lazy_import(
+            lateimport(
                 "codeweaver.providers.embedding.providers.huggingface",
                 "HuggingFaceEmbeddingProvider",
             ),
-            lazy_import("huggingface_hub", "AsyncInferenceClient"),
+            lateimport("huggingface_hub", "AsyncInferenceClient"),
             "hf_inference",
         ),
         service_card_factory(
             "x_ai",
             "agent",
             _get_pydantic_ai_provider_cls("xai"),
-            lazy_import("xai_sdk", "AsyncClient"),
+            lateimport("xai_sdk", "AsyncClient"),
             "x_ai",
         ),
     ]
@@ -938,21 +938,21 @@ def _build_local_provider_cards() -> list[ServiceCard]:
         service_card_factory(
             "fastembed",
             "embedding",
-            lazy_import(
+            lateimport(
                 "codeweaver.providers.embedding.providers.fastembed", "FastEmbedEmbeddingProvider"
             ),
-            lazy_import("codeweaver.providers.embedding.fastembed_extensions", "get_text_embedder"),
+            lateimport("codeweaver.providers.embedding.fastembed_extensions", "get_text_embedder"),
             "fastembed",
             metadata=ServiceMetadata(client_handler=_start_instance_in_thread),
         ),
         service_card_factory(
             "fastembed",
             "sparse_embedding",
-            lazy_import(
+            lateimport(
                 "codeweaver.providers.embedding.providers.fastembed",
                 "FastEmbedSparseEmbeddingProvider",
             ),
-            lazy_import(
+            lateimport(
                 "codeweaver.providers.embedding.fastembed_extensions", "get_sparse_embedder"
             ),
             "fastembed",
@@ -961,10 +961,10 @@ def _build_local_provider_cards() -> list[ServiceCard]:
         service_card_factory(
             "fastembed",
             "reranking",
-            lazy_import(
+            lateimport(
                 "codeweaver.providers.reranking.providers.fastembed", "FastEmbedRerankingProvider"
             ),
-            lazy_import("codeweaver.providers.embedding.fastembed_extensions", "get_cross_encoder"),
+            lateimport("codeweaver.providers.embedding.fastembed_extensions", "get_cross_encoder"),
             "fastembed",
             metadata=ServiceMetadata(client_handler=_start_instance_in_thread),
         ),
@@ -972,33 +972,33 @@ def _build_local_provider_cards() -> list[ServiceCard]:
         service_card_factory(
             "sentence_transformers",
             "embedding",
-            lazy_import(
+            lateimport(
                 "codeweaver.providers.embedding.providers.sentence_transformers",
                 "SentenceTransformersEmbeddingProvider",
             ),
-            lazy_import("sentence_transformers", "SentenceTransformer"),
+            lateimport("sentence_transformers", "SentenceTransformer"),
             "sentence_transformers",
             metadata=ServiceMetadata(client_handler=_start_instance_in_thread),
         ),
         service_card_factory(
             "sentence_transformers",
             "sparse_embedding",
-            lazy_import(
+            lateimport(
                 "codeweaver.providers.embedding.providers.sentence_transformers",
                 "SentenceTransformersSparseEmbeddingProvider",
             ),
-            lazy_import("sentence_transformers", "SparseEncoder"),
+            lateimport("sentence_transformers", "SparseEncoder"),
             "sentence_transformers",
             metadata=ServiceMetadata(client_handler=_start_instance_in_thread),
         ),
         service_card_factory(
             "sentence_transformers",
             "reranking",
-            lazy_import(
+            lateimport(
                 "codeweaver.providers.reranking.providers.sentence_transformers",
                 "SentenceTransformersRerankingProvider",
             ),
-            lazy_import("sentence_transformers", "CrossEncoder"),
+            lateimport("sentence_transformers", "CrossEncoder"),
             "sentence_transformers",
             metadata=ServiceMetadata(client_handler=_start_instance_in_thread),
         ),
@@ -1022,7 +1022,7 @@ def _build_multi_client_cards() -> list[ServiceCard]:
             "azure",
             "agent",
             anthropic_provider,
-            lazy_import("anthropic", "AsyncAnthropicFoundry"),
+            lateimport("anthropic", "AsyncAnthropicFoundry"),
             "anthropic",
             metadata=ServiceMetadata(discriminator=("model", _anthropic_model_discriminator)),
         ),
@@ -1030,7 +1030,7 @@ def _build_multi_client_cards() -> list[ServiceCard]:
             "azure",
             "agent",
             _get_pydantic_ai_provider_cls("azure"),
-            lazy_import("openai", "AsyncOpenAI"),
+            lateimport("openai", "AsyncOpenAI"),
             "openai",
         ),
         # Azure - Embedding (OpenAI or Cohere)
@@ -1038,10 +1038,10 @@ def _build_multi_client_cards() -> list[ServiceCard]:
         service_card_factory(
             "azure",
             "embedding",
-            lazy_import(
+            lateimport(
                 "codeweaver.providers.embedding.providers.cohere", "CohereEmbeddingProvider"
             ),
-            lazy_import("cohere", "AsyncClientV2"),
+            lateimport("cohere", "AsyncClientV2"),
             metadata=ServiceMetadata(
                 discriminator=(
                     "model",
@@ -1054,10 +1054,10 @@ def _build_multi_client_cards() -> list[ServiceCard]:
         service_card_factory(
             "azure",
             "embedding",
-            lazy_import(
+            lateimport(
                 "codeweaver.providers.embedding.providers.openai_factory", "get_provider_class"
             ),
-            lazy_import("openai", "AsyncOpenAI"),
+            lateimport("openai", "AsyncOpenAI"),
         ),
         # Bedrock - Agent (Bedrock or Anthropic based on model)
         # Use Anthropic client for Claude models on Bedrock
@@ -1065,15 +1065,15 @@ def _build_multi_client_cards() -> list[ServiceCard]:
             "bedrock",
             "agent",
             anthropic_provider,
-            lazy_import("anthropic", "AsyncAnthropicBedrock"),
+            lateimport("anthropic", "AsyncAnthropicBedrock"),
             metadata=ServiceMetadata(discriminator=("model", _anthropic_model_discriminator)),
         ),
         # Use Bedrock client for other models (default)
         service_card_factory(
             "bedrock",
             "agent",
-            lazy_import("pydantic_ai.providers.bedrock", "BedrockProvider"),
-            lazy_import("boto3", "client"),
+            lateimport("pydantic_ai.providers.bedrock", "BedrockProvider"),
+            lateimport("boto3", "client"),
             metadata=ServiceMetadata(
                 client_handler=lambda client, card, *args, **kwargs: client(
                     "bedrock-runtime", *args, **kwargs
@@ -1084,10 +1084,10 @@ def _build_multi_client_cards() -> list[ServiceCard]:
         service_card_factory(
             "bedrock",
             "embedding",
-            lazy_import(
+            lateimport(
                 "codeweaver.providers.embedding.providers.bedrock", "BedrockEmbeddingProvider"
             ),
-            lazy_import("boto3", "client"),
+            lateimport("boto3", "client"),
             "bedrock",
             metadata=ServiceMetadata(
                 client_handler=lambda client, card, *args, **kwargs: client(
@@ -1098,10 +1098,10 @@ def _build_multi_client_cards() -> list[ServiceCard]:
         service_card_factory(
             "bedrock",
             "reranking",
-            lazy_import(
+            lateimport(
                 "codeweaver.providers.reranking.providers.bedrock", "BedrockRerankingProvider"
             ),
-            lazy_import("boto3", "client"),
+            lateimport("boto3", "client"),
             "bedrock",
             metadata=ServiceMetadata(
                 client_handler=lambda client, card, *args, **kwargs: client(
@@ -1116,7 +1116,7 @@ def _build_multi_client_cards() -> list[ServiceCard]:
             "heroku",
             "agent",
             _get_pydantic_ai_provider_cls("cohere"),
-            lazy_import("cohere", "AsyncClientV2"),
+            lateimport("cohere", "AsyncClientV2"),
             "cohere",
             metadata=ServiceMetadata(discriminator=("model", "cohere")),
         ),
@@ -1125,17 +1125,17 @@ def _build_multi_client_cards() -> list[ServiceCard]:
             "heroku",
             "agent",
             _get_pydantic_ai_provider_cls("heroku"),
-            lazy_import("openai", "AsyncOpenAI"),
+            lateimport("openai", "AsyncOpenAI"),
             "openai",
         ),
         # Cohere embedding
         service_card_factory(
             "heroku",
             "embedding",
-            lazy_import(
+            lateimport(
                 "codeweaver.providers.embedding.providers.cohere", "CohereEmbeddingProvider"
             ),
-            lazy_import("cohere", "AsyncClientV2"),
+            lateimport("cohere", "AsyncClientV2"),
             "cohere",
             metadata=ServiceMetadata(discriminator=("model", "cohere-embed")),
         ),
@@ -1143,10 +1143,10 @@ def _build_multi_client_cards() -> list[ServiceCard]:
         service_card_factory(
             "heroku",
             "embedding",
-            lazy_import(
+            lateimport(
                 "codeweaver.providers.embedding.providers.openai_factory", "get_provider_class"
             ),
-            lazy_import("openai", "AsyncOpenAI"),
+            lateimport("openai", "AsyncOpenAI"),
             "openai",
         ),
         # Groq - Special case: agent uses Groq client, embedding uses OpenAI client
@@ -1154,24 +1154,24 @@ def _build_multi_client_cards() -> list[ServiceCard]:
             "groq",
             "agent",
             _get_pydantic_ai_provider_cls("groq"),
-            lazy_import("groq", "AsyncGroq"),
+            lateimport("groq", "AsyncGroq"),
             "groq",
         ),
         service_card_factory(
             "groq",
             "embedding",
-            lazy_import(
+            lateimport(
                 "codeweaver.providers.embedding.providers.openai_factory", "get_provider_class"
             ),
-            lazy_import("openai", "AsyncOpenAI"),
+            lateimport("openai", "AsyncOpenAI"),
             "openai",
         ),
         # Pydantic Gateway - agent only
         service_card_factory(
             "gateway",
             "agent",
-            lazy_import("pydantic_ai.providers.gateway", "gateway_provider"),
-            lazy_import("pydantic_ai.providers.gateway", "gateway_provider"),
+            lateimport("pydantic_ai.providers.gateway", "gateway_provider"),
+            lateimport("pydantic_ai.providers.gateway", "gateway_provider"),
             "gateway",
             metadata=ServiceMetadata(
                 provider_handler=lambda provider_cls, card, upstream_provider, **kwargs: (
@@ -1192,8 +1192,8 @@ def _build_pydantic_gateway_provider_cards() -> list[ServiceCard]:
         service_card_factory(
             "gateway",
             "agent",
-            lazy_import("pydantic_ai.providers.gateway", "gateway_provider"),
-            lazy_import("pydantic_ai.providers.gateway", "gateway_provider"),
+            lateimport("pydantic_ai.providers.gateway", "gateway_provider"),
+            lateimport("pydantic_ai.providers.gateway", "gateway_provider"),
             "gateway",
             metadata=ServiceMetadata(
                 provider_handler=lambda provider_cls, card, upstream_provider, **kwargs: (
@@ -1213,8 +1213,8 @@ def _build_data_provider_cards() -> list[ServiceCard]:
         service_card_factory(
             "tavily",
             "data",
-            lazy_import("codeweaver.providers.data.tavily", "tavily_search_tool"),
-            lazy_import("tavily", "AsyncTavilyClient"),
+            lateimport("codeweaver.providers.data.tavily", "tavily_search_tool"),
+            lateimport("tavily", "AsyncTavilyClient"),
             "tavily",
             metadata=ServiceMetadata(
                 provider_handler=lambda provider_cls, card, api_key: provider_cls(api_key=api_key)
@@ -1223,8 +1223,8 @@ def _build_data_provider_cards() -> list[ServiceCard]:
         service_card_factory(
             "duckduckgo",
             "data",
-            lazy_import("pydantic_ai.common_tools.duckduckgo", "duck_duck_go_search_tool"),
-            lazy_import("ddgs.ddgs", "DDGS"),
+            lateimport("pydantic_ai.common_tools.duckduckgo", "duck_duck_go_search_tool"),
+            lateimport("ddgs.ddgs", "DDGS"),
             "duckduckgo",
             metadata=ServiceMetadata(
                 provider_handler=lambda provider_cls, card: provider_cls(max_results=15)
@@ -1233,8 +1233,8 @@ def _build_data_provider_cards() -> list[ServiceCard]:
         service_card_factory(
             "exa",
             "data",
-            lazy_import("codeweaver.providers.data.exa", "ExaToolset"),
-            lazy_import("exa_py", "AsyncExa"),
+            lateimport("codeweaver.providers.data.exa", "ExaToolset"),
+            lateimport("exa_py", "AsyncExa"),
             "exa",
         ),
     ]
@@ -1250,19 +1250,19 @@ def _build_vector_store_cards() -> list[ServiceCard]:
         service_card_factory(
             "qdrant",
             "vector_store",
-            lazy_import(
+            lateimport(
                 "codeweaver.providers.vector_store.providers.qdrant", "QdrantVectorStoreProvider"
             ),
-            lazy_import("qdrant_client", "AsyncQdrantClient"),
+            lateimport("qdrant_client", "AsyncQdrantClient"),
             "qdrant",
         ),
         service_card_factory(
             "memory",
             "vector_store",
-            lazy_import(
+            lateimport(
                 "codeweaver.providers.vector_store.providers.inmemory", "MemoryVectorStoreProvider"
             ),
-            lazy_import("qdrant_client", "AsyncQdrantClient"),
+            lateimport("qdrant_client", "AsyncQdrantClient"),
             "qdrant",
         ),
     ]

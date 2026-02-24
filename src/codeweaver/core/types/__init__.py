@@ -10,7 +10,7 @@ import types as _types
 
 from typing import TYPE_CHECKING
 
-from codeweaver.core.utils import create_lazy_getattr
+from lateimport import create_late_getattr
 
 
 MappingProxyType = _types.MappingProxyType
@@ -272,7 +272,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
 })
 
 
-__getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
+__getattr__ = create_late_getattr(_dynamic_imports, globals(), __name__)
 
 __all__ = (
     "BASEDMODEL_CONFIG",

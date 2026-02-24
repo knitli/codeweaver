@@ -16,6 +16,7 @@ from collections.abc import Generator
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, cast
 
+from lateimport import LateImport, lateimport
 from pydantic_ai.providers import Provider as AgentProvider
 from pydantic_ai.toolsets import (
     AbstractToolset,
@@ -32,41 +33,40 @@ from pydantic_ai.toolsets import (
 
 from codeweaver.core.exceptions import ConfigurationError
 from codeweaver.core.types import LiteralProviderType
-from codeweaver.core.utils import LazyImport
 
 
 if TYPE_CHECKING:
     from codeweaver.core import Provider
 
 
-AGENT_PROVIDER_CLASSES: MappingProxyType[Provider, LazyImport] = MappingProxyType({
-    Provider.ALIBABA: LazyImport("pydantic_ai.providers.alibaba", "AlibabaProvider"),
-    Provider.ANTHROPIC: LazyImport("pydantic_ai.providers.anthropic", "AnthropicProvider"),
-    Provider.AZURE: LazyImport("pydantic_ai.providers.azure", "AzureProvider"),
-    Provider.BEDROCK: LazyImport("pydantic_ai.providers.bedrock", "BedrockProvider"),
-    Provider.CEREBRAS: LazyImport("pydantic_ai.providers.cerebras", "CerebrasProvider"),
-    Provider.COHERE: LazyImport("pydantic_ai.providers.cohere", "CohereProvider"),
-    Provider.DEEPSEEK: LazyImport("pydantic_ai.providers.deepseek", "DeepSeekProvider"),
-    Provider.FIREWORKS: LazyImport("pydantic_ai.providers.fireworks", "FireworksProvider"),
-    Provider.GITHUB: LazyImport("pydantic_ai.providers.github", "GitHubProvider"),
-    Provider.GOOGLE: LazyImport("pydantic_ai.providers.google", "GoogleProvider"),
-    Provider.GROQ: LazyImport("pydantic_ai.providers.groq", "GroqProvider"),
-    Provider.HEROKU: LazyImport("pydantic_ai.providers.heroku", "HerokuProvider"),
-    Provider.HUGGINGFACE_INFERENCE: LazyImport(
+AGENT_PROVIDER_CLASSES: MappingProxyType[Provider, LateImport] = MappingProxyType({
+    Provider.ALIBABA: lateimport("pydantic_ai.providers.alibaba", "AlibabaProvider"),
+    Provider.ANTHROPIC: lateimport("pydantic_ai.providers.anthropic", "AnthropicProvider"),
+    Provider.AZURE: lateimport("pydantic_ai.providers.azure", "AzureProvider"),
+    Provider.BEDROCK: lateimport("pydantic_ai.providers.bedrock", "BedrockProvider"),
+    Provider.CEREBRAS: lateimport("pydantic_ai.providers.cerebras", "CerebrasProvider"),
+    Provider.COHERE: lateimport("pydantic_ai.providers.cohere", "CohereProvider"),
+    Provider.DEEPSEEK: lateimport("pydantic_ai.providers.deepseek", "DeepSeekProvider"),
+    Provider.FIREWORKS: lateimport("pydantic_ai.providers.fireworks", "FireworksProvider"),
+    Provider.GITHUB: lateimport("pydantic_ai.providers.github", "GitHubProvider"),
+    Provider.GOOGLE: lateimport("pydantic_ai.providers.google", "GoogleProvider"),
+    Provider.GROQ: lateimport("pydantic_ai.providers.groq", "GroqProvider"),
+    Provider.HEROKU: lateimport("pydantic_ai.providers.heroku", "HerokuProvider"),
+    Provider.HUGGINGFACE_INFERENCE: lateimport(
         "pydantic_ai.providers.huggingface", "HuggingFaceProvider"
     ),
-    Provider.LITELLM: LazyImport("pydantic_ai.providers.litellm", "LiteLLMProvider"),
-    Provider.MISTRAL: LazyImport("pydantic_ai.providers.mistral", "MistralProvider"),
-    Provider.MOONSHOT: LazyImport("pydantic_ai.providers.moonshotai", "MoonshotAIProvider"),
-    Provider.NEBIUS: LazyImport("pydantic_ai.providers.nebius", "NebiusProvider"),
-    Provider.OLLAMA: LazyImport("pydantic_ai.providers.ollama", "OllamaProvider"),
-    Provider.OPENAI: LazyImport("pydantic_ai.providers.openai", "OpenAIProvider"),
-    Provider.OPENROUTER: LazyImport("pydantic_ai.providers.openrouter", "OpenRouterProvider"),
-    Provider.OVHCLOUD: LazyImport("pydantic_ai.providers.ovhcloud", "OVHcloudProvider"),
-    Provider.PERPLEXITY: LazyImport("pydantic_ai.providers.perplexity", "PerplexityProvider"),
-    Provider.TOGETHER: LazyImport("pydantic_ai.providers.together", "TogetherProvider"),
-    Provider.VERCEL: LazyImport("pydantic_ai.providers.vercel", "VercelProvider"),
-    Provider.X_AI: LazyImport("pydantic_ai.providers.grok", "GrokProvider"),
+    Provider.LITELLM: lateimport("pydantic_ai.providers.litellm", "LiteLLMProvider"),
+    Provider.MISTRAL: lateimport("pydantic_ai.providers.mistral", "MistralProvider"),
+    Provider.MOONSHOT: lateimport("pydantic_ai.providers.moonshotai", "MoonshotAIProvider"),
+    Provider.NEBIUS: lateimport("pydantic_ai.providers.nebius", "NebiusProvider"),
+    Provider.OLLAMA: lateimport("pydantic_ai.providers.ollama", "OllamaProvider"),
+    Provider.OPENAI: lateimport("pydantic_ai.providers.openai", "OpenAIProvider"),
+    Provider.OPENROUTER: lateimport("pydantic_ai.providers.openrouter", "OpenRouterProvider"),
+    Provider.OVHCLOUD: lateimport("pydantic_ai.providers.ovhcloud", "OVHcloudProvider"),
+    Provider.PERPLEXITY: lateimport("pydantic_ai.providers.perplexity", "PerplexityProvider"),
+    Provider.TOGETHER: lateimport("pydantic_ai.providers.together", "TogetherProvider"),
+    Provider.VERCEL: lateimport("pydantic_ai.providers.vercel", "VercelProvider"),
+    Provider.X_AI: lateimport("pydantic_ai.providers.grok", "GrokProvider"),
 })
 """Mapping of providers to their agent model provider classes."""
 

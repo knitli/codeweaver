@@ -13,9 +13,10 @@ from typing import Any, TypedDict
 from fastmcp import FastMCP
 from fastmcp.client.transports import FastMCPTransport
 from fastmcp.tools import Tool
+from lateimport import lateimport
 from mcp.types import ToolAnnotations
 
-from codeweaver.core import DictView, lazy_import
+from codeweaver.core import DictView
 from codeweaver.core.constants import (
     CONTEXT_AGENT_TAGS,
     FIND_CODE_DESCRIPTION,
@@ -44,7 +45,7 @@ class ToolCollectionDict(TypedDict):
 
 def get_bulk_tool(server: FastMCP[Any]) -> Tool:
     """Lazily import and return the bulk tool definition."""
-    bulk_tool_cls = lazy_import("fastmcp.contrib.bulk_tool_caller", "BulkToolCaller")
+    bulk_tool_cls = lateimport("fastmcp.contrib.bulk_tool_caller", "BulkToolCaller")
     bulk_tool_instance = bulk_tool_cls()
     bulk_tool_instance.connection = FastMCPTransport(mcp=server)
     bulk_tool_name = "call_tool_bulk"

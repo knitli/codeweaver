@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING, Annotated, Any, NamedTuple
 
 from codeweaver_daemon import check_daemon_health, spawn_daemon_process
 from cyclopts import App, Parameter
+from lateimport import lateimport
 from pydantic import FilePath, PositiveInt
 
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
@@ -32,7 +33,6 @@ from codeweaver.core import (
     SettingsMapDep,
     StatisticsDep,
     TypeIs,
-    lazy_import,
 )
 from codeweaver.core.di import INJECTED
 from codeweaver.core.statistics import SessionStatistics
@@ -194,7 +194,7 @@ async def start_cw_services(
 
     # Use background_services_lifespan (the new Phase 1 implementation)
     async with background_services_lifespan(
-        settings=lazy_import("codeweaver.server", "get_settings")._resolve()(),
+        settings=lateimport("codeweaver.server", "get_settings")._resolve()(),
         statistics=statistics,
         verbose=verbose,
         progress_reporter=progress_reporter,
@@ -391,7 +391,7 @@ async def start(
     ):
         display.print_error("Invalid host or port provided. Please check your inputs.")
         return
-    get_project_path = lazy_import("codeweaver.core", "get_project_path")
+    get_project_path = lateimport("codeweaver.core", "get_project_path")
     from codeweaver.core import Unset
 
     project = (

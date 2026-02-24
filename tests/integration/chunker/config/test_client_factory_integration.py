@@ -70,8 +70,8 @@ class TestProviderInstantiationWithClientFactory:
         mock_client_class.__signature__ = Signature([
             Parameter("api_key", Parameter.KEYWORD_ONLY, default=None)
         ])
-        mock_lazy_import = Mock()
-        mock_lazy_import._resolve.return_value = mock_client_class
+        mock_lateimport = Mock()
+        mock_lateimport._resolve.return_value = mock_client_class
 
         mock_provider_class = Mock()
         mock_provider_instance = Mock()
@@ -90,7 +90,7 @@ class TestProviderInstantiationWithClientFactory:
                 Client(
                     provider=Provider.VOYAGE,
                     category=ProviderCategory.EMBEDDING,
-                    client=mock_lazy_import,
+                    client=mock_lateimport,
                     provider_class=mock_provider_lazy,
                 ),
             )
@@ -120,8 +120,8 @@ class TestProviderInstantiationWithClientFactory:
 
         mock_existing_client = Mock()
         mock_client_class = Mock()
-        mock_lazy_import = Mock()
-        mock_lazy_import._resolve.return_value = mock_client_class
+        mock_lateimport = Mock()
+        mock_lateimport._resolve.return_value = mock_client_class
 
         mock_provider_class = Mock()
         mock_provider_lazy = Mock()
@@ -136,7 +136,7 @@ class TestProviderInstantiationWithClientFactory:
                 Client(
                     provider=Provider.VOYAGE,
                     category=ProviderCategory.EMBEDDING,
-                    client=mock_lazy_import,
+                    client=mock_lateimport,
                     provider_class=mock_provider_lazy,
                 ),
             )
@@ -164,8 +164,8 @@ class TestProviderInstantiationWithClientFactory:
         from codeweaver.providers import Client
 
         mock_client_class = Mock(side_effect=Exception("Connection failed"))
-        mock_lazy_import = Mock()
-        mock_lazy_import._resolve.return_value = mock_client_class
+        mock_lateimport = Mock()
+        mock_lateimport._resolve.return_value = mock_client_class
 
         mock_provider_class = Mock(return_value=Mock())
         mock_provider_lazy = Mock()
@@ -180,7 +180,7 @@ class TestProviderInstantiationWithClientFactory:
                 Client(
                     provider=Provider.VOYAGE,
                     category=ProviderCategory.EMBEDDING,
-                    client=mock_lazy_import,
+                    client=mock_lateimport,
                     provider_class=mock_provider_lazy,
                 ),
             )
@@ -242,8 +242,8 @@ class TestVectorStoreProviderWithClientFactory:
         mock_client_instance.location = ":memory:"
         # Fix: Mock should fail first (no URL), then succeed with memory mode
         mock_client_class = Mock(side_effect=[Exception("No URL provided"), mock_client_instance])
-        mock_lazy_import = Mock()
-        mock_lazy_import._resolve.return_value = mock_client_class
+        mock_lateimport = Mock()
+        mock_lateimport._resolve.return_value = mock_client_class
 
         mock_provider_class = Mock(return_value=Mock())
         mock_provider_lazy = Mock()
@@ -255,7 +255,7 @@ class TestVectorStoreProviderWithClientFactory:
                 Client(
                     provider=Provider.QDRANT,
                     category=ProviderCategory.VECTOR_STORE,
-                    client=mock_lazy_import,
+                    client=mock_lateimport,
                     provider_class=mock_provider_lazy,
                 ),
             )
@@ -284,8 +284,8 @@ class TestVectorStoreProviderWithClientFactory:
 
         mock_client_instance = Mock()
         mock_client_class = Mock(return_value=mock_client_instance)
-        mock_lazy_import = Mock()
-        mock_lazy_import._resolve.return_value = mock_client_class
+        mock_lateimport = Mock()
+        mock_lateimport._resolve.return_value = mock_client_class
 
         mock_provider_class = Mock(return_value=Mock())
         mock_provider_lazy = Mock()
@@ -296,7 +296,7 @@ class TestVectorStoreProviderWithClientFactory:
                 Client(
                     provider=Provider.QDRANT,
                     category=ProviderCategory.VECTOR_STORE,
-                    client=mock_lazy_import,
+                    client=mock_lateimport,
                     provider_class=mock_provider_lazy,
                 ),
             )
@@ -379,8 +379,8 @@ class TestProviderCategoryStringHandling:
         mock_client_class.__signature__ = Signature([
             Parameter("api_key", Parameter.KEYWORD_ONLY, default=None)
         ])
-        mock_lazy_import = Mock()
-        mock_lazy_import._resolve.return_value = mock_client_class
+        mock_lateimport = Mock()
+        mock_lateimport._resolve.return_value = mock_client_class
 
         mock_provider_class = Mock(return_value=Mock())
         mock_provider_lazy = Mock()
@@ -395,7 +395,7 @@ class TestProviderCategoryStringHandling:
                 Client(
                     provider=Provider.VOYAGE,
                     category=ProviderCategory.EMBEDDING,
-                    client=mock_lazy_import,
+                    client=mock_lateimport,
                     provider_class=mock_provider_lazy,
                 ),
             )

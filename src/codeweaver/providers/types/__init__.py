@@ -8,7 +8,7 @@
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
-from codeweaver.core.utils.lazy_importer import create_lazy_getattr
+from lateimport import create_late_getattr
 
 
 if TYPE_CHECKING:
@@ -54,7 +54,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "VectorSet": (__spec__.parent, "vectors"),
 })
 
-__getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
+__getattr__ = create_late_getattr(_dynamic_imports, globals(), __name__)
 
 
 __all__ = (

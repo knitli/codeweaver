@@ -19,8 +19,9 @@ from fastmcp import FastMCP
 from fastmcp.client.transports import StreamableHttpTransport
 from fastmcp.server.proxy import FastMCPProxy, ProxyClient
 from fastmcp.tools import Tool
+from lateimport import lateimport
 
-from codeweaver.core import DictView, SettingsMapDep, StatisticsDep, Unset, lazy_import
+from codeweaver.core import DictView, SettingsMapDep, StatisticsDep, Unset
 from codeweaver.core.constants import DEFAULT_MCP_PORT, LOCALHOST, MCP_ENDPOINT
 from codeweaver.core.di.depends import INJECTED
 from codeweaver.server.config import (
@@ -304,7 +305,7 @@ def _setup_server[TransportT: Literal["stdio", "streamable-http"]](
         run_args = setup_runargs(run_args, host, port, verbose=verbose, debug=debug)
     app = FastMCP(
         "CodeWeaver",
-        **(mutable_args | {"icons": [lazy_import("codeweaver.server", "CODEWEAVER_SVG_ICON")]}),
+        **(mutable_args | {"icons": [lateimport("codeweaver.server", "CODEWEAVER_SVG_ICON")]}),
     )
     app = register_tools(app)
     app = register_middleware(app, cast(list[type[McpMiddleware]], middleware), middleware_opts)

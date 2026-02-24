@@ -12,6 +12,8 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Literal, TypedDict, cast
 
+from lateimport import lateimport
+
 from codeweaver.core.types.aliases import (
     DirectoryName,
     DirectoryNameT,
@@ -23,17 +25,18 @@ from codeweaver.core.types.aliases import (
     LanguageNameT,
     LiteralStringT,
 )
-from codeweaver.core.utils import COMMON_LLM_TOOLING_PATHS, COMMON_TOOLING_PATHS, lazy_import
+from codeweaver.core.utils import COMMON_LLM_TOOLING_PATHS, COMMON_TOOLING_PATHS
 
 
-print(f"DEBUG: lazy_import is {lazy_import} type: {type(lazy_import)}")
+print(f"DEBUG: lateimport is {lateimport} type: {type(lateimport)}")
 
 if TYPE_CHECKING:
+    from lateimport import LateImport
+
     from codeweaver.core.metadata import ExtLangPair
-    from codeweaver.core.utils import LazyImport
 
 
-LangPair: LazyImport[ExtLangPair] = lazy_import("codeweaver.core.metadata", "ExtLangPair")
+LangPair: LateImport[ExtLangPair] = lateimport("codeweaver.core.metadata", "ExtLangPair")
 
 
 METADATA_PATH = "metadata"

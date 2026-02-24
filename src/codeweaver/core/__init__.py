@@ -5,8 +5,9 @@
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
+from lateimport import create_late_getattr
+
 from codeweaver.core.di.container import Container, get_container, reset_container
-from codeweaver.core.utils.lazy_importer import LazyImport, create_lazy_getattr, lazy_import
 
 
 if TYPE_CHECKING:
@@ -833,7 +834,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "we_are_in_vscode": (__spec__.parent, "utils"),
 })
 
-__getattr__ = create_lazy_getattr(_dynamic_imports, globals(), __name__)
+__getattr__ = create_late_getattr(_dynamic_imports, globals(), __name__)
 
 __all__ = (
     "ALL_LANGUAGES",
@@ -976,7 +977,6 @@ __all__ = (
     "LanguageName",
     "LanguageNameT",
     "LanguageSummary",
-    "LazyImport",
     "LineStrategy",
     "LiteralProvider",
     "LiteralProviderCategory",
@@ -1098,7 +1098,6 @@ __all__ = (
     "capture_session_event",
     "clean_args",
     "clean_sentinel_from_schema",
-    "create_lazy_getattr",
     "create_session_file_handler",
     "deep_merge_dicts",
     "dependency_provider",
@@ -1204,7 +1203,6 @@ __all__ = (
     "language_from_config_file",
     "language_from_path",
     "languages_present_from_configs",
-    "lazy_import",
     "log_to_client_or_fallback",
     "low_priority",
     "make_blake_store",

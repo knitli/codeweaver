@@ -50,7 +50,7 @@ def _get_settings(settings: SettingsDep = INJECTED) -> CodeWeaverSettingsType:
     return settings
 
 
-def _lazy_import_httpx() -> None:
+def _lateimport_httpx() -> None:
     """Lazy import httpx for type checking compatibility.
 
     This function ensures httpx is imported at runtime when needed,

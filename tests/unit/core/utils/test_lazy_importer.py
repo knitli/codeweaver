@@ -11,7 +11,7 @@ from types import ModuleType
 
 import pytest
 
-from codeweaver.core import LazyImport, lazy_import
+from lateimport import LateImport, lateimport
 
 
 pytestmark = [pytest.mark.unit]
@@ -19,13 +19,13 @@ pytestmark = [pytest.mark.unit]
 
 @pytest.mark.benchmark
 @pytest.mark.performance
-class TestLazyImportBasics:
-    """Test basic LazyImport functionality."""
+class TestLateImportBasics:
+    """Test basic LateImport functionality."""
 
-    def test_lazy_import_module(self):
+    def test_lateimport_module(self):
         """Test lazy importing a module."""
         # Create lazy import
-        os_lazy = lazy_import("os")
+        os_lazy = lateimport("os")
 
         # Should not be resolved yet
         assert not os_lazy.is_resolved()
@@ -34,21 +34,21 @@ class TestLazyImportBasics:
         # Access an attribute - should still not resolve
         path_lazy = os_lazy.path
         assert not os_lazy.is_resolved()
-        assert isinstance(path_lazy, LazyImport)
+        assert isinstance(path_lazy, LateImport)
 
         # Actually use it - should resolve
         path_lazy = os_lazy.path
-        assert isinstance(path_lazy, LazyImport)
+        assert isinstance(path_lazy, LateImport)
         assert not path_lazy.is_resolved()
 
         result = os_lazy.path.join("a", "b")
         assert result == "a/b"
         assert os_lazy.is_resolved()
 
-    def test_lazy_import_function(self):
+    def test_lateimport_function(self):
         """Test lazy importing a specific function."""
         # Import specific function
-        join_lazy = lazy_import("os.path", "join")
+        join_lazy = lateimport("os.path", "join")
 
         assert not join_lazy.is_resolved()
 
@@ -57,10 +57,10 @@ class TestLazyImportBasics:
         assert result == "a/b/c"
         assert join_lazy.is_resolved()
 
-    def test_lazy_import_class(self):
+    def test_lateimport_class(self):
         """Test lazy importing a class."""
         # Import a class
-        Path = lazy_import("pathlib", "Path")
+        Path = lateimport("pathlib", "Path")
 
         assert not Path.is_resolved()
 
@@ -69,10 +69,10 @@ class TestLazyImportBasics:
         assert Path.is_resolved()
         assert str(p) == "/tmp"
 
-    def test_lazy_import_nested_attributes(self):
+    def test_lateimport_nested_attributes(self):
         """Test lazy importing with nested attribute access."""
         # Create lazy import with nested attributes
-        lazy = lazy_import("collections", "abc", "Mapping")
+        lazy = lateimport("collections", "abc", "Mapping")
 
         assert not lazy.is_resolved()
 
@@ -82,21 +82,21 @@ class TestLazyImportBasics:
         assert lazy._resolve() is Mapping
         assert lazy.is_resolved()
 
-    def test_lazy_import_chaining(self):
+    def test_lateimport_chaining(self):
         """Test attribute chaining without resolution."""
         # Start with module
-        collections = lazy_import("collections")
+        collections = lateimport("collections")
         assert not collections.is_resolved()
 
         # Chain attribute access
         abc = collections.abc
         assert not collections.is_resolved()
-        assert isinstance(abc, LazyImport)
+        assert isinstance(abc, LateImport)
 
         # Chain more
         Mapping = abc.Mapping
         assert not collections.is_resolved()
-        assert isinstance(Mapping, LazyImport)
+        assert isinstance(Mapping, LateImport)
 
         # Finally resolve
         from collections.abc import Mapping as ActualMapping
@@ -107,26 +107,26 @@ class TestLazyImportBasics:
 
 @pytest.mark.benchmark
 @pytest.mark.performance
-class TestLazyImportErrors:
-    """Test error handling in LazyImport."""
+class TestLateImportErrors:
+    """Test error handling in LateImport."""
 
     def test_module_not_found(self):
         """Test ImportError for non-existent module."""
-        lazy = lazy_import("nonexistent_module_xyz")
+        lazy = lateimport("nonexistent_module_xyz")
 
         with pytest.raises(ImportError, match="Cannot import module"):
             lazy._resolve()
 
     def test_attribute_not_found(self):
         """Test AttributeError for non-existent attribute."""
-        lazy = lazy_import("os", "nonexistent_function")
+        lazy = lateimport("os", "nonexistent_function")
 
         with pytest.raises(AttributeError, match="has no attribute"):
             lazy._resolve()
 
     def test_nested_attribute_not_found(self):
         """Test AttributeError for nested non-existent attributes."""
-        lazy = lazy_import("os", "path", "nonexistent_attr")
+        lazy = lateimport("os", "path", "nonexistent_attr")
 
         with pytest.raises(AttributeError, match="has no attribute"):
             lazy._resolve()
@@ -134,7 +134,7 @@ class TestLazyImportErrors:
     def test_not_callable_error(self):
         """Test TypeError when calling non-callable."""
         # Import a non-callable attribute
-        lazy = lazy_import("os", "name")  # os.name is a string
+        lazy = lateimport("os", "name")  # os.name is a string
 
         with pytest.raises(TypeError):
             lazy()
@@ -142,12 +142,12 @@ class TestLazyImportErrors:
 
 @pytest.mark.benchmark
 @pytest.mark.performance
-class TestLazyImportCaching:
-    """Test that LazyImport caches resolved values."""
+class TestLateImportCaching:
+    """Test that LateImport caches resolved values."""
 
     def test_resolution_caching(self):
         """Test that resolution is cached."""
-        lazy = lazy_import("os.path", "join")
+        lazy = lateimport("os.path", "join")
 
         # Resolve twice
         result1 = lazy._resolve()
@@ -159,7 +159,7 @@ class TestLazyImportCaching:
 
     def test_multiple_calls_same_resolution(self):
         """Test that multiple calls use cached resolution."""
-        lazy = lazy_import("os.path", "join")
+        lazy = lateimport("os.path", "join")
 
         # Call multiple times
         result1 = lazy("a", "b")
@@ -173,12 +173,12 @@ class TestLazyImportCaching:
 
 @pytest.mark.benchmark
 @pytest.mark.performance
-class TestLazyImportThreadSafety:
-    """Test thread safety of LazyImport."""
+class TestLateImportThreadSafety:
+    """Test thread safety of LateImport."""
 
     def test_concurrent_resolution(self):
         """Test that concurrent resolution is thread-safe."""
-        lazy = lazy_import("os.path", "join")
+        lazy = lateimport("os.path", "join")
 
         results = []
         errors = []
@@ -210,12 +210,12 @@ class TestLazyImportThreadSafety:
 
 @pytest.mark.benchmark
 @pytest.mark.performance
-class TestLazyImportRealWorldUseCases:
+class TestLateImportRealWorldUseCases:
     """Test real-world use cases from codeweaver."""
 
     def test_settings_pattern(self):
         """Test the settings getter pattern from codeweaver."""
-        # Simulate: _settings = lazy_import("module").get_settings()
+        # Simulate: _settings = lateimport("module").get_settings()
         # Create a mock module for testing
         test_module = ModuleType("test_settings_module")
 
@@ -227,7 +227,7 @@ class TestLazyImportRealWorldUseCases:
 
         try:
             # Create lazy import chain
-            lazy_getter = lazy_import("test_settings_module").get_settings
+            lazy_getter = lateimport("test_settings_module").get_settings
             assert not lazy_getter.is_resolved()
 
             # Call it - should resolve and execute
@@ -250,8 +250,8 @@ class TestLazyImportRealWorldUseCases:
         sys.modules["test_types_module"] = test_module
 
         try:
-            # Simulate: CodeWeaverSettings = lazy_import("module", "Class")
-            LazyClass = lazy_import("test_types_module", "MyClass")
+            # Simulate: CodeWeaverSettings = lateimport("module", "Class")
+            LazyClass = lateimport("test_types_module", "MyClass")
             assert not LazyClass.is_resolved()
 
             # Use it at runtime
@@ -261,7 +261,7 @@ class TestLazyImportRealWorldUseCases:
         finally:
             del sys.modules["test_types_module"]
 
-    def test_global_level_lazy_imports(self):
+    def test_global_level_lateimports(self):
         """Test using lazy imports at global/module level."""
         # This simulates the main use case: global-level lazy imports
 
@@ -276,15 +276,15 @@ class TestLazyImportRealWorldUseCases:
         sys.modules["mock_tiktoken"] = tiktoken_module
 
         try:
-            self._test_lazy_imports_resolve()
+            self._test_lateimports_resolve()
         finally:
             del sys.modules["mock_config"]
             del sys.modules["mock_tiktoken"]
 
-    def _test_lazy_imports_resolve(self):
+    def _test_lateimports_resolve(self):
         # Global-level lazy imports (like at module scope)
-        _get_settings = lazy_import("mock_config").get_settings
-        _tiktoken = lazy_import("mock_tiktoken")
+        _get_settings = lateimport("mock_config").get_settings
+        _tiktoken = lateimport("mock_tiktoken")
 
         # Neither should be resolved yet
         assert not _get_settings.is_resolved()
@@ -302,12 +302,12 @@ class TestLazyImportRealWorldUseCases:
 
 @pytest.mark.benchmark
 @pytest.mark.performance
-class TestLazyImportMagicMethods:
+class TestLateImportMagicMethods:
     """Test magic method forwarding."""
 
     def test_repr(self):
         """Test __repr__ shows path and status."""
-        lazy = lazy_import("os", "path", "join")
+        lazy = lateimport("os", "path", "join")
 
         repr_ = repr(lazy)
         assert "os.path.join" in repr_
@@ -321,7 +321,7 @@ class TestLazyImportMagicMethods:
 
     def test_dir(self):
         """Test __dir__ forwards to resolved object."""
-        lazy = lazy_import("os")
+        lazy = lateimport("os")
 
         # dir() should resolve and forward
         assert not lazy.is_resolved()
@@ -337,7 +337,7 @@ class TestLazyImportMagicMethods:
         sys.modules["test_setattr_module"] = test_module
 
         try:
-            lazy = lazy_import("test_setattr_module")
+            lazy = lateimport("test_setattr_module")
 
             # Set an attribute - should resolve
             assert not lazy.is_resolved()
@@ -350,26 +350,26 @@ class TestLazyImportMagicMethods:
 
 @pytest.mark.benchmark
 @pytest.mark.performance
-class TestLazyImportComparison:
-    """Compare LazyImport with old lazy_importer pattern."""
+class TestLateImportComparison:
+    """Compare LateImport with old lateimporter pattern."""
 
     def test_old_vs_new_syntax(self):
         """Compare old awkward syntax vs new clean syntax."""
         # OLD pattern (what you had before):
-        # module = lazy_importer("os")()  # Awkward double-call
+        # module = lateimporter("os")()  # Awkward double-call
 
         # NEW pattern:
-        module = lazy_import("os")
+        module = lateimport("os")
         result = module.path.join("a", "b")
 
         assert result == "a/b"
 
     def test_chaining_impossible_with_old_pattern(self):
         """Show that attribute chaining was impossible with old pattern."""
-        # OLD: lazy_importer("os").path  # Would execute import immediately!
+        # OLD: lateimporter("os").path  # Would execute import immediately!
 
         # NEW: Can chain without execution
-        lazy = lazy_import("os").path.join
+        lazy = lateimport("os").path.join
         assert not lazy.is_resolved()  # Still lazy!
 
         result = lazy("a", "b")
@@ -383,8 +383,8 @@ class TestEdgeCases:
     """Test edge cases and special scenarios."""
 
     def test_empty_attribute_chain(self):
-        """Test LazyImport with no attributes (just module)."""
-        lazy = LazyImport("os")
+        """Test LateImport with no attributes (just module)."""
+        lazy = LateImport("os")
         result = lazy._resolve()
 
         import os
@@ -392,8 +392,8 @@ class TestEdgeCases:
         assert result is os
 
     def test_single_attribute(self):
-        """Test LazyImport with single attribute."""
-        lazy = LazyImport("os", "name")
+        """Test LateImport with single attribute."""
+        lazy = LateImport("os", "name")
         result = lazy._resolve()
 
         import os
@@ -402,30 +402,30 @@ class TestEdgeCases:
 
     def test_multiple_attribute_chains(self):
         """Test multiple levels of attribute chaining."""
-        lazy = lazy_import("os")
+        lazy = lateimport("os")
         chained = lazy.path.join
 
-        assert isinstance(chained, LazyImport)
+        assert isinstance(chained, LateImport)
         result = chained("a", "b", "c")
         assert result == "a/b/c"
 
-    def test_lazy_import_with_existing_import(self):
-        """Test LazyImport when module is already imported."""
+    def test_lateimport_with_existing_import(self):
+        """Test LateImport when module is already imported."""
         # Import normally first
 
         # Now create lazy import
-        lazy = lazy_import("os")
+        lazy = lateimport("os")
 
         # Should still work
         result = lazy.path.join("a", "b")
         assert result == "a/b"
 
-    def test_multiple_lazy_imports_same_module(self):
-        """Test multiple LazyImport instances for same module."""
-        lazy1 = lazy_import("os")
-        lazy2 = lazy_import("os")
+    def test_multiple_lateimports_same_module(self):
+        """Test multiple LateImport instances for same module."""
+        lazy1 = lateimport("os")
+        lazy2 = lateimport("os")
 
-        # Different LazyImport instances
+        # Different LateImport instances
         assert lazy1 is not lazy2
 
         # But resolve to same module
@@ -438,26 +438,26 @@ class TestDocumentationExamples:
     """Test all examples from the documentation."""
 
     def test_basic_module_import_example(self):
-        """Test example from LazyImport docstring."""
-        lazy_import("tiktoken")
+        """Test example from LateImport docstring."""
+        lateimport("tiktoken")
         # Would normally do: encoding = tiktoken.get_encoding("o200k_base")
         # But tiktoken might not be installed, so we test with os instead
 
-        os_lazy = lazy_import("os")
+        os_lazy = lateimport("os")
         result = os_lazy.path.join("a", "b")
         assert result == "a/b"
 
     def test_function_import_example(self):
         """Test function import example."""
-        join = lazy_import("os.path", "join")
+        join = lateimport("os.path", "join")
         result = join("a", "b", "c")
         assert result == "a/b/c"
 
     def test_attribute_chaining_example(self):
         """Test attribute chaining example."""
-        Mapping = lazy_import("collections").abc.Mapping
+        Mapping = lateimport("collections").abc.Mapping
 
-        assert isinstance(Mapping, LazyImport)
+        assert isinstance(Mapping, LateImport)
         from collections.abc import Mapping as ActualMapping
 
         assert Mapping._resolve() is ActualMapping
@@ -465,8 +465,8 @@ class TestDocumentationExamples:
 
 @pytest.mark.benchmark
 @pytest.mark.performance
-class TestLazyImportPerformance:
-    """Test performance characteristics of LazyImport."""
+class TestLateImportPerformance:
+    """Test performance characteristics of LateImport."""
 
     def test_resolution_overhead(self):
         """Test that lazy resolution overhead is reasonable."""
@@ -477,7 +477,7 @@ class TestLazyImportPerformance:
         start = time.perf_counter()
         # sourcery skip: no-loop-in-tests
         for _ in range(iterations):
-            lazy = lazy_import("os.path", "join")
+            lazy = lateimport("os.path", "join")
             result = lazy("a", "b")
             assert result == "a/b"
         lazy_time = time.perf_counter() - start
@@ -502,7 +502,7 @@ class TestLazyImportPerformance:
         """Test that cached resolution is fast (minimal overhead)."""
         import time
 
-        lazy = lazy_import("os.path", "join")
+        lazy = lateimport("os.path", "join")
         # Pre-resolve it
         lazy._resolve()
 
@@ -534,15 +534,15 @@ class TestLazyImportPerformance:
 
 @pytest.mark.benchmark
 @pytest.mark.performance
-class TestLazyImportIntrospection:
-    """Test LazyImport compatibility with introspection tools like inspect and pydantic."""
+class TestLateImportIntrospection:
+    """Test LateImport compatibility with introspection tools like inspect and pydantic."""
 
     def test_inspect_signature_compatibility(self):
-        """Test that inspect.signature() works with LazyImport objects."""
+        """Test that inspect.signature() works with LateImport objects."""
         from inspect import signature
 
         # Create a lazy import to a function
-        get_settings_lazy = lazy_import("codeweaver.server", "get_settings")
+        get_settings_lazy = lateimport("codeweaver.server", "get_settings")
 
         # This should not raise AttributeError
         sig = signature(get_settings_lazy)
@@ -556,7 +556,7 @@ class TestLazyImportIntrospection:
         assert get_settings_lazy.is_resolved()
 
     def test_pydantic_default_factory_compatibility(self):
-        """Test that LazyImport can be used as a pydantic default_factory."""
+        """Test that LateImport can be used as a pydantic default_factory."""
         from pydantic import Field
         from pydantic.dataclasses import dataclass
 
@@ -571,7 +571,7 @@ class TestLazyImportIntrospection:
         sys.modules["test_default_module"] = test_module
 
         try:
-            get_default_lazy = lazy_import("test_default_module", "get_default_dict")
+            get_default_lazy = lateimport("test_default_module", "get_default_dict")
 
             @dataclass
             class TestModel:
@@ -587,7 +587,7 @@ class TestLazyImportIntrospection:
         """Test that accessing introspection attributes resolves the object."""
         from codeweaver.server import get_settings
 
-        get_settings_lazy = lazy_import("codeweaver.server", "get_settings")
+        get_settings_lazy = lateimport("codeweaver.server", "get_settings")
 
         # Should not be resolved yet
         assert not get_settings_lazy.is_resolved()
@@ -600,7 +600,7 @@ class TestLazyImportIntrospection:
     def test_introspection_attributes_missing(self):
         """Test that missing introspection attributes raise AttributeError."""
         # Create lazy import to something that doesn't have __text_signature__
-        lazy = lazy_import("os")
+        lazy = lateimport("os")
 
         # Should raise AttributeError for missing introspection attributes
         with pytest.raises(AttributeError):

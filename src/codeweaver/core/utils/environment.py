@@ -16,6 +16,7 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
+from lateimport import LateImport, lateimport
 from pydantic import NonNegativeInt, PositiveInt
 
 from codeweaver.core.constants import (
@@ -26,7 +27,6 @@ from codeweaver.core.constants import (
 )
 from codeweaver.core.types.provider import Provider
 from codeweaver.core.utils.checks import has_package
-from codeweaver.core.utils.lazy_importer import LazyImport, lazy_import
 
 
 logger = logging.getLogger(__name__)
@@ -39,7 +39,7 @@ else:
 if TYPE_CHECKING:
     from codeweaver.core.config.settings_type import CodeWeaverSettingsType
 
-console: LazyImport[Console] = lazy_import("rich.console", "Console")
+console: LateImport[Console] = lateimport("rich.console", "Console")
 
 
 def is_tty() -> bool:

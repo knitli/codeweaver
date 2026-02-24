@@ -16,19 +16,19 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
 from fastmcp import Context
+from lateimport import lateimport
 from pydantic_core import to_json
 
 from codeweaver.core import LoggingConfigDict
-from codeweaver.core.utils import get_user_state_dir, is_ci, is_tty, lazy_import
+from codeweaver.core.utils import get_user_state_dir, is_ci, is_tty
 
 
 if TYPE_CHECKING:
+    from lateimport import LateImport
     from rich.console import Console
     from rich.logging import RichHandler
-
-    from codeweaver.core import LazyImport
 else:
-    RichHandler: LazyImport[RichHandler] = lazy_import("rich.logging", "RichHandler")
+    RichHandler: LateImport[RichHandler] = lateimport("rich.logging", "RichHandler")
 
 IS_CI = is_ci()
 IS_TTY = is_tty()
