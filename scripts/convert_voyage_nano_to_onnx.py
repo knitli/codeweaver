@@ -29,6 +29,7 @@ import argparse
 import sys
 
 from pathlib import Path
+from typing import cast
 
 import numpy as np
 import torch
@@ -132,14 +133,18 @@ def validate_conversion(
             with torch.no_grad():
                 features = original_model.tokenize([text])
                 features = {k: v.to("cuda") for k, v in features.items()}
-                raw_output = original_model[0].auto_model(**features)  # ty:ignore[call-non-callable]
-                print(f"    Original raw hidden states shape: {raw_output.last_hidden_state.shape}")
-                if len(original_model) > 1:
-                    print(f"    Model has {len(original_model)} modules")
-                    for idx, module in enumerate(original_model):
-                        print(f"      Module {idx}: {type(module).__name__}")
-                        if hasattr(module, "get_config_dict"):
-                            print(f"        Config: {module.get_config_dict()}")
+                if (module := original_model._first_module()) and isinstance(
+                    module, torch.nn.Model
+                ):
+                    raw_output = cast(torch.nn.Model, module).auto_model(**features)
+                    print(
+                        f"    Original raw hidden states shape: {raw_output.last_hidden_state.shape}"
+                    )
+                print(f"    Model has {len(original_model)} modules")
+                for idx, module in enumerate(original_model):
+                    print(f"      Module {idx}: {type(module).__name__}")
+                    if hasattr(module, "get_config_dict"):
+                        print(f"        Config: {cast(torch.nn.Model, module).get_config_dict()}")
             inputs = tokenizer(
                 text, padding=True, truncation=True, return_tensors="pt", max_length=32768
             )

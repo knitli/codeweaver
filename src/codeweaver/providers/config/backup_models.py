@@ -16,6 +16,7 @@ Models:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from typing import TYPE_CHECKING, Literal
@@ -138,9 +139,14 @@ async def get_backup_embedding_provider() -> EmbeddingProvider | None:
 
             # Create provider with minimal configuration
             config = await get_backup_embedding_config("sentence-transformers")
-            client = await config.get_client()
+            from codeweaver.core.types.service_cards import get_service_card
+
+            card = get_service_card("sentence_transformers", "embedding")
+            client = await asyncio.to_thread(
+                card.create_instance, "client", **config.client_options.as_settings()
+            )
             provider = SentenceTransformersEmbeddingProvider(
-                client=client,  # Will be created internally
+                client=client,
                 config=config,
                 caps=next(
                     cap
@@ -181,7 +187,12 @@ async def get_backup_embedding_provider() -> EmbeddingProvider | None:
 
             # create the config
             config = await get_backup_embedding_config("fastembed")
-            client = await config.get_client()
+            from codeweaver.core.types.service_cards import get_service_card
+
+            card = get_service_card("fastembed", "embedding")
+            client = await asyncio.to_thread(
+                card.create_instance, "client", **config.client_options.as_settings()
+            )
 
             provider = FastEmbedEmbeddingProvider(
                 client=client,
@@ -280,4 +291,9 @@ def get_backup_model_info() -> dict[str, str | bool]:
     }
 
 
-__all__ = ("get_backup_embedding_provider",)
+__all__ = (
+    "get_backup_embedding_provider",
+    "create_backup_embeddings",
+    "get_backup_embedding_config",
+    "get_backup_model_info",
+)

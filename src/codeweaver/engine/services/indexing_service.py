@@ -720,10 +720,7 @@ class IndexingService:
             registry[chunk.chunk_id] = ChunkEmbeddings(chunk=chunk).add(info)
 
     async def _index_compatible_chunks(self, chunks: list[CodeChunk]) -> None:
-        """Index chunks if compatible with current chunking configuration."""
-        if not self._chunking_service.can_reuse_chunks(chunks):
-            return
-
+        """Index chunks from backup store for reconciliation."""
         # Generate embeddings if providers available
         if self._embedding_provider or self._sparse_provider:
             await self._embed_chunks(chunks)
@@ -751,4 +748,4 @@ class IndexingService:
         }
 
 
-__all__ = ("IndexingService",)
+__all__ = ("IndexingService", "ProgressCallback")

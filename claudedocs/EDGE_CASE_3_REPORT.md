@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Knitli Inc.
+
+SPDX-License-Identifier: MIT OR Apache-2.0
+-->
+
 # Edge Case #3: Import vs Definition Differentiation - Implementation Report
 
 **Agent 17 Task**: Properly differentiate between symbols defined in a module and symbols imported into it, with special handling for `as` imports.

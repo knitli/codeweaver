@@ -720,6 +720,14 @@ CONTEXT_AGENT_EXPLANATORY_TASK_CONFIG = {
 RECOMMENDED_CLOUD_CONTEXT_AGENT_MODEL = "anthropic:claude-haiku-4.5"
 """Recommended model for agent operations. This is a strong, cost-effective model for agent tasks with good reasoning capabilities and tool use, and is currently the best performing model for CodeWeaver's internal testing when balancing speed, performance, and cost."""
 
+RECOMMENDED_CLOUD_CONTEXT_AGENT_MODEL_BARE = "claude-haiku-4.5"
+"""Bare model name for use in provider-specific settings (e.g. AnthropicAgentProviderSettings.model_name).
+
+This is the part after ':' in RECOMMENDED_CLOUD_CONTEXT_AGENT_MODEL. Provider-specific
+settings classes already capture the provider via their 'provider' field, so model_name
+must be the bare string the provider SDK expects, not the pydantic-ai 'provider:model' format.
+"""
+
 SOTA_CONTEXT_AGENT_MODEL = "anthropic:claude-opus-4.6"
 """State-of-the-art model for agent operations. Higher cost and latency than our recommendation, but currently the best performing model."""
 
@@ -948,6 +956,7 @@ __all__ = (
     "PYTHON_SHEBANG",
     "QDRANT_MEMORY_LOCATION",
     "RECOMMENDED_CLOUD_CONTEXT_AGENT_MODEL",
+    "RECOMMENDED_CLOUD_CONTEXT_AGENT_MODEL_BARE",
     "RECOMMENDED_CLOUD_EMBEDDING_MODEL",
     "RECOMMENDED_LOCAL_CONTEXT_AGENT_MODEL",
     "RECOMMENDED_LOCAL_EMBEDDING_MODEL",
@@ -978,4 +987,6 @@ __all__ = (
     "WINDOWS_NEWLINE",
     "ZERO",
     "ZERO_POINT_ZERO",
+    "RECOMMENDED_CLOUD_RERANKING_MODEL",
+    "ULTRALIGHT_SPARSE_EMBEDDING_MODEL",
 )

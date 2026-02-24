@@ -58,7 +58,9 @@ class ExtensionFilter(DefaultFilter):
         """
         self._ignore_paths = ignore_paths
         self.extensions: tuple[str, ...] = (
-            extensions if isinstance(extensions, tuple) else tuple(extensions)
+            cast(tuple[str, ...], extensions)
+            if isinstance(extensions, tuple)
+            else tuple(extensions)
         )
         super().__init__()
 
@@ -83,8 +85,8 @@ class DefaultExtensionFilter(ExtensionFilter):
     ) -> None:
         """Initialize the default extension filter with sensible defaults."""
         self._ignore_paths = ignore_paths
-        self.extensions: tuple[str, ...] = (
-            extensions if isinstance(extensions, tuple) else tuple(extensions)
+        self.extensions: tuple[str, ...] = cast(
+            tuple[str, ...], extensions if isinstance(extensions, tuple) else tuple(extensions)
         )
         super().__init__(extensions=extensions, ignore_paths=ignore_paths)
 

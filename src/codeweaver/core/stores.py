@@ -213,7 +213,7 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
                 return "copy"
         with contextlib.suppress(Exception):
             # does it have a constructor that returns itself?
-            if callable(item) and item(item) is item:
+            if callable(item) and cast(Callable[[Any], Any], item)(item) is item:
                 return "constructor"
         if hasattr(item, "__iter__") and callable(type(item)):
             with contextlib.suppress(Exception):
@@ -328,7 +328,7 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
         if not value:
             rand = os.urandom(16)
             value = rand
-        return cast(KeyT, self._keygen(value))
+        return cast(KeyT, cast(Callable[[str | bytes], KeyT], self._keygen)(value))
 
     @override
     def keys(self) -> KeysView[KeyT]:  # ty:ignore[invalid-method-override]

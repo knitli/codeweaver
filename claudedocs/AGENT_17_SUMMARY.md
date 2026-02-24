@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Knitli Inc.
+
+SPDX-License-Identifier: MIT OR Apache-2.0
+-->
+
 # Agent 17: Edge Case #3 Implementation Summary
 
 **Task**: Properly differentiate between symbols defined in a module and symbols imported into it. Special handling for `as` imports.
