@@ -128,3 +128,68 @@ def test_agent_default_no_package():
     """Agent default returns None when no anthropic package present."""
     result = _agent_defaults_with_mocked_env(has_anthropic=False, has_auth=False)
     assert result is None
+
+
+# ---------------------------------------------------------------------------
+# Task 6: embedding and sparse embedding defaults tests
+# ---------------------------------------------------------------------------
+
+
+def _embedding_defaults_with_mocked_packages(
+    available_packages: set[str],
+    voyage_auth: bool = False,
+):
+    from codeweaver.providers.config import providers as pmod
+
+    def mock_has_package(name: str):
+        return name if name in available_packages else None
+
+    with (
+        patch.object(pmod, "has_package", side_effect=mock_has_package),
+        patch.object(Provider.VOYAGE, "has_env_auth", new=voyage_auth),
+    ):
+        return pmod._get_default_embedding_settings()
+
+
+def test_embedding_default_voyage_uses_recommended_model():
+    """Voyage embedding default must use RECOMMENDED_CLOUD_EMBEDDING_MODEL (voyage-4-large, not voyage-4)."""
+    from codeweaver.core.constants import RECOMMENDED_CLOUD_EMBEDDING_MODEL
+
+    result = _embedding_defaults_with_mocked_packages({"voyageai"}, voyage_auth=True)
+    assert result.provider == Provider.VOYAGE
+    assert str(result.model) == RECOMMENDED_CLOUD_EMBEDDING_MODEL
+    assert ":" not in str(result.model)
+
+
+def test_embedding_default_fastembed_uses_recommended_query_model():
+    """FastEmbed embedding default must use RECOMMENDED_QUERY_EMBEDDING_MODEL without colon prefix."""
+    from codeweaver.core.constants import RECOMMENDED_QUERY_EMBEDDING_MODEL
+
+    result = _embedding_defaults_with_mocked_packages({"fastembed"})
+    assert result.provider == Provider.FASTEMBED
+    assert ":" not in str(result.model)
+    assert str(result.model) == RECOMMENDED_QUERY_EMBEDDING_MODEL
+
+
+def test_embedding_default_sentence_transformers_uses_recommended_query_model():
+    """SentenceTransformers embedding default must use RECOMMENDED_QUERY_EMBEDDING_MODEL."""
+    from codeweaver.core.constants import RECOMMENDED_QUERY_EMBEDDING_MODEL
+
+    result = _embedding_defaults_with_mocked_packages({"sentence_transformers"})
+    assert result.provider == Provider.SENTENCE_TRANSFORMERS
+    assert ":" not in str(result.model)
+    assert str(result.model) == RECOMMENDED_QUERY_EMBEDDING_MODEL
+
+
+def test_sparse_embedding_default_uses_sparse_constant():
+    """Sparse embedding default model must match RECOMMENDED_SPARSE_EMBEDDING_MODEL."""
+    from codeweaver.core.constants import RECOMMENDED_SPARSE_EMBEDDING_MODEL
+    from codeweaver.providers.config import providers as pmod
+
+    def mock_has_package(name: str):
+        return name if name == "fastembed" else None
+
+    with patch.object(pmod, "has_package", side_effect=mock_has_package):
+        result = pmod._get_default_sparse_embedding_settings()
+
+    assert str(result.model) == RECOMMENDED_SPARSE_EMBEDDING_MODEL

@@ -29,8 +29,11 @@ from codeweaver.core.constants import (
     LOCALHOST,
     ONE,
     RECOMMENDED_CLOUD_CONTEXT_AGENT_MODEL_BARE,
+    RECOMMENDED_CLOUD_EMBEDDING_MODEL,
     RECOMMENDED_CLOUD_RERANKING_MODEL,
     RECOMMENDED_LOCAL_RERANKING_MODEL,
+    RECOMMENDED_QUERY_EMBEDDING_MODEL,
+    RECOMMENDED_SPARSE_EMBEDDING_MODEL,
     ZERO,
 )
 from codeweaver.core.types import (
@@ -162,7 +165,9 @@ def _get_default_embedding_settings() -> DeterminedDefaults:
             # all three of the top defaults are extremely capable and finetuned for code tasks
             if lib == "voyageai" and Provider.VOYAGE.has_env_auth:
                 return DeterminedDefaults(
-                    provider=Provider.VOYAGE, model=ModelName("voyage-4"), enabled=True
+                    provider=Provider.VOYAGE,
+                    model=ModelName(RECOMMENDED_CLOUD_EMBEDDING_MODEL),
+                    enabled=True,
                 )
             if lib == "mistral" and Provider.MISTRAL.has_env_auth:
                 return DeterminedDefaults(
@@ -175,15 +180,13 @@ def _get_default_embedding_settings() -> DeterminedDefaults:
             if lib in {"fastembed_gpu", "fastembed"}:
                 return DeterminedDefaults(
                     provider=Provider.FASTEMBED,
-                    model=ModelName("BAAI/bge-small-en-v1.5"),
+                    model=ModelName(RECOMMENDED_QUERY_EMBEDDING_MODEL),
                     enabled=True,
                 )
             if lib == "sentence_transformers":
                 return DeterminedDefaults(
                     provider=Provider.SENTENCE_TRANSFORMERS,
-                    # embedding-small-english-r2 is *very lightweight* and quite capable with a good context window (8192 tokens)
-                    # Good upgrade from the likes of all-minilm-L6-v2 while still being very efficient
-                    model=ModelName("voyageai/voyage-4-nano"),
+                    model=ModelName(RECOMMENDED_QUERY_EMBEDDING_MODEL),
                     enabled=True,
                 )
     logger.warning(
@@ -287,7 +290,7 @@ def _get_default_sparse_embedding_settings() -> DeterminedDefaults:
             if lib in {"fastembed_gpu", "fastembed"}:
                 return DeterminedDefaults(
                     provider=Provider.FASTEMBED,
-                    model=ModelName("prithivida/Splade_PP_en_v1"),
+                    model=ModelName(RECOMMENDED_SPARSE_EMBEDDING_MODEL),
                     enabled=True,
                 )
     # qdrant_client has built-in BM25 support
