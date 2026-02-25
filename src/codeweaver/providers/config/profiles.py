@@ -37,6 +37,7 @@ from codeweaver.core import (
     get_user_data_dir,
 )
 from codeweaver.core.constants import (
+    BACKUP_EMBEDDING_MODEL_FALLBACK,
     RECOMMENDED_CLOUD_CONTEXT_AGENT_MODEL_BARE,
     RECOMMENDED_CLOUD_EMBEDDING_MODEL,
     RECOMMENDED_CLOUD_RERANKING_MODEL,
@@ -365,7 +366,7 @@ def _testing_profile(
     from codeweaver.core import Provider
     from codeweaver.providers.config.providers import ProviderSettingsDict
 
-    embedding_model = ULTRALIGHT_EMBEDDING_MODEL if HAS_ST else "jinaai/jina-embeddings-v2-small-en"
+    embedding_model = ULTRALIGHT_EMBEDDING_MODEL if HAS_ST else BACKUP_EMBEDDING_MODEL_FALLBACK
     reranking_model = ULTRALIGHT_RERANKING_MODEL
     default_collection = _default_collection_options(
         project_name=project_name, project_path=project_path

@@ -106,16 +106,18 @@ def test_recommended_profile_uses_constants_for_model_names():
     assert str(rerank_first.model_name) == RECOMMENDED_CLOUD_RERANKING_MODEL
 
 
-def test_testing_profile_uses_ultralight_constants():
+def test_testing_profile_uses_ultralight_constants(monkeypatch):
     """Testing profile must use the ultralight model name constants."""
     from codeweaver.core.constants import (
         ULTRALIGHT_EMBEDDING_MODEL,
         ULTRALIGHT_RERANKING_MODEL,
         ULTRALIGHT_SPARSE_EMBEDDING_MODEL,
     )
-    from codeweaver.providers.config.profiles import _testing_profile
 
-    result = _testing_profile()
+    pmod = _get_profiles_module(monkeypatch)
+    monkeypatch.setattr(pmod, "HAS_ST", True)
+
+    result = pmod._testing_profile()
 
     embedding = result.get("embedding")
     assert embedding is not None
