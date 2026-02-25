@@ -209,10 +209,10 @@ def _recommended_default(
                     provider=Provider.VOYAGE,
                 ),
                 query_provider=EmbeddingProviderSettings(
-                    model_name=ModelName("voyage-4-nano"),
+                    model_name=ModelName("voyageai/voyage-4-nano"),
                     provider=Provider.SENTENCE_TRANSFORMERS,
                     embedding_config=SentenceTransformersEmbeddingConfig(
-                        model_name=ModelName("voyage-4-nano")
+                        model_name=ModelName("voyageai/voyage-4-nano")
                     ),
                 ),
             ),
@@ -281,7 +281,7 @@ def _quickstart_default(
         if HAS_ST
         else ModelName("prithivida/Splade_PP_en_v1")
     )
-    reranking_model = ModelName("jinaai/jina-reranker-v1-en-")
+    reranking_model = ModelName("jinaai/jina-reranker-v1-tiny-en")
     return ProviderSettingsDict(
         embedding=(
             EmbeddingProviderSettings(
@@ -698,4 +698,10 @@ class ProviderProfile(ProviderConfigProfile, BaseDataclassEnum):
         })
 
 
-__all__ = ("ProviderConfigProfile", "ProviderProfile", "VersionedProfile")
+__all__ = (
+    "ProviderConfigProfile",
+    "ProviderProfile",
+    "VersionedProfile",
+    "HAS_FASTEMBED",
+    "HAS_ST",
+)

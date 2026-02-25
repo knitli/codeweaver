@@ -321,21 +321,21 @@ xai = ["pydantic-ai-slim[xai]"]
 dev = [
   # black is used to format generated code
   "black>=26.1.0",
-  "ruff>=0.15.0",
+  "ruff>=0.15.2",
   "serena>=0.9.1",
   "ty>=0.0.18",
-  "uv>=0.10.0",
+  "uv>=0.10.5",
 ]
 build = ["hatchling>=1.28.0", "twine>=6.2.0", "uv-dynamic-versioning>=0.12.0"]
 dev-helpers = [
   "ipython>=9.10.0",
   "jsonlines>=4.0.0",
   "memory-profiler>=0.61.0",
-  "pdbpp>=0.12.0.post1",
+  "pdbpp>=0.12.1",
   "pyperclip>=1.11.0",
   "superclaude>=4.2.0",
 ]
-docs = ["griffe>=1.15.0"]
+docs = ["griffe==1.15.0"]
 test = [
   "dirty-equals>=0.11.0",
   "hypothesis>=6.151.9",

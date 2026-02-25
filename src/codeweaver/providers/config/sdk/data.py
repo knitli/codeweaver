@@ -22,7 +22,10 @@ from codeweaver.core.constants import DEFAULT_MAX_RESULTS
 from codeweaver.core.exceptions import ConfigurationError
 from codeweaver.core.types import BasedModel, LiteralStringT, Provider
 from codeweaver.core.utils import has_package
-from codeweaver.providers import DuckDuckGoSearchTool
+
+
+if TYPE_CHECKING:
+    from codeweaver.providers import DuckDuckGoSearchTool
 
 
 if TYPE_CHECKING and has_package("exa_py"):
@@ -337,5 +340,5 @@ __all__ = (
     "ExaSearchToolOptions",
     "ExaToolConfig",
     "TavilySearchContextToolConfig",
-    DataToolConfigT,
+    "DataToolConfigT",
 )

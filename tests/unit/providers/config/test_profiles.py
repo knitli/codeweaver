@@ -1,0 +1,80 @@
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
+# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+"""Unit tests for provider profiles -- model name correctness and consistency."""
+
+from __future__ import annotations
+
+import sys
+from unittest.mock import MagicMock
+
+import pytest
+
+from codeweaver.core.constants import (
+    ULTRALIGHT_RERANKING_MODEL,
+)
+
+
+def _get_profiles_module(monkeypatch):
+    """Import profiles module with mocked dependencies to avoid circular imports."""
+    # If already imported, clear cached version so monkeypatching HAS_ST works
+    for key in list(sys.modules.keys()):
+        if "codeweaver.providers.config.profiles" in key:
+            del sys.modules[key]
+
+    import codeweaver.providers.config.profiles as pmod
+    return pmod
+
+
+def test_recommended_query_provider_has_huggingface_prefix(monkeypatch):
+    """voyage-4-nano loaded via SentenceTransformers needs voyageai/ org prefix."""
+    pmod = _get_profiles_module(monkeypatch)
+    monkeypatch.setattr(pmod, "HAS_ST", True)
+
+    result = pmod._recommended_default("local")
+
+    embedding_config = result.get("embedding")
+    assert embedding_config is not None
+    first = embedding_config[0] if isinstance(embedding_config, tuple) else embedding_config
+    # It should be an AsymmetricEmbeddingProviderSettings with query_provider
+    assert hasattr(first, "query_provider"), (
+        f"Expected AsymmetricEmbeddingProviderSettings, got {type(first)}"
+    )
+    query_model = str(first.query_provider.model_name)
+    assert query_model.startswith("voyageai/"), (
+        f"SentenceTransformers query model must use HuggingFace voyageai/ prefix, got: {query_model!r}"
+    )
+
+
+def test_quickstart_reranking_model_name_no_trailing_dash(monkeypatch):
+    """Quickstart reranking model must be a valid model name without trailing dash."""
+    pmod = _get_profiles_module(monkeypatch)
+    monkeypatch.setattr(pmod, "HAS_ST", False)
+    monkeypatch.setattr(pmod, "HAS_FASTEMBED", True)
+
+    result = pmod._quickstart_default("local")
+    reranking = result.get("reranking")
+    assert reranking is not None
+    first = reranking[0] if isinstance(reranking, tuple) else reranking
+    model_name = str(first.model_name)
+    assert not model_name.endswith("-"), (
+        f"Reranking model name must not end with -, got: {model_name!r}"
+    )
+    assert model_name == ULTRALIGHT_RERANKING_MODEL
+
+
+def test_quickstart_reranking_model_with_st(monkeypatch):
+    """Quickstart reranking model (ST path) must also be a valid name."""
+    pmod = _get_profiles_module(monkeypatch)
+    monkeypatch.setattr(pmod, "HAS_ST", True)
+    monkeypatch.setattr(pmod, "HAS_FASTEMBED", False)
+
+    result = pmod._quickstart_default("local")
+    reranking = result.get("reranking")
+    assert reranking is not None
+    first = reranking[0] if isinstance(reranking, tuple) else reranking
+    model_name = str(first.model_name)
+    assert not model_name.endswith("-"), (
+        f"Reranking model name must not end with -, got: {model_name!r}"
+    )
