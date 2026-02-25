@@ -7,13 +7,8 @@
 from __future__ import annotations
 
 import sys
-from unittest.mock import MagicMock
 
-import pytest
-
-from codeweaver.core.constants import (
-    ULTRALIGHT_RERANKING_MODEL,
-)
+from codeweaver.core.constants import ULTRALIGHT_RERANKING_MODEL
 
 
 def _get_profiles_module(monkeypatch):
