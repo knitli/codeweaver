@@ -36,6 +36,16 @@ from codeweaver.core import (
     generate_collection_name,
     get_user_data_dir,
 )
+from codeweaver.core.constants import (
+    RECOMMENDED_CLOUD_CONTEXT_AGENT_MODEL_BARE,
+    RECOMMENDED_CLOUD_EMBEDDING_MODEL,
+    RECOMMENDED_CLOUD_RERANKING_MODEL,
+    RECOMMENDED_QUERY_EMBEDDING_MODEL,
+    RECOMMENDED_SPARSE_EMBEDDING_MODEL,
+    ULTRALIGHT_EMBEDDING_MODEL,
+    ULTRALIGHT_RERANKING_MODEL,
+    ULTRALIGHT_SPARSE_EMBEDDING_MODEL,
+)
 from codeweaver.core.types import AnonymityConversion, FilteredKeyT
 from codeweaver.core.types.dataclasses import DataclassSerializationMixin
 from codeweaver.core.utils import has_package, uuid7
@@ -204,15 +214,17 @@ def _recommended_default(
         embedding=(
             AsymmetricEmbeddingProviderSettings(
                 embed_provider=EmbeddingProviderSettings(
-                    model_name=ModelName("voyage-4-large"),
-                    embedding_config=VoyageEmbeddingConfig(model_name=ModelName("voyage-4-large")),
+                    model_name=ModelName(RECOMMENDED_CLOUD_EMBEDDING_MODEL),
+                    embedding_config=VoyageEmbeddingConfig(
+                        model_name=ModelName(RECOMMENDED_CLOUD_EMBEDDING_MODEL)
+                    ),
                     provider=Provider.VOYAGE,
                 ),
                 query_provider=EmbeddingProviderSettings(
-                    model_name=ModelName("voyageai/voyage-4-nano"),
+                    model_name=ModelName(RECOMMENDED_QUERY_EMBEDDING_MODEL),
                     provider=Provider.SENTENCE_TRANSFORMERS,
                     embedding_config=SentenceTransformersEmbeddingConfig(
-                        model_name=ModelName("voyageai/voyage-4-nano")
+                        model_name=ModelName(RECOMMENDED_QUERY_EMBEDDING_MODEL)
                     ),
                 ),
             ),
@@ -220,26 +232,28 @@ def _recommended_default(
         sparse_embedding=(
             SparseEmbeddingProviderSettings(
                 provider=Provider.FASTEMBED,
-                model_name=ModelName("prithivida/Splade_PP_en_v1"),
+                model_name=ModelName(RECOMMENDED_SPARSE_EMBEDDING_MODEL),
                 sparse_embedding_config=FastEmbedSparseEmbeddingConfig(
-                    model_name=ModelName("prithivida/Splade_PP_en_v1")
+                    model_name=ModelName(RECOMMENDED_SPARSE_EMBEDDING_MODEL)
                 ),
             ),
         ),
         reranking=(
             RerankingProviderSettings(
                 provider=Provider.VOYAGE,
-                model_name=ModelName("voyage-rerank-2.5"),
-                reranking_config=VoyageRerankingConfig(model_name=ModelName("voyage-rerank-2.5")),
+                model_name=ModelName(RECOMMENDED_CLOUD_RERANKING_MODEL),
+                reranking_config=VoyageRerankingConfig(
+                    model_name=ModelName(RECOMMENDED_CLOUD_RERANKING_MODEL)
+                ),
             ),
         ),
         agent=(
             AnthropicAgentProviderSettings(
                 provider=Provider.ANTHROPIC,
-                model_name="claude-haiku-4.5",
+                model_name=RECOMMENDED_CLOUD_CONTEXT_AGENT_MODEL_BARE,
                 agent_config=AnthropicAgentModelConfig(
                     anthropic_metadata={"_user_id": f"cw-recommended-{uuid7().hex}"},
-                    model_name="claude-haiku-4.5",
+                    model_name=RECOMMENDED_CLOUD_CONTEXT_AGENT_MODEL_BARE,
                     max_tokens=20000,
                     temperature=0.2,
                     top_p=1.0,
@@ -281,7 +295,7 @@ def _quickstart_default(
         if HAS_ST
         else ModelName("prithivida/Splade_PP_en_v1")
     )
-    reranking_model = ModelName("jinaai/jina-reranker-v1-tiny-en")
+    reranking_model = ModelName(ULTRALIGHT_RERANKING_MODEL)
     return ProviderSettingsDict(
         embedding=(
             EmbeddingProviderSettings(
@@ -315,7 +329,7 @@ def _quickstart_default(
         agent=(
             AnthropicAgentProviderSettings(
                 provider=Provider.ANTHROPIC,
-                model_name="claude-haiku-4.5",
+                model_name=RECOMMENDED_CLOUD_CONTEXT_AGENT_MODEL_BARE,
                 agent_config=AnthropicAgentModelConfig(),
             ),
         ),
@@ -351,17 +365,17 @@ def _testing_profile(
     from codeweaver.core import Provider
     from codeweaver.providers.config.providers import ProviderSettingsDict
 
-    embedding_model = "minishlab/potion-base-8M" if HAS_ST else "jinaai/jina-embeddings-v2-small-en"
-    reranking_model = "jinaai/jina-reranker-v1-tiny-en"
+    embedding_model = ULTRALIGHT_EMBEDDING_MODEL if HAS_ST else "jinaai/jina-embeddings-v2-small-en"
+    reranking_model = ULTRALIGHT_RERANKING_MODEL
     default_collection = _default_collection_options(
         project_name=project_name, project_path=project_path
     )
     backup_settings = _quickstart_default("local") | {
         "sparse_embedding": SparseEmbeddingProviderSettings(
             provider=Provider.FASTEMBED,
-            model_name=ModelName("qdrant/bm25"),
+            model_name=ModelName(ULTRALIGHT_SPARSE_EMBEDDING_MODEL),
             sparse_embedding_config=FastEmbedSparseEmbeddingConfig(
-                model_name=ModelName("qdrant/bm25")
+                model_name=ModelName(ULTRALIGHT_SPARSE_EMBEDDING_MODEL)
             ),
         ),
         "embedding": EmbeddingProviderSettings(
@@ -699,9 +713,9 @@ class ProviderProfile(ProviderConfigProfile, BaseDataclassEnum):
 
 
 __all__ = (
+    "HAS_FASTEMBED",
+    "HAS_ST",
     "ProviderConfigProfile",
     "ProviderProfile",
     "VersionedProfile",
-    "HAS_FASTEMBED",
-    "HAS_ST",
 )
