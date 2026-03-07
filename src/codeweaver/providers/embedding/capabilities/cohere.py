@@ -108,4 +108,4 @@ def get_cohere_embedding_capabilities() -> tuple[CohereEmbeddingCapabilities, ..
     return tuple(output_models)
 
 
-__all__ = ("get_cohere_embedding_capabilities",)
+__all__ = ("MODEL_MAP", "CohereEmbeddingCapabilities", "get_cohere_embedding_capabilities")

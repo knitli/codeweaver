@@ -11,6 +11,12 @@ from codeweaver.core.dependencies.utils import ensure_container_initialized
 
 ensure_container_initialized()
 
+# === MANAGED EXPORTS ===
+
+# Exportify manages this section. It contains lazy-loading infrastructure
+# for the package: imports and runtime declarations (__all__, __getattr__,
+# __dir__). Manual edits will be overwritten by `exportify fix`.
+
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
@@ -29,6 +35,8 @@ if TYPE_CHECKING:
         TelemetrySettingsDep,
     )
     from codeweaver.core.dependencies.core_settings import (
+        AsyncPath,
+        CodeWeaverSettingsType,
         SettingsDep,
         SettingsMapDep,
         bootstrap_settings,
@@ -38,30 +46,28 @@ if TYPE_CHECKING:
         StatisticsDep,
         TelemetryServiceDep,
     )
+    from codeweaver.core.dependencies.utils import (
+        ensure_container_initialized,
+        ensure_settings_initialized,
+    )
 
-_dynamic_imports = MappingProxyType({
-    "LoggerDep": (__spec__.parent, "component_settings"),
-    "LoggingSettingsDep": (__spec__.parent, "component_settings"),
-    "ProgressReporterDep": (__spec__.parent, "services"),
-    "ResolvedGitBranchDep": (__spec__.parent, "component_settings"),
-    "ResolvedProjectNameDep": (__spec__.parent, "component_settings"),
-    "ResolvedProjectPathDep": (__spec__.parent, "component_settings"),
-    "ResolvedProjectPathHashDep": (__spec__.parent, "component_settings"),
-    "ServiceCardsDep": (__spec__.parent, "component_settings"),
+_dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
+    "AsyncPath": (__spec__.parent, "core_settings"),
+    "CodeWeaverSettingsType": (__spec__.parent, "core_settings"),
     "SettingsDep": (__spec__.parent, "core_settings"),
-    "SettingsMapDep": (__spec__.parent, "core_settings"),
-    "StatisticsDep": (__spec__.parent, "services"),
-    "TelemetryServiceDep": (__spec__.parent, "services"),
-    "TelemetrySettingsDep": (__spec__.parent, "component_settings"),
     "bootstrap_settings": (__spec__.parent, "core_settings"),
+    "ensure_container_initialized": (__spec__.parent, "utils"),
+    "ensure_settings_initialized": (__spec__.parent, "utils"),
 })
-
 
 __getattr__ = create_late_getattr(_dynamic_imports, globals(), __name__)
 
 __all__ = (
+    "AsyncPath",
+    "CodeWeaverSettingsType",
     "LoggerDep",
     "LoggingSettingsDep",
+    "MappingProxyType",
     "ProgressReporterDep",
     "ResolvedGitBranchDep",
     "ResolvedProjectNameDep",
@@ -74,8 +80,11 @@ __all__ = (
     "TelemetryServiceDep",
     "TelemetrySettingsDep",
     "bootstrap_settings",
+    "ensure_container_initialized",
+    "ensure_settings_initialized",
 )
 
 
 def __dir__() -> list[str]:
+    """List available attributes for the package."""
     return list(__all__)

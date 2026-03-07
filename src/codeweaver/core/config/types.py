@@ -113,4 +113,4 @@ match ROOT_PACKAGE:
             default_mcp_config: NotRequired[dict[str, dict] | Unset]
 
 
-__all__ = ("CodeWeaverSettingsDict",)
+__all__ = ("ROOT_PACKAGE", "BaseCodeWeaverSettingsDict", "CodeWeaverSettingsDict")

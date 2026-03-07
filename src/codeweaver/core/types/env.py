@@ -109,4 +109,4 @@ class ProviderEnvVars(TypedDict, total=False):
     other: NotRequired[dict[str, EnvVarInfo]]
 
 
-__all__ = ("EnvFormat", "EnvVarInfo", "ProviderEnvVars")
+__all__ = ("EnvFormat", "EnvVarInfo", "ProviderEnvVars", "VariableInfo")

@@ -470,7 +470,7 @@ class IndexingService:
         self.stats.chunks_embedded += len(all_chunks)
 
         # Retrieve embedded chunks from registry
-        from codeweaver.providers import get_embedding_registry
+        from codeweaver.providers.embedding import get_embedding_registry
 
         registry = get_embedding_registry()
         updated_chunks = [
@@ -512,7 +512,7 @@ class IndexingService:
 
     async def _embed_chunks(self, chunks: list[CodeChunk]) -> None:
         """Generate embeddings for chunks."""
-        from codeweaver.providers import get_embedding_registry
+        from codeweaver.providers.embedding import get_embedding_registry
 
         registry = get_embedding_registry()
 
@@ -603,7 +603,7 @@ class IndexingService:
         registry: EmbeddingRegistryDep = INJECTED,
     ) -> None:
         """Process a single batch of backup content for reconciliation."""
-        from codeweaver.providers import get_embedding_registry
+        from codeweaver.providers.embedding import get_embedding_registry
 
         # Extract chunks and sparse vectors from batch
         chunks, sparse_vectors = self._extract_chunks_from_batch(batch)

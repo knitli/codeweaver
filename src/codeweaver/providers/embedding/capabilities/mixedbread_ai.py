@@ -69,4 +69,11 @@ def get_mixedbread_ai_embedding_capabilities() -> tuple[MixedbreadAiEmbeddingCap
     return (MixedbreadAiEmbeddingCapabilities.model_validate(MXBAI_EMBED_LARGE_CAPABILITIES),)
 
 
-__all__ = ("get_mixedbread_ai_embedding_capabilities",)
+__all__ = (
+    "ALL_CAPABILITIES",
+    "CAP_MAP",
+    "MXBAI_EMBED_LARGE_CAPABILITIES",
+    "MixedbreadAiEmbeddingCapabilities",
+    "MixedbreadAiProvider",
+    "get_mixedbread_ai_embedding_capabilities",
+)

@@ -124,4 +124,9 @@ def get_voyage_embedding_capabilities() -> tuple[VoyageEmbeddingCapabilities, ..
     return tuple(VoyageEmbeddingCapabilities.model_validate({**s}) for s in settings)
 
 
-__all__ = ("get_voyage_embedding_capabilities",)
+__all__ = (
+    "VOYAGE_4_FAMILY",
+    "Voyage4ModelFamily",
+    "VoyageEmbeddingCapabilities",
+    "get_voyage_embedding_capabilities",
+)

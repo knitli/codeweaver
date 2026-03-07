@@ -1,6 +1,4 @@
-# sourcery skip: no-complex-if-expressions
-# SPDX-FileCopyrightText: 2025 Knitli Inc.
-# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
 
@@ -470,4 +468,156 @@ async def find_code(
         return response
 
 
-__all__ = ("MatchedSection", "find_code")
+# === MANAGED EXPORTS ===
+
+# Exportify manages this section. It contains lazy-loading infrastructure
+# for the package: imports and runtime declarations (__all__, __getattr__,
+# __dir__). Manual edits will be overwritten by `exportify fix`.
+
+from types import MappingProxyType
+from typing import TYPE_CHECKING
+
+from lateimport import create_late_getattr
+
+
+if TYPE_CHECKING:
+    from codeweaver.server.agent_api.find_code.conversion import (
+        CodeMatchType,
+        convert_search_result_to_code_match,
+    )
+    from codeweaver.server.agent_api.find_code.filters import (
+        apply_filters,
+        filter_by_languages,
+        filter_test_files,
+    )
+    from codeweaver.server.agent_api.find_code.intent import (
+        INTENT_KEYWORDS,
+        INTENT_TO_AGENT_TASK,
+        IntentResult,
+        IntentType,
+        QueryComplexity,
+        QueryIntent,
+        detect_intent,
+    )
+    from codeweaver.server.agent_api.find_code.pipeline import (
+        ConfigurationError,
+        QueryError,
+        SearchPackageDep,
+        build_query_vector,
+        embed_query,
+        execute_vector_search,
+        raise_value_error,
+        rerank_results,
+    )
+    from codeweaver.server.agent_api.find_code.response import (
+        CodeWeaverStateDep,
+        build_error_response,
+        build_success_response,
+        calculate_token_count,
+        extract_languages,
+        generate_summary,
+        get_indexer_state_info,
+    )
+    from codeweaver.server.agent_api.find_code.scoring import (
+        apply_hybrid_weights,
+        apply_semantic_weighting,
+        process_reranked_results,
+        process_unranked_results,
+    )
+    from codeweaver.server.agent_api.find_code.types import (
+        CodeMatch,
+        FindCodeResponseSummary,
+        FindCodeSubmission,
+        ValidationError,
+    )
+
+_dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
+    "INTENT_KEYWORDS": (__spec__.parent, "intent"),
+    "INTENT_TO_AGENT_TASK": (__spec__.parent, "intent"),
+    "CodeMatch": (__spec__.parent, "types"),
+    "CodeMatchType": (__spec__.parent, "conversion"),
+    "CodeWeaverStateDep": (__spec__.parent, "response"),
+    "ConfigurationError": (__spec__.parent, "pipeline"),
+    "FindCodeResponseSummary": (__spec__.parent, "types"),
+    "FindCodeSubmission": (__spec__.parent, "types"),
+    "IntentResult": (__spec__.parent, "intent"),
+    "IntentType": (__spec__.parent, "intent"),
+    "QueryComplexity": (__spec__.parent, "intent"),
+    "QueryError": (__spec__.parent, "pipeline"),
+    "QueryIntent": (__spec__.parent, "intent"),
+    "SearchPackageDep": (__spec__.parent, "pipeline"),
+    "ValidationError": (__spec__.parent, "types"),
+    "apply_filters": (__spec__.parent, "filters"),
+    "apply_hybrid_weights": (__spec__.parent, "scoring"),
+    "apply_semantic_weighting": (__spec__.parent, "scoring"),
+    "build_error_response": (__spec__.parent, "response"),
+    "build_query_vector": (__spec__.parent, "pipeline"),
+    "build_success_response": (__spec__.parent, "response"),
+    "calculate_token_count": (__spec__.parent, "response"),
+    "convert_search_result_to_code_match": (__spec__.parent, "conversion"),
+    "detect_intent": (__spec__.parent, "intent"),
+    "embed_query": (__spec__.parent, "pipeline"),
+    "execute_vector_search": (__spec__.parent, "pipeline"),
+    "extract_languages": (__spec__.parent, "response"),
+    "filter_by_languages": (__spec__.parent, "filters"),
+    "filter_test_files": (__spec__.parent, "filters"),
+    "generate_summary": (__spec__.parent, "response"),
+    "get_indexer_state_info": (__spec__.parent, "response"),
+    "process_reranked_results": (__spec__.parent, "scoring"),
+    "process_unranked_results": (__spec__.parent, "scoring"),
+    "raise_value_error": (__spec__.parent, "pipeline"),
+    "rerank_results": (__spec__.parent, "pipeline"),
+})
+
+__getattr__ = create_late_getattr(_dynamic_imports, globals(), __name__)
+
+__all__ = (
+    "INTENT_KEYWORDS",
+    "INTENT_TO_AGENT_TASK",
+    "CodeMatch",
+    "CodeMatchType",
+    "CodeWeaverSettingsType",
+    "CodeWeaverStateDep",
+    "ConfigurationError",
+    "FindCodeResponseSummary",
+    "FindCodeSubmission",
+    "IndexingServiceDep",
+    "IntentResult",
+    "IntentType",
+    "MappingProxyType",
+    "MatchedSection",
+    "QueryComplexity",
+    "QueryError",
+    "QueryIntent",
+    "SearchPackageDep",
+    "SettingsDep",
+    "TelemetryServiceDep",
+    "TelemetrySettingsDep",
+    "ValidationError",
+    "apply_filters",
+    "apply_hybrid_weights",
+    "apply_semantic_weighting",
+    "build_error_response",
+    "build_query_vector",
+    "build_success_response",
+    "calculate_token_count",
+    "convert_search_result_to_code_match",
+    "detect_intent",
+    "embed_query",
+    "execute_vector_search",
+    "extract_languages",
+    "filter_by_languages",
+    "filter_test_files",
+    "find_code",
+    "generate_summary",
+    "get_indexer_state_info",
+    "process_reranked_results",
+    "process_unranked_results",
+    "raise_value_error",
+    "rerank_results",
+)
+
+
+def __dir__() -> list[str]:
+    """List available attributes for the package."""
+    return list(__all__)

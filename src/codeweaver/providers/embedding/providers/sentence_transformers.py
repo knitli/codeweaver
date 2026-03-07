@@ -227,4 +227,8 @@ class SentenceTransformersSparseProvider(SparseEmbeddingProvider[_SparseEncoderT
         return formatted_results
 
 
-__all__ = ("SentenceTransformersEmbeddingProvider", "SentenceTransformersSparseProvider")
+__all__ = (
+    "SentenceTransformersEmbeddingProvider",
+    "SentenceTransformersSparseProvider",
+    "process_for_instruction_model",
+)

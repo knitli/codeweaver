@@ -301,6 +301,7 @@ def _determine_complexity(query: str) -> QueryComplexity:
 
 
 __all__ = (
+    "INTENT_KEYWORDS",
     "INTENT_TO_AGENT_TASK",
     "IntentResult",
     "IntentType",

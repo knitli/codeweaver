@@ -844,6 +844,11 @@ AllDefaultProviderSettings = None  # Will be lazy-initialized on first access
 __all__ = (
     "HAS_ANTHROPIC",
     "AllDefaultProviderSettings",
+    "DefaultAgentProviderSettings",
+    "DefaultEmbeddingProviderSettings",
+    "DefaultRerankingProviderSettings",
+    "DefaultSparseEmbeddingProviderSettings",
+    "DefaultVectorStoreProviderSettings",
     "DeterminedDefaults",
     "ProviderCategorySettingsType",
     "ProviderNameMap",

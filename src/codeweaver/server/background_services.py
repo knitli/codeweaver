@@ -195,4 +195,4 @@ async def run_background_indexing(
         # run_background_indexing is a task.
 
 
-__all__ = ("run_background_indexing",)
+__all__ = ("run_background_indexing", "start_watcher")

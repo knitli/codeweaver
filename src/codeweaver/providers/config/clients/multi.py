@@ -552,5 +552,7 @@ __all__ = (
     "MistralClientOptions",
     "OpenAIClientOptions",
     "SentenceTransformersClientOptions",
+    "SentenceTransformersModelOptions",
     "VoyageClientOptions",
+    "discriminate_azure_embedding_client_options",
 )

@@ -173,4 +173,11 @@ def get_text_embedder() -> type[TextEmbedding]:
     return add_models(TextEmbedding, DENSE_MODELS)
 
 
-__all__ = ("get_sparse_embedder", "get_text_embedder")
+__all__ = (
+    "DENSE_MODELS",
+    "RERANKING_MODELS",
+    "add_models",
+    "get_cross_encoder",
+    "get_sparse_embedder",
+    "get_text_embedder",
+)

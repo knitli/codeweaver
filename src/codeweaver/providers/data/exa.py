@@ -651,10 +651,17 @@ async def register_exa_tools(
 type ExaToolType = ExaSearchTool | ExaFindSimilarTool | ExaGetContentsTool | ExaAnswerTool
 
 __all__ = (
+    "ExaAnswerResult",
     "ExaAnswerTool",
+    "ExaContentResult",
     "ExaFindSimilarTool",
     "ExaGetContentsTool",
+    "ExaSearchResult",
     "ExaSearchTool",
     "ExaToolType",
+    "exa_answer_tool",
+    "exa_find_similar_tool",
+    "exa_get_contents_tool",
+    "exa_search_tool",
     "register_exa_tools",
 )

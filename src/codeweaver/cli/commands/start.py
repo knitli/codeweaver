@@ -534,3 +534,5 @@ if __name__ == "__main__":
         app()
     except Exception as e:
         error_handler.handle_error(e, "Start command", exit_code=1)
+
+__all__ = ()

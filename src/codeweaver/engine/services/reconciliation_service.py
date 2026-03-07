@@ -432,4 +432,4 @@ class VectorReconciliationService:
             self._backup_provider = None
 
 
-__all__ = ("VectorReconciliationService",)
+__all__ = ("ReconciliationResult", "RepairStats", "VectorReconciliationService")

@@ -177,4 +177,4 @@ class GoogleEmbeddingProvider(EmbeddingProvider[genai.Client]):
         return embeddings  # ty: ignore[invalid-return-type]
 
 
-__all__ = ("GoogleEmbeddingProvider",)
+__all__ = ("GoogleEmbeddingProvider", "GoogleEmbeddingTasks")

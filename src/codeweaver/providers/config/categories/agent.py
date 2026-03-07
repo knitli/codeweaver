@@ -40,7 +40,7 @@ from codeweaver.providers.config.clients import (
     OpenAIClientOptions,
     PydanticGatewayClientOptions,
 )
-from codeweaver.providers.config.sdk import (
+from codeweaver.providers.config.sdk.agent import (
     AgentModelConfig,
     AnthropicAgentModelConfig,
     CerebrasAgentModelConfig,
@@ -369,6 +369,7 @@ type AgentProviderSettingsType = Annotated[
 __all__ = (
     "AgentProviderSettingsType",
     "AnthropicAgentProviderSettings",
+    "AnthropicAgentProviderSettingsType",
     "AnthropicAzureAgentProviderSettings",
     "AnthropicBedrockAgentProviderSettings",
     "AnthropicGoogleVertexAgentProviderSettings",
@@ -379,6 +380,7 @@ __all__ = (
     "GroqAgentProviderSettings",
     "HuggingFaceAgentProviderSettings",
     "MistralAgentProviderSettings",
+    "NonAnthropicAgentProviderSettingsType",
     "OpenAIAgentProviderSettings",
     "OpenRouterAgentProviderSettings",
     "PydanticGatewayProviderSettings",

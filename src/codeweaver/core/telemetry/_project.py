@@ -27,3 +27,5 @@ Wait, if it isn't a secret, why use SecretStr?
 
 Because SecretStr masks the value when printed or logged, which keeps people from freaking out when they see it in logs or console output. It **looks** like a secret, but it's not. We really don't care if people see it, but this keeps peoples' nerves calm.
 """
+
+__all__ = ("CODEWEAVER_POSTHOG_PROJECT_KEY",)

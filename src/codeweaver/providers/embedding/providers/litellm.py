@@ -127,3 +127,5 @@ LITELLM_OPENAI_PROVIDERS: dict[Provider | LiteralStringT, tuple[LiteralStringT, 
         "voyage/voyage-3.5-lite",
     ),
 }
+
+__all__ = ("LITELLM_OPENAI_PROVIDERS", "LiteLLMModelSpec")

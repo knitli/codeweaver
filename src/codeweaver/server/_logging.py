@@ -70,3 +70,6 @@ def setup_logger(settings: DictView[CodeWeaverSettingsDict]) -> logging.Logger:
 
 # because of potential namespace issues, we're going to defensively prevent possible bugs:
 from logging import getLogger as getLogger
+
+
+__all__ = ("setup_logger",)

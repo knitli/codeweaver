@@ -220,8 +220,13 @@ async def log_to_client_or_fallback(
 
 
 __all__ = (
+    "IS_CI",
+    "IS_TTY",
+    "LOG_PATH",
     "SESSION_LOG_FILE",
+    "create_session_file_handler",
     "get_rich_console",
+    "get_rich_handler",
     "get_session_log_path",
     "log_to_client_or_fallback",
     "setup_logger",

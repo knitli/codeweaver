@@ -371,4 +371,15 @@ async def create_http_server(
     )
 
 
-__all__ = ("create_http_server", "create_stdio_server")
+__all__ = (
+    "TOOLS_TO_REGISTER",
+    "StdioClientLifespan",
+    "configure_uvicorn_logging",
+    "create_http_server",
+    "create_stdio_server",
+    "get_statistics_middleware",
+    "register_middleware",
+    "register_tools",
+    "setup_middleware",
+    "setup_runargs",
+)

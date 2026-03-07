@@ -182,4 +182,4 @@ async def tavily_search_tool(
     return tool
 
 
-__all__ = ("TavilySearchContextTool", "tavily_search_tool")
+__all__ = ("TavilyResults", "TavilySearchContextTool", "TavilySearchResult", "tavily_search_tool")

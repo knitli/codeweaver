@@ -303,7 +303,7 @@ async def test_search_handles_empty_codebase(tmp_path, clean_container):
         settings = get_settings()
         settings.project_path = empty_dir
         settings.project_name = f"test_empty_{empty_dir.name}"
-        return settings  # ty:ignore[invalid-return-type]
+        return settings
 
     # Apply overrides to container
     clean_container.override(CodeWeaverSettings, get_test_settings)

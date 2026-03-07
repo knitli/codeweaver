@@ -1,5 +1,4 @@
-# SPDX-FileCopyrightText: 2025 Knitli Inc.
-# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
 
@@ -82,14 +81,25 @@ The container automatically:
 from __future__ import annotations
 
 from types import MappingProxyType
+
+# === MANAGED EXPORTS ===
+# Exportify manages this section. It contains lazy-loading infrastructure
+# for the package: imports and runtime declarations (__all__, __getattr__,
+# __dir__). Manual edits will be overwritten by `exportify fix`.
 from typing import TYPE_CHECKING
 
 from lateimport import create_late_getattr
 
-from codeweaver.core.di.container import Container, get_container, reset_container
-
 
 if TYPE_CHECKING:
+    from codeweaver.core.di.container import (
+        Container,
+        DependencyInjectionError,
+        ResolutionResult,
+        TypeAliasType,
+        get_container,
+        reset_container,
+    )
     from codeweaver.core.di.depends import (
         INJECTED,
         Depends,
@@ -107,33 +117,39 @@ if TYPE_CHECKING:
         is_provider_registered,
     )
 
-
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "INJECTED": (__spec__.parent, "depends"),
+    "Container": (__spec__.parent, "container"),
+    "DependencyInjectionError": (__spec__.parent, "container"),
     "Depends": (__spec__.parent, "depends"),
     "DependsPlaceholder": (__spec__.parent, "depends"),
-    "is_depends_marker": (__spec__.parent, "depends"),
-    "depends": (__spec__.parent, "depends"),
     "ProviderMetadata": (__spec__.parent, "utils"),
     "ResolutionResult": (__spec__.parent, "container"),
+    "TypeAliasType": (__spec__.parent, "container"),
+    "dependency_provider": (__spec__.parent, "utils"),
+    "depends": (__spec__.parent, "depends"),
     "get_all_provider_metadata": (__spec__.parent, "utils"),
     "get_all_providers": (__spec__.parent, "utils"),
+    "get_container": (__spec__.parent, "container"),
     "get_provider": (__spec__.parent, "utils"),
     "get_provider_metadata": (__spec__.parent, "utils"),
+    "is_depends_marker": (__spec__.parent, "depends"),
     "is_provider_registered": (__spec__.parent, "utils"),
-    "dependency_provider": (__spec__.parent, "utils"),
+    "reset_container": (__spec__.parent, "container"),
 })
 
 __getattr__ = create_late_getattr(_dynamic_imports, globals(), __name__)
 
-
 __all__ = (
     "INJECTED",
     "Container",
+    "DependencyInjectionError",
     "Depends",
     "DependsPlaceholder",
+    "MappingProxyType",
     "ProviderMetadata",
     "ResolutionResult",
+    "TypeAliasType",
     "dependency_provider",
     "depends",
     "get_all_provider_metadata",
@@ -148,5 +164,5 @@ __all__ = (
 
 
 def __dir__() -> list[str]:
-    """Return the list of attributes for the module."""
+    """List available attributes for the package."""
     return list(__all__)

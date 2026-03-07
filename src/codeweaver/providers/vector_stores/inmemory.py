@@ -123,7 +123,7 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
     @property
     def auto_persist(self) -> bool:
         """Get whether auto-persistence is enabled."""
-        return self._auto_persist  # ty: ignore[unresolved-attribute]
+        return self._auto_persist
 
     async def _persist_to_disk(self) -> None:
         """Persist in-memory state to Qdrant storage directory.
@@ -194,7 +194,7 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
         """
         while not self._shutdown:
             try:
-                await asyncio.sleep(self._persist_interval or 300)  # type: ignore
+                await asyncio.sleep(self._persist_interval or 300)
                 if not self._shutdown:
                     await self._persist_to_disk()
             except asyncio.CancelledError:
@@ -220,10 +220,10 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
 
         # Cancel periodic task
         # ty can't identify the attribute because it's set with object.__setattr__
-        if self._periodic_task:  # ty: ignore[unresolved-attribute]
-            self._periodic_task.cancel()  # ty: ignore[unresolved-attribute]
+        if self._periodic_task:
+            self._periodic_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
-                await self._periodic_task  # ty: ignore[unresolved-attribute]
+                await self._periodic_task
 
         # Final persistence
         try:

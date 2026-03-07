@@ -110,4 +110,8 @@ class HuggingFaceEmbeddingProvider(EmbeddingProvider[AsyncInferenceClient]):
         return self._process_output(output)
 
 
-__all__ = ("HuggingFaceEmbeddingProvider",)
+__all__ = (
+    "HuggingFaceEmbeddingProvider",
+    "huggingface_hub_input_transformer",
+    "huggingface_hub_output_transformer",
+)

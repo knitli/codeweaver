@@ -40,4 +40,4 @@ def get_baai_reranking_capabilities() -> tuple[BaaiRerankingCapabilities, ...]:
     )
 
 
-__all__ = ("get_baai_reranking_capabilities",)
+__all__ = ("BaaiRerankingCapabilities", "get_baai_reranking_capabilities")

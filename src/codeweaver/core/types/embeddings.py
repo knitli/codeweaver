@@ -108,12 +108,12 @@ class QueryResult(BasedModel):
         return {FilteredKey("vectors"): AnonymityConversion.COUNT}
 
     @override
-    def __getitem__(self, intent: str) -> RawEmbeddingVectors | CodeWeaverSparseEmbedding:  # ty: ignore[invalid-method-override]
+    def __getitem__(self, intent: str) -> RawEmbeddingVectors | CodeWeaverSparseEmbedding:
         """Get embedding for a specific intent."""
         return self.vectors[intent]
 
     @override
-    def get(  # ty: ignore[invalid-method-override]
+    def get(
         self, intent: str, default: RawEmbeddingVectors | CodeWeaverSparseEmbedding | None = None
     ) -> RawEmbeddingVectors | CodeWeaverSparseEmbedding | None:
         """Get embedding for an intent with optional default."""

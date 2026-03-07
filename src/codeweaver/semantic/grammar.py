@@ -437,7 +437,7 @@ class Thing(BasedModel):
             return frozenset(
                 cat
                 for name in self.category_names
-                if (cat := self._registry().get_category_by_name(name, language=self.language))  # type: ignore
+                if (cat := self._registry().get_category_by_name(name, language=self.language))
             )
         finally:
             _resolving_grammar.reset(token)
@@ -795,7 +795,7 @@ class Category(BasedModel):
         return thing in self.member_things
 
     @override
-    def __iter__(self) -> Iterator[CompositeThing | Token]:  # ty:ignore[invalid-method-override]
+    def __iter__(self) -> Iterator[CompositeThing | Token]:
         """Iterate over the member Things in this Category."""
         return iter(self.member_things)
 
@@ -1481,6 +1481,7 @@ if __name__ == "__main__":
         console.print(grammar.print)
 
 __all__ = (
+    "AllThingsDict",
     "Category",
     "CompositeThing",
     "Connection",
@@ -1492,8 +1493,12 @@ __all__ = (
     "ThingOrCategoryType",
     "ThingType",
     "Token",
+    "cat_name_normalizer",
     "get_all_grammars",
     "get_grammar",
+    "name_normalizer",
+    "role_name_normalizer",
+    "thing_name_normalizer",
 )
 
 

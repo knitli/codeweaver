@@ -1,7 +1,7 @@
-# SPDX-FileCopyrightText: 2025 Knitli Inc.
-# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
+
 """Provider environment variable definitions.
 
 Auto-exports all provider configurations for registry discovery.
@@ -15,6 +15,50 @@ Organization:
 - cloud_platforms.py: Multi-client providers (Azure, Heroku, Vercel)
 - specialized.py: Providers with unique configurations (Qdrant, Bedrock, etc.)
 """
+
+from __future__ import annotations
+
+
+__all__: tuple[str, ...] = (
+    "ALIBABA",
+    "ANTHROPIC",
+    "AZURE",
+    "BEDROCK",
+    "CEREBRAS",
+    "COHERE",
+    "DEEPSEEK",
+    "EXA",
+    "FIREWORKS",
+    "GITHUB",
+    "GOOGLE",
+    "GROQ",
+    "HEROKU",
+    "HUGGINGFACE_INFERENCE",
+    "LITELLM",
+    "MISTRAL",
+    "MOONSHOT",
+    "MORPH",
+    "NEBIUS",
+    "OLLAMA",
+    "OPENAI",
+    "OPENROUTER",
+    "OVHCLOUD",
+    "PERPLEXITY",
+    "PYDANTIC_GATEWAY",
+    "QDRANT",
+    "SAMBANOVA",
+    "TAVILY",
+    "TOGETHER",
+    "VERCEL",
+    "VOYAGE",
+    "X_AI",
+)
+
+# === MANAGED EXPORTS ===
+
+# Exportify manages this section. It contains lazy-loading infrastructure
+# for the package: imports and runtime declarations (__all__, __getattr__,
+# __dir__). Manual edits will be overwritten by `exportify fix`.
 
 from types import MappingProxyType
 from typing import TYPE_CHECKING
@@ -58,7 +102,6 @@ if TYPE_CHECKING:
         X_AI,
     )
 
-
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "ALIBABA": (__spec__.parent, "openai_compatible"),
     "ANTHROPIC": (__spec__.parent, "specialized"),
@@ -96,8 +139,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
 
 __getattr__ = create_late_getattr(_dynamic_imports, globals(), __name__)
 
-
-__all__: tuple[str, ...] = (
+__all__ = (
     "ALIBABA",
     "ANTHROPIC",
     "AZURE",
@@ -130,9 +172,10 @@ __all__: tuple[str, ...] = (
     "VERCEL",
     "VOYAGE",
     "X_AI",
+    "MappingProxyType",
 )
 
 
 def __dir__() -> list[str]:
-    """Custom dir() implementation to list all provider definitions."""
+    """List available attributes for the package."""
     return list(__all__)

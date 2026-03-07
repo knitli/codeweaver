@@ -113,4 +113,4 @@ class CohereRerankingProvider(RerankingProvider[CohereClient]):
         )
 
 
-__all__ = ("CohereRerankingProvider",)
+__all__ = ("CohereRerankingProvider", "cohere_reranking_output_transformer")

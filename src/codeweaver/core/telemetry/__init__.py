@@ -1,7 +1,7 @@
-# SPDX-FileCopyrightText: 2025 Knitli Inc.
-# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
+
 """
 Privacy-preserving telemetry system for CodeWeaver.
 
@@ -31,15 +31,26 @@ Example:
 from __future__ import annotations
 
 from types import MappingProxyType
+
+# === MANAGED EXPORTS ===
+# Exportify manages this section. It contains lazy-loading infrastructure
+# for the package: imports and runtime declarations (__all__, __getattr__,
+# __dir__). Manual edits will be overwritten by `exportify fix`.
 from typing import TYPE_CHECKING
 
 from lateimport import create_late_getattr
 
 
 if TYPE_CHECKING:
-    # Import everything for IDE and type checker support
-    # These imports are never executed at runtime, only during type checking
-    from codeweaver.core.telemetry.client import SESSION_ID, TelemetryService, get_telemetry_client
+    from codeweaver.core.telemetry._project import CODEWEAVER_POSTHOG_PROJECT_KEY
+    from codeweaver.core.telemetry.client import (
+        NO_HOG,
+        SESSION_ID,
+        TelemetryService,
+        TelemetrySettingsDep,
+        TracebackType,
+        get_telemetry_client,
+    )
     from codeweaver.core.telemetry.events import (
         SearchEvent,
         SessionEvent,
@@ -47,35 +58,55 @@ if TYPE_CHECKING:
         capture_search_event,
         capture_session_event,
     )
+    from codeweaver.core.telemetry.utils import (
+        PATTERNS,
+        IntifyingPatterns,
+        find_identifiable_info,
+        redact_identifiable_info,
+    )
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
-    "TelemetryService": (__spec__.parent, "client"),
+    "CODEWEAVER_POSTHOG_PROJECT_KEY": (__spec__.parent, "_project"),
+    "NO_HOG": (__spec__.parent, "client"),
+    "PATTERNS": (__spec__.parent, "utils"),
     "SESSION_ID": (__spec__.parent, "client"),
+    "IntifyingPatterns": (__spec__.parent, "utils"),
     "SearchEvent": (__spec__.parent, "events"),
     "SessionEvent": (__spec__.parent, "events"),
     "TelemetryEvent": (__spec__.parent, "events"),
-    "TelemetrySettings": (__spec__.parent, "config"),
+    "TelemetryService": (__spec__.parent, "client"),
+    "TelemetrySettingsDep": (__spec__.parent, "client"),
+    "TracebackType": (__spec__.parent, "client"),
     "capture_search_event": (__spec__.parent, "events"),
     "capture_session_event": (__spec__.parent, "events"),
+    "find_identifiable_info": (__spec__.parent, "utils"),
     "get_telemetry_client": (__spec__.parent, "client"),
+    "redact_identifiable_info": (__spec__.parent, "utils"),
 })
-
 
 __getattr__ = create_late_getattr(_dynamic_imports, globals(), __name__)
 
 __all__ = (
+    "CODEWEAVER_POSTHOG_PROJECT_KEY",
+    "NO_HOG",
+    "PATTERNS",
     "SESSION_ID",
+    "IntifyingPatterns",
+    "MappingProxyType",
     "SearchEvent",
     "SessionEvent",
     "TelemetryEvent",
     "TelemetryService",
-    "TelemetrySettings",
+    "TelemetrySettingsDep",
+    "TracebackType",
     "capture_search_event",
     "capture_session_event",
+    "find_identifiable_info",
     "get_telemetry_client",
+    "redact_identifiable_info",
 )
 
 
 def __dir__() -> list[str]:
-    """List available attributes for the module."""
+    """List available attributes for the package."""
     return list(__all__)

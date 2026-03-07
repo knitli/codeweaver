@@ -240,3 +240,6 @@ def create_qdrant_service(
         failover_settings=failover_settings,
         failover_detector=failover_detector,
     )
+
+
+__all__ = ("QdrantVectorStoreService", "create_qdrant_service")

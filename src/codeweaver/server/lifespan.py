@@ -202,4 +202,4 @@ async def http_lifespan(
 combined_lifespan = http_lifespan
 
 
-__all__ = ("background_services_lifespan", "combined_lifespan", "http_lifespan")
+__all__ = ("background_services_lifespan", "http_lifespan")

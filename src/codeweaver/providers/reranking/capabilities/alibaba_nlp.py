@@ -53,4 +53,4 @@ def get_alibaba_reranking_capabilities() -> tuple[AlibabaNlpRerankingCapabilitie
     )
 
 
-__all__ = ("get_alibaba_reranking_capabilities",)
+__all__ = ("AlibabaNlpRerankingCapabilities", "get_alibaba_reranking_capabilities")

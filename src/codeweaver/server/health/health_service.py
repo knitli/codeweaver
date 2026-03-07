@@ -26,7 +26,7 @@ from codeweaver.core.constants import (
 )
 from codeweaver.engine.dependencies import FailoverServiceDep, IndexingServiceDep
 from codeweaver.engine.services.indexing_service import IndexingService
-from codeweaver.providers import AllProviderSettingsDep
+from codeweaver.providers import ProviderSettingsDep
 from codeweaver.server.health.models import (
     EmbeddingProviderServiceInfo,
     FailoverInfo,
@@ -58,7 +58,7 @@ class HealthService:
     def __init__(
         self,
         *,
-        providers: AllProviderSettingsDep = INJECTED,
+        providers: ProviderSettingsDep = INJECTED,
         statistics: StatisticsDep = INJECTED,
         indexer: IndexingServiceDep = INJECTED,
         failover_manager: FailoverServiceDep = INJECTED,
@@ -221,7 +221,7 @@ class HealthService:
                     status=status,
                     model=model_name,
                     latency_ms=latency_ms,
-                    circuit_breaker_state=circuit_state,  # ty:ignore[invalid-argument-type]
+                    circuit_breaker_state=circuit_state,
                 )
             raise_error()
         except Exception as e:

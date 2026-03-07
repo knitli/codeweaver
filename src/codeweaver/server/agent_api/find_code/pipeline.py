@@ -15,7 +15,7 @@ from __future__ import annotations
 import logging
 
 from contextvars import ContextVar
-from typing import Any, NoReturn
+from typing import TYPE_CHECKING, Any, NoReturn
 
 from codeweaver.core import (
     CodeWeaverSparseEmbedding,
@@ -29,12 +29,21 @@ from codeweaver.core import (
 )
 from codeweaver.core.constants import ZERO
 from codeweaver.core.di import INJECTED
-from codeweaver.providers import (
-    EmbeddingProviderDep,
-    RerankingProviderDep,
-    SparseEmbeddingProviderDep,
-    VectorStoreProviderDep,
-)
+from codeweaver.providers import SearchPackageDep
+
+
+if TYPE_CHECKING:
+    from codeweaver.providers import (
+        EmbeddingProvider,
+        RerankingProvider,
+        SparseEmbeddingProvider,
+        VectorStoreProvider,
+    )
+
+
+def _get_package(search_package: SearchPackageDep = INJECTED) -> SearchPackageDep:
+    """Helper to resolve the SearchPackageDep from the container."""
+    return search_package
 
 
 logger = logging.getLogger(__name__)
@@ -56,11 +65,12 @@ def raise_value_error(message: str) -> NoReturn:
 
 
 async def _embed_dense(
-    query: str, dense_provider: EmbeddingProviderDep, context: Any
+    query: str, context: Any, dense_provider: EmbeddingProvider | None = None
 ) -> RawEmbeddingVectors | None:
     """Attempt dense embedding, return None on failure."""
     from codeweaver.core import log_to_client_or_fallback
 
+    dense_provider = dense_provider or _get_package().embedding
     try:
         result = await dense_provider.embed_query(query)
         if isinstance(result, dict) and "error" in result:
@@ -85,7 +95,7 @@ async def _embed_dense(
                 "extra": {
                     "phase": "query_embedding",
                     "embedding_type": "dense",
-                    "embedding_dim": len(result[0]) if result and len(result) > 0 else 0,
+                    "embedding_dim": len(result[0]) if result and len(result) > 0 else 0,  # ty:ignore[invalid-key]
                 },
             },
         )
@@ -108,16 +118,17 @@ async def _embed_dense(
         if not result:
             return None
         if isinstance(result, list) and len(result) > 0 and isinstance(result[0], list):
-            return result
-        return [result]
+            return result  # ty:ignore[invalid-return-type]
+        return [result]  # ty:ignore[invalid-return-type]
 
 
 async def _embed_sparse(
-    query: str, context: Any, sparse_provider: SparseEmbeddingProviderDep = INJECTED
+    query: str, context: Any, sparse_provider: SparseEmbeddingProvider | None = None
 ) -> CodeWeaverSparseEmbedding | None:
     """Attempt sparse embedding, return None on failure."""
     from codeweaver.core import log_to_client_or_fallback
 
+    sparse_provider = sparse_provider or _get_package().sparse_embedding
     try:
         result = await sparse_provider.embed_query(query)
         if isinstance(result, dict) and "error" in result:
@@ -176,7 +187,7 @@ async def _embed_sparse(
             and isinstance(result[0], list)
             and isinstance(result[1], list)
         ):
-            return CodeWeaverSparseEmbedding(indices=result[0], values=result[1])
+            return CodeWeaverSparseEmbedding(indices=result[0], values=result[1])  # ty:ignore[invalid-argument-type]
     return None
 
 
@@ -258,8 +269,8 @@ def _build_vectors_dict(
 async def embed_query(
     query: str,
     context: Any = None,
-    dense_provider: EmbeddingProviderDep = INJECTED,
-    sparse_provider: SparseEmbeddingProviderDep = INJECTED,
+    dense_provider: EmbeddingProvider | None = None,
+    sparse_provider: SparseEmbeddingProvider | None = None,
 ) -> QueryResult:
     """Embed query using configured embedding providers.
 
@@ -280,6 +291,8 @@ async def embed_query(
     """
     from codeweaver.core import log_to_client_or_fallback
 
+    dense_provider = dense_provider or _get_package().embedding
+    sparse_provider = sparse_provider or _get_package().sparse_embedding
     _query_cv.set(query.strip())
     dense_query_embedding = None
     if dense_provider:
@@ -378,7 +391,7 @@ def build_query_vector(query_result: QueryResult, query: str) -> StrategizedQuer
 async def execute_vector_search(
     query_vector: StrategizedQuery,
     context: Any = None,
-    vector_store: VectorStoreProviderDep = INJECTED,
+    vector_store: VectorStoreProvider | None = None,
 ) -> list[SearchResult]:
     """Execute vector search against configured vector store.
 
@@ -394,6 +407,8 @@ async def execute_vector_search(
         ValueError: If no vector store provider configured
     """
     from codeweaver.core import log_to_client_or_fallback
+
+    vector_store = vector_store or _get_package().vector_store
 
     await log_to_client_or_fallback(
         context,
@@ -426,26 +441,8 @@ async def execute_vector_search(
     return results
 
 
-async def _resolve_reranking_providers(
-    reranking: tuple[RerankingProviderDep, ...] | RerankingProviderDep | None,
-) -> tuple[RerankingProviderDep, ...]:
-    """Resolve injected reranking provider(s) into a tuple of providers."""
-    if reranking is None or hasattr(reranking, "__pydantic_serializer__"):
-        try:
-            from codeweaver.core import get_container
-            from codeweaver.providers import RerankingProvider
-
-            reranking = await get_container().resolve(RerankingProvider)
-        except Exception as e:
-            logger.warning("Failed to resolve reranking provider: %s", e)
-            return ()
-    if isinstance(reranking, tuple):
-        return reranking
-    return (reranking,) if reranking else ()
-
-
 async def _try_rerank_with_provider(
-    provider: RerankingProviderDep,
+    provider: RerankingProvider | None,
     idx: int,
     total_providers: int,
     query: str,
@@ -458,6 +455,33 @@ async def _try_rerank_with_provider(
     from codeweaver.providers import RerankingResult
     from codeweaver.providers.exceptions import CircuitBreakerOpenError
 
+    if not (
+        provider := provider or _get_package().reranking[0] if _get_package().reranking else None
+    ):
+        if idx == total_providers - 1:
+            await log_to_client_or_fallback(
+                context,
+                "warning",
+                {
+                    "msg": "No reranking providers configured",
+                    "extra": {"phase": "reranking", "trying_next": False},
+                },
+            )
+            return (chunks_for_reranking, None)
+        await log_to_client_or_fallback(
+            context,
+            "warning",
+            {
+                "msg": "Reranking provider not available",
+                "extra": {
+                    "phase": "reranking",
+                    "provider_index": idx,
+                    "total_providers": total_providers,
+                    "trying_next": idx < total_providers - 1,
+                },
+            },
+        )
+        return (None, None)
     provider_name = type(provider).__name__
     try:
         await log_to_client_or_fallback(
@@ -487,6 +511,8 @@ async def _try_rerank_with_provider(
                     },
                 },
             )
+            if idx == total_providers - 1:
+                return (chunks_for_reranking, None)
             return (None, None)
         enriched_results = [
             RerankingResult(
@@ -561,12 +587,12 @@ async def rerank_results(
     query: str,
     candidates: list[SearchResult],
     context: Any = None,
-    reranking: tuple[RerankingProviderDep, ...] | RerankingProviderDep | None = INJECTED,
+    reranking: tuple[RerankingProvider | None, ...] | None = None,
 ) -> tuple[list[Any] | None, SearchStrategy | None]:
     """Rerank search results using configured reranking provider(s) with cascading fallback."""
     from codeweaver.core import log_to_client_or_fallback
 
-    providers = await _resolve_reranking_providers(reranking)
+    providers = reranking or _get_package().reranking
     if not providers or not candidates:
         await log_to_client_or_fallback(
             context,
@@ -625,9 +651,6 @@ async def rerank_results(
 
 
 __all__ = (
-    "_build_vectors_dict",
-    "_normalize_dense_embedding",
-    "_normalize_sparse_embedding",
     "build_query_vector",
     "embed_query",
     "execute_vector_search",

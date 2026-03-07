@@ -1,10 +1,22 @@
-# SPDX-FileCopyrightText: 2025 Knitli Inc.
-# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
+
 """Server configuration for CodeWeaver."""
 
 from __future__ import annotations
+
+
+"""Dynamically import submodules and classes for the config package.
+
+Maps class/function/type names to their respective module paths for lazy loading.
+"""
+
+# === MANAGED EXPORTS ===
+
+# Exportify manages this section. It contains lazy-loading infrastructure
+# for the package: imports and runtime declarations (__all__, __getattr__,
+# __dir__). Manual edits will be overwritten by `exportify fix`.
 
 from types import MappingProxyType
 from typing import TYPE_CHECKING
@@ -13,16 +25,27 @@ from lateimport import create_late_getattr
 
 
 if TYPE_CHECKING:
-    # Import everything for IDE and type checker support
-    # These imports are never executed at runtime, only during type checking
     from codeweaver.server.config.helpers import get_settings, get_settings_map, update_settings
-    from codeweaver.server.config.mcp import CodeWeaverMCPConfig, MCPConfig, StdioCodeWeaverConfig
+    from codeweaver.server.config.mcp import (
+        CodeWeaverMCPConfig,
+        FastMCPConfig,
+        FastMCPRemoteMCPServer,
+        FastMCPStdioMCPServer,
+        MCPConfig,
+        MCPServerConfig,
+        MissingValueError,
+        StdioCodeWeaverConfig,
+        update_mcp_config_file,
+    )
     from codeweaver.server.config.middleware import (
         AVAILABLE_MIDDLEWARE,
+        DefaultMiddlewareSettings,
         ErrorHandlingMiddlewareSettings,
         LoggingMiddlewareSettings,
+        McpMiddlewareContext,
         MiddlewareOptions,
         RateLimitingMiddlewareSettings,
+        ResponseCachingMiddlewareSettings,
         RetryMiddlewareSettings,
         default_for_transport,
     )
@@ -34,98 +57,133 @@ if TYPE_CHECKING:
         DefaultUvicornSettingsForMcp,
     )
     from codeweaver.server.config.settings import (
+        DEFAULT_BASE_MIDDLEWARE,
+        DEFAULT_HTTP_MIDDLEWARE,
+        BaseFastMcpServerSettings,
         CodeWeaverSettings,
+        CodeWeaverSettingsDict,
         FastMcpHttpServerSettings,
         FastMcpStdioServerSettings,
     )
     from codeweaver.server.config.types import (
+        ASGIMiddleware,
         CodeWeaverMCPConfigDict,
         EndpointSettingsDict,
         FastMcpHttpRunArgs,
         FastMcpServerSettingsDict,
+        HTTPProtocolType,
+        InterfaceType,
+        LifespanType,
         MCPConfigDict,
         StdioCodeWeaverConfigDict,
         UvicornServerSettings,
         UvicornServerSettingsDict,
+        WSProtocolType,
     )
-
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "AVAILABLE_MIDDLEWARE": (__spec__.parent, "middleware"),
-    "CodeWeaverMCPConfig": (__spec__.parent, "mcp"),
-    "CodeWeaverMCPConfigDict": (__spec__.parent, "types"),
+    "DEFAULT_BASE_MIDDLEWARE": (__spec__.parent, "settings"),
+    "DEFAULT_HTTP_MIDDLEWARE": (__spec__.parent, "settings"),
+    "BaseFastMcpServerSettings": (__spec__.parent, "settings"),
     "CodeWeaverSettings": (__spec__.parent, "settings"),
-    "ErrorHandlingMiddlewareSettings": (__spec__.parent, "middleware"),
+    "CodeWeaverSettingsDict": (__spec__.parent, "settings"),
+    "DefaultEndpointSettings": (__spec__.parent, "server_defaults"),
+    "DefaultFastMcpHttpRunArgs": (__spec__.parent, "server_defaults"),
+    "DefaultFastMcpServerSettings": (__spec__.parent, "server_defaults"),
+    "DefaultMiddlewareSettings": (__spec__.parent, "middleware"),
+    "DefaultUvicornSettings": (__spec__.parent, "server_defaults"),
+    "DefaultUvicornSettingsForMcp": (__spec__.parent, "server_defaults"),
     "EndpointSettingsDict": (__spec__.parent, "types"),
+    "ErrorHandlingMiddlewareSettings": (__spec__.parent, "middleware"),
     "FastMcpHttpRunArgs": (__spec__.parent, "types"),
     "FastMcpHttpServerSettings": (__spec__.parent, "settings"),
     "FastMcpServerSettingsDict": (__spec__.parent, "types"),
     "FastMcpStdioServerSettings": (__spec__.parent, "settings"),
-    "DefaultEndpointSettings": (__spec__.parent, "server_defaults"),
-    "DefaultFastMcpHttpRunArgs": (__spec__.parent, "server_defaults"),
-    "DefaultFastMcpServerSettings": (__spec__.parent, "server_defaults"),
-    "DefaultUvicornSettings": (__spec__.parent, "server_defaults"),
-    "DefaultUvicornSettingsForMcp": (__spec__.parent, "server_defaults"),
-    "FastEmbedGPUProviderSettings": (__spec__.parent, "providers"),
+    "InterfaceType": (__spec__.parent, "types"),
+    "LifespanType": (__spec__.parent, "types"),
     "LoggingMiddlewareSettings": (__spec__.parent, "middleware"),
-    "LoggingSettingsDict": (__spec__.parent, "_logging"),
-    "MCPConfig": (__spec__.parent, "mcp"),
-    "MCPConfigDict": (__spec__.parent, "types"),
+    "McpMiddlewareContext": (__spec__.parent, "middleware"),
     "MiddlewareOptions": (__spec__.parent, "middleware"),
+    "MissingValueError": (__spec__.parent, "mcp"),
     "RateLimitingMiddlewareSettings": (__spec__.parent, "middleware"),
+    "ResponseCachingMiddlewareSettings": (__spec__.parent, "middleware"),
     "RetryMiddlewareSettings": (__spec__.parent, "middleware"),
-    "SerializableLoggingFilter": (__spec__.parent, "_logging"),
     "StdioCodeWeaverConfig": (__spec__.parent, "mcp"),
     "StdioCodeWeaverConfigDict": (__spec__.parent, "types"),
     "UvicornServerSettings": (__spec__.parent, "types"),
     "UvicornServerSettingsDict": (__spec__.parent, "types"),
+    "ASGIMiddleware": (__spec__.parent, "types"),
+    "CodeWeaverMCPConfig": (__spec__.parent, "mcp"),
+    "CodeWeaverMCPConfigDict": (__spec__.parent, "types"),
     "default_for_transport": (__spec__.parent, "middleware"),
+    "FastMCPConfig": (__spec__.parent, "mcp"),
+    "FastMCPRemoteMCPServer": (__spec__.parent, "mcp"),
+    "FastMCPStdioMCPServer": (__spec__.parent, "mcp"),
     "get_settings": (__spec__.parent, "helpers"),
     "get_settings_map": (__spec__.parent, "helpers"),
+    "HTTPProtocolType": (__spec__.parent, "types"),
+    "MCPConfig": (__spec__.parent, "mcp"),
+    "MCPConfigDict": (__spec__.parent, "types"),
+    "update_mcp_config_file": (__spec__.parent, "mcp"),
     "update_settings": (__spec__.parent, "helpers"),
+    "WSProtocolType": (__spec__.parent, "types"),
 })
-"""Dynamically import submodules and classes for the config package.
-
-Maps class/function/type names to their respective module paths for lazy loading.
-"""
 
 __getattr__ = create_late_getattr(_dynamic_imports, globals(), __name__)
 
-
 __all__ = (
     "AVAILABLE_MIDDLEWARE",
+    "DEFAULT_BASE_MIDDLEWARE",
+    "DEFAULT_HTTP_MIDDLEWARE",
+    "ASGIMiddleware",
+    "BaseFastMcpServerSettings",
     "CodeWeaverMCPConfig",
     "CodeWeaverMCPConfigDict",
     "CodeWeaverSettings",
+    "CodeWeaverSettingsDict",
     "DefaultEndpointSettings",
     "DefaultFastMcpHttpRunArgs",
     "DefaultFastMcpServerSettings",
+    "DefaultMiddlewareSettings",
     "DefaultUvicornSettings",
     "DefaultUvicornSettingsForMcp",
     "EndpointSettingsDict",
     "ErrorHandlingMiddlewareSettings",
-    "FastEmbedGPUProviderSettings",
+    "FastMCPConfig",
+    "FastMCPRemoteMCPServer",
+    "FastMCPStdioMCPServer",
     "FastMcpHttpRunArgs",
     "FastMcpHttpServerSettings",
     "FastMcpServerSettingsDict",
     "FastMcpStdioServerSettings",
+    "HTTPProtocolType",
+    "InterfaceType",
+    "LifespanType",
     "LoggingMiddlewareSettings",
     "MCPConfig",
     "MCPConfigDict",
+    "MCPServerConfig",
+    "MappingProxyType",
+    "McpMiddlewareContext",
     "MiddlewareOptions",
+    "MissingValueError",
     "RateLimitingMiddlewareSettings",
+    "ResponseCachingMiddlewareSettings",
     "RetryMiddlewareSettings",
     "StdioCodeWeaverConfig",
     "StdioCodeWeaverConfigDict",
     "UvicornServerSettings",
     "UvicornServerSettingsDict",
+    "WSProtocolType",
     "default_for_transport",
     "get_settings",
     "get_settings_map",
+    "update_mcp_config_file",
     "update_settings",
 )
 
 
 def __dir__() -> list[str]:
-    """List available attributes for the config package."""
+    """List available attributes for the package."""
     return list(__all__)

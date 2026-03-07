@@ -749,9 +749,11 @@ __all__ = (
     "DOC_FILES_EXTENSIONS",
     "FALLBACK_TEST",
     "LANGUAGE_SPECIFIC_PATHS",
+    "METADATA_PATH",
     "REPO_POLICY_FILES",
     "TEST_DIR_NAMES",
     "TEST_FILE_PATTERNS",
     "FallBackTestDef",
+    "LlmTool",
     "all_js_exts",
 )

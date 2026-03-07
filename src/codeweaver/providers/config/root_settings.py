@@ -123,4 +123,4 @@ class CodeWeaverProviderSettingsDict(TypedDict, total=False):
     telemetry: TelemetrySettingsDict | None
 
 
-__all__ = ("CodeWeaverProviderSettings",)
+__all__ = ("CodeWeaverProviderSettings", "CodeWeaverProviderSettingsDict")

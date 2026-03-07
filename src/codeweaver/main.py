@@ -355,4 +355,4 @@ if __name__ == "__main__":
         logging.getLogger(__name__).exception("Failed to start CodeWeaver server: ")
         raise InitializationError("Failed to start CodeWeaver server.") from e
 
-__all__ = ("get_stdio_server", "run")
+__all__ = ("UvicornAccessLogFilter", "get_stdio_server", "run")

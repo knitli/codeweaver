@@ -1346,8 +1346,15 @@ def get_checks(thing_name: str, language: SemanticSearchLanguage) -> tuple[Seman
 
 
 __all__ = (
+    "IS_ANNOTATION",
+    "IS_IDENTIFIER",
+    "IS_KEYWORD",
+    "IS_LITERAL",
+    "IS_OPERATOR",
     "LANGUAGE_SPECIFIC_TOKEN_EXCEPTIONS",
     "NAMED_NODE_COUNTS",
+    "NOT_SYMBOL",
+    "TokenPatternCacheDict",
     "get_checks",
     "get_token_patterns_sync",
 )

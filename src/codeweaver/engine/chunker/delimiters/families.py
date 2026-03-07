@@ -635,6 +635,7 @@ def detect_family_characteristics(content: str) -> dict[LanguageFamily, dict[str
 
 __all__ = (
     "LanguageFamily",
+    "PatternKey",
     "defined_languages",
     "detect_family_characteristics",
     "detect_language_family",

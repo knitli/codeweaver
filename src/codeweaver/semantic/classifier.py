@@ -1112,4 +1112,11 @@ class GrammarBasedClassifier:
         return
 
 
-__all__ = ("GrammarBasedClassifier", "GrammarClassificationResult")
+__all__ = (
+    "ClassificationMethod",
+    "EvidenceKind",
+    "GrammarBasedClassifier",
+    "GrammarClassificationResult",
+    "is_composite_thing",
+    "is_token",
+)

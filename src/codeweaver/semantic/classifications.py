@@ -1166,7 +1166,13 @@ class ScoreValidation(BasedModel):
 
 __all__ = (
     "AgentTask",
-    # "ScoreValidation", not implemented yet
+    "BaseAgentTask",
+    "ImportanceRank",
+    "ImportanceScores",
+    "ImportanceScoresDict",
+    "ScoreValidation",
     "SemanticClass",
+    "SemanticClassDict",
+    "ThingClass",
     "UsageMetrics",
 )

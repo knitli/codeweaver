@@ -134,6 +134,7 @@ type SparseEmbeddingProviderSettingsType = Annotated[
 """A type alias representing all sparse embedding provider settings."""
 
 __all__ = (
+    "BaseSparseEmbeddingProviderSettings",
     "FastEmbedSparseEmbeddingProviderSettings",
     "SparseEmbeddingProviderSettings",
     "SparseEmbeddingProviderSettingsType",

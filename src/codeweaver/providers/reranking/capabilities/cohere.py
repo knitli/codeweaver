@@ -91,4 +91,4 @@ def get_cohere_reranking_capabilities() -> tuple[CohereRerankingCapabilities, ..
     )
 
 
-__all__ = ("CohereRerankingCapabilities", "get_cohere_reranking_capabilities")
+__all__ = ("CohereRerankingCapabilities", "cohere_max_input", "get_cohere_reranking_capabilities")

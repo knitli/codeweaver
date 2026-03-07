@@ -7,6 +7,11 @@
 from __future__ import annotations
 
 from types import MappingProxyType
+
+# === MANAGED EXPORTS ===
+# Exportify manages this section. It contains lazy-loading infrastructure
+# for the package: imports and runtime declarations (__all__, __getattr__,
+# __dir__). Manual edits will be overwritten by `exportify fix`.
 from typing import TYPE_CHECKING
 
 from lateimport import create_late_getattr
@@ -19,12 +24,15 @@ if TYPE_CHECKING:
         AnthropicBedrockClientOptions,
         AnthropicClientOptions,
         AnthropicGoogleVertexClientOptions,
+        BaseAnthropicClientOptions,
         GeneralAgentClientOptionsType,
         GroqClientOptions,
+        LiteralProviderType,
         OpenAIAgentClientOptions,
         PydanticGatewayClientOptions,
         SimpleAgentClientOptionsType,
         XAIClientOptions,
+        discriminate_anthropic_agent_client_options,
     )
     from codeweaver.providers.config.clients.base import ClientOptions
     from codeweaver.providers.config.clients.data import (
@@ -44,55 +52,73 @@ if TYPE_CHECKING:
         MistralClientOptions,
         OpenAIClientOptions,
         SentenceTransformersClientOptions,
+        SentenceTransformersModelOptions,
         VoyageClientOptions,
         discriminate_azure_embedding_client_options,
     )
+    from codeweaver.providers.config.clients.utils import (
+        ANTHROPIC_CLIENT_OPTIONS_AGENT_DISCRIMINATOR,
+        ConfigurationError,
+        discriminate_embedding_clients,
+        ensure_endpoint_version,
+        simple_provider_discriminator,
+        try_for_azure_endpoint,
+        try_for_heroku_endpoint,
+    )
     from codeweaver.providers.config.clients.vector_store import GrpcParams, QdrantClientOptions
 
-_dynamic_imports = MappingProxyType({
-    "AnthropicAgentClientOptionsType": (__spec__.parent, "agent"),
+_dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
+    "ANTHROPIC_CLIENT_OPTIONS_AGENT_DISCRIMINATOR": (__spec__.parent, "utils"),
     "AnthropicAzureClientOptions": (__spec__.parent, "agent"),
-    "AnthropicClientOptions": (__spec__.parent, "agent"),
     "AnthropicBedrockClientOptions": (__spec__.parent, "agent"),
+    "AnthropicClientOptions": (__spec__.parent, "agent"),
     "AnthropicGoogleVertexClientOptions": (__spec__.parent, "agent"),
-    "GeneralAgentClientOptionsType": (__spec__.parent, "agent"),
-    "GroqClientOptions": (__spec__.parent, "agent"),
-    "OpenAIAgentClientOptions": (__spec__.parent, "agent"),
-    "PydanticGatewayClientOptions": (__spec__.parent, "agent"),
-    "SimpleAgentClientOptionsType": (__spec__.parent, "agent"),
-    "XAIClientOptions": (__spec__.parent, "agent"),
+    "BaseAnthropicClientOptions": (__spec__.parent, "agent"),
+    "BedrockClientOptions": (__spec__.parent, "multi"),
+    "ClientOptions": (__spec__.parent, "base"),
+    "CohereClientOptions": (__spec__.parent, "multi"),
+    "ConfigurationError": (__spec__.parent, "utils"),
     "DuckDuckGoClientOptions": (__spec__.parent, "data"),
     "ExaClientOptions": (__spec__.parent, "data"),
-    "GeneralDataClientOptionsType": (__spec__.parent, "data"),
-    "GeneralEmbeddingClientOptionsType": (__spec__.parent, "multi"),
-    "GeneralRerankingClientOptionsType": (__spec__.parent, "multi"),
-    "GrpcParams": (__spec__.parent, "vector_store"),
-    "TavilyClientOptions": (__spec__.parent, "data"),
-    "QdrantClientOptions": (__spec__.parent, "vector_store"),
-    "ClientOptions": (__spec__.parent, "base"),
-    "BedrockClientOptions": (__spec__.parent, "multi"),
-    "CohereClientOptions": (__spec__.parent, "multi"),
     "FastEmbedClientOptions": (__spec__.parent, "multi"),
     "GoogleClientOptions": (__spec__.parent, "multi"),
+    "GroqClientOptions": (__spec__.parent, "agent"),
+    "GrpcParams": (__spec__.parent, "vector_store"),
     "HuggingFaceClientOptions": (__spec__.parent, "multi"),
+    "LiteralProviderType": (__spec__.parent, "agent"),
     "MistralClientOptions": (__spec__.parent, "multi"),
-    "OpenAIClientOptions": (__spec__.parent, "multi"),
+    "PydanticGatewayClientOptions": (__spec__.parent, "agent"),
+    "QdrantClientOptions": (__spec__.parent, "vector_store"),
     "SentenceTransformersClientOptions": (__spec__.parent, "multi"),
+    "SentenceTransformersModelOptions": (__spec__.parent, "multi"),
+    "TavilyClientOptions": (__spec__.parent, "data"),
     "VoyageClientOptions": (__spec__.parent, "multi"),
+    "discriminate_anthropic_agent_client_options": (__spec__.parent, "agent"),
     "discriminate_azure_embedding_client_options": (__spec__.parent, "multi"),
+    "discriminate_embedding_clients": (__spec__.parent, "utils"),
+    "ensure_endpoint_version": (__spec__.parent, "utils"),
+    "OpenAIAgentClientOptions": (__spec__.parent, "agent"),
+    "OpenAIClientOptions": (__spec__.parent, "multi"),
+    "simple_provider_discriminator": (__spec__.parent, "utils"),
+    "try_for_azure_endpoint": (__spec__.parent, "utils"),
+    "try_for_heroku_endpoint": (__spec__.parent, "utils"),
+    "XAIClientOptions": (__spec__.parent, "agent"),
 })
 
 __getattr__ = create_late_getattr(_dynamic_imports, globals(), __name__)
 
 __all__ = (
+    "ANTHROPIC_CLIENT_OPTIONS_AGENT_DISCRIMINATOR",
     "AnthropicAgentClientOptionsType",
     "AnthropicAzureClientOptions",
     "AnthropicBedrockClientOptions",
     "AnthropicClientOptions",
     "AnthropicGoogleVertexClientOptions",
+    "BaseAnthropicClientOptions",
     "BedrockClientOptions",
     "ClientOptions",
     "CohereClientOptions",
+    "ConfigurationError",
     "DuckDuckGoClientOptions",
     "ExaClientOptions",
     "FastEmbedClientOptions",
@@ -104,19 +130,29 @@ __all__ = (
     "GroqClientOptions",
     "GrpcParams",
     "HuggingFaceClientOptions",
+    "LiteralProviderType",
+    "MappingProxyType",
     "MistralClientOptions",
     "OpenAIAgentClientOptions",
     "OpenAIClientOptions",
     "PydanticGatewayClientOptions",
     "QdrantClientOptions",
     "SentenceTransformersClientOptions",
+    "SentenceTransformersModelOptions",
     "SimpleAgentClientOptionsType",
     "TavilyClientOptions",
     "VoyageClientOptions",
     "XAIClientOptions",
+    "discriminate_anthropic_agent_client_options",
     "discriminate_azure_embedding_client_options",
+    "discriminate_embedding_clients",
+    "ensure_endpoint_version",
+    "simple_provider_discriminator",
+    "try_for_azure_endpoint",
+    "try_for_heroku_endpoint",
 )
 
 
 def __dir__() -> list[str]:
+    """List available attributes for the package."""
     return list(__all__)

@@ -145,6 +145,7 @@ type DataProviderSettingsType = Annotated[
 
 __all__ = (
     "BaseDataProviderSettings",
+    "DataProviderSettingsType",
     "DuckDuckGoProviderSettings",
     "ExaProviderSettings",
     "TavilyProviderSettings",

@@ -370,4 +370,12 @@ class CodeWeaverSettingsDict(TypedDict, total=False):
     default_mcp_config: StdioCodeWeaverConfigDict | None
 
 
-__all__ = ("CodeWeaverSettings", "FastMcpHttpServerSettings", "FastMcpStdioServerSettings")
+__all__ = (
+    "DEFAULT_BASE_MIDDLEWARE",
+    "DEFAULT_HTTP_MIDDLEWARE",
+    "BaseFastMcpServerSettings",
+    "CodeWeaverSettings",
+    "CodeWeaverSettingsDict",
+    "FastMcpHttpServerSettings",
+    "FastMcpStdioServerSettings",
+)

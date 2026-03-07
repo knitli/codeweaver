@@ -8,6 +8,7 @@ This module is an internal implementation detail. You shouldn't use it directly.
 
 To allow for lazy loading and prevent circular imports, we put the mappings in this separate module and wrapped in functions. To avoid circular dependencies and initialization order issues, we require callers to pass in themselves (`ProviderCategory`, `Provider`, or `SDKClient`) either as a class or instance.
 """
+# TODO: Is this in the right place? It's here because the it feeds data for methods in `Provider` and `SDKClient`, but it extends well beyond just being a 'type' module. But if we moved it out, we'd have to import it into types, which is not a great solution either; we could remove the methods from `Provider` and `SDKClient`, but that's a larger refactor...
 
 from __future__ import annotations
 
@@ -331,10 +332,6 @@ def _trifecta_providers():
     )
 
 
-def _sparse_providers():
-    return _local_only_providers() - _non_model_providers()
-
-
 class ServiceMetadata(NamedTuple):
     """Optional metadata for services requiring special handling.
 
@@ -419,6 +416,26 @@ class ServiceCard(NamedTuple):
     - Custom instantiation logic - uses handler
     """
 
+    def _default_agent_handler(self, *args: Any, **kwargs: Any) -> Any:
+        """All agents require a slight difference in handling to construct the provider."""
+        if self.category != "agent":
+            raise ValueError("Default agent handler can only be used for agent category.")
+        provider_cls = self.provider_cls._resolve()
+        client_key = (
+            f"{self.client}_client"
+            if self.client not in {"hf_inference", "x_ai"}
+            else f"{self.client.replace('_inference', '').replace('_', '')}_client"
+        )
+        if kwargs.get("client"):
+            kwargs[client_key] = kwargs.pop("client")
+        else:
+            kwargs[client_key] = self.create_instance(
+                "client", *args, **kwargs.get("client_options", {})
+            )
+        if self.metadata and self.metadata.provider_handler:
+            return self.metadata.provider_handler(provider_cls, self, *args, **kwargs)
+        return provider_cls(*args, **kwargs)
+
     def has_multiple(self) -> bool:
         """Check if this service card is part of a multi-client scenario."""
         return self.metadata is not None and self.metadata.discriminator is not None
@@ -484,6 +501,8 @@ class ServiceCard(NamedTuple):
         handler = (
             self.metadata.client_handler if target == "client" else self.metadata.provider_handler
         )
+        if not handler and self.category == "agent" and target == "provider":
+            return self._default_agent_handler(*args, **kwargs)
         if not handler:
             return None
 
@@ -1598,13 +1617,20 @@ __all__ = (
     "ServiceCard",
     "ServiceMetadata",
     "get_categories",
+    "get_local_only_provider_members",
+    "get_local_only_providers",
+    "get_openai_provider_members",
+    "get_openai_providers",
     "get_provider_capabilities_map",
     "get_provider_category_sdk_clients_for_provider",
     "get_provider_clients",
+    "get_provider_literals",
     "get_providers_for_category",
     "get_sdk_client",
     "get_sdk_client_map",
     "get_service_card",
     "get_service_cards",
+    "get_sometimes_local_provider_members",
+    "get_sometimes_local_providers",
     "service_card_factory",
 )

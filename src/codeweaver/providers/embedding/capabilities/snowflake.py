@@ -355,4 +355,18 @@ def get_snowflake_embedding_capabilities() -> tuple[SnowflakeEmbeddingCapabiliti
     return tuple(SnowflakeEmbeddingCapabilities.model_validate(cap) for cap in capabilities)
 
 
-__all__ = ("get_snowflake_embedding_capabilities",)
+__all__ = (
+    "ALL_CAPABILITIES",
+    "CAP_MAP",
+    "SNOWFLAKE_ARCTIC_EMBED2_568M_CAPABILITIES",
+    "SNOWFLAKE_ARCTIC_EMBED_L_V2_0_CAPABILITIES",
+    "SNOWFLAKE_SNOWFLAKE_ARCTIC_EMBED_L_CAPABILITIES",
+    "SNOWFLAKE_SNOWFLAKE_ARCTIC_EMBED_M_CAPABILITIES",
+    "SNOWFLAKE_SNOWFLAKE_ARCTIC_EMBED_M_LONG_CAPABILITIES",
+    "SNOWFLAKE_SNOWFLAKE_ARCTIC_EMBED_M_V2_0_CAPABILITIES",
+    "SNOWFLAKE_SNOWFLAKE_ARCTIC_EMBED_S_CAPABILITIES",
+    "SNOWFLAKE_SNOWFLAKE_ARCTIC_EMBED_XS_CAPABILITIES",
+    "SnowflakeEmbeddingCapabilities",
+    "SnowflakeProvider",
+    "get_snowflake_embedding_capabilities",
+)

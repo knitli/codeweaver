@@ -199,4 +199,12 @@ class Missing(Sentinel):
 MISSING: Missing = Missing(name=SentinelName("MISSING"), module_name=__name__)
 
 
-__all__ = ("MISSING", "UNSET", "Missing", "Sentinel", "SentinelName", "Unset")
+__all__ = (
+    "MISSING",
+    "UNSET",
+    "DontGenerateJsonSchema",
+    "Missing",
+    "Sentinel",
+    "SentinelName",
+    "Unset",
+)

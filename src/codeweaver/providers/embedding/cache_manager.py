@@ -307,3 +307,6 @@ class EmbeddingCacheManager(BasedModel):
         # registry field will handle its own telemetry via its _telemetry_keys method
         # Private attributes (_batch_stores, _hash_stores, etc.) are automatically excluded
         return None
+
+
+__all__ = ("EmbeddingCacheManager",)

@@ -43,4 +43,4 @@ def get_google_embedding_capabilities() -> tuple[GoogleEmbeddingCapabilities, ..
     )
 
 
-__all__ = ("get_google_embedding_capabilities",)
+__all__ = ("GoogleEmbeddingCapabilities", "get_google_embedding_capabilities")

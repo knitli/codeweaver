@@ -138,4 +138,12 @@ def get_intfloat_embedding_capabilities() -> tuple[IntfloatEmbeddingCapabilities
     return tuple(IntfloatEmbeddingCapabilities.model_validate(cap) for cap in capabilities)
 
 
-__all__ = ("get_intfloat_embedding_capabilities",)
+__all__ = (
+    "ALL_CAPABILITIES",
+    "CAP_MAP",
+    "INTFLOAT_MULTILINGUAL_E5_LARGE_CAPABILITIES",
+    "INTFLOAT_MULTILINGUAL_E5_LARGE_INSTRUCT_CAPABILITIES",
+    "IntfloatEmbeddingCapabilities",
+    "IntfloatProvider",
+    "get_intfloat_embedding_capabilities",
+)

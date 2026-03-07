@@ -269,6 +269,7 @@ def get_codeweaver_prefix() -> str:
 
 
 __all__ = (
+    "console",
     "detect_root_package",
     "find_qdrant_instance",
     "format_file_link",
@@ -279,6 +280,7 @@ __all__ = (
     "in_ide",
     "is_codeweaver_config_path",
     "is_tty",
+    "logger",
     "qdrant_instance_live_at_port",
     "settings_type_for_root_package",
     "we_are_in_jetbrains",

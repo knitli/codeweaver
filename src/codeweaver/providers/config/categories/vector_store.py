@@ -385,7 +385,9 @@ type VectorStoreProviderSettingsType = Annotated[
 
 __all__ = (
     "BaseVectorStoreProviderSettings",
+    "MemoryConfig",
     "MemoryVectorStoreProviderSettings",
     "QdrantVectorStoreProviderSettings",
     "VectorStoreProviderSettings",
+    "VectorStoreProviderSettingsType",
 )

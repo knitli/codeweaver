@@ -589,4 +589,12 @@ DefaultIndexerSettings = IndexerSettingsDict(
     IndexerSettings().model_dump(exclude_none=True, exclude_computed_fields=True)
 )
 
-__all__ = ("DefaultIndexerSettings", "IndexerSettings", "IndexerSettingsDict", "RignoreSettings")
+__all__ = (
+    "BRACKET_PATTERN",
+    "DefaultIndexerSettings",
+    "FilteredPaths",
+    "IndexerSettings",
+    "IndexerSettingsDict",
+    "RignoreSettings",
+    "get_storage_path",
+)

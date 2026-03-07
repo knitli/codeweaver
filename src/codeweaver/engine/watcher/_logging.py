@@ -249,4 +249,4 @@ class WatchfilesLogManager:
             self.log_filter = None
 
 
-__all__ = ("WatchfilesLogManager",)
+__all__ = ("WatchfilesLogManager", "normalize_and_validate_patterns")

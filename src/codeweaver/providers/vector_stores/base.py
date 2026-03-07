@@ -569,4 +569,4 @@ class VectorStoreProvider[VectorStoreClient](BasedModel, ABC):
         return None
 
 
-__all__ = ("VectorStoreProvider",)
+__all__ = ("MixedQueryInput", "VectorStoreProvider")

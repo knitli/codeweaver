@@ -73,6 +73,7 @@ class AtomicAwareSeparatorColumn(ProgressColumn):
     """Separator column that skips rendering for atomic tasks."""
 
     def __init__(self, separator: str = "•") -> None:
+        """Initialize the separator column."""
         super().__init__()
         self._separator = separator
 
@@ -919,4 +920,12 @@ def get_display() -> StatusDisplay:
     return _display
 
 
-__all__ = ("IndexingProgress", "StatusDisplay", "get_display")
+__all__ = (
+    "AtomicAwareBarColumn",
+    "AtomicAwareCountColumn",
+    "AtomicAwarePercentColumn",
+    "AtomicAwareSeparatorColumn",
+    "IndexingProgress",
+    "StatusDisplay",
+    "get_display",
+)

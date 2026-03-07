@@ -175,4 +175,10 @@ class BasedModel(BaseModel):
             yield getattr(self, field)
 
 
-__all__ = ("BASEDMODEL_CONFIG", "FROZEN_BASEDMODEL_CONFIG", "BasedModel", "RootedRoot")
+__all__ = (
+    "BASEDMODEL_CONFIG",
+    "FILTERED_KEYS",
+    "FROZEN_BASEDMODEL_CONFIG",
+    "BasedModel",
+    "RootedRoot",
+)

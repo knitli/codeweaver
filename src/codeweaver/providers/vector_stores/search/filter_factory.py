@@ -262,4 +262,4 @@ def to_qdrant_filter(filter_obj: Filter | None) -> Filter | None:
     return None if filter_obj is None else filter_obj
 
 
-__all__ = ("ArbitraryFilter", "make_filter", "to_qdrant_filter")
+__all__ = ("ArbitraryFilter", "make_filter", "make_indexes", "to_qdrant_filter")

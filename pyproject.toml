@@ -617,6 +617,15 @@ too-many-positional-arguments = "warn"  # Dynamic function calls in tests
 invalid-assignment = "ignore"  # Test setup patterns
 invalid-argument-type = "ignore"  # Test mocks and fixtures may have dynamic types
 
+[[tool.ty.overrides]]
+include = ["src/codeweaver/core/statistics.py"]
+
+[tool.ty.overrides.rules]
+unresolved-attribute = "ignore"
+invalid-assignment = "ignore"
+invalid-argument-type = "ignore"
+invalid-return-type = "ignore"
+
 # Test Fixtures: Intentionally malformed or edge-case test data
 # These may have type errors by design to test error handling
 [[tool.ty.overrides]]

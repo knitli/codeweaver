@@ -221,4 +221,10 @@ class MCPConfig(BasedModel, FastMCPConfig):
         return cls.model_validate(data)
 
 
-__all__ = ("CodeWeaverMCPConfig", "MCPConfig", "StdioCodeWeaverConfig", "update_mcp_config_file")
+__all__ = (
+    "CodeWeaverMCPConfig",
+    "MCPConfig",
+    "MCPServerConfig",
+    "StdioCodeWeaverConfig",
+    "update_mcp_config_file",
+)

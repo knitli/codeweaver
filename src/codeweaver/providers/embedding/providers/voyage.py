@@ -165,4 +165,8 @@ class VoyageEmbeddingProvider(EmbeddingProvider[AsyncClient]):
         return self.embed_options.get("output_dimension", self.caps.default_dimension)
 
 
-__all__ = ("VoyageEmbeddingProvider",)
+__all__ = (
+    "VoyageEmbeddingProvider",
+    "voyage_context_output_transformer",
+    "voyage_output_transformer",
+)

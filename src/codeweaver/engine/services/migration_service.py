@@ -694,6 +694,7 @@ class MigrationService:
 
 __all__ = (
     "ChunkResult",
+    "InvalidStateTransitionError",
     "MigrationCheckpoint",
     "MigrationError",
     "MigrationResult",

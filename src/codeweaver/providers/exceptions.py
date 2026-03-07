@@ -14,4 +14,4 @@ class CircuitBreakerOpenError(ProviderError):
     """Raised when circuit breaker is open and rejecting requests."""
 
 
-__all__ = (CircuitBreakerOpenError,)
+__all__ = ("CircuitBreakerOpenError",)

@@ -321,7 +321,19 @@ class BaseChunker(ABC):
         return self._governor.simple_overlap
 
 
-__all__ = ("AdaptiveChunkBehavior", "BaseChunker", "ChunkGovernor")
+__all__ = (
+    "ACCEPTABLE_OVERAGE_RATIO",
+    "FLOOR_RATIO",
+    "MIN_FLOOR",
+    "MIN_VIABLE_CHUNK",
+    "RETRIEVAL_OPTIMAL",
+    "SAFETY_MARGIN",
+    "SMALL_MODEL_RATIO",
+    "TRANSITION_POINT",
+    "AdaptiveChunkBehavior",
+    "BaseChunker",
+    "ChunkGovernor",
+)
 
 
 def _get_capabilities() -> tuple[Any, ...]:

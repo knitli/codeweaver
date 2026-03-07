@@ -202,7 +202,7 @@ async def _cleanup_state(
                 _logger.info("Background indexing stopped")
     if state.telemetry and state.telemetry.enabled:
         try:
-            from codeweaver.core import capture_session_event
+            from codeweaver.core.telemetry import capture_session_event
 
             duration_seconds = time.time() - state.startup_time
             capture_session_event(
@@ -367,4 +367,4 @@ async def lifespan(
             await _cleanup_state(state, indexing_task, progress_reporter, verbose=verbose or debug)
 
 
-__all__ = ("CodeWeaverState", "lifespan")
+__all__ = ("BRACKET_PATTERN", "CodeWeaverState", "lifespan")

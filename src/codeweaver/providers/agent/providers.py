@@ -122,6 +122,7 @@ def load_default_agent_providers() -> Generator[type[AgentProvider[Provider]], N
 
 
 __all__ = (
+    "AGENT_PROVIDER_CLASSES",
     "AbstractToolset",
     "AgentProvider",
     "CombinedToolset",

@@ -92,7 +92,7 @@ async def _derive_collection_name(
         return (
             vector_settings[0].collection.collection_name
             if isinstance(vector_settings, tuple) and len(vector_settings) > 0
-            else vector_settings.collection.collection_name  # ty:ignore[unresolved-attribute, invalid-return-type]
+            else vector_settings.collection.collection_name  # ty:ignore[unresolved-attribute]
         )
     return collection_name
 
@@ -439,4 +439,4 @@ def main() -> None:
 if __name__ == "__main__":
     main()
 
-__all__ = ("app", "index")
+__all__ = ()

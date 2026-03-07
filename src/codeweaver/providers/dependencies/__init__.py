@@ -1,7 +1,7 @@
-# SPDX-FileCopyrightText: 2025 Knitli Inc.
-# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
+
 """Dependency injection setup for provider configuration.
 
 This module provides DI type aliases and factory functions for provider settings.
@@ -43,6 +43,11 @@ This is expected on the feat/di_monorepo branch.
 from __future__ import annotations
 
 from types import MappingProxyType
+
+# === MANAGED EXPORTS ===
+# Exportify manages this section. It contains lazy-loading infrastructure
+# for the package: imports and runtime declarations (__all__, __getattr__,
+# __dir__). Manual edits will be overwritten by `exportify fix`.
 from typing import TYPE_CHECKING
 
 from lateimport import create_late_getattr
@@ -60,77 +65,113 @@ if TYPE_CHECKING:
     )
     from codeweaver.providers.dependencies.config import (
         AgentProviderSettingsDep,
+        AgentProviderSettingsType,
         AllAgentProviderConfigsDep,
         AllDataProviderConfigsDep,
         AllEmbeddingConfigsDep,
         AllRerankingConfigsDep,
         AllSparseEmbeddingConfigsDep,
         AllVectorStoreConfigsDep,
+        CodeWeaverSettingsType,
+        ConfigurationError,
         DataProviderSettingsDep,
+        DataProviderSettingsType,
         EmbeddingProviderSettingsDep,
+        EmbeddingProviderSettingsType,
         ProviderSettingsDep,
         RerankingProviderSettingsDep,
+        RerankingProviderSettingsType,
         SparseEmbeddingProviderSettingsDep,
+        SparseEmbeddingProviderSettingsType,
         VectorStoreProviderSettingsDep,
+        VectorStoreProviderSettingsType,
+    )
+    from codeweaver.providers.dependencies.providers import (
+        AgentProviderDep,
+        DataProvidersDep,
+        DataProviderType,
+        EmbeddingProvidersDep,
+        PrimaryEmbeddingProviderDep,
+        PrimarySparseEmbeddingProviderDep,
+        PrimaryVectorStoreProviderDep,
+        ProviderCategorySettingsType,
+        QueryEmbeddingProviderDep,
+        RerankingProvidersDep,
+        SearchPackageDep,
+        SparseEmbeddingProvidersDep,
+        TypeAliasType,
+        VectorStoreProvidersDep,
     )
     from codeweaver.providers.dependencies.services import (
         EmbeddingCacheManagerDep,
         EmbeddingRegistryDep,
     )
 
-_dynamic_imports = MappingProxyType({
-    "AgentCapabilityResolverDep": (__spec__.parent, "capabilities"),
-    "AgentProviderSettingsDep": (__spec__.parent, "config"),
-    "AllAgentProviderConfigsDep": (__spec__.parent, "config"),
-    "AllDataProviderConfigsDep": (__spec__.parent, "config"),
-    "AllEmbeddingConfigsDep": (__spec__.parent, "config"),
-    "AllRerankingConfigsDep": (__spec__.parent, "config"),
-    "AllSparseEmbeddingConfigsDep": (__spec__.parent, "config"),
-    "AllVectorStoreConfigsDep": (__spec__.parent, "config"),
-    "ConfiguredCapabilitiesDep": (__spec__.parent, "capabilities"),
-    "EmbeddingCapabilityGroupDep": (__spec__.parent, "capabilities"),
-    "DataProviderSettingsDep": (__spec__.parent, "config"),
-    "EmbeddingCacheManagerDep": (__spec__.parent, "services"),
-    "EmbeddingCapabilityResolverDep": (__spec__.parent, "capabilities"),
-    "EmbeddingProviderSettingsDep": (__spec__.parent, "config"),
-    "EmbeddingRegistryDep": (__spec__.parent, "services"),
-    "ProviderSettingsDep": (__spec__.parent, "config"),
-    "RerankingCapabilityResolverDep": (__spec__.parent, "capabilities"),
-    "RerankingProviderSettingsDep": (__spec__.parent, "config"),
-    "SparseCapabilityResolverDep": (__spec__.parent, "capabilities"),
-    "SparseEmbeddingProviderSettingsDep": (__spec__.parent, "config"),
-    "TokenizerDep": (__spec__.parent, "capabilities"),
-    "VectorStoreProviderSettingsDep": (__spec__.parent, "config"),
+_dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
+    "AgentProviderSettingsType": (__spec__.parent, "config"),
+    "CodeWeaverSettingsType": (__spec__.parent, "config"),
+    "ConfigurationError": (__spec__.parent, "config"),
+    "DataProviderSettingsType": (__spec__.parent, "config"),
+    "DataProviderType": (__spec__.parent, "providers"),
+    "EmbeddingProviderSettingsType": (__spec__.parent, "config"),
+    "ProviderCategorySettingsType": (__spec__.parent, "providers"),
+    "RerankingProviderSettingsType": (__spec__.parent, "config"),
+    "SparseEmbeddingProviderSettingsType": (__spec__.parent, "config"),
+    "TypeAliasType": (__spec__.parent, "providers"),
+    "VectorStoreProviderSettingsType": (__spec__.parent, "config"),
 })
 
 __getattr__ = create_late_getattr(_dynamic_imports, globals(), __name__)
 
 __all__ = (
     "AgentCapabilityResolverDep",
+    "AgentProviderDep",
     "AgentProviderSettingsDep",
+    "AgentProviderSettingsType",
     "AllAgentProviderConfigsDep",
     "AllDataProviderConfigsDep",
     "AllEmbeddingConfigsDep",
     "AllRerankingConfigsDep",
     "AllSparseEmbeddingConfigsDep",
     "AllVectorStoreConfigsDep",
+    "CodeWeaverSettingsType",
+    "ConfigurationError",
     "ConfiguredCapabilitiesDep",
     "DataProviderSettingsDep",
+    "DataProviderSettingsType",
+    "DataProviderType",
+    "DataProvidersDep",
     "EmbeddingCacheManagerDep",
     "EmbeddingCapabilityGroupDep",
     "EmbeddingCapabilityResolverDep",
     "EmbeddingProviderSettingsDep",
+    "EmbeddingProviderSettingsType",
+    "EmbeddingProvidersDep",
     "EmbeddingRegistryDep",
+    "MappingProxyType",
+    "PrimaryEmbeddingProviderDep",
+    "PrimarySparseEmbeddingProviderDep",
+    "PrimaryVectorStoreProviderDep",
+    "ProviderCategorySettingsType",
     "ProviderSettingsDep",
+    "QueryEmbeddingProviderDep",
     "RerankingCapabilityResolverDep",
     "RerankingProviderSettingsDep",
+    "RerankingProviderSettingsType",
+    "RerankingProvidersDep",
+    "SearchPackageDep",
     "SparseCapabilityResolverDep",
     "SparseEmbeddingProviderSettingsDep",
+    "SparseEmbeddingProviderSettingsType",
+    "SparseEmbeddingProvidersDep",
     "TokenizerDep",
+    "TypeAliasType",
     "VectorStoreProviderSettingsDep",
+    "VectorStoreProviderSettingsType",
+    "VectorStoreProvidersDep",
 )
 
 
 def __dir__() -> list[str]:
-    """Custom __dir__ implementation to include dynamically imported names."""
+    """List available attributes for the package."""
     return list(__all__)

@@ -1,17 +1,22 @@
-# SPDX-FileCopyrightText: 2024-2025 Qdrant Solutions GmbH
-# SPDX-License-Identifier: Apache-2.0
-# This file was adapted from Qdrant's example MCP server, [mcp-server-qdrant](https://github.com/qdrant/mcp-server-qdrant/)
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
 #
-# Modification/changes:
-# SPDX-FileCopyrightText: 2025 Knitli Inc.
 # SPDX-License-Identifier: MIT OR Apache-2.0
-# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+
 """Search filtering and matching utilities.
 
 This package is heavily derived from Qdrant's example MCP server, [mcp-server-qdrant](https://github.com/qdrant/mcp-server-qdrant). We've made small modifications to fit our use case, and those changes are copyrighted by Knitli Inc. and licensed under MIT OR Apache-2.0, whichever you want. Original code from Qdrant remains under their copyright and Apache 2.0 license.
 """
 
 from __future__ import annotations
+
+
+parent = __spec__.parent or "codeweaver.providers.vector_stores.search"
+
+# === MANAGED EXPORTS ===
+
+# Exportify manages this section. It contains lazy-loading infrastructure
+# for the package: imports and runtime declarations (__all__, __getattr__,
+# __dir__). Manual edits will be overwritten by `exportify fix`.
 
 from types import MappingProxyType
 from typing import TYPE_CHECKING
@@ -22,6 +27,7 @@ from lateimport import create_late_getattr
 if TYPE_CHECKING:
     from codeweaver.providers.vector_stores.search.condition import (
         Condition,
+        ExtendedPointId,
         FieldCondition,
         Filter,
         FilterableField,
@@ -32,11 +38,12 @@ if TYPE_CHECKING:
         MinShould,
         Nested,
         NestedCondition,
+        PayloadSchemaType,
         ValuesCount,
     )
     from codeweaver.providers.vector_stores.search.filter_factory import (
-        ArbitraryFilter,
         make_filter,
+        make_indexes,
         to_qdrant_filter,
     )
     from codeweaver.providers.vector_stores.search.geo import (
@@ -48,7 +55,6 @@ if TYPE_CHECKING:
     )
     from codeweaver.providers.vector_stores.search.match import (
         AnyVariants,
-        ExtendedPointId,
         Match,
         MatchAny,
         MatchExcept,
@@ -57,67 +63,51 @@ if TYPE_CHECKING:
         MatchValue,
         ValueVariants,
     )
-    from codeweaver.providers.vector_stores.search.payload import (
-        Entry,
-        PayloadField,
-        PayloadMetadata,
-        PayloadSchemaType,
-    )
+    from codeweaver.providers.vector_stores.search.payload import Entry, PayloadField
     from codeweaver.providers.vector_stores.search.range import DatetimeRange, Range, RangeInterface
     from codeweaver.providers.vector_stores.search.wrap_filters import (
         make_partial_function,
         wrap_filters,
     )
 
-
-parent = __spec__.parent or "codeweaver.providers.vector_stores.search"
-
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
-    "Condition": (parent, "condition"),
-    "FieldCondition": (parent, "condition"),
-    "Filter": (parent, "condition"),
-    "FilterableField": (parent, "condition"),
-    "HasIdCondition": (parent, "condition"),
-    "HasVectorCondition": (parent, "condition"),
-    "IsEmptyCondition": (parent, "condition"),
-    "IsNullCondition": (parent, "condition"),
-    "MinShould": (parent, "condition"),
-    "Nested": (parent, "condition"),
-    "NestedCondition": (parent, "condition"),
-    "ValuesCount": (parent, "condition"),
-    "ArbitraryFilter": (parent, "filter_factory"),
-    "make_filter": (parent, "filter_factory"),
-    "to_qdrant_filter": (parent, "filter_factory"),
-    "GeoBoundingBox": (parent, "geo"),
-    "GeoPoint": (parent, "geo"),
-    "GeoPolygon": (parent, "geo"),
-    "GeoRadius": (parent, "geo"),
-    "GeoLineString": (parent, "geo"),
-    "MatchAny": (parent, "match"),
-    "MatchExcept": (parent, "match"),
-    "MatchPhrase": (parent, "match"),
-    "MatchText": (parent, "match"),
-    "MatchValue": (parent, "match"),
-    "ValueVariants": (parent, "match"),
-    "AnyVariants": (parent, "match"),
-    "ExtendedPointId": (parent, "match"),
-    "Match": (parent, "match"),
-    "RangeInterface": (parent, "range"),
-    "Range": (parent, "range"),
-    "DatetimeRange": (parent, "range"),
-    "wrap_filters": (parent, "wrap_filters"),
-    "make_partial_function": (parent, "wrap_filters"),
-    "Entry": (parent, "payload"),
-    "PayloadField": (parent, "payload"),
-    "PayloadMetadata": (parent, "payload"),
-    "PayloadSchemaType": (parent, "payload"),
+    "DatetimeRange": (__spec__.parent, "range"),
+    "Entry": (__spec__.parent, "payload"),
+    "FieldCondition": (__spec__.parent, "condition"),
+    "Filter": (__spec__.parent, "condition"),
+    "FilterableField": (__spec__.parent, "condition"),
+    "GeoBoundingBox": (__spec__.parent, "geo"),
+    "GeoLineString": (__spec__.parent, "geo"),
+    "GeoPoint": (__spec__.parent, "geo"),
+    "GeoPolygon": (__spec__.parent, "geo"),
+    "GeoRadius": (__spec__.parent, "geo"),
+    "HasIdCondition": (__spec__.parent, "condition"),
+    "HasVectorCondition": (__spec__.parent, "condition"),
+    "IsEmptyCondition": (__spec__.parent, "condition"),
+    "IsNullCondition": (__spec__.parent, "condition"),
+    "MatchAny": (__spec__.parent, "match"),
+    "MatchExcept": (__spec__.parent, "match"),
+    "MatchPhrase": (__spec__.parent, "match"),
+    "MatchText": (__spec__.parent, "match"),
+    "MatchValue": (__spec__.parent, "match"),
+    "MinShould": (__spec__.parent, "condition"),
+    "Nested": (__spec__.parent, "condition"),
+    "NestedCondition": (__spec__.parent, "condition"),
+    "PayloadField": (__spec__.parent, "payload"),
+    "PayloadSchemaType": (__spec__.parent, "condition"),
+    "Range": (__spec__.parent, "range"),
+    "ValuesCount": (__spec__.parent, "condition"),
+    "make_filter": (__spec__.parent, "filter_factory"),
+    "make_indexes": (__spec__.parent, "filter_factory"),
+    "make_partial_function": (__spec__.parent, "wrap_filters"),
+    "to_qdrant_filter": (__spec__.parent, "filter_factory"),
+    "wrap_filters": (__spec__.parent, "wrap_filters"),
 })
 
 __getattr__ = create_late_getattr(_dynamic_imports, globals(), __name__)
 
 __all__ = (
     "AnyVariants",
-    "ArbitraryFilter",
     "Condition",
     "DatetimeRange",
     "Entry",
@@ -134,6 +124,7 @@ __all__ = (
     "HasVectorCondition",
     "IsEmptyCondition",
     "IsNullCondition",
+    "MappingProxyType",
     "Match",
     "MatchAny",
     "MatchExcept",
@@ -144,14 +135,19 @@ __all__ = (
     "Nested",
     "NestedCondition",
     "PayloadField",
-    "PayloadMetadata",
     "PayloadSchemaType",
     "Range",
     "RangeInterface",
     "ValueVariants",
     "ValuesCount",
     "make_filter",
+    "make_indexes",
     "make_partial_function",
     "to_qdrant_filter",
     "wrap_filters",
 )
+
+
+def __dir__() -> list[str]:
+    """List available attributes for the package."""
+    return list(__all__)

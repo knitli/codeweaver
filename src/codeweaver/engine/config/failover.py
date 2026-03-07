@@ -209,6 +209,8 @@ DefaultFailoverSettings = get_default_failover_settings
 
 
 __all__ = (
+    "FIVE_MINUTES_IN_SECONDS",
+    "MAX_RAM_MB",
     "DefaultFailoverSettings",
     "FailoverSettings",
     "FailoverSettingsDict",

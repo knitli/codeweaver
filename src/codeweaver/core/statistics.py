@@ -533,8 +533,8 @@ class _CategoryStatistics(BasedModel):
         ):
             language = normalize_language(language)
         if language not in self.languages:
-            self.languages[language] = _LanguageStatistics(language=language)  # ty:ignore[invalid-assignment, invalid-argument-type]
-        return self.languages[language]  # ty:ignore[invalid-argument-type]
+            self.languages[language] = _LanguageStatistics(language=language)
+        return self.languages[language]
 
     @computed_field
     @property
@@ -639,7 +639,7 @@ class _CategoryStatistics(BasedModel):
         """Create a _CategoryStatistics from an ExtCategory."""
         return cls(
             category=ext_category.kind,
-            languages={ext_category.language: _LanguageStatistics(language=ext_category.language)},  # ty:ignore[invalid-argument-type]
+            languages={ext_category.language: _LanguageStatistics(language=ext_category.language)},
         )
 
 
@@ -676,7 +676,7 @@ class FileStatistics(BasedModel):
         elif self._other_files and path in self._other_files:
             # Handle explicitly added "other" files
             language_name = f".{path.stem}" if "." in path.name else path.name
-            self.categories[ChunkKind.OTHER].add_operation(language_name, operation, path)  # ty:ignore[invalid-argument-type]
+            self.categories[ChunkKind.OTHER].add_operation(language_name, operation, path)
 
     def add_file_from_discovered(
         self, discovered_file: DiscoveredFile, operation: OperationsKey
@@ -1321,7 +1321,7 @@ class SessionStatistics(BasedModel):
         """Add a file operation to the index statistics."""
         if not self.index_statistics:
             self.index_statistics = FileStatistics()
-        self.index_statistics.add_file(path, operation)
+        cast(FileStatistics, self.index_statistics).add_file(path, operation)
 
     def add_file_from_discovered(
         self, discovered_file: DiscoveredFile, operation: OperationsKey
@@ -1611,16 +1611,20 @@ def timed_http(
 
 
 __all__ = (
+    "UUID7_STR",
+    "FailoverStats",
     "FileStatistics",
     "Identifier",
     "LanguageSummary",
     "SessionStatistics",
     "TimingStatistics",
     "TokenCategory",
+    "TokenCost",
     "TokenCounter",
     "add_failed_request",
     "add_successful_request",
     "get_session_statistics",
+    "normalize_language",
     "record_timed_http_request",
     "timed_http",
 )

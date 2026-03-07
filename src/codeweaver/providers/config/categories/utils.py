@@ -120,10 +120,10 @@ NON_ANTHROPIC_AGENT_PROVIDER_DISCRIMINATOR = Discriminator(
 """A discriminator for non-Anthropic agent provider settings that determines the provider type based on the `provider` field in the input data, mapping unrecognized providers to "openai"."""
 
 __all__ = (
-    ANTHROPIC_PROVIDER_DISCRIMINATOR,
+    "ANTHROPIC_PROVIDER_DISCRIMINATOR",
     "CORE_EMBEDDING_PROVIDER_DISCRIMINATOR",
+    "NON_ANTHROPIC_AGENT_PROVIDER_DISCRIMINATOR",
     "PROVIDER_DISCRIMINATOR",
     "RERANKING_PROVIDER_DISCRIMINATOR",
     "is_cloud_provider",
-    "NON_ANTHROPIC_AGENT_PROVIDER_DISCRIMINATOR",
 )

@@ -551,7 +551,7 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         }
 
     @override
-    def model_dump_json(  # type: ignore
+    def model_dump_json(
         self,
         *,
         indent: int | None = None,
@@ -584,4 +584,9 @@ class RerankingProvider[RerankingClient](BasedModel, ABC):
         )
 
 
-__all__ = ("RerankingProvider", "RerankingResult")
+__all__ = (
+    "RerankingProvider",
+    "RerankingResult",
+    "default_reranking_input_transformer",
+    "default_reranking_output_transformer",
+)

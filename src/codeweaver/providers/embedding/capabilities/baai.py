@@ -177,4 +177,13 @@ def get_baai_embedding_capabilities() -> tuple[BaaiEmbeddingCapabilities, ...]:
     return tuple(BaaiEmbeddingCapabilities.model_validate(cap) for cap in capabilities)
 
 
-__all__ = ("get_baai_embedding_capabilities",)
+__all__ = (
+    "ALL_CAPABILITIES",
+    "BAAI_BGE_BASE_EN_V1_5_CAPABILITIES",
+    "BAAI_BGE_SMALL_EN_V1_5_CAPABILITIES",
+    "BGE_LARGE_EN_335M_CAPABILITIES",
+    "CAP_MAP",
+    "BaaiEmbeddingCapabilities",
+    "BaaiProvider",
+    "get_baai_embedding_capabilities",
+)

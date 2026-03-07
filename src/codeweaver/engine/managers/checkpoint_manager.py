@@ -611,6 +611,7 @@ class CheckpointManager:
 
 
 __all__ = (
+    "EXCEPTION_PATTERN",
     "ChangeImpact",
     "CheckpointManager",
     "CheckpointSettingsFingerprint",

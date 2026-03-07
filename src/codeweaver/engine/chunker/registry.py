@@ -127,4 +127,4 @@ class SourceIdRegistry(UUIDStore["DiscoveredFile"]):
         return removed
 
 
-__all__ = ("SourceIdRegistry",)
+__all__ = ("ONE_MEGABYTE", "SourceIdRegistry")

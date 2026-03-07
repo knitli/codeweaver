@@ -433,7 +433,7 @@ class SpanGroup(BasedModel):
         return self
 
     @override
-    def __iter__(self) -> Iterator[Span]:  # ty:ignore[invalid-method-override]
+    def __iter__(self) -> Iterator[Span]:
         """Iterate over the spans in the group, sorted by source_id and start line."""
         yield from sorted(self.spans, key=lambda s: (s.source_id, s.start))
 

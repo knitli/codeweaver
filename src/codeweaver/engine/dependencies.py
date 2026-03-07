@@ -54,10 +54,10 @@ from codeweaver.engine.services.migration_service import MigrationService
 from codeweaver.engine.services.watching_service import FileWatchingService
 from codeweaver.engine.watcher.watch_filters import ExtensionFilter, IgnoreFilter
 from codeweaver.providers import (
-    EmbeddingProviderDep,
-    SparseEmbeddingProviderDep,
+    PrimaryEmbeddingProviderDep,
+    PrimarySparseEmbeddingProviderDep,
+    PrimaryVectorStoreProviderDep,
     TokenizerDep,
-    VectorStoreProviderDep,
 )
 
 
@@ -194,9 +194,9 @@ def _create_chunking_service(
 @dependency_provider(IndexingService, scope="singleton")
 def _create_indexing_service(
     chunking_service: ChunkingServiceDep = INJECTED,
-    embedding_provider: EmbeddingProviderDep = INJECTED,
-    sparse_provider: SparseEmbeddingProviderDep = INJECTED,
-    vector_store: VectorStoreProviderDep = INJECTED,
+    embedding_provider: PrimaryEmbeddingProviderDep = INJECTED,
+    sparse_provider: PrimarySparseEmbeddingProviderDep = INJECTED,
+    vector_store: PrimaryVectorStoreProviderDep = INJECTED,
     settings: IndexerSettingsDep = INJECTED,
     progress_reporter: ProgressReporterDep = INJECTED,
     progress_tracker: ProgressTrackerDep = INJECTED,
@@ -221,8 +221,8 @@ def _create_indexing_service(
 
 @dependency_provider(FailoverService, scope="singleton")
 def _create_failover_service(
-    primary_store: VectorStoreProviderDep = INJECTED,
-    backup_store: VectorStoreProviderDep | None = None,
+    primary_store: PrimaryVectorStoreProviderDep = INJECTED,
+    backup_store: PrimaryVectorStoreProviderDep | None = None,
     indexing_service: IndexingServiceDep = INJECTED,
     settings: FailoverSettingsDep = INJECTED,
 ) -> FailoverService:
@@ -278,7 +278,7 @@ def _create_config_analyzer(
     settings: SettingsDep = INJECTED,
     checkpoint_manager: CheckpointManagerDep = INJECTED,
     manifest_manager: ManifestManagerDep = INJECTED,
-    vector_store: VectorStoreProviderDep = INJECTED,
+    vector_store: PrimaryVectorStoreProviderDep = INJECTED,
 ) -> ConfigChangeAnalyzer:
     """Factory for configuration change analyzer service.
 
@@ -302,7 +302,7 @@ type ConfigChangeAnalyzerDep = Annotated[
 
 @dependency_provider(MigrationService, scope="singleton")
 def _create_migration_service(
-    vector_store: VectorStoreProviderDep = INJECTED,
+    vector_store: PrimaryVectorStoreProviderDep = INJECTED,
     config_analyzer: ConfigChangeAnalyzerDep = INJECTED,
     checkpoint_manager: CheckpointManagerDep = INJECTED,
     manifest_manager: ManifestManagerDep = INJECTED,
@@ -360,6 +360,7 @@ type SourceIdRegistryDep = Annotated[
 
 __all__ = (
     "CheckpointManagerDep",
+    "ChunkGovernorDep",
     "ChunkerSettingsDep",
     "ChunkingServiceDep",
     "ConfigChangeAnalyzerDep",

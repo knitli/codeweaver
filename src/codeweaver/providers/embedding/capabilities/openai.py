@@ -68,4 +68,4 @@ def get_openai_embedding_capabilities() -> tuple[OpenaiEmbeddingCapabilities, ..
     )
 
 
-__all__ = ("get_openai_embedding_capabilities",)
+__all__ = ("OpenaiEmbeddingCapabilities", "get_openai_embedding_capabilities")

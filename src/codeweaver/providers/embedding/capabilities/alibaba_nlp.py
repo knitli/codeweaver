@@ -129,4 +129,12 @@ def get_alibaba_nlp_embedding_capabilities() -> tuple[AlibabaNlpEmbeddingCapabil
     return tuple(AlibabaNlpEmbeddingCapabilities.model_validate(cap) for cap in capabilities)
 
 
-__all__ = ("get_alibaba_nlp_embedding_capabilities",)
+__all__ = (
+    "ALIBABA_NLP_GTE_MODERNBERT_BASE_CAPABILITIES",
+    "ALIBABA_NLP_GTE_MULTILINGUAL_BASE_CAPABILITIES",
+    "ALL_CAPABILITIES",
+    "CAP_MAP",
+    "AlibabaNlpEmbeddingCapabilities",
+    "AlibabaNlpProvider",
+    "get_alibaba_nlp_embedding_capabilities",
+)

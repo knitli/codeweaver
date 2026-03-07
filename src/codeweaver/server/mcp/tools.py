@@ -100,4 +100,10 @@ def register_tool(app: FastMCP[Any], tool: Tool) -> FastMCP[Any]:
     return app
 
 
-__all__ = ("TOOL_DEFINITIONS", "find_code_tool_definition", "register_tool")
+__all__ = (
+    "TOOL_DEFINITIONS",
+    "ContextAgentToolkit",
+    "ToolCollectionDict",
+    "get_bulk_tool",
+    "register_tool",
+)

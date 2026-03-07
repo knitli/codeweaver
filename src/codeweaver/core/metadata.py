@@ -599,10 +599,15 @@ class ExtCategory(NamedTuple):
 
 
 __all__ = (
+    "BASH_SHEBANG_PATTERN",
+    "EXTENSION_TESTS",
+    "PERL_SHEBANG_PATTERN",
+    "PYTHON_SHEBANG_PATTERN",
     "ChunkKind",
     "ChunkSource",
     "ExtCategory",
     "ExtLangPair",
+    "ExtTestDef",
     "Metadata",
     "determine_ext_category",
     "get_ext_lang_pair_for_file",

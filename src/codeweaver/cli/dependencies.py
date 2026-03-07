@@ -51,3 +51,6 @@ def setup_cli_di(
     container.override(ProgressReporter, display)
 
     return container
+
+
+__all__ = ("setup_cli_di",)

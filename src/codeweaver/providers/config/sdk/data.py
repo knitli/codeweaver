@@ -332,6 +332,7 @@ type DataToolConfigT = (
 
 __all__ = (
     "BaseToolConfig",
+    "DataToolConfigT",
     "DuckDuckGoSearchToolConfig",
     "ExaAnswerToolOptions",
     "ExaContentsOptions",
@@ -340,5 +341,4 @@ __all__ = (
     "ExaSearchToolOptions",
     "ExaToolConfig",
     "TavilySearchContextToolConfig",
-    "DataToolConfigT",
 )

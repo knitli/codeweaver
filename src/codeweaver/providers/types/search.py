@@ -12,6 +12,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, TypedDict
 
+from pydantic_ai import Agent
+
 
 if TYPE_CHECKING:
     from codeweaver.core.types import ModelName, ModelNameT
@@ -58,6 +60,8 @@ class SearchPackage:
 
     capabilities: EmbeddingCapabilityGroup
 
+    agent: Agent | None = None
+
     def __init__(
         self,
         embedding: EmbeddingProvider,
@@ -65,6 +69,7 @@ class SearchPackage:
         reranking: tuple[RerankingProvider, ...],
         vector_store: VectorStoreProvider,
         capabilities: EmbeddingCapabilityGroup,
+        agent: Agent | None = None,
     ):
         """Initializes a SearchPackage with the given providers and capabilities."""
         self.embedding = embedding
@@ -72,6 +77,7 @@ class SearchPackage:
         self.reranking = reranking
         self.vector_store = vector_store
         self.capabilities = capabilities
+        self.agent = agent
 
     @property
     def model_names(self) -> ModelNameDict:
@@ -86,8 +92,8 @@ class SearchPackage:
     def caps(self) -> ModelCapDict:
         """Get the capabilities of the models used in this search package."""
         return ModelCapDict(
-            dense=self.capabilities.dense.capability if self.capabilities.dense else None,  # ty:ignore[invalid-argument-type]
-            sparse=self.capabilities.sparse.capability if self.capabilities.sparse else None,  # ty:ignore[invalid-argument-type]
+            dense=self.capabilities.dense.capability if self.capabilities.dense else None,
+            sparse=self.capabilities.sparse.capability if self.capabilities.sparse else None,
             reranking=tuple(model.capabilities for model in self.reranking)
             if self.reranking
             else None,

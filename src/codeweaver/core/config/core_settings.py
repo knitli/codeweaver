@@ -749,8 +749,13 @@ class CodeWeaverCoreSettings(BaseCodeWeaverSettings):
 
 
 __all__ = (
+    "SCHEMA_VERSION",
+    "SUPPORTED_CONFIG_FILE_EXTENSIONS",
     "CodeWeaverCoreSettings",
+    "aws_secret_store_configured",
+    "azure_key_vault_configured",
     "get_config_locations",
     "get_dotenv_locations",
     "get_possible_config_paths",
+    "google_secret_manager_configured",
 )

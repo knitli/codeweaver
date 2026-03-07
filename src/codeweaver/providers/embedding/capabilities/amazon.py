@@ -45,4 +45,4 @@ def get_amazon_embedding_capabilities() -> tuple[AmazonEmbeddingCapabilities, ..
     )
 
 
-__all__ = ("get_amazon_embedding_capabilities",)
+__all__ = ("AmazonEmbeddingCapabilities", "get_amazon_embedding_capabilities")

@@ -304,4 +304,4 @@ class QdrantClientOptions(ClientOptions):
         return self
 
 
-__all__ = ("QdrantClientOptions",)
+__all__ = ("GrpcParams", "QdrantClientOptions")

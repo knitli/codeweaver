@@ -378,4 +378,4 @@ def get_telemetry_client() -> TelemetryService:
     return TelemetryService.from_settings()
 
 
-__all__ = ("SESSION_ID", "TelemetryService", "get_telemetry_client")
+__all__ = ("NO_HOG", "SESSION_ID", "TelemetryService", "get_telemetry_client")

@@ -70,4 +70,7 @@ class Tokenizer[Encoder](ABC):
         return sum(len(batch) for batch in self.encode_batch(texts, **kwargs))
 
 
-__all__ = ("Tokenizer",)
+__all__ = (
+    "Tokenizer",
+    "EncoderName",
+)

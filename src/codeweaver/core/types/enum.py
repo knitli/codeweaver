@@ -38,7 +38,7 @@ class BaseDataclassEnum(Enum):
 
     Building a dataclass enum is a bit more involved than a standard enum. Steps:
     1. Create a dataclass. It should inherit from `codeweaver.core.types.dataclasses.BaseEnumData`.
-        - Note that `BaseEnumData` already includes `_aliases`, and `_description` fields, so you don't need to redefine those unless you want to customize them. `_name` and `_value` are required by `Enum` members, **you cannot use those names or their non-sunder versions (i.e. 'name')**. `_name` will be the name of the Enum member you assign in the class definition, and `_value` *is your dataclass instance*.
+        - Note that `BaseEnumData` already includes `aliases`, and `description` fields, so you don't need to redefine those unless you want to customize them. `_name` and `_value` are required by `Enum` members, **you cannot use those names or their non-sunder versions (i.e. 'name')**. `_name` will be the name of the Enum member you assign in the class definition, and `_value` *is your dataclass instance*.
         - It is already a dataclass and does not need a `@dataclass` decorator (which will break it).
         - Suggestion: I find that it's easiest to define a dataclass-within-a-dataclass, where there is only a single top-level field that is either a typed dict, dataclass or named tuple. It makes constructing the dataclass enum members easier to read.
     2. Create your enum class, inheriting from `BaseDataclassEnum`.
@@ -65,7 +65,7 @@ class BaseDataclassEnum(Enum):
             super().__init__(*args)
 
     class Color(ColorData, BaseDataclassEnum):
-        # Important: _aliases and _description are optional *positional* args after the required fields.
+        # Important: aliases and description are optional *positional* args after the required fields.
         RED = ColorData(hex_code="#FF0000", rgb=(255, 0, 0), ("rojo", "rouge"), "A bright red color.")
         GREEN = ColorData(hex_code="#00FF00", rgb=(0, 255, 0))
         BLUE = ColorData(hex_code="#0000FF", rgb=(0, 0, 255))
@@ -81,6 +81,23 @@ class BaseDataclassEnum(Enum):
     print(Color.BLUE.as_title)       # Output: Blue
     ```
     """
+
+    def __init__(self, value: BaseDataclassEnum):
+        """Initialize the enum member with a dataclass instance as its value. The dataclass instance should contain all the relevant data for that member, including any aliases and description."""
+        # Ensure that the value is an instance of BaseEnumData
+        if not isinstance(value, BaseEnumData):
+            raise TypeError(
+                f"Value for {self.__class__.__name__} must be an instance of BaseEnumData"
+            )
+        for key in type(value).__annotations__:
+            val = getattr(value, key)
+            object.__setattr__(self, key, val)
+
+    def __new__(cls, value: BaseEnumData) -> Self:
+        """Create a new enum member with the dataclass instance as its value."""
+        obj = object.__new__(cls)
+        object.__setattr__(obj, "_value_", value)
+        return obj
 
     @staticmethod
     def _multiply_variations(s: str) -> set[str]:
@@ -162,7 +179,7 @@ class BaseDataclassEnum(Enum):
     @property
     def description(self) -> str | None:
         """Return the description of the enum member."""
-        return self.value._description if hasattr(self.value, "_description") else None
+        return self.value.description if hasattr(self.value, "description") else None
 
     @computed_field
     @property
@@ -523,4 +540,10 @@ class AnonymityConversion(BaseEnum):
         return functions.get(self, lambda v: v)(values)
 
 
-__all__ = ("AnonymityConversion", "BaseDataclassEnum", "BaseEnum")
+__all__ = (
+    "AnonymityConversion",
+    "BaseDataclassEnum",
+    "BaseEnum",
+    "FilteredCallable",
+    "FilteredReturn",
+)

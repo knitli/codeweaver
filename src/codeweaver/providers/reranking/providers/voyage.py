@@ -131,4 +131,4 @@ class VoyageRerankingProvider(RerankingProvider[AsyncClient]):
             return response
 
 
-__all__ = ("VoyageRerankingProvider",)
+__all__ = ("VoyageRerankingProvider", "voyage_reranking_output_transformer")

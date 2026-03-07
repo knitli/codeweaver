@@ -371,4 +371,20 @@ class BedrockRerankingProvider(RerankingProvider[AgentsforBedrockRuntimeClient])
         return await loop.run_in_executor(None, self.client.rerank, request)
 
 
-__all__ = ("BedrockRerankingProvider", "BedrockRerankingResult")
+__all__ = (
+    "VALID_REGIONS",
+    "VALID_REGION_PATTERN",
+    "BaseBedrockModel",
+    "BedrockInlineDocumentSource",
+    "BedrockRerankConfiguration",
+    "BedrockRerankModelConfiguration",
+    "BedrockRerankRequest",
+    "BedrockRerankResultItem",
+    "BedrockRerankingProvider",
+    "BedrockRerankingResult",
+    "BedrockTextQuery",
+    "DocumentSource",
+    "RerankConfiguration",
+    "bedrock_reranking_input_transformer",
+    "bedrock_reranking_output_transformer",
+)

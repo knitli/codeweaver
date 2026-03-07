@@ -19,8 +19,9 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, NoReturn
 
+from codeweaver.core import ConfigurationError
 from codeweaver.core.constants import (
     BACKUP_EMBEDDING_MODEL_FALLBACK,
     BACKUP_EMBEDDING_MODEL_PRIMARY,
@@ -30,7 +31,9 @@ from codeweaver.core.utils import has_package
 
 
 if TYPE_CHECKING:
+    from codeweaver.providers import EmbeddingRegistry
     from codeweaver.providers.config import EmbeddingProviderSettings
+    from codeweaver.providers.embedding.cache_manager import EmbeddingCacheManager
     from codeweaver.providers.embedding.providers.base import EmbeddingProvider
 
 logger = logging.getLogger(__name__)
@@ -103,6 +106,141 @@ async def get_backup_embedding_config(
     raise ValueError(f"Unknown config provider: {config_provider}")
 
 
+def _raise_on_unavailable_provider(provider_name: str, message: str) -> NoReturn:
+    """Raise ConfigurationError if the specified provider is not available.
+
+    Args:
+        provider_name: Name of the provider to check
+        message: Error message to include in the exception
+
+    Raises:
+        ConfigurationError: If the provider is not available
+    """
+    raise ConfigurationError(f"Provider '{provider_name}' is not available: {message}")
+
+
+async def _create_sentence_transformers_provider(
+    cache_manager: EmbeddingCacheManager, registry: EmbeddingRegistry
+) -> EmbeddingProvider:
+    """Create a sentence-transformers backup embedding provider.
+
+    Args:
+        cache_manager: EmbeddingCacheManager instance
+        registry: EmbeddingRegistry instance
+
+    Returns:
+        EmbeddingProvider instance
+
+    Raises:
+        ConfigurationError: If provider creation fails
+    """
+    logger.info(
+        "Creating backup embedding provider with sentence-transformers: %s",
+        BACKUP_EMBEDDING_MODEL_PRIMARY,
+    )
+    from codeweaver.providers.embedding.capabilities.minishlab import (
+        get_minishlab_embedding_capabilities,
+    )
+    from codeweaver.providers.embedding.providers.sentence_transformers import (
+        SentenceTransformersEmbeddingProvider,
+    )
+
+    config = await get_backup_embedding_config("sentence-transformers")
+    from codeweaver.core.types.service_cards import get_service_card
+
+    card = get_service_card("sentence_transformers", "embedding")
+    if not card:
+        logger.warning(
+            "Service card for sentence-transformers embedding not found, cannot create provider."
+        )
+        _raise_on_unavailable_provider("sentence-transformers", "Service card not found")
+    if not config.client_options:
+        logger.warning(
+            "Client options for sentence-transformers embedding not found in config, cannot create provider."
+        )
+        _raise_on_unavailable_provider("sentence-transformers", "Client options missing in config")
+    client = await asyncio.to_thread(
+        card.create_instance, "client", **config.client_options.as_settings()
+    )
+    provider = SentenceTransformersEmbeddingProvider(
+        client=client,
+        config=config,
+        caps=next(
+            cap
+            for cap in get_minishlab_embedding_capabilities()
+            if cap.name == BACKUP_EMBEDDING_MODEL_PRIMARY
+        ),
+        cache_manager=cache_manager,
+        registry=registry,
+    )
+
+    await provider.initialize_async()
+
+    logger.info(
+        "Successfully created backup embedding provider: sentence-transformers/%s",
+        BACKUP_EMBEDDING_MODEL_PRIMARY,
+    )
+    return provider
+
+
+async def _create_fastembed_provider(
+    cache_manager: EmbeddingCacheManager, registry: EmbeddingRegistry
+) -> EmbeddingProvider:
+    """Create a fastembed backup embedding provider.
+
+    Args:
+        cache_manager: EmbeddingCacheManager instance
+        registry: EmbeddingRegistry instance
+
+    Returns:
+        EmbeddingProvider instance
+
+    Raises:
+        ConfigurationError: If provider creation fails
+    """
+    logger.info(
+        "Creating backup embedding provider with fastembed: %s", BACKUP_EMBEDDING_MODEL_FALLBACK
+    )
+    from codeweaver.providers.embedding.capabilities.jinaai import get_jinaai_embedding_capabilities
+    from codeweaver.providers.embedding.providers.fastembed import FastEmbedEmbeddingProvider
+
+    config = await get_backup_embedding_config("fastembed")
+    from codeweaver.core.types.service_cards import get_service_card
+
+    card = get_service_card("fastembed", "embedding")
+    if not card:
+        logger.warning("Service card for fastembed embedding not found, cannot create provider.")
+        _raise_on_unavailable_provider("fastembed", "Service card not found")
+    if not config.client_options:
+        logger.warning(
+            "Client options for fastembed embedding not found in config, cannot create provider."
+        )
+        _raise_on_unavailable_provider("fastembed", "Client options missing in config")
+    client = await asyncio.to_thread(
+        card.create_instance, "client", **config.client_options.as_settings()
+    )
+
+    provider = FastEmbedEmbeddingProvider(
+        client=client,
+        config=config,
+        caps=next(
+            cap
+            for cap in get_jinaai_embedding_capabilities()
+            if cap.name == BACKUP_EMBEDDING_MODEL_FALLBACK
+        ),
+        cache_manager=cache_manager,
+        registry=registry,
+    )
+
+    await provider.initialize_async()
+
+    logger.info(
+        "Successfully created backup embedding provider: fastembed/%s",
+        BACKUP_EMBEDDING_MODEL_FALLBACK,
+    )
+    return provider
+
+
 async def get_backup_embedding_provider() -> EmbeddingProvider | None:
     """Get backup embedding provider based on available dependencies.
 
@@ -123,101 +261,23 @@ async def get_backup_embedding_provider() -> EmbeddingProvider | None:
     container = get_container()
     registry = await container.resolve(EmbeddingRegistry)
     cache_manager = await container.resolve(EmbeddingCacheManager)
+
     # Try sentence-transformers first (preferred)
     if _check_sentence_transformers_available():
         try:
-            logger.info(
-                "Creating backup embedding provider with sentence-transformers: %s",
-                BACKUP_EMBEDDING_MODEL_PRIMARY,
-            )
-            from codeweaver.providers.embedding.capabilities.minishlab import (
-                get_minishlab_embedding_capabilities,
-            )
-            from codeweaver.providers.embedding.providers.sentence_transformers import (
-                SentenceTransformersEmbeddingProvider,
-            )
-
-            # Create provider with minimal configuration
-            config = await get_backup_embedding_config("sentence-transformers")
-            from codeweaver.core.types.service_cards import get_service_card
-
-            card = get_service_card("sentence_transformers", "embedding")
-            client = await asyncio.to_thread(
-                card.create_instance, "client", **config.client_options.as_settings()
-            )
-            provider = SentenceTransformersEmbeddingProvider(
-                client=client,
-                config=config,
-                caps=next(
-                    cap
-                    for cap in get_minishlab_embedding_capabilities()
-                    if cap.name == BACKUP_EMBEDDING_MODEL_PRIMARY
-                ),
-                cache_manager=cache_manager,
-                registry=registry,
-            )
-
-            # Initialize the provider
-            await provider.initialize_async()
-
-            logger.info(
-                "Successfully created backup embedding provider: sentence-transformers/%s",
-                BACKUP_EMBEDDING_MODEL_PRIMARY,
-            )
+            return await _create_sentence_transformers_provider(cache_manager, registry)
         except Exception as e:
             logger.warning(
                 "Failed to create sentence-transformers backup provider: %s. Trying fallback.", e
             )
-        else:
-            return provider
 
     # Try fastembed as fallback
     if _check_fastembed_available():
         try:
-            logger.info(
-                "Creating backup embedding provider with fastembed: %s",
-                BACKUP_EMBEDDING_MODEL_FALLBACK,
-            )
-            from codeweaver.providers.embedding.capabilities.jinaai import (
-                get_jinaai_embedding_capabilities,
-            )
-            from codeweaver.providers.embedding.providers.fastembed import (
-                FastEmbedEmbeddingProvider,
-            )
-
-            # create the config
-            config = await get_backup_embedding_config("fastembed")
-            from codeweaver.core.types.service_cards import get_service_card
-
-            card = get_service_card("fastembed", "embedding")
-            client = await asyncio.to_thread(
-                card.create_instance, "client", **config.client_options.as_settings()
-            )
-
-            provider = FastEmbedEmbeddingProvider(
-                client=client,
-                config=config,
-                caps=next(
-                    cap
-                    for cap in get_jinaai_embedding_capabilities()
-                    if cap.name == BACKUP_EMBEDDING_MODEL_FALLBACK
-                ),
-                cache_manager=cache_manager,
-                registry=await registry,
-            )
-
-            # Initialize the provider
-            await provider.initialize_async()
-
-            logger.info(
-                "Successfully created backup embedding provider: fastembed/%s",
-                BACKUP_EMBEDDING_MODEL_FALLBACK,
-            )
-
+            return await _create_fastembed_provider(cache_manager, registry)
         except Exception as e:
             logger.warning("Failed to create fastembed backup provider: %s", e)
-        else:
-            return provider
+
     # No backup provider available
     logger.warning(
         "No backup embedding provider available. Install sentence-transformers or fastembed."
@@ -292,8 +352,8 @@ def get_backup_model_info() -> dict[str, str | bool]:
 
 
 __all__ = (
-    "get_backup_embedding_provider",
     "create_backup_embeddings",
     "get_backup_embedding_config",
+    "get_backup_embedding_provider",
     "get_backup_model_info",
 )

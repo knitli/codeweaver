@@ -108,14 +108,4 @@ class CollectionConfig(BasedModel):
         )
 
 
-__all__ = (
-    "CollectionConfig",
-    WalConfig,
-    HnswConfig,
-    OptimizersConfig,
-    VectorParams,
-    SparseVectorParams,
-    BinaryQuantization,
-    ProductQuantization,
-    ScalarQuantization,
-)
+__all__ = ("CollectionConfig", "get_embedding_group")

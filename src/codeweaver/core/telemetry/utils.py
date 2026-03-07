@@ -132,4 +132,4 @@ def redact_identifiable_info(data: str) -> str:
     return PATTERNS.name.sub("[NAME]", data)
 
 
-__all__ = ("find_identifiable_info", "redact_identifiable_info")
+__all__ = ("PATTERNS", "IntifyingPatterns", "find_identifiable_info", "redact_identifiable_info")

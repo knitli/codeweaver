@@ -192,4 +192,4 @@ class FileWatchingService:
             self.context = context
 
 
-__all__ = ("FileWatchingService",)
+__all__ = ("USE_RICH", "FileWatchingService")

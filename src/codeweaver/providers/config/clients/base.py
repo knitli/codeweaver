@@ -9,13 +9,17 @@ from __future__ import annotations
 import logging
 import os
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from beartype.typing import ClassVar
 from pydantic import AnyUrl, ConfigDict, SecretStr, model_validator
 
 from codeweaver.core.types.models import BASEDMODEL_CONFIG, BasedModel
 from codeweaver.core.types.provider import Provider
+
+
+if TYPE_CHECKING:
+    from codeweaver.core.types.provider import SDKClient
 
 
 logger = logging.getLogger(__name__)
@@ -170,6 +174,11 @@ class ClientOptions(BasedModel):
             # it's a dictionary
             response_map |= cls._handle_env_dict(var_name, env_var_names)
         return response_map if response_map and response_map.values() else {}
+
+    @property
+    def sdk_client(self) -> SDKClient:
+        """Return an instance of the underlying SDK client, initialized with the client options."""
+        return SDKClient.from_string(self.core_provider.variable)
 
 
 __all__ = ("ClientOptions",)

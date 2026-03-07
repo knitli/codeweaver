@@ -321,6 +321,7 @@ class MCPConfigDict(TypedDict):
 
 __all__ = (
     "CodeWeaverMCPConfigDict",
+    "EndpointSettingsDict",
     "FastMcpHttpRunArgs",
     "FastMcpServerSettingsDict",
     "MCPConfigDict",

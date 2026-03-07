@@ -60,4 +60,4 @@ def get_mistral_embedding_capabilities() -> tuple[MistralEmbeddingCapabilities, 
     )
 
 
-__all__ = ("get_mistral_embedding_capabilities",)
+__all__ = ("MistralEmbeddingCapabilities", "get_mistral_embedding_capabilities")

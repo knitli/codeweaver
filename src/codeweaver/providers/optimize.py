@@ -287,6 +287,7 @@ def get_optimizations(model_kind: Literal["dense", "sparse", "both"]) -> Optimiz
 __all__ = (
     "AvailableOptimizations",
     "OptimizationDecisions",
+    "SimdExtensions",
     "decide_fastembed_runtime",
     "get_optimizations",
 )

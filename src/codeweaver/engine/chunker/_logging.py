@@ -271,3 +271,15 @@ def log_chunking_deduplication(
         extra |= extra_context
 
     logger.debug("Chunk deduplication completed", extra=extra)
+
+
+__all__ = (
+    "get_name",
+    "log_chunking_completed",
+    "log_chunking_deduplication",
+    "log_chunking_edge_case",
+    "log_chunking_failed",
+    "log_chunking_fallback",
+    "log_chunking_performance_warning",
+    "log_chunking_resource_limit",
+)

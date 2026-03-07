@@ -21,7 +21,6 @@ from pydantic import (
 )
 
 from codeweaver.core import (
-    ALL_LANGUAGES,
     FROZEN_BASEDMODEL_CONFIG,
     BasedModel,
     ExtLangPair,
@@ -29,6 +28,7 @@ from codeweaver.core import (
     SecondarySupportedLanguage,
     effective_cpu_count,
 )
+from codeweaver.core.file_extensions import ALL_LANGUAGES
 
 
 if TYPE_CHECKING:

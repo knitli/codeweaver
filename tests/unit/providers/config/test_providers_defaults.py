@@ -136,8 +136,7 @@ def test_agent_default_no_package():
 
 
 def _embedding_defaults_with_mocked_packages(
-    available_packages: set[str],
-    voyage_auth: bool = False,
+    available_packages: set[str], voyage_auth: bool = False
 ):
     from codeweaver.providers.config import providers as pmod
 

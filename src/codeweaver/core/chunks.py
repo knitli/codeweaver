@@ -80,7 +80,7 @@ type StructuredDataInput = (
 
 
 def _get_registry() -> EmbeddingRegistry:
-    from codeweaver.providers import get_embedding_registry
+    from codeweaver.providers.embedding import get_embedding_registry
 
     return get_embedding_registry()
 

@@ -662,7 +662,7 @@ class AstThing[SgNode: (AstGrepNode)](BasedModel):
         return self.importance_for_task(task).as_dict()[context]
 
     @override
-    def __getitem__(self, meta_var: str) -> AstThing[SgNode]:  # ty:ignore[invalid-method-override]
+    def __getitem__(self, meta_var: str) -> AstThing[SgNode]:
         """Get the child node for the given meta variable."""
         return type(self).from_sg_node(cast(SgNode, self._node[meta_var]), self.language)
 
@@ -890,6 +890,7 @@ __all__ = (
     "Config",
     "CustomLang",
     "FileThing",
+    "MetaVar",
     "NthChild",
     "Pattern",
     "Pos",
@@ -900,6 +901,7 @@ __all__ = (
     "Relation",
     "Rule",
     "RuleWithoutNot",
+    "Strictness",
     "rebuild_models_for_tests",
 )
 

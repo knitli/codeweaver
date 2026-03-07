@@ -420,12 +420,12 @@ class SettingsEnvVars:
 
 
 def _providers_for_category(category: LiteralProviderCategoryType) -> set[str]:
-
+    """Get a set of provider names for a given category."""
     return {provider.variable for provider in Provider if provider.has_capability(category)}
 
 
 def _providers_for_category_requiring_auth(category: LiteralProviderCategoryType) -> set[str]:
-
+    """Get a set of provider names for a category that require authentication."""
     return {
         provider.variable
         for provider in Provider
@@ -434,10 +434,12 @@ def _providers_for_category_requiring_auth(category: LiteralProviderCategoryType
 
 
 def as_cloud_string(provider_name: str) -> str:
+    """Format a provider name to indicate it's a cloud-only provider."""
     return f"{provider_name} (cloud only)"
 
 
 def _auth_list_for_category(category: LiteralProviderCategoryType) -> set[str]:
+    """Get a set of provider names for a category that require authentication, formatted to indicate they are cloud-only."""
     return set(
         _providers_for_category_requiring_auth(category)
         | {as_cloud_string(p) for p in _maybe_requiring_auth(category) if p}
@@ -445,7 +447,7 @@ def _auth_list_for_category(category: LiteralProviderCategoryType) -> set[str]:
 
 
 def _maybe_requiring_auth(category: LiteralProviderCategoryType) -> set[str]:
-
+    """Get a set of provider names for a category that may require authentication, formatted to indicate they are cloud-only."""
     return {
         provider.variable
         for provider in Provider
@@ -510,4 +512,11 @@ def get_provider_vars() -> MappingProxyType[ProviderCategoryLiteralString, SetPr
     return MappingProxyType(env_map)
 
 
-__all__ = ("SettingsEnvVars", "environment_variables", "get_provider_vars")
+__all__ = (
+    "ProviderKey",
+    "SetProviderEnvVarsDict",
+    "SettingsEnvVars",
+    "as_cloud_string",
+    "environment_variables",
+    "get_provider_vars",
+)

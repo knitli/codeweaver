@@ -36,4 +36,4 @@ def get_morph_embedding_capabilities() -> tuple[EmbeddingModelCapabilities]:
     return (EmbeddingModelCapabilities.model_construct(**MORPH_LLM_EMBEDDING_V4_CAPABILITIES),)
 
 
-__all__ = ("get_morph_embedding_capabilities",)
+__all__ = ("MORPH_LLM_EMBEDDING_V4_CAPABILITIES", "get_morph_embedding_capabilities")

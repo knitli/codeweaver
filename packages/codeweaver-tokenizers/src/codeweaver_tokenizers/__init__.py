@@ -1,7 +1,7 @@
-# SPDX-FileCopyrightText: 2025 Knitli Inc.
-# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
+
 """Entry point for CodeWeaver's tokenizer system. Provides the `get_tokenizer` function to retrieve the appropriate tokenizer class based on the specified type and model."""
 
 from __future__ import annotations
@@ -50,6 +50,7 @@ def estimate_tokens(text: str | bytes, encoder: str = "o200k_base") -> int:
 
 
 __all__ = (
+    "EncoderName",
     "TiktokenTokenizer",
     "Tokenizer",
     "Tokenizers",

@@ -37,7 +37,7 @@ from codeweaver.core.constants import (
     DEFAULT_MCP_RETRY_BASE_DELAY,
     DEFAULT_MCP_RETRY_MAX_DELAY,
 )
-from codeweaver.server.mcp import (
+from codeweaver.server.mcp.middleware import (
     ErrorHandlingMiddleware,
     LoggingMiddleware,
     RateLimitingMiddleware,
@@ -175,6 +175,7 @@ __all__ = (
     "LoggingMiddlewareSettings",
     "MiddlewareOptions",
     "RateLimitingMiddlewareSettings",
+    "ResponseCachingMiddlewareSettings",
     "RetryMiddlewareSettings",
-    default_for_transport,
+    "default_for_transport",
 )

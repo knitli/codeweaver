@@ -13,17 +13,17 @@
 #
 # Edit this file to customize export behavior for your project.
 # Docs: https://github.com/knitli/exportify
+output_style: lazy
 
 schema_version: "1.0"
-# Optional: add SPDX comment headers to every generated __init__.py.
-# spdx:
-#   enabled: true
-#   copyright: "2026 Your Name or Company."
-#   license: "MIT OR Apache-2.0"
 spdx:
   enabled: true
   copyright: "2026 Knitli Inc."
   license: "MIT OR Apache-2.0"
+project:
+  project_name: codeweaver
+  project_path: "src"
+  additional_source_paths: []
 rules:
   # ===================================================================
   # Priority 1000: Explicit exclusions
@@ -49,10 +49,24 @@ rules:
     match:
       name_pattern: ^__.*__$
     action: exclude
+  - name: ExcludeMain
+    priority: 999
+    description: Skip __main__ module and main function to prevent accidental exports from scripts
+    match:
+      any_of:
+        - module_exact: __main__
+        - name_exact: main
+    action: exclude
   # ===================================================================
   # Priority 900: Special component exclusions
   # Prevent self-referential or infrastructure issues
   # ===================================================================
+  - name: ExcludeCLICommands
+    priority: 901
+    description: Exclude CLI commands from exports
+    match:
+      module_pattern: .*\.cli\.commands(\..*)?$
+    action: exclude
   - name: ExcludeLateImportComponents
     priority: 900
     description: Never lazily export lateimport components (prevents circular dependency)
@@ -96,50 +110,78 @@ rules:
     match:
       name_pattern: ^dev_.*
     action: exclude
-  # ===================================================================
-  # Priority 700: Defined symbols (high priority exports)
-  # Export symbols defined in the module itself
-  # ===================================================================
-  - name: ExportDefinedClasses
-    priority: 700
-    description: Export classes defined in this module
-    match:
-      member_type: class
-    action: include
-    propagate: root
-  - name: ExportDefinedFunctions
-    priority: 700
-    description: Export functions defined in this module (including async)
-    match:
-      member_type: function
-    action: include
-    propagate: parent
-  - name: ExportSpecialConstants
-    priority: 702
-    description: Export constants in constants.py and file_extensions.py to root
-    match:
-      all_of:
-        - member_type: constant
-        - any_of:
-            - module_pattern: .*\.constants$
-            - module_pattern: .*\.file_extensions$
-    action: include
-    propagate: root
-  - name: ExportDefinedConstants
-    priority: 700
-    description: Export constants (SCREAMING_SNAKE_CASE variables)
+
+  - name: EnsureINJECTEDPropagateToRoot
+    priority: 710
+    description: Ensure INJECTED propagates to root for visibility in public API
     match:
       member_type: constant
-      name_pattern: ^[A-Z0-9_]+$
-    action: include
-    propagate: parent
-  - name: ExportTypeAliases
-    priority: 700
-    description: Export type aliases (both Python 3.12+ and pre-3.12 style)
-    match:
-      member_type: type_alias
+      name_exact: INJECTED
     action: include
     propagate: root
+
+  - name: IncludePydanticAIImports
+    priority: 709
+    description: Include Pydantic AI imports (core part of public API)
+    match:
+      module_pattern: .*providers\.config\.sdk\.agent$
+      name_pattern: ^.*AgentModelConfig$
+    action: include
+    propagate: root
+
+  - name: SpecialUtilitiesPropagateToRoot
+    priority: 708
+    description: Special utilities propagate to package root
+    match:
+      member_type: function
+      any_of:
+        - module_pattern: .*di$|.*di\.(depends|utils|container)$
+          name_pattern: ^depends$|^dependency_provider$|^get_container$|^is_depends_marker$
+        - module_pattern: .*server.*
+          name_pattern: ^find_code$|^lifetime$|^background_services_lifespan$|^http_lifespan$|^create_http_server$|^create_stdio_server$|.*_tool$|^find_code_tool_definition$
+        - module_pattern: .*providers\.config$|.*providers\.config\..*
+          name_exact: get_profile
+        - module_pattern: .*providers|.*providers\..*
+          name_exact: get_provider_registry
+        - module_pattern: .*providers\.data.*$
+          name_pattern: .*_tools?$
+        - module_pattern: .*engine\.chunker.*$
+          name_pattern: ^chunk_files_parallel$|^detect_language_family$|^expand_pattern$|^get_family_patterns$|^detect_family_characteristics$
+        - name_exact: get_settings
+          module_pattern: .*core.*
+        - name_exact: capture_search_event
+          module_pattern: .*core.*
+    action: include
+    propagate: root
+
+  - name: CoreUtilsPropagateToRoot
+    priority: 707
+    description: Core utilities propagate to package root
+    match:
+      module_pattern: .*core\.utils$|.*core\.utils\..*
+    action: include
+    propagate: root
+
+  - name: SpecialVariablesPropagateToRoot
+    priority: 706
+    description: Special variables propagate to package root
+    match:
+      member_type: variable
+      any_of:
+        - name_pattern: ^Default.*$
+        - name_pattern: .*ConfigT?$
+    action: include
+    propagate: root
+
+  - name: IncludeMcpMiddleware
+    priority: 705
+    description: Include MCP middleware components (core part of public API)
+    match:
+      module_pattern: .*server\.mcp.*$
+      name_pattern: ^.*Middleware$
+    action: include
+    propagate: root
+
   # ===================================================================
   # Priority 600: Import handling
   # Determine which imported symbols to re-export
@@ -177,44 +219,8 @@ rules:
   #
   # Example: propagate everything from mypackage.core.types to root
 
-  - name: CoreUtilsPropagateToRoot
-    priority: 300
-    description: Core utilities propagate to package root
-    match:
-      module_pattern: .*core\.utils$|.*core\.utils\..*
-    action: include
-    propagate: root
-
-  - name: SpecialUtilitiesPropagateToRoot
-    priority: 300
-    description: Special utilities propagate to package root
-    match:
-      member_type: function
-      any_of:
-        - module_pattern: .*di$|.*di\.(depends|utils)$
-          name_pattern: ^depends$|^dependency_provider$
-        - module_pattern: .*server.*
-          name_pattern: ^find_code$|^lifetime$|^background_services_lifespan$|^http_lifespan$|^create_http_server$|^create_stdio_server$|.*_tool$|^find_code_tool_definition$
-        - module_pattern: .*providers\.config$|.*providers\.config\..*
-          name_pattern: ^get_profile$
-        - module_pattern: .*providers\.data.*$
-          name_pattern: .*_tools?$
-        - module_pattern: .*engine\.chunker.*$
-          name_pattern: ^chunk_files_parallel$|^detect_language_family$|^expand_pattern$|^get_family_patterns$|^detect_family_characteristics$
-    action: include
-    propagate: root
-
-  - name: EnsureINJECTEDPropagateToRoot
-    priority: 300
-    description: Ensure INJECTED propagates to root for visibility in public API
-    match:
-      member_type: constant
-      name_exact: INJECTED
-    action: include
-    propagate: root
-
   - name: PropagateToRoot
-    priority: 300
+    priority: 307
     description: Core types and exceptions propagate to package root
     match:
       any_of:
@@ -222,17 +228,59 @@ rules:
         - module_pattern: .*\.exceptions$
         - name_pattern: .*Error$
         - name_pattern: .*Exception$
+        - name_pattern: ^Codeweaver.*$ # All public symbols starting with Codeweaver
+        - name_pattern: ^.*Type$ # All public symbols ending with Type
+        - name_pattern: ^.*Dep$ # All public symbols ending with Dep (common suffix for dependency definitions)
     action: include
     propagate: root
 
+  - name: ExportDefinedFunctions
+    priority: 200
+    description: Export functions defined in this module (including async)
+    match:
+      member_type: function
+    action: include
+    propagate: parent
   # ===================================================================
-
+  - name: ExportDefinedClasses
+    priority: 299
+    description: Export classes defined in this module
+    match:
+      member_type: class
+    action: include
+    propagate: root
+  - name: ExportSpecialConstants
+    priority: 298
+    description: Export constants in constants.py and file_extensions.py to root
+    match:
+      all_of:
+        - member_type: constant
+        - any_of:
+            - module_pattern: .*\.constants$
+            - module_pattern: .*\.file_extensions$
+    action: include
+    propagate: root
+  - name: ExportDefinedConstants
+    priority: 297
+    description: Export constants (SCREAMING_SNAKE_CASE variables)
+    match:
+      member_type: constant
+      name_pattern: ^[A-Z0-9_]+$
+    action: include
+    propagate: parent
+  - name: ExportTypeAliases
+    priority: 296
+    description: Export type aliases (both Python 3.12+ and pre-3.12 style)
+    match:
+      member_type: type_alias
+    action: include
+    propagate: root
   # ===================================================================
   # Priority 0: Default fallback
   # ===================================================================
   - name: DefaultNoDecision
     priority: 0
-    description: 'Default: no decision (symbol not exported)'
+    description: "Default: no decision (symbol not exported)"
     match:
       name_pattern: .* # Matches everything
     action: no_decision

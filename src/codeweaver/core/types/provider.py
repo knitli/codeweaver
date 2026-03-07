@@ -560,4 +560,5 @@ __all__ = (
     "ProviderCategory",
     "SDKClient",
     "get_categories",
+    "get_default_provider_import_for_category",
 )

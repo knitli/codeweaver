@@ -252,6 +252,8 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
             custom_deps: Custom dependencies
             **kwargs: Additional keyword arguments
         """
+        from codeweaver.core.types import ProviderCategory
+
         defaults = getattr(self, "_defaults", {})
         object.__setattr__(self, "_model_dump_json", super().model_dump_json)
         object.__setattr__(self, "_circuit_state", CircuitBreakerState.CLOSED)
@@ -268,7 +270,9 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
 
         # Access embedding options through config.embedding_config
         embedding_config = (
-            config.embedding_config if isinstance(config, EmbeddingProviderSettings) else config
+            config.embedding_config
+            if isinstance(config, EmbeddingProviderSettings)
+            else config.sparse_embedding_config
         )
         object.__setattr__(
             self,
@@ -292,10 +296,14 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         # Compute namespace from provider ID + embedding kind
         # Note: We need to check the type after initialization to determine if sparse
         # For now, we'll set a placeholder and update it after _initialize
-        provider_id = config.provider.variable if config.provider else "unknown"
+        provider_id = config.provider.variable
         object.__setattr__(
-            self, "_namespace", f"{provider_id}.dense"
-        )  # Default to dense, may be updated
+            self,
+            "_namespace",
+            f"{provider_id}.dense"
+            if config.category == ProviderCategory.EMBEDDING
+            else f"{provider_id}.sparse",
+        )
 
         self._initialize(impl_deps, custom_deps, **kwargs)
         object.__setattr__(self, "caps", caps)
@@ -1114,7 +1122,7 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         }
 
     @override
-    def model_dump_json(  # type: ignore
+    def model_dump_json(
         self,
         *,
         indent: int | None = None,
@@ -1229,9 +1237,12 @@ class SparseEmbeddingProvider[SparseClient](EmbeddingProvider[SparseClient], ABC
 
 
 __all__ = (
+    "DEFAULT_MAX_BATCH_TOKENS",
     "EmbeddingCustomDeps",
     "EmbeddingErrorInfo",
     "EmbeddingImplementationDeps",
     "EmbeddingProvider",
     "SparseEmbeddingProvider",
+    "default_input_transformer",
+    "default_output_transformer",
 )

@@ -23,7 +23,7 @@ from codeweaver.core.dependencies import (
 )
 from codeweaver.core.di import INJECTED, dependency_provider, depends
 from codeweaver.engine.dependencies import FailoverServiceDep, IndexingServiceDep
-from codeweaver.providers import AllProviderSettingsDep
+from codeweaver.providers import ProviderSettingsDep
 
 # Runtime imports needed for dependency_provider decorators
 from codeweaver.server.health.health_service import HealthService
@@ -45,7 +45,7 @@ def _create_health_service(
     statistics: StatisticsDep = INJECTED,
     indexer: IndexingServiceDep = INJECTED,
     failover_manager: FailoverServiceDep = INJECTED,
-    providers: AllProviderSettingsDep = INJECTED,
+    providers: ProviderSettingsDep = INJECTED,
 ) -> HealthService:
     """Factory for health service."""
     return HealthService(

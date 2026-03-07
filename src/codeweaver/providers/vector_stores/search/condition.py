@@ -212,6 +212,7 @@ type Condition = (
 
 __all__ = (
     "Condition",
+    "ExtendedPointId",
     "FieldCondition",
     "Filter",
     "FilterableField",

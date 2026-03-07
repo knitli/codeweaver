@@ -165,7 +165,7 @@ class SemanticChunker(BaseChunker):
         self.language = language
 
         # Handle statistics injection - resolve placeholder in test environments
-        from codeweaver.core import is_depends_marker
+        from codeweaver.core.di import is_depends_marker
 
         if is_depends_marker(statistics):
             # No DI container active, create a simple SessionStatistics instance

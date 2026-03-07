@@ -239,9 +239,9 @@ class EmbeddingMixin:
             if dim := getattr(cap, "default_dimension", None):
                 object.__setattr__(self, "_dimension", dim)
                 return dim
-            if cap.output_dimensions:  # ty:ignore[unresolved-attribute]
-                object.__setattr__(self, "_dimension", cap.output_dimensions[0])  # ty:ignore[unresolved-attribute]
-                return cap.output_dimensions[0]  # ty:ignore[unresolved-attribute]
+            if cap.output_dimensions:
+                object.__setattr__(self, "_dimension", cap.output_dimensions[0])
+                return cap.output_dimensions[0]
         raise ConfigurationError(
             "Could not resolve embedding dimension from config, capabilities, or registered defaults. You need to specify it explicitly, for best results, register an `EmbeddingModelCapabilities` subclass with the capability resolver."
         )
@@ -1578,6 +1578,7 @@ __all__ = (
     "BedrockCohereConfigDict",
     "BedrockEmbeddingConfig",
     "BedrockEmbeddingRequestParams",
+    "BedrockModelConfig",
     "BedrockTitanV2ConfigDict",
     "CohereEmbeddingConfig",
     "CohereEmbeddingOptionsDict",
@@ -1587,6 +1588,7 @@ __all__ = (
     "GoogleEmbeddingConfig",
     "GoogleEmbeddingRequestParams",
     "HuggingFaceEmbeddingConfig",
+    "HuggingFaceEmbeddingOptionsDict",
     "MistralEmbeddingConfig",
     "MistralEmbeddingOptionsDict",
     "OpenAIEmbeddingConfig",

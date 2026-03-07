@@ -105,4 +105,12 @@ def get_thenlper_embedding_capabilities() -> tuple[ThenlperEmbeddingCapabilities
     return tuple(ThenlperEmbeddingCapabilities.model_validate(cap) for cap in capabilities)
 
 
-__all__ = ("get_thenlper_embedding_capabilities",)
+__all__ = (
+    "ALL_CAPABILITIES",
+    "CAP_MAP",
+    "THENLPER_GTE_BASE_CAPABILITIES",
+    "THENLPER_GTE_LARGE_CAPABILITIES",
+    "ThenlperEmbeddingCapabilities",
+    "ThenlperProvider",
+    "get_thenlper_embedding_capabilities",
+)

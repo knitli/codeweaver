@@ -69,7 +69,6 @@ from codeweaver.providers.config.categories import (
 )
 from codeweaver.providers.config.clients import QdrantClientOptions
 from codeweaver.providers.config.sdk import (
-    AnthropicAgentModelConfig,
     CollectionConfig,
     FastEmbedEmbeddingConfig,
     FastEmbedSparseEmbeddingConfig,
@@ -77,6 +76,7 @@ from codeweaver.providers.config.sdk import (
     SentenceTransformersSparseEmbeddingConfig,
     VoyageEmbeddingConfig,
 )
+from codeweaver.providers.config.sdk.agent import AnthropicAgentModelConfig
 
 
 if TYPE_CHECKING:
@@ -458,6 +458,7 @@ class VersionedProfile(DataclassSerializationMixin):
         version: str,
         embedding_config: EmbeddingProviderSettingsType | AsymmetricEmbeddingProviderSettings,
         changelog: tuple[str, ...] | list[str],
+        **kwargs: Any,
     ) -> None:
         """Initialize a versioned profile.
 
@@ -473,7 +474,8 @@ class VersionedProfile(DataclassSerializationMixin):
         object.__setattr__(
             self, "changelog", tuple(changelog) if isinstance(changelog, list) else changelog
         )
-        super().__init__()
+        cleaned_kwargs = {k: v for k, v in kwargs.items() if k in {"aliases", "description"}} or {}
+        super().__init__(**cleaned_kwargs)
 
     def _telemetry_keys(self) -> dict[FilteredKeyT, AnonymityConversion] | None:
         """Define telemetry anonymization rules."""
@@ -630,8 +632,8 @@ class ProviderConfigProfile(BaseEnumData):
                 agent=(*(self.agent or ()), *(other.agent or ())),
                 data=(*(self.data or ()), *(other.data or ())),
             ),
-            self._aliases if hasattr(self, "_aliases") else (),
-            self._description or "",
+            self.aliases if hasattr(self, "aliases") else (),
+            self.description or "",
         )
 
 
@@ -691,8 +693,7 @@ class ProviderProfile(ProviderConfigProfile, BaseDataclassEnum):
         """
         for profile in cls:
             if name in (
-                alias.lower()
-                for alias in (profile._aliases if hasattr(profile, "_aliases") else ())
+                alias.lower() for alias in (profile.aliases if hasattr(profile, "aliases") else ())
             ):
                 return profile
         provider = ProviderProfile.from_string(name)

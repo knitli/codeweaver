@@ -126,4 +126,4 @@ class SentenceTransformersRerankingProvider(RerankingProvider[CrossEncoder]):
             self.kwargs["model_kwargs"]["attention_implementation"] = "flash_attention_2"
 
 
-__all__ = ("SentenceTransformersRerankingProvider",)
+__all__ = ("SentenceTransformersRerankingProvider", "preprocess_for_qwen")

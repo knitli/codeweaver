@@ -14,7 +14,14 @@ Design principles for adding new provider implementations in a category:
 4. **Special handling**: If your provider requires special handling for initialization that you can't address in the common `_initialize` method. You can provide a callable to its service card (codeweaver.core.types.service_cards.ServiceCard) that will be called during provider initialization.
 """
 
+from __future__ import annotations
+
 from types import MappingProxyType
+
+# === MANAGED EXPORTS ===
+# Exportify manages this section. It contains lazy-loading infrastructure
+# for the package: imports and runtime declarations (__all__, __getattr__,
+# __dir__). Manual edits will be overwritten by `exportify fix`.
 from typing import TYPE_CHECKING
 
 from lateimport import create_late_getattr
@@ -24,16 +31,19 @@ if TYPE_CHECKING:
     from codeweaver.providers.config.categories.agent import (
         AgentProviderSettingsType,
         AnthropicAgentProviderSettings,
+        AnthropicAgentProviderSettingsType,
         AnthropicAzureAgentProviderSettings,
         AnthropicBedrockAgentProviderSettings,
         AnthropicGoogleVertexAgentProviderSettings,
         BaseAgentProviderSettings,
         CerebrasAgentProviderSettings,
         CohereAgentProviderSettings,
+        GeneralAgentClientOptionsType,
         GoogleAgentProviderSettings,
         GroqAgentProviderSettings,
         HuggingFaceAgentProviderSettings,
         MistralAgentProviderSettings,
+        NonAnthropicAgentProviderSettingsType,
         OpenAIAgentProviderSettings,
         OpenRouterAgentProviderSettings,
         PydanticGatewayProviderSettings,
@@ -49,18 +59,24 @@ if TYPE_CHECKING:
         DataProviderSettingsType,
         DuckDuckGoProviderSettings,
         ExaProviderSettings,
+        GeneralDataClientOptionsType,
         TavilyProviderSettings,
     )
     from codeweaver.providers.config.categories.embedding import (
         AsymmetricEmbeddingProviderSettings,
         AsymmetricEmbeddingProviderSettingsDict,
+        AzureClientOptionsType,
         AzureEmbeddingProviderSettings,
         BaseEmbeddingProviderSettings,
         BedrockEmbeddingProviderSettings,
         CohereEmbeddingProviderSettings,
+        CoreEmbeddingProviderSettingsType,
+        DatatypeMismatchError,
+        DimensionMismatchError,
         EmbeddingProviderSettings,
         EmbeddingProviderSettingsType,
         FastEmbedEmbeddingProviderSettings,
+        GeneralEmbeddingClientOptionsType,
         GoogleEmbeddingProviderSettings,
         HuggingFaceEmbeddingProviderSettings,
         MistralEmbeddingProviderSettings,
@@ -77,8 +93,10 @@ if TYPE_CHECKING:
         BedrockRerankingProviderSettings,
         CohereRerankingProviderSettings,
         FastEmbedRerankingProviderSettings,
+        GeneralRerankingClientOptionsType,
         RerankingProviderSettings,
         RerankingProviderSettingsType,
+        SentenceTransformersRerankingProviderSettings,
         VoyageRerankingProviderSettings,
     )
     from codeweaver.providers.config.categories.sparse_embedding import (
@@ -99,15 +117,18 @@ if TYPE_CHECKING:
         BaseVectorStoreProviderSettings,
         MemoryConfig,
         MemoryVectorStoreProviderSettings,
+        QdrantCollectionConfig,
         QdrantVectorStoreProviderSettings,
         VectorStoreProviderSettings,
         VectorStoreProviderSettingsType,
     )
 
-
-_dynamic_imports = MappingProxyType({
+_dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "ANTHROPIC_PROVIDER_DISCRIMINATOR": (__spec__.parent, "utils"),
-    "AgentProviderSettingsType": (__spec__.parent, "agent"),
+    "CORE_EMBEDDING_PROVIDER_DISCRIMINATOR": (__spec__.parent, "utils"),
+    "NON_ANTHROPIC_AGENT_PROVIDER_DISCRIMINATOR": (__spec__.parent, "utils"),
+    "PROVIDER_DISCRIMINATOR": (__spec__.parent, "utils"),
+    "RERANKING_PROVIDER_DISCRIMINATOR": (__spec__.parent, "utils"),
     "AnthropicAgentProviderSettings": (__spec__.parent, "agent"),
     "AnthropicAzureAgentProviderSettings": (__spec__.parent, "agent"),
     "AnthropicBedrockAgentProviderSettings": (__spec__.parent, "agent"),
@@ -127,22 +148,25 @@ _dynamic_imports = MappingProxyType({
     "BedrockEmbeddingProviderSettings": (__spec__.parent, "embedding"),
     "BedrockProviderMixin": (__spec__.parent, "mixins"),
     "BedrockRerankingProviderSettings": (__spec__.parent, "reranking"),
-    "CORE_EMBEDDING_PROVIDER_DISCRIMINATOR": (__spec__.parent, "utils"),
     "CerebrasAgentProviderSettings": (__spec__.parent, "agent"),
     "CohereAgentProviderSettings": (__spec__.parent, "agent"),
     "CohereEmbeddingProviderSettings": (__spec__.parent, "embedding"),
     "CohereRerankingProviderSettings": (__spec__.parent, "reranking"),
     "ConnectionConfiguration": (__spec__.parent, "base"),
     "ConnectionRateLimitConfig": (__spec__.parent, "base"),
-    "DataProviderSettingsType": (__spec__.parent, "data"),
+    "DatatypeMismatchError": (__spec__.parent, "embedding"),
+    "DimensionMismatchError": (__spec__.parent, "embedding"),
     "DuckDuckGoProviderSettings": (__spec__.parent, "data"),
     "EmbeddingProviderSettings": (__spec__.parent, "embedding"),
-    "EmbeddingProviderSettingsType": (__spec__.parent, "embedding"),
     "ExaProviderSettings": (__spec__.parent, "data"),
     "FastEmbedEmbeddingProviderSettings": (__spec__.parent, "embedding"),
     "FastEmbedProviderMixin": (__spec__.parent, "mixins"),
     "FastEmbedRerankingProviderSettings": (__spec__.parent, "reranking"),
     "FastEmbedSparseEmbeddingProviderSettings": (__spec__.parent, "sparse_embedding"),
+    "GeneralAgentClientOptionsType": (__spec__.parent, "agent"),
+    "GeneralDataClientOptionsType": (__spec__.parent, "data"),
+    "GeneralEmbeddingClientOptionsType": (__spec__.parent, "embedding"),
+    "GeneralRerankingClientOptionsType": (__spec__.parent, "reranking"),
     "GoogleAgentProviderSettings": (__spec__.parent, "agent"),
     "GoogleEmbeddingProviderSettings": (__spec__.parent, "embedding"),
     "GroqAgentProviderSettings": (__spec__.parent, "agent"),
@@ -152,29 +176,23 @@ _dynamic_imports = MappingProxyType({
     "MemoryVectorStoreProviderSettings": (__spec__.parent, "vector_store"),
     "MistralAgentProviderSettings": (__spec__.parent, "agent"),
     "MistralEmbeddingProviderSettings": (__spec__.parent, "embedding"),
-    "NON_ANTHROPIC_AGENT_PROVIDER_DISCRIMINATOR": (__spec__.parent, "utils"),
-    "OpenAIAgentProviderSettings": (__spec__.parent, "agent"),
     "OpenRouterAgentProviderSettings": (__spec__.parent, "agent"),
-    "PROVIDER_DISCRIMINATOR": (__spec__.parent, "utils"),
     "PydanticGatewayProviderSettings": (__spec__.parent, "agent"),
+    "QdrantCollectionConfig": (__spec__.parent, "vector_store"),
     "QdrantVectorStoreProviderSettings": (__spec__.parent, "vector_store"),
-    "RERANKING_PROVIDER_DISCRIMINATOR": (__spec__.parent, "utils"),
     "RerankingProviderSettings": (__spec__.parent, "reranking"),
-    "RerankingProviderSettingsType": (__spec__.parent, "reranking"),
     "SentenceTransformersEmbeddingProviderSettings": (__spec__.parent, "embedding"),
+    "SentenceTransformersRerankingProviderSettings": (__spec__.parent, "reranking"),
     "SparseEmbeddingProviderSettings": (__spec__.parent, "sparse_embedding"),
-    "SparseEmbeddingProviderSettingsType": (__spec__.parent, "sparse_embedding"),
     "TavilyProviderSettings": (__spec__.parent, "data"),
     "VectorStoreProviderSettings": (__spec__.parent, "vector_store"),
-    "VectorStoreProviderSettingsType": (__spec__.parent, "vector_store"),
     "VoyageEmbeddingProviderSettings": (__spec__.parent, "embedding"),
     "VoyageRerankingProviderSettings": (__spec__.parent, "reranking"),
     "is_cloud_provider": (__spec__.parent, "utils"),
+    "OpenAIAgentProviderSettings": (__spec__.parent, "agent"),
 })
 
-
 __getattr__ = create_late_getattr(_dynamic_imports, globals(), __name__)
-
 
 __all__ = (
     "ANTHROPIC_PROVIDER_DISCRIMINATOR",
@@ -184,11 +202,13 @@ __all__ = (
     "RERANKING_PROVIDER_DISCRIMINATOR",
     "AgentProviderSettingsType",
     "AnthropicAgentProviderSettings",
+    "AnthropicAgentProviderSettingsType",
     "AnthropicAzureAgentProviderSettings",
     "AnthropicBedrockAgentProviderSettings",
     "AnthropicGoogleVertexAgentProviderSettings",
     "AsymmetricEmbeddingProviderSettings",
     "AsymmetricEmbeddingProviderSettingsDict",
+    "AzureClientOptionsType",
     "AzureEmbeddingProviderSettings",
     "AzureProviderMixin",
     "BaseAgentProviderSettings",
@@ -200,8 +220,6 @@ __all__ = (
     "BaseSparseEmbeddingProviderSettings",
     "BaseVectorStoreProviderSettings",
     "BedrockEmbeddingProviderSettings",
-    "BedrockEmbeddingProviderSettings",
-    "BedrockProviderMixin",
     "BedrockProviderMixin",
     "BedrockRerankingProviderSettings",
     "CerebrasAgentProviderSettings",
@@ -210,7 +228,10 @@ __all__ = (
     "CohereRerankingProviderSettings",
     "ConnectionConfiguration",
     "ConnectionRateLimitConfig",
+    "CoreEmbeddingProviderSettingsType",
     "DataProviderSettingsType",
+    "DatatypeMismatchError",
+    "DimensionMismatchError",
     "DuckDuckGoProviderSettings",
     "EmbeddingProviderSettings",
     "EmbeddingProviderSettingsType",
@@ -219,22 +240,30 @@ __all__ = (
     "FastEmbedProviderMixin",
     "FastEmbedRerankingProviderSettings",
     "FastEmbedSparseEmbeddingProviderSettings",
+    "GeneralAgentClientOptionsType",
+    "GeneralDataClientOptionsType",
+    "GeneralEmbeddingClientOptionsType",
+    "GeneralRerankingClientOptionsType",
     "GoogleAgentProviderSettings",
     "GoogleEmbeddingProviderSettings",
     "GroqAgentProviderSettings",
     "HuggingFaceAgentProviderSettings",
     "HuggingFaceEmbeddingProviderSettings",
+    "MappingProxyType",
     "MemoryConfig",
     "MemoryVectorStoreProviderSettings",
     "MistralAgentProviderSettings",
     "MistralEmbeddingProviderSettings",
+    "NonAnthropicAgentProviderSettingsType",
     "OpenAIAgentProviderSettings",
     "OpenRouterAgentProviderSettings",
     "PydanticGatewayProviderSettings",
+    "QdrantCollectionConfig",
     "QdrantVectorStoreProviderSettings",
     "RerankingProviderSettings",
     "RerankingProviderSettingsType",
     "SentenceTransformersEmbeddingProviderSettings",
+    "SentenceTransformersRerankingProviderSettings",
     "SparseEmbeddingProviderSettings",
     "SparseEmbeddingProviderSettingsType",
     "TavilyProviderSettings",
@@ -247,5 +276,5 @@ __all__ = (
 
 
 def __dir__() -> list[str]:
-    """Return the list of attributes for the module, including dynamically imported ones."""
+    """List available attributes for the package."""
     return list(__all__)

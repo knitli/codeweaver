@@ -133,4 +133,12 @@ def get_whereisai_embedding_capabilities() -> tuple[WhereisaiEmbeddingCapabiliti
     return tuple(WhereisaiEmbeddingCapabilities.model_validate(cap) for cap in capabilities)
 
 
-__all__ = ("get_whereisai_embedding_capabilities",)
+__all__ = (
+    "ALL_CAPABILITIES",
+    "CAP_MAP",
+    "WHEREISAI_UAE_CODE_LARGE_V1_CAPABILITIES",
+    "WHEREISAI_UAE_LARGE_V1_CAPABILITIES",
+    "WhereisaiEmbeddingCapabilities",
+    "WhereisaiProvider",
+    "get_whereisai_embedding_capabilities",
+)

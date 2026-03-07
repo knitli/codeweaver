@@ -224,4 +224,9 @@ class FastEmbedSparseProvider(SparseEmbeddingProvider[SparseTextEmbedding]):
         return await loop.run_in_executor(None, lambda: self._process_output(embeddings))
 
 
-__all__ = ("FastEmbedEmbeddingProvider", "FastEmbedSparseProvider")
+__all__ = (
+    "FastEmbedEmbeddingProvider",
+    "FastEmbedSparseProvider",
+    "fastembed_output_transformer",
+    "fastembed_sparse_output_transformer",
+)

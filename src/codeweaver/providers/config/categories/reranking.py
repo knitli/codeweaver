@@ -22,6 +22,7 @@ from codeweaver.providers import (
     SentenceTransformersRerankingConfig,
     VoyageRerankingConfig,
 )
+from codeweaver.providers.config import BedrockRerankingModelConfig
 from codeweaver.providers.config.categories import PROVIDER_DISCRIMINATOR
 from codeweaver.providers.config.categories.base import BaseProviderCategorySettings
 from codeweaver.providers.config.categories.mixins import (
@@ -35,12 +36,11 @@ from codeweaver.providers.config.clients import (
     GeneralRerankingClientOptionsType,
 )
 from codeweaver.providers.config.sdk import RerankingConfigT
-from codeweaver.providers.embedding import BedrockRerankingModelConfig
 
 
 def _config_factory[T: RerankingConfigT](data: dict[str, Any], config_class: type[T]) -> T:
     """Factory function to create a reranking config instance from the input data."""
-    defaults = config_class._defaults() if hasattr(config_class, "_defaults") else {}  # ty:ignore[invalid-argument-type]
+    defaults = config_class._defaults() if hasattr(config_class, "_defaults") else {}
     config_data = (
         defaults
         | {"model_name": data.get("model_name"), "provider": data.get("provider")}
@@ -274,5 +274,6 @@ __all__ = (
     "FastEmbedRerankingProviderSettings",
     "RerankingProviderSettings",
     "RerankingProviderSettingsType",
+    "SentenceTransformersRerankingProviderSettings",
     "VoyageRerankingProviderSettings",
 )

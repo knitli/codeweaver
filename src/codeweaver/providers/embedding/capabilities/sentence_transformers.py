@@ -356,4 +356,18 @@ def get_sentence_transformers_embedding_capabilities() -> tuple[
     )
 
 
-__all__ = ("get_sentence_transformers_embedding_capabilities",)
+__all__ = (
+    "ALL_CAPABILITIES",
+    "CAP_MAP",
+    "SENTENCE_TRANSFORMERS_ALL_MINILM_L6_V2_CAPABILITIES",
+    "SENTENCE_TRANSFORMERS_ALL_MINILM_L12_V2_CAPABILITIES",
+    "SENTENCE_TRANSFORMERS_ALL_MPNET_BASE_V2_CAPABILITIES",
+    "SENTENCE_TRANSFORMERS_GTR_T5_BASE_CAPABILITIES",
+    "SENTENCE_TRANSFORMERS_MULTI_QA_MINILM_L6_COS_V1_CAPABILITIES",
+    "SENTENCE_TRANSFORMERS_PARAPHRASE_MULTILINGUAL_MINILM_L12_V2_CAPABILITIES",
+    "SENTENCE_TRANSFORMERS_PARAPHRASE_MULTILINGUAL_MPNET_BASE_V2_CAPABILITIES",
+    "VOYAGE_4_NANO_CAPABILITIES",
+    "SentenceTransformersEmbeddingCapabilities",
+    "SentenceTransformersProvider",
+    "get_sentence_transformers_embedding_capabilities",
+)

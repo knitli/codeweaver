@@ -152,4 +152,4 @@ class CwMcpHttpState(BasedModel):
         return cls(**assembled_kwargs)
 
 
-__all__ = ("CwMcpHttpState",)
+__all__ = ("CwMcpHttpState", "FastMCPServerSettings")

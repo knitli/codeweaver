@@ -19,6 +19,7 @@ def _get_profiles_module(monkeypatch):
             del sys.modules[key]
 
     import codeweaver.providers.config.profiles as pmod
+
     return pmod
 
 

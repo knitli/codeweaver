@@ -309,4 +309,4 @@ class DiscoveredFile(BasedModel):
         return sanitize_unicode(content)
 
 
-__all__ = "DiscoveredFile"
+__all__ = ("DiscoveredFile",)

@@ -2040,4 +2040,11 @@ class DelimiterChunker(BaseChunker):
         return result or [chunk]
 
 
-__all__ = ("DelimiterChunker",)
+__all__ = (
+    "CHARS_PER_TOKEN",
+    "MIN_LINES_FOR_PARAGRAPH_SPLIT",
+    "PERFORMANCE_THRESHOLD_MS",
+    "SLIDING_WINDOW_OVERLAP",
+    "DelimiterChunker",
+    "StringParseState",
+)

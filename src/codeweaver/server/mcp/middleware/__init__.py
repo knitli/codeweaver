@@ -1,64 +1,12 @@
-# SPDX-FileCopyrightText: 2025 Knitli Inc.
-# SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
+# SPDX-FileCopyrightText: 2026 Knitli Inc.
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
+
 """FastMCP middleware for CodeWeaver."""
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal
-
-from fastmcp.server.middleware.middleware import Middleware as McpMiddleware
-
-
-if TYPE_CHECKING:
-    from fastmcp.server.middleware.caching import ResponseCachingMiddleware
-    from fastmcp.server.middleware.error_handling import ErrorHandlingMiddleware, RetryMiddleware
-    from fastmcp.server.middleware.logging import LoggingMiddleware, StructuredLoggingMiddleware
-    from fastmcp.server.middleware.rate_limiting import RateLimitingMiddleware
-    from fastmcp.server.middleware.timing import DetailedTimingMiddleware
-
-    from codeweaver.server.mcp.middleware.statistics import StatisticsMiddleware
-
-
-def __getattr__(name: str) -> object:
-    """Dynamically import middleware classes."""
-    # External FastMCP middleware - direct imports
-    if name == "ResponseCachingMiddleware":
-        from fastmcp.server.middleware.caching import ResponseCachingMiddleware
-
-        return ResponseCachingMiddleware
-    if name == "ErrorHandlingMiddleware":
-        from fastmcp.server.middleware.error_handling import ErrorHandlingMiddleware
-
-        return ErrorHandlingMiddleware
-    if name == "RetryMiddleware":
-        from fastmcp.server.middleware.error_handling import RetryMiddleware
-
-        return RetryMiddleware
-    if name == "LoggingMiddleware":
-        from fastmcp.server.middleware.logging import LoggingMiddleware
-
-        return LoggingMiddleware
-    if name == "StructuredLoggingMiddleware":
-        from fastmcp.server.middleware.logging import StructuredLoggingMiddleware
-
-        return StructuredLoggingMiddleware
-    if name == "RateLimitingMiddleware":
-        from fastmcp.server.middleware.rate_limiting import RateLimitingMiddleware
-
-        return RateLimitingMiddleware
-    if name == "DetailedTimingMiddleware":
-        from fastmcp.server.middleware.timing import DetailedTimingMiddleware
-
-        return DetailedTimingMiddleware
-    # Internal CodeWeaver middleware
-    if name == "StatisticsMiddleware":
-        from codeweaver.server.mcp.middleware.statistics import StatisticsMiddleware
-
-        return StatisticsMiddleware
-
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+from typing import Literal
 
 
 def default_middleware_for_transport(
@@ -90,14 +38,65 @@ def default_middleware_for_transport(
     ]
 
 
+# === MANAGED EXPORTS ===
+
+# Exportify manages this section. It contains lazy-loading infrastructure
+# for the package: imports and runtime declarations (__all__, __getattr__,
+# __dir__). Manual edits will be overwritten by `exportify fix`.
+
+from types import MappingProxyType
+from typing import TYPE_CHECKING
+
+from lateimport import create_late_getattr
+
+
+if TYPE_CHECKING:
+    from codeweaver.server.mcp.middleware.fastmcp import (
+        DetailedTimingMiddleware,
+        ErrorHandlingMiddleware,
+        LoggingMiddleware,
+        RateLimitingMiddleware,
+        ResponseCachingMiddleware,
+        RetryMiddleware,
+        StructuredLoggingMiddleware,
+    )
+    from codeweaver.server.mcp.middleware.statistics import (
+        McpMiddleware,
+        McpMiddlewareContext,
+        ProviderError,
+        StatisticsDep,
+        StatisticsMiddleware,
+    )
+
+_dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
+    "DetailedTimingMiddleware": (__spec__.parent, "fastmcp"),
+    "ErrorHandlingMiddleware": (__spec__.parent, "fastmcp"),
+    "LoggingMiddleware": (__spec__.parent, "fastmcp"),
+    "McpMiddleware": (__spec__.parent, "statistics"),
+    "McpMiddlewareContext": (__spec__.parent, "statistics"),
+    "ProviderError": (__spec__.parent, "statistics"),
+    "RateLimitingMiddleware": (__spec__.parent, "fastmcp"),
+    "ResponseCachingMiddleware": (__spec__.parent, "fastmcp"),
+    "RetryMiddleware": (__spec__.parent, "fastmcp"),
+    "StatisticsDep": (__spec__.parent, "statistics"),
+    "StatisticsMiddleware": (__spec__.parent, "statistics"),
+    "StructuredLoggingMiddleware": (__spec__.parent, "fastmcp"),
+})
+
+__getattr__ = create_late_getattr(_dynamic_imports, globals(), __name__)
+
 __all__ = (
     "DetailedTimingMiddleware",
     "ErrorHandlingMiddleware",
     "LoggingMiddleware",
+    "MappingProxyType",
     "McpMiddleware",
+    "McpMiddlewareContext",
+    "ProviderError",
     "RateLimitingMiddleware",
     "ResponseCachingMiddleware",
     "RetryMiddleware",
+    "StatisticsDep",
     "StatisticsMiddleware",
     "StructuredLoggingMiddleware",
     "default_middleware_for_transport",
@@ -105,5 +104,5 @@ __all__ = (
 
 
 def __dir__() -> list[str]:
-    """List available attributes for the middleware package."""
+    """List available attributes for the package."""
     return list(__all__)

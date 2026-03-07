@@ -408,10 +408,12 @@ __all__ = (
     "AnthropicBedrockClientOptions",
     "AnthropicClientOptions",
     "AnthropicGoogleVertexClientOptions",
+    "BaseAnthropicClientOptions",
     "GeneralAgentClientOptionsType",
     "GroqClientOptions",
     "OpenAIAgentClientOptions",
     "PydanticGatewayClientOptions",
     "SimpleAgentClientOptionsType",
     "XAIClientOptions",
+    "discriminate_anthropic_agent_client_options",
 )

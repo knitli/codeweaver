@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from functools import cached_property
 from typing import Annotated, Any, Literal, NotRequired, Self, TypedDict, Unpack, cast
 
-from pydantic import ConfigDict, Field, PrivateAttr, TypeAdapter, computed_field
+from pydantic import ConfigDict, Field, PrivateAttr, TypeAdapter
 from pydantic.main import IncEx
 
 from codeweaver.core.types.aliases import FilteredKeyT
@@ -204,30 +204,12 @@ class BaseEnumData:
         description="A tuple of alternative names or aliases for the enum member.",
         default_factory=tuple,
     )
-    _description: (
+    description: (
         Annotated[
             str | None, Field(description="The description of the enum member.", exclude=True)
         ]
         | None
     ) = None
-
-    # These are just generic fields, define more in subclasses as needed.
-
-    def __init__(
-        self, aliases: Sequence[str] | None = None, description: str | None = None, **kwargs: Any
-    ) -> None:
-        """Initialize the BaseEnumData dataclass."""
-        object.__setattr__(self, "aliases", tuple(aliases) if aliases is not None else ())
-        object.__setattr__(self, "_description", description)
-        for key, val in kwargs.items():
-            object.__setattr__(self, key, val)
-        super().__init__()
-
-    @computed_field
-    @property
-    def description(self) -> str | None:
-        """Get the description of the enum member."""
-        return self._description
 
 
 __all__ = (

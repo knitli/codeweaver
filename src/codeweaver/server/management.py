@@ -342,4 +342,15 @@ class ManagementServer:
             logger.info("Management server stopped")
 
 
-__all__ = (ManagementServer,)
+__all__ = (
+    "ManagementServer",
+    "favicon",
+    "health",
+    "settings",
+    "settings_info",
+    "shutdown_handler",
+    "state_info",
+    "stats_info",
+    "status_info",
+    "version_info",
+)

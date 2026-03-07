@@ -739,6 +739,7 @@ __all__ = (
     "WHITESPACE_PATTERN",
     "DelimiterPattern",
     "expand_pattern",
+    "generate_latex_patterns",
     "kind_from_delimiter_tuple",
     "matches_pattern",
 )

@@ -133,4 +133,4 @@ async def duckduckgo_search_tool(
     return tool
 
 
-__all__ = ("DuckDuckGoSearchTool", "duckduckgo_search_tool")
+__all__ = ("DdgsResultItem", "DdgsResults", "DuckDuckGoSearchTool", "duckduckgo_search_tool")

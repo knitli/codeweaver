@@ -293,12 +293,23 @@ def variable_to_env_var(var: str) -> str:
 
 
 __all__ = (
+    "BOUNDARY",
+    "CONTROL_CHARS",
+    "INJECT_PATTERN",
+    "INVISIBLE_CHARS",
+    "INVISIBLE_PATTERN",
+    "LOWLY_WORDS",
+    "MAX_REGEX_PATTERN_LENGTH",
+    "NORMALIZE_FORM",
+    "POSSIBLE_PROMPT_INJECTS",
+    "REMOVE_ID",
     "elapsed_time_to_human_readable",
     "format_descriptor",
     "format_docstring",
     "format_signature",
     "format_snippet_name",
     "humanize",
+    "logger",
     "sanitize_unicode",
     "to_lowly_lowercase",
     "to_tokens",

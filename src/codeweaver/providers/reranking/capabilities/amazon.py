@@ -33,4 +33,4 @@ def get_amazon_reranking_capabilities() -> tuple[AmazonRerankingCapabilities, ..
     )
 
 
-__all__ = ("get_amazon_reranking_capabilities",)
+__all__ = ("AmazonRerankingCapabilities", "get_amazon_reranking_capabilities")

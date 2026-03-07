@@ -129,6 +129,7 @@ class CohereRequestHandler:
         kind: Literal["documents", "query"],
         **kwargs: Any,
     ) -> None:
+        """Initialize the CohereRequestHandler."""
         self.inputs = inputs
         self.kind = kind
         self.kwargs = kwargs
@@ -714,4 +715,22 @@ class BedrockEmbeddingProvider(EmbeddingProvider[BedrockRuntimeClient]):
         ]  # ty: ignore[invalid-return-type]
 
 
-__all__ = ("BedrockEmbeddingProvider",)
+__all__ = (
+    "BaseBedrockModel",
+    "BedrockEmbeddingProvider",
+    "BedrockInvokeEmbeddingRequest",
+    "BedrockInvokeEmbeddingResponse",
+    "CohereEmbeddingRequestBody",
+    "CohereEmbeddingResponse",
+    "CohereRequestHandler",
+    "ImageDescription",
+    "InvokeRequestDict",
+    "TitanEmbeddingV2RequestBody",
+    "TitanEmbeddingV2Response",
+    "is_cohere_request",
+    "is_cohere_response",
+    "is_one_of_valid_types",
+    "is_titan_response",
+    "shared_serializer",
+    "shared_validator",
+)

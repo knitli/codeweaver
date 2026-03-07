@@ -946,10 +946,12 @@ type EmbeddingProviderSettingsType = Annotated[
 __all__ = (
     "AsymmetricEmbeddingProviderSettings",
     "AsymmetricEmbeddingProviderSettingsDict",
+    "AzureClientOptionsType",
     "AzureEmbeddingProviderSettings",
     "BaseEmbeddingProviderSettings",
     "BedrockEmbeddingProviderSettings",
     "CohereEmbeddingProviderSettings",
+    "CoreEmbeddingProviderSettingsType",
     "EmbeddingProviderSettings",
     "EmbeddingProviderSettingsType",
     "FastEmbedEmbeddingProviderSettings",

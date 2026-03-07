@@ -293,7 +293,7 @@ class ThingRegistry:
 
         if isinstance(connections, Connection):
             for connection in connections:
-                self.register_connection(connection)  # ty:ignore[invalid-argument-type]
+                self.register_connection(connection)
             return
         for connection in connections:
             self.register_connection(connection)
@@ -472,4 +472,4 @@ def build_models() -> None:
         _ = model.model_rebuild()
 
 
-__all__ = ("ThingRegistry",)
+__all__ = ("ThingRegistry", "build_models")
