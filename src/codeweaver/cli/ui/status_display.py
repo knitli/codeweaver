@@ -43,7 +43,7 @@ if TYPE_CHECKING:
 class AtomicAwareBarColumn(BarColumn):
     """BarColumn that skips rendering for atomic tasks."""
 
-    def render(self, task: Task) -> RenderableType:  # ty: ignore[invalid-method-override]
+    def render(self, task: Task) -> RenderableType:
         """Render the bar, or empty for atomic tasks."""
         return Text("") if task.fields.get("atomic", False) else super().render(task)
 

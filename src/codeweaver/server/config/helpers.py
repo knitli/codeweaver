@@ -45,7 +45,7 @@ def get_settings_map(config_file: str | None = None) -> DictView[CodeWeaverSetti
         Dictionary view of settings
     """
     settings = get_settings(config_file=config_file)
-    return settings.view
+    return settings.view()
 
 
 def update_settings(**kwargs) -> CodeWeaverSettingsType:

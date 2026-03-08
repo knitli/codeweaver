@@ -71,6 +71,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "QueryError": (__spec__.parent, "find_code.pipeline"),
     "QueryIntent": (__spec__.parent, "find_code.intent"),
     "SearchPackageDep": (__spec__.parent, "find_code"),
+    "SearchStrategy": ("codeweaver.core", "types.search"),
     "SettingsDep": (__spec__.parent, "find_code"),
     "TelemetryServiceDep": (__spec__.parent, "find_code"),
     "TelemetrySettingsDep": (__spec__.parent, "find_code"),

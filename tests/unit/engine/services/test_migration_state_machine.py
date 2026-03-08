@@ -259,7 +259,9 @@ def load_migration(data: dict[str, str]) -> Migration:
     Returns:
         Reconstructed migration object
     """
-    return Migration(id=data["id"], current_state=MigrationState(data["current_state"]))
+    from uuid import UUID
+
+    return Migration(id=UUID(data["id"]), current_state=MigrationState(data["current_state"]))
 
 
 @contextmanager

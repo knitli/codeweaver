@@ -470,7 +470,7 @@ class MigrationService:
             dense = record.vector.get("dense", [])
             truncated_dense = dense[:new_dimension] if dense else []
             new_vector = {"dense": truncated_dense}
-            if "sparse" in record.vector:
+            if "sparse" in record.vector and record.vector["sparse"] is not None:
                 new_vector["sparse"] = record.vector["sparse"]
         else:
             vector_values = (

@@ -340,6 +340,15 @@ class GrammarClassificationResult(BasedModel):
         return max_confidence_result
 
 
+def _rebuild_grammar_classification_result() -> None:
+    from codeweaver.semantic.ast_grep import AstThing  # noqa: F401
+
+    GrammarClassificationResult.model_rebuild()
+
+
+_rebuild_grammar_classification_result()
+
+
 class GrammarBasedClassifier:
     """Primary classifier using grammar structure from node_types.json."""
 

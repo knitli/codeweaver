@@ -82,11 +82,11 @@ def _set_settings() -> DictView[CodeWeaverSettingsDict]:
 
     No manual loading needed - the config system handles it automatically.
     """
-    from codeweaver.core.config import get_settings_map
+    from codeweaver.core.config.loader import get_settings
 
     # Just return the settings map - config system already loaded codeweaver.test.toml
     # because CODEWEAVER_TEST_MODE="true" (set at top of this file)
-    return get_settings_map()
+    return get_settings().view()  # ty:ignore[invalid-return-type]
 
 
 _settings: DictView[CodeWeaverSettingsDict] = _set_settings()

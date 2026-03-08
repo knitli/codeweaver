@@ -12,15 +12,15 @@ from typing import TYPE_CHECKING, Annotated, Literal, NamedTuple, override
 
 from pydantic import UUID7, Field, NonNegativeInt, PositiveInt
 
-from codeweaver.core import BasedModel
-from codeweaver.core.chunks import CodeChunk
 from codeweaver.core.types.aliases import LiteralStringT, ModelName, ModelNameT
 from codeweaver.core.types.enum import BaseEnum
+from codeweaver.core.types.models import BasedModel
 from codeweaver.core.types.provider import Provider
 from codeweaver.core.types.utils import generate_field_title
 
 
 if TYPE_CHECKING:
+    from codeweaver.core.chunks import CodeChunk
     from codeweaver.core.types import AnonymityConversion, FilteredKeyT
 
 type RawEmbeddingVectors = Sequence[float] | Sequence[int]
@@ -378,6 +378,8 @@ class ChunkEmbeddings(BasedModel):
         return self.has_dense and self.has_sparse
 
 
+SparseEmbedding = CodeWeaverSparseEmbedding
+
 __all__ = (
     "ChunkEmbeddings",
     "CodeWeaverSparseEmbedding",
@@ -386,5 +388,6 @@ __all__ = (
     "EmbeddingKind",
     "QueryResult",
     "RawEmbeddingVectors",
+    "SparseEmbedding",
     "StoredEmbeddingVectors",
 )

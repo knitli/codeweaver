@@ -50,6 +50,10 @@ async def _to_sparse_vector_params(instance: BaseSparseEmbeddingConfig) -> Spars
 class BaseSparseEmbeddingConfig(BasedModel, EmbeddingMixin):
     """Base configuration for sparse embedding models."""
 
+    def _telemetry_keys(self) -> None:
+        """Get the telemetry keys for the sparse embedding config."""
+        return
+
     provider: Provider | None = Field(
         None,
         description="The provider for this embedding configuration. You don't have to provide this value -- while provider is a required setting at the top-level EmbeddingProviderSettings object, we will inject that value into the embedding configuration for you, so you can just specify the provider-specific config without worrying about the provider field in most cases.",

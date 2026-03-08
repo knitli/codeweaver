@@ -221,7 +221,7 @@ class HealthService:
                     status=status,
                     model=model_name,
                     latency_ms=latency_ms,
-                    circuit_breaker_state=circuit_state,
+                    circuit_breaker_state=circuit_state,  # ty:ignore[invalid-argument-type]
                 )
             raise_error()
         except Exception as e:

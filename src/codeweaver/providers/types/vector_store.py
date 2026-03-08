@@ -136,7 +136,7 @@ class HybridVectorPayload(BasedModel):
     def symbol(self) -> str | None:
         """Return the symbol associated with the semantic metadata, if available."""
         if hasattr(self, "_symbol"):
-            return self._symbol
+            return self._symbol  # ty:ignore[invalid-return-type]
         if not self.chunk.metadata or not (metadata := self.chunk.metadata.get("semantic_meta")):
             return None
         return metadata.symbol
@@ -161,7 +161,7 @@ class HybridVectorPayload(BasedModel):
         """Create a HybridVectorPayload from a dictionary payload."""
         context = payload.pop("symbol", None)
         new = cls.model_validate(payload)
-        new._symbol = context
+        new._symbol = context  # ty:ignore[unresolved-attribute]
         return new
 
     @staticmethod

@@ -62,6 +62,7 @@ from codeweaver.providers.config.categories import (
     AsymmetricEmbeddingProviderSettings,
     DuckDuckGoProviderSettings,
     EmbeddingProviderSettings,
+    FastEmbedSparseEmbeddingProviderSettings,
     QdrantVectorStoreProviderSettings,
     RerankingProviderSettings,
     SparseEmbeddingProviderSettings,
@@ -231,7 +232,7 @@ def _recommended_default(
             ),
         ),
         sparse_embedding=(
-            SparseEmbeddingProviderSettings(
+            FastEmbedSparseEmbeddingProviderSettings(
                 provider=Provider.FASTEMBED,
                 model_name=ModelName(RECOMMENDED_SPARSE_EMBEDDING_MODEL),
                 sparse_embedding_config=FastEmbedSparseEmbeddingConfig(
@@ -254,6 +255,7 @@ def _recommended_default(
                 model_name=RECOMMENDED_CLOUD_CONTEXT_AGENT_MODEL_BARE,
                 agent_config=AnthropicAgentModelConfig(
                     anthropic_metadata={"_user_id": f"cw-recommended-{uuid7().hex}"},
+                    anthropic_thinking={"type": "disabled"},
                     model_name=RECOMMENDED_CLOUD_CONTEXT_AGENT_MODEL_BARE,
                     max_tokens=20000,
                     temperature=0.2,
@@ -308,8 +310,12 @@ def _quickstart_default(
             ),
         ),
         sparse_embedding=(
-            SparseEmbeddingProviderSettings(
-                provider=Provider.SENTENCE_TRANSFORMERS if HAS_ST else Provider.FASTEMBED,
+            (
+                SparseEmbeddingProviderSettings
+                if HAS_ST
+                else FastEmbedSparseEmbeddingProviderSettings
+            )(
+                provider=Provider.SENTENCE_TRANSFORMERS if HAS_ST else Provider.FASTEMBED,  # ty:ignore[invalid-argument-type]
                 model_name=sparse_model,
                 sparse_embedding_config=SentenceTransformersSparseEmbeddingConfig(
                     model_name=sparse_model
@@ -331,7 +337,7 @@ def _quickstart_default(
             AnthropicAgentProviderSettings(
                 provider=Provider.ANTHROPIC,
                 model_name=RECOMMENDED_CLOUD_CONTEXT_AGENT_MODEL_BARE,
-                agent_config=AnthropicAgentModelConfig(),
+                agent_config=AnthropicAgentModelConfig(anthropic_thinking={"type": "disabled"}),
             ),
         ),
         data=(
@@ -372,7 +378,7 @@ def _testing_profile(
         project_name=project_name, project_path=project_path
     )
     backup_settings = _quickstart_default("local") | {
-        "sparse_embedding": SparseEmbeddingProviderSettings(
+        "sparse_embedding": FastEmbedSparseEmbeddingProviderSettings(
             provider=Provider.FASTEMBED,
             model_name=ModelName(ULTRALIGHT_SPARSE_EMBEDDING_MODEL),
             sparse_embedding_config=FastEmbedSparseEmbeddingConfig(
@@ -599,6 +605,18 @@ class ProviderConfigProfile(BaseEnumData):
             *args: Additional positional args passed to BaseEnumData
             **kwargs: Additional keyword args passed to BaseEnumData
         """
+        if isinstance(provider_settings, ProviderConfigProfile):
+            # Called by Python's Enum metaclass with the already-created instance as value.
+            # Copy all fields directly from the existing instance and return.
+            object.__setattr__(self, "vector_store", provider_settings.vector_store)
+            object.__setattr__(self, "embedding", provider_settings.embedding)
+            object.__setattr__(self, "sparse_embedding", provider_settings.sparse_embedding)
+            object.__setattr__(self, "reranking", provider_settings.reranking)
+            object.__setattr__(self, "agent", provider_settings.agent)
+            object.__setattr__(self, "data", provider_settings.data)
+            object.__setattr__(self, "aliases", getattr(provider_settings, "aliases", ()))
+            object.__setattr__(self, "description", getattr(provider_settings, "description", None))
+            return
         provider_settings = provider_settings or ProviderSettingsDict()
         object.__setattr__(self, "vector_store", provider_settings.get("vector_store"))
         object.__setattr__(self, "embedding", provider_settings.get("embedding"))
@@ -640,27 +658,27 @@ class ProviderConfigProfile(BaseEnumData):
 class ProviderProfile(ProviderConfigProfile, BaseDataclassEnum):
     """Prebuilt provider settings profiles for quick setup."""
 
-    RECOMMENDED = (
+    RECOMMENDED = ProviderConfigProfile(
         _get_profile("recommended", vector_deployment="local"),
         ("recommended",),
         "Recommended provider settings profile with high-quality providers. Uses Voyage AI for embeddings and rerankings, FastEmbed for sparse (local) embeddings, and local Qdrant for vector storage.",
     )
-    RECOMMENDED_CLOUD = (
+    RECOMMENDED_CLOUD = ProviderConfigProfile(
         _recommended_default(vector_deployment="cloud"),
         ("recommended-cloud",),
         "Recommended provider settings profile with high-quality providers and cloud vector store. Uses Voyage AI for embeddings and rerankings, FastEmbed for sparse (local) embeddings, and cloud Qdrant for vector storage.",
     )
-    QUICKSTART = (
+    QUICKSTART = ProviderConfigProfile(
         _get_profile("quickstart", vector_deployment="local"),
         ("quickstart", "local", "free", "open-source"),
         "Quickstart provider settings profile. Entirely local and free. Uses open-source models for sparse and dense embeddings and rerankings, and local Qdrant for vector storage.",
     )
-    TESTING = (
+    TESTING = ProviderConfigProfile(
         _get_profile("testing", vector_deployment="local"),
         ("testing", "development", "lightweight", "dev"),
         "Optimized for testing and local development. Uses the lightest weight local models available, and an in-memory vector store with on-disk persistence. This profile is also used as CodeWeaver's backup when cloud providers are unavailable, ensuring reliable operation regardless of external service status with minimal resource usage.",
     )
-    TESTING_DB = (
+    TESTING_DB = ProviderConfigProfile(
         {
             **_get_profile("testing", vector_deployment="local"),
             "vector_store": (

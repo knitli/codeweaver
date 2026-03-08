@@ -799,6 +799,7 @@ def _build_openai_api_cards() -> list[ServiceCard]:
             category="agent",
             provider_cls=_get_pydantic_ai_provider_cls(provider),
             client_cls=lateimport("openai", "AsyncOpenAI"),
+            client="openai",
         )
         for provider in _openai_agent_providers()
     ]
@@ -811,6 +812,7 @@ def _build_openai_api_cards() -> list[ServiceCard]:
                 "codeweaver.providers.embedding.providers.openai_factory", "get_provider_class"
             ),
             client_cls=lateimport("openai", "AsyncOpenAI"),
+            client="openai",
         )
         for provider in _openai_embedding_providers()
     ]
@@ -1061,6 +1063,7 @@ def _build_multi_client_cards() -> list[ServiceCard]:
                 "codeweaver.providers.embedding.providers.cohere", "CohereEmbeddingProvider"
             ),
             lateimport("cohere", "AsyncClientV2"),
+            "cohere",
             metadata=ServiceMetadata(
                 discriminator=(
                     "model",
@@ -1077,6 +1080,7 @@ def _build_multi_client_cards() -> list[ServiceCard]:
                 "codeweaver.providers.embedding.providers.openai_factory", "get_provider_class"
             ),
             lateimport("openai", "AsyncOpenAI"),
+            "openai",
         ),
         # Bedrock - Agent (Bedrock or Anthropic based on model)
         # Use Anthropic client for Claude models on Bedrock
@@ -1085,6 +1089,7 @@ def _build_multi_client_cards() -> list[ServiceCard]:
             "agent",
             anthropic_provider,
             lateimport("anthropic", "AsyncAnthropicBedrock"),
+            "anthropic",
             metadata=ServiceMetadata(discriminator=("model", _anthropic_model_discriminator)),
         ),
         # Use Bedrock client for other models (default)
@@ -1093,6 +1098,7 @@ def _build_multi_client_cards() -> list[ServiceCard]:
             "agent",
             lateimport("pydantic_ai.providers.bedrock", "BedrockProvider"),
             lateimport("boto3", "client"),
+            "bedrock",
             metadata=ServiceMetadata(
                 client_handler=lambda client, card, *args, **kwargs: client(
                     "bedrock-runtime", *args, **kwargs
@@ -1381,13 +1387,15 @@ def get_service_cards(
     if prov_filter or category_filter or client_filter:
         return tuple(
             sorted(
-                c
-                for c in registry
-                if (not prov_filter or c.provider in prov_filter)
-                and (not category_filter or c.category in category_filter)
-                and (not client_filter or c.client in client_filter)
-            ),
-            key=lambda c: (c.provider, c.category, c.client),
+                (
+                    c
+                    for c in registry
+                    if (not prov_filter or c.provider in prov_filter)
+                    and (not category_filter or c.category in category_filter)
+                    and (not client_filter or c.client in client_filter)
+                ),
+                key=lambda c: (c.provider, c.category, c.client),
+            )
         )
     return registry
 

@@ -84,7 +84,7 @@ def _get_settings_map_for(
     from codeweaver.core.config.loader import get_settings
 
     settings = get_settings(config_file=config_file, project_path=project_path)
-    return settings.view
+    return settings.view()
 
 
 async def are_services_running(management_host: str, management_port: int) -> bool:

@@ -341,7 +341,7 @@ class SentenceTransformersRerankingConfig(BaseRerankingConfig):
 
     @override
     @classmethod
-    def _defaults(cls) -> dict[Literal["rerank"], SentenceTransformersRerankingOptionsDict]:  # ty:ignore[invalid-method-override]
+    def _defaults(cls) -> dict[Literal["rerank"], SentenceTransformersRerankingOptionsDict]:
         """Default config values for the rerank config."""
         return {
             "rerank": SentenceTransformersRerankingOptionsDict(

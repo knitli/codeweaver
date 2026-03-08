@@ -103,6 +103,12 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "try_for_azure_endpoint": (__spec__.parent, "utils"),
     "try_for_heroku_endpoint": (__spec__.parent, "utils"),
     "XAIClientOptions": (__spec__.parent, "agent"),
+    "AnthropicAgentClientOptionsType": (__spec__.parent, "agent"),
+    "GeneralAgentClientOptionsType": (__spec__.parent, "agent"),
+    "GeneralDataClientOptionsType": (__spec__.parent, "data"),
+    "GeneralEmbeddingClientOptionsType": (__spec__.parent, "multi"),
+    "GeneralRerankingClientOptionsType": (__spec__.parent, "multi"),
+    "SimpleAgentClientOptionsType": (__spec__.parent, "agent"),
 })
 
 __getattr__ = create_late_getattr(_dynamic_imports, globals(), __name__)

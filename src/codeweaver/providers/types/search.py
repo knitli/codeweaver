@@ -10,7 +10,7 @@ The primary type defined here is `SearchPackage`, which encapsulates the compone
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, TypedDict
+from typing import TYPE_CHECKING, TypedDict, cast
 
 from pydantic_ai import Agent
 
@@ -92,8 +92,12 @@ class SearchPackage:
     def caps(self) -> ModelCapDict:
         """Get the capabilities of the models used in this search package."""
         return ModelCapDict(
-            dense=self.capabilities.dense.capability if self.capabilities.dense else None,
-            sparse=self.capabilities.sparse.capability if self.capabilities.sparse else None,
+            dense=cast(EmbeddingModelCapabilities, self.capabilities.dense.capability)
+            if self.capabilities.dense
+            else None,
+            sparse=cast(SparseEmbeddingModelCapabilities, self.capabilities.sparse.capability)
+            if self.capabilities.sparse
+            else None,
             reranking=tuple(model.capabilities for model in self.reranking)
             if self.reranking
             else None,

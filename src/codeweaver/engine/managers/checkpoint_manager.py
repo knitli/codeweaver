@@ -17,16 +17,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
-from typing import (
-    TYPE_CHECKING,
-    Annotated,
-    Any,
-    Literal,
-    NoReturn,
-    TypedDict,
-    cast,
-    type_check_only,
-)
+from typing import TYPE_CHECKING, Annotated, Any, Literal, NoReturn, TypedDict, cast
 from uuid import UUID
 
 from anyio import Path as AsyncPath
@@ -70,7 +61,6 @@ def _raise_if_unset_provider() -> NoReturn:
     )
 
 
-@type_check_only
 def _is_provider_settings(value: Any) -> TypeIs[ProviderSettings]:
     assert isinstance(ProviderSettings, value)  # noqa: S101
     return True

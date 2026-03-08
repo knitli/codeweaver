@@ -16,6 +16,7 @@ import logging
 
 from typing import Annotated, Any, Literal, TypedDict
 
+from fastmcp.server.middleware.middleware import Middleware as McpMiddleware
 from fastmcp.server.server import DuplicateBehavior
 from mcp.server.auth.settings import AuthSettings
 from mcp.server.lowlevel.server import LifespanResultT
@@ -47,7 +48,6 @@ from codeweaver.server.config.types import (
     UvicornServerSettings,
     UvicornServerSettingsDict,
 )
-from codeweaver.server.mcp import McpMiddleware
 
 
 logger = logging.getLogger(__name__)

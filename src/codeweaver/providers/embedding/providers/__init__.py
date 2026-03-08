@@ -6,11 +6,12 @@
 
 from __future__ import annotations
 
+from types import MappingProxyType
+
 # === MANAGED EXPORTS ===
 # Exportify manages this section. It contains lazy-loading infrastructure
 # for the package: imports and runtime declarations (__all__, __getattr__,
 # __dir__). Manual edits will be overwritten by `exportify fix`.
-from types import MappingProxyType
 from typing import TYPE_CHECKING
 
 from lateimport import create_late_getattr

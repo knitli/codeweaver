@@ -18,6 +18,7 @@ try:
         BaseModelDescription,
         DenseModelDescription,
         ModelSource,
+        PoolingType,
         #    SparseModelDescription,
     )
     from fastembed.rerank.cross_encoder import TextCrossEncoder
@@ -121,10 +122,37 @@ def add_models[T: type[TextCrossEncoder | TextEmbedding]](
 
     Models are added to the *class*; the function returns the input class, not an instance.
     """
-    known_models = {model.model for model in cls.list_supported_models()}
+    known_models = {
+        model["model"] if isinstance(model, dict) else model.model
+        for model in cls.list_supported_models()
+    }
     for model in models:
         if model.model not in known_models:
-            cls.add_custom_model(model)
+            if isinstance(model, DenseModelDescription):
+                # New fastembed API requires individual parameters for TextEmbedding
+                cls.add_custom_model(
+                    model.model,
+                    pooling=PoolingType.MEAN,
+                    normalization=True,
+                    sources=model.sources,
+                    dim=model.dim or 768,
+                    model_file=model.model_file,
+                    description=model.description,
+                    license=model.license,
+                    size_in_gb=model.size_in_GB,
+                    additional_files=model.additional_files or [],
+                )
+            else:
+                # TextCrossEncoder uses a simpler API
+                cls.add_custom_model(
+                    model.model,
+                    sources=model.sources,
+                    model_file=model.model_file,
+                    description=model.description,
+                    license=model.license,
+                    size_in_gb=model.size_in_GB,
+                    additional_files=model.additional_files or [],
+                )
     return cls
 
 

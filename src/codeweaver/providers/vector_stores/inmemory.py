@@ -12,7 +12,7 @@ import contextlib
 import logging
 
 from pathlib import Path
-from typing import TYPE_CHECKING, ClassVar, Literal
+from typing import TYPE_CHECKING, ClassVar, Literal, cast
 
 from anyio import Path as AsyncPath
 
@@ -220,10 +220,10 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
 
         # Cancel periodic task
         # ty can't identify the attribute because it's set with object.__setattr__
-        if self._periodic_task:
-            self._periodic_task.cancel()
+        if cast(asyncio.Task, self._periodic_task):
+            cast(asyncio.Task, self._periodic_task).cancel()
             with contextlib.suppress(asyncio.CancelledError):
-                await self._periodic_task
+                await cast(asyncio.Task, self._periodic_task)
 
         # Final persistence
         try:

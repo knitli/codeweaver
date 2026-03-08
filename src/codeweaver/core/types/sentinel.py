@@ -27,7 +27,7 @@ from codeweaver.core.types.models import BasedModel
 class DontGenerateJsonSchema(GenerateJsonSchema):
     """GenerateJsonSchema implementation that disables JSON Schema generation."""
 
-    def generate(self, _schema: core_schema.CoreSchema, _error_info: str) -> JsonSchemaValue:  # ty:ignore[invalid-method-override]
+    def generate(self, _schema: core_schema.CoreSchema, _error_info: str) -> JsonSchemaValue:
         """Disable JSON Schema generation by raising an error."""
         raise PydanticOmit
 

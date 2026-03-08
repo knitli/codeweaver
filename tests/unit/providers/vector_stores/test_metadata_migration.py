@@ -17,7 +17,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from codeweaver.providers.vector_stores.metadata import CollectionMetadata
+from codeweaver.providers.types.vector_store import CollectionMetadata
 
 
 @pytest.mark.external_api

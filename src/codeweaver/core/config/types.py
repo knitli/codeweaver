@@ -7,7 +7,7 @@
 
 from __future__ import annotations
 
-from typing import NotRequired, TypedDict
+from typing import TYPE_CHECKING, NotRequired, TypedDict
 
 from pydantic import DirectoryPath, FilePath, PositiveInt
 
@@ -78,12 +78,13 @@ match ROOT_PACKAGE:
             failover: NotRequired[FailoverSettingsDict | Unset]
 
     case "server":
-        from codeweaver.server.config import (
-            EndpointSettingsDict,
-            FastMcpServerSettingsDict,
-            MiddlewareOptions,
-            UvicornServerSettingsDict,
-        )
+        if TYPE_CHECKING:
+            from codeweaver.server.config import (
+                EndpointSettingsDict,
+                FastMcpServerSettingsDict,
+                MiddlewareOptions,
+                UvicornServerSettingsDict,
+            )
 
         class CodeWeaverSettingsDict(BaseCodeWeaverSettingsDict):
             """TypedDict for CodeWeaver settings.

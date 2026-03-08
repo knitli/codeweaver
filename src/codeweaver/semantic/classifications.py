@@ -941,14 +941,14 @@ class AgentTask(BaseAgentTask, BaseDataclassEnum):
     Values are `BaseAgentTask` dataclass instances.
     """
 
-    DEBUG = (
+    DEBUG = BaseAgentTask(
         ImportanceScoresDict(
             discovery=0.2, comprehension=0.3, modification=0.1, debugging=0.35, documentation=0.05
         ),
         ("debugging", "debugger", "debug", "fix", "troubleshoot", "bugfix"),
         "Predefined task for debugging code.",
     )
-    DEFAULT = (
+    DEFAULT = BaseAgentTask(
         ImportanceScoresDict(
             discovery=0.05,
             comprehension=0.05,
@@ -959,21 +959,21 @@ class AgentTask(BaseAgentTask, BaseDataclassEnum):
         ("default", "general", "normal", "standard", "typical"),
         "Default task with balanced context weights.",
     )
-    DOCUMENT = (
+    DOCUMENT = BaseAgentTask(
         ImportanceScoresDict(
             discovery=0.2, comprehension=0.2, modification=0.1, debugging=0.05, documentation=0.45
         ),
         ("document", "documentation", "doc", "docs", "docstrings"),
         "Predefined task for documenting code.",
     )
-    IMPLEMENT = (
+    IMPLEMENT = BaseAgentTask(
         ImportanceScoresDict(
             discovery=0.3, comprehension=0.3, modification=0.2, debugging=0.1, documentation=0.1
         ),
         ("implement", "implementation", "implementing", "create", "build", "develop"),
         "Predefined task for implementing code.",
     )
-    LOCAL_EDIT = (
+    LOCAL_EDIT = BaseAgentTask(
         ImportanceScoresDict(
             discovery=0.4, comprehension=0.3, modification=0.2, debugging=0.05, documentation=0.05
         ),
@@ -989,7 +989,7 @@ class AgentTask(BaseAgentTask, BaseDataclassEnum):
         ),
         "Predefined task for local code edits.",
     )
-    REFACTOR = (
+    REFACTOR = BaseAgentTask(
         ImportanceScoresDict(
             discovery=0.15, comprehension=0.25, modification=0.45, debugging=0.1, documentation=0.05
         ),
@@ -1004,21 +1004,21 @@ class AgentTask(BaseAgentTask, BaseDataclassEnum):
         ),
         "Predefined task for refactoring code.",
     )
-    REVIEW = (
+    REVIEW = BaseAgentTask(
         ImportanceScoresDict(
             discovery=0.25, comprehension=0.35, modification=0.15, debugging=0.15, documentation=0.1
         ),
         ("review", "code_review", "audit", "code_audit", "inspect", "inspection", "qa"),
         "Predefined task for reviewing code.",
     )
-    SEARCH = (
+    SEARCH = BaseAgentTask(
         ImportanceScoresDict(
             discovery=0.5, comprehension=0.2, modification=0.15, debugging=0.1, documentation=0.05
         ),
         ("search", "find", "lookup", "explore", "investigate", "where", "locate"),
         "Predefined task for searching code, such as for definitions, references, or explanations.",
     )
-    TEST = (
+    TEST = BaseAgentTask(
         ImportanceScoresDict(
             discovery=0.5, comprehension=0.2, modification=0.2, debugging=0.4, documentation=0.1
         ),

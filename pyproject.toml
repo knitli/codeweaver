@@ -534,6 +534,7 @@ minversion = "9.0"
 python_classes = ["Test*"]
 python_files = ["*_test.py", "test_*.py"]
 python_functions = ["test_*"]
+pythonpath = ["src"]
 testpaths = ["tests"]
 asyncio_mode = "auto"
 timeout = "600"
@@ -550,7 +551,7 @@ extra-paths = ["./typings"]
 [tool.ty.rules]
 # === Core Type Safety Rules (kept strict for src/) ===
 # These remain as errors by default and will catch real bugs in production code
-
+invalid-method-override = "ignore"  # many false positives here
 # === Test Framework Limitations ===
 # ty doesn't understand pytest mocks/fixtures - these are inherent limitations, not real bugs
 possibly-missing-attribute = "ignore"  # Pytest fixtures don't have static attributes
@@ -704,6 +705,7 @@ include = [
   "src/codeweaver/providers/reranking/providers/*.py",
   "src/codeweaver/providers/data/*.py",
   "src/codeweaver/engine/services/config_analyzer.py",
+  "src/codeweaver/providers/vector_stores/inmemory.py",
 ]
 
 [tool.ty.overrides.rules]

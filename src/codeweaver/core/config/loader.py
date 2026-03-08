@@ -20,9 +20,11 @@ from typing import TYPE_CHECKING
 
 from anyio import Path as AsyncPath
 
+from codeweaver.core.config.settings_type import CodeWeaverSettingsType
+
 
 if TYPE_CHECKING:
-    from codeweaver.core.config.settings_type import CodeWeaverSettingsType
+    pass
 
 
 logger = logging.getLogger(__name__)
@@ -149,4 +151,4 @@ def get_settings(config_file: Path | None = None, **kwargs) -> CodeWeaverSetting
             raise ImportError(f"Unsupported package detected: {package}")
 
 
-__all__ = ("get_settings", "get_settings_async")
+__all__ = ("CodeWeaverSettingsType", "get_settings", "get_settings_async")

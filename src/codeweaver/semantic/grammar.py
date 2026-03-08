@@ -437,7 +437,7 @@ class Thing(BasedModel):
             return frozenset(
                 cat
                 for name in self.category_names
-                if (cat := self._registry().get_category_by_name(name, language=self.language))
+                if (cat := _get_registry().get_category_by_name(name, language=self.language))
             )
         finally:
             _resolving_grammar.reset(token)

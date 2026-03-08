@@ -23,6 +23,7 @@ import ssl
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Annotated, Any, Literal, NotRequired, Required, TypedDict
 
+from fastmcp.server.middleware.middleware import Middleware as McpMiddleware
 from fastmcp.server.server import DuplicateBehavior
 from fastmcp.tools import Tool
 from mcp.server.auth.settings import AuthSettings
@@ -45,7 +46,6 @@ from codeweaver.core import (
     Unset,
 )
 from codeweaver.core.constants import DEFAULT_MANAGEMENT_PORT, LOCALHOST, ONE_MEGABYTE
-from codeweaver.server.mcp import McpMiddleware
 
 
 if TYPE_CHECKING:

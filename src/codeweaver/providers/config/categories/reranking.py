@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+import contextlib
+
 from typing import Annotated, Any, ClassVar, Literal, Self, cast
 
 from pydantic import Field, PositiveInt, Tag, computed_field, model_validator
@@ -40,7 +42,7 @@ from codeweaver.providers.config.sdk import RerankingConfigT
 
 def _config_factory[T: RerankingConfigT](data: dict[str, Any], config_class: type[T]) -> T:
     """Factory function to create a reranking config instance from the input data."""
-    defaults = config_class._defaults() if hasattr(config_class, "_defaults") else {}
+    defaults = config_class._defaults() if hasattr(config_class, "_defaults") else {}  # ty:ignore[invalid-argument-type]
     config_data = (
         defaults
         | {"model_name": data.get("model_name"), "provider": data.get("provider")}
@@ -123,23 +125,31 @@ class RerankingProviderSettings(BaseRerankingProviderSettings):
 
     def __init__(self, **data: Any) -> None:
         """Initialize the RerankingProviderSettings."""
+        raw_provider = data.get("provider")
+        provider = (
+            raw_provider
+            if isinstance(raw_provider, Provider)
+            else Provider(raw_provider)
+            if raw_provider
+            else None
+        )
+        model_name = data.get("model_name")
         if (
             "client_options" in data
             and isinstance(data["client_options"], dict)
-            and self.provider in (Provider.SENTENCE_TRANSFORMERS, Provider.FASTEMBED)
+            and provider in (Provider.SENTENCE_TRANSFORMERS, Provider.FASTEMBED)
         ):
-            if self.provider == Provider.FASTEMBED:
-                data["client_options"]["model_name"] = data.get("model_name", self.model_name)
+            if provider == Provider.FASTEMBED:
+                data["client_options"]["model_name"] = model_name
             else:
-                data["client_options"]["model_name_or_path"] = data.get(
-                    "model_name", self.model_name
-                )
+                data["client_options"]["model_name_or_path"] = model_name
         if isinstance(data["reranking_config"], dict):
-            data["reranking_config"]["model_name"] = data["model_name"]
-            data["reranking_config"]["provider"] = self.provider
+            data["reranking_config"]["model_name"] = model_name
+            data["reranking_config"]["provider"] = provider
         else:
-            data["reranking_config"].model_name = data["model_name"]
-            data["reranking_config"].provider = self.provider
+            data["reranking_config"].model_name = model_name
+            with contextlib.suppress(AttributeError):
+                data["reranking_config"].provider = provider
         super().__init__(**data)
 
 

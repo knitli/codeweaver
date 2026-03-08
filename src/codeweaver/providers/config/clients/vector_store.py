@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 
 from collections.abc import Awaitable, Callable, Sequence
-from typing import Any, Literal, NotRequired, Self, TypedDict, cast, type_check_only
+from typing import Any, Literal, NotRequired, Self, TypedDict, cast
 
 from pydantic import (
     AnyUrl,
@@ -48,7 +48,6 @@ class GrpcParams(TypedDict, total=False):
     """A mapping of channel options. See grpc documentation for details. Note: max_send_message_length and max_receive_message_length can't be set here because qdrant_client will override them (always -1)."""
 
 
-@type_check_only
 def _is_memory_provider(value: Any) -> TypeIs[Literal[":memory:"]]:
     value = str(value) if value is not None else ""
     return value == ":memory:"

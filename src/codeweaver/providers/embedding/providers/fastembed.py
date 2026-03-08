@@ -168,7 +168,7 @@ class FastEmbedSparseProvider(SparseEmbeddingProvider[SparseTextEmbedding]):
     )
 
     @override
-    def _initialize(self, caps: SparseEmbeddingModelCapabilities | None = None) -> None:  # type: ignore
+    def _initialize(self, caps: SparseEmbeddingModelCapabilities | None = None) -> None:
         """Initialize the FastEmbed client."""
         # 1. Set _caps from parameter, not from self
         self.caps = caps

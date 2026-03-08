@@ -252,7 +252,7 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
         return lambda item: item  # no-op copy
 
     @override
-    def get(self, key: KeyT, default: Any = None) -> T | None:  # ty:ignore[invalid-method-override]
+    def get(self, key: KeyT, default: Any = None) -> T | None:
         """Get a value from the store."""
         if item := self.store.get(key):
             if (strategy := self._get_copy_strategy) is not None:
@@ -262,7 +262,7 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
         return self.store.get(key, default) if self.recover(key) else default
 
     @override
-    def __iter__(self) -> Iterator[KeyT]:  # ty:ignore[invalid-method-override]
+    def __iter__(self) -> Iterator[KeyT]:
         """Return an iterator over the keys in the store."""
         return iter(self.store)
 
@@ -275,7 +275,7 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
         raise KeyError(key)
 
     @override
-    def __getitem__(self, key: KeyT) -> T:  # ty:ignore[invalid-method-override]
+    def __getitem__(self, key: KeyT) -> T:
         """Get an item from the store by key."""
         if key in self:
             return cast(T, self.get(key))
@@ -289,7 +289,7 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
         return len(self.store)
 
     @override
-    def __setitem__(self, key: KeyT, value: Any) -> None:  # ty:ignore[invalid-method-override]
+    def __setitem__(self, key: KeyT, value: Any) -> None:
         """Set an item in the store by key."""
         self.set(key, value)
 
@@ -331,17 +331,17 @@ class _SimpleTypedStore[KeyT: (UUID7, BlakeHashKey), T](BasedModel):
         return cast(KeyT, cast(Callable[[str | bytes], KeyT], self._keygen)(value))
 
     @override
-    def keys(self) -> KeysView[KeyT]:  # ty:ignore[invalid-method-override]
+    def keys(self) -> KeysView[KeyT]:
         """Return the keys in the store."""
         return self.store.keys()
 
     @override
-    def values(self) -> ValuesView[T]:  # ty:ignore[invalid-method-override]
+    def values(self) -> ValuesView[T]:
         """Return the values in the store."""
         return self.store.values()
 
     @override
-    def items(self) -> ItemsView[KeyT, T]:  # ty:ignore[invalid-method-override]
+    def items(self) -> ItemsView[KeyT, T]:
         """Return the items in the store."""
         return self.store.items()
 

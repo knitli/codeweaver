@@ -239,6 +239,9 @@ class EmbeddingMixin:
             if dim := getattr(cap, "default_dimension", None):
                 object.__setattr__(self, "_dimension", dim)
                 return dim
+            from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities
+
+            assert isinstance(cap, EmbeddingModelCapabilities)  # noqa: S101
             if cap.output_dimensions:
                 object.__setattr__(self, "_dimension", cap.output_dimensions[0])
                 return cap.output_dimensions[0]
@@ -462,7 +465,11 @@ class EmbeddingMixin:
 class BaseEmbeddingConfig(BasedModel, EmbeddingMixin):
     """Base configuration for embedding models."""
 
-    provider: ClassVar[Provider | None] = Field(
+    def _telemetry_keys(self) -> None:
+        """Get the telemetry keys for the embedding config."""
+        return
+
+    provider: Provider | None = Field(
         None,
         description="The provider for this embedding configuration. You don't have to provide this value -- while provider is a required setting at the top-level EmbeddingProviderSettings object, we will inject that value into the embedding configuration for you, so you can just specify the provider-specific config without worrying about the provider field in most cases.",
     )
@@ -572,7 +579,7 @@ type BedrockModelConfig = Annotated[
 class BedrockEmbeddingConfig(BaseEmbeddingConfig):
     """Configuration options for Bedrock embedding models."""
 
-    provider: ClassVar[Literal[Provider.BEDROCK]] = Provider.BEDROCK
+    provider: Literal[Provider.BEDROCK] = Provider.BEDROCK
 
     model_name: (
         Literal[
@@ -721,7 +728,7 @@ class CohereEmbeddingOptionsDict(TypedDict, total=False):
 class CohereEmbeddingConfig(BaseEmbeddingConfig):
     """Configuration options for Cohere embedding models."""
 
-    provider: ClassVar[Literal[Provider.COHERE]] = Provider.COHERE
+    provider: Literal[Provider.COHERE] = Provider.COHERE
 
     model_name: (
         Literal[
@@ -837,7 +844,7 @@ class FastEmbedEmbeddingConfig(BaseEmbeddingConfig):
     FastEmbed has no specific embedding parameters. It does pass kwargs on to the ONNX model, but they are the same keys/values as `FastEmbedClientOptions`, and are combined internally in FastEmbed. So, these are empty dicts and we recommend you set configs using `FastEmbedClientOptions` instead of these fields, but we include them here for consistency and future extensibility.
     """
 
-    provider: ClassVar[Literal[Provider.FASTEMBED]] = Provider.FASTEMBED
+    provider: Literal[Provider.FASTEMBED] = Provider.FASTEMBED
 
     embedding: dict[str, Any] = Field(
         default_factory=dict, description="Parameters for document embedding requests."
@@ -890,7 +897,7 @@ class GoogleEmbeddingRequestParams(TypedDict, total=False):
 class GoogleEmbeddingConfig(BaseEmbeddingConfig):
     """Configuration options for Google embedding models."""
 
-    provider: ClassVar[Literal[Provider.GOOGLE]] = Provider.GOOGLE
+    provider: Literal[Provider.GOOGLE] = Provider.GOOGLE
 
     model_name: Literal["gemini-embedding-001"] | ModelNameT = Field(
         default_factory=ModelName, description="The Google embedding model to use."
@@ -995,7 +1002,7 @@ class HuggingFaceEmbeddingOptionsDict(TypedDict, total=False):
 class HuggingFaceEmbeddingConfig(BaseEmbeddingConfig):
     """Configuration options for HuggingFace embedding models."""
 
-    provider: ClassVar[Literal[Provider.HUGGINGFACE_INFERENCE]] = Provider.HUGGINGFACE_INFERENCE
+    provider: Literal[Provider.HUGGINGFACE_INFERENCE] = Provider.HUGGINGFACE_INFERENCE
 
     embedding: HuggingFaceEmbeddingOptionsDict = Field(
         default_factory=lambda: HuggingFaceEmbeddingOptionsDict(
@@ -1106,7 +1113,7 @@ class MistralEmbeddingOptionsDict(TypedDict, total=False):
 class MistralEmbeddingConfig(BaseEmbeddingConfig):
     """Configuration options for Mistral AI embedding models."""
 
-    provider: ClassVar[Literal[Provider.MISTRAL]] = Provider.MISTRAL
+    provider: Literal[Provider.MISTRAL] = Provider.MISTRAL
 
     model_name: Literal["mistral-embed", "codestral-embed"] | ModelNameT = Field(
         default_factory=ModelName, description="The Mistral AI embedding model to use."
@@ -1222,7 +1229,7 @@ class OpenAIEmbeddingConfig(BaseEmbeddingConfig):
     Supports OpenAI, Azure OpenAI, Ollama, Fireworks, Together AI, GitHub Models, Groq, and other OpenAI-compatible providers.
     """
 
-    provider: ClassVar[Literal[Provider.OPENAI]] = Provider.OPENAI
+    provider: Literal[Provider.OPENAI] = Provider.OPENAI
 
     model_name: Literal["text-embedding-3-large", "text-embedding-3-small"] | ModelNameT = Field(
         default_factory=ModelName, description="The OpenAI-API compatible embedding model to use."
@@ -1372,7 +1379,7 @@ class SentenceTransformersEmbeddingConfig(BaseEmbeddingConfig):
     Note: Sentence Transformers receives model kwargs through its client constructor. Provide model options to the `model_kwargs` field in `SentenceTransformersClientOptions`.
     """
 
-    provider: ClassVar[Literal[Provider.SENTENCE_TRANSFORMERS]] = Provider.SENTENCE_TRANSFORMERS
+    provider: Literal[Provider.SENTENCE_TRANSFORMERS] = Provider.SENTENCE_TRANSFORMERS
 
     model_name: ModelNameT = Field(
         default_factory=ModelName, description="The Sentence Transformers model to use."
@@ -1483,7 +1490,7 @@ class VoyageEmbeddingOptionsDict(TypedDict, total=False):
 class VoyageEmbeddingConfig(BaseEmbeddingConfig):
     """Configuration options for Voyage AI embedding models."""
 
-    provider: ClassVar[Literal[Provider.VOYAGE]] = Provider.VOYAGE
+    provider: Literal[Provider.VOYAGE] = Provider.VOYAGE
 
     model_name: (
         Literal[

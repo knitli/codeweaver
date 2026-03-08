@@ -293,7 +293,7 @@ class ThingRegistry:
 
         if isinstance(connections, Connection):
             for connection in connections:
-                self.register_connection(connection)
+                self.register_connection(connection)  # ty:ignore[invalid-argument-type]
             return
         for connection in connections:
             self.register_connection(connection)

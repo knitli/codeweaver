@@ -1225,14 +1225,14 @@ class SparseEmbeddingProvider[SparseClient](EmbeddingProvider[SparseClient], ABC
     @override
     async def _embed_documents(
         self, documents: Sequence[CodeChunk], **kwargs: Any
-    ) -> list[CodeWeaverSparseEmbedding]:  # ty:ignore[invalid-method-override]
+    ) -> list[CodeWeaverSparseEmbedding]:
         """Abstract method to implement document embedding logic for sparse embeddings."""
 
     @abstractmethod
     @override
     async def _embed_query(
         self, query: Sequence[str], **kwargs: Any
-    ) -> list[CodeWeaverSparseEmbedding]:  # ty:ignore[invalid-method-override]
+    ) -> list[CodeWeaverSparseEmbedding]:
         """Abstract method to implement query embedding logic for sparse embeddings."""
 
 

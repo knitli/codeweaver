@@ -341,6 +341,9 @@ class CodeWeaverCoreSettings(BaseCodeWeaverSettings):
     _resolution_complete: bool = PrivateAttr(default=False)
     """Whether config resolution has been completed."""
 
+    _map: DictView | None = PrivateAttr(default=None)
+    """Cached read-only mapping view of the settings."""
+
     _env_prefix: ClassVar[str] = "CODEWEAVER_"
 
     def __init__(
@@ -362,11 +365,11 @@ class CodeWeaverCoreSettings(BaseCodeWeaverSettings):
             for key in type(self).model_fields
             if data.get(key) is UNSET or locals().get(key) is UNSET
         }
-        if project_path is not Unset and project_path is not None:
+        if project_path is not UNSET and project_path is not None:
             data["project_path"] = cast(DirectoryPath, project_path).resolve()
         else:
             if (env_path := _set_or_unset("CODEWEAVER_PROJECT_PATH", is_path=True)) is not UNSET:
-                data["project_path"] = env_path.resolve()
+                data["project_path"] = env_path.resolve()  # ty:ignore[unresolved-attribute]
             else:
                 data["project_path"] = _resolve_project_path()
         if (env_config_file := _set_or_unset("CODEWEAVER_CONFIG_FILE", is_path=True)) is not UNSET:
@@ -740,7 +743,6 @@ class CodeWeaverCoreSettings(BaseCodeWeaverSettings):
         schema_path.parent.mkdir(parents=True, exist_ok=True)
         _ = schema_path.write_bytes(schema)
 
-    @property
     def view(self) -> DictView[CodeWeaverSettingsDict]:
         """Get a read-only mapping view of the settings."""
         if self._map is None:

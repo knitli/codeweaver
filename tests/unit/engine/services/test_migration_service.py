@@ -255,8 +255,10 @@ class TestVectorTruncation:
         assert isinstance(truncated.vector, dict)
         assert len(truncated.vector["dense"]) == 3
         assert truncated.vector["dense"] == [1.0, 2.0, 3.0]
-        # Sparse component should be preserved
-        assert truncated.vector["sparse"] == {"indices": [0, 5, 10], "values": [0.5, 0.3, 0.2]}
+        # Sparse component should be preserved (qdrant converts dict to SparseVector object)
+        sparse = truncated.vector["sparse"]
+        assert cast(NamedSparseVector, sparse).indices == [0, 5, 10]
+        assert cast(NamedSparseVector, sparse).values == [0.5, 0.3, 0.2]
 
     def test_preserves_sparse_component(self, migration_service: MigrationService) -> None:
         """Test that sparse component is preserved during truncation."""
@@ -275,9 +277,11 @@ class TestVectorTruncation:
 
     def test_handles_empty_sparse_component(self, migration_service: MigrationService) -> None:
         """Test handling of empty sparse component."""
-        original = PointStruct(
-            id="test_id", vector={"dense": [1.0, 2.0], "sparse": None}, payload={}
-        )
+        # Use Mock to bypass qdrant validation — PointStruct no longer accepts sparse=None
+        original = Mock()
+        original.id = "test_id"
+        original.payload = {}
+        original.vector = {"dense": [1.0, 2.0], "sparse": None}
 
         truncated = migration_service._truncate_vector(original, new_dimension=1)
         assert isinstance(truncated.vector, dict)
@@ -637,7 +641,7 @@ class TestParallelWorkerExecution:
         # Mock batch operations
         migration_service._fetch_batch = AsyncMock(
             side_effect=[
-                [Mock(spec=PointStruct)],  # Batch 1
+                [PointStruct(id="test_id", vector=[1.0, 2.0, 3.0], payload={})],  # Batch 1
                 [],  # No more batches
             ]
         )
@@ -689,7 +693,9 @@ class TestParallelWorkerExecution:
         from codeweaver.engine.services.migration_service import WorkItem
 
         # Create 11 batches to trigger checkpoint save
-        batches = [[Mock(spec=PointStruct)] for _ in range(11)]
+        batches = [
+            [PointStruct(id=f"id_{i}", vector=[1.0, 2.0, 3.0], payload={})] for i in range(11)
+        ]
         batches.append([])  # End marker
 
         migration_service._fetch_batch = AsyncMock(side_effect=batches)

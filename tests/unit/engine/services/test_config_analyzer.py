@@ -104,6 +104,32 @@ def asymmetric_embedding_config() -> Mock:
     return config
 
 
+@pytest.fixture
+def mock_vector_store() -> Mock:
+    """Create mock VectorStoreProvider for ConfigChangeAnalyzer."""
+    store = Mock()
+    store.collection_info = AsyncMock()
+    return store
+
+
+@pytest.fixture
+def config_analyzer(
+    mock_settings: Mock,
+    mock_checkpoint_manager: Mock,
+    mock_manifest_manager: Mock,
+    mock_vector_store: Mock,
+) -> Mock[ConfigChangeAnalyzer]:
+    """Create ConfigChangeAnalyzer with mock dependencies."""
+    from codeweaver.engine.services.config_analyzer import ConfigChangeAnalyzer
+
+    return ConfigChangeAnalyzer(
+        settings=mock_settings,
+        checkpoint_manager=mock_checkpoint_manager,
+        manifest_manager=mock_manifest_manager,
+        vector_store=mock_vector_store,
+    )
+
+
 # ===========================================================================
 # *                    Tests: Analyze Current Config
 # ===========================================================================

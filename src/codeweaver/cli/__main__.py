@@ -69,12 +69,12 @@ if ROOT_PACKAGE == "server":
 if ROOT_PACKAGE in ("engine", "server"):
     app.command("codeweaver.cli.commands.index:app", name="index")
 if ROOT_PACKAGE in ("provider", "engine", "server"):
-    app.command("codeweaver.cli.commands.list:app", name="list", alias="ls")
+    app.command("codeweaver.cli.commands.ls:app", name="list", alias="ls")
 
 app.command("codeweaver.cli.commands.config:app", name="config")
 
 # Developer tools - available in all packages
-app.command("codeweaver.tools.lateimports.cli:app", name="lazy-imports")
+# app.command("codeweaver.tools.lateimports.cli:app", name="lazy-imports")  # Not yet implemented
 
 
 def _handle_keyboard_interrupt():

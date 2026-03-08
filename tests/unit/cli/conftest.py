@@ -64,7 +64,7 @@ provider = "qdrant"
     mock_settings.save_to_file = mock_save_to_file
 
     # Mock the view property (used by config command)
-    mock_settings.view = {}
+    mock_settings.view = lambda: {}  # noqa: PIE807
 
     # Patch the _get_settings function in init command
     def mock_get_settings(*args, **kwargs):

@@ -14,7 +14,7 @@ import contextlib
 
 from collections.abc import Generator
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any, cast
 
 from lateimport import LateImport, lateimport
 from pydantic_ai.providers import Provider as AgentProvider
@@ -31,12 +31,9 @@ from pydantic_ai.toolsets import (
     WrapperToolset,
 )
 
+from codeweaver.core import Provider
 from codeweaver.core.exceptions import ConfigurationError
 from codeweaver.core.types import LiteralProviderType
-
-
-if TYPE_CHECKING:
-    from codeweaver.core import Provider
 
 
 AGENT_PROVIDER_CLASSES: MappingProxyType[Provider, LateImport] = MappingProxyType({

@@ -46,11 +46,11 @@ def temp_persist_path():
 @pytest.fixture
 async def memory_config(temp_persist_path):
     """Provide test Memory configuration."""
-    from codeweaver.providers.config.categories import CollectionConfig
+    from codeweaver.providers.config.categories import QdrantCollectionConfig
 
     return MemoryVectorStoreProviderSettings(
         provider=Provider.MEMORY,
-        collection=CollectionConfig(collection_name=f"test_memory_{uuid4().hex[:8]}"),
+        collection=QdrantCollectionConfig(collection_name=f"test_memory_{uuid4().hex[:8]}"),
         in_memory_config={
             "persist_path": str(temp_persist_path / "vector_store"),
             "auto_persist": True,

@@ -92,15 +92,16 @@ class SparseEmbeddingProviderSettings(BaseSparseEmbeddingProviderSettings):
         model_key = (
             "model_name_or_path" if self.client == SDKClient.SENTENCE_TRANSFORMERS else "model_name"
         )
+        model_name = data.get("model_name")
 
         if "client_options" in data and isinstance(data["client_options"], dict):
-            data["client_options"][model_key] = data.get("model_name", self.model_name)
+            data["client_options"][model_key] = model_name
         if isinstance(data.get("client_options"), ClientOptions):
-            setattr(data["client_options"], model_key, data.get("model_name", self.model_name))
+            setattr(data["client_options"], model_key, model_name)
         if isinstance(data["sparse_embedding_config"], dict):
-            data["sparse_embedding_config"]["model_name"] = data.get("model_name", self.model_name)
+            data["sparse_embedding_config"]["model_name"] = model_name
         else:
-            data["sparse_embedding_config"].model_name = data.get("model_name", self.model_name)
+            data["sparse_embedding_config"].model_name = model_name
         super().__init__(**data)
 
 

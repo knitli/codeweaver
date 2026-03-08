@@ -122,7 +122,7 @@ class BaseEmbeddingProviderSettings(BaseProviderCategorySettings, ABC):
     """Settings for (dense) embedding models. It validates that the model and provider settings are compatible and complete, reconciling environment variables and config file settings as needed."""
 
     category: ClassVar[Literal[ProviderCategory.EMBEDDING]] = ProviderCategory.EMBEDDING
-    config_type: ClassVar[Literal["symmetric"]] = "symmetric"
+    config_type: Literal["symmetric"] = "symmetric"
 
     @abstractmethod
     def get_embed_kwargs(self) -> dict[str, Any]:
@@ -155,22 +155,30 @@ class EmbeddingProviderSettings(BaseEmbeddingProviderSettings):
 
     def _initialize(self, data: dict[str, Any]) -> dict[str, Any]:
         """Perform any additional initialization steps. Happens before pydantic initialization and the model's post_init."""
-        if self.provider in (
+        raw_provider = data.get("provider")
+        provider = (
+            raw_provider
+            if isinstance(raw_provider, Provider)
+            else Provider(raw_provider)
+            if raw_provider
+            else None
+        )
+        if provider in (
             Provider.HUGGINGFACE_INFERENCE,
             Provider.SENTENCE_TRANSFORMERS,
             Provider.FASTEMBED,
         ):
-            if self.provider == Provider.FASTEMBED:
+            if provider == Provider.FASTEMBED:
                 data = self._set_client_option(
-                    data, "model_name", self.model_name or data.get("model_name")
+                    data, "model_name", data.get("model_name")
                 )
-            if self.provider == Provider.SENTENCE_TRANSFORMERS:
+            if provider == Provider.SENTENCE_TRANSFORMERS:
                 data = self._set_client_option(
-                    data, "model_name_or_path", self.model_name or data.get("model_name")
+                    data, "model_name_or_path", data.get("model_name")
                 )
             else:
                 data = self._set_client_option(
-                    data, "model", self.model_name or data.get("model_name")
+                    data, "model", data.get("model_name")
                 )
         data |= super()._initialize(data)
         return data
@@ -262,7 +270,7 @@ class AzureEmbeddingProviderSettings(AzureProviderMixin, EmbeddingProviderSettin
         CohereEmbeddingConfig | BedrockEmbeddingConfig,
         Field(
             description="Model configuration for embedding operations.",
-            discriminator="client_options",
+            discriminator="provider",
         ),
     ]
 
@@ -490,7 +498,7 @@ class GoogleEmbeddingProviderSettings(EmbeddingProviderSettings):
 
 
 type CoreEmbeddingProviderSettingsType = Annotated[
-    Annotated[EmbeddingProviderSettings, Field(discriminator="tag"), Tag("simple")]
+    Annotated[EmbeddingProviderSettings, Tag("simple")]
     | Annotated[AzureEmbeddingProviderSettings, Tag(Provider.AZURE.variable)]
     | Annotated[BedrockEmbeddingProviderSettings, Tag(Provider.BEDROCK.variable)]
     | Annotated[FastEmbedEmbeddingProviderSettings, Tag(Provider.FASTEMBED.variable)],
@@ -664,7 +672,7 @@ class AsymmetricEmbeddingProviderSettings(BasedModel):
         validate_family_compatibility: Whether to validate models belong to same family.
     """
 
-    config_type: ClassVar[Literal["asymmetric"]] = "asymmetric"
+    config_type: Literal["asymmetric"] = "asymmetric"
 
     embed_provider: Annotated[
         CoreEmbeddingProviderSettingsType,
@@ -681,7 +689,7 @@ class AsymmetricEmbeddingProviderSettings(BasedModel):
 
     category: ClassVar[Literal[ProviderCategory.EMBEDDING]] = ProviderCategory.EMBEDDING
 
-    _model_name: ModelNameT = PrivateAttr(default_factory=_get_model_name_for_family)
+    _model_name: ModelNameT | None = PrivateAttr(default=None)
 
     def get_embed_kwargs(self) -> dict[str, Any]:
         """Get keyword arguments for the embed provider."""
@@ -693,15 +701,14 @@ class AsymmetricEmbeddingProviderSettings(BasedModel):
 
     def __getattribute__(self, name: str) -> Any:
         """Delegate attribute access to embed provider for shared properties."""
-        if name in self.__dict__:
-            return self.__dict__[name]
+        instance_dict = object.__getattribute__(self, "__dict__")
+        if name in instance_dict:
+            return instance_dict[name]
         if name == "get_embed_kwargs":
-            return self.embed_provider.get_embed_kwargs
+            return object.__getattribute__(self, "embed_provider").get_embed_kwargs
         if name == "get_query_kwargs":
-            return self.query_provider.get_query_embed_kwargs
-        if name in list(self.__dir__()):
-            return super().__getattribute__(name)
-        raise AttributeError(f"{self.__class__.__name__} object has no attribute '{name}'")
+            return object.__getattribute__(self, "query_provider").get_query_embed_kwargs
+        return super().__getattribute__(name)
 
     @cached_property
     def dimension_tuple(self) -> tuple[NonNegativeInt, NonNegativeInt]:
@@ -925,6 +932,8 @@ class AsymmetricEmbeddingProviderSettings(BasedModel):
     @property
     def model_name(self) -> ModelNameT:
         """Get the model family name for the asymmetric embedding configuration."""
+        if self._model_name is None:
+            self._model_name = _get_model_name_for_family(self)
         return self._model_name
 
     def _telemetry_keys(self) -> None:

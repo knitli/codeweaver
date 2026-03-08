@@ -15,9 +15,18 @@ from __future__ import annotations
 
 import pytest
 
-from codeweaver.cli.commands.list import app as list_app
+from codeweaver.cli.commands.ls import app as list_app
 from codeweaver.core import ProviderCategory
-from codeweaver.core.types.provider import PROVIDER_CAPABILITIES
+from codeweaver.core.types.provider import Provider
+from codeweaver.core.types.service_cards import get_provider_capabilities_map
+
+
+# Build a PROVIDER_CAPABILITIES dict mapping Provider → set[ProviderCategory]
+_raw_caps = get_provider_capabilities_map(Provider)
+PROVIDER_CAPABILITIES = {
+    provider: {ProviderCategory.from_string(cat) for cat in cats}
+    for provider, cats in _raw_caps.items()
+}
 
 
 @pytest.mark.unit

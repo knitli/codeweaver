@@ -38,7 +38,7 @@ class ProviderEnvRegistry:
     """
 
     _registry: ClassVar[dict[str, list[ProviderEnvConfig]]] = {}
-    _lock: ClassVar[threading.Lock] = threading.Lock()
+    _lock: ClassVar[threading.RLock] = threading.RLock()
     _initialized: ClassVar[bool] = False
 
     @classmethod

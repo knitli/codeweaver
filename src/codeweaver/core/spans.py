@@ -165,14 +165,14 @@ class Span(NamedTuple):
         return tuple(result) if result else None
 
     @override
-    def __le__(self, other: Span) -> bool:  # ty:ignore[invalid-method-override]
+    def __le__(self, other: Span) -> bool:
         """Check if this span is a subset of another span."""
         if self.source_id.hex != other.source_id.hex:
             return False
         return self.start >= other.start and self.end <= other.end
 
     @override
-    def __ge__(self, other: Span) -> bool:  # ty:ignore[invalid-method-override]
+    def __ge__(self, other: Span) -> bool:
         """Check if this span is a superset of another span."""
         if self.source_id.hex != other.source_id.hex:
             return False
@@ -193,7 +193,7 @@ class Span(NamedTuple):
             current += ONE_LINE
 
     @override
-    def __len__(self) -> NonNegativeInt:  # ty:ignore[invalid-method-override]
+    def __len__(self) -> NonNegativeInt:
         """Return the number of lines in the span."""
         return self.end - self.start + ONE_LINE
 
@@ -218,7 +218,7 @@ class Span(NamedTuple):
         return self.start <= number <= self.end
 
     @override
-    def __contains__(self, span: Span | SpanTuple | int) -> bool:  # ty:ignore[invalid-method-override]
+    def __contains__(self, span: Span | SpanTuple | int) -> bool:
         """
         Check if the span contains a line number or another span or a tuple of (start, end).
 

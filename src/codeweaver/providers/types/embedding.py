@@ -9,7 +9,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any, Literal, NamedTuple, Self, cast
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, Self, cast
 
 from pydantic import PositiveInt
 from qdrant_client.http.models import Datatype
@@ -25,15 +25,25 @@ from qdrant_client.models import (
 from codeweaver.core.constants import PRIMARY_SPARSE_VECTOR_NAME, PRIMARY_VECTOR_NAME
 from codeweaver.core.exceptions import InvalidEmbeddingModelError
 from codeweaver.core.types import ModelName, ModelNameT
-from codeweaver.providers.config.categories import (
-    AsymmetricEmbeddingProviderSettings,
-    EmbeddingProviderSettings,
-    SparseEmbeddingProviderSettings,
-)
 from codeweaver.providers.embedding.capabilities.base import (
     EmbeddingModelCapabilities,
     SparseEmbeddingModelCapabilities,
 )
+
+
+if TYPE_CHECKING:
+    from codeweaver.providers.config.categories import (
+        AsymmetricEmbeddingProviderSettings,
+        EmbeddingProviderSettings,
+        SparseEmbeddingProviderSettings,
+    )
+
+
+def _sparse_settings_type() -> type[SparseEmbeddingProviderSettings]:
+    """Lazy import to avoid circular imports at module load time."""
+    from codeweaver.providers.config.categories import SparseEmbeddingProviderSettings
+
+    return SparseEmbeddingProviderSettings
 
 
 class ConfiguredCapability(NamedTuple):
@@ -59,7 +69,7 @@ class ConfiguredCapability(NamedTuple):
         # Get the embedding config - use sparse_embedding_config for sparse providers
         embedding_config = (
             self.config.sparse_embedding_config
-            if isinstance(self.config, SparseEmbeddingProviderSettings)
+            if isinstance(self.config, _sparse_settings_type())
             else self.config.embedding_config
         )
         return ModelName(
@@ -73,7 +83,7 @@ class ConfiguredCapability(NamedTuple):
         # Get the embedding config - use sparse_embedding_config for sparse providers
         embedding_config = (
             self.config.sparse_embedding_config
-            if isinstance(self.config, SparseEmbeddingProviderSettings)
+            if isinstance(self.config, _sparse_settings_type())
             else self.config.embedding_config
         )
         return await embedding_config.get_datatype()
@@ -105,7 +115,7 @@ class ConfiguredCapability(NamedTuple):
         # Get the embedding config - use sparse_embedding_config for sparse providers
         embedding_config = (
             self.config.sparse_embedding_config
-            if isinstance(self.config, SparseEmbeddingProviderSettings)
+            if isinstance(self.config, _sparse_settings_type())
             else self.config.embedding_config
         )
         configured_dimension = await embedding_config.get_dimension() or default_dimension
@@ -192,7 +202,7 @@ class EmbeddingCapabilityGroup(NamedTuple):
         for capability in capabilities:
             config = capability.config
             if (
-                isinstance(config, SparseEmbeddingProviderSettings)
+                isinstance(config, _sparse_settings_type())
                 and (model_name := config.model_name or config.sparse_embedding_config.model_name)
                 and any(
                     n
@@ -201,7 +211,7 @@ class EmbeddingCapabilityGroup(NamedTuple):
                 )
             ):
                 values["idf"] = values["idf"] or capability
-            elif isinstance(config, SparseEmbeddingProviderSettings):
+            elif isinstance(config, _sparse_settings_type()):
                 values["sparse"] = values["sparse"] or capability
             else:
                 values["dense"] = values["dense"] or capability

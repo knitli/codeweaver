@@ -2040,11 +2040,43 @@ class DelimiterChunker(BaseChunker):
         return result or [chunk]
 
 
+from codeweaver.core.types.delimiter import DelimiterDict, DelimiterKind, DelimiterPattern
+from codeweaver.engine.chunker.delimiters.families import (
+    LanguageFamily,
+    detect_family_characteristics,
+    detect_language_family,
+)
+from codeweaver.engine.chunker.delimiters.patterns import (
+    ALL_PATTERNS,
+    CONDITIONAL_PATTERN,
+    FUNCTION_PATTERN,
+    HASH_COMMENT_PATTERN,
+    PARAGRAPH_PATTERN,
+    STRING_QUOTE_PATTERN,
+    expand_pattern,
+    matches_pattern,
+)
+
+
 __all__ = (
+    "ALL_PATTERNS",
     "CHARS_PER_TOKEN",
+    "CONDITIONAL_PATTERN",
+    "FUNCTION_PATTERN",
+    "HASH_COMMENT_PATTERN",
     "MIN_LINES_FOR_PARAGRAPH_SPLIT",
+    "PARAGRAPH_PATTERN",
     "PERFORMANCE_THRESHOLD_MS",
     "SLIDING_WINDOW_OVERLAP",
+    "STRING_QUOTE_PATTERN",
     "DelimiterChunker",
+    "DelimiterDict",
+    "DelimiterKind",
+    "DelimiterPattern",
+    "LanguageFamily",
     "StringParseState",
+    "detect_family_characteristics",
+    "detect_language_family",
+    "expand_pattern",
+    "matches_pattern",
 )

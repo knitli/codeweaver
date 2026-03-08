@@ -41,6 +41,7 @@ if TYPE_CHECKING:
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "ROOT_PACKAGE": (__spec__.parent, "__main__"),
+    "app": (__spec__.parent, "__main__"),
     "AtomicAwareBarColumn": (__spec__.parent, "ui.status_display"),
     "AtomicAwareCountColumn": (__spec__.parent, "ui.status_display"),
     "AtomicAwarePercentColumn": (__spec__.parent, "ui.status_display"),

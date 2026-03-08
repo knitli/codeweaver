@@ -19,10 +19,9 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from codeweaver.providers.config.embedding import VoyageEmbeddingConfig
-
 from codeweaver.core import Provider
 from codeweaver.core.exceptions import ConfigurationError
+from codeweaver.providers.config.sdk.embedding import VoyageEmbeddingConfig
 
 
 if TYPE_CHECKING:

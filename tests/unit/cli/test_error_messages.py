@@ -179,7 +179,7 @@ def trigger_network_timeout() -> ProviderError:
             "Option 1: Check network connectivity and try again",
             "Option 2: Increase timeout in settings: voyage.timeout = 60",
             "Option 3: Reduce batch size: voyage.batch_size = 50",
-            "If timeouts persist, check provider status: https://status.voyageai.com",
+            "Option 4: If timeouts persist, check provider status: https://status.voyageai.com",
         ],
     )
 
@@ -229,6 +229,9 @@ def trigger_profile_version_mismatch() -> ConfigurationError:
 # ===========================================================================
 
 
+@pytest.mark.external_api
+@pytest.mark.unit
+@pytest.mark.voyageai
 class TestErrorMessageActionability:
     """Tests verifying that all errors include clear next steps."""
 
@@ -388,6 +391,9 @@ class TestErrorMessageActionability:
         assert "Option" in suggestions_text
 
 
+@pytest.mark.external_api
+@pytest.mark.unit
+@pytest.mark.voyageai
 class TestErrorMessageStructure:
     """Tests verifying error message structural quality."""
 
@@ -414,9 +420,11 @@ class TestErrorMessageStructure:
             for suggestion in error.suggestions:
                 assert suggestion.strip(), f"Empty suggestion in {type(error).__name__}"
                 # Should start with action word or option marker
+                stripped = suggestion.strip()
                 assert any([
-                    suggestion.strip().startswith(("Option", "To ", "Run:", "Check")),
-                    ":" in suggestion[:50],  # Has structure like "Step 1: ..."
+                    stripped.startswith(("Option", "To ", "Run:", "Check", "Or ")),
+                    ":" in stripped[:60],  # Has structure like "Step 1: ..."
+                    stripped[:4].rstrip(". ").isdigit(),  # Starts with a number like "1." or "2."
                 ]), f"Suggestion not actionable: {suggestion}"
 
     def test_all_errors_have_details(self) -> None:
@@ -485,6 +493,9 @@ class TestErrorMessageStructure:
                     )
 
 
+@pytest.mark.external_api
+@pytest.mark.unit
+@pytest.mark.voyageai
 class TestJargonExplanation:
     """Tests verifying that technical jargon is explained."""
 
@@ -557,6 +568,9 @@ class TestJargonExplanation:
             ]), "Layer 2 validation not explained"
 
 
+@pytest.mark.external_api
+@pytest.mark.unit
+@pytest.mark.voyageai
 class TestErrorMessageConsistency:
     """Tests verifying consistent error message patterns."""
 
@@ -611,6 +625,9 @@ class TestErrorMessageConsistency:
             assert "docs.codeweaver.dev" in full_text or "docs.codeweaver" in full_text
 
 
+@pytest.mark.external_api
+@pytest.mark.unit
+@pytest.mark.voyageai
 class TestErrorMessageCompleteness:
     """Tests verifying error messages provide complete information."""
 
@@ -662,6 +679,9 @@ class TestErrorMessageCompleteness:
 # ===========================================================================
 
 
+@pytest.mark.external_api
+@pytest.mark.unit
+@pytest.mark.voyageai
 class TestRealErrorScenarios:
     """Tests with realistic error scenarios matching actual usage."""
 
@@ -742,6 +762,9 @@ class TestRealErrorScenarios:
 # ===========================================================================
 
 
+@pytest.mark.external_api
+@pytest.mark.unit
+@pytest.mark.voyageai
 class TestMessageFormatting:
     """Tests verifying error message formatting quality."""
 

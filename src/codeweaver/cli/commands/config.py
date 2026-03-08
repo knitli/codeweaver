@@ -83,7 +83,7 @@ async def config(
             error_handler.handle_error(e, "Configuration", exit_code=1)
         except Exception as e:
             error_handler.handle_error(e, "Configuration", exit_code=1)
-    _show_config(settings.view)
+    _show_config(settings.view())
 
 
 def _show_config(settings: DictView[CodeWeaverSettingsDict]) -> None:
