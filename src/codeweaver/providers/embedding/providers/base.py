@@ -269,11 +269,13 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         object.__setattr__(self, "config", config)
 
         # Access embedding options through config.embedding_config
-        embedding_config = (
-            config.embedding_config
-            if isinstance(config, EmbeddingProviderSettings)
-            else config.sparse_embedding_config
-        )
+        if isinstance(config, EmbeddingProviderSettings):
+            embedding_config = config.embedding_config
+        elif hasattr(config, "sparse_embedding_config"):
+            embedding_config = config.sparse_embedding_config
+        else:
+            # config is already an SDK config (EmbeddingConfigT)
+            embedding_config = config
         object.__setattr__(
             self,
             "query_options",

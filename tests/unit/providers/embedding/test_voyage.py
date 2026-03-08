@@ -73,9 +73,8 @@ def voyage_context_capabilities():
 @pytest.fixture
 def mock_voyage_config():
     """Create a config for Voyage embedding provider."""
-    from codeweaver.providers.config.embedding import VoyageEmbeddingConfig
-
     from codeweaver.providers import EmbeddingProviderSettings
+    from codeweaver.providers.config import VoyageEmbeddingConfig
 
     embedding_config = VoyageEmbeddingConfig(
         tag="voyage", provider=Provider.VOYAGE, model_name="voyage-3"
@@ -538,9 +537,8 @@ class TestVoyageEmbeddingProviderDimension:
         self, mock_voyage_client, mock_embedding_registry, mock_cache_manager
     ):
         """Test dimension property with custom output_dimension."""
-        from codeweaver.providers.config.embedding import VoyageEmbeddingConfig
-
         from codeweaver.providers import EmbeddingProviderSettings
+        from codeweaver.providers.config import VoyageEmbeddingConfig
 
         caps = EmbeddingModelCapabilities(
             name="voyage-3",

@@ -107,6 +107,16 @@ class BaseCapabilityResolver[Capability: (EmbeddingCapabilityType | RerankingCap
             self._ensure_loaded()
         return tuple(self._capabilities_by_name.keys())
 
+    def all_capabilities(self) -> Sequence[Capability]:
+        """Get all registered capabilities.
+
+        Returns:
+            A sequence of all registered capability objects.
+        """
+        with self._lock:
+            self._ensure_loaded()
+        return tuple(self._capabilities_by_name.values())
+
 
 class BaseRerankingCapabilityResolver(BaseCapabilityResolver[RerankingCapabilityType]):
     """A capability resolver for reranking models."""

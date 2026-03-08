@@ -231,7 +231,7 @@ class TestProviderEnvRegistry:
 
         providers = ProviderEnvRegistry.all_providers()
 
-        assert len(providers) == 3
+        # Auto-initialization adds built-in providers; check test providers are included
         assert "test1" in providers
         assert "test2" in providers
         assert "test3" in providers
@@ -248,7 +248,7 @@ class TestProviderEnvRegistry:
 
         all_configs = ProviderEnvRegistry.all_configs()
 
-        assert len(all_configs) == 2
+        # Auto-initialization adds built-in providers; check test providers are included
         assert "test1" in all_configs
         assert "test2" in all_configs
         assert all_configs["test1"] == [cfg1]

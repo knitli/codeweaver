@@ -64,6 +64,7 @@ if TYPE_CHECKING:
         CodeWeaverSettingsDict,
         FastMcpHttpServerSettings,
         FastMcpStdioServerSettings,
+        McpMiddleware,
     )
     from codeweaver.server.config.types import (
         ASGIMiddleware,
@@ -103,6 +104,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "InterfaceType": (__spec__.parent, "types"),
     "LifespanType": (__spec__.parent, "types"),
     "LoggingMiddlewareSettings": (__spec__.parent, "middleware"),
+    "McpMiddleware": (__spec__.parent, "settings"),
     "McpMiddlewareContext": (__spec__.parent, "middleware"),
     "MiddlewareOptions": (__spec__.parent, "middleware"),
     "MissingValueError": (__spec__.parent, "mcp"),
@@ -165,6 +167,7 @@ __all__ = (
     "MCPConfigDict",
     "MCPServerConfig",
     "MappingProxyType",
+    "McpMiddleware",
     "McpMiddlewareContext",
     "MiddlewareOptions",
     "MissingValueError",

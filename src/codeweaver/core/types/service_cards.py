@@ -1379,10 +1379,14 @@ def get_service_cards(
         >>> get_service_cards(provider="azure", category="agent")
     """
     registry = _build_service_card_registry()
-    prov_filter, category_filter, client_filter = (
-        provider if isinstance(provider, set) else {provider},
-        category if isinstance(category, set) else {category},
-        client if isinstance(client, set) else {client},
+    prov_filter: set[ProviderLiteralString | None] = (
+        provider if isinstance(provider, set) else ({provider} if provider is not None else set())
+    )
+    category_filter: set[ProviderCategoryLiteralString | None] = (
+        category if isinstance(category, set) else ({category} if category is not None else set())
+    )
+    client_filter: set[SDKClientLiteralString | None] = (
+        client if isinstance(client, set) else ({client} if client is not None else set())
     )
     if prov_filter or category_filter or client_filter:
         return tuple(
@@ -1524,9 +1528,9 @@ def get_provider_capabilities_map(
     cards = get_service_cards()
     mapping = defaultdict(set)
     for card in cards:
-        mapping[Provider.from_string(card.provider)].add(card.category)
+        mapping[provider_cls.from_string(card.provider)].add(card.category)
     return MappingProxyType({
-        provider: tuple(sorted(categories)) for provider, categories in mapping.items()
+        prov: tuple(sorted(categories)) for prov, categories in mapping.items()
     })
 
 

@@ -53,8 +53,7 @@ def voyage_4_nano_settings() -> EmbeddingProviderSettings:
     This is a local model via SentenceTransformers that is part of the
     VOYAGE_4_FAMILY, allowing asymmetric pairing with VOYAGE API models.
     """
-    from codeweaver.providers.config.embedding import SentenceTransformersEmbeddingConfig
-
+    from codeweaver.providers.config import SentenceTransformersEmbeddingConfig
     from codeweaver.providers.config.categories import EmbeddingProviderSettings
 
     return EmbeddingProviderSettings(
@@ -87,8 +86,7 @@ def openai_settings() -> EmbeddingProviderSettings:
     This model is from a different family/provider and should fail
     validation when paired with Voyage models.
     """
-    from codeweaver.providers.config.embedding import OpenAIEmbeddingConfig
-
+    from codeweaver.providers.config import OpenAIEmbeddingConfig
     from codeweaver.providers.config.categories import EmbeddingProviderSettings
 
     return EmbeddingProviderSettings(
@@ -255,8 +253,8 @@ class TestModelWithoutFamily:
         """Test that models without family assignment are rejected."""
         try:
             from codeweaver.providers.config.asymmetric import AsymmetricEmbeddingProviderSettings
-            from codeweaver.providers.config.embedding import FastEmbedEmbeddingConfig
 
+            from codeweaver.providers.config import FastEmbedEmbeddingConfig
             from codeweaver.providers.config.categories import EmbeddingProviderSettings
         except ImportError:
             pytest.skip("AsymmetricEmbeddingProviderSettings not yet implemented")

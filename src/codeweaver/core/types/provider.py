@@ -55,14 +55,13 @@ class ProviderCategory(BaseEnum):
         return Provider
 
     @cached_property
-    def providers(self) -> Generator[Provider]:
+    def providers(self) -> tuple[Provider, ...]:
         """Get all providers that support this category."""
         from codeweaver.core.types.service_cards import get_providers_for_category
 
         if self == ProviderCategory.UNSET:
-            yield from Provider
-        else:
-            yield from get_providers_for_category(self)
+            return tuple(Provider)
+        return tuple(type(self).from_string(cat) for cat in get_providers_for_category(self))
 
 
 def get_default_provider_import_for_category(
@@ -115,7 +114,7 @@ class SDKClient(BaseEnum):
         """Get the SDK clients for a given provider and category."""
         from codeweaver.core.types.service_cards import get_sdk_client
 
-        if sdk_clients := get_sdk_client(provider, category):
+        if sdk_clients := get_sdk_client(cls, provider, category):
             yield from (sdk_clients if isinstance(sdk_clients, tuple) else (sdk_clients,))
 
     @property

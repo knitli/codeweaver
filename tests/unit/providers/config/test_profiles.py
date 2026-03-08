@@ -38,8 +38,8 @@ def test_recommended_query_provider_has_huggingface_prefix(monkeypatch):
         f"Expected AsymmetricEmbeddingProviderSettings, got {type(first)}"
     )
     query_model = str(first.query_provider.model_name)
-    assert query_model.startswith("voyageai/"), (
-        f"SentenceTransformers query model must use HuggingFace voyageai/ prefix, got: {query_model!r}"
+    assert query_model.startswith(("voyageai/", "onnx-community/")), (
+        f"SentenceTransformers query model must use HuggingFace voyageai/ or onnx-community/ prefix, got: {query_model!r}"
     )
 
 

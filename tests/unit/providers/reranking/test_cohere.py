@@ -56,7 +56,7 @@ def cohere_rerank_capabilities():
 @pytest.fixture
 def mock_cohere_rerank_config():
     """Create a config for Cohere reranking provider."""
-    from codeweaver.providers.config.reranking import CohereRerankingConfig
+    from codeweaver.providers.config import CohereRerankingConfig
 
     return CohereRerankingConfig(
         tag="cohere", provider=Provider.COHERE, model_name="rerank-english-v3.0"

@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import contextlib
 
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from importlib import util
 from importlib.util import find_spec
 from pathlib import Path
@@ -727,8 +727,9 @@ class ProviderProfile(ProviderConfigProfile, BaseDataclassEnum):
         """Get the provider settings as a dictionary."""
         from codeweaver.providers.config.providers import ProviderSettingsDict
 
+        _fields = ("embedding", "sparse_embedding", "reranking", "vector_store", "agent", "data")
         return ProviderSettingsDict(**{
-            k: v for k, v in asdict(self.value).items() if k not in {"aliases", "description"}
+            k: v for k in _fields if (v := getattr(self, k, None)) is not None
         })
 
 

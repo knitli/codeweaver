@@ -309,4 +309,12 @@ class EmbeddingCacheManager(BasedModel):
         return None
 
 
+def _rebuild_embedding_cache_manager() -> None:
+    from codeweaver.core import CodeChunk as CodeChunk
+
+    EmbeddingCacheManager.model_rebuild()
+
+
+_rebuild_embedding_cache_manager()
+
 __all__ = ("EmbeddingCacheManager",)

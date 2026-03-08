@@ -468,13 +468,13 @@ if TYPE_CHECKING:
     from codeweaver.core.types.embeddings import (
         BasedModel,
         ChunkEmbeddings,
-        CodeChunk,
         CodeWeaverSparseEmbedding,
         DataType,
         EmbeddingBatchInfo,
         EmbeddingKind,
         QueryResult,
         RawEmbeddingVectors,
+        SparseEmbedding,
         StoredEmbeddingVectors,
         override,
     )
@@ -506,6 +506,7 @@ if TYPE_CHECKING:
     )
     from codeweaver.core.types.search import (
         AfterValidator,
+        CodeChunk,
         DiscoveredFile,
         Metadata,
         SearchResult,
@@ -1931,7 +1932,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "ClassificationMethod": (__spec__.parent, "semantic.classifier"),
     "ClassVar": (__spec__.parent, "core.exceptions"),
     "ClientOptions": (__spec__.parent, "providers.config.clients.base"),
-    "CodeChunk": (__spec__.parent, "core.types.embeddings"),
+    "CodeChunk": (__spec__.parent, "core.types.search"),
     "CodeChunkDict": (__spec__.parent, "core.chunks"),
     "CodeMatch": (__spec__.parent, "server.agent_api.find_code.types"),
     "CodeMatchType": (__spec__.parent, "server.agent_api.find_code.conversion"),
@@ -2498,6 +2499,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "SpanGroup": (__spec__.parent, "core.spans"),
     "SpanTuple": (__spec__.parent, "core.spans"),
     "SparseCapabilities": (__spec__.parent, "providers.embedding.capabilities.base"),
+    "SparseEmbedding": (__spec__.parent, "core.types.embeddings"),
     "SparseEmbeddingCapabilityResolver": (
         __spec__.parent,
         "providers.embedding.capabilities.resolver",
@@ -3819,6 +3821,7 @@ __all__ = (
     "SpanTuple",
     "SparseCapabilities",
     "SparseCapabilityResolverDep",
+    "SparseEmbedding",
     "SparseEmbeddingCapabilityResolver",
     "SparseEmbeddingConfigT",
     "SparseEmbeddingModelCapabilities",

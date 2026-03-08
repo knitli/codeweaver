@@ -75,7 +75,7 @@ def cohere_4_capabilities():
 @pytest.fixture
 def mock_cohere_config():
     """Create a config for Cohere embedding provider."""
-    from codeweaver.providers.config.embedding import CohereEmbeddingConfig
+    from codeweaver.providers.config import CohereEmbeddingConfig
 
     return CohereEmbeddingConfig(
         tag="cohere",

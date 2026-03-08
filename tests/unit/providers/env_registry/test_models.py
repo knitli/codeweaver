@@ -163,7 +163,7 @@ class TestProviderEnvConfig:
 
         result = cfg.to_dict()
         assert result["provider"] == "test"
-        assert result["clients"] == ["test_client"]
+        assert result["clients"] == ("test_client",)
         assert result["note"] == "Test provider"
 
     def test_to_dict_with_fields(self) -> None:

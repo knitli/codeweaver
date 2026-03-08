@@ -67,7 +67,7 @@ def voyage_rerank_capabilities():
 @pytest.fixture
 def mock_voyage_rerank_config():
     """Create a config for Voyage reranking provider."""
-    from codeweaver.providers.config.reranking import VoyageRerankingConfig
+    from codeweaver.providers.config import VoyageRerankingConfig
 
     return VoyageRerankingConfig(tag="voyage", provider=Provider.VOYAGE, model_name="rerank-2")
 
@@ -262,7 +262,7 @@ class TestVoyageRerankingProviderReranking:
         mock_voyage_rerank_client.rerank.return_value = mock_response
 
         provider = VoyageRerankingProvider(
-            _provider=Provider.Voyage,
+            _provider=Provider.VOYAGE,
             client=mock_voyage_rerank_client,
             config=mock_voyage_rerank_config,
             caps=voyage_rerank_capabilities,
@@ -322,7 +322,7 @@ class TestVoyageRerankingProviderErrorHandling:
         mock_voyage_rerank_client.rerank.side_effect = Exception("API error")
 
         provider = VoyageRerankingProvider(
-            _provider=Provider.Voyage,
+            _provider=Provider.VOYAGE,
             client=mock_voyage_rerank_client,
             config=mock_voyage_rerank_config,
             caps=voyage_rerank_capabilities,
@@ -342,7 +342,7 @@ class TestVoyageRerankingProviderErrorHandling:
         mock_voyage_rerank_client.rerank.side_effect = ConnectionError("Connection failed")
 
         provider = VoyageRerankingProvider(
-            _provider=Provider.Voyage,
+            _provider=Provider.VOYAGE,
             client=mock_voyage_rerank_client,
             config=mock_voyage_rerank_config,
             caps=voyage_rerank_capabilities,
@@ -363,7 +363,7 @@ class TestVoyageRerankingProviderErrorHandling:
         mock_voyage_rerank_client.rerank.side_effect = TimeoutError("Request timed out")
 
         provider = VoyageRerankingProvider(
-            _provider=Provider.Voyage,
+            _provider=Provider.VOYAGE,
             client=mock_voyage_rerank_client,
             config=mock_voyage_rerank_config,
             caps=voyage_rerank_capabilities,
@@ -385,7 +385,7 @@ class TestVoyageRerankingProviderProperties:
     ):
         """Test that provider property returns correct value."""
         provider = VoyageRerankingProvider(
-            _provider=Provider.Voyage,
+            _provider=Provider.VOYAGE,
             client=mock_voyage_rerank_client,
             config=mock_voyage_rerank_config,
             caps=voyage_rerank_capabilities,
@@ -398,7 +398,7 @@ class TestVoyageRerankingProviderProperties:
     ):
         """Test that model_name property returns correct value."""
         provider = VoyageRerankingProvider(
-            _provider=Provider.Voyage,
+            _provider=Provider.VOYAGE,
             client=mock_voyage_rerank_client,
             config=mock_voyage_rerank_config,
             caps=voyage_rerank_capabilities,
@@ -411,7 +411,7 @@ class TestVoyageRerankingProviderProperties:
     ):
         """Test that model_capabilities property returns correct value."""
         provider = VoyageRerankingProvider(
-            _provider=Provider.Voyage,
+            _provider=Provider.VOYAGE,
             client=mock_voyage_rerank_client,
             config=mock_voyage_rerank_config,
             caps=voyage_rerank_capabilities,
@@ -431,7 +431,7 @@ class TestVoyageRerankingProviderCircuitBreaker:
         mock_voyage_rerank_client.rerank.side_effect = ConnectionError("Connection failed")
 
         provider = VoyageRerankingProvider(
-            _provider=Provider.Voyage,
+            _provider=Provider.VOYAGE,
             client=mock_voyage_rerank_client,
             config=mock_voyage_rerank_config,
             caps=voyage_rerank_capabilities,
@@ -450,7 +450,7 @@ class TestVoyageRerankingProviderCircuitBreaker:
     ):
         """Test that circuit breaker starts in closed state."""
         provider = VoyageRerankingProvider(
-            _provider=Provider.Voyage,
+            _provider=Provider.VOYAGE,
             client=mock_voyage_rerank_client,
             config=mock_voyage_rerank_config,
             caps=voyage_rerank_capabilities,

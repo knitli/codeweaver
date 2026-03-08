@@ -262,4 +262,4 @@ class TestMultiClientProvider:
     def test_empty_list(self) -> None:
         """Test handles empty config list."""
         result = multi_client_provider("azure", [])
-        assert result == []
+        assert result == ()

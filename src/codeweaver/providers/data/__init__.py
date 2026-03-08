@@ -75,7 +75,6 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "ExaSearchResult": (__spec__.parent, "exa"),
     "ExaSearchTool": (__spec__.parent, "exa"),
     "LiteralProviderCategoryType": (__spec__.parent, "utils"),
-    "DataProviderType": (__spec__.parent, "providers"),
     "LiteralProviderType": (__spec__.parent, "providers"),
     "TavilyResults": (__spec__.parent, "tavily"),
     "TavilySearchContextTool": (__spec__.parent, "tavily"),

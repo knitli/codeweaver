@@ -277,8 +277,8 @@ class TestMetadataMigration:
 class TestMetadataVersioning:
     """Test version field behavior across schema versions."""
 
-    def test_default_version_is_v1_3_0(self):
-        """New metadata defaults to v1.3.0."""
+    def test_default_version_is_v1_5_0(self):
+        """New metadata defaults to current schema version."""
         metadata = CollectionMetadata(
             provider="qdrant",
             created_at=datetime.now(UTC),
@@ -287,7 +287,7 @@ class TestMetadataVersioning:
             collection_name="test_collection",
         )
 
-        assert metadata.version == "1.3.0"
+        assert metadata.version == "1.5.0"
 
     def test_preserve_v1_2_0_version_on_load(self):
         """Loading v1.2.0 metadata preserves original version."""

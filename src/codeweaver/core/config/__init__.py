@@ -53,7 +53,12 @@ if TYPE_CHECKING:
         environment_variables,
         get_provider_vars,
     )
-    from codeweaver.core.config.loader import AsyncPath, get_settings, get_settings_async
+    from codeweaver.core.config.loader import (
+        AsyncPath,
+        CodeWeaverSettingsType,
+        get_settings,
+        get_settings_async,
+    )
     from codeweaver.core.config.telemetry import (
         DefaultTelemetrySettings,
         TelemetrySettings,
@@ -68,6 +73,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "AsyncPath": (__spec__.parent, "loader"),
     "BaseCodeWeaverSettingsDict": (__spec__.parent, "types"),
     "CodeWeaverCoreSettings": (__spec__.parent, "core_settings"),
+    "CodeWeaverSettingsType": (__spec__.parent, "loader"),
     "DefaultLoggingSettings": (__spec__.parent, "_logging"),
     "DefaultTelemetrySettings": (__spec__.parent, "telemetry"),
     "FormattersDict": (__spec__.parent, "_logging"),
@@ -106,6 +112,7 @@ __all__ = (
     "AsyncPath",
     "BaseCodeWeaverSettingsDict",
     "CodeWeaverCoreSettings",
+    "CodeWeaverSettingsType",
     "DefaultLoggingSettings",
     "DefaultTelemetrySettings",
     "FiltersDict",
