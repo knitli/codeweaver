@@ -1548,7 +1548,7 @@ def get_categories(provider: LiteralProvider) -> tuple[ProviderCategoryLiteralSt
 
 
 @cache
-def get_providers_for_category(category: LiteralProviderCategory) -> set[ProviderLiteralString]:
+def get_providers_for_category(category: LiteralProviderCategory) -> set[LiteralProvider]:
     """Get all providers that support a given provider category.
 
     Args:

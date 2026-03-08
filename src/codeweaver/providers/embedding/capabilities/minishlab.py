@@ -291,15 +291,6 @@ def get_minishlab_embedding_capabilities() -> tuple[MinishlabEmbeddingCapabiliti
 
 
 __all__ = (
-    "ALL_CAPABILITIES",
-    "CAP_MAP",
-    "MINISHLAB_M2V_BASE_GLOVE_CAPABILITIES",
-    "MINISHLAB_M2V_BASE_GLOVE_SUBWORD_CAPABILITIES",
-    "MINISHLAB_M2V_BASE_OUTPUT_CAPABILITIES",
-    "MINISHLAB_M2V_MULTILINGUAL_OUTPUT_CAPABILITIES",
-    "MINISHLAB_POTION_BASE_2M_CAPABILITIES",
-    "MINISHLAB_POTION_BASE_4M_CAPABILITIES",
-    "MINISHLAB_POTION_BASE_8M_CAPABILITIES",
     "MinishlabEmbeddingCapabilities",
     "MinishlabProvider",
     "get_minishlab_embedding_capabilities",

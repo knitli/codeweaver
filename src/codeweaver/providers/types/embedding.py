@@ -108,7 +108,7 @@ class ConfiguredCapability(NamedTuple):
     async def dimension(self) -> PositiveInt | None:
         """Get the dimensionality of the embedding vectors for this capability."""
         if isinstance(self.capability, SparseEmbeddingModelCapabilities) or isinstance(
-            self.config, SparseEmbeddingProviderSettings
+            self.config, _sparse_settings_type()
         ):
             return None
         default_dimension = self.capability.default_dimension if self.capability else None
@@ -132,6 +132,11 @@ class ConfiguredCapability(NamedTuple):
             raise InvalidEmbeddingModelError(
                 "Invalid embedding model configuration. We weren't able to determine a valid embedding dimension for what looks like a dense embedding model. Please either explicitly provide a dimension in your embedding config, or preferably, provide an EmbeddingModelCapabilities instance/configuration."
             )
+
+        # Ensure we are working with an integer for comparison
+        if not isinstance(configured_dimension, int):
+            configured_dimension = int(configured_dimension) if hasattr(configured_dimension, "__int__") else (default_dimension or 0)
+
         if allowed_values and (max_value := max(allowed_values)):
             configured_dimension = min(max_value, configured_dimension or max_value)
         if allowed_values and configured_dimension not in allowed_values:
@@ -246,6 +251,11 @@ class EmbeddingCapabilityGroup(NamedTuple):
                     "Cannot create vector params: dense embedding model dimension is not configured."
                 )
             datatype = await self.dense.datatype()
+            if not isinstance(datatype, str):
+                datatype = str(datatype) if hasattr(datatype, "__str__") else "float16"
+            if "ModelPrivateAttr" in datatype:
+                datatype = "float16"
+
             distance_metric_name = await self.dense.distance()
 
             # Create proper VectorParams object

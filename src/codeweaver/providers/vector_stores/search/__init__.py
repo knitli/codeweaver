@@ -76,9 +76,12 @@ if TYPE_CHECKING:
     )
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
+    "AnyVariants": (__spec__.parent, "match"),
     "ArbitraryFilter": (__spec__.parent, "filter_factory"),
+    "Condition": (__spec__.parent, "condition"),
     "DatetimeRange": (__spec__.parent, "range"),
     "Entry": (__spec__.parent, "payload"),
+    "ExtendedPointId": (__spec__.parent, "condition"),
     "FieldCondition": (__spec__.parent, "condition"),
     "Filter": (__spec__.parent, "condition"),
     "FilterableField": (__spec__.parent, "condition"),
@@ -91,6 +94,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "HasVectorCondition": (__spec__.parent, "condition"),
     "IsEmptyCondition": (__spec__.parent, "condition"),
     "IsNullCondition": (__spec__.parent, "condition"),
+    "Match": (__spec__.parent, "match"),
     "MatchAny": (__spec__.parent, "match"),
     "MatchExcept": (__spec__.parent, "match"),
     "MatchPhrase": (__spec__.parent, "match"),
@@ -103,7 +107,9 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "PayloadMetadata": (__spec__.parent, "payload"),
     "PayloadSchemaType": (__spec__.parent, "payload"),
     "Range": (__spec__.parent, "range"),
+    "RangeInterface": (__spec__.parent, "range"),
     "ValuesCount": (__spec__.parent, "condition"),
+    "ValueVariants": (__spec__.parent, "match"),
     "make_filter": (__spec__.parent, "filter_factory"),
     "make_indexes": (__spec__.parent, "filter_factory"),
     "make_partial_function": (__spec__.parent, "wrap_filters"),

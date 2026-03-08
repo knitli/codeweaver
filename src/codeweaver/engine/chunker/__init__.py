@@ -101,6 +101,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "GracefulChunker": (__spec__.parent, "selector"),
     "OversizedChunkError": (__spec__.parent, "exceptions"),
     "ParseError": (__spec__.parent, "exceptions"),
+    "PatternKey": (__spec__.parent, "delimiters.families"),
     "ResourceGovernor": (__spec__.parent, "governance"),
     "SemanticChunker": (__spec__.parent, "semantic"),
     "SourceIdRegistry": (__spec__.parent, "registry"),

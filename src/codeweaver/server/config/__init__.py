@@ -106,6 +106,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "get_settings_map": (__spec__.parent, "helpers"),
     "MCPConfig": (__spec__.parent, "mcp"),
     "MCPConfigDict": (__spec__.parent, "types"),
+    "MCPServerConfig": (__spec__.parent, "mcp"),
     "update_mcp_config_file": (__spec__.parent, "mcp"),
     "update_settings": (__spec__.parent, "helpers"),
 })

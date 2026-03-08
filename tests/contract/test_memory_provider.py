@@ -24,10 +24,17 @@ from codeweaver.providers import (
     ConfiguredCapability,
     EmbeddingCapabilityGroup,
     EmbeddingModelCapabilities,
-    EmbeddingProviderSettings,
     MemoryVectorStoreProvider,
     MemoryVectorStoreProviderSettings,
 )
+
+
+# Resolve Pydantic forward references
+MemoryVectorStoreProvider.model_rebuild()
+from codeweaver.core.types import ChunkEmbeddings
+
+
+ChunkEmbeddings.model_rebuild()
 
 
 pytestmark = [pytest.mark.validation]
@@ -46,11 +53,11 @@ def temp_persist_path():
 @pytest.fixture
 async def memory_config(temp_persist_path):
     """Provide test Memory configuration."""
-    from codeweaver.providers.config.categories import QdrantCollectionConfig
+    from codeweaver.providers.config import CollectionConfig
 
     return MemoryVectorStoreProviderSettings(
         provider=Provider.MEMORY,
-        collection=QdrantCollectionConfig(collection_name=f"test_memory_{uuid4().hex[:8]}"),
+        collection=CollectionConfig(collection_name=f"test_memory_{uuid4().hex[:8]}"),
         in_memory_config={
             "persist_path": str(temp_persist_path / "vector_store"),
             "auto_persist": True,
@@ -62,7 +69,7 @@ async def memory_config(temp_persist_path):
 @pytest.fixture
 async def test_embedding_caps():
     """Provide test embedding capabilities with 768 dimensions."""
-    from codeweaver.providers.config.embedding import FastEmbedEmbeddingConfig
+    from codeweaver.providers.config import EmbeddingProviderSettings, FastEmbedEmbeddingConfig
 
     dense_caps = EmbeddingModelCapabilities(
         name="test-dense-model",
@@ -100,7 +107,9 @@ async def memory_provider(memory_config, test_embedding_caps):
         client=client, config=memory_config, caps=test_embedding_caps
     )
     await provider._initialize()
-    return provider
+    yield provider
+    await provider.close()
+
     # Cleanup handled by temp directory
 
 

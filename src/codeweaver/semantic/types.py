@@ -18,15 +18,15 @@ from typing import Annotated, Any, Literal, NamedTuple, TypedDict, cast
 
 from pydantic import ConfigDict, Field, PrivateAttr, SkipValidation, computed_field
 
-from codeweaver.core import (
+from codeweaver.core.language import SemanticSearchLanguage
+from codeweaver.core.types import (
     BasedModel,
     BaseEnum,
     LanguageNameT,
     LiteralStringT,
-    SemanticSearchLanguage,
     generate_field_title,
-    uuid7,
 )
+from codeweaver.core.utils import uuid7
 
 
 class SimpleNodeTypeDTO(TypedDict):

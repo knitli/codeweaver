@@ -135,12 +135,4 @@ def get_nomic_ai_embedding_capabilities() -> tuple[NomicAiEmbeddingCapabilities,
     return tuple(NomicAiEmbeddingCapabilities.model_validate(cap) for cap in capabilities)
 
 
-__all__ = (
-    "ALL_CAPABILITIES",
-    "CAP_MAP",
-    "NOMIC_AI_MODERNBERT_EMBED_BASE_CAPABILITIES",
-    "NOMIC_AI_NOMIC_EMBED_TEXT_V2_MOE_CAPABILITIES",
-    "NomicAiEmbeddingCapabilities",
-    "NomicAiProvider",
-    "get_nomic_ai_embedding_capabilities",
-)
+__all__ = ("NomicAiEmbeddingCapabilities", "NomicAiProvider", "get_nomic_ai_embedding_capabilities")

@@ -25,7 +25,7 @@ from lateimport import create_late_getattr
 
 
 if TYPE_CHECKING:
-    from codeweaver.cli.__main__ import ROOT_PACKAGE
+    from codeweaver.cli.__main__ import ROOT_PACKAGE, app
     from codeweaver.cli.dependencies import setup_cli_di
     from codeweaver.cli.ui.error_handler import CLIErrorHandler
     from codeweaver.cli.ui.status_display import (
@@ -46,6 +46,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "AtomicAwareSeparatorColumn": (__spec__.parent, "ui.status_display"),
     "IndexingProgress": (__spec__.parent, "ui.status_display"),
     "StatusDisplay": (__spec__.parent, "ui.status_display"),
+    "app": (__spec__.parent, "__main__"),
     "check_provider_package_available": (__spec__.parent, "utils"),
     "CLIErrorHandler": (__spec__.parent, "ui.error_handler"),
     "setup_cli_di": (__spec__.parent, "dependencies"),
@@ -62,6 +63,7 @@ __all__ = (
     "CLIErrorHandler",
     "IndexingProgress",
     "StatusDisplay",
+    "app",
     "check_provider_package_available",
     "setup_cli_di",
 )

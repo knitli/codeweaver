@@ -67,6 +67,7 @@ if TYPE_CHECKING:
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "ANTHROPIC_CLIENT_OPTIONS_AGENT_DISCRIMINATOR": (__spec__.parent, "utils"),
+    "AnthropicAgentClientOptionsType": (__spec__.parent, "agent"),
     "AnthropicAzureClientOptions": (__spec__.parent, "agent"),
     "AnthropicBedrockClientOptions": (__spec__.parent, "agent"),
     "AnthropicClientOptions": (__spec__.parent, "agent"),
@@ -78,6 +79,10 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "DuckDuckGoClientOptions": (__spec__.parent, "data"),
     "ExaClientOptions": (__spec__.parent, "data"),
     "FastEmbedClientOptions": (__spec__.parent, "multi"),
+    "GeneralAgentClientOptionsType": (__spec__.parent, "agent"),
+    "GeneralDataClientOptionsType": (__spec__.parent, "data"),
+    "GeneralEmbeddingClientOptionsType": (__spec__.parent, "multi"),
+    "GeneralRerankingClientOptionsType": (__spec__.parent, "multi"),
     "GoogleClientOptions": (__spec__.parent, "multi"),
     "GroqClientOptions": (__spec__.parent, "agent"),
     "GrpcParams": (__spec__.parent, "vector_store"),
@@ -87,6 +92,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "QdrantClientOptions": (__spec__.parent, "vector_store"),
     "SentenceTransformersClientOptions": (__spec__.parent, "multi"),
     "SentenceTransformersModelOptions": (__spec__.parent, "multi"),
+    "SimpleAgentClientOptionsType": (__spec__.parent, "agent"),
     "TavilyClientOptions": (__spec__.parent, "data"),
     "VoyageClientOptions": (__spec__.parent, "multi"),
     "discriminate_anthropic_agent_client_options": (__spec__.parent, "agent"),

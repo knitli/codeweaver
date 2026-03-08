@@ -183,12 +183,6 @@ def get_ibm_granite_embedding_capabilities() -> tuple[IbmGraniteEmbeddingCapabil
 
 
 __all__ = (
-    "ALL_CAPABILITIES",
-    "CAP_MAP",
-    "GRANITE_EMBEDDING_30M_CAPABILITIES",
-    "GRANITE_EMBEDDING_278M_CAPABILITIES",
-    "GRANITE_EMBEDDING_ENGLISH_R2_CAPABILITIES",
-    "GRANITE_EMBEDDING_SMALL_ENGLISH_R2_CAPABILITIES",
     "IbmGraniteEmbeddingCapabilities",
     "IbmGraniteProvider",
     "get_ibm_granite_embedding_capabilities",

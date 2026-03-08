@@ -49,6 +49,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "DefaultFilter": (__spec__.parent, "watch_filters"),
     "DocsFilter": (__spec__.parent, "watch_filters"),
     "ExtensionFilter": (__spec__.parent, "watch_filters"),
+    "FileChange": (__spec__.parent, "types"),
     "IgnoreFilter": (__spec__.parent, "watch_filters"),
     "WatchfilesArgs": (__spec__.parent, "types"),
     "WatchfilesLogManager": (__spec__.parent, "_logging"),

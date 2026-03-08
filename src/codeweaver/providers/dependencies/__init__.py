@@ -96,7 +96,41 @@ if TYPE_CHECKING:
         EmbeddingRegistryDep,
     )
 
-_dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({})
+_dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
+    "AgentCapabilityResolverDep": (__spec__.parent, "capabilities"),
+    "AgentProviderDep": (__spec__.parent, "providers"),
+    "AgentProviderSettingsDep": (__spec__.parent, "config"),
+    "AllAgentProviderConfigsDep": (__spec__.parent, "config"),
+    "AllDataProviderConfigsDep": (__spec__.parent, "config"),
+    "AllEmbeddingConfigsDep": (__spec__.parent, "config"),
+    "AllRerankingConfigsDep": (__spec__.parent, "config"),
+    "AllSparseEmbeddingConfigsDep": (__spec__.parent, "config"),
+    "AllVectorStoreConfigsDep": (__spec__.parent, "config"),
+    "ConfiguredCapabilitiesDep": (__spec__.parent, "capabilities"),
+    "DataProvidersDep": (__spec__.parent, "providers"),
+    "DataProviderSettingsDep": (__spec__.parent, "config"),
+    "EmbeddingCacheManagerDep": (__spec__.parent, "services"),
+    "EmbeddingCapabilityGroupDep": (__spec__.parent, "capabilities"),
+    "EmbeddingCapabilityResolverDep": (__spec__.parent, "capabilities"),
+    "EmbeddingProvidersDep": (__spec__.parent, "providers"),
+    "EmbeddingProviderSettingsDep": (__spec__.parent, "config"),
+    "EmbeddingRegistryDep": (__spec__.parent, "services"),
+    "PrimaryEmbeddingProviderDep": (__spec__.parent, "providers"),
+    "PrimarySparseEmbeddingProviderDep": (__spec__.parent, "providers"),
+    "PrimaryVectorStoreProviderDep": (__spec__.parent, "providers"),
+    "ProviderSettingsDep": (__spec__.parent, "config"),
+    "QueryEmbeddingProviderDep": (__spec__.parent, "providers"),
+    "RerankingCapabilityResolverDep": (__spec__.parent, "capabilities"),
+    "RerankingProvidersDep": (__spec__.parent, "providers"),
+    "RerankingProviderSettingsDep": (__spec__.parent, "config"),
+    "SearchPackageDep": (__spec__.parent, "providers"),
+    "SparseCapabilityResolverDep": (__spec__.parent, "capabilities"),
+    "SparseEmbeddingProvidersDep": (__spec__.parent, "providers"),
+    "SparseEmbeddingProviderSettingsDep": (__spec__.parent, "config"),
+    "TokenizerDep": (__spec__.parent, "capabilities"),
+    "VectorStoreProvidersDep": (__spec__.parent, "providers"),
+    "VectorStoreProviderSettingsDep": (__spec__.parent, "config"),
+})
 
 __getattr__ = create_late_getattr(_dynamic_imports, globals(), __name__)
 

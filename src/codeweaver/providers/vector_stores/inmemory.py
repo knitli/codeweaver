@@ -134,10 +134,13 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
         # Atomic persistence via temporary directory
         persist_path = AsyncPath(str(self.persist_path))
         temp_path = persist_path.with_suffix(".tmp")
-        if temp_path.exists():
+        if await temp_path.exists():
             import shutil
 
-            await asyncio.to_thread(shutil.rmtree, str(temp_path))
+            if await temp_path.is_dir():
+                await asyncio.to_thread(shutil.rmtree, str(temp_path))
+            else:
+                await temp_path.unlink()
 
         try:
             # Initialize persistent client at temp path
@@ -152,18 +155,23 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
 
             # Atomic replace
             if await temp_path.exists():
-                import shutil
+                if await persist_path.exists():
+                    import shutil
 
-                if await temp_path.is_dir():
-                    await asyncio.to_thread(shutil.rmtree, str(self.persist_path))
-                else:
-                    await persist_path.unlink()
+                    if await persist_path.is_dir():
+                        await asyncio.to_thread(shutil.rmtree, str(self.persist_path))
+                    else:
+                        await persist_path.unlink()
 
-            await temp_path.rename(str(self.persist_path))
+                await temp_path.rename(str(self.persist_path))
         except Exception as e:
             if await temp_path.exists():
                 import shutil
-            await asyncio.to_thread(shutil.rmtree, str(temp_path))
+
+                if await temp_path.is_dir():
+                    await asyncio.to_thread(shutil.rmtree, str(temp_path))
+                else:
+                    await temp_path.unlink()
             raise PersistenceError(f"Failed to persist to disk: {e}") from e
 
     async def _restore_from_disk(self) -> None:
@@ -208,13 +216,6 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
         if not self.client:
             return
 
-        # check if we are in a test environment
-        from codeweaver.core import is_test_environment
-
-        if is_test_environment():
-            # In tests, we don't close the shared client as it's used by multiple tests
-            return
-
         # Shutdown sequence
         self._shutdown = True
 
@@ -224,6 +225,14 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
             cast(asyncio.Task, self._periodic_task).cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await cast(asyncio.Task, self._periodic_task)
+
+        # check if we are in a test environment
+        from codeweaver.core import is_test_environment
+
+        if is_test_environment():
+            # In tests, we don't close the shared client or do final persistence
+            # because the temp directory might already be gone
+            return
 
         # Final persistence
         try:

@@ -106,10 +106,6 @@ def get_thenlper_embedding_capabilities() -> tuple[ThenlperEmbeddingCapabilities
 
 
 __all__ = (
-    "ALL_CAPABILITIES",
-    "CAP_MAP",
-    "THENLPER_GTE_BASE_CAPABILITIES",
-    "THENLPER_GTE_LARGE_CAPABILITIES",
     "ThenlperEmbeddingCapabilities",
     "ThenlperProvider",
     "get_thenlper_embedding_capabilities",

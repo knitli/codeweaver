@@ -63,7 +63,9 @@ if TYPE_CHECKING:
     )
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
+    "DataProviderType": (__spec__.parent, "providers"),
     "DdgsResultItem": (__spec__.parent, "duckduckgo"),
+    "DdgsResults": (__spec__.parent, "duckduckgo"),
     "DuckDuckGoSearchTool": (__spec__.parent, "duckduckgo"),
     "ExaAnswerResult": (__spec__.parent, "exa"),
     "ExaAnswerTool": (__spec__.parent, "exa"),
@@ -72,6 +74,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "ExaGetContentsTool": (__spec__.parent, "exa"),
     "ExaSearchResult": (__spec__.parent, "exa"),
     "ExaSearchTool": (__spec__.parent, "exa"),
+    "ExaToolType": (__spec__.parent, "exa"),
     "TavilyResults": (__spec__.parent, "tavily"),
     "TavilySearchContextTool": (__spec__.parent, "tavily"),
     "TavilySearchResult": (__spec__.parent, "tavily"),

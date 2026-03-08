@@ -10,12 +10,12 @@ from unittest.mock import Mock
 
 import pytest
 
-from codeweaver.core import CodeChunk, EmbeddingBatchInfo
+from codeweaver.core import CodeChunk, DelimiterPattern, EmbeddingBatchInfo, LanguageFamily
 
 # Rebuild models to resolve forward references
 # This must happen after all imports to ensure all referenced types are available
 # Import types needed for forward reference resolution
-from codeweaver.engine import ChunkGovernor, DelimiterPattern, LanguageFamily, ResourceGovernor
+from codeweaver.engine import ChunkGovernor, ResourceGovernor
 from codeweaver.engine.config import ChunkerSettings, PerformanceSettings
 from codeweaver.providers import EmbeddingModelCapabilities
 

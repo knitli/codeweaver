@@ -26,6 +26,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from codeweaver.core import Provider
+from codeweaver.core.config.loader import CodeWeaverSettingsType
 from codeweaver.providers import CircuitBreakerOpenError, CircuitBreakerState, EmbeddingProvider
 
 
@@ -307,17 +308,16 @@ async def test_indexing_continues_on_file_errors(
     Then: Successfully discovers and processes the 2 Python files
     """
     from codeweaver.engine import IndexingService
-    from codeweaver.server import CodeWeaverSettings
 
     # Configure settings for this test
-    async def get_test_settings() -> CodeWeaverSettings:
+    async def get_test_settings() -> CodeWeaverSettingsType:
         from codeweaver.server.config.helpers import get_settings
 
         settings = get_settings()
         settings.project_path = test_project_path
         return settings
 
-    overrides = {CodeWeaverSettings: get_test_settings}
+    overrides = {CodeWeaverSettingsType: get_test_settings}
 
     with clean_container.use_overrides(overrides):
         # Resolve Indexer via DI
@@ -359,7 +359,6 @@ async def test_warning_at_25_errors(initialize_test_settings, tmp_path: Path, cl
     Then: Warning displayed to stderr
     """
     from codeweaver.engine import IndexingService
-    from codeweaver.server import CodeWeaverSettings
 
     # Create project with many corrupted files
     project_root = tmp_path / "error_project"
@@ -374,14 +373,14 @@ async def test_warning_at_25_errors(initialize_test_settings, tmp_path: Path, cl
     (project_root / "good2.py").write_text("def hello(): pass")
 
     # Configure settings for this test
-    async def get_test_settings() -> CodeWeaverSettings:
+    async def get_test_settings() -> CodeWeaverSettingsType:
         from codeweaver.server.config.helpers import get_settings
 
         settings = get_settings()
         settings.project_path = project_root
         return settings
 
-    clean_container.override(CodeWeaverSettings, get_test_settings)
+    clean_container.override(CodeWeaverSettingsType, get_test_settings)
 
     # Resolve Indexer via DI
     indexer = await clean_container.resolve(IndexingService)
@@ -544,20 +543,19 @@ async def test_graceful_shutdown_with_checkpoint(
     # Create test project
 
     from codeweaver.engine import CheckpointManager, IndexingService
-    from codeweaver.server import CodeWeaverSettings
 
     project_root = tmp_path / "test_project"
     (project_root / "test.py").write_text("def test(): pass")
 
     # Configure settings for this test
-    async def get_test_settings() -> CodeWeaverSettings:
+    async def get_test_settings() -> CodeWeaverSettingsType:
         from codeweaver.server.config.helpers import get_settings
 
         settings = get_settings()
         settings.project_path = project_root
         return settings
 
-    clean_container.override(CodeWeaverSettings, get_test_settings)
+    clean_container.override(CodeWeaverSettingsType, get_test_settings)
 
     # Resolve Indexer via DI
     indexer = await clean_container.resolve(IndexingService)
@@ -633,7 +631,6 @@ async def test_error_logging_structured(clean_container):
         import tempfile
 
         from codeweaver.engine import IndexingService
-        from codeweaver.server import CodeWeaverSettings
 
         with tempfile.TemporaryDirectory() as tmpdir:
             test_path = Path(tmpdir)
@@ -642,14 +639,14 @@ async def test_error_logging_structured(clean_container):
             corrupt_file.write_bytes(b"\xff\xfe" * 100)  # Invalid UTF-8
 
             # Configure settings for this test
-            async def get_test_settings() -> CodeWeaverSettings:
+            async def get_test_settings() -> CodeWeaverSettingsType:
                 from codeweaver.server.config.helpers import get_settings
 
                 settings = get_settings()
                 settings.project_path = test_path
                 return settings
 
-            clean_container.override(CodeWeaverSettings, get_test_settings)
+            clean_container.override(CodeWeaverSettingsType, get_test_settings)
 
             # Resolve Indexer via DI
             indexer = await clean_container.resolve(IndexingService)

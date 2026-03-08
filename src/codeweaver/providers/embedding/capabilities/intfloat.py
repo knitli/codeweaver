@@ -139,10 +139,6 @@ def get_intfloat_embedding_capabilities() -> tuple[IntfloatEmbeddingCapabilities
 
 
 __all__ = (
-    "ALL_CAPABILITIES",
-    "CAP_MAP",
-    "INTFLOAT_MULTILINGUAL_E5_LARGE_CAPABILITIES",
-    "INTFLOAT_MULTILINGUAL_E5_LARGE_INSTRUCT_CAPABILITIES",
     "IntfloatEmbeddingCapabilities",
     "IntfloatProvider",
     "get_intfloat_embedding_capabilities",

@@ -24,10 +24,10 @@ import pytest
 from watchfiles.main import Change
 
 from codeweaver.core import get_container
-from codeweaver.engine import IndexingService
 
 # TODO: Update to use DI system for settings reset (container.override pattern)
-from codeweaver.server import CodeWeaverSettings  # , reset_settings
+from codeweaver.core.config.settings_type import CodeWeaverSettingsType  # , reset_settings
+from codeweaver.engine import IndexingService
 
 
 # Mark all tests in this module as skipped until reset_settings is replaced with DI
@@ -142,7 +142,7 @@ async def indexer(test_project_path: Path, clean_container) -> IndexingService:
     from codeweaver.server.config.helpers import get_settings, reset_settings
 
     # Define a factory that returns settings with the test project path
-    async def get_test_settings() -> CodeWeaverSettings:
+    async def get_test_settings() -> CodeWeaverSettingsType:
         # Get fresh settings instance
 
         reset_settings()
@@ -153,7 +153,7 @@ async def indexer(test_project_path: Path, clean_container) -> IndexingService:
         return settings
 
     # Override CodeWeaverSettings in the container
-    clean_container.override(CodeWeaverSettings, get_test_settings)
+    clean_container.override(CodeWeaverSettingsType, get_test_settings)
 
     # Resolve indexer from container - this will now use the overridden settings
     # and properly initialize all dependencies (chunking_service, etc.)
@@ -284,13 +284,13 @@ async def test_indexing_error_recovery(test_project_path: Path):
     reset_settings()
     container = get_container()
 
-    async def get_test_settings() -> CodeWeaverSettings:
+    async def get_test_settings() -> CodeWeaverSettingsType:
         settings = get_settings()
         settings.project_path = test_project_path
         settings.project_name = f"test_project_recovery_{test_project_path.name}"
         return settings
 
-    container.override(CodeWeaverSettings, get_test_settings)
+    container.override(CodeWeaverSettingsType, get_test_settings)
     indexer = await container.resolve(IndexingService)
 
     # Run indexing

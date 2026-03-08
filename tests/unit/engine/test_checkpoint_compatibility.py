@@ -12,7 +12,6 @@ an existing index can be reused when configuration changes.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -29,10 +28,6 @@ from codeweaver.providers.config.categories import (
     EmbeddingProviderSettings,
 )
 from codeweaver.providers.embedding.capabilities.base import EmbeddingModelCapabilities, ModelFamily
-
-
-if TYPE_CHECKING:
-    pass
 
 
 # ===========================================================================

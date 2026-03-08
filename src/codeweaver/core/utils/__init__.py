@@ -156,6 +156,8 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "NORMALIZE_FORM": (__spec__.parent, "text"),
     "POSSIBLE_PROMPT_INJECTS": (__spec__.parent, "text"),
     "REMOVE_ID": (__spec__.parent, "text"),
+    "DictInputTypesT": (__spec__.parent, "general"),
+    "DictOutputTypesT": (__spec__.parent, "general"),
     "TypeIs": (__spec__.parent, "checks"),
     "asyncio_or_uvloop": (__spec__.parent, "procs"),
     "clean_args": (__spec__.parent, "introspect"),

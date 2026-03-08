@@ -77,9 +77,12 @@ if TYPE_CHECKING:
     )
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
+    "AnyVariants": (__spec__.parent, "search.match"),
     "ArbitraryFilter": (__spec__.parent, "search.filter_factory"),
+    "Condition": (__spec__.parent, "search.condition"),
     "DatetimeRange": (__spec__.parent, "search.range"),
     "Entry": (__spec__.parent, "search.payload"),
+    "ExtendedPointId": (__spec__.parent, "search.condition"),
     "FieldCondition": (__spec__.parent, "search.condition"),
     "Filter": (__spec__.parent, "search.condition"),
     "FilterableField": (__spec__.parent, "search.condition"),
@@ -92,6 +95,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "HasVectorCondition": (__spec__.parent, "search.condition"),
     "IsEmptyCondition": (__spec__.parent, "search.condition"),
     "IsNullCondition": (__spec__.parent, "search.condition"),
+    "Match": (__spec__.parent, "search.match"),
     "MatchAny": (__spec__.parent, "search.match"),
     "MatchExcept": (__spec__.parent, "search.match"),
     "MatchPhrase": (__spec__.parent, "search.match"),
@@ -99,6 +103,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "MatchValue": (__spec__.parent, "search.match"),
     "MemoryVectorStoreProvider": (__spec__.parent, "inmemory"),
     "MinShould": (__spec__.parent, "search.condition"),
+    "MixedQueryInput": (__spec__.parent, "base"),
     "Nested": (__spec__.parent, "search.condition"),
     "NestedCondition": (__spec__.parent, "search.condition"),
     "PayloadField": (__spec__.parent, "search.payload"),
@@ -108,7 +113,9 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "QdrantVectorStoreProvider": (__spec__.parent, "qdrant"),
     "QdrantVectorStoreService": (__spec__.parent, "qdrant_service"),
     "Range": (__spec__.parent, "search.range"),
+    "RangeInterface": (__spec__.parent, "search.range"),
     "ValuesCount": (__spec__.parent, "search.condition"),
+    "ValueVariants": (__spec__.parent, "search.match"),
     "VectorStoreProvider": (__spec__.parent, "base"),
     "create_qdrant_service": (__spec__.parent, "qdrant_service"),
     "make_filter": (__spec__.parent, "search.filter_factory"),

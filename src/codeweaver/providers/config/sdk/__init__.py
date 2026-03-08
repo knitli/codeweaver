@@ -91,11 +91,16 @@ if TYPE_CHECKING:
         SentenceTransformersSparseEmbeddingConfig,
         SparseEmbeddingConfigT,
     )
-    from codeweaver.providers.config.sdk.vector_store import CollectionConfig, get_embedding_group
+    from codeweaver.providers.config.sdk.vector_store import (
+        CollectionConfig,
+        QdrantCollectionConfig,
+        get_embedding_group,
+    )
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "INCOMPATIBLE_FIELDS": (__spec__.parent, "embedding"),
     "AgentModelConfig": (__spec__.parent, "agent"),
+    "AgentModelConfigT": (__spec__.parent, "agent"),
     "BaseEmbeddingConfig": (__spec__.parent, "embedding"),
     "BaseRerankingConfig": (__spec__.parent, "reranking"),
     "BaseSparseEmbeddingConfig": (__spec__.parent, "sparse_embedding"),
@@ -103,6 +108,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "BedrockCohereConfigDict": (__spec__.parent, "embedding"),
     "BedrockEmbeddingConfig": (__spec__.parent, "embedding"),
     "BedrockEmbeddingRequestParams": (__spec__.parent, "embedding"),
+    "BedrockModelConfig": (__spec__.parent, "embedding"),
     "BedrockRerankingConfig": (__spec__.parent, "reranking"),
     "BedrockRerankingModelConfig": (__spec__.parent, "reranking"),
     "BedrockRerankingOptionsDict": (__spec__.parent, "reranking"),
@@ -113,6 +119,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "CohereRerankingConfig": (__spec__.parent, "reranking"),
     "CohereRerankingOptionsDict": (__spec__.parent, "reranking"),
     "CollectionConfig": (__spec__.parent, "vector_store"),
+    "DataToolConfigT": (__spec__.parent, "data"),
     "DuckDuckGoSearchToolConfig": (__spec__.parent, "data"),
     "EmbeddingConfigT": (__spec__.parent, "embedding"),
     "EmbeddingMixin": (__spec__.parent, "embedding"),
@@ -132,6 +139,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "HuggingFaceEmbeddingOptionsDict": (__spec__.parent, "embedding"),
     "MistralEmbeddingConfig": (__spec__.parent, "embedding"),
     "MistralEmbeddingOptionsDict": (__spec__.parent, "embedding"),
+    "QdrantCollectionConfig": (__spec__.parent, "vector_store"),
     "RerankingConfigT": (__spec__.parent, "reranking"),
     "SentenceTransformersEmbeddingConfig": (__spec__.parent, "embedding"),
     "SentenceTransformersEncodeDict": (__spec__.parent, "embedding"),
@@ -197,6 +205,7 @@ __all__ = (
     "MistralEmbeddingOptionsDict",
     "OpenAIEmbeddingConfig",
     "OpenAIEmbeddingRequestParams",
+    "QdrantCollectionConfig",
     "RerankingConfigT",
     "SentenceTransformersEmbeddingConfig",
     "SentenceTransformersEncodeDict",

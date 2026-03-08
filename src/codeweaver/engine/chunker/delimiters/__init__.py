@@ -321,6 +321,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "TUPLE_PATTERN": (__spec__.parent, "patterns"),
     "TYPE_ALIAS_PATTERN": (__spec__.parent, "patterns"),
     "WHITESPACE_PATTERN": (__spec__.parent, "patterns"),
+    "PatternKey": (__spec__.parent, "families"),
     "defined_languages": (__spec__.parent, "families"),
     "detect_family_characteristics": (__spec__.parent, "families"),
     "detect_language_family": (__spec__.parent, "families"),

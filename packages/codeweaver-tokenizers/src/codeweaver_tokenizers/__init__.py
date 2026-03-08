@@ -63,20 +63,11 @@ from lateimport import create_late_getattr
 if TYPE_CHECKING:
     from codeweaver_tokenizers.base import (
         EncoderName,
-        Tokenizer,
-    )
-    from codeweaver_tokenizers.tiktoken import (
-        TiktokenTokenizer,
-    )
-    from codeweaver_tokenizers.tokenizers import (
-        Tokenizers,
     )
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType(
     {
-        "TiktokenTokenizer": (__spec__.parent, "tiktoken"),
-        "Tokenizer": (__spec__.parent, "base"),
-        "Tokenizers": (__spec__.parent, "tokenizers"),
+        "EncoderName": (__spec__.parent, "base"),
     }
 )
 

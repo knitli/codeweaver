@@ -61,7 +61,8 @@ class ProviderCategory(BaseEnum):
 
         if self == ProviderCategory.UNSET:
             return tuple(Provider)
-        return tuple(type(self).from_string(cat) for cat in get_providers_for_category(self))
+        # get_providers_for_category returns a set of Provider objects
+        return tuple(sorted(get_providers_for_category(self)))
 
 
 def get_default_provider_import_for_category(

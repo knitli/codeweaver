@@ -422,8 +422,6 @@ def get_sparse_caps() -> tuple[SparseCapabilities, ...]:
 
 
 __all__ = (
-    "HAS_FASTEMBED",
-    "HAS_ST",
     "EmbeddingModelCapabilities",
     "ModelFamily",
     "SparseCapabilities",

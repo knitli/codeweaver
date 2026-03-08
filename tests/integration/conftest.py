@@ -86,7 +86,7 @@ def _set_settings() -> DictView[CodeWeaverSettingsDict]:
 
     # Just return the settings map - config system already loaded codeweaver.test.toml
     # because CODEWEAVER_TEST_MODE="true" (set at top of this file)
-    return get_settings().view()
+    return get_settings().view()  # ty:ignore[invalid-return-type]
 
 
 _settings: DictView[CodeWeaverSettingsDict] = _set_settings()
@@ -1025,14 +1025,15 @@ async def indexed_test_project(known_test_codebase, clean_container):
     5. Yields the project path for tests
     """
     from codeweaver.core.config.loader import get_settings_async
+    from codeweaver.core.config.settings_type import CodeWeaverSettingsType
     from codeweaver.engine import IndexingService
-    from codeweaver.server import CodeWeaverSettings, CodeWeaverState
+    from codeweaver.server import CodeWeaverState
 
     # Ensure known_test_codebase is absolute
     project_path = known_test_codebase.resolve()
 
     # Define a factory that returns settings with the test project path
-    async def get_test_settings() -> CodeWeaverSettings:
+    async def get_test_settings() -> CodeWeaverSettingsType:
         # codeweaver.test.toml is already loaded via CODEWEAVER_TEST_MODE="true"
         settings = await get_settings_async()
         settings.project_path = project_path
@@ -1041,7 +1042,7 @@ async def indexed_test_project(known_test_codebase, clean_container):
         return settings
 
     # Apply overrides to container
-    clean_container.override(CodeWeaverSettings, get_test_settings)
+    clean_container.override(CodeWeaverSettingsType, get_test_settings)
 
     # Resolve state via container to ensure it's initialized with correct settings
     state = await clean_container.resolve(CodeWeaverState)

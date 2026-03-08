@@ -21,7 +21,8 @@ from pathlib import Path
 
 import pytest
 
-from codeweaver.engine import ChunkGovernor, DelimiterChunker, DelimiterKind
+from codeweaver.core.types import DelimiterKind
+from codeweaver.engine import ChunkGovernor, DelimiterChunker
 
 
 pytestmark = [pytest.mark.unit]

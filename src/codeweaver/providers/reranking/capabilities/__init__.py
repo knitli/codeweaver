@@ -74,6 +74,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "JinaaiRerankingCapabilities": (__spec__.parent, "jinaai"),
     "MixedBreadAiRerankingCapabilities": (__spec__.parent, "mixed_bread_ai"),
     "MsMarcoRerankingCapabilities": (__spec__.parent, "ms_marco"),
+    "PartialRerankingCapabilitiesDict": (__spec__.parent, "types"),
     "QwenRerankingCapabilities": (__spec__.parent, "qwen"),
     "RerankingCapabilitiesDict": (__spec__.parent, "types"),
     "RerankingCapabilityResolver": (__spec__.parent, "resolver"),

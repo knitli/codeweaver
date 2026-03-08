@@ -108,4 +108,4 @@ class CollectionConfig(BasedModel):
         )
 
 
-__all__ = ("CollectionConfig", "get_embedding_group")
+__all__ = ("CollectionConfig", "QdrantCollectionConfig", "get_embedding_group")

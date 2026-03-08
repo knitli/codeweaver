@@ -53,7 +53,11 @@ if TYPE_CHECKING:
         environment_variables,
         get_provider_vars,
     )
-    from codeweaver.core.config.loader import get_settings, get_settings_async
+    from codeweaver.core.config.loader import (
+        CodeWeaverSettingsType,
+        get_settings,
+        get_settings_async,
+    )
     from codeweaver.core.config.telemetry import (
         DefaultTelemetrySettings,
         TelemetrySettings,
@@ -67,14 +71,17 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "SUPPORTED_CONFIG_FILE_EXTENSIONS": (__spec__.parent, "core_settings"),
     "BaseCodeWeaverSettingsDict": (__spec__.parent, "types"),
     "CodeWeaverCoreSettings": (__spec__.parent, "core_settings"),
+    "CodeWeaverSettingsType": (__spec__.parent, "loader"),
     "DefaultLoggingSettings": (__spec__.parent, "_logging"),
     "DefaultTelemetrySettings": (__spec__.parent, "telemetry"),
+    "FiltersDict": (__spec__.parent, "_logging"),
     "FormattersDict": (__spec__.parent, "_logging"),
     "HandlersDict": (__spec__.parent, "_logging"),
     "LoggerName": (__spec__.parent, "_logging"),
     "LoggersDict": (__spec__.parent, "_logging"),
     "LoggingConfigDict": (__spec__.parent, "_logging"),
     "LoggingSettingsDict": (__spec__.parent, "_logging"),
+    "ProviderKey": (__spec__.parent, "envs"),
     "SerializableLoggingFilter": (__spec__.parent, "_logging"),
     "SetProviderEnvVarsDict": (__spec__.parent, "envs"),
     "SettingsEnvVars": (__spec__.parent, "envs"),
@@ -104,6 +111,7 @@ __all__ = (
     "SUPPORTED_CONFIG_FILE_EXTENSIONS",
     "BaseCodeWeaverSettingsDict",
     "CodeWeaverCoreSettings",
+    "CodeWeaverSettingsType",
     "DefaultLoggingSettings",
     "DefaultTelemetrySettings",
     "FilterID",

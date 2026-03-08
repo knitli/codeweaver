@@ -156,6 +156,16 @@ rules:
         - name_exact: main
     action: exclude
 
+  - name: IncludeCLIApp
+    priority: 956
+    description: Include CLI app classes for visibility in public API
+    match:
+      all_of:
+        - module_pattern: .*\.cli(\.__main__)?$
+        - name_exact: app
+    action: include
+    propagate: parent
+
   - name: ExcludeCLICommands
     priority: 955
     description: Exclude CLI commands from exports
@@ -163,10 +173,10 @@ rules:
       module_pattern: .*\.cli\.commands(\..*)?$
     action: exclude
   # ===================================================================
-  # Priority 950: Import and Variable Exclusions
+  # Priority 250: Import and Variable Exclusions
   # ===================================================================
   - name: ExcludeNonAliasedImports
-    priority: 950
+    priority: 250
     description: >-
       Exclude non-aliased imported symbols from re-export. When a symbol is
       imported without an alias (e.g. `from .models import BasedModel`), it is
@@ -187,15 +197,6 @@ rules:
     action: include
     propagate: root
 
-  - name: ExportPublicVariables
-    priority: 910
-    description: Exclude public variables (snake_case module-level assignments)
-    match:
-      member_type: variable
-      name_pattern: ^[a-z0-9_]+$
-    action: exclude
-    propagate: none
-
   # ===================================================================
   # Priority 900: Special component exclusions
   # Prevent self-referential or infrastructure issues
@@ -208,6 +209,15 @@ rules:
         - name_pattern: ^lateimport$|^LateImport$|^create_late_getattr$
         - module_pattern: .*\.lateimport\..*
         - module_pattern: .*\.lateimport$
+    action: exclude
+
+  - name: ExcludeCapabilitiesConstants
+    priority: 900
+    description: Never lazily export capabilities constants (prevents circular dependency)
+    match:
+      all_of:
+        - member_type: constant
+        - module_pattern: .*\.capabilities\..*
     action: exclude
 
   # ===================================================================
@@ -228,7 +238,9 @@ rules:
     priority: 800
     description: Skip functions marked as development-only
     match:
-      name_pattern: ^dev_.*
+      all_of:
+        - member_type: function
+        - name_pattern: ^dev_.*
     action: exclude
 
   # ===================================================================
@@ -285,8 +297,18 @@ rules:
     description: Include Pydantic AI imports (core part of public API)
     match:
       all_of:
-        - module_pattern: .*providers\.config\.sdk\.agent$
+        - module_pattern: .*providers\.config(\.sdk(\.agent)?)?$
         - name_pattern: ^.*AgentModelConfig$
+    action: include
+    propagate: root
+
+  - name: IncludeAllProviderTypes
+    priority: 425
+    description: Include all provider-related types for visibility in public API
+    match:
+      all_of:
+        - module_pattern: .*providers\.config.*$
+        - name_pattern: ^[A-Z][A-Za-z0-9_]*(T(ype)?|Settings|Config)$
     action: include
     propagate: root
 
@@ -295,8 +317,8 @@ rules:
     description: Include special type constants for visibility in public API
     match:
       all_of:
-        - module_pattern: .*core\.types\..*$
-        - name_pattern: ^(UNSET|MISSING|BASEDMODEL_CONFIG|FROZEN_BASEDMODEL_CONFIG|LANGUAGE_TO_FAMILY)$
+        - module_pattern: .*core\.types(\..*)?$
+        - name_pattern: ^(UNSET|MISSING|DATACLASS_CONFIG|BASEDMODEL_CONFIG|FROZEN_BASEDMODEL_CONFIG|LANGUAGE_TO_FAMILY)$
     action: include
     propagate: root
 
@@ -504,6 +526,15 @@ rules:
         - name_pattern: ^[a-z0-9_]+$ # only snake_case public functions
     action: include
     propagate: parent
+
+  - name: ExportPublicVariables
+    priority: 200
+    description: Exclude public variables (snake_case module-level assignments)
+    match:
+      member_type: variable
+      name_pattern: ^[a-z0-9_]+$
+    action: exclude
+    propagate: none
 
   # ===================================================================
   # Priority 0: Default fallback behaviors

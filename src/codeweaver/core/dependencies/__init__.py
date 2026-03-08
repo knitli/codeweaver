@@ -35,6 +35,7 @@ if TYPE_CHECKING:
         TelemetrySettingsDep,
     )
     from codeweaver.core.dependencies.core_settings import (
+        CodeWeaverSettingsType,
         SettingsDep,
         SettingsMapDep,
         bootstrap_settings,
@@ -44,21 +45,31 @@ if TYPE_CHECKING:
         StatisticsDep,
         TelemetryServiceDep,
     )
-    from codeweaver.core.dependencies.utils import (
-        ensure_container_initialized,
-        ensure_settings_initialized,
-    )
+    from codeweaver.core.dependencies.utils import ensure_settings_initialized
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
+    "CodeWeaverSettingsType": (__spec__.parent, "core_settings"),
+    "LoggerDep": (__spec__.parent, "component_settings"),
+    "LoggingSettingsDep": (__spec__.parent, "component_settings"),
+    "ProgressReporterDep": (__spec__.parent, "services"),
+    "ResolvedGitBranchDep": (__spec__.parent, "component_settings"),
+    "ResolvedProjectNameDep": (__spec__.parent, "component_settings"),
+    "ResolvedProjectPathDep": (__spec__.parent, "component_settings"),
+    "ResolvedProjectPathHashDep": (__spec__.parent, "component_settings"),
+    "ServiceCardsDep": (__spec__.parent, "component_settings"),
     "SettingsDep": (__spec__.parent, "core_settings"),
+    "SettingsMapDep": (__spec__.parent, "core_settings"),
+    "StatisticsDep": (__spec__.parent, "services"),
+    "TelemetryServiceDep": (__spec__.parent, "services"),
+    "TelemetrySettingsDep": (__spec__.parent, "component_settings"),
     "bootstrap_settings": (__spec__.parent, "core_settings"),
-    "ensure_container_initialized": (__spec__.parent, "utils"),
     "ensure_settings_initialized": (__spec__.parent, "utils"),
 })
 
 __getattr__ = create_late_getattr(_dynamic_imports, globals(), __name__)
 
 __all__ = (
+    "CodeWeaverSettingsType",
     "LoggerDep",
     "LoggingSettingsDep",
     "ProgressReporterDep",

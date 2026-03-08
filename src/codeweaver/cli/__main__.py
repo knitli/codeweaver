@@ -161,4 +161,4 @@ if __name__ == "__main__":
             sys.exit(1)
 
 
-__all__ = ("ROOT_PACKAGE",)
+__all__ = ("ROOT_PACKAGE", "app")

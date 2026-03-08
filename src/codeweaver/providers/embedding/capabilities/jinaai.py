@@ -206,14 +206,4 @@ def get_jinaai_embedding_capabilities() -> tuple[JinaaiEmbeddingCapabilities, ..
     return tuple(JinaaiEmbeddingCapabilities.model_validate(cap) for cap in capabilities)
 
 
-__all__ = (
-    "ALL_CAPABILITIES",
-    "CAP_MAP",
-    "JINAAI_JINA_EMBEDDINGS_V2_BASE_CODE_CAPABILITIES",
-    "JINAAI_JINA_EMBEDDINGS_V2_SMALL_EN_CAPABILITIES",
-    "JINAAI_JINA_EMBEDDINGS_V3_CAPABILITIES",
-    "JINAAI_JINA_EMBEDDINGS_V4_CAPABILITIES",
-    "JinaaiEmbeddingCapabilities",
-    "JinaaiProvider",
-    "get_jinaai_embedding_capabilities",
-)
+__all__ = ("JinaaiEmbeddingCapabilities", "JinaaiProvider", "get_jinaai_embedding_capabilities")

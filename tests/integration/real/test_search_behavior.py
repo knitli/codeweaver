@@ -25,6 +25,8 @@ from unittest.mock import patch
 
 import pytest
 
+from codeweaver.core.config.loader import CodeWeaverSettingsType
+
 
 # =============================================================================
 # Search Quality Validation Tests
@@ -291,7 +293,7 @@ async def test_search_handles_empty_codebase(tmp_path, clean_container):
     - Error messages are clear
     """
     from codeweaver.engine import IndexingService
-    from codeweaver.server import CodeWeaverSettings, get_settings
+    from codeweaver.server import get_settings
     from codeweaver.server.agent_api import IntentType, find_code
 
     empty_dir = tmp_path / "empty_codebase"
@@ -299,14 +301,14 @@ async def test_search_handles_empty_codebase(tmp_path, clean_container):
     (empty_dir / ".git").mkdir()  # Git marker
 
     # Define a factory that returns settings with the empty project path
-    async def get_test_settings() -> CodeWeaverSettings:
+    async def get_test_settings() -> CodeWeaverSettingsType:
         settings = get_settings()
         settings.project_path = empty_dir
         settings.project_name = f"test_empty_{empty_dir.name}"
         return settings
 
     # Apply overrides to container
-    clean_container.override(CodeWeaverSettings, get_test_settings)
+    clean_container.override(CodeWeaverSettingsType, get_test_settings)
 
     # Index and search
     call_count = [0]

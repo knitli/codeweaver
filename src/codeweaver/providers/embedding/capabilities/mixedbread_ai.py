@@ -70,9 +70,6 @@ def get_mixedbread_ai_embedding_capabilities() -> tuple[MixedbreadAiEmbeddingCap
 
 
 __all__ = (
-    "ALL_CAPABILITIES",
-    "CAP_MAP",
-    "MXBAI_EMBED_LARGE_CAPABILITIES",
     "MixedbreadAiEmbeddingCapabilities",
     "MixedbreadAiProvider",
     "get_mixedbread_ai_embedding_capabilities",
