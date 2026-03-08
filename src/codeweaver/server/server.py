@@ -50,7 +50,7 @@ from codeweaver.providers import HttpClientPool
 from codeweaver.server.config import CodeWeaverSettings
 from codeweaver.server.health.health_service import HealthService
 from codeweaver.server.management import ManagementServer
-from codeweaver.server.mcp.server import CwMcpHttpState
+from codeweaver.server.mcp.state import CwMcpHttpState
 
 
 if TYPE_CHECKING:

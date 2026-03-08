@@ -112,6 +112,8 @@ def get_voyage_embedding_capabilities() -> tuple[VoyageEmbeddingCapabilities, ..
         "voyage-4-large",
         "voyage-4",
         "voyage-4-lite",
+        "voyage-4-nano",
+        "onnx-community/voyage-4-nano-ONNX",
     )
     settings = [{**_get_shared_capabilities()} for _ in models]
     for i, model in enumerate(models):

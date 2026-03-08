@@ -154,4 +154,13 @@ class CohereEmbeddingProvider(EmbeddingProvider[CohereClient]):
         return await self._fetch_embeddings(cast(list[str], query), is_query=True, **kwargs)
 
 
+def _rebuild_cohere_embedding_provider() -> None:
+    from codeweaver.core import CodeChunk as CodeChunk
+
+    CohereEmbeddingProvider.model_rebuild()
+
+
+_rebuild_cohere_embedding_provider()
+
+
 __all__ = ("CohereEmbeddingProvider",)

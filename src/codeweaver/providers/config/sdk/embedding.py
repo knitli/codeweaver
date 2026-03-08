@@ -26,7 +26,7 @@ from typing import (
     overload,
 )
 
-from pydantic import Discriminator, Field, PositiveInt, PrivateAttr, Tag, computed_field
+from pydantic import Discriminator, Field, PositiveInt, Tag, computed_field
 from qdrant_client.models import Datatype, Distance, ScalarQuantization, ScalarType, VectorParams
 
 from codeweaver.core import (
@@ -60,14 +60,14 @@ INCOMPATIBLE_FIELDS = {"prompt_name", "prompt", "task"}
 
 
 @overload
-def _get_embedding_capabilities_for_model(
+async def _get_embedding_capabilities_for_model(
     model_name: ModelNameT, *, sparse: Literal[True]
 ) -> SparseEmbeddingModelCapabilities | None: ...
 @overload
-def _get_embedding_capabilities_for_model(
+async def _get_embedding_capabilities_for_model(
     model_name: ModelNameT, *, sparse: Literal[False] = False
 ) -> EmbeddingModelCapabilities | None: ...
-def _get_embedding_capabilities_for_model(
+async def _get_embedding_capabilities_for_model(
     model_name: ModelNameT, *, sparse: bool = False
 ) -> EmbeddingModelCapabilities | SparseEmbeddingModelCapabilities | None:
     """Get the embedding model capabilities for a given model name.
@@ -83,10 +83,20 @@ def _get_embedding_capabilities_for_model(
         "codeweaver.providers.embedding.capabilities.resolver"
     )
     if sparse:
-        resolver = getattr(resolver_module, "SparseEmbeddingCapabilityResolver", None)
+        resolver_type = getattr(resolver_module, "SparseEmbeddingCapabilityResolver", None)
     else:
-        resolver = getattr(resolver_module, "EmbeddingCapabilityResolver", None)
-    return None if resolver is None else resolver().resolve(model_name)
+        resolver_type = getattr(resolver_module, "EmbeddingCapabilityResolver", None)
+
+    if resolver_type is None:
+        return None
+
+    from codeweaver.core.di.container import get_container
+
+    try:
+        resolver = await get_container().resolve(resolver_type)
+        return resolver.resolve(model_name)
+    except Exception:
+        return resolver_type().resolve(model_name)
 
 
 class SerializedEmbeddingOptionsDict(TypedDict, total=False):
@@ -105,8 +115,8 @@ class SerializedEmbeddingOptionsDict(TypedDict, total=False):
 class EmbeddingMixin:
     """Mixin class for dense and sparse embedding configurations. Provides shared methods and interfaces for both types of embedding configurations."""
 
-    _datatype: str | None = PrivateAttr(default=None)
-    _dimension: int | None = PrivateAttr(default=None)
+    _datatype: str | None = None
+    _dimension: int | None = None
     _is_sparse: ClassVar[bool] = False
 
     model_name: ModelNameT
@@ -218,8 +228,9 @@ class EmbeddingMixin:
         Returns:
             Resolved dimension or None
         """
-        if self._dimension:
-            return self._dimension
+        val = getattr(self, "_dimension", None)
+        if isinstance(val, int):
+            return val
         if type(self)._is_sparse:
             object.__setattr__(self, "_dimension", 0)
             return 0
@@ -299,8 +310,9 @@ class EmbeddingMixin:
         Returns:
             Resolved datatype or None
         """
-        if self._datatype:
-            return self._datatype
+        val = getattr(self, "_datatype", None)
+        if isinstance(val, str):
+            return val
         if datatype := self._get_datatype():
             object.__setattr__(self, "_datatype", datatype)
             return datatype
@@ -313,18 +325,19 @@ class EmbeddingMixin:
                 return config[found_field]
 
         # 2. Model capabilities
-        if (caps := self.capabilities) and (dtype := getattr(caps, "default_datatype", None)):
+        if (caps := self.capabilities) and (dtype := getattr(caps, "default_dtype", None)):
             object.__setattr__(self, "_datatype", dtype)
             return dtype
 
         # 3. Provider-specific defaults
+        defaults = self._defaults() if callable(self._defaults) else self._defaults  # ty:ignore[call-top-callable]
         if output_default := next(
-            (f for f in DATATYPE_FIELDS if f in self._defaults.get("embedding", {})), None
+            (f for f in DATATYPE_FIELDS if f in defaults.get("embedding", {})), None
         ):
-            object.__setattr__(
-                self, "_datatype", self._defaults.get("embedding", {}).get(output_default)
-            )
-            return self._defaults.get("embedding", {}).get(output_default)
+            dtype = defaults.get("embedding", {}).get(output_default)
+            object.__setattr__(self, "_datatype", dtype)
+            return dtype
+
         object.__setattr__(self, "_datatype", "float16")
         return "float16"
 
@@ -337,8 +350,9 @@ class EmbeddingMixin:
         Returns:
             Resolved datatype
         """
-        if self._datatype:
-            return self._datatype
+        val = getattr(self, "_datatype", None)
+        if isinstance(val, str):
+            return val
         if datatype := self._get_datatype():
             object.__setattr__(self, "_datatype", datatype)
             return datatype
@@ -351,18 +365,19 @@ class EmbeddingMixin:
                 return config[found_field]
 
         # 2. Model capabilities
-        if (caps := self.capabilities) and (dtype := getattr(caps, "default_datatype", None)):
+        if (caps := self.capabilities) and (dtype := getattr(caps, "default_dtype", None)):
             object.__setattr__(self, "_datatype", dtype)
             return dtype
 
         # 3. Provider-specific defaults
+        defaults = self._defaults() if callable(self._defaults) else self._defaults  # ty:ignore[call-top-callable]
         if output_default := next(
-            (f for f in DATATYPE_FIELDS if f in self._defaults.get("embedding", {})), None
+            (f for f in DATATYPE_FIELDS if f in defaults.get("embedding", {})), None
         ):
-            object.__setattr__(
-                self, "_datatype", self._defaults.get("embedding", {}).get(output_default)
-            )
-            return self._defaults.get("embedding", {}).get(output_default)
+            dtype = defaults.get("embedding", {}).get(output_default)
+            object.__setattr__(self, "_datatype", dtype)
+            return dtype
+
         object.__setattr__(self, "_datatype", "float16")
         return "float16"
 
@@ -386,17 +401,17 @@ class EmbeddingMixin:
             ),
             None,
         ):
-            if "embedding" in kwargs:
+            if "embedding" in kwargs and isinstance(kwargs["embedding"], dict):
                 kwargs["embedding"].pop(found_field, None)
-            if "query" in kwargs:
+            if "query" in kwargs and isinstance(kwargs["query"], dict):
                 kwargs["query"].pop(found_field, None)
-            if "model" in kwargs:
+            if "model" in kwargs and isinstance(kwargs["model"], dict):
                 kwargs["model"].pop(found_field, None)
-        if "embedding" in kwargs:
+        if "embedding" in kwargs and isinstance(kwargs["embedding"], dict):
             kwargs["embedding"] = EmbeddingMixin._clean_dtypes(kwargs.get("embedding", {}))
-        if "query" in kwargs:
+        if "query" in kwargs and isinstance(kwargs["query"], dict):
             kwargs["query"] = EmbeddingMixin._clean_dtypes(kwargs.get("query", {}))
-        if "model" in kwargs:
+        if "model" in kwargs and isinstance(kwargs["model"], dict):
             kwargs["model"] = EmbeddingMixin._clean_dtypes(kwargs.get("model", {}))
         return kwargs
 
@@ -431,8 +446,9 @@ class EmbeddingMixin:
     def as_options(self) -> SerializedEmbeddingOptionsDict:
         """Return the configuration as a dictionary of options."""
         serialized = self._as_options()
+        defaults = self._defaults() if callable(self._defaults) else self._defaults  # ty:ignore[call-top-callable]
         return SerializedEmbeddingOptionsDict(  # type: ignore
-            **type(self)._clean_dtypes(self._defaults | serialized)  # type: ignore
+            **type(self)._clean_dtypes(defaults | serialized)  # type: ignore
         )
 
     @property
@@ -449,7 +465,7 @@ class EmbeddingMixin:
         resolution, use get_dimension() directly. This property returns
         only explicitly configured values or None.
         """
-        return self._dimension or self.get_dimension_sync()
+        return self.get_dimension_sync()
 
     @property
     def datatype(self) -> str | None:
@@ -459,7 +475,7 @@ class EmbeddingMixin:
         resolution, use get_datatype() directly. This property returns
         only explicitly configured values or None.
         """
-        return self._datatype or self.get_datatype_sync()
+        return self.get_datatype_sync()
 
 
 class BaseEmbeddingConfig(BasedModel, EmbeddingMixin):
@@ -504,6 +520,11 @@ class BaseEmbeddingConfig(BasedModel, EmbeddingMixin):
         Returns:
             VectorParams instance with dimension and datatype set.
         """
+        from codeweaver.providers.embedding.capabilities.base import (
+            EmbeddingModelCapabilities,
+            SparseEmbeddingModelCapabilities,
+        )
+
         dimension = await self.get_dimension()
         datatype = await self.get_datatype()
         if datatype and datatype not in ("float32", "float16", "uint8"):
@@ -1064,7 +1085,7 @@ class HuggingFaceEmbeddingConfig(BaseEmbeddingConfig):
         if self._datatype:
             return self._datatype
         if (capabilities := self.capabilities) and (
-            dtype := getattr(capabilities, "default_datatype", None)
+            dtype := getattr(capabilities, "default_dtype", None)
         ):
             self.set_datatype(dtype)
         return self._datatype

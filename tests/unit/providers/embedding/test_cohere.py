@@ -75,15 +75,20 @@ def cohere_4_capabilities():
 @pytest.fixture
 def mock_cohere_config():
     """Create a config for Cohere embedding provider."""
-    from codeweaver.providers.config import CohereEmbeddingConfig
+    from codeweaver.providers.config import CohereEmbeddingConfig, CohereEmbeddingProviderSettings
 
-    return CohereEmbeddingConfig(
+    embedding_config = CohereEmbeddingConfig(
         tag="cohere",
         provider=Provider.COHERE,
         model_name="embed-english-v3.0",
         embedding={},
         query={},
         model={},
+    )
+    return CohereEmbeddingProviderSettings(
+        provider=Provider.COHERE,
+        model_name="embed-english-v3.0",
+        embedding_config=embedding_config,
     )
 
 

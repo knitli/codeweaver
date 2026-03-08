@@ -35,6 +35,8 @@ CAP_MAP: dict[
         "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
         "sentence-transformers/paraphrase-multilingual-mpnet-base-v2",
         "voyageai/voyage-4-nano",
+        "voyage-4-nano",
+        "onnx-community/voyage-4-nano-ONNX",
     ],
     tuple[SentenceTransformersProvider, ...],
 ] = {
@@ -71,6 +73,8 @@ CAP_MAP: dict[
         Provider.SENTENCE_TRANSFORMERS,
     ),
     "voyageai/voyage-4-nano": (Provider.SENTENCE_TRANSFORMERS,),
+    "voyage-4-nano": (Provider.SENTENCE_TRANSFORMERS,),
+    "onnx-community/voyage-4-nano-ONNX": (Provider.SENTENCE_TRANSFORMERS, Provider.FASTEMBED),
 }
 
 
@@ -333,6 +337,8 @@ ALL_CAPABILITIES: tuple[PartialCapabilities, ...] = (
     SENTENCE_TRANSFORMERS_PARAPHRASE_MULTILINGUAL_MINILM_L12_V2_CAPABILITIES,
     SENTENCE_TRANSFORMERS_PARAPHRASE_MULTILINGUAL_MPNET_BASE_V2_CAPABILITIES,
     VOYAGE_4_NANO_CAPABILITIES,
+    {**VOYAGE_4_NANO_CAPABILITIES, "name": "voyage-4-nano"},
+    {**VOYAGE_4_NANO_CAPABILITIES, "name": "onnx-community/voyage-4-nano-ONNX"},
 )
 
 

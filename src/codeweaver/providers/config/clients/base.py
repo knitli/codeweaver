@@ -69,7 +69,7 @@ class ClientOptions(BasedModel):
         env_vars = cls.assemble_env_vars()
         if values and not isinstance(values, dict):
             values = values.model_dump()
-        return env_vars | values
+        return env_vars | (values or {})
 
     @staticmethod
     def _filter_values(value: Any) -> Any:

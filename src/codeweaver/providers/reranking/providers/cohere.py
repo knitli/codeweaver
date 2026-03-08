@@ -75,7 +75,7 @@ class CohereRerankingProvider(RerankingProvider[CohereClient]):
     """Cohere reranking provider."""
 
     client: SkipValidation[CohereClient]
-    _provider = ClassVar[Provider.COHERE]
+    _provider: ClassVar[Provider] = Provider.COHERE
 
     def _initialize(self) -> None:
         """Initialize the Cohere reranking provider after Pydantic setup."""

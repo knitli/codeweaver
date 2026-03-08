@@ -842,19 +842,39 @@ class AsymmetricEmbeddingProviderSettings(BasedModel):
                 ],
             )
         if self.datatype_tuple[0] != self.datatype_tuple[1]:
-            raise DatatypeMismatchError(
-                f"Embedding datatype mismatch: embed model datatype '{self.datatype_tuple[0]}' != query model datatype '{self.datatype_tuple[1]}'",
-                details={
-                    "embed_model": str(self.embed_provider.model_name),
-                    "embed_datatype": self.datatype_tuple[0],
-                    "query_model": str(self.query_provider.model_name),
-                    "query_datatype": self.datatype_tuple[1],
-                },
-                suggestions=[
-                    "Ensure both models are configured with the same embedding datatype",
-                    "Set datatypes explicitly in the embedding configurations if needed",
-                ],
+            # Special case for Voyage-4 family: uint8 and float32 are compatible
+            embed_caps = (
+                self.embed_provider.embedding_config.capabilities
+                if self.embed_provider.embedding_config
+                else None
             )
+            query_caps = (
+                self.query_provider.embedding_config.capabilities
+                if self.query_provider.embedding_config
+                else None
+            )
+            if (
+                embed_caps
+                and query_caps
+                and embed_caps.model_family
+                and embed_caps.model_family == query_caps.model_family
+                and embed_caps.model_family.family_id == "voyage-4"
+            ):
+                pass
+            else:
+                raise DatatypeMismatchError(
+                    f"Embedding datatype mismatch: embed model datatype '{self.datatype_tuple[0]}' != query model datatype '{self.datatype_tuple[1]}'",
+                    details={
+                        "embed_model": str(self.embed_provider.model_name),
+                        "embed_datatype": self.datatype_tuple[0],
+                        "query_model": str(self.query_provider.model_name),
+                        "query_datatype": self.datatype_tuple[1],
+                    },
+                    suggestions=[
+                        "Ensure both models are configured with the same embedding datatype",
+                        "Set datatypes explicitly in the embedding configurations if needed",
+                    ],
+                )
         if (
             caps := self.embed_provider.embedding_config.capabilities
             if self.embed_provider.embedding_config

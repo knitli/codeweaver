@@ -185,7 +185,7 @@ class EmbeddingBatchInfo(BasedModel):
         ),
     ]
     dtype: Annotated[
-        Literal["float32", "float16", "int8", "binary"],
+        Literal["float", "float32", "float16", "int8", "binary"],
         Field(description="Data type of the embedding", field_title_generator=generate_field_title),
     ] = "float32"
 
@@ -376,6 +376,16 @@ class ChunkEmbeddings(BasedModel):
     def is_complete(self) -> bool:
         """Check if this chunk has both dense and sparse embeddings."""
         return self.has_dense and self.has_sparse
+
+
+def _rebuild_embedding_types() -> None:
+    from codeweaver.core.chunks import CodeChunk as CodeChunk
+
+    EmbeddingBatchInfo.model_rebuild()
+    ChunkEmbeddings.model_rebuild()
+
+
+_rebuild_embedding_types()
 
 
 SparseEmbedding = CodeWeaverSparseEmbedding

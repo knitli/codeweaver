@@ -269,7 +269,7 @@ class EmbeddingCapabilityGroup(NamedTuple):
                     quantization_config=ScalarQuantization.model_construct(scalar={"type": "uint8"})
                     if datatype == "uint8"
                     else None,
-                    datatype=Datatype(datatype) if datatype else Datatype.FLOAT16,
+                    datatype=Datatype("float32" if datatype == "float" else (datatype or "float32")),
                 )
             }
         if self.sparse:
@@ -291,4 +291,26 @@ class EmbeddingCapabilityGroup(NamedTuple):
         return CollectionParams.model_construct(**params)
 
 
-__all__ = ("ConfiguredCapability", "EmbeddingCapabilityGroup")
+def inject_embedding_settings() -> None:
+    """Inject embedding settings into globals to resolve Pydantic forward references.
+
+    This avoids circular imports by importing late.
+    """
+    from codeweaver.providers.config.categories.embedding import (
+        AsymmetricEmbeddingProviderSettings,
+        EmbeddingProviderSettings,
+    )
+    from codeweaver.providers.config.categories.sparse_embedding import (
+        SparseEmbeddingProviderSettings,
+    )
+
+    globals().update(
+        {
+            "AsymmetricEmbeddingProviderSettings": AsymmetricEmbeddingProviderSettings,
+            "EmbeddingProviderSettings": EmbeddingProviderSettings,
+            "SparseEmbeddingProviderSettings": SparseEmbeddingProviderSettings,
+        }
+    )
+
+
+__all__ = ("ConfiguredCapability", "EmbeddingCapabilityGroup", "inject_embedding_settings")

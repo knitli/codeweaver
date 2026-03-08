@@ -340,7 +340,7 @@ async def actual_vector_store() -> MemoryVectorStoreProvider:
         client = AsyncQdrantClient(location=":memory:")
 
         # Create collection config with test collection name
-        from codeweaver.providers.config.categories import CollectionConfig
+        from codeweaver.providers import CollectionConfig
 
         collection = CollectionConfig(collection_name="codeweaver-test-collection")
         config = MemoryVectorStoreProviderSettings(collection=collection)

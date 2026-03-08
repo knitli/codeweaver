@@ -50,7 +50,7 @@ async def test_inmemory_persistence(vector_store_factory):
 
         # Get the actual dimension from the embedding provider configuration
         # This dynamically adapts to whatever model is configured (testing profile uses minishlab/potion-base-8M = 256 dims)
-        dense_caps = provider1._embedding_caps.get("dense")
+        dense_caps = provider1.caps.dense.capability if provider1.caps.dense else None
         embedding_dim = dense_caps.default_dimension if dense_caps else 512
 
         chunk = create_test_chunk_with_embeddings(
@@ -87,7 +87,7 @@ async def test_inmemory_persistence(vector_store_factory):
         from codeweaver.core import SearchStrategy, StrategizedQuery
 
         # Use the same dimension as we used for upserting
-        dense_caps2 = provider2._embedding_caps.get("dense")
+        dense_caps2 = provider2.caps.dense.capability if provider2.caps.dense else None
         embedding_dim2 = dense_caps2.default_dimension if dense_caps2 else 512
 
         results = await provider2.search(

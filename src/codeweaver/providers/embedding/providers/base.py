@@ -883,8 +883,9 @@ class EmbeddingProvider[EmbeddingClient](BasedModel, ABC):
         self, *, sparse: bool = False
     ) -> Literal["float32", "float16", "int8", "binary"]:
         """Get the datatype of the embedding vectors based on capabilities and config."""
-        # First try to get from capabilities
-        return self.embed_options.datatype
+        if self.caps:
+            return self.caps.default_dtype  # ty:ignore[invalid-return-type]
+        return self.embed_options.get("datatype", "float32")
 
     def get_dimension(self, *, sparse: bool = False) -> PositiveInt | Literal[0]:
         """Get the dimension of the embedding vectors based on capabilities."""
@@ -1236,6 +1237,16 @@ class SparseEmbeddingProvider[SparseClient](EmbeddingProvider[SparseClient], ABC
         self, query: Sequence[str], **kwargs: Any
     ) -> list[CodeWeaverSparseEmbedding]:
         """Abstract method to implement query embedding logic for sparse embeddings."""
+
+
+def _rebuild_embedding_providers() -> None:
+    from codeweaver.core import CodeChunk as CodeChunk
+
+    EmbeddingProvider.model_rebuild()
+    SparseEmbeddingProvider.model_rebuild()
+
+
+_rebuild_embedding_providers()
 
 
 __all__ = (

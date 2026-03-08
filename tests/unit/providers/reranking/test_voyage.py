@@ -121,7 +121,7 @@ class TestVoyageRerankingProviderInitialization:
     def test_provider_initialization_default_top_n(
         self, mock_voyage_rerank_client, mock_voyage_rerank_config, voyage_rerank_capabilities
     ):
-        """Test that default top_n is 10."""
+        """Test that default top_n is 15."""
         provider = VoyageRerankingProvider(
             _provider=Provider.VOYAGE,
             client=mock_voyage_rerank_client,
@@ -129,7 +129,7 @@ class TestVoyageRerankingProviderInitialization:
             caps=voyage_rerank_capabilities,
         )
 
-        assert provider.top_n == 10
+        assert provider.top_n == 15
 
     def test_provider_prompt_not_supported(
         self, mock_voyage_rerank_client, mock_voyage_rerank_config, voyage_rerank_capabilities

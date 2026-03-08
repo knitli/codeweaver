@@ -407,7 +407,7 @@ async def qdrant_test_collection(
 
 
 @pytest.fixture
-def vector_store_factory(qdrant_test_manager) -> Any:
+def vector_store_factory(request) -> Any:
     """Factory fixture to create configured vector store providers.
 
     Handles creation of settings, client, and capabilities for DI-compliant instantiation.
@@ -437,28 +437,33 @@ def vector_store_factory(qdrant_test_manager) -> Any:
 
         # Default caps if not provided
         if embedding_caps is None:
-            from codeweaver.providers.config.embedding import FastEmbedEmbeddingConfig
+            from codeweaver.providers import FastEmbedEmbeddingConfig
 
             dense_caps = EmbeddingModelCapabilities(
-                name="test-dense-model",
-                default_dimension=768,
-                default_dtype="float16",
+                name="BAAI/bge-small-en-v1.5",
+                default_dimension=384,
+                default_dtype="float32",
                 preferred_metrics=("cosine", "dot"),
             )
             # Create proper embedding config for the provider settings
             embedding_config = FastEmbedEmbeddingConfig(
-                tag="fastembed", provider=Provider.FASTEMBED, model_name="test-dense-model"
+                tag="fastembed", provider=Provider.FASTEMBED, model_name="BAAI/bge-small-en-v1.5"
             )
             # Mock settings to satisfy ConfiguredCapability
             mock_settings = EmbeddingProviderSettings(
                 provider=Provider.FASTEMBED,
-                model_name="test-dense-model",
+                model_name="BAAI/bge-small-en-v1.5",
                 embedding_config=embedding_config,
             )
             configured_dense = ConfiguredCapability(capability=dense_caps, config=mock_settings)
             embedding_caps = EmbeddingCapabilityGroup(dense=configured_dense, sparse=None)
 
         if provider_cls is QdrantVectorStoreProvider:
+            try:
+                qdrant_test_manager = request.getfixturevalue("qdrant_test_manager")
+            except (pytest.FixtureLookupError, Exception):
+                pytest.skip("QdrantTestManager required for QdrantVectorStoreProvider tests")
+
             collection_name = config_overrides.get("collection_name")
             if not collection_name:
                 collection_name = qdrant_test_manager.create_collection_name("factory-test")
@@ -544,9 +549,15 @@ def create_test_chunk_with_embeddings(
         CodeChunk with embeddings registered in the global registry
     """
 
-    from codeweaver.core import BatchKeys, CodeChunk, Span, uuid7
-    from codeweaver.providers import ChunkEmbeddings, EmbeddingBatchInfo, get_embedding_registry
-
+    from codeweaver.core import (
+        BatchKeys,
+        ChunkEmbeddings,
+        CodeChunk,
+        EmbeddingBatchInfo,
+        Span,
+        uuid7,
+    )
+    from codeweaver.providers import get_embedding_registry
     # Create the base chunk
     chunk = CodeChunk(
         chunk_id=chunk_id,
@@ -709,11 +720,13 @@ def reset_cli_settings_cache() -> None:
 def reset_di_container() -> Generator[None, None, None]:
     """Reset DI container between tests to ensure isolation."""
     from codeweaver.core import reset_container
+    from codeweaver.providers.embedding.registry import reset_embedding_registry
 
     reset_container()
+    reset_embedding_registry()
     yield
     reset_container()
-    reset_container()
+    reset_embedding_registry()
 
 
 @pytest.fixture

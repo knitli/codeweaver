@@ -21,7 +21,7 @@ from codeweaver.core import (
 
 
 if TYPE_CHECKING:
-    from codeweaver.server.mcp.server import CwMcpHttpState
+    from codeweaver.server.mcp.state import CwMcpHttpState
     from codeweaver.server.mcp.types import ToolRegistrationDict
 
 

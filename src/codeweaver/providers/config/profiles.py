@@ -226,7 +226,8 @@ def _recommended_default(
                     model_name=ModelName(RECOMMENDED_QUERY_EMBEDDING_MODEL),
                     provider=Provider.SENTENCE_TRANSFORMERS,
                     embedding_config=SentenceTransformersEmbeddingConfig(
-                        model_name=ModelName(RECOMMENDED_QUERY_EMBEDDING_MODEL)
+                        model_name=ModelName(RECOMMENDED_QUERY_EMBEDDING_MODEL),
+                        embedding={"precision": "uint8"},
                     ),
                 ),
             ),

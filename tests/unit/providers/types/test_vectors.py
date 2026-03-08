@@ -243,10 +243,8 @@ class TestVectorConfig:
     @pytest.mark.asyncio
     async def test_from_provider_settings_dense(self):
         """Test factory method from_provider_settings for dense embeddings."""
-        from codeweaver.providers.config.embedding import VoyageEmbeddingConfig
-
         from codeweaver.core import Provider
-        from codeweaver.providers.config.categories import EmbeddingProviderSettings
+        from codeweaver.providers import EmbeddingProviderSettings, VoyageEmbeddingConfig
 
         # Create proper embedding config
         embedding_config = VoyageEmbeddingConfig(
@@ -270,10 +268,11 @@ class TestVectorConfig:
     @pytest.mark.asyncio
     async def test_from_provider_settings_sparse(self):
         """Test factory method from_provider_settings for sparse embeddings."""
-        from codeweaver.providers.config.embedding import FastEmbedSparseEmbeddingConfig
-
         from codeweaver.core import Provider
-        from codeweaver.providers.config.categories import SparseEmbeddingProviderSettings
+        from codeweaver.providers import (
+            FastEmbedSparseEmbeddingConfig,
+            FastEmbedSparseEmbeddingProviderSettings,
+        )
 
         # Create proper sparse embedding config
         sparse_embedding_config = FastEmbedSparseEmbeddingConfig(
@@ -281,7 +280,7 @@ class TestVectorConfig:
         )
 
         # Create sparse provider settings with the proper config
-        settings = SparseEmbeddingProviderSettings(
+        settings = FastEmbedSparseEmbeddingProviderSettings(
             provider=Provider.FASTEMBED,
             model_name="Qdrant/bm25",
             sparse_embedding_config=sparse_embedding_config,
@@ -299,10 +298,8 @@ class TestVectorConfig:
     @pytest.mark.asyncio
     async def test_from_provider_settings_role_defaults(self):
         """Test that from_provider_settings defaults role to name."""
-        from codeweaver.providers.config.embedding import VoyageEmbeddingConfig
-
         from codeweaver.core import Provider
-        from codeweaver.providers.config.categories import EmbeddingProviderSettings
+        from codeweaver.providers import EmbeddingProviderSettings, VoyageEmbeddingConfig
 
         # Create proper embedding config
         embedding_config = VoyageEmbeddingConfig(

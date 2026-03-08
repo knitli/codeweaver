@@ -230,13 +230,13 @@ class TestVoyageEmbeddingProviderEmbedding:
         )
         from pathlib import Path
 
-        from codeweaver.core import ChunkKind, ExtKind, Span, uuid7
+        from codeweaver.core import ChunkKind, ExtCategory, Span, uuid7
 
         # Create test chunks
         chunks = [
             CodeChunk(
                 content="test content 1",
-                ext_category=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
+                ext_category=ExtCategory(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
                 language=SemanticSearchLanguage.PYTHON,
                 line_range=Span(start=1, end=1, source_id=uuid7()),
                 file_path=Path("/test/file.py"),
@@ -244,7 +244,7 @@ class TestVoyageEmbeddingProviderEmbedding:
             ),
             CodeChunk(
                 content="test content 2",
-                ext_category=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
+                ext_category=ExtCategory(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
                 language=SemanticSearchLanguage.PYTHON,
                 line_range=Span(start=2, end=2, source_id=uuid7()),
                 file_path=Path("/test/file.py"),
@@ -454,13 +454,13 @@ class TestVoyageEmbeddingProviderErrorHandling:
 
         from pathlib import Path
 
-        from codeweaver.core import ChunkKind, ExtKind, Span, uuid7
+        from codeweaver.core import ChunkKind, ExtCategory, Span, uuid7
 
         # Create test chunks
         chunks = [
             CodeChunk(
                 content="test content 1",
-                ext_category=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
+                ext_category=ExtCategory(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
                 language=SemanticSearchLanguage.PYTHON,
                 line_range=Span(start=1, end=1, source_id=uuid7()),
                 file_path=Path("/test/file.py"),
@@ -468,7 +468,7 @@ class TestVoyageEmbeddingProviderErrorHandling:
             ),
             CodeChunk(
                 content="test content 2",
-                ext_category=ExtKind(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
+                ext_category=ExtCategory(language=SemanticSearchLanguage.PYTHON, kind=ChunkKind.CODE),
                 language=SemanticSearchLanguage.PYTHON,
                 line_range=Span(start=2, end=2, source_id=uuid7()),
                 file_path=Path("/test/file.py"),

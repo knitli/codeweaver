@@ -130,7 +130,8 @@ async def _run_http_server(
     from codeweaver.core import Unset, get_project_path
     from codeweaver.server.lifespan import http_lifespan
     from codeweaver.server.management import ManagementServer
-    from codeweaver.server.mcp.server import CwMcpHttpState, create_http_server
+    from codeweaver.server.mcp.server import create_http_server
+    from codeweaver.server.mcp.state import CwMcpHttpState
 
     settings = _settings
 

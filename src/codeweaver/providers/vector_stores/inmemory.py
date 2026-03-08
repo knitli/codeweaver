@@ -25,6 +25,7 @@ from codeweaver.core import (
     StrategizedQuery,
 )
 from codeweaver.providers import MemoryVectorStoreProviderSettings
+from codeweaver.providers.types.embedding import inject_embedding_settings
 from codeweaver.providers.vector_stores.qdrant_base import QdrantBaseProvider
 
 
@@ -105,8 +106,8 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
                 id(self.client),
             )
             sys.stdout.flush()
-        # Restore from disk if persistence file exists (and not in test mode)
-        if not is_test_environment() and await AsyncPath(str(self.persist_path)).exists():
+        # Restore from disk if persistence file exists
+        if await AsyncPath(str(self.persist_path)).exists():
             await self._restore_from_disk()
 
         # Set up periodic persistence if configured
@@ -298,6 +299,11 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
         """
         if self.auto_persist:
             await self._persist_to_disk()
+
+
+# Ensure the model is fully defined for Pydantic
+inject_embedding_settings()
+MemoryVectorStoreProvider.model_rebuild()
 
 
 __all__ = ("MemoryVectorStoreProvider",)

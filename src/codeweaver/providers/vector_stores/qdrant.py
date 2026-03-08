@@ -14,6 +14,7 @@ from typing import ClassVar
 from codeweaver.core import Provider
 from codeweaver.core.constants import LOCALHOST_URL
 from codeweaver.providers.config import QdrantVectorStoreProviderSettings
+from codeweaver.providers.types.embedding import inject_embedding_settings
 from codeweaver.providers.vector_stores.qdrant_base import QdrantBaseProvider
 
 
@@ -36,6 +37,11 @@ class QdrantVectorStoreProvider(QdrantBaseProvider):
 
     async def _init_provider(self) -> None:
         """We don't use this method at the moment for the main Qdrant provider."""
+
+
+# Ensure the model is fully defined for Pydantic
+inject_embedding_settings()
+QdrantVectorStoreProvider.model_rebuild()
 
 
 __all__ = ("QdrantVectorStoreProvider",)

@@ -147,6 +147,9 @@ def _rebuild_store(store: type[EmbeddingRegistry]) -> None:
         store.model_rebuild()
 
 
+_main_registry: EmbeddingRegistry | None = None
+
+
 def get_embedding_registry(*, backup: bool = False) -> EmbeddingRegistry:
     """Get the global EmbeddingRegistry instance, creating it if it doesn't exist.
 
@@ -154,13 +157,28 @@ def get_embedding_registry(*, backup: bool = False) -> EmbeddingRegistry:
     approach, backup embeddings are stored as additional vectors on the same points.
     This function always returns the main registry.
     """
+    global _main_registry
+
     if backup:
         logger.warning(
             "backup parameter is deprecated - new system uses multi-vector approach. "
             "Returning main registry."
         )
-    _rebuild_store(EmbeddingRegistry)
-    return EmbeddingRegistry()
+
+    if _main_registry is None:
+        _rebuild_store(EmbeddingRegistry)
+        _main_registry = EmbeddingRegistry()
+
+    return _main_registry
+
+
+def reset_embedding_registry() -> None:
+    """Reset the global EmbeddingRegistry instance.
+
+    Primarily used for testing to ensure isolation between tests.
+    """
+    global _main_registry
+    _main_registry = None
 
 
 @dependency_provider(EmbeddingRegistry, scope="singleton", module=__name__)
