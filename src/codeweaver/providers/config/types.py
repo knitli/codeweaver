@@ -18,7 +18,7 @@ from pydantic import Field, NonNegativeInt, PositiveInt, SecretStr
 
 from codeweaver.core.constants import ZERO
 from codeweaver.core.types import LiteralStringT
-from codeweaver.providers.agent import KnownAgentModelName
+from codeweaver.providers.agent.capabilities import KnownAgentModelName
 
 
 if TYPE_CHECKING:

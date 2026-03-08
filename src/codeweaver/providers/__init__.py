@@ -18,19 +18,28 @@ from lateimport import create_late_getattr
 
 
 if TYPE_CHECKING:
-    from codeweaver.providers.agent import MappingProxyType
     from codeweaver.providers.agent.capabilities import (
         AgentModelCapabilities,
         AgentModelCapabilitiesT,
-        KnownAgentModelName,
+        get_agent_capabilities_for_model,
+        get_agent_model_capabilities,
     )
     from codeweaver.providers.agent.providers import (
+        AGENT_PROVIDER_CLASSES,
         AgentProvider,
-        ConfigurationError,
-        LiteralProviderType,
+        get_agent_model_provider,
+        infer_agent_provider_class,
+        load_default_agent_providers,
     )
-    from codeweaver.providers.agent.resolver import AgentCapabilityResolver
+    from codeweaver.providers.agent.resolver import AgentCapabilityResolver, get_agent_resolver
+    from codeweaver.providers.config.backup_models import (
+        create_backup_embeddings,
+        get_backup_embedding_config,
+        get_backup_embedding_provider,
+        get_backup_model_info,
+    )
     from codeweaver.providers.config.categories.agent import (
+        AgentProviderSettingsType,
         AnthropicAgentProviderSettings,
         AnthropicAgentProviderSettingsType,
         AnthropicAzureAgentProviderSettings,
@@ -39,7 +48,6 @@ if TYPE_CHECKING:
         BaseAgentProviderSettings,
         CerebrasAgentProviderSettings,
         CohereAgentProviderSettings,
-        GeneralAgentClientOptionsType,
         GoogleAgentProviderSettings,
         GroqAgentProviderSettings,
         HuggingFaceAgentProviderSettings,
@@ -57,9 +65,9 @@ if TYPE_CHECKING:
     )
     from codeweaver.providers.config.categories.data import (
         BaseDataProviderSettings,
+        DataProviderSettingsType,
         DuckDuckGoProviderSettings,
         ExaProviderSettings,
-        GeneralDataClientOptionsType,
         TavilyProviderSettings,
     )
     from codeweaver.providers.config.categories.embedding import (
@@ -71,11 +79,9 @@ if TYPE_CHECKING:
         BedrockEmbeddingProviderSettings,
         CohereEmbeddingProviderSettings,
         CoreEmbeddingProviderSettingsType,
-        DatatypeMismatchError,
-        DimensionMismatchError,
         EmbeddingProviderSettings,
+        EmbeddingProviderSettingsType,
         FastEmbedEmbeddingProviderSettings,
-        GeneralEmbeddingClientOptionsType,
         GoogleEmbeddingProviderSettings,
         HuggingFaceEmbeddingProviderSettings,
         MistralEmbeddingProviderSettings,
@@ -92,8 +98,8 @@ if TYPE_CHECKING:
         BedrockRerankingProviderSettings,
         CohereRerankingProviderSettings,
         FastEmbedRerankingProviderSettings,
-        GeneralRerankingClientOptionsType,
         RerankingProviderSettings,
+        RerankingProviderSettingsType,
         SentenceTransformersRerankingProviderSettings,
         VoyageRerankingProviderSettings,
     )
@@ -101,14 +107,23 @@ if TYPE_CHECKING:
         BaseSparseEmbeddingProviderSettings,
         FastEmbedSparseEmbeddingProviderSettings,
         SparseEmbeddingProviderSettings,
+        SparseEmbeddingProviderSettingsType,
+    )
+    from codeweaver.providers.config.categories.utils import (
+        ANTHROPIC_PROVIDER_DISCRIMINATOR,
+        CORE_EMBEDDING_PROVIDER_DISCRIMINATOR,
+        NON_ANTHROPIC_AGENT_PROVIDER_DISCRIMINATOR,
+        PROVIDER_DISCRIMINATOR,
+        RERANKING_PROVIDER_DISCRIMINATOR,
+        is_cloud_provider,
     )
     from codeweaver.providers.config.categories.vector_store import (
         BaseVectorStoreProviderSettings,
         MemoryConfig,
         MemoryVectorStoreProviderSettings,
-        QdrantCollectionConfig,
         QdrantVectorStoreProviderSettings,
         VectorStoreProviderSettings,
+        VectorStoreProviderSettingsType,
     )
     from codeweaver.providers.config.clients.agent import (
         AnthropicAgentClientOptionsType,
@@ -117,22 +132,27 @@ if TYPE_CHECKING:
         AnthropicClientOptions,
         AnthropicGoogleVertexClientOptions,
         BaseAnthropicClientOptions,
+        GeneralAgentClientOptionsType,
         GroqClientOptions,
         OpenAIAgentClientOptions,
         PydanticGatewayClientOptions,
         SimpleAgentClientOptionsType,
         XAIClientOptions,
+        discriminate_anthropic_agent_client_options,
     )
     from codeweaver.providers.config.clients.base import ClientOptions
     from codeweaver.providers.config.clients.data import (
         DuckDuckGoClientOptions,
         ExaClientOptions,
+        GeneralDataClientOptionsType,
         TavilyClientOptions,
     )
     from codeweaver.providers.config.clients.multi import (
         BedrockClientOptions,
         CohereClientOptions,
         FastEmbedClientOptions,
+        GeneralEmbeddingClientOptionsType,
+        GeneralRerankingClientOptionsType,
         GoogleClientOptions,
         HuggingFaceClientOptions,
         MistralClientOptions,
@@ -140,34 +160,39 @@ if TYPE_CHECKING:
         SentenceTransformersClientOptions,
         SentenceTransformersModelOptions,
         VoyageClientOptions,
+        discriminate_azure_embedding_client_options,
+    )
+    from codeweaver.providers.config.clients.utils import (
+        ANTHROPIC_CLIENT_OPTIONS_AGENT_DISCRIMINATOR,
+        discriminate_embedding_clients,
+        ensure_endpoint_version,
+        simple_provider_discriminator,
+        try_for_azure_endpoint,
+        try_for_heroku_endpoint,
     )
     from codeweaver.providers.config.clients.vector_store import GrpcParams, QdrantClientOptions
     from codeweaver.providers.config.profiles import (
-        AgentProviderSettingsType,
-        DataProviderSettingsType,
-        EmbeddingProviderSettingsType,
+        HAS_FASTEMBED,
+        HAS_ST,
         ProviderConfigProfile,
         ProviderProfile,
-        RerankingProviderSettingsType,
-        SparseEmbeddingProviderSettingsType,
         VersionedProfile,
-        parse_version,
     )
     from codeweaver.providers.config.providers import (
-        AgentModelSettings,
+        HAS_ANTHROPIC,
+        AllDefaultProviderSettings,
         DefaultAgentProviderSettings,
         DefaultEmbeddingProviderSettings,
         DefaultRerankingProviderSettings,
         DefaultSparseEmbeddingProviderSettings,
         DefaultVectorStoreProviderSettings,
         DeterminedDefaults,
-        LiteralProviderCategoryType,
         ProviderCategorySettingsType,
         ProviderNameMap,
         ProviderSettings,
         ProviderSettingsDict,
         ProviderSettingsView,
-        VectorStoreProviderSettingsType,
+        merge_agent_model_settings,
     )
     from codeweaver.providers.config.root_settings import (
         CodeWeaverProviderSettings,
@@ -191,6 +216,7 @@ if TYPE_CHECKING:
         TavilySearchContextToolConfig,
     )
     from codeweaver.providers.config.sdk.embedding import (
+        INCOMPATIBLE_FIELDS,
         BaseEmbeddingConfig,
         BedrockCohereConfigDict,
         BedrockEmbeddingConfig,
@@ -210,7 +236,6 @@ if TYPE_CHECKING:
         MistralEmbeddingOptionsDict,
         OpenAIEmbeddingConfig,
         OpenAIEmbeddingRequestParams,
-        ScalarType,
         SentenceTransformersEmbeddingConfig,
         SentenceTransformersEncodeDict,
         SerializedEmbeddingOptionsDict,
@@ -239,7 +264,7 @@ if TYPE_CHECKING:
         SentenceTransformersSparseEmbeddingConfig,
         SparseEmbeddingConfigT,
     )
-    from codeweaver.providers.config.sdk.vector_store import CollectionConfig
+    from codeweaver.providers.config.sdk.vector_store import CollectionConfig, get_embedding_group
     from codeweaver.providers.config.types import (
         AgentModelNameString,
         AzureOptions,
@@ -269,14 +294,25 @@ if TYPE_CHECKING:
         exa_search_tool,
         register_exa_tools,
     )
-    from codeweaver.providers.data.providers import DataProviderType
+    from codeweaver.providers.data.providers import (
+        DataProviderType,
+        get_data_provider,
+        load_default_data_providers,
+    )
     from codeweaver.providers.data.tavily import (
         TavilyResults,
         TavilySearchContextTool,
         TavilySearchResult,
         tavily_search_tool,
     )
-    from codeweaver.providers.data.utils import build_data_tool, register_data_tool
+    from codeweaver.providers.data.utils import (
+        build_data_tool,
+        get_provider_names_for_category,
+        get_schema_for_type,
+        get_serializer_for_type,
+        get_type_adapter,
+        register_data_tool,
+    )
     from codeweaver.providers.dependencies.capabilities import (
         AgentCapabilityResolverDep,
         ConfiguredCapabilitiesDep,
@@ -294,7 +330,6 @@ if TYPE_CHECKING:
         AllRerankingConfigsDep,
         AllSparseEmbeddingConfigsDep,
         AllVectorStoreConfigsDep,
-        CodeWeaverSettingsType,
         DataProviderSettingsDep,
         EmbeddingProviderSettingsDep,
         ProviderSettingsDep,
@@ -313,7 +348,6 @@ if TYPE_CHECKING:
         RerankingProvidersDep,
         SearchPackageDep,
         SparseEmbeddingProvidersDep,
-        TypeAliasType,
         VectorStoreProvidersDep,
     )
     from codeweaver.providers.dependencies.services import (
@@ -322,89 +356,183 @@ if TYPE_CHECKING:
     )
     from codeweaver.providers.embedding.cache_manager import EmbeddingCacheManager
     from codeweaver.providers.embedding.capabilities.alibaba_nlp import (
+        ALIBABA_NLP_GTE_MODERNBERT_BASE_CAPABILITIES,
+        ALIBABA_NLP_GTE_MULTILINGUAL_BASE_CAPABILITIES,
+        ALL_CAPABILITIES,
+        CAP_MAP,
         AlibabaNlpEmbeddingCapabilities,
         AlibabaNlpProvider,
+        get_alibaba_nlp_embedding_capabilities,
     )
-    from codeweaver.providers.embedding.capabilities.amazon import AmazonEmbeddingCapabilities
+    from codeweaver.providers.embedding.capabilities.amazon import (
+        AmazonEmbeddingCapabilities,
+        get_amazon_embedding_capabilities,
+    )
     from codeweaver.providers.embedding.capabilities.baai import (
+        BAAI_BGE_BASE_EN_V1_5_CAPABILITIES,
+        BAAI_BGE_SMALL_EN_V1_5_CAPABILITIES,
+        BGE_LARGE_EN_335M_CAPABILITIES,
         BaaiEmbeddingCapabilities,
         BaaiProvider,
+        get_baai_embedding_capabilities,
     )
     from codeweaver.providers.embedding.capabilities.base import (
         EmbeddingModelCapabilities,
         ModelFamily,
         SparseCapabilities,
         SparseEmbeddingModelCapabilities,
+        get_sparse_caps,
     )
-    from codeweaver.providers.embedding.capabilities.cohere import CohereEmbeddingCapabilities
-    from codeweaver.providers.embedding.capabilities.google import GoogleEmbeddingCapabilities
+    from codeweaver.providers.embedding.capabilities.cohere import (
+        MODEL_MAP,
+        CohereEmbeddingCapabilities,
+        get_cohere_embedding_capabilities,
+    )
+    from codeweaver.providers.embedding.capabilities.google import (
+        GoogleEmbeddingCapabilities,
+        get_google_embedding_capabilities,
+    )
     from codeweaver.providers.embedding.capabilities.ibm_granite import (
+        GRANITE_EMBEDDING_30M_CAPABILITIES,
+        GRANITE_EMBEDDING_278M_CAPABILITIES,
+        GRANITE_EMBEDDING_ENGLISH_R2_CAPABILITIES,
+        GRANITE_EMBEDDING_SMALL_ENGLISH_R2_CAPABILITIES,
         IbmGraniteEmbeddingCapabilities,
         IbmGraniteProvider,
+        get_ibm_granite_embedding_capabilities,
     )
     from codeweaver.providers.embedding.capabilities.intfloat import (
+        INTFLOAT_MULTILINGUAL_E5_LARGE_CAPABILITIES,
+        INTFLOAT_MULTILINGUAL_E5_LARGE_INSTRUCT_CAPABILITIES,
         IntfloatEmbeddingCapabilities,
         IntfloatProvider,
+        get_intfloat_embedding_capabilities,
     )
     from codeweaver.providers.embedding.capabilities.jinaai import (
+        JINAAI_JINA_EMBEDDINGS_V2_BASE_CODE_CAPABILITIES,
+        JINAAI_JINA_EMBEDDINGS_V2_SMALL_EN_CAPABILITIES,
+        JINAAI_JINA_EMBEDDINGS_V3_CAPABILITIES,
+        JINAAI_JINA_EMBEDDINGS_V4_CAPABILITIES,
         JinaaiEmbeddingCapabilities,
         JinaaiProvider,
+        get_jinaai_embedding_capabilities,
     )
     from codeweaver.providers.embedding.capabilities.minishlab import (
+        MINISHLAB_M2V_BASE_GLOVE_CAPABILITIES,
+        MINISHLAB_M2V_BASE_GLOVE_SUBWORD_CAPABILITIES,
+        MINISHLAB_M2V_BASE_OUTPUT_CAPABILITIES,
+        MINISHLAB_M2V_MULTILINGUAL_OUTPUT_CAPABILITIES,
+        MINISHLAB_POTION_BASE_2M_CAPABILITIES,
+        MINISHLAB_POTION_BASE_4M_CAPABILITIES,
+        MINISHLAB_POTION_BASE_8M_CAPABILITIES,
         MinishlabEmbeddingCapabilities,
         MinishlabProvider,
+        get_minishlab_embedding_capabilities,
     )
-    from codeweaver.providers.embedding.capabilities.mistral import MistralEmbeddingCapabilities
+    from codeweaver.providers.embedding.capabilities.mistral import (
+        MistralEmbeddingCapabilities,
+        get_mistral_embedding_capabilities,
+    )
     from codeweaver.providers.embedding.capabilities.mixedbread_ai import (
+        MXBAI_EMBED_LARGE_CAPABILITIES,
         MixedbreadAiEmbeddingCapabilities,
         MixedbreadAiProvider,
+        get_mixedbread_ai_embedding_capabilities,
+    )
+    from codeweaver.providers.embedding.capabilities.morph import (
+        MORPH_LLM_EMBEDDING_V4_CAPABILITIES,
+        get_morph_embedding_capabilities,
     )
     from codeweaver.providers.embedding.capabilities.nomic_ai import (
+        NOMIC_AI_MODERNBERT_EMBED_BASE_CAPABILITIES,
+        NOMIC_AI_NOMIC_EMBED_TEXT_V2_MOE_CAPABILITIES,
         NomicAiEmbeddingCapabilities,
         NomicAiProvider,
+        get_nomic_ai_embedding_capabilities,
     )
-    from codeweaver.providers.embedding.capabilities.openai import OpenaiEmbeddingCapabilities
+    from codeweaver.providers.embedding.capabilities.openai import (
+        OpenaiEmbeddingCapabilities,
+        get_openai_embedding_capabilities,
+    )
     from codeweaver.providers.embedding.capabilities.qwen import (
+        QWEN_QWEN3_EMBEDDING_0_6B_CAPABILITIES,
+        QWEN_QWEN3_EMBEDDING_4B_CAPABILITIES,
+        QWEN_QWEN3_EMBEDDING_8B_CAPABILITIES,
         QwenEmbeddingCapabilities,
         QwenProvider,
+        get_qwen_embedding_capabilities,
     )
     from codeweaver.providers.embedding.capabilities.resolver import (
         EmbeddingCapabilityResolver,
         SparseEmbeddingCapabilityResolver,
     )
     from codeweaver.providers.embedding.capabilities.sentence_transformers import (
+        SENTENCE_TRANSFORMERS_ALL_MINILM_L6_V2_CAPABILITIES,
+        SENTENCE_TRANSFORMERS_ALL_MINILM_L12_V2_CAPABILITIES,
+        SENTENCE_TRANSFORMERS_ALL_MPNET_BASE_V2_CAPABILITIES,
+        SENTENCE_TRANSFORMERS_GTR_T5_BASE_CAPABILITIES,
+        SENTENCE_TRANSFORMERS_MULTI_QA_MINILM_L6_COS_V1_CAPABILITIES,
+        SENTENCE_TRANSFORMERS_PARAPHRASE_MULTILINGUAL_MINILM_L12_V2_CAPABILITIES,
+        SENTENCE_TRANSFORMERS_PARAPHRASE_MULTILINGUAL_MPNET_BASE_V2_CAPABILITIES,
+        VOYAGE_4_NANO_CAPABILITIES,
         SentenceTransformersEmbeddingCapabilities,
         SentenceTransformersProvider,
+        get_sentence_transformers_embedding_capabilities,
     )
     from codeweaver.providers.embedding.capabilities.snowflake import (
+        SNOWFLAKE_ARCTIC_EMBED2_568M_CAPABILITIES,
+        SNOWFLAKE_ARCTIC_EMBED_L_V2_0_CAPABILITIES,
+        SNOWFLAKE_SNOWFLAKE_ARCTIC_EMBED_L_CAPABILITIES,
+        SNOWFLAKE_SNOWFLAKE_ARCTIC_EMBED_M_CAPABILITIES,
+        SNOWFLAKE_SNOWFLAKE_ARCTIC_EMBED_M_LONG_CAPABILITIES,
+        SNOWFLAKE_SNOWFLAKE_ARCTIC_EMBED_M_V2_0_CAPABILITIES,
+        SNOWFLAKE_SNOWFLAKE_ARCTIC_EMBED_S_CAPABILITIES,
+        SNOWFLAKE_SNOWFLAKE_ARCTIC_EMBED_XS_CAPABILITIES,
         SnowflakeEmbeddingCapabilities,
         SnowflakeProvider,
+        get_snowflake_embedding_capabilities,
     )
     from codeweaver.providers.embedding.capabilities.thenlper import (
+        THENLPER_GTE_BASE_CAPABILITIES,
+        THENLPER_GTE_LARGE_CAPABILITIES,
         ThenlperEmbeddingCapabilities,
         ThenlperProvider,
+        get_thenlper_embedding_capabilities,
     )
     from codeweaver.providers.embedding.capabilities.types import (
         EmbeddingCapabilitiesDict,
         PartialCapabilities,
     )
     from codeweaver.providers.embedding.capabilities.voyage import (
+        VOYAGE_4_FAMILY,
         Voyage4ModelFamily,
         VoyageEmbeddingCapabilities,
+        get_voyage_embedding_capabilities,
     )
     from codeweaver.providers.embedding.capabilities.whereisai import (
+        WHEREISAI_UAE_CODE_LARGE_V1_CAPABILITIES,
+        WHEREISAI_UAE_LARGE_V1_CAPABILITIES,
         WhereisaiEmbeddingCapabilities,
         WhereisaiProvider,
+        get_whereisai_embedding_capabilities,
+    )
+    from codeweaver.providers.embedding.fastembed_extensions import (
+        DENSE_MODELS,
+        RERANKING_MODELS,
+        add_models,
+        get_cross_encoder,
+        get_sparse_embedder,
+        get_text_embedder,
     )
     from codeweaver.providers.embedding.providers.base import (
+        DEFAULT_MAX_BATCH_TOKENS,
         EmbeddingCustomDeps,
         EmbeddingErrorInfo,
         EmbeddingImplementationDeps,
         EmbeddingProvider,
-        RetryError,
         SparseEmbeddingProvider,
-        StatisticsDep,
-        np,
+        default_input_transformer,
+        default_output_transformer,
     )
     from codeweaver.providers.embedding.providers.bedrock import (
         BaseBedrockModel,
@@ -418,33 +546,95 @@ if TYPE_CHECKING:
         InvokeRequestDict,
         TitanEmbeddingV2RequestBody,
         TitanEmbeddingV2Response,
+        is_cohere_request,
+        is_cohere_response,
+        is_one_of_valid_types,
+        is_titan_response,
+        shared_serializer,
+        shared_validator,
     )
     from codeweaver.providers.embedding.providers.cohere import CohereEmbeddingProvider
     from codeweaver.providers.embedding.providers.fastembed import (
         FastEmbedEmbeddingProvider,
         FastEmbedSparseProvider,
+        fastembed_output_transformer,
+        fastembed_sparse_output_transformer,
     )
     from codeweaver.providers.embedding.providers.google import (
         GoogleEmbeddingProvider,
         GoogleEmbeddingTasks,
     )
-    from codeweaver.providers.embedding.providers.huggingface import HuggingFaceEmbeddingProvider
-    from codeweaver.providers.embedding.providers.litellm import LiteLLMModelSpec
+    from codeweaver.providers.embedding.providers.huggingface import (
+        HuggingFaceEmbeddingProvider,
+        huggingface_hub_input_transformer,
+        huggingface_hub_output_transformer,
+    )
+    from codeweaver.providers.embedding.providers.litellm import (
+        LITELLM_OPENAI_PROVIDERS,
+        LiteLLMModelSpec,
+    )
     from codeweaver.providers.embedding.providers.mistral import MistralEmbeddingProvider
     from codeweaver.providers.embedding.providers.openai_factory import OpenAIEmbeddingBase
     from codeweaver.providers.embedding.providers.sentence_transformers import (
         SentenceTransformersEmbeddingProvider,
         SentenceTransformersSparseProvider,
+        process_for_instruction_model,
     )
-    from codeweaver.providers.embedding.providers.voyage import VoyageEmbeddingProvider
-    from codeweaver.providers.embedding.registry import (
-        CodeWeaverValidationError,
-        EmbeddingRegistry,
-        InvalidEmbeddingModelError,
+    from codeweaver.providers.embedding.providers.voyage import (
+        VoyageEmbeddingProvider,
+        voyage_context_output_transformer,
+        voyage_output_transformer,
+    )
+    from codeweaver.providers.embedding.registry import EmbeddingRegistry, get_embedding_registry
+    from codeweaver.providers.env_registry.builders import (
+        httpx_env_vars,
+        multi_client_provider,
+        openai_compatible_provider,
+        simple_api_key_provider,
+    )
+    from codeweaver.providers.env_registry.conversion import (
+        env_var_config_to_info,
+        get_provider_configs,
+        get_provider_env_vars_from_registry,
+        provider_env_config_to_vars,
+    )
+    from codeweaver.providers.env_registry.definitions.cloud_platforms import AZURE, HEROKU, VERCEL
+    from codeweaver.providers.env_registry.definitions.openai_compatible import (
+        ALIBABA,
+        CEREBRAS,
+        DEEPSEEK,
+        FIREWORKS,
+        GITHUB,
+        GROQ,
+        LITELLM,
+        MOONSHOT,
+        MORPH,
+        NEBIUS,
+        OLLAMA,
+        OPENAI,
+        OPENROUTER,
+        OVHCLOUD,
+        PERPLEXITY,
+        SAMBANOVA,
+        TOGETHER,
+    )
+    from codeweaver.providers.env_registry.definitions.specialized import (
+        ANTHROPIC,
+        BEDROCK,
+        COHERE,
+        EXA,
+        GOOGLE,
+        HUGGINGFACE_INFERENCE,
+        MISTRAL,
+        PYDANTIC_GATEWAY,
+        QDRANT,
+        TAVILY,
+        VOYAGE,
+        X_AI,
     )
     from codeweaver.providers.env_registry.models import EnvVarConfig, ProviderEnvConfig
     from codeweaver.providers.env_registry.registry import ProviderEnvRegistry
-    from codeweaver.providers.exceptions import CircuitBreakerOpenError, ProviderError
+    from codeweaver.providers.exceptions import CircuitBreakerOpenError
     from codeweaver.providers.http_pool import (
         HttpClientPool,
         PoolLimits,
@@ -455,7 +645,6 @@ if TYPE_CHECKING:
     )
     from codeweaver.providers.optimize import (
         AvailableOptimizations,
-        ModuleType,
         OptimizationDecisions,
         SimdExtensions,
         decide_fastembed_runtime,
@@ -463,30 +652,55 @@ if TYPE_CHECKING:
     )
     from codeweaver.providers.reranking.capabilities.alibaba_nlp import (
         AlibabaNlpRerankingCapabilities,
+        get_alibaba_reranking_capabilities,
     )
-    from codeweaver.providers.reranking.capabilities.amazon import AmazonRerankingCapabilities
-    from codeweaver.providers.reranking.capabilities.baai import BaaiRerankingCapabilities
+    from codeweaver.providers.reranking.capabilities.amazon import (
+        AmazonRerankingCapabilities,
+        get_amazon_reranking_capabilities,
+    )
+    from codeweaver.providers.reranking.capabilities.baai import (
+        BaaiRerankingCapabilities,
+        get_baai_reranking_capabilities,
+    )
     from codeweaver.providers.reranking.capabilities.base import RerankingModelCapabilities
-    from codeweaver.providers.reranking.capabilities.cohere import CohereRerankingCapabilities
-    from codeweaver.providers.reranking.capabilities.jinaai import JinaaiRerankingCapabilities
+    from codeweaver.providers.reranking.capabilities.cohere import (
+        CohereRerankingCapabilities,
+        cohere_max_input,
+        get_cohere_reranking_capabilities,
+    )
+    from codeweaver.providers.reranking.capabilities.jinaai import (
+        JinaaiRerankingCapabilities,
+        get_jinaai_reranking_capabilities,
+    )
     from codeweaver.providers.reranking.capabilities.mixed_bread_ai import (
         MixedBreadAiRerankingCapabilities,
+        get_mixed_bread_reranking_capabilities,
     )
-    from codeweaver.providers.reranking.capabilities.ms_marco import MsMarcoRerankingCapabilities
-    from codeweaver.providers.reranking.capabilities.qwen import QwenRerankingCapabilities
+    from codeweaver.providers.reranking.capabilities.ms_marco import (
+        MsMarcoRerankingCapabilities,
+        get_marco_reranking_capabilities,
+    )
+    from codeweaver.providers.reranking.capabilities.qwen import (
+        QwenRerankingCapabilities,
+        get_qwen_reranking_capabilities,
+    )
     from codeweaver.providers.reranking.capabilities.resolver import RerankingCapabilityResolver
     from codeweaver.providers.reranking.capabilities.types import (
         PartialRerankingCapabilitiesDict,
         RerankingCapabilitiesDict,
     )
-    from codeweaver.providers.reranking.capabilities.voyage import VoyageRerankingCapabilities
+    from codeweaver.providers.reranking.capabilities.voyage import (
+        VoyageRerankingCapabilities,
+        get_voyage_reranking_capabilities,
+    )
     from codeweaver.providers.reranking.providers.base import (
-        PydanticValidationError,
         RerankingProvider,
-        RerankingProviderError,
-        ValidationError,
+        default_reranking_input_transformer,
+        default_reranking_output_transformer,
     )
     from codeweaver.providers.reranking.providers.bedrock import (
+        VALID_REGION_PATTERN,
+        VALID_REGIONS,
         BedrockInlineDocumentSource,
         BedrockRerankConfiguration,
         BedrockRerankingProvider,
@@ -497,14 +711,23 @@ if TYPE_CHECKING:
         BedrockTextQuery,
         DocumentSource,
         RerankConfiguration,
+        bedrock_reranking_input_transformer,
+        bedrock_reranking_output_transformer,
     )
-    from codeweaver.providers.reranking.providers.cohere import CohereRerankingProvider
+    from codeweaver.providers.reranking.providers.cohere import (
+        CohereRerankingProvider,
+        cohere_reranking_output_transformer,
+    )
     from codeweaver.providers.reranking.providers.fastembed import FastEmbedRerankingProvider
     from codeweaver.providers.reranking.providers.sentence_transformers import (
         SentenceTransformersRerankingProvider,
+        preprocess_for_qwen,
     )
     from codeweaver.providers.reranking.providers.types import RerankingResult
-    from codeweaver.providers.reranking.providers.voyage import VoyageRerankingProvider
+    from codeweaver.providers.reranking.providers.voyage import (
+        VoyageRerankingProvider,
+        voyage_reranking_output_transformer,
+    )
     from codeweaver.providers.types.circuit_breaker import CircuitBreakerState
     from codeweaver.providers.types.embedding import ConfiguredCapability, EmbeddingCapabilityGroup
     from codeweaver.providers.types.resolvers import (
@@ -521,23 +744,18 @@ if TYPE_CHECKING:
         CollectionMetadata,
         CollectionPolicy,
         HybridVectorPayload,
-        ModelSwitchError,
         PayloadFieldDict,
         TransformationRecord,
     )
     from codeweaver.providers.types.vectors import VectorConfig, VectorRole, VectorSet
     from codeweaver.providers.vector_stores.base import MixedQueryInput, VectorStoreProvider
-    from codeweaver.providers.vector_stores.inmemory import (
-        AsyncPath,
-        MemoryVectorStoreProvider,
-        PersistenceError,
-    )
+    from codeweaver.providers.vector_stores.inmemory import MemoryVectorStoreProvider
     from codeweaver.providers.vector_stores.qdrant import QdrantVectorStoreProvider
-    from codeweaver.providers.vector_stores.qdrant_base import (
-        QdrantBaseProvider,
-        ResolvedProjectNameDep,
+    from codeweaver.providers.vector_stores.qdrant_base import QdrantBaseProvider
+    from codeweaver.providers.vector_stores.qdrant_service import (
+        QdrantVectorStoreService,
+        create_qdrant_service,
     )
-    from codeweaver.providers.vector_stores.qdrant_service import QdrantVectorStoreService
     from codeweaver.providers.vector_stores.search.condition import (
         Condition,
         ExtendedPointId,
@@ -551,8 +769,13 @@ if TYPE_CHECKING:
         MinShould,
         Nested,
         NestedCondition,
-        PayloadSchemaType,
         ValuesCount,
+    )
+    from codeweaver.providers.vector_stores.search.filter_factory import (
+        ArbitraryFilter,
+        make_filter,
+        make_indexes,
+        to_qdrant_filter,
     )
     from codeweaver.providers.vector_stores.search.geo import (
         GeoBoundingBox,
@@ -571,19 +794,116 @@ if TYPE_CHECKING:
         MatchValue,
         ValueVariants,
     )
-    from codeweaver.providers.vector_stores.search.payload import Entry, PayloadField
+    from codeweaver.providers.vector_stores.search.payload import (
+        Entry,
+        PayloadField,
+        PayloadMetadata,
+        PayloadSchemaType,
+    )
     from codeweaver.providers.vector_stores.search.range import DatetimeRange, Range, RangeInterface
+    from codeweaver.providers.vector_stores.search.wrap_filters import (
+        make_partial_function,
+        wrap_filters,
+    )
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
+    "AGENT_PROVIDER_CLASSES": (__spec__.parent, "agent.providers"),
+    "ALIBABA": (__spec__.parent, "env_registry.definitions.openai_compatible"),
+    "ALIBABA_NLP_GTE_MODERNBERT_BASE_CAPABILITIES": (
+        __spec__.parent,
+        "embedding.capabilities.alibaba_nlp",
+    ),
+    "ALIBABA_NLP_GTE_MULTILINGUAL_BASE_CAPABILITIES": (
+        __spec__.parent,
+        "embedding.capabilities.alibaba_nlp",
+    ),
+    "ALL_CAPABILITIES": (__spec__.parent, "embedding.capabilities.alibaba_nlp"),
+    "ANTHROPIC": (__spec__.parent, "env_registry.definitions.specialized"),
+    "ANTHROPIC_CLIENT_OPTIONS_AGENT_DISCRIMINATOR": (__spec__.parent, "config.clients.utils"),
+    "ANTHROPIC_PROVIDER_DISCRIMINATOR": (__spec__.parent, "config.categories.utils"),
+    "AZURE": (__spec__.parent, "env_registry.definitions.cloud_platforms"),
+    "BEDROCK": (__spec__.parent, "env_registry.definitions.specialized"),
+    "CAP_MAP": (__spec__.parent, "embedding.capabilities.alibaba_nlp"),
+    "CEREBRAS": (__spec__.parent, "env_registry.definitions.openai_compatible"),
+    "COHERE": (__spec__.parent, "env_registry.definitions.specialized"),
+    "CORE_EMBEDDING_PROVIDER_DISCRIMINATOR": (__spec__.parent, "config.categories.utils"),
+    "DEEPSEEK": (__spec__.parent, "env_registry.definitions.openai_compatible"),
+    "DEFAULT_MAX_BATCH_TOKENS": (__spec__.parent, "embedding.providers.base"),
+    "DENSE_MODELS": (__spec__.parent, "embedding.fastembed_extensions"),
+    "EXA": (__spec__.parent, "env_registry.definitions.specialized"),
+    "FIREWORKS": (__spec__.parent, "env_registry.definitions.openai_compatible"),
+    "GITHUB": (__spec__.parent, "env_registry.definitions.openai_compatible"),
+    "GOOGLE": (__spec__.parent, "env_registry.definitions.specialized"),
+    "GROQ": (__spec__.parent, "env_registry.definitions.openai_compatible"),
+    "HAS_ANTHROPIC": (__spec__.parent, "config.providers"),
+    "HAS_FASTEMBED": (__spec__.parent, "config.profiles"),
+    "HAS_ST": (__spec__.parent, "config.profiles"),
+    "HEROKU": (__spec__.parent, "env_registry.definitions.cloud_platforms"),
+    "HUGGINGFACE_INFERENCE": (__spec__.parent, "env_registry.definitions.specialized"),
+    "INCOMPATIBLE_FIELDS": (__spec__.parent, "config.sdk.embedding"),
+    "LITELLM": (__spec__.parent, "env_registry.definitions.openai_compatible"),
+    "LITELLM_OPENAI_PROVIDERS": (__spec__.parent, "embedding.providers.litellm"),
+    "MISTRAL": (__spec__.parent, "env_registry.definitions.specialized"),
+    "MODEL_MAP": (__spec__.parent, "embedding.capabilities.cohere"),
+    "MOONSHOT": (__spec__.parent, "env_registry.definitions.openai_compatible"),
+    "MORPH": (__spec__.parent, "env_registry.definitions.openai_compatible"),
+    "MXBAI_EMBED_LARGE_CAPABILITIES": (__spec__.parent, "embedding.capabilities.mixedbread_ai"),
+    "NEBIUS": (__spec__.parent, "env_registry.definitions.openai_compatible"),
+    "NOMIC_AI_MODERNBERT_EMBED_BASE_CAPABILITIES": (
+        __spec__.parent,
+        "embedding.capabilities.nomic_ai",
+    ),
+    "NON_ANTHROPIC_AGENT_PROVIDER_DISCRIMINATOR": (__spec__.parent, "config.categories.utils"),
+    "OLLAMA": (__spec__.parent, "env_registry.definitions.openai_compatible"),
+    "OPENAI": (__spec__.parent, "env_registry.definitions.openai_compatible"),
+    "OPENROUTER": (__spec__.parent, "env_registry.definitions.openai_compatible"),
+    "OVHCLOUD": (__spec__.parent, "env_registry.definitions.openai_compatible"),
+    "PERPLEXITY": (__spec__.parent, "env_registry.definitions.openai_compatible"),
+    "PROVIDER_DISCRIMINATOR": (__spec__.parent, "config.categories.utils"),
+    "PYDANTIC_GATEWAY": (__spec__.parent, "env_registry.definitions.specialized"),
+    "QDRANT": (__spec__.parent, "env_registry.definitions.specialized"),
+    "RERANKING_MODELS": (__spec__.parent, "embedding.fastembed_extensions"),
+    "RERANKING_PROVIDER_DISCRIMINATOR": (__spec__.parent, "config.categories.utils"),
+    "SAMBANOVA": (__spec__.parent, "env_registry.definitions.openai_compatible"),
+    "SNOWFLAKE_SNOWFLAKE_ARCTIC_EMBED_L_CAPABILITIES": (
+        __spec__.parent,
+        "embedding.capabilities.snowflake",
+    ),
+    "SNOWFLAKE_SNOWFLAKE_ARCTIC_EMBED_M_CAPABILITIES": (
+        __spec__.parent,
+        "embedding.capabilities.snowflake",
+    ),
+    "SNOWFLAKE_SNOWFLAKE_ARCTIC_EMBED_M_LONG_CAPABILITIES": (
+        __spec__.parent,
+        "embedding.capabilities.snowflake",
+    ),
+    "SNOWFLAKE_SNOWFLAKE_ARCTIC_EMBED_S_CAPABILITIES": (
+        __spec__.parent,
+        "embedding.capabilities.snowflake",
+    ),
+    "SNOWFLAKE_SNOWFLAKE_ARCTIC_EMBED_XS_CAPABILITIES": (
+        __spec__.parent,
+        "embedding.capabilities.snowflake",
+    ),
+    "TAVILY": (__spec__.parent, "env_registry.definitions.specialized"),
+    "THENLPER_GTE_BASE_CAPABILITIES": (__spec__.parent, "embedding.capabilities.thenlper"),
+    "THENLPER_GTE_LARGE_CAPABILITIES": (__spec__.parent, "embedding.capabilities.thenlper"),
+    "TOGETHER": (__spec__.parent, "env_registry.definitions.openai_compatible"),
+    "VALID_REGION_PATTERN": (__spec__.parent, "reranking.providers.bedrock"),
+    "VALID_REGIONS": (__spec__.parent, "reranking.providers.bedrock"),
+    "VERCEL": (__spec__.parent, "env_registry.definitions.cloud_platforms"),
+    "VOYAGE": (__spec__.parent, "env_registry.definitions.specialized"),
+    "VOYAGE_4_FAMILY": (__spec__.parent, "embedding.capabilities.voyage"),
+    "VOYAGE_4_NANO_CAPABILITIES": (__spec__.parent, "embedding.capabilities.sentence_transformers"),
+    "X_AI": (__spec__.parent, "env_registry.definitions.specialized"),
     "AgentCapabilityResolver": (__spec__.parent, "agent.resolver"),
     "AgentModelCapabilities": (__spec__.parent, "agent.capabilities"),
     "AgentModelCapabilitiesT": (__spec__.parent, "agent.capabilities"),
     "AgentModelConfig": (__spec__.parent, "config.sdk.agent"),
-    "AgentModelSettings": (__spec__.parent, "config.providers"),
     "AgentProvider": (__spec__.parent, "agent.providers"),
-    "AgentProviderSettingsType": (__spec__.parent, "config.profiles"),
     "AlibabaNlpEmbeddingCapabilities": (__spec__.parent, "embedding.capabilities.alibaba_nlp"),
     "AlibabaNlpRerankingCapabilities": (__spec__.parent, "reranking.capabilities.alibaba_nlp"),
+    "AllDefaultProviderSettings": (__spec__.parent, "config.providers"),
     "AmazonEmbeddingCapabilities": (__spec__.parent, "embedding.capabilities.amazon"),
     "AmazonRerankingCapabilities": (__spec__.parent, "reranking.capabilities.amazon"),
     "AnthropicAgentProviderSettings": (__spec__.parent, "config.categories.agent"),
@@ -594,9 +914,9 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "AnthropicClientOptions": (__spec__.parent, "config.clients.agent"),
     "AnthropicGoogleVertexAgentProviderSettings": (__spec__.parent, "config.categories.agent"),
     "AnthropicGoogleVertexClientOptions": (__spec__.parent, "config.clients.agent"),
+    "ArbitraryFilter": (__spec__.parent, "vector_stores.search.filter_factory"),
     "AsymmetricEmbeddingProviderSettings": (__spec__.parent, "config.categories.embedding"),
     "AsymmetricEmbeddingProviderSettingsDict": (__spec__.parent, "config.categories.embedding"),
-    "AsyncPath": (__spec__.parent, "vector_stores.inmemory"),
     "AvailableOptimizations": (__spec__.parent, "optimize"),
     "AzureEmbeddingProviderSettings": (__spec__.parent, "config.categories.embedding"),
     "AzureOptions": (__spec__.parent, "config.types"),
@@ -651,8 +971,6 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "ClientOptions": (__spec__.parent, "config.clients.base"),
     "CodeWeaverProviderSettings": (__spec__.parent, "config.root_settings"),
     "CodeWeaverProviderSettingsDict": (__spec__.parent, "config.root_settings"),
-    "CodeWeaverSettingsType": (__spec__.parent, "dependencies.config"),
-    "CodeWeaverValidationError": (__spec__.parent, "embedding.registry"),
     "CohereAgentModelConfig": (__spec__.parent, "config.sdk.agent"),
     "CohereAgentProviderSettings": (__spec__.parent, "config.categories.agent"),
     "CohereClientOptions": (__spec__.parent, "config.clients.multi"),
@@ -673,12 +991,9 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "CollectionConfig": (__spec__.parent, "config.sdk.vector_store"),
     "CollectionMetadata": (__spec__.parent, "types.vector_store"),
     "CollectionPolicy": (__spec__.parent, "types.vector_store"),
-    "ConfigurationError": (__spec__.parent, "agent.providers"),
     "ConfiguredCapability": (__spec__.parent, "types.embedding"),
     "ConnectionConfiguration": (__spec__.parent, "config.categories.base"),
     "ConnectionRateLimitConfig": (__spec__.parent, "config.categories.base"),
-    "DataProviderSettingsType": (__spec__.parent, "config.profiles"),
-    "DatatypeMismatchError": (__spec__.parent, "config.categories.embedding"),
     "DatetimeRange": (__spec__.parent, "vector_stores.search.range"),
     "DdgsResultItem": (__spec__.parent, "data.duckduckgo"),
     "DefaultAgentProviderSettings": (__spec__.parent, "config.providers"),
@@ -687,7 +1002,6 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "DefaultSparseEmbeddingProviderSettings": (__spec__.parent, "config.providers"),
     "DefaultVectorStoreProviderSettings": (__spec__.parent, "config.providers"),
     "DeterminedDefaults": (__spec__.parent, "config.providers"),
-    "DimensionMismatchError": (__spec__.parent, "config.categories.embedding"),
     "DocumentRepr": (__spec__.parent, "config.types"),
     "DocumentSource": (__spec__.parent, "reranking.providers.bedrock"),
     "DuckDuckGoClientOptions": (__spec__.parent, "config.clients.data"),
@@ -704,7 +1018,6 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "EmbeddingModelCapabilities": (__spec__.parent, "embedding.capabilities.base"),
     "EmbeddingProvider": (__spec__.parent, "embedding.providers.base"),
     "EmbeddingProviderSettings": (__spec__.parent, "config.categories.embedding"),
-    "EmbeddingProviderSettingsType": (__spec__.parent, "config.profiles"),
     "EmbeddingRegistry": (__spec__.parent, "embedding.registry"),
     "Entry": (__spec__.parent, "vector_stores.search.payload"),
     "EnvVarConfig": (__spec__.parent, "env_registry.models"),
@@ -741,10 +1054,6 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "FieldCondition": (__spec__.parent, "vector_stores.search.condition"),
     "Filter": (__spec__.parent, "vector_stores.search.condition"),
     "FilterableField": (__spec__.parent, "vector_stores.search.condition"),
-    "GeneralAgentClientOptionsType": (__spec__.parent, "config.categories.agent"),
-    "GeneralDataClientOptionsType": (__spec__.parent, "config.categories.data"),
-    "GeneralEmbeddingClientOptionsType": (__spec__.parent, "config.categories.embedding"),
-    "GeneralRerankingClientOptionsType": (__spec__.parent, "config.categories.reranking"),
     "GeoBoundingBox": (__spec__.parent, "vector_stores.search.geo"),
     "GeoLineString": (__spec__.parent, "vector_stores.search.geo"),
     "GeoPoint": (__spec__.parent, "vector_stores.search.geo"),
@@ -775,16 +1084,11 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "IbmGraniteEmbeddingCapabilities": (__spec__.parent, "embedding.capabilities.ibm_granite"),
     "ImageDescription": (__spec__.parent, "embedding.providers.bedrock"),
     "IntfloatEmbeddingCapabilities": (__spec__.parent, "embedding.capabilities.intfloat"),
-    "InvalidEmbeddingModelError": (__spec__.parent, "embedding.registry"),
     "InvokeRequestDict": (__spec__.parent, "embedding.providers.bedrock"),
     "IsEmptyCondition": (__spec__.parent, "vector_stores.search.condition"),
     "IsNullCondition": (__spec__.parent, "vector_stores.search.condition"),
     "JinaaiEmbeddingCapabilities": (__spec__.parent, "embedding.capabilities.jinaai"),
     "JinaaiRerankingCapabilities": (__spec__.parent, "reranking.capabilities.jinaai"),
-    "KnownAgentModelName": (__spec__.parent, "agent.capabilities"),
-    "LiteralProviderCategoryType": (__spec__.parent, "config.providers"),
-    "LiteralProviderType": (__spec__.parent, "agent.providers"),
-    "MappingProxyType": (__spec__.parent, "agent"),
     "MatchAny": (__spec__.parent, "vector_stores.search.match"),
     "MatchExcept": (__spec__.parent, "vector_stores.search.match"),
     "MatchPhrase": (__spec__.parent, "vector_stores.search.match"),
@@ -807,8 +1111,6 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "ModelCapDict": (__spec__.parent, "types.search"),
     "ModelFamily": (__spec__.parent, "embedding.capabilities.base"),
     "ModelNameDict": (__spec__.parent, "types.search"),
-    "ModelSwitchError": (__spec__.parent, "types.vector_store"),
-    "ModuleType": (__spec__.parent, "optimize"),
     "MsMarcoRerankingCapabilities": (__spec__.parent, "reranking.capabilities.ms_marco"),
     "Nested": (__spec__.parent, "vector_stores.search.condition"),
     "NestedCondition": (__spec__.parent, "vector_stores.search.condition"),
@@ -818,24 +1120,21 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "OptimizationDecisions": (__spec__.parent, "optimize"),
     "PayloadField": (__spec__.parent, "vector_stores.search.payload"),
     "PayloadFieldDict": (__spec__.parent, "types.vector_store"),
-    "PayloadSchemaType": (__spec__.parent, "vector_stores.search.condition"),
-    "PersistenceError": (__spec__.parent, "vector_stores.inmemory"),
+    "PayloadMetadata": (__spec__.parent, "vector_stores.search.payload"),
+    "PayloadSchemaType": (__spec__.parent, "vector_stores.search.payload"),
     "PoolLimits": (__spec__.parent, "http_pool"),
     "PoolTimeouts": (__spec__.parent, "http_pool"),
     "ProviderConfigProfile": (__spec__.parent, "config.profiles"),
     "ProviderEnvConfig": (__spec__.parent, "env_registry.models"),
     "ProviderEnvRegistry": (__spec__.parent, "env_registry.registry"),
-    "ProviderError": (__spec__.parent, "exceptions"),
     "ProviderNameMap": (__spec__.parent, "config.providers"),
     "ProviderProfile": (__spec__.parent, "config.profiles"),
     "ProviderSettings": (__spec__.parent, "config.providers"),
     "ProviderSettingsDict": (__spec__.parent, "config.providers"),
     "PydanticGatewayClientOptions": (__spec__.parent, "config.clients.agent"),
     "PydanticGatewayProviderSettings": (__spec__.parent, "config.categories.agent"),
-    "PydanticValidationError": (__spec__.parent, "reranking.providers.base"),
     "QdrantBaseProvider": (__spec__.parent, "vector_stores.qdrant_base"),
     "QdrantClientOptions": (__spec__.parent, "config.clients.vector_store"),
-    "QdrantCollectionConfig": (__spec__.parent, "config.categories.vector_store"),
     "QdrantVectorStoreProvider": (__spec__.parent, "vector_stores.qdrant"),
     "QdrantVectorStoreProviderSettings": (__spec__.parent, "config.categories.vector_store"),
     "QdrantVectorStoreService": (__spec__.parent, "vector_stores.qdrant_service"),
@@ -848,13 +1147,8 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "RerankingConfigT": (__spec__.parent, "config.sdk.reranking"),
     "RerankingModelCapabilities": (__spec__.parent, "reranking.capabilities.base"),
     "RerankingProvider": (__spec__.parent, "reranking.providers.base"),
-    "RerankingProviderError": (__spec__.parent, "reranking.providers.base"),
     "RerankingProviderSettings": (__spec__.parent, "config.categories.reranking"),
-    "RerankingProviderSettingsType": (__spec__.parent, "config.profiles"),
     "RerankingResult": (__spec__.parent, "reranking.providers.types"),
-    "ResolvedProjectNameDep": (__spec__.parent, "vector_stores.qdrant_base"),
-    "RetryError": (__spec__.parent, "embedding.providers.base"),
-    "ScalarType": (__spec__.parent, "config.sdk.embedding"),
     "SearchPackage": (__spec__.parent, "types.search"),
     "SentenceTransformersClientOptions": (__spec__.parent, "config.clients.multi"),
     "SentenceTransformersEmbeddingCapabilities": (
@@ -896,8 +1190,6 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "SparseEmbeddingModelCapabilities": (__spec__.parent, "embedding.capabilities.base"),
     "SparseEmbeddingProvider": (__spec__.parent, "embedding.providers.base"),
     "SparseEmbeddingProviderSettings": (__spec__.parent, "config.categories.sparse_embedding"),
-    "SparseEmbeddingProviderSettingsType": (__spec__.parent, "config.profiles"),
-    "StatisticsDep": (__spec__.parent, "embedding.providers.base"),
     "TavilyClientOptions": (__spec__.parent, "config.clients.data"),
     "TavilyProviderSettings": (__spec__.parent, "config.categories.data"),
     "TavilyResults": (__spec__.parent, "data.tavily"),
@@ -908,15 +1200,12 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "TitanEmbeddingV2RequestBody": (__spec__.parent, "embedding.providers.bedrock"),
     "TitanEmbeddingV2Response": (__spec__.parent, "embedding.providers.bedrock"),
     "TransformationRecord": (__spec__.parent, "types.vector_store"),
-    "TypeAliasType": (__spec__.parent, "dependencies.providers"),
-    "ValidationError": (__spec__.parent, "reranking.providers.base"),
     "ValuesCount": (__spec__.parent, "vector_stores.search.condition"),
     "VectorConfig": (__spec__.parent, "types.vectors"),
     "VectorRole": (__spec__.parent, "types.vectors"),
     "VectorSet": (__spec__.parent, "types.vectors"),
     "VectorStoreProvider": (__spec__.parent, "vector_stores.base"),
     "VectorStoreProviderSettings": (__spec__.parent, "config.categories.vector_store"),
-    "VectorStoreProviderSettingsType": (__spec__.parent, "config.providers"),
     "VersionedProfile": (__spec__.parent, "config.profiles"),
     "Voyage4ModelFamily": (__spec__.parent, "embedding.capabilities.voyage"),
     "VoyageClientOptions": (__spec__.parent, "config.clients.multi"),
@@ -931,35 +1220,345 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "VoyageRerankingProvider": (__spec__.parent, "reranking.providers.voyage"),
     "VoyageRerankingProviderSettings": (__spec__.parent, "config.categories.reranking"),
     "WhereisaiEmbeddingCapabilities": (__spec__.parent, "embedding.capabilities.whereisai"),
+    "add_models": (__spec__.parent, "embedding.fastembed_extensions"),
+    "BAAI_BGE_BASE_EN_V1_5_CAPABILITIES": (__spec__.parent, "embedding.capabilities.baai"),
+    "BAAI_BGE_SMALL_EN_V1_5_CAPABILITIES": (__spec__.parent, "embedding.capabilities.baai"),
+    "bedrock_reranking_input_transformer": (__spec__.parent, "reranking.providers.bedrock"),
+    "bedrock_reranking_output_transformer": (__spec__.parent, "reranking.providers.bedrock"),
+    "BGE_LARGE_EN_335M_CAPABILITIES": (__spec__.parent, "embedding.capabilities.baai"),
     "build_data_tool": (__spec__.parent, "data.utils"),
+    "cohere_max_input": (__spec__.parent, "reranking.capabilities.cohere"),
+    "cohere_reranking_output_transformer": (__spec__.parent, "reranking.providers.cohere"),
+    "create_backup_embeddings": (__spec__.parent, "config.backup_models"),
+    "create_qdrant_service": (__spec__.parent, "vector_stores.qdrant_service"),
     "decide_fastembed_runtime": (__spec__.parent, "optimize"),
+    "default_input_transformer": (__spec__.parent, "embedding.providers.base"),
+    "default_output_transformer": (__spec__.parent, "embedding.providers.base"),
+    "default_reranking_input_transformer": (__spec__.parent, "reranking.providers.base"),
+    "default_reranking_output_transformer": (__spec__.parent, "reranking.providers.base"),
+    "discriminate_anthropic_agent_client_options": (__spec__.parent, "config.clients.agent"),
+    "discriminate_azure_embedding_client_options": (__spec__.parent, "config.clients.multi"),
+    "discriminate_embedding_clients": (__spec__.parent, "config.clients.utils"),
     "duckduckgo_search_tool": (__spec__.parent, "data.duckduckgo"),
+    "ensure_endpoint_version": (__spec__.parent, "config.clients.utils"),
+    "env_var_config_to_info": (__spec__.parent, "env_registry.conversion"),
     "exa_answer_tool": (__spec__.parent, "data.exa"),
     "exa_find_similar_tool": (__spec__.parent, "data.exa"),
     "exa_get_contents_tool": (__spec__.parent, "data.exa"),
     "exa_search_tool": (__spec__.parent, "data.exa"),
+    "fastembed_output_transformer": (__spec__.parent, "embedding.providers.fastembed"),
+    "fastembed_sparse_output_transformer": (__spec__.parent, "embedding.providers.fastembed"),
+    "get_agent_capabilities_for_model": (__spec__.parent, "agent.capabilities"),
+    "get_agent_model_capabilities": (__spec__.parent, "agent.capabilities"),
+    "get_agent_model_provider": (__spec__.parent, "agent.providers"),
+    "get_agent_resolver": (__spec__.parent, "agent.resolver"),
+    "get_alibaba_nlp_embedding_capabilities": (
+        __spec__.parent,
+        "embedding.capabilities.alibaba_nlp",
+    ),
+    "get_alibaba_reranking_capabilities": (__spec__.parent, "reranking.capabilities.alibaba_nlp"),
+    "get_amazon_embedding_capabilities": (__spec__.parent, "embedding.capabilities.amazon"),
+    "get_amazon_reranking_capabilities": (__spec__.parent, "reranking.capabilities.amazon"),
+    "get_baai_embedding_capabilities": (__spec__.parent, "embedding.capabilities.baai"),
+    "get_baai_reranking_capabilities": (__spec__.parent, "reranking.capabilities.baai"),
+    "get_backup_embedding_config": (__spec__.parent, "config.backup_models"),
+    "get_backup_embedding_provider": (__spec__.parent, "config.backup_models"),
+    "get_backup_model_info": (__spec__.parent, "config.backup_models"),
+    "get_cohere_embedding_capabilities": (__spec__.parent, "embedding.capabilities.cohere"),
+    "get_cohere_reranking_capabilities": (__spec__.parent, "reranking.capabilities.cohere"),
+    "get_cross_encoder": (__spec__.parent, "embedding.fastembed_extensions"),
+    "get_data_provider": (__spec__.parent, "data.providers"),
+    "get_embedding_group": (__spec__.parent, "config.sdk.vector_store"),
+    "get_embedding_registry": (__spec__.parent, "embedding.registry"),
+    "get_google_embedding_capabilities": (__spec__.parent, "embedding.capabilities.google"),
     "get_http_pool": (__spec__.parent, "http_pool"),
+    "get_ibm_granite_embedding_capabilities": (
+        __spec__.parent,
+        "embedding.capabilities.ibm_granite",
+    ),
+    "get_intfloat_embedding_capabilities": (__spec__.parent, "embedding.capabilities.intfloat"),
+    "get_jinaai_embedding_capabilities": (__spec__.parent, "embedding.capabilities.jinaai"),
+    "get_jinaai_reranking_capabilities": (__spec__.parent, "reranking.capabilities.jinaai"),
+    "get_marco_reranking_capabilities": (__spec__.parent, "reranking.capabilities.ms_marco"),
+    "get_minishlab_embedding_capabilities": (__spec__.parent, "embedding.capabilities.minishlab"),
+    "get_mistral_embedding_capabilities": (__spec__.parent, "embedding.capabilities.mistral"),
+    "get_mixed_bread_reranking_capabilities": (
+        __spec__.parent,
+        "reranking.capabilities.mixed_bread_ai",
+    ),
+    "get_mixedbread_ai_embedding_capabilities": (
+        __spec__.parent,
+        "embedding.capabilities.mixedbread_ai",
+    ),
+    "get_morph_embedding_capabilities": (__spec__.parent, "embedding.capabilities.morph"),
+    "get_nomic_ai_embedding_capabilities": (__spec__.parent, "embedding.capabilities.nomic_ai"),
+    "get_openai_embedding_capabilities": (__spec__.parent, "embedding.capabilities.openai"),
     "get_optimizations": (__spec__.parent, "optimize"),
+    "get_provider_configs": (__spec__.parent, "env_registry.conversion"),
+    "get_provider_env_vars_from_registry": (__spec__.parent, "env_registry.conversion"),
+    "get_provider_names_for_category": (__spec__.parent, "data.utils"),
+    "get_qwen_embedding_capabilities": (__spec__.parent, "embedding.capabilities.qwen"),
+    "get_qwen_reranking_capabilities": (__spec__.parent, "reranking.capabilities.qwen"),
+    "get_schema_for_type": (__spec__.parent, "data.utils"),
+    "get_sentence_transformers_embedding_capabilities": (
+        __spec__.parent,
+        "embedding.capabilities.sentence_transformers",
+    ),
+    "get_serializer_for_type": (__spec__.parent, "data.utils"),
+    "get_snowflake_embedding_capabilities": (__spec__.parent, "embedding.capabilities.snowflake"),
+    "get_sparse_caps": (__spec__.parent, "embedding.capabilities.base"),
+    "get_sparse_embedder": (__spec__.parent, "embedding.fastembed_extensions"),
+    "get_text_embedder": (__spec__.parent, "embedding.fastembed_extensions"),
+    "get_thenlper_embedding_capabilities": (__spec__.parent, "embedding.capabilities.thenlper"),
+    "get_type_adapter": (__spec__.parent, "data.utils"),
+    "get_voyage_embedding_capabilities": (__spec__.parent, "embedding.capabilities.voyage"),
+    "get_voyage_reranking_capabilities": (__spec__.parent, "reranking.capabilities.voyage"),
+    "get_whereisai_embedding_capabilities": (__spec__.parent, "embedding.capabilities.whereisai"),
+    "GRANITE_EMBEDDING_278M_CAPABILITIES": (__spec__.parent, "embedding.capabilities.ibm_granite"),
+    "GRANITE_EMBEDDING_30M_CAPABILITIES": (__spec__.parent, "embedding.capabilities.ibm_granite"),
+    "GRANITE_EMBEDDING_ENGLISH_R2_CAPABILITIES": (
+        __spec__.parent,
+        "embedding.capabilities.ibm_granite",
+    ),
+    "GRANITE_EMBEDDING_SMALL_ENGLISH_R2_CAPABILITIES": (
+        __spec__.parent,
+        "embedding.capabilities.ibm_granite",
+    ),
+    "httpx_env_vars": (__spec__.parent, "env_registry.builders"),
+    "huggingface_hub_input_transformer": (__spec__.parent, "embedding.providers.huggingface"),
+    "huggingface_hub_output_transformer": (__spec__.parent, "embedding.providers.huggingface"),
+    "infer_agent_provider_class": (__spec__.parent, "agent.providers"),
+    "INTFLOAT_MULTILINGUAL_E5_LARGE_CAPABILITIES": (
+        __spec__.parent,
+        "embedding.capabilities.intfloat",
+    ),
+    "INTFLOAT_MULTILINGUAL_E5_LARGE_INSTRUCT_CAPABILITIES": (
+        __spec__.parent,
+        "embedding.capabilities.intfloat",
+    ),
+    "is_cloud_provider": (__spec__.parent, "config.categories.utils"),
+    "is_cohere_request": (__spec__.parent, "embedding.providers.bedrock"),
+    "is_cohere_response": (__spec__.parent, "embedding.providers.bedrock"),
+    "is_one_of_valid_types": (__spec__.parent, "embedding.providers.bedrock"),
+    "is_titan_response": (__spec__.parent, "embedding.providers.bedrock"),
+    "JINAAI_JINA_EMBEDDINGS_V2_BASE_CODE_CAPABILITIES": (
+        __spec__.parent,
+        "embedding.capabilities.jinaai",
+    ),
+    "JINAAI_JINA_EMBEDDINGS_V2_SMALL_EN_CAPABILITIES": (
+        __spec__.parent,
+        "embedding.capabilities.jinaai",
+    ),
+    "JINAAI_JINA_EMBEDDINGS_V3_CAPABILITIES": (__spec__.parent, "embedding.capabilities.jinaai"),
+    "JINAAI_JINA_EMBEDDINGS_V4_CAPABILITIES": (__spec__.parent, "embedding.capabilities.jinaai"),
     "LiteLLMModelSpec": (__spec__.parent, "embedding.providers.litellm"),
-    "np": (__spec__.parent, "embedding.providers.base"),
+    "load_default_agent_providers": (__spec__.parent, "agent.providers"),
+    "load_default_data_providers": (__spec__.parent, "data.providers"),
+    "make_filter": (__spec__.parent, "vector_stores.search.filter_factory"),
+    "make_indexes": (__spec__.parent, "vector_stores.search.filter_factory"),
+    "make_partial_function": (__spec__.parent, "vector_stores.search.wrap_filters"),
+    "merge_agent_model_settings": (__spec__.parent, "config.providers"),
+    "MINISHLAB_M2V_BASE_GLOVE_CAPABILITIES": (__spec__.parent, "embedding.capabilities.minishlab"),
+    "MINISHLAB_M2V_BASE_GLOVE_SUBWORD_CAPABILITIES": (
+        __spec__.parent,
+        "embedding.capabilities.minishlab",
+    ),
+    "MINISHLAB_M2V_BASE_OUTPUT_CAPABILITIES": (__spec__.parent, "embedding.capabilities.minishlab"),
+    "MINISHLAB_M2V_MULTILINGUAL_OUTPUT_CAPABILITIES": (
+        __spec__.parent,
+        "embedding.capabilities.minishlab",
+    ),
+    "MINISHLAB_POTION_BASE_2M_CAPABILITIES": (__spec__.parent, "embedding.capabilities.minishlab"),
+    "MINISHLAB_POTION_BASE_4M_CAPABILITIES": (__spec__.parent, "embedding.capabilities.minishlab"),
+    "MINISHLAB_POTION_BASE_8M_CAPABILITIES": (__spec__.parent, "embedding.capabilities.minishlab"),
+    "MORPH_LLM_EMBEDDING_V4_CAPABILITIES": (__spec__.parent, "embedding.capabilities.morph"),
+    "multi_client_provider": (__spec__.parent, "env_registry.builders"),
+    "NOMIC_AI_NOMIC_EMBED_TEXT_V2_MOE_CAPABILITIES": (
+        __spec__.parent,
+        "embedding.capabilities.nomic_ai",
+    ),
+    "openai_compatible_provider": (__spec__.parent, "env_registry.builders"),
     "OpenAIAgentClientOptions": (__spec__.parent, "config.clients.agent"),
     "OpenAIAgentProviderSettings": (__spec__.parent, "config.categories.agent"),
     "OpenAIClientOptions": (__spec__.parent, "config.clients.multi"),
     "OpenAIEmbeddingBase": (__spec__.parent, "embedding.providers.openai_factory"),
     "OpenAIEmbeddingConfig": (__spec__.parent, "config.sdk.embedding"),
     "OpenAIEmbeddingRequestParams": (__spec__.parent, "config.sdk.embedding"),
-    "parse_version": (__spec__.parent, "config.profiles"),
+    "preprocess_for_qwen": (__spec__.parent, "reranking.providers.sentence_transformers"),
+    "process_for_instruction_model": (__spec__.parent, "embedding.providers.sentence_transformers"),
+    "provider_env_config_to_vars": (__spec__.parent, "env_registry.conversion"),
+    "QWEN_QWEN3_EMBEDDING_0_6B_CAPABILITIES": (__spec__.parent, "embedding.capabilities.qwen"),
+    "QWEN_QWEN3_EMBEDDING_4B_CAPABILITIES": (__spec__.parent, "embedding.capabilities.qwen"),
+    "QWEN_QWEN3_EMBEDDING_8B_CAPABILITIES": (__spec__.parent, "embedding.capabilities.qwen"),
     "register_data_tool": (__spec__.parent, "data.utils"),
     "register_exa_tools": (__spec__.parent, "data.exa"),
     "reset_http_pool": (__spec__.parent, "http_pool"),
     "reset_http_pool_sync": (__spec__.parent, "http_pool"),
+    "SENTENCE_TRANSFORMERS_ALL_MINILM_L12_V2_CAPABILITIES": (
+        __spec__.parent,
+        "embedding.capabilities.sentence_transformers",
+    ),
+    "SENTENCE_TRANSFORMERS_ALL_MINILM_L6_V2_CAPABILITIES": (
+        __spec__.parent,
+        "embedding.capabilities.sentence_transformers",
+    ),
+    "SENTENCE_TRANSFORMERS_ALL_MPNET_BASE_V2_CAPABILITIES": (
+        __spec__.parent,
+        "embedding.capabilities.sentence_transformers",
+    ),
+    "SENTENCE_TRANSFORMERS_GTR_T5_BASE_CAPABILITIES": (
+        __spec__.parent,
+        "embedding.capabilities.sentence_transformers",
+    ),
+    "SENTENCE_TRANSFORMERS_MULTI_QA_MINILM_L6_COS_V1_CAPABILITIES": (
+        __spec__.parent,
+        "embedding.capabilities.sentence_transformers",
+    ),
+    "SENTENCE_TRANSFORMERS_PARAPHRASE_MULTILINGUAL_MINILM_L12_V2_CAPABILITIES": (
+        __spec__.parent,
+        "embedding.capabilities.sentence_transformers",
+    ),
+    "SENTENCE_TRANSFORMERS_PARAPHRASE_MULTILINGUAL_MPNET_BASE_V2_CAPABILITIES": (
+        __spec__.parent,
+        "embedding.capabilities.sentence_transformers",
+    ),
+    "shared_serializer": (__spec__.parent, "embedding.providers.bedrock"),
+    "shared_validator": (__spec__.parent, "embedding.providers.bedrock"),
+    "simple_api_key_provider": (__spec__.parent, "env_registry.builders"),
+    "simple_provider_discriminator": (__spec__.parent, "config.clients.utils"),
+    "SNOWFLAKE_ARCTIC_EMBED2_568M_CAPABILITIES": (
+        __spec__.parent,
+        "embedding.capabilities.snowflake",
+    ),
+    "SNOWFLAKE_ARCTIC_EMBED_L_V2_0_CAPABILITIES": (
+        __spec__.parent,
+        "embedding.capabilities.snowflake",
+    ),
+    "SNOWFLAKE_SNOWFLAKE_ARCTIC_EMBED_M_V2_0_CAPABILITIES": (
+        __spec__.parent,
+        "embedding.capabilities.snowflake",
+    ),
     "tavily_search_tool": (__spec__.parent, "data.tavily"),
+    "to_qdrant_filter": (__spec__.parent, "vector_stores.search.filter_factory"),
+    "try_for_azure_endpoint": (__spec__.parent, "config.clients.utils"),
+    "try_for_heroku_endpoint": (__spec__.parent, "config.clients.utils"),
+    "voyage_context_output_transformer": (__spec__.parent, "embedding.providers.voyage"),
+    "voyage_output_transformer": (__spec__.parent, "embedding.providers.voyage"),
+    "voyage_reranking_output_transformer": (__spec__.parent, "reranking.providers.voyage"),
+    "WHEREISAI_UAE_CODE_LARGE_V1_CAPABILITIES": (
+        __spec__.parent,
+        "embedding.capabilities.whereisai",
+    ),
+    "WHEREISAI_UAE_LARGE_V1_CAPABILITIES": (__spec__.parent, "embedding.capabilities.whereisai"),
+    "wrap_filters": (__spec__.parent, "vector_stores.search.wrap_filters"),
     "XAIClientOptions": (__spec__.parent, "config.clients.agent"),
 })
 
 __getattr__ = create_late_getattr(_dynamic_imports, globals(), __name__)
 
 __all__ = (
+    "AGENT_PROVIDER_CLASSES",
+    "ALIBABA",
+    "ALIBABA_NLP_GTE_MODERNBERT_BASE_CAPABILITIES",
+    "ALIBABA_NLP_GTE_MULTILINGUAL_BASE_CAPABILITIES",
+    "ALL_CAPABILITIES",
+    "ANTHROPIC",
+    "ANTHROPIC_CLIENT_OPTIONS_AGENT_DISCRIMINATOR",
+    "ANTHROPIC_PROVIDER_DISCRIMINATOR",
+    "AZURE",
+    "BAAI_BGE_BASE_EN_V1_5_CAPABILITIES",
+    "BAAI_BGE_SMALL_EN_V1_5_CAPABILITIES",
+    "BEDROCK",
+    "BGE_LARGE_EN_335M_CAPABILITIES",
+    "CAP_MAP",
+    "CEREBRAS",
+    "COHERE",
+    "CORE_EMBEDDING_PROVIDER_DISCRIMINATOR",
+    "DEEPSEEK",
+    "DEFAULT_MAX_BATCH_TOKENS",
+    "DENSE_MODELS",
+    "EXA",
+    "FIREWORKS",
+    "GITHUB",
+    "GOOGLE",
+    "GRANITE_EMBEDDING_30M_CAPABILITIES",
+    "GRANITE_EMBEDDING_278M_CAPABILITIES",
+    "GRANITE_EMBEDDING_ENGLISH_R2_CAPABILITIES",
+    "GRANITE_EMBEDDING_SMALL_ENGLISH_R2_CAPABILITIES",
+    "GROQ",
+    "HAS_ANTHROPIC",
+    "HAS_FASTEMBED",
+    "HAS_ST",
+    "HEROKU",
+    "HUGGINGFACE_INFERENCE",
+    "INCOMPATIBLE_FIELDS",
+    "INTFLOAT_MULTILINGUAL_E5_LARGE_CAPABILITIES",
+    "INTFLOAT_MULTILINGUAL_E5_LARGE_INSTRUCT_CAPABILITIES",
+    "JINAAI_JINA_EMBEDDINGS_V2_BASE_CODE_CAPABILITIES",
+    "JINAAI_JINA_EMBEDDINGS_V2_SMALL_EN_CAPABILITIES",
+    "JINAAI_JINA_EMBEDDINGS_V3_CAPABILITIES",
+    "JINAAI_JINA_EMBEDDINGS_V4_CAPABILITIES",
+    "LITELLM",
+    "LITELLM_OPENAI_PROVIDERS",
+    "MINISHLAB_M2V_BASE_GLOVE_CAPABILITIES",
+    "MINISHLAB_M2V_BASE_GLOVE_SUBWORD_CAPABILITIES",
+    "MINISHLAB_M2V_BASE_OUTPUT_CAPABILITIES",
+    "MINISHLAB_M2V_MULTILINGUAL_OUTPUT_CAPABILITIES",
+    "MINISHLAB_POTION_BASE_2M_CAPABILITIES",
+    "MINISHLAB_POTION_BASE_4M_CAPABILITIES",
+    "MINISHLAB_POTION_BASE_8M_CAPABILITIES",
+    "MISTRAL",
+    "MODEL_MAP",
+    "MOONSHOT",
+    "MORPH",
+    "MORPH_LLM_EMBEDDING_V4_CAPABILITIES",
+    "MXBAI_EMBED_LARGE_CAPABILITIES",
+    "NEBIUS",
+    "NOMIC_AI_MODERNBERT_EMBED_BASE_CAPABILITIES",
+    "NOMIC_AI_NOMIC_EMBED_TEXT_V2_MOE_CAPABILITIES",
+    "NON_ANTHROPIC_AGENT_PROVIDER_DISCRIMINATOR",
+    "OLLAMA",
+    "OPENAI",
+    "OPENROUTER",
+    "OVHCLOUD",
+    "PERPLEXITY",
+    "PROVIDER_DISCRIMINATOR",
+    "PYDANTIC_GATEWAY",
+    "QDRANT",
+    "QWEN_QWEN3_EMBEDDING_0_6B_CAPABILITIES",
+    "QWEN_QWEN3_EMBEDDING_4B_CAPABILITIES",
+    "QWEN_QWEN3_EMBEDDING_8B_CAPABILITIES",
+    "RERANKING_MODELS",
+    "RERANKING_PROVIDER_DISCRIMINATOR",
+    "SAMBANOVA",
+    "SENTENCE_TRANSFORMERS_ALL_MINILM_L6_V2_CAPABILITIES",
+    "SENTENCE_TRANSFORMERS_ALL_MINILM_L12_V2_CAPABILITIES",
+    "SENTENCE_TRANSFORMERS_ALL_MPNET_BASE_V2_CAPABILITIES",
+    "SENTENCE_TRANSFORMERS_GTR_T5_BASE_CAPABILITIES",
+    "SENTENCE_TRANSFORMERS_MULTI_QA_MINILM_L6_COS_V1_CAPABILITIES",
+    "SENTENCE_TRANSFORMERS_PARAPHRASE_MULTILINGUAL_MINILM_L12_V2_CAPABILITIES",
+    "SENTENCE_TRANSFORMERS_PARAPHRASE_MULTILINGUAL_MPNET_BASE_V2_CAPABILITIES",
+    "SNOWFLAKE_ARCTIC_EMBED2_568M_CAPABILITIES",
+    "SNOWFLAKE_ARCTIC_EMBED_L_V2_0_CAPABILITIES",
+    "SNOWFLAKE_SNOWFLAKE_ARCTIC_EMBED_L_CAPABILITIES",
+    "SNOWFLAKE_SNOWFLAKE_ARCTIC_EMBED_M_CAPABILITIES",
+    "SNOWFLAKE_SNOWFLAKE_ARCTIC_EMBED_M_LONG_CAPABILITIES",
+    "SNOWFLAKE_SNOWFLAKE_ARCTIC_EMBED_M_V2_0_CAPABILITIES",
+    "SNOWFLAKE_SNOWFLAKE_ARCTIC_EMBED_S_CAPABILITIES",
+    "SNOWFLAKE_SNOWFLAKE_ARCTIC_EMBED_XS_CAPABILITIES",
+    "TAVILY",
+    "THENLPER_GTE_BASE_CAPABILITIES",
+    "THENLPER_GTE_LARGE_CAPABILITIES",
+    "TOGETHER",
+    "VALID_REGIONS",
+    "VALID_REGION_PATTERN",
+    "VERCEL",
+    "VOYAGE",
+    "VOYAGE_4_FAMILY",
+    "VOYAGE_4_NANO_CAPABILITIES",
+    "WHEREISAI_UAE_CODE_LARGE_V1_CAPABILITIES",
+    "WHEREISAI_UAE_LARGE_V1_CAPABILITIES",
+    "X_AI",
     "AgentCapabilityResolver",
     "AgentCapabilityResolverDep",
     "AgentModelCapabilities",
@@ -967,7 +1566,6 @@ __all__ = (
     "AgentModelConfig",
     "AgentModelConfigT",
     "AgentModelNameString",
-    "AgentModelSettings",
     "AgentProvider",
     "AgentProviderDep",
     "AgentProviderSettingsDep",
@@ -977,6 +1575,7 @@ __all__ = (
     "AlibabaNlpRerankingCapabilities",
     "AllAgentProviderConfigsDep",
     "AllDataProviderConfigsDep",
+    "AllDefaultProviderSettings",
     "AllEmbeddingConfigsDep",
     "AllRerankingConfigsDep",
     "AllSparseEmbeddingConfigsDep",
@@ -994,9 +1593,9 @@ __all__ = (
     "AnthropicGoogleVertexAgentProviderSettings",
     "AnthropicGoogleVertexClientOptions",
     "AnyVariants",
+    "ArbitraryFilter",
     "AsymmetricEmbeddingProviderSettings",
     "AsymmetricEmbeddingProviderSettingsDict",
-    "AsyncPath",
     "AvailableOptimizations",
     "AzureClientOptionsType",
     "AzureEmbeddingProviderSettings",
@@ -1054,8 +1653,6 @@ __all__ = (
     "ClientOptions",
     "CodeWeaverProviderSettings",
     "CodeWeaverProviderSettingsDict",
-    "CodeWeaverSettingsType",
-    "CodeWeaverValidationError",
     "CohereAgentModelConfig",
     "CohereAgentProviderSettings",
     "CohereClientOptions",
@@ -1077,7 +1674,6 @@ __all__ = (
     "CollectionMetadata",
     "CollectionPolicy",
     "Condition",
-    "ConfigurationError",
     "ConfiguredCapabilitiesDep",
     "ConfiguredCapability",
     "ConnectionConfiguration",
@@ -1088,7 +1684,6 @@ __all__ = (
     "DataProviderType",
     "DataProvidersDep",
     "DataToolConfigT",
-    "DatatypeMismatchError",
     "DatetimeRange",
     "DdgsResultItem",
     "DdgsResults",
@@ -1098,7 +1693,6 @@ __all__ = (
     "DefaultSparseEmbeddingProviderSettings",
     "DefaultVectorStoreProviderSettings",
     "DeterminedDefaults",
-    "DimensionMismatchError",
     "DocumentRepr",
     "DocumentSource",
     "DuckDuckGoClientOptions",
@@ -1196,18 +1790,13 @@ __all__ = (
     "ImageDescription",
     "IntfloatEmbeddingCapabilities",
     "IntfloatProvider",
-    "InvalidEmbeddingModelError",
     "InvokeRequestDict",
     "IsEmptyCondition",
     "IsNullCondition",
     "JinaaiEmbeddingCapabilities",
     "JinaaiProvider",
     "JinaaiRerankingCapabilities",
-    "KnownAgentModelName",
     "LiteLLMModelSpec",
-    "LiteralProviderCategoryType",
-    "LiteralProviderType",
-    "MappingProxyType",
     "Match",
     "MatchAny",
     "MatchExcept",
@@ -1234,8 +1823,6 @@ __all__ = (
     "ModelCapDict",
     "ModelFamily",
     "ModelNameDict",
-    "ModelSwitchError",
-    "ModuleType",
     "MsMarcoRerankingCapabilities",
     "Nested",
     "NestedCondition",
@@ -1255,8 +1842,8 @@ __all__ = (
     "PartialRerankingCapabilitiesDict",
     "PayloadField",
     "PayloadFieldDict",
+    "PayloadMetadata",
     "PayloadSchemaType",
-    "PersistenceError",
     "PoolLimits",
     "PoolTimeouts",
     "PrimaryEmbeddingProviderDep",
@@ -1266,7 +1853,6 @@ __all__ = (
     "ProviderConfigProfile",
     "ProviderEnvConfig",
     "ProviderEnvRegistry",
-    "ProviderError",
     "ProviderNameMap",
     "ProviderProfile",
     "ProviderSettings",
@@ -1275,10 +1861,8 @@ __all__ = (
     "ProviderSettingsView",
     "PydanticGatewayClientOptions",
     "PydanticGatewayProviderSettings",
-    "PydanticValidationError",
     "QdrantBaseProvider",
     "QdrantClientOptions",
-    "QdrantCollectionConfig",
     "QdrantVectorStoreProvider",
     "QdrantVectorStoreProviderSettings",
     "QdrantVectorStoreService",
@@ -1296,15 +1880,11 @@ __all__ = (
     "RerankingConfigT",
     "RerankingModelCapabilities",
     "RerankingProvider",
-    "RerankingProviderError",
     "RerankingProviderSettings",
     "RerankingProviderSettingsDep",
     "RerankingProviderSettingsType",
     "RerankingProvidersDep",
     "RerankingResult",
-    "ResolvedProjectNameDep",
-    "RetryError",
-    "ScalarType",
     "SearchPackage",
     "SearchPackageDep",
     "SentenceTransformersClientOptions",
@@ -1337,7 +1917,6 @@ __all__ = (
     "SparseEmbeddingProviderSettingsDep",
     "SparseEmbeddingProviderSettingsType",
     "SparseEmbeddingProvidersDep",
-    "StatisticsDep",
     "TavilyClientOptions",
     "TavilyProviderSettings",
     "TavilyResults",
@@ -1350,8 +1929,6 @@ __all__ = (
     "TitanEmbeddingV2Response",
     "TokenizerDep",
     "TransformationRecord",
-    "TypeAliasType",
-    "ValidationError",
     "ValueVariants",
     "ValuesCount",
     "VectorConfig",
@@ -1378,22 +1955,118 @@ __all__ = (
     "WhereisaiEmbeddingCapabilities",
     "WhereisaiProvider",
     "XAIClientOptions",
+    "add_models",
+    "bedrock_reranking_input_transformer",
+    "bedrock_reranking_output_transformer",
     "build_data_tool",
+    "cohere_max_input",
+    "cohere_reranking_output_transformer",
+    "create_backup_embeddings",
+    "create_qdrant_service",
     "decide_fastembed_runtime",
+    "default_input_transformer",
+    "default_output_transformer",
+    "default_reranking_input_transformer",
+    "default_reranking_output_transformer",
+    "discriminate_anthropic_agent_client_options",
+    "discriminate_azure_embedding_client_options",
+    "discriminate_embedding_clients",
     "duckduckgo_search_tool",
+    "ensure_endpoint_version",
+    "env_var_config_to_info",
     "exa_answer_tool",
     "exa_find_similar_tool",
     "exa_get_contents_tool",
     "exa_search_tool",
+    "fastembed_output_transformer",
+    "fastembed_sparse_output_transformer",
+    "get_agent_capabilities_for_model",
+    "get_agent_model_capabilities",
+    "get_agent_model_provider",
+    "get_agent_resolver",
+    "get_alibaba_nlp_embedding_capabilities",
+    "get_alibaba_reranking_capabilities",
+    "get_amazon_embedding_capabilities",
+    "get_amazon_reranking_capabilities",
+    "get_baai_embedding_capabilities",
+    "get_baai_reranking_capabilities",
+    "get_backup_embedding_config",
+    "get_backup_embedding_provider",
+    "get_backup_model_info",
+    "get_cohere_embedding_capabilities",
+    "get_cohere_reranking_capabilities",
+    "get_cross_encoder",
+    "get_data_provider",
+    "get_embedding_group",
+    "get_embedding_registry",
+    "get_google_embedding_capabilities",
     "get_http_pool",
+    "get_ibm_granite_embedding_capabilities",
+    "get_intfloat_embedding_capabilities",
+    "get_jinaai_embedding_capabilities",
+    "get_jinaai_reranking_capabilities",
+    "get_marco_reranking_capabilities",
+    "get_minishlab_embedding_capabilities",
+    "get_mistral_embedding_capabilities",
+    "get_mixed_bread_reranking_capabilities",
+    "get_mixedbread_ai_embedding_capabilities",
+    "get_morph_embedding_capabilities",
+    "get_nomic_ai_embedding_capabilities",
+    "get_openai_embedding_capabilities",
     "get_optimizations",
-    "np",
-    "parse_version",
+    "get_provider_configs",
+    "get_provider_env_vars_from_registry",
+    "get_provider_names_for_category",
+    "get_qwen_embedding_capabilities",
+    "get_qwen_reranking_capabilities",
+    "get_schema_for_type",
+    "get_sentence_transformers_embedding_capabilities",
+    "get_serializer_for_type",
+    "get_snowflake_embedding_capabilities",
+    "get_sparse_caps",
+    "get_sparse_embedder",
+    "get_text_embedder",
+    "get_thenlper_embedding_capabilities",
+    "get_type_adapter",
+    "get_voyage_embedding_capabilities",
+    "get_voyage_reranking_capabilities",
+    "get_whereisai_embedding_capabilities",
+    "httpx_env_vars",
+    "huggingface_hub_input_transformer",
+    "huggingface_hub_output_transformer",
+    "infer_agent_provider_class",
+    "is_cloud_provider",
+    "is_cohere_request",
+    "is_cohere_response",
+    "is_one_of_valid_types",
+    "is_titan_response",
+    "load_default_agent_providers",
+    "load_default_data_providers",
+    "make_filter",
+    "make_indexes",
+    "make_partial_function",
+    "merge_agent_model_settings",
+    "multi_client_provider",
+    "openai_compatible_provider",
+    "preprocess_for_qwen",
+    "process_for_instruction_model",
+    "provider_env_config_to_vars",
     "register_data_tool",
     "register_exa_tools",
     "reset_http_pool",
     "reset_http_pool_sync",
+    "shared_serializer",
+    "shared_validator",
+    "simple_api_key_provider",
+    "simple_provider_discriminator",
     "tavily_search_tool",
+    "to_qdrant_filter",
+    "try_for_azure_endpoint",
+    "try_for_heroku_endpoint",
+    "voyage_context_output_transformer",
+    "voyage_output_transformer",
+    "voyage_reranking_output_transformer",
+    "wrap_filters",
 )
 
 

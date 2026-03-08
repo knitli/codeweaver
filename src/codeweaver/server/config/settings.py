@@ -32,7 +32,7 @@ from codeweaver.core.constants import (
 )
 from codeweaver.engine.config import CodeWeaverEngineSettings
 from codeweaver.providers import ProviderSettings
-from codeweaver.server import DefaultFastMcpServerSettings
+from codeweaver.server.config import DefaultFastMcpServerSettings
 from codeweaver.server.config.mcp import MCPServerConfig, StdioCodeWeaverConfig
 from codeweaver.server.config.middleware import DefaultMiddlewareSettings, MiddlewareOptions
 from codeweaver.server.config.server_defaults import (

@@ -55,7 +55,6 @@ from pydantic import NonNegativeInt, PositiveInt
 
 from codeweaver.core import (
     INJECTED,
-    CodeWeaverSettingsType,
     SearchStrategy,
     SettingsDep,
     Span,
@@ -64,6 +63,7 @@ from codeweaver.core import (
     capture_search_event,
     log_to_client_or_fallback,
 )
+from codeweaver.core.config.settings_type import CodeWeaverSettingsType
 from codeweaver.core.constants import DEFAULT_MAX_RESULTS, DEFAULT_MAX_TOKENS
 from codeweaver.engine import IndexingServiceDep
 from codeweaver.engine.services.indexing_service import IndexingService
@@ -481,10 +481,7 @@ from lateimport import create_late_getattr
 
 
 if TYPE_CHECKING:
-    from codeweaver.server.agent_api.find_code.conversion import (
-        CodeMatchType,
-        convert_search_result_to_code_match,
-    )
+    from codeweaver.server.agent_api.find_code.conversion import convert_search_result_to_code_match
     from codeweaver.server.agent_api.find_code.filters import (
         apply_filters,
         filter_by_languages,
@@ -500,9 +497,6 @@ if TYPE_CHECKING:
         detect_intent,
     )
     from codeweaver.server.agent_api.find_code.pipeline import (
-        ConfigurationError,
-        QueryError,
-        SearchPackageDep,
         build_query_vector,
         embed_query,
         execute_vector_search,
@@ -510,7 +504,6 @@ if TYPE_CHECKING:
         rerank_results,
     )
     from codeweaver.server.agent_api.find_code.response import (
-        CodeWeaverStateDep,
         build_error_response,
         build_success_response,
         calculate_token_count,
@@ -526,27 +519,22 @@ if TYPE_CHECKING:
     )
     from codeweaver.server.agent_api.find_code.types import (
         CodeMatch,
+        CodeMatchType,
         FindCodeResponseSummary,
         FindCodeSubmission,
-        ValidationError,
     )
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "INTENT_KEYWORDS": (__spec__.parent, "intent"),
     "INTENT_TO_AGENT_TASK": (__spec__.parent, "intent"),
     "CodeMatch": (__spec__.parent, "types"),
-    "CodeMatchType": (__spec__.parent, "conversion"),
-    "CodeWeaverStateDep": (__spec__.parent, "response"),
-    "ConfigurationError": (__spec__.parent, "pipeline"),
+    "CodeMatchType": (__spec__.parent, "types"),
     "FindCodeResponseSummary": (__spec__.parent, "types"),
     "FindCodeSubmission": (__spec__.parent, "types"),
     "IntentResult": (__spec__.parent, "intent"),
     "IntentType": (__spec__.parent, "intent"),
     "QueryComplexity": (__spec__.parent, "intent"),
-    "QueryError": (__spec__.parent, "pipeline"),
     "QueryIntent": (__spec__.parent, "intent"),
-    "SearchPackageDep": (__spec__.parent, "pipeline"),
-    "ValidationError": (__spec__.parent, "types"),
     "apply_filters": (__spec__.parent, "filters"),
     "apply_hybrid_weights": (__spec__.parent, "scoring"),
     "apply_semantic_weighting": (__spec__.parent, "scoring"),
@@ -576,24 +564,13 @@ __all__ = (
     "INTENT_TO_AGENT_TASK",
     "CodeMatch",
     "CodeMatchType",
-    "CodeWeaverSettingsType",
-    "CodeWeaverStateDep",
-    "ConfigurationError",
     "FindCodeResponseSummary",
     "FindCodeSubmission",
-    "IndexingServiceDep",
     "IntentResult",
     "IntentType",
-    "MappingProxyType",
     "MatchedSection",
     "QueryComplexity",
-    "QueryError",
     "QueryIntent",
-    "SearchPackageDep",
-    "SettingsDep",
-    "TelemetryServiceDep",
-    "TelemetrySettingsDep",
-    "ValidationError",
     "apply_filters",
     "apply_hybrid_weights",
     "apply_semantic_weighting",

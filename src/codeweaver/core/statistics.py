@@ -1484,7 +1484,7 @@ class SessionStatistics(BasedModel):
         if TYPE_CHECKING:
             from mcp.shared.context import RequestContext
 
-            from codeweaver.server import CodeWeaverState
+            from codeweaver.server.server import CodeWeaverState
 
         if context is None:
             return

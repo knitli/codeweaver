@@ -35,7 +35,7 @@ from codeweaver.providers.data.utils import (
     get_serializer_for_type,
     register_data_tool,
 )
-from codeweaver.server import ToolRegistrationDict
+from codeweaver.server.mcp.types import ToolRegistrationDict
 
 
 if TYPE_CHECKING and has_package("tavily"):

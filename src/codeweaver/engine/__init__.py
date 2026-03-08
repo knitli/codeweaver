@@ -22,16 +22,8 @@ from lateimport import create_late_getattr
 
 
 if TYPE_CHECKING:
-    from codeweaver.engine.chunker import MappingProxyType
     from codeweaver.engine.chunker.base import AdaptiveChunkBehavior, BaseChunker, ChunkGovernor
-    from codeweaver.engine.chunker.delimiter import (
-        BinaryFileError,
-        ChunkingError,
-        ChunkLimitExceededError,
-        DelimiterChunker,
-        ParseError,
-        StringParseState,
-    )
+    from codeweaver.engine.chunker.delimiter import DelimiterChunker, StringParseState
     from codeweaver.engine.chunker.delimiter_model import Boundary, Delimiter, DelimiterMatch
     from codeweaver.engine.chunker.delimiters.families import (
         PatternKey,
@@ -41,17 +33,19 @@ if TYPE_CHECKING:
     )
     from codeweaver.engine.chunker.delimiters.patterns import expand_pattern
     from codeweaver.engine.chunker.exceptions import (
-        Any,
         ASTDepthExceededError,
+        BinaryFileError,
+        ChunkingError,
         ChunkingTimeoutError,
-        CodeWeaverError,
+        ChunkLimitExceededError,
         OversizedChunkError,
+        ParseError,
     )
     from codeweaver.engine.chunker.governance import ResourceGovernor
     from codeweaver.engine.chunker.parallel import chunk_files_parallel
     from codeweaver.engine.chunker.registry import SourceIdRegistry
     from codeweaver.engine.chunker.selector import ChunkerSelector, GracefulChunker
-    from codeweaver.engine.chunker.semantic import SemanticChunker, StatisticsDep
+    from codeweaver.engine.chunker.semantic import SemanticChunker
     from codeweaver.engine.config.chunker import (
         ChunkerSettings,
         ChunkerSettingsDict,
@@ -70,9 +64,7 @@ if TYPE_CHECKING:
     )
     from codeweaver.engine.config.failover_detector import FailoverDetector, LocalEmbeddingDetector
     from codeweaver.engine.config.indexer import (
-        AsyncPath,
         DefaultIndexerSettings,
-        FastMCPContext,
         FilteredPaths,
         IndexerSettings,
         IndexerSettingsDict,
@@ -84,7 +76,6 @@ if TYPE_CHECKING:
         ChunkerSettingsDep,
         ChunkGovernorDep,
         ChunkingServiceDep,
-        CodeWeaverSettingsType,
         ConfigChangeAnalyzerDep,
         ExtensionFilterDep,
         FailoverServiceDep,
@@ -96,27 +87,15 @@ if TYPE_CHECKING:
         IndexingStatsDep,
         ManifestManagerDep,
         MigrationServiceDep,
-        PrimaryEmbeddingProviderDep,
-        PrimarySparseEmbeddingProviderDep,
-        PrimaryVectorStoreProviderDep,
-        ProgressReporterDep,
         ProgressTrackerDep,
-        ResolvedProjectNameDep,
-        ResolvedProjectPathDep,
-        SettingsDep,
         SourceIdRegistryDep,
-        TokenizerDep,
     )
     from codeweaver.engine.managers.checkpoint_manager import (
         ChangeImpact,
         CheckpointManager,
         CheckpointSettingsFingerprint,
         CheckpointSettingsMap,
-        CodeWeaverDeveloperError,
-        EmbeddingProviderSettingsType,
         IndexingCheckpoint,
-        SparseEmbeddingProviderSettingsType,
-        VectorStoreProviderSettingsType,
     )
     from codeweaver.engine.managers.manifest_manager import (
         FileManifestEntry,
@@ -137,11 +116,7 @@ if TYPE_CHECKING:
         TransformationDetails,
     )
     from codeweaver.engine.services.failover_service import FailoverService
-    from codeweaver.engine.services.indexing_service import (
-        EmbeddingRegistryDep,
-        IndexingService,
-        ProgressCallback,
-    )
+    from codeweaver.engine.services.indexing_service import IndexingService, ProgressCallback
     from codeweaver.engine.services.migration_service import (
         ChunkResult,
         InvalidStateTransitionError,
@@ -164,18 +139,19 @@ if TYPE_CHECKING:
     from codeweaver.engine.watcher.progress import IndexingProgressUI
     from codeweaver.engine.watcher.types import FileChange, WatchfilesArgs
     from codeweaver.engine.watcher.watch_filters import (
+        CodeFilter,
+        ConfigFilter,
         DefaultExtensionFilter,
         DefaultFilter,
+        DocsFilter,
         ExtensionFilter,
         IgnoreFilter,
     )
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "AdaptiveChunkBehavior": (__spec__.parent, "chunker.base"),
-    "Any": (__spec__.parent, "chunker.exceptions"),
-    "AsyncPath": (__spec__.parent, "config.indexer"),
     "BaseChunker": (__spec__.parent, "chunker.base"),
-    "BinaryFileError": (__spec__.parent, "chunker.delimiter"),
+    "BinaryFileError": (__spec__.parent, "chunker.exceptions"),
     "Boundary": (__spec__.parent, "chunker.delimiter_model"),
     "ChangeImpact": (__spec__.parent, "managers.checkpoint_manager"),
     "CheckpointManager": (__spec__.parent, "managers.checkpoint_manager"),
@@ -185,19 +161,18 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "ChunkerSettings": (__spec__.parent, "config.chunker"),
     "ChunkerSettingsDict": (__spec__.parent, "config.chunker"),
     "ChunkGovernor": (__spec__.parent, "chunker.base"),
-    "ChunkingError": (__spec__.parent, "chunker.delimiter"),
+    "ChunkingError": (__spec__.parent, "chunker.exceptions"),
     "ChunkingService": (__spec__.parent, "services.chunking_service"),
     "ChunkingTimeoutError": (__spec__.parent, "chunker.exceptions"),
-    "ChunkLimitExceededError": (__spec__.parent, "chunker.delimiter"),
+    "ChunkLimitExceededError": (__spec__.parent, "chunker.exceptions"),
     "ChunkResult": (__spec__.parent, "services.migration_service"),
-    "CodeWeaverDeveloperError": (__spec__.parent, "managers.checkpoint_manager"),
+    "CodeFilter": (__spec__.parent, "watcher.watch_filters"),
     "CodeWeaverEngineSettings": (__spec__.parent, "config.root_settings"),
-    "CodeWeaverError": (__spec__.parent, "chunker.exceptions"),
-    "CodeWeaverSettingsType": (__spec__.parent, "dependencies"),
     "ConcurrencySettings": (__spec__.parent, "config.chunker"),
     "ConcurrencySettingsDict": (__spec__.parent, "config.chunker"),
     "ConfigChangeAnalysis": (__spec__.parent, "services.config_analyzer"),
     "ConfigChangeAnalyzer": (__spec__.parent, "services.config_analyzer"),
+    "ConfigFilter": (__spec__.parent, "watcher.watch_filters"),
     "CustomDelimiter": (__spec__.parent, "config.chunker"),
     "CustomLanguage": (__spec__.parent, "config.chunker"),
     "DefaultChunkerSettings": (__spec__.parent, "config.chunker"),
@@ -208,8 +183,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "Delimiter": (__spec__.parent, "chunker.delimiter_model"),
     "DelimiterChunker": (__spec__.parent, "chunker.delimiter"),
     "DelimiterMatch": (__spec__.parent, "chunker.delimiter_model"),
-    "EmbeddingProviderSettingsType": (__spec__.parent, "managers.checkpoint_manager"),
-    "EmbeddingRegistryDep": (__spec__.parent, "services.indexing_service"),
+    "DocsFilter": (__spec__.parent, "watcher.watch_filters"),
     "ExtensionFilter": (__spec__.parent, "watcher.watch_filters"),
     "FailoverDetector": (__spec__.parent, "config.failover_detector"),
     "FailoverService": (__spec__.parent, "services.failover_service"),
@@ -233,39 +207,27 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "IndexingStats": (__spec__.parent, "managers.progress_tracker"),
     "InvalidStateTransitionError": (__spec__.parent, "services.migration_service"),
     "LocalEmbeddingDetector": (__spec__.parent, "config.failover_detector"),
-    "MappingProxyType": (__spec__.parent, "chunker"),
     "MigrationCheckpoint": (__spec__.parent, "services.migration_service"),
     "MigrationError": (__spec__.parent, "services.migration_service"),
     "MigrationResult": (__spec__.parent, "services.migration_service"),
     "MigrationService": (__spec__.parent, "services.migration_service"),
     "MigrationState": (__spec__.parent, "services.migration_service"),
     "OversizedChunkError": (__spec__.parent, "chunker.exceptions"),
-    "ParseError": (__spec__.parent, "chunker.delimiter"),
+    "ParseError": (__spec__.parent, "chunker.exceptions"),
     "PerformanceSettings": (__spec__.parent, "config.chunker"),
     "PerformanceSettingsDict": (__spec__.parent, "config.chunker"),
-    "PrimaryEmbeddingProviderDep": (__spec__.parent, "dependencies"),
-    "PrimarySparseEmbeddingProviderDep": (__spec__.parent, "dependencies"),
-    "PrimaryVectorStoreProviderDep": (__spec__.parent, "dependencies"),
     "ProgressCallback": (__spec__.parent, "services.indexing_service"),
-    "ProgressReporterDep": (__spec__.parent, "dependencies"),
     "QdrantSnapshotBackupService": (__spec__.parent, "services.snapshot_service"),
     "ReconciliationResult": (__spec__.parent, "services.reconciliation_service"),
     "RepairStats": (__spec__.parent, "services.reconciliation_service"),
-    "ResolvedProjectNameDep": (__spec__.parent, "dependencies"),
-    "ResolvedProjectPathDep": (__spec__.parent, "dependencies"),
     "ResourceGovernor": (__spec__.parent, "chunker.governance"),
     "RignoreSettings": (__spec__.parent, "config.indexer"),
     "SemanticChunker": (__spec__.parent, "chunker.semantic"),
-    "SettingsDep": (__spec__.parent, "dependencies"),
     "SourceIdRegistry": (__spec__.parent, "chunker.registry"),
-    "SparseEmbeddingProviderSettingsType": (__spec__.parent, "managers.checkpoint_manager"),
-    "StatisticsDep": (__spec__.parent, "chunker.semantic"),
     "StringParseState": (__spec__.parent, "chunker.delimiter"),
-    "TokenizerDep": (__spec__.parent, "dependencies"),
     "TransformationDetails": (__spec__.parent, "services.config_analyzer"),
     "ValidationError": (__spec__.parent, "services.migration_service"),
     "VectorReconciliationService": (__spec__.parent, "services.reconciliation_service"),
-    "VectorStoreProviderSettingsType": (__spec__.parent, "managers.checkpoint_manager"),
     "WatchfilesArgs": (__spec__.parent, "watcher.types"),
     "WatchfilesLogManager": (__spec__.parent, "watcher._logging"),
     "WorkItem": (__spec__.parent, "services.migration_service"),
@@ -274,7 +236,6 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "detect_family_characteristics": (__spec__.parent, "chunker.delimiters.families"),
     "detect_language_family": (__spec__.parent, "chunker.delimiters.families"),
     "expand_pattern": (__spec__.parent, "chunker.delimiters.patterns"),
-    "FastMCPContext": (__spec__.parent, "config.indexer"),
     "get_family_patterns": (__spec__.parent, "chunker.delimiters.families"),
     "IndexingProgressUI": (__spec__.parent, "watcher.progress"),
 })
@@ -284,8 +245,6 @@ __getattr__ = create_late_getattr(_dynamic_imports, globals(), __name__)
 __all__ = (
     "ASTDepthExceededError",
     "AdaptiveChunkBehavior",
-    "Any",
-    "AsyncPath",
     "BaseChunker",
     "BinaryFileError",
     "Boundary",
@@ -306,15 +265,14 @@ __all__ = (
     "ChunkingService",
     "ChunkingServiceDep",
     "ChunkingTimeoutError",
-    "CodeWeaverDeveloperError",
+    "CodeFilter",
     "CodeWeaverEngineSettings",
-    "CodeWeaverError",
-    "CodeWeaverSettingsType",
     "ConcurrencySettings",
     "ConcurrencySettingsDict",
     "ConfigChangeAnalysis",
     "ConfigChangeAnalyzer",
     "ConfigChangeAnalyzerDep",
+    "ConfigFilter",
     "CustomDelimiter",
     "CustomLanguage",
     "DefaultChunkerSettings",
@@ -325,8 +283,7 @@ __all__ = (
     "Delimiter",
     "DelimiterChunker",
     "DelimiterMatch",
-    "EmbeddingProviderSettingsType",
-    "EmbeddingRegistryDep",
+    "DocsFilter",
     "ExtensionFilter",
     "ExtensionFilterDep",
     "FailoverDetector",
@@ -335,7 +292,6 @@ __all__ = (
     "FailoverSettings",
     "FailoverSettingsDep",
     "FailoverSettingsDict",
-    "FastMCPContext",
     "FileChange",
     "FileManifestEntry",
     "FileManifestManager",
@@ -362,7 +318,6 @@ __all__ = (
     "InvalidStateTransitionError",
     "LocalEmbeddingDetector",
     "ManifestManagerDep",
-    "MappingProxyType",
     "MigrationCheckpoint",
     "MigrationError",
     "MigrationResult",
@@ -374,31 +329,20 @@ __all__ = (
     "PatternKey",
     "PerformanceSettings",
     "PerformanceSettingsDict",
-    "PrimaryEmbeddingProviderDep",
-    "PrimarySparseEmbeddingProviderDep",
-    "PrimaryVectorStoreProviderDep",
     "ProgressCallback",
-    "ProgressReporterDep",
     "ProgressTrackerDep",
     "QdrantSnapshotBackupService",
     "ReconciliationResult",
     "RepairStats",
-    "ResolvedProjectNameDep",
-    "ResolvedProjectPathDep",
     "ResourceGovernor",
     "RignoreSettings",
     "SemanticChunker",
-    "SettingsDep",
     "SourceIdRegistry",
     "SourceIdRegistryDep",
-    "SparseEmbeddingProviderSettingsType",
-    "StatisticsDep",
     "StringParseState",
-    "TokenizerDep",
     "TransformationDetails",
     "ValidationError",
     "VectorReconciliationService",
-    "VectorStoreProviderSettingsType",
     "WatchfilesArgs",
     "WatchfilesLogManager",
     "WorkItem",

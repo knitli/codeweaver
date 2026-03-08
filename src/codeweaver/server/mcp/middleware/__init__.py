@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from typing import Literal
 
+from codeweaver.server.mcp.middleware.fastmcp import McpMiddleware
+
 
 def default_middleware_for_transport(
     transport: Literal["streamable-http", "stdio"],
@@ -60,25 +62,15 @@ if TYPE_CHECKING:
         RetryMiddleware,
         StructuredLoggingMiddleware,
     )
-    from codeweaver.server.mcp.middleware.statistics import (
-        McpMiddleware,
-        McpMiddlewareContext,
-        ProviderError,
-        StatisticsDep,
-        StatisticsMiddleware,
-    )
+    from codeweaver.server.mcp.middleware.statistics import StatisticsMiddleware
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "DetailedTimingMiddleware": (__spec__.parent, "fastmcp"),
     "ErrorHandlingMiddleware": (__spec__.parent, "fastmcp"),
     "LoggingMiddleware": (__spec__.parent, "fastmcp"),
-    "McpMiddleware": (__spec__.parent, "statistics"),
-    "McpMiddlewareContext": (__spec__.parent, "statistics"),
-    "ProviderError": (__spec__.parent, "statistics"),
     "RateLimitingMiddleware": (__spec__.parent, "fastmcp"),
     "ResponseCachingMiddleware": (__spec__.parent, "fastmcp"),
     "RetryMiddleware": (__spec__.parent, "fastmcp"),
-    "StatisticsDep": (__spec__.parent, "statistics"),
     "StatisticsMiddleware": (__spec__.parent, "statistics"),
     "StructuredLoggingMiddleware": (__spec__.parent, "fastmcp"),
 })
@@ -89,14 +81,10 @@ __all__ = (
     "DetailedTimingMiddleware",
     "ErrorHandlingMiddleware",
     "LoggingMiddleware",
-    "MappingProxyType",
     "McpMiddleware",
-    "McpMiddlewareContext",
-    "ProviderError",
     "RateLimitingMiddleware",
     "ResponseCachingMiddleware",
     "RetryMiddleware",
-    "StatisticsDep",
     "StatisticsMiddleware",
     "StructuredLoggingMiddleware",
     "default_middleware_for_transport",

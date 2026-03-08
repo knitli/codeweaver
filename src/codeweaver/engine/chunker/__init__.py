@@ -46,16 +46,10 @@ if TYPE_CHECKING:
         MIN_LINES_FOR_PARAGRAPH_SPLIT,
         PERFORMANCE_THRESHOLD_MS,
         SLIDING_WINDOW_OVERLAP,
-        BinaryFileError,
-        ChunkingError,
-        ChunkLimitExceededError,
         DelimiterChunker,
-        ParseError,
         StringParseState,
     )
     from codeweaver.engine.chunker.delimiter_model import Boundary, Delimiter, DelimiterMatch
-    from codeweaver.engine.chunker.delimiters import MappingProxyType
-    from codeweaver.engine.chunker.delimiters.custom import SettingsDep
     from codeweaver.engine.chunker.delimiters.families import (
         PatternKey,
         detect_family_characteristics,
@@ -64,17 +58,19 @@ if TYPE_CHECKING:
     )
     from codeweaver.engine.chunker.delimiters.patterns import expand_pattern
     from codeweaver.engine.chunker.exceptions import (
-        Any,
         ASTDepthExceededError,
+        BinaryFileError,
+        ChunkingError,
         ChunkingTimeoutError,
-        CodeWeaverError,
+        ChunkLimitExceededError,
         OversizedChunkError,
+        ParseError,
     )
     from codeweaver.engine.chunker.governance import ResourceGovernor
     from codeweaver.engine.chunker.parallel import chunk_files_parallel, chunk_files_parallel_dict
     from codeweaver.engine.chunker.registry import ONE_MEGABYTE, SourceIdRegistry
     from codeweaver.engine.chunker.selector import ChunkerSelector, GracefulChunker
-    from codeweaver.engine.chunker.semantic import SemanticChunker, StatisticsDep
+    from codeweaver.engine.chunker.semantic import SemanticChunker
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "ACCEPTABLE_OVERAGE_RATIO": (__spec__.parent, "base"),
@@ -91,28 +87,23 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "SMALL_MODEL_RATIO": (__spec__.parent, "base"),
     "TRANSITION_POINT": (__spec__.parent, "base"),
     "AdaptiveChunkBehavior": (__spec__.parent, "base"),
-    "Any": (__spec__.parent, "exceptions"),
     "BaseChunker": (__spec__.parent, "base"),
-    "BinaryFileError": (__spec__.parent, "delimiter"),
+    "BinaryFileError": (__spec__.parent, "exceptions"),
     "Boundary": (__spec__.parent, "delimiter_model"),
     "ChunkerSelector": (__spec__.parent, "selector"),
     "ChunkGovernor": (__spec__.parent, "base"),
-    "ChunkingError": (__spec__.parent, "delimiter"),
+    "ChunkingError": (__spec__.parent, "exceptions"),
     "ChunkingTimeoutError": (__spec__.parent, "exceptions"),
-    "ChunkLimitExceededError": (__spec__.parent, "delimiter"),
-    "CodeWeaverError": (__spec__.parent, "exceptions"),
+    "ChunkLimitExceededError": (__spec__.parent, "exceptions"),
     "Delimiter": (__spec__.parent, "delimiter_model"),
     "DelimiterChunker": (__spec__.parent, "delimiter"),
     "DelimiterMatch": (__spec__.parent, "delimiter_model"),
     "GracefulChunker": (__spec__.parent, "selector"),
-    "MappingProxyType": (__spec__.parent, "delimiters"),
     "OversizedChunkError": (__spec__.parent, "exceptions"),
-    "ParseError": (__spec__.parent, "delimiter"),
+    "ParseError": (__spec__.parent, "exceptions"),
     "ResourceGovernor": (__spec__.parent, "governance"),
     "SemanticChunker": (__spec__.parent, "semantic"),
-    "SettingsDep": (__spec__.parent, "delimiters.custom"),
     "SourceIdRegistry": (__spec__.parent, "registry"),
-    "StatisticsDep": (__spec__.parent, "semantic"),
     "StringParseState": (__spec__.parent, "delimiter"),
     "ASTDepthExceededError": (__spec__.parent, "exceptions"),
     "chunk_files_parallel": (__spec__.parent, "parallel"),
@@ -149,7 +140,6 @@ __all__ = (
     "TRANSITION_POINT",
     "ASTDepthExceededError",
     "AdaptiveChunkBehavior",
-    "Any",
     "BaseChunker",
     "BinaryFileError",
     "Boundary",
@@ -158,20 +148,16 @@ __all__ = (
     "ChunkerSelector",
     "ChunkingError",
     "ChunkingTimeoutError",
-    "CodeWeaverError",
     "Delimiter",
     "DelimiterChunker",
     "DelimiterMatch",
     "GracefulChunker",
-    "MappingProxyType",
     "OversizedChunkError",
     "ParseError",
     "PatternKey",
     "ResourceGovernor",
     "SemanticChunker",
-    "SettingsDep",
     "SourceIdRegistry",
-    "StatisticsDep",
     "StringParseState",
     "chunk_files_parallel",
     "chunk_files_parallel_dict",

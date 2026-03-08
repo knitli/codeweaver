@@ -158,6 +158,9 @@ exclude = [
 convention = "google"
 
 [lint.per-file-ignores]
+"**/**/__init__.py" = [
+  "E402",  # module level import not at top of file
+]
 # Ignore specific rules for certain files
 "**/validation/**/*.py" = [
   "S110",  # try-except-pass

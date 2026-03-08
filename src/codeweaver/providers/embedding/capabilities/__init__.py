@@ -55,7 +55,6 @@ if TYPE_CHECKING:
     from codeweaver.providers.embedding.capabilities.cohere import (
         MODEL_MAP,
         CohereEmbeddingCapabilities,
-        MappingProxyType,
         get_cohere_embedding_capabilities,
     )
     from codeweaver.providers.embedding.capabilities.google import (
@@ -134,7 +133,6 @@ if TYPE_CHECKING:
     )
     from codeweaver.providers.embedding.capabilities.resolver import (
         EmbeddingCapabilityResolver,
-        EmbeddingCapabilityType,
         SparseEmbeddingCapabilityResolver,
     )
     from codeweaver.providers.embedding.capabilities.sentence_transformers import (
@@ -213,13 +211,11 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "CohereEmbeddingCapabilities": (__spec__.parent, "cohere"),
     "EmbeddingCapabilitiesDict": (__spec__.parent, "types"),
     "EmbeddingCapabilityResolver": (__spec__.parent, "resolver"),
-    "EmbeddingCapabilityType": (__spec__.parent, "resolver"),
     "EmbeddingModelCapabilities": (__spec__.parent, "base"),
     "GoogleEmbeddingCapabilities": (__spec__.parent, "google"),
     "IbmGraniteEmbeddingCapabilities": (__spec__.parent, "ibm_granite"),
     "IntfloatEmbeddingCapabilities": (__spec__.parent, "intfloat"),
     "JinaaiEmbeddingCapabilities": (__spec__.parent, "jinaai"),
-    "MappingProxyType": (__spec__.parent, "cohere"),
     "MinishlabEmbeddingCapabilities": (__spec__.parent, "minishlab"),
     "MistralEmbeddingCapabilities": (__spec__.parent, "mistral"),
     "MixedbreadAiEmbeddingCapabilities": (__spec__.parent, "mixedbread_ai"),
@@ -380,7 +376,6 @@ __all__ = (
     "CohereEmbeddingCapabilities",
     "EmbeddingCapabilitiesDict",
     "EmbeddingCapabilityResolver",
-    "EmbeddingCapabilityType",
     "EmbeddingModelCapabilities",
     "GoogleEmbeddingCapabilities",
     "IbmGraniteEmbeddingCapabilities",
@@ -389,7 +384,6 @@ __all__ = (
     "IntfloatProvider",
     "JinaaiEmbeddingCapabilities",
     "JinaaiProvider",
-    "MappingProxyType",
     "MinishlabEmbeddingCapabilities",
     "MinishlabProvider",
     "MistralEmbeddingCapabilities",

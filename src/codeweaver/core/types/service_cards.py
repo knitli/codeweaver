@@ -1379,13 +1379,13 @@ def get_service_cards(
         >>> get_service_cards(provider="azure", category="agent")
     """
     registry = _build_service_card_registry()
-    prov_filter: set[ProviderLiteralString | None] = (
+    prov_filter: set[ProviderLiteralString] = (
         provider if isinstance(provider, set) else ({provider} if provider is not None else set())
     )
-    category_filter: set[ProviderCategoryLiteralString | None] = (
+    category_filter: set[ProviderCategoryLiteralString] = (
         category if isinstance(category, set) else ({category} if category is not None else set())
     )
-    client_filter: set[SDKClientLiteralString | None] = (
+    client_filter: set[SDKClientLiteralString] = (
         client if isinstance(client, set) else ({client} if client is not None else set())
     )
     if prov_filter or category_filter or client_filter:

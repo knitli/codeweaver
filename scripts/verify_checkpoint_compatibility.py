@@ -3,6 +3,7 @@
 # SPDX-FileContributor: Adam Poulemanos <adam@knit.li>
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
+# ruff: noqa: S101
 
 """Verification script for checkpoint compatibility logic.
 
@@ -70,7 +71,7 @@ class CheckpointSettingsFingerprint:
         return True, ChangeImpact.NONE
 
 
-def verify_scenarios():
+def verify_scenarios() -> None:
     """Verify key compatibility scenarios."""
     print("=" * 70)
     print("Checkpoint Compatibility Verification")
@@ -100,7 +101,8 @@ def verify_scenarios():
     print(f"   Old: {old.embed_model} / {old.query_model}")
     print(f"   New: {new.embed_model} / {new.query_model}")
     print(f"   Result: {impact.value.upper()} (compatible={is_compatible})")
-    assert is_compatible and impact == ChangeImpact.COMPATIBLE, "Failed!"
+    assert is_compatible, "Failed!"
+    assert impact == ChangeImpact.COMPATIBLE, "Failed!"
 
     # Scenario 2: Model family change (BREAKING)
     print("\n❌ Scenario 2: Model family change")
@@ -126,7 +128,8 @@ def verify_scenarios():
     print(f"   Old: {old.embed_model_family}")
     print(f"   New: {new.embed_model_family}")
     print(f"   Result: {impact.value.upper()} (compatible={is_compatible})")
-    assert not is_compatible and impact == ChangeImpact.BREAKING, "Failed!"
+    assert not is_compatible, "Failed!"
+    assert impact == ChangeImpact.BREAKING, "Failed!"
 
     # Scenario 3: Symmetric model change (BREAKING)
     print("\n❌ Scenario 3: Symmetric embed model change")
@@ -152,7 +155,8 @@ def verify_scenarios():
     print(f"   Old: {old.embed_model}")
     print(f"   New: {new.embed_model}")
     print(f"   Result: {impact.value.upper()} (compatible={is_compatible})")
-    assert not is_compatible and impact == ChangeImpact.BREAKING, "Failed!"
+    assert not is_compatible, "Failed!"
+    assert impact == ChangeImpact.BREAKING, "Failed!"
 
     # Scenario 4: Sparse model change (BREAKING)
     print("\n❌ Scenario 4: Sparse model change")
@@ -178,7 +182,8 @@ def verify_scenarios():
     print(f"   Old sparse: {old.sparse_model}")
     print(f"   New sparse: {new.sparse_model}")
     print(f"   Result: {impact.value.upper()} (compatible={is_compatible})")
-    assert not is_compatible and impact == ChangeImpact.BREAKING, "Failed!"
+    assert not is_compatible, "Failed!"
+    assert impact == ChangeImpact.BREAKING, "Failed!"
 
     # Scenario 5: No changes (NONE)
     print("\n✅ Scenario 5: No configuration changes")
@@ -204,7 +209,8 @@ def verify_scenarios():
     print(f"   Old: {old.embed_model}")
     print(f"   New: {new.embed_model}")
     print(f"   Result: {impact.value.upper()} (compatible={is_compatible})")
-    assert is_compatible and impact == ChangeImpact.NONE, "Failed!"
+    assert is_compatible, "Failed!"
+    assert impact == ChangeImpact.NONE, "Failed!"
 
     # Scenario 6: Embed model change within family (BREAKING)
     print("\n❌ Scenario 6: Embed model change within same family")
@@ -231,7 +237,8 @@ def verify_scenarios():
     print(f"   New embed: {new.embed_model}")
     print(f"   Family: {new.embed_model_family}")
     print(f"   Result: {impact.value.upper()} (compatible={is_compatible})")
-    assert not is_compatible and impact == ChangeImpact.BREAKING, "Failed!"
+    assert not is_compatible, "Failed!"  # Embed model change is breaking even within family
+    assert impact == ChangeImpact.BREAKING, "Failed!"
 
     print("\n" + "=" * 70)
     print("✓ All scenarios verified successfully!")

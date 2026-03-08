@@ -1354,7 +1354,10 @@ __all__ = (
     "LANGUAGE_SPECIFIC_TOKEN_EXCEPTIONS",
     "NAMED_NODE_COUNTS",
     "NOT_SYMBOL",
+    "JavaScriptFamily",
+    "JavaScriptLangs",
     "TokenPatternCacheDict",
+    "TypeScriptLangs",
     "get_checks",
     "get_token_patterns_sync",
 )

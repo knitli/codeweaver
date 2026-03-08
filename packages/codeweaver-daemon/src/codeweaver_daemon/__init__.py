@@ -268,6 +268,12 @@ async def wait_for_daemon_shutdown(
     return False
 
 
+# === MANAGED EXPORTS ===
+
+# Exportify manages this section. It contains lazy-loading infrastructure
+# for the package: imports and runtime declarations (__all__, __getattr__,
+# __dir__). Manual edits will be overwritten by `exportify fix`.
+
 __all__ = (
     "check_daemon_health",
     "request_daemon_shutdown",
@@ -275,3 +281,8 @@ __all__ = (
     "start_daemon_if_needed",
     "wait_for_daemon_shutdown",
 )
+
+
+def __dir__() -> list[str]:
+    """List available attributes for the package."""
+    return list(__all__)

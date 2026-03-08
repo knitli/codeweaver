@@ -25,7 +25,6 @@ from starlette.middleware import Middleware as ASGIMiddleware
 from codeweaver import __version__ as version
 from codeweaver.core import (
     AnonymityConversion,
-    CodeWeaverSettingsType,
     DataclassSerializationMixin,
     InitializationError,
     ProgressReporter,
@@ -38,6 +37,7 @@ from codeweaver.core import (
     get_project_path,
     get_settings,
 )
+from codeweaver.core.config.settings_type import CodeWeaverSettingsType
 from codeweaver.core.constants import (
     DEFAULT_MANAGEMENT_PORT,
     INDEXER_WINDDOWN_TIMEOUT,
@@ -50,7 +50,7 @@ from codeweaver.providers import HttpClientPool
 from codeweaver.server.config import CodeWeaverSettings
 from codeweaver.server.health.health_service import HealthService
 from codeweaver.server.management import ManagementServer
-from codeweaver.server.mcp import CwMcpHttpState
+from codeweaver.server.mcp.server import CwMcpHttpState
 
 
 if TYPE_CHECKING:

@@ -26,9 +26,8 @@ from lateimport import create_late_getattr
 
 if TYPE_CHECKING:
     from codeweaver.cli.__main__ import ROOT_PACKAGE
-    from codeweaver.cli.dependencies import CodeWeaverSettingsType, setup_cli_di
-    from codeweaver.cli.ui import MappingProxyType
-    from codeweaver.cli.ui.error_handler import CLIErrorHandler, CodeWeaverError
+    from codeweaver.cli.dependencies import setup_cli_di
+    from codeweaver.cli.ui.error_handler import CLIErrorHandler
     from codeweaver.cli.ui.status_display import (
         AtomicAwareBarColumn,
         AtomicAwareCountColumn,
@@ -45,10 +44,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "AtomicAwareCountColumn": (__spec__.parent, "ui.status_display"),
     "AtomicAwarePercentColumn": (__spec__.parent, "ui.status_display"),
     "AtomicAwareSeparatorColumn": (__spec__.parent, "ui.status_display"),
-    "CodeWeaverError": (__spec__.parent, "ui.error_handler"),
-    "CodeWeaverSettingsType": (__spec__.parent, "dependencies"),
     "IndexingProgress": (__spec__.parent, "ui.status_display"),
-    "MappingProxyType": (__spec__.parent, "ui"),
     "StatusDisplay": (__spec__.parent, "ui.status_display"),
     "check_provider_package_available": (__spec__.parent, "utils"),
     "CLIErrorHandler": (__spec__.parent, "ui.error_handler"),
@@ -64,10 +60,7 @@ __all__ = (
     "AtomicAwarePercentColumn",
     "AtomicAwareSeparatorColumn",
     "CLIErrorHandler",
-    "CodeWeaverError",
-    "CodeWeaverSettingsType",
     "IndexingProgress",
-    "MappingProxyType",
     "StatusDisplay",
     "check_provider_package_available",
     "setup_cli_di",

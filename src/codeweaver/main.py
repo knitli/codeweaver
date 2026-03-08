@@ -128,12 +128,9 @@ async def _run_http_server(
         debug: Enable debug logging
     """
     from codeweaver.core import Unset, get_project_path
-    from codeweaver.server import (
-        CwMcpHttpState,
-        ManagementServer,
-        create_http_server,
-        http_lifespan,
-    )
+    from codeweaver.server.lifespan import http_lifespan
+    from codeweaver.server.management import ManagementServer
+    from codeweaver.server.mcp.server import CwMcpHttpState, create_http_server
 
     settings = _settings
 
@@ -278,7 +275,7 @@ async def get_stdio_server(
         Configured FastMCP stdio server instance (not yet running).
 
     """
-    from codeweaver.server import create_stdio_server
+    from codeweaver.server.mcp.server import create_stdio_server
 
     if config_file or project_path:
         # We normally want to use the global settings instance, but here because a proxied stdio client could be used in isolation and outside a typical configuration, we create a unique settings instance.

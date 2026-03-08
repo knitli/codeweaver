@@ -44,7 +44,6 @@ if TYPE_CHECKING:
     )
     from codeweaver.providers.data.providers import (
         DataProviderType,
-        LiteralProviderType,
         get_data_provider,
         load_default_data_providers,
     )
@@ -55,7 +54,6 @@ if TYPE_CHECKING:
         tavily_search_tool,
     )
     from codeweaver.providers.data.utils import (
-        LiteralProviderCategoryType,
         build_data_tool,
         get_provider_names_for_category,
         get_schema_for_type,
@@ -74,8 +72,6 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "ExaGetContentsTool": (__spec__.parent, "exa"),
     "ExaSearchResult": (__spec__.parent, "exa"),
     "ExaSearchTool": (__spec__.parent, "exa"),
-    "LiteralProviderCategoryType": (__spec__.parent, "utils"),
-    "LiteralProviderType": (__spec__.parent, "providers"),
     "TavilyResults": (__spec__.parent, "tavily"),
     "TavilySearchContextTool": (__spec__.parent, "tavily"),
     "TavilySearchResult": (__spec__.parent, "tavily"),
@@ -111,9 +107,6 @@ __all__ = (
     "ExaSearchResult",
     "ExaSearchTool",
     "ExaToolType",
-    "LiteralProviderCategoryType",
-    "LiteralProviderType",
-    "MappingProxyType",
     "TavilyResults",
     "TavilySearchContextTool",
     "TavilySearchResult",

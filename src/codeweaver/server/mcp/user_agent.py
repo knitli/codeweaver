@@ -21,8 +21,8 @@ from starlette.requests import Request
 from codeweaver.core import SemanticSearchLanguage, StatisticsDep
 from codeweaver.core.constants import DEFAULT_MAX_RESULTS, DEFAULT_MAX_TOKENS
 from codeweaver.core.di.depends import INJECTED
-from codeweaver.server import CodeWeaverStateDep
 from codeweaver.server.agent_api import FindCodeResponseSummary, IntentType, find_code
+from codeweaver.server.dependencies import CodeWeaverStateDep
 
 
 _logger = logging.getLogger(__name__)

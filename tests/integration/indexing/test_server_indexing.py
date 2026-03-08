@@ -150,7 +150,7 @@ async def indexer(test_project_path: Path, clean_container) -> IndexingService:
         # Ensure we don't load existing config files that might point elsewhere
         settings.project_path = test_project_path
         settings.project_name = f"test_project_{test_project_path.name}"
-        return settings  # ty:ignore[invalid-return-type]
+        return settings
 
     # Override CodeWeaverSettings in the container
     clean_container.override(CodeWeaverSettings, get_test_settings)

@@ -22,7 +22,6 @@ from typing import Annotated
 from codeweaver.core import (
     DEFAULT_EXCLUDED_EXTENSIONS,
     INJECTED,
-    CodeWeaverSettingsType,
     ProgressReporterDep,
     ResolvedProjectNameDep,
     ResolvedProjectPathDep,
@@ -31,6 +30,7 @@ from codeweaver.core import (
     dependency_provider,
     depends,
 )
+from codeweaver.core.config.settings_type import CodeWeaverSettingsType
 
 # Runtime imports needed for dependency_provider decorators
 from codeweaver.engine.chunker.base import ChunkGovernor

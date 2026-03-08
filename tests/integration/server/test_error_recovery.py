@@ -315,7 +315,7 @@ async def test_indexing_continues_on_file_errors(
 
         settings = get_settings()
         settings.project_path = test_project_path
-        return settings  # ty:ignore[invalid-return-type]
+        return settings
 
     overrides = {CodeWeaverSettings: get_test_settings}
 
@@ -379,7 +379,7 @@ async def test_warning_at_25_errors(initialize_test_settings, tmp_path: Path, cl
 
         settings = get_settings()
         settings.project_path = project_root
-        return settings  # ty:ignore[invalid-return-type]
+        return settings
 
     clean_container.override(CodeWeaverSettings, get_test_settings)
 
@@ -555,7 +555,7 @@ async def test_graceful_shutdown_with_checkpoint(
 
         settings = get_settings()
         settings.project_path = project_root
-        return settings  # ty:ignore[invalid-return-type]
+        return settings
 
     clean_container.override(CodeWeaverSettings, get_test_settings)
 
@@ -647,7 +647,7 @@ async def test_error_logging_structured(clean_container):
 
                 settings = get_settings()
                 settings.project_path = test_path
-                return settings  # ty:ignore[invalid-return-type]
+                return settings
 
             clean_container.override(CodeWeaverSettings, get_test_settings)
 

@@ -19,11 +19,7 @@ from lateimport import create_late_getattr
 
 if TYPE_CHECKING:
     from codeweaver.providers.types.circuit_breaker import CircuitBreakerState
-    from codeweaver.providers.types.embedding import (
-        ConfiguredCapability,
-        EmbeddingCapabilityGroup,
-        InvalidEmbeddingModelError,
-    )
+    from codeweaver.providers.types.embedding import ConfiguredCapability, EmbeddingCapabilityGroup
     from codeweaver.providers.types.resolvers import (
         BaseCapabilityResolver,
         BaseEmbeddingCapabilityResolver,
@@ -31,7 +27,6 @@ if TYPE_CHECKING:
         BaseResolver,
         BaseSparseEmbeddingCapabilityResolver,
         EmbeddingCapabilityType,
-        MappingProxyType,
         RerankingCapabilityType,
     )
     from codeweaver.providers.types.search import ModelCapDict, ModelNameDict, SearchPackage
@@ -39,7 +34,6 @@ if TYPE_CHECKING:
         CollectionMetadata,
         CollectionPolicy,
         HybridVectorPayload,
-        ModelSwitchError,
         PayloadFieldDict,
         TransformationRecord,
     )
@@ -57,11 +51,8 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "ConfiguredCapability": (__spec__.parent, "embedding"),
     "EmbeddingCapabilityGroup": (__spec__.parent, "embedding"),
     "HybridVectorPayload": (__spec__.parent, "vector_store"),
-    "InvalidEmbeddingModelError": (__spec__.parent, "embedding"),
-    "MappingProxyType": (__spec__.parent, "resolvers"),
     "ModelCapDict": (__spec__.parent, "search"),
     "ModelNameDict": (__spec__.parent, "search"),
-    "ModelSwitchError": (__spec__.parent, "vector_store"),
     "PayloadFieldDict": (__spec__.parent, "vector_store"),
     "SearchPackage": (__spec__.parent, "search"),
     "TransformationRecord": (__spec__.parent, "vector_store"),
@@ -85,11 +76,8 @@ __all__ = (
     "EmbeddingCapabilityGroup",
     "EmbeddingCapabilityType",
     "HybridVectorPayload",
-    "InvalidEmbeddingModelError",
-    "MappingProxyType",
     "ModelCapDict",
     "ModelNameDict",
-    "ModelSwitchError",
     "PayloadFieldDict",
     "RerankingCapabilityType",
     "SearchPackage",

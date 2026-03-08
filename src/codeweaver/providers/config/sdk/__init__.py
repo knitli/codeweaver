@@ -32,7 +32,6 @@ if TYPE_CHECKING:
     )
     from codeweaver.providers.config.sdk.data import (
         BaseToolConfig,
-        ConfigurationError,
         DataToolConfigT,
         DuckDuckGoSearchToolConfig,
         ExaAnswerToolOptions,
@@ -64,7 +63,6 @@ if TYPE_CHECKING:
         MistralEmbeddingOptionsDict,
         OpenAIEmbeddingConfig,
         OpenAIEmbeddingRequestParams,
-        ScalarType,
         SentenceTransformersEmbeddingConfig,
         SentenceTransformersEncodeDict,
         SerializedEmbeddingOptionsDict,
@@ -93,12 +91,7 @@ if TYPE_CHECKING:
         SentenceTransformersSparseEmbeddingConfig,
         SparseEmbeddingConfigT,
     )
-    from codeweaver.providers.config.sdk.vector_store import (
-        CollectionConfig,
-        EmbeddingCapabilityGroupDep,
-        QdrantCollectionConfig,
-        get_embedding_group,
-    )
+    from codeweaver.providers.config.sdk.vector_store import CollectionConfig, get_embedding_group
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "INCOMPATIBLE_FIELDS": (__spec__.parent, "embedding"),
@@ -120,9 +113,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "CohereRerankingConfig": (__spec__.parent, "reranking"),
     "CohereRerankingOptionsDict": (__spec__.parent, "reranking"),
     "CollectionConfig": (__spec__.parent, "vector_store"),
-    "ConfigurationError": (__spec__.parent, "data"),
     "DuckDuckGoSearchToolConfig": (__spec__.parent, "data"),
-    "EmbeddingCapabilityGroupDep": (__spec__.parent, "vector_store"),
     "EmbeddingConfigT": (__spec__.parent, "embedding"),
     "EmbeddingMixin": (__spec__.parent, "embedding"),
     "ExaAnswerToolOptions": (__spec__.parent, "data"),
@@ -141,9 +132,7 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "HuggingFaceEmbeddingOptionsDict": (__spec__.parent, "embedding"),
     "MistralEmbeddingConfig": (__spec__.parent, "embedding"),
     "MistralEmbeddingOptionsDict": (__spec__.parent, "embedding"),
-    "QdrantCollectionConfig": (__spec__.parent, "vector_store"),
     "RerankingConfigT": (__spec__.parent, "reranking"),
-    "ScalarType": (__spec__.parent, "embedding"),
     "SentenceTransformersEmbeddingConfig": (__spec__.parent, "embedding"),
     "SentenceTransformersEncodeDict": (__spec__.parent, "embedding"),
     "SentenceTransformersRerankingConfig": (__spec__.parent, "reranking"),
@@ -186,10 +175,8 @@ __all__ = (
     "CohereRerankingConfig",
     "CohereRerankingOptionsDict",
     "CollectionConfig",
-    "ConfigurationError",
     "DataToolConfigT",
     "DuckDuckGoSearchToolConfig",
-    "EmbeddingCapabilityGroupDep",
     "EmbeddingConfigT",
     "EmbeddingMixin",
     "ExaAnswerToolOptions",
@@ -206,14 +193,11 @@ __all__ = (
     "GoogleEmbeddingRequestParams",
     "HuggingFaceEmbeddingConfig",
     "HuggingFaceEmbeddingOptionsDict",
-    "MappingProxyType",
     "MistralEmbeddingConfig",
     "MistralEmbeddingOptionsDict",
     "OpenAIEmbeddingConfig",
     "OpenAIEmbeddingRequestParams",
-    "QdrantCollectionConfig",
     "RerankingConfigT",
-    "ScalarType",
     "SentenceTransformersEmbeddingConfig",
     "SentenceTransformersEncodeDict",
     "SentenceTransformersRerankingConfig",

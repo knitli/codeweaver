@@ -31,7 +31,7 @@ from codeweaver.providers.data.utils import (
     get_type_adapter,
     register_data_tool,
 )
-from codeweaver.server import ToolRegistrationDict
+from codeweaver.server.mcp.types import ToolRegistrationDict
 
 
 if TYPE_CHECKING and has_package("exa_py"):

@@ -172,7 +172,6 @@ __all__ = (
     "VERCEL",
     "VOYAGE",
     "X_AI",
-    "MappingProxyType",
 )
 
 

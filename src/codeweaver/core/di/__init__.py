@@ -94,9 +94,7 @@ from lateimport import create_late_getattr
 if TYPE_CHECKING:
     from codeweaver.core.di.container import (
         Container,
-        DependencyInjectionError,
         ResolutionResult,
-        TypeAliasType,
         get_container,
         reset_container,
     )
@@ -120,12 +118,10 @@ if TYPE_CHECKING:
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "INJECTED": (__spec__.parent, "depends"),
     "Container": (__spec__.parent, "container"),
-    "DependencyInjectionError": (__spec__.parent, "container"),
     "Depends": (__spec__.parent, "depends"),
     "DependsPlaceholder": (__spec__.parent, "depends"),
     "ProviderMetadata": (__spec__.parent, "utils"),
     "ResolutionResult": (__spec__.parent, "container"),
-    "TypeAliasType": (__spec__.parent, "container"),
     "dependency_provider": (__spec__.parent, "utils"),
     "depends": (__spec__.parent, "depends"),
     "get_all_provider_metadata": (__spec__.parent, "utils"),
@@ -143,13 +139,10 @@ __getattr__ = create_late_getattr(_dynamic_imports, globals(), __name__)
 __all__ = (
     "INJECTED",
     "Container",
-    "DependencyInjectionError",
     "Depends",
     "DependsPlaceholder",
-    "MappingProxyType",
     "ProviderMetadata",
     "ResolutionResult",
-    "TypeAliasType",
     "dependency_provider",
     "depends",
     "get_all_provider_metadata",

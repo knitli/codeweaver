@@ -23,7 +23,7 @@ from codeweaver.core import SettingsMapDep, Unset
 from codeweaver.core.config.types import CodeWeaverSettingsDict
 from codeweaver.core.di.depends import INJECTED
 from codeweaver.core.types.dictview import DictView
-from codeweaver.server import DefaultFastMcpHttpRunArgs
+from codeweaver.server.config import DefaultFastMcpHttpRunArgs
 
 
 _display: StatusDisplay = get_display()

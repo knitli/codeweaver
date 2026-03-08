@@ -26,128 +26,45 @@ from lateimport import create_late_getattr
 
 
 if TYPE_CHECKING:
-    from codeweaver.server.mcp.middleware import MappingProxyType, default_middleware_for_transport
+    from codeweaver.server.mcp.middleware import default_middleware_for_transport
     from codeweaver.server.mcp.middleware.fastmcp import (
         DetailedTimingMiddleware,
         ErrorHandlingMiddleware,
         LoggingMiddleware,
+        McpMiddleware,
         RateLimitingMiddleware,
         ResponseCachingMiddleware,
         RetryMiddleware,
         StructuredLoggingMiddleware,
     )
-    from codeweaver.server.mcp.middleware.statistics import McpMiddlewareContext, ProviderError
-    from codeweaver.server.mcp.server import (
-        TOOLS_TO_REGISTER,
-        McpMiddleware,
-        SettingsMapDep,
-        StatisticsDep,
-        StatisticsMiddleware,
-        StdioClientLifespan,
-        configure_uvicorn_logging,
-        create_http_server,
-        create_stdio_server,
-        get_statistics_middleware,
-        register_middleware,
-        register_tools,
-        setup_middleware,
-        setup_runargs,
-    )
-    from codeweaver.server.mcp.state import (
-        CodeWeaverSettingsType,
-        CwMcpHttpState,
-        FastMCPServerSettings,
-    )
-    from codeweaver.server.mcp.tools import (
-        TOOL_DEFINITIONS,
-        ContextAgentToolkit,
-        ToolCollectionDict,
-        get_bulk_tool,
-        register_tool,
-    )
-    from codeweaver.server.mcp.types import ToolAnnotationsDict, ToolRegistrationDict
-    from codeweaver.server.mcp.user_agent import CodeWeaverStateDep, IntentType, find_code_tool
+    from codeweaver.server.mcp.middleware.statistics import StatisticsMiddleware
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
-    "TOOL_DEFINITIONS": (__spec__.parent, "tools"),
-    "TOOLS_TO_REGISTER": (__spec__.parent, "server"),
-    "CodeWeaverSettingsType": (__spec__.parent, "state"),
-    "CodeWeaverStateDep": (__spec__.parent, "user_agent"),
-    "ContextAgentToolkit": (__spec__.parent, "tools"),
-    "CwMcpHttpState": (__spec__.parent, "state"),
     "DetailedTimingMiddleware": (__spec__.parent, "middleware.fastmcp"),
     "ErrorHandlingMiddleware": (__spec__.parent, "middleware.fastmcp"),
-    "IntentType": (__spec__.parent, "user_agent"),
     "LoggingMiddleware": (__spec__.parent, "middleware.fastmcp"),
-    "MappingProxyType": (__spec__.parent, "middleware"),
-    "McpMiddleware": (__spec__.parent, "server"),
-    "McpMiddlewareContext": (__spec__.parent, "middleware.statistics"),
-    "ProviderError": (__spec__.parent, "middleware.statistics"),
+    "McpMiddleware": (__spec__.parent, "middleware.fastmcp"),
     "RateLimitingMiddleware": (__spec__.parent, "middleware.fastmcp"),
     "ResponseCachingMiddleware": (__spec__.parent, "middleware.fastmcp"),
     "RetryMiddleware": (__spec__.parent, "middleware.fastmcp"),
-    "SettingsMapDep": (__spec__.parent, "server"),
-    "StatisticsDep": (__spec__.parent, "server"),
-    "StatisticsMiddleware": (__spec__.parent, "server"),
+    "StatisticsMiddleware": (__spec__.parent, "middleware.statistics"),
     "StructuredLoggingMiddleware": (__spec__.parent, "middleware.fastmcp"),
-    "ToolAnnotationsDict": (__spec__.parent, "types"),
-    "ToolCollectionDict": (__spec__.parent, "tools"),
-    "ToolRegistrationDict": (__spec__.parent, "types"),
-    "configure_uvicorn_logging": (__spec__.parent, "server"),
-    "create_http_server": (__spec__.parent, "server"),
-    "create_stdio_server": (__spec__.parent, "server"),
     "default_middleware_for_transport": (__spec__.parent, "middleware"),
-    "find_code_tool": (__spec__.parent, "user_agent"),
-    "get_bulk_tool": (__spec__.parent, "tools"),
-    "get_statistics_middleware": (__spec__.parent, "server"),
-    "register_middleware": (__spec__.parent, "server"),
-    "register_tool": (__spec__.parent, "tools"),
-    "register_tools": (__spec__.parent, "server"),
-    "setup_middleware": (__spec__.parent, "server"),
-    "setup_runargs": (__spec__.parent, "server"),
 })
 
 __getattr__ = create_late_getattr(_dynamic_imports, globals(), __name__)
 
 __all__ = (
-    "TOOLS_TO_REGISTER",
-    "TOOL_DEFINITIONS",
-    "CodeWeaverSettingsType",
-    "CodeWeaverStateDep",
-    "ContextAgentToolkit",
-    "CwMcpHttpState",
     "DetailedTimingMiddleware",
     "ErrorHandlingMiddleware",
-    "FastMCPServerSettings",
-    "IntentType",
     "LoggingMiddleware",
-    "MappingProxyType",
     "McpMiddleware",
-    "McpMiddlewareContext",
-    "ProviderError",
     "RateLimitingMiddleware",
     "ResponseCachingMiddleware",
     "RetryMiddleware",
-    "SettingsMapDep",
-    "StatisticsDep",
     "StatisticsMiddleware",
-    "StdioClientLifespan",
     "StructuredLoggingMiddleware",
-    "ToolAnnotationsDict",
-    "ToolCollectionDict",
-    "ToolRegistrationDict",
-    "configure_uvicorn_logging",
-    "create_http_server",
-    "create_stdio_server",
     "default_middleware_for_transport",
-    "find_code_tool",
-    "get_bulk_tool",
-    "get_statistics_middleware",
-    "register_middleware",
-    "register_tool",
-    "register_tools",
-    "setup_middleware",
-    "setup_runargs",
 )
 
 

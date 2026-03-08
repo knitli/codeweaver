@@ -19,14 +19,15 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING
 
-from codeweaver.core import CodeWeaverSettingsType, get_container
+from codeweaver.core import get_container
+from codeweaver.core.config.settings_type import CodeWeaverSettingsType
 from codeweaver.core.ui_protocol import ProgressReporter, RichConsoleProgressReporter
 from codeweaver.server.server import CodeWeaverState
 
 
 if TYPE_CHECKING:
     from codeweaver.core import SessionStatistics
-    from codeweaver.server.mcp import CwMcpHttpState
+    from codeweaver.server.mcp.server import CwMcpHttpState
 
 logger = logging.getLogger(__name__)
 

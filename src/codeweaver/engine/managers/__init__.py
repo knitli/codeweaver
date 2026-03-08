@@ -20,18 +20,11 @@ from lateimport import create_late_getattr
 if TYPE_CHECKING:
     from codeweaver.engine.managers.checkpoint_manager import (
         EXCEPTION_PATTERN,
-        AsyncPath,
         ChangeImpact,
         CheckpointManager,
         CheckpointSettingsFingerprint,
         CheckpointSettingsMap,
-        CodeWeaverDeveloperError,
-        EmbeddingProviderSettingsType,
         IndexingCheckpoint,
-        ResolvedProjectNameDep,
-        ResolvedProjectPathDep,
-        SparseEmbeddingProviderSettingsType,
-        VectorStoreProviderSettingsType,
         get_checkpoint_settings_map,
     )
     from codeweaver.engine.managers.manifest_manager import (
@@ -49,13 +42,10 @@ if TYPE_CHECKING:
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "EXCEPTION_PATTERN": (__spec__.parent, "checkpoint_manager"),
-    "AsyncPath": (__spec__.parent, "checkpoint_manager"),
     "ChangeImpact": (__spec__.parent, "checkpoint_manager"),
     "CheckpointManager": (__spec__.parent, "checkpoint_manager"),
     "CheckpointSettingsFingerprint": (__spec__.parent, "checkpoint_manager"),
     "CheckpointSettingsMap": (__spec__.parent, "checkpoint_manager"),
-    "CodeWeaverDeveloperError": (__spec__.parent, "checkpoint_manager"),
-    "EmbeddingProviderSettingsType": (__spec__.parent, "checkpoint_manager"),
     "FileManifestEntry": (__spec__.parent, "manifest_manager"),
     "FileManifestManager": (__spec__.parent, "manifest_manager"),
     "FileManifestStats": (__spec__.parent, "manifest_manager"),
@@ -65,10 +55,6 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "IndexingPhase": (__spec__.parent, "progress_tracker"),
     "IndexingProgressTracker": (__spec__.parent, "progress_tracker"),
     "IndexingStats": (__spec__.parent, "progress_tracker"),
-    "ResolvedProjectNameDep": (__spec__.parent, "checkpoint_manager"),
-    "ResolvedProjectPathDep": (__spec__.parent, "checkpoint_manager"),
-    "SparseEmbeddingProviderSettingsType": (__spec__.parent, "checkpoint_manager"),
-    "VectorStoreProviderSettingsType": (__spec__.parent, "checkpoint_manager"),
     "get_checkpoint_settings_map": (__spec__.parent, "checkpoint_manager"),
 })
 
@@ -76,13 +62,10 @@ __getattr__ = create_late_getattr(_dynamic_imports, globals(), __name__)
 
 __all__ = (
     "EXCEPTION_PATTERN",
-    "AsyncPath",
     "ChangeImpact",
     "CheckpointManager",
     "CheckpointSettingsFingerprint",
     "CheckpointSettingsMap",
-    "CodeWeaverDeveloperError",
-    "EmbeddingProviderSettingsType",
     "FileManifestEntry",
     "FileManifestManager",
     "FileManifestStats",
@@ -92,11 +75,6 @@ __all__ = (
     "IndexingPhase",
     "IndexingProgressTracker",
     "IndexingStats",
-    "MappingProxyType",
-    "ResolvedProjectNameDep",
-    "ResolvedProjectPathDep",
-    "SparseEmbeddingProviderSettingsType",
-    "VectorStoreProviderSettingsType",
     "get_checkpoint_settings_map",
 )
 

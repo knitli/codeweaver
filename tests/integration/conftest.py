@@ -86,7 +86,7 @@ def _set_settings() -> DictView[CodeWeaverSettingsDict]:
 
     # Just return the settings map - config system already loaded codeweaver.test.toml
     # because CODEWEAVER_TEST_MODE="true" (set at top of this file)
-    return get_settings().view()  # ty:ignore[invalid-return-type]
+    return get_settings().view()
 
 
 _settings: DictView[CodeWeaverSettingsDict] = _set_settings()
@@ -1038,7 +1038,7 @@ async def indexed_test_project(known_test_codebase, clean_container):
         settings.project_path = project_path
         settings.project_name = f"test_real_{project_path.name}"
         # get_settings() returns BaseCodeWeaverSettings, but in test mode it's actually CodeWeaverSettings
-        return settings  # type: ignore[return-value]
+        return settings
 
     # Apply overrides to container
     clean_container.override(CodeWeaverSettings, get_test_settings)

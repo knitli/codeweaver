@@ -18,15 +18,8 @@ from lateimport import create_late_getattr
 
 
 if TYPE_CHECKING:
-    from codeweaver.server.health.endpoint import CodeWeaverStateDep, get_health
-    from codeweaver.server.health.health_service import (
-        ConfigurationError,
-        FailoverServiceDep,
-        HealthService,
-        IndexingServiceDep,
-        ProviderSettingsDep,
-        StatisticsDep,
-    )
+    from codeweaver.server.health.endpoint import get_health
+    from codeweaver.server.health.health_service import HealthService
     from codeweaver.server.health.models import (
         EmbeddingProviderServiceInfo,
         FailoverInfo,
@@ -42,22 +35,16 @@ if TYPE_CHECKING:
     )
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
-    "CodeWeaverStateDep": (__spec__.parent, "endpoint"),
-    "ConfigurationError": (__spec__.parent, "health_service"),
     "EmbeddingProviderServiceInfo": (__spec__.parent, "models"),
     "FailoverInfo": (__spec__.parent, "models"),
-    "FailoverServiceDep": (__spec__.parent, "health_service"),
     "HealthResponse": (__spec__.parent, "models"),
     "HealthService": (__spec__.parent, "health_service"),
     "IndexingInfo": (__spec__.parent, "models"),
     "IndexingProgressInfo": (__spec__.parent, "models"),
-    "IndexingServiceDep": (__spec__.parent, "health_service"),
-    "ProviderSettingsDep": (__spec__.parent, "health_service"),
     "RerankingServiceInfo": (__spec__.parent, "models"),
     "ResourceInfo": (__spec__.parent, "models"),
     "ServicesInfo": (__spec__.parent, "models"),
     "SparseEmbeddingServiceInfo": (__spec__.parent, "models"),
-    "StatisticsDep": (__spec__.parent, "health_service"),
     "StatisticsInfo": (__spec__.parent, "models"),
     "VectorStoreServiceInfo": (__spec__.parent, "models"),
     "get_health": (__spec__.parent, "endpoint"),
@@ -66,23 +53,16 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
 __getattr__ = create_late_getattr(_dynamic_imports, globals(), __name__)
 
 __all__ = (
-    "CodeWeaverStateDep",
-    "ConfigurationError",
     "EmbeddingProviderServiceInfo",
     "FailoverInfo",
-    "FailoverServiceDep",
     "HealthResponse",
     "HealthService",
     "IndexingInfo",
     "IndexingProgressInfo",
-    "IndexingServiceDep",
-    "MappingProxyType",
-    "ProviderSettingsDep",
     "RerankingServiceInfo",
     "ResourceInfo",
     "ServicesInfo",
     "SparseEmbeddingServiceInfo",
-    "StatisticsDep",
     "StatisticsInfo",
     "VectorStoreServiceInfo",
     "get_health",

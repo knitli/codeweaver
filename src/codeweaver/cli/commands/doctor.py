@@ -27,7 +27,6 @@ from codeweaver.cli.dependencies import setup_cli_di
 from codeweaver.cli.ui import CLIErrorHandler, StatusDisplay, get_display
 from codeweaver.cli.utils import check_provider_package_available
 from codeweaver.core import (
-    CodeWeaverSettingsType,
     ProviderCategory,
     SettingsMapDep,
     Unset,
@@ -35,6 +34,7 @@ from codeweaver.core import (
     get_project_path,
     is_git_dir,
 )
+from codeweaver.core.config.settings_type import CodeWeaverSettingsType
 from codeweaver.core.config.types import CodeWeaverSettingsDict
 from codeweaver.core.di import INJECTED
 from codeweaver.core.types.dictview import DictView
@@ -44,8 +44,8 @@ from codeweaver.engine import ConfigChangeAnalyzerDep
 
 if TYPE_CHECKING:
     from codeweaver.core import Provider
+    from codeweaver.core.config.settings_type import CodeWeaverSettingsType
     from codeweaver.providers import ProviderSettings
-    from codeweaver.server import CodeWeaverSettings
 
 
 # Module-level display for check functions
@@ -241,7 +241,7 @@ def _identify_missing_dependencies(
     return missing, installed
 
 
-def check_project_path(settings: CodeWeaverSettings) -> DoctorCheck:
+def check_project_path(settings: CodeWeaverSettingsType) -> DoctorCheck:
     """Check if project path exists and is accessible."""
     project_path = (
         settings.project_path if isinstance(settings.project_path, Path) else get_project_path()
@@ -278,7 +278,7 @@ def check_project_path(settings: CodeWeaverSettings) -> DoctorCheck:
     )
 
 
-def check_configuration_file(settings: CodeWeaverSettings) -> DoctorCheck:
+def check_configuration_file(settings: CodeWeaverSettingsType) -> DoctorCheck:
     """Check if configuration file exists and is valid."""
     check = DoctorCheck("Configuration File")
 
@@ -533,14 +533,14 @@ def _set_warning_status(check: DoctorCheck, message: str, suggestion: str) -> No
     check.suggestions = [suggestion]
 
 
-def check_indexer_config(settings: CodeWeaverSettings) -> DoctorCheck:
+def check_indexer_config(settings: CodeWeaverSettingsType) -> DoctorCheck:
     """Check if the indexer is properly configured and cache directory is writable."""
     from codeweaver.engine.config import IndexerSettings
 
     check = DoctorCheck("Indexer Configuration")
 
     try:
-        if not isinstance(settings.indexer, IndexerSettings):
+        if not hasattr(settings, "indexer") or not isinstance(settings.indexer, IndexerSettings):
             return DoctorCheck.set_check(
                 check.name,
                 "warn",
@@ -862,7 +862,7 @@ async def check_embedding_compatibility(
 
 
 async def process_checks(
-    display: StatusDisplay, settings: CodeWeaverSettings, container: Any = None
+    display: StatusDisplay, settings: CodeWeaverSettingsType, container: Any = None
 ) -> list[DoctorCheck]:
     """Process all doctor checks and return the results.
 
@@ -905,7 +905,11 @@ async def process_checks(
     if config_failed or settings is None or isinstance(settings, Unset):
         return checks
     checks.extend((check_project_path(settings), check_indexer_config(settings)))
-    if not (provider_settings := settings.provider) or isinstance(provider_settings, Unset):
+    if (
+        not hasattr(settings, "provider")
+        or not (provider_settings := settings.provider)
+        or isinstance(provider_settings, Unset)
+    ):
         checks.append(
             DoctorCheck.set_check(
                 "Provider Settings",
@@ -916,8 +920,8 @@ async def process_checks(
         )
         return checks
     checks.extend((
-        await check_vector_store_config(provider_settings),
-        *check_provider_availability(provider_settings),
+        await check_vector_store_config(cast(ProviderSettings, provider_settings)),
+        *check_provider_availability(cast(ProviderSettings, provider_settings)),
     ))
 
     # Check embedding configuration compatibility if container is available
@@ -934,12 +938,19 @@ async def process_checks(
                     ["This check is optional and doesn't affect core functionality"],
                 )
             )
-
+    if (
+        not hasattr(settings, "provider")
+        or not (provider_settings := settings.provider)
+        or isinstance(provider_settings, Unset)
+    ):
+        return checks
     if remote_providers := {
-        provider for provider in provider_settings.providers if provider.requires_auth
+        provider
+        for provider in cast(ProviderSettings, provider_settings).providers
+        if provider.requires_auth
     }:
         for provider in remote_providers:
-            if not _has_auth_configured(provider, provider_settings):
+            if not _has_auth_configured(provider, provider_settings):  # ty:ignore[invalid-argument-type]
                 checks.append(
                     DoctorCheck.set_check(
                         f"{provider.as_title} Authentication",

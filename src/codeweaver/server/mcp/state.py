@@ -15,22 +15,18 @@ from typing import TYPE_CHECKING, Annotated, Any
 from fastmcp import FastMCP
 from pydantic import Field, NonNegativeFloat, NonNegativeInt, PrivateAttr, computed_field
 
-from codeweaver.core import (
-    CodeWeaverSettingsType,
-    DictView,
-    SettingsMapDep,
-    Unset,
-    elapsed_time_to_human_readable,
-)
+from codeweaver.core import DictView, SettingsMapDep, Unset, elapsed_time_to_human_readable
+from codeweaver.core.config.settings_type import CodeWeaverSettingsType
 from codeweaver.core.config.types import CodeWeaverSettingsDict
 from codeweaver.core.constants import DEFAULT_MCP_PORT, LOCALHOST
 from codeweaver.core.di.depends import INJECTED
 from codeweaver.core.types import BasedModel
-from codeweaver.server import FastMcpHttpServerSettings, FastMcpStdioServerSettings
 from codeweaver.server.config import (
     DefaultFastMcpHttpRunArgs,
     FastMcpHttpRunArgs,
+    FastMcpHttpServerSettings,
     FastMcpServerSettingsDict,
+    FastMcpStdioServerSettings,
 )
 from codeweaver.server.mcp.middleware import McpMiddleware
 

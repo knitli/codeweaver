@@ -210,6 +210,4 @@ __all__ = (
     "is_typeadapter",
     "is_wsl",
     "is_wsl_vscode",
-    "logger",
-    "python_version",
 )

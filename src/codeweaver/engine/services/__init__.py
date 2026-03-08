@@ -18,20 +18,15 @@ from lateimport import create_late_getattr
 
 
 if TYPE_CHECKING:
-    from codeweaver.engine.services.chunking_service import ChunkingError, ChunkingService
+    from codeweaver.engine.services.chunking_service import ChunkingService
     from codeweaver.engine.services.config_analyzer import (
         ConfigChangeAnalysis,
         ConfigChangeAnalyzer,
         TransformationDetails,
     )
     from codeweaver.engine.services.failover_service import FailoverService
-    from codeweaver.engine.services.indexing_service import (
-        EmbeddingRegistryDep,
-        IndexingService,
-        ProgressCallback,
-    )
+    from codeweaver.engine.services.indexing_service import IndexingService, ProgressCallback
     from codeweaver.engine.services.migration_service import (
-        AsyncPath,
         ChunkResult,
         InvalidStateTransitionError,
         MigrationCheckpoint,
@@ -52,13 +47,10 @@ if TYPE_CHECKING:
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "USE_RICH": (__spec__.parent, "watching_service"),
-    "AsyncPath": (__spec__.parent, "migration_service"),
-    "ChunkingError": (__spec__.parent, "chunking_service"),
     "ChunkingService": (__spec__.parent, "chunking_service"),
     "ChunkResult": (__spec__.parent, "migration_service"),
     "ConfigChangeAnalysis": (__spec__.parent, "config_analyzer"),
     "ConfigChangeAnalyzer": (__spec__.parent, "config_analyzer"),
-    "EmbeddingRegistryDep": (__spec__.parent, "indexing_service"),
     "FailoverService": (__spec__.parent, "failover_service"),
     "FileWatchingService": (__spec__.parent, "watching_service"),
     "IndexingService": (__spec__.parent, "indexing_service"),
@@ -82,18 +74,14 @@ __getattr__ = create_late_getattr(_dynamic_imports, globals(), __name__)
 
 __all__ = (
     "USE_RICH",
-    "AsyncPath",
     "ChunkResult",
-    "ChunkingError",
     "ChunkingService",
     "ConfigChangeAnalysis",
     "ConfigChangeAnalyzer",
-    "EmbeddingRegistryDep",
     "FailoverService",
     "FileWatchingService",
     "IndexingService",
     "InvalidStateTransitionError",
-    "MappingProxyType",
     "MigrationCheckpoint",
     "MigrationError",
     "MigrationResult",

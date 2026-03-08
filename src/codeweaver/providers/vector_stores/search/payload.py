@@ -57,4 +57,4 @@ class PayloadField(BaseModel, extra="forbid"):
     key: Annotated[str, Field(description="""Payload field name""")]
 
 
-__all__ = ("Entry", "PayloadField", "PayloadSchemaType")
+__all__ = ("Entry", "PayloadField", "PayloadMetadata", "PayloadSchemaType")

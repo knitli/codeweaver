@@ -35,8 +35,6 @@ if TYPE_CHECKING:
         TelemetrySettingsDep,
     )
     from codeweaver.core.dependencies.core_settings import (
-        AsyncPath,
-        CodeWeaverSettingsType,
         SettingsDep,
         SettingsMapDep,
         bootstrap_settings,
@@ -52,8 +50,6 @@ if TYPE_CHECKING:
     )
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
-    "AsyncPath": (__spec__.parent, "core_settings"),
-    "CodeWeaverSettingsType": (__spec__.parent, "core_settings"),
     "SettingsDep": (__spec__.parent, "core_settings"),
     "bootstrap_settings": (__spec__.parent, "core_settings"),
     "ensure_container_initialized": (__spec__.parent, "utils"),
@@ -63,11 +59,8 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
 __getattr__ = create_late_getattr(_dynamic_imports, globals(), __name__)
 
 __all__ = (
-    "AsyncPath",
-    "CodeWeaverSettingsType",
     "LoggerDep",
     "LoggingSettingsDep",
-    "MappingProxyType",
     "ProgressReporterDep",
     "ResolvedGitBranchDep",
     "ResolvedProjectNameDep",

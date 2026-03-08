@@ -649,6 +649,10 @@ include = [
   "src/codeweaver/*/*/__init__.py",
   "src/codeweaver/*/*/*/__init__.py",
   "src/codeweaver/*/*/*/*/__init__.py",
+  "packages/*/__init__.py",
+  "packages/*/*/__init__.py",
+  "packages/*/*/*/__init__.py",
+  "packages/*/*/*/*/__init__.py",
   # there's a similar issue in some of the embedding providers
   "src/codeweaver/providers/embedding/providers/bedrock.py",
   "src/codeweaver/providers/embedding/providers/cohere.py",

@@ -33,19 +33,23 @@ if TYPE_CHECKING:
     from codeweaver.engine.watcher.progress import IndexingProgressUI
     from codeweaver.engine.watcher.types import FileChange, WatchfilesArgs
     from codeweaver.engine.watcher.watch_filters import (
+        CodeFilter,
+        ConfigFilter,
         DefaultExtensionFilter,
         DefaultFilter,
+        DocsFilter,
         ExtensionFilter,
         IgnoreFilter,
-        ResolvedProjectPathDep,
     )
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
+    "CodeFilter": (__spec__.parent, "watch_filters"),
+    "ConfigFilter": (__spec__.parent, "watch_filters"),
     "DefaultExtensionFilter": (__spec__.parent, "watch_filters"),
     "DefaultFilter": (__spec__.parent, "watch_filters"),
+    "DocsFilter": (__spec__.parent, "watch_filters"),
     "ExtensionFilter": (__spec__.parent, "watch_filters"),
     "IgnoreFilter": (__spec__.parent, "watch_filters"),
-    "ResolvedProjectPathDep": (__spec__.parent, "watch_filters"),
     "WatchfilesArgs": (__spec__.parent, "types"),
     "WatchfilesLogManager": (__spec__.parent, "_logging"),
     "IndexingProgressUI": (__spec__.parent, "progress"),
@@ -55,14 +59,15 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
 __getattr__ = create_late_getattr(_dynamic_imports, globals(), __name__)
 
 __all__ = (
+    "CodeFilter",
+    "ConfigFilter",
     "DefaultExtensionFilter",
     "DefaultFilter",
+    "DocsFilter",
     "ExtensionFilter",
     "FileChange",
     "IgnoreFilter",
     "IndexingProgressUI",
-    "MappingProxyType",
-    "ResolvedProjectPathDep",
     "WatchfilesArgs",
     "WatchfilesLogManager",
     "normalize_and_validate_patterns",

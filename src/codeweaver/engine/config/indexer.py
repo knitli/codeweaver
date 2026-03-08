@@ -322,7 +322,10 @@ class IndexerSettings(BasedModel):
         if self.include_github_dir:
             self.forced_includes |= {"**/.github/**", "**/.circleci/**"}
         if self.include_tooling_dirs:
-            from codeweaver.core import COMMON_LLM_TOOLING_PATHS, COMMON_TOOLING_PATHS
+            from codeweaver.core.file_extensions import (
+                COMMON_LLM_TOOLING_PATHS,
+                COMMON_TOOLING_PATHS,
+            )
 
             file_endings = {
                 ".json",
@@ -472,7 +475,7 @@ class IndexerSettings(BasedModel):
     @cached_property
     def hidden_tool_paths(self) -> set[str]:
         """Get common hidden tooling paths to consider for forced-includes."""
-        from codeweaver.core import COMMON_LLM_TOOLING_PATHS, COMMON_TOOLING_PATHS
+        from codeweaver.core.file_extensions import COMMON_LLM_TOOLING_PATHS, COMMON_TOOLING_PATHS
 
         result: set[str] = set()
         for tool in COMMON_TOOLING_PATHS:

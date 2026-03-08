@@ -32,7 +32,8 @@ from codeweaver.server.config import (
     MiddlewareOptions,
     default_for_transport,
 )
-from codeweaver.server.mcp.middleware import McpMiddleware, StatisticsMiddleware
+from codeweaver.server.mcp import McpMiddleware
+from codeweaver.server.mcp.middleware import StatisticsMiddleware
 
 
 if TYPE_CHECKING:

@@ -21,8 +21,8 @@ from codeweaver.core import (
 
 
 if TYPE_CHECKING:
-    from codeweaver.server import CwMcpHttpState
-    from codeweaver.server.mcp import ToolRegistrationDict
+    from codeweaver.server.mcp.server import CwMcpHttpState
+    from codeweaver.server.mcp.types import ToolRegistrationDict
 
 
 logger = logging.getLogger(__name__)

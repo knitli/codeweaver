@@ -113,13 +113,6 @@ rules:
   # Priority 1000: Explicit exclusions
   # These rules run first to prevent unwanted exports
   # ===================================================================
-  - name: ExcludePrivateSymbols
-    priority: 1000
-    description: Skip all private symbols (names starting with underscore)
-    match:
-      name_pattern: ^_.*
-    action: exclude
-
   - name: ExcludeStdlibImports
     priority: 1000
     description: >-
@@ -148,6 +141,12 @@ rules:
       name_pattern: ^__.*__$
     action: exclude
 
+  - name: ExcludePrivateSymbols
+    priority: 998
+    description: Skip all private symbols (names starting with underscore)
+    match:
+      name_pattern: ^_.*$ # any name starting with an underscore
+    action: exclude
   - name: ExcludeMain
     priority: 998
     description: Skip __main__ modules to prevent circular imports and unintended exports
@@ -179,6 +178,14 @@ rules:
         - member_type: imported
         - provenance: imported
     action: exclude
+
+  - name: EnsureCodeWeaverTypesPropagateToRoot
+    priority: 915
+    description: Ensure core types propagate to root for visibility in public API
+    match:
+      name_pattern: ^CodeWeaver.*$
+    action: include
+    propagate: root
 
   - name: ExportPublicVariables
     priority: 910
@@ -258,6 +265,21 @@ rules:
     action: include
     propagate: root
 
+  - name: IncludePydanticAIReexports
+    priority: 425
+    description: Include KnownAgentName for visibility in public API
+    match:
+      module_pattern: .*providers\.agent(\.capabilities)?$
+      any_of:
+        - name_exact: KnownAgentModelName
+        - name_exact: KnownAgentName
+        - name_exact: AgentModelCapabilities
+        - name_exact: AgentModelCapabilitiesT
+
+      name_exact: KnownAgentModelName
+    action: include
+    propagate: root
+
   - name: IncludePydanticAIImports
     priority: 425
     description: Include Pydantic AI imports (core part of public API)
@@ -265,6 +287,26 @@ rules:
       all_of:
         - module_pattern: .*providers\.config\.sdk\.agent$
         - name_pattern: ^.*AgentModelConfig$
+    action: include
+    propagate: root
+
+  - name: IncludeSpecialTypeConstants
+    priority: 425
+    description: Include special type constants for visibility in public API
+    match:
+      all_of:
+        - module_pattern: .*core\.types\..*$
+        - name_pattern: ^(UNSET|MISSING|BASEDMODEL_CONFIG|FROZEN_BASEDMODEL_CONFIG|LANGUAGE_TO_FAMILY)$
+    action: include
+    propagate: root
+
+  - name: IncludeMcpMiddlewareClasses
+    priority: 425
+    description: Include MCP middleware classes for visibility in public API
+    match:
+      all_of:
+        - module_pattern: .*server\.mcp.*$
+        - name_pattern: ^.*Middleware$
     action: include
     propagate: root
 
@@ -381,7 +423,7 @@ rules:
       all_of:
         - member_type: constant
         - any_of:
-            - module_pattern: .*\.constants$
+            - module_pattern: .*\.(constants|file_extensions)$
     action: include
     propagate: root
 

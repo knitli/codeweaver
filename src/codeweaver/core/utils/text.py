@@ -309,7 +309,6 @@ __all__ = (
     "format_signature",
     "format_snippet_name",
     "humanize",
-    "logger",
     "sanitize_unicode",
     "to_lowly_lowercase",
     "to_tokens",

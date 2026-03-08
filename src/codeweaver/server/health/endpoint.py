@@ -11,7 +11,7 @@ import logging
 from typing import TYPE_CHECKING, Any, NoReturn
 
 from codeweaver.core.di.depends import INJECTED
-from codeweaver.server import CodeWeaverStateDep
+from codeweaver.server.dependencies import CodeWeaverStateDep
 from codeweaver.server.health.models import (
     EmbeddingProviderServiceInfo,
     HealthResponse,

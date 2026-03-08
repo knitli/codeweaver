@@ -18,29 +18,14 @@ from lateimport import create_late_getattr
 
 
 if TYPE_CHECKING:
-    from codeweaver.providers.vector_stores.base import (
-        CircuitBreakerOpenError,
-        MixedQueryInput,
-        VectorStoreProvider,
-    )
-    from codeweaver.providers.vector_stores.inmemory import (
-        AsyncPath,
-        MemoryVectorStoreProvider,
-        PersistenceError,
-        ProviderError,
-    )
+    from codeweaver.providers.vector_stores.base import MixedQueryInput, VectorStoreProvider
+    from codeweaver.providers.vector_stores.inmemory import MemoryVectorStoreProvider
     from codeweaver.providers.vector_stores.qdrant import QdrantVectorStoreProvider
-    from codeweaver.providers.vector_stores.qdrant_base import (
-        ConfigurationError,
-        QdrantBaseProvider,
-        ResolvedProjectNameDep,
-    )
+    from codeweaver.providers.vector_stores.qdrant_base import QdrantBaseProvider
     from codeweaver.providers.vector_stores.qdrant_service import (
-        ProviderSettingsDep,
         QdrantVectorStoreService,
         create_qdrant_service,
     )
-    from codeweaver.providers.vector_stores.search import MappingProxyType
     from codeweaver.providers.vector_stores.search.condition import (
         Condition,
         ExtendedPointId,
@@ -54,8 +39,13 @@ if TYPE_CHECKING:
         MinShould,
         Nested,
         NestedCondition,
-        PayloadSchemaType,
         ValuesCount,
+    )
+    from codeweaver.providers.vector_stores.search.filter_factory import (
+        ArbitraryFilter,
+        make_filter,
+        make_indexes,
+        to_qdrant_filter,
     )
     from codeweaver.providers.vector_stores.search.geo import (
         GeoBoundingBox,
@@ -74,13 +64,20 @@ if TYPE_CHECKING:
         MatchValue,
         ValueVariants,
     )
-    from codeweaver.providers.vector_stores.search.payload import Entry, PayloadField
+    from codeweaver.providers.vector_stores.search.payload import (
+        Entry,
+        PayloadField,
+        PayloadMetadata,
+        PayloadSchemaType,
+    )
     from codeweaver.providers.vector_stores.search.range import DatetimeRange, Range, RangeInterface
+    from codeweaver.providers.vector_stores.search.wrap_filters import (
+        make_partial_function,
+        wrap_filters,
+    )
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
-    "AsyncPath": (__spec__.parent, "inmemory"),
-    "CircuitBreakerOpenError": (__spec__.parent, "base"),
-    "ConfigurationError": (__spec__.parent, "qdrant_base"),
+    "ArbitraryFilter": (__spec__.parent, "search.filter_factory"),
     "DatetimeRange": (__spec__.parent, "search.range"),
     "Entry": (__spec__.parent, "search.payload"),
     "FieldCondition": (__spec__.parent, "search.condition"),
@@ -95,7 +92,6 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "HasVectorCondition": (__spec__.parent, "search.condition"),
     "IsEmptyCondition": (__spec__.parent, "search.condition"),
     "IsNullCondition": (__spec__.parent, "search.condition"),
-    "MappingProxyType": (__spec__.parent, "search"),
     "MatchAny": (__spec__.parent, "search.match"),
     "MatchExcept": (__spec__.parent, "search.match"),
     "MatchPhrase": (__spec__.parent, "search.match"),
@@ -106,28 +102,28 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "Nested": (__spec__.parent, "search.condition"),
     "NestedCondition": (__spec__.parent, "search.condition"),
     "PayloadField": (__spec__.parent, "search.payload"),
-    "PayloadSchemaType": (__spec__.parent, "search.condition"),
-    "PersistenceError": (__spec__.parent, "inmemory"),
-    "ProviderError": (__spec__.parent, "inmemory"),
-    "ProviderSettingsDep": (__spec__.parent, "qdrant_service"),
+    "PayloadMetadata": (__spec__.parent, "search.payload"),
+    "PayloadSchemaType": (__spec__.parent, "search.payload"),
     "QdrantBaseProvider": (__spec__.parent, "qdrant_base"),
     "QdrantVectorStoreProvider": (__spec__.parent, "qdrant"),
     "QdrantVectorStoreService": (__spec__.parent, "qdrant_service"),
     "Range": (__spec__.parent, "search.range"),
-    "ResolvedProjectNameDep": (__spec__.parent, "qdrant_base"),
     "ValuesCount": (__spec__.parent, "search.condition"),
     "VectorStoreProvider": (__spec__.parent, "base"),
     "create_qdrant_service": (__spec__.parent, "qdrant_service"),
+    "make_filter": (__spec__.parent, "search.filter_factory"),
+    "make_indexes": (__spec__.parent, "search.filter_factory"),
+    "make_partial_function": (__spec__.parent, "search.wrap_filters"),
+    "to_qdrant_filter": (__spec__.parent, "search.filter_factory"),
+    "wrap_filters": (__spec__.parent, "search.wrap_filters"),
 })
 
 __getattr__ = create_late_getattr(_dynamic_imports, globals(), __name__)
 
 __all__ = (
     "AnyVariants",
-    "AsyncPath",
-    "CircuitBreakerOpenError",
+    "ArbitraryFilter",
     "Condition",
-    "ConfigurationError",
     "DatetimeRange",
     "Entry",
     "ExtendedPointId",
@@ -143,7 +139,6 @@ __all__ = (
     "HasVectorCondition",
     "IsEmptyCondition",
     "IsNullCondition",
-    "MappingProxyType",
     "Match",
     "MatchAny",
     "MatchExcept",
@@ -156,20 +151,22 @@ __all__ = (
     "Nested",
     "NestedCondition",
     "PayloadField",
+    "PayloadMetadata",
     "PayloadSchemaType",
-    "PersistenceError",
-    "ProviderError",
-    "ProviderSettingsDep",
     "QdrantBaseProvider",
     "QdrantVectorStoreProvider",
     "QdrantVectorStoreService",
     "Range",
     "RangeInterface",
-    "ResolvedProjectNameDep",
     "ValueVariants",
     "ValuesCount",
     "VectorStoreProvider",
     "create_qdrant_service",
+    "make_filter",
+    "make_indexes",
+    "make_partial_function",
+    "to_qdrant_filter",
+    "wrap_filters",
 )
 
 

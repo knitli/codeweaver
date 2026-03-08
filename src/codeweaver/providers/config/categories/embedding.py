@@ -169,17 +169,11 @@ class EmbeddingProviderSettings(BaseEmbeddingProviderSettings):
             Provider.FASTEMBED,
         ):
             if provider == Provider.FASTEMBED:
-                data = self._set_client_option(
-                    data, "model_name", data.get("model_name")
-                )
+                data = self._set_client_option(data, "model_name", data.get("model_name"))
             if provider == Provider.SENTENCE_TRANSFORMERS:
-                data = self._set_client_option(
-                    data, "model_name_or_path", data.get("model_name")
-                )
+                data = self._set_client_option(data, "model_name_or_path", data.get("model_name"))
             else:
-                data = self._set_client_option(
-                    data, "model", data.get("model_name")
-                )
+                data = self._set_client_option(data, "model", data.get("model_name"))
         data |= super()._initialize(data)
         return data
 
@@ -269,8 +263,7 @@ class AzureEmbeddingProviderSettings(AzureProviderMixin, EmbeddingProviderSettin
     embedding_config: Annotated[
         CohereEmbeddingConfig | BedrockEmbeddingConfig,
         Field(
-            description="Model configuration for embedding operations.",
-            discriminator="provider",
+            description="Model configuration for embedding operations.", discriminator="provider"
         ),
     ]
 

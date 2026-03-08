@@ -169,7 +169,6 @@ class TestDoctorProviderEnvVars:
             assert cohere_env["api_key"].env == "COHERE_API_KEY"
 
 
-
 @pytest.mark.unit
 @pytest.mark.config
 class TestDoctorQdrantDetection:

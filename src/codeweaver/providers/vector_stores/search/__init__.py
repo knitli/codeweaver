@@ -38,10 +38,10 @@ if TYPE_CHECKING:
         MinShould,
         Nested,
         NestedCondition,
-        PayloadSchemaType,
         ValuesCount,
     )
     from codeweaver.providers.vector_stores.search.filter_factory import (
+        ArbitraryFilter,
         make_filter,
         make_indexes,
         to_qdrant_filter,
@@ -63,7 +63,12 @@ if TYPE_CHECKING:
         MatchValue,
         ValueVariants,
     )
-    from codeweaver.providers.vector_stores.search.payload import Entry, PayloadField
+    from codeweaver.providers.vector_stores.search.payload import (
+        Entry,
+        PayloadField,
+        PayloadMetadata,
+        PayloadSchemaType,
+    )
     from codeweaver.providers.vector_stores.search.range import DatetimeRange, Range, RangeInterface
     from codeweaver.providers.vector_stores.search.wrap_filters import (
         make_partial_function,
@@ -71,6 +76,7 @@ if TYPE_CHECKING:
     )
 
 _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
+    "ArbitraryFilter": (__spec__.parent, "filter_factory"),
     "DatetimeRange": (__spec__.parent, "range"),
     "Entry": (__spec__.parent, "payload"),
     "FieldCondition": (__spec__.parent, "condition"),
@@ -94,7 +100,8 @@ _dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType({
     "Nested": (__spec__.parent, "condition"),
     "NestedCondition": (__spec__.parent, "condition"),
     "PayloadField": (__spec__.parent, "payload"),
-    "PayloadSchemaType": (__spec__.parent, "condition"),
+    "PayloadMetadata": (__spec__.parent, "payload"),
+    "PayloadSchemaType": (__spec__.parent, "payload"),
     "Range": (__spec__.parent, "range"),
     "ValuesCount": (__spec__.parent, "condition"),
     "make_filter": (__spec__.parent, "filter_factory"),
@@ -108,6 +115,7 @@ __getattr__ = create_late_getattr(_dynamic_imports, globals(), __name__)
 
 __all__ = (
     "AnyVariants",
+    "ArbitraryFilter",
     "Condition",
     "DatetimeRange",
     "Entry",
@@ -124,7 +132,6 @@ __all__ = (
     "HasVectorCondition",
     "IsEmptyCondition",
     "IsNullCondition",
-    "MappingProxyType",
     "Match",
     "MatchAny",
     "MatchExcept",
@@ -135,6 +142,7 @@ __all__ = (
     "Nested",
     "NestedCondition",
     "PayloadField",
+    "PayloadMetadata",
     "PayloadSchemaType",
     "Range",
     "RangeInterface",

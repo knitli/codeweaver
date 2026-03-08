@@ -243,7 +243,6 @@ __all__ = (
     "effective_cpu_count",
     "get_cpu_count",
     "get_optimal_workers",
-    "logger",
     "low_priority",
     "python_version",
     "very_low_priority",

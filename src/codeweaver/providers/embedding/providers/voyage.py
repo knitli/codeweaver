@@ -165,10 +165,11 @@ class VoyageEmbeddingProvider(EmbeddingProvider[AsyncClient]):
         return self.embed_options.get("output_dimension", self.caps.default_dimension)
 
 
-
 def _rebuild_voyage_embedding_provider() -> None:
     from codeweaver.core import CodeChunk as CodeChunk
+
     VoyageEmbeddingProvider.model_rebuild()
+
 
 _rebuild_voyage_embedding_provider()
 

@@ -886,6 +886,7 @@ def rebuild_models_for_tests() -> bool:
 
 
 __all__ = (
+    "AstGrepSearchTypes",
     "AstThing",
     "Config",
     "CustomLang",

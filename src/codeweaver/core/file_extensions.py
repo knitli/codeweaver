@@ -754,6 +754,7 @@ __all__ = (
     "TEST_DIR_NAMES",
     "TEST_FILE_PATTERNS",
     "FallBackTestDef",
+    "LangPair",
     "LlmTool",
     "all_js_exts",
 )

@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2026 Knitli Inc.
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
-
+# ruff: noqa: E402
 """Entry point for CodeWeaver's tokenizer system. Provides the `get_tokenizer` function to retrieve the appropriate tokenizer class based on the specified type and model."""
 
 from __future__ import annotations
@@ -49,6 +49,39 @@ def estimate_tokens(text: str | bytes, encoder: str = "o200k_base") -> int:
     return len(encoding.encode(text))
 
 
+# === MANAGED EXPORTS ===
+
+# Exportify manages this section. It contains lazy-loading infrastructure
+# for the package: imports and runtime declarations (__all__, __getattr__,
+# __dir__). Manual edits will be overwritten by `exportify fix`.
+
+from types import MappingProxyType
+from typing import TYPE_CHECKING
+
+from lateimport import create_late_getattr
+
+if TYPE_CHECKING:
+    from codeweaver_tokenizers.base import (
+        EncoderName,
+        Tokenizer,
+    )
+    from codeweaver_tokenizers.tiktoken import (
+        TiktokenTokenizer,
+    )
+    from codeweaver_tokenizers.tokenizers import (
+        Tokenizers,
+    )
+
+_dynamic_imports: MappingProxyType[str, tuple[str, str]] = MappingProxyType(
+    {
+        "TiktokenTokenizer": (__spec__.parent, "tiktoken"),
+        "Tokenizer": (__spec__.parent, "base"),
+        "Tokenizers": (__spec__.parent, "tokenizers"),
+    }
+)
+
+__getattr__ = create_late_getattr(_dynamic_imports, globals(), __name__)
+
 __all__ = (
     "EncoderName",
     "TiktokenTokenizer",
@@ -57,3 +90,8 @@ __all__ = (
     "estimate_tokens",
     "get_tokenizer",
 )
+
+
+def __dir__() -> list[str]:
+    """List available attributes for the package."""
+    return list(__all__)

@@ -24,7 +24,7 @@ from codeweaver.providers.data.utils import (
     get_serializer_for_type,
     get_type_adapter,
 )
-from codeweaver.server import ToolRegistrationDict
+from codeweaver.server.mcp.types import ToolRegistrationDict
 
 
 if TYPE_CHECKING:
