@@ -236,7 +236,8 @@ class MemoryVectorStoreProvider(QdrantBaseProvider):
             # Write to temporary file first (atomic write)
             temp_path = self._persist_path.with_suffix(".tmp")  # type: ignore
             await asyncio.to_thread(temp_path.parent.mkdir, parents=True, exist_ok=True)
-            await asyncio.to_thread(temp_path.write_text, json.dumps(persistence_data, indent=2))
+            persist_json = await asyncio.to_thread(json.dumps, persistence_data, indent=2)
+            await asyncio.to_thread(temp_path.write_text, persist_json)
 
             # Atomic rename
             await asyncio.to_thread(temp_path.replace, self._persist_path)
